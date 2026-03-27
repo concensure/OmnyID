@@ -1,0 +1,82 @@
+version: '3.9'
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_DB: afp
+      POSTGRES_USER: afp
+      POSTGRES_PASSWORD: afp
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+  homeserver:
+    build: .
+    depends_on:
+      - postgres
+      - minio
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://afp:afp@postgres:5432/afp}
+      OMNYID_AGENT_ID: ${OMNYID_AGENT_ID}
+      OMNYID_GATEWAY_AGENT_ID: ${OMNYID_GATEWAY_AGENT_ID}
+      OMNYID_HOMESERVER_URL: ${OMNYID_HOMESERVER_URL}
+      OMNYID_AFP_DELEGATION: ${OMNYID_AFP_DELEGATION}
+      OMNYID_DOMAIN: ${OMNYID_DOMAIN}
+      OMNYID_PUBLIC_KEY_HEX: ${OMNYID_PUBLIC_KEY_HEX}
+      OMNYID_SIGNING_KEY_HEX: ${OMNYID_SIGNING_KEY_HEX}
+      OMNYID_ENCRYPTION_KEY_HEX: ${OMNYID_ENCRYPTION_KEY_HEX}
+      OMNYID_RECIPIENT_KEYS_JSON: ${OMNYID_RECIPIENT_KEYS_JSON:-{}}
+      OMNYID_ALLOW_INSECURE_UNSIGNED: "false"
+      OMNYID_REQUIRE_ENCRYPTION: "true"
+      OMNYID_ALLOW_PLAINTEXT_STORAGE: "false"
+      OMNYID_ENABLE_SERVER_SUMMARIZATION: "false"
+      OMNYID_ENCRYPT_BY_DEFAULT: "true"
+      OMNYID_ENABLE_INTERNAL_GRPC: "false"
+      OMNYID_INTERNAL_GRPC_ADDR: 127.0.0.1:50051
+      OMNYID_MAIL_PROVIDER: ${OMNYID_MAIL_PROVIDER:-gmail}
+      OMNYID_IMAP_POLL_SECONDS: ${OMNYID_IMAP_POLL_SECONDS:-30}
+      OMNYID_EMAIL_ADDRESS: ${OMNYID_EMAIL_ADDRESS}
+      OMNYID_GMAIL_CLIENT_ID: ${OMNYID_GMAIL_CLIENT_ID:-}
+      OMNYID_GMAIL_CLIENT_SECRET: ${OMNYID_GMAIL_CLIENT_SECRET:-}
+      OMNYID_GMAIL_REFRESH_TOKEN: ${OMNYID_GMAIL_REFRESH_TOKEN:-}
+      OMNYID_GMAIL_USER_ID: ${OMNYID_GMAIL_USER_ID:-me}
+      OMNYID_IMAP_HOST: ${OMNYID_IMAP_HOST:-}
+      OMNYID_IMAP_PORT: ${OMNYID_IMAP_PORT:-993}
+      OMNYID_IMAP_USERNAME: ${OMNYID_IMAP_USERNAME:-}
+      OMNYID_IMAP_PASSWORD: ${OMNYID_IMAP_PASSWORD:-}
+      FROM_ADDRESS: ${FROM_ADDRESS}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      MINIO_URL: http://minio:9000
+      MINIO_USER: ${MINIO_ROOT_USER}
+      MINIO_PASS: ${MINIO_ROOT_PASSWORD}
+      OMNYID_ENABLE_WEBTRANSPORT: "true"
+      OMNYID_WEBTRANSPORT_BIND_ADDR: 0.0.0.0:8443
+      OMNYID_WEBTRANSPORT_CERT_PATH: ${OMNYID_WEBTRANSPORT_CERT_PATH}
+      OMNYID_WEBTRANSPORT_KEY_PATH: ${OMNYID_WEBTRANSPORT_KEY_PATH}
+    ports:
+      - "127.0.0.1:18080:8080"
+      - "443:8443/udp"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
+      - /srv/omnyid/runtimes:/srv/omnyid/runtimes
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  minio-data:

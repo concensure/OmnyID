@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "protocol": { "const": "afp-v1" },
+    "id": { "type": "string", "minLength": 1 },
+    "thread_id": { "type": "string", "minLength": 1 },
+    "parent_id": { "type": "string" },
+    "from": { "type": "string", "pattern": "^agent:.+@.+$" },
+    "to": { "type": "array", "items": { "type": "string", "pattern": "^agent:.+@.+$" } },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "type": { "type": "string" },
+    "content": { "type": "object" },
+    "views": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/view" }
+    },
+    "references": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/reference" }
+    },
+    "attachments": { "type": "array", "items": { "$ref": "#/definitions/attachment" } },
+    "signature": { "type": "string" },
+    "encryption": { "type": "object" },
+    "store_in_relational": { "type": "boolean" }
+  },
+  "required": ["protocol","id","thread_id","from","to","timestamp","type","content","signature"],
+  "definitions": {
+    "view": {
+      "type": "object",
+      "properties": {
+        "format": { "type": "string" },
+        "content": { "type": "object" },
+        "priority": { "type": "integer" }
+      },
+      "required": ["format", "content"]
+    },
+    "reference": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "target": { "type": "string" },
+        "label": { "type": "string" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["type", "target"]
+    },
+    "attachment": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "mime_type": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "storage": { "type": "object" },
+        "encryption": { "type": "object" },
+        "sha256": { "type": "string" }
+      },
+      "required": ["id", "name", "mime_type", "size_bytes", "storage", "encryption"]
+    }
+  }
+}

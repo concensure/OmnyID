@@ -1,0 +1,57 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary office files
+~$*
+~WRL*.tmp
+*.tmp
+
+# Node / frontend
+node_modules/
+.next/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Rust
+target/
+
+# Local env
+.env
+.env.*
+!.env.example
+
+# Secrets and cloud credentials
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_ed25519*
+id_rsa*
+oracle-cloud.env
+oracle-cloud.local.env
+scripts/oracle-config.local.ps1
+oracle-cloud.quic.local.env
+ovhcloud.env
+vault.env
+
+# Logs
+*.log

@@ -1,0 +1,7 @@
+# Copy this file to oracle-config.local.ps1 (same directory) and fill in your values.
+# oracle-config.local.ps1 is gitignored — never commit the actual file.
+
+$ORACLE_HOST   = "YOUR_ORACLE_IP_HERE"
+$ORACLE_USER   = "ubuntu"
+$ORACLE_KEY    = "C:\Users\yourname\.ssh\oracle-omnyid.key"
+$ORACLE_DIR    = "/home/ubuntu/omnyid"

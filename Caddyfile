@@ -1,0 +1,46 @@
+{
+    email {$ACME_EMAIL}
+    acme_ca https://acme-v02.api.letsencrypt.org/directory
+}
+
+(omnyid_proxy) {
+    reverse_proxy homeserver:8080 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-For {remote_host}
+    }
+}
+
+{$OMNYID_DOMAIN} {
+    basic_auth {
+        {$OMNYID_PREVIEW_USERNAME} {$OMNYID_PREVIEW_PASSWORD_HASH}
+    }
+
+    # OAuth callbacks and API routes on the main domain → homeserver
+    handle /gmail/* {
+        import omnyid_proxy
+    }
+
+    handle_path /workspace* {
+        root * /srv/workspace
+        try_files {path} /index.html
+        file_server
+    }
+
+    handle {
+        root * /srv/docs
+        file_server
+    }
+}
+
+api.{$OMNYID_DOMAIN} {
+    import omnyid_proxy
+}
+
+cloud.{$OMNYID_DOMAIN} {
+    import omnyid_proxy
+}
+
+wt.{$OMNYID_DOMAIN} {
+    import omnyid_proxy
+}

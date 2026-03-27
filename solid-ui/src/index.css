@@ -1,0 +1,53 @@
+@import "gridstack/dist/gridstack.min.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(49, 86, 142, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(82, 99, 82, 0.1), transparent 24%),
+    linear-gradient(180deg, #f9f9f7 0%, #eef2f8 100%);
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.glass-surface {
+  background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.3));
+  backdrop-filter: blur(26px);
+  -webkit-backdrop-filter: blur(26px);
+}
+
+.glass-button {
+  transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.glass-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(49, 86, 142, 0.12);
+}
+
+.grid-stack-item-content {
+  background: transparent;
+}
+
+.cm-editor {
+  height: 100%;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.cm-scroller {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}

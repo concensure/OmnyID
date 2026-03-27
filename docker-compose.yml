@@ -1,0 +1,91 @@
+version: '3.9'
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_DB: afp
+      POSTGRES_USER: afp
+      POSTGRES_PASSWORD: afp
+    ports: ["5432:5432"]
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: afpadmin
+      MINIO_ROOT_PASSWORD: afpadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+  homeserver:
+    build: .
+    depends_on: [postgres, minio]
+    environment:
+      DATABASE_URL: postgres://afp:afp@postgres:5432/afp
+      OMNYID_AGENT_ID: agent:you@yourdomain.ai
+      OMNYID_GATEWAY_AGENT_ID: agent:email-gateway@yourdomain.ai
+      OMNYID_HOMESERVER_URL: https://your-homeserver.example.com
+      OMNYID_PUBLIC_KEY_HEX: ${OMNYID_PUBLIC_KEY_HEX}
+      OMNYID_SIGNING_KEY_HEX: ${OMNYID_SIGNING_KEY_HEX}
+      OMNYID_ENCRYPTION_KEY_HEX: ${OMNYID_ENCRYPTION_KEY_HEX}
+      OMNYID_RECIPIENT_KEYS_JSON: ${OMNYID_RECIPIENT_KEYS_JSON:-{}}
+      OMNYID_ALLOW_INSECURE_UNSIGNED: "false"
+      OMNYID_REQUIRE_ENCRYPTION: "true"
+      OMNYID_ALLOW_PLAINTEXT_STORAGE: "false"
+      OMNYID_ENABLE_SERVER_SUMMARIZATION: "false"
+      OMNYID_ENCRYPT_BY_DEFAULT: "true"
+      OMNYID_ENABLE_WEBTRANSPORT: "false"
+      OMNYID_WEBTRANSPORT_BIND_ADDR: 0.0.0.0:8443
+      OMNYID_WEBTRANSPORT_CERT_PATH: ${OMNYID_WEBTRANSPORT_CERT_PATH:-}
+      OMNYID_WEBTRANSPORT_KEY_PATH: ${OMNYID_WEBTRANSPORT_KEY_PATH:-}
+      OMNYID_ENABLE_INTERNAL_GRPC: "false"
+      OMNYID_INTERNAL_GRPC_ADDR: 127.0.0.1:50051
+      OMNYID_MAIL_PROVIDER: gmail
+      OMNYID_IMAP_POLL_SECONDS: 30
+      OMNYID_EMAIL_ADDRESS: you@yourdomain.com
+      OMNYID_GMAIL_CLIENT_ID: ${OMNYID_GMAIL_CLIENT_ID:-}
+      OMNYID_GMAIL_CLIENT_SECRET: ${OMNYID_GMAIL_CLIENT_SECRET:-}
+      OMNYID_GMAIL_REFRESH_TOKEN: ${OMNYID_GMAIL_REFRESH_TOKEN:-}
+      OMNYID_MICROSOFT_CLIENT_ID: ${OMNYID_MICROSOFT_CLIENT_ID:-}
+      OMNYID_MICROSOFT_CLIENT_SECRET: ${OMNYID_MICROSOFT_CLIENT_SECRET:-}
+      OMNYID_MICROSOFT_REFRESH_TOKEN: ${OMNYID_MICROSOFT_REFRESH_TOKEN:-}
+      OMNYID_IMAP_HOST: ${OMNYID_IMAP_HOST:-}
+      OMNYID_IMAP_USERNAME: ${OMNYID_IMAP_USERNAME:-}
+      OMNYID_IMAP_PASSWORD: ${OMNYID_IMAP_PASSWORD:-}
+      MINIO_URL: http://minio:9000
+      MINIO_USER: afpadmin
+      MINIO_PASS: afpadmin123
+      SMTP_HOST: smtp.gmail.com
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_PORT: 587
+      FROM_ADDRESS: you@yourdomain.com
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [homeserver]
+    networks:
+      - default
+
+volumes:
+  minio-data:
+  caddy-data:
+  caddy-config:

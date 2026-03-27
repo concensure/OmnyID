@@ -1,0 +1,424 @@
+use serde_json::Value;
+use tracing::{info, instrument, warn};
+
+use crate::message::AFPMessage;
+
+use super::{
+    gmail_api::{GmailOAuthConfig, send_gmail_message},
+    provider::{MailGatewayConfig, OutboundAuthMode},
+    smtp_fallback::{SmtpFallbackConfig, send_via_smtp_fallback},
+};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OutgoingEmailRequest {
+    pub thread_id: String,
+    pub message_id: String,
+    pub parent_id: Option<String>,
+    pub to: Vec<String>,
+    pub subject: String,
+    pub body: String,
+    pub in_reply_to: Option<String>,
+    pub references: Vec<String>,
+}
+
+#[instrument(skip(message), fields(thread_id = %message.thread_id, message_id = %message.id, message_type = %message.r#type))]
+pub async fn dispatch_outgoing_message(message: &AFPMessage) -> Result<bool, String> {
+    let Some(request) = build_outgoing_email_request(message) else {
+        return Ok(false);
+    };
+
+    send_outgoing_email(&request).await?;
+    Ok(true)
+}
+
+pub fn build_outgoing_email_request(message: &AFPMessage) -> Option<OutgoingEmailRequest> {
+    match email_operation_kind(message) {
+        Some("outgoing") => {
+            let to = recipients_from_content(&message.content, &message.to);
+            let subject = message.content.get("subject")?.as_str()?.trim().to_string();
+            let body = body_from_content(&message.content)?;
+            Some(OutgoingEmailRequest {
+                thread_id: message.thread_id.clone(),
+                message_id: message.id.clone(),
+                parent_id: message.parent_id.clone(),
+                to,
+                subject,
+                body,
+                in_reply_to: in_reply_to_from_content(&message.content),
+                references: references_from_content(&message.content),
+            })
+        }
+        Some("reply") => {
+            let to = recipients_from_content(&message.content, &message.to);
+            let body = body_from_content(&message.content)?;
+            let subject = message
+                .content
+                .get("subject")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("Re: Omnyid thread {}", message.thread_id));
+            Some(OutgoingEmailRequest {
+                thread_id: message.thread_id.clone(),
+                message_id: message.id.clone(),
+                parent_id: message.parent_id.clone(),
+                to,
+                subject,
+                body,
+                in_reply_to: in_reply_to_from_content(&message.content),
+                references: references_from_content(&message.content),
+            })
+        }
+        Some("forward") => {
+            let to = recipients_from_content(&message.content, &message.to);
+            let body = forward_body_from_content(&message.content)?;
+            let subject = message
+                .content
+                .get("subject")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("Fwd: Omnyid thread {}", message.thread_id));
+            Some(OutgoingEmailRequest {
+                thread_id: message.thread_id.clone(),
+                message_id: message.id.clone(),
+                parent_id: message.parent_id.clone(),
+                to,
+                subject,
+                body,
+                in_reply_to: in_reply_to_from_content(&message.content),
+                references: references_from_content(&message.content),
+            })
+        }
+        _ => None,
+    }
+}
+
+fn email_operation_kind(message: &AFPMessage) -> Option<&'static str> {
+    match message.r#type.as_str() {
+        "email_outgoing" => Some("outgoing"),
+        "action_reply" => Some("reply"),
+        "action_forward" => Some("forward"),
+        "email" => match message.subtype.as_deref() {
+            Some("outgoing") => Some("outgoing"),
+            Some("reply") => Some("reply"),
+            Some("forward") => Some("forward"),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+#[instrument(skip(request), fields(thread_id = %request.thread_id, message_id = %request.message_id))]
+pub async fn send_outgoing_email(request: &OutgoingEmailRequest) -> Result<(), String> {
+    let config = MailGatewayConfig::from_env();
+
+    match config.outbound_auth_mode {
+        OutboundAuthMode::OAuthGmailApi => {
+            let gmail_config = gmail_config_from_env(&config)?;
+            send_gmail_message(request, &gmail_config).await
+        }
+        OutboundAuthMode::OAuthMicrosoftGraph => {
+            info!(
+                thread_id = %request.thread_id,
+                message_id = %request.message_id,
+                recipients = ?request.to,
+                subject = %request.subject,
+                in_reply_to = ?request.in_reply_to,
+                references = ?request.references,
+                provider = config.provider_label(),
+                "Omnyid outbound email placeholder via OAuth + Microsoft Graph path"
+            );
+            Ok(())
+        }
+        OutboundAuthMode::DirectSmtpFallback => {
+            let smtp_config = smtp_fallback_config_from_env(&config)?;
+            send_via_smtp_fallback(request, &smtp_config).await
+        }
+        OutboundAuthMode::Disabled => {
+            warn!(
+                thread_id = %request.thread_id,
+                message_id = %request.message_id,
+                "Omnyid outbound email disabled: no supported auth configured"
+            );
+            Err("Outbound email provider auth is not configured".to_string())
+        }
+    }
+}
+
+fn gmail_config_from_env(config: &MailGatewayConfig) -> Result<GmailOAuthConfig, String> {
+    Ok(GmailOAuthConfig {
+        client_id: config
+            .gmail_client_id
+            .clone()
+            .ok_or_else(|| "OMNYID_GMAIL_CLIENT_ID is not configured".to_string())?,
+        client_secret: config
+            .gmail_client_secret
+            .clone()
+            .ok_or_else(|| "OMNYID_GMAIL_CLIENT_SECRET is not configured".to_string())?,
+        refresh_token: config
+            .gmail_refresh_token
+            .clone()
+            .ok_or_else(|| "OMNYID_GMAIL_REFRESH_TOKEN is not configured".to_string())?,
+        user_id: config
+            .gmail_user_id
+            .clone()
+            .unwrap_or_else(|| "me".to_string()),
+        from_address: config
+            .from_address
+            .clone()
+            .ok_or_else(|| "FROM_ADDRESS or OMNYID_EMAIL_ADDRESS is not configured".to_string())?,
+    })
+}
+
+fn smtp_fallback_config_from_env(config: &MailGatewayConfig) -> Result<SmtpFallbackConfig, String> {
+    Ok(SmtpFallbackConfig {
+        host: config
+            .smtp_host
+            .clone()
+            .ok_or_else(|| "SMTP_HOST is not configured".to_string())?,
+        port: config.smtp_port,
+        username: config
+            .smtp_username
+            .clone()
+            .ok_or_else(|| "SMTP_USER is not configured".to_string())?,
+        password: config
+            .smtp_password
+            .clone()
+            .ok_or_else(|| "SMTP_PASS is not configured".to_string())?,
+        from_address: config
+            .from_address
+            .clone()
+            .ok_or_else(|| "FROM_ADDRESS or OMNYID_EMAIL_ADDRESS is not configured".to_string())?,
+    })
+}
+
+fn recipients_from_content(content: &Value, fallback: &[String]) -> Vec<String> {
+    let mut recipients = content
+        .get("to")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    if recipients.is_empty() {
+        recipients = fallback
+            .iter()
+            .map(String::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .collect();
+    }
+
+    if recipients.is_empty() {
+        vec![]
+    } else {
+        recipients
+    }
+}
+
+fn body_from_content(content: &Value) -> Option<String> {
+    content
+        .get("body")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn forward_body_from_content(content: &Value) -> Option<String> {
+    let forwarded_body = body_from_content(content);
+    let note = content
+        .get("note")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+
+    match (note, forwarded_body) {
+        (Some(note), Some(body)) => Some(format!("{note}\n\n{body}")),
+        (Some(note), None) => Some(note),
+        (None, Some(body)) => Some(body),
+        (None, None) => None,
+    }
+}
+
+fn in_reply_to_from_content(content: &Value) -> Option<String> {
+    content
+        .get("in_reply_to")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn references_from_content(content: &Value) -> Vec<String> {
+    content
+        .get("references")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_outgoing_email_request, dispatch_outgoing_message};
+    use crate::message::AFPMessage;
+    use serde_json::{Value, json};
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn sample_message(message_type: &str, subtype: Option<&str>, content: Value) -> AFPMessage {
+        AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: "msg_test_01".to_string(),
+            thread_id: "thread_test_01".to_string(),
+            parent_id: Some("msg_parent_01".to_string()),
+            from: "agent:test@omnyid.local".to_string(),
+            to: vec!["friend@example.com".to_string()],
+            timestamp: "2026-03-20T00:00:00Z".to_string(),
+            r#type: message_type.to_string(),
+            subtype: subtype.map(str::to_string),
+            content,
+            metadata: None,
+            signature: "ed25519:test".to_string(),
+            encryption: None,
+            views: vec![],
+            references: vec![],
+            attachments: vec![],
+            store_in_relational: false,
+            prev_hash: None,
+        }
+    }
+
+    #[test]
+    fn email_outgoing_maps_to_gateway_request() {
+        let request = build_outgoing_email_request(&sample_message(
+            "email_outgoing",
+            None,
+            json!({
+                "subject": "Hello",
+                "body": "Body text"
+            }),
+        ))
+        .expect("request");
+
+        assert_eq!(request.to, vec!["friend@example.com".to_string()]);
+        assert_eq!(request.subject, "Hello");
+        assert_eq!(request.body, "Body text");
+    }
+
+    #[test]
+    fn action_forward_combines_note_and_body() {
+        let request = build_outgoing_email_request(&sample_message(
+            "action_forward",
+            None,
+            json!({
+                "to": ["other@example.com"],
+                "note": "FYI",
+                "body": "Forwarded body"
+            }),
+        ))
+        .expect("request");
+
+        assert_eq!(request.to, vec!["other@example.com".to_string()]);
+        assert_eq!(request.body, "FYI\n\nForwarded body");
+        assert_eq!(request.subject, "Fwd: Omnyid thread thread_test_01");
+    }
+
+    #[test]
+    fn action_reply_maps_reply_headers_and_defaults_subject() {
+        let request = build_outgoing_email_request(&sample_message(
+            "action_reply",
+            None,
+            json!({
+                "body": "Reply body",
+                "in_reply_to": "<msg-1@example.com>",
+                "references": ["<msg-0@example.com>", "<msg-1@example.com>"]
+            }),
+        ))
+        .expect("request");
+
+        assert_eq!(request.subject, "Re: Omnyid thread thread_test_01");
+        assert_eq!(request.in_reply_to, Some("<msg-1@example.com>".to_string()));
+        assert_eq!(
+            request.references,
+            vec![
+                "<msg-0@example.com>".to_string(),
+                "<msg-1@example.com>".to_string()
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn dispatch_reports_config_error_when_outbound_auth_missing() {
+        let _guard = env_lock().lock().expect("env lock");
+        for key in [
+            "OMNYID_MAIL_PROVIDER",
+            "OMNYID_GMAIL_CLIENT_ID",
+            "OMNYID_GMAIL_CLIENT_SECRET",
+            "OMNYID_GMAIL_REFRESH_TOKEN",
+            "OMNYID_MICROSOFT_CLIENT_ID",
+            "OMNYID_MICROSOFT_CLIENT_SECRET",
+            "OMNYID_MICROSOFT_REFRESH_TOKEN",
+            "SMTP_HOST",
+            "SMTP_USER",
+            "SMTP_PASS",
+        ] {
+            unsafe {
+                std::env::remove_var(key);
+            }
+        }
+
+        let error = dispatch_outgoing_message(&sample_message(
+            "email_outgoing",
+            None,
+            json!({
+                "subject": "Hello",
+                "body": "Body text"
+            }),
+        ))
+        .await
+        .expect_err("dispatch should fail");
+
+        assert!(error.contains("not configured"));
+    }
+
+    #[test]
+    fn broad_email_outgoing_shape_maps_to_gateway_request() {
+        let request = build_outgoing_email_request(&sample_message(
+            "email",
+            Some("outgoing"),
+            json!({
+                "subject": "Hello",
+                "body": "Body text"
+            }),
+        ))
+        .expect("request");
+
+        assert_eq!(request.subject, "Hello");
+        assert_eq!(request.body, "Body text");
+    }
+}
