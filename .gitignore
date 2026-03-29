@@ -1,0 +1,54 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+~$*
+~WRL*.tmp
+*.tmp
+
+# Node
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Rust
+target/
+
+# Local env
+.env
+.env.*
+!.env.example
+
+# Secrets and certs
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_ed25519*
+id_rsa*
+
+# Logs / local data
+*.log
+*.sqlite
+*.db
+tmp/

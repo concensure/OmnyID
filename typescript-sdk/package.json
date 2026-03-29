@@ -1,0 +1,36 @@
+{
+  "name": "afp-ts",
+  "version": "1.0.0",
+  "description": "Agent Forward Protocol (AFP) TypeScript SDK for OmnyID homeservers",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=22.22.1 <23"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/concensure/OmnyID"
+  },
+  "dependencies": {
+    "libsodium-wrappers": "^0.7.15",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

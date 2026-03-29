@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_DB: afp
+      POSTGRES_USER: afp
+      POSTGRES_PASSWORD: afp
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: afpadmin
+      MINIO_ROOT_PASSWORD: afpadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+  homeserver:
+    build: .
+    depends_on:
+      - postgres
+      - minio
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://afp:afp@postgres:5432/afp
+      MINIO_URL: http://minio:9000
+      MINIO_USER: afpadmin
+      MINIO_PASS: afpadmin123
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  minio-data:
