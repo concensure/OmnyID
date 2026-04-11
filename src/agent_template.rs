@@ -399,6 +399,26 @@ impl AgentTrigger {
 
 // ── Sub-agent delegations ─────────────────────────────────────────────────────
 
+/// Pre-loaded context snapshot handed to a sub-agent at delegation time.
+///
+/// Sub-agents should start reasoning from this snapshot and only make AFP
+/// callbacks for information not covered here. The field is `Option` so legacy
+/// delegations without a snapshot continue to work unchanged.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct ContextSnapshot {
+    /// Trimmed slice of AFP thread messages relevant to the current task.
+    pub afp_thread_slice: Vec<serde_json::Value>,
+    /// Map of `task_id → node_result` content for already-completed steps
+    /// in the same orchestration run.
+    pub prior_step_results: std::collections::HashMap<String, String>,
+    /// Node `system_prompt` from the compiled IR manifest.
+    pub system_prompt: Option<String>,
+    /// Node `instruction_prompt` from the compiled IR manifest.
+    pub instruction_prompt: Option<String>,
+    /// Advisory token budget remaining for this sub-agent turn.
+    pub token_budget_remaining: Option<u32>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AgentDelegation {
     pub id: String,
@@ -411,11 +431,28 @@ pub struct AgentDelegation {
     pub revoked_at: Option<chrono::DateTime<chrono::Utc>>,
     pub task_id: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// Resolved capability slice for this delegation (item 25).
+    /// Intersection of the node's `allowed_capabilities` and the global
+    /// PolicyEngine set. An empty vec means the global policy is the sole gate.
+    #[serde(default)]
+    pub allowed_capabilities: Vec<String>,
+    /// Per-node outbound URL allowlist (item 26).
+    /// Populated from the compiled IR node manifest at delegation time.
+    /// An empty vec means no host restriction beyond approval_mode.
+    #[serde(default)]
+    pub outbound_allowlist: Vec<String>,
+    /// Optional pre-loaded context for the receiving sub-agent (item 27).
+    #[serde(default)]
+    pub context_snapshot: Option<ContextSnapshot>,
 }
 
 /// Derive a scoped short-lived delegation key from the master key using HKDF.
 /// The derived key is safe to hand to a sub-agent: it can only be used for
 /// the given `scope` and is time-limited by `expires_at`.
+///
+/// `allowed_capabilities` and `outbound_allowlist` are resolved by the caller
+/// (orchestrator) from the compiled IR node manifest before this function is
+/// called. Pass empty vecs for legacy / non-workflow orchestration.
 pub fn generate_delegated_key(
     master_key_hex: &str,
     scope: &str,
@@ -423,6 +460,9 @@ pub fn generate_delegated_key(
     expires_in_secs: u64,
     master_instance_id: &str,
     owner_user_id: &str,
+    allowed_capabilities: Vec<String>,
+    outbound_allowlist: Vec<String>,
+    context_snapshot: Option<ContextSnapshot>,
 ) -> AgentDelegation {
     let ikm = hex::decode(master_key_hex).unwrap_or_else(|_| master_key_hex.as_bytes().to_vec());
     let now = chrono::Utc::now();
@@ -441,6 +481,9 @@ pub fn generate_delegated_key(
         revoked_at: None,
         task_id: Some(task_id.to_string()),
         created_at: now,
+        allowed_capabilities,
+        outbound_allowlist,
+        context_snapshot,
     }
 }
 
@@ -700,10 +743,15 @@ mod tests {
             3600,
             "inst_01",
             "user_01",
+            vec![],
+            vec![],
+            None,
         );
         assert_eq!(d.delegated_key_hex.len(), 64); // 32 bytes hex
         assert_eq!(d.scope, "email_triage");
         assert!(d.revoked_at.is_none());
+        assert!(d.allowed_capabilities.is_empty());
+        assert!(d.context_snapshot.is_none());
         // Different task → different key
         let d2 = generate_delegated_key(
             &master_hex,
@@ -712,6 +760,9 @@ mod tests {
             3600,
             "inst_01",
             "user_01",
+            vec!["summarise".to_string()],
+            vec!["api.example.com".to_string()],
+            None,
         );
         assert_ne!(d.delegated_key_hex, d2.delegated_key_hex);
     }

@@ -57,6 +57,14 @@ pub struct RestCallParams {
     pub body: Value,
     /// Optional agent identity for request signing.
     pub signing_context: Option<AgentSigningContext>,
+    /// Per-node outbound URL host allowlist (item 26 — Phase 2 hardening).
+    ///
+    /// Populated from `AgentDelegation.outbound_allowlist` which is resolved at
+    /// delegation-issuance time from the compiled IR node manifest. When
+    /// non-empty, `execute_action` checks the target host before any HTTP call
+    /// or Ed25519 signing. An empty vec means no host restriction beyond the
+    /// capability's `approval_mode`.
+    pub outbound_allowlist: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -102,6 +110,22 @@ pub async fn execute_action(
             });
         }
         ApprovalMode::Autonomous => {}
+    }
+
+    // ── Item 26: Outbound allowlist check (structural, pre-signing) ───────────
+    // Must happen before Ed25519 signing so unauthorized calls never produce
+    // valid request signatures. Check applies to both REST and GraphQL.
+    if !params.outbound_allowlist.is_empty() {
+        let host = extract_host(&params.url);
+        if !params.outbound_allowlist.iter().any(|allowed| host_matches(&host, allowed)) {
+            return Err(format!(
+                "policy_block: outbound call to '{}' (host '{}') is not in the node's \
+                 outbound_allowlist [{}]. Request denied before signing.",
+                params.url,
+                host,
+                params.outbound_allowlist.join(", ")
+            ));
+        }
     }
 
     let result = match capability.transport {
@@ -208,6 +232,37 @@ async fn graphql_call(params: &RestCallParams) -> Result<(Value, Option<String>)
     Ok((body, None))
 }
 
+// ── Allowlist helpers ─────────────────────────────────────────────────────────
+
+/// Extract the hostname (and optional port) from a URL string.
+/// Returns the raw string on parse failure so the caller can include it in
+/// the deny message.
+fn extract_host(url: &str) -> String {
+    // Minimal host extraction: find "://" then take up to the next "/" or end.
+    if let Some(after_scheme) = url.split_once("://").map(|(_, rest)| rest) {
+        let host_part = after_scheme.split('/').next().unwrap_or(after_scheme);
+        // Strip port for matching purposes — allowlist entries may omit port.
+        host_part.split(':').next().unwrap_or(host_part).to_string()
+    } else {
+        url.to_string()
+    }
+}
+
+/// Returns `true` if `host` matches an allowlist entry.
+///
+/// Matching rules (in order):
+/// 1. Exact match: `"api.stripe.com"` matches `"api.stripe.com"`.
+/// 2. Wildcard subdomain: `"*.stripe.com"` matches `"api.stripe.com"` and
+///    `"checkout.stripe.com"` but NOT `"stripe.com"` itself.
+fn host_matches(host: &str, allowed: &str) -> bool {
+    if allowed.starts_with("*.") {
+        let suffix = &allowed[1..]; // ".stripe.com"
+        host.ends_with(suffix)
+    } else {
+        host == allowed
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252,6 +307,7 @@ mod tests {
             bearer_token: None,
             body: serde_json::json!({"foo": "bar"}),
             signing_context: None,
+            outbound_allowlist: vec![],
         };
         let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z").await;
         assert!(result.is_err());
@@ -289,11 +345,71 @@ mod tests {
             bearer_token: Some("sk_test_xxx".to_string()),
             body: serde_json::json!({"amount": 2000, "currency": "usd"}),
             signing_context: None,
+            outbound_allowlist: vec![],
         };
         let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z")
             .await
             .unwrap();
         assert_eq!(result.status, ActionStatus::Pending);
         assert!(result.output.get("suggest_only").is_some());
+    }
+
+    // ── Item 26: outbound allowlist tests ─────────────────────────────────────
+
+    #[test]
+    fn extract_host_strips_scheme_path_and_port() {
+        assert_eq!(extract_host("https://api.stripe.com/v1/charges"), "api.stripe.com");
+        assert_eq!(extract_host("http://localhost:8080/foo"), "localhost");
+        assert_eq!(extract_host("https://example.com"), "example.com");
+    }
+
+    #[test]
+    fn host_matches_exact_and_wildcard() {
+        assert!(host_matches("api.stripe.com", "api.stripe.com"));
+        assert!(!host_matches("other.stripe.com", "api.stripe.com"));
+        assert!(host_matches("api.stripe.com", "*.stripe.com"));
+        assert!(host_matches("checkout.stripe.com", "*.stripe.com"));
+        // Wildcard should NOT match the apex domain itself
+        assert!(!host_matches("stripe.com", "*.stripe.com"));
+    }
+
+    #[tokio::test]
+    async fn allowlist_blocks_unauthorized_host() {
+        let cap = make_capability(ApprovalMode::Autonomous, IntegrationTransport::Rest);
+        let intent = make_intent();
+        let params = RestCallParams {
+            url: "https://evil.example.com/exfiltrate".to_string(),
+            method: "POST".to_string(),
+            bearer_token: None,
+            body: serde_json::json!({}),
+            signing_context: None,
+            outbound_allowlist: vec!["api.stripe.com".to_string()],
+        };
+        let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z").await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("policy_block"));
+        assert!(err.contains("evil.example.com"));
+    }
+
+    #[tokio::test]
+    async fn empty_allowlist_does_not_block() {
+        // Empty allowlist = no restriction. The call will fail at the network
+        // level (no real server) but must NOT fail with a policy_block error.
+        let cap = make_capability(ApprovalMode::Autonomous, IntegrationTransport::Rest);
+        let intent = make_intent();
+        let params = RestCallParams {
+            url: "https://api.example.com/test".to_string(),
+            method: "GET".to_string(),
+            bearer_token: None,
+            body: serde_json::Value::Null,
+            signing_context: None,
+            outbound_allowlist: vec![],
+        };
+        let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z").await;
+        // Should not be a policy_block — may succeed or fail with a network error
+        if let Err(e) = &result {
+            assert!(!e.contains("policy_block"), "empty allowlist triggered policy_block: {e}");
+        }
     }
 }

@@ -154,6 +154,22 @@ export type WorkflowValidationResponse = {
   };
 };
 
+export type WorkflowIntentExpansion = {
+  preset_kind: string;
+  requires_approval: boolean;
+  needs_branching: boolean;
+  needs_research_support: boolean;
+  public_output: boolean;
+  optimization_mode: "balanced" | "speed" | "cost";
+};
+
+export type WorkflowDescribeResponse = {
+  described: boolean;
+  saved?: boolean;
+  intent_expansion: WorkflowIntentExpansion;
+  workflow: SavedWorkflow;
+};
+
 export type WorkflowCompileResponse = {
   compiled: boolean;
   workflow_id: string;
@@ -204,10 +220,57 @@ export type WorkflowRunStartResponse = {
   run: WorkflowRun;
 };
 
+export type WorkflowWaitResumeRecord = {
+  wait_resume_id: string;
+  workflow_id: string;
+  deployment_id: string;
+  run_id: string;
+  owner_user_id: string;
+  manifest_node_id: string;
+  source_graph_node_id: string;
+  status: string;
+  resume_family: string;
+  resume_kind: string;
+  wait_reason?: string | null;
+  scheduled_for?: string | null;
+  descriptor: Record<string, unknown>;
+  created_at: string;
+  resumed_at?: string | null;
+};
+
+export type WorkflowWaitResumeListResponse = {
+  workflow_id: string;
+  run_id: string;
+  wait_resume_records: WorkflowWaitResumeRecord[];
+};
+
+export type WorkflowWaitResumeDecisionResponse = {
+  updated: boolean;
+  workflow_id: string;
+  run_id: string;
+  wait_resume_id: string;
+  decision: "approved" | "rejected";
+  wait_resume_status: string;
+  run: WorkflowRun;
+  decision_dispatch: Record<string, unknown>;
+};
+
 export type WorkflowActionResponse = {
   updated: boolean;
   deployment_id?: string;
   workflow: SavedWorkflow;
+};
+
+export type WorkflowConnectorOverrideFields = {
+  delivery_tier?: string;
+  auth_mode?: string;
+  side_effects?: string;
+  provider_route?: string;
+};
+
+export type WorkflowConnectorOverrides = WorkflowConnectorOverrideFields & {
+  family_overrides?: Record<string, WorkflowConnectorOverrideFields>;
+  node_overrides?: Record<string, WorkflowConnectorOverrideFields>;
 };
 
 export function readSession(): Session | null {
@@ -373,6 +436,7 @@ export const KNOWN_VIEW_FORMATS = [
   "generative_card",
   "a2ui.v1",
   "ui_blueprint",
+  "ui_presentation",
   "blueprint",
 ] as const;
 
@@ -433,7 +497,8 @@ export const patchWorkflow = (
       }
     | { op: "node_move"; node_id: string; x: number; y: number }
     | { op: "root_toggle"; node_id: string; root_enabled: boolean }
-    | { op: "edge_add"; source: string; target: string }
+    | { op: "edge_add"; source: string; target: string; condition_label?: string }
+    | { op: "edge_meta_replace"; edge_id: string; condition_label?: string }
     | { op: "edge_remove"; edge_id: string }
     | { op: "node_delete"; node_id: string }
     | { op: "node_config_replace"; node_id: string; config: Record<string, unknown> }
@@ -462,6 +527,21 @@ export const validateWorkflow = (graph: Record<string, unknown>) =>
     bodyJson: { graph },
   });
 
+export const describeWorkflow = (body: {
+  intent: string;
+  base_workflow?: SavedWorkflow | null;
+  preset_override?: string;
+  optimization_override?: "balanced" | "speed" | "cost";
+  regeneration_mode?: "rebuild" | "preserve_manual";
+  save_draft?: boolean;
+  branch_from_workflow_id?: string;
+  branch_from_event_id?: string;
+}) =>
+  apiFetch<WorkflowDescribeResponse>("/workflows/describe", {
+    method: "POST",
+    bodyJson: body,
+  });
+
 export const compileWorkflow = (workflowId: string) =>
   apiFetch<WorkflowCompileResponse>(`/workflows/${encodeURIComponent(workflowId)}/compile`, {
     method: "POST",
@@ -482,6 +562,25 @@ export const startWorkflowRun = (
     bodyJson: body,
   });
 
+export const listWorkflowWaitResumeRecords = (workflowId: string, runId: string) =>
+  apiFetch<WorkflowWaitResumeListResponse>(
+    `/workflows/${encodeURIComponent(workflowId)}/runs/${encodeURIComponent(runId)}/wait-resume`,
+  );
+
+export const decideWorkflowWaitResume = (
+  workflowId: string,
+  runId: string,
+  waitResumeId: string,
+  body: { decision: "approved" | "rejected"; option_id?: string; note?: string },
+) =>
+  apiFetch<WorkflowWaitResumeDecisionResponse>(
+    `/workflows/${encodeURIComponent(workflowId)}/runs/${encodeURIComponent(runId)}/wait-resume/${encodeURIComponent(waitResumeId)}/decision`,
+    {
+      method: "POST",
+      bodyJson: body,
+    },
+  );
+
 export const runWorkflowAction = (
   workflowId: string,
   body: {
@@ -490,12 +589,40 @@ export const runWorkflowAction = (
     archived?: boolean;
     environment?: "dev" | "prod";
     deployment_id?: string;
+    connector_overrides?: WorkflowConnectorOverrides;
   },
 ) =>
   apiFetch<WorkflowActionResponse>(`/workflows/${encodeURIComponent(workflowId)}/action`, {
     method: "POST",
     bodyJson: body,
   });
+
+export const listWorkflowTriggerRegistrations = (workflowId: string, deploymentId?: string) => {
+  const params = deploymentId ? `?deployment_id=${encodeURIComponent(deploymentId)}` : "";
+  return apiFetch<{ registrations: Record<string, unknown>[] }>(
+    `/workflows/${encodeURIComponent(workflowId)}/trigger-registrations${params}`,
+  );
+};
+
+export const updateWorkflowTriggerRegistrationStatus = (
+  workflowId: string,
+  registrationId: string,
+  status: "preview" | "registered" | "paused" | "unhealthy" | "retired",
+) =>
+  apiFetch<{ ok: boolean }>(
+    `/workflows/${encodeURIComponent(workflowId)}/trigger-registrations/${encodeURIComponent(registrationId)}/status`,
+    { method: "POST", bodyJson: { status } },
+  );
+
+export const listWorkflowTriggerObservations = (workflowId: string, registrationId?: string) => {
+  const params = registrationId ? `?registration_id=${encodeURIComponent(registrationId)}` : "";
+  return apiFetch<{ workflow_id: string; trigger_observations: Record<string, unknown>[] }>(
+    `/workflows/${encodeURIComponent(workflowId)}/trigger-observations${params}`,
+  );
+};
+
+export const getWorkflowConnectorAdapters = () =>
+  apiFetch<{ adapters: Record<string, unknown> }>("/workflows/connector-adapters");
 
 /** Fetch the user's AFP encryption key for client-side decryption. */
 export const fetchEncKey = () =>
@@ -522,6 +649,9 @@ export const saveLlmConfig = (data: {
   api_key?: string;
   ollama_url?: string;
 }) => apiFetch("/user/llm-config", { method: "POST", bodyJson: data });
+
+export const pingLlmConfig = () =>
+  apiFetch<{ ok: boolean; backend?: string; provider?: string; http_status?: number; reason?: string }>("/user/llm-config/ping", { method: "POST" });
 
 // ── Capability registry ────────────────────────────────────────────────────
 
@@ -656,3 +786,12 @@ export const submitDecision = (req: UiDecisionRequest) =>
     method: "POST",
     bodyJson: req,
   });
+
+export const updateAgentSettings = (settings: { auto_approve_workflows?: boolean }) =>
+  apiFetch<{ ok: boolean }>("/agent/settings", { method: "PATCH", bodyJson: settings });
+
+/** Opens a native EventSource for the run SSE stream. Caller is responsible for closing it. */
+export function openRunStream(workflowId: string, runId: string): EventSource {
+  const base = (window as unknown as { __API_BASE__?: string }).__API_BASE__ ?? "";
+  return new EventSource(`${base}/workflows/${encodeURIComponent(workflowId)}/runs/${encodeURIComponent(runId)}/stream`);
+}

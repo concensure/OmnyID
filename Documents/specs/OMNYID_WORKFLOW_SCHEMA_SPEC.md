@@ -7,6 +7,7 @@ This document defines the first shared contract for the visual workflow builder.
 It complements:
 
 - [OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md)
+- [OMNYID_SUBAGENT_TEMPLATE_SPEC.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_SUBAGENT_TEMPLATE_SPEC.md)
 - [OMNYID_A2UI_V1_SPEC.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_A2UI_V1_SPEC.md)
 - [OMNYID_CANONICAL_MESSAGE_SHAPES.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_CANONICAL_MESSAGE_SHAPES.md)
 
@@ -26,6 +27,11 @@ This is the compiled execution plan.
 
 3. `RuntimeNodeManifest`
 This is the per-node runtime contract executed by workers.
+
+This now sits alongside a reusable template layer:
+
+4. `SubagentTemplate`
+This is the reusable orchestration skeleton used by presets and future NL workflow generation.
 
 The rule is strict:
 
@@ -152,6 +158,34 @@ Initial preset kinds:
 A preset node is not a separate runtime type.
 
 It is a controlled expansion over graph primitives plus hidden runtime manifests.
+
+It should also be backed by a `SubagentTemplate`, not by bespoke graph assembly.
+
+## Subagent Templates
+
+The workflow schema now includes a template layer for reusable orchestration skeletons.
+
+Initial template ids:
+
+- `linear_worker`
+- `branching_worker`
+- `research_loop`
+- `action_guarded`
+
+Each template defines:
+
+- slot bindings
+- default primitive/runtime mappings
+- template-level efficiency hints
+- expansion rules for graph and IR generation
+
+`WorkflowGraph` may optionally carry:
+
+- `template_id`
+- `template_version`
+- `template_bindings`
+
+This keeps hand-authored primitive workflows valid while allowing presets and future NL generation to target templates first.
 
 ## Node Policy Contract
 

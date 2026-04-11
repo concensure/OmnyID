@@ -29,3 +29,4 @@ pub mod server;
 pub mod summarizer;
 pub mod sync_worker;
 pub mod webauthn;
+pub mod workflow_supervisor;

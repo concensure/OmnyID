@@ -2,6 +2,7 @@ use crate::afp::Message as ProtoMessage;
 use crate::crypto::is_supported_encryption_envelope;
 use crate::integration::{ActionResult, IntegrationCapability};
 use crate::local_sync::{DeviceBootstrap, SyncSliceSpec};
+use crate::message::metadata_store_flag;
 use crate::personalization::{LoraArtifact, PersonalizationEvent};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -25,10 +26,7 @@ impl Db {
         Ok(())
     }
 
-    pub async fn ensure_user_private_schema(
-        &self,
-        user_id: &str,
-    ) -> Result<String, sqlx::Error> {
+    pub async fn ensure_user_private_schema(&self, user_id: &str) -> Result<String, sqlx::Error> {
         let schema = tenant_schema_name(user_id);
         let statements = tenant_private_schema_bootstrap_sql(&schema);
         let mut tx = self.pool.begin().await?;
@@ -39,11 +37,19 @@ impl Db {
         Ok(schema)
     }
 
+    // ── Messages & threads ────────────────────────────────────────────────────
+
     pub async fn store_message(
         &self,
         msg: &ProtoMessage,
         content_json: Value,
     ) -> Result<bool, sqlx::Error> {
+        // Enforce AFP metadata.store:false — ephemeral tool-call messages must
+        // never be written to storage, regardless of what the client requests.
+        if !metadata_store_flag(&msg.metadata) {
+            return Ok(false);
+        }
+
         let views_json = parse_json_array_string(&msg.views);
         let references_json = parse_json_array_string(&msg.references);
         let attachments_json = parse_json_array_string(&msg.attachments);
@@ -106,6 +112,12 @@ impl Db {
         msg: &ProtoMessage,
         content_json: Value,
     ) -> Result<bool, sqlx::Error> {
+        // Enforce AFP metadata.store:false — ephemeral tool-call messages must
+        // never be written to storage, regardless of what the client requests.
+        if !metadata_store_flag(&msg.metadata) {
+            return Ok(false);
+        }
+
         let views_json = parse_json_array_string(&msg.views);
         let references_json = parse_json_array_string(&msg.references);
         let attachments_json = parse_json_array_string(&msg.attachments);
@@ -284,6 +296,8 @@ impl Db {
         Ok(rows.into_iter().map(proto_message_from_row).collect())
     }
 
+    // ── Mail sync ─────────────────────────────────────────────────────────────
+
     pub async fn upsert_mail_sync_checkpoint(
         &self,
         provider: &str,
@@ -376,6 +390,8 @@ impl Db {
 
         Ok(())
     }
+
+    // ── Integrations & action results ─────────────────────────────────────────
 
     pub async fn upsert_integration_capability(
         &self,
@@ -722,6 +738,8 @@ impl Db {
         Ok(row.map(sync_device_policy_from_row))
     }
 
+    // ── Personalization ────────────────────────────────────────────────────────
+
     pub async fn record_personalization_event(
         &self,
         event: &PersonalizationEvent,
@@ -803,6 +821,8 @@ impl Db {
             "training_schedule": crate::personalization::TrainingSchedule::weekly_default(),
         }))
     }
+
+    // ── Billing ────────────────────────────────────────────────────────────────
 
     /// Upsert billing subscription state for an account (from Stripe webhook).
     pub async fn upsert_billing_subscription(
@@ -899,6 +919,8 @@ impl Db {
         })
     }
 
+    // ── LoRA artifacts ─────────────────────────────────────────────────────────
+
     pub async fn upsert_lora_artifact(&self, artifact: &LoraArtifact) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
@@ -928,6 +950,8 @@ impl Db {
         Ok(())
     }
 
+    // ── Users & sessions ───────────────────────────────────────────────────────
+
     pub async fn create_user(&self, user: &UserRecord) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
@@ -950,6 +974,22 @@ impl Db {
         self.ensure_user_private_schema(&user.id).await?;
 
         Ok(())
+    }
+
+    pub async fn list_user_ids(&self) -> Result<Vec<String>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id
+            FROM users
+            ORDER BY created_at ASC, id ASC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| row.try_get::<String, _>("id").ok())
+            .collect())
     }
 
     pub async fn find_user_by_email(&self, email: &str) -> Result<Option<UserRecord>, sqlx::Error> {
@@ -1180,6 +1220,8 @@ impl Db {
         Ok(())
     }
 
+    // ── Managed agents ─────────────────────────────────────────────────────────
+
     pub async fn upsert_managed_agent(
         &self,
         agent: &ManagedAgentRecord,
@@ -1301,6 +1343,8 @@ impl Db {
 
         Ok(rows.into_iter().map(action_audit_entry_from_row).collect())
     }
+
+    // ── Runtime deployments & update policy ───────────────────────────────────
 
     pub async fn upsert_runtime_deployment(
         &self,
@@ -1574,6 +1618,8 @@ impl Db {
             .collect())
     }
 
+    // ── User onboarding ────────────────────────────────────────────────────────
+
     pub async fn upsert_user_onboarding(
         &self,
         onboarding: &UserOnboardingRecord,
@@ -1632,6 +1678,8 @@ impl Db {
 
         Ok(row.map(user_onboarding_from_row))
     }
+
+    // ── Support access ─────────────────────────────────────────────────────────
 
     pub async fn create_support_access_grant(
         &self,
@@ -1808,6 +1856,8 @@ impl Db {
             .map(support_access_grant_from_row)
             .collect())
     }
+
+    // ── Runtime backups ────────────────────────────────────────────────────────
 
     pub async fn upsert_runtime_backup_policy(
         &self,
@@ -2134,6 +2184,8 @@ impl Db {
         Ok(result.rows_affected())
     }
 
+    // ── Waitlist ───────────────────────────────────────────────────────────────
+
     pub async fn record_waitlist_submission(
         &self,
         email: &str,
@@ -2159,6 +2211,8 @@ impl Db {
     }
 
     // ── Agent template ────────────────────────────────────────────────────────
+
+    // ── Agent instances & tasks ────────────────────────────────────────────────
 
     /// Provision an agent instance for a new user account.
     /// Idempotent: if the user already has an instance, returns its ID without error.
@@ -2359,6 +2413,8 @@ impl Db {
         }
         Ok(())
     }
+
+    // ── Workflow storage ───────────────────────────────────────────────────────
 
     pub async fn upsert_saved_workflow(
         &self,
@@ -2562,10 +2618,7 @@ impl Db {
         }
     }
 
-    pub async fn append_workflow_run(
-        &self,
-        record: &WorkflowRunRecord,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn append_workflow_run(&self, record: &WorkflowRunRecord) -> Result<(), sqlx::Error> {
         let table = tenant_workflow_runs_table(&record.owner_user_id);
         sqlx::query(&format!(
             r#"
@@ -2655,6 +2708,440 @@ impl Db {
             None => Err(sqlx::Error::RowNotFound),
         }
     }
+
+    // ── Workflow wait / resume ─────────────────────────────────────────────────
+
+    pub async fn append_workflow_wait_resume_record(
+        &self,
+        record: &WorkflowWaitResumeRecord,
+    ) -> Result<(), sqlx::Error> {
+        let table = tenant_workflow_wait_resume_table(&record.owner_user_id);
+        sqlx::query(&format!(
+            r#"
+            INSERT INTO {table} (
+                wait_resume_id, workflow_id, deployment_id, run_id, owner_user_id,
+                manifest_node_id, source_graph_node_id, status, resume_family, resume_kind,
+                wait_reason, scheduled_for, descriptor_json, created_at, resumed_at
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::timestamptz,$13,$14::timestamptz,$15::timestamptz)
+            ON CONFLICT (wait_resume_id) DO UPDATE SET
+                status = EXCLUDED.status,
+                wait_reason = EXCLUDED.wait_reason,
+                scheduled_for = EXCLUDED.scheduled_for,
+                descriptor_json = EXCLUDED.descriptor_json,
+                resumed_at = EXCLUDED.resumed_at
+            "#
+        ))
+        .bind(&record.wait_resume_id)
+        .bind(&record.workflow_id)
+        .bind(&record.deployment_id)
+        .bind(&record.run_id)
+        .bind(&record.owner_user_id)
+        .bind(&record.manifest_node_id)
+        .bind(&record.source_graph_node_id)
+        .bind(&record.status)
+        .bind(&record.resume_family)
+        .bind(&record.resume_kind)
+        .bind(record.wait_reason.as_deref())
+        .bind(record.scheduled_for.as_deref())
+        .bind(&record.descriptor_json)
+        .bind(&record.created_at)
+        .bind(record.resumed_at.as_deref())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn list_workflow_wait_resume_records(
+        &self,
+        owner_user_id: &str,
+        workflow_id: &str,
+        run_id: &str,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let table = tenant_workflow_wait_resume_table(owner_user_id);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT wait_resume_id, workflow_id, deployment_id, run_id, owner_user_id,
+                   manifest_node_id, source_graph_node_id, status, resume_family, resume_kind,
+                   wait_reason, scheduled_for::text, descriptor_json, created_at::text, resumed_at::text
+            FROM {table}
+            WHERE owner_user_id = $1
+              AND workflow_id = $2
+              AND run_id = $3
+            ORDER BY created_at DESC
+            LIMIT $4
+            "#
+        ))
+        .bind(owner_user_id)
+        .bind(workflow_id)
+        .bind(run_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(workflow_wait_resume_json_from_row)
+            .collect())
+    }
+
+    pub async fn get_workflow_wait_resume_record(
+        &self,
+        owner_user_id: &str,
+        workflow_id: &str,
+        run_id: &str,
+        wait_resume_id: &str,
+    ) -> Result<Value, sqlx::Error> {
+        let table = tenant_workflow_wait_resume_table(owner_user_id);
+        let row = sqlx::query(&format!(
+            r#"
+            SELECT wait_resume_id, workflow_id, deployment_id, run_id, owner_user_id,
+                   manifest_node_id, source_graph_node_id, status, resume_family, resume_kind,
+                   wait_reason, scheduled_for::text, descriptor_json, created_at::text, resumed_at::text
+            FROM {table}
+            WHERE owner_user_id = $1
+              AND workflow_id = $2
+              AND run_id = $3
+              AND wait_resume_id = $4
+            "#
+        ))
+        .bind(owner_user_id)
+        .bind(workflow_id)
+        .bind(run_id)
+        .bind(wait_resume_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some(row) => Ok(workflow_wait_resume_json_from_row(&row)),
+            None => Err(sqlx::Error::RowNotFound),
+        }
+    }
+
+    pub async fn list_due_workflow_wait_resume_records(
+        &self,
+        owner_user_id: &str,
+        due_before: &str,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let table = tenant_workflow_wait_resume_table(owner_user_id);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT wait_resume_id, workflow_id, deployment_id, run_id, owner_user_id,
+                   manifest_node_id, source_graph_node_id, status, resume_family, resume_kind,
+                   wait_reason, scheduled_for::text, descriptor_json, created_at::text, resumed_at::text
+            FROM {table}
+            WHERE owner_user_id = $1
+              AND status = 'pending'
+              AND resume_family IN ('timer', 'hybrid')
+              AND scheduled_for IS NOT NULL
+              AND scheduled_for <= $2::timestamptz
+            ORDER BY scheduled_for ASC, created_at ASC
+            LIMIT $3
+            "#
+        ))
+        .bind(owner_user_id)
+        .bind(due_before)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(workflow_wait_resume_json_from_row)
+            .collect())
+    }
+
+    pub async fn update_workflow_wait_resume_record_status(
+        &self,
+        owner_user_id: &str,
+        wait_resume_id: &str,
+        status: &str,
+        resumed_at: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        let table = tenant_workflow_wait_resume_table(owner_user_id);
+        sqlx::query(&format!(
+            r#"
+            UPDATE {table}
+            SET status = $3,
+                resumed_at = $4::timestamptz
+            WHERE owner_user_id = $1
+              AND wait_resume_id = $2
+            "#
+        ))
+        .bind(owner_user_id)
+        .bind(wait_resume_id)
+        .bind(status)
+        .bind(resumed_at)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // ── Workflow trigger registry ─────────────────────────────────────────────
+
+    pub async fn upsert_workflow_trigger_registration(
+        &self,
+        record: &WorkflowTriggerRegistrationRecord,
+    ) -> Result<(), sqlx::Error> {
+        let table = tenant_workflow_trigger_registrations_table(&record.owner_user_id);
+        sqlx::query(&format!(
+            r#"
+            INSERT INTO {table} (
+                registration_id, workflow_id, deployment_id, owner_user_id,
+                environment, trigger_node_id, manifest_node_id,
+                trigger_family, trigger_kind, registration_status,
+                idempotency_key, dedup_hash, descriptor_json,
+                last_fired_at, next_fire_at, retry_count, created_at, updated_at
+            )
+            VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                $11, $12, $13::jsonb,
+                $14::timestamptz, $15::timestamptz, $16, $17::timestamptz, $18::timestamptz
+            )
+            ON CONFLICT (idempotency_key) DO UPDATE SET
+                registration_status = EXCLUDED.registration_status,
+                dedup_hash = EXCLUDED.dedup_hash,
+                descriptor_json = EXCLUDED.descriptor_json,
+                next_fire_at = EXCLUDED.next_fire_at,
+                retry_count = EXCLUDED.retry_count,
+                updated_at = NOW()
+            "#
+        ))
+        .bind(&record.registration_id)
+        .bind(&record.workflow_id)
+        .bind(&record.deployment_id)
+        .bind(&record.owner_user_id)
+        .bind(&record.environment)
+        .bind(&record.trigger_node_id)
+        .bind(&record.manifest_node_id)
+        .bind(&record.trigger_family)
+        .bind(&record.trigger_kind)
+        .bind(&record.registration_status)
+        .bind(&record.idempotency_key)
+        .bind(&record.dedup_hash)
+        .bind(record.descriptor_json.to_string())
+        .bind(record.last_fired_at.as_deref())
+        .bind(record.next_fire_at.as_deref())
+        .bind(record.retry_count)
+        .bind(&record.created_at)
+        .bind(&record.updated_at)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn list_workflow_trigger_registrations(
+        &self,
+        owner_user_id: &str,
+        workflow_id: &str,
+        deployment_id: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let table = tenant_workflow_trigger_registrations_table(owner_user_id);
+        let rows: Vec<(Value,)> = if let Some(dep_id) = deployment_id {
+            sqlx::query_as(&format!(
+                r#"
+                SELECT to_jsonb(r) AS row
+                FROM {table} r
+                WHERE r.owner_user_id = $1
+                  AND r.workflow_id = $2
+                  AND r.deployment_id = $3
+                ORDER BY r.created_at DESC
+                LIMIT $4
+                "#
+            ))
+            .bind(owner_user_id)
+            .bind(workflow_id)
+            .bind(dep_id)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query_as(&format!(
+                r#"
+                SELECT to_jsonb(r) AS row
+                FROM {table} r
+                WHERE r.owner_user_id = $1
+                  AND r.workflow_id = $2
+                ORDER BY r.created_at DESC
+                LIMIT $3
+                "#
+            ))
+            .bind(owner_user_id)
+            .bind(workflow_id)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?
+        };
+        Ok(rows.into_iter().map(|(v,)| v).collect())
+    }
+
+    pub async fn update_workflow_trigger_registration_status(
+        &self,
+        owner_user_id: &str,
+        registration_id: &str,
+        status: &str,
+    ) -> Result<(), sqlx::Error> {
+        let table = tenant_workflow_trigger_registrations_table(owner_user_id);
+        sqlx::query(&format!(
+            r#"
+            UPDATE {table}
+            SET registration_status = $3,
+                updated_at = NOW()
+            WHERE owner_user_id = $1
+              AND registration_id = $2
+            "#
+        ))
+        .bind(owner_user_id)
+        .bind(registration_id)
+        .bind(status)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn retire_workflow_trigger_registrations_for_deployment(
+        &self,
+        owner_user_id: &str,
+        deployment_id: &str,
+    ) -> Result<u64, sqlx::Error> {
+        let table = tenant_workflow_trigger_registrations_table(owner_user_id);
+        let result = sqlx::query(&format!(
+            r#"
+            UPDATE {table}
+            SET registration_status = 'retired',
+                updated_at = NOW()
+            WHERE owner_user_id = $1
+              AND deployment_id = $2
+              AND registration_status != 'retired'
+            "#
+        ))
+        .bind(owner_user_id)
+        .bind(deployment_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    // ── Trigger observability & replay protection ─────────────────────────────
+
+    /// Write one trigger observability record.  The caller must call
+    /// `check_and_claim_replay_nonce` first; this function does not enforce
+    /// uniqueness on `replay_nonce` itself (the table has a UNIQUE constraint).
+    pub async fn write_trigger_observation(
+        &self,
+        record: &TriggerObservabilityRecord,
+    ) -> Result<(), sqlx::Error> {
+        let table = tenant_trigger_observations_table(&record.owner_user_id);
+        sqlx::query(&format!(
+            r#"
+            INSERT INTO {table} (
+                observation_id, registration_id, workflow_id, deployment_id,
+                owner_user_id, trigger_source, trigger_time,
+                payload_summary, schedule_metadata,
+                delayed_resumption_reason, hybrid_decision_chain,
+                run_initiation_trace, replay_nonce, created_at
+            )
+            VALUES (
+                $1, $2, $3, $4, $5, $6, $7::timestamptz,
+                $8::jsonb, $9::jsonb,
+                $10, $11::jsonb,
+                $12::jsonb, $13, $14::timestamptz
+            )
+            ON CONFLICT (replay_nonce) DO NOTHING
+            "#
+        ))
+        .bind(&record.observation_id)
+        .bind(&record.registration_id)
+        .bind(&record.workflow_id)
+        .bind(&record.deployment_id)
+        .bind(&record.owner_user_id)
+        .bind(&record.trigger_source)
+        .bind(&record.trigger_time)
+        .bind(record.payload_summary.to_string())
+        .bind(record.schedule_metadata.to_string())
+        .bind(record.delayed_resumption_reason.as_deref())
+        .bind(record.hybrid_decision_chain.to_string())
+        .bind(record.run_initiation_trace.to_string())
+        .bind(&record.replay_nonce)
+        .bind(&record.created_at)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Returns `true` when `replay_nonce` is new and has been claimed (inserted).
+    /// Returns `false` when the nonce already exists — the caller must reject the
+    /// duplicate activation.
+    ///
+    /// Uses a public schema replay-nonce table so the check works even before the
+    /// per-user tenant schema is fully initialised.
+    pub async fn check_and_claim_replay_nonce(
+        &self,
+        owner_user_id: &str,
+        replay_nonce: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            INSERT INTO public.trigger_replay_nonces (replay_nonce, owner_user_id, claimed_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (replay_nonce) DO NOTHING
+            "#,
+        )
+        .bind(replay_nonce)
+        .bind(owner_user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    pub async fn list_trigger_observations(
+        &self,
+        owner_user_id: &str,
+        workflow_id: &str,
+        registration_id: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let table = tenant_trigger_observations_table(owner_user_id);
+        let rows: Vec<(Value,)> = if let Some(reg_id) = registration_id {
+            sqlx::query_as(&format!(
+                r#"
+                SELECT to_jsonb(o) AS row
+                FROM {table} o
+                WHERE o.owner_user_id = $1
+                  AND o.workflow_id = $2
+                  AND o.registration_id = $3
+                ORDER BY o.created_at DESC
+                LIMIT $4
+                "#
+            ))
+            .bind(owner_user_id)
+            .bind(workflow_id)
+            .bind(reg_id)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query_as(&format!(
+                r#"
+                SELECT to_jsonb(o) AS row
+                FROM {table} o
+                WHERE o.owner_user_id = $1
+                  AND o.workflow_id = $2
+                ORDER BY o.created_at DESC
+                LIMIT $3
+                "#
+            ))
+            .bind(owner_user_id)
+            .bind(workflow_id)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?
+        };
+        Ok(rows.into_iter().map(|(v,)| v).collect())
+    }
+
+    // ── LLM config & usage ────────────────────────────────────────────────────
 
     pub async fn upsert_llm_config(
         &self,
@@ -3125,13 +3612,38 @@ impl Db {
         Ok(rows.iter().map(trigger_json_from_row).collect())
     }
 
+    /// Returns all agent_triggers for a user regardless of agent_instance_id.
+    /// Used by the workflow deploy path to surface overlaps between the legacy
+    /// activation table and new `workflow_trigger_registrations` rows.
+    pub async fn list_all_triggers_for_user(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+        let table = tenant_agent_triggers_table(owner_user_id);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT id, trigger_type, config_json, enabled,
+                   last_fired_at::text, next_fire_at::text, created_at::text
+            FROM {table}
+            WHERE owner_user_id = $1
+            ORDER BY created_at DESC
+            "#,
+        ))
+        .bind(owner_user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.iter().map(trigger_json_from_row).collect())
+    }
+
     pub async fn delete_trigger(&self, owner_user_id: &str, id: &str) -> Result<(), sqlx::Error> {
         let table = tenant_agent_triggers_table(owner_user_id);
-        let result = sqlx::query(&format!("DELETE FROM {table} WHERE owner_user_id = $2 AND id = $1"))
-            .bind(id)
-            .bind(owner_user_id)
-            .execute(&self.pool)
-            .await?;
+        let result = sqlx::query(&format!(
+            "DELETE FROM {table} WHERE owner_user_id = $2 AND id = $1"
+        ))
+        .bind(id)
+        .bind(owner_user_id)
+        .execute(&self.pool)
+        .await?;
         if result.rows_affected() == 0 {
             return Err(sqlx::Error::RowNotFound);
         }
@@ -3145,12 +3657,22 @@ impl Db {
         d: &crate::agent_template::AgentDelegation,
     ) -> Result<(), sqlx::Error> {
         let table = tenant_agent_delegations_table(&d.owner_user_id);
+        let caps_json = serde_json::to_value(&d.allowed_capabilities)
+            .unwrap_or(serde_json::Value::Array(vec![]));
+        let allowlist_json = serde_json::to_value(&d.outbound_allowlist)
+            .unwrap_or(serde_json::Value::Array(vec![]));
+        let snapshot_json = d
+            .context_snapshot
+            .as_ref()
+            .and_then(|s| serde_json::to_value(s).ok());
         sqlx::query(&format!(
             r#"
             INSERT INTO {table}
                 (id, master_instance_id, owner_user_id, scope, mask,
-                 delegated_key_hex, expires_at, task_id, created_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+                 delegated_key_hex, expires_at, task_id,
+                 allowed_capabilities, outbound_allowlist, context_snapshot,
+                 created_at)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
             "#,
         ))
         .bind(&d.id)
@@ -3161,6 +3683,9 @@ impl Db {
         .bind(&d.delegated_key_hex)
         .bind(d.expires_at.to_rfc3339())
         .bind(&d.task_id)
+        .bind(caps_json)
+        .bind(allowlist_json)
+        .bind(snapshot_json)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -3359,7 +3884,7 @@ impl Db {
         agent_instance_id: &str,
     ) -> Result<Vec<crate::agentcard::CapabilityDescriptor>, sqlx::Error> {
         let owner_user_id = sqlx::query_scalar::<_, String>(
-            "SELECT owner_user_id FROM agent_instances WHERE id = $1"
+            "SELECT owner_user_id FROM agent_instances WHERE id = $1",
         )
         .bind(agent_instance_id)
         .fetch_optional(&self.pool)
@@ -3804,6 +4329,8 @@ impl Db {
         }))
     }
 
+    // ── Gmail & calendar ──────────────────────────────────────────────────────
+
     pub async fn store_gmail_token(
         &self,
         user_id: &str,
@@ -4143,7 +4670,7 @@ impl Db {
     }
 }
 
-const MIGRATIONS: [(&str, &str, &str); 26] = [
+pub const MIGRATIONS: [(&str, &str, &str); 28] = [
     (
         "0001_init",
         "Initial Omnyid schema baseline",
@@ -4274,6 +4801,16 @@ const MIGRATIONS: [(&str, &str, &str); 26] = [
         "Optional subtype and metadata columns for broad stable AFP message taxonomy",
         include_str!("../postgres/migrations/0026_message_taxonomy.sql"),
     ),
+    (
+        "0027_delegation_hardening",
+        "Per-node capability validation, outbound allowlist, and context snapshot on agent_delegations",
+        include_str!("../postgres/migrations/0027_delegation_hardening.sql"),
+    ),
+    (
+        "0028_trigger_hardening",
+        "Public replay-nonce deduplication table for trigger activation idempotency",
+        include_str!("../postgres/migrations/0028_trigger_hardening.sql"),
+    ),
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -4369,6 +4906,81 @@ pub struct WorkflowRunRecord {
     pub result_json: Value,
     pub started_at: String,
     pub completed_at: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WorkflowWaitResumeRecord {
+    pub wait_resume_id: String,
+    pub workflow_id: String,
+    pub deployment_id: String,
+    pub run_id: String,
+    pub owner_user_id: String,
+    pub manifest_node_id: String,
+    pub source_graph_node_id: String,
+    pub status: String,
+    pub resume_family: String,
+    pub resume_kind: String,
+    pub wait_reason: Option<String>,
+    pub scheduled_for: Option<String>,
+    pub descriptor_json: Value,
+    pub created_at: String,
+    pub resumed_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WorkflowTriggerRegistrationRecord {
+    pub registration_id: String,
+    pub workflow_id: String,
+    pub deployment_id: String,
+    pub owner_user_id: String,
+    pub environment: String,
+    pub trigger_node_id: String,
+    pub manifest_node_id: String,
+    pub trigger_family: String,
+    pub trigger_kind: String,
+    /// One of: preview | registered | paused | unhealthy | retired
+    pub registration_status: String,
+    /// SHA-256 of (deployment_id + trigger_node_id) — prevents double-registration
+    pub idempotency_key: String,
+    /// Hash of the trigger descriptor JSON — used to detect config drift between deployments
+    pub dedup_hash: Option<String>,
+    pub descriptor_json: Value,
+    pub last_fired_at: Option<String>,
+    pub next_fire_at: Option<String>,
+    pub retry_count: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// One row per trigger activation attempt, written before the run is initiated.
+/// Provides the audit trail required by Phase 3 item 11 of the builder plan.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TriggerObservabilityRecord {
+    pub observation_id: String,
+    /// Foreign-key reference to `workflow_trigger_registrations.registration_id`.
+    pub registration_id: String,
+    pub workflow_id: String,
+    pub deployment_id: String,
+    pub owner_user_id: String,
+    /// `manual` | `cron` | `webhook` | `event` | `wake_up` | `hybrid`
+    pub trigger_source: String,
+    /// RFC-3339 timestamp at which the trigger fired.
+    pub trigger_time: String,
+    /// Sanitised/truncated JSON summary of the inbound payload (no secrets).
+    pub payload_summary: Value,
+    /// `schedule_kind`, `cron_expression`, `timezone`, `scheduled_for` for time triggers.
+    pub schedule_metadata: Value,
+    /// Non-null for `wake_up` family: reason the delayed continuation fired.
+    pub delayed_resumption_reason: Option<String>,
+    /// Ordered list of conditions evaluated for hybrid trigger composition.
+    pub hybrid_decision_chain: Value,
+    /// `run_id`, `workflow_id`, `deployment_id`, `trigger_node_id` linking this
+    /// observation to the resulting workflow run.
+    pub run_initiation_trace: Value,
+    /// Stable unique nonce derived from (activation_id + trigger_node_id + deployment_id).
+    /// Checked before insertion; duplicate nonce → activation rejected.
+    pub replay_nonce: String,
     pub created_at: String,
 }
 
@@ -4712,7 +5324,10 @@ fn tenant_agent_delegations_table(user_id: &str) -> String {
 }
 
 fn tenant_agent_capability_registry_table(user_id: &str) -> String {
-    format!("\"{}\".agent_capability_registry", tenant_schema_name(user_id))
+    format!(
+        "\"{}\".agent_capability_registry",
+        tenant_schema_name(user_id)
+    )
 }
 
 fn tenant_user_llm_config_table(user_id: &str) -> String {
@@ -4733,6 +5348,24 @@ fn tenant_workflow_deployments_table(user_id: &str) -> String {
 
 fn tenant_workflow_runs_table(user_id: &str) -> String {
     format!("\"{}\".workflow_runs", tenant_schema_name(user_id))
+}
+
+fn tenant_workflow_wait_resume_table(user_id: &str) -> String {
+    format!("\"{}\".workflow_wait_resume", tenant_schema_name(user_id))
+}
+
+fn tenant_workflow_trigger_registrations_table(user_id: &str) -> String {
+    format!(
+        "\"{}\".workflow_trigger_registrations",
+        tenant_schema_name(user_id)
+    )
+}
+
+fn tenant_trigger_observations_table(user_id: &str) -> String {
+    format!(
+        "\"{}\".workflow_trigger_observations",
+        tenant_schema_name(user_id)
+    )
 }
 
 fn tenant_messages_table(user_id: &str) -> String {
@@ -4806,6 +5439,26 @@ fn workflow_run_json_from_row(row: &sqlx::postgres::PgRow) -> Value {
         "started_at": row.get::<String, _>("started_at"),
         "completed_at": row.get::<Option<String>, _>("completed_at"),
         "created_at": row.get::<String, _>("created_at"),
+    })
+}
+
+fn workflow_wait_resume_json_from_row(row: &sqlx::postgres::PgRow) -> Value {
+    json!({
+        "wait_resume_id": row.get::<String, _>("wait_resume_id"),
+        "workflow_id": row.get::<String, _>("workflow_id"),
+        "deployment_id": row.get::<String, _>("deployment_id"),
+        "run_id": row.get::<String, _>("run_id"),
+        "owner_user_id": row.get::<String, _>("owner_user_id"),
+        "manifest_node_id": row.get::<String, _>("manifest_node_id"),
+        "source_graph_node_id": row.get::<String, _>("source_graph_node_id"),
+        "status": row.get::<String, _>("status"),
+        "resume_family": row.get::<String, _>("resume_family"),
+        "resume_kind": row.get::<String, _>("resume_kind"),
+        "wait_reason": row.get::<Option<String>, _>("wait_reason"),
+        "scheduled_for": row.get::<Option<String>, _>("scheduled_for"),
+        "descriptor": row.get::<serde_json::Value, _>("descriptor_json"),
+        "created_at": row.get::<String, _>("created_at"),
+        "resumed_at": row.get::<Option<String>, _>("resumed_at"),
     })
 }
 
@@ -5197,6 +5850,92 @@ fn tenant_private_schema_bootstrap_sql(schema: &str) -> Vec<String> {
         ),
         format!(
             r#"
+            CREATE TABLE IF NOT EXISTS {schema_quoted}.workflow_wait_resume (
+                wait_resume_id TEXT PRIMARY KEY,
+                workflow_id TEXT NOT NULL REFERENCES {schema_quoted}.saved_workflows(workflow_id) ON DELETE CASCADE,
+                deployment_id TEXT NOT NULL REFERENCES {schema_quoted}.workflow_deployments(deployment_id) ON DELETE CASCADE,
+                run_id TEXT NOT NULL REFERENCES {schema_quoted}.workflow_runs(run_id) ON DELETE CASCADE,
+                owner_user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                manifest_node_id TEXT NOT NULL,
+                source_graph_node_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                resume_family TEXT NOT NULL,
+                resume_kind TEXT NOT NULL,
+                wait_reason TEXT,
+                scheduled_for TIMESTAMPTZ,
+                descriptor_json JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                resumed_at TIMESTAMPTZ
+            )
+            "#
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_workflow_wait_resume_run_created ON {schema_quoted}.workflow_wait_resume(run_id, created_at DESC)"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_workflow_wait_resume_owner_workflow ON {schema_quoted}.workflow_wait_resume(owner_user_id, workflow_id, created_at DESC)"
+        ),
+        // ── Workflow trigger registrations ────────────────────────────────────
+        format!(
+            r#"
+            CREATE TABLE IF NOT EXISTS {schema_quoted}.workflow_trigger_registrations (
+                registration_id TEXT PRIMARY KEY,
+                workflow_id TEXT NOT NULL REFERENCES {schema_quoted}.saved_workflows(workflow_id) ON DELETE CASCADE,
+                deployment_id TEXT NOT NULL REFERENCES {schema_quoted}.workflow_deployments(deployment_id) ON DELETE CASCADE,
+                owner_user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                environment TEXT NOT NULL DEFAULT 'dev',
+                trigger_node_id TEXT NOT NULL,
+                manifest_node_id TEXT NOT NULL,
+                trigger_family TEXT NOT NULL DEFAULT 'manual',
+                trigger_kind TEXT NOT NULL DEFAULT 'manual',
+                registration_status TEXT NOT NULL DEFAULT 'preview'
+                    CHECK (registration_status IN ('preview','registered','paused','unhealthy','retired')),
+                idempotency_key TEXT NOT NULL UNIQUE,
+                dedup_hash TEXT,
+                descriptor_json JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                last_fired_at TIMESTAMPTZ,
+                next_fire_at TIMESTAMPTZ,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            "#
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_wf_trigger_reg_deployment ON {schema_quoted}.workflow_trigger_registrations(deployment_id, created_at DESC)"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_wf_trigger_reg_workflow ON {schema_quoted}.workflow_trigger_registrations(owner_user_id, workflow_id, created_at DESC)"
+        ),
+        // ── Trigger observability (Phase 3 item 11) ───────────────────────────
+        format!(
+            r#"
+            CREATE TABLE IF NOT EXISTS {schema_quoted}.workflow_trigger_observations (
+                observation_id TEXT PRIMARY KEY,
+                registration_id TEXT NOT NULL,
+                workflow_id TEXT NOT NULL REFERENCES {schema_quoted}.saved_workflows(workflow_id) ON DELETE CASCADE,
+                deployment_id TEXT NOT NULL,
+                owner_user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                trigger_source TEXT NOT NULL DEFAULT 'manual',
+                trigger_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                payload_summary JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                schedule_metadata JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                delayed_resumption_reason TEXT,
+                hybrid_decision_chain JSONB NOT NULL DEFAULT '[]'::jsonb,
+                run_initiation_trace JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                replay_nonce TEXT NOT NULL UNIQUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            "#
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_wf_trigger_obs_registration ON {schema_quoted}.workflow_trigger_observations(registration_id, created_at DESC)"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_wf_trigger_obs_workflow ON {schema_quoted}.workflow_trigger_observations(owner_user_id, workflow_id, created_at DESC)"
+        ),
+        format!(
+            r#"
             DO $$
             BEGIN
                 IF NOT EXISTS (
@@ -5549,8 +6288,14 @@ async fn persist_attachment_metadata(
     thread_id: &str,
     attachments_json: &Value,
 ) -> Result<(), sqlx::Error> {
-    persist_attachment_metadata_to_table(pool, "attachments", message_id, thread_id, attachments_json)
-        .await
+    persist_attachment_metadata_to_table(
+        pool,
+        "attachments",
+        message_id,
+        thread_id,
+        attachments_json,
+    )
+    .await
 }
 
 async fn persist_attachment_metadata_to_table(
@@ -5619,10 +6364,11 @@ async fn persist_attachment_metadata_to_table(
 #[cfg(test)]
 mod tests {
     use super::{
-        Db, SavedWorkflowRecord, StorageMode, UserRecord, WorkflowDeploymentRecord, WorkflowRunRecord, effective_storage_mode, enable_server_summarization,
-        persisted_content_for_mode, persisted_views_for_mode, redacted_views_for_read,
-        summary_and_embedding_for_mode, tenant_private_schema_bootstrap_sql,
-        tenant_schema_name,
+        Db, SavedWorkflowRecord, StorageMode, UserRecord, WorkflowDeploymentRecord,
+        WorkflowRunRecord, WorkflowWaitResumeRecord, effective_storage_mode,
+        enable_server_summarization, persisted_content_for_mode, persisted_views_for_mode,
+        redacted_views_for_read, summary_and_embedding_for_mode,
+        tenant_private_schema_bootstrap_sql, tenant_schema_name,
     };
     use crate::afp::Message;
     use crate::agent_template::{
@@ -5768,6 +6514,7 @@ mod tests {
         assert!(joined.contains("\"user_test\".saved_workflows"));
         assert!(joined.contains("\"user_test\".workflow_deployments"));
         assert!(joined.contains("\"user_test\".workflow_runs"));
+        assert!(joined.contains("\"user_test\".workflow_wait_resume"));
         assert!(joined.contains("\"user_test\".sync_devices"));
         assert!(joined.contains("\"user_test\".personalization_events"));
         assert!(joined.contains("public.notify_new_message()"));
@@ -5988,15 +6735,16 @@ mod tests {
                   'llm_usage_log',
                   'saved_workflows',
                   'workflow_deployments',
-                  'workflow_runs'
+                  'workflow_runs',
+                  'workflow_wait_resume'
                 )
               "#,
-          )
+        )
         .bind(&schema_name)
         .fetch_one(&db.pool)
         .await
         .expect("count tenant tables");
-          assert_eq!(tenant_table_count, 10);
+        assert_eq!(tenant_table_count, 11);
 
         let instance = AgentInstance::provision(&user.id, &format!("Smoke{suffix}"), "omnyid.test");
         let agent_instance_id = db
@@ -6124,12 +6872,16 @@ mod tests {
             .get_private_thread(&user.id, &task.thread_id)
             .await
             .expect("get private task thread");
-        assert!(private_task_thread
-            .iter()
-            .any(|message| message.id == private_plan_trace.id));
-        assert!(private_task_thread
-            .iter()
-            .any(|message| message.id == private_result_trace.id));
+        assert!(
+            private_task_thread
+                .iter()
+                .any(|message| message.id == private_plan_trace.id)
+        );
+        assert!(
+            private_task_thread
+                .iter()
+                .any(|message| message.id == private_result_trace.id)
+        );
         let tenant_private_trace_count: i64 = sqlx::query_scalar(&format!(
             "SELECT COUNT(*) FROM \"{}\".messages WHERE id = ANY($1)",
             schema_name
@@ -6158,7 +6910,9 @@ mod tests {
             user.id.clone(),
             "Review smoke focus".to_string(),
         );
-        db.create_focus_item(&focus).await.expect("create focus item");
+        db.create_focus_item(&focus)
+            .await
+            .expect("create focus item");
         let tenant_focus_count: i64 = sqlx::query_scalar(&format!(
             "SELECT COUNT(*) FROM \"{}\".agent_focus_items WHERE id = $1",
             schema_name
@@ -6187,9 +6941,11 @@ mod tests {
             .list_focus_items(&user.id, &agent_instance_id)
             .await
             .expect("list updated focus items");
-        assert!(focus_items
-            .iter()
-            .any(|entry| entry["id"] == focus.id && entry["status"] == "in_progress"));
+        assert!(
+            focus_items
+                .iter()
+                .any(|entry| entry["id"] == focus.id && entry["status"] == "in_progress")
+        );
 
         let trigger = crate::agent_template::AgentTrigger::new(
             agent_instance_id.clone(),
@@ -6235,6 +6991,9 @@ mod tests {
             600,
             &agent_instance_id,
             &user.id,
+            vec![],
+            vec![],
+            None,
         );
         let delegation_id = delegation.id.clone();
         db.create_delegation(&delegation)
@@ -6260,9 +7019,11 @@ mod tests {
             .get_active_delegations(&user.id, &agent_instance_id)
             .await
             .expect("list active delegations");
-        assert!(active_delegations
-            .iter()
-            .any(|entry| entry["id"] == delegation_id));
+        assert!(
+            active_delegations
+                .iter()
+                .any(|entry| entry["id"] == delegation_id)
+        );
         let delegation_detail = db
             .get_delegation_by_id(&user.id, &delegation_id)
             .await
@@ -6276,9 +7037,11 @@ mod tests {
             .get_active_delegations(&user.id, &agent_instance_id)
             .await
             .expect("list active delegations after revoke");
-        assert!(!active_delegations
-            .iter()
-            .any(|entry| entry["id"] == delegation_id));
+        assert!(
+            !active_delegations
+                .iter()
+                .any(|entry| entry["id"] == delegation_id)
+        );
 
         let capability_id = db
             .create_capability(
@@ -6306,7 +7069,7 @@ mod tests {
         .expect("count tenant capability rows");
         assert_eq!(tenant_capability_count, 1);
         let public_capability_count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM public.agent_capability_registry WHERE id = $1"
+            "SELECT COUNT(*) FROM public.agent_capability_registry WHERE id = $1",
         )
         .bind(&capability_id)
         .fetch_one(&db.pool)
@@ -6317,7 +7080,11 @@ mod tests {
             .list_capabilities(&user.id, &agent_instance_id)
             .await
             .expect("list capabilities");
-        assert!(capabilities.iter().any(|entry| entry["id"] == capability_id));
+        assert!(
+            capabilities
+                .iter()
+                .any(|entry| entry["id"] == capability_id)
+        );
         let card_caps = db
             .get_capabilities_for_agent_card(&agent_instance_id)
             .await
@@ -6345,12 +7112,13 @@ mod tests {
         .await
         .expect("count tenant llm config rows");
         assert_eq!(tenant_llm_cfg_count, 1);
-        let public_llm_cfg_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM public.user_llm_config WHERE owner_user_id = $1")
-                .bind(&user.id)
-                .fetch_one(&db.pool)
-                .await
-                .expect("count public llm config rows");
+        let public_llm_cfg_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM public.user_llm_config WHERE owner_user_id = $1",
+        )
+        .bind(&user.id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count public llm config rows");
         assert_eq!(public_llm_cfg_count, 0);
         let llm_view = db
             .get_llm_config(&user.id)
@@ -6370,192 +7138,234 @@ mod tests {
         .await
         .expect("count tenant llm usage rows");
         assert_eq!(tenant_llm_usage_count, 1);
-        let public_llm_usage_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM public.llm_usage_log WHERE owner_user_id = $1")
-                .bind(&user.id)
+        let public_llm_usage_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM public.llm_usage_log WHERE owner_user_id = $1",
+        )
+        .bind(&user.id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count public llm usage rows");
+        assert_eq!(public_llm_usage_count, 0);
+        let llm_view = db
+            .get_llm_config(&user.id)
+            .await
+            .expect("get llm config after usage")
+            .expect("llm config exists after usage");
+        assert_eq!(llm_view["usage_cents_current_month"], 33);
+
+        let saved_workflow = SavedWorkflowRecord {
+            workflow_id: format!("wf_{suffix}"),
+            owner_user_id: user.id.clone(),
+            title: "Smoke workflow".to_string(),
+            description: Some("Tenant-local saved workflow smoke test".to_string()),
+            favorite: true,
+            preset_kinds: vec!["research_assistant".to_string()],
+            graph_json: json!({
+                "version": "omnyid-workflow.v1",
+                "workflow_id": format!("wf_{suffix}"),
+                "title": "Smoke workflow",
+                "status": "draft",
+                "environment": "dev",
+                "owner_user_id": user.id,
+                "root_node_ids": ["node_trigger"],
+                "nodes": [
+                    {
+                        "id": "node_trigger",
+                        "kind": "trigger",
+                        "label": "Manual start",
+                        "position": {"x": 0, "y": 0},
+                        "inputs": [],
+                        "outputs": [],
+                        "policy": {
+                            "mask": "private",
+                            "approval_mode": "none",
+                            "allowed_tools": [],
+                            "allowed_capabilities": [],
+                            "max_steps": 1,
+                            "max_cost_cents": 0,
+                            "outbound_allowlist": []
+                        },
+                        "metadata": {},
+                        "hidden_runtime_nodes": [],
+                        "config": {
+                            "trigger_kind": "manual",
+                            "event_filter": {}
+                        }
+                    }
+                ],
+                "edges": [],
+                "presets": [],
+                "optimization_mode": "balanced",
+                "metadata": {}
+            }),
+            latest_ir_json: None,
+            created_at: chrono::Utc::now().to_rfc3339(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+            archived_at: None,
+        };
+        db.upsert_saved_workflow(&saved_workflow)
+            .await
+            .expect("save workflow");
+        let listed_workflows = db
+            .list_saved_workflows(&user.id, false, 10)
+            .await
+            .expect("list saved workflows");
+        assert!(
+            listed_workflows
+                .iter()
+                .any(|entry| entry["workflow_id"] == saved_workflow.workflow_id)
+        );
+        let workflow_detail = db
+            .get_saved_workflow(&user.id, &saved_workflow.workflow_id)
+            .await
+            .expect("get saved workflow");
+        assert_eq!(workflow_detail["title"], "Smoke workflow");
+        let deployment = WorkflowDeploymentRecord {
+            deployment_id: format!("wfdep_smoke_{suffix}"),
+            workflow_id: saved_workflow.workflow_id.clone(),
+            owner_user_id: user.id.clone(),
+            environment: "dev".to_string(),
+            status: "active".to_string(),
+            ir_snapshot_json: json!({
+                "version": "omnyid-workflow-ir.v1",
+                "deployment_id": format!("wfdep_smoke_{suffix}")
+            }),
+            graph_snapshot_json: saved_workflow.graph_json.clone(),
+            source_deployment_id: None,
+            deployed_at: chrono::Utc::now().to_rfc3339(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.append_workflow_deployment(&deployment)
+            .await
+            .expect("append workflow deployment");
+        let listed_deployments = db
+            .list_workflow_deployments(&user.id, &saved_workflow.workflow_id, 10)
+            .await
+            .expect("list workflow deployments");
+        assert_eq!(listed_deployments.len(), 1);
+        assert_eq!(
+            listed_deployments[0]["deployment_id"].as_str(),
+            Some(deployment.deployment_id.as_str())
+        );
+        let run = WorkflowRunRecord {
+            run_id: format!("wfrun_smoke_{suffix}"),
+            workflow_id: saved_workflow.workflow_id.clone(),
+            deployment_id: deployment.deployment_id.clone(),
+            owner_user_id: user.id.clone(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: json!([
+                {
+                    "node_id": "mf_start",
+                    "runtime_kind": "goal_intake",
+                    "status": "completed"
+                }
+            ]),
+            result_json: json!({"summary": "Smoke run completed"}),
+            started_at: chrono::Utc::now().to_rfc3339(),
+            completed_at: Some(chrono::Utc::now().to_rfc3339()),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.append_workflow_run(&run)
+            .await
+            .expect("append workflow run");
+        let listed_runs = db
+            .list_workflow_runs(&user.id, &saved_workflow.workflow_id, 10)
+            .await
+            .expect("list workflow runs");
+        assert_eq!(listed_runs.len(), 1);
+        assert_eq!(listed_runs[0]["run_id"].as_str(), Some(run.run_id.as_str()));
+        let wait_resume = WorkflowWaitResumeRecord {
+            wait_resume_id: format!("wfwait_smoke_{suffix}"),
+            workflow_id: saved_workflow.workflow_id.clone(),
+            deployment_id: deployment.deployment_id.clone(),
+            run_id: run.run_id.clone(),
+            owner_user_id: user.id.clone(),
+            manifest_node_id: "mf_review".to_string(),
+            source_graph_node_id: "review".to_string(),
+            status: "pending".to_string(),
+            resume_family: "approval".to_string(),
+            resume_kind: "human_approval".to_string(),
+            wait_reason: Some("A manager must approve this workflow.".to_string()),
+            scheduled_for: None,
+            descriptor_json: json!({
+                "resume_family": "approval",
+                "resume_kind": "human_approval"
+            }),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            resumed_at: None,
+        };
+        db.append_workflow_wait_resume_record(&wait_resume)
+            .await
+            .expect("append workflow wait resume");
+        let listed_wait_resume = db
+            .list_workflow_wait_resume_records(
+                &user.id,
+                &saved_workflow.workflow_id,
+                &run.run_id,
+                10,
+            )
+            .await
+            .expect("list workflow wait resume");
+        assert_eq!(listed_wait_resume.len(), 1);
+        assert_eq!(
+            listed_wait_resume[0]["wait_resume_id"].as_str(),
+            Some(wait_resume.wait_resume_id.as_str())
+        );
+        let tenant_saved_workflow_count: i64 = sqlx::query_scalar(&format!(
+            "SELECT COUNT(*) FROM \"{}\".saved_workflows WHERE workflow_id = $1",
+            schema_name
+        ))
+        .bind(&saved_workflow.workflow_id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count tenant saved workflow rows");
+        assert_eq!(tenant_saved_workflow_count, 1);
+        let tenant_workflow_deployment_count: i64 = sqlx::query_scalar(&format!(
+            "SELECT COUNT(*) FROM \"{}\".workflow_deployments WHERE workflow_id = $1",
+            schema_name
+        ))
+        .bind(&saved_workflow.workflow_id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count tenant workflow deployment rows");
+        assert_eq!(tenant_workflow_deployment_count, 1);
+        let tenant_workflow_run_count: i64 = sqlx::query_scalar(&format!(
+            "SELECT COUNT(*) FROM \"{}\".workflow_runs WHERE workflow_id = $1",
+            schema_name
+        ))
+        .bind(&saved_workflow.workflow_id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count tenant workflow run rows");
+        assert_eq!(tenant_workflow_run_count, 1);
+        let public_saved_workflow_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM public.saved_workflows WHERE workflow_id = $1",
+        )
+        .bind(&saved_workflow.workflow_id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap_or(0);
+        assert_eq!(public_saved_workflow_count, 0);
+        let public_workflow_deployment_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM public.workflow_deployments WHERE workflow_id = $1",
+        )
+        .bind(&saved_workflow.workflow_id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap_or(0);
+        assert_eq!(public_workflow_deployment_count, 0);
+        let public_workflow_run_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM public.workflow_runs WHERE workflow_id = $1")
+                .bind(&saved_workflow.workflow_id)
                 .fetch_one(&db.pool)
                 .await
-                .expect("count public llm usage rows");
-        assert_eq!(public_llm_usage_count, 0);
-          let llm_view = db
-              .get_llm_config(&user.id)
-              .await
-              .expect("get llm config after usage")
-              .expect("llm config exists after usage");
-          assert_eq!(llm_view["usage_cents_current_month"], 33);
+                .unwrap_or(0);
+        assert_eq!(public_workflow_run_count, 0);
 
-          let saved_workflow = SavedWorkflowRecord {
-              workflow_id: format!("wf_{suffix}"),
-              owner_user_id: user.id.clone(),
-              title: "Smoke workflow".to_string(),
-              description: Some("Tenant-local saved workflow smoke test".to_string()),
-              favorite: true,
-              preset_kinds: vec!["research_assistant".to_string()],
-              graph_json: json!({
-                  "version": "omnyid-workflow.v1",
-                  "workflow_id": format!("wf_{suffix}"),
-                  "title": "Smoke workflow",
-                  "status": "draft",
-                  "environment": "dev",
-                  "owner_user_id": user.id,
-                  "root_node_ids": ["node_trigger"],
-                  "nodes": [
-                      {
-                          "id": "node_trigger",
-                          "kind": "trigger",
-                          "label": "Manual start",
-                          "position": {"x": 0, "y": 0},
-                          "inputs": [],
-                          "outputs": [],
-                          "policy": {
-                              "mask": "private",
-                              "approval_mode": "none",
-                              "allowed_tools": [],
-                              "allowed_capabilities": [],
-                              "max_steps": 1,
-                              "max_cost_cents": 0,
-                              "outbound_allowlist": []
-                          },
-                          "metadata": {},
-                          "hidden_runtime_nodes": [],
-                          "config": {
-                              "trigger_kind": "manual",
-                              "event_filter": {}
-                          }
-                      }
-                  ],
-                  "edges": [],
-                  "presets": [],
-                  "optimization_mode": "balanced",
-                  "metadata": {}
-              }),
-              latest_ir_json: None,
-              created_at: chrono::Utc::now().to_rfc3339(),
-              updated_at: chrono::Utc::now().to_rfc3339(),
-              archived_at: None,
-          };
-          db.upsert_saved_workflow(&saved_workflow)
-              .await
-              .expect("save workflow");
-          let listed_workflows = db
-              .list_saved_workflows(&user.id, false, 10)
-              .await
-              .expect("list saved workflows");
-          assert!(listed_workflows
-              .iter()
-              .any(|entry| entry["workflow_id"] == saved_workflow.workflow_id));
-          let workflow_detail = db
-              .get_saved_workflow(&user.id, &saved_workflow.workflow_id)
-              .await
-              .expect("get saved workflow");
-          assert_eq!(workflow_detail["title"], "Smoke workflow");
-          let deployment = WorkflowDeploymentRecord {
-              deployment_id: format!("wfdep_smoke_{suffix}"),
-              workflow_id: saved_workflow.workflow_id.clone(),
-              owner_user_id: user.id.clone(),
-              environment: "dev".to_string(),
-              status: "active".to_string(),
-              ir_snapshot_json: json!({
-                  "version": "omnyid-workflow-ir.v1",
-                  "deployment_id": format!("wfdep_smoke_{suffix}")
-              }),
-              graph_snapshot_json: saved_workflow.graph_json.clone(),
-              source_deployment_id: None,
-              deployed_at: chrono::Utc::now().to_rfc3339(),
-              created_at: chrono::Utc::now().to_rfc3339(),
-          };
-          db.append_workflow_deployment(&deployment)
-              .await
-              .expect("append workflow deployment");
-          let listed_deployments = db
-              .list_workflow_deployments(&user.id, &saved_workflow.workflow_id, 10)
-              .await
-              .expect("list workflow deployments");
-          assert_eq!(listed_deployments.len(), 1);
-          assert_eq!(
-              listed_deployments[0]["deployment_id"].as_str(),
-              Some(deployment.deployment_id.as_str())
-          );
-          let run = WorkflowRunRecord {
-              run_id: format!("wfrun_smoke_{suffix}"),
-              workflow_id: saved_workflow.workflow_id.clone(),
-              deployment_id: deployment.deployment_id.clone(),
-              owner_user_id: user.id.clone(),
-              status: "completed".to_string(),
-              trigger_kind: "manual".to_string(),
-              replay_of_run_id: None,
-              timeline_json: json!([
-                  {
-                      "node_id": "mf_start",
-                      "runtime_kind": "goal_intake",
-                      "status": "completed"
-                  }
-              ]),
-              result_json: json!({"summary": "Smoke run completed"}),
-              started_at: chrono::Utc::now().to_rfc3339(),
-              completed_at: Some(chrono::Utc::now().to_rfc3339()),
-              created_at: chrono::Utc::now().to_rfc3339(),
-          };
-          db.append_workflow_run(&run)
-              .await
-              .expect("append workflow run");
-          let listed_runs = db
-              .list_workflow_runs(&user.id, &saved_workflow.workflow_id, 10)
-              .await
-              .expect("list workflow runs");
-          assert_eq!(listed_runs.len(), 1);
-          assert_eq!(listed_runs[0]["run_id"].as_str(), Some(run.run_id.as_str()));
-          let tenant_saved_workflow_count: i64 = sqlx::query_scalar(&format!(
-              "SELECT COUNT(*) FROM \"{}\".saved_workflows WHERE workflow_id = $1",
-              schema_name
-          ))
-          .bind(&saved_workflow.workflow_id)
-          .fetch_one(&db.pool)
-          .await
-          .expect("count tenant saved workflow rows");
-          assert_eq!(tenant_saved_workflow_count, 1);
-          let tenant_workflow_deployment_count: i64 = sqlx::query_scalar(&format!(
-              "SELECT COUNT(*) FROM \"{}\".workflow_deployments WHERE workflow_id = $1",
-              schema_name
-          ))
-          .bind(&saved_workflow.workflow_id)
-          .fetch_one(&db.pool)
-          .await
-          .expect("count tenant workflow deployment rows");
-          assert_eq!(tenant_workflow_deployment_count, 1);
-          let tenant_workflow_run_count: i64 = sqlx::query_scalar(&format!(
-              "SELECT COUNT(*) FROM \"{}\".workflow_runs WHERE workflow_id = $1",
-              schema_name
-          ))
-          .bind(&saved_workflow.workflow_id)
-          .fetch_one(&db.pool)
-          .await
-          .expect("count tenant workflow run rows");
-          assert_eq!(tenant_workflow_run_count, 1);
-          let public_saved_workflow_count: i64 =
-              sqlx::query_scalar("SELECT COUNT(*) FROM public.saved_workflows WHERE workflow_id = $1")
-                  .bind(&saved_workflow.workflow_id)
-                  .fetch_one(&db.pool)
-                  .await
-                  .unwrap_or(0);
-          assert_eq!(public_saved_workflow_count, 0);
-          let public_workflow_deployment_count: i64 =
-              sqlx::query_scalar("SELECT COUNT(*) FROM public.workflow_deployments WHERE workflow_id = $1")
-                  .bind(&saved_workflow.workflow_id)
-                  .fetch_one(&db.pool)
-                  .await
-                  .unwrap_or(0);
-          assert_eq!(public_workflow_deployment_count, 0);
-          let public_workflow_run_count: i64 =
-              sqlx::query_scalar("SELECT COUNT(*) FROM public.workflow_runs WHERE workflow_id = $1")
-                  .bind(&saved_workflow.workflow_id)
-                  .fetch_one(&db.pool)
-                  .await
-                  .unwrap_or(0);
-          assert_eq!(public_workflow_run_count, 0);
-
-          let private_message = Message {
-              protocol: "afp-v1".to_string(),
+        let private_message = Message {
+            protocol: "afp-v1".to_string(),
             id: format!("msg_{suffix}"),
             thread_id: format!("private-thread-{suffix}"),
             parent_id: String::new(),
@@ -6581,13 +7391,9 @@ mod tests {
             subtype: "message".to_string(),
             metadata: json!({"scope": "private_smoke"}).to_string(),
         };
-        db.store_private_message(
-            &user.id,
-            &private_message,
-            json!({"body": "private hello"}),
-        )
-        .await
-        .expect("store private message");
+        db.store_private_message(&user.id, &private_message, json!({"body": "private hello"}))
+            .await
+            .expect("store private message");
         let private_thread = db
             .get_private_thread(&user.id, &private_message.thread_id)
             .await

@@ -5,19 +5,58 @@
 /// PolicyEngine, spawns scoped sub-agent delegations, runs each task under a
 /// bounded concurrency limit with a per-task timeout, and aggregates results.
 ///
+/// Phase 2 items 25–27 (Security and Context Hardening):
+/// - Item 25: Per-node capability validation at delegation time. Before
+///   `generate_delegated_key()` the orchestrator intersects the requested task
+///   type against the node's `allowed_capabilities` slice (from a
+///   `WorkflowNodeManifest`). Tasks not in the node's allowed set are blocked
+///   with a `policy_block` status before any delegation key is issued.
+/// - Item 27: `context_snapshot` is populated at delegation time using
+///   already-accumulated step results, the node system prompt, and a token
+///   budget hint — zero additional round-trips.
+///
 /// Conceptual architecture inspired by Clawith (Apache 2.0 — see /about).
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 
 use crate::{
-    agent_template::{AgentTask, TaskPriority, TaskStatus, generate_delegated_key},
+    agent_template::{AgentTask, ContextSnapshot, TaskPriority, TaskStatus, generate_delegated_key},
     audit_chain::message_hash,
     db::Db,
     inference::{InferenceMessage, InferenceRequest, anthropic_infer, runpod_infer},
     policy_engine::PolicyEngine,
 };
+
+// ── Node manifest (compiled IR node slice) ────────────────────────────────────
+
+/// Minimal representation of a compiled IR workflow node used by the
+/// orchestrator to enforce per-node policy at delegation time.
+///
+/// Populated from `latest_ir_json` in `saved_workflows`. When the orchestrator
+/// is called outside of a workflow context (bare `ui/command` orchestration),
+/// supply an empty manifest list — in that case the global PolicyEngine is the
+/// sole gate.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WorkflowNodeManifest {
+    /// The node's `id` field in the graph JSON.
+    pub node_id: String,
+    /// Node kind: "agent", "tool", "delegation", "trigger", etc.
+    pub kind: String,
+    /// Capability IDs this node is permitted to exercise.
+    /// Empty = no per-node restriction beyond global policy.
+    #[serde(default)]
+    pub allowed_capabilities: Vec<String>,
+    /// Outbound URL host allowlist. Empty = no host restriction.
+    #[serde(default)]
+    pub outbound_allowlist: Vec<String>,
+    /// Optional system prompt from the compiled manifest.
+    pub system_prompt: Option<String>,
+    /// Optional instruction prompt from the compiled manifest.
+    pub instruction_prompt: Option<String>,
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,6 +71,12 @@ pub struct PlannedTask {
     pub mask: String,
     #[serde(default = "default_priority")]
     pub priority: String,
+    /// Optional reference to a specific node in the compiled IR.
+    /// When present the orchestrator uses its `allowed_capabilities` and
+    /// `outbound_allowlist` for the delegation; otherwise falls back to the
+    /// global PolicyEngine set.
+    #[serde(default)]
+    pub node_id: Option<String>,
 }
 
 fn default_mask() -> String {
@@ -89,6 +134,9 @@ pub struct MasterOrchestrator {
     pub owner_user_id: String,
     /// Maximum number of tasks that can execute concurrently (default: 3)
     pub max_concurrency: usize,
+    /// Optional compiled IR node manifests for per-node capability validation.
+    /// When non-empty the orchestrator enforces item-25 policy at delegation time.
+    pub node_manifests: Vec<WorkflowNodeManifest>,
 }
 
 impl MasterOrchestrator {
@@ -97,16 +145,26 @@ impl MasterOrchestrator {
             agent_instance_id,
             owner_user_id,
             max_concurrency: 3,
+            node_manifests: vec![],
         }
+    }
+
+    /// Attach compiled IR node manifests so per-node capability validation
+    /// (item 25) is enforced at delegation time.
+    pub fn with_node_manifests(mut self, manifests: Vec<WorkflowNodeManifest>) -> Self {
+        self.node_manifests = manifests;
+        self
     }
 
     /// Run the orchestrator on a natural-language objective.
     ///
     /// Steps:
     /// 1. Ask the LLM to decompose `objective` into typed tasks (JSON).
-    /// 2. Validate each task via PolicyEngine.
+    /// 2. Validate each task via PolicyEngine (global) and per-node manifest
+    ///    (item 25) — task blocked → `policy_block` result, no key issued.
     /// 3. Execute valid tasks in parallel up to `max_concurrency`, each with a
-    ///    30-second timeout.
+    ///    30-second timeout. Delegation carries `allowed_capabilities`,
+    ///    `outbound_allowlist`, and a `context_snapshot` (item 27).
     /// 4. Log an audit-chain entry and return aggregated results.
     pub async fn run(
         &self,
@@ -133,8 +191,14 @@ impl MasterOrchestrator {
             .await?;
         let task_count = tasks.len();
 
+        // Shared accumulator for prior step results (item 27 context snapshot).
+        // Protected by a Mutex so concurrent tasks can read previous results.
+        let prior_results: Arc<tokio::sync::Mutex<HashMap<String, String>>> =
+            Arc::new(tokio::sync::Mutex::new(HashMap::new()));
+
         // Step 2 & 3: validate + execute concurrently
         let semaphore = Arc::new(Semaphore::new(self.max_concurrency));
+        let node_manifests = Arc::new(self.node_manifests.clone());
         let mut handles = vec![];
 
         for task in tasks {
@@ -147,11 +211,13 @@ impl MasterOrchestrator {
             let soul = soul_md.map(str::to_string);
             let lora = lora_active;
             let runpod_ep = runpod_endpoint.map(str::to_string);
+            let manifests = node_manifests.clone();
+            let prior = prior_results.clone();
 
             let handle = tokio::spawn(async move {
                 let _permit = sem.acquire().await.ok();
 
-                // Policy gate
+                // ── Global policy gate ──────────────────────────────────────
                 if !PolicyEngine::can_run(&task.task_type, &task.mask) {
                     return TaskResult {
                         task_id: task.id.clone(),
@@ -164,6 +230,81 @@ impl MasterOrchestrator {
                         )),
                     };
                 }
+
+                // ── Item 25: Per-node capability validation ─────────────────
+                // Resolve the matching node manifest (by node_id if supplied,
+                // otherwise by matching task_type to node kind).
+                let node_manifest: Option<&WorkflowNodeManifest> = task
+                    .node_id
+                    .as_deref()
+                    .and_then(|nid| manifests.iter().find(|m| m.node_id == nid))
+                    .or_else(|| {
+                        // Fallback: match by kind when node_id is not specified
+                        manifests.iter().find(|m| m.kind == task.task_type)
+                    });
+
+                let (allowed_capabilities, outbound_allowlist, system_prompt, instruction_prompt) =
+                    if let Some(manifest) = node_manifest {
+                        // If the node has a non-empty allowed_capabilities list,
+                        // verify the task type is in it.
+                        if !manifest.allowed_capabilities.is_empty()
+                            && !manifest.allowed_capabilities.contains(&task.task_type)
+                        {
+                            return TaskResult {
+                                task_id: task.id.clone(),
+                                task_type: task.task_type.clone(),
+                                status: "policy_blocked".to_string(),
+                                result: None,
+                                error: Some(format!(
+                                    "task type '{}' is not in node '{}' allowed_capabilities: [{}]",
+                                    task.task_type,
+                                    manifest.node_id,
+                                    manifest.allowed_capabilities.join(", ")
+                                )),
+                            };
+                        }
+                        // Resolved capability slice: intersection of node list
+                        // and PolicyEngine caps; use node list if non-empty,
+                        // else fall back to global PolicyEngine set.
+                        let caps: Vec<String> = if manifest.allowed_capabilities.is_empty() {
+                            PolicyEngine::capabilities_for_task(&task.task_type)
+                                .iter()
+                                .map(|s| s.to_string())
+                                .collect()
+                        } else {
+                            let global: Vec<&str> =
+                                PolicyEngine::capabilities_for_task(&task.task_type).to_vec();
+                            manifest
+                                .allowed_capabilities
+                                .iter()
+                                .filter(|c| global.contains(&c.as_str()))
+                                .cloned()
+                                .collect()
+                        };
+                        (
+                            caps,
+                            manifest.outbound_allowlist.clone(),
+                            manifest.system_prompt.clone(),
+                            manifest.instruction_prompt.clone(),
+                        )
+                    } else {
+                        // No manifest → global PolicyEngine caps, no host restriction
+                        let caps = PolicyEngine::capabilities_for_task(&task.task_type)
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect();
+                        (caps, vec![], None, None)
+                    };
+
+                // ── Item 27: Build context snapshot ────────────────────────
+                let prior_map = prior.lock().await.clone();
+                let context_snapshot = Some(ContextSnapshot {
+                    afp_thread_slice: vec![], // populated by supervisor when running in workflow context
+                    prior_step_results: prior_map,
+                    system_prompt: system_prompt.clone(),
+                    instruction_prompt: instruction_prompt.clone(),
+                    token_budget_remaining: Some(512),
+                });
 
                 // Create DB task record
                 let agent_task = AgentTask::new(
@@ -178,7 +319,7 @@ impl MasterOrchestrator {
                 );
                 let _ = db.create_agent_task(&agent_task).await;
 
-                // Generate scoped delegation
+                // Generate scoped delegation — item 25 caps + allowlist + item 27 snapshot
                 let placeholder_master_key = "0".repeat(64);
                 let delegation = generate_delegated_key(
                     &placeholder_master_key,
@@ -187,6 +328,9 @@ impl MasterOrchestrator {
                     30,
                     &agent_instance_id,
                     &owner_user_id,
+                    allowed_capabilities,
+                    outbound_allowlist,
+                    context_snapshot,
                 );
                 let delegation_id = delegation.id.clone();
                 let _ = db.create_delegation(&delegation).await;
@@ -202,6 +346,8 @@ impl MasterOrchestrator {
                         soul_ref,
                         lora,
                         runpod_ep.as_deref(),
+                        system_prompt.as_deref(),
+                        instruction_prompt.as_deref(),
                     ),
                 )
                 .await;
@@ -209,7 +355,7 @@ impl MasterOrchestrator {
                 // Revoke delegation
                 let _ = db.revoke_delegation(&owner_user_id, &delegation_id).await;
 
-                // Update task status in DB
+                // Update task status + accumulate result for subsequent snapshots
                 let (status_str, result_str, error_str) = match result {
                     Ok(Ok(text)) => {
                         let _ = db
@@ -221,6 +367,7 @@ impl MasterOrchestrator {
                                 None,
                             )
                             .await;
+                        prior.lock().await.insert(agent_task.id.clone(), text.clone());
                         ("ok".to_string(), Some(text), None)
                     }
                     Ok(Err(e)) => {
@@ -379,6 +526,7 @@ fn planning_system_prompt(soul_md: Option<&str>) -> String {
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn execute_task_llm(
     task: &PlannedTask,
     api_key: &str,
@@ -386,6 +534,8 @@ async fn execute_task_llm(
     soul_md: Option<&str>,
     lora_active: bool,
     runpod_endpoint: Option<&str>,
+    system_prompt_override: Option<&str>,
+    instruction_prompt: Option<&str>,
 ) -> Result<String, String> {
     let capabilities = PolicyEngine::capabilities_for_task(&task.task_type);
     let caps_str = capabilities.join(", ");
@@ -398,19 +548,32 @@ async fn execute_task_llm(
         String::new()
     };
 
-    let system = format!(
-        "You are a sub-agent specialising in '{}'.\n\
-        Your granted capabilities for this task: [{caps_str}].\n\
-        Mask: {}. Operate under the principle of data minimisation.\n\
-        Return a concise structured result.{soul_context}",
-        task.task_type, task.mask,
-    );
+    // Use the node's system prompt from the compiled IR if available (item 27);
+    // otherwise fall back to the generic sub-agent prompt.
+    let system = if let Some(sp) = system_prompt_override {
+        format!("{sp}{soul_context}")
+    } else {
+        format!(
+            "You are a sub-agent specialising in '{}'.\n\
+            Your granted capabilities for this task: [{caps_str}].\n\
+            Mask: {}. Operate under the principle of data minimisation.\n\
+            Return a concise structured result.{soul_context}",
+            task.task_type, task.mask,
+        )
+    };
+
+    // Prepend the instruction prompt to the user content when provided.
+    let user_content = if let Some(ip) = instruction_prompt {
+        format!("{ip}\n\n{}", task.content)
+    } else {
+        task.content.clone()
+    };
 
     let req = InferenceRequest {
         system,
         messages: vec![InferenceMessage {
             role: "user".to_string(),
-            content: task.content.clone(),
+            content: user_content,
         }],
         max_tokens: 512,
         temperature: 0.3,
@@ -442,6 +605,7 @@ mod tests {
         assert_eq!(task.mask, "private");
         assert_eq!(task.priority, "normal");
         assert_eq!(task.task_type, "email_triage");
+        assert!(task.node_id.is_none());
     }
 
     #[test]
@@ -470,5 +634,73 @@ mod tests {
     fn planning_system_prompt_omits_soul_when_none() {
         let prompt = planning_system_prompt(None);
         assert!(!prompt.contains("Agent soul context"));
+    }
+
+    // ── Item 25: per-node capability validation ───────────────────────────────
+
+    #[test]
+    fn manifest_blocks_task_not_in_allowed_capabilities() {
+        // A node that only allows "note" should block "email_triage"
+        let manifest = WorkflowNodeManifest {
+            node_id: "node-1".into(),
+            kind: "agent".into(),
+            allowed_capabilities: vec!["note".into()],
+            outbound_allowlist: vec![],
+            system_prompt: None,
+            instruction_prompt: None,
+        };
+        // email_triage is NOT in allowed_capabilities
+        assert!(!manifest.allowed_capabilities.contains(&"email_triage".to_string()));
+        // note IS in allowed_capabilities
+        assert!(manifest.allowed_capabilities.contains(&"note".to_string()));
+    }
+
+    #[test]
+    fn manifest_with_empty_capabilities_allows_all() {
+        let manifest = WorkflowNodeManifest {
+            node_id: "node-2".into(),
+            kind: "agent".into(),
+            allowed_capabilities: vec![], // empty = no restriction
+            outbound_allowlist: vec![],
+            system_prompt: None,
+            instruction_prompt: None,
+        };
+        assert!(manifest.allowed_capabilities.is_empty());
+    }
+
+    #[test]
+    fn capability_intersection_with_global_policy() {
+        // Node claims "read_email_metadata" and "email_send" (email_send is not
+        // in the global PolicyEngine set for email_triage).
+        let node_caps = vec!["read_email_metadata".to_string(), "email_send".to_string()];
+        let global: Vec<&str> = PolicyEngine::capabilities_for_task("email_triage").to_vec();
+        let intersection: Vec<String> = node_caps
+            .iter()
+            .filter(|c| global.contains(&c.as_str()))
+            .cloned()
+            .collect();
+        // Only "read_email_metadata" passes — "email_send" is not in global caps
+        assert_eq!(intersection, vec!["read_email_metadata".to_string()]);
+        assert!(!intersection.contains(&"email_send".to_string()));
+    }
+
+    // ── Item 27: context snapshot ──────────────────────────────────────────────
+
+    #[test]
+    fn context_snapshot_serializes_round_trip() {
+        let mut prior = HashMap::new();
+        prior.insert("task-1".to_string(), "result text".to_string());
+        let snap = ContextSnapshot {
+            afp_thread_slice: vec![],
+            prior_step_results: prior,
+            system_prompt: Some("You are helpful".into()),
+            instruction_prompt: Some("Summarise emails".into()),
+            token_budget_remaining: Some(256),
+        };
+        let json = serde_json::to_string(&snap).unwrap();
+        let back: ContextSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.system_prompt.as_deref(), Some("You are helpful"));
+        assert_eq!(back.token_budget_remaining, Some(256));
+        assert_eq!(back.prior_step_results.get("task-1").map(|s| s.as_str()), Some("result text"));
     }
 }

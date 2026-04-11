@@ -12,6 +12,7 @@ import { TaskCardRenderer } from "@/components/renderers/TaskCardRenderer";
 import { GenerativeCardRenderer } from "@/components/renderers/GenerativeCardRenderer";
 import { BlueprintRenderer } from "@/components/renderers/BlueprintRenderer";
 import { A2UIRenderer } from "@/components/renderers/A2UIRenderer";
+import { PresentationCardRenderer } from "@/components/renderers/PresentationCardRenderer";
 
 /**
  * The agent-first renderer registry.
@@ -31,6 +32,8 @@ export function ViewDispatcher(props: {
   /** card_section_update messages belonging to this card (for generative_card format) */
   cardUpdates?: AfpMessage[];
   onDecision?: (cardId: string, dpId: string, optionId: string) => void;
+  /** Called by ui_presentation cards when user clicks "View workflow →" */
+  onViewWorkflow?: () => void;
 }) {
   const chosenView = () => props.viewOverride ?? pickView(props.message, [...KNOWN_VIEW_FORMATS]);
 
@@ -48,6 +51,7 @@ export function ViewDispatcher(props: {
     if (t.includes("canvas") || t.includes("note")) return "canvas";
     if (t.includes("attachment") || t.includes("file")) return "attachments";
     if (t.includes("approval") || t.includes("decision") || t.includes("review")) return "approvals";
+    if (t === "agent" && subtype === "ui_presentation") return "ui_presentation";
     if (t === "agent" && subtype === "orchestration_card") return "generative_card";
     if (t === "agent" && subtype === "plan") return "task_card";
     if (t === "agent" && (subtype === "dashboard_panel" || subtype === "runner_editor" || subtype === "workspace_panel")) return "a2ui.v1";
@@ -104,6 +108,13 @@ export function ViewDispatcher(props: {
         <Show when={effectiveFormat() === "a2ui.v1"}>
           <A2UIRenderer message={props.message} view={chosenView() ?? undefined} />
         </Show>
+        <Show when={effectiveFormat() === "ui_presentation"}>
+          <PresentationCardRenderer
+            message={props.message}
+            view={chosenView() ?? undefined}
+            onViewWorkflow={props.onViewWorkflow}
+          />
+        </Show>
         <Show when={effectiveFormat() === "ui_blueprint" || effectiveFormat() === "blueprint"}>
           <BlueprintRenderer message={props.message} view={chosenView() ?? undefined} />
         </Show>
@@ -127,6 +138,7 @@ function FormatBadge(props: { format: string; agentDriven: boolean }) {
       "a2ui.v1": "A2UI",
       ui_blueprint: "Blueprint",
       blueprint: "Blueprint",
+      ui_presentation: "Presentation",
     };
     return map[props.format] ?? props.format;
   };

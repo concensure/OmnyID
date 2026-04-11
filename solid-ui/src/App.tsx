@@ -17,6 +17,8 @@ import { SearchBar } from "@/components/SearchBar";
 import { ThreadView } from "@/components/ThreadView";
 import { ViewDispatcher } from "@/components/ViewDispatcher";
 import { WorkflowsView } from "@/components/WorkflowsView";
+import { CofounderStudioView } from "@/components/CofounderStudioView";
+import { KnowledgeGraphView } from "@/components/KnowledgeGraphView";
 import {
   apiFetch,
   type AfpMessage,
@@ -586,6 +588,38 @@ function commandResponseToPreviewMessage(command: UiCommandResponse, query: stri
     };
   }
 
+  // ── Universal UI Presentation (intent: "trip_planner" or any orchestrate with rich content)
+  // Produces a ui_presentation AFP message that PresentationCardRenderer renders as
+  // interactive, domain-aware UI cards. Domain + card set are detected client-side
+  // from the query, so no server changes are needed for new domains.
+  // To add a new domain: update DOMAIN_SIGNALS + DOMAIN_DEFAULT_CARDS in presentationState.ts.
+  const isPresentation = command.intent === "trip_planner"
+    || (command.preferred_view ?? "") === "trip_planner"
+    || (command.preferred_view ?? "") === "ui_presentation";
+
+  if (isPresentation) {
+    const presentationContent = {
+      query,
+      summary: command.summary,
+      bullets: command.bullets ?? [],
+      sources: (command.links ?? []).map((l) => ({ title: l.title, url: l.url })),
+    };
+    return {
+      ...base,
+      type: "agent",
+      subtype: "ui_presentation",
+      content: presentationContent,
+      metadata: { origin: "workspace_command_preview", intent: command.intent },
+      views: [
+        {
+          format: "ui_presentation",
+          priority: 100,
+          content: presentationContent,
+        },
+      ],
+    };
+  }
+
   if (command.intent === "orchestrate" || (command.preferred_view ?? "") === "orchestrate_progress") {
     const cardId = command.card_id ?? "card.preview.local";
     const generativeContent = {
@@ -999,7 +1033,7 @@ function App() {
 
 
   return (
-    <main class="min-h-screen p-4 text-on-surface">
+    <main class="min-h-screen p-4 md:p-6 text-on-surface">
       {/* Guided tour — first-time visitors */}
       <Show when={showTour()}>
         <GuidedTour onComplete={() => {
@@ -1015,17 +1049,17 @@ function App() {
 
       {/* Guest mode banner */}
       <Show when={!session()?.token}>
-        <div class="mx-auto mb-4 max-w-[1700px] flex items-center justify-between gap-4 rounded-2xl border border-outline-variant/30 bg-white/30 px-5 py-3 text-sm text-on-surface-variant backdrop-blur-sm">
+        <div class="mx-auto mb-4 max-w-[1700px] flex items-center justify-between gap-4 rounded-2xl border border-amber-200/50 bg-amber-50/60 px-5 py-3 text-sm text-on-surface-variant backdrop-blur-sm animate-fade-in">
           <span>
-            You're in <strong class="text-on-surface">guest mode</strong> — sandbox isolation, up to 3 sessions.
+            You're in <strong class="text-on-surface">guest mode</strong> — most actions require a signed-in account.
           </span>
-          <a href="/" class="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90">
-            Sign in for full access
+          <a href="/?open_auth=1" class="glass-button rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 shadow-sm">
+            Sign in →
           </a>
         </div>
       </Show>
 
-      <GlassPanel class="mx-auto max-w-[1700px] p-5 lg:p-7">
+      <GlassPanel class="mx-auto max-w-[1700px] p-5 lg:p-8">
         <NavBar
           activeView={activeView()}
           onSelect={selectView}
@@ -1039,15 +1073,15 @@ function App() {
 
         {/* Fleet pane — slides in below nav when user clicks active/idle badge */}
         <Show when={fleetOpen()}>
-          <div class="mt-4 glass-surface rounded-[20px] border border-white/40 p-5 shadow-panel overflow-auto max-h-[70vh]">
+          <div class="mt-4 glass-surface animate-slide-down rounded-[20px] border border-white/50 p-5 shadow-panel overflow-auto max-h-[70vh]">
             <AgentFleetView />
           </div>
         </Show>
 
         {/* Chat bar — always visible */}
-        <div class="mt-6">
+        <div class="mt-7">
           <SearchBar onSubmit={handleSearch} busy={searchBusy()} />
-          <div class="mt-2 flex flex-wrap items-center justify-center gap-3">
+          <div class="mt-2.5 flex flex-wrap items-center justify-center gap-3">
             <Show when={searchFeedback()}>
               <p class="text-center text-sm leading-7 text-on-surface-variant">
                 {searchFeedback()}
@@ -1062,25 +1096,66 @@ function App() {
         </div>
 
         {/* 2-column layout (left sidebar removed) */}
-        <div class="mt-4 flex gap-3" style="min-height: 620px">
+        <div class="mt-5 flex gap-4" style="min-height: 620px">
 
           {/* ── MAIN CONTENT ─────────────────────────────────────────── */}
           <div class="min-w-0 flex-1 overflow-hidden">
 
             {/* Chat / search view */}
             <Show when={activeView() === "search"}>
-              <div class="space-y-6">
+              <div class="view-enter space-y-5">
                 {/* Search result card — shown when a command has been run */}
                 <Show when={commandPreviewMessage()}>
                   {(preview) => (
                     <div class="space-y-3">
-                      <ViewDispatcher message={preview()} />
+                      <ViewDispatcher
+                        message={preview()}
+                        onViewWorkflow={() => selectView("workflows")}
+                      />
                       <Show when={advanced()}>
                         <AlternateViewsInspector message={preview()} compact />
+                      </Show>
+                      {/* Canvas switch pill — shown for orchestrate/workflow intents */}
+                      <Show when={
+                        commandResult()?.intent === "orchestrate" ||
+                        commandResult()?.intent === "trip_planner"
+                      }>
+                        <div class="flex justify-end">
+                          <button
+                            type="button"
+                            class="animate-fade-in rounded-full border border-outline-variant/40 bg-white/50 px-4 py-1.5 text-xs font-medium text-on-surface-variant transition hover:border-primary/40 hover:text-primary"
+                            onClick={() => selectView("workflows")}
+                          >
+                            View workflow on canvas →
+                          </button>
+                        </div>
                       </Show>
                     </div>
                   )}
                 </Show>
+                {/* AI Co-Founder Launchpad card */}
+                <div
+                  class="card-hover cursor-pointer rounded-[22px] border border-indigo-200/60 bg-gradient-to-br from-indigo-50/80 via-violet-50/70 to-sky-50/80 p-5 shadow-card transition hover:border-indigo-300/70 backdrop-blur-sm"
+                  onClick={() => selectView("cofounder_studio")}
+                  role="button"
+                  tabindex={0}
+                  onKeyDown={(e) => e.key === "Enter" && selectView("cofounder_studio")}
+                >
+                  <div class="flex items-start gap-4">
+                    <span class="text-3xl leading-none select-none">🚀</span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-bold text-indigo-900">AI Co-Founder Launchpad</p>
+                      <p class="mt-0.5 text-xs text-indigo-700/80">Turn your raw idea into a validated concept, full asset kit &amp; scheduled social content — all private, all E2EE.</p>
+                      <div class="mt-2 flex flex-wrap gap-1.5">
+                        {["Market research", "Dream Score", "Business plan", "Social content"].map(tag => (
+                          <span class="rounded-full border border-indigo-200/60 bg-indigo-50/80 px-2 py-0.5 text-[10px] font-medium text-indigo-700">{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <span class="text-indigo-400 text-sm font-medium self-center">→</span>
+                  </div>
+                </div>
+
                 <DashboardFeed
                   bootstrap={dashboard()}
                   commandSummary={commandResult() ? undefined : undefined}
@@ -1092,59 +1167,76 @@ function App() {
 
             {/* Threads view */}
               <Show when={activeView() === "threads"}>
-                <Show
-                  when={openThreadId()}
-                fallback={
-                  <ThreadListFallback
-                    threadIds={(dashboard()?.messages ?? []).map((m) => m.thread_id)}
-                    onOpen={openThread}
-                  />
-                }
-              >
-                <ThreadView
-                  threadId={openThreadId()!}
-                  advanced={advanced()}
-                  onBack={() => { setOpenThreadId(null); persistPrefs("threads", null); }}
-                />
-              </Show>
+                <div class="view-enter">
+                  <Show
+                    when={openThreadId()}
+                    fallback={
+                      <ThreadListFallback
+                        threadIds={(dashboard()?.messages ?? []).map((m) => m.thread_id)}
+                        onOpen={openThread}
+                      />
+                    }
+                  >
+                    <ThreadView
+                      threadId={openThreadId()!}
+                      advanced={advanced()}
+                      onBack={() => { setOpenThreadId(null); persistPrefs("threads", null); }}
+                    />
+                  </Show>
+                </div>
               </Show>
 
               <Show when={activeView() === "workflows"}>
-                <WorkflowsView />
+                <div class="view-enter"><WorkflowsView /></div>
+              </Show>
+
+              <Show when={activeView() === "cofounder_studio"}>
+                <div class="view-enter">
+                  <CofounderStudioView onNavigateBack={() => selectView("search")} />
+                </div>
               </Show>
 
               {/* Email view */}
               <Show when={activeView() === "email"}>
-              <EmailView bootstrap={dashboard()} signedIn={Boolean(session()?.token)} />
-            </Show>
+                <div class="view-enter">
+                  <EmailView bootstrap={dashboard()} signedIn={Boolean(session()?.token)} />
+                </div>
+              </Show>
 
-            {/* Note view — AFP messages filtered by type containing "note" */}
+            {/* Note view — notes feed + Knowledge Graph section */}
             <Show when={activeView() === "note"}>
-              <DashboardFeed
-                bootstrap={(() => {
-                  const d = dashboard();
-                  if (!d) return null;
-                  return { ...d, messages: d.messages.filter((m) => m.type.includes("note")) };
-                })()}
-                onOpenThread={openThread}
-              />
+              <div class="view-enter flex flex-col gap-6">
+                <DashboardFeed
+                  bootstrap={(() => {
+                    const d = dashboard();
+                    if (!d) return null;
+                    return { ...d, messages: d.messages.filter((m) => m.type.includes("note")) };
+                  })()}
+                  onOpenThread={openThread}
+                />
+                <div class="rounded-3xl border border-white/50 bg-white/35 p-5 backdrop-blur shadow-card">
+                  <KnowledgeGraphView messages={dashboard()?.messages ?? []} />
+                </div>
+              </div>
             </Show>
 
             {/* Calendar view — monthly interactive calendar */}
             <Show when={activeView() === "calendar"}>
-              <MonthlyCalendarView />
+              <div class="view-enter"><MonthlyCalendarView /></div>
             </Show>
 
             {/* Database view — AFP messages filtered by type containing "database" or "table" */}
             <Show when={activeView() === "database"}>
-              <DashboardFeed
-                bootstrap={(() => {
-                  const d = dashboard();
-                  if (!d) return null;
-                  return { ...d, messages: d.messages.filter((m) => m.type.includes("database") || m.type.includes("table")) };
-                })()}
-                onOpenThread={openThread}
-              />
+              <div class="view-enter">
+                <DashboardFeed
+                  bootstrap={(() => {
+                    const d = dashboard();
+                    if (!d) return null;
+                    return { ...d, messages: d.messages.filter((m) => m.type.includes("database") || m.type.includes("table")) };
+                  })()}
+                  onOpenThread={openThread}
+                />
+              </div>
             </Show>
 
             {/* Runner view — advanced only */}
@@ -1176,32 +1268,36 @@ function App() {
               />
             </Show>
             <Show when={activeView() === "runner" && !advanced()}>
-              <div class="glass-surface rounded-xl border border-white/40 p-8 text-center shadow-panel">
-                <p class="text-sm text-on-surface-variant">Enable <strong>Advanced ▾</strong> in the top nav to access the Python runner.</p>
+              <div class="view-enter glass-surface rounded-3xl border border-white/50 p-10 text-center shadow-card">
+                <p class="text-sm text-on-surface-variant">Enable <strong class="text-on-surface">Advanced ▾</strong> in the top nav to access the Python runner.</p>
               </div>
             </Show>
 
-            {/* Agent Settings view — advanced only */}
+            {/* Agent Settings view */}
             <Show when={activeView() === "agent_settings"}>
-              <AgentSettingsView
-                browserAiLabel={browserAiLabel()}
-                focusLlm={agentSettingsFocusLlm()}
-                onFocusDone={() => setAgentSettingsFocusLlm(false)}
-              />
+              <div class="view-enter">
+                <AgentSettingsView
+                  browserAiLabel={browserAiLabel()}
+                  focusLlm={agentSettingsFocusLlm()}
+                  onFocusDone={() => setAgentSettingsFocusLlm(false)}
+                  signedIn={Boolean(session()?.token)}
+                  onLlmConfigSaved={(cfg) => setLlmConfig(cfg)}
+                />
+              </div>
             </Show>
           </div>
 
           {/* ── RIGHT SIDEBAR ────────────────────────────────────────── */}
           <aside
-            class="flex-shrink-0 overflow-hidden rounded-2xl border border-white/20 bg-white/5"
-            style={`width: ${rightOpen() ? "280px" : "48px"}; transition: width 0.2s ease`}
+            class="flex-shrink-0 overflow-hidden rounded-3xl border border-white/35 bg-white/20 backdrop-blur"
+            style={`width: ${rightOpen() ? "272px" : "44px"}; transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1)`}
           >
             <div class="flex h-full flex-col">
-              <div class="flex flex-shrink-0 justify-end border-b border-white/10 p-2">
+              <div class="flex flex-shrink-0 justify-end border-b border-white/20 px-2 py-2.5">
                 <button
                   type="button"
                   title={rightOpen() ? "Collapse" : "Expand"}
-                  class="flex h-8 w-8 items-center justify-center rounded-lg text-sm text-on-surface-variant hover:bg-white/20"
+                  class="flex h-7 w-7 items-center justify-center rounded-xl text-sm text-on-surface-variant transition hover:bg-white/40"
                   onClick={() => setRightOpen((v) => !v)}
                 >
                   ≡
@@ -1209,24 +1305,24 @@ function App() {
               </div>
 
               <Show when={rightOpen()}>
-                <div class="flex-1 overflow-auto p-3 space-y-4">
+                <div class="flex-1 overflow-auto p-4 space-y-5 animate-fade-in">
                   <div>
-                    <p class="mb-2 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">Mask</p>
+                    <p class="label-caps mb-2">Mask</p>
                     <MaskSwitcher />
                   </div>
 
-                  <div class="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div class="rounded-2xl border border-white/30 bg-white/40 p-3.5">
                     <Show
                       when={session()?.token}
                       fallback={
                         <>
-                          <p class="text-xs font-medium text-yellow-600">Guest mode</p>
-                          <a href="/" class="mt-1 block text-xs text-primary underline">Sign in</a>
+                          <p class="text-xs font-medium text-amber-600">Guest mode</p>
+                          <a href="/" class="mt-1 block text-xs text-primary hover:underline">Sign in →</a>
                         </>
                       }
                     >
-                      <p class="font-mono text-[9px] uppercase tracking-[0.18em] text-outline">Signed in as</p>
-                      <p class="mt-1 text-sm font-medium text-on-surface">{(session() as any)?.user?.display_name ?? "User"}</p>
+                      <p class="label-caps mb-1">Signed in as</p>
+                      <p class="text-sm font-semibold text-on-surface">{(session() as any)?.user?.display_name ?? "User"}</p>
                     </Show>
                   </div>
 
@@ -1236,7 +1332,7 @@ function App() {
 
                   {/* Plaza — Public Feed */}
                   <div>
-                    <p class="mb-2 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">Plaza</p>
+                    <p class="label-caps mb-2.5">Plaza</p>
                     <PublicFeedView isAnon={!session()?.token} />
                   </div>
                 </div>
@@ -1272,14 +1368,14 @@ function AgentStatusPill(props: {
   };
   return (
     <Show when={label()} fallback={
-      <span class="rounded-full border border-white/20 bg-white/10 px-3 py-0.5 font-mono text-[10px] text-on-surface-variant opacity-60">
-        No agent —{" "}
+      <span class="rounded-full border border-red-300/60 bg-red-50/80 px-3 py-1 font-mono text-[11px] font-semibold text-red-600 shadow-sm">
+        ⚠ No AI model —{" "}
         <button
           type="button"
           onClick={props.onSettingsClick}
-          class="underline opacity-80 hover:opacity-100 transition"
+          class="underline text-red-700 hover:text-red-900 transition font-bold"
         >
-          configure in Agent Settings
+          set up in Agent Settings
         </button>
       </span>
     }>

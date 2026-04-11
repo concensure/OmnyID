@@ -49,6 +49,22 @@ export const PresetNodeKindSchema = z.enum([
   'travel_booker',
   'content_publisher',
 ]);
+export const SubagentTemplateIdSchema = z.enum([
+  'linear_worker',
+  'branching_worker',
+  'research_loop',
+  'action_guarded',
+]);
+export const TemplateSlotNameSchema = z.enum([
+  'intake_slot',
+  'context_slot',
+  'planner_slot',
+  'gather_slot',
+  'check_slot',
+  'approval_slot',
+  'merge_slot',
+  'finalize_slot',
+]);
 
 export const WorkflowStatusSchema = z.enum([
   'draft',
@@ -87,8 +103,87 @@ export const WorkflowNodePromptSchema = z.object({
   instruction_prompt: z.string().optional(),
   user_editable: z.boolean().default(true),
 });
+export const TemplateModelHintSchema = z.object({
+  strategy: z.enum(['cheap_reasoning', 'balanced_reasoning', 'high_accuracy']),
+  provider_hint: z.string().optional(),
+  model_hint: z.string().optional(),
+});
+export const TemplateContextSliceSchema = z.object({
+  scope: z.enum([
+    'none',
+    'thread_summary',
+    'workflow_summary',
+    'workspace_slice',
+    'artifact_slice',
+  ]),
+  include_artifact_types: z.array(z.string()).default([]),
+  max_items: z.number().int().positive().default(8),
+});
+export const TemplateCachePolicySchema = z.object({
+  enabled: z.boolean().default(false),
+  artifact_family: z.string().optional(),
+  cache_key_fields: z.array(z.string()).default([]),
+});
+export const TemplateEfficiencyPolicySchema = z.object({
+  inherit_prompt_contract: z.boolean().default(true),
+  model_hint: TemplateModelHintSchema.optional(),
+  context_slice: TemplateContextSliceSchema.optional(),
+  cache_policy: TemplateCachePolicySchema.optional(),
+  early_stop_confidence: z.number().min(0).max(1).optional(),
+  deterministic_pruning: z.boolean().default(true),
+  parallel_group_id: z.string().optional(),
+  max_concurrency: z.number().int().positive().optional(),
+});
+export const TemplateSlotBindingSchema = z.object({
+  slot_name: TemplateSlotNameSchema,
+  label: z.string(),
+  description: z.string().optional(),
+  required: z.boolean().default(true),
+  allowed_primitive_kinds: z.array(PrimitiveNodeKindSchema).min(1),
+  default_primitive_kind: PrimitiveNodeKindSchema,
+  default_runtime_kind: HiddenRuntimeNodeKindSchema.optional(),
+  default_config: z.record(z.any()).default({}),
+  default_policy: z.record(z.any()).default({}),
+  default_prompt: WorkflowNodePromptSchema.optional(),
+  efficiency_policy: TemplateEfficiencyPolicySchema.optional(),
+});
+export const SubagentTemplateSchema = z.object({
+  template_id: SubagentTemplateIdSchema,
+  version: z.literal('omnyid-subagent-template.v1'),
+  label: z.string(),
+  description: z.string(),
+  category: z.enum(['general', 'research', 'action', 'branching']),
+  default_optimization_mode: OptimizationModeSchema.default('balanced'),
+  allowed_preset_kinds: z.array(PresetNodeKindSchema).default([]),
+  slot_bindings: z.array(TemplateSlotBindingSchema).min(1),
+  expansion_rules: z.object({
+    root_slot_names: z.array(TemplateSlotNameSchema).min(1),
+    terminal_slot_names: z.array(TemplateSlotNameSchema).min(1),
+    supports_parallel_fanout: z.boolean().default(false),
+    requires_merge_for_parallel: z.boolean().default(false),
+  }),
+  metadata: z.record(z.any()).default({}),
+});
+export const WorkflowTemplateBindingSchema = z.object({
+  template_id: SubagentTemplateIdSchema,
+  slot_name: TemplateSlotNameSchema,
+  node_ids: z.array(z.string()).min(1),
+  metadata: z.record(z.any()).default({}),
+});
+export const PresetTemplateMappingSchema = z.object({
+  preset_kind: PresetNodeKindSchema,
+  template_id: SubagentTemplateIdSchema,
+  slot_overrides: z.record(z.any()).default({}),
+  metadata: z.record(z.any()).default({}),
+});
 
 const TriggerConfigSchema = z.object({
+  trigger_family: z.enum([
+    'manual',
+    'time',
+    'event',
+    'hybrid',
+  ]).default('manual'),
   trigger_kind: z.enum([
     'manual',
     'schedule',
@@ -98,7 +193,130 @@ const TriggerConfigSchema = z.object({
     'watcher',
   ]),
   schedule: z.string().optional(),
+  time: z.object({
+    schedule_kind: z.enum([
+      'cron',
+      'recurring',
+      'one_off',
+    ]),
+    cron_expression: z.string().optional(),
+    timezone: z.string().optional(),
+    run_at: z.string().optional(),
+    every: z.number().int().positive().optional(),
+    interval_unit: z.enum([
+      'minute',
+      'hour',
+      'day',
+      'week',
+      'month',
+    ]).optional(),
+    days_of_week: z.array(z.number().int().min(0).max(6)).default([]),
+    at_time: z.string().optional(),
+  }).optional(),
+  event: z.object({
+    source_kind: z.enum([
+      'webhook',
+      'email',
+      'calendar',
+      'file_upload',
+      'api_callback',
+      'message_bus',
+      'node_finished',
+      'state_changed',
+      'run_completed',
+      'approval_granted',
+      'payload_arrived',
+    ]),
+    source_id: z.string().optional(),
+    event_name: z.string().optional(),
+    webhook_path: z.string().optional(),
+    auth_policy: z.enum([
+      'none',
+      'shared_secret',
+      'signed',
+      'oauth_context',
+    ]).optional(),
+    dedupe_key: z.string().optional(),
+  }).optional(),
+  delay: z.object({
+    delay_kind: z.enum([
+      'fixed_duration',
+      'until_datetime',
+      'after_event_time',
+    ]),
+    duration_seconds: z.number().int().positive().optional(),
+    until_datetime: z.string().optional(),
+    anchor_field: z.string().optional(),
+    offset_seconds: z.number().int().optional(),
+  }).optional(),
+  hybrid: z.object({
+    condition_expression: z.string().optional(),
+    state_ref: z.string().optional(),
+    continuation_mode: z.enum([
+      'event_then_time',
+      'schedule_then_condition',
+      'event_plus_condition_plus_time',
+      'daily_state_audit',
+    ]).optional(),
+  }).optional(),
   event_filter: z.record(z.any()).default({}),
+});
+
+const TriggerDescriptorSchema = z.object({
+  trigger_family: z.enum([
+    'manual',
+    'time',
+    'event',
+    'hybrid',
+  ]),
+  trigger_kind: z.string(),
+  time: z.record(z.any()).optional(),
+  event: z.record(z.any()).optional(),
+  delay: z.record(z.any()).optional(),
+  hybrid: z.record(z.any()).optional(),
+  event_filter: z.record(z.any()).default({}),
+  afp_message_type: z.literal('agent').default('agent'),
+  afp_message_families: z.array(z.string()).default([]),
+  afp_trigger_origin_template: z.record(z.any()).optional(),
+  registration_targets: z.array(z.string()).default([]),
+  runtime_requirements: z.array(z.string()).default([]),
+});
+
+const TriggerRegistrationPreviewSchema = z.object({
+  status: z.enum(['not_applicable', 'compiled_preview']).default('not_applicable'),
+  activation_count: z.number().int().nonnegative().default(0),
+  live_registration_supported: z.boolean().default(false),
+  family_counts: z.record(z.number().int().nonnegative()).default({}),
+  registration_target_counts: z.record(z.number().int().nonnegative()).default({}),
+  runtime_requirement_counts: z.record(z.number().int().nonnegative()).default({}),
+  registration_targets: z.array(z.string()).default([]),
+  runtime_requirements: z.array(z.string()).default([]),
+  missing_runtime_capabilities: z.array(z.string()).default([]),
+  next_dependency: z.string().optional(),
+});
+
+const WaitResumeContractSchema = z.object({
+  resume_family: z.enum([
+    'approval',
+    'timer',
+    'hybrid',
+  ]),
+  resume_kind: z.string(),
+  trigger_family: z.enum([
+    'manual',
+    'time',
+    'event',
+    'hybrid',
+  ]).optional(),
+  delay: z.record(z.any()).optional(),
+  event: z.record(z.any()).optional(),
+  hybrid: z.record(z.any()).optional(),
+  approval: z.record(z.any()).optional(),
+  afp_message_type: z.literal('agent').default('agent'),
+  afp_message_families: z.array(z.string()).default([]),
+  registration_targets: z.array(z.string()).default([]),
+  runtime_requirements: z.array(z.string()).default([]),
+  resume_origin_template: z.record(z.any()).optional(),
 });
 
 const ConditionConfigSchema = z.object({
@@ -287,6 +505,9 @@ export const WorkflowGraphSchema = z.object({
   nodes: z.array(WorkflowNodeSchema).min(1),
   edges: z.array(WorkflowEdgeSchema).default([]),
   presets: z.array(PresetExpansionSchema).default([]),
+  template_id: SubagentTemplateIdSchema.optional(),
+  template_version: z.literal('omnyid-subagent-template.v1').optional(),
+  template_bindings: z.array(WorkflowTemplateBindingSchema).default([]),
   optimization_mode: OptimizationModeSchema.default('balanced'),
   metadata: z.record(z.any()).default({}),
 });
@@ -323,6 +544,14 @@ export const RuntimeNodeManifestSchema = z.object({
   ]),
   model_assignment: RuntimeModelAssignmentSchema,
   retry_policy: RuntimeRetryPolicySchema,
+  trigger_descriptor: TriggerDescriptorSchema.optional(),
+  wait_resume_contract: WaitResumeContractSchema.optional(),
+  // Step 5: cache policy propagated from template slot efficiency policy
+  cache_policy: TemplateCachePolicySchema.optional(),
+  capability_bundle_id: z.string().optional(),
+  // Step 6: parallel group annotation propagated from template slot efficiency policy
+  parallel_group_id: z.string().optional(),
+  max_concurrency: z.number().int().positive().optional(),
   metadata: z.record(z.any()).default({}),
 });
 
@@ -330,6 +559,31 @@ export const WorkflowIrEdgeSchema = z.object({
   from_manifest_node_id: z.string(),
   to_manifest_node_id: z.string(),
   route_label: z.string().optional(),
+  // Step 6: branch identity for edges within a parallel group
+  branch_id: z.string().optional(),
+  join_strategy: z.enum(['first_wins', 'all_required', 'any_threshold']).optional(),
+});
+
+// Step 6: parallel group descriptor emitted by the IR compiler when at least one
+// template slot carries a parallel_group_id in its efficiency policy.
+export const WorkflowIRParallelGroupSchema = z.object({
+  parallel_group_id: z.string(),
+  manifest_node_ids: z.array(z.string()).min(1),
+  max_concurrency: z.number().int().positive().default(2),
+  join_strategy: z.enum(['first_wins', 'all_required', 'any_threshold']).default('all_required'),
+  merge_barrier_manifest_node_id: z.string().optional(),
+});
+
+// Step 5: capability bundle descriptor - groups nodes sharing a cacheable capability
+// (e.g. all web-search tool nodes in a research_loop workflow).
+export const WorkflowIRCapabilityBundleSchema = z.object({
+  bundle_id: z.string(),
+  capability_id: z.string(),
+  operation: z.string().optional(),
+  connector_family: z.string().optional(),
+  cache_policy: TemplateCachePolicySchema.optional(),
+  artifact_family: z.string().optional(),
+  manifest_node_ids: z.array(z.string()).min(1),
 });
 
 export const WorkflowIRSchema = z.object({
@@ -341,6 +595,21 @@ export const WorkflowIRSchema = z.object({
   entry_manifest_node_ids: z.array(z.string()).min(1),
   manifests: z.array(RuntimeNodeManifestSchema).min(1),
   edges: z.array(WorkflowIrEdgeSchema).default([]),
+  activation_descriptors: z.array(TriggerDescriptorSchema.extend({
+    manifest_node_id: z.string(),
+    source_graph_node_id: z.string(),
+  })).default([]),
+  activation_registration_preview: TriggerRegistrationPreviewSchema.default({}),
+  wait_resume_descriptors: z.array(WaitResumeContractSchema.extend({
+    manifest_node_id: z.string(),
+    source_graph_node_id: z.string(),
+  })).default([]),
+  // Step 6: parallel group descriptors — one entry per unique parallel_group_id found
+  // in compiled manifests. Empty for most workflows; populated for research_loop fan-out.
+  parallel_groups: z.array(WorkflowIRParallelGroupSchema).default([]),
+  // Step 5: capability bundle descriptors — groups cacheable tool nodes that share
+  // a capability_id so the runtime can share artifact results across them.
+  capability_bundles: z.array(WorkflowIRCapabilityBundleSchema).default([]),
   policy_snapshot: z.record(z.any()).default({}),
   metadata: z.record(z.any()).default({}),
 });
@@ -357,6 +626,711 @@ export const SavedWorkflowRecordSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   archived_at: z.string().optional(),
+});
+export const TemplateRegistryRecordSchema = z.object({
+  template: SubagentTemplateSchema,
+  preset_mappings: z.array(PresetTemplateMappingSchema).default([]),
+});
+export const PresetStarterBlueprintSchema = z.object({
+  kind: PrimitiveNodeKindSchema,
+  label: z.string(),
+  description: z.string(),
+  slot_name: TemplateSlotNameSchema,
+  config: z.record(z.any()).default({}),
+  prompt: WorkflowNodePromptSchema.optional(),
+  policy: WorkflowNodePolicySchema.optional(),
+  runtime_kind_source: PrimitiveNodeKindSchema.optional(),
+});
+export const PresetStarterRegistrySchema = z.record(
+  PresetNodeKindSchema,
+  z.array(PresetStarterBlueprintSchema).min(1),
+);
+export const WorkflowIntentExpansionSchema = z.object({
+  preset_kind: PresetNodeKindSchema,
+  requires_approval: z.boolean().default(false),
+  needs_branching: z.boolean().default(false),
+  needs_research_support: z.boolean().default(false),
+  public_output: z.boolean().default(false),
+  optimization_mode: OptimizationModeSchema.default('balanced'),
+});
+
+export const DEFAULT_SUBAGENT_TEMPLATES = [
+  {
+    template_id: 'linear_worker',
+    version: 'omnyid-subagent-template.v1',
+    label: 'Linear Worker',
+    description: 'Use for straightforward intake -> gather/transform -> finalize flows with minimal branching.',
+    category: 'general',
+    default_optimization_mode: 'balanced',
+    allowed_preset_kinds: ['receipt_tracker'],
+    slot_bindings: [
+      {
+        slot_name: 'intake_slot',
+        label: 'Intake',
+        description: 'Capture the user objective and normalize the task contract.',
+        allowed_primitive_kinds: ['agent'],
+        default_primitive_kind: 'agent',
+        default_runtime_kind: 'goal_intake',
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          deterministic_pruning: true,
+          model_hint: { strategy: 'cheap_reasoning' },
+          context_slice: { scope: 'thread_summary', max_items: 4 },
+        },
+      },
+      {
+        slot_name: 'gather_slot',
+        label: 'Gather',
+        description: 'Collect the required artifact or tool output.',
+        allowed_primitive_kinds: ['tool', 'transform'],
+        default_primitive_kind: 'tool',
+        default_runtime_kind: 'executor',
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          deterministic_pruning: true,
+          cache_policy: { enabled: true, artifact_family: 'gather_output', cache_key_fields: ['workflow_id', 'slot_name'] },
+        },
+      },
+      {
+        slot_name: 'merge_slot',
+        label: 'Shape Result',
+        description: 'Convert gathered output into the final structure.',
+        allowed_primitive_kinds: ['transform', 'merge'],
+        default_primitive_kind: 'transform',
+        default_runtime_kind: 'merge_runtime',
+        required: false,
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          deterministic_pruning: true,
+        },
+      },
+      {
+        slot_name: 'finalize_slot',
+        label: 'Finalize',
+        description: 'Return the bounded result to the workflow surface.',
+        allowed_primitive_kinds: ['termination'],
+        default_primitive_kind: 'termination',
+        default_runtime_kind: 'termination_runtime',
+      },
+    ],
+    expansion_rules: {
+      root_slot_names: ['intake_slot'],
+      terminal_slot_names: ['finalize_slot'],
+      supports_parallel_fanout: false,
+      requires_merge_for_parallel: false,
+    },
+    metadata: {
+      recommended_for: ['extract', 'map', 'summarize'],
+    },
+  },
+  {
+    template_id: 'branching_worker',
+    version: 'omnyid-subagent-template.v1',
+    label: 'Branching Worker',
+    description: 'Use for workflows that split by condition or anomaly checks before converging on a result.',
+    category: 'branching',
+    default_optimization_mode: 'balanced',
+    allowed_preset_kinds: ['study_planner', 'finance_guardian'],
+    slot_bindings: [
+      {
+        slot_name: 'intake_slot',
+        label: 'Intake',
+        allowed_primitive_kinds: ['agent'],
+        default_primitive_kind: 'agent',
+        default_runtime_kind: 'goal_intake',
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          model_hint: { strategy: 'cheap_reasoning' },
+          deterministic_pruning: true,
+        },
+      },
+      {
+        slot_name: 'check_slot',
+        label: 'Branch Check',
+        description: 'Evaluate a deterministic or low-cost branching rule.',
+        allowed_primitive_kinds: ['condition', 'policy'],
+        default_primitive_kind: 'condition',
+        default_runtime_kind: 'policy_runtime',
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          deterministic_pruning: true,
+          early_stop_confidence: 0.85,
+        },
+      },
+      {
+        slot_name: 'merge_slot',
+        label: 'Merge or Shape',
+        allowed_primitive_kinds: ['transform', 'merge', 'agent'],
+        default_primitive_kind: 'transform',
+        default_runtime_kind: 'merge_runtime',
+        required: false,
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          deterministic_pruning: true,
+        },
+      },
+      {
+        slot_name: 'finalize_slot',
+        label: 'Finalize',
+        allowed_primitive_kinds: ['termination'],
+        default_primitive_kind: 'termination',
+        default_runtime_kind: 'termination_runtime',
+      },
+    ],
+    expansion_rules: {
+      root_slot_names: ['intake_slot'],
+      terminal_slot_names: ['finalize_slot'],
+      supports_parallel_fanout: false,
+      requires_merge_for_parallel: false,
+    },
+    metadata: {
+      recommended_for: ['branch', 'classify', 'escalate'],
+    },
+  },
+  {
+    template_id: 'research_loop',
+    version: 'omnyid-subagent-template.v1',
+    label: 'Research Loop',
+    description: 'Use for search/synthesis workflows that gather evidence and merge it into an answer.',
+    category: 'research',
+    default_optimization_mode: 'balanced',
+    allowed_preset_kinds: ['research_assistant'],
+    slot_bindings: [
+      {
+        slot_name: 'intake_slot',
+        label: 'Intake',
+        allowed_primitive_kinds: ['agent'],
+        default_primitive_kind: 'agent',
+        default_runtime_kind: 'goal_intake',
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          model_hint: { strategy: 'balanced_reasoning' },
+          context_slice: { scope: 'thread_summary', max_items: 5 },
+          deterministic_pruning: true,
+        },
+      },
+      {
+        slot_name: 'gather_slot',
+        label: 'Gather Evidence',
+        allowed_primitive_kinds: ['tool', 'agent'],
+        default_primitive_kind: 'tool',
+        default_runtime_kind: 'executor',
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          cache_policy: { enabled: true, artifact_family: 'research_sources', cache_key_fields: ['workflow_id', 'slot_name'] },
+          model_hint: { strategy: 'cheap_reasoning' },
+          deterministic_pruning: true,
+          parallel_group_id: 'research_sources',
+          max_concurrency: 2,
+        },
+      },
+      {
+        slot_name: 'merge_slot',
+        label: 'Merge Evidence',
+        allowed_primitive_kinds: ['merge', 'transform', 'agent'],
+        default_primitive_kind: 'merge',
+        default_runtime_kind: 'merge_runtime',
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          model_hint: { strategy: 'balanced_reasoning' },
+          deterministic_pruning: true,
+        },
+      },
+      {
+        slot_name: 'finalize_slot',
+        label: 'Finalize',
+        allowed_primitive_kinds: ['termination'],
+        default_primitive_kind: 'termination',
+        default_runtime_kind: 'termination_runtime',
+      },
+    ],
+    expansion_rules: {
+      root_slot_names: ['intake_slot'],
+      terminal_slot_names: ['finalize_slot'],
+      supports_parallel_fanout: true,
+      requires_merge_for_parallel: true,
+    },
+    metadata: {
+      recommended_for: ['research', 'source_compare', 'synthesis'],
+    },
+  },
+  {
+    template_id: 'action_guarded',
+    version: 'omnyid-subagent-template.v1',
+    label: 'Action Guarded',
+    description: 'Use for workflows that gather context, possibly prepare an external action, and pause for approval when needed.',
+    category: 'action',
+    default_optimization_mode: 'balanced',
+    allowed_preset_kinds: ['email_guardian', 'calendar_coordinator', 'travel_booker', 'content_publisher'],
+    slot_bindings: [
+      {
+        slot_name: 'intake_slot',
+        label: 'Intake',
+        allowed_primitive_kinds: ['agent'],
+        default_primitive_kind: 'agent',
+        default_runtime_kind: 'goal_intake',
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          model_hint: { strategy: 'balanced_reasoning' },
+          deterministic_pruning: true,
+        },
+      },
+      {
+        slot_name: 'gather_slot',
+        label: 'Gather or Prepare',
+        allowed_primitive_kinds: ['tool', 'transform', 'agent'],
+        default_primitive_kind: 'tool',
+        default_runtime_kind: 'executor',
+        required: false,
+        efficiency_policy: {
+          inherit_prompt_contract: true,
+          cache_policy: { enabled: true, artifact_family: 'action_context', cache_key_fields: ['workflow_id', 'slot_name'] },
+          deterministic_pruning: true,
+        },
+      },
+      {
+        slot_name: 'approval_slot',
+        label: 'Approval',
+        allowed_primitive_kinds: ['approval', 'policy'],
+        default_primitive_kind: 'approval',
+        default_runtime_kind: 'approval_runtime',
+        required: false,
+      },
+      {
+        slot_name: 'merge_slot',
+        label: 'Shape Output',
+        allowed_primitive_kinds: ['transform', 'merge'],
+        default_primitive_kind: 'transform',
+        default_runtime_kind: 'merge_runtime',
+        required: false,
+      },
+      {
+        slot_name: 'finalize_slot',
+        label: 'Finalize',
+        allowed_primitive_kinds: ['termination'],
+        default_primitive_kind: 'termination',
+        default_runtime_kind: 'termination_runtime',
+      },
+    ],
+    expansion_rules: {
+      root_slot_names: ['intake_slot'],
+      terminal_slot_names: ['finalize_slot'],
+      supports_parallel_fanout: false,
+      requires_merge_for_parallel: false,
+    },
+    metadata: {
+      recommended_for: ['approve', 'review', 'external_action'],
+    },
+  },
+] as const satisfies readonly z.input<typeof SubagentTemplateSchema>[];
+
+export const DEFAULT_PRESET_TEMPLATE_MAPPINGS = [
+  {
+    preset_kind: 'email_guardian',
+    template_id: 'action_guarded',
+    slot_overrides: {},
+    metadata: { rationale: 'email triage and reply preparation often requires guarded external output' },
+  },
+  {
+    preset_kind: 'calendar_coordinator',
+    template_id: 'action_guarded',
+    slot_overrides: {},
+    metadata: { rationale: 'calendar actions often need approval before final commitment' },
+  },
+  {
+    preset_kind: 'receipt_tracker',
+    template_id: 'linear_worker',
+    slot_overrides: {},
+    metadata: { rationale: 'receipt extraction is mostly linear intake to extraction to ledger shaping' },
+  },
+  {
+    preset_kind: 'study_planner',
+    template_id: 'branching_worker',
+    slot_overrides: {},
+    metadata: { rationale: 'study planning branches on urgency and priority' },
+  },
+  {
+    preset_kind: 'research_assistant',
+    template_id: 'research_loop',
+    slot_overrides: {},
+    metadata: { rationale: 'research requires gather and merge phases with room for bounded fan-out later' },
+  },
+  {
+    preset_kind: 'finance_guardian',
+    template_id: 'branching_worker',
+    slot_overrides: {},
+    metadata: { rationale: 'anomaly detection naturally branches into normal or escalated paths' },
+  },
+  {
+    preset_kind: 'travel_booker',
+    template_id: 'action_guarded',
+    slot_overrides: {},
+    metadata: { rationale: 'travel booking should gather options then pause before external booking' },
+  },
+  {
+    preset_kind: 'content_publisher',
+    template_id: 'action_guarded',
+    slot_overrides: {},
+    metadata: { rationale: 'public publication should be guarded by policy and review' },
+  },
+] as const satisfies readonly z.input<typeof PresetTemplateMappingSchema>[];
+
+export const DEFAULT_TEMPLATE_REGISTRY = DEFAULT_SUBAGENT_TEMPLATES.map((template) =>
+  TemplateRegistryRecordSchema.parse({
+    template,
+    preset_mappings: DEFAULT_PRESET_TEMPLATE_MAPPINGS.filter(
+      (mapping) => mapping.template_id === template.template_id,
+    ),
+  }),
+);
+
+export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.parse({
+  email_guardian: [
+    {
+      kind: 'agent',
+      label: 'Email Guardian',
+      description: 'Triage, summarize, and route inbox items.',
+      slot_name: 'intake_slot',
+      config: {
+        objective: 'Handle inbox triage and prepare safe next actions.',
+        preset_kind: 'email_guardian',
+        memory_scope: 'thread_summary',
+      },
+      prompt: {
+        system_prompt: 'Triage inbound email responsibly and prepare safe next actions.',
+        instruction_prompt: 'Summarize, classify, and decide whether a reply draft is needed.',
+        user_editable: true,
+      },
+      runtime_kind_source: 'agent',
+    },
+    {
+      kind: 'tool',
+      label: 'Mailbox Scan',
+      description: 'Scan recent inbound messages for urgent or actionable items.',
+      slot_name: 'gather_slot',
+      config: { capability_id: 'email', operation: 'triage_inbox', timeout_seconds: 90 },
+      runtime_kind_source: 'tool',
+    },
+    {
+      kind: 'approval',
+      label: 'Reply Review',
+      description: 'Review reply suggestions before any external send.',
+      slot_name: 'approval_slot',
+      config: {
+        approval_reason: 'Outgoing email content should be reviewed before sending.',
+        decision_point_id: '',
+        options: [
+          { option_id: 'approve_reply', label: 'Approve reply', consequence_summary: 'Continue toward response delivery.' },
+          { option_id: 'hold_reply', label: 'Hold', consequence_summary: 'Stop before sending anything externally.' },
+        ],
+      },
+      runtime_kind_source: 'approval',
+    },
+    {
+      kind: 'termination',
+      label: 'Inbox Summary',
+      description: 'Deliver the triage summary and next-step recommendations.',
+      slot_name: 'finalize_slot',
+      config: { output_kind: 'chat_reply', final_schema: { workflow: 'email_guardian' } },
+      runtime_kind_source: 'termination',
+    },
+  ],
+  calendar_coordinator: [
+    {
+      kind: 'agent',
+      label: 'Calendar Coordinator',
+      description: 'Coordinate schedule intent and meeting context.',
+      slot_name: 'intake_slot',
+      config: {
+        objective: 'Coordinate scheduling intent and meeting context.',
+        preset_kind: 'calendar_coordinator',
+        memory_scope: 'thread_summary',
+      },
+      runtime_kind_source: 'agent',
+    },
+    {
+      kind: 'tool',
+      label: 'Conflict Scan',
+      description: 'Check availability and detect scheduling collisions.',
+      slot_name: 'gather_slot',
+      config: { capability_id: 'calendar', operation: 'scan_availability', timeout_seconds: 60 },
+      runtime_kind_source: 'tool',
+    },
+    {
+      kind: 'approval',
+      label: 'Confirm Time',
+      description: 'Review the recommended time slot before locking it in.',
+      slot_name: 'approval_slot',
+      config: {
+        approval_reason: 'A human should confirm the proposed meeting slot.',
+        decision_point_id: '',
+        options: [
+          { option_id: 'approve_slot', label: 'Confirm slot', consequence_summary: 'Proceed with the booking.' },
+          { option_id: 'reject_slot', label: 'Reject slot', consequence_summary: 'Return to planning without booking.' },
+        ],
+      },
+      runtime_kind_source: 'approval',
+    },
+    {
+      kind: 'termination',
+      label: 'Schedule Summary',
+      description: 'Return the selected slot and any remaining scheduling notes.',
+      slot_name: 'finalize_slot',
+      config: { output_kind: 'chat_reply', final_schema: { workflow: 'calendar_coordinator' } },
+      runtime_kind_source: 'termination',
+    },
+  ],
+  receipt_tracker: [
+    {
+      kind: 'agent',
+      label: 'Receipt Tracker',
+      description: 'Interpret receipts and prepare bookkeeping updates.',
+      slot_name: 'intake_slot',
+      config: {
+        objective: 'Interpret receipts and prepare bookkeeping updates.',
+        preset_kind: 'receipt_tracker',
+        memory_scope: 'thread_summary',
+      },
+      runtime_kind_source: 'agent',
+    },
+    {
+      kind: 'tool',
+      label: 'Receipt Extractor',
+      description: 'Extract merchant, amount, tax, and date fields.',
+      slot_name: 'gather_slot',
+      config: { capability_id: 'document_extract', operation: 'receipt_parse', timeout_seconds: 90 },
+      runtime_kind_source: 'tool',
+    },
+    {
+      kind: 'transform',
+      label: 'Ledger Mapping',
+      description: 'Map receipt data into a ledger-friendly category structure.',
+      slot_name: 'merge_slot',
+      config: { transform_kind: 'template', output_contract: { category: '', merchant: '', amount: 0 } },
+      runtime_kind_source: 'transform',
+    },
+    {
+      kind: 'termination',
+      label: 'Ledger Update Summary',
+      description: 'Return the categorized receipt entry for review or posting.',
+      slot_name: 'finalize_slot',
+      config: { output_kind: 'chat_reply', final_schema: { workflow: 'receipt_tracker' } },
+      runtime_kind_source: 'termination',
+    },
+  ],
+  study_planner: [
+    {
+      kind: 'agent',
+      label: 'Study Planner',
+      description: 'Plan study blocks from goals, deadlines, and priorities.',
+      slot_name: 'intake_slot',
+      config: {
+        objective: 'Plan study blocks from goals, deadlines, and priorities.',
+        preset_kind: 'study_planner',
+        memory_scope: 'thread_summary',
+      },
+      runtime_kind_source: 'agent',
+    },
+    {
+      kind: 'condition',
+      label: 'Urgency Split',
+      description: 'Split between urgent work and routine planning.',
+      slot_name: 'check_slot',
+      config: { expression: 'deadline_within_72h' },
+      runtime_kind_source: 'condition',
+    },
+    {
+      kind: 'transform',
+      label: 'Block Builder',
+      description: 'Turn chosen priorities into a realistic block schedule.',
+      slot_name: 'merge_slot',
+      config: { transform_kind: 'template', output_contract: { study_blocks: [] } },
+      runtime_kind_source: 'transform',
+    },
+    {
+      kind: 'termination',
+      label: 'Study Plan Summary',
+      description: 'Deliver the planned blocks and reminders.',
+      slot_name: 'finalize_slot',
+      config: { output_kind: 'chat_reply', final_schema: { workflow: 'study_planner' } },
+      runtime_kind_source: 'termination',
+    },
+  ],
+  research_assistant: [
+    {
+      kind: 'agent',
+      label: 'Research Assistant',
+      description: 'Frame the question and coordinate evidence gathering.',
+      slot_name: 'intake_slot',
+      config: {
+        objective: 'Frame the question and coordinate evidence gathering.',
+        preset_kind: 'research_assistant',
+        memory_scope: 'thread_summary',
+      },
+      runtime_kind_source: 'agent',
+    },
+    {
+      kind: 'tool',
+      label: 'Web Research',
+      description: 'Search the web for relevant sources and findings.',
+      slot_name: 'gather_slot',
+      config: { capability_id: 'web_search', operation: 'search', timeout_seconds: 120 },
+      runtime_kind_source: 'tool',
+    },
+    {
+      kind: 'merge',
+      label: 'Evidence Merge',
+      description: 'Combine source findings into a coherent synthesis.',
+      slot_name: 'merge_slot',
+      config: { merge_strategy: 'structured_merge' },
+      runtime_kind_source: 'merge',
+    },
+    {
+      kind: 'termination',
+      label: 'Research Summary',
+      description: 'Return a concise summary with supporting findings.',
+      slot_name: 'finalize_slot',
+      config: { output_kind: 'chat_reply', final_schema: { workflow: 'research_assistant', include_sources: true } },
+      runtime_kind_source: 'termination',
+    },
+  ],
+  finance_guardian: [
+    {
+      kind: 'agent',
+      label: 'Finance Guardian',
+      description: 'Track spending and identify unusual activity.',
+      slot_name: 'intake_slot',
+      config: {
+        objective: 'Track spending and identify unusual activity.',
+        preset_kind: 'finance_guardian',
+        memory_scope: 'thread_summary',
+      },
+      runtime_kind_source: 'agent',
+    },
+    {
+      kind: 'tool',
+      label: 'Spend Scan',
+      description: 'Analyze recent transactions and spending categories.',
+      slot_name: 'gather_slot',
+      config: { capability_id: 'finance', operation: 'analyze_spend', timeout_seconds: 90 },
+      runtime_kind_source: 'tool',
+    },
+    {
+      kind: 'condition',
+      label: 'Anomaly Check',
+      description: 'Decide whether anomalies or alerts require escalation.',
+      slot_name: 'check_slot',
+      config: { expression: 'anomaly_detected' },
+      runtime_kind_source: 'condition',
+    },
+    {
+      kind: 'termination',
+      label: 'Finance Digest',
+      description: 'Return trends, anomalies, and suggested next steps.',
+      slot_name: 'finalize_slot',
+      config: { output_kind: 'chat_reply', final_schema: { workflow: 'finance_guardian' } },
+      runtime_kind_source: 'termination',
+    },
+  ],
+  travel_booker: [
+    {
+      kind: 'agent',
+      label: 'Travel Booker',
+      description: 'Coordinate travel intent, constraints, and tradeoffs.',
+      slot_name: 'intake_slot',
+      config: {
+        objective: 'Coordinate travel intent, constraints, and tradeoffs.',
+        preset_kind: 'travel_booker',
+        memory_scope: 'thread_summary',
+      },
+      runtime_kind_source: 'agent',
+    },
+    {
+      kind: 'tool',
+      label: 'Option Finder',
+      description: 'Search flight, stay, or route options.',
+      slot_name: 'gather_slot',
+      config: { capability_id: 'travel', operation: 'compare_options', timeout_seconds: 120 },
+      runtime_kind_source: 'tool',
+    },
+    {
+      kind: 'approval',
+      label: 'Booking Approval',
+      description: 'Require explicit approval before confirming anything externally.',
+      slot_name: 'approval_slot',
+      config: {
+        approval_reason: 'Booking external travel should require explicit approval.',
+        decision_point_id: '',
+        options: [
+          { option_id: 'book', label: 'Book option', consequence_summary: 'Proceed with confirmed booking.' },
+          { option_id: 'decline', label: 'Do not book', consequence_summary: 'Stop before any external confirmation.' },
+        ],
+      },
+      runtime_kind_source: 'approval',
+    },
+    {
+      kind: 'termination',
+      label: 'Travel Options Summary',
+      description: 'Return the shortlisted travel plan and approval outcome.',
+      slot_name: 'finalize_slot',
+      config: { output_kind: 'chat_reply', final_schema: { workflow: 'travel_booker' } },
+      runtime_kind_source: 'termination',
+    },
+  ],
+  content_publisher: [
+    {
+      kind: 'agent',
+      label: 'Content Publisher',
+      description: 'Draft and prepare publishable public content.',
+      slot_name: 'intake_slot',
+      config: {
+        objective: 'Draft and prepare publishable public content.',
+        preset_kind: 'content_publisher',
+        memory_scope: 'thread_summary',
+      },
+      policy: {
+        mask: 'public',
+        approval_mode: 'none',
+        allowed_tools: [],
+        allowed_capabilities: [],
+        max_steps: 1,
+        max_cost_cents: 0,
+        outbound_allowlist: [],
+      },
+      runtime_kind_source: 'agent',
+    },
+    {
+      kind: 'transform',
+      label: 'Draft Formatter',
+      description: 'Shape the content into the target publishing format.',
+      slot_name: 'merge_slot',
+      config: { transform_kind: 'template', output_contract: { title: '', body: '', tags: [] } },
+      runtime_kind_source: 'transform',
+    },
+    {
+      kind: 'approval',
+      label: 'Publish Review',
+      description: 'Review public-facing copy before publication.',
+      slot_name: 'approval_slot',
+      config: {
+        approval_reason: 'Public content should be reviewed before publishing.',
+        decision_point_id: '',
+        options: [
+          { option_id: 'publish', label: 'Publish', consequence_summary: 'Approve public release.' },
+          { option_id: 'hold', label: 'Hold', consequence_summary: 'Keep the draft unpublished.' },
+        ],
+      },
+      runtime_kind_source: 'approval',
+    },
+    {
+      kind: 'termination',
+      label: 'Publishing Summary',
+      description: 'Return the final content package and publication readiness.',
+      slot_name: 'finalize_slot',
+      config: { output_kind: 'chat_reply', final_schema: { workflow: 'content_publisher', visibility: 'public' } },
+      runtime_kind_source: 'termination',
+    },
+  ],
 });
 
 export const NodeMessageSubtypeSchema = z.enum([
@@ -391,11 +1365,22 @@ export const WorkflowNodeMessageMetadataSchema = z.object({
 export type PrimitiveNodeKind = z.infer<typeof PrimitiveNodeKindSchema>;
 export type HiddenRuntimeNodeKind = z.infer<typeof HiddenRuntimeNodeKindSchema>;
 export type PresetNodeKind = z.infer<typeof PresetNodeKindSchema>;
+export type SubagentTemplateId = z.infer<typeof SubagentTemplateIdSchema>;
+export type TemplateSlotName = z.infer<typeof TemplateSlotNameSchema>;
 export type WorkflowNode = z.infer<typeof WorkflowNodeSchema>;
 export type WorkflowGraph = z.infer<typeof WorkflowGraphSchema>;
 export type WorkflowIR = z.infer<typeof WorkflowIRSchema>;
+export type WorkflowIrEdge = z.infer<typeof WorkflowIrEdgeSchema>;
+export type WorkflowIRParallelGroup = z.infer<typeof WorkflowIRParallelGroupSchema>;
+export type WorkflowIRCapabilityBundle = z.infer<typeof WorkflowIRCapabilityBundleSchema>;
 export type RuntimeNodeManifest = z.infer<typeof RuntimeNodeManifestSchema>;
 export type SavedWorkflowRecord = z.infer<typeof SavedWorkflowRecordSchema>;
+export type SubagentTemplate = z.infer<typeof SubagentTemplateSchema>;
+export type WorkflowTemplateBinding = z.infer<typeof WorkflowTemplateBindingSchema>;
+export type PresetTemplateMapping = z.infer<typeof PresetTemplateMappingSchema>;
+export type TemplateRegistryRecord = z.infer<typeof TemplateRegistryRecordSchema>;
+export type PresetStarterBlueprint = z.infer<typeof PresetStarterBlueprintSchema>;
+export type WorkflowIntentExpansion = z.infer<typeof WorkflowIntentExpansionSchema>;
 export type NodeMessageSubtype = z.infer<typeof NodeMessageSubtypeSchema>;
 
 export function parseWorkflowGraph(input: unknown): WorkflowGraph {
@@ -408,4 +1393,186 @@ export function parseWorkflowIR(input: unknown): WorkflowIR {
 
 export function parseRuntimeNodeManifest(input: unknown): RuntimeNodeManifest {
   return RuntimeNodeManifestSchema.parse(input);
+}
+
+export function parseSubagentTemplate(input: unknown): SubagentTemplate {
+  return SubagentTemplateSchema.parse(input);
+}
+
+export function parseTemplateRegistryRecord(input: unknown): TemplateRegistryRecord {
+  return TemplateRegistryRecordSchema.parse(input);
+}
+
+export function presetStarterBlueprintsForPreset(
+  presetKind: PresetNodeKind,
+): PresetStarterBlueprint[] {
+  return DEFAULT_PRESET_STARTER_BLUEPRINTS[presetKind] ?? [];
+}
+
+const PRESET_INTENT_KEYWORDS: Record<PresetNodeKind, string[]> = {
+  email_guardian: ['email', 'inbox', 'reply', 'respond', 'triage', 'mail', 'outreach'],
+  calendar_coordinator: ['calendar', 'schedule', 'meeting', 'availability', 'timeslot', 'appointment'],
+  receipt_tracker: ['receipt', 'invoice', 'expense', 'ledger', 'merchant', 'bookkeeping'],
+  study_planner: ['study', 'exam', 'homework', 'course', 'revision', 'deadline', 'learn'],
+  research_assistant: ['research', 'search', 'sources', 'web', 'summarize', 'find information', 'investigate'],
+  finance_guardian: ['finance', 'spending', 'budget', 'transaction', 'anomaly', 'expenses', 'cashflow'],
+  travel_booker: ['travel', 'flight', 'hotel', 'trip', 'itinerary', 'book', 'booking'],
+  content_publisher: ['publish', 'article', 'blog', 'content', 'post', 'newsletter', 'draft'],
+};
+
+export function inferPresetFromIntent(intent: string): PresetNodeKind | null {
+  const normalized = intent.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  let bestPreset: PresetNodeKind | null = null;
+  let bestScore = 0;
+  for (const presetKind of Object.keys(PRESET_INTENT_KEYWORDS) as PresetNodeKind[]) {
+    const score = PRESET_INTENT_KEYWORDS[presetKind].reduce((sum, keyword) => (
+      normalized.includes(keyword) ? sum + Math.max(1, keyword.split(' ').length) : sum
+    ), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestPreset = presetKind;
+    }
+  }
+
+  if (bestPreset) {
+    return bestPreset;
+  }
+
+  if (normalized.includes('public')) {
+    return 'content_publisher';
+  }
+  if (normalized.includes('approval') || normalized.includes('review')) {
+    return 'travel_booker';
+  }
+  return 'research_assistant';
+}
+
+export function expandWorkflowIntent(intent: string): WorkflowIntentExpansion {
+  const normalized = intent.trim().toLowerCase();
+  const presetKind = inferPresetFromIntent(intent) ?? 'research_assistant';
+
+  const requiresApproval =
+    /approval|approve|review|confirm|before sending|before booking|before publishing|human/.test(normalized) ||
+    ['travel_booker', 'content_publisher', 'email_guardian', 'calendar_coordinator'].includes(presetKind);
+  const needsBranching =
+    /compare|comparison|options|choose|branch|fallback|if |when |anomaly|route|otherwise/.test(normalized);
+  const needsResearchSupport =
+    /research|search|web|sources|investigate|compare|market|supplier|vendor/.test(normalized) &&
+    presetKind !== 'research_assistant';
+  const publicOutput =
+    /public|publish|external audience|newsletter|blog|article/.test(normalized) ||
+    presetKind === 'content_publisher';
+  const optimizationMode =
+    /cheap|budget|low cost|token|cost sensitive/.test(normalized)
+      ? 'cost'
+      : /fast|quick|quickly|urgent|asap/.test(normalized)
+        ? 'speed'
+        : 'balanced';
+
+  return WorkflowIntentExpansionSchema.parse({
+    preset_kind: presetKind,
+    requires_approval: requiresApproval,
+    needs_branching: needsBranching,
+    needs_research_support: needsResearchSupport,
+    public_output: publicOutput,
+    optimization_mode: optimizationMode,
+  });
+}
+
+export function suggestWorkflowTitleFromIntent(intent: string, presetKind: PresetNodeKind): string {
+  const trimmed = intent.trim().replace(/\s+/g, ' ');
+  if (!trimmed) {
+    const starter = DEFAULT_PRESET_STARTER_BLUEPRINTS[presetKind];
+    return starter?.[0]?.label ?? 'Workflow draft';
+  }
+  const sentence = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  return sentence.length > 72 ? `${sentence.slice(0, 69)}...` : sentence;
+}
+
+export function templateForPreset(presetKind: PresetNodeKind): PresetTemplateMapping | undefined {
+  return DEFAULT_PRESET_TEMPLATE_MAPPINGS.find((mapping) => mapping.preset_kind === presetKind);
+}
+
+export function registryRecordForTemplate(
+  templateId: SubagentTemplateId,
+): TemplateRegistryRecord | undefined {
+  return DEFAULT_TEMPLATE_REGISTRY.find((record) => record.template.template_id === templateId);
+}
+
+/**
+ * Default trigger config for each preset kind.
+ * Used by the NL describe flow (server-side) and by the frontend when the
+ * user drops a preset onto the canvas to pre-populate the TriggerNode config.
+ *
+ * Rules:
+ * - reactive/inbox presets → event family (email_ingress or calendar event)
+ * - time-driven presets    → schedule family (cron)
+ * - ad-hoc / approval-heavy presets → manual (unchanged default)
+ */
+export const PRESET_DEFAULT_TRIGGER_CONFIGS: Record<
+  PresetNodeKind,
+  {
+    trigger_family: string;
+    trigger_kind: string;
+    cron_expression?: string;
+    schedule_description?: string;
+    event_source?: string;
+    event_type?: string;
+    timezone?: string;
+  }
+> = {
+  email_guardian: {
+    trigger_family: "event",
+    trigger_kind: "email_ingress",
+    event_source: "gmail",
+    event_type: "email.received",
+  },
+  calendar_coordinator: {
+    trigger_family: "event",
+    trigger_kind: "internal_event",
+    event_source: "calendar",
+    event_type: "calendar.event_starting",
+  },
+  receipt_tracker: {
+    trigger_family: "event",
+    trigger_kind: "email_ingress",
+    event_source: "email",
+    event_type: "email.received",
+  },
+  study_planner: {
+    trigger_family: "schedule",
+    trigger_kind: "cron",
+    cron_expression: "0 9 * * 1-5",
+    schedule_description: "Every weekday at 9am",
+    timezone: "UTC",
+  },
+  research_assistant: {
+    trigger_family: "manual",
+    trigger_kind: "manual",
+  },
+  finance_guardian: {
+    trigger_family: "schedule",
+    trigger_kind: "cron",
+    cron_expression: "0 8 * * 1",
+    schedule_description: "Every Monday at 8am",
+    timezone: "UTC",
+  },
+  travel_booker: {
+    trigger_family: "manual",
+    trigger_kind: "manual",
+  },
+  content_publisher: {
+    trigger_family: "manual",
+    trigger_kind: "manual",
+  },
+};
+
+export function presetDefaultTriggerConfig(
+  presetKind: PresetNodeKind,
+): (typeof PRESET_DEFAULT_TRIGGER_CONFIGS)[PresetNodeKind] {
+  return PRESET_DEFAULT_TRIGGER_CONFIGS[presetKind];
 }

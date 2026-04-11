@@ -170,7 +170,10 @@ async fn build_report(pool: &PgPool, limit: i64) -> Result<AuditReport, sqlx::Er
     let has_subtype = has_column(pool, "messages", "subtype").await?;
     let has_metadata = has_column(pool, "messages", "metadata").await?;
 
-    let legacy_names = LEGACY_MAPPINGS.iter().map(|item| item.legacy_type).collect::<Vec<_>>();
+    let legacy_names = LEGACY_MAPPINGS
+        .iter()
+        .map(|item| item.legacy_type)
+        .collect::<Vec<_>>();
 
     let legacy_type_counts = sqlx::query(
         r#"
@@ -282,7 +285,11 @@ async fn build_report(pool: &PgPool, limit: i64) -> Result<AuditReport, sqlx::Er
     })
 }
 
-async fn has_column(pool: &PgPool, table_name: &str, column_name: &str) -> Result<bool, sqlx::Error> {
+async fn has_column(
+    pool: &PgPool,
+    table_name: &str,
+    column_name: &str,
+) -> Result<bool, sqlx::Error> {
     let present = sqlx::query_scalar::<_, bool>(
         r#"
         SELECT EXISTS (
@@ -323,10 +330,7 @@ fn print_human_report(report: &AuditReport, limit: i64) {
         } else {
             &item.subtype
         };
-        println!(
-            "  {:<18} {:<22} {}",
-            item.message_type, subtype, item.count
-        );
+        println!("  {:<18} {:<22} {}", item.message_type, subtype, item.count);
     }
     println!();
 
@@ -390,15 +394,19 @@ mod tests {
 
     #[test]
     fn legacy_mapping_table_includes_key_normalizations() {
-        assert!(LEGACY_MAPPINGS
-            .iter()
-            .any(|item| item.legacy_type == "agent_plan"
-                && item.canonical_type == "agent"
-                && item.canonical_subtype == "plan"));
-        assert!(LEGACY_MAPPINGS
-            .iter()
-            .any(|item| item.legacy_type == "task_update"
-                && item.canonical_type == "task"
-                && item.canonical_subtype == "status"));
+        assert!(
+            LEGACY_MAPPINGS
+                .iter()
+                .any(|item| item.legacy_type == "agent_plan"
+                    && item.canonical_type == "agent"
+                    && item.canonical_subtype == "plan")
+        );
+        assert!(
+            LEGACY_MAPPINGS
+                .iter()
+                .any(|item| item.legacy_type == "task_update"
+                    && item.canonical_type == "task"
+                    && item.canonical_subtype == "status")
+        );
     }
 }
