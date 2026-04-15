@@ -175,6 +175,8 @@ impl MasterOrchestrator {
         soul_md: Option<&str>,
         lora_active: bool,
         runpod_endpoint: Option<&str>,
+        _cost_oracle: Option<&crate::cost_oracle::CostOracle>,
+        _trace_context: Option<&str>,
     ) -> Result<OrchestratorResult, OrchestratorError> {
         let correlation_id = ulid::Ulid::new().to_string();
 

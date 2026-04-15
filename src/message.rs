@@ -1,12 +1,22 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+// ── Message types ─────────────────────────────────────────────────────────────
+pub const AFP_TYPE_FOLDER_RULE: &str = "folder_rule";
+pub const AFP_TYPE_AREA_RULES: &str = "area_rules";
+pub const AFP_TYPE_TAG_UPDATE: &str = "tag_update";
+pub const AFP_TYPE_BACKLINK_OVERRIDE: &str = "backlink_override";
+pub const AFP_TYPE_SUPERTAG_DEFINITION: &str = "supertag_definition";
+
 // ── Trigger subtypes ──────────────────────────────────────────────────────────
 pub const AFP_SUBTYPE_TRIGGER_REQUEST: &str = "trigger_request";
 pub const AFP_SUBTYPE_TRIGGER_DISPATCH: &str = "trigger_dispatch";
+pub const AFP_SUBTYPE_TRIGGER_INITIATION: &str = "trigger_initiation";
 pub const AFP_SUBTYPE_EVENT_DISPATCH: &str = "event_dispatch";
 pub const AFP_SUBTYPE_WAKE_REQUEST: &str = "wake_request";
 pub const AFP_SUBTYPE_WAKE_RESULT: &str = "wake_result";
+pub const AFP_SUBTYPE_WAKE_DISPATCH: &str = "wake_dispatch";
+pub const AFP_SUBTYPE_APPROVAL_DECISION: &str = "approval_decision";
 
 // ── Workflow node communication subtypes ─────────────────────────────────────
 /// Carries the compiled `WorkflowIR` manifest to the supervisor before execution.
@@ -198,6 +208,38 @@ pub struct AFPMessage {
 
 fn default_protocol() -> String {
     "afp-v1".to_string()
+}
+
+/// Content shape for `AFP_TYPE_FOLDER_RULE` messages.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct FolderRuleContent {
+    pub folder_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backlink_rules: Option<String>,
+    #[serde(default)]
+    pub tag_suggestions: Vec<String>,
+}
+
+/// Content shape for `AFP_TYPE_BACKLINK_OVERRIDE` messages.
+/// Per-message or per-thread override for the curator backlink pipeline.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct BacklinkOverrideContent {
+    /// Optional free-text backlink rules (same syntax as folder rules).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rules: Option<String>,
+    /// When `true`, suppress all curator-generated backlinks for this message/thread.
+    #[serde(default)]
+    pub suppress: bool,
+}
+
+/// Content shape for `AFP_TYPE_SUPERTAG_DEFINITION` messages.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct SupertagDefinitionContent {
+    pub tag_name: String,
+    #[serde(default)]
+    pub keywords: Vec<String>,
+    #[serde(default)]
+    pub folder_scope: Vec<String>,
 }
 
 /// Return the AFP message families that a node of `node_kind` is expected to

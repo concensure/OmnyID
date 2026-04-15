@@ -745,7 +745,7 @@ pub async fn run() {
         error!(%err, "Omnyid failed to ensure daemon registrations at startup");
     }
     start_knowledge_curator_daemon(db.clone()).await;
-    start_sync_worker(db.clone()).await;
+    start_sync_worker(db.pool.clone()).await;
     start_imap_sync(db.clone(), metrics.clone(), app_state.relay_tx.clone()).await;
     start_archive_daemon(db.clone()).await;
     start_health_maintenance_daemon(db.clone()).await;
