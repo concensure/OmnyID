@@ -995,7 +995,7 @@ pub async fn run() {
         .route("/api/cost/summary", get(cost_summary_http))
         .route("/api/cost/budget", get(get_budget_http))
         .route("/api/cost/budget", post(upsert_budget_http))
-        .route("/api/cost/runs/:run_id", get(get_run_context_http))
+        .route("/api/cost/runs/{run_id}", get(get_run_context_http))
         .route("/mcp", post(mcp_http))
         // ── Agent template ────────────────────────────────────────────────
         .route("/agent/provision", post(agent_provision_http))
@@ -14421,6 +14421,91 @@ fn workflow_run_record(
                 decision_point_id: Option<&str>,
                 option_count: Option<usize>,
             | {
+                let trace_phase = match trace_kind {
+                    "approval_wait" | "policy_block" | "execution_failure" | "simulation"
+                    | "completed" | "queued" | "branch_skip" | "wait_resume_dispatch"
+                    | "approval_rejection" | "approval_resume" => "action_taken",
+                    _ => "action_taken",
+                };
+                let outcome_checkpoint = match trace_kind {
+                    "approval_wait" => "approval_requested".to_string(),
+                    "policy_block" => "policy_blocked".to_string(),
+                    "execution_failure" => "execution_failed".to_string(),
+                    "simulation" => "simulated_completion".to_string(),
+                    "queued" => "queued_for_execution".to_string(),
+                    "branch_skip" => "branch_skipped".to_string(),
+                    "wait_resume_dispatch" => "resume_dispatched".to_string(),
+                    "approval_rejection" => "approval_rejected".to_string(),
+                    "approval_resume" => "approval_resumed".to_string(),
+                    "completed" => {
+                        if graph_node_kind == "trigger" {
+                            "trigger_started".to_string()
+                        } else if graph_node_kind == "approval" {
+                            "approval_completed".to_string()
+                        } else if graph_node_kind == "policy" {
+                            "policy_passed".to_string()
+                        } else {
+                            "step_completed".to_string()
+                        }
+                    }
+                    _ => format!("step_{}", outcome.replace('-', "_")),
+                };
+                let resolved_reason = reason
+                    .map(str::to_string)
+                    .unwrap_or_else(|| match trace_kind {
+                        "completed" => format!("{graph_node_label} completed successfully."),
+                        "queued" => {
+                            "Execution is queued behind an upstream gate or unfinished branch outcome."
+                                .to_string()
+                        }
+                        "simulation" => {
+                            "Dry-run simulation completed without executing live side effects."
+                                .to_string()
+                        }
+                        "branch_skip" => {
+                            "Node was skipped because another branch path remained active."
+                                .to_string()
+                        }
+                        "policy_block" => {
+                            "Policy enforcement blocked execution.".to_string()
+                        }
+                        "execution_failure" => {
+                            format!("{graph_node_label} failed during execution.")
+                        }
+                        "approval_wait" => {
+                            format!("{graph_node_label} requires human approval.")
+                        }
+                        _ => format!("{graph_node_label} reached {outcome_checkpoint}."),
+                    });
+                let complexity_score = {
+                    let mut score = 1i64;
+                    if matches!(
+                        graph_node_kind.as_str(),
+                        "agent" | "delegation" | "approval" | "condition" | "merge"
+                    ) {
+                        score += 1;
+                    }
+                    if retry_count > 0 {
+                        score += 1;
+                    }
+                    if runtime_kind == "capability_router" || runtime_kind == "reflection" {
+                        score += 1;
+                    }
+                    score.min(5)
+                };
+                let risk_score = {
+                    let mut score = 1i64;
+                    if matches!(trace_kind, "approval_wait" | "policy_block" | "execution_failure") {
+                        score += 2;
+                    }
+                    if trace_side_effects == "executed" || trace_side_effects == "live_allowed" {
+                        score += 1;
+                    }
+                    if matches!(graph_node_kind.as_str(), "tool" | "delegation" | "approval") {
+                        score += 1;
+                    }
+                    score.min(5)
+                };
                 let mut action = action_trace.as_object().cloned().unwrap_or_default();
                 action.insert("outcome".to_string(), Value::String(outcome.to_string()));
                 action.insert("retry_count".to_string(), Value::Number(serde_json::Number::from(retry_count)));
@@ -14436,6 +14521,20 @@ fn workflow_run_record(
                 trace.insert("detail_mode".to_string(), Value::String(trace_detail_mode.to_string()));
                 trace.insert("side_effects".to_string(), Value::String(trace_side_effects.to_string()));
                 trace.insert("execution_mode".to_string(), Value::String(execution_mode.to_string()));
+                trace.insert("phase".to_string(), Value::String(trace_phase.to_string()));
+                trace.insert("reason".to_string(), Value::String(resolved_reason.clone()));
+                trace.insert(
+                    "outcome_checkpoint".to_string(),
+                    Value::String(outcome_checkpoint),
+                );
+                trace.insert(
+                    "complexity_score".to_string(),
+                    Value::Number(serde_json::Number::from(complexity_score)),
+                );
+                trace.insert(
+                    "risk_score".to_string(),
+                    Value::Number(serde_json::Number::from(risk_score)),
+                );
                 trace.insert("action".to_string(), action_value.clone());
                 trace.insert(
                     "events".to_string(),
@@ -14450,7 +14549,7 @@ fn workflow_run_record(
                             .and_then(|entry| entry.get("result_summary"))
                             .and_then(Value::as_str)
                             .unwrap_or("Action completed."),
-                        reason,
+                        Some(resolved_reason.as_str()),
                         decision_point_id,
                         option_count,
                     ),
@@ -15159,6 +15258,15 @@ fn apply_wait_resume_to_run_record(
             "completed_at": resumed_at,
             "trace": {
                 "kind": "wait_resume_dispatch",
+                "phase": "action_taken",
+                "reason": format!(
+                    "Workflow resumed after {} {}.",
+                    resume_family.replace('_', " "),
+                    resume_kind.replace('_', " ")
+                ),
+                "outcome_checkpoint": "resume_dispatched",
+                "complexity_score": 2,
+                "risk_score": if resume_family == "approval" { 4 } else { 2 },
                 "resume_family": resume_family,
                 "resume_kind": resume_kind,
                 "wait_resume_id": wait_resume_id,
@@ -15256,8 +15364,28 @@ fn apply_wait_resume_approval_decision_to_run_record(
                         Value::String("approval_resume".to_string()),
                     );
                     trace.insert(
+                        "phase".to_string(),
+                        Value::String("reflection".to_string()),
+                    );
+                    trace.insert(
                         "decision".to_string(),
                         Value::String(decision_label.to_string()),
+                    );
+                    trace.insert(
+                        "reason".to_string(),
+                        Value::String("Workflow resumed after human approval.".to_string()),
+                    );
+                    trace.insert(
+                        "outcome_checkpoint".to_string(),
+                        Value::String("approval_resumed".to_string()),
+                    );
+                    trace.insert(
+                        "complexity_score".to_string(),
+                        Value::Number(serde_json::Number::from(2)),
+                    );
+                    trace.insert(
+                        "risk_score".to_string(),
+                        Value::Number(serde_json::Number::from(4)),
                     );
                     if let Some(option_id) = option_id {
                         trace.insert(
@@ -15316,6 +15444,11 @@ fn apply_wait_resume_approval_decision_to_run_record(
                 "completed_at": decided_at,
                 "trace": {
                     "kind": "approval_rejection",
+                    "phase": "reflection",
+                    "reason": "Workflow cancelled after approval was rejected.",
+                    "outcome_checkpoint": "approval_rejected",
+                    "complexity_score": 2,
+                    "risk_score": 4,
                     "resume_family": wait_resume_record.get("resume_family").cloned().unwrap_or(Value::Null),
                     "resume_kind": wait_resume_record.get("resume_kind").cloned().unwrap_or(Value::Null),
                     "wait_resume_id": wait_resume_id,
@@ -16536,6 +16669,7 @@ async fn workflow_run_stream_http(
         "workflow_id": workflow_id,
         "status": "running",
         "node_count": timeline.len(),
+        "phase": "plan_step",
     });
     body.push_str(&format!("data: {}\n\n", run_started));
 
@@ -16558,21 +16692,66 @@ async fn workflow_run_stream_http(
             .get("runtime_kind")
             .and_then(Value::as_str)
             .unwrap_or("agent");
+        let graph_node_kind = node
+            .get("graph_node_kind")
+            .and_then(Value::as_str)
+            .unwrap_or("agent");
         let started_at = node
             .get("started_at")
             .and_then(Value::as_str)
             .or_else(|| node.get("ts").and_then(Value::as_str))
             .unwrap_or("");
+        let trace = node.get("trace").and_then(Value::as_object);
+        let trace_kind = trace
+            .and_then(|entry| entry.get("kind"))
+            .and_then(Value::as_str)
+            .unwrap_or("completed");
+        let phase = trace
+            .and_then(|entry| entry.get("phase"))
+            .and_then(Value::as_str)
+            .unwrap_or("action_taken");
+        let checkpoint = trace
+            .and_then(|entry| entry.get("outcome_checkpoint"))
+            .and_then(Value::as_str);
+        let reason = node
+            .get("state_reason")
+            .and_then(Value::as_str)
+            .or_else(|| trace.and_then(|entry| entry.get("reason")).and_then(Value::as_str))
+            .or_else(|| node.get("failure_reason").and_then(Value::as_str))
+            .or_else(|| node.get("block_reason").and_then(Value::as_str))
+            .or_else(|| node.get("approval_reason").and_then(Value::as_str))
+            .map(str::to_string);
+        let complexity_score = trace
+            .and_then(|entry| entry.get("complexity_score"))
+            .and_then(Value::as_i64);
+        let risk_score = trace
+            .and_then(|entry| entry.get("risk_score"))
+            .and_then(Value::as_i64);
 
         // node_started
-        let node_started = serde_json::json!({
+        let mut node_started = serde_json::json!({
             "event": "node_started",
             "node_id": node_id,
             "label": label,
             "runtime_kind": runtime_kind,
+            "graph_node_kind": graph_node_kind,
             "index": index,
             "ts": started_at,
+            "phase": phase,
+            "trace_kind": trace_kind,
         });
+        if let Some(checkpoint) = checkpoint {
+            node_started["outcome_checkpoint"] = Value::String(checkpoint.to_string());
+        }
+        if let Some(reason) = reason.as_ref() {
+            node_started["reason"] = Value::String(reason.clone());
+        }
+        if let Some(complexity_score) = complexity_score {
+            node_started["complexity_score"] = Value::Number(serde_json::Number::from(complexity_score));
+        }
+        if let Some(risk_score) = risk_score {
+            node_started["risk_score"] = Value::Number(serde_json::Number::from(risk_score));
+        }
         body.push_str(&format!("data: {}\n\n", node_started));
 
         // terminal node event
@@ -16588,12 +16767,6 @@ async fn workflow_run_stream_http(
             .and_then(Value::as_str)
             .or_else(|| node.get("completed_at").and_then(Value::as_str))
             .unwrap_or("");
-        let reason = node
-            .get("failure_reason")
-            .and_then(Value::as_str)
-            .or_else(|| node.get("block_reason").and_then(Value::as_str))
-            .or_else(|| node.get("approval_reason").and_then(Value::as_str))
-            .map(str::to_string);
         let mut terminal = serde_json::json!({
             "event": terminal_event,
             "node_id": node_id,
@@ -16601,9 +16774,22 @@ async fn workflow_run_stream_http(
             "status": node_status,
             "index": index,
             "ts": finished_at,
+            "phase": phase,
+            "trace_kind": trace_kind,
+            "runtime_kind": runtime_kind,
+            "graph_node_kind": graph_node_kind,
         });
         if let Some(r) = reason {
             terminal["reason"] = Value::String(r);
+        }
+        if let Some(checkpoint) = checkpoint {
+            terminal["outcome_checkpoint"] = Value::String(checkpoint.to_string());
+        }
+        if let Some(complexity_score) = complexity_score {
+            terminal["complexity_score"] = Value::Number(serde_json::Number::from(complexity_score));
+        }
+        if let Some(risk_score) = risk_score {
+            terminal["risk_score"] = Value::Number(serde_json::Number::from(risk_score));
         }
         body.push_str(&format!("data: {}\n\n", terminal));
     }

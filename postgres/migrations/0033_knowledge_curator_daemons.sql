@@ -7,7 +7,7 @@
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS daemon_registrations (
   daemon_id              TEXT        PRIMARY KEY,
-  user_id                TEXT        NOT NULL REFERENCES afp_accounts(user_id) ON DELETE CASCADE,
+  user_id                TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   daemon_kind            TEXT        NOT NULL,   -- 'knowledge_curator' | 'email_gateway' | 'relational_sync' | 'archive_cold_storage' | 'health_maintenance'
   workflow_id            TEXT,                   -- NULL for system-level daemons
   delegated_key_id       TEXT        NOT NULL,
@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS daemon_registrations_kind_idx
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS afp_backlinks (
   backlink_id    TEXT        PRIMARY KEY,
-  user_id        TEXT        NOT NULL REFERENCES afp_accounts(user_id) ON DELETE CASCADE,
+  user_id        TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   source_id      TEXT        NOT NULL,   -- AFP message id (originating message)
   target_id      TEXT        NOT NULL,   -- AFP message id (related message)
   link_kind      TEXT        NOT NULL    -- 'semantic_similarity' | 'entity_overlap' | 'explicit_ref' | 'temporal_proximity'
@@ -57,7 +57,7 @@ CREATE INDEX IF NOT EXISTS afp_backlinks_target_idx
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS afp_knowledge_cards (
   card_id        TEXT        PRIMARY KEY,
-  user_id        TEXT        NOT NULL REFERENCES afp_accounts(user_id) ON DELETE CASCADE,
+  user_id        TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   source_id      TEXT        NOT NULL,   -- AFP message id this card summarises
   summary        TEXT,
   supertags      TEXT[]      NOT NULL DEFAULT '{}',
@@ -92,7 +92,7 @@ CREATE INDEX IF NOT EXISTS afp_knowledge_cards_supertags_idx
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS curator_run_audit (
   run_id              TEXT        PRIMARY KEY,
-  user_id             TEXT        NOT NULL REFERENCES afp_accounts(user_id) ON DELETE CASCADE,
+  user_id             TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   daemon_id           TEXT        NOT NULL REFERENCES daemon_registrations(daemon_id) ON DELETE CASCADE,
   source_message_id   TEXT        NOT NULL,
   trigger_kind        TEXT        NOT NULL DEFAULT 'new_message',   -- 'new_message' | 'deep_maintenance' | 'reindex'
@@ -120,7 +120,7 @@ CREATE INDEX IF NOT EXISTS curator_run_audit_daemon_idx
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS afp_archive_index (
   message_id     TEXT        PRIMARY KEY,
-  user_id        TEXT        NOT NULL REFERENCES afp_accounts(user_id) ON DELETE CASCADE,
+  user_id        TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   thread_id      TEXT        NOT NULL,
   message_type   TEXT        NOT NULL,
   archived_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
