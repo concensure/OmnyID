@@ -1,6 +1,7 @@
 use crate::afp::Message as ProtoMessage;
 use crate::crypto::is_supported_encryption_envelope;
 use crate::integration::{ActionResult, IntegrationCapability};
+use crate::knowledge_curator::{BacklinkKind, BacklinkRecord, DaemonHeartbeat, DaemonKind};
 use crate::local_sync::{DeviceBootstrap, SyncSliceSpec};
 use crate::message::metadata_store_flag;
 use crate::personalization::{LoraArtifact, PersonalizationEvent};
@@ -296,6 +297,186 @@ impl Db {
         Ok(rows.into_iter().map(proto_message_from_row).collect())
     }
 
+    pub async fn upsert_backlink_record(&self, record: &BacklinkRecord) -> Result<(), sqlx::Error> {
+        if record.user_id.trim().is_empty() {
+            return Ok(());
+        }
+
+        sqlx::query(
+            r#"
+            INSERT INTO afp_backlinks (
+                backlink_id,
+                user_id,
+                source_id,
+                target_id,
+                link_kind,
+                similarity,
+                entities,
+                created_at,
+                curator_run_id
+            )
+            VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9
+            )
+            ON CONFLICT (user_id, source_id, target_id, link_kind) DO UPDATE SET
+                backlink_id = EXCLUDED.backlink_id,
+                similarity = EXCLUDED.similarity,
+                entities = EXCLUDED.entities,
+                created_at = EXCLUDED.created_at,
+                curator_run_id = EXCLUDED.curator_run_id
+            "#,
+        )
+        .bind(&record.backlink_id)
+        .bind(&record.user_id)
+        .bind(&record.source_id)
+        .bind(&record.target_id)
+        .bind(backlink_kind_as_str(&record.link_kind))
+        .bind(record.similarity)
+        .bind(&record.entities)
+        .bind(&record.created_at)
+        .bind(&record.curator_run_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn list_backlinks_for_message(
+        &self,
+        user_id: &str,
+        message_id: &str,
+    ) -> Result<Vec<BacklinkRecord>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                backlink_id,
+                user_id,
+                source_id,
+                target_id,
+                link_kind,
+                similarity,
+                entities,
+                created_at::text AS created_at,
+                curator_run_id
+            FROM afp_backlinks
+            WHERE user_id = $1
+              AND (source_id = $2 OR target_id = $2)
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .bind(message_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| BacklinkRecord {
+                backlink_id: row.get("backlink_id"),
+                user_id: row.get("user_id"),
+                source_id: row.get("source_id"),
+                target_id: row.get("target_id"),
+                link_kind: backlink_kind_from_str(&row.get::<String, _>("link_kind")),
+                similarity: row.get("similarity"),
+                entities: row.get("entities"),
+                created_at: row.get("created_at"),
+                curator_run_id: row
+                    .get::<Option<String>, _>("curator_run_id")
+                    .unwrap_or_default(),
+            })
+            .collect())
+    }
+
+    /// Return the top-N supertags by usage frequency across the user's
+    /// knowledge cards.  Each item is `{ "tag": string, "count": number }`.
+    pub async fn list_top_supertags(
+        &self,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT tag, COUNT(*) AS freq
+            FROM afp_knowledge_cards,
+                 UNNEST(supertags) AS tag
+            WHERE user_id = $1
+            GROUP BY tag
+            ORDER BY freq DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                serde_json::json!({
+                    "tag":   row.get::<String, _>("tag"),
+                    "count": row.try_get::<i64, _>("freq").unwrap_or(0),
+                })
+            })
+            .collect())
+    }
+
+    /// BFS multi-hop backlink graph traversal.
+    ///
+    /// Starting from `root_id`, expands up to `depth` hops through the
+    /// `afp_backlinks` table and returns the set of unique edges reachable
+    /// within that radius.  Depth is clamped to 4 to prevent runaway queries.
+    ///
+    /// Returns `(nodes, edges)` where:
+    /// - `nodes` is the de-duplicated set of all message IDs encountered.
+    /// - `edges` is a `Vec<BacklinkRecord>` for every edge in the subgraph.
+    pub async fn bfs_backlinks_graph(
+        &self,
+        user_id: &str,
+        root_id: &str,
+        depth: u32,
+    ) -> Result<(Vec<String>, Vec<BacklinkRecord>), sqlx::Error> {
+        let depth = depth.min(4) as usize;
+        let mut visited_nodes: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        let mut visited_edge_ids: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        let mut all_edges: Vec<BacklinkRecord> = Vec::new();
+        let mut frontier: Vec<String> = vec![root_id.to_string()];
+        visited_nodes.insert(root_id.to_string());
+
+        for _ in 0..depth {
+            if frontier.is_empty() {
+                break;
+            }
+            let mut next_frontier: Vec<String> = Vec::new();
+            for node_id in &frontier {
+                let edges = self.list_backlinks_for_message(user_id, node_id).await?;
+                for edge in edges {
+                    if visited_edge_ids.contains(&edge.backlink_id) {
+                        continue;
+                    }
+                    visited_edge_ids.insert(edge.backlink_id.clone());
+                    // Discover the neighbour node
+                    let neighbour = if edge.source_id == *node_id {
+                        edge.target_id.clone()
+                    } else {
+                        edge.source_id.clone()
+                    };
+                    if !visited_nodes.contains(&neighbour) {
+                        visited_nodes.insert(neighbour.clone());
+                        next_frontier.push(neighbour);
+                    }
+                    all_edges.push(edge);
+                }
+            }
+            frontier = next_frontier;
+        }
+
+        let nodes: Vec<String> = visited_nodes.into_iter().collect();
+        Ok((nodes, all_edges))
+    }
+
     // ── Mail sync ─────────────────────────────────────────────────────────────
 
     pub async fn upsert_mail_sync_checkpoint(
@@ -392,6 +573,190 @@ impl Db {
     }
 
     // ── Integrations & action results ─────────────────────────────────────────
+
+    pub async fn upsert_daemon_registration(
+        &self,
+        user_id: &str,
+        daemon_kind: &DaemonKind,
+        delegated_key_id: &str,
+        workflow_id: Option<&str>,
+        policy_config: Value,
+    ) -> Result<String, sqlx::Error> {
+        let daemon_id = format!("{}:{}", daemon_kind_label(daemon_kind), user_id.trim());
+        sqlx::query(
+            r#"
+            INSERT INTO daemon_registrations (
+                daemon_id,
+                user_id,
+                daemon_kind,
+                workflow_id,
+                delegated_key_id,
+                allowed_message_types,
+                status,
+                policy_config,
+                last_heartbeat_at,
+                created_at,
+                revoked_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, NOW(), NOW(), NULL)
+            ON CONFLICT (daemon_id) DO UPDATE SET
+                workflow_id = EXCLUDED.workflow_id,
+                delegated_key_id = EXCLUDED.delegated_key_id,
+                allowed_message_types = EXCLUDED.allowed_message_types,
+                status = 'active',
+                policy_config = EXCLUDED.policy_config,
+                revoked_at = NULL
+            "#,
+        )
+        .bind(&daemon_id)
+        .bind(user_id)
+        .bind(daemon_kind_label(daemon_kind))
+        .bind(workflow_id)
+        .bind(delegated_key_id)
+        .bind(daemon_kind.allowed_message_types())
+        .bind(policy_config)
+        .execute(&self.pool)
+        .await?;
+        Ok(daemon_id)
+    }
+
+    pub async fn record_daemon_heartbeat(
+        &self,
+        heartbeat: &DaemonHeartbeat,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE daemon_registrations
+            SET last_heartbeat_at = $2::timestamptz
+            WHERE daemon_id = $1
+            "#,
+        )
+        .bind(&heartbeat.daemon_id)
+        .bind(&heartbeat.created_at)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO daemon_heartbeats (
+                heartbeat_id,
+                daemon_id,
+                user_id,
+                metrics,
+                created_at
+            )
+            VALUES ($1, $2, $3, $4, $5::timestamptz)
+            ON CONFLICT (heartbeat_id) DO NOTHING
+            "#,
+        )
+        .bind(&heartbeat.heartbeat_id)
+        .bind(&heartbeat.daemon_id)
+        .bind(&heartbeat.user_id)
+        .bind(json!({
+            "queue_depth": heartbeat.queue_depth,
+            "events_processed_last_hour": heartbeat.events_processed_last_hour,
+            "tokens_used_today": heartbeat.tokens_used_today,
+            "error_count_last_hour": heartbeat.error_count_last_hour,
+        }))
+        .bind(&heartbeat.created_at)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn upsert_relational_projection(
+        &self,
+        owner_user_id: Option<&str>,
+        message_id: &str,
+        thread_id: &str,
+        message_type: &str,
+        subtype: Option<&str>,
+        projection_kind: &str,
+        workspace_id: Option<&str>,
+        projection_json: Value,
+        source_timestamp: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO afp_relational_projections (
+                message_id,
+                owner_user_id,
+                thread_id,
+                message_type,
+                subtype,
+                projection_kind,
+                workspace_id,
+                projection_json,
+                synced_at,
+                source_timestamp
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9::timestamptz)
+            ON CONFLICT (message_id) DO UPDATE SET
+                owner_user_id = EXCLUDED.owner_user_id,
+                thread_id = EXCLUDED.thread_id,
+                message_type = EXCLUDED.message_type,
+                subtype = EXCLUDED.subtype,
+                projection_kind = EXCLUDED.projection_kind,
+                workspace_id = EXCLUDED.workspace_id,
+                projection_json = EXCLUDED.projection_json,
+                synced_at = NOW(),
+                source_timestamp = EXCLUDED.source_timestamp
+            "#,
+        )
+        .bind(message_id)
+        .bind(owner_user_id)
+        .bind(thread_id)
+        .bind(message_type)
+        .bind(subtype)
+        .bind(projection_kind)
+        .bind(workspace_id)
+        .bind(projection_json)
+        .bind(source_timestamp)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn upsert_archive_index_entry(
+        &self,
+        user_id: &str,
+        message_id: &str,
+        thread_id: &str,
+        message_type: &str,
+        minio_key: &str,
+        metadata_stub: Value,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO afp_archive_index (
+                message_id,
+                user_id,
+                thread_id,
+                message_type,
+                archived_at,
+                minio_key,
+                metadata_stub,
+                restored_at
+            )
+            VALUES ($1, $2, $3, $4, NOW(), $5, $6, NULL)
+            ON CONFLICT (message_id) DO UPDATE SET
+                minio_key = EXCLUDED.minio_key,
+                metadata_stub = EXCLUDED.metadata_stub,
+                archived_at = NOW()
+            "#,
+        )
+        .bind(message_id)
+        .bind(user_id)
+        .bind(thread_id)
+        .bind(message_type)
+        .bind(minio_key)
+        .bind(metadata_stub)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
 
     pub async fn upsert_integration_capability(
         &self,
@@ -820,6 +1185,53 @@ impl Db {
             "active_lora_artifact_id": latest_artifact,
             "training_schedule": crate::personalization::TrainingSchedule::weekly_default(),
         }))
+    }
+
+    /// Compute a LoRA confidence score from feedback signal counts for an agent.
+    ///
+    /// Formula:  raw = (approved × 0.02) + (edited × 0.01) − (rejected × 0.01)
+    /// Clamped to [0.0, LORA_TAKEOVER_THRESHOLD].
+    ///
+    /// Returns `(score, genome_active)`.  Callers should call `update_lora_confidence`
+    /// with the result so the agent record stays consistent.
+    pub async fn compute_lora_score_from_feedback(
+        &self,
+        agent_id: &str,
+    ) -> Result<(f64, bool), sqlx::Error> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            signal: String,
+            count: i64,
+        }
+        let rows = sqlx::query_as::<_, Row>(
+            r#"
+            SELECT signal, COUNT(*) AS count
+            FROM personalization_events
+            WHERE actor_agent_id = $1
+            GROUP BY signal
+            "#,
+        )
+        .bind(agent_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut approved: i64 = 0;
+        let mut edited: i64 = 0;
+        let mut rejected: i64 = 0;
+        for row in rows {
+            match row.signal.as_str() {
+                "approved" => approved = row.count,
+                "edited" => edited = row.count,
+                "rejected" => rejected = row.count,
+                _ => {}
+            }
+        }
+
+        let threshold = crate::agent_template::LORA_TAKEOVER_THRESHOLD;
+        let raw = (approved as f64 * 0.02) + (edited as f64 * 0.01) - (rejected as f64 * 0.01);
+        let score = raw.clamp(0.0, threshold);
+        let genome_active = score >= threshold;
+        Ok((score, genome_active))
     }
 
     // ── Billing ────────────────────────────────────────────────────────────────
@@ -3023,6 +3435,466 @@ impl Db {
         Ok(result.rows_affected())
     }
 
+    /// Returns all `email`-family trigger registrations with status `registered`
+    /// for the given user.  Used by the email trigger dispatcher background task.
+    /// Returns an empty vec (not an error) when the tenant table does not exist.
+    pub async fn list_due_email_trigger_registrations_for_user(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Vec<WorkflowTriggerRegistrationRecord>, sqlx::Error> {
+        let table = tenant_workflow_trigger_registrations_table(owner_user_id);
+        let rows: Vec<(serde_json::Value,)> = sqlx::query_as(&format!(
+            r#"
+            SELECT to_jsonb(r) AS row
+            FROM {table} r
+            WHERE r.trigger_family = 'event'
+              AND r.trigger_kind   = 'email'
+              AND r.registration_status = 'registered'
+            ORDER BY r.created_at ASC
+            LIMIT 100
+            "#
+        ))
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default();
+        Ok(rows
+            .into_iter()
+            .filter_map(|(v,)| serde_json::from_value(v).ok())
+            .collect())
+    }
+
+    /// Returns all `schedule`-family trigger registrations for the given user
+    /// whose `next_fire_at` is at or before `now_rfc3339`.  Used exclusively
+    /// by the background cron scheduler.  Returns an empty vec (not an error)
+    /// when the tenant schema has no trigger registrations table yet.
+    pub async fn list_due_schedule_registrations_for_user(
+        &self,
+        owner_user_id: &str,
+        now_rfc3339: &str,
+    ) -> Result<Vec<WorkflowTriggerRegistrationRecord>, sqlx::Error> {
+        let table = tenant_workflow_trigger_registrations_table(owner_user_id);
+        let rows: Vec<(serde_json::Value,)> = sqlx::query_as(&format!(
+            r#"
+            SELECT to_jsonb(r) AS row
+            FROM {table} r
+            WHERE r.trigger_family = 'schedule'
+              AND r.registration_status = 'registered'
+              AND (r.next_fire_at IS NULL OR r.next_fire_at <= $1::timestamptz)
+            ORDER BY r.next_fire_at ASC NULLS FIRST
+            LIMIT 100
+            "#
+        ))
+        .bind(now_rfc3339)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default(); // table may not exist for users with no tenant schema yet
+        Ok(rows
+            .into_iter()
+            .filter_map(|(v,)| serde_json::from_value(v).ok())
+            .collect())
+    }
+
+    /// Updates `last_fired_at` and `next_fire_at` on a schedule trigger
+    /// registration after a successful scheduler-initiated run.
+    /// Resets `retry_count` to 0.
+    pub async fn mark_trigger_fired(
+        &self,
+        owner_user_id: &str,
+        registration_id: &str,
+        last_fired_at: &str,
+        next_fire_at: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        let table = tenant_workflow_trigger_registrations_table(owner_user_id);
+        sqlx::query(&format!(
+            r#"
+            UPDATE {table}
+            SET last_fired_at = $1::timestamptz,
+                next_fire_at  = $2::timestamptz,
+                retry_count   = 0,
+                updated_at    = NOW()
+            WHERE registration_id = $3
+              AND owner_user_id   = $4
+            "#
+        ))
+        .bind(last_fired_at)
+        .bind(next_fire_at)
+        .bind(registration_id)
+        .bind(owner_user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // ── Webhook ingress routing (migration 0029) ──────────────────────────────
+
+    /// Register a public webhook ingress route.
+    ///
+    /// Called at workflow deploy time for every webhook-family trigger
+    /// registration so the unauthenticated `POST /ingest/webhook/{id}` handler
+    /// can look up the owning tenant and workflow without bearer auth.
+    pub async fn insert_webhook_ingress_route(
+        &self,
+        registration_id: &str,
+        owner_user_id: &str,
+        workflow_id: &str,
+        webhook_path: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO public.webhook_ingress_routing
+                (registration_id, owner_user_id, workflow_id, webhook_path, registered_at)
+            VALUES ($1, $2, $3, $4, NOW())
+            ON CONFLICT (registration_id) DO UPDATE
+                SET owner_user_id = EXCLUDED.owner_user_id,
+                    workflow_id   = EXCLUDED.workflow_id,
+                    webhook_path  = EXCLUDED.webhook_path,
+                    registered_at = NOW()
+            "#,
+        )
+        .bind(registration_id)
+        .bind(owner_user_id)
+        .bind(workflow_id)
+        .bind(webhook_path)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Look up the routing row for a given `registration_id`.
+    ///
+    /// Returns `(owner_user_id, workflow_id, webhook_path)` when found.
+    /// Returns `None` when the registration is not in the routing table
+    /// (i.e. not a webhook-family trigger or not yet deployed).
+    pub async fn lookup_webhook_ingress_route(
+        &self,
+        registration_id: &str,
+    ) -> Result<Option<(String, String, Option<String>)>, sqlx::Error> {
+        let row: Option<(String, String, Option<String>)> = sqlx::query_as(
+            r#"
+            SELECT owner_user_id, workflow_id, webhook_path
+            FROM public.webhook_ingress_routing
+            WHERE registration_id = $1
+            "#,
+        )
+        .bind(registration_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    /// Remove the webhook ingress route for a registration.
+    ///
+    /// Called at rollback or trigger retirement so stale routes do not linger
+    /// in the routing table and cannot receive new webhook deliveries.
+    pub async fn delete_webhook_ingress_route(
+        &self,
+        registration_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(r#"DELETE FROM public.webhook_ingress_routing WHERE registration_id = $1"#)
+            .bind(registration_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    // ── Email trigger queue (migration 0030) ──────────────────────────────────
+
+    /// Write one entry to the global email trigger queue.
+    ///
+    /// Called non-fatally by the IMAP/Gmail/Graph sync loop after each email
+    /// is successfully ingested so the email_trigger_dispatcher can later
+    /// fire workflow runs for all users with registered email-family triggers.
+    pub async fn enqueue_email_trigger_event(
+        &self,
+        event_id: &str,
+        provider: &str,
+        account: &str,
+        email_subject: Option<&str>,
+        email_from: Option<&str>,
+        message_uid: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO public.email_trigger_queue
+                (event_id, provider, account, email_subject, email_from, message_uid, processed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            ON CONFLICT (event_id) DO NOTHING
+            "#,
+        )
+        .bind(event_id)
+        .bind(provider)
+        .bind(account)
+        .bind(email_subject)
+        .bind(email_from)
+        .bind(message_uid)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Return up to `limit` unprocessed email trigger queue entries.
+    ///
+    /// Returns `(event_id, provider, account, email_subject, email_from, message_uid)`.
+    pub async fn list_pending_email_trigger_events(
+        &self,
+        limit: i64,
+    ) -> Result<
+        Vec<(
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )>,
+        sqlx::Error,
+    > {
+        let rows = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                String,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+            ),
+        >(
+            r#"
+            SELECT event_id, provider, account, email_subject, email_from, message_uid
+            FROM public.email_trigger_queue
+            WHERE dispatched_at IS NULL
+            ORDER BY processed_at ASC
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Mark a queue entry as dispatched after the dispatcher has fired runs for it.
+    pub async fn mark_email_trigger_dispatched(&self, event_id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"UPDATE public.email_trigger_queue SET dispatched_at = NOW() WHERE event_id = $1"#,
+        )
+        .bind(event_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // ── File-drop trigger queue (migration 0031) ──────────────────────────────
+
+    /// Returns all `file_drop`-kind trigger registrations with status `registered`
+    /// for the given user.  Used by the file-drop trigger dispatcher background task.
+    /// Returns an empty vec (not an error) when the tenant table does not exist.
+    pub async fn list_due_file_drop_trigger_registrations_for_user(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Vec<WorkflowTriggerRegistrationRecord>, sqlx::Error> {
+        let table = tenant_workflow_trigger_registrations_table(owner_user_id);
+        let rows: Vec<(serde_json::Value,)> = sqlx::query_as(&format!(
+            r#"
+            SELECT to_jsonb(r) AS row
+            FROM {table} r
+            WHERE r.trigger_family = 'event'
+              AND r.trigger_kind   = 'file_drop'
+              AND r.registration_status = 'registered'
+            "#
+        ))
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default();
+        Ok(rows
+            .into_iter()
+            .filter_map(|(v,)| serde_json::from_value(v).ok())
+            .collect())
+    }
+
+    /// Write one entry to the global file-drop trigger queue.
+    ///
+    /// Called non-fatally by the file-watcher task after detecting a new file
+    /// so the file-drop trigger dispatcher can later fire workflow runs.
+    pub async fn enqueue_file_drop_trigger_event(
+        &self,
+        event_id: &str,
+        watched_path: &str,
+        file_name: &str,
+        file_size_bytes: Option<i64>,
+        file_event_type: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO public.file_drop_trigger_queue
+                (event_id, watched_path, file_name, file_size_bytes, file_event_type, processed_at)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            ON CONFLICT (event_id) DO NOTHING
+            "#,
+        )
+        .bind(event_id)
+        .bind(watched_path)
+        .bind(file_name)
+        .bind(file_size_bytes)
+        .bind(file_event_type)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Return up to `limit` unprocessed file-drop trigger queue entries.
+    ///
+    /// Returns `(event_id, watched_path, file_name, file_size_bytes, file_event_type)`.
+    pub async fn list_pending_file_drop_trigger_events(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<(String, String, String, Option<i64>, String)>, sqlx::Error> {
+        let rows = sqlx::query_as::<_, (String, String, String, Option<i64>, String)>(
+            r#"
+            SELECT event_id, watched_path, file_name, file_size_bytes, file_event_type
+            FROM public.file_drop_trigger_queue
+            WHERE dispatched_at IS NULL
+            ORDER BY processed_at ASC
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Mark a file-drop queue entry as dispatched.
+    pub async fn mark_file_drop_trigger_dispatched(
+        &self,
+        event_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"UPDATE public.file_drop_trigger_queue SET dispatched_at = NOW() WHERE event_id = $1"#,
+        )
+        .bind(event_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // ── Internal event queue (migration 0032) ─────────────────────────────────
+
+    /// Returns all `internal_event`-kind trigger registrations with status `registered`
+    /// for the given user.  Used by the internal-event trigger dispatcher.
+    /// Returns an empty vec when the tenant table does not exist.
+    pub async fn list_due_internal_event_trigger_registrations_for_user(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Vec<WorkflowTriggerRegistrationRecord>, sqlx::Error> {
+        let table = tenant_workflow_trigger_registrations_table(owner_user_id);
+        let rows: Vec<(serde_json::Value,)> = sqlx::query_as(&format!(
+            r#"
+            SELECT to_jsonb(r) AS row
+            FROM {table} r
+            WHERE r.trigger_family = 'event'
+              AND r.trigger_kind   = 'internal_event'
+              AND r.registration_status = 'registered'
+            "#
+        ))
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default();
+        Ok(rows
+            .into_iter()
+            .filter_map(|(v,)| serde_json::from_value(v).ok())
+            .collect())
+    }
+
+    /// Write one entry to the global internal event queue.
+    ///
+    /// Called non-fatally by the workflow runtime after a run reaches a
+    /// terminal state so downstream workflows with internal_event triggers
+    /// can be started by the dispatcher.
+    pub async fn enqueue_internal_event(
+        &self,
+        event_id: &str,
+        event_type: &str,
+        source_workflow_id: Option<&str>,
+        source_run_id: Option<&str>,
+        owner_user_id: &str,
+        payload: &serde_json::Value,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO public.internal_event_queue
+                (event_id, event_type, source_workflow_id, source_run_id,
+                 owner_user_id, payload, processed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            ON CONFLICT (event_id) DO NOTHING
+            "#,
+        )
+        .bind(event_id)
+        .bind(event_type)
+        .bind(source_workflow_id)
+        .bind(source_run_id)
+        .bind(owner_user_id)
+        .bind(payload)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Return up to `limit` unprocessed internal event queue entries.
+    ///
+    /// Returns `(event_id, event_type, source_workflow_id, source_run_id, owner_user_id, payload)`.
+    pub async fn list_pending_internal_events(
+        &self,
+        limit: i64,
+    ) -> Result<
+        Vec<(
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            String,
+            serde_json::Value,
+        )>,
+        sqlx::Error,
+    > {
+        let rows = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                Option<String>,
+                Option<String>,
+                String,
+                serde_json::Value,
+            ),
+        >(
+            r#"
+            SELECT event_id, event_type, source_workflow_id, source_run_id,
+                   owner_user_id, payload
+            FROM public.internal_event_queue
+            WHERE dispatched_at IS NULL
+            ORDER BY processed_at ASC
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Mark an internal event queue entry as dispatched.
+    pub async fn mark_internal_event_dispatched(&self, event_id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"UPDATE public.internal_event_queue SET dispatched_at = NOW() WHERE event_id = $1"#,
+        )
+        .bind(event_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     // ── Trigger observability & replay protection ─────────────────────────────
 
     /// Write one trigger observability record.  The caller must call
@@ -3659,8 +4531,8 @@ impl Db {
         let table = tenant_agent_delegations_table(&d.owner_user_id);
         let caps_json = serde_json::to_value(&d.allowed_capabilities)
             .unwrap_or(serde_json::Value::Array(vec![]));
-        let allowlist_json = serde_json::to_value(&d.outbound_allowlist)
-            .unwrap_or(serde_json::Value::Array(vec![]));
+        let allowlist_json =
+            serde_json::to_value(&d.outbound_allowlist).unwrap_or(serde_json::Value::Array(vec![]));
         let snapshot_json = d
             .context_snapshot
             .as_ref()
@@ -4178,6 +5050,34 @@ impl Db {
         Ok(active)
     }
 
+    /// Update LoRA confidence by AFP `agent_id` string (e.g. `"agent:foo@domain"`).
+    ///
+    /// Used by the auto-compute path in the personalization event handler where
+    /// only the AFP agent ID is available. Skips the RLS `set_config` because this
+    /// is a trusted internal server-side update triggered by the user's own event.
+    pub async fn update_lora_confidence_by_afp_id(
+        &self,
+        afp_agent_id: &str,
+        score: f64,
+    ) -> Result<bool, sqlx::Error> {
+        let active = score >= crate::agent_template::LORA_TAKEOVER_THRESHOLD;
+        sqlx::query(
+            r#"
+            UPDATE agent_instances
+            SET lora_confidence_score = $1,
+                lora_genome_active = $2,
+                updated_at = NOW()
+            WHERE agent_id = $3
+            "#,
+        )
+        .bind(score)
+        .bind(active)
+        .bind(afp_agent_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(active)
+    }
+
     // ── Public feed (Plaza equivalent) ───────────────────────────────────────
 
     pub async fn list_public_messages(
@@ -4299,6 +5199,7 @@ impl Db {
                    is_master, max_sub_agents, ephemeral,
                    expires_at::text,
                    lora_confidence_score, lora_genome_active,
+                   auto_approve_workflows,
                    created_at::text, updated_at::text
             FROM agent_instances
             WHERE owner_user_id = $1 AND is_master = TRUE
@@ -4323,10 +5224,34 @@ impl Db {
                 "expires_at": r.try_get::<Option<String>, _>("expires_at").ok().flatten(),
                 "lora_confidence_score": r.get::<f64, _>("lora_confidence_score"),
                 "lora_genome_active": r.get::<bool, _>("lora_genome_active"),
+                "auto_approve_workflows": r.try_get::<bool, _>("auto_approve_workflows").unwrap_or(true),
                 "created_at": r.get::<String, _>("created_at"),
                 "updated_at": r.get::<String, _>("updated_at"),
             })
         }))
+    }
+
+    /// PATCH /agent/settings — persist per-user agent settings on the master instance.
+    pub async fn update_agent_settings(
+        &self,
+        owner_user_id: &str,
+        auto_approve_workflows: bool,
+    ) -> Result<(), sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
+            .bind(owner_user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query(
+            "UPDATE agent_instances SET auto_approve_workflows = $1, updated_at = NOW() \
+             WHERE owner_user_id = $2 AND is_master = TRUE",
+        )
+        .bind(auto_approve_workflows)
+        .bind(owner_user_id)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     // ── Gmail & calendar ──────────────────────────────────────────────────────
@@ -4615,7 +5540,8 @@ impl Db {
             .await?;
         let row = sqlx::query(
             r#"
-            SELECT optimization_mode, auto_confirm_threshold_cents, show_cost_estimates
+            SELECT optimization_mode, auto_confirm_threshold_cents, show_cost_estimates,
+                   default_store_in_history
             FROM user_agent_preferences
             WHERE owner_user_id = $1
             "#,
@@ -4631,6 +5557,7 @@ impl Db {
                 "optimization_mode":             r.get::<String, _>("optimization_mode"),
                 "auto_confirm_threshold_cents":  r.get::<f64, _>("auto_confirm_threshold_cents"),
                 "show_cost_estimates":           r.get::<bool, _>("show_cost_estimates"),
+                "default_store_in_history":      r.get::<bool, _>("default_store_in_history"),
             })
         }))
     }
@@ -4641,6 +5568,7 @@ impl Db {
         optimization_mode: &str,
         auto_confirm_threshold_cents: f64,
         show_cost_estimates: bool,
+        default_store_in_history: bool,
     ) -> Result<(), sqlx::Error> {
         let mut tx = self.pool.begin().await?;
         sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
@@ -4650,12 +5578,13 @@ impl Db {
         sqlx::query(
             r#"
             INSERT INTO user_agent_preferences
-                (owner_user_id, optimization_mode, auto_confirm_threshold_cents, show_cost_estimates, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, NOW(), NOW())
+                (owner_user_id, optimization_mode, auto_confirm_threshold_cents, show_cost_estimates, default_store_in_history, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
             ON CONFLICT (owner_user_id) DO UPDATE SET
                 optimization_mode             = EXCLUDED.optimization_mode,
                 auto_confirm_threshold_cents  = EXCLUDED.auto_confirm_threshold_cents,
                 show_cost_estimates           = EXCLUDED.show_cost_estimates,
+                default_store_in_history      = EXCLUDED.default_store_in_history,
                 updated_at                    = NOW()
             "#,
         )
@@ -4663,6 +5592,7 @@ impl Db {
         .bind(optimization_mode)
         .bind(auto_confirm_threshold_cents)
         .bind(show_cost_estimates)
+        .bind(default_store_in_history)
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
@@ -4670,7 +5600,7 @@ impl Db {
     }
 }
 
-pub const MIGRATIONS: [(&str, &str, &str); 28] = [
+pub const MIGRATIONS: [(&str, &str, &str); 37] = [
     (
         "0001_init",
         "Initial Omnyid schema baseline",
@@ -4811,7 +5741,62 @@ pub const MIGRATIONS: [(&str, &str, &str); 28] = [
         "Public replay-nonce deduplication table for trigger activation idempotency",
         include_str!("../postgres/migrations/0028_trigger_hardening.sql"),
     ),
+    (
+        "0029_webhook_ingress_routing",
+        "Global public-schema routing table for unauthenticated webhook ingress",
+        include_str!("../postgres/migrations/0029_webhook_ingress_routing.sql"),
+    ),
+    (
+        "0030_email_trigger_queue",
+        "Global queue for email ingest events consumed by the email trigger dispatcher",
+        include_str!("../postgres/migrations/0030_email_trigger_queue.sql"),
+    ),
+    (
+        "0031_file_drop_trigger_queue",
+        "Global queue for file-drop/watcher events consumed by the file-drop trigger dispatcher",
+        include_str!("../postgres/migrations/0031_file_drop_trigger_queue.sql"),
+    ),
+    (
+        "0032_internal_event_queue",
+        "Global queue for internal workflow runtime events consumed by the internal event dispatcher",
+        include_str!("../postgres/migrations/0032_internal_event_queue.sql"),
+    ),
+    (
+        "0033_knowledge_curator_daemons",
+        "Knowledge Curator, daemon registrations, archive index, and daemon heartbeats",
+        include_str!("../postgres/migrations/0033_knowledge_curator_daemons.sql"),
+    ),
+    (
+        "0034_agent_settings",
+        "Per-agent settings including workflow auto-approve",
+        include_str!("../postgres/migrations/0034_agent_settings.sql"),
+    ),
+    (
+        "0035_cost_tracking",
+        "Cost tracking cache and trend state",
+        include_str!("../postgres/migrations/0035_cost_tracking.sql"),
+    ),
+    (
+        "0036_daemon_runtime_support",
+        "Daemon runtime support and storage defaults",
+        include_str!("../postgres/migrations/0036_daemon_runtime_support.sql"),
+    ),
+    (
+        "0037_supertag_definitions",
+        "User-authored supertag definition rules and derived index for the Knowledge Curator",
+        include_str!("../postgres/migrations/0037_supertag_definitions.sql"),
+    ),
 ];
+
+fn daemon_kind_label(kind: &DaemonKind) -> &'static str {
+    match kind {
+        DaemonKind::KnowledgeCurator => "knowledge_curator",
+        DaemonKind::EmailGateway => "email_gateway",
+        DaemonKind::RelationalSync => "relational_sync",
+        DaemonKind::ArchiveColdStorage => "archive_cold_storage",
+        DaemonKind::HealthMaintenance => "health_maintenance",
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AliasRecord {
@@ -5290,6 +6275,24 @@ fn nullable_string(input: &str) -> Option<String> {
         None
     } else {
         Some(input.to_string())
+    }
+}
+
+fn backlink_kind_as_str(kind: &BacklinkKind) -> &'static str {
+    match kind {
+        BacklinkKind::SemanticSimilarity => "semantic_similarity",
+        BacklinkKind::EntityOverlap => "entity_overlap",
+        BacklinkKind::ExplicitRef => "explicit_ref",
+        BacklinkKind::TemporalProximity => "temporal_proximity",
+    }
+}
+
+fn backlink_kind_from_str(input: &str) -> BacklinkKind {
+    match input {
+        "semantic_similarity" => BacklinkKind::SemanticSimilarity,
+        "entity_overlap" => BacklinkKind::EntityOverlap,
+        "temporal_proximity" => BacklinkKind::TemporalProximity,
+        _ => BacklinkKind::ExplicitRef,
     }
 }
 

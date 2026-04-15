@@ -9,9 +9,50 @@ Omnyid is a private, self-hosted, agent-first personal workspace built around AF
 - Python and TypeScript SDKs with 1 to 3 line agent flows
 - a config-driven UI that renders AFP threads as multiple views
 
+Design & Technical Principles of the OmnyID Project
+
+Zero-Trust / E2EE-First
+Encryption happens on the sender’s device before any message is transmitted or stored. Homeservers (even your own cloud instance) only ever see ciphertext. This is the single most important principle.
+
+Local-First
+The primary data store is ElectricSQL (Postgres + PGlite) running on the user’s own devices. Most operations (reading recent messages, running agents) happen locally without network round-trips.
+
+Agent-First / Agent-Centric
+Every design decision starts from the perspective of autonomous agents with their own cryptographic Agent ID. Humans are secondary users of the same system.
+
+Immutable / Append-Only
+The message log is strictly append-only. Past messages cannot be altered or deleted. This provides perfect history and auditability. Backlink relationships are replayable from lightweight AFP `backlink_update` messages, but normal traversal and search use a separate derived graph index rather than scanning raw audit messages.
+
+Atomic
+Every piece of data, UI view, tool call, note, or email is a single self-contained AFP message. There are no separate tables or fragmented records.
+
+Declarative
+Agents describe intent and desired outcome (via AFP messages and the views array) rather than imperatively manipulating the UI or storage. The receiver (SolidJS dashboard) decides final rendering.
+
+Extensible
+The protocol uses a small set of required fields plus optional metadata, subtype, and views arrays. New capabilities can be added without breaking existing messages or clients.
+Interoperable
+
+AFP is designed to be bridged to other protocols (A2A, MCP, OpenAI function calling) via thin adapters. It does not require the world to adopt AFP exclusively.
+
+Backward Compatible
+The protocol is explicitly versioned (afp-v1). Future versions will maintain forward compatibility for all v1 messages. Optional fields ensure old clients can still read new messages.
+
+User-Owned / Self-Hostable
+The entire core (protocol, homeserver, SDKs) is open-source and runs completely on user-controlled hardware. No vendor lock-in is required.
+
+Performance-Aware
+Local-first design + thread-scoped queries + pgvector indexing + time-based partitioning ensure the system remains responsive even at billions of messages.
+
+Minimal & Simple
+The protocol and SDKs deliberately minimize required fields and cognitive load. Optional metadata keeps normal messages clean while allowing advanced features when needed.
+
+These 12 principles are the foundation of every technical decision made in the project. They are not aspirational — they are actively enforced in the code, schemas, and SDKs that have already been published in the OmnyID repository.
+
+
 The current Oracle preview deployment also includes:
 
-- a protected `omnyid.com` homepage served from [docs](/c:/Users/ozans/Desktop/projects/Agenton/docs)
+- a protected `omnyid.com` homepage served from [docs](/OmnyID/docs)
 - email/password Agent ID creation
 - Google OAuth popup sign-in
 - a seeded private dashboard with test agents, messages, and logs
@@ -20,9 +61,9 @@ Important product boundary:
 
 - agent-to-agent communication does not require Gmail, IMAP, or email routing
 - Gmail and custom mailbox linking are optional human inbox bridges only
-- Cloudflare Email Routing is only relevant if you want human email for `@omnyid.com` forwarded into a real mailbox such as Gmail
 
-## Current Status
+
+## Current Status (OmnyID Cloud)
 
 Phases 0.5 through 13 are now complete or have concrete implementation artifacts.
 
@@ -116,6 +157,9 @@ Phase 11 is complete:
 - `scripts/omnyid-restore.sh`: drop/recreate DB + pg_restore from MinIO archive
 - `scripts/omnyid-upgrade.sh`: backup → pull → build → restart → healthcheck loop
 - `docker-compose.oracle.minimal.yml` includes a `backup` service on a daily 02:00 UTC cron
+- Knowledge Curator backlink writes now use lightweight `backlink_update` AFP audit messages while maintaining a derived `afp_backlinks` index for fast traversal
+- the server keeps an optional real-time in-memory Knowledge Curator graph view in sync with new `backlink_update` messages
+- low-value internal agent steps are expected to use `metadata.store: false`, with older internal-heavy history moving to cold storage so the hot path stays lean
 
 Phase 12 is complete:
 
@@ -129,6 +173,15 @@ Phase 13 is complete:
 - `.github/workflows/ci.yml`: four-job CI pipeline — `rust` (fmt + clippy + test), `typescript-sdk` (typecheck), `solid-ui` (build), `audit` (cargo-audit)
 - 8 exhaustive property-style parse tests for the relay protocol in `src/relay.rs`
 - 112 unit tests passing across all modules
+
+Knowledge Curator Enhanced (Phase 11 supplement) is complete as of 2026-04-15:
+
+- `GET /backlinks/graph?root={id}&depth={n}` — BFS multi-hop backlink graph traversal, depth clamped to 4; returns node set + edge list
+- `POST /notes/supertags/install-defaults` — one-click install of 8 default supertag definitions (`#Work`, `#Personal`, `#Health`, `#Finance`, `#Travel`, `#Learning`, `#Ideas`, `#Urgent`)
+- Real Ollama embedding model replaces placeholder `[0.1; 768]` in the Knowledge Curator pipeline; configure with `OLLAMA_URL` and `OLLAMA_EMBED_MODEL` env vars; defaults to `nomic-embed-text` at `127.0.0.1:11434`
+- Calendar View Week and Day views added alongside the existing Month grid
+- Calendar right sidebar wired to live backlinks API with direction, similarity score, and entity chips
+- Voice note capture in the calendar event modal via Web Speech API live transcription
 
 ## Quick Start
 
@@ -172,14 +225,14 @@ cd python-sdk
 Python status:
 
 - Python 3.14.3 is the pinned stable runtime
-- the project-local SDK environment lives at [python-sdk/.venv](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/.venv)
-- the bootstrap script is [setup-python-sdk.ps1](/c:/Users/ozans/Desktop/projects/Agenton/scripts/setup-python-sdk.ps1)
+- the project-local SDK environment lives at [python-sdk/.venv](OmnyID/python-sdk/.venv)
+- the bootstrap script is [setup-python-sdk.ps1](OmnyID/scripts/setup-python-sdk.ps1)
 
 ## Consumer Privacy Onboarding
 
-- privacy/product strategy: [OMNYID_CONSUMER_PRIVACY_STRATEGY.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_CONSUMER_PRIVACY_STRATEGY.md)
-- Windows local/BYOC installer wizard: [install-omnyid-private.ps1](/c:/Users/ozans/Desktop/projects/Agenton/scripts/install-omnyid-private.ps1)
-- macOS/Linux local/BYOC installer wizard: [install-omnyid-private.sh](/c:/Users/ozans/Desktop/projects/Agenton/scripts/install-omnyid-private.sh)
+- privacy/product strategy: [OMNYID_CONSUMER_PRIVACY_STRATEGY.md](/OMNYID_CONSUMER_PRIVACY_STRATEGY.md)
+- Windows local/BYOC installer wizard: [install-omnyid-private.ps1](/OmnyID/scripts/install-omnyid-private.ps1)
+- macOS/Linux local/BYOC installer wizard: [install-omnyid-private.sh](/OmnyID/scripts/install-omnyid-private.sh)
 - dashboard onboarding bundle now provides a personalized plan, direct installer links, and a copyable install command after setup is saved
 - private-cloud bundles now include provider-specific bootstrap files and deployment notes for Oracle Cloud, UpCloud, and OVHcloud
 - support access is disabled by default and can only be granted as a temporary, user-initiated consent window from the dashboard
@@ -194,7 +247,7 @@ Python status:
 - that Python runner policy panel now also supports starter-template defaults plus per-run token caps and daily/monthly spend caps, and syncs those changes back into the hosted runtime policy and agent profile files
 - the control plane now also records metadata-only Python runner policy save events and shows recent policy history in-product, so users can audit hosted runner changes without exposing tenant secrets or runtime content
 - the Python runner policy panel now also lets users configure the web tool allowlist directly, keeping generic HTTP access default-deny unless a workspace owner explicitly permits hostnames
-- a new Solid-based unified app shell now lives in [solid-ui](/C:/Users/ozans/Desktop/projects/Agenton/solid-ui), with a glass-panel search, dashboard, and Python runner experience instead of only the landing-page control surface
+- a new Solid-based unified app shell now lives in [solid-ui](/OmnyID/solid-ui), with a glass-panel search, dashboard, and Python runner experience instead of only the landing-page control surface
 - the backend now also exposes `GET /runtime/workspace-files`, `GET/POST /runtime/workspace-file`, and `POST /ui/command` so the unified search bar can route Python-runner edit intents into a safe, per-user runner editor
 - the Solid runner view can now load editable Python runner workspace files, save them through the homeserver, and apply review-required command-bar drafts into code before the user confirms the save
 - the dashboard now also provides a downloadable FastAPI AFP service-adapter starter so universities and small businesses can wrap existing systems behind signed capability endpoints without rewriting their core portal or CRM

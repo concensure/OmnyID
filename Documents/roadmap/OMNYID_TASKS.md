@@ -1293,3 +1293,94 @@ On Ollama backend: call `GET {ollama_url}/api/tags` and show a dropdown of avail
 
 ### N6 — Web Search Storage Toggle
 Add a setting in AgentSettingsView: "Save web search results to AFP feed" (default: off). When on, stores summarised results as AFP `note` messages.
+
+---
+
+## Phase 16: Multi-Modal Ingest Pipeline
+
+**Status:** Not yet started — specced 2026-04-14
+
+**Goal:** Give the AI assistant ultra-fast, high-accuracy ingestion and retrieval across documents, images, audio, and video. Everything flows through AFP; the server stays E2EE and blind to content.
+
+### Why Now
+
+The Knowledge Curator (Phase 11) established the graph index, backlink graph, and embedding pipeline. The Ephemeral Workspace layer (shipped alongside Phase 11) provides a safe sandbox for expensive ingest jobs. Multi-modal ingest is the logical next layer: convert any raw asset into structured AFP messages the Curator can index.
+
+Phase 11 runtime closure update as of 2026-04-14:
+
+- `src/daemon_registry.rs` now boots and tracks system daemons per user
+- `src/curator_runtime.rs` now runs the curator continuously with pgvector-backed candidate search and folder-rule-aware scope
+- `src/daemon_runtime.rs` now archives AFP payloads to MinIO when configured and uses health passes for backlog re-indexing, duplicate detection, and backlink repair
+- Dashboard supertag browsing is now surfaced in `solid-ui/src/components/DashboardFeed.tsx`
+
+Phase 11 + 12 (Knowledge Curator Enhanced) closure update as of 2026-04-15:
+
+- `src/summarizer.rs` — replaced placeholder `[0.1; 768]` embedding with async `generate_embedding_with_ollama()` hitting Ollama `/api/embeddings` (default model `nomic-embed-text`). Graceful fallback to uniform vector. Configure via `OLLAMA_URL` / `OLLAMA_EMBED_MODEL` env vars.
+- `src/curator_runtime.rs` — curator now uses real Ollama embeddings; cosine-similarity backlinks are meaningful when Ollama is running locally.
+- `src/db.rs` — `Db::bfs_backlinks_graph(user_id, root_id, depth)` added: iterative BFS up to depth 4 over `afp_backlinks`, returning reachable node set and edge list.
+- `src/server/mod.rs` — two new endpoints: `GET /backlinks/graph?root=&depth=` (multi-hop graph); `POST /notes/supertags/install-defaults` (one-click taxonomy install: `#Work`, `#Personal`, `#Health`, `#Finance`, `#Travel`, `#Learning`, `#Ideas`, `#Urgent`).
+- `solid-ui/src/lib/api.ts` — `BacklinkItem`, `BacklinksResponse`, `BacklinksGraphResponse` types; `fetchBacklinksForMessage()`, `fetchBacklinksGraph()`, `installDefaultSupertags()` helpers.
+- `solid-ui/src/components/MonthlyCalendarView.tsx` — right sidebar wired to live backlinks API; `WeekView` (7-column hourly grid) and `DayView` (24-hour single-column list) components added; voice note capture via Web Speech API live transcription in `AddEventModal`; "Install defaults" supertag card in right sidebar.
+
+### P16-A — Short-Term: External Parser Tool Calls (immediate)
+
+Wire high-accuracy parsers as AFP tool calls via MCP/tool_call instead of building parsers from scratch:
+
+- **PDF / rich docs:** MinerU (open-source, layout-preserving), LlamaParse, or Unstructured.io — caller's choice, routed by connector_family
+- **Audio / video:** Whisper (local via Ollama, or hosted) transcription → AFP `transcript` message
+- Every parsed output lands as an AFP message (`markdown_view`, `table_view`, or `image_view` subtype) in the same thread as the source attachment
+- Knowledge Curator indexes these automatically via its `afp_new_message` subscription — no extra wiring needed
+- All intermediate parse steps use `metadata.store: false` to suppress AFP bloat; only the clean structured output is persisted
+
+**AFP messages introduced:**
+- `multimodal_ingest_request` (ephemeral, kicked off in a workspace branch)
+- `parsed_document` (persisted, with `content_type`, `parser_used`, `source_url`)
+- `transcript` (persisted, with `duration_seconds`, `language`, `model_used`)
+
+### P16-B — Medium-Term: Multi-Modal Ingest Daemon
+
+New background daemon: **Ingest Coordinator**
+
+- Subscribes to `afp_new_message` where `message.type IN ('attachment', 'upload_complete')`
+- Routes asset to the best available parser by MIME type:
+  - `application/pdf` → MinerU (preferred) or LlamaParse fallback
+  - `image/*` → vision model caption + OCR
+  - `audio/*`, `video/*` → Whisper transcription
+  - `text/html` → Readability extract → markdown
+- Runs inside an ephemeral workspace branch; merges on success, discards on failure
+- Emits a `knowledge_card` AFP message for each parsed chunk, letting the Knowledge Curator pick up entity extraction and backlink creation for free
+
+**Daemon spec (same pattern as Knowledge Curator):**
+- `subscription_slot`: `afp_new_message` + MIME filter
+- `analysis_slot`: parser routing + chunking
+- `write_slot`: `parsed_document`, `transcript`, `knowledge_card`
+- `policy_slot`: `outbound_allowlist = ["parsed_document", "transcript", "knowledge_card", "daemon_heartbeat"]`
+- `heartbeat_slot`: `daemon_heartbeat` every 60 s
+- `max_cost_cents ≤ 5` per trigger (parser calls are cheap; LLM captioning is bounded to 1 call per image)
+
+### P16-C — Long-Term: Hybrid Retrieval in the Knowledge Curator
+
+Upgrade retrieval from pure vector search to hybrid ranked results:
+
+- **Vector search:** pgvector (`embedding <-> query_vec`) — already live, P95 < 200 ms
+- **BM25 keyword search:** `pg_bm25` (ParadeDB extension) over structured AFP content fields
+- **Fusion:** Reciprocal Rank Fusion (RRF) merges pgvector and BM25 results before returning to the caller
+- **Multi-hop reasoning:** traverse `afp_backlinks` graph for linked entities before falling back to raw vector search — catches related items that share no embedding proximity
+- **PGlite query cache:** frequent queries + summaries cached locally in the browser PGlite instance; cache-hit path targets < 100 ms with zero server round-trips
+
+**New retrieval API:**
+- `GET /knowledge/search?q=...&mode=hybrid&hops=2` — returns ranked AFP message IDs with relevance scores
+- `GET /knowledge/graph?anchor=<message_id>&depth=2` — returns sub-graph rooted at a message for multi-hop browsing
+
+### Dependencies
+
+- Phase 11 (Knowledge Curator + afp_backlinks + daemon runtime closure) — done
+- Ephemeral Workspace layer (`workspace_id`, `branch_id`, `validateBranchMerge`) — done
+- Phase 14 (AFP Retry + Checkpointing) — required before P16-B daemon is production-safe
+- pg_bm25 / ParadeDB — new Postgres extension, must be added to the `pgvector/pgvector` image or switched to ParadeDB image
+
+### Non-Negotiables
+
+- Parser output is always an AFP message — no raw blobs stored outside the AFP thread
+- The homeserver never sees plaintext: all parse jobs run client-side or in the user's private runtime worker; only the encrypted AFP result is uploaded
+- `branch_id` is set on all ingest workspace messages — Knowledge Curator skips re-indexing them until `branch_merge` fires

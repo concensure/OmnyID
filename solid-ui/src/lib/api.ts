@@ -1,6 +1,15 @@
+const runtimeApiBase =
+  typeof window !== "undefined"
+    ? (window as unknown as { __API_BASE__?: string }).__API_BASE__?.trim()
+    : "";
+const envApiBase = typeof import.meta !== "undefined" ? import.meta.env.VITE_API_BASE?.trim?.() : "";
+
 export const API_BASE =
-  window.location.hostname === "localhost" ? "http://127.0.0.1:8080" : "https://api.omnyid.com";
+  runtimeApiBase ||
+  envApiBase ||
+  (window.location.hostname === "localhost" ? "http://127.0.0.1:8080" : window.location.origin);
 export const SESSION_STORAGE_KEY = "omnyid.preview.session";
+export const SESSION_CHANGED_EVENT = "omnyid:session-changed";
 
 export type Session = {
   token: string;
@@ -273,6 +282,28 @@ export type WorkflowConnectorOverrides = WorkflowConnectorOverrideFields & {
   node_overrides?: Record<string, WorkflowConnectorOverrideFields>;
 };
 
+export type DaemonRecord = {
+  daemon_id: string;
+  daemon_kind: string;
+  display_name: string;
+  status: string;
+  workflow_id?: string | null;
+  delegated_key_id: string;
+  last_heartbeat_at?: string | null;
+  created_at: string;
+  revoked_at?: string | null;
+  policy_config?: Record<string, unknown> | null;
+  stale_minutes?: number | null;
+};
+
+export type DaemonHeartbeatDetail = {
+  heartbeat_id: string;
+  daemon_id: string;
+  user_id: string;
+  metrics: Record<string, unknown>;
+  created_at: string;
+};
+
 export function readSession(): Session | null {
   try {
     const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
@@ -280,6 +311,24 @@ export function readSession(): Session | null {
   } catch {
     return null;
   }
+}
+
+export function writeSession(session: Session | null): void {
+  try {
+    if (!session) {
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+    }
+  } catch {
+    // ignore persistence failures
+  } finally {
+    window.dispatchEvent(new CustomEvent(SESSION_CHANGED_EVENT, { detail: session }));
+  }
+}
+
+export function clearSession(): void {
+  writeSession(null);
 }
 
 export async function apiFetch<T>(
@@ -303,6 +352,9 @@ export async function apiFetch<T>(
 
   if (!response.ok) {
     const text = await response.text();
+    if (response.status === 401) {
+      clearSession();
+    }
     throw new Error(text || `Request failed with ${response.status}`);
   }
 
@@ -312,6 +364,67 @@ export async function apiFetch<T>(
 /** Fetch all messages for a thread. Returns AFP messages sorted oldest-first. */
 export async function fetchThread(threadId: string): Promise<AfpMessage[]> {
   return apiFetch<AfpMessage[]>(`/thread/${encodeURIComponent(threadId)}`);
+}
+
+export async function listDaemons(): Promise<DaemonRecord[]> {
+  const body = await apiFetch<{ daemons: DaemonRecord[] }>("/daemons");
+  return body.daemons ?? [];
+}
+
+export async function fetchDaemonHeartbeat(
+  daemonId: string
+): Promise<{ daemon: DaemonRecord; heartbeat: DaemonHeartbeatDetail | null }> {
+  return apiFetch(`/daemons/${encodeURIComponent(daemonId)}/heartbeat`);
+}
+
+export async function revokeDaemon(daemonId: string): Promise<void> {
+  await apiFetch(`/daemons/${encodeURIComponent(daemonId)}/revoke`, { method: "POST" });
+}
+
+// ── Note organisation messages ────────────────────────────────────────────────
+
+export type FolderRulePayload = {
+  folder_id: string;
+  summary_style?: string;
+  backlink_rules?: string;
+  tag_suggestions?: string[];
+};
+
+export type AreaRulesPayload = {
+  area: string;
+  summary_style?: string;
+  backlink_rules?: string;
+  tag_suggestions?: string[];
+};
+
+export type TagUpdatePayload = {
+  remove_tags?: string[];
+  add_tags?: string[];
+  remove_supertags?: string[];
+  add_supertags?: string[];
+};
+
+type NoteMessageRequest =
+  | { type: "folder_rule"; thread_id: string; content: FolderRulePayload }
+  | { type: "area_rules"; thread_id: string; content: AreaRulesPayload }
+  | {
+      type: "tag_update";
+      thread_id: string;
+      content: TagUpdatePayload;
+      /** IDs of the original note messages being updated. */
+      references: Array<{ id: string }>;
+    };
+
+/**
+ * Send a note organisation AFP message (folder_rule, area_rules, or tag_update).
+ * Returns the server-assigned message_id.
+ */
+export async function sendNoteMessage(req: NoteMessageRequest): Promise<string> {
+  const body = await apiFetch<{ success: boolean; message_id: string }>(
+    "/notes/message",
+    { method: "POST", bodyJson: req }
+  );
+  return body.message_id;
 }
 
 /**
@@ -645,6 +758,7 @@ export const fetchLlmConfig = () =>
 
 export const saveLlmConfig = (data: {
   backend: string;
+  provider?: string;
   model?: string;
   api_key?: string;
   ollama_url?: string;
@@ -652,6 +766,20 @@ export const saveLlmConfig = (data: {
 
 export const pingLlmConfig = () =>
   apiFetch<{ ok: boolean; backend?: string; provider?: string; http_status?: number; reason?: string }>("/user/llm-config/ping", { method: "POST" });
+
+export type BillingStatus = {
+  plan: string;
+  status: string;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  current_period_end?: string | null;
+};
+
+export const getBillingStatus = () =>
+  apiFetch<BillingStatus>("/billing/status");
+
+export const getAuthSession = () =>
+  apiFetch<Session["user"]>("/auth/session");
 
 // ── Capability registry ────────────────────────────────────────────────────
 
@@ -728,6 +856,47 @@ export const createCalendarEvent = (data: {
 export const deleteCalendarEvent = (id: string) =>
   apiFetch<{ deleted: boolean }>(`/calendar/events/${encodeURIComponent(id)}`, { method: "DELETE" });
 
+// ── Knowledge Curator — backlinks & graph ─────────────────────────────────────
+
+export type BacklinkItem = {
+  backlink_id: string;
+  source_id: string;
+  target_id: string;
+  direction: "inbound" | "outbound";
+  link_kind: string;
+  similarity: number;
+  entities: string[];
+  created_at: string;
+};
+
+export type BacklinksResponse = {
+  message_id: string;
+  backlinks: BacklinkItem[];
+  count: number;
+};
+
+export type BacklinksGraphResponse = {
+  root: string;
+  depth: number;
+  nodes: string[];
+  edges: Omit<BacklinkItem, "direction">[];
+  node_count: number;
+  edge_count: number;
+};
+
+export const fetchBacklinksForMessage = (messageId: string) =>
+  apiFetch<BacklinksResponse>(`/notes/backlinks/${encodeURIComponent(messageId)}`);
+
+export const fetchBacklinksGraph = (rootId: string, depth = 2) =>
+  apiFetch<BacklinksGraphResponse>(
+    `/backlinks/graph?root=${encodeURIComponent(rootId)}&depth=${depth}`,
+  );
+
+export const installDefaultSupertags = () =>
+  apiFetch<{ installed: string[]; count: number }>("/notes/supertags/install-defaults", {
+    method: "POST",
+  });
+
 // ── Agent Alias Registry ──────────────────────────────────────────────────────
 
 export type AliasCheckResult = {
@@ -763,6 +932,7 @@ export type AgentPreferences = {
   optimization_mode: "speed" | "cost" | "balanced";
   auto_confirm_threshold_cents: number;
   show_cost_estimates: boolean;
+  default_store_in_history: boolean;
 };
 
 export const getAgentPreferences = () =>
@@ -792,6 +962,5 @@ export const updateAgentSettings = (settings: { auto_approve_workflows?: boolean
 
 /** Opens a native EventSource for the run SSE stream. Caller is responsible for closing it. */
 export function openRunStream(workflowId: string, runId: string): EventSource {
-  const base = (window as unknown as { __API_BASE__?: string }).__API_BASE__ ?? "";
-  return new EventSource(`${base}/workflows/${encodeURIComponent(workflowId)}/runs/${encodeURIComponent(runId)}/stream`);
+  return new EventSource(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/runs/${encodeURIComponent(runId)}/stream`);
 }
