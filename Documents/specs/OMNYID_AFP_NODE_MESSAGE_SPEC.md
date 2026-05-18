@@ -41,6 +41,7 @@ Use broad stable `type`, with detailed `subtype`.
 
 Initial workflow node subtypes:
 
+- `plan`
 - `workflow_manifest`
 - `node_request`
 - `node_result`
@@ -50,6 +51,7 @@ Initial workflow node subtypes:
 - `policy_block`
 - `replan_request`
 - `workflow_summary`
+- `snapshot`
 
 ## Shared Content Fields
 
@@ -69,7 +71,63 @@ Recommended metadata fields:
 - `policy_checkpoint`
 - `replayable`
 
+Planning and checkpointing guidance:
+
+- `type: "agent", subtype: "plan"` is the canonical structured planning message for master-agent and planner loops
+- `type: "agent", subtype: "workflow_summary"` remains the execution-summary and compression-summary message
+- `type: "agent", subtype: "snapshot"` is the checkpoint message for compact current-state captures
+- `type: "note", subtype: "ledger"` is the shared-memory note primitive and is not an agent-family message
+
 ## Canonical Shapes
+
+### Agent Plan
+
+```json
+{
+  "type": "agent",
+  "subtype": "plan",
+  "content": {
+    "kind": "task_plan",
+    "workflow_id": "wf_01",
+    "workflow_run_id": "run_01",
+    "node_id": "plan_01",
+    "objective": "Collect options and produce a ranked recommendation.",
+    "plan_id": "plan_01_v2",
+    "status": "in_progress",
+    "progress": {
+      "completed": 1,
+      "total": 3,
+      "pct": 33
+    },
+    "todos": [
+      {
+        "todo_id": "todo_collect",
+        "title": "Collect candidate options",
+        "status": "done",
+        "depends_on": []
+      },
+      {
+        "todo_id": "todo_rank",
+        "title": "Rank candidates against constraints",
+        "status": "in_progress",
+        "depends_on": ["todo_collect"]
+      }
+    ],
+    "next_actions": [
+      "Finish ranking",
+      "Draft recommendation"
+    ],
+    "revision": {
+      "number": 2,
+      "reason": "constraints_refined"
+    }
+  },
+  "metadata": {
+    "mask": "private",
+    "replayable": true
+  }
+}
+```
 
 ### Workflow Manifest
 
@@ -242,6 +300,32 @@ Recommended metadata fields:
 }
 ```
 
+### Snapshot
+
+```json
+{
+  "type": "agent",
+  "subtype": "snapshot",
+  "content": {
+    "kind": "thread_snapshot",
+    "workflow_id": "wf_01",
+    "workflow_run_id": "run_01",
+    "node_id": "merge_05",
+    "snapshot_id": "snap_01",
+    "summary": "Three ranked candidates remain after policy filtering.",
+    "state": {
+      "candidate_count": 3,
+      "approval_state": "pending"
+    }
+  },
+  "metadata": {
+    "mask": "private",
+    "replayable": true,
+    "source_thread_id": "thread_research_01"
+  }
+}
+```
+
 ## UI Relationship
 
 These node messages do not replace:
@@ -258,6 +342,12 @@ In practice:
 
 - node messages feed observability, replay, and debug views
 - the UI can choose to summarize them into a generative card or timeline
+
+## Decision Notes
+
+- Use `snapshot` as a dedicated `agent` subtype instead of overloading `workflow_summary`
+- keep `workflow_summary` for workflow-end summaries and thread-compression summaries
+- keep `ledger` under the `note` family so shared-memory threads do not blur into agent-runtime events
 
 ## Storage Guidance
 

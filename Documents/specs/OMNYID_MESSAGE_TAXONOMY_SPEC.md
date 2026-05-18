@@ -75,6 +75,7 @@ Examples:
 - `type: "task", subtype: "status"`
 - `type: "email", subtype: "incoming"`
 - `type: "email", subtype: "outgoing"`
+- `type: "note", subtype: "ledger"`
 - `type: "action", subtype: "intent"`
 - `type: "action", subtype: "result"`
 - `type: "action", subtype: "approval_decision"`
@@ -127,6 +128,12 @@ Operational action audit:
 type == "action" && subtype == "result" && metadata.capability_id == "cap_stripe_charge"
 ```
 
+Persistent shared-memory ledger note:
+
+```text
+type == "note" && subtype == "ledger"
+```
+
 Outbound email requiring approval:
 
 ```text
@@ -151,6 +158,29 @@ Agents and services should:
 - preserve them when forwarding or transforming messages
 - prefer broad `type` values for new message families
 - use `subtype`, `content.kind`, and `metadata` before inventing a new top-level `type`
+
+## Note-Family Ledger Guidance
+
+`ledger` is a note-family subtype.
+
+Use:
+
+- `type: "note"`
+- `subtype: "ledger"` or `content.kind: "ledger"`
+
+Ledger is not:
+
+- an `agent`-family subtype
+- only a render/view hint
+- a mutable document store outside AFP
+
+Ledger is:
+
+- a persistent shared-memory note primitive
+- append-only under a stable `thread_id`
+- suitable for collaborative state, running research records, CRM-style thread state, and long-lived workspace memory
+
+Each ledger update must still be a new AFP message.
 
 ## Audit Workflow
 

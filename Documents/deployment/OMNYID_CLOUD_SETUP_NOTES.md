@@ -25,6 +25,10 @@ Keep these outside git:
 - AFP encryption keys
 - provider token key-encryption keys
 - user LLM secret references and exports
+- MinIO access key and secret key (`MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`)
+- image generation API keys (`XAI_API_KEY`, `FLUX_API_KEY`)
+- Google Calendar refresh token (`OMNYID_GCAL_REFRESH_TOKEN`) and client secret (`OMNYID_GCAL_CLIENT_SECRET`)
+- Outlook Calendar refresh token (`OMNYID_OUTLOOK_REFRESH_TOKEN`) and client secret (`OMNYID_OUTLOOK_CLIENT_SECRET`)
 
 ## Key Separation Policy
 
@@ -35,15 +39,29 @@ Omnyid production keeps three separate key domains:
    - end-to-end message encryption
 2. provider token protection keys
    - wraps Gmail and mail-provider OAuth tokens at rest
+   - wraps Google Calendar and Outlook Calendar OAuth tokens at rest
 3. user LLM and integration secret domain
    - BYO-LLM keys
    - external integration API secrets
+   - image generation backend API keys (xAI / BFL Flux)
 
 These domains must stay separate so that:
 
 - agent-relay E2EE remains intact
 - BYO-LLM does not share cryptographic material with mail-provider auth
 - token compromise does not imply message compromise
+
+## MinIO Object Storage
+
+Omnyid uses MinIO for storing user-generated media (images, QR codes, generated documents).
+
+- Default endpoint: `minio.omnyid.cloud:9000`
+- Default public URL: `https://minio.omnyid.cloud`
+- Default bucket: `omnyid-user-media`
+- Object path pattern: `{user_id}/{subfolder}/{prefix}-{date}-{uuid}.{ext}`
+- Credentials are injected via `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` only — never present in AFP messages or agent-visible surfaces.
+
+On Oracle Cloud, MinIO should run as a Docker service on the same host or a dedicated storage node. The service account credentials go in the gitignored `.env` file only.
 
 ## Oracle Cloud Setup Inputs Needed Later
 

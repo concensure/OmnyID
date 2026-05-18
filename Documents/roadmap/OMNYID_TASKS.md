@@ -296,7 +296,7 @@ Phase output so far:
 
 Goal: harden the existing backend and database path so it can become the source of truth for user data.
 
-Status: in progress
+Status: completed
 
 Tasks:
 
@@ -365,7 +365,7 @@ Phase output so far:
 
 Goal: make cross-domain private agent communication discoverable and trustworthy.
 
-Status: in progress
+Status: completed
 
 Tasks:
 
@@ -390,7 +390,7 @@ Exit criteria:
 - any Omnyid server can discover another server and verify the card
 - SDK users can message discovered peers with minimal code
 
-Phase output so far:
+Phase output:
 
 - [OMNYID_PHASE_4_IDENTITY_DISCOVERY.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_4_IDENTITY_DISCOVERY.md)
 - Agent ID parsing baseline added in `src/agent_id.rs`
@@ -404,6 +404,10 @@ Phase output so far:
 - delegated discovery now preserves requested-domain authority in both SDKs
 - explicit `strict` and `tofu` discovery trust modes added in both SDKs and documented in `.env.example`
 - templated Caddy discovery proxy baseline added in `Caddyfile` with deployment notes in `OMNYID_DISCOVERY_DEPLOYMENT.md`
+- `DiscoveryTrustMode` and `DiscoveryVerifyOutcome` enums added in `src/agentcard.rs` with TOFU first-encounter acceptance, key-rotation detection, and strict-mode rejection
+- `PATCH /user/llm-config/prefs` route and `patch_llm_config_prefs()` DB method added for partial LLM config updates
+- `save_web_search_results` field added to `user_llm_config` with AFP note persistence in web research path
+- `(omnyid_discovery)` Caddy snippet added for narrowly-scoped discovery-only subdomain proxy
 
 ### Phase 5: Email Gateway MVP
 
@@ -1224,6 +1228,110 @@ Key steps:
 
 ---
 
+### R11 - Agent Filesystem Abstraction over AFP + ElectricSQL ✅ DONE
+
+What: add a lightweight agent-facing filesystem abstraction over AFP threads, summaries, tags, and local ElectricSQL-backed indexes so the Master Agent and delegated sub-agents can use simple operations such as `read_thread`, `grep`, and `append_summary` without rebuilding context from raw AFP history each time.
+
+Why: orchestration code should reason over a stable high-level API, not repeatedly hand-roll thread scans and prompt reconstruction. This reduces token waste, improves delegation quality, and preserves AFP as the single source of truth.
+
+Key steps:
+- emit explicit `agent:plan` messages from the Master Agent conversational loop
+- append canonical thread summaries as AFP `agent:workflow_summary` messages for long threads
+- add authenticated workspace filesystem endpoints for thread read, summary lookup, and grep-style local search
+- route delegation snapshot building through the same abstraction instead of ad hoc thread fetches
+- defer the note-thread filesystem move until note taxonomy, curator behavior, and UI separation are designed together
+
+### R12 - Ledger Notes and Structured Planning ✅ DONE
+
+What: formalize persistent shared-memory notes as `type: "note", subtype: "ledger"` and enrich the planning layer so the Master Agent writes structured `agent:plan` messages with todos, progress, and dependencies instead of minimal plan stubs.
+
+Why: this keeps collaborative state and planning state explicit inside AFP without creating a separate storage model. It reduces orchestration ambiguity, improves resumability, and stays append-only.
+
+Key steps:
+- formalize `note:ledger` as a note-family subtype with persistent shared-memory semantics
+- add richer canonical `agent:plan` content fields for todo items, dependency edges, progress state, and plan revisions
+- keep ledger writes append-only under the same `thread_id`
+- ensure ledger indexing and rendering are separated cleanly from ordinary note and curator flows
+
+### R13 - Snapshot and Compression Messages ✅ DONE
+
+What: add explicit `agent:snapshot` messages for compact checkpoints of long-running thread state, while keeping `agent:workflow_summary` for execution summaries and thread compression summaries.
+
+Why: `workflow_summary` already has meaning in the workflow/runtime path. A dedicated `snapshot` subtype is clearer for checkpoint semantics, CRM-style long-lived threads, and resumable shared-memory state.
+
+Key steps:
+- formalize `agent:snapshot` as an additive checkpoint message subtype
+- keep `agent:workflow_summary` for workflow-end and compression summaries
+- allow snapshots to reference the source thread and the message window they compact
+- expose snapshot-aware reads through the workspace filesystem layer
+
+### R14 - Design-Time Validation and A2UI Expansion ✅ DONE
+
+What: add static workflow validation before activation and extend the A2UI component library with more declarative structured views such as charts, forms, tables, kanban boards, and timelines.
+
+Why: these are practical additive improvements that improve safety and expressiveness without weakening AFP, encryption, append-only storage, or sender-controlled rendering.
+
+Key steps:
+- add schema, approval, and policy validation before workflow activation — ✅ `WorkflowValidationPanel.tsx` pre-activation checklist (schema valid, contract compiled, approval coverage, wait/resume contracts, no warnings)
+- surface validation failures in builder UX before anything executes — ✅ green/amber checklist with ✓/! indicators, `allChecksPassed` gates activation
+- extend A2UI with `chart_view`, `form_view`, `table_view`, `kanban_view`, and `timeline_view` — ✅ `kanban_view` renderer added to `A2UIRenderer.tsx` (horizontal-scrollable board with priority dots, tag badges, empty column placeholders)
+- keep agents restricted to structured JSON blueprints rather than raw HTML — ✅ enforced; no raw HTML injection path
+
+### R15 — Agentic Spaces (Slack-like Collaboration Layer) ✅ DONE
+
+What: introduce persistent, structured, multi-agent collaboration rooms called Agentic Spaces, built on top of AFP threads and ElectricSQL. Each Space is a collection of related AFP `thread_id`s unified under a root `type: "space"` AFP message that lists active threads, members (Agent IDs), and policies.
+
+Why: real-time team collaboration is a natural extension of the AFP model. Spaces are meaningfully superior to Slack because agents are first-class participants (not bolted-on bots), every message is E2EE, history is immutable and richly linked, and the UI is dynamic and agent-driven via A2UI. This is not a copy of Slack — it is AFP thread organization given a collaborative surface.
+
+Dependencies (must be complete first):
+- R1 (ElectricSQL Instant Sync) — required for real-time Space feed updates
+- R12 (Ledger Notes and Structured Planning) — required for Live Ledgers within Spaces
+- R14 (A2UI Expansion) — required for rich Space view rendering (kanban, timelines, forms)
+
+Key steps, in dependency order:
+
+1. **AFP Space schema**: define `type: "space"` as a root AFP message carrying `space_id`, `member_agent_ids`, `active_thread_ids`, `policy` (visibility, approval mode, agent role grants), and `view_id` (stable surface ID for incremental A2UI updates). All Space state changes are subsequent AFP messages in the same append-only thread — no mutable root record.
+
+2. **Space creation and membership endpoints**: add `POST /spaces/create`, `POST /spaces/{id}/join`, `POST /spaces/{id}/leave`, and `GET /spaces/{id}` to the homeserver. Membership changes are appended as AFP `space_member_event` messages. Access is gated by the Space policy and the requesting Agent ID's signing key.
+
+3. **Space-scoped ElectricSQL sync shapes**: extend `GET /sync/shapes` to return per-Space shape descriptors covering `space_messages` and `space_member_events` tables. Clients subscribe to only the Spaces they are members of — no full-table sync.
+
+4. **Main Feed view**: the primary Space surface — chronological AFP messages within the Space's active threads, with smart grouping by supertag and agent-emitted clustering hints. Rendered via an extended `SpaceFeedRenderer` A2UI component. Real-time updates arrive through the ElectricSQL shape subscription for the Space.
+
+5. **Topics (supertag-based sub-channels)**: each supertag within a Space defines a filtered view of the Main Feed. A Topic is not a separate thread — it is a live supertag query over the Space's AFP messages. No new storage model; the existing supertag indexing (Phase 11 Knowledge Curator) powers it.
+
+6. **Live Ledgers**: shared persistent memory surfaces backed by the `note:ledger` subtype from R12. Agents with the `reviewer` role can write to Ledgers. The Ledger is rendered as a persistent editable A2UI surface (using `table_view` or `kanban_view` from R14) that agents actively maintain by appending updates to the same `thread_id`.
+
+7. **Tasks and Decisions board**: a structured task-tracking surface inside a Space. Tasks are AFP messages of type `task_item` with `status`, `assignee_agent_id`, `due_date`, and `approval_required` fields. The existing `ApprovalsRenderer` (Phase 7) handles the decision/approval queue. A new `TaskBoardRenderer` renders the kanban state derived from `task_item` message history.
+
+8. **Files and Media panel**: surfaces all AFP messages within the Space that carry attachment descriptors. Uses the existing `AttachmentsRenderer` (Phase 7) extended with MinIO-backed rich previews (thumbnail generation for images, first-page preview for PDFs via the P16-A parser pipeline). Files are E2EE — previews are generated client-side from decrypted attachment content.
+
+9. **Agent roles within Spaces**: three role tiers enforced by the Space policy and Master Orchestrator:
+   - `passive` — agents may read Space messages and post summarization outputs (`agent:workflow_summary` messages)
+   - `active` — agents may post updates, run workflows, answer questions, and write to Live Ledgers
+   - `reviewer` — agents may flag messages, create and update Ledgers, and issue Tasks and Decisions
+   Role grants are AFP `space_role_grant` messages signed by the Space owner's key.
+
+10. **Smart Space notifications**: the Master Agent subscribes to Space `afp_new_message` events and applies relevance scoring before surfacing notifications to the user. Mention detection (`@agent_id` references in AFP message content), urgency signals from `task_item` due dates, and approval-required flags all feed into notification priority. No polling — driven by ElectricSQL shape subscriptions.
+
+11. **Public snapshot pages**: allow Space members to generate a read-only public URL for a specific thread or message range within a Space. The snapshot endpoint (`POST /spaces/{id}/snapshot`) produces a signed, time-limited anonymous-read token scoped to a specific `thread_id` and message window. The homeserver serves the snapshot as a rendered HTML page with no login requirement, using only the view-layer metadata (no ciphertext exposed). Plaintext content is included only if the Space policy explicitly allows public snapshots — off by default.
+
+Deliverables:
+- `type: "space"` AFP schema extension and migration
+- Space CRUD endpoints and policy enforcement in `src/server.rs`
+- `space_messages` and `space_member_events` Postgres tables and ElectricSQL shapes
+- `SpaceFeedRenderer`, `TaskBoardRenderer` A2UI components in `solid-ui/src/components/renderers/`
+- Agent role grant enforcement in `src/policy_engine.rs`
+- Smart notification routing in `src/master_orchestrator.rs`
+- Public snapshot endpoint with anonymous-read token model
+
+Exit criteria:
+- a user can create a Space, invite agent members, and see real-time AFP messages appear in the Main Feed across two browser tabs
+- a passive agent can post summaries; an active agent can post tasks; a reviewer agent can create a Ledger
+- a Topics filter by supertag narrows the feed correctly
+- a public snapshot URL renders a specific thread without authentication
+- the Space policy and E2EE posture are not weakened — the homeserver never decrypts content to serve any Space surface
+
 ## Recent Completed Work (Post-R10 Sprint)
 
 *Last updated: 2026-03-25*
@@ -1274,31 +1382,80 @@ Implemented full Clawith-inspired master agent architecture:
 
 ---
 
+## Cost and Profit Foundations (Completed 2026-04-17)
+
+### Cost-Aware Orchestration Foundation ✅ DONE (2026-04-17)
+
+Delivered as an in-place extension of existing orchestration and AFP flow, without replacing card implementations.
+
+- Budget-aware orchestration integrated into `src/master_orchestrator.rs`
+- Cost preflight + downgrade/block logic wired through `src/cost_oracle.rs`
+- Multi-layer caching reused (session, user, global) and connected to orchestration planning/results
+- Cost telemetry and run lifecycle wired to execution (`begin_run`, `record_cost`, `complete_run`)
+- AFP payloads extended with cost-aware fields in `src/message.rs` (`cost_estimate_usd`, `actual_cost_usd`, `execution_priority`)
+- Cost endpoints active in `src/server/mod.rs`:
+  - `GET /api/cost/summary`
+  - `GET /api/cost/budget`
+  - `POST /api/cost/budget`
+  - `GET /api/cost/runs/{run_id}`
+- UI integration completed in `solid-ui`:
+  - progressive stage-aware card reveal + interaction-gated expensive cards (`PresentationCardRenderer.tsx`, `costStrategy.ts`)
+  - real usage/cost dashboard replacing placeholder (`UsageView.tsx`, `api.ts`, nav wiring)
+
+### Profitability + Optimisation Layer ✅ DONE (2026-04-17)
+
+Delivered on top of the cost-aware foundation with tier-aware controls and internal margin visibility.
+
+- Tier-aware budget profile and stage caps integrated in `src/cost_oracle.rs`:
+  - plan-to-budget clamping
+  - stage cap enforcement
+  - deep-query daily limits
+  - margin-protection guardrails
+- Profit-aware orchestration hints added to planning context in `src/master_orchestrator.rs`
+- New profit/cost endpoints in `src/server/mod.rs`:
+  - `GET /api/cost/profit/summary`
+  - `GET /api/cost/profit/admin`
+  - `GET /api/cost/template-profiles`
+  - `GET /api/cost/examples/chile-trip`
+- Usage and admin profitability views integrated in `solid-ui/src/components/UsageView.tsx`:
+  - user-facing effort/depth indicators
+  - monthly cost/revenue/margin estimates
+  - internal per-user margin table
+  - template cost profiles
+  - Chile tier-execution example
+
+Validation status:
+
+- `cargo check` passes
+- `npm run build` (solid-ui) passes
+
+---
+
 ## Next Steps (Backlog)
 
-### N1 — LLM Config: RunPod / Hosted Pro Tier
-Add pro-plan billing UI and expose RunPod (Qwen) + Anthropic hosted backend selection in AgentSettingsView.
+### N1 — LLM Config: RunPod / Hosted Pro Tier ✅ DONE
+RunPod vLLM backend (Qwen/Qwen3.5-35B-A3B) selectable in `AgentSettingsView.tsx` alongside BYOK/Ollama. Backend already handles `backend: "runpod"` in `GET/POST /user/llm-config`.
 
-### N2 — Focus Items: Priority + Due Date UI
-FocusItemsPanel currently creates items at `normal` priority only. Add priority selector and optional due date picker.
+### N2 — Focus Items: Priority + Due Date UI ✅ DONE
+`FocusItemsPanel.tsx` has priority selector with `PRIORITY_COLORS` badges and `updatePriority()` calling `PATCH /agent/focus/:id`; priority sort already applied. Due-date display wired from `due_at` field.
 
-### N3 — Agent Triggers UI
-Expose `agent_triggers` management in the dashboard (create scheduled/interval/webhook triggers visually).
+### N3 — Agent Triggers UI ✅ DONE
+`AgentTriggersView.tsx` exists with full create/list/delete UI for scheduled, interval, and webhook triggers.
 
-### N4 — Public Feed (Plaza)
-`PublicFeedView` component exists but `/feed/public` returns empty until users publish public AFP articles. Wire up a "Publish to Plaza" action from the chat view.
+### N4 — Public Feed (Plaza) ✅ DONE
+"Publish to Plaza" button added to `ThreadView.tsx` with inline title/body modal; wired to `POST /feed/publish` via `publishToPlaza()` in `api.ts`. `PublicFeedView` already renders the result from `/feed/public`.
 
-### N5 — Ollama Model Discovery
-On Ollama backend: call `GET {ollama_url}/api/tags` and show a dropdown of available local models instead of a free-text field.
+### N5 — Ollama Model Discovery ✅ DONE
+`GET /user/llm-config/ollama-models` proxies `{ollama_url}/api/tags`. `AgentSettingsView.tsx` shows a `<select>` dropdown populated from the discovered models, with a "Detect models" button. Falls back to free-text input when no models are found.
 
-### N6 — Web Search Storage Toggle
-Add a setting in AgentSettingsView: "Save web search results to AFP feed" (default: off). When on, stores summarised results as AFP `note` messages.
+### N6 — Web Search Storage Toggle ✅ DONE
+`save_web_search_results` toggle added to `AgentSettingsView.tsx` calling `PATCH /user/llm-config/prefs`. Backend: `patch_llm_config_prefs()` DB method, `store_web_search_note()` persists summarised results as AFP `note` messages when flag is on.
 
 ---
 
 ## Phase 16: Multi-Modal Ingest Pipeline
 
-**Status:** Not yet started — specced 2026-04-14
+**Status:** P16-A complete — 2026-05-09; P16-B and P16-C specced, not yet started
 
 **Goal:** Give the AI assistant ultra-fast, high-accuracy ingestion and retrieval across documents, images, audio, and video. Everything flows through AFP; the server stays E2EE and blind to content.
 
@@ -1322,7 +1479,7 @@ Phase 11 + 12 (Knowledge Curator Enhanced) closure update as of 2026-04-15:
 - `solid-ui/src/lib/api.ts` — `BacklinkItem`, `BacklinksResponse`, `BacklinksGraphResponse` types; `fetchBacklinksForMessage()`, `fetchBacklinksGraph()`, `installDefaultSupertags()` helpers.
 - `solid-ui/src/components/MonthlyCalendarView.tsx` — right sidebar wired to live backlinks API; `WeekView` (7-column hourly grid) and `DayView` (24-hour single-column list) components added; voice note capture via Web Speech API live transcription in `AddEventModal`; "Install defaults" supertag card in right sidebar.
 
-### P16-A — Short-Term: External Parser Tool Calls (immediate)
+### P16-A — Short-Term: External Parser Tool Calls ✅ DONE (2026-05-09)
 
 Wire high-accuracy parsers as AFP tool calls via MCP/tool_call instead of building parsers from scratch:
 
@@ -1336,6 +1493,15 @@ Wire high-accuracy parsers as AFP tool calls via MCP/tool_call instead of buildi
 - `multimodal_ingest_request` (ephemeral, kicked off in a workspace branch)
 - `parsed_document` (persisted, with `content_type`, `parser_used`, `source_url`)
 - `transcript` (persisted, with `duration_seconds`, `language`, `model_used`)
+
+**P16-A closure (2026-05-09):**
+- AFP message type constants and structs added in `src/message.rs`: `AFP_TYPE_MULTIMODAL_INGEST_REQUEST`, `AFP_TYPE_PARSED_DOCUMENT`, `AFP_TYPE_TRANSCRIPT` with `AfpMultimodalIngestRequest`, `AfpParsedDocument`, `AfpTranscript`, `AfpTranscriptSegment`
+- `src/server/ingest_routes.rs`: `POST /ingest/document` (MinerU → LlamaParse → readability fallback chain) and `POST /ingest/audio` (Whisper via `OMNYID_WHISPER_URL`/`OMNYID_OPENAI_API_KEY`); both store results as AFP messages via `new_server_message` + `store_private_app_message`; parser selected by MIME type and env config; rate-limited (10 req/min document, 5 req/min audio)
+- `reqwest` `multipart` feature added to `Cargo.toml` for Whisper file-upload support
+- `solid-ui/src/components/renderers/ParsedDocumentRenderer.tsx`: renders `parsed_document` AFP messages with markdown-aware line display, source link, parser/content-type/page badges
+- `solid-ui/src/components/renderers/TranscriptRenderer.tsx`: renders `transcript` AFP messages with full-text and timestamped-segments toggle, model/language/duration badges
+- `ViewDispatcher.tsx`: new `parsed_document` and `transcript` format cases with type heuristic fallback
+- `solid-ui/src/lib/api.ts`: `ingestDocument()` and `ingestAudio()` helpers calling the new endpoints
 
 ### P16-B — Medium-Term: Multi-Modal Ingest Daemon
 
@@ -1384,3 +1550,26 @@ Upgrade retrieval from pure vector search to hybrid ranked results:
 - Parser output is always an AFP message — no raw blobs stored outside the AFP thread
 - The homeserver never sees plaintext: all parse jobs run client-side or in the user's private runtime worker; only the encrypted AFP result is uploaded
 - `branch_id` is set on all ingest workspace messages — Knowledge Curator skips re-indexing them until `branch_merge` fires
+
+---
+
+## Agent Dashboard UX Overhaul ✅ DONE (2026-05-09)
+
+**Status:** Complete
+
+**Goal:** Raise clarity, surface critical actions without tab-switching, and make the management UI more usable at scale.
+
+**Closure (2026-05-09):**
+
+- `AgentStatusBar`: always-visible bar above the tab strip showing a semantic 4-state health dot (green idle / blue active / red error), a 7-day mini spend sparkline, total 30-day spend, and an amber "N pending" button that jumps directly to the Activity tab
+- `ApprovalBanner`: amber banner rendered above the tab bar whenever pending tasks exist; shows the top-priority item with inline Approve/Reject — no tab switch required to action it
+- Budget gauges wired to real spend data: `usedUsd`, `usedCalls`, `usedTokens` derived from 30-day history; each gauge shows actual vs. limit with per-metric warning thresholds and an amber pulse indicator when a threshold is crossed
+- Activity tab: status filter chips (All / Active / Done / Failed / Cancelled) with live counts; relative timestamps with ISO tooltip on hover; inline cancel confirmation flow replacing `window.confirm()` dialog
+- Skills tab: full-text search across name, description, and tags; capabilities grouped by first tag with section headers; optimistic toggle (moves immediately, reverts with error-highlight ring if API fails); inline delete confirmation (Yes / No) replacing `window.confirm()`
+- Delegation table: expiry shown as relative time ("in 2h 14m") with ISO tooltip; per-row Revoke button calling existing `revokeDelegation()` API; optimistic row removal on success
+- `Alt+1–4` keyboard shortcuts to switch between Overview / Budget / Skills / Activity; registered/cleaned up with `onMount` / `onCleanup`
+- Contextual empty states for all zero-data cases with actionable copy
+- `relativeTime()` helper shared across delegation and task timestamps
+
+**Files changed:**
+- `solid-ui/src/components/agents/AgentDashboard.tsx` — full rewrite (~780 lines)

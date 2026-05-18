@@ -2,7 +2,7 @@
 
 ## Current Oracle Host
 
-- Date checked: March 21, 2026
+- Date checked: 2026-05-09 (last verified)
 - Public IP: `152.67.110.187`
 - Hostname: `vnic-syd-prod`
 - SSH user: `ubuntu`
@@ -53,7 +53,13 @@ This is the current deployed shape on Oracle.
 docker compose --env-file .env.oracle -f docker-compose.oracle.minimal.yml up -d --build
 ```
 
-From this workstation, the same sync path can now be run with [deploy-oracle.ps1](/c:/Users/ozans/Desktop/projects/Agenton/scripts/deploy-oracle.ps1).
+From this workstation, the same sync path can now be run with `scripts/deploy-oracle.ps1`. Always pass `-ProjectRoot` explicitly — the default is a stale path:
+
+```powershell
+& scripts/deploy-oracle.ps1 -ProjectRoot 'C:\Users\ozans\Desktop\projects\OmnyID' -EnvFile 'C:\Users\ozans\Desktop\projects\OmnyID\oracle-cloud.local.env'
+```
+
+**Important:** `oracle-cloud.local.env` must contain `DATABASE_URL` and `POSTGRES_PASSWORD` — the homeserver will crash-loop without them. The correct values as of 2026-05-09 are already present in the local file. The Postgres `afp` user password is `afp_prod_2026` (set directly via `ALTER USER afp WITH PASSWORD` on first deploy).
 
 ## DNS Status
 
@@ -122,12 +128,26 @@ Current certificate status:
 
 Note: the username is `preview`, not an email address.
 
-## New Env Vars (2026-03-24)
+## Deployment History
 
-| Variable | Purpose |
+| Date | Change |
 |---|---|
-| `OMNYID_RUNPOD_API_KEY` | RunPod API key for QWEN 3.5 inference |
-| `OMNYID_RUNPOD_ENDPOINT_ID` | RunPod endpoint ID (`sdr11n90qjwjy2`) |
+| 2026-03-21 | Initial Oracle stack deployed; Caddy TLS certificates obtained |
+| 2026-03-24 | Workspace route 404 fix (Caddyfile `handle_path`); RunPod env vars added |
+| 2026-05-09 | Phase 16-A deployed (multi-modal ingest routes + renderers); duplicate route panic fixed (`/agent/fs/thread/:id` registered twice); `DATABASE_URL` + `POSTGRES_PASSWORD` added to env files; Agent Dashboard UX overhaul deployed; all 6 containers healthy with 0 restarts |
+
+## Required Env Vars
+
+| Variable | Purpose | Added |
+|---|---|---|
+| `OMNYID_RUNPOD_API_KEY` | RunPod API key for QWEN 3.5 inference | 2026-03-24 |
+| `OMNYID_RUNPOD_ENDPOINT_ID` | RunPod endpoint ID (`sdr11n90qjwjy2`) | 2026-03-24 |
+| `DATABASE_URL` | SQLx connection string for homeserver (`postgresql://afp:<pw>@postgres:5432/afp`) | 2026-05-09 |
+| `POSTGRES_PASSWORD` | Postgres `afp` user password; must match `DATABASE_URL` | 2026-05-09 |
+| `OMNYID_MINERU_URL` | Optional: MinerU REST endpoint for PDF ingest (P16-A) | 2026-05-09 |
+| `OMNYID_LLAMAPARSE_KEY` | Optional: LlamaParse API key for PDF ingest fallback (P16-A) | 2026-05-09 |
+| `OMNYID_WHISPER_URL` | Optional: Whisper endpoint for audio transcription (defaults to OpenAI) | 2026-05-09 |
+| `OMNYID_OPENAI_API_KEY` | Required if using OpenAI Whisper for audio ingest (P16-A) | 2026-05-09 |
 
 ## Workspace Route Fix (2026-03-24)
 

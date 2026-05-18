@@ -40,6 +40,28 @@ The expected audience is:
 
 - `OMNYID_GOOGLE_CLIENT_ID`
 
+## Google Calendar OAuth (AFP calendar_event capability)
+
+The `calendar_event` native AFP capability uses a separate offline refresh token scoped to Google Calendar. This is distinct from the sign-in flow above.
+
+**Required OAuth scope:**
+```
+https://www.googleapis.com/auth/calendar
+```
+
+**Setup steps:**
+
+1. Use the existing `omnyid_cloud` OAuth app (same client ID).
+2. Add `https://www.googleapis.com/auth/calendar` to the app's enabled scopes in Google Cloud Console.
+3. Run a one-time OAuth consent flow with `access_type=offline&prompt=consent` to obtain a refresh token with calendar scope.
+4. Set the following in the gitignored `.env` file on Oracle Cloud:
+   - `OMNYID_GCAL_CLIENT_SECRET=<client secret from Google Cloud Console>`
+   - `OMNYID_GCAL_REFRESH_TOKEN=<offline refresh token>`
+   - `OMNYID_GCAL_CALENDAR_ID=primary` (optional, default is `primary`)
+5. The capability routes to the appropriate calendar via `OMNYID_CALENDAR_PROVIDER=google`.
+
+The client secret must never be committed — it belongs in the gitignored `.env` only, consistent with the key separation policy.
+
 ## Deployment Notes
 
 - `omnyid.com` is currently intended to stay behind preview auth until public launch.
