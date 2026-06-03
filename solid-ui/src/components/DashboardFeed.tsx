@@ -270,6 +270,7 @@ export function DashboardFeed(props: {
   });
 
   const [pinnedNavIdx, setPinnedNavIdx] = createSignal(0);
+  const [focusedCardId, setFocusedCardId] = createSignal<string | null>(null);
   function scrollToPinned(idx: number) {
     const ids = [...pinned()];
     if (ids.length === 0 || !gridEl) return;
@@ -343,6 +344,7 @@ export function DashboardFeed(props: {
     const id = setInterval(() => setTick((n) => n + 1), 60_000);
 
     function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") { setFocusedCardId(null); return; }
       if (e.key !== "f" || e.ctrlKey || e.metaKey || e.altKey) return;
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -720,8 +722,12 @@ export function DashboardFeed(props: {
                       : `border-white/35 bg-white/20 ${cardAgeOpacity(msg.timestamp)}`
                   }`}>
                     <Show when={!pinned().has(msg.id)}>
-                      <div class="pointer-events-none absolute left-0 top-0 z-10 h-full w-[3px]"
-                           style={`background: hsl(${typeHue(msg.type)}, 50%, 60%); opacity: 0.5`} />
+                      <div
+                        class="absolute left-0 top-0 z-10 h-full w-[3px] cursor-pointer"
+                        style={`background: hsl(${typeHue(msg.type)}, 50%, 60%); opacity: 0.5`}
+                        title={`Right-click to toggle ${msg.type} filter`}
+                        onContextMenu={(e) => { e.preventDefault(); setActiveTypes((prev) => { const next = new Set(prev); if (next.has(msg.type)) next.delete(msg.type); else next.add(msg.type); return next; }); }}
+                      />
                     </Show>
                     <div
                       class="drag-handle flex cursor-grab select-none items-center justify-between border-b border-white/15 bg-white/25 px-4 py-2 active:cursor-grabbing"
@@ -868,6 +874,7 @@ export function DashboardFeed(props: {
                       return (
                         <div
                           class="overflow-auto p-4 min-h-[60px]"
+                          onDblClick={() => setFocusedCardId(msg.id)}
                           onPointerDown={(e) => { swipeX = e.clientX; swipeY = e.clientY; }}
                           onPointerUp={(e) => {
                             const dx = e.clientX - swipeX;
@@ -952,6 +959,36 @@ export function DashboardFeed(props: {
             </button>
           </div>
         </div>
+      </Show>
+      {/* Card focus mode overlay — double-click a card body to activate, ESC or click outside to dismiss */}
+      <Show when={focusedCardId() !== null}>
+        {(() => {
+          const focusedMsg = (props.bootstrap?.messages ?? []).find((m) => m.id === focusedCardId());
+          if (!focusedMsg) return null;
+          return (
+            <div
+              class="fixed inset-0 z-[200] flex items-center justify-center bg-on-surface/40 backdrop-blur-md animate-fade-in"
+              onClick={() => setFocusedCardId(null)}
+            >
+              <div
+                class="relative mx-4 w-full max-w-3xl max-h-[80vh] overflow-auto rounded-[24px] border border-white/45 bg-white/97 p-6 shadow-panel backdrop-blur-xl animate-slide-down"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div class="mb-3 flex items-center justify-between">
+                  <span class="font-mono text-[9px] uppercase tracking-[0.2em] text-outline">{focusedMsg.type}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFocusedCardId(null)}
+                    class="rounded-full border border-white/40 bg-white/40 px-3 py-1 text-xs text-on-surface-variant transition hover:bg-white/60"
+                  >
+                    × Close (ESC)
+                  </button>
+                </div>
+                <ViewDispatcher message={focusedMsg} />
+              </div>
+            </div>
+          );
+        })()}
       </Show>
     </div>
   );

@@ -309,6 +309,9 @@ export function NavBar(props: {
   );
   const [sessionTick, setSessionTick] = createSignal(0);
   const [showSessionMenu, setShowSessionMenu] = createSignal(false);
+  const [connStatus, setConnStatus] = createSignal<"fast" | "connected" | "slow" | "offline">(navigator.onLine ? "connected" : "offline");
+  const CONN_COLORS = { fast: "bg-green-400", connected: "bg-blue-400", slow: "bg-amber-400", offline: "bg-gray-400" } as const;
+  const CONN_LABELS = { fast: "Transport: fast (<300ms)", connected: "Transport: connected", slow: "Transport: high latency", offline: "Transport: offline" } as const;
   let sessionChipRef: HTMLDivElement | undefined;
   const LAST_RUN_KEY = "omnyid.fleet.lastrun";
   const AGENT_ACTIVE_SINCE_KEY = "omnyid.fleet.active_since";
@@ -488,6 +491,29 @@ export function NavBar(props: {
     onCleanup(() => clearInterval(id));
   });
 
+  onMount(() => {
+    async function pingConn() {
+      if (!navigator.onLine) { setConnStatus("offline"); return; }
+      const t0 = Date.now();
+      try {
+        await fetch("/", { method: "HEAD" });
+        const ms = Date.now() - t0;
+        setConnStatus(ms < 300 ? "fast" : ms < 1200 ? "connected" : "slow");
+      } catch { setConnStatus("slow"); }
+    }
+    void pingConn();
+    const id = setInterval(() => void pingConn(), 30_000);
+    const goOnline = () => void pingConn();
+    const goOffline = () => setConnStatus("offline");
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    onCleanup(() => {
+      clearInterval(id);
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    });
+  });
+
   return (
     <>
       {/* Keyboard shortcut first-run hint */}
@@ -651,6 +677,8 @@ export function NavBar(props: {
                   : "border-white/35 bg-white/35 text-on-surface-variant hover:bg-white/50"
               }`}
             >?</button>
+            {/* Transport connectivity dot */}
+            <div title={CONN_LABELS[connStatus()]} class={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${CONN_COLORS[connStatus()]}`} />
             <button
               type="button"
               onClick={props.onFleetClick}

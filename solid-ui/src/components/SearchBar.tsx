@@ -15,6 +15,14 @@ const OPT_MODE_KEY = "omnyid.search.optmode";
 const ENGINE_KEY = "omnyid.search.engine";
 const SESSION_HIST_KEY = "omnyid.search.session_hist";
 
+const SLASH_COMMANDS = [
+  { cmd: "/sync",        icon: "↻",  label: "Sync",        desc: "Reload all data from relay" },
+  { cmd: "/backup",      icon: "💾", label: "Backup",       desc: "Export search history to JSON" },
+  { cmd: "/purge-cache", icon: "🗑",  label: "Purge cache", desc: "Clear all local history" },
+  { cmd: "/theme-dark",  icon: "🌙", label: "Dark theme",   desc: "Add dark class to document" },
+  { cmd: "/theme-light", icon: "☀️", label: "Light theme",  desc: "Remove dark class" },
+] as const;
+
 const SMART_TEMPLATES: Array<(q: string) => string> = [
   (q) => `Summarise ${q}`,
   (q) => `Find everything I know about ${q}`,
@@ -62,6 +70,30 @@ export function SearchBar(props: {
   let recentClearTimer: ReturnType<typeof setTimeout> | undefined;
   let textareaRef: HTMLTextAreaElement | undefined;
   let formRef: HTMLFormElement | undefined;
+
+  const isSlashMode = () => query().startsWith("/");
+  const slashMatches = () => {
+    const q = query().toLowerCase();
+    return SLASH_COMMANDS.filter((c) => c.cmd.startsWith(q) || c.label.toLowerCase().includes(q.slice(1)));
+  };
+  function executeSlashCommand(cmd: string) {
+    setQuery(""); setShowDropdown(false);
+    if (cmd === "/sync") { window.location.reload(); return; }
+    if (cmd === "/purge-cache") {
+      localStorage.removeItem(RECENT_KEY); setRecentQueries([]);
+      sessionStorage.removeItem(SESSION_HIST_KEY); setSessionHistory([]);
+      return;
+    }
+    if (cmd === "/backup") {
+      const a = Object.assign(document.createElement("a"), {
+        href: URL.createObjectURL(new Blob([JSON.stringify({ recent: loadRecent(), exportedAt: new Date().toISOString() }, null, 2)], { type: "application/json" })),
+        download: `omnyid-backup-${Date.now()}.json`,
+      });
+      a.click(); return;
+    }
+    if (cmd === "/theme-dark") { document.documentElement.classList.add("dark"); return; }
+    if (cmd === "/theme-light") { document.documentElement.classList.remove("dark"); }
+  }
 
   function armClear() { setRecentClearPending(true); recentClearTimer = setTimeout(() => setRecentClearPending(false), 3000); }
   function confirmClear() {
@@ -168,6 +200,7 @@ export function SearchBar(props: {
 
   const dropdownVisible = () =>
     showDropdown() && (
+      isSlashMode() ||
       smartSuggestions().length > 0 ||
       recentQueries().length > 0 ||
       (!query() && timeOfDaySuggestions().length > 0) ||
@@ -382,7 +415,28 @@ export function SearchBar(props: {
       {/* Suggestions dropdown */}
       <Show when={dropdownVisible()}>
         <div class="absolute left-0 right-0 top-full z-50 mt-2 animate-fade-in rounded-[20px] border border-white/45 bg-white/95 shadow-panel backdrop-blur-xl">
-          <Show when={!debouncedQuery().trim() && timeOfDaySuggestions().length > 0}>
+          <Show when={isSlashMode() && slashMatches().length > 0}>
+          <div class="px-4 pt-3 pb-2">
+            <p class="mb-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">Commands</p>
+            <For each={slashMatches()}>
+              {(sc) => (
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); executeSlashCommand(sc.cmd); }}
+                  class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-on-surface transition hover:bg-primary/8"
+                >
+                  <span class="w-5 flex-shrink-0 text-center text-base">{sc.icon}</span>
+                  <div>
+                    <span class="font-medium">{sc.label}</span>
+                    <span class="ml-2 font-mono text-[10px] text-on-surface-variant/40">{sc.cmd}</span>
+                    <p class="mt-0.5 text-[11px] text-on-surface-variant/60">{sc.desc}</p>
+                  </div>
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <Show when={!isSlashMode() && !debouncedQuery().trim() && timeOfDaySuggestions().length > 0}>
             <div class="px-4 pt-3 pb-2">
               <p class="mb-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">Suggested</p>
               <For each={timeOfDaySuggestions()}>
@@ -433,7 +487,7 @@ export function SearchBar(props: {
               </For>
             </div>
           </Show>
-          <Show when={recentQueries().length > 0}>
+          <Show when={!isSlashMode() && recentQueries().length > 0}>
             <div class={`px-4 pb-3 ${smartSuggestions().length > 0 ? "border-t border-white/40 pt-2" : "pt-3"}`}>
               <div class="mb-1.5 flex items-center justify-between">
                 <p class="font-mono text-[9px] uppercase tracking-[0.2em] text-outline">Recent</p>

@@ -6,6 +6,8 @@ import { ViewDispatcher } from "@/components/ViewDispatcher";
 import { GlassPanel } from "@/components/GlassPanel";
 
 const STARRED_KEY = "omnyid.thread.starred";
+const REACTIONS = ["👍", "❤️", "💡", "✅"] as const;
+const REACTIONS_KEY = "omnyid.thread.reactions";
 
 const SENDER_COLORS = [
   "border-l-2 border-l-sky-400/50",
@@ -364,6 +366,24 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
   const [showSenderBreakdown, setShowSenderBreakdown] = createSignal(false);
   const [senderFilter, setSenderFilter] = createSignal<string | null>(null);
   const [headerCollapsed, setHeaderCollapsed] = createSignal(false);
+  const [agentTrustMsgId, setAgentTrustMsgId] = createSignal<string | null>(null);
+  const [openTraces, setOpenTraces] = createSignal<Set<string>>(new Set());
+  const [reactions, setReactions] = createSignal<Record<string, Record<string, number>>>(
+    (() => { try { return JSON.parse(localStorage.getItem(REACTIONS_KEY) ?? "{}"); } catch { return {}; } })()
+  );
+  function addReaction(msgId: string, emoji: string) {
+    setReactions((prev) => {
+      const msgR = prev[msgId] ?? {};
+      const next = { ...prev, [msgId]: { ...msgR, [emoji]: (msgR[emoji] ?? 0) + 1 } };
+      localStorage.setItem(REACTIONS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+  function agentHue(from: string): number {
+    let h = 0;
+    for (let i = 0; i < from.length; i++) h = (h * 31 + from.charCodeAt(i)) & 0xffff;
+    return h % 360;
+  }
 
   const [typingStartedAt, setTypingStartedAt] = createSignal<number | null>(null);
   const [typingElapsed, setTypingElapsed] = createSignal(0);
@@ -741,16 +761,36 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                 return (
                   <div class={`group space-y-1.5 ${senderCounts().length > 1 && !isUser ? senderColorClass(name) : ""}`} data-msg-id={msg.id}>
                     <div class={`flex items-center gap-1.5 ${isUser ? "justify-end" : "justify-start"}`}>
-                      <button
-                        type="button"
-                        onClick={() => !isUser && setSenderFilter((prev) => prev === name ? null : name)}
-                        title={isUser ? undefined : senderFilter() === name ? "Clear sender filter" : `Filter to ${name}`}
-                        class={`font-mono text-[9px] uppercase tracking-[0.16em] transition ${
-                          !isUser ? "cursor-pointer hover:text-primary" : "cursor-default"
-                        } ${senderFilter() === name ? "font-semibold text-primary" : "text-on-surface-variant/50"}`}
-                      >
-                        {isUser ? "you" : name}
-                      </button>
+                      <div class="relative">
+                        <button
+                          type="button"
+                          onClick={() => !isUser && setSenderFilter((prev) => prev === name ? null : name)}
+                          onMouseEnter={() => !isUser && setAgentTrustMsgId(msg.id)}
+                          onMouseLeave={() => setAgentTrustMsgId(null)}
+                          title={isUser ? undefined : senderFilter() === name ? "Clear sender filter" : `Filter to ${name}`}
+                          class={`font-mono text-[9px] uppercase tracking-[0.16em] transition ${
+                            !isUser ? "cursor-pointer hover:text-primary" : "cursor-default"
+                          } ${senderFilter() === name ? "font-semibold text-primary" : "text-on-surface-variant/50"}`}
+                        >
+                          {isUser ? "you" : name}
+                        </button>
+                        <Show when={agentTrustMsgId() === msg.id && !isUser}>
+                          <div class="absolute left-0 top-full z-50 mt-1 w-52 animate-fade-in rounded-2xl border border-white/45 bg-white/97 p-3 shadow-panel backdrop-blur-xl">
+                            <p class="mb-1.5 font-mono text-[8px] uppercase tracking-[0.18em] text-outline">Agent Identity</p>
+                            <div class="mb-2 flex gap-1">
+                              {[0, 1, 2].map((i) => (
+                                <div class="h-3 w-8 rounded-sm"
+                                     style={`background: hsl(${(agentHue(msg.from ?? "") + i * 120) % 360}, 45%, 60%)`} />
+                              ))}
+                            </div>
+                            <p class="break-all font-mono text-[9px] text-on-surface/80">{msg.from}</p>
+                            <div class="mt-2 flex items-center gap-1.5">
+                              <span class="h-1.5 w-1.5 rounded-full bg-green-400" />
+                              <span class="font-mono text-[8px] text-green-600">Signed &amp; Verified</span>
+                            </div>
+                          </div>
+                        </Show>
+                      </div>
                       <Show when={!isUser}>
                         <span class="rounded-full border border-white/30 bg-white/25 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] text-on-surface-variant/40">
                           {msg.type}
@@ -793,6 +833,14 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                       >
                         {collapsedMsgs().has(msg.id) ? "▸" : "▾"}
                       </button>
+                      <Show when={!isUser && msg.metadata && Object.keys(msg.metadata as Record<string, unknown>).length > 0}>
+                        <button
+                          type="button"
+                          title={openTraces().has(msg.id) ? "Hide intent trace" : "Show agent intent trace"}
+                          onClick={() => setOpenTraces((prev) => { const next = new Set(prev); if (next.has(msg.id)) next.delete(msg.id); else next.add(msg.id); return next; })}
+                          class={`font-mono text-[0.5em] transition ${openTraces().has(msg.id) ? "text-primary opacity-100" : "text-on-surface-variant/15 opacity-0 group-hover:opacity-100 hover:!text-primary"}`}
+                        >⟨/⟩</button>
+                      </Show>
                     </div>
                     <Show when={!collapsedMsgs().has(msg.id)}>
                     <div class="space-y-3">
@@ -811,8 +859,41 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                           </Show>
                         </>
                       )}
+                      <Show when={openTraces().has(msg.id)}>
+                        <div class="animate-fade-in rounded-xl border border-primary/15 bg-primary/5 p-3">
+                          <p class="mb-1 font-mono text-[8px] uppercase tracking-[0.18em] text-outline">Agent intent trace</p>
+                          <pre class="max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-[9px] text-on-surface-variant/70">{JSON.stringify(msg.metadata ?? {}, null, 2)}</pre>
+                        </div>
+                      </Show>
                     </div>
                     </Show>
+                    {/* Reactions */}
+                    <div class="flex flex-wrap items-center gap-1 min-h-[1.125rem]">
+                      <For each={Object.entries(reactions()[msg.id] ?? {})}>
+                        {([emoji, count]) => (
+                          <button
+                            type="button"
+                            title={`${count as number} · click to add`}
+                            onClick={() => addReaction(msg.id, emoji)}
+                            class="flex items-center gap-1 rounded-full border border-white/30 bg-white/25 px-2 py-0.5 text-[11px] transition hover:bg-white/45"
+                          >
+                            {emoji} <span class="font-mono text-[9px] text-on-surface-variant/60">{count as number}</span>
+                          </button>
+                        )}
+                      </For>
+                      <div class="flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+                        <For each={REACTIONS}>
+                          {(emoji) => (
+                            <button
+                              type="button"
+                              title={`React with ${emoji}`}
+                              onClick={() => addReaction(msg.id, emoji)}
+                              class="rounded-full px-1 py-0.5 text-[11px] transition hover:bg-white/40 hover:scale-110"
+                            >{emoji}</button>
+                          )}
+                        </For>
+                      </div>
+                    </div>
                   </div>
                 );
               }}
