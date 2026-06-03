@@ -1182,6 +1182,35 @@ export function AgentSettingsView(props: {
                 Closing this tab discards all decrypted content from memory.
               </p>
             </div>
+
+            {/* Sovereign Data Bundle */}
+            <div class="rounded-xl border border-outline/20 bg-outline/5 p-4">
+              <p class="text-sm font-semibold text-on-surface">📦 Sovereign Data Bundle</p>
+              <p class="mt-1 text-xs leading-5 text-on-surface-variant">
+                Export all local AFP state (preferences, reactions, bookmarks, LLM config, LoRA history) as a
+                portable JSON bundle. Nothing is held back — you own your data completely.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const bundle: Record<string, unknown> = { exportedAt: new Date().toISOString(), version: "1" };
+                  for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k?.startsWith("omnyid.")) {
+                      try { bundle[k] = JSON.parse(localStorage.getItem(k)!); } catch { bundle[k] = localStorage.getItem(k); }
+                    }
+                  }
+                  const a = Object.assign(document.createElement("a"), {
+                    href: URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" })),
+                    download: `omnyid-bundle-${Date.now()}.json`,
+                  });
+                  a.click();
+                }}
+                class="mt-3 rounded-lg border border-outline/20 bg-white/20 px-4 py-2 text-xs font-medium text-on-surface-variant transition hover:bg-white/40"
+              >
+                Export Bundle
+              </button>
+            </div>
           </div>
         </Show>
       </div>

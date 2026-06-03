@@ -384,6 +384,12 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
     for (let i = 0; i < from.length; i++) h = (h * 31 + from.charCodeAt(i)) & 0xffff;
     return h % 360;
   }
+  const [hoveredTag, setHoveredTag] = createSignal<string | null>(null);
+  const typingTask = createMemo<string | null>(() => {
+    const dm = messages().find((m) => m.type === "daemon_typing" && m.timestamp && Date.now() - new Date(m.timestamp).getTime() < 30_000);
+    const act = dm ? String((dm.metadata as Record<string, unknown> | undefined)?.action ?? (dm.content as Record<string, unknown>)?.action ?? "") : "";
+    return act.includes("search") || act.includes("web") ? "Searching the web…" : act.includes("email") ? "Checking email…" : act.includes("read") ? "Reading documents…" : act || null;
+  });
 
   const [typingStartedAt, setTypingStartedAt] = createSignal<number | null>(null);
   const [typingElapsed, setTypingElapsed] = createSignal(0);
@@ -796,6 +802,11 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                           {msg.type}
                         </span>
                       </Show>
+                      <Show when={(msg.type === "email_inbound" || msg.type === "inbound_email") && !!(msg.content as Record<string, unknown>).message_id}>
+                        <button type="button" title={`SMTP ID: ${(msg.content as Record<string, unknown>).message_id} — click to copy`}
+                          onClick={() => navigator.clipboard.writeText(String((msg.content as Record<string, unknown>).message_id ?? ""))}
+                          class="rounded-full bg-amber-400/10 px-1.5 py-0.5 font-mono text-[8px] text-amber-700 transition hover:bg-amber-400/20">↩ SMTP</button>
+                      </Show>
                       <Show when={msg.timestamp}>
                         <span class="font-mono text-[8px] text-on-surface-variant/30">
                           {relativeTime(msg.timestamp)}
@@ -867,6 +878,33 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                       </Show>
                     </div>
                     </Show>
+                    {/* Supertag chips — detected #tags from message content */}
+                    {(() => {
+                      const tags = [...new Set(
+                        Object.values(msg.content as Record<string, unknown>).filter((v): v is string => typeof v === "string")
+                          .join(" ").match(/#[\w-]+/g) ?? []
+                      )];
+                      if (!tags.length) return null;
+                      return (
+                        <div class="flex flex-wrap gap-1">
+                          <For each={tags}>{(tag) => (
+                            <div class="relative">
+                              <button type="button" onMouseEnter={() => setHoveredTag(`${msg.id}:${tag}`)} onMouseLeave={() => setHoveredTag(null)}
+                                class="rounded-full bg-primary/8 px-2 py-0.5 font-mono text-[9px] text-primary transition hover:bg-primary/15">{tag}</button>
+                              <Show when={hoveredTag() === `${msg.id}:${tag}`}>
+                                <div class="absolute bottom-full left-0 z-50 mb-1 w-48 animate-fade-in rounded-xl border border-white/45 bg-white/97 p-2.5 shadow-panel backdrop-blur-xl">
+                                  <p class="mb-0.5 font-mono text-[8px] uppercase tracking-[0.18em] text-outline">Supertag Definition</p>
+                                  <p class="text-xs font-semibold text-on-surface">{tag}</p>
+                                  <p class="mt-1 font-mono text-[9px] text-on-surface-variant/70">
+                                    {messages().filter((m) => JSON.stringify(m.content).includes(tag)).length} uses · ⚡ Auto-indexed by Curator
+                                  </p>
+                                </div>
+                              </Show>
+                            </div>
+                          )}</For>
+                        </div>
+                      );
+                    })()}
                     {/* Reactions */}
                     <div class="flex flex-wrap items-center gap-1 min-h-[1.125rem]">
                       <For each={Object.entries(reactions()[msg.id] ?? {})}>
@@ -913,17 +951,25 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
         </div>
       </Show>
 
-      {/* Typing indicator */}
+      {/* Typing indicator — shows contextual task label + progress bar for long-running ops */}
       <Show when={typingStartedAt() !== null}>
-        <div class="flex items-center gap-2 px-2 py-1 animate-fade-in">
-          <div class="flex gap-[3px]">
-            <span class="h-1.5 w-1.5 rounded-full bg-primary/50 animate-bounce" style="animation-delay: 0ms" />
-            <span class="h-1.5 w-1.5 rounded-full bg-primary/50 animate-bounce" style="animation-delay: 150ms" />
-            <span class="h-1.5 w-1.5 rounded-full bg-primary/50 animate-bounce" style="animation-delay: 300ms" />
+        <div class="space-y-1.5 px-2 py-1 animate-fade-in">
+          <div class="flex items-center gap-2">
+            <div class="flex gap-[3px]">
+              <span class="h-1.5 w-1.5 rounded-full bg-primary/50 animate-bounce" style="animation-delay: 0ms" />
+              <span class="h-1.5 w-1.5 rounded-full bg-primary/50 animate-bounce" style="animation-delay: 150ms" />
+              <span class="h-1.5 w-1.5 rounded-full bg-primary/50 animate-bounce" style="animation-delay: 300ms" />
+            </div>
+            <span class="font-mono text-[9px] text-on-surface-variant/50">
+              {typingTask() ?? "agent is thinking…"} {formatTypingElapsed(typingElapsed())}
+            </span>
           </div>
-          <span class="font-mono text-[9px] text-on-surface-variant/50">
-            agent is thinking… {formatTypingElapsed(typingElapsed())}
-          </span>
+          <Show when={typingElapsed() >= 5}>
+            <div class="h-0.5 overflow-hidden rounded-full bg-primary/15">
+              <div class="h-full bg-primary/40 transition-all duration-1000"
+                style={`width: ${Math.min(98, (typingElapsed() / 60) * 100)}%`} />
+            </div>
+          </Show>
         </div>
       </Show>
 

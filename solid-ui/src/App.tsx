@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { AgentFleetView } from "@/components/AgentFleetView";
 import { AgentSettingsView } from "@/components/AgentSettingsView";
 import { AlternateViewsInspector } from "@/components/AlternateViewsInspector";
@@ -19,21 +19,36 @@ import { ViewDispatcher } from "@/components/ViewDispatcher";
 import { WorkflowsView } from "@/components/WorkflowsView";
 import { CofounderStudioView } from "@/components/CofounderStudioView";
 import { KnowledgeGraphView } from "@/components/KnowledgeGraphView";
+import { DiaryView } from "@/components/DiaryView";
+import { DiscoverView } from "@/components/DiscoverView";
 import {
   apiFetch,
+  API_BASE,
   type AfpMessage,
   fetchEncKey,
   fetchLlmConfig,
   loadPrefs,
+  orchestrate,
   readSession,
   savePrefs,
+  writeSession,
   type DashboardBootstrap,
   type LlmConfig,
   type RuntimeWorkspaceFileEntry,
   type RuntimeWorkspaceFileResponse,
+  type Session,
   type UiCommandResponse
 } from "@/lib/api";
 import { checkBrowserAiAvailable, classifyWithBrowserAi, getBrowserAiLabel } from "@/lib/browserAi";
+import {
+  buildRouteCardPreviewMessage,
+  buildRouteComparisonPreviewMessage,
+  buildSocialComposerPreviewMessage,
+  buildSpaceFeedPreviewMessage,
+  travelPreviewPrefersComparison,
+} from "@/lib/commandPreviewSurfaces";
+import { hasConsentBeenAsked } from "@/lib/profileLedger";
+import { ProfilingConsentModal } from "@/components/ProfilingConsentModal";
 
 let decryptModulePromise: Promise<typeof import("@/lib/decrypt")> | null = null;
 
@@ -42,6 +57,29 @@ function loadDecryptModule() {
     decryptModulePromise = import("@/lib/decrypt");
   }
   return decryptModulePromise;
+}
+
+function dispatchDecisionOsBootstrap(payload: DashboardBootstrap) {
+  const briefing = payload.continuity_brief
+    ? {
+        northStar: payload.continuity_priority_card?.title ?? payload.continuity_brief.title,
+        urgentCount: payload.continuity_priority_card?.requires_approval ? 1 : 0,
+        highImpactCount: payload.continuity_brief.decision_count,
+        completedCount: 0,
+        estimatedMinutes: Math.max(10, payload.continuity_brief.commitment_count * 10),
+        totalDecisions: Math.max(1, payload.continuity_brief.decision_count),
+      }
+    : undefined;
+
+  window.dispatchEvent(
+    new CustomEvent("omnyid:decision-os-update", {
+      detail: {
+        briefing,
+        continuityPrimaryMode: payload.continuity_primary_mode,
+        priorityCard: payload.continuity_priority_card ?? undefined,
+      },
+    })
+  );
 }
 
 function buildRunnerEditPanel(command: UiCommandResponse, query: string): Record<string, unknown> {
@@ -536,7 +574,7 @@ function commandResponseToPreviewMessage(command: UiCommandResponse, query: stri
     };
   }
 
-  if (command.intent === "note" || (command.preferred_view ?? "") === "note_canvas") {
+  if (command.intent === "note" || (command.preferred_view ?? "") === "ledger_canvas") {
     const noteContent = {
       kind: "workspace_note",
       title: query || "Note",
@@ -556,6 +594,26 @@ function commandResponseToPreviewMessage(command: UiCommandResponse, query: stri
         },
       ],
     };
+  }
+
+  if (command.intent === "social" || (command.preferred_view ?? "") === "social_composer") {
+    return buildSocialComposerPreviewMessage(base, command, query);
+  }
+
+  if (command.intent === "spaces" || (command.preferred_view ?? "") === "spaces") {
+    return buildSpaceFeedPreviewMessage(base, command, query);
+  }
+
+  if (
+    command.intent === "travel"
+    || (command.preferred_view ?? "") === "route_card"
+    || (command.preferred_view ?? "") === "comparison_table"
+  ) {
+    const bullets = command.bullets ?? [];
+    if (travelPreviewPrefersComparison(query, command.preferred_view, bullets)) {
+      return buildRouteComparisonPreviewMessage(base, command, query);
+    }
+    return buildRouteCardPreviewMessage(base, command, query);
   }
 
   if (command.intent === "schedule" || (command.preferred_view ?? "") === "draggable_calendar") {
@@ -739,6 +797,14 @@ function App() {
   const [loraActive, setLoraActive] = createSignal(false);
   const [fleetActiveCount, setFleetActiveCount] = createSignal(0);
   const [fleetIdleCount, setFleetIdleCount] = createSignal(0);
+  const [fleetActiveNames, setFleetActiveNames] = createSignal<string[]>([]);
+  const [searchFocusTick, setSearchFocusTick] = createSignal(0);
+  const [fleetLoaded, setFleetLoaded] = createSignal(false);
+  const [workflowNewResult, setWorkflowNewResult] = createSignal(
+    localStorage.getItem("omnyid.workflow.new_result") === "1"
+  );
+  const [threadBadge, setThreadBadge] = createSignal(0);
+  let seenThreadCount = parseInt(localStorage.getItem("omnyid.thread.seen_count") ?? "0", 10);
 
   // Browser AI
   const [browserAiLabel, setBrowserAiLabel] = createSignal<string | null>(null);
@@ -750,17 +816,43 @@ function App() {
   const [agentSettingsFocusLlm, setAgentSettingsFocusLlm] = createSignal(false);
 
   // UI state
-  const [advanced, setAdvanced] = createSignal(false);
+  const ADVANCED_KEY = "omnyid.nav.advanced";
+  const [advanced, setAdvanced] = createSignal(localStorage.getItem(ADVANCED_KEY) === "1");
 
   // Onboarding / tour state
   const [showTour, setShowTour] = createSignal(shouldShowTour());
   const [showOnboarding, setShowOnboarding] = createSignal(false);
+  const [showProfilingConsent, setShowProfilingConsent] = createSignal(false);
+  const [showAuthModal, setShowAuthModal] = createSignal(
+    new URLSearchParams(window.location.search).get("open_auth") === "1"
+  );
 
   function persistPrefs(view: ViewName, threadId: string | null) {
     savePrefs({ activeView: view, openThreadId: threadId });
   }
 
+  // Track when active fleet drops to 0 — set "new result" badge until Workflows is opened
+  let prevActiveCount = 0;
+  createEffect(() => {
+    const current = fleetActiveCount();
+    if (prevActiveCount > 0 && current === 0) {
+      localStorage.setItem("omnyid.workflow.new_result", "1");
+      setWorkflowNewResult(true);
+    }
+    prevActiveCount = current;
+  });
+
   function selectView(view: ViewName) {
+    if (view === "workflows") {
+      localStorage.removeItem("omnyid.workflow.new_result");
+      setWorkflowNewResult(false);
+    }
+    if (view === "threads") {
+      setThreadBadge(0);
+      const total = new Set((dashboard()?.messages ?? []).map((m) => m.thread_id)).size;
+      seenThreadCount = total;
+      localStorage.setItem("omnyid.thread.seen_count", String(total));
+    }
     setActiveView(view);
     persistPrefs(view, openThreadId());
   }
@@ -776,6 +868,9 @@ function App() {
   const [searchFeedback, setSearchFeedback] = createSignal("");
   const [commandResult, setCommandResult] = createSignal<UiCommandResponse | null>(null);
   const [lastQuery, setLastQuery] = createSignal("");
+  const [lastEngine, setLastEngine] = createSignal("auto");
+  const [lastOptMode, setLastOptMode] = createSignal("balanced");
+  const [queryChipDismissed, setQueryChipDismissed] = createSignal(false);
   const [runnerFiles, setRunnerFiles] = createSignal<RuntimeWorkspaceFileEntry[]>([]);
   const [activeFile, setActiveFile] = createSignal<RuntimeWorkspaceFileResponse | null>(null);
   const [editorValue, setEditorValue] = createSignal("");
@@ -794,6 +889,11 @@ function App() {
       const { decryptMessages } = await loadDecryptModule();
       payload.messages = decryptMessages(payload.messages);
       setDashboard(payload);
+      dispatchDecisionOsBootstrap(payload);
+      if (activeView() !== "threads") {
+        const total = new Set(payload.messages.map((m) => m.thread_id)).size;
+        if (total > seenThreadCount) setThreadBadge(total - seenThreadCount);
+      }
       const monitor = payload.runtime_deployment?.runtime_monitor;
       if (monitor) {
         setRuntimeLogs(monitor.lines ?? []);
@@ -923,6 +1023,7 @@ function App() {
         instance?: { lora_confidence_score?: number; lora_genome_active?: boolean };
         active_count?: number;
         idle_count?: number;
+        active_agents?: string[];
       }>("/agent/fleet");
       if (fleet.instance) {
         setLoraScore(fleet.instance.lora_confidence_score ?? 0);
@@ -930,12 +1031,17 @@ function App() {
       }
       setFleetActiveCount(fleet.active_count ?? 0);
       setFleetIdleCount(fleet.idle_count ?? 0);
+      setFleetActiveNames(fleet.active_agents ?? []);
     } catch { /* ignore */ }
+    setFleetLoaded(true);
   }
 
   async function handleSearch(query: string, engine: string, optimizationMode = "balanced") {
     setSearchBusy(true);
     setLastQuery(query);
+    setLastEngine(engine);
+    setLastOptMode(optimizationMode);
+    setQueryChipDismissed(false);
     try {
       // Try browser AI classification as a hint for the server (used when no server LLM configured)
       let browserIntent: string | undefined;
@@ -1011,11 +1117,41 @@ function App() {
       fetchLlmConfig().then(setLlmConfig).catch(() => {});
     }
 
+    // Auto-expand sidebar on first authenticated session so Mask, LoRA, and Plaza are discoverable
+    if (session()?.token && !localStorage.getItem("omnyid.sidebar.seen")) {
+      setRightOpen(true);
+      localStorage.setItem("omnyid.sidebar.seen", "1");
+    }
+
+    // Show profiling consent on first session
+    if (!hasConsentBeenAsked()) {
+      setShowProfilingConsent(true);
+    }
+
     // Detect browser-native AI (Gemini Nano on Chrome, Phi on Edge)
     const label = getBrowserAiLabel();
     if (label) {
       checkBrowserAiAvailable().then((ok) => { if (ok) setBrowserAiLabel(label); });
     }
+
+    // Keyboard shortcuts: Ctrl/Cmd+1–7 for nav items
+    const SHORTCUT_VIEWS: ViewName[] = ["search", "threads", "workflows", "email", "note", "calendar", "database"];
+    function onGlobalKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === "k") {
+        e.preventDefault();
+        selectView("search");
+        setSearchFocusTick((n) => n + 1);
+        return;
+      }
+      const idx = parseInt(e.key, 10) - 1;
+      if (idx >= 0 && idx < SHORTCUT_VIEWS.length) {
+        e.preventDefault();
+        selectView(SHORTCUT_VIEWS[idx]);
+      }
+    }
+    document.addEventListener("keydown", onGlobalKeyDown);
+    onCleanup(() => document.removeEventListener("keydown", onGlobalKeyDown));
 
     void loadDashboard();
     void loadRunnerFiles();
@@ -1034,6 +1170,10 @@ function App() {
 
   return (
     <main class="min-h-screen p-4 md:p-6 text-on-surface">
+      <Show when={showAuthModal()}>
+        <AuthModal onClose={() => setShowAuthModal(false)} />
+      </Show>
+
       {/* Guided tour — first-time visitors */}
       <Show when={showTour()}>
         <GuidedTour onComplete={() => {
@@ -1047,15 +1187,24 @@ function App() {
         <OnboardingWizard onComplete={() => setShowOnboarding(false)} />
       </Show>
 
+      {/* Profiling consent — shown once, after tour and onboarding */}
+      <Show when={!showTour() && !showOnboarding() && showProfilingConsent()}>
+        <ProfilingConsentModal onDismiss={() => setShowProfilingConsent(false)} />
+      </Show>
+
       {/* Guest mode banner */}
       <Show when={!session()?.token}>
         <div class="mx-auto mb-4 max-w-[1700px] flex items-center justify-between gap-4 rounded-2xl border border-amber-200/50 bg-amber-50/60 px-5 py-3 text-sm text-on-surface-variant backdrop-blur-sm animate-fade-in">
           <span>
             You're in <strong class="text-on-surface">guest mode</strong> — most actions require a signed-in account.
           </span>
-          <a href="/?open_auth=1" class="glass-button rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setShowAuthModal(true)}
+            class="glass-button rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 shadow-sm"
+          >
             Sign in →
-          </a>
+          </button>
         </div>
       </Show>
 
@@ -1065,10 +1214,17 @@ function App() {
           onSelect={selectView}
           signedIn={Boolean(session()?.token)}
           advanced={advanced()}
-          onToggleAdvanced={() => setAdvanced((v) => !v)}
+          onToggleAdvanced={() => { const next = !advanced(); setAdvanced(next); localStorage.setItem(ADVANCED_KEY, next ? "1" : "0"); }}
           activeCount={fleetActiveCount()}
           idleCount={fleetIdleCount()}
+          activeAgentNames={fleetActiveNames()}
           onFleetClick={() => setFleetOpen((v) => !v)}
+          workflowBadge={fleetActiveCount() > 0 ? fleetActiveCount() : undefined}
+          workflowNewResult={workflowNewResult()}
+          fleetLoaded={fleetLoaded()}
+          threadBadge={threadBadge() > 0 ? threadBadge() : undefined}
+          ctrlKPulse={searchFocusTick()}
+          onSignIn={() => setShowAuthModal(true)}
         />
 
         {/* Fleet pane — slides in below nav when user clicks active/idle badge */}
@@ -1080,7 +1236,7 @@ function App() {
 
         {/* Chat bar — always visible */}
         <div class="mt-7">
-          <SearchBar onSubmit={handleSearch} busy={searchBusy()} />
+          <SearchBar onSubmit={handleSearch} busy={searchBusy()} focusTrigger={searchFocusTick()} />
           <div class="mt-2.5 flex flex-wrap items-center justify-center gap-3">
             <Show when={searchFeedback()}>
               <p class="text-center text-sm leading-7 text-on-surface-variant">
@@ -1092,7 +1248,63 @@ function App() {
               browserAiLabel={browserAiLabel()}
               onSettingsClick={() => { selectView("agent_settings"); setAgentSettingsFocusLlm(true); }}
             />
+            {/* Approval-gate notice — surfaces when orchestration is waiting for a decision */}
+            <Show when={commandResult()?.intent === "orchestrate"}>
+              <span class="flex items-center gap-2 rounded-full border border-amber-300/60 bg-amber-50/80 px-3 py-1 text-xs font-medium text-amber-700 animate-pulse">
+                <span class="h-1.5 w-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                Approval may be required — review the card below
+              </span>
+            </Show>
           </div>
+
+          {/* Last-search context chip — re-run or dismiss */}
+          <Show when={lastQuery() && !searchBusy() && !queryChipDismissed()}>
+            <div class="mt-2.5 flex items-center justify-center animate-fade-in">
+              <div class="flex items-center gap-1.5 rounded-full border border-white/40 bg-white/30 py-1 pl-3 pr-1.5 text-xs text-on-surface-variant">
+                <span class="text-on-surface-variant/60">Last:</span>
+                <span class="max-w-[200px] truncate font-medium text-on-surface">"{lastQuery()}"</span>
+                <button
+                  type="button"
+                  disabled={searchBusy()}
+                  onClick={() => void handleSearch(lastQuery(), lastEngine(), lastOptMode())}
+                  class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary transition hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ↺ Re-run
+                </button>
+                <button
+                  type="button"
+                  aria-label="Dismiss"
+                  onClick={() => setQueryChipDismissed(true)}
+                  class="rounded-full p-0.5 text-on-surface-variant/40 transition hover:text-on-surface-variant"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          </Show>
+
+          {/* Setup checklist — visible until LLM is configured */}
+          <Show when={Boolean(session()?.token) && !llmConfig()}>
+            <div class="mt-3 flex items-center gap-3 rounded-2xl border border-amber-200/60 bg-amber-50/70 px-4 py-2.5 animate-fade-in">
+              <span class="flex-shrink-0 text-amber-500">⚙</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-amber-800">Quick setup</p>
+                <div class="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5">
+                  <span class="text-[11px] text-green-700 flex items-center gap-1">
+                    <span>✓</span> Signed in
+                  </span>
+                  <a
+                    role="button"
+                    class="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                    onClick={() => { selectView("agent_settings"); setAgentSettingsFocusLlm(true); }}
+                  >
+                    <span class="text-amber-500">○</span> Connect AI model →
+                  </a>
+                </div>
+              </div>
+              <span class="text-[10px] text-amber-600/70 flex-shrink-0">Step 1 of 2</span>
+            </div>
+          </Show>
         </div>
 
         {/* 2-column layout (left sidebar removed) */}
@@ -1172,7 +1384,7 @@ function App() {
                     when={openThreadId()}
                     fallback={
                       <ThreadListFallback
-                        threadIds={(dashboard()?.messages ?? []).map((m) => m.thread_id)}
+                        messages={dashboard()?.messages ?? []}
                         onOpen={openThread}
                       />
                     }
@@ -1239,8 +1451,11 @@ function App() {
               </div>
             </Show>
 
-            {/* Runner view — advanced only */}
-            <Show when={activeView() === "runner" && advanced()}>
+            {/* Runner view — advanced only, signed-in only */}
+            <Show when={activeView() === "runner" && !session()?.token}>
+              <GuestGate label="Python Runner" onSignIn={() => setShowAuthModal(true)} />
+            </Show>
+            <Show when={activeView() === "runner" && Boolean(session()?.token) && advanced()}>
               <PythonRunnerView
                 files={runnerFiles()}
                 activeFile={activeFile()}
@@ -1267,14 +1482,17 @@ function App() {
                 onRuntimeAction={(action) => void handleRuntimeAction(action)}
               />
             </Show>
-            <Show when={activeView() === "runner" && !advanced()}>
+            <Show when={activeView() === "runner" && Boolean(session()?.token) && !advanced()}>
               <div class="view-enter glass-surface rounded-3xl border border-white/50 p-10 text-center shadow-card">
                 <p class="text-sm text-on-surface-variant">Enable <strong class="text-on-surface">Advanced ▾</strong> in the top nav to access the Python runner.</p>
               </div>
             </Show>
 
             {/* Agent Settings view */}
-            <Show when={activeView() === "agent_settings"}>
+            <Show when={activeView() === "agent_settings" && !session()?.token}>
+              <GuestGate label="Agent Settings" onSignIn={() => setShowAuthModal(true)} />
+            </Show>
+            <Show when={activeView() === "agent_settings" && Boolean(session()?.token)}>
               <div class="view-enter">
                 <AgentSettingsView
                   browserAiLabel={browserAiLabel()}
@@ -1282,8 +1500,19 @@ function App() {
                   onFocusDone={() => setAgentSettingsFocusLlm(false)}
                   signedIn={Boolean(session()?.token)}
                   onLlmConfigSaved={(cfg) => setLlmConfig(cfg)}
+                  onViewWorkflows={() => selectView("workflows")}
                 />
               </div>
+            </Show>
+
+            {/* Diary view */}
+            <Show when={activeView() === "diary"}>
+              <div class="view-enter"><DiaryView /></div>
+            </Show>
+
+            {/* Discover view */}
+            <Show when={activeView() === "discover"}>
+              <div class="view-enter"><DiscoverView /></div>
             </Show>
           </div>
 
@@ -1327,7 +1556,7 @@ function App() {
                   </div>
 
                   <Show when={session()?.token}>
-                    <LoraStatusWidget score={loraScore()} active={loraActive()} />
+                    <LoraStatusWidget score={loraScore()} active={loraActive()} activeCount={fleetActiveCount()} idleCount={fleetIdleCount()} onFleetOpen={() => setFleetOpen((v) => !v)} />
                   </Show>
 
                   {/* Plaza — Public Feed */}
@@ -1343,6 +1572,24 @@ function App() {
         </div>
       </GlassPanel>
     </main>
+  );
+}
+
+function GuestGate(props: { label: string; onSignIn: () => void }) {
+  return (
+    <div class="view-enter glass-surface rounded-3xl border border-white/50 p-10 text-center shadow-card animate-fade-in">
+      <p class="text-base font-semibold text-on-surface">{props.label} requires a signed-in account</p>
+      <p class="mt-2 text-sm text-on-surface-variant">
+        Create a free OmnyID account to access this feature. Your data stays on your homeserver.
+      </p>
+      <button
+        type="button"
+        onClick={props.onSignIn}
+        class="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/80"
+      >
+        Sign in →
+      </button>
+    </div>
   );
 }
 
@@ -1386,37 +1633,222 @@ function AgentStatusPill(props: {
   );
 }
 
-function ThreadListFallback(props: { threadIds: string[]; onOpen: (id: string) => void }) {
-  const unique = () => [...new Set(props.threadIds)];
+const MSG_TYPE_COLORS: Record<string, string> = {
+  task:             "bg-blue-100/60 text-blue-700",
+  note:             "bg-yellow-100/60 text-yellow-700",
+  research_result:  "bg-purple-100/60 text-purple-700",
+  email:            "bg-green-100/60 text-green-700",
+  generative_card:  "bg-indigo-100/60 text-indigo-700",
+  search_result:    "bg-teal-100/60 text-teal-700",
+};
+
+function ThreadListFallback(props: { messages: AfpMessage[]; onOpen: (id: string) => void }) {
+  const [filter, setFilter] = createSignal("");
+  const [draggedThreadId, setDraggedThreadId] = createSignal<string | null>(null);
+
+  const threads = createMemo(() => {
+    const seen = new Set<string>();
+    return props.messages
+      .filter((m) => {
+        if (seen.has(m.thread_id)) return false;
+        seen.add(m.thread_id);
+        return true;
+      })
+      .map((m) => {
+        const c = m.content as Record<string, unknown>;
+        const raw = String(c["title"] ?? c["summary"] ?? c["description"] ?? c["query"] ?? m.type);
+        const preview = raw.length > 65 ? `${raw.slice(0, 65)}…` : raw;
+        return { id: m.thread_id, preview, msgType: m.type };
+      });
+  });
+
+  const visible = createMemo(() => {
+    const q = filter().toLowerCase().trim();
+    if (!q) return threads();
+    return threads().filter(
+      (t) => t.preview.toLowerCase().includes(q) || t.msgType.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <GlassPanel class="p-6">
       <p class="font-mono text-[10px] uppercase tracking-[0.28em] text-outline">Thread browser</p>
       <h2 class="mt-2 text-lg font-semibold text-on-surface">Your AFP threads</h2>
       <Show
-        when={unique().length > 0}
+        when={threads().length > 0}
         fallback={
           <p class="mt-4 text-sm text-on-surface-variant">
             No threads yet. Talk to your agent in the chat bar above.
           </p>
         }
       >
-        <div class="mt-5 space-y-2">
-          <For each={unique()}>
-            {(tid) => (
-              <button
-                type="button"
-                onClick={() => props.onOpen(tid)}
-                class="flex w-full items-center justify-between rounded-2xl border border-white/35 bg-white/25 px-5 py-4 text-left transition hover:bg-white/45"
-              >
-                <span class="font-mono text-sm text-on-surface">{tid}</span>
-                <span class="text-sm text-primary">Open →</span>
-              </button>
-            )}
-          </For>
+        <div class="mt-4">
+          <input
+            type="text"
+            placeholder="Filter threads…"
+            value={filter()}
+            onInput={(e) => setFilter(e.currentTarget.value)}
+            class="w-full rounded-xl border border-white/35 bg-white/30 px-4 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/40 outline-none focus:border-primary/40 focus:bg-white/50 transition"
+          />
+        </div>
+        <div class="mt-3 space-y-2">
+          <Show
+            when={visible().length > 0}
+            fallback={
+              <p class="text-sm text-on-surface-variant">No threads match "{filter()}".</p>
+            }
+          >
+            <For each={visible()}>
+              {(thread) => {
+                const badgeClass = () =>
+                  MSG_TYPE_COLORS[thread.msgType] ?? "bg-white/40 text-on-surface-variant";
+                const isDragTarget = () => draggedThreadId() !== null && draggedThreadId() !== thread.id;
+                return (
+                  <button
+                    type="button"
+                    draggable={true}
+                    onClick={() => props.onOpen(thread.id)}
+                    onDragStart={() => setDraggedThreadId(thread.id)}
+                    onDragEnd={() => setDraggedThreadId(null)}
+                    onDragOver={(e) => { if (isDragTarget()) e.preventDefault(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = draggedThreadId();
+                      setDraggedThreadId(null);
+                      if (!from || from === thread.id) return;
+                      void orchestrate(
+                        `Create a knowledge backlink between AFP thread "${thread.id}" and thread "${from}". Emit a backlink_update message linking them.`,
+                        { thread_id: thread.id }
+                      );
+                    }}
+                    class={`flex w-full items-start justify-between gap-4 rounded-2xl border px-5 py-3.5 text-left transition ${isDragTarget() ? "border-primary/40 bg-primary/8 ring-1 ring-primary/20" : "border-white/35 bg-white/25 hover:bg-white/45"}`}
+                  >
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2">
+                        <span class={`inline-block rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] ${badgeClass()}`}>
+                          {thread.msgType}
+                        </span>
+                      </div>
+                      <p class="mt-1 truncate text-sm font-medium text-on-surface">{thread.preview}</p>
+                    </div>
+                    <span class="flex-shrink-0 self-center text-sm text-primary">{isDragTarget() ? "↩ Link" : "Open →"}</span>
+                  </button>
+                );
+              }}
+            </For>
+          </Show>
         </div>
       </Show>
     </GlassPanel>
+  );
+}
+
+function AuthModal(props: { onClose: () => void }) {
+  const [tab, setTab] = createSignal<"signin" | "signup">("signin");
+  const [email, setEmail] = createSignal("");
+  const [password, setPassword] = createSignal("");
+  const [displayName, setDisplayName] = createSignal("");
+  const [loading, setLoading] = createSignal(false);
+  const [error, setError] = createSignal("");
+
+  async function submit(e: Event) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const endpoint = tab() === "signin" ? "/auth/login" : "/auth/register";
+      const body: Record<string, string> = { email: email().trim(), password: password() };
+      if (tab() === "signup" && displayName().trim()) body.display_name = displayName().trim();
+      const resp = await fetch(`${API_BASE}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || resp.statusText);
+      }
+      const data = await resp.json() as Session;
+      writeSession(data);
+      window.location.reload();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      const isNetwork = !msg || msg.toLowerCase().includes("networkerror") || msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("load failed");
+      setError(isNetwork
+        ? "Cannot reach the homeserver. Make sure the OmnyID backend is running (run dev.ps1 or docker compose up)."
+        : msg || "Authentication failed — check credentials");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div
+      class="fixed inset-0 z-[200] flex items-center justify-center bg-on-surface/30 backdrop-blur-sm animate-fade-in"
+      onClick={(e) => { if (e.target === e.currentTarget) props.onClose(); }}
+    >
+      <div class="relative w-full max-w-sm rounded-3xl border border-white/45 bg-white/96 p-6 shadow-panel backdrop-blur-xl">
+        <button
+          type="button"
+          onClick={props.onClose}
+          class="absolute right-4 top-4 text-on-surface-variant/40 transition hover:text-on-surface"
+          aria-label="Close"
+        >×</button>
+        <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline mb-4">OmnyID Account</p>
+        <div class="mb-5 flex rounded-xl border border-white/40 bg-white/40 p-0.5">
+          <button
+            type="button"
+            onClick={() => { setTab("signin"); setError(""); }}
+            class={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${tab() === "signin" ? "bg-white shadow-sm text-on-surface" : "text-on-surface-variant hover:text-on-surface"}`}
+          >Sign in</button>
+          <button
+            type="button"
+            onClick={() => { setTab("signup"); setError(""); }}
+            class={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${tab() === "signup" ? "bg-white shadow-sm text-on-surface" : "text-on-surface-variant hover:text-on-surface"}`}
+          >Create account</button>
+        </div>
+        <form onSubmit={submit} class="space-y-3">
+          <Show when={tab() === "signup"}>
+            <input
+              type="text"
+              placeholder="Display name (optional)"
+              value={displayName()}
+              onInput={(e) => setDisplayName(e.currentTarget.value)}
+              class="w-full rounded-xl border border-white/40 bg-white/60 px-4 py-2.5 text-sm text-on-surface outline-none focus:border-primary/50 transition"
+            />
+          </Show>
+          <input
+            type="email"
+            required
+            placeholder="Email"
+            value={email()}
+            onInput={(e) => setEmail(e.currentTarget.value)}
+            class="w-full rounded-xl border border-white/40 bg-white/60 px-4 py-2.5 text-sm text-on-surface outline-none focus:border-primary/50 transition"
+          />
+          <input
+            type="password"
+            required
+            placeholder="Password (8+ chars)"
+            value={password()}
+            onInput={(e) => setPassword(e.currentTarget.value)}
+            class="w-full rounded-xl border border-white/40 bg-white/60 px-4 py-2.5 text-sm text-on-surface outline-none focus:border-primary/50 transition"
+          />
+          <Show when={error()}>
+            <p class="rounded-lg border border-red-200/60 bg-red-50/80 px-3 py-2 text-xs text-red-700">{error()}</p>
+          </Show>
+          <button
+            type="submit"
+            disabled={loading()}
+            class="w-full rounded-full bg-primary py-2.5 text-sm font-semibold text-white transition hover:bg-primary/80 disabled:opacity-60"
+          >
+            {loading() ? "Please wait…" : tab() === "signin" ? "Sign in" : "Create account"}
+          </button>
+        </form>
+        <p class="mt-4 text-center text-[11px] text-on-surface-variant/50">
+          Your data stays on your homeserver — privacy-first.
+        </p>
+      </div>
+    </div>
   );
 }
 
