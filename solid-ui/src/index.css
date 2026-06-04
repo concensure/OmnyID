@@ -286,6 +286,32 @@ body {
   animation: btn-shimmer 5s ease infinite;
 }
 
+/* ── Agent persona FAB animations ───────────────────────────────────────────── */
+@keyframes persona-idle {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-3px); }
+}
+@keyframes persona-busy {
+  0%, 100% { transform: scale(1); box-shadow: 0 4px 16px rgba(59,130,246,0.2); }
+  50%       { transform: scale(1.06); box-shadow: 0 8px 24px rgba(59,130,246,0.35); }
+}
+@keyframes persona-error {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-4px); }
+  40%       { transform: translateX(4px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+@keyframes persona-success {
+  0%, 100% { transform: scale(1) translateY(0); }
+  30%       { transform: scale(1.15) translateY(-6px); }
+  60%       { transform: scale(0.95) translateY(0); }
+}
+.animate-persona-idle    { animation: persona-idle    4s ease-in-out infinite; }
+.animate-persona-busy    { animation: persona-busy    1.2s ease-in-out infinite; }
+.animate-persona-error   { animation: persona-error   0.5s ease-in-out 3; }
+.animate-persona-success { animation: persona-success 0.6s ease-in-out 3; }
+
 /* ── Swipe-reveal action tray (T7) ──────────────────────────────────────────── */
 [data-swipe-tray] {
   position: absolute;

@@ -22,6 +22,8 @@ import { KnowledgeGraphView } from "@/components/KnowledgeGraphView";
 import { DiaryView } from "@/components/DiaryView";
 import { DiscoverView } from "@/components/DiscoverView";
 import { BentoGrid } from "@/components/BentoGrid";
+import { AgentPersonaFAB } from "@/components/AgentPersonaFAB";
+import { FloatingFormatBar } from "@/components/FloatingFormatBar";
 import {
   apiFetch,
   API_BASE,
@@ -1528,6 +1530,16 @@ function App() {
           </div>
         </div>
       </GlassPanel>
+
+      {/* Floating agent persona FAB */}
+      <AgentPersonaFAB
+        activeCount={fleetActiveCount()}
+        justCompleted={workflowNewResult()}
+        onOpenSettings={() => selectView("agent_settings")}
+      />
+
+      {/* Floating format bar — appears when a contenteditable is focused */}
+      <FloatingFormatBar />
     </main>
   );
 }

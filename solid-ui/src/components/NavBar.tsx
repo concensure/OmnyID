@@ -544,14 +544,14 @@ export function NavBar(props: {
             <button
               type="button"
               onClick={() => selectAndPersist("home")}
-              class={`rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+              class={`rail-icon-btn flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
                 props.activeView === "home" ? "bg-on-surface/8 ring-2 ring-primary/30" : "hover:bg-white/60"
               }`}
             >
               <img
                 src="/omnyid-logo.png"
                 alt="OmnyID"
-                class="h-8 w-8 rounded-xl object-contain"
+                class="w-10 h-auto object-contain"
                 style={props.activeView === "home" ? "filter: drop-shadow(0 0 6px rgba(49,86,142,0.5))" : ""}
               />
             </button>

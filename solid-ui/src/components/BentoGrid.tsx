@@ -1,8 +1,8 @@
-// @locs-version: 2.0
+// @locs-version: 2.1
 // @module-id: ui.bento-grid
 // @primary-capability: home-workspace-bento-layout
 // @stability: beta
-import { createMemo, createSignal, For, Show, Switch, Match } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, Show, Switch, Match } from "solid-js";
 import type { DashboardBootstrap } from "@/lib/api";
 import type { ViewName } from "@/components/NavBar";
 import { RailIcon } from "@/components/RailIcons";
@@ -15,6 +15,8 @@ interface TileConfig {
   viewId: ViewName;
   colSpan: 1 | 2;
   rowSpan: 1 | 2;
+  bgKey?: string;
+  displayMode?: "default" | "compact" | "graph";
 }
 
 const TILE_META: Record<string, { label: string; desc: string }> = {
@@ -41,6 +43,20 @@ const ACCENT: Record<string, string> = {
   discover:  "from-sky-50/80 via-cyan-50/50 to-sky-50/30 border-sky-200/40",
 };
 
+const TILE_BG: Record<string, string> = {
+  blue:    "from-blue-100/80 via-blue-50/50 to-white/30 border-blue-300/50",
+  violet:  "from-violet-100/80 via-violet-50/50 to-white/30 border-violet-300/50",
+  emerald: "from-emerald-100/80 via-emerald-50/50 to-white/30 border-emerald-300/50",
+  amber:   "from-amber-100/80 via-amber-50/50 to-white/30 border-amber-300/50",
+  rose:    "from-rose-100/80 via-rose-50/50 to-white/30 border-rose-300/50",
+  slate:   "from-slate-100/80 via-slate-50/50 to-white/30 border-slate-300/50",
+};
+
+const TILE_BG_DOT: Record<string, string> = {
+  blue: "bg-blue-400", violet: "bg-violet-400", emerald: "bg-emerald-400",
+  amber: "bg-amber-400", rose: "bg-rose-400", slate: "bg-slate-400",
+};
+
 const DEFAULT_TILES: TileConfig[] = [
   { id: "t-chat",      viewId: "search",    colSpan: 2, rowSpan: 2 },
   { id: "t-email",     viewId: "email",     colSpan: 1, rowSpan: 1 },
@@ -63,7 +79,7 @@ function saveLayout(tiles: TileConfig[]) {
   localStorage.setItem(LAYOUT_KEY, JSON.stringify(tiles));
 }
 
-// ── Compact tile content ───────────────────────────────────────────────────────
+// ── Tile content components ────────────────────────────────────────────────────
 
 type ContentBody = { body?: string; text?: string; title?: string; subject?: string };
 
@@ -165,6 +181,105 @@ function GenericTile(props: { msgs: { type: string; content: unknown }[] }) {
   );
 }
 
+function CompactTile(props: { meta: { label: string; desc: string }; count: number }) {
+  return (
+    <div class="flex flex-col items-center justify-center h-full gap-1 py-4">
+      <p class="text-3xl font-bold text-on-surface leading-none">{props.count}</p>
+      <p class="text-[10px] text-on-surface-variant/60 text-center">{props.meta.desc}</p>
+    </div>
+  );
+}
+
+function GraphTile(props: { msgs: { type: string; content: unknown }[] }) {
+  const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+  const bars = createMemo(() => {
+    const data = Array.from({ length: 7 }, (_, i) =>
+      props.msgs.filter((_, idx) => idx % 7 === i).length
+    );
+    const maxVal = Math.max(...data, 1);
+    return data.map((v) => Math.max(Math.round((v / maxVal) * 100), 8));
+  });
+  return (
+    <div class="flex h-full flex-col justify-end gap-1 pb-1">
+      <div class="flex items-end gap-1" style={{ height: "56px" }}>
+        <For each={bars()}>
+          {(h) => (
+            <div class="flex-1 rounded-t bg-primary/25 transition-all" style={{ height: `${h}%` }} />
+          )}
+        </For>
+      </div>
+      <div class="flex gap-1">
+        <For each={DAY_LABELS}>
+          {(d) => (
+            <p class="flex-1 text-center font-mono text-[7px] text-outline/40">{d}</p>
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
+
+// ── Tile options menu ─────────────────────────────────────────────────────────
+
+function TileOptionsMenu(props: {
+  config: TileConfig;
+  onSetBg: (key: string | undefined) => void;
+  onSetMode: (mode: "default" | "compact" | "graph") => void;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div class="absolute right-0 top-6 z-50 min-w-[168px] animate-fade-in rounded-2xl border border-white/50 bg-white/96 p-2 shadow-panel backdrop-blur-xl">
+      <p class="mb-1.5 px-2 font-mono text-[8px] uppercase tracking-widest text-outline/50">Background</p>
+      <div class="mb-2 flex flex-wrap gap-1.5 px-2">
+        <button
+          type="button"
+          onClick={() => { props.onSetBg(undefined); props.onClose(); }}
+          class={`h-5 w-5 rounded-full border-2 bg-gradient-to-br from-gray-100 to-white ${!props.config.bgKey ? "border-primary" : "border-outline/20"}`}
+          title="Default"
+        />
+        <For each={Object.entries(TILE_BG_DOT)}>
+          {([key, cls]) => (
+            <button
+              type="button"
+              onClick={() => { props.onSetBg(key); props.onClose(); }}
+              class={`h-5 w-5 rounded-full border-2 ${cls} ${props.config.bgKey === key ? "border-primary" : "border-white/50 shadow-sm"}`}
+              title={key}
+            />
+          )}
+        </For>
+      </div>
+      <div class="mx-2 my-1 h-px bg-outline/10" />
+      <p class="mb-1 mt-1.5 px-2 font-mono text-[8px] uppercase tracking-widest text-outline/50">Display</p>
+      <For each={(["default", "compact", "graph"] as const)}>
+        {(mode) => (
+          <button
+            type="button"
+            onClick={() => { props.onSetMode(mode); props.onClose(); }}
+            class={`flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-xs transition hover:bg-on-surface/5 ${
+              (props.config.displayMode ?? "default") === mode ? "text-primary font-medium" : "text-on-surface"
+            }`}
+          >
+            <span class="w-4 text-center opacity-60">
+              {mode === "default" ? "✦" : mode === "compact" ? "≡" : "▦"}
+            </span>
+            {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            {(props.config.displayMode ?? "default") === mode && <span class="ml-auto text-primary text-[9px]">✓</span>}
+          </button>
+        )}
+      </For>
+      <div class="mx-2 my-1 h-px bg-outline/10" />
+      <button
+        type="button"
+        onClick={() => { props.onRemove(); props.onClose(); }}
+        class="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-xs text-red-500 transition hover:bg-red-50/80"
+      >
+        <span class="w-4 text-center">×</span> Remove tile
+      </button>
+    </div>
+  );
+}
+
 // ── BentoTile ──────────────────────────────────────────────────────────────────
 
 function BentoTile(props: {
@@ -172,14 +287,21 @@ function BentoTile(props: {
   bootstrap: DashboardBootstrap | null;
   isDragging: boolean;
   isDropTarget: boolean;
+  menuOpen: boolean;
   onOpen: () => void;
   onRemove: () => void;
   onResize: (colSpan: 1 | 2, rowSpan: 1 | 2) => void;
+  onSetBg: (key: string | undefined) => void;
+  onSetMode: (mode: "default" | "compact" | "graph") => void;
   onDragStart: () => void;
+  onMenuToggle: () => void;
   ref: (el: HTMLDivElement) => void;
 }) {
   const meta = () => TILE_META[props.config.viewId] ?? { label: props.config.viewId, desc: "" };
-  const accent = () => ACCENT[props.config.viewId] ?? "from-gray-50/80 to-white/60 border-gray-200/40";
+  const bgClass = () =>
+    props.config.bgKey
+      ? (TILE_BG[props.config.bgKey] ?? ACCENT[props.config.viewId] ?? "from-gray-50/80 to-white/60 border-gray-200/40")
+      : (ACCENT[props.config.viewId] ?? "from-gray-50/80 to-white/60 border-gray-200/40");
 
   const msgs = createMemo(() => {
     const id = props.config.viewId;
@@ -194,10 +316,48 @@ function BentoTile(props: {
     return all.filter((m) => m.type.includes(id));
   });
 
+  function startResizeCol(e: PointerEvent) {
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startSpan = props.config.colSpan;
+    let changed = false;
+    function onMove(ev: PointerEvent) {
+      if (changed) return;
+      const dx = ev.clientX - startX;
+      if (startSpan === 1 && dx > 55) { changed = true; props.onResize(2, props.config.rowSpan); }
+      else if (startSpan === 2 && dx < -55) { changed = true; props.onResize(1, props.config.rowSpan); }
+    }
+    function onUp() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    }
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
+  function startResizeRow(e: PointerEvent) {
+    e.stopPropagation();
+    const startY = e.clientY;
+    const startSpan = props.config.rowSpan;
+    let changed = false;
+    function onMove(ev: PointerEvent) {
+      if (changed) return;
+      const dy = ev.clientY - startY;
+      if (startSpan === 1 && dy > 55) { changed = true; props.onResize(props.config.colSpan, 2); }
+      else if (startSpan === 2 && dy < -55) { changed = true; props.onResize(props.config.colSpan, 1); }
+    }
+    function onUp() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    }
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
   return (
     <div
       ref={props.ref}
-      class={`group/tile relative flex flex-col rounded-[22px] border bg-gradient-to-br transition-all duration-200 ${accent()} ${
+      class={`group/tile relative flex flex-col rounded-[22px] border bg-gradient-to-br transition-all duration-200 ${bgClass()} ${
         props.isDropTarget
           ? "ring-2 ring-primary/40 shadow-lg scale-[1.01]"
           : "shadow-card hover:shadow-md"
@@ -208,13 +368,10 @@ function BentoTile(props: {
         "min-height": props.config.rowSpan === 2 ? "300px" : "160px",
       }}
     >
-      {/* Header — grip handle */}
+      {/* Drag handle header */}
       <div
         class="flex cursor-grab items-center gap-2 px-4 pt-4 pb-2 select-none active:cursor-grabbing"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          props.onDragStart();
-        }}
+        onPointerDown={() => props.onDragStart()}
       >
         <span class="text-on-surface/60 flex-shrink-0">
           <RailIcon id={props.config.viewId as Parameters<typeof RailIcon>[0]["id"]} />
@@ -222,13 +379,14 @@ function BentoTile(props: {
         <div class="flex-1 min-w-0">
           <p class="text-xs font-semibold text-on-surface truncate">{meta().label}</p>
         </div>
+
+        {/* Controls group — visible on hover */}
         <div class="flex items-center gap-0.5 opacity-0 transition group-hover/tile:opacity-100">
           <Tip label={props.config.colSpan === 2 ? "Make narrow (1 col)" : "Make wide (2 cols)"} side="top">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); props.onResize(props.config.colSpan === 2 ? 1 : 2, props.config.rowSpan); }}
               class="flex h-5 w-5 items-center justify-center rounded-full text-[9px] text-outline/40 hover:bg-on-surface/8 hover:text-on-surface"
-              aria-label="Toggle column span"
             >
               {props.config.colSpan === 2 ? "⇥" : "↔"}
             </button>
@@ -238,43 +396,62 @@ function BentoTile(props: {
               type="button"
               onClick={(e) => { e.stopPropagation(); props.onResize(props.config.colSpan, props.config.rowSpan === 2 ? 1 : 2); }}
               class="flex h-5 w-5 items-center justify-center rounded-full text-[9px] text-outline/40 hover:bg-on-surface/8 hover:text-on-surface"
-              aria-label="Toggle row span"
             >
               {props.config.rowSpan === 2 ? "⇤" : "↕"}
             </button>
           </Tip>
-          <Tip label={`Remove ${meta().label} tile`} side="left">
+
+          {/* Three-dot menu */}
+          <div class="relative">
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); props.onRemove(); }}
-              class="flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-outline/40 hover:bg-on-surface/8 hover:text-on-surface"
-              aria-label={`Remove ${meta().label} tile`}
+              onClick={(e) => { e.stopPropagation(); props.onMenuToggle(); }}
+              class="flex h-5 w-5 items-center justify-center rounded-full text-[12px] leading-none text-outline/40 hover:bg-on-surface/8 hover:text-on-surface"
+              aria-label="Tile options"
             >
-              ×
+              ⋮
             </button>
-          </Tip>
+            <Show when={props.menuOpen}>
+              <div class="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); props.onMenuToggle(); }} />
+              <TileOptionsMenu
+                config={props.config}
+                onSetBg={props.onSetBg}
+                onSetMode={props.onSetMode}
+                onRemove={props.onRemove}
+                onClose={props.onMenuToggle}
+              />
+            </Show>
+          </div>
         </div>
       </div>
 
-      {/* Content */}
+      {/* Tile content */}
       <div class="flex-1 overflow-hidden px-4 py-1">
-        <Switch>
-          <Match when={props.config.viewId === "search"}>
-            <ChatTile msgs={msgs()} />
-          </Match>
-          <Match when={props.config.viewId === "email"}>
-            <EmailTile msgs={msgs()} />
-          </Match>
-          <Match when={props.config.viewId === "workflows"}>
-            <WorkflowsTile msgs={msgs()} />
-          </Match>
-          <Match when={props.config.viewId === "calendar"}>
-            <CalendarTile />
-          </Match>
-          <Match when={true}>
-            <GenericTile msgs={msgs()} />
-          </Match>
-        </Switch>
+        <Show when={(props.config.displayMode ?? "default") === "compact"}>
+          <CompactTile meta={meta()} count={msgs().length} />
+        </Show>
+        <Show when={(props.config.displayMode ?? "default") === "graph"}>
+          <GraphTile msgs={msgs()} />
+        </Show>
+        <Show when={!props.config.displayMode || props.config.displayMode === "default"}>
+          <Switch>
+            <Match when={props.config.viewId === "search"}>
+              <ChatTile msgs={msgs()} />
+            </Match>
+            <Match when={props.config.viewId === "email"}>
+              <EmailTile msgs={msgs()} />
+            </Match>
+            <Match when={props.config.viewId === "workflows"}>
+              <WorkflowsTile msgs={msgs()} />
+            </Match>
+            <Match when={props.config.viewId === "calendar"}>
+              <CalendarTile />
+            </Match>
+            <Match when={true}>
+              <GenericTile msgs={msgs()} />
+            </Match>
+          </Switch>
+        </Show>
       </div>
 
       {/* Footer */}
@@ -288,6 +465,22 @@ function BentoTile(props: {
             Open {meta().label} →
           </button>
         </Tip>
+      </div>
+
+      {/* Right edge resize handle */}
+      <div
+        class="absolute right-0 top-8 bottom-8 w-3 cursor-col-resize select-none opacity-0 group-hover/tile:opacity-100 transition-opacity flex items-center justify-center z-10"
+        onPointerDown={startResizeCol}
+      >
+        <div class="h-8 w-[3px] rounded-full bg-outline/25" />
+      </div>
+
+      {/* Bottom edge resize handle */}
+      <div
+        class="absolute bottom-0 left-8 right-8 h-3 cursor-row-resize select-none opacity-0 group-hover/tile:opacity-100 transition-opacity flex items-center justify-center z-10"
+        onPointerDown={startResizeRow}
+      >
+        <div class="w-8 h-[3px] rounded-full bg-outline/25" />
       </div>
     </div>
   );
@@ -308,7 +501,7 @@ function WidgetTray(props: {
 
   return (
     <>
-      <div class="fixed inset-0 z-40" onClick={props.onClose} />
+      <div class="fixed inset-0 z-30" onClick={props.onClose} />
       <div class="absolute right-0 top-full z-50 mt-2 min-w-[200px] animate-fade-in rounded-2xl border border-white/45 bg-white/96 p-3 shadow-panel backdrop-blur-xl">
         <p class="mb-2 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">Add tile</p>
         <Show when={available().length === 0}>
@@ -349,11 +542,11 @@ export function BentoGrid(props: {
   const [draggingId, setDraggingId] = createSignal<string | null>(null);
   const [dropTargetId, setDropTargetId] = createSignal<string | null>(null);
   const [showTray, setShowTray] = createSignal(false);
+  const [openMenuId, setOpenMenuId] = createSignal<string | null>(null);
   const tileRefs = new Map<string, HTMLDivElement>();
 
   function startDrag(tileId: string) {
     setDraggingId(tileId);
-
     let rafId = 0;
 
     function onMove(e: PointerEvent) {
@@ -393,6 +586,11 @@ export function BentoGrid(props: {
 
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
+    onCleanup(() => {
+      cancelAnimationFrame(rafId);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    });
   }
 
   function addTile(viewId: ViewName) {
@@ -420,13 +618,31 @@ export function BentoGrid(props: {
     });
   }
 
+  function setBgTile(tileId: string, bgKey: string | undefined) {
+    setTiles((prev) => {
+      const next = prev.map((t) => t.id === tileId ? { ...t, bgKey } : t);
+      saveLayout(next);
+      return next;
+    });
+  }
+
+  function setModeTile(tileId: string, displayMode: "default" | "compact" | "graph") {
+    setTiles((prev) => {
+      const next = prev.map((t) => t.id === tileId ? { ...t, displayMode } : t);
+      saveLayout(next);
+      return next;
+    });
+  }
+
   return (
     <div class="flex flex-col gap-4">
       {/* Header */}
       <div class="flex items-center justify-between">
         <div>
           <h1 class="heading-tight text-xl font-bold text-on-surface">Workspace</h1>
-          <p class="mt-0.5 text-xs text-on-surface-variant/60">Drag tiles to reorder · click to open full view</p>
+          <p class="mt-0.5 text-xs text-on-surface-variant/60">
+            Drag tiles to reorder · drag edge to resize · click to open
+          </p>
         </div>
         <div class="relative">
           <Tip label="Add a new tile to your workspace" side="left">
@@ -461,10 +677,14 @@ export function BentoGrid(props: {
               bootstrap={props.bootstrap}
               isDragging={draggingId() === tile.id}
               isDropTarget={dropTargetId() === tile.id}
+              menuOpen={openMenuId() === tile.id}
               onOpen={() => props.onOpenView(tile.viewId)}
               onRemove={() => removeTile(tile.id)}
               onResize={(col, row) => resizeTile(tile.id, col, row)}
+              onSetBg={(key) => setBgTile(tile.id, key)}
+              onSetMode={(mode) => setModeTile(tile.id, mode)}
               onDragStart={() => startDrag(tile.id)}
+              onMenuToggle={() => setOpenMenuId((prev) => prev === tile.id ? null : tile.id)}
               ref={(el) => tileRefs.set(tile.id, el)}
             />
           )}
