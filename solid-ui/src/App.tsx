@@ -1645,6 +1645,29 @@ const MSG_TYPE_COLORS: Record<string, string> = {
 function ThreadListFallback(props: { messages: AfpMessage[]; onOpen: (id: string) => void }) {
   const [filter, setFilter] = createSignal("");
   const [draggedThreadId, setDraggedThreadId] = createSignal<string | null>(null);
+  const [focusedIdx, setFocusedIdx] = createSignal(-1);
+
+  onMount(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!e.altKey) return;
+      if (e.key === "ArrowDown") { e.preventDefault(); setFocusedIdx((i) => Math.min(i + 1, visible().length - 1)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setFocusedIdx((i) => Math.max(i - 1, 0)); }
+      else if (e.key === "Enter" && focusedIdx() >= 0) { const t = visible()[focusedIdx()]; if (t) props.onOpen(t.id); }
+    }
+    window.addEventListener("keydown", onKey);
+    onCleanup(() => window.removeEventListener("keydown", onKey));
+  });
+
+  function threadHeat(threadId: string): number[] {
+    const now = Date.now();
+    const buckets = new Array(7).fill(0);
+    for (const m of props.messages) {
+      if (m.thread_id !== threadId || !m.timestamp) continue;
+      const d = Math.floor((now - new Date(m.timestamp).getTime()) / 86_400_000);
+      if (d < 7) buckets[6 - d]++;
+    }
+    return buckets;
+  }
 
   const threads = createMemo(() => {
     const seen = new Set<string>();
@@ -1699,15 +1722,18 @@ function ThreadListFallback(props: { messages: AfpMessage[]; onOpen: (id: string
             }
           >
             <For each={visible()}>
-              {(thread) => {
+              {(thread, idx) => {
                 const badgeClass = () =>
                   MSG_TYPE_COLORS[thread.msgType] ?? "bg-white/40 text-on-surface-variant";
                 const isDragTarget = () => draggedThreadId() !== null && draggedThreadId() !== thread.id;
+                const isFocused = () => focusedIdx() === idx();
+                const heat = () => threadHeat(thread.id);
+                const heatMax = () => Math.max(...heat(), 1);
                 return (
                   <button
                     type="button"
                     draggable={true}
-                    onClick={() => props.onOpen(thread.id)}
+                    onClick={() => { setFocusedIdx(idx()); props.onOpen(thread.id); }}
                     onDragStart={() => setDraggedThreadId(thread.id)}
                     onDragEnd={() => setDraggedThreadId(null)}
                     onDragOver={(e) => { if (isDragTarget()) e.preventDefault(); }}
@@ -1721,13 +1747,30 @@ function ThreadListFallback(props: { messages: AfpMessage[]; onOpen: (id: string
                         { thread_id: thread.id }
                       );
                     }}
-                    class={`flex w-full items-start justify-between gap-4 rounded-2xl border px-5 py-3.5 text-left transition ${isDragTarget() ? "border-primary/40 bg-primary/8 ring-1 ring-primary/20" : "border-white/35 bg-white/25 hover:bg-white/45"}`}
+                    class={`flex w-full items-start justify-between gap-4 rounded-2xl border px-5 py-3.5 text-left transition ${
+                      isDragTarget() ? "border-primary/40 bg-primary/8 ring-1 ring-primary/20" :
+                      isFocused() ? "border-primary/50 bg-primary/10 ring-1 ring-primary/30" :
+                      "border-white/35 bg-white/25 hover:bg-white/45"
+                    }`}
                   >
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-2">
                         <span class={`inline-block rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] ${badgeClass()}`}>
                           {thread.msgType}
                         </span>
+                        {/* 7-day activity heat sparkline */}
+                        <svg viewBox="0 14 56 16" class="h-3 w-14 flex-shrink-0">
+                          <For each={heat()}>
+                            {(n, i) => (
+                              <rect
+                                x={i() * 8} y={14 + 14 * (1 - n / heatMax())}
+                                width={6} height={14 * (n / heatMax())}
+                                rx={1}
+                                fill={`rgba(49,86,142,${0.15 + 0.6 * (n / heatMax())})`}
+                              />
+                            )}
+                          </For>
+                        </svg>
                       </div>
                       <p class="mt-1 truncate text-sm font-medium text-on-surface">{thread.preview}</p>
                     </div>

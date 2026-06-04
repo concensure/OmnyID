@@ -4,6 +4,7 @@ import { AlternateViewsInspector } from "@/components/AlternateViewsInspector";
 import { fetchThread, orchestrate, subscribeThread } from "@/lib/api";
 import { ViewDispatcher } from "@/components/ViewDispatcher";
 import { GlassPanel } from "@/components/GlassPanel";
+import { ThreadMiniMap } from "@/components/ThreadMiniMap";
 
 const STARRED_KEY = "omnyid.thread.starred";
 const REACTIONS = ["👍", "❤️", "💡", "✅"] as const;
@@ -117,7 +118,10 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
     setReplySending(true);
     setReplyError("");
     try {
-      await orchestrate(text, { thread_id: props.threadId });
+      const mention = text.match(/^@(\w+)\s+/);
+      const routedText = mention ? `[Route to ${mention[1]}]: ${text.slice(mention[0].length)}` : text;
+      setAtQuery(null);
+      await orchestrate(routedText, { thread_id: props.threadId });
       setReplyText("");
       setReplySent(true);
       setTimeout(() => setReplySent(false), 2000);
@@ -385,6 +389,22 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
     return h % 360;
   }
   const [hoveredTag, setHoveredTag] = createSignal<string | null>(null);
+  const [hoveredReaction, setHoveredReaction] = createSignal<string | null>(null);
+  const [previewReply, setPreviewReply] = createSignal(false);
+  const [showCostReceipt, setShowCostReceipt] = createSignal(false);
+  const [atQuery, setAtQuery] = createSignal<string | null>(null);
+  const AGENT_NAMES = ["knowledge_curator", "email_gateway", "master", "health_maintenance"] as const;
+  const atSuggestions = createMemo(() => {
+    const q = atQuery();
+    if (q === null) return [] as string[];
+    return (AGENT_NAMES as readonly string[]).filter((a) => a.startsWith(q));
+  });
+  const totalCostCents = createMemo(() =>
+    messages().reduce((sum, m) => {
+      const c = (m.metadata as Record<string, unknown> | undefined)?.cost_cents;
+      return sum + (typeof c === "number" ? c : 0);
+    }, 0)
+  );
   const typingTask = createMemo<string | null>(() => {
     const dm = messages().find((m) => m.type === "daemon_typing" && m.timestamp && Date.now() - new Date(m.timestamp).getTime() < 30_000);
     const act = dm ? String((dm.metadata as Record<string, unknown> | undefined)?.action ?? (dm.content as Record<string, unknown>)?.action ?? "") : "";
@@ -612,6 +632,31 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                   </Show>
                 </div>
               </Show>
+            </Show>
+            {/* Cost receipt chip */}
+            <Show when={totalCostCents() > 0}>
+              <div class="relative">
+                <button type="button" onClick={() => setShowCostReceipt((v) => !v)}
+                  class={`rounded-full border px-2.5 py-1 font-mono text-[9px] transition ${showCostReceipt() ? "border-primary/30 bg-primary/10 text-primary" : "border-white/30 bg-white/25 text-on-surface-variant/50 hover:bg-white/50"}`}>
+                  ¢{(totalCostCents() / 100).toFixed(3)}
+                </button>
+                <Show when={showCostReceipt()}>
+                  <div class="absolute right-0 top-full z-40 mt-1 w-64 animate-fade-in rounded-xl border border-white/45 bg-white/97 p-3 shadow-panel backdrop-blur-xl">
+                    <p class="mb-2 font-mono text-[8px] uppercase tracking-[0.18em] text-outline">Cost Receipt</p>
+                    <For each={messages().filter((m) => (m.metadata as Record<string, unknown> | undefined)?.cost_cents)}>
+                      {(m) => (
+                        <div class="flex items-center justify-between py-0.5 text-[10px]">
+                          <span class="truncate font-mono text-on-surface-variant/70 max-w-[75%]">{m.type}</span>
+                          <span class="font-mono text-on-surface-variant">¢{(((m.metadata as Record<string, unknown>).cost_cents as number) / 100).toFixed(3)}</span>
+                        </div>
+                      )}
+                    </For>
+                    <div class="mt-1.5 border-t border-white/20 pt-1.5 flex justify-between font-mono text-[9px] font-semibold text-on-surface">
+                      <span>Total</span><span>¢{(totalCostCents() / 100).toFixed(3)}</span>
+                    </div>
+                  </div>
+                </Show>
+              </div>
             </Show>
             {/* Live indicator + header collapse toggle */}
             <span
@@ -908,16 +953,27 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                     {/* Reactions */}
                     <div class="flex flex-wrap items-center gap-1 min-h-[1.125rem]">
                       <For each={Object.entries(reactions()[msg.id] ?? {})}>
-                        {([emoji, count]) => (
-                          <button
-                            type="button"
-                            title={`${count as number} · click to add`}
-                            onClick={() => addReaction(msg.id, emoji)}
-                            class="flex items-center gap-1 rounded-full border border-white/30 bg-white/25 px-2 py-0.5 text-[11px] transition hover:bg-white/45"
-                          >
-                            {emoji} <span class="font-mono text-[9px] text-on-surface-variant/60">{count as number}</span>
-                          </button>
-                        )}
+                        {([emoji, count]) => {
+                          const key = `${msg.id}:${emoji}`;
+                          const wordCount = Object.values(msg.content as Record<string, unknown>)
+                            .filter((v): v is string => typeof v === "string").join(" ").split(/\s+/).filter(Boolean).length;
+                          return (
+                            <div class="relative">
+                              <button type="button" onClick={() => addReaction(msg.id, emoji)}
+                                onMouseEnter={() => setHoveredReaction(key)} onMouseLeave={() => setHoveredReaction(null)}
+                                class="flex items-center gap-1 rounded-full border border-white/30 bg-white/25 px-2 py-0.5 text-[11px] transition hover:bg-white/45">
+                                {emoji} <span class="font-mono text-[9px] text-on-surface-variant/60">{count as number}</span>
+                              </button>
+                              <Show when={hoveredReaction() === key}>
+                                <div class="absolute bottom-full left-0 z-50 mb-1 w-44 animate-fade-in rounded-xl border border-white/45 bg-white/97 p-2.5 shadow-panel backdrop-blur-xl">
+                                  <p class="font-mono text-[8px] uppercase tracking-[0.18em] text-outline mb-1">Reaction Analytics</p>
+                                  <p class="font-mono text-[9px] text-on-surface-variant/70">{count as number} reaction{(count as number) === 1 ? "" : "s"}</p>
+                                  <p class="font-mono text-[9px] text-on-surface-variant/70">{wordCount} words · {relativeTime(msg.timestamp)}</p>
+                                </div>
+                              </Show>
+                            </div>
+                          );
+                        }}
                       </For>
                       <div class="flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
                         <For each={REACTIONS}>
@@ -973,9 +1029,26 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
         </div>
       </Show>
 
+      {/* Thread knowledge mini-map */}
+      <ThreadMiniMap threadId={props.threadId} />
+
       {/* Reply compose box */}
       <GlassPanel class="p-4">
         <form onSubmit={(e) => { e.preventDefault(); void sendReply(); }}>
+          {/* @mention agent suggestions */}
+          <Show when={atSuggestions().length > 0}>
+            <div class="mb-1.5 flex flex-wrap gap-1 animate-fade-in">
+              <For each={atSuggestions()}>
+                {(a) => (
+                  <button type="button"
+                    class="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[9px] text-primary transition hover:bg-primary/20"
+                    onClick={() => { setReplyText((t) => t.replace(/@\w*$/, `@${a} `)); setAtQuery(null); }}>
+                    @{a}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
           <textarea
             ref={replyRef}
             rows={1}
@@ -984,15 +1057,24 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
               setReplyText(e.currentTarget.value);
               e.currentTarget.style.height = "auto";
               e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
+              const m = e.currentTarget.value.match(/@(\w*)$/);
+              setAtQuery(m ? m[1] : null);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendReply(); }
             }}
-            placeholder="Reply in this thread… (Enter to send, Shift+Enter for newline)"
+            placeholder="Reply… (Enter to send · @agent to route · Shift+Enter for newline)"
             disabled={replySending()}
             class="w-full resize-none overflow-hidden rounded-xl border border-white/30 bg-white/30 px-4 py-2.5 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/40 focus:border-primary/40 disabled:opacity-60"
             style="min-height: 40px"
           />
+          {/* Draft preview panel */}
+          <Show when={previewReply() && replyText().trim()}>
+            <div class="mt-1.5 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-on-surface whitespace-pre-wrap animate-fade-in">
+              <p class="mb-1 font-mono text-[8px] uppercase tracking-[0.18em] text-outline">AFP preview · note</p>
+              {replyText()}
+            </div>
+          </Show>
           <div class="mt-2 flex items-center justify-between gap-3">
             <Show when={replyError()}>
               <span class="text-xs text-red-500">{replyError()}</span>
@@ -1006,6 +1088,12 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
               </span>
             </Show>
             <div class="flex-1" />
+            <Show when={replyText().trim().length > 0}>
+              <button type="button" onClick={() => setPreviewReply((v) => !v)}
+                class={`rounded-full border px-2.5 py-1 font-mono text-[9px] transition ${previewReply() ? "border-primary/30 bg-primary/10 text-primary" : "border-white/30 bg-white/25 text-on-surface-variant/50 hover:bg-white/50"}`}>
+                {previewReply() ? "Edit" : "Preview"}
+              </button>
+            </Show>
             <button
               type="submit"
               disabled={replySending() || !replyText().trim()}
