@@ -274,6 +274,18 @@ body {
   inset: -8px;
 }
 
+/* ── Button shimmer gradient (matches bento-tile accent vibe) ───────────────── */
+@keyframes btn-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.btn-shimmer {
+  background: linear-gradient(270deg, #31568e, #3d6aaa, #2d4f84, #31568e);
+  background-size: 300% 300%;
+  animation: btn-shimmer 5s ease infinite;
+}
+
 /* ── Swipe-reveal action tray (T7) ──────────────────────────────────────────── */
 [data-swipe-tray] {
   position: absolute;

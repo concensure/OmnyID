@@ -539,16 +539,21 @@ export function NavBar(props: {
       <Show when={!isWatch()}>
         <aside class="fixed left-0 top-0 bottom-0 z-40 flex w-16 flex-col items-center border-r border-white/20 bg-white/75 py-3 backdrop-blur-2xl">
 
-          {/* Logo mark — bento icon, navigates to home workspace grid */}
+          {/* OmnyID logo — navigates to home workspace grid */}
           <div class="group relative mb-2 flex w-full justify-center">
             <button
               type="button"
               onClick={() => selectAndPersist("home")}
               class={`rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
-                props.activeView === "home" ? "bg-on-surface text-white" : "text-primary hover:bg-white/60"
+                props.activeView === "home" ? "bg-on-surface/8 ring-2 ring-primary/30" : "hover:bg-white/60"
               }`}
             >
-              <RailIcon id="home" />
+              <img
+                src="/omnyid-logo.png"
+                alt="OmnyID"
+                class="h-8 w-8 rounded-xl object-contain"
+                style={props.activeView === "home" ? "filter: drop-shadow(0 0 6px rgba(49,86,142,0.5))" : ""}
+              />
             </button>
             <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
               Workspace home
@@ -610,7 +615,6 @@ export function NavBar(props: {
                 type="button"
                 onClick={props.onFleetClick}
                 class={`rail-icon-btn relative flex h-11 w-11 items-center justify-center rounded-2xl text-outline/70 outline-none hover:bg-white/60 hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/50`}
-                title="Agent fleet"
               >
                 <RailIcon id="fleet" />
                 {/* Live pulse dot */}
@@ -645,7 +649,6 @@ export function NavBar(props: {
                 type="button"
                 onClick={() => setShowCheatSheet((v) => !v)}
                 class={`rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${showCheatSheet() ? "bg-primary/12 text-primary" : "text-outline/70 hover:bg-white/60 hover:text-on-surface"}`}
-                title="Keyboard shortcuts (?)"
               >
                 <RailIcon id="help" />
               </button>

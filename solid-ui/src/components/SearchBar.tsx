@@ -210,7 +210,7 @@ export function SearchBar(props: {
   return (
     <form
       ref={formRef}
-      class="relative mx-auto w-full max-w-4xl"
+      class="relative w-full"
       onSubmit={(event) => {
         event.preventDefault();
         void handleSubmit();
@@ -369,7 +369,7 @@ export function SearchBar(props: {
             class={`glass-button rounded-full px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 transition-colors ${
               query().length >= 16384 ? "animate-pulse bg-red-500" :
               query().length >= 15360 ? "animate-pulse bg-amber-500" :
-              submitFailed() ? "bg-red-500" : "bg-primary"
+              submitFailed() ? "bg-red-500" : "btn-shimmer"
             }`}
           >
             {submitFailed() ? "✗ Failed" : submitted() ? "✓ Sent" : props.busy ? "Routing..." : "Run"}

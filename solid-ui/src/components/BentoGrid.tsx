@@ -174,6 +174,7 @@ function BentoTile(props: {
   isDropTarget: boolean;
   onOpen: () => void;
   onRemove: () => void;
+  onResize: (colSpan: 1 | 2, rowSpan: 1 | 2) => void;
   onDragStart: () => void;
   ref: (el: HTMLDivElement) => void;
 }) {
@@ -221,16 +222,38 @@ function BentoTile(props: {
         <div class="flex-1 min-w-0">
           <p class="text-xs font-semibold text-on-surface truncate">{meta().label}</p>
         </div>
-        <Tip label={`Remove ${meta().label} tile`} side="left">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); props.onRemove(); }}
-            class="flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-outline/40 opacity-0 transition group-hover/tile:opacity-100 hover:bg-on-surface/8 hover:text-on-surface"
-            aria-label={`Remove ${meta().label} tile`}
-          >
-            ×
-          </button>
-        </Tip>
+        <div class="flex items-center gap-0.5 opacity-0 transition group-hover/tile:opacity-100">
+          <Tip label={props.config.colSpan === 2 ? "Make narrow (1 col)" : "Make wide (2 cols)"} side="top">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); props.onResize(props.config.colSpan === 2 ? 1 : 2, props.config.rowSpan); }}
+              class="flex h-5 w-5 items-center justify-center rounded-full text-[9px] text-outline/40 hover:bg-on-surface/8 hover:text-on-surface"
+              aria-label="Toggle column span"
+            >
+              {props.config.colSpan === 2 ? "⇥" : "↔"}
+            </button>
+          </Tip>
+          <Tip label={props.config.rowSpan === 2 ? "Make shorter (1 row)" : "Make taller (2 rows)"} side="top">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); props.onResize(props.config.colSpan, props.config.rowSpan === 2 ? 1 : 2); }}
+              class="flex h-5 w-5 items-center justify-center rounded-full text-[9px] text-outline/40 hover:bg-on-surface/8 hover:text-on-surface"
+              aria-label="Toggle row span"
+            >
+              {props.config.rowSpan === 2 ? "⇤" : "↕"}
+            </button>
+          </Tip>
+          <Tip label={`Remove ${meta().label} tile`} side="left">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); props.onRemove(); }}
+              class="flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-outline/40 hover:bg-on-surface/8 hover:text-on-surface"
+              aria-label={`Remove ${meta().label} tile`}
+            >
+              ×
+            </button>
+          </Tip>
+        </div>
       </div>
 
       {/* Content */}
@@ -286,7 +309,7 @@ function WidgetTray(props: {
   return (
     <>
       <div class="fixed inset-0 z-40" onClick={props.onClose} />
-      <div class="absolute bottom-full right-0 z-50 mb-2 min-w-[200px] animate-fade-in rounded-2xl border border-white/45 bg-white/96 p-3 shadow-panel backdrop-blur-xl">
+      <div class="absolute right-0 top-full z-50 mt-2 min-w-[200px] animate-fade-in rounded-2xl border border-white/45 bg-white/96 p-3 shadow-panel backdrop-blur-xl">
         <p class="mb-2 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">Add tile</p>
         <Show when={available().length === 0}>
           <p class="text-xs text-on-surface-variant/60">All views already pinned</p>
@@ -389,6 +412,14 @@ export function BentoGrid(props: {
     });
   }
 
+  function resizeTile(tileId: string, colSpan: 1 | 2, rowSpan: 1 | 2) {
+    setTiles((prev) => {
+      const next = prev.map((t) => t.id === tileId ? { ...t, colSpan, rowSpan } : t);
+      saveLayout(next);
+      return next;
+    });
+  }
+
   return (
     <div class="flex flex-col gap-4">
       {/* Header */}
@@ -432,6 +463,7 @@ export function BentoGrid(props: {
               isDropTarget={dropTargetId() === tile.id}
               onOpen={() => props.onOpenView(tile.viewId)}
               onRemove={() => removeTile(tile.id)}
+              onResize={(col, row) => resizeTile(tile.id, col, row)}
               onDragStart={() => startDrag(tile.id)}
               ref={(el) => tileRefs.set(tile.id, el)}
             />

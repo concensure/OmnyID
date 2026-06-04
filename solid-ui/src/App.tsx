@@ -1202,7 +1202,7 @@ function App() {
           <button
             type="button"
             onClick={() => setShowAuthModal(true)}
-            class="glass-button rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 shadow-sm"
+            class="glass-button btn-shimmer rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm"
           >
             Sign in →
           </button>
@@ -1247,7 +1247,9 @@ function App() {
             <AgentStatusPill
               llmConfig={llmConfig()}
               browserAiLabel={browserAiLabel()}
+              signedIn={Boolean(session()?.token)}
               onSettingsClick={() => { selectView("agent_settings"); setAgentSettingsFocusLlm(true); }}
+              onSignIn={() => setShowAuthModal(true)}
             />
             {/* Approval-gate notice — surfaces when orchestration is waiting for a decision */}
             <Show when={commandResult()?.intent === "orchestrate"}>
@@ -1308,11 +1310,9 @@ function App() {
           </Show>
         </div>
 
-        {/* 2-column layout (left sidebar removed) */}
-        <div class="mt-5 flex gap-4" style="min-height: 620px">
-
-          {/* ── MAIN CONTENT ─────────────────────────────────────────── */}
-          <div class="min-w-0 flex-1 overflow-hidden">
+        {/* Main content area */}
+        <div class="mt-5" style="min-height: 620px">
+          <div class="min-w-0 overflow-hidden">
 
             {/* Home — bento workspace grid */}
             <Show when={activeView() === "home"}>
@@ -1526,60 +1526,6 @@ function App() {
               <div class="view-enter"><DiscoverView /></div>
             </Show>
           </div>
-
-          {/* ── RIGHT SIDEBAR ────────────────────────────────────────── */}
-          <aside
-            class="flex-shrink-0 overflow-hidden rounded-3xl border border-white/35 bg-white/20 backdrop-blur"
-            style={`width: ${rightOpen() ? "272px" : "44px"}; transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1)`}
-          >
-            <div class="flex h-full flex-col">
-              <div class="flex flex-shrink-0 justify-end border-b border-white/20 px-2 py-2.5">
-                <button
-                  type="button"
-                  title={rightOpen() ? "Collapse" : "Expand"}
-                  class="flex h-7 w-7 items-center justify-center rounded-xl text-sm text-on-surface-variant transition hover:bg-white/40"
-                  onClick={() => setRightOpen((v) => !v)}
-                >
-                  ≡
-                </button>
-              </div>
-
-              <Show when={rightOpen()}>
-                <div class="flex-1 overflow-auto p-4 space-y-5 animate-fade-in">
-                  <div>
-                    <p class="label-caps mb-2">Mask</p>
-                    <MaskSwitcher />
-                  </div>
-
-                  <div class="rounded-2xl border border-white/30 bg-white/40 p-3.5">
-                    <Show
-                      when={session()?.token}
-                      fallback={
-                        <>
-                          <p class="text-xs font-medium text-amber-600">Guest mode</p>
-                          <a href="/" class="mt-1 block text-xs text-primary hover:underline">Sign in →</a>
-                        </>
-                      }
-                    >
-                      <p class="label-caps mb-1">Signed in as</p>
-                      <p class="text-sm font-semibold text-on-surface">{(session() as any)?.user?.display_name ?? "User"}</p>
-                    </Show>
-                  </div>
-
-                  <Show when={session()?.token}>
-                    <LoraStatusWidget score={loraScore()} active={loraActive()} activeCount={fleetActiveCount()} idleCount={fleetIdleCount()} onFleetOpen={() => setFleetOpen((v) => !v)} />
-                  </Show>
-
-                  {/* Plaza — Public Feed */}
-                  <div>
-                    <p class="label-caps mb-2.5">Plaza</p>
-                    <PublicFeedView isAnon={!session()?.token} />
-                  </div>
-                </div>
-              </Show>
-            </div>
-          </aside>
-
         </div>
       </GlassPanel>
     </main>
@@ -1607,7 +1553,9 @@ function GuestGate(props: { label: string; onSignIn: () => void }) {
 function AgentStatusPill(props: {
   llmConfig: LlmConfig | null;
   browserAiLabel: string | null;
+  signedIn: boolean;
   onSettingsClick?: () => void;
+  onSignIn?: () => void;
 }) {
   const label = () => {
     const cfg = props.llmConfig;
@@ -1628,13 +1576,23 @@ function AgentStatusPill(props: {
     <Show when={label()} fallback={
       <span class="rounded-full border border-red-300/60 bg-red-50/80 px-3 py-1 font-mono text-[11px] font-semibold text-red-600 shadow-sm">
         ⚠ No AI model —{" "}
-        <button
-          type="button"
-          onClick={props.onSettingsClick}
-          class="underline text-red-700 hover:text-red-900 transition font-bold"
-        >
-          set up in Agent Settings
-        </button>
+        <Show when={props.signedIn} fallback={
+          <button
+            type="button"
+            onClick={props.onSignIn}
+            class="underline text-red-700 hover:text-red-900 transition font-bold"
+          >
+            Sign in to continue
+          </button>
+        }>
+          <button
+            type="button"
+            onClick={props.onSettingsClick}
+            class="underline text-red-700 hover:text-red-900 transition font-bold"
+          >
+            Set up in Agent Settings
+          </button>
+        </Show>
       </span>
     }>
       <span class="rounded-full border border-primary/25 bg-primary/10 px-3 py-0.5 font-mono text-[10px] text-primary">
