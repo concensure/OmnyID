@@ -21,6 +21,7 @@ import { CofounderStudioView } from "@/components/CofounderStudioView";
 import { KnowledgeGraphView } from "@/components/KnowledgeGraphView";
 import { DiaryView } from "@/components/DiaryView";
 import { DiscoverView } from "@/components/DiscoverView";
+import { BentoGrid } from "@/components/BentoGrid";
 import {
   apiFetch,
   API_BASE,
@@ -1312,6 +1313,16 @@ function App() {
 
           {/* ── MAIN CONTENT ─────────────────────────────────────────── */}
           <div class="min-w-0 flex-1 overflow-hidden">
+
+            {/* Home — bento workspace grid */}
+            <Show when={activeView() === "home"}>
+              <div class="view-enter">
+                <BentoGrid
+                  bootstrap={dashboard()}
+                  onOpenView={(view) => selectView(view)}
+                />
+              </div>
+            </Show>
 
             {/* Chat / search view */}
             <Show when={activeView() === "search"}>

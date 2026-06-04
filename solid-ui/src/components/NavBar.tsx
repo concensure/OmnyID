@@ -3,7 +3,7 @@ import { useViewport } from "@/context/ViewportContext";
 import { apiFetch, readSession } from "@/lib/api";
 import { RailIcon } from "@/components/RailIcons";
 
-export type ViewName = "search" | "threads" | "workflows" | "email" | "note" | "calendar" | "database" | "runner" | "agent_settings" | "diary" | "discover";
+export type ViewName = "home" | "search" | "threads" | "workflows" | "email" | "note" | "calendar" | "database" | "runner" | "agent_settings" | "diary" | "discover" | "cofounder_studio";
 
 const CORE_ITEMS: Array<{ id: ViewName; label: string; icon: string; shortcut: string }> = [
   { id: "search",    label: "Chat",      icon: "💬", shortcut: "Ctrl+1" },
@@ -539,15 +539,20 @@ export function NavBar(props: {
       <Show when={!isWatch()}>
         <aside class="fixed left-0 top-0 bottom-0 z-40 flex w-16 flex-col items-center border-r border-white/20 bg-white/75 py-3 backdrop-blur-2xl">
 
-          {/* Logo mark — asymmetric bento, acts as "home dashboard" button */}
+          {/* Logo mark — bento icon, navigates to home workspace grid */}
           <div class="group relative mb-2 flex w-full justify-center">
             <button
               type="button"
-              title="OmnyID workspace"
-              class="rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              onClick={() => selectAndPersist("home")}
+              class={`rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+                props.activeView === "home" ? "bg-on-surface text-white" : "text-primary hover:bg-white/60"
+              }`}
             >
               <RailIcon id="home" />
             </button>
+            <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
+              Workspace home
+            </div>
           </div>
 
           <div class="mx-3 mb-2 h-px w-10 bg-outline/10" />
