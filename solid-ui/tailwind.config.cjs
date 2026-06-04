@@ -1,6 +1,14 @@
 module.exports = {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
+    screens: {
+      'watch': { 'max': '280px' },
+      'phone': { 'max': '639px' },
+      'sm':    '640px',
+      'md':    '768px',
+      'lg':    '1024px',
+      'xl':    '1280px',
+    },
     extend: {
       colors: {
         surface: "#f9f9f7",
@@ -16,7 +24,10 @@ module.exports = {
         outline: "#737781",
         "outline-variant": "#c3c6d1",
         error: "#ba1a1a",
-        ember: "#d96b39"
+        ember: "#d96b39",
+        "atelier-lime": "#cef264",
+        "atelier-mint": "#a8f0c6",
+        "surface-cool": "#f2f3f8"
       },
       boxShadow: {
         panel:   "0 24px 80px rgba(15, 23, 42, 0.14)",
@@ -47,11 +58,16 @@ module.exports = {
           "0%":   { opacity: "0", transform: "translateY(-6px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        slideUp: {
+          "0%":   { opacity: "0", transform: "translateY(100%)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "fade-up":    "fadeUp 0.30s cubic-bezier(0.22, 1, 0.36, 1) both",
         "fade-in":    "fadeIn 0.25s ease both",
         "slide-down": "slideDown 0.22s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "slide-up":   "slideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both",
       },
       spacing: {
         "18": "4.5rem",

@@ -62,6 +62,56 @@ body {
   box-shadow: none;
 }
 
+/* ── Navigation rail icons ──────────────────────────────────────────────────── */
+.rail-icon-btn {
+  transition:
+    color 0.14s ease,
+    background-color 0.14s ease,
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+.rail-icon-btn:hover  { transform: translateX(3px); }
+.rail-icon-btn:active { transform: translateX(1px) scale(0.91); transition-duration: 0.07s; }
+
+/* Tooltip slide-in from left */
+.rail-tooltip {
+  transition: opacity 0.12s ease, transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Chat icon — dots pulse on hover to signal "agent ready" */
+@keyframes dot-bob {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-2px); }
+}
+.rail-icon-btn:hover .rd1 { animation: dot-bob 0.9s 0.00s ease-in-out infinite; }
+.rail-icon-btn:hover .rd2 { animation: dot-bob 0.9s 0.15s ease-in-out infinite; }
+.rail-icon-btn:hover .rd3 { animation: dot-bob 0.9s 0.30s ease-in-out infinite; }
+
+/* Runner icon — cursor blink on hover */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.rail-icon-btn:hover .ri-cursor { animation: cursor-blink 0.75s step-end infinite; }
+
+/* Discover compass — needle settle on hover */
+@keyframes needle-settle {
+  0%   { transform: rotate(-12deg); transform-origin: 10px 10px; }
+  100% { transform: rotate(0deg);   transform-origin: 10px 10px; }
+}
+.rail-icon-btn:hover .ri-needle {
+  animation: needle-settle 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Workflows — data flow along edges on hover */
+@keyframes flow-dash {
+  to { stroke-dashoffset: -8; }
+}
+.rail-icon-btn:hover .ri-flow {
+  stroke-dasharray: 3 5;
+  animation: flow-dash 0.8s linear infinite;
+}
+
 /* ── View transitions ───────────────────────────────────────────────────────── */
 /* Applied to every view container in App.tsx for a smooth "breathe-in" effect */
 @keyframes fadeUp {
@@ -160,4 +210,85 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(115, 119, 129, 0.48);
+}
+
+/* ── Fluid typography (T2) ──────────────────────────────────────────────────── */
+:root {
+  --text-nano:   clamp(10px, 3.5vw, 13px);
+  --text-sm:     clamp(12px, 2.5vw, 14px);
+  --text-base:   clamp(13px, 2vw, 16px);
+  --text-lg:     clamp(15px, 2.5vw, 20px);
+  /* Glass tokens — overrideable by hc-mode */
+  --glass-blur:    28px;
+  --glass-opacity: 0.72;
+  --surface-solid: #f4f4f2;
+}
+
+/* ── High-contrast / no-blur mode (T2 / T8) ────────────────────────────────── */
+.hc-mode {
+  --glass-blur:    0px;
+  --glass-opacity: 0.95;
+}
+.hc-mode .glass-surface,
+.hc-mode .glass-card {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--surface-solid) !important;
+}
+
+/* Auto-apply hc-mode at watch viewport or if OS requests reduced transparency */
+@media (max-width: 280px), (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-blur:    0px;
+    --glass-opacity: 0.95;
+  }
+  .glass-surface,
+  .glass-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--surface-solid) !important;
+  }
+}
+
+/* ── Touch target expansion (T6) ────────────────────────────────────────────── */
+/* Applies only when the device has a coarse pointer (touch screens) */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Invisible hit-target expander for inline badges / chips */
+.touch-target {
+  position: relative;
+}
+.touch-target::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+/* ── Swipe-reveal action tray (T7) ──────────────────────────────────────────── */
+[data-swipe-tray] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  transform: translateX(100%);
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.15s ease;
+  z-index: 10;
 }

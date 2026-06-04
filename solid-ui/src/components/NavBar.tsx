@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { useViewport } from "@/context/ViewportContext";
 import { apiFetch, readSession } from "@/lib/api";
+import { RailIcon } from "@/components/RailIcons";
 
 export type ViewName = "search" | "threads" | "workflows" | "email" | "note" | "calendar" | "database" | "runner" | "agent_settings" | "diary" | "discover";
 
@@ -287,7 +288,8 @@ export function NavBar(props: {
   ctrlKPulse?: number;
   onSignIn?: () => void;
 }) {
-  const { isWatch } = useViewport();
+  const _vp = useViewport();
+  const isWatch = () => _vp?.isWatch?.() ?? false;
   const [viewHistory, setViewHistory] = createSignal<ViewName[]>([]);
   const [viewFuture, setViewFuture] = createSignal<ViewName[]>([]);
   const [showShortcutHint, setShowShortcutHint] = createSignal(!localStorage.getItem(SHORTCUTS_SEEN_KEY));
@@ -459,17 +461,11 @@ export function NavBar(props: {
     onCleanup(() => document.removeEventListener("mousedown", onDocClickSession));
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") { setShowCheatSheet(false); setShowSessionMenu(false); return; }
-      if (e.ctrlKey && e.shiftKey && e.key === "F") {
-        e.preventDefault();
-        props.onFleetClick();
-        return;
-      }
-      if (e.altKey && e.key === "m") {
-        e.preventDefault();
-        setShowMoreMenu((v) => !v);
-        return;
-      }
+      if (e.key === "Escape") { setShowCheatSheet(false); setShowSessionMenu(false); setShowMoreMenu(false); return; }
+      if (e.ctrlKey && e.shiftKey && e.key === "F") { e.preventDefault(); props.onFleetClick(); return; }
+      if (e.altKey && e.key === "m") { e.preventDefault(); setShowMoreMenu((v) => !v); return; }
+      if (e.altKey && e.key === "ArrowLeft")  { e.preventDefault(); goBack();    return; }
+      if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); goForward(); return; }
       if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey) return;
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -539,212 +535,158 @@ export function NavBar(props: {
         <GestureNav activeView={props.activeView} onSelect={props.onSelect} />
       </Show>
 
-      {/* Standard nav: phone / tablet / desktop */}
+      {/* ── Left navigation rail ─────────────────────────────────────── */}
       <Show when={!isWatch()}>
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <WeatherDate />
+        <aside class="fixed left-0 top-0 bottom-0 z-40 flex w-16 flex-col items-center border-r border-white/20 bg-white/75 py-3 backdrop-blur-2xl">
 
-          <nav class="flex items-center gap-1 rounded-full border border-white/35 bg-white/35 px-2 py-2">
+          {/* Logo mark — asymmetric bento, acts as "home dashboard" button */}
+          <div class="group relative mb-2 flex w-full justify-center">
+            <button
+              type="button"
+              title="OmnyID workspace"
+              class="rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            >
+              <RailIcon id="home" />
+            </button>
+          </div>
+
+          <div class="mx-3 mb-2 h-px w-10 bg-outline/10" />
+
+          {/* Core nav items */}
+          <nav class="flex flex-1 flex-col items-center gap-0.5 overflow-y-auto py-1 w-full">
             <For each={CORE_ITEMS}>
-              {(item) => (
-                <button
-                  type="button"
-                  title={`${item.label} (${item.shortcut})${
-                    item.id === "threads" && (props.threadBadge ?? 0) > 0 ? ` · ${props.threadBadge} new` : ""
-                  }${
-                    item.id === "workflows" && (props.workflowBadge ?? 0) > 0 ? ` · ${props.workflowBadge} pending` : ""
-                  }${lastVisitSuffix(item.id)}`}
-                  class={`glass-button relative flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
-                    props.activeView === item.id
-                      ? "bg-primary text-white"
-                      : "bg-transparent text-on-surface-variant hover:bg-white/50"
-                  } ${item.id === "search" && chatPulsing() ? "ring-2 ring-primary/60 scale-105" : ""}`}
-                  onClick={() => selectAndPersist(item.id)}
-                >
-                  <span class="text-base leading-none" aria-hidden>{item.icon}</span>
-                  <span>{item.label}</span>
-                  <Show when={item.id === "workflows" && ((props.workflowBadge ?? 0) > 0 || persistedNewResult())}>
-                    <span class="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-bold text-white shadow-sm">
-                      {(props.workflowBadge ?? 0) > 0 ? props.workflowBadge : "!"}
-                    </span>
-                  </Show>
-                  <Show when={item.id === "threads" && (props.threadBadge ?? 0) > 0}>
-                    <span class="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white shadow-sm">
-                      {props.threadBadge}
-                    </span>
-                  </Show>
-                </button>
-              )}
-            </For>
-            {/* More ▾ dropdown — diary, discover, and advanced views */}
-            <div ref={moreMenuRef} class="relative ml-1">
-              <button
-                type="button"
-                title="More views"
-                aria-expanded={showMoreMenu()}
-                class={`glass-button rounded-full px-3 py-2 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
-                  showMoreMenu() || ["diary","discover","runner","agent_settings"].includes(props.activeView)
-                    ? "bg-white/50 text-on-surface"
-                    : "bg-transparent text-on-surface-variant hover:bg-white/30"
-                }`}
-                onClick={() => setShowMoreMenu((v) => !v)}
-              >
-                More {showMoreMenu() ? "▴" : "▾"}
-              </button>
-              <Show when={showMoreMenu()}>
-                <div class="absolute left-0 top-full z-50 mt-2 min-w-[13rem] animate-fade-in rounded-2xl border border-white/45 bg-white/95 py-2 shadow-panel backdrop-blur-xl">
-                  {([
-                    { id: "diary" as ViewName,    icon: "📔", label: "Diary" },
-                    { id: "discover" as ViewName, icon: "🔭", label: "Discover" },
-                  ] as const).map((item) => (
+              {(item) => {
+                const active = () => props.activeView === item.id;
+                const badge = () => {
+                  if (item.id === "workflows" && ((props.workflowBadge ?? 0) > 0 || persistedNewResult()))
+                    return String((props.workflowBadge ?? 0) > 0 ? props.workflowBadge : "!");
+                  if (item.id === "threads" && (props.threadBadge ?? 0) > 0)
+                    return String(props.threadBadge);
+                  return null;
+                };
+                return (
+                  <div class="group relative flex w-full justify-center">
                     <button
                       type="button"
-                      onClick={() => { selectAndPersist(item.id); setShowMoreMenu(false); }}
-                      class={`flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition ${
-                        props.activeView === item.id
-                          ? "bg-primary/10 text-primary"
-                          : "text-on-surface hover:bg-on-surface/5"
-                      }`}
+                      onClick={() => selectAndPersist(item.id)}
+                      class={`rail-icon-btn relative flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50
+                        ${active()
+                          ? "bg-on-surface text-white"
+                          : "text-outline/70 hover:bg-white/60 hover:text-on-surface"
+                        }
+                        ${item.id === "search" && chatPulsing() ? "ring-2 ring-primary/50" : ""}`}
                     >
-                      <span class="text-base leading-none" aria-hidden>{item.icon}</span>
-                      {item.label}
-                    </button>
-                  ))}
-                  <div class="mx-3 my-1 h-px bg-white/40" />
-                  {([
-                    { id: "runner" as ViewName,        icon: "🐍", label: "Runner",         advanced: true },
-                    { id: "agent_settings" as ViewName, icon: "🤖", label: "Agent Settings", advanced: true },
-                  ] as const).map((item) => (
-                    <button
-                      type="button"
-                      onClick={() => { selectAndPersist(item.id); setShowMoreMenu(false); }}
-                      class={`flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition ${
-                        props.activeView === item.id
-                          ? "bg-primary/10 text-primary"
-                          : "text-on-surface hover:bg-on-surface/5"
-                      }`}
-                    >
-                      <span class="text-base leading-none" aria-hidden>{item.icon}</span>
-                      {item.label}
-                      <Show when={!props.advanced}>
-                        <span class="ml-auto rounded-full border border-white/30 bg-white/30 px-1.5 py-0.5 font-mono text-[8px] text-on-surface-variant/50">adv</span>
+                      <RailIcon id={item.id} />
+                      <Show when={badge()}>
+                        <span class="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 font-mono text-[8px] font-bold text-white">
+                          {badge()}
+                        </span>
                       </Show>
                     </button>
-                  ))}
-                  <div class="mx-3 my-1 h-px bg-white/40" />
-                  <button
-                    type="button"
-                    onClick={() => { props.onToggleAdvanced(); }}
-                    class="flex w-full items-center gap-3 px-4 py-2 text-xs text-on-surface-variant/60 transition hover:text-on-surface-variant"
-                  >
-                    <span class="font-mono">{props.advanced ? "✕" : "+"}</span>
-                    {props.advanced ? "Hide advanced" : "Enable advanced mode"}
-                  </button>
-                </div>
-              </Show>
-            </div>
+                    {/* Hover tooltip — slides in from the left */}
+                    <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
+                      {item.label}
+                      <span class="ml-2 font-mono text-[9px] text-outline/50">{item.shortcut}</span>
+                    </div>
+                  </div>
+                );
+              }}
+            </For>
           </nav>
 
-          <div class="flex items-center gap-3">
-            <div class="flex items-center gap-0.5">
+          <div class="mx-3 my-2 h-px w-10 bg-outline/10" />
+
+          {/* Bottom controls */}
+          <div class="flex flex-col items-center gap-0.5 pb-1 w-full">
+
+            {/* Fleet status indicator */}
+            <div class="group relative flex w-full justify-center">
               <button
                 type="button"
-                onClick={goBack}
-                disabled={viewHistory().length === 0}
-                title={viewHistory().length > 0 ? `Back to ${viewHistory()[viewHistory().length - 1]}` : "No history"}
-                class="rounded-full border border-white/25 bg-white/25 px-2.5 py-1.5 font-mono text-xs text-on-surface-variant transition hover:bg-white/40 disabled:cursor-default disabled:opacity-25 outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                onClick={props.onFleetClick}
+                class={`rail-icon-btn relative flex h-11 w-11 items-center justify-center rounded-2xl text-outline/70 outline-none hover:bg-white/60 hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/50`}
+                title="Agent fleet"
               >
-                ←
+                <RailIcon id="fleet" />
+                {/* Live pulse dot */}
+                <span class={`absolute right-1.5 top-1.5 h-2 w-2 rounded-full ${props.activeCount > 0 ? "animate-pulse bg-blue-500" : "bg-emerald-400"}`} />
+                <Show when={llmConfigured() === false}>
+                  <span class="absolute left-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-400" title="LLM not configured" />
+                </Show>
               </button>
-              <button
-                type="button"
-                onClick={goForward}
-                disabled={viewFuture().length === 0}
-                title={viewFuture().length > 0 ? `Forward to ${viewFuture()[0]}` : "No forward history"}
-                class="rounded-full border border-white/25 bg-white/25 px-2.5 py-1.5 font-mono text-xs text-on-surface-variant transition hover:bg-white/40 disabled:cursor-default disabled:opacity-25 outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-              >
-                →
-              </button>
+              <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
+                {props.activeCount > 0
+                  ? `${props.activeCount} active · ${props.idleCount} idle`
+                  : `${props.idleCount} agents ready`}
+                <Show when={lastRunLabel()}>
+                  <span class="ml-1.5 text-outline/50">{lastRunLabel()}</span>
+                </Show>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowCheatSheet((v) => !v)}
-              title="Keyboard shortcuts (?)"
-              aria-label="Toggle keyboard shortcuts"
-              class={`rounded-full border px-2.5 py-1.5 font-mono text-sm transition outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
-                showCheatSheet()
-                  ? "border-primary/30 bg-primary/10 text-primary"
-                  : "border-white/35 bg-white/35 text-on-surface-variant hover:bg-white/50"
-              }`}
-            >?</button>
-            {/* Transport connectivity dot */}
-            <div title={CONN_LABELS[connStatus()]} class={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${CONN_COLORS[connStatus()]}`} />
-            <button
-              type="button"
-              onClick={props.onFleetClick}
-              class="flex items-center gap-2 rounded-full border border-white/35 bg-white/35 px-3 py-2 text-sm text-on-surface-variant transition hover:bg-white/50 outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-              title={(() => {
-                const names = props.activeAgentNames ?? [];
-                sessionTick();
-                const since = agentActiveSince();
-                const nameHint = names.length > 0
-                  ? `Active: ${names.slice(0, 3).map((n) => {
-                      const startedAt = since[n];
-                      if (!startedAt) return n.replace(/_/g, " ");
-                      const secs = Math.floor((Date.now() - startedAt) / 1000);
-                      const dur = secs < 60 ? `${secs}s` : secs < 3600 ? `${Math.floor(secs / 60)}m` : `${Math.floor(secs / 3600)}h`;
-                      return `${n.replace(/_/g, " ")} · ${dur}`;
-                    }).join(", ")}${names.length > 3 ? ` +${names.length - 3} more` : ""}`
-                  : `Active: ${props.activeCount} running`;
-                const lr = lastRunLabel();
-                return `${nameHint} · Idle: ${props.idleCount} ready${lr ? ` · ${lr}` : ""} · Click to open fleet view`;
-              })()}
-            >
-              <span class={`h-2 w-2 rounded-full flex-shrink-0 ${props.activeCount > 0 ? "animate-pulse bg-blue-500" : "bg-green-400"}`} />
-              <Show when={llmConfigured() === false}>
-                <span class="text-amber-500" title="LLM not configured — go to Agent Settings to add an API key">⚠</span>
-              </Show>
-              {props.fleetLoaded === false
-                ? "…"
-                : props.activeCount === 0
-                  ? `idle · ${props.idleCount} ready`
-                  : `${props.activeCount} active / ${props.idleCount} idle`}
-              <Show when={(props.activeAgentNames?.length ?? 0) > 0}>
-                <div class="flex items-center gap-[0.25em]">
-                  <For each={(props.activeAgentNames ?? []).slice(0, 2)}>
-                    {(name) => (
-                      <span class="max-w-[5em] truncate rounded-full bg-blue-500/20 px-[0.5em] py-[0.15em] font-mono text-[0.65em] text-blue-600">
-                        {name.replace(/_/g, " ")}
-                      </span>
-                    )}
-                  </For>
-                  <Show when={(props.activeAgentNames?.length ?? 0) > 2}>
-                    <span class="font-mono text-[0.65em] text-on-surface-variant/50">
-                      +{(props.activeAgentNames?.length ?? 0) - 2}
-                    </span>
-                  </Show>
-                </div>
-              </Show>
-              <Show when={props.activeCount === 0 && lastRunLabel() !== null}>
-                <span class="font-mono text-[0.6em] text-on-surface-variant/35">{lastRunLabel()}</span>
-              </Show>
-            </button>
-            <div ref={sessionChipRef} class="relative">
+
+            {/* Connectivity dot */}
+            <div class="group relative flex w-full justify-center">
+              <div class="flex h-7 w-11 items-center justify-center">
+                <div title={CONN_LABELS[connStatus()]} class={`h-2 w-2 rounded-full ${CONN_COLORS[connStatus()]}`} />
+              </div>
+              <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
+                {CONN_LABELS[connStatus()]}
+              </div>
+            </div>
+
+            {/* Help / shortcuts */}
+            <div class="group relative flex w-full justify-center">
+              <button
+                type="button"
+                onClick={() => setShowCheatSheet((v) => !v)}
+                class={`rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${showCheatSheet() ? "bg-primary/12 text-primary" : "text-outline/70 hover:bg-white/60 hover:text-on-surface"}`}
+                title="Keyboard shortcuts (?)"
+              >
+                <RailIcon id="help" />
+              </button>
+              <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
+                Shortcuts <span class="ml-1.5 font-mono text-[9px] text-outline/50">?</span>
+              </div>
+            </div>
+
+            {/* More views */}
+            <div ref={moreMenuRef} class="group relative flex w-full justify-center">
+              <button
+                type="button"
+                onClick={() => setShowMoreMenu((v) => !v)}
+                aria-expanded={showMoreMenu()}
+                class={`rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+                  showMoreMenu() || ["diary","discover","runner","agent_settings"].includes(props.activeView)
+                    ? "bg-on-surface/8 text-on-surface"
+                    : "text-outline/70 hover:bg-white/60 hover:text-on-surface"
+                }`}
+              >
+                <RailIcon id="more" />
+              </button>
+              <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
+                More <span class="ml-1.5 font-mono text-[9px] text-outline/50">Alt+M</span>
+              </div>
+            </div>
+
+            {/* Session / user */}
+            <div ref={sessionChipRef} class="group relative flex w-full justify-center">
               <button
                 type="button"
                 onClick={() => {
                   if (!props.signedIn && props.onSignIn) { props.onSignIn(); return; }
                   setShowSessionMenu((v) => !v);
                 }}
-                title={sessionDurationLabel() ? `Session started ${new Date(sessionStarted).toLocaleTimeString()}` : undefined}
-                class="rounded-full border border-white/35 bg-white/35 px-3 py-2 text-sm text-on-surface-variant transition hover:bg-white/50 outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                class={`rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${showSessionMenu() ? "bg-on-surface/8 text-on-surface" : "text-outline/70 hover:bg-white/60 hover:text-on-surface"}`}
               >
-                {props.signedIn
-                  ? `${sessionUserName ? sessionUserName + " · " : "Signed in · "}${sessionDurationLabel() ?? "OmnyID session active"}`
-                  : "Guest mode — sign in →"}
+                <RailIcon id="user" />
               </button>
+              <div class="rail-tooltip pointer-events-none absolute left-full bottom-0 z-50 ml-2.5 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
+                {props.signedIn
+                  ? `${sessionUserName ?? "Signed in"}${sessionDurationLabel() ? " · " + sessionDurationLabel() : ""}`
+                  : "Guest — sign in"}
+              </div>
               <Show when={showSessionMenu()}>
-                <div class="absolute right-0 top-full z-50 mt-2 min-w-[180px] animate-fade-in rounded-2xl border border-white/45 bg-white/95 p-3 shadow-panel backdrop-blur-xl">
+                <div class="absolute left-full bottom-0 z-50 ml-2 min-w-[180px] animate-fade-in rounded-2xl border border-white/45 bg-white/95 p-3 shadow-panel backdrop-blur-xl">
                   <p class="font-mono text-[9px] uppercase tracking-[0.2em] text-outline mb-2">Session</p>
                   <Show when={sessionDurationLabel()}>
                     <p class="mb-2 text-xs text-on-surface-variant">
@@ -753,12 +695,12 @@ export function NavBar(props: {
                   </Show>
                   <Show when={sessionRunsStarted() > 0}>
                     <p class="mb-2 text-xs text-on-surface-variant">
-                      {sessionRunsStarted()} agent run{sessionRunsStarted() === 1 ? "" : "s"} triggered this session
+                      {sessionRunsStarted()} agent run{sessionRunsStarted() === 1 ? "" : "s"} this session
                     </p>
                   </Show>
                   <Show when={llmLastPingFailed}>
                     <p class="mb-2 flex items-center gap-1 rounded-lg border border-amber-200/60 bg-amber-50/80 px-2 py-1 text-[10px] text-amber-700">
-                      <span>⚠</span> Last LLM test failed — re-test in Agent Settings
+                      <span>⚠</span> Last LLM test failed
                     </p>
                   </Show>
                   <Show when={props.signedIn}>
@@ -769,12 +711,87 @@ export function NavBar(props: {
                         window.location.reload();
                       }}
                       class="w-full rounded-lg border border-red-200/60 bg-red-50/80 px-3 py-1.5 text-left text-xs font-medium text-red-600 transition hover:bg-red-100/80"
-                    >
-                      Sign out
-                    </button>
+                    >Sign out</button>
                   </Show>
                 </div>
               </Show>
+            </div>
+          </div>
+        </aside>
+      </Show>
+
+      {/* More views drawer — slides in from left rail */}
+      <Show when={showMoreMenu() && !isWatch()}>
+        <div class="fixed inset-0 z-30" onClick={() => setShowMoreMenu(false)} />
+        <div class="fixed bottom-0 left-16 top-0 z-40 w-56 animate-fade-in border-r border-white/20 bg-white/92 shadow-panel backdrop-blur-2xl">
+          <div class="flex h-full flex-col py-5">
+            <p class="mb-3 px-5 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">More views</p>
+            {([
+              { id: "diary"         as ViewName, label: "Diary",         icon: "diary"          as const },
+              { id: "discover"      as ViewName, label: "Discover",      icon: "discover"       as const },
+            ]).map((item) => (
+              <button
+                type="button"
+                onClick={() => { selectAndPersist(item.id); setShowMoreMenu(false); }}
+                class={`flex w-full items-center gap-3 px-5 py-2.5 text-sm font-medium transition ${
+                  props.activeView === item.id ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-on-surface/5"
+                }`}
+              >
+                <span class={props.activeView === item.id ? "text-primary" : "text-outline/70"}><RailIcon id={item.icon} /></span>
+                {item.label}
+              </button>
+            ))}
+            <div class="mx-5 my-2 h-px bg-outline/10" />
+            {([
+              { id: "runner"        as ViewName, label: "Runner",         icon: "runner"         as const },
+              { id: "agent_settings"as ViewName, label: "Agent Settings", icon: "agent_settings" as const },
+            ]).map((item) => (
+              <button
+                type="button"
+                onClick={() => { selectAndPersist(item.id); setShowMoreMenu(false); }}
+                class={`flex w-full items-center gap-3 px-5 py-2.5 text-sm font-medium transition ${
+                  props.activeView === item.id ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-on-surface/5"
+                }`}
+              >
+                <span class={props.activeView === item.id ? "text-primary" : "text-outline/70"}><RailIcon id={item.icon} /></span>
+                {item.label}
+                <Show when={!props.advanced}>
+                  <span class="ml-auto rounded-full border border-outline/20 bg-outline/8 px-1.5 py-0.5 font-mono text-[8px] text-outline/50">adv</span>
+                </Show>
+              </button>
+            ))}
+            <div class="mx-5 my-2 h-px bg-outline/10" />
+            <button
+              type="button"
+              onClick={() => props.onToggleAdvanced()}
+              class="flex w-full items-center gap-3 px-5 py-2 text-xs text-outline/60 transition hover:text-on-surface-variant"
+            >
+              <span class="font-mono text-[10px]">{props.advanced ? "−" : "+"}</span>
+              {props.advanced ? "Hide advanced" : "Enable advanced mode"}
+            </button>
+            {/* History nav at drawer footer */}
+            <div class="mt-auto border-t border-outline/10 px-5 pt-3">
+              <p class="mb-2 font-mono text-[9px] uppercase tracking-[0.15em] text-outline/50">Navigate</p>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  onClick={goBack}
+                  disabled={viewHistory().length === 0}
+                  title="Back (Alt+←)"
+                  class="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl border border-outline/15 text-xs text-outline/60 transition hover:bg-on-surface/5 hover:text-on-surface disabled:opacity-30"
+                >
+                  <RailIcon id="back" />Back
+                </button>
+                <button
+                  type="button"
+                  onClick={goForward}
+                  disabled={viewFuture().length === 0}
+                  title="Forward (Alt+→)"
+                  class="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl border border-outline/15 text-xs text-outline/60 transition hover:bg-on-surface/5 hover:text-on-surface disabled:opacity-30"
+                >
+                  Fwd<RailIcon id="forward" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -813,6 +830,10 @@ export function NavBar(props: {
               <div class="flex items-center justify-between gap-[1.5em] text-xs">
                 <span class="text-on-surface-variant">More views</span>
                 <kbd class="rounded bg-on-surface/8 px-[0.5em] py-[0.15em] font-mono text-[0.85em] text-on-surface">Alt+M</kbd>
+              </div>
+              <div class="flex items-center justify-between gap-[1.5em] text-xs">
+                <span class="text-on-surface-variant">Back / Forward</span>
+                <kbd class="rounded bg-on-surface/8 px-[0.5em] py-[0.15em] font-mono text-[0.85em] text-on-surface">Alt+←/→</kbd>
               </div>
               <div class="flex items-center justify-between gap-[1.5em] text-xs">
                 <span class="text-on-surface-variant">Filter feed</span>

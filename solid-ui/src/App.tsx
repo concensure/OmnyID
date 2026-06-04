@@ -1208,7 +1208,7 @@ function App() {
         </div>
       </Show>
 
-      <GlassPanel class="mx-auto max-w-[1700px] p-5 lg:p-8">
+      <GlassPanel class="mx-auto max-w-[1700px] p-5 pl-[76px] lg:p-8 lg:pl-[80px]">
         <NavBar
           activeView={activeView()}
           onSelect={selectView}
