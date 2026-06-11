@@ -13,6 +13,7 @@ import { GenerativeCardRenderer } from "@/components/renderers/GenerativeCardRen
 import { BlueprintRenderer } from "@/components/renderers/BlueprintRenderer";
 import { A2UIRenderer } from "@/components/renderers/A2UIRenderer";
 import { PresentationCardRenderer } from "@/components/renderers/PresentationCardRenderer";
+import { RichTextRenderer } from "@/components/renderers/RichTextRenderer";
 
 /**
  * The agent-first renderer registry.
@@ -38,7 +39,10 @@ export function ViewDispatcher(props: {
   const chosenView = () => props.viewOverride ?? pickView(props.message, [...KNOWN_VIEW_FORMATS]);
 
   const effectiveFormat = (): string => {
-    if (chosenView()) return chosenView()!.format;
+    const raw = chosenView()?.format;
+    // Normalize single-node A2UI view formats to a2ui.v1 so A2UIRenderer handles them.
+    if (raw === "insight_line" || raw === "action_chips" || raw === "stat_row") return "a2ui.v1";
+    if (raw) return raw;
     // Heuristic fallback from message type
     const t = props.message.type;
     const subtype = props.message.subtype ?? "";
@@ -55,11 +59,16 @@ export function ViewDispatcher(props: {
     if (t === "agent" && subtype === "orchestration_card") return "generative_card";
     if (t === "agent" && subtype === "plan") return "task_card";
     if (t === "agent" && (subtype === "dashboard_panel" || subtype === "runner_editor" || subtype === "workspace_panel")) return "a2ui.v1";
-    if (t === "note" && (subtype === "content" || kind.includes("note"))) return "canvas";
+    if (t === "note" && (subtype === "content" || kind.includes("note"))) return "rich_text";
     if (t === "calendar" && (subtype === "plan" || kind.includes("schedule"))) return "calendar";
     if (t === "task" && (subtype === "card" || kind.includes("task"))) return "task_card";
     if (t === "research" && (subtype === "content" || kind.includes("research"))) return "search_result";
     if (t.includes("blueprint") || t.includes("ui")) return "ui_blueprint";
+    // Continuity AFP types — route to A2UIRenderer which handles their embedded views.
+    if (
+      t === "watcher_alert" || t === "smart_suggestion" || t === "behavior_pattern" ||
+      t === "projection" || t === "temporal_projection" || t === "state_synthesis"
+    ) return "a2ui.v1";
     // Content-shape heuristic: if content has bullets/summary it's a search result
     const c = props.message.content;
     if (c && typeof c === "object" && !Array.isArray(c) && ("bullets" in c || "sources" in c)) return "search_result";
@@ -115,6 +124,9 @@ export function ViewDispatcher(props: {
             onViewWorkflow={props.onViewWorkflow}
           />
         </Show>
+        <Show when={effectiveFormat() === "rich_text"}>
+          <RichTextRenderer message={props.message} view={chosenView() ?? undefined} />
+        </Show>
         <Show when={effectiveFormat() === "ui_blueprint" || effectiveFormat() === "blueprint"}>
           <BlueprintRenderer message={props.message} view={chosenView() ?? undefined} />
         </Show>
@@ -136,6 +148,7 @@ function FormatBadge(props: { format: string; agentDriven: boolean }) {
       task_card: "Task",
       generative_card: "Agent",
       "a2ui.v1": "A2UI",
+      rich_text: "Note",
       ui_blueprint: "Blueprint",
       blueprint: "Blueprint",
       ui_presentation: "Presentation",

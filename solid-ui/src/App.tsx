@@ -13,17 +13,32 @@ import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { MonthlyCalendarView } from "@/components/MonthlyCalendarView";
 import { PublicFeedView } from "@/components/PublicFeedView";
 import { PythonRunnerView } from "@/components/PythonRunnerView";
+import { DecisionQueueView } from "@/components/DecisionQueueView";
+import { ResponseQueueView } from "@/components/ResponseQueueView";
 import { SearchBar } from "@/components/SearchBar";
 import { ThreadView } from "@/components/ThreadView";
 import { ViewDispatcher } from "@/components/ViewDispatcher";
 import { WorkflowsView } from "@/components/WorkflowsView";
 import { CofounderStudioView } from "@/components/CofounderStudioView";
+import { TemplatesView } from "@/components/TemplatesView";
+import { ContactsView } from "@/components/ContactsView";
+import { ConnectedAppsView } from "@/components/ConnectedAppsView";
+import { CostDashboardView } from "@/components/CostDashboardView";
+import { EditProfileModal } from "@/components/EditProfileModal";
+import { DatabaseView } from "@/components/DatabaseView";
+import { ToolsView } from "@/components/ToolsView";
+import { AfpInspector } from "@/components/AfpInspector";
 import { KnowledgeGraphView } from "@/components/KnowledgeGraphView";
+import { SpacesView } from "@/components/SpacesView";
 import { DiaryView } from "@/components/DiaryView";
 import { DiscoverView } from "@/components/DiscoverView";
 import { BentoGrid } from "@/components/BentoGrid";
+import { PulseFeed } from "@/components/PulseFeed";
+import { HomeQueuesSection } from "@/components/HomeQueuesSection";
 import { AgentPersonaFAB } from "@/components/AgentPersonaFAB";
 import { FloatingFormatBar } from "@/components/FloatingFormatBar";
+import { ViewCustomizer } from "@/components/ViewCustomizer";
+import { ToastContainer } from "@/components/Toast";
 import {
   apiFetch,
   API_BASE,
@@ -34,12 +49,13 @@ import {
   orchestrate,
   readSession,
   savePrefs,
+  SESSION_CHANGED_EVENT,
+  type Session,
   writeSession,
   type DashboardBootstrap,
   type LlmConfig,
   type RuntimeWorkspaceFileEntry,
   type RuntimeWorkspaceFileResponse,
-  type Session,
   type UiCommandResponse
 } from "@/lib/api";
 import { checkBrowserAiAvailable, classifyWithBrowserAi, getBrowserAiLabel } from "@/lib/browserAi";
@@ -50,10 +66,28 @@ import {
   buildSpaceFeedPreviewMessage,
   travelPreviewPrefersComparison,
 } from "@/lib/commandPreviewSurfaces";
+import { buildDecisionOsUpdateDetail } from "@/lib/decisionosContinuity";
 import { hasConsentBeenAsked } from "@/lib/profileLedger";
 import { ProfilingConsentModal } from "@/components/ProfilingConsentModal";
 
 let decryptModulePromise: Promise<typeof import("@/lib/decrypt")> | null = null;
+
+// Views that must never be auto-navigated to from a search result suggestion
+const NAV_BLOCKLIST = new Set(["agent_settings", "connected_apps", "cost_dashboard", "sovereignty_audit"]);
+
+const VIEW_LABELS: Partial<Record<ViewName, string>> = {
+  home: "Home", search: "Chat", threads: "Threads", workflows: "Workflows",
+  email: "Email", note: "Notes", calendar: "Calendar", database: "Database",
+  templates: "Templates", runner: "Runner", agent_settings: "Agent Settings",
+  diary: "Diary", discover: "Discover", cofounder_studio: "Co-Founder",
+  space_feed: "Spaces", public_feed: "Public Feed",
+  knowledge_graph: "Knowledge Graph", sovereignty_audit: "Sovereignty",
+  contacts: "Contacts", connected_apps: "Connected Apps", decision_queue: "Decision Queue", tasks: "Tasks", response_queue: "Response Queue",
+  cost_dashboard: "Cost Dashboard",
+  tools: "Tools",
+  pulse: "Pulse Feed",
+  goals: "Goals",
+};
 
 function loadDecryptModule() {
   if (!decryptModulePromise) {
@@ -63,24 +97,11 @@ function loadDecryptModule() {
 }
 
 function dispatchDecisionOsBootstrap(payload: DashboardBootstrap) {
-  const briefing = payload.continuity_brief
-    ? {
-        northStar: payload.continuity_priority_card?.title ?? payload.continuity_brief.title,
-        urgentCount: payload.continuity_priority_card?.requires_approval ? 1 : 0,
-        highImpactCount: payload.continuity_brief.decision_count,
-        completedCount: 0,
-        estimatedMinutes: Math.max(10, payload.continuity_brief.commitment_count * 10),
-        totalDecisions: Math.max(1, payload.continuity_brief.decision_count),
-      }
-    : undefined;
+  const detail = buildDecisionOsUpdateDetail(payload);
 
   window.dispatchEvent(
     new CustomEvent("omnyid:decision-os-update", {
-      detail: {
-        briefing,
-        continuityPrimaryMode: payload.continuity_primary_mode,
-        priorityCard: payload.continuity_priority_card ?? undefined,
-      },
+      detail,
     })
   );
 }
@@ -785,13 +806,20 @@ function commandResponseToPreviewMessage(command: UiCommandResponse, query: stri
 }
 
 function App() {
-  const session = createMemo(() => readSession());
+  const [session, setSession] = createSignal(readSession());
 
-  const _prefs = loadPrefs();
+  // Stable user ID at initialization — available before dashboard loads
+  const initUserId = readSession()?.user?.id ?? "";
+  // User-scoped localStorage key builders — reads use initUserId, writes use userId()
+  const mkWfKey    = (uid: string) => uid ? `omnyid.workflow.new_result.${uid}` : "omnyid.workflow.new_result";
+  const mkThreadKey = (uid: string) => uid ? `omnyid.thread.seen_count.${uid}` : "omnyid.thread.seen_count";
+  const mkAdvKey   = (uid: string) => uid ? `omnyid.nav.advanced.${uid}` : "omnyid.nav.advanced";
+  const _prefs = loadPrefs(initUserId);
   const [activeView, setActiveView] = createSignal<ViewName>(
     (_prefs.activeView as ViewName) ?? "search"
   );
   const [openThreadId, setOpenThreadId] = createSignal<string | null>(_prefs.openThreadId);
+  const [navTrail, setNavTrail] = createSignal<ViewName[]>([(_prefs.activeView as ViewName) ?? "search"]);
 
   const [rightOpen, setRightOpen] = createSignal(false);
   const [fleetOpen, setFleetOpen] = createSignal(false);
@@ -804,10 +832,10 @@ function App() {
   const [searchFocusTick, setSearchFocusTick] = createSignal(0);
   const [fleetLoaded, setFleetLoaded] = createSignal(false);
   const [workflowNewResult, setWorkflowNewResult] = createSignal(
-    localStorage.getItem("omnyid.workflow.new_result") === "1"
+    localStorage.getItem(mkWfKey(initUserId)) === "1"
   );
   const [threadBadge, setThreadBadge] = createSignal(0);
-  let seenThreadCount = parseInt(localStorage.getItem("omnyid.thread.seen_count") ?? "0", 10);
+  let seenThreadCount = parseInt(localStorage.getItem(mkThreadKey(initUserId)) ?? "0", 10);
 
   // Browser AI
   const [browserAiLabel, setBrowserAiLabel] = createSignal<string | null>(null);
@@ -819,19 +847,30 @@ function App() {
   const [agentSettingsFocusLlm, setAgentSettingsFocusLlm] = createSignal(false);
 
   // UI state
-  const ADVANCED_KEY = "omnyid.nav.advanced";
-  const [advanced, setAdvanced] = createSignal(localStorage.getItem(ADVANCED_KEY) === "1");
+  const [advanced, setAdvanced] = createSignal(localStorage.getItem(mkAdvKey(initUserId)) === "1");
 
   // Onboarding / tour state
-  const [showTour, setShowTour] = createSignal(shouldShowTour());
+  const [showTour, setShowTour] = createSignal(shouldShowTour(initUserId));
   const [showOnboarding, setShowOnboarding] = createSignal(false);
   const [showProfilingConsent, setShowProfilingConsent] = createSignal(false);
+  const [showEditProfile, setShowEditProfile] = createSignal(false);
   const [showAuthModal, setShowAuthModal] = createSignal(
     new URLSearchParams(window.location.search).get("open_auth") === "1"
   );
+  const [authNotice, setAuthNotice] = createSignal<AuthModalFeedback | null>(null);
+
+  // U-01: update-ready toast — shown when the service worker has a new version waiting.
+  const [updateReady, setUpdateReady] = createSignal(false);
+  let pendingUpdateSw: ServiceWorker | null = null;
+
+  function applyUpdate() {
+    pendingUpdateSw?.postMessage({ type: "SKIP_WAITING" });
+    // Reload after a brief delay so the new SW can activate.
+    setTimeout(() => window.location.reload(), 250);
+  }
 
   function persistPrefs(view: ViewName, threadId: string | null) {
-    savePrefs({ activeView: view, openThreadId: threadId });
+    savePrefs({ activeView: view, openThreadId: threadId }, userId());
   }
 
   // Track when active fleet drops to 0 — set "new result" badge until Workflows is opened
@@ -839,22 +878,36 @@ function App() {
   createEffect(() => {
     const current = fleetActiveCount();
     if (prevActiveCount > 0 && current === 0) {
-      localStorage.setItem("omnyid.workflow.new_result", "1");
+      localStorage.setItem(mkWfKey(userId()), "1");
       setWorkflowNewResult(true);
     }
     prevActiveCount = current;
   });
 
+  function addToNavTrail(view: ViewName) {
+    setNavTrail((prev) => {
+      const existing = prev.lastIndexOf(view);
+      if (existing >= 0) return [...prev.slice(0, existing), view];
+      return [...prev.slice(-4), view];
+    });
+  }
+
   function selectView(view: ViewName) {
     if (view === "workflows") {
-      localStorage.removeItem("omnyid.workflow.new_result");
+      localStorage.removeItem(mkWfKey(userId()));
       setWorkflowNewResult(false);
     }
     if (view === "threads") {
       setThreadBadge(0);
       const total = new Set((dashboard()?.messages ?? []).map((m) => m.thread_id)).size;
       seenThreadCount = total;
-      localStorage.setItem("omnyid.thread.seen_count", String(total));
+      localStorage.setItem(mkThreadKey(userId()), String(total));
+    }
+    // Reset breadcrumb to a single entry when returning to top-level views
+    if (view === "home" || view === "search") {
+      setNavTrail([view]);
+    } else {
+      addToNavTrail(view);
     }
     setActiveView(view);
     persistPrefs(view, openThreadId());
@@ -862,13 +915,13 @@ function App() {
 
   function openThread(threadId: string) {
     setOpenThreadId(threadId);
-    setActiveView("threads");
-    persistPrefs("threads", threadId);
+    selectView("threads"); // selectView calls persistPrefs with the current openThreadId — set ID first
   }
 
   const [dashboard, setDashboard] = createSignal<DashboardBootstrap | null>(null);
   const [searchBusy, setSearchBusy] = createSignal(false);
   const [searchFeedback, setSearchFeedback] = createSignal("");
+  const [isSearchError, setIsSearchError] = createSignal(false);
   const [commandResult, setCommandResult] = createSignal<UiCommandResponse | null>(null);
   const [lastQuery, setLastQuery] = createSignal("");
   const [lastEngine, setLastEngine] = createSignal("auto");
@@ -883,19 +936,36 @@ function App() {
   const [runtimeLogs, setRuntimeLogs] = createSignal<string[]>([]);
   const [runtimeLogSource, setRuntimeLogSource] = createSignal("bootstrap");
   const [runtimeBusy, setRuntimeBusy] = createSignal(false);
+  const [serverOffline, setServerOffline] = createSignal(false);
+  const [retrying, setRetrying] = createSignal(false);
+  let dashboardFetchSeq = 0;
+  let runnerFilesFetchSeq = 0;
+  let loraIntervalId: ReturnType<typeof setInterval> | null = null;
+  let dashboardDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  async function loadDashboard() {
+  function loadDashboard() {
+    if (dashboardDebounceTimer !== null) clearTimeout(dashboardDebounceTimer);
+    dashboardDebounceTimer = setTimeout(() => { dashboardDebounceTimer = null; void _loadDashboard(); }, 120);
+  }
+
+  async function _loadDashboard() {
     if (!session()?.token) { setDashboard(null); return; }
+    const seq = ++dashboardFetchSeq;
     try {
       const payload = await apiFetch<DashboardBootstrap>("/dashboard/bootstrap");
+      if (seq !== dashboardFetchSeq) return;
       // Decrypt AFP messages in-memory before rendering — plaintext never re-stored
       const { decryptMessages } = await loadDecryptModule();
       payload.messages = decryptMessages(payload.messages);
       setDashboard(payload);
       dispatchDecisionOsBootstrap(payload);
-      if (activeView() !== "threads") {
-        const total = new Set(payload.messages.map((m) => m.thread_id)).size;
-        if (total > seenThreadCount) setThreadBadge(total - seenThreadCount);
+      const total = new Set(payload.messages.map((m) => m.thread_id)).size;
+      if (activeView() === "threads") {
+        // User is already reading threads — keep seenCount current so no badge fires on next load
+        seenThreadCount = total;
+        localStorage.setItem(mkThreadKey(userId()), String(total));
+      } else if (total > seenThreadCount) {
+        setThreadBadge(total - seenThreadCount);
       }
       const monitor = payload.runtime_deployment?.runtime_monitor;
       if (monitor) {
@@ -906,22 +976,27 @@ function App() {
         );
       }
     } catch (error) {
-      setSearchFeedback((error as Error).message);
+      if (seq !== dashboardFetchSeq) return;
+      // Background load errors should not overwrite the search feedback slot
+      console.warn("Dashboard load failed:", (error as Error).message);
     }
   }
 
   async function loadRunnerFiles() {
     if (!session()?.token) { setRunnerFiles([]); setActiveFile(null); setEditorValue(""); return; }
+    const seq = ++runnerFilesFetchSeq;
     try {
       const payload = await apiFetch<{
         framework: string;
         active_file_id?: string | null;
         files: RuntimeWorkspaceFileEntry[];
       }>("/runtime/workspace-files");
+      if (seq !== runnerFilesFetchSeq) return;
       setRunnerFiles(payload.files);
       const fileId = payload.active_file_id || payload.files[0]?.file_id;
       if (fileId) await selectFile(fileId);
     } catch (error) {
+      if (seq !== runnerFilesFetchSeq) return;
       setRunnerFeedback((error as Error).message);
     }
   }
@@ -935,7 +1010,7 @@ function App() {
         method: "POST",
         bodyJson: { framework: "python-runner-chat" }
       });
-      await loadDashboard();
+      loadDashboard();
       await loadRunnerFiles();
       await loadRuntimeLogs();
       setRunnerFeedback("Python runner deployed. Logs and files are ready.");
@@ -956,7 +1031,7 @@ function App() {
         method: "POST",
         bodyJson: { action }
       });
-      await loadDashboard();
+      loadDashboard();
       await loadRuntimeLogs();
       setRunnerFeedback(`Runtime ${action} completed.`);
     } catch (error) {
@@ -969,7 +1044,7 @@ function App() {
   async function refreshRunnerMonitor() {
     setRuntimeBusy(true);
     try {
-      await loadDashboard();
+      loadDashboard();
       await loadRuntimeLogs();
       setRunnerFeedback("Runtime monitor refreshed.");
     } catch (error) {
@@ -1014,10 +1089,38 @@ function App() {
       const payload = await apiFetch<{ lines: string[]; source?: string }>("/runtime/logs");
       setRuntimeLogs(payload.lines ?? []);
       setRuntimeLogSource(payload.source || "runtime/logs");
-    } catch {
-      setRuntimeLogs([]);
+    } catch (error) {
+      setRuntimeLogs([`[error] Failed to load runtime logs: ${(error as Error).message}`]);
       setRuntimeLogSource("runtime/logs");
     }
+  }
+
+  function startLoraPolling() {
+    if (loraIntervalId !== null) return;
+    void loadLora();
+    loraIntervalId = setInterval(() => { if (session()?.token) void loadLora(); }, 30_000);
+  }
+
+  async function bootstrap() {
+    try {
+      await apiFetch("/healthz");
+      setServerOffline(false);
+    } catch (e) {
+      const msg = (e as Error)?.message ?? "";
+      const isNetwork = !msg
+        || msg.toLowerCase().includes("failed to fetch")
+        || msg.toLowerCase().includes("networkerror")
+        || msg.toLowerCase().includes("load failed");
+      if (isNetwork) {
+        setServerOffline(true);
+        return;
+      }
+      // 4xx/5xx from /healthz still means the server is reachable — clear any prior offline state
+      setServerOffline(false);
+    }
+    void loadDashboard();
+    void loadRunnerFiles();
+    void loadRuntimeLogs();
   }
 
   async function loadLora() {
@@ -1041,6 +1144,8 @@ function App() {
 
   async function handleSearch(query: string, engine: string, optimizationMode = "balanced") {
     setSearchBusy(true);
+    setSearchFeedback("");
+    setIsSearchError(false);
     setLastQuery(query);
     setLastEngine(engine);
     setLastOptMode(optimizationMode);
@@ -1061,18 +1166,17 @@ function App() {
         bodyJson: { query, engine, active_file_id: activeFile()?.file_id, browser_intent: browserIntent, browser_parsed: browserParsed, optimization_mode: optimizationMode }
       });
       setCommandResult(payload);
-      setSearchFeedback(payload.summary);
       // Reload dashboard to pick up any new AFP messages the agent created
       void loadDashboard();
-      const suggested = payload.suggested_view as ViewName;
-      if (suggested === "threads" || suggested === "email" || suggested === "runner"
-          || suggested === "note" || suggested === "calendar" || suggested === "database") {
+      const suggested = payload.suggested_view as ViewName | undefined;
+      if (suggested && !NAV_BLOCKLIST.has(suggested)) {
         selectView(suggested);
-      } else {
+      } else if (!suggested) {
         selectView("search");
       }
     } catch (error) {
       setSearchFeedback((error as Error).message);
+      setIsSearchError(true);
     } finally {
       setSearchBusy(false);
     }
@@ -1089,10 +1193,25 @@ function App() {
       setEditorValue((current) => `${current}${draft.content}`);
     }
     setRunnerFeedback("Command-bar draft inserted into the editor. Review and save when ready.");
+    setCommandResult(null);
     selectView("runner");
   }
 
   const runtimeDeployment = createMemo(() => dashboard()?.runtime_deployment ?? null);
+  const userId = createMemo(() => dashboard()?.user.id ?? session()?.user?.id ?? "");
+
+  // Clear search state only when transitioning *away from* "search" — not on initial mount
+  let prevView: ViewName | null = null;
+  createEffect(() => {
+    const view = activeView();
+    if (prevView === "search" && view !== "search") {
+      setCommandResult(null);
+      setSearchFeedback("");
+      setIsSearchError(false);
+    }
+    prevView = view;
+  });
+
   const commandPreviewMessage = createMemo(() => {
     const result = commandResult();
     if (!result) return null;
@@ -1101,6 +1220,18 @@ function App() {
   });
 
   onMount(async () => {
+    // U-01: listen for service worker update-ready events fired by main.tsx
+    function onSwUpdate(e: Event) {
+      const detail = (e as CustomEvent<{ sw: ServiceWorker }>).detail;
+      // CGAP-014: suppress toast when the search pipeline or any agent in the fleet
+      // is actively running — a reload mid-run would lose orchestration context.
+      if (searchBusy() || fleetActiveCount() > 0) return;
+      pendingUpdateSw = detail.sw;
+      setUpdateReady(true);
+    }
+    window.addEventListener("omnyid:update-ready", onSwUpdate);
+    onCleanup(() => window.removeEventListener("omnyid:update-ready", onSwUpdate));
+
     // Initialize E2EE: fetch encryption key and set up client-side decryption
     if (session()?.token) {
       try {
@@ -1120,15 +1251,55 @@ function App() {
       fetchLlmConfig().then(setLlmConfig).catch(() => {});
     }
 
-    // Auto-expand sidebar on first authenticated session so Mask, LoRA, and Plaza are discoverable
-    if (session()?.token && !localStorage.getItem("omnyid.sidebar.seen")) {
+    // Auto-expand sidebar on first authenticated session — scoped per user so each user sees it once
+    const sidebarSeenKey = initUserId ? `omnyid.sidebar.seen.${initUserId}` : "omnyid.sidebar.seen";
+    if (session()?.token && !localStorage.getItem(sidebarSeenKey)) {
       setRightOpen(true);
-      localStorage.setItem("omnyid.sidebar.seen", "1");
+      localStorage.setItem(sidebarSeenKey, "1");
     }
 
     // Show profiling consent on first session
     if (!hasConsentBeenAsked()) {
       setShowProfilingConsent(true);
+    }
+
+    const currentUrl = new URL(window.location.href);
+    if (currentUrl.pathname === "/verify-email") {
+      const token = currentUrl.searchParams.get("token");
+      setShowAuthModal(true);
+      void (async () => {
+        if (!token) {
+          setAuthNotice({
+            tone: "error",
+            text: "Verification link is incomplete. Request a fresh verification email and try again.",
+          });
+          window.history.replaceState({}, "", "/?open_auth=1");
+          return;
+        }
+        try {
+          const response = await fetch(`${API_BASE}/auth/verify-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || response.statusText);
+          }
+          setAuthNotice({
+            tone: "success",
+            text: "Email verified. You can sign in now.",
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Verification failed.";
+          setAuthNotice({
+            tone: "error",
+            text: message || "Verification failed.",
+          });
+        } finally {
+          window.history.replaceState({}, "", "/?open_auth=1");
+        }
+      })();
     }
 
     // Detect browser-native AI (Gemini Nano on Chrome, Phi on Edge)
@@ -1138,7 +1309,7 @@ function App() {
     }
 
     // Keyboard shortcuts: Ctrl/Cmd+1–7 for nav items
-    const SHORTCUT_VIEWS: ViewName[] = ["search", "threads", "workflows", "email", "note", "calendar", "database"];
+    const SHORTCUT_VIEWS: ViewName[] = ["search", "threads", "workflows", "email", "note", "calendar", "database", "templates"];
     function onGlobalKeyDown(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey)) return;
       if (e.key === "k") {
@@ -1154,16 +1325,51 @@ function App() {
       }
     }
     document.addEventListener("keydown", onGlobalKeyDown);
-    onCleanup(() => document.removeEventListener("keydown", onGlobalKeyDown));
+    function onNavigate(event: Event) {
+      const custom = event as CustomEvent<{
+        view?: string;
+        threadId?: string | null;
+        messageId?: string | null;
+      }>;
+      const view = custom.detail?.view;
+      if (!view) return;
+      if (view === "threads" && custom.detail?.messageId) {
+        const threadId = dashboard()?.messages.find((message) => message.id === custom.detail?.messageId)?.thread_id;
+        if (threadId) {
+          openThread(threadId);
+          return;
+        }
+      }
+      if (view === "threads" && custom.detail?.threadId) {
+        openThread(custom.detail.threadId);
+        return;
+      }
+      selectView(view as ViewName);
+    }
+    window.addEventListener("omnyid:navigate", onNavigate as EventListener);
 
-    void loadDashboard();
-    void loadRunnerFiles();
-    void loadRuntimeLogs();
-    if (session()?.token) void loadLora();
+    function onSessionChanged(e: Event) {
+      const detail = (e as CustomEvent<Session | null>).detail;
+      setSession(detail);
+      if (!detail) setShowAuthModal(true);
+    }
+    window.addEventListener(SESSION_CHANGED_EVENT, onSessionChanged);
+
+    onCleanup(() => {
+      document.removeEventListener("keydown", onGlobalKeyDown);
+      window.removeEventListener("omnyid:navigate", onNavigate as EventListener);
+      window.removeEventListener(SESSION_CHANGED_EVENT, onSessionChanged);
+    });
+
+    void bootstrap();
+    if (session()?.token) {
+      startLoraPolling();
+      onCleanup(() => { if (loraIntervalId) { clearInterval(loraIntervalId); loraIntervalId = null; } });
+    }
     if (session()?.token) {
       void import("@/lib/sync").then(({ initSync }) =>
         initSync(
-          import.meta.env.VITE_API_BASE ?? "https://api.omnyid.com",
+          API_BASE,
           session()?.token ?? null
         )
       );
@@ -1174,12 +1380,58 @@ function App() {
   return (
     <main class="min-h-screen p-4 md:p-6 text-on-surface">
       <Show when={showAuthModal()}>
-        <AuthModal onClose={() => setShowAuthModal(false)} />
+        <AuthModal
+          onClose={() => { setShowAuthModal(false); setAuthNotice(null); }}
+          notice={authNotice()}
+          onClearNotice={() => setAuthNotice(null)}
+          onLogin={() => {
+            setShowAuthModal(false);
+            setAuthNotice(null);
+            setServerOffline(false);
+            const loginUserId = readSession()?.user?.id ?? "";
+            if (loginUserId && shouldShowTour(loginUserId)) setShowTour(true);
+            void loadDashboard();
+            void loadRunnerFiles();
+            void loadRuntimeLogs();
+            startLoraPolling();
+            void import("@/lib/sync").then(({ initSync }) =>
+              initSync(
+                API_BASE,
+                session()?.token ?? null
+              )
+            );
+          }}
+        />
+      </Show>
+      <Show when={showEditProfile()}>
+        <EditProfileModal onClose={() => setShowEditProfile(false)} />
+      </Show>
+
+      {/* U-01: Update-ready toast — hidden while fleet is active (CGAP-014) */}
+      <Show when={updateReady() && !searchBusy() && fleetActiveCount() === 0}>
+        <div class="fixed bottom-5 right-5 z-[9999] flex items-center gap-3 rounded-2xl border border-primary/20 bg-white/90 shadow-lg backdrop-blur-md px-4 py-3 text-sm animate-fade-in">
+          <span class="text-on-surface font-medium">Update available</span>
+          <button
+            type="button"
+            onClick={applyUpdate}
+            class="rounded-lg bg-primary px-3 py-1 text-[12px] font-semibold text-white transition hover:bg-primary/80"
+          >
+            Update Now
+          </button>
+          <button
+            type="button"
+            onClick={() => setUpdateReady(false)}
+            class="text-on-surface-variant/50 hover:text-on-surface-variant transition text-lg leading-none"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
       </Show>
 
       {/* Guided tour — first-time visitors */}
       <Show when={showTour()}>
-        <GuidedTour onComplete={() => {
+        <GuidedTour userId={userId()} onComplete={() => {
           setShowTour(false);
           // If authenticated and not onboarded, let onboarding wizard show next
         }} />
@@ -1193,6 +1445,24 @@ function App() {
       {/* Profiling consent — shown once, after tour and onboarding */}
       <Show when={!showTour() && !showOnboarding() && showProfilingConsent()}>
         <ProfilingConsentModal onDismiss={() => setShowProfilingConsent(false)} />
+      </Show>
+
+      {/* Homeserver offline banner */}
+      <Show when={serverOffline()}>
+        <div class="mx-auto mb-4 max-w-[1700px] flex items-center justify-between gap-4 rounded-2xl border border-red-200/50 bg-red-50/60 px-5 py-3 text-sm text-on-surface-variant backdrop-blur-sm animate-fade-in">
+          <span>
+            <strong class="text-on-surface">Homeserver offline</strong> — cannot reach the OmnyID backend.
+            Start it with <code class="font-mono text-xs">docker compose up</code> or <code class="font-mono text-xs">dev.ps1</code>.
+          </span>
+          <button
+            type="button"
+            disabled={retrying()}
+            onClick={async () => { setRetrying(true); try { await bootstrap(); } finally { setRetrying(false); } }}
+            class="glass-button btn-shimmer rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {retrying() ? "Checking…" : "Retry →"}
+          </button>
+        </div>
       </Show>
 
       {/* Guest mode banner */}
@@ -1211,38 +1481,75 @@ function App() {
         </div>
       </Show>
 
+      {/* NavBar is outside GlassPanel so its fixed children are positioned relative to the viewport,
+          not the backdrop-filter stacking context of GlassPanel */}
+      <NavBar
+        activeView={activeView()}
+        onSelect={selectView}
+        signedIn={Boolean(session()?.token)}
+        advanced={advanced()}
+        onToggleAdvanced={() => { const next = !advanced(); setAdvanced(next); localStorage.setItem(mkAdvKey(userId()), next ? "1" : "0"); }}
+        activeCount={fleetActiveCount()}
+        idleCount={fleetIdleCount()}
+        activeAgentNames={fleetActiveNames()}
+        onFleetClick={() => setFleetOpen((v) => !v)}
+        workflowBadge={fleetActiveCount() > 0 ? fleetActiveCount() : undefined}
+        workflowNewResult={workflowNewResult()}
+        fleetLoaded={fleetLoaded()}
+        threadBadge={threadBadge() > 0 ? threadBadge() : undefined}
+        ctrlKPulse={searchFocusTick()}
+        onSignIn={() => setShowAuthModal(true)}
+        onEditProfile={() => setShowEditProfile(true)}
+        userId={userId()}
+      />
+
       <GlassPanel class="mx-auto max-w-[1700px] p-5 pl-[76px] lg:p-8 lg:pl-[80px]">
-        <NavBar
-          activeView={activeView()}
-          onSelect={selectView}
-          signedIn={Boolean(session()?.token)}
-          advanced={advanced()}
-          onToggleAdvanced={() => { const next = !advanced(); setAdvanced(next); localStorage.setItem(ADVANCED_KEY, next ? "1" : "0"); }}
-          activeCount={fleetActiveCount()}
-          idleCount={fleetIdleCount()}
-          activeAgentNames={fleetActiveNames()}
-          onFleetClick={() => setFleetOpen((v) => !v)}
-          workflowBadge={fleetActiveCount() > 0 ? fleetActiveCount() : undefined}
-          workflowNewResult={workflowNewResult()}
-          fleetLoaded={fleetLoaded()}
-          threadBadge={threadBadge() > 0 ? threadBadge() : undefined}
-          ctrlKPulse={searchFocusTick()}
-          onSignIn={() => setShowAuthModal(true)}
-        />
 
         {/* Fleet pane — slides in below nav when user clicks active/idle badge */}
         <Show when={fleetOpen()}>
           <div class="mt-4 glass-surface animate-slide-down rounded-[20px] border border-white/50 p-5 shadow-panel overflow-auto max-h-[70vh]">
-            <AgentFleetView />
+            <AgentFleetView onClose={() => setFleetOpen(false)} onNavigate={(v) => { setFleetOpen(false); selectView(v as import("@/components/NavBar").ViewName); }} />
           </div>
         </Show>
 
         {/* Chat bar — always visible */}
         <div class="mt-7">
-          <SearchBar onSubmit={handleSearch} busy={searchBusy()} focusTrigger={searchFocusTick()} />
+          {/* Breadcrumb trail — shows navigation path, clickable to jump back */}
+          <Show when={navTrail().length > 1}>
+            <div class="mb-2.5 flex items-center gap-0.5 text-xs text-on-surface-variant/60 animate-fade-in">
+              <For each={navTrail()}>
+                {(view, idx) => (
+                  <span class="flex items-center gap-0.5">
+                    <Show when={idx() > 0}>
+                      <span class="px-0.5 text-outline/30 select-none">›</span>
+                    </Show>
+                    <Show when={idx() < navTrail().length - 1} fallback={
+                      <span class="rounded px-1.5 py-0.5 font-medium text-on-surface/70">
+                        {VIEW_LABELS[view] ?? view}
+                      </span>
+                    }>
+                      <button
+                        type="button"
+                        onClick={() => selectView(view)}
+                        class="rounded px-1.5 py-0.5 transition hover:bg-on-surface/5 hover:text-on-surface"
+                      >
+                        {VIEW_LABELS[view] ?? view}
+                      </button>
+                    </Show>
+                  </span>
+                )}
+              </For>
+            </div>
+          </Show>
+          <div data-search-host>
+            <SearchBar onSubmit={handleSearch} busy={searchBusy()} focusTrigger={searchFocusTick()} userId={userId()} />
+          </div>
           <div class="mt-2.5 flex flex-wrap items-center justify-center gap-3">
             <Show when={searchFeedback()}>
-              <p class="text-center text-sm leading-7 text-on-surface-variant">
+              <p
+                class={`text-center text-sm leading-7 ${isSearchError() ? "text-error" : "text-on-surface-variant"}`}
+                role={isSearchError() ? "alert" : undefined}
+              >
                 {searchFeedback()}
               </p>
             </Show>
@@ -1318,11 +1625,15 @@ function App() {
 
             {/* Home — bento workspace grid */}
             <Show when={activeView() === "home"}>
-              <div class="view-enter">
+              <div class="space-y-4">
+                <HomeQueuesSection bootstrap={dashboard()} />
+
+                <div class="view-enter">
                 <BentoGrid
                   bootstrap={dashboard()}
                   onOpenView={(view) => selectView(view)}
                 />
+                </div>
               </div>
             </Show>
 
@@ -1358,34 +1669,12 @@ function App() {
                     </div>
                   )}
                 </Show>
-                {/* AI Co-Founder Launchpad card */}
-                <div
-                  class="card-hover cursor-pointer rounded-[22px] border border-indigo-200/60 bg-gradient-to-br from-indigo-50/80 via-violet-50/70 to-sky-50/80 p-5 shadow-card transition hover:border-indigo-300/70 backdrop-blur-sm"
-                  onClick={() => selectView("cofounder_studio")}
-                  role="button"
-                  tabindex={0}
-                  onKeyDown={(e) => e.key === "Enter" && selectView("cofounder_studio")}
-                >
-                  <div class="flex items-start gap-4">
-                    <span class="text-3xl leading-none select-none">🚀</span>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-bold text-indigo-900">AI Co-Founder Launchpad</p>
-                      <p class="mt-0.5 text-xs text-indigo-700/80">Turn your raw idea into a validated concept, full asset kit &amp; scheduled social content — all private, all E2EE.</p>
-                      <div class="mt-2 flex flex-wrap gap-1.5">
-                        {["Market research", "Dream Score", "Business plan", "Social content"].map(tag => (
-                          <span class="rounded-full border border-indigo-200/60 bg-indigo-50/80 px-2 py-0.5 text-[10px] font-medium text-indigo-700">{tag}</span>
-                        ))}
-                      </div>
-                    </div>
-                    <span class="text-indigo-400 text-sm font-medium self-center">→</span>
-                  </div>
-                </div>
-
                 <DashboardFeed
                   bootstrap={dashboard()}
                   commandSummary={commandResult() ? undefined : undefined}
                   advanced={advanced()}
                   onOpenThread={openThread}
+                  onNavigate={(view, _hint) => selectView(view as import("@/components/NavBar").ViewName)}
                 />
               </div>
             </Show>
@@ -1417,7 +1706,14 @@ function App() {
 
               <Show when={activeView() === "cofounder_studio"}>
                 <div class="view-enter">
-                  <CofounderStudioView onNavigateBack={() => selectView("search")} />
+                  <CofounderStudioView onNavigateBack={() => selectView("templates")} />
+                </div>
+              </Show>
+
+              {/* Templates view */}
+              <Show when={activeView() === "templates"}>
+                <div class="view-enter">
+                  <TemplatesView onLaunch={(view) => selectView(view)} />
                 </div>
               </Show>
 
@@ -1450,18 +1746,47 @@ function App() {
               <div class="view-enter"><MonthlyCalendarView /></div>
             </Show>
 
-            {/* Database view — AFP messages filtered by type containing "database" or "table" */}
+            {/* Database view — structured grid per DATABASE_VIEW_DETAILED_DESIGN.md */}
             <Show when={activeView() === "database"}>
               <div class="view-enter">
-                <DashboardFeed
-                  bootstrap={(() => {
-                    const d = dashboard();
-                    if (!d) return null;
-                    return { ...d, messages: d.messages.filter((m) => m.type.includes("database") || m.type.includes("table")) };
-                  })()}
-                  onOpenThread={openThread}
-                />
+                <DatabaseView bootstrap={dashboard()} />
               </div>
+            </Show>
+
+            {/* Tasks view — pending AFP task messages not yet due */}
+            <Show when={activeView() === "tasks"}>
+              <div class="view-enter">
+                <TasksView bootstrap={dashboard()} onAddTask={() => selectView("calendar")} />
+              </div>
+            </Show>
+
+            {/* Decision Queue view — continuity-backed approvals and actions */}
+            <Show when={activeView() === "decision_queue"}>
+              <div class="view-enter">
+                <DecisionQueueView bootstrap={dashboard()} />
+              </div>
+            </Show>
+
+            {/* Response Queue view — dedicated conversational follow-up surface */}
+            <Show when={activeView() === "response_queue"}>
+              <div class="view-enter">
+                <ResponseQueueView bootstrap={dashboard()} />
+              </div>
+            </Show>
+
+            {/* Cost Dashboard — cost oracle budgeting, tracking, and analysis */}
+            <Show when={activeView() === "cost_dashboard" && !session()?.token}>
+              <GuestGate label="Cost Dashboard" onSignIn={() => setShowAuthModal(true)} />
+            </Show>
+            <Show when={activeView() === "cost_dashboard" && Boolean(session()?.token)}>
+              <div class="view-enter">
+                <CostDashboardView initialSnapshot={dashboard()?.cost_snapshot ?? null} />
+              </div>
+            </Show>
+
+            {/* Tools view — MCP tools and skill capsules */}
+            <Show when={activeView() === "tools"}>
+              <div class="view-enter"><ToolsView signedIn={Boolean(session()?.token)} /></div>
             </Show>
 
             {/* Runner view — advanced only, signed-in only */}
@@ -1511,8 +1836,6 @@ function App() {
                   browserAiLabel={browserAiLabel()}
                   focusLlm={agentSettingsFocusLlm()}
                   onFocusDone={() => setAgentSettingsFocusLlm(false)}
-                  signedIn={Boolean(session()?.token)}
-                  onLlmConfigSaved={(cfg) => setLlmConfig(cfg)}
                   onViewWorkflows={() => selectView("workflows")}
                 />
               </div>
@@ -1527,6 +1850,47 @@ function App() {
             <Show when={activeView() === "discover"}>
               <div class="view-enter"><DiscoverView /></div>
             </Show>
+
+            {/* Pulse Feed view */}
+            <Show when={activeView() === "pulse"}>
+              <div class="view-enter h-full"><PulseFeed /></div>
+            </Show>
+
+            {/* Contacts view */}
+            <Show when={activeView() === "contacts"}>
+              <div class="view-enter"><ContactsView /></div>
+            </Show>
+
+            {/* Connected Apps view */}
+            <Show when={activeView() === "connected_apps"}>
+              <div class="view-enter"><ConnectedAppsView /></div>
+            </Show>
+
+            {/* Space Feed view */}
+            <Show when={activeView() === "space_feed"}>
+              <div class="view-enter"><SpacesView /></div>
+            </Show>
+
+            {/* Public Feed view */}
+            <Show when={activeView() === "public_feed"}>
+              <div class="view-enter"><PublicFeedView isAnon={!session()?.token} /></div>
+            </Show>
+
+            {/* Knowledge Graph — standalone full view */}
+            <Show when={activeView() === "knowledge_graph"}>
+              <div class="view-enter">
+                <div class="rounded-3xl border border-white/50 bg-white/35 p-5 backdrop-blur shadow-card">
+                  <KnowledgeGraphView messages={dashboard()?.messages ?? []} />
+                </div>
+              </div>
+            </Show>
+
+            {/* Sovereignty Audit — data ownership metrics */}
+            <Show when={activeView() === "sovereignty_audit"}>
+              <div class="view-enter">
+                <SovereigntyAuditView messages={dashboard()?.messages ?? []} signedIn={Boolean(session()?.token)} />
+              </div>
+            </Show>
           </div>
         </div>
       </GlassPanel>
@@ -1536,11 +1900,203 @@ function App() {
         activeCount={fleetActiveCount()}
         justCompleted={workflowNewResult()}
         onOpenSettings={() => selectView("agent_settings")}
+        loraScore={loraScore()}
+        loraActive={loraActive()}
+        urgentPending={(() => {
+          const msgs = dashboard()?.messages ?? [];
+          return msgs.filter((m) => {
+            if (m.type === "decision_request") return true;
+            if (m.type === "agent" && (m.subtype === "approval_request" || m.subtype === "orchestration_card")) return true;
+            if (m.type === "watcher_alert") {
+              const c = m.content as Record<string, unknown>;
+              return c.severity === "urgent" || c.urgency === "high";
+            }
+            return false;
+          }).length;
+        })()}
       />
+
+      {/* View customizer — floating + for image background and custom A2UI cards (non-home views only) */}
+      <Show when={activeView() !== "home"}>
+        <ViewCustomizer viewId={activeView()} />
+      </Show>
 
       {/* Floating format bar — appears when a contenteditable is focused */}
       <FloatingFormatBar />
+
+      {/* AFP Metadata Inspector — fires on afp:inspect custom event */}
+      <AfpInspector />
+
+      {/* Global toast notifications */}
+      <ToastContainer />
     </main>
+  );
+}
+
+function TasksView(props: { bootstrap: DashboardBootstrap | null; onAddTask: () => void }) {
+  const now = new Date();
+  const pending = createMemo(() =>
+    (props.bootstrap?.messages ?? [])
+      .filter((m) => {
+        const c = m.content as Record<string, unknown>;
+        if (m.type !== "task" && c?.kind !== "task") return false;
+        if (c?.status === "completed" || c?.completed === true) return false;
+        const due = c?.due_date as string | undefined;
+        if (due) return new Date(due) >= now;
+        return true;
+      })
+      .sort((a, b) => {
+        const da = ((a.content as Record<string, unknown>)?.due_date as string | undefined);
+        const db2 = ((b.content as Record<string, unknown>)?.due_date as string | undefined);
+        return (da ?? "9999") < (db2 ?? "9999") ? -1 : 1;
+      })
+  );
+  const overdue = createMemo(() =>
+    (props.bootstrap?.messages ?? []).filter((m) => {
+      const c = m.content as Record<string, unknown>;
+      if (m.type !== "task" && c?.kind !== "task") return false;
+      if (c?.status === "completed") return false;
+      const due = c?.due_date as string | undefined;
+      return due ? new Date(due) < now : false;
+    })
+  );
+
+  return (
+    <div class="animate-fade-in space-y-5">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="font-mono text-[10px] uppercase tracking-[0.28em] text-outline">Tasks</p>
+          <h2 class="mt-1 text-xl font-bold text-on-surface">Active To-Dos</h2>
+          <p class="mt-0.5 text-sm text-on-surface-variant">AFP task messages not yet completed or overdue.</p>
+        </div>
+        <button type="button" onClick={props.onAddTask}
+          class="mt-2 flex-shrink-0 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/80">
+          + Add Task
+        </button>
+      </div>
+
+      <Show when={overdue().length > 0}>
+        <div class="rounded-2xl border border-red-200/60 bg-red-50/60 p-4 space-y-2">
+          <p class="font-mono text-[9px] uppercase tracking-wider text-red-500">Overdue</p>
+          <For each={overdue()}>
+            {(m) => {
+              const c = m.content as Record<string, unknown>;
+              return (
+                <div class="flex items-center gap-2 rounded-xl bg-white/60 px-3 py-2 text-xs">
+                  <span class="h-2 w-2 rounded-full bg-red-400 flex-shrink-0" />
+                  <span class="flex-1 font-medium text-on-surface">{String(c.title ?? "Task")}</span>
+                  <span class="text-red-400 text-[10px]">
+                    {c.due_date ? new Date(String(c.due_date)).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
+                  </span>
+                </div>
+              );
+            }}
+          </For>
+        </div>
+      </Show>
+
+      <Show when={pending().length > 0} fallback={
+        <div class="rounded-2xl border border-white/40 bg-white/30 p-10 text-center">
+          <p class="text-3xl mb-2">✓</p>
+          <p class="text-sm font-medium text-on-surface">All caught up</p>
+          <p class="mt-1 text-xs text-on-surface-variant/60">No pending tasks. Add one via calendar or the + button above.</p>
+        </div>
+      }>
+        <div class="space-y-2">
+          <For each={pending()}>
+            {(m) => {
+              const c = m.content as Record<string, unknown>;
+              const due = c?.due_date as string | undefined;
+              return (
+                <div class="flex items-start gap-3 rounded-2xl border border-white/50 bg-white/40 px-4 py-3 shadow-card">
+                  <span class="mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded border-2 border-primary/40" />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-on-surface">{String(c?.title ?? "Task")}</p>
+                    <Show when={c?.description}>
+                      <p class="text-xs text-on-surface-variant mt-0.5 line-clamp-1">{String(c?.description)}</p>
+                    </Show>
+                  </div>
+                  <Show when={due}>
+                    <span class="flex-shrink-0 rounded-full border border-primary/20 bg-primary/8 px-2 py-0.5 text-[10px] text-primary">
+                      {new Date(due!).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </span>
+                  </Show>
+                </div>
+              );
+            }}
+          </For>
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+function SovereigntyAuditView(props: { messages: AfpMessage[]; signedIn: boolean }) {
+  const encryptedCount = () => props.messages.filter((m) => m.encryption !== null).length;
+  const totalCount = () => props.messages.length;
+  const e2eePercent = () => totalCount() > 0 ? Math.round((encryptedCount() / totalCount()) * 100) : 0;
+  const typeBreakdown = () => {
+    const counts: Record<string, number> = {};
+    for (const m of props.messages) counts[m.type] = (counts[m.type] ?? 0) + 1;
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  };
+
+  return (
+    <div class="space-y-5 animate-fade-in">
+      <div>
+        <p class="font-mono text-[10px] uppercase tracking-[0.28em] text-outline">Data Sovereignty</p>
+        <h2 class="mt-1 text-xl font-bold text-on-surface">Your data, your control</h2>
+        <p class="mt-0.5 text-sm text-on-surface-variant">E2EE status and ownership metrics for your AFP message log.</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Total messages", value: totalCount(), color: "text-on-surface" },
+          { label: "E2EE encrypted", value: encryptedCount(), color: "text-emerald-600" },
+          { label: "Plaintext", value: totalCount() - encryptedCount(), color: "text-amber-600" },
+          { label: "E2EE coverage", value: `${e2eePercent()}%`, color: e2eePercent() >= 80 ? "text-emerald-600" : "text-amber-600" },
+        ].map((stat) => (
+          <div class="rounded-2xl border border-white/50 bg-white/40 p-4 backdrop-blur shadow-card">
+            <p class="text-xs text-on-surface-variant">{stat.label}</p>
+            <p class={`mt-1 text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="rounded-2xl border border-white/50 bg-white/40 p-4 backdrop-blur shadow-card">
+        <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Message types</p>
+        <div class="space-y-2">
+          {typeBreakdown().map(([type, count]) => (
+            <div class="flex items-center gap-3">
+              <span class="w-28 truncate font-mono text-[10px] text-on-surface-variant">{type}</span>
+              <div class="flex-1 h-1.5 rounded-full bg-on-surface/8">
+                <div
+                  class="h-1.5 rounded-full bg-primary/60 transition-all"
+                  style={{ width: `${Math.round((count / (totalCount() || 1)) * 100)}%` }}
+                />
+              </div>
+              <span class="w-6 text-right font-mono text-[10px] text-on-surface-variant">{count}</span>
+            </div>
+          ))}
+          {typeBreakdown().length === 0 && (
+            <p class="text-sm text-on-surface-variant/50">No messages yet.</p>
+          )}
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-white/50 bg-white/40 p-4 backdrop-blur shadow-card text-sm space-y-2">
+        <p class="font-semibold text-on-surface">Storage guarantees</p>
+        <ul class="space-y-1 text-on-surface-variant text-xs list-none">
+          <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> All AFP messages stored on your self-hosted homeserver</li>
+          <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> E2EE messages encrypted before leaving your device</li>
+          <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> No vendor lock-in — export your data at any time</li>
+          <li class="flex items-center gap-2">
+            <span class={props.signedIn ? "text-emerald-500" : "text-amber-400"}>{props.signedIn ? "✓" : "○"}</span>
+            {props.signedIn ? "Signed in to your homeserver" : "Guest mode — sign in for full ownership"}
+          </li>
+        </ul>
+      </div>
+    </div>
   );
 }
 
@@ -1621,6 +2177,18 @@ const MSG_TYPE_COLORS: Record<string, string> = {
   email:            "bg-green-100/60 text-green-700",
   generative_card:  "bg-indigo-100/60 text-indigo-700",
   search_result:    "bg-teal-100/60 text-teal-700",
+};
+
+type AuthModalFeedback = {
+  tone: "success" | "error";
+  text: string;
+};
+
+type AuthApiResponse = Partial<Session> & {
+  requires_2fa?: boolean;
+  verification_required?: boolean;
+  message?: string;
+  email?: string;
 };
 
 function ThreadListFallback(props: { messages: AfpMessage[]; onOpen: (id: string) => void }) {
@@ -1767,7 +2335,12 @@ function ThreadListFallback(props: { messages: AfpMessage[]; onOpen: (id: string
   );
 }
 
-function AuthModal(props: { onClose: () => void }) {
+function AuthModal(props: {
+  onClose: () => void;
+  onLogin?: () => void;
+  notice?: AuthModalFeedback | null;
+  onClearNotice?: () => void;
+}) {
   const [tab, setTab] = createSignal<"signin" | "signup">("signin");
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
@@ -1779,6 +2352,7 @@ function AuthModal(props: { onClose: () => void }) {
     e.preventDefault();
     setLoading(true);
     setError("");
+    props.onClearNotice?.();
     try {
       const endpoint = tab() === "signin" ? "/auth/login" : "/auth/register";
       const body: Record<string, string> = { email: email().trim(), password: password() };
@@ -1792,9 +2366,26 @@ function AuthModal(props: { onClose: () => void }) {
         const text = await resp.text();
         throw new Error(text || resp.statusText);
       }
-      const data = await resp.json() as Session;
-      writeSession(data);
-      window.location.reload();
+      const data = await resp.json() as AuthApiResponse;
+      if (data.requires_2fa) {
+        setError("Two-factor authentication required — not yet supported in the web UI. Please use the CLI or contact support.");
+        return;
+      }
+      if (data.verification_required) {
+        setTab("signin");
+        setPassword("");
+        setError(data.message || "Check your email to verify your account before signing in.");
+        return;
+      }
+      if (typeof data.token !== "string" || !data.user) {
+        throw new Error("Authentication response was incomplete.");
+      }
+      writeSession(data as Session);
+      if (props.onLogin) {
+        props.onLogin();
+      } else {
+        window.location.reload();
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       const isNetwork = !msg || msg.toLowerCase().includes("networkerror") || msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("load failed");
@@ -1822,16 +2413,27 @@ function AuthModal(props: { onClose: () => void }) {
         <div class="mb-5 flex rounded-xl border border-white/40 bg-white/40 p-0.5">
           <button
             type="button"
-            onClick={() => { setTab("signin"); setError(""); }}
+            onClick={() => { setTab("signin"); setError(""); props.onClearNotice?.(); }}
             class={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${tab() === "signin" ? "bg-white shadow-sm text-on-surface" : "text-on-surface-variant hover:text-on-surface"}`}
           >Sign in</button>
           <button
             type="button"
-            onClick={() => { setTab("signup"); setError(""); }}
+            onClick={() => { setTab("signup"); setError(""); props.onClearNotice?.(); }}
             class={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${tab() === "signup" ? "bg-white shadow-sm text-on-surface" : "text-on-surface-variant hover:text-on-surface"}`}
           >Create account</button>
         </div>
         <form onSubmit={submit} class="space-y-3">
+          <Show when={props.notice}>
+            {(notice) => (
+              <p class={`rounded-lg px-3 py-2 text-xs ${
+                notice().tone === "success"
+                  ? "border border-emerald-200/70 bg-emerald-50/90 text-emerald-800"
+                  : "border border-amber-200/70 bg-amber-50/90 text-amber-800"
+              }`}>
+                {notice().text}
+              </p>
+            )}
+          </Show>
           <Show when={tab() === "signup"}>
             <input
               type="text"
@@ -1844,6 +2446,7 @@ function AuthModal(props: { onClose: () => void }) {
           <input
             type="email"
             required
+            autocomplete="email"
             placeholder="Email"
             value={email()}
             onInput={(e) => setEmail(e.currentTarget.value)}
@@ -1852,6 +2455,7 @@ function AuthModal(props: { onClose: () => void }) {
           <input
             type="password"
             required
+            autocomplete={tab() === "signin" ? "current-password" : "new-password"}
             placeholder="Password (8+ chars)"
             value={password()}
             onInput={(e) => setPassword(e.currentTarget.value)}

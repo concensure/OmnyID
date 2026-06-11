@@ -3,9 +3,21 @@
 // @primary-capability: floating-agent-persona-switcher
 // @stability: beta
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { activatePersona, listPersonas, type AgentPersona } from "@/lib/api";
+import {
+  activatePersona,
+  createPersona,
+  listPersonas,
+  type AgentPersona,
+} from "@/lib/api";
+import {
+  PERSONA_TEMPLATES,
+  type PersonaTemplate,
+} from "@/lib/personaTemplates";
 
 type AnimState = "idle" | "busy" | "error" | "success";
+type SwitcherTab = "mine" | "templates";
+// Visual mood derived from queue pressure and LoRA genome state.
+type AvatarMood = "overwhelmed" | "focused" | "sharp" | "learning" | "idle";
 
 function extractEmoji(soul_md: string | undefined): string {
   if (!soul_md) return "🤖";
@@ -13,16 +25,48 @@ function extractEmoji(soul_md: string | undefined): string {
   return match ? match[0] : "🤖";
 }
 
+function writingStyleLabel(style: string | undefined): string {
+  switch (style) {
+    case "balanced":   return "Balanced";
+    case "concise":    return "Concise";
+    case "warm":       return "Warm";
+    case "formal":     return "Formal";
+    case "creative":   return "Creative";
+    case "analytical": return "Analytical";
+    default:           return style ?? "Balanced";
+  }
+}
+
+// LoRA genome capability badges unlocked at score milestones.
+type GenomeBadge = { icon: string; label: string; key: string };
+
+function computeGenomeBadges(score: number, active: boolean): GenomeBadge[] {
+  const earned: GenomeBadge[] = [];
+  if (score >= 0.3) earned.push({ icon: "✍️", label: "Style",    key: "style" });
+  if (score >= 0.6) earned.push({ icon: "🔬", label: "Research", key: "research" });
+  if (score >= 0.8) earned.push({ icon: "💰", label: "Finance",  key: "finance" });
+  if (active)       earned.push({ icon: "⚡", label: "Auto",     key: "auto" });
+  return earned;
+}
+
 export function AgentPersonaFAB(props: {
   activeCount: number;
   hasError?: boolean;
   justCompleted?: boolean;
   onOpenSettings: () => void;
+  // State-driven avatar props
+  loraScore?: number;
+  loraActive?: boolean;
+  urgentPending?: number;
 }) {
-  const [open, setOpen] = createSignal(false);
   const [showSwitcher, setShowSwitcher] = createSignal(false);
   const [personas, setPersonas] = createSignal<AgentPersona[]>([]);
-  let longPressTimer: ReturnType<typeof setTimeout>;
+  const [loading, setLoading] = createSignal(true);
+  const [switchingId, setSwitchingId] = createSignal<string | null>(null);
+  const [installingTemplateId, setInstallingTemplateId] = createSignal<string | null>(null);
+  const [tab, setTab] = createSignal<SwitcherTab>("mine");
+  const [search, setSearch] = createSignal("");
+  let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let didLongPress = false;
 
   const animState = createMemo<AnimState>(() => {
@@ -32,43 +76,186 @@ export function AgentPersonaFAB(props: {
     return "idle";
   });
 
-  const active = () => personas().find((p) => p.is_active) ?? null;
-  const personaEmoji = () => extractEmoji(active()?.soul_md);
+  // ── Avatar mood ──────────────────────────────────────────────────────────────
+  const avatarMood = createMemo<AvatarMood>(() => {
+    const urgent = props.urgentPending ?? 0;
+    const score  = props.loraScore ?? 0;
+    if (urgent >= 10) return "overwhelmed";
+    if (urgent >= 5 || props.activeCount > 3) return "focused";
+    if (props.activeCount === 0 && urgent === 0 && score > 0.5) return "sharp";
+    if (score < 0.3 && props.activeCount === 0) return "learning";
+    return "idle";
+  });
 
-  onMount(async () => {
+  const genomeBadges = createMemo(() =>
+    computeGenomeBadges(props.loraScore ?? 0, props.loraActive ?? false)
+  );
+
+  const moodEmoji = (): string | null => {
+    switch (avatarMood()) {
+      case "overwhelmed": return "😰";
+      case "focused":     return "🎯";
+      case "sharp":       return "⚡";
+      case "learning":    return "🌱";
+      default:            return null;
+    }
+  };
+
+  const moodLabel = (): string => {
+    const urgent = props.urgentPending ?? 0;
+    switch (avatarMood()) {
+      case "overwhelmed": return `Overwhelmed — ${urgent} urgent items need attention`;
+      case "focused":     return `${props.activeCount} tasks in progress`;
+      case "sharp":       return "Sharp and ready — queue is clear";
+      case "learning":    return "Learning your style…";
+      default:            return "Ready";
+    }
+  };
+
+  const fabTitle = (): string => {
+    const urgent = props.urgentPending ?? 0;
+    switch (avatarMood()) {
+      case "overwhelmed": return `Overwhelmed — ${urgent} urgent decisions need attention`;
+      case "focused":     return "Focused — active tasks in queue";
+      case "sharp":       return "Sharp and ready — switch persona";
+      case "learning":    return "Learning your style — switch persona";
+      default:            return "Switch agent persona";
+    }
+  };
+
+  // Ring colour on the FAB button reflects queue pressure.
+  const moodRingClass = (): string => {
+    switch (avatarMood()) {
+      case "overwhelmed": return "ring-2 ring-red-400/75";
+      case "focused":     return "ring-2 ring-amber-400/60";
+      case "sharp":       return "ring-2 ring-emerald-400/75";
+      case "learning":    return "ring-2 ring-blue-400/55";
+      default:            return "";
+    }
+  };
+
+  // ── Existing persona management ───────────────────────────────────────────────
+  const active = () => personas().find((p) => p.is_active) ?? null;
+  const installedTemplateNames = createMemo(
+    () => new Set(personas().map((persona) => persona.name.trim().toLowerCase())),
+  );
+  const filteredPersonas = createMemo(() => {
+    const q = search().trim().toLowerCase();
+    return personas().filter((persona) => {
+      if (!q) return true;
+      return (
+        persona.name.toLowerCase().includes(q) ||
+        persona.writing_style.toLowerCase().includes(q)
+      );
+    });
+  });
+  const filteredTemplates = createMemo(() => {
+    const q = search().trim().toLowerCase();
+    return PERSONA_TEMPLATES.filter((template) => {
+      if (!q) return true;
+      return (
+        template.name.toLowerCase().includes(q) ||
+        template.description.toLowerCase().includes(q) ||
+        template.writing_style.toLowerCase().includes(q) ||
+        template.source.toLowerCase().includes(q)
+      );
+    });
+  });
+
+  async function reloadPersonas() {
     try {
       const res = await listPersonas();
       setPersonas(res.personas);
-    } catch { /* unauthenticated — ignore */ }
+      if (res.personas.length === 0) setTab("templates");
+    } catch {
+      setPersonas([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  onMount(reloadPersonas);
+
+  onCleanup(() => {
+    if (longPressTimer) clearTimeout(longPressTimer);
   });
 
-  onCleanup(() => clearTimeout(longPressTimer));
+  function openSwitcher(preferredTab?: SwitcherTab) {
+    if (preferredTab) setTab(preferredTab);
+    else if (personas().length === 0) setTab("templates");
+    setShowSwitcher(true);
+  }
+
+  function closeSwitcher() {
+    setShowSwitcher(false);
+    setSearch("");
+  }
 
   function startLongPress() {
     didLongPress = false;
     longPressTimer = setTimeout(() => {
       didLongPress = true;
-      setOpen(false);
-      setShowSwitcher(true);
+      openSwitcher("templates");
     }, 600);
   }
 
   function cancelLongPress() {
-    clearTimeout(longPressTimer);
+    if (longPressTimer) clearTimeout(longPressTimer);
   }
 
   function handleClick() {
-    if (didLongPress) { didLongPress = false; return; }
-    setOpen((v) => !v);
-    setShowSwitcher(false);
+    if (didLongPress) {
+      didLongPress = false;
+      return;
+    }
+    if (showSwitcher()) closeSwitcher();
+    else openSwitcher();
   }
 
   async function switchPersona(persona: AgentPersona) {
+    if (persona.is_active) {
+      closeSwitcher();
+      return;
+    }
+    setSwitchingId(persona.id);
     try {
       await activatePersona(persona.id);
-      setPersonas((prev) => prev.map((p) => (p.id === persona.id ? { ...p, is_active: true } : { ...p, is_active: false })));
-    } catch { /* ignore */ }
-    setShowSwitcher(false);
+      setPersonas((prev) =>
+        prev.map((p) =>
+          p.id === persona.id ? { ...p, is_active: true } : { ...p, is_active: false },
+        ),
+      );
+      closeSwitcher();
+    } catch {
+      // Ignore transient switch failures in the FAB path.
+    } finally {
+      setSwitchingId(null);
+    }
+  }
+
+  async function installTemplate(template: PersonaTemplate) {
+    setInstallingTemplateId(template.id);
+    try {
+      const created = await createPersona({
+        name: template.name,
+        soul_md: template.soul_md,
+        writing_style: template.writing_style,
+        skills: template.skills,
+      });
+      const persona = created.persona;
+      await activatePersona(persona.id);
+      await reloadPersonas();
+      setPersonas((prev) =>
+        prev.map((p) =>
+          p.id === persona.id ? { ...p, is_active: true } : { ...p, is_active: false },
+        ),
+      );
+      closeSwitcher();
+    } catch {
+      // Ignore transient install failures in the FAB path.
+    } finally {
+      setInstallingTemplateId(null);
+    }
   }
 
   const dotColor = () => {
@@ -89,89 +276,257 @@ export function AgentPersonaFAB(props: {
     }
   };
 
+  const tabClass = (value: SwitcherTab) =>
+    `rounded-xl px-2.5 py-1.5 text-[0.6875em] font-medium transition ${
+      tab() === value
+        ? "bg-primary/12 text-primary"
+        : "text-on-surface-variant hover:bg-on-surface/6"
+    }`;
+
   return (
     <>
-      {/* Backdrop */}
-      <Show when={open() || showSwitcher()}>
-        <div
-          class="fixed inset-0 z-40"
-          onClick={() => { setOpen(false); setShowSwitcher(false); }}
-        />
+      <Show when={showSwitcher()}>
+        <div class="fixed inset-0 z-40" onClick={closeSwitcher} />
       </Show>
 
-      {/* Options panel */}
-      <Show when={open()}>
-        <div class="fixed bottom-[90px] right-6 z-50 min-w-[200px] animate-fade-in rounded-2xl border border-white/45 bg-white/96 p-3 shadow-panel backdrop-blur-xl">
-          <p class="mb-2 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">
-            {active()?.name ?? "Agent"}
-          </p>
-          <button
-            type="button"
-            onClick={() => { setOpen(false); setShowSwitcher(true); }}
-            class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-xs transition hover:bg-on-surface/6 text-on-surface"
-          >
-            <span class="text-outline/70">👥</span> Switch persona
-          </button>
-          <button
-            type="button"
-            onClick={() => { setOpen(false); props.onOpenSettings(); }}
-            class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-xs transition hover:bg-on-surface/6 text-on-surface"
-          >
-            <span class="text-outline/70">⚙</span> Agent settings
-          </button>
-          <div class="mx-2 my-1 h-px bg-outline/10" />
-          <p class="px-2 py-1 text-[10px] text-on-surface-variant/50">
+      <Show when={showSwitcher()}>
+        {/* Panel: fluid width so it doesn't overflow on narrow screens */}
+        <div class="fixed bottom-[4.75rem] right-6 z-50 max-h-[32rem] w-[min(25rem,_calc(100vw_-_1.5rem))] overflow-hidden rounded-3xl border border-white/45 bg-white/96 shadow-panel backdrop-blur-xl animate-fade-in">
+          <div class="border-b border-outline/10 px-3.5 py-3">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="font-mono text-[0.5625em] uppercase tracking-[0.2em] text-outline">
+                  Swap agent persona
+                </p>
+                <p class="mt-1 truncate text-sm font-medium text-on-surface">
+                  {active()?.name ?? "No active persona"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  closeSwitcher();
+                  props.onOpenSettings();
+                }}
+                class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface"
+              >
+                Settings
+              </button>
+            </div>
+
+            {/* ── Genome state strip ─────────────────────────────────────── */}
+            {/* Shows avatar mood + earned LoRA capability badges. */}
+            <Show when={avatarMood() !== "idle" || genomeBadges().length > 0}>
+              <div
+                class={`mt-2 flex items-center gap-2 rounded-xl px-2.5 py-1.5 ${
+                  avatarMood() === "overwhelmed"
+                    ? "bg-red-400/10"
+                    : avatarMood() === "sharp"
+                      ? "bg-emerald-400/10"
+                      : "bg-on-surface/4"
+                }`}
+              >
+                <Show when={moodEmoji()}>
+                  <span class="text-sm leading-none" aria-hidden="true">{moodEmoji()}</span>
+                </Show>
+                <span class="flex-1 truncate text-[0.625em] text-on-surface-variant">
+                  {moodLabel()}
+                </span>
+                <div class="flex items-center gap-1">
+                  <For each={genomeBadges()}>
+                    {(badge) => (
+                      <span
+                        title={`${badge.label} capability learned`}
+                        class="rounded-full bg-primary/10 px-1.5 py-0.5 text-[0.5625em] text-primary"
+                      >
+                        {badge.icon}
+                      </span>
+                    )}
+                  </For>
+                </div>
+              </div>
+            </Show>
+
+            <input
+              type="text"
+              value={search()}
+              onInput={(event) => setSearch(event.currentTarget.value)}
+              placeholder="Search personas"
+              class="mt-3 w-full rounded-2xl border border-outline/15 bg-white/75 px-3 py-2 text-xs text-on-surface outline-none transition focus:border-primary/35"
+            />
+            <div class="mt-3 flex gap-1">
+              <button type="button" class={tabClass("mine")} onClick={() => setTab("mine")}>
+                My personas
+              </button>
+              <button
+                type="button"
+                class={tabClass("templates")}
+                onClick={() => setTab("templates")}
+              >
+                Templates
+              </button>
+            </div>
+          </div>
+
+          <div class="max-h-[19rem] overflow-auto px-2 py-2">
+            <Show when={tab() === "mine"}>
+              <Show when={loading()}>
+                <p class="px-3 py-8 text-center text-xs text-on-surface-variant/60">
+                  Loading personas…
+                </p>
+              </Show>
+              <Show when={!loading() && filteredPersonas().length === 0}>
+                <div class="px-3 py-8 text-center">
+                  <p class="text-xs text-on-surface-variant/60">
+                    No saved personas yet.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setTab("templates")}
+                    class="mt-3 rounded-xl bg-primary/10 px-3 py-1.5 text-[0.6875em] font-medium text-primary transition hover:bg-primary/15"
+                  >
+                    Browse templates
+                  </button>
+                </div>
+              </Show>
+              <For each={filteredPersonas()}>
+                {(persona) => (
+                  <button
+                    type="button"
+                    onClick={() => switchPersona(persona)}
+                    disabled={switchingId() === persona.id}
+                    class={`mb-1 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-on-surface/6 ${
+                      persona.is_active ? "bg-primary/8 text-primary" : "text-on-surface"
+                    }`}
+                  >
+                    <span class="text-lg leading-none">{extractEmoji(persona.soul_md)}</span>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-medium leading-snug">{persona.name}</p>
+                      <p class="mt-0.5 text-[0.625em] text-on-surface-variant/65">
+                        {writingStyleLabel(persona.writing_style)}
+                      </p>
+                    </div>
+                    <Show when={switchingId() === persona.id}>
+                      <span class="text-[0.625em] text-primary/70">…</span>
+                    </Show>
+                    <Show when={persona.is_active && switchingId() !== persona.id}>
+                      <span class="text-[0.625em] font-semibold text-primary">Active</span>
+                    </Show>
+                  </button>
+                )}
+              </For>
+            </Show>
+
+            <Show when={tab() === "templates"}>
+              <Show when={filteredTemplates().length === 0}>
+                <p class="px-3 py-8 text-center text-xs text-on-surface-variant/60">
+                  No matching templates.
+                </p>
+              </Show>
+              <For each={filteredTemplates()}>
+                {(template) => {
+                  const installed = () =>
+                    installedTemplateNames().has(template.name.trim().toLowerCase());
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (installed()) return;
+                        void installTemplate(template);
+                      }}
+                      disabled={installed() || installingTemplateId() === template.id}
+                      class="mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-on-surface/6 disabled:cursor-default disabled:hover:bg-transparent"
+                    >
+                      <span class="pt-0.5 text-lg leading-none">
+                        {extractEmoji(template.soul_md)}
+                      </span>
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                          <p class="truncate text-sm font-medium text-on-surface">
+                            {template.name}
+                          </p>
+                          <span class="rounded-full bg-on-surface/6 px-1.5 py-0.5 text-[0.5625em] text-on-surface-variant/70">
+                            {writingStyleLabel(template.writing_style)}
+                          </span>
+                        </div>
+                        <p class="mt-0.5 line-clamp-2 text-[0.6875em] text-on-surface-variant/70">
+                          {template.description}
+                        </p>
+                      </div>
+                      <span class="pt-0.5 text-[0.625em] font-medium text-primary">
+                        {installed()
+                          ? "Installed"
+                          : installingTemplateId() === template.id
+                            ? "Installing…"
+                            : "Install"}
+                      </span>
+                    </button>
+                  );
+                }}
+              </For>
+            </Show>
+          </div>
+
+          <div class="border-t border-outline/10 px-3.5 py-2.5 text-[0.625em] text-on-surface-variant/55">
             {props.activeCount > 0
               ? `${props.activeCount} agent${props.activeCount === 1 ? "" : "s"} running`
               : "All agents idle"}
-          </p>
+          </div>
         </div>
       </Show>
 
-      {/* Persona switcher */}
-      <Show when={showSwitcher()}>
-        <div class="fixed bottom-[90px] right-6 z-50 min-w-[220px] max-h-72 overflow-auto animate-fade-in rounded-2xl border border-white/45 bg-white/96 p-3 shadow-panel backdrop-blur-xl">
-          <p class="mb-2 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">Switch persona</p>
-          <For each={personas()}>
-            {(persona) => (
-              <button
-                type="button"
-                onClick={() => switchPersona(persona)}
-                class={`flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-xs transition hover:bg-on-surface/6 ${
-                  persona.is_active ? "text-primary font-medium" : "text-on-surface"
-                }`}
-              >
-                <span class="text-base leading-none">{extractEmoji(persona.soul_md)}</span>
-                <div class="flex-1 min-w-0">
-                  <p class="font-medium truncate">{persona.name}</p>
-                  <p class="text-[9px] text-on-surface-variant/60 capitalize">{persona.writing_style ?? "balanced"}</p>
-                </div>
-                <Show when={persona.is_active}>
-                  <span class="text-primary text-[10px]">✓</span>
-                </Show>
-              </button>
-            )}
-          </For>
-          <Show when={personas().length === 0}>
-            <p class="px-2 py-1 text-xs text-on-surface-variant/50">
-              No personas yet — create one in Agent Settings
-            </p>
-          </Show>
-        </div>
-      </Show>
-
-      {/* FAB button */}
+      {/* ── FAB button ────────────────────────────────────────────────────────── */}
+      {/* Avatar emoji + mood ring + capability count chip + status dot.          */}
       <button
         type="button"
-        class={`fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-white/50 bg-white/90 shadow-lg backdrop-blur-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition ${fabAnim()}`}
+        class={`fixed bottom-6 right-6 z-50 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/85 text-on-surface/70 shadow-md outline-none transition-all backdrop-blur-2xl hover:bg-white/95 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-primary/50 ${fabAnim()} ${moodRingClass()}`}
         onPointerDown={startLongPress}
         onPointerUp={cancelLongPress}
         onPointerLeave={cancelLongPress}
         onClick={handleClick}
-        title="Agent persona (hold to switch)"
+        title={fabTitle()}
+        aria-label={fabTitle()}
       >
-        <span class="text-2xl leading-none select-none">{personaEmoji()}</span>
-        <span class={`absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-white ${dotColor()}`} />
+        {/* Persona or mood emoji — replaces the static SVG when state is meaningful */}
+        <Show
+          when={active() || avatarMood() !== "idle"}
+          fallback={
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              class="h-[1.125rem] w-[1.125rem]"
+            >
+              <circle cx="10" cy="7" r="3.5" />
+              <path d="M3,18 Q3,13 10,13 Q17,13 17,18" />
+            </svg>
+          }
+        >
+          <span class="text-xl leading-none select-none" aria-hidden="true">
+            {/* Prefer persona emoji; fall back to mood emoji */}
+            {active() ? extractEmoji(active()!.soul_md) : moodEmoji() ?? "🤖"}
+          </span>
+        </Show>
+
+        {/* Capability chip — shown in top-left when genome badges are earned */}
+        <Show when={genomeBadges().length > 0}>
+          <span
+            class="absolute -top-1 -left-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full border border-white/60 bg-primary px-1 text-[0.5rem] font-bold leading-none text-white"
+            title={`${genomeBadges().length} LoRA ${genomeBadges().length === 1 ? "capability" : "capabilities"} learned`}
+            aria-label={`${genomeBadges().length} LoRA capabilities`}
+          >
+            {genomeBadges()[genomeBadges().length - 1]?.icon}
+          </span>
+        </Show>
+
+        {/* Status dot — bottom-right, unchanged from original */}
+        <span
+          class={`absolute bottom-1.5 right-1.5 h-2 w-2 rounded-full border border-white/80 ${dotColor()}`}
+        />
       </button>
     </>
   );

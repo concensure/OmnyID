@@ -1,13 +1,23 @@
-const runtimeApiBase =
-  typeof window !== "undefined"
-    ? (window as unknown as { __API_BASE__?: string }).__API_BASE__?.trim()
-    : "";
+function safeRuntimeApiBase(): string {
+  if (typeof window === "undefined") return "";
+  const raw = (window as unknown as { __API_BASE__?: string }).__API_BASE__?.trim() ?? "";
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    // Only accept same origin or explicit localhost during development
+    const allowed =
+      u.origin === window.location.origin ||
+      (window.location.hostname === "localhost" && (u.hostname === "localhost" || u.hostname === "127.0.0.1"));
+    return allowed ? raw : "";
+  } catch { return ""; }
+}
+const runtimeApiBase = safeRuntimeApiBase();
 const envApiBase = typeof import.meta !== "undefined" ? import.meta.env.VITE_API_BASE?.trim?.() : "";
 
 export const API_BASE =
   runtimeApiBase ||
   envApiBase ||
-  (window.location.hostname === "localhost" ? "http://127.0.0.1:8080" : window.location.origin);
+  window.location.origin;
 export const SESSION_STORAGE_KEY = "omnyid.preview.session";
 export const SESSION_CHANGED_EVENT = "omnyid:session-changed";
 
@@ -49,10 +59,11 @@ export type AfpReference = {
 
 /**
  * A full AFP message as returned by GET /thread/{id}.
- * The `views` array is the agent-first rendering contract:
+ * The `views` array is the agent-native rendering contract:
  * agents set views[].format to tell the workspace how to render this message.
- * Keep `type` broad and stable. Use `subtype`, `content.kind`, and `metadata`
- * for finer-grained routing without exploding the top-level taxonomy.
+ * Keep `type` broad and stable. Use top-level `kind` for semantic typing,
+ * and use `subtype`, payload-local fields such as `content.kind`, and
+ * `metadata` for message-family-specific routing without exploding the taxonomy.
  */
 export type AfpMessage = {
   id: string;
@@ -62,6 +73,7 @@ export type AfpMessage = {
   to?: string[];
   timestamp: string;
   type: string;
+  kind?: string | null;
   subtype?: string | null;
   content: Record<string, unknown>;
   metadata?: Record<string, unknown> | null;
@@ -76,6 +88,76 @@ export type DashboardBootstrap = {
   user: Session["user"];
   agents: Array<{ agent_id: string; label?: string }>;
   messages: AfpMessage[];
+  cost_snapshot?: {
+    total_usd: number;
+    total_tokens: number;
+    event_count: number;
+    run_count: number;
+    monthly_budget_usd: number;
+    soft_limit_ratio: number;
+    recent_spend_usd_14d: number;
+    cost_month_usd: number;
+    estimated_monthly_margin_usd: number;
+    deep_queries_today: number;
+    daily_deep_query_limit: number;
+    margin_guard_active: boolean;
+    usage_guard_active: boolean;
+  } | null;
+  cost_status?: {
+    level: string;
+    title: string;
+    detail: string;
+    action_label: string;
+  } | null;
+  continuity_brief?: {
+    source_type: string;
+    title: string;
+    decision_count: number;
+    commitment_count: number;
+    critical_change_count: number;
+    suggested_actions: string[];
+    staleness_at?: string | null;
+  } | null;
+  continuity_primary_mode?: "priority_card" | "briefing_bar" | "continuity_panel" | string;
+  continuity_priority_card?: {
+    title: string;
+    description: string;
+    panel_kind: string;
+    requires_approval: boolean;
+    action_label: string;
+    surface_hint?: string | null;
+    confidence?: string | null;
+    source_refs?: string[];
+  } | null;
+  continuity_action_items?: Array<{
+    id: string;
+    title: string;
+    category: string;
+    urgency: string;
+    confidence: string;
+    requires_approval: boolean;
+    suggested_action: string;
+    source_refs: string[];
+  }>;
+  continuity_response_items?: Array<{
+    id: string;
+    title: string;
+    channel: string;
+    urgency: string;
+    confidence: string;
+    response_due_hint: string;
+    suggested_action: string;
+    source_refs: string[];
+  }>;
+  continuity_context_panel_items?: Array<{
+    id: string;
+    label: string;
+    why_surfaced: string;
+    confidence: string;
+    relation_path: string[];
+    source_refs: string[];
+    decrypt_needed: boolean;
+  }>;
   runtime_updates?: {
     current_version: string;
     latest_version: string;
@@ -152,6 +234,28 @@ export type WorkflowListResponse = {
   workflows: SavedWorkflow[];
 };
 
+export type WorkflowTemplateSuggestion = {
+  title: string;
+  score: number;
+  template_id: string;
+  workflow_family: string;
+  implementation_status: string;
+  reliability: string;
+  already_aligned: boolean;
+  rationale: string;
+  advisory: string;
+  semantic_roles: string[];
+  matched_node_ids: string[];
+};
+
+export type WorkflowCompiledSummary = {
+  manifest_count: number;
+  runtime_kind_counts: Record<string, number>;
+  afp_message_family_counts: Record<string, number>;
+  approval_manifest_count: number;
+  wait_resume_count: number;
+};
+
 export type WorkflowValidationResponse = {
   valid: boolean;
   errors: string[];
@@ -160,7 +264,9 @@ export type WorkflowValidationResponse = {
     workflow_id?: string | null;
     node_count: number;
     edge_count: number;
+    compiled?: WorkflowCompiledSummary;
   };
+  template_suggestions?: WorkflowTemplateSuggestion[];
 };
 
 export type WorkflowIntentExpansion = {
@@ -304,10 +410,27 @@ export type DaemonHeartbeatDetail = {
   created_at: string;
 };
 
+function isValidSession(v: unknown): v is Session {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  if (typeof o.token !== "string" || !o.token) return false;
+  const u = o.user;
+  if (!u || typeof u !== "object") return false;
+  const usr = u as Record<string, unknown>;
+  return (
+    typeof usr.id === "string" &&
+    typeof usr.email === "string" &&
+    typeof usr.display_name === "string" &&
+    typeof usr.auth_provider === "string"
+  );
+}
+
 export function readSession(): Session | null {
   try {
     const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Session) : null;
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return isValidSession(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -442,11 +565,13 @@ export function subscribeThread(
   const socket = new WebSocket(`${wsBase}/relay/ws`);
 
   socket.addEventListener("open", () => {
+    const token = readSession()?.token ?? null;
     socket.send(
       JSON.stringify({
         op: "subscribe_thread",
         thread_id: threadId,
-        include_snapshot: false
+        include_snapshot: false,
+        ...(token ? { token } : {}),
       })
     );
   });
@@ -480,7 +605,8 @@ export function subscribeFleet(onUpdate: () => void): () => void {
   const socket = new WebSocket(`${wsBase}/relay/ws`);
 
   socket.addEventListener("open", () => {
-    socket.send(JSON.stringify({ op: "subscribe_fleet" }));
+    const token = readSession()?.token ?? null;
+    socket.send(JSON.stringify({ op: "subscribe_fleet", ...(token ? { token } : {}) }));
   });
 
   socket.addEventListener("message", (ev) => {
@@ -502,25 +628,38 @@ export const cancelTask = (taskId: string) =>
 
 // ── Workspace preference persistence ─────────────────────────────────────────
 
-const PREF_KEY = "omnyid.workspace.prefs";
+const PREF_KEY_BASE = "omnyid.workspace.prefs";
 
 export type WorkspacePrefs = {
   activeView: string;
   openThreadId: string | null;
 };
 
-export function loadPrefs(): WorkspacePrefs {
+const DEFAULT_PREFS: WorkspacePrefs = { activeView: "search", openThreadId: null };
+
+function prefKey(userId?: string): string {
+  return userId ? `${PREF_KEY_BASE}.${userId}` : PREF_KEY_BASE;
+}
+
+export function loadPrefs(userId?: string): WorkspacePrefs {
   try {
-    const raw = window.localStorage.getItem(PREF_KEY);
-    return raw ? (JSON.parse(raw) as WorkspacePrefs) : { activeView: "search", openThreadId: null };
+    const raw = window.localStorage.getItem(prefKey(userId));
+    if (!raw) return { ...DEFAULT_PREFS };
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { ...DEFAULT_PREFS };
+    const p = parsed as Record<string, unknown>;
+    return {
+      activeView: typeof p.activeView === "string" && p.activeView ? p.activeView : DEFAULT_PREFS.activeView,
+      openThreadId: typeof p.openThreadId === "string" ? p.openThreadId : null,
+    };
   } catch {
-    return { activeView: "search", openThreadId: null };
+    return { ...DEFAULT_PREFS };
   }
 }
 
-export function savePrefs(prefs: WorkspacePrefs): void {
+export function savePrefs(prefs: WorkspacePrefs, userId?: string): void {
   try {
-    window.localStorage.setItem(PREF_KEY, JSON.stringify(prefs));
+    window.localStorage.setItem(prefKey(userId), JSON.stringify(prefs));
   } catch {
     // storage unavailable in guest/private mode — ignore
   }
@@ -539,6 +678,7 @@ export function pickView(message: AfpMessage, known: string[]): AfpView | null {
 
 export const KNOWN_VIEW_FORMATS = [
   "email",
+  "rich_text",
   "canvas",
   "table",
   "calendar",
@@ -551,6 +691,10 @@ export const KNOWN_VIEW_FORMATS = [
   "ui_blueprint",
   "ui_presentation",
   "blueprint",
+  // Single-node A2UI view formats emitted by backend agents (watcher, synthesizer, etc.)
+  "insight_line",
+  "action_chips",
+  "stat_row",
 ] as const;
 
 // ── Master agent / dashboard API ─────────────────────────────────────────────
@@ -562,8 +706,20 @@ export const createFocusItem = (data: { title: string; description?: string; pri
   apiFetch("/agent/focus", { method: "POST", bodyJson: data });
 export const updateFocusItem = (id: string, data: { status?: string; priority?: string }) =>
   apiFetch(`/agent/focus/${id}`, { method: "PATCH", bodyJson: data });
-export const orchestrate = (objective: string) =>
-  apiFetch("/agent/orchestrate", { method: "POST", bodyJson: { objective } });
+async function withRetry<T>(fn: () => Promise<T>, attempts = 2, baseDelayMs = 1000): Promise<T> {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try { return await fn(); }
+    catch (e) {
+      lastError = e;
+      if (i < attempts - 1) await new Promise<void>((r) => setTimeout(r, baseDelayMs * (i + 1)));
+    }
+  }
+  throw lastError;
+}
+
+export const orchestrate = (objective: string, options?: { thread_id?: string }) =>
+  withRetry(() => apiFetch("/agent/orchestrate", { method: "POST", bodyJson: { objective, ...options } }));
 export const onboard = (answers: Record<string, string>) =>
   apiFetch("/agent/onboarding", { method: "POST", bodyJson: answers });
 export const createDelegation = (scope: string, mask: string, expiresIn: number) =>
@@ -756,6 +912,62 @@ export type LlmConfig = {
 export const fetchLlmConfig = () =>
   apiFetch<LlmConfig>("/user/llm-config");
 
+export type CostSummary = {
+  user_id: string;
+  total_usd: number;
+  total_tokens: number;
+  event_count: number;
+  run_count: number;
+};
+
+export type CostBudget = {
+  user_id?: string;
+  max_cost_usd: number;
+  max_api_calls: number;
+  max_llm_tokens: number;
+  soft_limit_ratio: number;
+  degradation_policy?: "downgrade" | "cache_only" | "halt" | string;
+};
+
+export type CostProfitSummary = {
+  user_id: string;
+  pricing_tier: string;
+  tier_max_stage: number;
+  daily_deep_query_limit: number;
+  deep_queries_today: number;
+  budget_max_cost_usd: number;
+  cost_day_usd: number;
+  cost_month_usd: number;
+  estimated_monthly_revenue_usd: number;
+  estimated_monthly_margin_usd: number;
+  margin_guard_active: boolean;
+  usage_guard_active: boolean;
+};
+
+export type SpendHistoryEntry = {
+  day: string;
+  cost_usd: number;
+  api_calls: number;
+  tokens: number;
+};
+
+export const fetchCostSummary = () =>
+  apiFetch<CostSummary>("/api/cost/summary");
+
+export const fetchCostProfitSummary = () =>
+  apiFetch<CostProfitSummary>("/api/cost/profit/summary");
+
+export const getCostBudget = () =>
+  apiFetch<CostBudget>("/api/cost/budget");
+
+export const upsertCostBudget = (body: Partial<CostBudget>) =>
+  apiFetch<{ ok: boolean }>("/api/cost/budget", { method: "POST", bodyJson: body });
+
+export const fetchSpendHistory = (days = 30) =>
+  apiFetch<{ days: number; history: SpendHistoryEntry[] }>(
+    `/agent/spend-history?days=${encodeURIComponent(String(days))}`,
+  );
+
 export const saveLlmConfig = (data: {
   backend: string;
   provider?: string;
@@ -793,6 +1005,7 @@ export type CapabilityDescriptor = {
   tags: string[];
   approval_mode: "autonomous" | "suggest_only" | "human_approval_required";
   created_at: string;
+  enabled?: boolean;
 };
 
 export const registerCapability = (d: Omit<CapabilityDescriptor, "id" | "created_at">) =>
@@ -803,6 +1016,84 @@ export const listCapabilities = () =>
 
 export const deleteCapability = (id: string) =>
   apiFetch(`/agent/capability/${id}`, { method: "DELETE" });
+
+export const patchCapability = (id: string, patch: Partial<Pick<CapabilityDescriptor, "approval_mode">>) =>
+  apiFetch<CapabilityDescriptor>(`/agent/capability/${id}`, { method: "PATCH", bodyJson: patch });
+
+// ── Agent personas ────────────────────────────────────────────────────────────
+
+export type AgentPersona = {
+  id: string;
+  owner_user_id: string;
+  name: string;
+  soul_md: string;
+  writing_style: string;
+  skills_json: string[];
+  lora_confidence_score: number;
+  lora_genome_active: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export const listPersonas = () =>
+  apiFetch<{ personas: AgentPersona[] }>("/agent/personas");
+
+export const createPersona = (d: { name: string; soul_md?: string; writing_style?: string; skills?: string[] }) =>
+  apiFetch<{ persona: AgentPersona }>("/agent/personas", { method: "POST", bodyJson: d });
+
+export const updatePersona = (id: string, d: { name?: string; soul_md?: string; writing_style?: string; skills?: string[]; lora_confidence_score?: number }) =>
+  apiFetch<{ persona: AgentPersona }>(`/agent/personas/${encodeURIComponent(id)}`, { method: "PUT", bodyJson: d });
+
+export const activatePersona = (id: string) =>
+  apiFetch<{ activated: string }>(`/agent/personas/${encodeURIComponent(id)}/activate`, { method: "POST" });
+
+export const deletePersona = (id: string) =>
+  apiFetch<{ deleted: string }>(`/agent/personas/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+// ── Note creation (used by drag-and-drop) ─────────────────────────────────────
+
+function escapeMd(s: string): string {
+  // Escape characters that have structural meaning in Markdown
+  return s.replace(/[\\`*_{}[\]()#+\-.!|]/g, "\\$&").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+export async function createNoteFromThread(opts: {
+  threadId: string;
+  title: string;
+  summary: string;
+  sourceMessageId?: string;
+}): Promise<{ message_id: string }> {
+  const noteThreadId = `note_from_email_${opts.threadId}_${Date.now()}`;
+  const safeTitle = escapeMd(opts.title);
+  const safeSummary = escapeMd(opts.summary);
+  const content = {
+    markdown: `# ${safeTitle}\n\n${safeSummary}\n\n---\n*Clipped from email thread*`,
+    text: opts.summary,
+  };
+  const references = opts.sourceMessageId
+    ? [{ id: opts.sourceMessageId, rel: "source_email" }]
+    : [];
+  return apiFetch<{ success: boolean; message_id: string }>("/send", {
+    method: "POST",
+    bodyJson: {
+      thread_id: noteThreadId,
+      parent_id: null,
+      from: "agent:notes",
+      to: [],
+      timestamp: new Date().toISOString(),
+      type: "note",
+      subtype: "content",
+      content,
+      views: [{ format: "rich_text", content: { markdown: content.markdown }, priority: 1 }],
+      attachments: [],
+      references,
+      metadata: { origin: "email_drag_drop", source_thread_id: opts.threadId },
+      store_in_relational: true,
+      signature: "",
+    },
+  });
+}
 
 // ── Feed follow / engage ──────────────────────────────────────────────────────
 
@@ -933,6 +1224,13 @@ export type AgentPreferences = {
   auto_confirm_threshold_cents: number;
   show_cost_estimates: boolean;
   default_store_in_history: boolean;
+  response_queue_policy?: {
+    supplier_due_hours: number;
+    friend_due_hours: number;
+    general_due_hours: number;
+    prioritize_with_local_llm: boolean;
+    allow_remote_fallback: boolean;
+  };
 };
 
 export const getAgentPreferences = () =>
@@ -940,6 +1238,63 @@ export const getAgentPreferences = () =>
 
 export const setAgentPreferences = (prefs: AgentPreferences) =>
   apiFetch<{ updated: boolean }>("/user/agent-preferences", { method: "POST", bodyJson: prefs });
+
+export type McpToolConnection = {
+  id: string;
+  tool_slug: string;
+  tool_name: string;
+  mcp_server_url: string;
+  connected_at: string;
+};
+
+export type SkillCapsuleCatalogEntry = {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  integration_mode: string;
+  surfaces: string[];
+  existing_runtime_fit: string;
+  compose_scaffold?: string;
+  compose_placeholder?: string;
+  capsule_kind?: string;
+  tags?: string[];
+};
+
+export const fetchToolConnections = () =>
+  apiFetch<{ connections: McpToolConnection[] }>("/tools/connections");
+
+export const connectTool = (body: Record<string, unknown>) =>
+  apiFetch<{ ok: boolean }>("/tools/connections", { method: "POST", bodyJson: body });
+
+export const disconnectTool = (slug: string) =>
+  apiFetch<{ ok: boolean }>(`/tools/connections/${encodeURIComponent(slug)}`, {
+    method: "DELETE",
+  });
+
+export const fetchSkillCapsuleCatalog = () =>
+  apiFetch<{
+    available: boolean;
+    catalog: SkillCapsuleCatalogEntry[];
+    warnings: string[];
+    workspace: { selected_skill_ids: string[] };
+  }>("/skill-capsule/catalog");
+
+export const generateSkillCapsule = (description: string) =>
+  apiFetch<{ entry: SkillCapsuleCatalogEntry }>("/skill-capsule/generate", {
+    method: "POST",
+    bodyJson: { description },
+  });
+
+export const saveWorkspaceSkillSelection = (selected_skill_ids: string[]) =>
+  apiFetch<{
+    selected_skill_ids: string[];
+    reasoning_guidance?: string[];
+    warnings?: string[];
+  }>("/skill-capsule/workspace", {
+    method: "POST",
+    bodyJson: { selected_skill_ids },
+  });
 
 // ── Generative card decisions ─────────────────────────────────────────────────
 
@@ -957,6 +1312,23 @@ export const submitDecision = (req: UiDecisionRequest) =>
     bodyJson: req,
   });
 
+/**
+ * Sanitize a URL coming from agent/server data before placing it in an href.
+ * Only http: and https: are permitted. Any other scheme (javascript:, data:, etc.)
+ * returns "#" so the link is inert rather than executable.
+ */
+export function safeHref(url: unknown): string {
+  if (typeof url !== "string" || !url.trim()) return "#";
+  try {
+    const u = new URL(url.trim());
+    if (u.protocol === "https:" || u.protocol === "http:") return url.trim();
+  } catch { /* relative URL — check it's not a protocol-less attack vector */ }
+  // Accept relative paths only — block protocol-relative URLs (//host) (GAP-103).
+  const trimmed = url.trim();
+  if (/^\.\//.test(trimmed) || /^\/[^/]/.test(trimmed)) return trimmed;
+  return "#";
+}
+
 export const updateAgentSettings = (settings: { auto_approve_workflows?: boolean }) =>
   apiFetch<{ ok: boolean }>("/agent/settings", { method: "PATCH", bodyJson: settings });
 
@@ -964,3 +1336,210 @@ export const updateAgentSettings = (settings: { auto_approve_workflows?: boolean
 export function openRunStream(workflowId: string, runId: string): EventSource {
   return new EventSource(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/runs/${encodeURIComponent(runId)}/stream`);
 }
+
+// ── Token budget / LLM provider management ──────────────────────────────────
+
+export type TokenBudgetStatus = {
+  status: "ok" | "warning" | "exceeded";
+  budget_cents: number;
+  used_cents: number;
+  remaining_cents: number;
+  reset_at: string;
+  daily_used_tokens: number;
+  daily_limit_tokens: number;
+  usage_pct: number;
+  escalation_enabled: boolean;
+};
+
+export type UserLlmProvider = {
+  id: string;
+  name: string;
+  provider: string;
+  display_name: string;
+  backend: string;
+  model: string;
+  model_id: string;
+  is_default: boolean;
+  priority: number;
+  has_api_key: boolean;
+  consent_given: boolean;
+};
+
+export type UpsertLlmProviderInput = {
+  provider?: string;
+  display_name?: string;
+  model_id?: string;
+  api_key?: string;
+  base_url?: string;
+  consent?: boolean;
+  backend?: string;
+  model?: string;
+  is_default?: boolean;
+};
+
+export const getTokenBudget = () =>
+  apiFetch<TokenBudgetStatus>("/api/cost/budget");
+
+export const updateTokenBudget = (patch: { escalation_enabled?: boolean; budget_cents?: number }) =>
+  apiFetch<{ ok: boolean }>("/api/cost/budget", { method: "POST", bodyJson: patch });
+
+export const listLlmProviders = () =>
+  apiFetch<{ providers: UserLlmProvider[] }>("/user/llm-providers");
+
+export const upsertLlmProvider = (input: UpsertLlmProviderInput) =>
+  apiFetch<UserLlmProvider>("/user/llm-providers", { method: "POST", bodyJson: input });
+
+export const deleteLlmProvider = (id: string) =>
+  apiFetch<{ ok: boolean }>(`/user/llm-providers/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+// ── Continuity / briefing / behavioural synthesis ────────────────────────────
+
+export type ContinuityMessage = {
+  id: string;
+  type: string;
+  content: Record<string, unknown>;
+  timestamp: string;
+};
+
+export const getContinuitySummary = () =>
+  apiFetch<{ messages: ContinuityMessage[] }>("/dashboard/continuity");
+
+export const generateProjections = () =>
+  apiFetch<{ ok: boolean }>("/dashboard/projections", { method: "POST" });
+
+export const generateTemporalProjection = (opts: number | Record<string, unknown>) =>
+  apiFetch<{ ok: boolean }>("/dashboard/temporal-projection", {
+    method: "POST",
+    bodyJson: typeof opts === "number" ? { days: opts } : opts,
+  });
+
+export const synthesizeBehaviorPatterns = () =>
+  apiFetch<{ ok: boolean }>("/dashboard/behavior-patterns", { method: "POST" });
+
+export const synthesizeState = () =>
+  apiFetch<{ ok: boolean }>("/dashboard/state-synthesis", { method: "POST" });
+
+// ── Agent memory ─────────────────────────────────────────────────────────────
+
+export type AgentMemoryPointerBundle = {
+  items: unknown[];
+  token_estimate: number;
+  pointers_text: string;
+  harness?: string;
+};
+
+export type AgentMemoryItem = {
+  id: string;
+  content: string;
+  created_at: string;
+  updated_at?: string;
+  tier?: string;
+  type?: string;
+  status?: string;
+  confidence?: number;
+  namespace?: string | null;
+  role?: string | null;
+  repo_state_hash?: string | null;
+  citations?: string[];
+};
+
+export type AgentMemoryWarning = {
+  code: string;
+  message: string;
+  memory_id?: string | null;
+};
+
+export type AgentMemoryResponse = {
+  configured?: boolean;
+  available?: boolean;
+  source?: string;
+  agent_id?: string;
+  query?: Record<string, unknown>;
+  memories?: AgentMemoryItem[];
+  items?: AgentMemoryItem[];
+  evidence?: unknown[];
+  warnings?: AgentMemoryWarning[];
+  pointer_bundle?: AgentMemoryPointerBundle | null;
+  message?: string;
+};
+
+export const fetchAgentMemory = (agentId: string, opts?: Record<string, unknown>) =>
+  apiFetch<AgentMemoryResponse>(`/agent/${encodeURIComponent(agentId)}/memory`, {
+    method: "POST",
+    bodyJson: opts ?? {},
+  });
+
+export const setCapabilityEnabled = (id: string, enabled: boolean) =>
+  apiFetch<CapabilityDescriptor>(`/agent/capability/${encodeURIComponent(id)}/enabled`, {
+    method: "PATCH",
+    bodyJson: { enabled },
+  });
+
+export const extractDocument = (
+  threadId: string,
+  messageId: string,
+  opts: { title?: string },
+) =>
+  apiFetch<{ row_count: number; column_count: number; quality_status: string }>(
+    `/thread/${encodeURIComponent(threadId)}/message/${encodeURIComponent(messageId)}/extract-document`,
+    { method: "POST", bodyJson: opts },
+  );
+
+// ── Planning ──────────────────────────────────────────────────────────────────
+
+export type PlanAssumption = {
+  key: string;
+  value: string;
+  label?: string;
+  editable?: boolean;
+};
+
+export type PlanOption = {
+  id?: string;
+  title: string;
+  description: string;
+  rationale: string;
+  metric_label?: string;
+  metric_value?: string;
+  confidence?: string;
+  risk_flags: string[];
+  follow_up_chips?: string[];
+};
+
+export type PlanningQueryResponse = {
+  thread_id?: string;
+  correlation_id?: string;
+  goal?: string;
+  summary?: string;
+  options?: PlanOption[];
+  assumptions: PlanAssumption[];
+  unresolved?: string[];
+  comparison_headers?: string[];
+  comparison_rows?: Array<{ label: string; values: string[] }>;
+};
+
+export const submitPlanningQuery = (body: {
+  query: string;
+  session_state?: Record<string, unknown>;
+  thread_id?: string;
+  assumption_delta?: { key: string; value: string };
+}) =>
+  apiFetch<PlanningQueryResponse>("/ui/planning", { method: "POST", bodyJson: body });
+
+// ── Claim neighborhood ────────────────────────────────────────────────────────
+
+export type ClaimNeighborhoodResponse = {
+  a2ui?: Record<string, unknown>;
+  filters?: Record<string, unknown>;
+  groups?: unknown[];
+  message_id?: string;
+};
+
+export const fetchClaimNeighborhood = (
+  messageId: string,
+  opts: { stance?: string; depth?: number; limit_per_group?: number },
+) =>
+  apiFetch<ClaimNeighborhoodResponse>(
+    `/knowledge/claim-neighborhood/${encodeURIComponent(messageId)}`,
+    { method: "POST", bodyJson: opts },
+  );
