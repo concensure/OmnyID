@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     net::SocketAddr,
@@ -13,10 +15,12 @@ use axum::{
     response::IntoResponse,
     routing::{get, post, put},
 };
-use serde_json::Value;
+pub use serde_json::Value;
+pub use serde_json::json;
 use sqlx::Error as SqlxError;
+pub use sqlx::Row;
 use tokio::process::Command;
-use tokio::sync::{Mutex, broadcast};
+use tokio::sync::{Mutex, Semaphore, broadcast};
 use tonic::{Request, Response, Status, transport::Server};
 use tracing::{error, info, instrument};
 use ulid::Ulid;
@@ -36,7 +40,8 @@ use crate::{
     curator_runtime::start_knowledge_curator_daemon,
     daemon_registry,
     daemon_runtime::{
-        emit_daemon_heartbeats, start_archive_daemon, start_health_maintenance_daemon,
+        emit_daemon_heartbeats, shutdown_channel, start_archive_daemon,
+        start_health_maintenance_daemon,
     },
     db::{
         AuthSessionRecord, Db, ManagedAgentRecord, RuntimeBackupPolicyRecord, RuntimeBackupRecord,
@@ -56,6 +61,7 @@ use crate::{
     },
     integration::{ActionIntent, ActionResult, ActionStatus, IntegrationCapability},
     knowledge_curator::{BacklinkRecord, KnowledgeCuratorState},
+    ledger_ingestion_daemon::start_ledger_ingestion_daemon,
     local_sync::{
         DeviceBootstrap, default_sync_profile, parse_device_class, requires_local_key_material,
         shape_descriptors_for_slices, sync_slices_for_device,
@@ -72,13 +78,57 @@ use crate::{
 
 mod auth;
 mod billing;
+mod compat_helpers;
 mod health;
+mod health_deps;
+mod persona_routes;
 mod relay;
 mod types;
 mod workflow;
+// Route submodules (compile-verified)
+mod account_routes;
+mod agent_capability_routes;
+mod agent_memory_routes;
+mod agent_setup_routes;
+mod agent_trigger_routes;
+mod continuity_routes;
+mod cost_controls;
+mod dashboard_routes;
+mod dashboard_runtime_routes;
+mod email_group_routes;
+mod export_routes;
+mod brief_routes;
+mod feed_routes;
+mod federation_routes;
+mod finance_routes;
+mod goal_routes;
+mod para_routes;
+mod conversion_routes;
+mod ingest_routes;
+mod knowledge_routes;
+mod news_routes;
+mod map_routes;
+mod privacy_routes;
+mod proactive_routes;
+mod protocol_routes;
+mod runtime_routes;
+mod skill_capsule_routes;
+mod social_routes;
+mod space_routes;
+mod ui_command_browser_fallback;
+mod ui_command_research;
+mod ui_command_response_enricher;
+mod ui_command_router_core;
+mod ui_command_routes;
+mod ui_command_zero_token;
+mod ui_decision_routes;
+mod user_integrations;
+mod user_management_routes;
+mod workspace_routes;
 use self::auth::*;
 use self::billing::*;
 use self::health::*;
+use self::persona_routes::*;
 use self::relay::*;
 use self::types::*;
 use self::workflow::*;
@@ -169,7 +219,7 @@ fn runtime_status_panel_a2ui(
                         "type": "text",
                         "props": {
                             "label": "Log source",
-                            "value": format!("{log_source} · updated {updated_at}"),
+                            "value": format!("{log_source} Â· updated {updated_at}"),
                         }
                     },
                     {
@@ -360,10 +410,24 @@ impl TrialRunnerManager {
         sessions.get(session_id).cloned()
     }
 
+    async fn get_session_for_identity(
+        &self,
+        session_id: &str,
+        identity_key: &str,
+    ) -> Option<TrialRunnerSession> {
+        let session = self.get_session(session_id).await?;
+        if session.identity_key == identity_key {
+            Some(session)
+        } else {
+            None
+        }
+    }
+
     async fn start_template_run(
         &self,
         session_id: &str,
         template_id: &str,
+        identity_key: &str,
     ) -> Result<TrialRunnerSession, String> {
         self.prune_expired().await;
         let session_identity = {
@@ -371,6 +435,9 @@ impl TrialRunnerManager {
             let session = sessions
                 .get(session_id)
                 .ok_or_else(|| "trial session not found".to_string())?;
+            if session.identity_key != identity_key {
+                return Err("trial session not found".to_string());
+            }
             session.identity_key.clone()
         };
 
@@ -448,12 +515,16 @@ impl TrialRunnerManager {
         &self,
         session_id: &str,
         content: &str,
+        identity_key: &str,
     ) -> Result<TrialRunnerSession, String> {
         self.prune_expired().await;
         let mut sessions = self.sessions.lock().await;
         let session = sessions
             .get_mut(session_id)
             .ok_or_else(|| "trial session not found".to_string())?;
+        if session.identity_key != identity_key {
+            return Err("trial session not found".to_string());
+        }
         if session.requires_signup {
             return Err("anonymous trial limit reached; sign up to continue".to_string());
         }
@@ -586,6 +657,8 @@ struct AppState {
     http_client: reqwest::Client,
     /// Cost oracle — shared singleton for budget enforcement + cost tracking.
     cost_oracle: Arc<CostOracle>,
+    /// CGAP-009: global cap on concurrent Playwright subprocesses (max 4).
+    pdf_semaphore: Arc<tokio::sync::Semaphore>,
 }
 
 fn knowledge_curator_state() -> &'static Arc<Mutex<KnowledgeCuratorState>> {
@@ -723,9 +796,30 @@ impl AfpService for AFPServer {
 pub async fn run() {
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://afp:afp@postgres:5432/afp".to_string());
-    let db = Db::new(&database_url)
-        .await
-        .expect("database connection failed");
+    // Retry DB connection with backoff so the homeserver survives container
+    // startup races where Postgres isn't ready yet (GAP-082).
+    let db = {
+        let mut attempt = 0u32;
+        loop {
+            match Db::new(&database_url).await {
+                Ok(d) => break d,
+                Err(e) => {
+                    attempt += 1;
+                    if attempt >= 10 {
+                        panic!("database connection failed after 10 attempts: {e}");
+                    }
+                    let wait_secs = (2u64).pow(attempt.min(6));
+                    tracing::warn!(
+                        attempt,
+                        wait_secs,
+                        error = %e,
+                        "database not ready, retrying"
+                    );
+                    tokio::time::sleep(std::time::Duration::from_secs(wait_secs)).await;
+                }
+            }
+        }
+    };
     let metrics = Arc::new(Metrics::default());
     let (relay_tx, _) = broadcast::channel(256);
     let app_state = Arc::new(AppState {
@@ -739,17 +833,51 @@ pub async fn run() {
             .build()
             .unwrap_or_default(),
         cost_oracle: Arc::new(CostOracle::new(db.pool.clone())),
+        pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(4)),
     });
 
-    if let Err(err) = daemon_registry::ensure_system_daemons_registered(&db).await {
-        error!(%err, "Omnyid failed to ensure daemon registrations at startup");
+    // GAP-129: run daemon registration in the background so startup latency does
+    // not scale linearly with user count. The HTTP server begins accepting
+    // connections immediately; daemons are registered within seconds.
+    {
+        let db_reg = db.clone();
+        tokio::spawn(async move {
+            if let Err(err) = daemon_registry::ensure_system_daemons_registered(&db_reg).await {
+                error!(%err, "Omnyid failed to ensure daemon registrations at startup");
+            }
+        });
     }
-    start_knowledge_curator_daemon(db.clone()).await;
+
+    // GAP-083: shared shutdown channel — sending `true` tells all daemons to exit cleanly.
+    let (shutdown_tx, shutdown_rx) = shutdown_channel();
+    // Extra clone for the HTTP graceful-shutdown guard (GAP-119).
+    let http_shutdown_rx = shutdown_rx.clone();
+
+    start_knowledge_curator_daemon(db.clone(), shutdown_rx.clone()).await;
+    start_ledger_ingestion_daemon(db.clone(), shutdown_rx.clone()).await;
     start_sync_worker(db.pool.clone()).await;
     start_imap_sync(db.clone(), metrics.clone(), app_state.relay_tx.clone()).await;
-    start_archive_daemon(db.clone()).await;
-    start_health_maintenance_daemon(db.clone()).await;
+    start_archive_daemon(db.clone(), shutdown_rx.clone()).await;
+    start_health_maintenance_daemon(db.clone(), shutdown_rx.clone()).await;
     start_workflow_wait_resume_worker(db.clone(), app_state.relay_tx.clone()).await;
+
+    // Listen for SIGTERM/Ctrl-C and broadcast shutdown to all daemons.
+    tokio::spawn(async move {
+        #[cfg(unix)]
+        {
+            use tokio::signal::unix::{SignalKind, signal};
+            let mut sigterm =
+                signal(SignalKind::terminate()).expect("failed to install SIGTERM handler");
+            tokio::select! {
+                _ = sigterm.recv() => {},
+                _ = tokio::signal::ctrl_c() => {},
+            }
+        }
+        #[cfg(not(unix))]
+        let _ = tokio::signal::ctrl_c().await;
+        info!("Shutdown signal received — asking daemons to stop");
+        let _ = shutdown_tx.send(true);
+    });
 
     // Background: clean up expired ephemeral (anon) agent instances every 30 min
     let cleanup_db = db.clone();
@@ -815,7 +943,16 @@ pub async fn run() {
         .route("/auth/register", post(register_http))
         .route("/auth/login", post(login_http))
         .route("/auth/google", post(google_auth_http))
+        .route("/auth/apple", post(apple_auth_http))
         .route("/auth/session", get(auth_session_http))
+        .route("/auth/change-password", post(change_password_http))
+        .route(
+            "/auth/verify-email/send",
+            post(send_verification_email_http),
+        )
+        .route("/auth/verify-email", post(verify_email_http))
+        .route("/auth/forgot-password", post(forgot_password_http))
+        .route("/auth/reset-password", post(reset_password_http))
         .route("/dashboard/bootstrap", get(dashboard_bootstrap_http))
         .route("/dashboard/export", get(dashboard_export_http))
         .route("/dashboard/onboarding", post(update_onboarding_http))
@@ -824,67 +961,17 @@ pub async fn run() {
             "/dashboard/service-adapter-bundle",
             get(service_adapter_bundle_http),
         )
-        .route(
-            "/dashboard/sessions",
-            get(account_sessions_http).post(account_sessions_action_http),
-        )
-        .route(
-            "/dashboard/runtime-backups",
-            get(runtime_backups_http).post(runtime_backups_action_http),
-        )
-        .route(
-            "/dashboard/runtime-backups/{backup_id}",
-            get(runtime_backup_manifest_http),
-        )
-        .route(
-            "/dashboard/runtime-restore-drills",
-            get(runtime_restore_drills_http).post(runtime_restore_drill_create_http),
-        )
-        .route(
-            "/dashboard/runtime-updates",
-            get(runtime_updates_http).post(runtime_updates_action_http),
-        )
-        .route(
-            "/dashboard/runtime-recovery-packet",
-            get(runtime_recovery_packet_http),
-        )
-        .route(
-            "/dashboard/device-bootstrap-bundle",
-            post(device_bootstrap_bundle_http),
-        )
-        .route(
-            "/dashboard/device-sync-policies",
-            get(device_sync_policies_http).post(device_sync_policies_action_http),
-        )
-        .route(
-            "/dashboard/support-access",
-            get(support_access_http).post(update_support_access_http),
-        )
-        .route(
-            "/dashboard/support-access/history",
-            get(support_access_history_http),
-        )
-        .route("/dashboard/account/delete", post(account_delete_http))
         .route("/dashboard/demo/send", post(demo_send_http))
-        .route("/runtime/deploy", post(runtime_deploy_http))
-        .route("/runtime/action", post(runtime_action_http))
-        .route("/runtime/destroy", post(runtime_destroy_http))
-        .route("/runtime/logs", get(runtime_logs_http))
         .route(
-            "/runtime/runner-config",
-            get(runtime_runner_config_http).post(runtime_runner_config_action_http),
+            "/installers/local/windows.ps1",
+            get(local_windows_installer_http),
         )
-        .route(
-            "/runtime/workspace-files",
-            get(runtime_workspace_files_http),
-        )
-        .route(
-            "/runtime/workspace-file",
-            get(runtime_workspace_file_http).post(runtime_workspace_file_save_http),
-        )
+        .route("/installers/local/unix.sh", get(local_unix_installer_http))
         .route("/notes/message", post(notes_message_http))
-        .route("/ui/command", post(ui_command_http))
-        .route("/ui/decision", post(ui_decision_http))
+        .route(
+            "/ui/command",
+            post(self::ui_command_routes::ui_command_http),
+        )
         .route(
             "/workflows",
             get(workflows_list_http).post(workflows_save_http),
@@ -940,38 +1027,16 @@ pub async fn run() {
             get(workflow_connector_adapters_http),
         )
         // Public unauthenticated webhook ingress (Phase 2 item 5).
-        // No bearer auth — HMAC-SHA256 signature in X-OmnyID-Signature header.
+        // No bearer auth â€” HMAC-SHA256 signature in X-OmnyID-Signature header.
         .route(
             "/ingest/webhook/{registration_id}",
             post(webhook_ingress_http),
         )
         // Authenticated internal event ingress (Phase 2 item 5).
         .route("/ingest/internal/{event_type}", post(internal_ingest_http))
-        .route(
-            "/user/agent-preferences",
-            get(agent_preferences_get_http).post(agent_preferences_set_http),
-        )
-        .route("/daemons", get(daemons_list_http))
-        .route("/daemons/{daemon_id}/heartbeat", get(daemon_heartbeat_http))
-        .route("/daemons/{daemon_id}/revoke", post(daemon_revoke_http))
-        // ── Knowledge Curator — backlinks & supertags ─────────────────────────
-        .route("/notes/backlinks/{message_id}", get(note_backlinks_http))
-        .route(
-            "/notes/{message_id}/backlink-override",
-            post(note_backlink_override_http),
-        )
-        .route("/notes/supertags", get(user_supertags_http))
-        .route("/backlinks/graph", get(backlinks_graph_http))
-        .route("/notes/supertags/install-defaults", post(install_default_supertags_http))
-        .route(
-            "/installers/local/windows.ps1",
-            get(local_windows_installer_http),
-        )
-        .route("/installers/local/unix.sh", get(local_unix_installer_http))
         .route("/relay/ws", get(relay_ws_http))
         .route("/send", post(send_http))
         .route("/thread/{thread_id}", get(get_thread_http))
-        .route("/thread/{id}/verify", get(verify_thread_chain_http))
         .route("/actions/decision", post(record_action_decision_http))
         .route("/actions/execute", post(execute_action_http))
         .route("/gateway/email", post(handle_gateway_email))
@@ -991,13 +1056,13 @@ pub async fn run() {
         )
         .route("/billing/webhook", post(billing_webhook_http))
         .route("/billing/status", get(billing_status_http))
-        // ── Cost-aware orchestration ──────────────────────────────────────────
         .route("/api/cost/summary", get(cost_summary_http))
-        .route("/api/cost/budget", get(get_budget_http))
-        .route("/api/cost/budget", post(upsert_budget_http))
-        .route("/api/cost/runs/{run_id}", get(get_run_context_http))
-        .route("/mcp", post(mcp_http))
-        // ── Agent template ────────────────────────────────────────────────
+        .route(
+            "/api/cost/budget",
+            get(get_budget_http).post(upsert_budget_http),
+        )
+        .route("/agent/spend-history", get(agent_spend_history_http))
+        // â”€â”€ Agent template â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         .route("/agent/provision", post(agent_provision_http))
         .route("/agent/me", get(agent_me_http))
         .route("/agent/intent", post(agent_intent_http))
@@ -1011,7 +1076,7 @@ pub async fn run() {
         .route("/user/llm-config", get(llm_config_get_http))
         .route("/user/llm-config", post(llm_config_set_http))
         .route("/user/llm-config/ping", post(llm_config_ping_http))
-        // ── Passkey auth ──────────────────────────────────────────────────
+        // â”€â”€ Passkey auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         .route(
             "/auth/passkey/register/begin",
             post(passkey_register_begin_http),
@@ -1028,36 +1093,6 @@ pub async fn run() {
             "/auth/passkey/authenticate/finish",
             post(passkey_authenticate_finish_http),
         )
-        // ── Portable export ───────────────────────────────────────────────
-        .route("/export/mbox", get(export_mbox_http))
-        .route("/export/afp-archive", get(export_afp_archive_http))
-        .route("/export/json-ld", get(export_json_ld_http))
-        // ── Federation (homeserver-to-homeserver AFP relay) ───────────────
-        .route("/federation/relay", post(federation_relay_http))
-        // ── Master agent orchestration ────────────────────────────────────
-        .route("/dashboard/session", get(dashboard_session_http))
-        .route("/agent/onboarding", post(agent_onboarding_http))
-        .route(
-            "/agent/focus",
-            get(list_focus_items_http).post(create_focus_item_http),
-        )
-        .route(
-            "/agent/focus/{id}",
-            axum::routing::patch(update_focus_item_http),
-        )
-        .route("/agent/trigger", post(create_trigger_http))
-        .route(
-            "/agent/trigger/{id}",
-            axum::routing::delete(delete_trigger_http),
-        )
-        .route(
-            "/agent/capability",
-            post(create_capability_http).get(list_capabilities_http),
-        )
-        .route(
-            "/agent/capability/{id}",
-            axum::routing::delete(delete_capability_http),
-        )
         .route("/agent/delegate", post(create_delegation_http))
         .route(
             "/agent/delegate/{id}",
@@ -1066,6 +1101,16 @@ pub async fn run() {
         .route("/agent/fleet", get(agent_fleet_http))
         .route("/agent/settings", axum::routing::patch(agent_settings_http))
         .route("/agent/orchestrate", post(agent_orchestrate_http))
+        // â”€â”€ Persona routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        .route(
+            "/agent/personas",
+            get(list_personas_http).post(create_persona_http),
+        )
+        .route(
+            "/agent/personas/{id}",
+            axum::routing::put(update_persona_http).delete(delete_persona_http),
+        )
+        .route("/agent/personas/{id}/activate", post(activate_persona_http))
         .route("/agent/invoke", post(agent_invoke_http))
         .route("/agent/tasks/{id}/complete", post(agent_task_complete_http))
         .route(
@@ -1073,54 +1118,70 @@ pub async fn run() {
             axum::routing::patch(lora_confidence_http),
         )
         .route("/agent/keys", get(agent_keys_http))
-        .route("/feed/public", get(public_feed_http))
-        .route("/feed/search", get(feed_search_http))
-        .route(
-            "/feed/follow/{agent_id}",
-            post(feed_follow_http).delete(feed_unfollow_http),
-        )
-        .route("/feed/following", get(feed_following_http))
-        .route("/feed/engage", post(feed_engage_http))
-        .route(
-            "/calendar/events",
-            get(calendar_list_http).post(calendar_create_http),
-        )
-        .route(
-            "/calendar/events/{id}",
-            axum::routing::delete(calendar_delete_http),
-        )
-        .route("/gmail/connect-url", get(gmail_connect_url_http))
-        .route("/gmail/callback", get(gmail_callback_http))
-        .route("/gmail/status", get(gmail_status_http))
-        .route("/api/alias/check", get(alias_check_http))
-        .route("/api/alias/mine", get(alias_mine_http))
-        .route("/api/alias/claim", post(alias_claim_http))
-        .route("/api/alias/change", post(alias_change_http))
         .route("/about", get(about_http))
+        // â”€â”€ Route submodule merges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        .merge(account_routes::routes())
+        .merge(agent_capability_routes::routes())
+        .merge(agent_memory_routes::routes())
+        .merge(agent_setup_routes::routes())
+        .merge(agent_trigger_routes::routes())
+        .merge(continuity_routes::routes())
+        .merge(cost_controls::routes())
+        .merge(dashboard_routes::routes())
+        .merge(dashboard_routes::installer_routes())
+        .merge(dashboard_runtime_routes::routes())
+        .merge(email_group_routes::routes())
+        .merge(export_routes::routes())
+        .merge(brief_routes::routes())
+        .merge(feed_routes::routes())
+        .merge(federation_routes::routes())
+        .merge(finance_routes::routes())
+        .merge(goal_routes::routes())
+        .merge(conversion_routes::routes())
+        .merge(ingest_routes::routes())
+        .merge(knowledge_routes::routes())
+        .merge(para_routes::routes())
+        .merge(news_routes::routes())
+        .merge(map_routes::routes())
+        .merge(privacy_routes::routes())
+        .merge(proactive_routes::routes())
+        .merge(protocol_routes::routes())
+        .merge(runtime_routes::routes())
+        .merge(skill_capsule_routes::routes())
+        .merge(social_routes::routes())
+        .merge(space_routes::routes())
+        .merge(ui_decision_routes::routes())
+        .merge(user_integrations::routes())
+        .merge(user_management_routes::routes())
+        .merge(workspace_routes::routes())
         .layer(cors_layer())
+        .layer(axum::middleware::from_fn(request_id_middleware))
+        // GAP-145: reject oversized request bodies before any handler runs.
+        // Per-route overrides (e.g. large file uploads) can add a bigger limit locally.
+        .layer(axum::extract::DefaultBodyLimit::max(32 * 1024 * 1024))
         .with_state(app_state.clone());
 
-    // Background cron trigger scheduler — fires schedule-family workflow triggers.
+    // Background cron trigger scheduler â€” fires schedule-family workflow triggers.
     let scheduler_state = app_state.clone();
     tokio::spawn(async move {
         cron_scheduler_loop(scheduler_state).await;
     });
 
-    // Background email trigger dispatcher — fires email-family workflow triggers
+    // Background email trigger dispatcher â€” fires email-family workflow triggers
     // by consuming entries from public.email_trigger_queue (written by imap_sync).
     let email_dispatcher_state = app_state.clone();
     tokio::spawn(async move {
         email_trigger_dispatcher_loop(email_dispatcher_state).await;
     });
 
-    // Background file-drop watcher and dispatcher — polls OMNYID_FILE_WATCH_DIR for
+    // Background file-drop watcher and dispatcher â€” polls OMNYID_FILE_WATCH_DIR for
     // new files (no-op when env var is unset) and fires file_drop-kind triggers.
     let file_drop_state = app_state.clone();
     tokio::spawn(async move {
         file_drop_watcher_loop(file_drop_state).await;
     });
 
-    // Background internal event dispatcher — fires internal_event-kind triggers
+    // Background internal event dispatcher â€” fires internal_event-kind triggers
     // by consuming entries from public.internal_event_queue.
     let internal_event_state = app_state.clone();
     tokio::spawn(async move {
@@ -1131,7 +1192,18 @@ pub async fn run() {
         .await
         .expect("http bind failed");
     let http = async move {
+        // GAP-119: wire graceful shutdown so in-flight requests finish before the process exits.
         axum::serve(listener, app)
+            .with_graceful_shutdown(async move {
+                let mut rx = http_shutdown_rx;
+                // Wait until the shutdown_tx broadcasts true.
+                while !*rx.borrow() {
+                    if rx.changed().await.is_err() {
+                        break;
+                    }
+                }
+                info!("HTTP server draining in-flight requests");
+            })
             .await
             .map_err(|err| err.to_string())
     };
@@ -1165,12 +1237,54 @@ pub async fn run() {
     }
 }
 
+pub async fn build_test_router(database_url: &str) -> Router {
+    let db = Db::new(database_url)
+        .await
+        .expect("test router database connection");
+    let metrics = Arc::new(Metrics::default());
+    let (relay_tx, _) = broadcast::channel(256);
+    let app_state = Arc::new(AppState {
+        db: db.clone(),
+        metrics,
+        relay_tx,
+        rate_limiter: Arc::new(RateLimiter::new()),
+        trial_runner: Arc::new(TrialRunnerManager::new()),
+        http_client: reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(35))
+            .build()
+            .unwrap_or_default(),
+        cost_oracle: Arc::new(CostOracle::new(db.pool.clone())),
+        pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+    });
+
+    Router::new()
+        .route("/healthz", get(healthz_http))
+        .route("/relay/ws", get(relay_ws_http))
+        .route("/thread/{thread_id}", get(get_thread_http))
+        .route("/actions/decision", post(record_action_decision_http))
+        .route("/gateway/email", post(handle_gateway_email))
+        .layer(cors_layer())
+        .layer(axum::middleware::from_fn(request_id_middleware))
+        .layer(axum::extract::DefaultBodyLimit::max(32 * 1024 * 1024))
+        .with_state(app_state)
+}
+
 #[instrument(skip(state, message), fields(thread_id = %message.thread_id, message_type = %message.r#type))]
 async fn send_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(message): Json<AFPMessage>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("send", &headers),
+        RateLimitPolicy {
+            max_requests: 60,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let _user = authenticated_user(&state.db, &headers).await?;
     let message_id = store_app_message_for_headers(
         &state.db,
         &state.metrics,
@@ -1186,7 +1300,7 @@ async fn send_http(
     })))
 }
 
-// ── Waitlist ───────────────────────────────────────────────────────────────────
+// â”€â”€ Waitlist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn waitlist_http(
     State(state): State<Arc<AppState>>,
@@ -1251,7 +1365,7 @@ async fn waitlist_http(
     })))
 }
 
-// ── Trial Python runner ────────────────────────────────────────────────────────
+// â”€â”€ Trial Python runner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn trial_python_runner_session_http(
     State(state): State<Arc<AppState>>,
@@ -1286,11 +1400,18 @@ async fn trial_python_runner_run_http(
         },
     )
     .await?;
+    let identity = trial_identity_key(&headers, request.fingerprint.as_deref());
     let session = state
         .trial_runner
-        .start_template_run(&request.session_id, &request.template_id)
+        .start_template_run(&request.session_id, &request.template_id, &identity)
         .await
-        .map_err(|err| (StatusCode::BAD_REQUEST, err))?;
+        .map_err(|err| {
+            if err.contains("not found") {
+                (StatusCode::NOT_FOUND, err)
+            } else {
+                (StatusCode::BAD_REQUEST, err)
+            }
+        })?;
     Ok(Json(trial_session_response(&session)))
 }
 
@@ -1315,12 +1436,15 @@ async fn trial_python_runner_chat_http(
             "trial content is required".to_string(),
         ));
     }
+    let identity = trial_identity_key(&headers, request.fingerprint.as_deref());
     let session = state
         .trial_runner
-        .append_chat_turn(&request.session_id, content)
+        .append_chat_turn(&request.session_id, content, &identity)
         .await
         .map_err(|err| {
-            if err.contains("sign up") {
+            if err.contains("not found") {
+                (StatusCode::NOT_FOUND, err)
+            } else if err.contains("sign up") {
                 (StatusCode::PAYMENT_REQUIRED, err)
             } else {
                 (StatusCode::BAD_REQUEST, err)
@@ -1331,11 +1455,14 @@ async fn trial_python_runner_chat_http(
 
 async fn trial_python_runner_state_http(
     State(state): State<Arc<AppState>>,
+    Query(query): Query<TrialSessionStateQuery>,
+    headers: HeaderMap,
     Path(session_id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    let identity = trial_identity_key(&headers, query.fingerprint.as_deref());
     let session = state
         .trial_runner
-        .get_session(&session_id)
+        .get_session_for_identity(&session_id, &identity)
         .await
         .ok_or_else(|| (StatusCode::NOT_FOUND, "trial session not found".to_string()))?;
     Ok(Json(trial_session_response(&session)))
@@ -1343,11 +1470,13 @@ async fn trial_python_runner_state_http(
 
 async fn trial_python_runner_convert_http(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(request): Json<TrialConvertRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    let identity = trial_identity_key(&headers, request.fingerprint.as_deref());
     let session = state
         .trial_runner
-        .get_session(&request.session_id)
+        .get_session_for_identity(&request.session_id, &identity)
         .await
         .ok_or_else(|| (StatusCode::NOT_FOUND, "trial session not found".to_string()))?;
     Ok(Json(serde_json::json!({
@@ -1360,7 +1489,7 @@ async fn trial_python_runner_convert_http(
     })))
 }
 
-// ── Dashboard ──────────────────────────────────────────────────────────────────
+// â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn dashboard_bootstrap_http(
     State(state): State<Arc<AppState>>,
@@ -1382,15 +1511,28 @@ async fn dashboard_bootstrap_http(
         .iter()
         .map(|agent| agent.agent_id.clone())
         .collect::<Vec<_>>();
-    let messages = state
-        .db
-        .recent_messages_for_agents(&agent_ids, 10)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .into_iter()
-        .map(proto_to_app)
-        .collect::<Vec<_>>();
+    // GAP-075: merge shared (inter-agent) messages with private user messages.
+    // Private messages live in the tenant schema and were absent from the bootstrap.
+    let (shared_msgs, private_msgs) = tokio::join!(
+        state.db.recent_messages_for_agents(&agent_ids, 20),
+        state.db.recent_private_messages_for_user(&user.id, 20),
+    );
+    let mut merged: Vec<_> = {
+        let mut v = shared_msgs
+            .map_err(internal_error)
+            .map_err(status_to_http)?;
+        v.extend(
+            private_msgs
+                .map_err(internal_error)
+                .map_err(status_to_http)?,
+        );
+        v
+    };
+    // Dedup by id, then keep newest 20.
+    merged.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    merged.dedup_by(|a, b| a.id == b.id);
+    merged.truncate(20);
+    let messages = merged.into_iter().map(proto_to_app).collect::<Vec<_>>();
     let thread_ids = messages
         .iter()
         .map(|message| message.thread_id.clone())
@@ -1472,6 +1614,21 @@ async fn dashboard_bootstrap_http(
         user: session_user_response(&user),
         agents,
         messages,
+        cost_snapshot: None,
+        cost_status: None,
+        continuity_state: None,
+        continuity_brief: None,
+        continuity_handoff: None,
+        continuity_surface_hint: None,
+        continuity_requires_approval: false,
+        continuity_panel_kind: "briefing_bar".to_string(),
+        continuity_primary_mode: "briefing_bar".to_string(),
+        continuity_priority_item: None,
+        continuity_priority_card: None,
+        continuity_action_items: Vec::new(),
+        continuity_response_items: Vec::new(),
+        continuity_prepared_draft_items: Vec::new(),
+        continuity_context_panel_items: Vec::new(),
         action_log,
         onboarding,
         device_sync_policies,
@@ -1482,6 +1639,8 @@ async fn dashboard_bootstrap_http(
         runtime_restore_drills,
         runtime_updates,
         runtime_deployment,
+        proactive_suggestions: vec![],
+        enabled_heuristic_packs: vec![],
     }))
 }
 
@@ -1503,15 +1662,22 @@ async fn dashboard_export_http(
         .iter()
         .map(|agent| agent.agent_id.clone())
         .collect::<Vec<_>>();
-    let messages = state
-        .db
-        .recent_messages_for_agents(&agent_ids, 100)
-        .await
+    // GAP-075: include private messages in the export, same as the bootstrap handler.
+    let (shared_msgs, private_msgs) = tokio::join!(
+        state.db.recent_messages_for_agents(&agent_ids, 100),
+        state.db.recent_private_messages_for_user(&user.id, 100),
+    );
+    let mut all_raw = shared_msgs
         .map_err(internal_error)
-        .map_err(status_to_http)?
-        .into_iter()
-        .map(proto_to_app)
-        .collect::<Vec<_>>();
+        .map_err(status_to_http)?;
+    all_raw.extend(
+        private_msgs
+            .map_err(internal_error)
+            .map_err(status_to_http)?,
+    );
+    all_raw.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    all_raw.dedup_by(|a, b| a.id == b.id);
+    let messages: Vec<_> = all_raw.into_iter().map(proto_to_app).collect();
     let thread_ids = messages
         .iter()
         .map(|message| message.thread_id.clone())
@@ -1585,6 +1751,21 @@ async fn dashboard_export_http(
         export_version: "omnyid-dashboard-export-v1".to_string(),
         user: session_user_response(&user),
         agents,
+        cost_snapshot: None,
+        cost_status: None,
+        continuity_state: None,
+        continuity_brief: None,
+        continuity_handoff: None,
+        continuity_surface_hint: None,
+        continuity_requires_approval: false,
+        continuity_panel_kind: "briefing_bar".to_string(),
+        continuity_primary_mode: "briefing_bar".to_string(),
+        continuity_priority_item: None,
+        continuity_priority_card: None,
+        continuity_action_items: Vec::new(),
+        continuity_response_items: Vec::new(),
+        continuity_prepared_draft_items: Vec::new(),
+        continuity_context_panel_items: Vec::new(),
         onboarding,
         device_sync_policies,
         support_access,
@@ -1690,7 +1871,7 @@ async fn demo_send_http(
     })))
 }
 
-// ── Notes message endpoint ────────────────────────────────────────────────────
+// â”€â”€ Notes message endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Accepted `type` values for the notes message endpoint.
 const NOTES_ALLOWED_TYPES: &[&str] = &[
@@ -1703,10 +1884,12 @@ const NOTES_ALLOWED_TYPES: &[&str] = &[
 struct NoteMessageRequest {
     /// AFP message type: "folder_rule", "area_rules", or "tag_update".
     r#type: String,
+    #[serde(default)]
+    kind: Option<String>,
     /// Thread to append to. For folder/area rules this is the folder/area id;
     /// for tag_update it should match the source note's thread_id.
     thread_id: String,
-    /// Message content. Shape varies by type — see `FolderRuleContent`,
+    /// Message content. Shape varies by type â€” see `FolderRuleContent`,
     /// `AreaRulesContent`, `TagUpdateContent` in `src/message.rs`.
     content: serde_json::Value,
     /// For `tag_update`: ids of the original note messages being updated.
@@ -1798,7 +1981,7 @@ async fn onboarding_bundle_http(
     )))
 }
 
-// ── Account & support management ──────────────────────────────────────────────
+// â”€â”€ Account & support management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn service_adapter_bundle_http(
     State(state): State<Arc<AppState>>,
@@ -1885,7 +2068,8 @@ async fn account_sessions_action_http(
                     "token preview is required when revoking a session".to_string(),
                 )
             })?;
-            if token_preview == runtime_token_preview(&current_token) {
+            // Compare against hash since stored tokens are hashed (GAP-005)
+            if token_preview == runtime_token_preview(&sha256_token(&current_token)) {
                 return Err((
                     StatusCode::BAD_REQUEST,
                     "use sign out to end the current session".to_string(),
@@ -1908,7 +2092,7 @@ async fn account_sessions_action_http(
                 })?;
             state
                 .db
-                .revoke_session(&user.id, &target_token)
+                .revoke_session_by_hash(&user.id, &target_token)
                 .await
                 .map_err(internal_error)
                 .map_err(status_to_http)?;
@@ -1941,7 +2125,7 @@ async fn account_sessions_action_http(
     Ok(Json(AccountSessionsResponse { sessions }))
 }
 
-// ── Runtime backups ────────────────────────────────────────────────────────────
+// â”€â”€ Runtime backups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn runtime_backups_http(
     State(state): State<Arc<AppState>>,
@@ -2142,7 +2326,7 @@ async fn runtime_restore_drill_create_http(
     Ok(Json(response))
 }
 
-// ── Runtime updates & policies ────────────────────────────────────────────────
+// â”€â”€ Runtime updates & policies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn runtime_updates_http(
     State(state): State<Arc<AppState>>,
@@ -2262,7 +2446,7 @@ async fn runtime_recovery_packet_http(
     )))
 }
 
-// ── Device bootstrap & sync ───────────────────────────────────────────────────
+// â”€â”€ Device bootstrap & sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn device_bootstrap_bundle_http(
     State(state): State<Arc<AppState>>,
@@ -2504,7 +2688,7 @@ async fn update_support_access_http(
     }
 }
 
-// ── Runtime installer scripts ─────────────────────────────────────────────────
+// â”€â”€ Runtime installer scripts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn local_windows_installer_http() -> impl IntoResponse {
     let content = include_str!("../../scripts/install-omnyid-private.ps1");
@@ -2528,7 +2712,7 @@ async fn local_unix_installer_http() -> impl IntoResponse {
     )
 }
 
-// ── Runtime deploy & lifecycle ────────────────────────────────────────────────
+// â”€â”€ Runtime deploy & lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn runtime_deploy_http(
     State(state): State<Arc<AppState>>,
@@ -2992,7 +3176,7 @@ async fn runtime_runner_config_action_http(
     Ok(Json(runtime_deployment_response_live(deployment).await))
 }
 
-// ── Runtime workspace files ───────────────────────────────────────────────────
+// â”€â”€ Runtime workspace files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn runtime_workspace_files_http(
     State(state): State<Arc<AppState>>,
@@ -3023,6 +3207,8 @@ async fn runtime_workspace_files_http(
     Ok(Json(RuntimeWorkspaceFilesResponse {
         framework: deployment.framework,
         active_file_id,
+        edit_scope: "private_runner_instance".to_string(),
+        reset_supported: true,
         files: files
             .into_iter()
             .map(|file| RuntimeWorkspaceFileEntryResponse {
@@ -3150,1054 +3336,18 @@ async fn runtime_workspace_file_save_http(
     }))
 }
 
-// ── UI command / LLM router ───────────────────────────────────────────────────
+// â”€â”€ UI command / LLM router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+#[allow(dead_code)]
 async fn ui_command_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(request): Json<UiCommandRequest>,
 ) -> Result<Json<UiCommandResponse>, (StatusCode, String)> {
-    let engine = normalize_search_engine(request.engine.as_deref());
-    let trimmed_query = request.query.trim();
-    if trimmed_query.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "query is required".to_string()));
-    }
-
-    // Try to resolve authenticated user (optional — unauthenticated callers still get fallback)
-    let opt_user = if bearer_token_from_headers(&headers).is_some() {
-        authenticated_user(&state.db, &headers).await.ok()
-    } else {
-        None
-    };
-    let default_store_in_history = if let Some(ref user) = opt_user {
-        state
-            .db
-            .get_agent_preferences(&user.id)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|value| {
-                value
-                    .get("default_store_in_history")
-                    .and_then(Value::as_bool)
-            })
-            .unwrap_or(true)
-    } else {
-        true
-    };
-    let store_in_history = request.store_in_history.unwrap_or(default_store_in_history);
-
-    let deployment = if let Some(ref user) = opt_user {
-        state
-            .db
-            .find_runtime_deployment_by_user(&user.id)
-            .await
-            .ok()
-            .flatten()
-    } else {
-        None
-    };
-
-    let base = route_ui_command(
-        trimmed_query,
-        engine.clone(),
-        deployment.as_ref(),
-        request.active_file_id.as_deref(),
-    );
-
-    // For authenticated users with an LLM configured, use the model to classify
-    // intent and act accordingly — tasks, research, notes, or orchestration.
-    // Unauthenticated / no-LLM calls fall through to the keyword-based base result.
-    if let Some(ref user) = opt_user {
-        if let Ok(Some(llm_cfg)) = state.db.get_llm_config(&user.id).await {
-            let backend_name = llm_cfg["backend"].as_str().unwrap_or("hosted").to_string();
-            let (api_key, model) = if backend_name == "runpod" {
-                (
-                    std::env::var("OMNYID_RUNPOD_API_KEY").unwrap_or_default(),
-                    llm_cfg["model"]
-                        .as_str()
-                        .unwrap_or("Qwen/Qwen3.5-35B-A3B")
-                        .to_string(),
-                )
-            } else {
-                (
-                    std::env::var("OMNYID_ANTHROPIC_KEY")
-                        .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
-                        .unwrap_or_default(),
-                    llm_cfg["model"]
-                        .as_str()
-                        .unwrap_or("claude-haiku-4-5-20251001")
-                        .to_string(),
-                )
-            };
-
-            if !api_key.is_empty() {
-                // Single LLM call: classify intent AND generate structured content.
-                // The model picks the intent and fills in the matching fields.
-                let system_prompt = r#"You are an AI agent's command router. Given a user message, classify the intent and return ONLY a valid JSON object — no markdown, no explanation, no code fences.
-
-INTENT RULES (apply strictly):
-- "schedule"     : planning time, day scheduling, calendar events, lessons, appointments, "plan my day", "block time", "add to calendar". Key signals: "plan", "schedule", "lesson", "appointment", "calendar", "block", "from Xpm", "at X:XX".
-- "task"         : adding/managing items — shopping lists, to-dos, reminders, buying things, errands. Key signals: "add", "buy", "remind me", "shopping list", "to-do", "task", "pick up", "don't forget".
-- "note"         : saving information, writing a memo, journaling, quick capture. Key signals: "note", "save this", "remember", "jot", "write down".
-- "orchestrate"  : complex multi-step goals requiring planning and background work. Key signals: "organise my", "handle all my", "set up", "manage my", "do everything for".
-- "web_research" : ONLY when the user clearly wants to look something up, research a topic, or asks a factual question. Key signals: "what is", "how does", "search for", "find info", "tell me about", "research".
-
-IMPORTANT: "plan my day", "I have lessons at X", "schedule my workout" → ALWAYS "schedule", NEVER "task".
-IMPORTANT: "add X to my shopping list", "buy X", "remind me to X" → ALWAYS "task", NEVER "web_research".
-
-preferred_view values: "draggable_calendar" for schedule, "task_board" for task, "note_canvas" for note, "orchestrate_progress" for orchestrate, "search_result" for web_research.
-
-Return the matching schema:
-
-schedule:
-{"intent":"schedule","preferred_view":"draggable_calendar","title":"<brief title>","description":"<full description>","summary":"<friendly confirmation>","slots":[{"label":"<slot name>","start_hour":<hour 0-23>,"duration_hours":<hours>}]}
-
-task:
-{"intent":"task","preferred_view":"task_board","title":"<short task title>","description":"<full description>","priority":"low|normal|high","task_type":"shopping|todo|reminder|general","summary":"<friendly confirmation, e.g. 'Added to shopping list: Toothbrush'>"}
-
-web_research:
-{"intent":"web_research","preferred_view":"search_result","query":"<cleaned search query>","summary":"<1-2 sentence overview based on your knowledge>","bullets":["key point 1","key point 2","key point 3"],"sources":[{"title":"source name","url":"https://example.com","snippet":"brief description"}]}
-
-note:
-{"intent":"note","preferred_view":"note_canvas","title":"<note title>","content":"<full note content>","summary":"<friendly confirmation>"}
-
-orchestrate:
-{"intent":"orchestrate","preferred_view":"orchestrate_progress","objective":"<full multi-step objective>","summary":"<what you are about to do>"}"#;
-
-                let infer_req = crate::inference::InferenceRequest {
-                    system: system_prompt.to_string(),
-                    messages: vec![crate::inference::InferenceMessage {
-                        role: "user".to_string(),
-                        content: trimmed_query.to_string(),
-                    }],
-                    max_tokens: 900,
-                    temperature: 0.2,
-                };
-
-                let infer_result = if backend_name == "runpod" {
-                    let ep = std::env::var("OMNYID_RUNPOD_ENDPOINT_ID").unwrap_or_default();
-                    crate::inference::runpod_infer(&api_key, &ep, &model, &infer_req).await
-                } else {
-                    crate::inference::anthropic_infer(&api_key, &model, &infer_req).await
-                };
-
-                if let Ok(infer_resp) = infer_result {
-                    let raw = infer_resp.content.trim();
-                    let json_str = raw
-                        .trim_start_matches("```json")
-                        .trim_start_matches("```")
-                        .trim_end_matches("```")
-                        .trim();
-
-                    if let Ok(parsed) = serde_json::from_str::<Value>(json_str) {
-                        let detected_intent = parsed["intent"].as_str().unwrap_or("web_research");
-                        let summary = parsed["summary"]
-                            .as_str()
-                            .unwrap_or(trimmed_query)
-                            .to_string();
-                        // preferred_view: LLM may supply it, or fall back to intent mapping
-                        let preferred_view = parsed["preferred_view"]
-                            .as_str()
-                            .map(str::to_string)
-                            .unwrap_or_else(|| preferred_view_for_intent(detected_intent));
-
-                        // Get the master agent instance for AFP message authorship
-                        let agent_id_opt = state
-                            .db
-                            .get_master_agent_instance(&user.id)
-                            .await
-                            .ok()
-                            .flatten()
-                            .and_then(|inst| inst["agent_id"].as_str().map(str::to_string));
-
-                        match detected_intent {
-                            // ── Schedule / day-plan ──────────────────────────────────────────
-                            "schedule" => {
-                                let title = parsed["title"]
-                                    .as_str()
-                                    .unwrap_or("Scheduled plan")
-                                    .to_string();
-                                let description =
-                                    parsed["description"].as_str().unwrap_or("").to_string();
-                                // Persist as a high-priority task so the fleet view tracks it
-                                let instance =
-                                    state.db.get_agent_instance(&user.id).await.ok().flatten();
-                                if store_in_history {
-                                    if let (Some(inst), Some(agent_id)) =
-                                        (instance, agent_id_opt.clone())
-                                    {
-                                        let instance_id =
-                                            inst["id"].as_str().unwrap_or("").to_string();
-                                        let task = AgentTask::new(
-                                            user.id.clone(),
-                                            instance_id,
-                                            title.clone(),
-                                            TaskPriority::Normal,
-                                        );
-                                        let task_id = task.id.clone();
-                                        let thread_id = task.thread_id.clone();
-                                        let _ = state.db.create_agent_task(&task).await;
-                                        // Store AFP message with draggable_calendar view so frontend renders the planner
-                                        let slots = parsed["slots"].clone();
-                                        let msg_content = serde_json::json!({
-                                            "task_id": task_id,
-                                            "title": title,
-                                            "description": description,
-                                            "status": "pending",
-                                            "slots": slots,
-                                        });
-                                        let msg_views = vec![serde_json::json!({
-                                            "format": "draggable_calendar",
-                                            "content": {
-                                                "title": title,
-                                                "slots": slots,
-                                                "pending_confirmation": true,
-                                            },
-                                            "priority": 10
-                                        })];
-                                        if let Ok(msg) = new_server_message(
-                                            agent_id,
-                                            vec![],
-                                            thread_id,
-                                            "schedule",
-                                            msg_content,
-                                            msg_views,
-                                            vec![],
-                                            vec![],
-                                            true,
-                                        ) {
-                                            let _ = store_private_app_message(
-                                                &state.db,
-                                                &state.metrics,
-                                                &state.relay_tx,
-                                                &user.id,
-                                                msg,
-                                            )
-                                            .await;
-                                        }
-                                    }
-                                }
-                                let bullets: Vec<String> = parsed["slots"]
-                                    .as_array()
-                                    .map(|arr| {
-                                        arr.iter()
-                                            .filter_map(|s| {
-                                                let label = s["label"].as_str()?;
-                                                let start = s["start_hour"].as_u64().unwrap_or(0);
-                                                let dur =
-                                                    s["duration_hours"].as_f64().unwrap_or(1.0);
-                                                Some(format!("{label} — {start:02}:00 ({dur}h)"))
-                                            })
-                                            .collect()
-                                    })
-                                    .unwrap_or_default();
-                                let preview_events = parsed["slots"]
-                                    .as_array()
-                                    .cloned()
-                                    .unwrap_or_default()
-                                    .iter()
-                                    .enumerate()
-                                    .map(|(idx, slot)| {
-                                        let start_hour = slot["start_hour"].as_u64().unwrap_or(9);
-                                        let duration_hours =
-                                            slot["duration_hours"].as_u64().unwrap_or(1).max(1);
-                                        serde_json::json!({
-                                            "id": format!("schedule-slot-{idx}"),
-                                            "title": slot["label"].as_str().unwrap_or("Planned block"),
-                                            "start": format!("2026-03-27T{start_hour:02}:00:00Z"),
-                                            "end": format!("2026-03-27T{:02}:00:00Z", start_hour + duration_hours),
-                                            "description": description,
-                                            "status": "tentative",
-                                        })
-                                    })
-                                    .collect::<Vec<_>>();
-                                return Ok(Json(finalize_ui_command_response(
-                                    trimmed_query,
-                                    UiCommandResponse {
-                                        intent: "schedule".to_string(),
-                                        suggested_view: "calendar".to_string(),
-                                        preferred_view,
-                                        summary,
-                                        engine,
-                                        links: vec![],
-                                        runner_draft: None,
-                                        bullets,
-                                        card_id: None,
-                                        preview_message: Some(AFPMessage {
-                                            protocol: "afp-v1".to_string(),
-                                            id: format!("preview.schedule.{}", Ulid::new()),
-                                            thread_id: format!(
-                                                "thread.preview.schedule.{}",
-                                                Ulid::new()
-                                            ),
-                                            parent_id: None,
-                                            from: "omnyid://workspace/command-bar".to_string(),
-                                            to: vec!["omnyid://workspace/user".to_string()],
-                                            timestamp: chrono::Utc::now().to_rfc3339(),
-                                            r#type: "schedule".to_string(),
-                                            subtype: Some("preview".to_string()),
-                                            content: serde_json::json!({
-                                                "title": title,
-                                                "description": description,
-                                                "events": preview_events,
-                                            }),
-                                            metadata: Some(serde_json::json!({
-                                                "origin": "workspace_command_preview",
-                                                "store": store_in_history,
-                                            })),
-                                            signature: String::new(),
-                                            encryption: None,
-                                            views: vec![serde_json::json!({
-                                                "format": "calendar",
-                                                "priority": 100,
-                                                "content": {
-                                                    "title": title,
-                                                    "events": preview_events,
-                                                }
-                                            })],
-                                            references: vec![],
-                                            attachments: vec![],
-                                            store_in_relational: false,
-                                            prev_hash: None,
-                                        }),
-                                    },
-                                )));
-                            }
-
-                            // ── Task creation ────────────────────────────────────────────────
-                            "task" => {
-                                let title = parsed["title"]
-                                    .as_str()
-                                    .unwrap_or(trimmed_query)
-                                    .to_string();
-                                let description =
-                                    parsed["description"].as_str().unwrap_or("").to_string();
-                                let priority_str = parsed["priority"].as_str().unwrap_or("normal");
-                                let task_type = parsed["task_type"]
-                                    .as_str()
-                                    .unwrap_or("general")
-                                    .to_string();
-                                let priority = match priority_str {
-                                    "high" => TaskPriority::High,
-                                    "low" => TaskPriority::Low,
-                                    _ => TaskPriority::Normal,
-                                };
-
-                                // Get the primary (non-master) agent instance for task ownership
-                                let instance =
-                                    state.db.get_agent_instance(&user.id).await.ok().flatten();
-                                if store_in_history {
-                                    if let Some(inst) = instance {
-                                        let instance_id =
-                                            inst["id"].as_str().unwrap_or("").to_string();
-                                        let task = AgentTask::new(
-                                            user.id.clone(),
-                                            instance_id,
-                                            title.clone(),
-                                            priority,
-                                        );
-                                        let task_id = task.id.clone();
-                                        let thread_id = task.thread_id.clone();
-                                        let _ = state.db.create_agent_task(&task).await;
-
-                                        // Store AFP message with task_card view
-                                        if let Some(agent_id) = agent_id_opt {
-                                            let msg_content = serde_json::json!({
-                                                "task_id": task_id,
-                                                "title": title,
-                                                "description": description,
-                                                "priority": priority_str,
-                                                "task_type": task_type,
-                                                "status": "pending",
-                                            });
-                                            let msg_views = vec![serde_json::json!({
-                                                "format": "task_card",
-                                                "content": {
-                                                    "task_id": task_id,
-                                                    "title": title,
-                                                    "description": description,
-                                                    "priority": priority_str,
-                                                    "task_type": task_type,
-                                                    "status": "pending",
-                                                },
-                                                "priority": 10
-                                            })];
-                                            if let Ok(msg) = new_server_message(
-                                                agent_id,
-                                                vec![],
-                                                thread_id,
-                                                "task",
-                                                msg_content,
-                                                msg_views,
-                                                vec![],
-                                                vec![],
-                                                true,
-                                            ) {
-                                                let _ = store_private_app_message(
-                                                    &state.db,
-                                                    &state.metrics,
-                                                    &state.relay_tx,
-                                                    &user.id,
-                                                    msg,
-                                                )
-                                                .await;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                return Ok(Json(finalize_ui_command_response(
-                                    trimmed_query,
-                                    UiCommandResponse {
-                                        intent: "task".to_string(),
-                                        suggested_view: "search".to_string(),
-                                        preferred_view,
-                                        summary,
-                                        engine,
-                                        links: vec![],
-                                        runner_draft: None,
-                                        bullets: vec![],
-                                        card_id: None,
-                                        preview_message: Some(AFPMessage {
-                                            protocol: "afp-v1".to_string(),
-                                            id: format!("preview.task.{}", Ulid::new()),
-                                            thread_id: format!(
-                                                "thread.preview.task.{}",
-                                                Ulid::new()
-                                            ),
-                                            parent_id: None,
-                                            from: "omnyid://workspace/command-bar".to_string(),
-                                            to: vec!["omnyid://workspace/user".to_string()],
-                                            timestamp: chrono::Utc::now().to_rfc3339(),
-                                            r#type: "task".to_string(),
-                                            subtype: Some("preview".to_string()),
-                                            content: serde_json::json!({
-                                                "title": title,
-                                                "description": description,
-                                                "priority": priority_str,
-                                                "task_type": task_type,
-                                                "status": "pending",
-                                            }),
-                                            metadata: Some(serde_json::json!({
-                                                "origin": "workspace_command_preview",
-                                                "store": store_in_history,
-                                            })),
-                                            signature: String::new(),
-                                            encryption: None,
-                                            views: vec![serde_json::json!({
-                                                "format": "task_card",
-                                                "priority": 100,
-                                                "content": {
-                                                    "title": title,
-                                                    "description": description,
-                                                    "priority": priority_str,
-                                                    "task_type": task_type,
-                                                    "status": "pending",
-                                                }
-                                            })],
-                                            references: vec![],
-                                            attachments: vec![],
-                                            store_in_relational: false,
-                                            prev_hash: None,
-                                        }),
-                                    },
-                                )));
-                            }
-
-                            // ── Note creation ────────────────────────────────────────────────
-                            "note" => {
-                                let title = parsed["title"].as_str().unwrap_or("Note").to_string();
-                                let content = parsed["content"]
-                                    .as_str()
-                                    .unwrap_or(trimmed_query)
-                                    .to_string();
-
-                                if store_in_history {
-                                    if let Some(agent_id) = agent_id_opt {
-                                        let thread_id = Ulid::new().to_string();
-                                        let msg_content =
-                                            serde_json::json!({"title": title, "content": content});
-                                        let msg_views = vec![serde_json::json!({
-                                            "format": "canvas",
-                                            "content": {"title": title, "body": content},
-                                            "priority": 10
-                                        })];
-                                        if let Ok(msg) = new_server_message(
-                                            agent_id,
-                                            vec![],
-                                            thread_id,
-                                            "note",
-                                            msg_content,
-                                            msg_views,
-                                            vec![],
-                                            vec![],
-                                            true,
-                                        ) {
-                                            let _ = store_private_app_message(
-                                                &state.db,
-                                                &state.metrics,
-                                                &state.relay_tx,
-                                                &user.id,
-                                                msg,
-                                            )
-                                            .await;
-                                        }
-                                    }
-                                }
-
-                                return Ok(Json(finalize_ui_command_response(
-                                    trimmed_query,
-                                    UiCommandResponse {
-                                        intent: "note".to_string(),
-                                        suggested_view: "note".to_string(),
-                                        preferred_view,
-                                        summary,
-                                        engine,
-                                        links: vec![],
-                                        runner_draft: None,
-                                        bullets: vec![],
-                                        card_id: None,
-                                        preview_message: Some(AFPMessage {
-                                            protocol: "afp-v1".to_string(),
-                                            id: format!("preview.note.{}", Ulid::new()),
-                                            thread_id: format!(
-                                                "thread.preview.note.{}",
-                                                Ulid::new()
-                                            ),
-                                            parent_id: None,
-                                            from: "omnyid://workspace/command-bar".to_string(),
-                                            to: vec!["omnyid://workspace/user".to_string()],
-                                            timestamp: chrono::Utc::now().to_rfc3339(),
-                                            r#type: "note".to_string(),
-                                            subtype: Some("preview".to_string()),
-                                            content: serde_json::json!({
-                                                "title": title,
-                                                "blocks": [
-                                                    {"type": "paragraph", "text": content}
-                                                ],
-                                            }),
-                                            metadata: Some(serde_json::json!({
-                                                "origin": "workspace_command_preview",
-                                                "store": store_in_history,
-                                            })),
-                                            signature: String::new(),
-                                            encryption: None,
-                                            views: vec![serde_json::json!({
-                                                "format": "canvas",
-                                                "priority": 100,
-                                                "content": {
-                                                    "title": title,
-                                                    "blocks": [
-                                                        {"type": "paragraph", "text": content}
-                                                    ],
-                                                }
-                                            })],
-                                            references: vec![],
-                                            attachments: vec![],
-                                            store_in_relational: false,
-                                            prev_hash: None,
-                                        }),
-                                    },
-                                )));
-                            }
-
-                            // ── Orchestration ────────────────────────────────────────────────
-                            "orchestrate" => {
-                                let objective = parsed["objective"]
-                                    .as_str()
-                                    .unwrap_or(trimmed_query)
-                                    .to_string();
-                                let thread_id = format!("thread.orchestrate.{}", Ulid::new());
-                                let card_id = format!("card.orchestrate.{}", Ulid::new());
-                                let gate_raw = classify_orchestration_gate(&objective);
-
-                                // Read the user's auto-approve preference from the agent instance.
-                                // When auto_approve_workflows=true (default) and the gate is only
-                                // Clarification (not Approval), we downgrade to Gate::None so the
-                                // workflow runs immediately without a confirmation step.
-                                // Gate::Approval (destructive / financial) always stays as Approval
-                                // regardless of the preference — the inner ApprovalNode handles it.
-                                let auto_approve = state
-                                    .db
-                                    .get_master_agent_instance(&user.id)
-                                    .await
-                                    .ok()
-                                    .flatten()
-                                    .and_then(|inst| inst["auto_approve_workflows"].as_bool())
-                                    .unwrap_or(true);
-
-                                let gate = if auto_approve
-                                    && gate_raw == OrchestrationGate::Clarification
-                                {
-                                    // Clarification-only objectives can auto-run; assumptions are
-                                    // visible in the workflow_preview metadata on the card.
-                                    OrchestrationGate::None
-                                } else {
-                                    gate_raw
-                                };
-
-                                // ── Generate + save a visual workflow draft from the objective ──
-                                // This bridges the command bar and the workflow builder: every
-                                // orchestration request now also creates a user-inspectable
-                                // workflow graph.  The draft is saved immediately; for Approval
-                                // and Clarification gates it becomes the pending workflow the
-                                // user confirms before execution.
-                                let described = workflow_builder_describe_draft(
-                                    &user.id,
-                                    &DescribeWorkflowRequest {
-                                        intent: objective.clone(),
-                                        base_workflow: None,
-                                        preset_override: None,
-                                        optimization_override: None,
-                                        regeneration_mode: "new".to_string(),
-                                        save_draft: false,
-                                        branch_from_workflow_id: None,
-                                        branch_from_event_id: None,
-                                    },
-                                );
-                                let workflow_preview = described.get("workflow").cloned();
-                                let generated_workflow_id = workflow_preview
-                                    .as_ref()
-                                    .and_then(|w| w.get("workflow_id"))
-                                    .and_then(Value::as_str)
-                                    .map(str::to_string);
-                                let generated_node_count = workflow_preview
-                                    .as_ref()
-                                    .and_then(|w| w.get("graph"))
-                                    .and_then(|g| g.get("nodes"))
-                                    .and_then(Value::as_array)
-                                    .map(|n| n.len())
-                                    .unwrap_or(0);
-                                let generated_preset = workflow_preview
-                                    .as_ref()
-                                    .and_then(|w| w.get("graph"))
-                                    .and_then(|g| g.get("presets"))
-                                    .and_then(Value::as_array)
-                                    .and_then(|arr| arr.first())
-                                    .and_then(|p| p.get("preset_kind").or(p.get("kind")))
-                                    .and_then(Value::as_str)
-                                    .unwrap_or("research_assistant")
-                                    .to_string();
-
-                                // Save as a named draft workflow so it appears in the builder
-                                if let Some(wf_value) = workflow_preview.clone() {
-                                    if let Some(graph) = wf_value.get("graph").cloned() {
-                                        let record = normalized_workflow_record(
-                                            &user.id,
-                                            SaveWorkflowRequest {
-                                                graph,
-                                                latest_ir: None,
-                                                favorite: Some(false),
-                                                archived: None,
-                                            },
-                                            None,
-                                        );
-                                        if let Ok(rec) = record {
-                                            let _ = state.db.upsert_saved_workflow(&rec).await;
-                                        }
-                                    }
-                                }
-
-                                let initial_summary = if gate == OrchestrationGate::Approval {
-                                    format!(
-                                        "This orchestration may trigger external actions. Review the plan and confirm before OmnyID proceeds: {objective}"
-                                    )
-                                } else if gate == OrchestrationGate::Clarification {
-                                    format!(
-                                        "This objective is still a bit broad. Review the draft plan and decide whether OmnyID should proceed with best-effort assumptions: {objective}"
-                                    )
-                                } else {
-                                    format!("Orchestrating: {objective}")
-                                };
-                                let preview_message = Some(orchestration_preview_message(
-                                    &objective,
-                                    &initial_summary,
-                                    &card_id,
-                                    &thread_id,
-                                    gate,
-                                ));
-
-                                if let Some(agent_id) = agent_id_opt.clone() {
-                                    let msg_content = serde_json::json!({
-                                        "card_id": card_id,
-                                        "query": objective,
-                                        "status": "streaming",
-                                        "optimization_mode": "balanced",
-                                        "provider": "omnyid",
-                                        "model": "",
-                                        "gate": match gate {
-                                            OrchestrationGate::None => "none",
-                                            OrchestrationGate::Clarification => "clarification",
-                                            OrchestrationGate::Approval => "approval",
-                                        },
-                                        // workflow_preview carries the generated draft so the
-                                        // frontend can render a compact minimap + action buttons.
-                                        "workflow_preview": {
-                                            "workflow_id": generated_workflow_id,
-                                            "preset_kind": generated_preset,
-                                            "node_count": generated_node_count,
-                                            "gate": match gate {
-                                                OrchestrationGate::None => "none",
-                                                OrchestrationGate::Clarification => "clarification",
-                                                OrchestrationGate::Approval => "approval",
-                                            },
-                                            // auto_run: true means the frontend shows a "Running…"
-                                            // spinner instead of an "Approve & Run" button.
-                                            "auto_run": gate == OrchestrationGate::None,
-                                        },
-                                        "sections": orchestrate_card_sections(&initial_summary, &objective, gate),
-                                    });
-                                    if let Ok(msg) = new_server_message(
-                                        agent_id,
-                                        vec![],
-                                        thread_id.clone(),
-                                        "generative_card",
-                                        msg_content,
-                                        vec![],
-                                        vec![],
-                                        vec![],
-                                        true,
-                                    ) {
-                                        let _ = store_private_app_message(
-                                            &state.db,
-                                            &state.metrics,
-                                            &state.relay_tx,
-                                            &user.id,
-                                            msg,
-                                        )
-                                        .await;
-                                    }
-                                }
-                                if gate == OrchestrationGate::None {
-                                    let lora_active = state
-                                        .db
-                                        .get_master_agent_instance(&user.id)
-                                        .await
-                                        .ok()
-                                        .flatten()
-                                        .and_then(|inst| inst["lora_genome_active"].as_bool())
-                                        .unwrap_or(false);
-                                    spawn_orchestration_run(
-                                        state.clone(),
-                                        user.id.clone(),
-                                        api_key.clone(),
-                                        model.clone(),
-                                        backend_name.clone(),
-                                        objective.clone(),
-                                        lora_active,
-                                        thread_id.clone(),
-                                        card_id.clone(),
-                                        agent_id_opt.clone(),
-                                    );
-                                }
-
-                                return Ok(Json(finalize_ui_command_response(
-                                    trimmed_query,
-                                    UiCommandResponse {
-                                        intent: "orchestrate".to_string(),
-                                        suggested_view: "search".to_string(),
-                                        preferred_view: preferred_view_for_intent("orchestrate"),
-                                        summary: initial_summary,
-                                        engine,
-                                        links: vec![],
-                                        runner_draft: None,
-                                        bullets: if gate == OrchestrationGate::Approval {
-                                            vec![
-                                                "A visual workflow has been generated — review it before OmnyID executes.".to_string(),
-                                                "Approve the workflow to start execution, or open it in the builder to edit first.".to_string(),
-                                            ]
-                                        } else if gate == OrchestrationGate::Clarification {
-                                            vec![
-                                                "A visual workflow draft has been generated with best-effort assumptions.".to_string(),
-                                                "Confirm to run it as-is, or open it in the builder to adjust before execution.".to_string(),
-                                            ]
-                                        } else {
-                                            vec![
-                                                "A visual workflow has been generated and is now running.".to_string(),
-                                                "Results will appear in the agent feed — open the workflow to watch the execution trace.".to_string(),
-                                            ]
-                                        },
-                                        card_id: Some(card_id),
-                                        preview_message,
-                                    },
-                                )));
-                            }
-
-                            // ── Web research — fetch real results, then LLM summarizes ──────────
-                            _ => {
-                                let search_query = parsed["query"]
-                                    .as_str()
-                                    .unwrap_or(trimmed_query)
-                                    .to_string();
-                                let _ = agent_id_opt;
-
-                                // Step 1: Fetch real web results from DuckDuckGo (free, no key needed)
-                                let ddg_context = fetch_ddg_results(&search_query).await;
-
-                                // Step 2: Second LLM call to summarize real results
-                                let (final_summary, bullets, links) = if ddg_context.is_empty() {
-                                    // No DDG results — fall back to LLM knowledge with disclaimer
-                                    let b: Vec<String> = parsed["bullets"]
-                                        .as_array()
-                                        .map(|arr| {
-                                            arr.iter()
-                                                .filter_map(|v| v.as_str().map(String::from))
-                                                .collect()
-                                        })
-                                        .unwrap_or_default();
-                                    let s: Vec<Value> =
-                                        parsed["sources"].as_array().cloned().unwrap_or_default();
-                                    let l: Vec<UiCommandLink> = s
-                                        .iter()
-                                        .filter_map(|src| {
-                                            Some(UiCommandLink {
-                                                title: src["title"].as_str()?.to_string(),
-                                                url: src["url"].as_str()?.to_string(),
-                                                kind: "source".to_string(),
-                                            })
-                                        })
-                                        .collect();
-                                    (
-                                        format!(
-                                            "{summary} (from agent knowledge — live web results unavailable)"
-                                        ),
-                                        b,
-                                        l,
-                                    )
-                                } else {
-                                    summarize_search_results(
-                                        &search_query,
-                                        &ddg_context,
-                                        &api_key,
-                                        &model,
-                                        &backend_name,
-                                    )
-                                    .await
-                                };
-
-                                // Add direct search link always
-                                let mut all_links = links;
-                                all_links.push(UiCommandLink {
-                                    title: format!("Search: {search_query}"),
-                                    url: search_engine_url(&engine, &search_query),
-                                    kind: "search".to_string(),
-                                });
-
-                                return Ok(Json(finalize_ui_command_response(
-                                    trimmed_query,
-                                    UiCommandResponse {
-                                        intent: "web_research".to_string(),
-                                        suggested_view: "search".to_string(),
-                                        preferred_view: preferred_view.clone(),
-                                        summary: final_summary,
-                                        engine,
-                                        links: all_links,
-                                        runner_draft: None,
-                                        bullets,
-                                        card_id: None,
-                                        preview_message: None,
-                                    },
-                                )));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Browser AI path — authenticated user, no server LLM, but client sent a
-    // pre-classified intent from Chrome Gemini Nano or Edge Phi.
-    if let (Some(user), Some(b_intent), Some(b_parsed)) =
-        (&opt_user, &request.browser_intent, &request.browser_parsed)
-    {
-        let summary = b_parsed["summary"]
-            .as_str()
-            .unwrap_or(trimmed_query)
-            .to_string();
-        let agent_id_opt = state
-            .db
-            .get_master_agent_instance(&user.id)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|inst| inst["agent_id"].as_str().map(str::to_string));
-
-        match b_intent.as_str() {
-            "task" => {
-                let title = b_parsed["title"]
-                    .as_str()
-                    .unwrap_or(trimmed_query)
-                    .to_string();
-                let description = b_parsed["description"].as_str().unwrap_or("").to_string();
-                let priority_str = b_parsed["priority"].as_str().unwrap_or("normal");
-                let task_type = b_parsed["task_type"]
-                    .as_str()
-                    .unwrap_or("general")
-                    .to_string();
-                let priority = match priority_str {
-                    "high" => TaskPriority::High,
-                    "low" => TaskPriority::Low,
-                    _ => TaskPriority::Normal,
-                };
-                let instance = state.db.get_agent_instance(&user.id).await.ok().flatten();
-                if store_in_history {
-                    if let Some(inst) = instance {
-                        let instance_id = inst["id"].as_str().unwrap_or("").to_string();
-                        let task =
-                            AgentTask::new(user.id.clone(), instance_id, title.clone(), priority);
-                        let task_id = task.id.clone();
-                        let thread_id = task.thread_id.clone();
-                        let _ = state.db.create_agent_task(&task).await;
-                        if let Some(agent_id) = agent_id_opt {
-                            let msg_content = serde_json::json!({"task_id": task_id, "title": title, "description": description, "priority": priority_str, "task_type": task_type, "status": "pending"});
-                            let msg_views = vec![
-                                serde_json::json!({"format": "task_card", "content": {"task_id": task_id, "title": title, "description": description, "priority": priority_str, "task_type": task_type, "status": "pending"}, "priority": 10}),
-                            ];
-                            if let Ok(msg) = new_server_message(
-                                agent_id,
-                                vec![],
-                                thread_id,
-                                "task",
-                                msg_content,
-                                msg_views,
-                                vec![],
-                                vec![],
-                                true,
-                            ) {
-                                let _ = store_private_app_message(
-                                    &state.db,
-                                    &state.metrics,
-                                    &state.relay_tx,
-                                    &user.id,
-                                    msg,
-                                )
-                                .await;
-                            }
-                        }
-                    }
-                }
-                return Ok(Json(finalize_ui_command_response(
-                    trimmed_query,
-                    UiCommandResponse {
-                        intent: "task".to_string(),
-                        suggested_view: "search".to_string(),
-                        preferred_view: preferred_view_for_intent("task"),
-                        summary,
-                        engine,
-                        links: vec![],
-                        runner_draft: None,
-                        bullets: vec![],
-                        card_id: None,
-                        preview_message: None,
-                    },
-                )));
-            }
-            "note" => {
-                let title = b_parsed["title"].as_str().unwrap_or("Note").to_string();
-                let content = b_parsed["content"]
-                    .as_str()
-                    .unwrap_or(trimmed_query)
-                    .to_string();
-                if store_in_history {
-                    if let Some(agent_id) = agent_id_opt {
-                        let thread_id = Ulid::new().to_string();
-                        let msg_content = serde_json::json!({"title": title, "content": content});
-                        let msg_views = vec![
-                            serde_json::json!({"format": "canvas", "content": {"title": title, "body": content}, "priority": 10}),
-                        ];
-                        if let Ok(msg) = new_server_message(
-                            agent_id,
-                            vec![],
-                            thread_id,
-                            "note",
-                            msg_content,
-                            msg_views,
-                            vec![],
-                            vec![],
-                            true,
-                        ) {
-                            let _ = store_private_app_message(
-                                &state.db,
-                                &state.metrics,
-                                &state.relay_tx,
-                                &user.id,
-                                msg,
-                            )
-                            .await;
-                        }
-                    }
-                }
-                return Ok(Json(finalize_ui_command_response(
-                    trimmed_query,
-                    UiCommandResponse {
-                        intent: "note".to_string(),
-                        suggested_view: "note".to_string(),
-                        preferred_view: preferred_view_for_intent("note"),
-                        summary,
-                        engine,
-                        links: vec![],
-                        runner_draft: None,
-                        bullets: vec![],
-                        card_id: None,
-                        preview_message: None,
-                    },
-                )));
-            }
-            "orchestrate" => {
-                // Orchestration requires a server-side LLM for background execution.
-                return Ok(Json(finalize_ui_command_response(trimmed_query, UiCommandResponse {
-                    intent: "orchestrate".to_string(),
-                    suggested_view: "search".to_string(),
-                    preferred_view: preferred_view_for_intent("orchestrate"),
-                    summary: "Multi-step orchestration requires a server API key. Add one in Agent Settings → AI Model Configuration.".to_string(),
-                    engine,
-                    links: vec![],
-                    runner_draft: None,
-                    bullets: vec!["Go to Agent Settings and add your API key to enable full orchestration.".to_string()],
-                    card_id: None,
-                    preview_message: None,
-                })));
-            }
-            _ => { /* web_research — fall through to DDG block below */ }
-        }
-    }
-
-    // No LLM configured — still do a real DDG search for web_research queries.
-    // Returns snippet-based bullets without LLM summarization.
-    if base.intent == "web_search" {
-        let q = trimmed_query.to_string();
-        let ddg_results = fetch_ddg_results(&q).await;
-        if !ddg_results.is_empty() {
-            let (summary, bullets, mut links) = fallback_from_ddg(&ddg_results);
-            links.push(UiCommandLink {
-                title: format!("Search: {q}"),
-                url: search_engine_url(&base.engine, &q),
-                kind: "search".to_string(),
-            });
-            return Ok(Json(finalize_ui_command_response(
-                trimmed_query,
-                UiCommandResponse {
-                    intent: "web_research".to_string(),
-                    suggested_view: "search".to_string(),
-                    preferred_view: preferred_view_for_intent("web_research"),
-                    summary,
-                    engine: base.engine,
-                    links,
-                    runner_draft: None,
-                    bullets,
-                    card_id: None,
-                    preview_message: None,
-                },
-            )));
-        }
-    }
-
-    Ok(Json(finalize_ui_command_response(trimmed_query, base)))
+    self::ui_command_routes::ui_command_http(State(state), headers, Json(request)).await
 }
 
-// ── Thread & action review ────────────────────────────────────────────────────
+// â”€â”€ Thread & action review â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[instrument(skip(state), fields(thread_id = %thread_id))]
 async fn get_thread_http(
@@ -4262,6 +3412,7 @@ async fn record_action_decision_http(
         to: vec![target_app_message.from.clone()],
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "action".to_string(),
+        kind: None,
         subtype: Some("approval_decision".to_string()),
         content: serde_json::json!({
             "target_message_id": request.target_message_id,
@@ -4270,11 +3421,17 @@ async fn record_action_decision_http(
             "status": action_status_json_label(&action_status),
             "approval_mode": "human_approval_required",
             "note": request.note,
+            "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                "This action flowed through an explicit human approval boundary."
+            ),
         }),
         metadata: Some(serde_json::json!({
             "origin": "human_approval",
             "status": action_status_json_label(&action_status),
-            "capability_id": capability_id
+            "capability_id": capability_id,
+            "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                "This action flowed through an explicit human approval boundary."
+            )
         })),
         signature: String::new(),
         encryption: None,
@@ -4292,6 +3449,7 @@ async fn record_action_decision_http(
                 "relation": "approval_target"
             }
         })],
+        typed_refs: vec![],
         attachments: vec![],
         store_in_relational: true,
         prev_hash: None,
@@ -4316,6 +3474,9 @@ async fn record_action_decision_http(
             "target_message_id": request.target_message_id,
             "decision": normalized_decision,
             "note": request.note,
+            "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                "This action flowed through an explicit human approval boundary."
+            ),
         }),
         external_reference: Some(decision_message_id.clone()),
         recorded_at: chrono::Utc::now().to_rfc3339(),
@@ -4341,12 +3502,12 @@ async fn record_action_decision_http(
 ///
 /// Execute a typed integration action against an external endpoint.
 /// The request embeds the `IntegrationCapability` inline so callers don't need a
-/// separate capability registry — the homeserver validates, executes (if autonomous),
+/// separate capability registry â€” the homeserver validates, executes (if autonomous),
 /// stores an AFP intent message + result message into the thread, and returns the
 /// structured `ActionResult`.
 #[derive(serde::Deserialize)]
 struct ExecuteActionRequest {
-    /// The capability definition (provider, operation, transport, approval_mode, …).
+    /// The capability definition (provider, operation, transport, approval_mode, â€¦).
     capability: IntegrationCapability,
     /// The call intent (thread_id, requested_by, input, reason).
     intent: ActionIntent,
@@ -4363,14 +3524,110 @@ fn default_post_method() -> String {
     "POST".to_string()
 }
 
-// ── Action execution & email gateway ─────────────────────────────────────────
+fn action_execute_route_allowlist() -> Vec<String> {
+    std::env::var("OMNYID_ACTION_EXECUTE_ALLOWLIST")
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .map(|entry| entry.to_ascii_lowercase())
+        .collect()
+}
+
+fn action_execute_is_localhost_http(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    let localhost_prefixes = [
+        "http://localhost:",
+        "http://localhost/",
+        "http://127.0.0.1:",
+        "http://127.0.0.1/",
+        "http://[::1]:",
+        "http://[::1]/",
+    ];
+    let localhost_exact = ["http://localhost", "http://127.0.0.1", "http://[::1]"];
+    localhost_prefixes.iter().any(|p| lower.starts_with(p))
+        || localhost_exact.iter().any(|e| lower == *e)
+}
+
+fn direct_action_execute_semaphore() -> &'static Arc<Semaphore> {
+    static SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
+    SEMAPHORE.get_or_init(|| {
+        let limit = std::env::var("OMNYID_ACTION_EXECUTE_MAX_CONCURRENCY")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(8);
+        Arc::new(Semaphore::new(limit))
+    })
+}
+
+fn direct_action_execute_outbound_allowlist(
+    req: &ExecuteActionRequest,
+) -> Result<Vec<String>, (StatusCode, String)> {
+    let transport_requires_http = matches!(
+        req.capability.transport,
+        crate::integration::IntegrationTransport::Rest
+            | crate::integration::IntegrationTransport::Graphql
+    );
+    if !transport_requires_http
+        || !matches!(
+            req.capability.approval_mode,
+            crate::integration::ApprovalMode::Autonomous
+        )
+        || action_execute_is_localhost_http(&req.url)
+    {
+        return Ok(vec![]);
+    }
+
+    let allowlist = action_execute_route_allowlist();
+    if allowlist.is_empty() {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Direct autonomous action execution is disabled until OMNYID_ACTION_EXECUTE_ALLOWLIST is configured."
+                .to_string(),
+        ));
+    }
+    Ok(allowlist)
+}
+
+// â”€â”€ Action execution & email gateway â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn execute_action_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(req): Json<ExecuteActionRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("actions_execute", &headers),
+        RateLimitPolicy {
+            max_requests: 12,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let _user = authenticated_user(&state.db, &headers).await?;
     let now = chrono::Utc::now().to_rfc3339();
+
+    // Guard against SSRF: the caller supplies an arbitrary URL and this
+    // endpoint is reachable without authentication.  Block HTTP to any
+    // non-loopback host â€” only HTTPS external calls and http://localhost are
+    // allowed.  The same policy is enforced in mcp_client::validate_mcp_server_url.
+    {
+        let lower = req.url.to_ascii_lowercase();
+        let is_https = lower.starts_with("https://");
+        let is_localhost_http = action_execute_is_localhost_http(&req.url);
+        if !is_https && !is_localhost_http {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Action URL must use https:// (or http://localhost for development). \
+                     HTTP to external hosts is blocked to prevent SSRF. Got: {}",
+                    req.url
+                ),
+            ));
+        }
+    }
 
     // Build optional signing context from the homeserver's own key.
     let signing_context = env_hex_32("OMNYID_SIGNING_KEY_HEX")
@@ -4380,6 +3637,7 @@ async fn execute_action_http(
             agent_id: AgentCard::from_env().agent_id,
             private_key_bytes: key_bytes,
         });
+    let outbound_allowlist = direct_action_execute_outbound_allowlist(&req)?;
 
     let params = RestCallParams {
         url: req.url.clone(),
@@ -4387,12 +3645,28 @@ async fn execute_action_http(
         bearer_token: req.bearer_token.clone(),
         body: req.intent.input.clone(),
         signing_context,
-        outbound_allowlist: vec![], // populated from delegation when called via workflow executor
+        outbound_allowlist,
     };
 
-    let result = rest_execute_action(&req.capability, &req.intent, params, &now)
+    let _permit = direct_action_execute_semaphore()
+        .clone()
+        .acquire_owned()
         .await
-        .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err))?;
+        .map_err(|_| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Action execution concurrency limiter is unavailable".to_string(),
+            )
+        })?;
+    let result = rest_execute_action(
+        &req.capability,
+        &req.intent,
+        params,
+        &now,
+        &state.http_client,
+    )
+    .await
+    .map_err(|err| (StatusCode::UNPROCESSABLE_ENTITY, err))?;
 
     // Persist intent + result as AFP messages in the thread.
     let mut intent_message = AFPMessage {
@@ -4404,6 +3678,7 @@ async fn execute_action_http(
         to: vec![],
         timestamp: now.clone(),
         r#type: "action".to_string(),
+        kind: None,
         subtype: Some("intent".to_string()),
         content: serde_json::json!({
             "capability_id": req.capability.capability_id,
@@ -4428,6 +3703,7 @@ async fn execute_action_http(
             "content": { "event": "action_intent", "capability_id": req.capability.capability_id }
         })],
         references: vec![],
+        typed_refs: vec![],
         attachments: vec![],
         store_in_relational: true,
         prev_hash: None,
@@ -4451,6 +3727,7 @@ async fn execute_action_http(
         to: vec![req.intent.requested_by.clone()],
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "action".to_string(),
+        kind: None,
         subtype: Some("result".to_string()),
         content: serde_json::json!({
             "capability_id": result.capability_id,
@@ -4480,6 +3757,7 @@ async fn execute_action_http(
             "target": intent_message_id,
             "metadata": { "relation": "action_intent" }
         })],
+        typed_refs: vec![],
         attachments: vec![],
         store_in_relational: true,
         prev_hash: None,
@@ -4543,13 +3821,17 @@ async fn handle_gateway_email(
 
 /// GET /sync/shapes?device_class=desktop&profile=full
 ///
-// ── Sync ───────────────────────────────────────────────────────────────────────
+// â”€â”€ Sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Returns the ElectricSQL-compatible shape descriptors for the requested device profile.
 /// Clients use these to configure PGLite subscriptions without hardcoding table names.
 async fn sync_shapes_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Json<Value> {
+    let opt_user = authenticated_user(&state.db, &headers).await.ok();
+
     let device_class = params
         .get("device_class")
         .and_then(|dc| parse_device_class(dc))
@@ -4564,7 +3846,8 @@ async fn sync_shapes_http(
 
     let slices = sync_slices_for_device(&device_class, &profile);
     let requires_key = requires_local_key_material(&slices);
-    let shapes = shape_descriptors_for_slices(&slices);
+    // Pass user_id so per-user shapes carry owner filters (GAP-092/GAP-093).
+    let shapes = shape_descriptors_for_slices(&slices, opt_user.as_ref().map(|u| u.id.as_str()));
 
     Json(serde_json::json!({
         "device_class": format!("{device_class:?}").to_lowercase(),
@@ -4580,8 +3863,12 @@ async fn sync_shapes_http(
 /// Returns a `DeviceBootstrap` bundle the client uses to initialise its local PGLite
 /// instance and connect to the ElectricSQL project URL.
 async fn sync_bootstrap_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    let opt_user = authenticated_user(&state.db, &headers).await.ok();
+
     let device_id = params
         .get("device_id")
         .cloned()
@@ -4595,7 +3882,7 @@ async fn sync_bootstrap_http(
 
     let profile = default_sync_profile(&device_class);
     let slices = sync_slices_for_device(&device_class, &profile);
-    let shapes = shape_descriptors_for_slices(&slices);
+    let shapes = shape_descriptors_for_slices(&slices, opt_user.as_ref().map(|u| u.id.as_str()));
 
     let electric_project_url = std::env::var("OMNYID_ELECTRIC_URL")
         .unwrap_or_else(|_| "https://electric.yourdomain.ai".to_string());
@@ -4630,12 +3917,20 @@ struct RecordPersonalizationEventRequest {
     rationale: Option<String>,
 }
 
-// ── Personalization ────────────────────────────────────────────────────────────
+// â”€â”€ Personalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn record_personalization_event_http(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(req): Json<RecordPersonalizationEventRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    // Require authentication to prevent arbitrary signal injection (GAP-053).
+    authenticated_user(&state.db, &headers).await.map_err(|_| {
+        (
+            StatusCode::UNAUTHORIZED,
+            "authentication required".to_string(),
+        )
+    })?;
     let signal = match req.signal.as_str() {
         "approved" => FeedbackSignal::Approved,
         "rejected" => FeedbackSignal::Rejected,
@@ -4685,12 +3980,26 @@ async fn record_personalization_event_http(
 /// Used by the dashboard personalization panel to surface training readiness.
 async fn get_personalization_stats_http(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    // Require auth: even with differential-privacy noise, leaking LoRA signal
+    // distributions per agent_id to unauthenticated callers reveals usage patterns.
+    let user = authenticated_user(&state.db, &headers).await?;
     let agent_id = params
         .get("agent_id")
         .cloned()
         .unwrap_or_else(|| AgentCard::from_env().agent_id);
+    // Prevent cross-user stats access: only allow querying agents owned by this user.
+    let owned = state
+        .db
+        .list_managed_agents_by_user(&user.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+    if !owned.iter().any(|a| a.agent_id == agent_id) {
+        return Err((StatusCode::FORBIDDEN, "agent not owned by this user".to_string()));
+    }
 
     let stats = state
         .db
@@ -4744,7 +4053,7 @@ async fn serve_afp_delegation() -> Json<Value> {
     }))
 }
 
-// ── Key lifecycle endpoints (Phase 2) ────────────────────────────────────────
+// â”€â”€ Key lifecycle endpoints (Phase 2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[derive(serde::Deserialize)]
 struct RotateKeyRequest {
@@ -4758,8 +4067,12 @@ struct RotateKeyRequest {
 /// Requires a valid bearer session with an authenticated user.
 async fn rotate_key_http(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(request): Json<RotateKeyRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    // Operator-level endpoint: the response contains a newly-generated private key.
+    // Unauthenticated callers must not be able to receive or corrupt the signing key.
+    health::guard_operational_endpoint(&state, &headers).await?;
     use chacha20poly1305::aead::{OsRng, rand_core::RngCore};
     use ed25519_dalek::SigningKey;
 
@@ -4816,8 +4129,12 @@ struct UpsertPeerKeyRequest {
 /// SDKs call this after successfully fetching a remote AgentCard.
 async fn upsert_peer_key_http(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(request): Json<UpsertPeerKeyRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    // Require auth: an unauthenticated caller could poison any agent's trusted public key,
+    // enabling signature forgery attacks on the AFP message verification chain.
+    authenticated_user(&state.db, &headers).await?;
     let prev = request.previous_key_ids.unwrap_or_default();
     state
         .db
@@ -4888,7 +4205,8 @@ pub(crate) async fn store_proto_message(
                 "event": "message_stored",
                 "message_id": msg.id,
                 "thread_id": msg.thread_id,
-                "type": msg.r#type
+                "type": msg.r#type,
+                "owner_user_id": msg.from
             })
             .to_string(),
         );
@@ -4902,7 +4220,7 @@ pub(crate) async fn store_proto_message(
     }))
 }
 
-// ── AFP message processing ────────────────────────────────────────────────────
+// â”€â”€ AFP message processing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn index_backlink_update(db: &Db, app_message: &AFPMessage) {
     let Some(record) = BacklinkRecord::from_backlink_message(app_message) else {
@@ -4947,6 +4265,9 @@ async fn handle_inserted_message_effects(
             output: serde_json::json!({
                 "message_id": app_message.id,
                 "approval_mode": "human_approval_required",
+                "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                    "Outbound or high-risk action requires explicit human approval."
+                ),
             }),
             external_reference: Some(app_message.id.clone()),
             recorded_at: chrono::Utc::now().to_rfc3339(),
@@ -5112,10 +4433,17 @@ fn action_capability_id(message: &AFPMessage) -> String {
         .unwrap_or_else(|| message.r#type.clone())
 }
 
+/// Returns true if `s` is a valid ULID: 26 characters, Crockford base32 alphabet.
+fn is_valid_ulid(s: &str) -> bool {
+    s.len() == 26 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'A'..=b'H' | b'J'..=b'N' | b'P'..=b'T' | b'V'..=b'Z' | b'a'..=b'h' | b'j'..=b'n' | b'p'..=b't' | b'v'..=b'z'))
+}
+
 pub(super) fn validate_proto_message(msg: &Message) -> bool {
+    // GAP-098: enforce ULID format on id and thread_id to prevent injection via
+    // arbitrary strings reaching tenant-schema SQL queries.
     msg.protocol == "afp-v1"
-        && !msg.id.trim().is_empty()
-        && !msg.thread_id.trim().is_empty()
+        && is_valid_ulid(msg.id.trim())
+        && is_valid_ulid(msg.thread_id.trim())
         && !msg.from.trim().is_empty()
         && !msg.r#type.trim().is_empty()
 }
@@ -5130,6 +4458,7 @@ pub(crate) fn app_to_proto(message: AFPMessage) -> Message {
         to: message.to,
         timestamp: message.timestamp,
         r#type: message.r#type,
+        kind: message.kind,
         content: message.content.to_string(),
         signature: message.signature,
         encryption: message
@@ -5158,6 +4487,7 @@ pub(super) fn proto_to_app(message: Message) -> AFPMessage {
         to: message.to,
         timestamp: message.timestamp,
         r#type: message.r#type,
+        kind: message.kind,
         subtype: string_to_option(message.subtype),
         content: serde_json::from_str(&message.content).unwrap_or_else(|_| serde_json::json!({})),
         metadata: json_optional_value_from_str(&message.metadata),
@@ -5165,6 +4495,7 @@ pub(super) fn proto_to_app(message: Message) -> AFPMessage {
         encryption: json_object_from_str(&message.encryption),
         views: json_array_from_str(&message.views),
         references: json_array_from_str(&message.references),
+        typed_refs: vec![],
         attachments: json_array_from_str(&message.attachments),
         store_in_relational: message.store_in_relational,
         prev_hash: None,
@@ -5365,7 +4696,7 @@ fn trial_assistant_reply(
     intent: &str,
 ) -> String {
     if intent == "confirm" {
-        return "Done. Your day plan is confirmed and added to your calendar.\n\n✓ Lesson 1 at 5:00 pm\n✓ Lesson 2 at 6:00 pm\n✓ Dog washing at 7:00 pm\n✓ Free time from 8:00 pm\n\nYour evening is set. Come back to adjust any slot at any time.".to_string();
+        return "Done. Your day plan is confirmed and added to your calendar.\n\nâœ“ Lesson 1 at 5:00 pm\nâœ“ Lesson 2 at 6:00 pm\nâœ“ Dog washing at 7:00 pm\nâœ“ Free time from 8:00 pm\n\nYour evening is set. Come back to adjust any slot at any time.".to_string();
     }
 
     let lowered = content.to_lowercase();
@@ -5382,25 +4713,28 @@ fn trial_assistant_reply(
         };
         let has_dog = lowered.contains("dog") || lowered.contains("wash");
         let mut lines = vec![
-            "Day Planner · Plan built".to_string(),
+            "Day Planner Â· Plan built".to_string(),
             String::new(),
             "Here is a plan built around your fixed commitments today:".to_string(),
             String::new(),
-            "  17:00 – 18:00  Lesson 1".to_string(),
+            "  17:00 â€“ 18:00  Lesson 1".to_string(),
         ];
         if num_lessons >= 2 {
-            lines.push("  18:00 – 19:00  Lesson 2".to_string());
+            lines.push("  18:00 â€“ 19:00  Lesson 2".to_string());
         }
         let mut next = if num_lessons >= 2 { 19 } else { 18 };
         if has_dog {
             lines.push(format!(
-                "  {:02}:00 – {:02}:00  Dog washing 🐾",
+                "  {:02}:00 â€“ {:02}:00  Dog washing ðŸ¾",
                 next,
                 next + 1
             ));
             next += 1;
         }
-        lines.push(format!("  {:02}:00 – 24:00  Free time · wind down", next));
+        lines.push(format!(
+            "  {:02}:00 â€“ 24:00  Free time Â· wind down",
+            next
+        ));
         lines.push(String::new());
         lines.push(
             "The calendar below shows your plan. Click \"Add to my calendar\" to confirm."
@@ -5495,7 +4829,7 @@ fn build_trial_calendar_view(content: &str) -> Value {
         slots.push(serde_json::json!({
             "start": format!("{:02}:00", current),
             "end": format!("{:02}:00", current + 1),
-            "label": "Dog washing 🐾",
+            "label": "Dog washing ðŸ¾",
             "type": "chore",
             "movable": true
         }));
@@ -6271,692 +5605,6 @@ fn python_runner_workspace_file(
         .find(|descriptor| descriptor.file_id == file_id)
 }
 
-fn normalize_search_engine(engine: Option<&str>) -> String {
-    match engine
-        .unwrap_or("duckduckgo")
-        .trim()
-        .to_lowercase()
-        .as_str()
-    {
-        "google" => "google".to_string(),
-        _ => "duckduckgo".to_string(),
-    }
-}
-
-fn search_engine_url(engine: &str, query: &str) -> String {
-    let encoded = query.replace(' ', "+");
-    match engine {
-        "google" => format!("https://www.google.com/search?q={encoded}"),
-        _ => format!("https://duckduckgo.com/?q={encoded}"),
-    }
-}
-
-fn infer_runner_target_file(query: &str, active_file_id: Option<&str>) -> String {
-    let lowered = query.to_lowercase();
-    if lowered.contains("dockerfile")
-        || lowered.contains("container")
-        || lowered.contains("image build")
-    {
-        "dockerfile".to_string()
-    } else if lowered.contains("policy.py")
-        || lowered.contains("policy ")
-        || lowered.contains("allowlist")
-    {
-        "policy_py".to_string()
-    } else if lowered.contains("tool registry") || lowered.contains("tool_registry") {
-        "tool_registry_py".to_string()
-    } else if lowered.contains("requirements")
-        || lowered.contains("dependency")
-        || lowered.contains("package")
-    {
-        "requirements_txt".to_string()
-    } else if lowered.contains("template") {
-        "starter_templates_json".to_string()
-    } else if lowered.contains("profile") || lowered.contains("agent profile") {
-        "agent_profile_json".to_string()
-    } else if lowered.contains("runtime policy")
-        || lowered.contains("token cap")
-        || lowered.contains("spend cap")
-    {
-        "runtime_policy_json".to_string()
-    } else if let Some(current) = active_file_id {
-        current.to_string()
-    } else {
-        "runner_chat_py".to_string()
-    }
-}
-
-fn build_runner_draft(query: &str, target_file_id: &str) -> UiRunnerDraftResponse {
-    let timestamp = chrono::Utc::now().to_rfc3339();
-    let snippet = match target_file_id {
-        "policy_py" => format!(
-            "\n\n# TODO(omnyid-search-agent): requested from unified command bar at {timestamp}\n# Instruction: {query}\ndef requested_policy_hook(policy: dict, context: dict) -> dict:\n    \"\"\"Implement the requested policy behavior and return the updated context.\"\"\"\n    return context\n"
-        ),
-        "tool_registry_py" => format!(
-            "\n\n# TODO(omnyid-search-agent): requested from unified command bar at {timestamp}\n# Instruction: {query}\ndef requested_tool_action(prompt: str, policy: dict):\n    \"\"\"Add a capability-gated tool flow for this request.\"\"\"\n    return [], []\n"
-        ),
-        "requirements_txt" => format!(
-            "\n# TODO(omnyid-search-agent): review requested dependency change at {timestamp}: {query}\n"
-        ),
-        "starter_templates_json" => format!(
-            "\n{{\n  \"id\": \"generated_template_{id}\",\n  \"name\": \"Generated from command bar\",\n  \"summary\": \"{summary}\",\n  \"system_prompt\": \"Expand this into a safe starter template based on the user request.\",\n  \"suggested_prompts\": [\"{prompt}\"]\n}}\n",
-            id = Ulid::new(),
-            summary = query.replace('"', "'"),
-            prompt = query.replace('"', "'")
-        ),
-        "agent_profile_json" => format!(
-            "\n// TODO(omnyid-search-agent): review profile update requested at {timestamp}: {query}\n"
-        ),
-        "runtime_policy_json" => format!(
-            "\n// TODO(omnyid-search-agent): review policy update requested at {timestamp}: {query}\n"
-        ),
-        _ => format!(
-            "\n\n# TODO(omnyid-search-agent): requested from unified command bar at {timestamp}\n# Instruction: {query}\ndef requested_command_bar_change(state: dict):\n    \"\"\"Implement the requested runner behavior and return the updated state.\"\"\"\n    return state\n"
-        ),
-    };
-
-    UiRunnerDraftResponse {
-        target_file_id: target_file_id.to_string(),
-        title: "Command bar draft".to_string(),
-        content: snippet,
-        requires_confirmation: true,
-    }
-}
-
-/// Fetch search results from DuckDuckGo instant answer API.
-/// Returns a list of (title, url, snippet) tuples.
-async fn fetch_ddg_results(query: &str) -> Vec<(String, String, String)> {
-    let encoded = urlencoding_encode(query);
-    let url = format!(
-        "https://api.duckduckgo.com/?q={encoded}&format=json&no_redirect=1&no_html=1&skip_disambig=1"
-    );
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .user_agent("OmnyID-Agent/1.0")
-        .build()
-        .unwrap_or_default();
-    let Ok(resp) = client.get(&url).send().await else {
-        return vec![];
-    };
-    let Ok(json) = resp.json::<Value>().await else {
-        return vec![];
-    };
-
-    let mut results: Vec<(String, String, String)> = vec![];
-
-    // Abstract (e.g. Wikipedia summary)
-    if let (Some(text), Some(source_url)) = (
-        json["AbstractText"].as_str().filter(|s| !s.is_empty()),
-        json["AbstractURL"].as_str().filter(|s| !s.is_empty()),
-    ) {
-        let source = json["AbstractSource"].as_str().unwrap_or("Web").to_string();
-        results.push((source, source_url.to_string(), text.to_string()));
-    }
-
-    // Instant answer
-    if let Some(answer) = json["Answer"].as_str().filter(|s| !s.is_empty()) {
-        results.push((
-            "DuckDuckGo Answer".to_string(),
-            String::new(),
-            answer.to_string(),
-        ));
-    }
-
-    // Related topics — top 4
-    if let Some(topics) = json["RelatedTopics"].as_array() {
-        for topic in topics.iter().take(4) {
-            if let (Some(text), Some(link)) = (
-                topic["Text"].as_str().filter(|s| !s.is_empty()),
-                topic["FirstURL"].as_str().filter(|s| !s.is_empty()),
-            ) {
-                let title = topic["Name"].as_str().unwrap_or("Related").to_string();
-                results.push((title, link.to_string(), text.to_string()));
-            }
-        }
-    }
-
-    // Results — top 3
-    if let Some(res_arr) = json["Results"].as_array() {
-        for res in res_arr.iter().take(3) {
-            if let (Some(text), Some(link)) = (
-                res["Text"].as_str().filter(|s| !s.is_empty()),
-                res["FirstURL"].as_str().filter(|s| !s.is_empty()),
-            ) {
-                results.push(("Result".to_string(), link.to_string(), text.to_string()));
-            }
-        }
-    }
-
-    results
-}
-
-fn urlencoding_encode(s: &str) -> String {
-    s.chars()
-        .flat_map(|c| {
-            if c.is_alphanumeric() || matches!(c, '-' | '_' | '.' | '~') {
-                vec![c]
-            } else if c == ' ' {
-                vec!['+']
-            } else {
-                let bytes = c.to_string().into_bytes();
-                bytes
-                    .iter()
-                    .flat_map(|b| {
-                        let hi = (b >> 4) as u8;
-                        let lo = (b & 0xF) as u8;
-                        let hex = |n: u8| if n < 10 { b'0' + n } else { b'a' + n - 10 };
-                        vec!['%', hex(hi) as char, hex(lo) as char]
-                    })
-                    .collect::<Vec<char>>()
-            }
-        })
-        .collect()
-}
-
-/// Ask the LLM to summarize real search results into bullets + sources.
-async fn summarize_search_results(
-    query: &str,
-    results: &[(String, String, String)],
-    api_key: &str,
-    model: &str,
-    backend: &str,
-) -> (String, Vec<String>, Vec<UiCommandLink>) {
-    let context = results
-        .iter()
-        .enumerate()
-        .map(|(i, (title, url, snippet))| format!("[{}] {title}\nURL: {url}\n{snippet}", i + 1))
-        .collect::<Vec<_>>()
-        .join("\n\n");
-
-    let prompt = format!(
-        "Search query: \"{query}\"\n\nSearch results:\n{context}\n\nSummarise these results in 3-5 concise bullet points. Return ONLY valid JSON:\n{{\"summary\":\"<1-2 sentence overview>\",\"bullets\":[\"point 1\",\"point 2\",\"point 3\"],\"sources\":[{{\"title\":\"<source title>\",\"url\":\"<url>\",\"snippet\":\"<brief>\"}}]}}"
-    );
-
-    let infer_req = crate::inference::InferenceRequest {
-        system: "You are a research assistant. Summarise the provided search results accurately. Return only valid JSON.".to_string(),
-        messages: vec![crate::inference::InferenceMessage {
-            role: "user".to_string(),
-            content: prompt,
-        }],
-        max_tokens: 800,
-        temperature: 0.1,
-    };
-
-    let infer_result = if backend == "runpod" {
-        let ep = std::env::var("OMNYID_RUNPOD_ENDPOINT_ID").unwrap_or_default();
-        crate::inference::runpod_infer(api_key, &ep, model, &infer_req).await
-    } else {
-        crate::inference::anthropic_infer(api_key, model, &infer_req).await
-    };
-
-    let Ok(resp) = infer_result else {
-        return fallback_from_ddg(results);
-    };
-    let raw = resp
-        .content
-        .trim()
-        .trim_start_matches("```json")
-        .trim_start_matches("```")
-        .trim_end_matches("```")
-        .trim();
-    let Ok(parsed) = serde_json::from_str::<Value>(raw) else {
-        return fallback_from_ddg(results);
-    };
-
-    let summary = parsed["summary"]
-        .as_str()
-        .unwrap_or("Research results summarised below.")
-        .to_string();
-    let bullets: Vec<String> = parsed["bullets"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
-    let sources = parsed["sources"].as_array().cloned().unwrap_or_default();
-    let links: Vec<UiCommandLink> = sources
-        .iter()
-        .filter_map(|s| {
-            Some(UiCommandLink {
-                title: s["title"].as_str()?.to_string(),
-                url: s["url"].as_str()?.to_string(),
-                kind: "source".to_string(),
-            })
-        })
-        .collect();
-    (summary, bullets, links)
-}
-
-fn fallback_from_ddg(
-    results: &[(String, String, String)],
-) -> (String, Vec<String>, Vec<UiCommandLink>) {
-    let bullets: Vec<String> = results
-        .iter()
-        .take(5)
-        .map(|(_, _, snippet)| snippet.chars().take(120).collect::<String>())
-        .collect();
-    let links: Vec<UiCommandLink> = results
-        .iter()
-        .filter(|(_, url, _)| !url.is_empty())
-        .take(5)
-        .map(|(title, url, _snippet)| UiCommandLink {
-            title: title.clone(),
-            url: url.clone(),
-            kind: "source".to_string(),
-        })
-        .collect();
-    (
-        "Search results from DuckDuckGo.".to_string(),
-        bullets,
-        links,
-    )
-}
-
-/// Map a canonical intent string to the richest UI surface the frontend can render.
-fn preferred_view_for_intent(intent: &str) -> String {
-    match intent {
-        "task" => "task_board",
-        "note" => "note_canvas",
-        "schedule" => "draggable_calendar",
-        "orchestrate" => "orchestrate_progress",
-        "web_research" => "search_result",
-        "runner_edit" => "runner",
-        "dashboard_focus" => "search",
-        _ => "search_result",
-    }
-    .to_string()
-}
-
-fn ui_command_a2ui_content(
-    query: &str,
-    response: &UiCommandResponse,
-    source_links: &[Value],
-) -> Value {
-    let title = if query.is_empty() {
-        "Command result".to_string()
-    } else {
-        format!("Command result for \"{query}\"")
-    };
-    let description = if response.intent == "runner_edit" {
-        "The agent prepared a safe, review-first runner draft."
-    } else {
-        "The agent routed your request into the workspace."
-    };
-
-    let mut nodes = vec![serde_json::json!({
-        "id": "command-summary",
-        "type": "callout",
-        "props": {
-            "tone": if response.intent == "runner_edit" { "strategy" } else { "info" },
-            "title": title,
-            "body": response.summary,
-        }
-    })];
-
-    if !response.bullets.is_empty() {
-        nodes.push(serde_json::json!({
-            "id": "command-next-steps",
-            "type": "table",
-            "props": {
-                "columns": ["Checklist"],
-                "rows": response
-                    .bullets
-                    .iter()
-                    .map(|item| serde_json::json!([item]))
-                    .collect::<Vec<_>>(),
-                "caption": "Next steps",
-            }
-        }));
-    }
-
-    if let Some(draft) = &response.runner_draft {
-        nodes.push(serde_json::json!({
-            "id": "runner-draft-stats",
-            "type": "stats_grid",
-            "props": {
-                "items": [
-                    {"label": "Target file", "value": draft.target_file_id},
-                    {"label": "Review", "value": if draft.requires_confirmation { "Required" } else { "Optional" }},
-                    {"label": "Workspace", "value": "Python runner"},
-                ]
-            }
-        }));
-        nodes.push(serde_json::json!({
-            "id": "runner-draft-code",
-            "type": "code",
-            "props": {
-                "title": if draft.target_file_id.ends_with("_json") {
-                    "Draft code (json)"
-                } else if draft.target_file_id.ends_with("_txt") {
-                    "Draft code (text)"
-                } else {
-                    "Draft code (python)"
-                },
-                "language": if draft.target_file_id.ends_with("_json") {
-                    "json"
-                } else if draft.target_file_id.ends_with("_txt") {
-                    "text"
-                } else {
-                    "python"
-                },
-                "code": draft.content,
-            }
-        }));
-    }
-
-    if !source_links.is_empty() {
-        nodes.push(serde_json::json!({
-            "id": "command-sources",
-            "type": "link_list",
-            "props": {
-                "title": "Sources",
-                "items": source_links
-                    .iter()
-                    .map(|item| serde_json::json!({
-                        "title": item["title"].as_str().unwrap_or(item["url"].as_str().unwrap_or("Link")),
-                        "url": item["url"].as_str().unwrap_or_default(),
-                        "subtitle": item["snippet"].as_str().unwrap_or_default(),
-                    }))
-                    .collect::<Vec<_>>(),
-            }
-        }));
-    }
-
-    serde_json::json!({
-        "schema_version": "a2ui.v1",
-        "kind": "panel",
-        "title": title,
-        "description": description,
-        "layout": {
-            "type": "stack",
-            "gap": "md",
-        },
-        "nodes": nodes,
-    })
-}
-
-fn ui_runner_edit_a2ui_content(query: &str, response: &UiCommandResponse) -> Value {
-    let title = if query.is_empty() {
-        "Runner draft".to_string()
-    } else {
-        format!("Runner draft for \"{query}\"")
-    };
-    let draft = response.runner_draft.as_ref();
-    let target_file = draft
-        .map(|item| item.target_file_id.as_str())
-        .unwrap_or("runner_chat_py");
-    let review_required = draft
-        .map(|item| {
-            if item.requires_confirmation {
-                "Required"
-            } else {
-                "Optional"
-            }
-        })
-        .unwrap_or("Optional");
-    let code_title = if target_file.ends_with("_json") {
-        "Draft code (json)"
-    } else if target_file.ends_with("_txt") {
-        "Draft code (text)"
-    } else {
-        "Draft code (python)"
-    };
-    let code_language = if target_file.ends_with("_json") {
-        "json"
-    } else if target_file.ends_with("_txt") {
-        "text"
-    } else {
-        "python"
-    };
-    let code = draft.map(|item| item.content.as_str()).unwrap_or_default();
-    let checklist_rows = if response.bullets.is_empty() {
-        vec![
-            serde_json::json!(["Review the generated patch before applying it"]),
-            serde_json::json!(["Confirm tool and policy changes before redeploying"]),
-            serde_json::json!(["Run a test or dry-run after saving the draft"]),
-        ]
-    } else {
-        response
-            .bullets
-            .iter()
-            .map(|item| serde_json::json!([item]))
-            .collect::<Vec<_>>()
-    };
-
-    serde_json::json!({
-        "schema_version": "a2ui.v1",
-        "kind": "panel",
-        "title": title,
-        "description": "The agent prepared a safe, review-first Python runner draft with clear next steps before execution.",
-        "layout": {
-            "type": "stack",
-            "gap": "md",
-        },
-        "nodes": [
-            {
-                "id": "runner-edit-summary",
-                "type": "callout",
-                "props": {
-                    "tone": "strategy",
-                    "title": "Runner draft ready for review",
-                    "body": response.summary,
-                }
-            },
-            {
-                "id": "runner-edit-stats",
-                "type": "stats_grid",
-                "props": {
-                    "items": [
-                        {"label": "Target file", "value": target_file},
-                        {"label": "Review", "value": review_required},
-                        {"label": "Workspace", "value": "Python runner"},
-                    ]
-                }
-            },
-            {
-                "id": "runner-edit-workflow",
-                "type": "section",
-                "props": {
-                    "title": "Suggested workflow",
-                    "layout": {"type": "stack", "gap": "sm"},
-                },
-                "children": [
-                    {
-                        "id": "runner-edit-checklist",
-                        "type": "table",
-                        "props": {
-                            "columns": ["Review checklist"],
-                            "rows": checklist_rows,
-                            "caption": "Safe editing flow",
-                        }
-                    },
-                    {
-                        "id": "runner-edit-tip",
-                        "type": "text",
-                        "props": {
-                            "label": "Tip",
-                            "value": "Keep the command bar open while reviewing the draft so the agent can revise the code in place before you save it.",
-                        }
-                    }
-                ]
-            },
-            {
-                "id": "runner-edit-code",
-                "type": "code",
-                "props": {
-                    "title": code_title,
-                    "language": code_language,
-                    "code": code,
-                }
-            }
-        ]
-    })
-}
-
-fn ui_dashboard_focus_a2ui_content(query: &str, response: &UiCommandResponse) -> Value {
-    let title = if query.is_empty() {
-        "Workspace focus".to_string()
-    } else {
-        format!("Workspace focus for \"{query}\"")
-    };
-    let bullet_rows = if response.bullets.is_empty() {
-        vec![
-            serde_json::json!([
-                "Recent messages",
-                "See the latest agent output and thread activity."
-            ]),
-            serde_json::json!([
-                "Agent status",
-                "Check running, idle, and blocked agents at a glance."
-            ]),
-            serde_json::json!([
-                "Runtime health",
-                "Inspect runner state, logs, and recent changes."
-            ]),
-        ]
-    } else {
-        response
-            .bullets
-            .iter()
-            .map(|item| serde_json::json!([item, "Suggested workspace focus"]))
-            .collect::<Vec<_>>()
-    };
-
-    serde_json::json!({
-        "schema_version": "a2ui.v1",
-        "kind": "panel",
-        "title": title,
-        "description": "Pivot the workspace toward recent agent output, runtime health, and the next useful control surface.",
-        "layout": {
-            "type": "stack",
-            "gap": "md",
-        },
-        "nodes": [
-            {
-                "id": "dashboard-focus-summary",
-                "type": "callout",
-                "props": {
-                    "tone": "info",
-                    "title": "Dashboard focus ready",
-                    "body": response.summary,
-                }
-            },
-            {
-                "id": "dashboard-focus-stats",
-                "type": "stats_grid",
-                "props": {
-                    "items": [
-                        {"label": "Primary view", "value": "Dashboard"},
-                        {"label": "Status panel", "value": "Agent fleet"},
-                        {"label": "Detail view", "value": "Threads and runtime"},
-                    ]
-                }
-            },
-            {
-                "id": "dashboard-focus-guidance",
-                "type": "section",
-                "props": {
-                    "title": "Suggested pivots",
-                    "layout": {"type": "stack", "gap": "sm"},
-                },
-                "children": [
-                    {
-                        "id": "dashboard-focus-table",
-                        "type": "table",
-                        "props": {
-                            "columns": ["Focus area", "What happens"],
-                            "rows": bullet_rows,
-                            "caption": "High-value next views",
-                        }
-                    },
-                    {
-                        "id": "dashboard-focus-tip",
-                        "type": "text",
-                        "props": {
-                            "label": "Tip",
-                            "value": "Use the agent status panel to jump from green completed tasks to orange in-progress work before opening the full thread view.",
-                        }
-                    }
-                ]
-            }
-        ]
-    })
-}
-
-fn ui_search_result_a2ui_content(
-    query: &str,
-    response: &UiCommandResponse,
-    source_links: &[Value],
-) -> Value {
-    let summary = response.summary.clone();
-    let bullet_rows = response
-        .bullets
-        .iter()
-        .map(|item| serde_json::json!([item]))
-        .collect::<Vec<_>>();
-    let source_items = source_links
-        .iter()
-        .map(|item| {
-            serde_json::json!({
-                "title": item["title"].as_str().unwrap_or(item["url"].as_str().unwrap_or("Link")),
-                "url": item["url"].as_str().unwrap_or_default(),
-                "subtitle": item["snippet"].as_str().unwrap_or_default(),
-            })
-        })
-        .collect::<Vec<_>>();
-
-    let mut nodes = vec![serde_json::json!({
-        "id": "search-summary",
-        "type": "callout",
-        "props": {
-            "tone": "info",
-            "title": if query.is_empty() { "Research result" } else { "Research summary" },
-            "body": summary,
-        }
-    })];
-
-    if !bullet_rows.is_empty() {
-        nodes.push(serde_json::json!({
-            "id": "search-bullets",
-            "type": "table",
-            "props": {
-                "columns": ["Key points"],
-                "rows": bullet_rows,
-                "caption": "Research highlights",
-            }
-        }));
-    }
-
-    if !source_items.is_empty() {
-        nodes.push(serde_json::json!({
-            "id": "search-sources",
-            "type": "link_list",
-            "props": {
-                "title": "Sources",
-                "items": source_items,
-            }
-        }));
-    }
-
-    serde_json::json!({
-        "schema_version": "a2ui.v1",
-        "kind": "panel",
-        "title": if query.is_empty() {
-            "Search result".to_string()
-        } else {
-            format!("Search result for \"{query}\"")
-        },
-        "description": "Structured research view companion for the current search result.",
-        "layout": {
-            "type": "stack",
-            "gap": "md",
-        },
-        "nodes": nodes,
-    })
-}
-
 fn orchestration_companion_a2ui_content(
     query: &str,
     summary: &str,
@@ -7241,270 +5889,6 @@ fn orchestration_error_section_content(error_text: &str) -> Value {
             ]
         }
     })
-}
-
-fn ui_command_preview_message(query: &str, response: &UiCommandResponse) -> AFPMessage {
-    let timestamp = chrono::Utc::now().to_rfc3339();
-    let preview_id = format!("preview.{}.{}", response.intent, Ulid::new());
-    let thread_id = format!("thread.preview.{}", response.intent);
-    let source_links: Vec<Value> = response
-        .links
-        .iter()
-        .map(|link| {
-            serde_json::json!({
-                "title": link.title,
-                "url": link.url,
-                "snippet": link.kind,
-            })
-        })
-        .collect();
-
-    let (message_type, message_subtype, message_metadata, content, views) =
-        if response.intent == "task" || response.preferred_view == "task_board" {
-            let first_bullet = response.bullets.first().cloned().unwrap_or_default();
-            let description = if response.summary == first_bullet || first_bullet.is_empty() {
-                response.summary.clone()
-            } else {
-                format!("{}\n{}", response.summary, first_bullet)
-            };
-            let content = serde_json::json!({
-                "kind": "task_preview",
-                "title": query,
-                "description": description,
-                "priority": "normal",
-                "task_type": "general",
-                "status": "pending",
-            });
-            (
-                "task".to_string(),
-                Some("card".to_string()),
-                serde_json::json!({
-                    "origin": "workspace_command_preview",
-                    "intent": response.intent,
-                }),
-                content.clone(),
-                vec![serde_json::json!({
-                    "format": "task_card",
-                    "priority": 100,
-                    "content": content,
-                })],
-            )
-        } else if response.intent == "note" || response.preferred_view == "note_canvas" {
-            let content = serde_json::json!({
-                "kind": "workspace_note",
-                "title": if query.is_empty() { "Note" } else { query },
-                "blocks": [
-                    {"type": "paragraph", "text": response.summary},
-                ],
-            });
-            (
-                "note".to_string(),
-                Some("content".to_string()),
-                serde_json::json!({
-                    "origin": "workspace_command_preview",
-                    "intent": response.intent,
-                }),
-                content.clone(),
-                vec![serde_json::json!({
-                    "format": "canvas",
-                    "priority": 100,
-                    "content": content,
-                })],
-            )
-        } else if response.intent == "schedule" || response.preferred_view == "draggable_calendar" {
-            let events = response
-                .bullets
-                .iter()
-                .enumerate()
-                .map(|(idx, bullet)| {
-                    serde_json::json!({
-                        "id": format!("preview-event-{idx}"),
-                        "title": bullet,
-                        "start": timestamp,
-                        "description": response.summary,
-                        "status": "tentative",
-                    })
-                })
-                .collect::<Vec<_>>();
-            let content = serde_json::json!({
-                "kind": "schedule_plan",
-                "title": if query.is_empty() { "Schedule preview" } else { query },
-                "description": response.summary,
-                "events": events,
-            });
-            (
-                "calendar".to_string(),
-                Some("plan".to_string()),
-                serde_json::json!({
-                    "origin": "workspace_command_preview",
-                    "intent": response.intent,
-                }),
-                content.clone(),
-                vec![serde_json::json!({
-                    "format": "calendar",
-                    "priority": 100,
-                    "content": content,
-                })],
-            )
-        } else if response.intent == "orchestrate"
-            || response.preferred_view == "orchestrate_progress"
-        {
-            let card_id = response
-                .card_id
-                .clone()
-                .unwrap_or_else(|| format!("card.preview.{}", Ulid::new()));
-            let gate = classify_orchestration_gate(query);
-            let a2ui_companion =
-                orchestration_companion_a2ui_content(query, &response.summary, &card_id, gate);
-            let content = serde_json::json!({
-                "kind": "orchestration",
-                "card_id": card_id,
-                "query": query,
-                "status": "streaming",
-                "optimization_mode": "balanced",
-                "provider": "omnyid",
-                "model": "",
-                "gate": match gate {
-                    OrchestrationGate::None => "none",
-                    OrchestrationGate::Clarification => "clarification",
-                    OrchestrationGate::Approval => "approval",
-                },
-                "sections": orchestrate_card_sections(&response.summary, query, gate),
-            });
-            (
-                "agent".to_string(),
-                Some("orchestration_card".to_string()),
-                serde_json::json!({
-                    "origin": "workspace_command_preview",
-                    "intent": response.intent,
-                    "gate": match gate {
-                        OrchestrationGate::None => "none",
-                        OrchestrationGate::Clarification => "clarification",
-                        OrchestrationGate::Approval => "approval",
-                    }
-                }),
-                content.clone(),
-                vec![
-                    serde_json::json!({
-                        "format": "generative_card",
-                        "priority": 100,
-                        "content": content,
-                    }),
-                    serde_json::json!({
-                        "format": "a2ui.v1",
-                        "priority": 80,
-                        "content": a2ui_companion,
-                    }),
-                ],
-            )
-        } else if response.preferred_view == "search_result" || response.intent == "web_research" {
-            let content = serde_json::json!({
-                "kind": "web_research",
-                "query": query,
-                "summary": response.summary,
-                "bullets": response.bullets,
-                "sources": source_links,
-            });
-            let a2ui_companion = ui_search_result_a2ui_content(query, response, &source_links);
-            (
-                "research".to_string(),
-                Some("content".to_string()),
-                serde_json::json!({
-                    "origin": "workspace_command_preview",
-                    "intent": response.intent,
-                    "source_count": response.links.len(),
-                }),
-                content.clone(),
-                vec![
-                    serde_json::json!({
-                        "format": "search_result",
-                        "priority": 100,
-                        "content": content,
-                    }),
-                    serde_json::json!({
-                        "format": "a2ui.v1",
-                        "priority": 80,
-                        "content": a2ui_companion,
-                    }),
-                ],
-            )
-        } else if response.intent == "dashboard_focus" {
-            let content = ui_dashboard_focus_a2ui_content(query, response);
-            (
-                "agent".to_string(),
-                Some("dashboard_panel".to_string()),
-                serde_json::json!({
-                    "origin": "workspace_command_preview",
-                    "intent": response.intent,
-                }),
-                content.clone(),
-                vec![serde_json::json!({
-                    "format": "a2ui.v1",
-                    "priority": 100,
-                    "content": content,
-                })],
-            )
-        } else if response.intent == "runner_edit" {
-            let content = ui_runner_edit_a2ui_content(query, response);
-            (
-                "agent".to_string(),
-                Some("runner_editor".to_string()),
-                serde_json::json!({
-                    "origin": "workspace_command_preview",
-                    "intent": response.intent,
-                }),
-                content.clone(),
-                vec![serde_json::json!({
-                    "format": "a2ui.v1",
-                    "priority": 100,
-                    "content": content,
-                })],
-            )
-        } else {
-            let content = ui_command_a2ui_content(query, response, &source_links);
-            (
-                "agent".to_string(),
-                Some("workspace_panel".to_string()),
-                serde_json::json!({
-                    "origin": "workspace_command_preview",
-                    "intent": response.intent,
-                }),
-                content.clone(),
-                vec![serde_json::json!({
-                    "format": "a2ui.v1",
-                    "priority": 100,
-                    "content": content,
-                })],
-            )
-        };
-
-    AFPMessage {
-        protocol: "afp-v1".to_string(),
-        id: preview_id,
-        thread_id,
-        parent_id: None,
-        from: "omnyid://workspace/command-bar".to_string(),
-        to: vec!["omnyid://workspace/user".to_string()],
-        timestamp,
-        r#type: message_type,
-        subtype: message_subtype,
-        content,
-        metadata: Some(message_metadata),
-        signature: String::new(),
-        encryption: None,
-        views,
-        references: vec![],
-        attachments: vec![],
-        store_in_relational: false,
-        prev_hash: None,
-    }
-}
-
-fn finalize_ui_command_response(query: &str, mut response: UiCommandResponse) -> UiCommandResponse {
-    if response.preview_message.is_none() {
-        response.preview_message = Some(ui_command_preview_message(query, &response));
-    }
-    response
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -7890,6 +6274,7 @@ fn orchestration_preview_message(
         to: vec!["omnyid://workspace/user".to_string()],
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "agent".to_string(),
+        kind: None,
         subtype: Some("orchestration_card".to_string()),
         content: serde_json::json!({
             "kind": "orchestration",
@@ -7918,10 +6303,37 @@ fn orchestration_preview_message(
             }),
         ],
         references: vec![],
+        typed_refs: vec![],
         attachments: vec![],
         store_in_relational: false,
         prev_hash: None,
     }
+}
+
+pub(super) fn resolve_execution_profile(
+    _explicit_mode: Option<&str>,
+    _optimization_mode: Option<&str>,
+    _prefs: Option<&Value>,
+) -> crate::response_queue_policy::AgentExecutionProfile {
+    crate::response_queue_policy::AgentExecutionProfile::from_mode("balanced")
+}
+
+pub(super) fn apply_workspace_reasoning_overlays(objective: &str, _user_id: &str) -> String {
+    objective.to_string()
+}
+
+pub(super) async fn emit_agent_session_message(
+    _state: &Arc<AppState>,
+    _user_id: &str,
+    _session: &crate::db::AgentSessionRecord,
+) {
+}
+
+pub(super) fn spawn_session_dispatcher(
+    _state: Arc<AppState>,
+    _user_id: String,
+    _session_id: String,
+) {
 }
 
 fn spawn_orchestration_run(
@@ -7931,10 +6343,12 @@ fn spawn_orchestration_run(
     model: String,
     backend_name: String,
     objective: String,
+    _execution_profile: crate::response_queue_policy::AgentExecutionProfile,
     lora_active: bool,
     thread_id: String,
     card_id: String,
     agent_id: Option<String>,
+    _session_context: Option<(String, String)>,
 ) {
     tokio::spawn(async move {
         if let Ok(Some(inst)) = state.db.get_master_agent_instance(&user_id).await {
@@ -8107,124 +6521,6 @@ fn spawn_orchestration_run(
     });
 }
 
-fn route_ui_command(
-    query: &str,
-    engine: String,
-    deployment: Option<&RuntimeDeploymentRecord>,
-    active_file_id: Option<&str>,
-) -> UiCommandResponse {
-    let lowered = query.to_lowercase();
-    let runner_intent = [
-        "runner",
-        "python",
-        "code",
-        "edit",
-        "function",
-        "policy",
-        "tool registry",
-        "requirements",
-        "template",
-        "dockerfile",
-        "container",
-        "image build",
-    ]
-    .iter()
-    .any(|token| lowered.contains(token));
-
-    if runner_intent && deployment.map(|item| item.framework.as_str()) == Some("python-runner-chat")
-    {
-        let target_file_id = infer_runner_target_file(query, active_file_id);
-        return UiCommandResponse {
-            intent: "runner_edit".to_string(),
-            suggested_view: "runner".to_string(),
-            preferred_view: preferred_view_for_intent("runner_edit"),
-            summary: "The command bar recognized a Python runner code/config edit request and prepared a review-required draft.".to_string(),
-            engine,
-            links: vec![],
-            runner_draft: Some(build_runner_draft(query, &target_file_id)),
-            bullets: vec![],
-            card_id: None,
-            preview_message: None,
-        };
-    }
-
-    if lowered.contains("dashboard")
-        || lowered.contains("agent status")
-        || lowered.contains("messages")
-    {
-        return UiCommandResponse {
-            intent: "dashboard_focus".to_string(),
-            suggested_view: "search".to_string(),
-            preferred_view: preferred_view_for_intent("dashboard_focus"),
-            summary: "The command bar recognized a dashboard intent and can pivot the UI to recent agent output and runtime health.".to_string(),
-            engine,
-            links: vec![],
-            runner_draft: None,
-            bullets: vec![],
-            card_id: None,
-            preview_message: None,
-        };
-    }
-
-    // Keyword-based task detection (fallback when no LLM is configured)
-    let task_keywords = [
-        "add ",
-        "add to",
-        "remind me",
-        "reminder",
-        "todo",
-        "to-do",
-        "to do",
-        "shopping list",
-        "buy ",
-        "note:",
-        "note to",
-        "remember to",
-        "don't forget",
-        "task:",
-        "create task",
-        "new task",
-        "make a note",
-        "jot down",
-    ];
-    let is_task = task_keywords.iter().any(|t| lowered.contains(t));
-    if is_task {
-        return UiCommandResponse {
-            intent: "task".to_string(),
-            suggested_view: "search".to_string(),
-            preferred_view: preferred_view_for_intent("task"),
-            summary: format!(
-                "Task noted: {query}. Sign in and configure your LLM for full agent routing."
-            ),
-            engine,
-            links: vec![],
-            runner_draft: None,
-            bullets: vec![
-                "Connect your LLM in Agent Settings to enable full task management.".to_string(),
-            ],
-            card_id: None,
-            preview_message: None,
-        };
-    }
-
-    UiCommandResponse {
-        intent: "web_search".to_string(),
-        suggested_view: "search".to_string(),
-        preferred_view: preferred_view_for_intent("web_research"),
-        summary: "Web search — results below".to_string(),
-        links: vec![UiCommandLink {
-            title: "Search the web".to_string(),
-            url: search_engine_url(&engine, query),
-            kind: "search".to_string(),
-        }],
-        engine,
-        runner_draft: None,
-        bullets: vec![],
-        card_id: None,
-        preview_message: None,
-    }
-}
-
 fn relax_runtime_permissions(_workspace_dir: &PathBuf) {
     #[cfg(unix)]
     {
@@ -8242,7 +6538,8 @@ fn relax_runtime_permissions(_workspace_dir: &PathBuf) {
         ];
         for path in paths {
             if path.exists() {
-                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o777));
+                // 0o750: owner rwx, group rx, no world access (GAP-093).
+                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o750));
             }
         }
     }
@@ -8613,6 +6910,13 @@ async fn runtime_compose_action(
     }
 
     let mut command = Command::new("docker");
+    // GAP-100: clear inherited environment so homeserver secrets (OMNYID_*) cannot
+    // leak into Docker Compose output / error messages written to the runtime log files.
+    // Pass only PATH and HOME so docker can locate itself and user config.
+    command
+        .env_clear()
+        .env("PATH", std::env::var("PATH").unwrap_or_default())
+        .env("HOME", std::env::var("HOME").unwrap_or_default());
     command.arg("compose").arg("-f").arg(&compose_file);
     match action {
         "start" => {
@@ -8633,10 +6937,18 @@ async fn runtime_compose_action(
         }
     }
 
-    let output = command
-        .output()
-        .await
-        .map_err(|err| format!("failed to execute docker compose {action}: {err}"))?;
+    // GAP-096: cap docker compose operations at 10 minutes to prevent indefinite thread starvation.
+    let timeout_secs = std::env::var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(600);
+    let output = tokio::time::timeout(
+        std::time::Duration::from_secs(timeout_secs),
+        command.output(),
+    )
+    .await
+    .map_err(|_| format!("docker compose {action} timed out after {timeout_secs}s"))?
+    .map_err(|err| format!("failed to execute docker compose {action}: {err}"))?;
     persist_runtime_compose_output(deployment, action, &output.stdout, &output.stderr);
     if output.status.success() {
         return Ok(());
@@ -10165,7 +8477,8 @@ fn account_session_entry(session: AuthSessionRecord, current_token: &str) -> Acc
         token_preview: runtime_token_preview(&session.token),
         created_at: session.created_at,
         expires_at: session.expires_at,
-        current: session.token == current_token,
+        // session.token is the stored SHA-256 hash; compare against hash of the bearer (GAP-005)
+        current: session.token == sha256_token(current_token),
     }
 }
 
@@ -10286,12 +8599,43 @@ fn build_onboarding_record(
     })
 }
 
+/// Middleware: generate or propagate X-Request-ID for distributed tracing (GAP-080).
+async fn request_id_middleware(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let req_id = req
+        .headers()
+        .get("x-request-id")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string)
+        .unwrap_or_else(|| ulid::Ulid::new().to_string());
+
+    let span = tracing::info_span!("request", request_id = %req_id);
+    let _guard = span.enter();
+
+    let mut response = next.run(req).await;
+    if let Ok(hv) = axum::http::HeaderValue::from_str(&req_id) {
+        response.headers_mut().insert("x-request-id", hv);
+    }
+    response
+}
+
 pub(super) fn internal_error(err: sqlx::Error) -> Status {
-    Status::internal(err.to_string())
+    // Log full error internally but never return raw DB details to clients (GAP-079).
+    tracing::error!(error = %err, "database error");
+    match &err {
+        sqlx::Error::RowNotFound => Status::not_found("record not found"),
+        _ => Status::internal("internal server error"),
+    }
 }
 
 pub(super) fn readiness_error_to_http(err: SqlxError) -> (StatusCode, String) {
-    (StatusCode::SERVICE_UNAVAILABLE, err.to_string())
+    tracing::error!(error = %err, "readiness check database error");
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "database unavailable".to_string(),
+    )
 }
 
 pub(super) fn status_to_http(status: Status) -> (StatusCode, String) {
@@ -10493,7 +8837,7 @@ fn apply_external_email_thread_match(
     }
 }
 
-// ── Agent template endpoints ──────────────────────────────────────────────────
+// -- Agent template endpoints --------------------------------------------------
 
 async fn agent_provision_http(
     State(state): State<Arc<AppState>>,
@@ -10964,7 +9308,7 @@ fn workflow_builder_template_for_preset(preset: &str) -> &'static str {
 /// Callers should treat a `Value::Null` return as "no efficiency policy".
 fn workflow_builder_slot_efficiency_policy(template_id: &str, slot_name: &str) -> Value {
     match (template_id, slot_name) {
-        // ── linear_worker ────────────────────────────────────────────────────────
+        // -- linear_worker --------------------------------------------------------
         ("linear_worker", "intake_slot") => serde_json::json!({
             "inherit_prompt_contract": true,
             "deterministic_pruning": true,
@@ -10984,7 +9328,7 @@ fn workflow_builder_slot_efficiency_policy(template_id: &str, slot_name: &str) -
             "inherit_prompt_contract": true,
             "deterministic_pruning": true
         }),
-        // ── branching_worker ─────────────────────────────────────────────────────
+        // -- branching_worker -----------------------------------------------------
         ("branching_worker", "intake_slot") => serde_json::json!({
             "inherit_prompt_contract": true,
             "model_hint": { "strategy": "cheap_reasoning" },
@@ -10999,7 +9343,7 @@ fn workflow_builder_slot_efficiency_policy(template_id: &str, slot_name: &str) -
             "inherit_prompt_contract": true,
             "deterministic_pruning": true
         }),
-        // ── research_loop ────────────────────────────────────────────────────────
+        // -- research_loop --------------------------------------------------------
         ("research_loop", "intake_slot") => serde_json::json!({
             "model_hint": { "strategy": "cheap_reasoning" },
             "deterministic_pruning": true
@@ -11028,7 +9372,7 @@ fn workflow_builder_slot_efficiency_policy(template_id: &str, slot_name: &str) -
                 "cache_key_fields": ["workflow_id", "slot_name"]
             }
         }),
-        // ── action_guarded ───────────────────────────────────────────────────────
+        // -- action_guarded -------------------------------------------------------
         ("action_guarded", "intake_slot") => serde_json::json!({
             "model_hint": { "strategy": "cheap_reasoning" },
             "deterministic_pruning": true
@@ -12102,7 +10446,7 @@ fn validate_workflow_graph_json(
     (errors, warnings)
 }
 
-// ── Trigger hardening helpers (Phase 3 item 10) ───────────────────────────────
+// -- Trigger hardening helpers (Phase 3 item 10) -------------------------------
 
 /// Compute the RFC-3339 timestamp for the next retry of a failed trigger
 /// dispatch, using capped exponential backoff.
@@ -12918,7 +11262,7 @@ async fn workflows_list_http(
     Ok(Json(serde_json::json!({ "workflows": workflows })))
 }
 
-// ── Workflow storage & deployments ────────────────────────────────────────────
+// -- Workflow storage & deployments --------------------------------------------
 
 async fn workflows_save_http(
     State(state): State<Arc<AppState>>,
@@ -14750,6 +13094,9 @@ fn workflow_run_record(
                         "reason": approval_reason,
                         "decision_point_id": approval_decision_point_id,
                         "option_count": approval_options.len(),
+                        "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                            "Workflow node is paused at an explicit human approval boundary."
+                        ),
                     }),
                 )
             } else {
@@ -14903,6 +13250,13 @@ fn workflow_run_record(
             "approval_reason": approval_reason,
             "approval_decision_point_id": approval_decision_point_id,
             "approval_options": approval_options,
+            "autonomy_decision": if waiting_node_count > 0 {
+                serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
+                    "Workflow is currently paused at a human approval boundary."
+                )).unwrap_or(Value::Null)
+            } else {
+                Value::Null
+            },
             "blocked_at_node_id": blocked_at_node_id,
             "blocked_at_label": blocked_at_label,
             "blocked_reason": blocked_reason,
@@ -15121,6 +13475,9 @@ fn workflow_wait_resume_approval_dispatch_plan(
         "option_id": option_id,
         "note": note,
         "status": "approval_decision_ready",
+        "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+            "Workflow resume decision is being dispatched from an explicit human approval boundary."
+        ),
         "afp_message": {
             "type": "action",
             "subtype": "approval_decision",
@@ -15137,6 +13494,9 @@ fn workflow_wait_resume_approval_dispatch_plan(
                 "option_id": option_id,
                 "note": note,
                 "descriptor": descriptor,
+                "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                    "Workflow resume decision is being dispatched from an explicit human approval boundary."
+                ),
             },
             "metadata": {
                 "origin": "workflow_wait_resume",
@@ -15147,6 +13507,9 @@ fn workflow_wait_resume_approval_dispatch_plan(
                 "resume_family": wait_resume_record.get("resume_family").cloned().unwrap_or(Value::Null),
                 "resume_kind": wait_resume_record.get("resume_kind").cloned().unwrap_or(Value::Null),
                 "decision": decision,
+                "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                    "Workflow resume decision is being dispatched from an explicit human approval boundary."
+                ),
             }
         }
     })
@@ -15286,6 +13649,15 @@ fn apply_wait_resume_to_run_record(
                     "resume_family": resume_family,
                     "resume_kind": resume_kind,
                     "afp_subtype": afp_subtype,
+                    "autonomy_decision": if resume_family == "approval" {
+                        serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
+                            "Workflow was resumed from an explicit human approval boundary."
+                        )).unwrap_or(Value::Null)
+                    } else {
+                        serde_json::to_value(crate::autonomy_policy::AutonomyDecision::prepare_silently(
+                            "Workflow resumed from a non-approval wait condition."
+                        )).unwrap_or(Value::Null)
+                    },
                 }
             }
         }));
@@ -15311,6 +13683,20 @@ fn apply_wait_resume_to_run_record(
         result_obj.insert(
             "resumed_at".to_string(),
             Value::String(resumed_at.to_string()),
+        );
+        result_obj.insert(
+            "autonomy_decision".to_string(),
+            if resume_family == "approval" {
+                serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
+                    "Workflow was resumed from an explicit human approval boundary."
+                ))
+                .unwrap_or(Value::Null)
+            } else {
+                serde_json::to_value(crate::autonomy_policy::AutonomyDecision::prepare_silently(
+                    "Workflow resumed from a non-approval wait condition."
+                ))
+                .unwrap_or(Value::Null)
+            },
         );
         result_obj.insert("paused_at_node_id".to_string(), Value::Null);
         result_obj.insert("paused_at_label".to_string(), Value::Null);
@@ -15363,10 +13749,7 @@ fn apply_wait_resume_approval_decision_to_run_record(
                         "kind".to_string(),
                         Value::String("approval_resume".to_string()),
                     );
-                    trace.insert(
-                        "phase".to_string(),
-                        Value::String("reflection".to_string()),
-                    );
+                    trace.insert("phase".to_string(), Value::String("reflection".to_string()));
                     trace.insert(
                         "decision".to_string(),
                         Value::String(decision_label.to_string()),
@@ -15386,6 +13769,12 @@ fn apply_wait_resume_approval_decision_to_run_record(
                     trace.insert(
                         "risk_score".to_string(),
                         Value::Number(serde_json::Number::from(4)),
+                    );
+                    trace.insert(
+                        "autonomy_decision".to_string(),
+                        serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
+                            "Workflow resumed after explicit human approval."
+                        )).unwrap_or(Value::Null),
                     );
                     if let Some(option_id) = option_id {
                         trace.insert(
@@ -15455,6 +13844,9 @@ fn apply_wait_resume_approval_decision_to_run_record(
                     "decision": decision_label,
                     "option_id": option_id,
                     "note": note,
+                    "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                        "Workflow was cancelled after explicit human approval was rejected."
+                    ),
                     "action": {
                         "action_category": "workflow_approval",
                         "integration_family": "workflow_runtime",
@@ -15470,6 +13862,9 @@ fn apply_wait_resume_approval_decision_to_run_record(
                     "metadata": {
                         "outcome": decision_label,
                         "afp_subtype": crate::message::AFP_SUBTYPE_APPROVAL_DECISION,
+                        "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                            "Workflow was cancelled after explicit human approval was rejected."
+                        ),
                     }
                 }
             }));
@@ -15492,6 +13887,12 @@ fn apply_wait_resume_approval_decision_to_run_record(
                 "waiting_node_count".to_string(),
                 Value::Number(serde_json::Number::from(0)),
             );
+            result_obj.insert(
+                "autonomy_decision".to_string(),
+                serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
+                    "Workflow was cancelled after explicit human approval was rejected."
+                )).unwrap_or(Value::Null),
+            );
         }
     }
 
@@ -15504,6 +13905,9 @@ fn apply_wait_resume_approval_decision_to_run_record(
                 "option_id": option_id,
                 "note": note,
                 "decided_at": decided_at,
+                "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                    "Workflow approval decision was recorded at an explicit approval boundary."
+                ),
             }),
         );
     }
@@ -16603,7 +15007,7 @@ fn enrich_workflow_ir_for_run(
     enriched
 }
 
-// ── Workflow runs, wait/resume & compilation ──────────────────────────────────
+// -- Workflow runs, wait/resume & compilation ----------------------------------
 
 async fn workflow_runs_http(
     State(state): State<Arc<AppState>>,
@@ -16626,7 +15030,7 @@ async fn workflow_runs_http(
 /// GET /workflows/{id}/runs/{run_id}/stream — SSE stream replaying stored timeline events.
 ///
 /// Emits server-sent events in order derived from the run's `timeline_json`.
-/// Event sequence per node: `node_started` → `node_completed` | `node_failed` | `policy_block` | `wait_for_approval`
+/// Event sequence per node: `node_started` ? `node_completed` | `node_failed` | `policy_block` | `wait_for_approval`
 /// Terminal events: `run_completed` | `run_failed`
 /// Each event is JSON: `{ "event": "...", "node_id": "...", "label": "...", "status": "...", "index": N, "ts": "..." }`
 async fn workflow_run_stream_http(
@@ -16716,7 +15120,11 @@ async fn workflow_run_stream_http(
         let reason = node
             .get("state_reason")
             .and_then(Value::as_str)
-            .or_else(|| trace.and_then(|entry| entry.get("reason")).and_then(Value::as_str))
+            .or_else(|| {
+                trace
+                    .and_then(|entry| entry.get("reason"))
+                    .and_then(Value::as_str)
+            })
             .or_else(|| node.get("failure_reason").and_then(Value::as_str))
             .or_else(|| node.get("block_reason").and_then(Value::as_str))
             .or_else(|| node.get("approval_reason").and_then(Value::as_str))
@@ -16747,7 +15155,8 @@ async fn workflow_run_stream_http(
             node_started["reason"] = Value::String(reason.clone());
         }
         if let Some(complexity_score) = complexity_score {
-            node_started["complexity_score"] = Value::Number(serde_json::Number::from(complexity_score));
+            node_started["complexity_score"] =
+                Value::Number(serde_json::Number::from(complexity_score));
         }
         if let Some(risk_score) = risk_score {
             node_started["risk_score"] = Value::Number(serde_json::Number::from(risk_score));
@@ -16786,7 +15195,8 @@ async fn workflow_run_stream_http(
             terminal["outcome_checkpoint"] = Value::String(checkpoint.to_string());
         }
         if let Some(complexity_score) = complexity_score {
-            terminal["complexity_score"] = Value::Number(serde_json::Number::from(complexity_score));
+            terminal["complexity_score"] =
+                Value::Number(serde_json::Number::from(complexity_score));
         }
         if let Some(risk_score) = risk_score {
             terminal["risk_score"] = Value::Number(serde_json::Number::from(risk_score));
@@ -17202,7 +15612,7 @@ async fn workflow_run_start_http(
         replay_of_run_id.as_deref(),
     );
 
-    // ── Replay protection (Phase 3 item 10) ──────────────────────────────────
+    // -- Replay protection (Phase 3 item 10) ----------------------------------
     // For any non-manual, non-replay trigger that provides an activation_id,
     // we derive a stable replay nonce and reject the activation if it was
     // already claimed.  Manual and replay runs are exempt (intentional re-runs).
@@ -17248,7 +15658,7 @@ async fn workflow_run_start_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
 
-    // ── Trigger observability record (Phase 3 item 11) ────────────────────────
+    // -- Trigger observability record (Phase 3 item 11) ------------------------
     // Write one record per non-manual activation for audit and run-review provenance.
     // Non-fatal: a failure here must not block run creation.
     if is_automated_trigger {
@@ -17316,7 +15726,7 @@ async fn workflow_run_start_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
 
-    // ── Internal event emission (Phase 2 item 5) ──────────────────────────────
+    // -- Internal event emission (Phase 2 item 5) ------------------------------
     // When the run reaches a terminal state immediately (dry_run, simulated, or
     // fast-path completed/failed), emit an internal workflow runtime event so
     // downstream workflows with trigger_kind=internal_event can chain off it.
@@ -17490,7 +15900,7 @@ fn compile_workflow_graph_to_ir(graph: &Value) -> Result<Value, Vec<String>> {
     let (strategy, model_name, max_input_tokens, max_output_tokens) =
         workflow_model_strategy(optimization_mode);
 
-    // ── Step 5 / Step 6: build node_id -> (template_id, slot_name) from template_bindings ──
+    // -- Step 5 / Step 6: build node_id -> (template_id, slot_name) from template_bindings --
     // Each binding lists one or more node_ids mapped to a slot in a template.
     // This drives cache_policy, parallel_group_id, and capability_bundle_id injection below.
     let node_template_slot: std::collections::HashMap<String, (String, String)> = {
@@ -17748,7 +16158,7 @@ fn compile_workflow_graph_to_ir(graph: &Value) -> Result<Value, Vec<String>> {
                     manifest_obj.insert("wait_resume_contract".to_string(), wait_resume_contract);
                 }
             }
-            // ── Step 5 / Step 6: inject efficiency policy from template slot binding ──
+            // -- Step 5 / Step 6: inject efficiency policy from template slot binding --
             if let Some((tmpl_id, slot_nm)) = node_template_slot.get(node_id) {
                 let ep = workflow_builder_slot_efficiency_policy(tmpl_id, slot_nm);
                 if let (Some(ep_obj), Some(mf)) = (ep.as_object(), manifest.as_object_mut()) {
@@ -17841,7 +16251,7 @@ fn compile_workflow_graph_to_ir(graph: &Value) -> Result<Value, Vec<String>> {
         })
         .unwrap_or_default();
 
-    // ── Step 6: collect parallel groups from compiled manifests ──────────────────
+    // -- Step 6: collect parallel groups from compiled manifests ------------------
     // Each unique parallel_group_id becomes one entry in the IR parallel_groups list.
     let parallel_groups: Vec<Value> = {
         let mut groups: std::collections::HashMap<String, (Vec<String>, u64)> =
@@ -17896,7 +16306,7 @@ fn compile_workflow_graph_to_ir(graph: &Value) -> Result<Value, Vec<String>> {
             .collect()
     };
 
-    // ── Step 5: collect capability bundles from cache-enabled manifests ───────────
+    // -- Step 5: collect capability bundles from cache-enabled manifests -----------
     let capability_bundles: Vec<Value> = {
         let mut bundles: std::collections::HashMap<String, (Value, Vec<String>)> =
             std::collections::HashMap::new();
@@ -17951,7 +16361,7 @@ fn compile_workflow_graph_to_ir(graph: &Value) -> Result<Value, Vec<String>> {
             .collect()
     };
 
-    // ── Step 6: build IR edges, annotating parallel-group → merge-barrier edges ──
+    // -- Step 6: build IR edges, annotating parallel-group ? merge-barrier edges --
     // Manifest node IDs belonging to any parallel group.
     let parallel_group_mf_ids: std::collections::HashSet<String> = manifests
         .iter()
@@ -18038,7 +16448,7 @@ fn compile_workflow_graph_to_ir(graph: &Value) -> Result<Value, Vec<String>> {
     }))
 }
 
-// ── Workflow trigger registry handlers ────────────────────────────────────────
+// -- Workflow trigger registry handlers ----------------------------------------
 
 /// GET /workflows/{id}/trigger-registrations[?deployment_id=...]
 /// Returns trigger registration records for a workflow, optionally filtered by deployment.
@@ -18152,7 +16562,7 @@ async fn workflow_trigger_registration_status_http(
     })))
 }
 
-// ── Trigger trust boundaries (Phase 3 hardening) ──────────────────────────────
+// -- Trigger trust boundaries (Phase 3 hardening) ------------------------------
 
 /// Derive a per-registration HMAC signing secret from the server signing key.
 ///
@@ -18258,7 +16668,7 @@ async fn workflow_trigger_dispatch_http(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
 
-    // ── 1. Verify the dispatch token (trust boundary) ─────────────────────────
+    // -- 1. Verify the dispatch token (trust boundary) -------------------------
     let signing_seed = env_hex_32("OMNYID_SIGNING_KEY_HEX").map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -18287,7 +16697,7 @@ async fn workflow_trigger_dispatch_http(
         ));
     }
 
-    // ── 2. Fetch the registration to verify ownership and get trigger metadata ─
+    // -- 2. Fetch the registration to verify ownership and get trigger metadata -
     let registrations = state
         .db
         .list_workflow_trigger_registrations(
@@ -18339,7 +16749,7 @@ async fn workflow_trigger_dispatch_http(
         })
         .unwrap_or_else(|| "manual".to_string());
 
-    // ── 3. Replay protection ──────────────────────────────────────────────────
+    // -- 3. Replay protection --------------------------------------------------
     let nonce = trigger_replay_nonce(&deployment_id, &body.trigger_node_id, &body.activation_id);
     let claimed = state
         .db
@@ -18357,7 +16767,7 @@ async fn workflow_trigger_dispatch_http(
         ));
     }
 
-    // ── 4. Write observability record ─────────────────────────────────────────
+    // -- 4. Write observability record -----------------------------------------
     let obs_now = chrono::Utc::now().to_rfc3339();
     // Derive a provisional run_id for the trace; the run record is written below.
     let provisional_run_id = format!("wfrun_{}", ulid::Ulid::new().to_string().to_lowercase());
@@ -18399,7 +16809,7 @@ async fn workflow_trigger_dispatch_http(
         );
     }
 
-    // ── 5. Initiate the workflow run ──────────────────────────────────────────
+    // -- 5. Initiate the workflow run ------------------------------------------
     // Update the registration's last_fired_at.
     if let Err(err) = state
         .db
@@ -18502,7 +16912,7 @@ async fn workflow_connector_adapters_http(
     Ok(Json(workflow_connector_adapter_registry()))
 }
 
-// ── Webhook ingress (Phase 2 item 5) ─────────────────────────────────────────
+// -- Webhook ingress (Phase 2 item 5) -----------------------------------------
 
 /// Request body for the public webhook ingress endpoint.
 ///
@@ -18538,10 +16948,23 @@ struct WebhookIngressBody {
 ///   receive 409 Conflict.
 async fn webhook_ingress_http(
     State(state): State<Arc<AppState>>,
+    _headers: HeaderMap,
     Path(registration_id): Path<String>,
     Json(body): Json<WebhookIngressBody>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    // ── 1. Resolve the signing key ────────────────────────────────────────────
+    // Rate-limit before any crypto work to prevent HMAC CPU exhaustion (GAP-089).
+    // Bucket per registration_id so one flooded webhook doesn't block others.
+    let rate_key = format!("webhook:{registration_id}");
+    enforce_rate_limit(
+        &state,
+        rate_key,
+        RateLimitPolicy {
+            max_requests: 60,
+            window: std::time::Duration::from_secs(60),
+        },
+    )
+    .await?;
+    // -- 1. Resolve the signing key --------------------------------------------
     let signing_seed = env_hex_32("OMNYID_SIGNING_KEY_HEX")
         .map_err(|e| {
             (
@@ -18557,7 +16980,7 @@ async fn webhook_ingress_http(
             )
         })?;
 
-    // ── 2. Verify HMAC signature (trust boundary, pre-DB) ────────────────────
+    // -- 2. Verify HMAC signature (trust boundary, pre-DB) --------------------
     let now_secs = chrono::Utc::now().timestamp();
     if !verify_trigger_dispatch_token(
         &signing_seed,
@@ -18573,7 +16996,7 @@ async fn webhook_ingress_http(
         ));
     }
 
-    // ── 3. Look up the ingress route to resolve tenant ────────────────────────
+    // -- 3. Look up the ingress route to resolve tenant ------------------------
     let route = state
         .db
         .lookup_webhook_ingress_route(&registration_id)
@@ -18591,7 +17014,7 @@ async fn webhook_ingress_http(
         })?;
     let (owner_user_id, workflow_id, _webhook_path) = route;
 
-    // ── 4. Load the registration record from the per-tenant schema ────────────
+    // -- 4. Load the registration record from the per-tenant schema ------------
     let registrations = state
         .db
         .list_workflow_trigger_registrations(&owner_user_id, &workflow_id, None, 1)
@@ -18638,7 +17061,7 @@ async fn webhook_ingress_http(
         .unwrap_or("webhook")
         .to_string();
 
-    // ── 4a. Policy descriptor checks ─────────────────────────────────────────
+    // -- 4a. Policy descriptor checks -----------------------------------------
     {
         let descriptor_json = registration
             .get("descriptor_json")
@@ -18681,7 +17104,7 @@ async fn webhook_ingress_http(
         }
     }
 
-    // ── 5. Replay protection ──────────────────────────────────────────────────
+    // -- 5. Replay protection --------------------------------------------------
     // activation_id is the HMAC signature itself — unique per valid delivery.
     let activation_id = body.signature.clone();
     let nonce = trigger_replay_nonce(&deployment_id, &trigger_node_id, &activation_id);
@@ -18698,7 +17121,7 @@ async fn webhook_ingress_http(
         ));
     }
 
-    // ── 6. Write trigger observation ──────────────────────────────────────────
+    // -- 6. Write trigger observation ------------------------------------------
     let obs_now = chrono::Utc::now().to_rfc3339();
     let provisional_run_id = format!("wfrun_{}", ulid::Ulid::new().to_string().to_lowercase());
     let obs = crate::db::TriggerObservabilityRecord {
@@ -18739,7 +17162,7 @@ async fn webhook_ingress_http(
         );
     }
 
-    // ── 7. Update last_fired_at on the registration ───────────────────────────
+    // -- 7. Update last_fired_at on the registration ---------------------------
     if let Err(err) = state
         .db
         .upsert_workflow_trigger_registration(&crate::db::WorkflowTriggerRegistrationRecord {
@@ -19431,7 +17854,7 @@ async fn workflow_action_http(
     }
 }
 
-// ── Agent task management ─────────────────────────────────────────────────────
+// -- Agent task management -----------------------------------------------------
 
 async fn agent_task_approve_http(
     State(state): State<Arc<AppState>>,
@@ -19569,7 +17992,7 @@ struct LlmConfigRequest {
     ollama_url: Option<String>,
 }
 
-// ── LLM config ────────────────────────────────────────────────────────────────
+// -- LLM config ----------------------------------------------------------------
 
 async fn llm_config_get_http(
     State(state): State<Arc<AppState>>,
@@ -19668,7 +18091,7 @@ fn llm_config_save_response(cfg: &LlmConfig) -> Value {
     })
 }
 
-// ── LLM ping — verify connection without triggering inference ─────────────────
+// -- LLM ping — verify connection without triggering inference -----------------
 
 async fn llm_config_ping_http(
     State(state): State<Arc<AppState>>,
@@ -19796,7 +18219,7 @@ async fn llm_config_ping_http(
     }
 }
 
-// ── /ui/decision — record user decision for a generative card decision_point ─
+// -- /ui/decision — record user decision for a generative card decision_point -
 
 async fn ui_decision_http(
     State(state): State<Arc<AppState>>,
@@ -19816,6 +18239,7 @@ async fn ui_decision_http(
         to: body.agent_id.clone().map(|a| vec![a]).unwrap_or_default(),
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "user_decision".to_string(),
+        kind: None,
         subtype: Some("decision_point".to_string()),
         content: serde_json::json!({
             "card_id":            body.card_id,
@@ -19827,8 +18251,9 @@ async fn ui_decision_http(
             "origin": "workspace_ui_decision"
         })),
         views: vec![],
-        attachments: vec![],
         references: vec![],
+        typed_refs: vec![],
+        attachments: vec![],
         encryption: None,
         signature: String::new(),
         store_in_relational: true,
@@ -20018,10 +18443,12 @@ async fn ui_decision_http(
                     model,
                     backend_name,
                     orchestration_objective,
+                    crate::response_queue_policy::AgentExecutionProfile::from_mode("balanced"),
                     lora_active,
                     body.thread_id.clone(),
                     body.card_id.clone(),
                     agent_id,
+                    None,
                 );
             } else if body.selected_option_id == "cancel_orchestration"
                 || body.selected_option_id == "cancel_for_clarification"
@@ -20119,7 +18546,7 @@ async fn ui_decision_http(
     })))
 }
 
-// ── /user/agent-preferences — get/set agent optimization preferences ──────────
+// -- /user/agent-preferences — get/set agent optimization preferences ----------
 
 async fn agent_preferences_get_http(
     State(state): State<Arc<AppState>>,
@@ -20165,6 +18592,8 @@ async fn agent_preferences_set_http(
             body.auto_confirm_threshold_cents,
             body.show_cost_estimates,
             body.default_store_in_history,
+            &serde_json::json!({}),
+            &serde_json::json!({}),
         )
         .await
         .map_err(internal_error)
@@ -20182,13 +18611,12 @@ async fn daemons_list_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
-    let warnings = daemon_registry::daemon_health_check(&state.db)
+    let warnings = daemon_registry::daemon_health_check(&state.db, Some(&user.id))
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
     let stale_map = warnings
         .into_iter()
-        .filter(|warning| warning.user_id == user.id)
         .map(|warning| (warning.daemon_id, warning.stale_minutes))
         .collect::<HashMap<_, _>>();
     let items = daemons
@@ -20267,7 +18695,7 @@ async fn daemon_revoke_http(
     })))
 }
 
-// ── Knowledge Curator — backlinks & supertags ─────────────────────────────────
+// -- Knowledge Curator — backlinks & supertags ---------------------------------
 
 /// `GET /notes/backlinks/{message_id}`
 ///
@@ -20381,6 +18809,7 @@ async fn note_backlink_override_http(
         to: vec!["omnyid://workspace/user".to_string()],
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: crate::message::AFP_TYPE_BACKLINK_OVERRIDE.to_string(),
+        kind: None,
         content: content.to_string(),
         signature: String::new(),
         encryption: "{}".to_string(),
@@ -20406,7 +18835,7 @@ async fn note_backlink_override_http(
     })))
 }
 
-// ── Multi-hop backlink graph ───────────────────────────────────────────────────
+// -- Multi-hop backlink graph ---------------------------------------------------
 
 /// `GET /backlinks/graph?root={id}&depth={n}`
 ///
@@ -20422,7 +18851,12 @@ async fn backlinks_graph_http(
     let root = params
         .get("root")
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| (StatusCode::BAD_REQUEST, "root query parameter required".to_string()))?
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "root query parameter required".to_string(),
+            )
+        })?
         .clone();
     let depth: u32 = params
         .get("depth")
@@ -20464,18 +18898,110 @@ async fn backlinks_graph_http(
     })))
 }
 
-// ── Default supertag taxonomy install ─────────────────────────────────────────
+// -- Default supertag taxonomy install -----------------------------------------
 
 /// Default taxonomy to seed.  Each entry is `(tag_name, keywords)`.
 const DEFAULT_SUPERTAG_TAXONOMY: &[(&str, &[&str])] = &[
-    ("#Work",      &["meeting", "standup", "sprint", "deadline", "milestone", "jira", "ticket", "project", "client", "proposal"]),
-    ("#Personal",  &["birthday", "anniversary", "family", "holiday", "weekend", "personal", "home"]),
-    ("#Health",    &["gym", "workout", "doctor", "appointment", "medication", "therapy", "wellness", "run", "exercise"]),
-    ("#Finance",   &["invoice", "payment", "salary", "tax", "budget", "expense", "receipt", "bank", "subscription"]),
-    ("#Travel",    &["flight", "hotel", "airport", "visa", "booking", "trip", "travel", "itinerary", "passport"]),
-    ("#Learning",  &["course", "lecture", "study", "tutorial", "book", "reading", "workshop", "certification"]),
-    ("#Ideas",     &["idea", "brainstorm", "concept", "hypothesis", "experiment", "prototype", "draft"]),
-    ("#Urgent",    &["urgent", "asap", "critical", "blocker", "p0", "hotfix", "fire", "outage"]),
+    (
+        "#Work",
+        &[
+            "meeting",
+            "standup",
+            "sprint",
+            "deadline",
+            "milestone",
+            "jira",
+            "ticket",
+            "project",
+            "client",
+            "proposal",
+        ],
+    ),
+    (
+        "#Personal",
+        &[
+            "birthday",
+            "anniversary",
+            "family",
+            "holiday",
+            "weekend",
+            "personal",
+            "home",
+        ],
+    ),
+    (
+        "#Health",
+        &[
+            "gym",
+            "workout",
+            "doctor",
+            "appointment",
+            "medication",
+            "therapy",
+            "wellness",
+            "run",
+            "exercise",
+        ],
+    ),
+    (
+        "#Finance",
+        &[
+            "invoice",
+            "payment",
+            "salary",
+            "tax",
+            "budget",
+            "expense",
+            "receipt",
+            "bank",
+            "subscription",
+        ],
+    ),
+    (
+        "#Travel",
+        &[
+            "flight",
+            "hotel",
+            "airport",
+            "visa",
+            "booking",
+            "trip",
+            "travel",
+            "itinerary",
+            "passport",
+        ],
+    ),
+    (
+        "#Learning",
+        &[
+            "course",
+            "lecture",
+            "study",
+            "tutorial",
+            "book",
+            "reading",
+            "workshop",
+            "certification",
+        ],
+    ),
+    (
+        "#Ideas",
+        &[
+            "idea",
+            "brainstorm",
+            "concept",
+            "hypothesis",
+            "experiment",
+            "prototype",
+            "draft",
+        ],
+    ),
+    (
+        "#Urgent",
+        &[
+            "urgent", "asap", "critical", "blocker", "p0", "hotfix", "fire", "outage",
+        ],
+    ),
 ];
 
 /// `POST /notes/supertags/install-defaults`
@@ -20508,6 +19034,7 @@ async fn install_default_supertags_http(
             to: vec!["omnyid://workspace/user".to_string()],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: AFP_TYPE_SUPERTAG_DEFINITION.to_string(),
+            kind: None,
             content: content.to_string(),
             signature: String::new(),
             encryption: "{}".to_string(),
@@ -20518,7 +19045,11 @@ async fn install_default_supertags_http(
             subtype: String::new(),
             metadata: "{}".to_string(),
         };
-        if let Err(e) = state.db.store_private_message(&user.id, &msg, content).await {
+        if let Err(e) = state
+            .db
+            .store_private_message(&user.id, &msg, content)
+            .await
+        {
             tracing::warn!("install_default_supertags: skipped {tag_name}: {e}");
             continue;
         }
@@ -20586,7 +19117,7 @@ async fn verify_thread_chain_http(
     }
 }
 
-// ── Portable export ────────────────────────────────────────────────────────────
+// -- Portable export ------------------------------------------------------------
 
 /// Helper: fetch all AFP messages for the authenticated user across their agents.
 async fn user_export_messages(
@@ -20675,12 +19206,22 @@ async fn export_json_ld_http(
     Ok(Json(crate::export::build_json_ld(&msgs)))
 }
 
-// ── Federation inbound handler ─────────────────────────────────────────────────
+// -- Federation inbound handler -------------------------------------------------
+
+// GAP-110: in-process nonce store for federation replay protection.
+// Nonces are ULIDs (time-prefixed); entries older than 5 minutes are pruned on access.
+fn federation_seen_nonces()
+-> &'static std::sync::Mutex<std::collections::HashMap<String, std::time::Instant>> {
+    static NONCES: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<String, std::time::Instant>>,
+    > = std::sync::OnceLock::new();
+    NONCES.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
 
 /// POST /federation/relay
 ///
 /// Accepts an AFP message relayed from another Omnyid homeserver.
-/// Verifies the HMAC-SHA256 signature using the sender's `.well-known/afp-delegation`.
+/// Verifies the Ed25519 signature using the sender's `.well-known/afp-delegation`.
 async fn federation_relay_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -20717,6 +19258,23 @@ async fn federation_relay_http(
         .await
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
+    // GAP-110: reject replayed requests by tracking seen nonces for 5 minutes.
+    {
+        let nonce_ttl = std::time::Duration::from_secs(300);
+        let mut seen = federation_seen_nonces()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        let now = std::time::Instant::now();
+        seen.retain(|_, ts| now.duration_since(*ts) < nonce_ttl);
+        if seen.contains_key(&relay_req.nonce) {
+            return Err((
+                StatusCode::CONFLICT,
+                "duplicate nonce — replay rejected".to_string(),
+            ));
+        }
+        seen.insert(relay_req.nonce.clone(), now);
+    }
+
     // Ingest the relayed message into the local AFP database
     tracing::info!(
         "federation: accepted relay from {} nonce={}",
@@ -20732,22 +19290,18 @@ async fn federation_relay_http(
     })))
 }
 
-// ── Master Agent Orchestration Handlers ──────────────────────────────────────
+// -- Master Agent Orchestration Handlers --------------------------------------
 
 /// SHA-256 fingerprint of remote IP + User-Agent for anon session tracking.
 fn anon_fingerprint(headers: &HeaderMap) -> String {
     use std::fmt::Write;
-    let ip = headers
-        .get("x-forwarded-for")
-        .or_else(|| headers.get("x-real-ip"))
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("unknown");
+    // Use request_ip_identity — only trusts X-Forwarded-For when OMNYID_BEHIND_TRUSTED_PROXY=true.
+    let ip = request_ip_identity(headers);
     let ua = headers
         .get("user-agent")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("unknown");
     let input = format!("{ip}{ua}");
-    // Use HKDF-SHA256 as a convenient hash (salt="" info="fp")
     let hash_bytes = crate::post_quantum::hkdf_sha256(input.as_bytes(), b"", b"fp", 16);
     let mut hex = String::with_capacity(32);
     for b in hash_bytes {
@@ -20872,7 +19426,7 @@ async fn agent_onboarding_http(
     ))
 }
 
-// ── Focus items ────────────────────────────────────────────────────────────────
+// -- Focus items ----------------------------------------------------------------
 
 /// GET /agent/focus
 async fn list_focus_items_http(
@@ -20967,7 +19521,7 @@ struct CreateTriggerRequest {
     config: serde_json::Value,
 }
 
-// ── Cron trigger scheduler ────────────────────────────────────────────────────
+// -- Cron trigger scheduler ----------------------------------------------------
 
 /// Converts a single day-of-week token from unix numbering (0=Sun, 1=Mon, ...,
 /// 6=Sat) to Quartz numbering (1=Sun, 2=Mon, ..., 7=Sat) by incrementing
@@ -20976,8 +19530,8 @@ fn unix_dow_token_to_quartz(token: &str) -> String {
     // Pass through non-numeric atoms unchanged (e.g. "MON", "SUN").
     if let Ok(n) = token.parse::<u32>() {
         let q = match n {
-            7 => 1,     // unix 7 = Sun → Quartz 1
-            d => d + 1, // unix 0-6 → Quartz 1-7
+            7 => 1,     // unix 7 = Sun ? Quartz 1
+            d => d + 1, // unix 0-6 ? Quartz 1-7
         };
         return q.to_string();
     }
@@ -21019,7 +19573,7 @@ fn unix_dow_field_to_quartz(field: &str) -> String {
 /// into the 7-field Quartz format (`sec min hour dom month dow year`) expected
 /// by the `cron` crate.
 ///
-/// Day-of-week numbering is also converted: unix 0=Sun,1=Mon…6=Sat →
+/// Day-of-week numbering is also converted: unix 0=Sun,1=Mon…6=Sat ?
 /// Quartz 1=Sun,2=Mon…7=Sat.  Passes 7-field expressions through unchanged.
 fn cron_to_quartz(expr: &str) -> String {
     let fields: Vec<&str> = expr.split_whitespace().collect();
@@ -21053,7 +19607,7 @@ fn cron_next_fire_at(
     schedule.after(&from).next()
 }
 
-// ── Email trigger dispatcher ──────────────────────────────────────────────────
+// -- Email trigger dispatcher --------------------------------------------------
 
 /// Fire a single email-family workflow run.
 ///
@@ -21278,7 +19832,7 @@ async fn email_trigger_dispatcher_loop(state: Arc<AppState>) {
         tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
     }
 }
-// ── File-drop / watcher adapter ───────────────────────────────────────────────
+// -- File-drop / watcher adapter -----------------------------------------------
 
 /// Fire one workflow run for a `file_drop`-kind trigger registration.
 ///
@@ -21589,7 +20143,7 @@ async fn file_drop_watcher_loop(state: Arc<AppState>) {
     }
 }
 
-// ── Internal workflow runtime event dispatcher ────────────────────────────────
+// -- Internal workflow runtime event dispatcher --------------------------------
 
 /// Fire one workflow run for an `internal_event`-kind trigger registration.
 ///
@@ -21867,7 +20421,7 @@ fn enqueue_internal_workflow_event_nonblocking(
     });
 }
 
-// ── POST /ingest/internal/{event_type} — authenticated internal event ingress ──
+// -- POST /ingest/internal/{event_type} — authenticated internal event ingress --
 
 #[derive(serde::Deserialize)]
 struct InternalIngestBody {
@@ -21916,7 +20470,7 @@ async fn internal_ingest_http(
     })))
 }
 
-// ── Triggers ──────────────────────────────────────────────────────────────────
+// -- Triggers ------------------------------------------------------------------
 
 async fn create_trigger_http(
     State(state): State<Arc<AppState>>,
@@ -21980,7 +20534,7 @@ fn default_delegation_expiry() -> u64 {
     3600
 }
 
-// ── Delegations ───────────────────────────────────────────────────────────────
+// -- Delegations ---------------------------------------------------------------
 
 async fn create_delegation_http(
     State(state): State<Arc<AppState>>,
@@ -21988,6 +20542,18 @@ async fn create_delegation_http(
     Json(body): Json<CreateDelegationRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+
+    // GAP-111: enforce task-type / mask policy before issuing the delegation token.
+    if !crate::policy_engine::PolicyEngine::can_run(&body.scope, &body.mask) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            format!(
+                "delegation denied: task type '{}' is not allowed under mask '{}'",
+                body.scope, body.mask
+            ),
+        ));
+    }
+
     let instance = state
         .db
         .get_master_agent_instance(&user.id)
@@ -21996,7 +20562,7 @@ async fn create_delegation_http(
         .map_err(status_to_http)?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "no master agent".to_string()))?;
     let instance_id = instance["id"].as_str().unwrap_or("").to_string();
-    let master_key_hex = "0".repeat(64); // placeholder until master key storage is implemented
+    let master_key_hex = crate::agent_template::delegation_master_key_hex();
     let task_id = Ulid::new().to_string();
     let delegation = crate::agent_template::generate_delegated_key(
         &master_key_hex,
@@ -22040,7 +20606,7 @@ async fn revoke_delegation_http(
     Ok(Json(serde_json::json!({"revoked": true})))
 }
 
-// ── Agent fleet & orchestration ───────────────────────────────────────────────
+// -- Agent fleet & orchestration -----------------------------------------------
 
 /// GET /agent/fleet
 async fn agent_fleet_http(
@@ -22197,7 +20763,7 @@ async fn agent_orchestrate_http(
     Ok(Json(serde_json::to_value(&result).unwrap_or_default()))
 }
 
-// ── Capability registry handlers ─────────────────────────────────────────────
+// -- Capability registry handlers ---------------------------------------------
 
 /// POST /agent/capability
 #[derive(serde::Deserialize)]
@@ -22290,7 +20856,7 @@ async fn delete_capability_http(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ── Agent invoke handler ──────────────────────────────────────────────────────
+// -- Agent invoke handler ------------------------------------------------------
 
 /// POST /agent/invoke
 /// Validates delegation (if present), then forwards to the runner's /invoke endpoint.
@@ -22388,6 +20954,7 @@ async fn agent_invoke_http(
         to: vec![],
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "action_capability_invoke".to_string(),
+        kind: None,
         content: serde_json::to_string(&serde_json::json!({
             "capability_name": body.capability_name,
             "delegation_id": body.delegation_id,
@@ -22524,7 +21091,7 @@ struct LoraConfidenceRequest {
     score: f64,
 }
 
-// ── LoRA confidence ────────────────────────────────────────────────────────────
+// -- LoRA confidence ------------------------------------------------------------
 
 async fn lora_confidence_http(
     State(state): State<Arc<AppState>>,
@@ -22557,7 +21124,7 @@ async fn lora_confidence_http(
     })))
 }
 
-// ── Public feed & social ──────────────────────────────────────────────────────
+// -- Public feed & social ------------------------------------------------------
 
 /// GET /feed/public
 /// Rate-limited for unauthenticated callers (10 req/min per IP).
@@ -22595,7 +21162,7 @@ async fn public_feed_http(
     Ok(Json(serde_json::json!({"items": messages, "count": count})))
 }
 
-// ── Feed follow / engage routes ───────────────────────────────────────────────
+// -- Feed follow / engage routes -----------------------------------------------
 
 /// GET /feed/search?q=&limit=
 async fn feed_search_http(
@@ -22603,7 +21170,7 @@ async fn feed_search_http(
     headers: HeaderMap,
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let _user = authenticated_user(&state.db, &headers).await?;
+    let user = authenticated_user(&state.db, &headers).await?;
     let q = params
         .get("q")
         .map(String::as_str)
@@ -22620,7 +21187,7 @@ async fn feed_search_http(
         .min(50);
     let agents = state
         .db
-        .search_agents(&q, limit)
+        .search_agents(&user.id, &q, limit)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
@@ -22704,26 +21271,24 @@ async fn feed_engage_http(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ── Agent encryption keys ─────────────────────────────────────────────────────
+// -- Agent encryption keys -----------------------------------------------------
 
-/// GET /agent/keys — returns the user's encryption key so the dashboard can decrypt AFP content locally.
-/// This enables client-side E2EE: ciphertext lives on the server, plaintext only exists in the client's memory.
+/// GET /agent/keys — blocked: previously leaked the server-wide encryption key (GAP-040).
+///
+/// Returning OMNYID_ENCRYPTION_KEY_HEX to clients defeats E2EE — any authenticated
+/// user could decrypt all other users' messages. Returns 501 until per-user key
+/// derivation is implemented.
 async fn agent_keys_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let _user = authenticated_user(&state.db, &headers).await?;
-    let enc_key = std::env::var("OMNYID_ENCRYPTION_KEY_HEX").map_err(|_| {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Encryption not configured on this server.".to_string(),
-        )
-    })?;
-    Ok(Json(serde_json::json!({
-        "enc_key_hex": enc_key,
-        "algorithm": "xchacha20poly1305-ietf",
-        "note": "Use this key to decrypt AFP message content client-side. Never store decrypted content."
-    })))
+    Err((
+        StatusCode::NOT_IMPLEMENTED,
+        "Per-user E2EE key management is not yet implemented. \
+         The server-wide encryption key cannot be vended to clients."
+            .to_string(),
+    ))
 }
 
 /// GET /about
@@ -22746,7 +21311,7 @@ a{color:#6366f1}</style></head>
     )
 }
 
-// ── Gmail OAuth routes ────────────────────────────────────────────────────────
+// -- Gmail OAuth routes --------------------------------------------------------
 
 /// GET /gmail/status — returns whether a Gmail token is stored for the user
 async fn gmail_status_http(
@@ -22900,7 +21465,7 @@ async fn gmail_callback_http(
     axum::response::Redirect::temporary("/workspace/?gmail=connected").into_response()
 }
 
-// ── Calendar events ───────────────────────────────────────────────────────────
+// -- Calendar events -----------------------------------------------------------
 
 #[derive(serde::Deserialize)]
 struct CalendarListQuery {
@@ -22991,7 +21556,7 @@ async fn calendar_delete_http(
     Ok(Json(serde_json::json!({ "deleted": deleted })))
 }
 
-// ── Agent Alias Registry ──────────────────────────────────────────────────────
+// -- Agent Alias Registry ------------------------------------------------------
 
 const ALIAS_RESERVED: &[&str] = &[
     "admin",
@@ -23273,6 +21838,7 @@ async fn alias_change_http(
 
 #[cfg(test)]
 mod tests {
+    use super::ui_command_response_enricher::finalize_ui_command_response;
     use super::{
         NoteMessageRequest, OrchestrationGate, RuntimeBackupPolicyResponse, RuntimeBackupsResponse,
         RuntimeRestoreDrillsResponse, RuntimeUpdatePolicyResponse, RuntimeUpdatesResponse,
@@ -23284,21 +21850,20 @@ mod tests {
         build_runtime_deployment_plan, build_runtime_recovery_packet_response,
         build_service_adapter_bundle_response, clarification_option_progress_text,
         clarification_option_summary, classify_orchestration_gate, delegation_revoke_error_to_http,
-        enable_internal_grpc, external_email_thread_targets, finalize_ui_command_response,
-        generate_trigger_dispatch_token, grpc_bind_addr, has_encryption_envelope,
-        has_supported_encryption_envelope, healthz_http, llm_config_save_response,
-        merge_thread_messages, metrics_http, new_server_message, objective_needs_clarification,
-        objective_requires_human_confirmation, orchestrate_card_sections, parse_datetime_to_utc,
-        proto_to_app, python_runner_workspace_file, remove_runtime_backup_artifact_path,
-        remove_runtime_workspace, require_encryption, route_ui_command,
-        runtime_deployment_response, runtime_runner_policy_event_entry_response,
-        runtime_template_content, runtime_template_version_from_deployment,
-        runtime_update_event_entry_response, serve_afp_delegation, session_is_expired,
-        store_app_message_for_headers, store_private_app_message, support_access_history_entry,
-        task_complete_result_payload, task_created_response_payload, task_list_response_payload,
-        task_status_response_payload, task_update_error_to_http, trigger_delete_error_to_http,
-        validate_proto_message, verify_trigger_dispatch_token, webtransport_bind_addr,
-        webtransport_enabled,
+        enable_internal_grpc, external_email_thread_targets, generate_trigger_dispatch_token,
+        grpc_bind_addr, has_encryption_envelope, has_supported_encryption_envelope, healthz_http,
+        llm_config_save_response, merge_thread_messages, metrics_http, new_server_message,
+        objective_needs_clarification, objective_requires_human_confirmation,
+        orchestrate_card_sections, parse_datetime_to_utc, proto_to_app,
+        python_runner_workspace_file, remove_runtime_backup_artifact_path,
+        remove_runtime_workspace, require_encryption, runtime_deployment_response,
+        runtime_runner_policy_event_entry_response, runtime_template_content,
+        runtime_template_version_from_deployment, runtime_update_event_entry_response,
+        serve_afp_delegation, session_is_expired, store_app_message_for_headers,
+        store_private_app_message, support_access_history_entry, task_complete_result_payload,
+        task_created_response_payload, task_list_response_payload, task_status_response_payload,
+        task_update_error_to_http, trigger_delete_error_to_http, validate_proto_message,
+        verify_trigger_dispatch_token, webtransport_bind_addr, webtransport_enabled,
     };
     use crate::afp::Message;
     use crate::{
@@ -23363,6 +21928,7 @@ mod tests {
             to: vec!["agent:peer@omnyid.local".to_string()],
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "task_update".to_string(),
+            kind: None,
             subtype: Some("status".to_string()),
             content: serde_json::json!({"status": "done", "amount": 42}),
             metadata: Some(serde_json::json!({"domain": "operations"})),
@@ -23370,6 +21936,7 @@ mod tests {
             encryption: Some(serde_json::json!({"algorithm": "demo"})),
             views: vec![serde_json::json!({"format": "email", "content": {"body": "hello"}})],
             references: vec![serde_json::json!({"type": "thread", "target": "thread_other"})],
+            typed_refs: vec![],
             attachments: vec![serde_json::json!({"id": "att_1", "name": "invoice.pdf"})],
             store_in_relational: true,
             prev_hash: None,
@@ -23405,6 +21972,7 @@ mod tests {
             to: vec![],
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "task_update".to_string(),
+            kind: None,
             content: "{}".to_string(),
             signature: "demo-signature".to_string(),
             encryption: "{}".to_string(),
@@ -23466,6 +22034,7 @@ mod tests {
             to: vec!["agent:peer@omnyid.local".to_string()],
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "task_update".to_string(),
+            kind: None,
             content: "{}".to_string(),
             signature: "demo-signature".to_string(),
             encryption: "{}".to_string(),
@@ -23491,6 +22060,7 @@ mod tests {
             to: vec!["agent:peer@omnyid.local".to_string()],
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "task_update".to_string(),
+            kind: None,
             content: "{\"omnyid_encrypted\":true}".to_string(),
             signature: "demo-signature".to_string(),
             encryption: "{\"scheme\":\"omnyid-envelope-v1\",\"algorithm\":\"xchacha20poly1305-ietf\",\"nonce\":\"abc\",\"ciphertext\":\"def\"}".to_string(),
@@ -23507,13 +22077,10 @@ mod tests {
 
     #[tokio::test]
     async fn healthz_reports_ok() {
-        let payload = healthz_http().await.0;
-        assert_eq!(payload["status"], "ok");
-        assert_eq!(payload["service"], "omnyid-homeserver");
-    }
-
-    #[tokio::test]
-    async fn metrics_endpoint_reports_snapshot() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS", "true");
+        }
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(1)
             .connect_lazy("postgres://afp:afp@localhost/afp")
@@ -23526,10 +22093,51 @@ mod tests {
             rate_limiter: Arc::new(super::RateLimiter::new()),
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
+        pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+        });
+        let payload = healthz_http(axum::extract::State(state), HeaderMap::new())
+            .await
+            .expect("health payload")
+            .0;
+        unsafe {
+            std::env::remove_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS");
+        }
+        assert_eq!(payload["status"], "ok");
+        assert_eq!(payload["service"], "omnyid-homeserver");
+    }
+
+    #[tokio::test]
+    async fn metrics_endpoint_reports_snapshot() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS", "true");
+        }
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://afp:afp@localhost/afp")
+            .expect("lazy pool");
+        let state = Arc::new(super::AppState {
+            cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(pool.clone())),
+            db: super::Db { pool },
+            metrics: Arc::new(Metrics::default()),
+            relay_tx: tokio::sync::broadcast::channel(8).0,
+            rate_limiter: Arc::new(super::RateLimiter::new()),
+            trial_runner: Arc::new(super::TrialRunnerManager::new()),
+            http_client: reqwest::Client::new(),
+        pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
         state.metrics.inc_messages_stored();
 
-        let payload = metrics_http(axum::extract::State(state)).await.0;
+        let resp = metrics_http(axum::extract::State(state), HeaderMap::new())
+            .await
+            .expect("metrics response");
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .expect("body bytes");
+        let payload: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        unsafe {
+            std::env::remove_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS");
+        }
         assert_eq!(payload["status"], "ok");
         assert_eq!(payload["metrics"]["messages_stored_total"], 1);
     }
@@ -23548,6 +22156,7 @@ mod tests {
             rate_limiter: Arc::new(super::RateLimiter::new()),
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
+        pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let payload = super::transport_capabilities_http(axum::extract::State(state.clone()))
@@ -23592,7 +22201,13 @@ mod tests {
             axum::http::HeaderValue::from_static("198.51.100.7"),
         );
 
+        unsafe {
+            std::env::set_var("OMNYID_BEHIND_TRUSTED_PROXY", "true");
+        }
         assert_eq!(super::request_ip_identity(&headers), "203.0.113.10");
+        unsafe {
+            std::env::remove_var("OMNYID_BEHIND_TRUSTED_PROXY");
+        }
     }
 
     #[tokio::test]
@@ -23611,27 +22226,26 @@ mod tests {
     #[tokio::test]
     async fn trial_runner_requires_signup_after_three_template_runs() {
         let manager = super::TrialRunnerManager::new();
-        let session = manager
-            .create_or_get_session("203.0.113.10:trial-browser".to_string())
-            .await;
+        let identity = "203.0.113.10:trial-browser";
+        let session = manager.create_or_get_session(identity.to_string()).await;
 
         let first = manager
-            .start_template_run(&session.id, "student_day_planner")
+            .start_template_run(&session.id, "student_day_planner", identity)
             .await
             .expect("first run");
         assert_eq!(first.runs_started, 1);
         let second = manager
-            .start_template_run(&session.id, "research_assistant")
+            .start_template_run(&session.id, "research_assistant", identity)
             .await
             .expect("second run");
         assert_eq!(second.runs_started, 2);
         let third = manager
-            .start_template_run(&session.id, "appointment_assistant")
+            .start_template_run(&session.id, "appointment_assistant", identity)
             .await
             .expect("third run");
         assert_eq!(third.runs_started, 3);
         let fourth = manager
-            .start_template_run(&session.id, "student_day_planner")
+            .start_template_run(&session.id, "student_day_planner", identity)
             .await
             .expect("quota response");
         assert!(fourth.requires_signup);
@@ -23641,22 +22255,21 @@ mod tests {
     #[tokio::test]
     async fn trial_runner_limits_chat_turns_per_template_run() {
         let manager = super::TrialRunnerManager::new();
-        let session = manager
-            .create_or_get_session("198.51.100.5:trial-browser".to_string())
-            .await;
+        let identity = "198.51.100.5:trial-browser";
+        let session = manager.create_or_get_session(identity.to_string()).await;
         manager
-            .start_template_run(&session.id, "student_day_planner")
+            .start_template_run(&session.id, "student_day_planner", identity)
             .await
             .expect("template run");
         for index in 0..10 {
             let updated = manager
-                .append_chat_turn(&session.id, &format!("turn {index}"))
+                .append_chat_turn(&session.id, &format!("turn {index}"), identity)
                 .await
                 .expect("trial turn");
             assert_eq!(updated.turns_used, index + 1);
         }
         let err = manager
-            .append_chat_turn(&session.id, "turn 11")
+            .append_chat_turn(&session.id, "turn 11", identity)
             .await
             .expect_err("turn 11 should fail");
         assert!(err.contains("10-turn limit"));
@@ -23722,6 +22335,7 @@ mod tests {
             to: vec![],
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "email".to_string(),
+            kind: None,
             subtype: Some("incoming".to_string()),
             content: serde_json::json!({}),
             metadata: Some(serde_json::json!({"channel": "smtp", "transport": "smtp"})),
@@ -23729,6 +22343,7 @@ mod tests {
             encryption: None,
             views: vec![],
             references: vec![],
+            typed_refs: vec![],
             attachments: vec![],
             store_in_relational: false,
             prev_hash: None,
@@ -24211,67 +22826,6 @@ mod tests {
     }
 
     #[test]
-    fn ui_command_router_prefers_runner_edit_intent_for_code_requests() {
-        let user = UserRecord {
-            id: "usr_runner".to_string(),
-            email: "runner@example.com".to_string(),
-            password_hash: Some("hash".to_string()),
-            auth_provider: "password".to_string(),
-            google_sub: None,
-            display_name: "Runner".to_string(),
-            created_at: "2026-03-23T00:00:00Z".to_string(),
-        };
-        let deployment =
-            build_runtime_deployment_plan(&user, &[], "python-runner-chat", None).expect("plan");
-        let response = route_ui_command(
-            "Edit policy.py to tighten the allowlist",
-            "duckduckgo".to_string(),
-            Some(&deployment),
-            Some("runner_chat_py"),
-        );
-
-        assert_eq!(response.intent, "runner_edit");
-        assert_eq!(response.suggested_view, "runner");
-        assert_eq!(
-            response
-                .runner_draft
-                .as_ref()
-                .map(|draft| draft.target_file_id.as_str()),
-            Some("policy_py")
-        );
-    }
-
-    #[test]
-    fn ui_command_router_can_target_python_runner_dockerfile() {
-        let user = UserRecord {
-            id: "usr_runner".to_string(),
-            email: "runner@example.com".to_string(),
-            password_hash: Some("hash".to_string()),
-            auth_provider: "password".to_string(),
-            google_sub: None,
-            display_name: "Runner".to_string(),
-            created_at: "2026-03-23T00:00:00Z".to_string(),
-        };
-        let deployment =
-            build_runtime_deployment_plan(&user, &[], "python-runner-chat", None).expect("plan");
-        let response = route_ui_command(
-            "Update the Dockerfile to add a system package",
-            "duckduckgo".to_string(),
-            Some(&deployment),
-            Some("runner_chat_py"),
-        );
-
-        assert_eq!(response.intent, "runner_edit");
-        assert_eq!(
-            response
-                .runner_draft
-                .as_ref()
-                .map(|draft| draft.target_file_id.as_str()),
-            Some("dockerfile")
-        );
-    }
-
-    #[test]
     fn finalized_ui_command_response_contains_preview_message() {
         let response = finalize_ui_command_response(
             "Plan my day",
@@ -24295,6 +22849,9 @@ mod tests {
                 bullets: vec!["Review the draft".to_string()],
                 card_id: None,
                 preview_message: None,
+                intent_route: None,
+                boundary: None,
+                execution_explanation: None,
             },
         );
 
@@ -24331,6 +22888,9 @@ mod tests {
                 ],
                 card_id: None,
                 preview_message: None,
+                intent_route: None,
+                boundary: None,
+                execution_explanation: None,
             },
         );
 
@@ -24363,6 +22923,9 @@ mod tests {
                 bullets: vec!["Bring an umbrella".to_string()],
                 card_id: None,
                 preview_message: None,
+                intent_route: None,
+                boundary: None,
+                execution_explanation: None,
             },
         );
 
@@ -24424,6 +22987,9 @@ mod tests {
                 bullets: vec![],
                 card_id: None,
                 preview_message: None,
+                intent_route: None,
+                boundary: None,
+                execution_explanation: None,
             },
         );
 
@@ -24457,6 +23023,9 @@ mod tests {
                 bullets: vec!["Recent messages".to_string(), "Runtime health".to_string()],
                 card_id: None,
                 preview_message: None,
+                intent_route: None,
+                boundary: None,
+                execution_explanation: None,
             },
         );
 
@@ -24491,6 +23060,9 @@ mod tests {
                 bullets: vec!["Validate the policy changes".to_string()],
                 card_id: None,
                 preview_message: None,
+                intent_route: None,
+                boundary: None,
+                execution_explanation: None,
             },
         );
 
@@ -24569,6 +23141,9 @@ mod tests {
                 bullets: vec![],
                 card_id: None,
                 preview_message: None,
+                intent_route: None,
+                boundary: None,
+                execution_explanation: None,
             },
         );
 
@@ -24596,6 +23171,9 @@ mod tests {
                 bullets: vec![],
                 card_id: None,
                 preview_message: None,
+                intent_route: None,
+                boundary: None,
+                execution_explanation: None,
             },
         );
 
@@ -24626,6 +23204,7 @@ mod tests {
             to: vec!["friend@example.com".to_string()],
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "email".to_string(),
+            kind: None,
             subtype: Some("outgoing".to_string()),
             content: serde_json::json!({"subject": "Hi", "body": "Hello"}),
             metadata: Some(serde_json::json!({"channel": "smtp"})),
@@ -24633,6 +23212,7 @@ mod tests {
             encryption: None,
             views: vec![],
             references: vec![],
+            typed_refs: vec![],
             attachments: vec![],
             store_in_relational: false,
             prev_hash: None,
@@ -24651,6 +23231,7 @@ mod tests {
             to: vec![],
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "action".to_string(),
+            kind: None,
             subtype: Some("result".to_string()),
             content: serde_json::json!({}),
             metadata: Some(serde_json::json!({"capability_id": "cap_stripe_charge"})),
@@ -24658,6 +23239,7 @@ mod tests {
             encryption: None,
             views: vec![],
             references: vec![],
+            typed_refs: vec![],
             attachments: vec![],
             store_in_relational: false,
             prev_hash: None,
@@ -24680,6 +23262,9 @@ mod tests {
                 bullets: vec![],
                 card_id: None,
                 preview_message: None,
+                intent_route: None,
+                boundary: None,
+                execution_explanation: None,
             },
         );
 
@@ -24716,6 +23301,9 @@ mod tests {
                 bullets: vec![],
                 card_id: None,
                 preview_message: None,
+                intent_route: None,
+                boundary: None,
+                execution_explanation: None,
             },
         );
 
@@ -25006,7 +23594,7 @@ mod tests {
     fn account_session_entry_marks_current_session_and_redacts_token() {
         let entry = account_session_entry(
             AuthSessionRecord {
-                token: "abcdef1234567890".to_string(),
+                token: super::sha256_token("abcdef1234567890"),
                 user_id: "user_01".to_string(),
                 created_at: "2026-03-22T00:00:00Z".to_string(),
                 expires_at: "2026-03-29T00:00:00Z".to_string(),
@@ -25015,7 +23603,10 @@ mod tests {
         );
 
         assert!(entry.current);
-        assert_eq!(entry.token_preview, "abcd...7890");
+        assert_eq!(
+            entry.token_preview,
+            super::runtime_token_preview(&super::sha256_token("abcdef1234567890"))
+        );
     }
 
     #[test]
@@ -25194,6 +23785,7 @@ mod tests {
             to: vec![],
             timestamp: "2026-03-27T10:01:00Z".to_string(),
             r#type: "agent".to_string(),
+            kind: None,
             content: "{}".to_string(),
             signature: String::new(),
             encryption: "{}".to_string(),
@@ -25214,6 +23806,7 @@ mod tests {
                 to: vec![],
                 timestamp: "2026-03-27T10:00:00Z".to_string(),
                 r#type: "agent".to_string(),
+                kind: None,
                 content: "{}".to_string(),
                 signature: String::new(),
                 encryption: "{}".to_string(),
@@ -25233,6 +23826,7 @@ mod tests {
                 to: vec![],
                 timestamp: "2026-03-27T10:01:00Z".to_string(),
                 r#type: "agent".to_string(),
+                kind: None,
                 content: "{}".to_string(),
                 signature: String::new(),
                 encryption: "{}".to_string(),
@@ -25301,6 +23895,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
+            kind: None,
             subtype: Some("message".to_string()),
             content: serde_json::json!({
                 "body": "tenant scoped message",
@@ -25313,6 +23908,7 @@ mod tests {
             encryption: None,
             views: vec![],
             references: vec![],
+            typed_refs: vec![],
             attachments: vec![],
             store_in_relational: true,
             prev_hash: None,
@@ -25375,6 +23971,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
+            kind: None,
             subtype: Some("message".to_string()),
             content: serde_json::json!({
                 "body": "shared fallback message",
@@ -25387,6 +23984,7 @@ mod tests {
             encryption: None,
             views: vec![],
             references: vec![],
+            typed_refs: vec![],
             attachments: vec![],
             store_in_relational: true,
             prev_hash: None,
@@ -25459,6 +24057,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
+            kind: None,
             subtype: Some("message".to_string()),
             content: serde_json::json!({
                 "body": "authenticated send",
@@ -25471,6 +24070,7 @@ mod tests {
             encryption: None,
             views: vec![],
             references: vec![],
+            typed_refs: vec![],
             attachments: vec![],
             store_in_relational: true,
             prev_hash: None,
@@ -25484,6 +24084,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let response = super::send_http(State(state), headers, Json(message))
@@ -25519,7 +24120,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn local_postgres_send_http_without_auth_uses_shared_storage() {
+    async fn local_postgres_send_http_without_auth_is_rejected() {
         if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
             return;
         }
@@ -25541,6 +24142,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
+            kind: None,
             subtype: Some("message".to_string()),
             content: serde_json::json!({
                 "body": "unauthenticated send",
@@ -25553,6 +24155,7 @@ mod tests {
             encryption: None,
             views: vec![],
             references: vec![],
+            typed_refs: vec![],
             attachments: vec![],
             store_in_relational: true,
             prev_hash: None,
@@ -25566,24 +24169,13 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
-        let response = super::send_http(State(state), headers, Json(message))
+        let error = super::send_http(State(state), headers, Json(message))
             .await
-            .expect("send http");
-        let payload = response.0;
-        let message_id = payload["message_id"]
-            .as_str()
-            .expect("message id")
-            .to_string();
-
-        let public_count: i64 =
-            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM public.messages WHERE id = $1")
-                .bind(&message_id)
-                .fetch_one(&db.pool)
-                .await
-                .expect("count public rows");
-        assert_eq!(public_count, 1);
+            .expect_err("send http should require auth");
+        assert_eq!(error.0, StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]
@@ -25657,6 +24249,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let response = super::execute_action_http(State(state), headers, Json(request))
@@ -25697,7 +24290,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn local_postgres_execute_action_http_without_auth_uses_shared_storage() {
+    async fn local_postgres_execute_action_http_without_auth_is_rejected() {
         if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
             return;
         }
@@ -25743,29 +24336,82 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
-        let response = super::execute_action_http(State(state), headers, Json(request))
+        let error = super::execute_action_http(State(state), headers, Json(request))
             .await
-            .expect("execute action");
-        let payload = response.0;
-        let intent_message_id = payload["intent_message_id"]
-            .as_str()
-            .expect("intent id")
-            .to_string();
-        let result_message_id = payload["result_message_id"]
-            .as_str()
-            .expect("result id")
-            .to_string();
-        assert_eq!(payload["thread_id"].as_str(), Some(thread_id.as_str()));
+            .expect_err("execute action should require auth");
+        assert_eq!(error.0, StatusCode::UNAUTHORIZED);
+    }
 
-        let public_count: i64 =
-            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM public.messages WHERE id = ANY($1)")
-                .bind(vec![intent_message_id, result_message_id])
-                .fetch_one(&db.pool)
-                .await
-                .expect("count public rows");
-        assert_eq!(public_count, 2);
+    #[test]
+    fn direct_action_execute_outbound_allowlist_requires_config_for_autonomous_http_calls() {
+        unsafe {
+            std::env::remove_var("OMNYID_ACTION_EXECUTE_ALLOWLIST");
+        }
+
+        let request = super::ExecuteActionRequest {
+            capability: crate::integration::IntegrationCapability {
+                capability_id: "cap_test".to_string(),
+                provider: "test".to_string(),
+                operation: "run".to_string(),
+                transport: crate::integration::IntegrationTransport::Rest,
+                scopes: vec![],
+                approval_mode: crate::integration::ApprovalMode::Autonomous,
+                secret_refs: vec![],
+                metadata: serde_json::json!({}),
+            },
+            intent: crate::integration::ActionIntent {
+                capability_id: "cap_test".to_string(),
+                thread_id: "thread_test".to_string(),
+                requested_by: "agent:test@omnyid.com".to_string(),
+                input: serde_json::json!({}),
+                reason: None,
+            },
+            url: "https://api.example.com/run".to_string(),
+            method: "POST".to_string(),
+            bearer_token: None,
+        };
+
+        let error = super::direct_action_execute_outbound_allowlist(&request)
+            .expect_err("autonomous outbound call should require allowlist");
+        assert_eq!(error.0, StatusCode::FORBIDDEN);
+        assert!(error.1.contains("OMNYID_ACTION_EXECUTE_ALLOWLIST"));
+    }
+
+    #[test]
+    fn direct_action_execute_outbound_allowlist_allows_suggest_only_without_host_policy() {
+        unsafe {
+            std::env::remove_var("OMNYID_ACTION_EXECUTE_ALLOWLIST");
+        }
+
+        let request = super::ExecuteActionRequest {
+            capability: crate::integration::IntegrationCapability {
+                capability_id: "cap_test".to_string(),
+                provider: "test".to_string(),
+                operation: "preview".to_string(),
+                transport: crate::integration::IntegrationTransport::Rest,
+                scopes: vec![],
+                approval_mode: crate::integration::ApprovalMode::SuggestOnly,
+                secret_refs: vec![],
+                metadata: serde_json::json!({}),
+            },
+            intent: crate::integration::ActionIntent {
+                capability_id: "cap_test".to_string(),
+                thread_id: "thread_test".to_string(),
+                requested_by: "agent:test@omnyid.com".to_string(),
+                input: serde_json::json!({}),
+                reason: None,
+            },
+            url: "https://api.example.com/preview".to_string(),
+            method: "POST".to_string(),
+            bearer_token: None,
+        };
+
+        let allowlist = super::direct_action_execute_outbound_allowlist(&request)
+            .expect("suggest-only path should not require allowlist");
+        assert!(allowlist.is_empty());
     }
 
     #[tokio::test]
@@ -25828,6 +24474,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let response = super::agent_task_complete_http(
@@ -25937,6 +24584,7 @@ mod tests {
             to: vec![],
             timestamp: "2026-03-27T00:00:00Z".to_string(),
             r#type: "agent".to_string(),
+            kind: None,
             content: String::new(),
             signature: "smoke-signature".to_string(),
             encryption: String::new(),
@@ -25964,6 +24612,7 @@ mod tests {
             to: vec![],
             timestamp: "2026-03-27T00:00:01Z".to_string(),
             r#type: "agent".to_string(),
+            kind: None,
             content: String::new(),
             signature: "smoke-signature".to_string(),
             encryption: String::new(),
@@ -25991,6 +24640,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let response = super::get_thread_http(State(state), headers, Path(thread_id.clone()))
@@ -26007,6 +24657,178 @@ mod tests {
         );
         assert_eq!(messages[1].id, shared_message.id);
         assert_eq!(messages[1].content["body"].as_str(), Some("shared trace"));
+    }
+
+    #[tokio::test]
+    async fn trial_runner_session_access_is_bound_to_identity_key() {
+        let manager = super::TrialRunnerManager::new();
+        let session = manager
+            .create_or_get_session("ip-a:fingerprint-a".to_string())
+            .await;
+
+        let same_identity = manager
+            .get_session_for_identity(&session.id, "ip-a:fingerprint-a")
+            .await;
+        assert!(same_identity.is_some());
+
+        let other_identity = manager
+            .get_session_for_identity(&session.id, "ip-b:fingerprint-b")
+            .await;
+        assert!(other_identity.is_none());
+    }
+
+    #[tokio::test]
+    async fn trial_runner_run_rejects_cross_identity_session_use() {
+        let manager = super::TrialRunnerManager::new();
+        let session = manager
+            .create_or_get_session("ip-a:fingerprint-a".to_string())
+            .await;
+        let template_id = session
+            .starter_templates
+            .first()
+            .expect("template")
+            .id
+            .clone();
+
+        let error = manager
+            .start_template_run(&session.id, &template_id, "ip-b:fingerprint-b")
+            .await
+            .expect_err("cross-identity use should fail");
+        assert!(error.contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn local_postgres_get_thread_http_without_auth_is_rejected() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let thread_id = format!("thread_public_only_{suffix}");
+        let shared_message = Message {
+            protocol: "afp-v1".to_string(),
+            id: format!("shared_public_thread_msg_{suffix}"),
+            thread_id: thread_id.clone(),
+            parent_id: String::new(),
+            from: "omnyid://transport/public".to_string(),
+            to: vec![],
+            timestamp: "2026-03-27T00:00:01Z".to_string(),
+            r#type: "agent".to_string(),
+            kind: None,
+            content: String::new(),
+            signature: "smoke-signature".to_string(),
+            encryption: String::new(),
+            views: String::new(),
+            references: String::new(),
+            attachments: String::new(),
+            store_in_relational: true,
+            subtype: "message".to_string(),
+            metadata: serde_json::json!({"origin": "shared"}).to_string(),
+        };
+        db.store_message(&shared_message, serde_json::json!({"body": "shared trace"}))
+            .await
+            .expect("store shared message");
+
+        let state = Arc::new(super::AppState {
+            db: db.clone(),
+            metrics: Arc::new(Metrics::default()),
+            relay_tx: tokio::sync::broadcast::channel(8).0,
+            rate_limiter: Arc::new(super::RateLimiter::new()),
+            trial_runner: Arc::new(super::TrialRunnerManager::new()),
+            http_client: reqwest::Client::new(),
+            cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+        });
+
+        let error = super::get_thread_http(State(state), HeaderMap::new(), Path(thread_id))
+            .await
+            .expect_err("thread fetch should require auth");
+        assert_eq!(error.0, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn local_postgres_get_thread_http_authenticated_requires_private_thread_membership() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user = UserRecord {
+            id: format!("user_thread_acl_{suffix}"),
+            email: format!("thread-acl-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Thread ACL {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user).await.expect("create user");
+
+        let session = AuthSessionRecord {
+            token: format!("token_thread_acl_{suffix}"),
+            user_id: user.id.clone(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            expires_at: (chrono::Utc::now() + chrono::Duration::days(7)).to_rfc3339(),
+        };
+        db.create_session(&session).await.expect("create session");
+
+        let thread_id = format!("thread_public_only_acl_{suffix}");
+        let shared_message = Message {
+            protocol: "afp-v1".to_string(),
+            id: format!("shared_acl_thread_msg_{suffix}"),
+            thread_id: thread_id.clone(),
+            parent_id: String::new(),
+            from: "omnyid://transport/public".to_string(),
+            to: vec![],
+            timestamp: "2026-03-27T00:00:01Z".to_string(),
+            r#type: "agent".to_string(),
+            kind: None,
+            content: String::new(),
+            signature: "smoke-signature".to_string(),
+            encryption: String::new(),
+            views: String::new(),
+            references: String::new(),
+            attachments: String::new(),
+            store_in_relational: true,
+            subtype: "message".to_string(),
+            metadata: serde_json::json!({"origin": "shared"}).to_string(),
+        };
+        db.store_message(&shared_message, serde_json::json!({"body": "shared trace"}))
+            .await
+            .expect("store shared message");
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", session.token)).expect("auth header"),
+        );
+        let state = Arc::new(super::AppState {
+            db: db.clone(),
+            metrics: Arc::new(Metrics::default()),
+            relay_tx: tokio::sync::broadcast::channel(8).0,
+            rate_limiter: Arc::new(super::RateLimiter::new()),
+            trial_runner: Arc::new(super::TrialRunnerManager::new()),
+            http_client: reqwest::Client::new(),
+            cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+        });
+
+        let error = super::get_thread_http(State(state), headers, Path(thread_id))
+            .await
+            .expect_err("thread fetch should require private membership");
+        assert_eq!(error.0, StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
@@ -26061,6 +24883,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let created = super::agent_intent_http(
@@ -26242,6 +25065,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "note".to_string(),
+            kind: None,
             content: serde_json::json!({
                 "title": "Project Apollo standup notes",
                 "body": "Project Apollo budget and schedule update for the work folder.",
@@ -26278,6 +25102,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "note".to_string(),
+            kind: None,
             content: serde_json::json!({
                 "title": "Apollo global summary",
                 "body": "Global reference for Project Apollo budget and schedule update.",
@@ -26322,6 +25147,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let response = super::notes_message_http(
@@ -26329,6 +25155,7 @@ mod tests {
             headers,
             Json(NoteMessageRequest {
                 r#type: "folder_rule".to_string(),
+                kind: None,
                 thread_id: "folder:work".to_string(),
                 content: serde_json::json!({
                     "folder_id": "work",
@@ -26353,6 +25180,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "note".to_string(),
+            kind: None,
             content: serde_json::json!({
                 "title": "Apollo budget follow-up",
                 "body": "Project Apollo budget and schedule update for the work folder.",
@@ -26458,6 +25286,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "note".to_string(),
+            kind: None,
             content: serde_json::json!({
                 "title": "Apollo budget follow-up",
                 "body": "Project Apollo budget review with schedule risks and owners for the work folder.",
@@ -26494,6 +25323,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "note".to_string(),
+            kind: None,
             content: serde_json::json!({
                 "title": "Apollo budget review",
                 "body": "Project Apollo budget review with schedule risks and owners for the work folder.",
@@ -26543,6 +25373,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let response = super::notes_message_http(
@@ -26550,6 +25381,7 @@ mod tests {
             headers,
             Json(NoteMessageRequest {
                 r#type: "folder_rule".to_string(),
+                kind: None,
                 thread_id: "folder:work".to_string(),
                 content: serde_json::json!({
                     "folder_id": "work",
@@ -26574,6 +25406,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "note".to_string(),
+            kind: None,
             content: serde_json::json!({
                 "title": "Apollo budget blockers",
                 "body": "Project Apollo budget review with schedule risks and owners for the work folder.",
@@ -26666,6 +25499,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let created = super::agent_intent_http(
@@ -26848,6 +25682,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let workflow_id = format!("wf_http_{suffix}");
@@ -27059,6 +25894,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let workflow_id = format!("wf_compile_{suffix}");
@@ -27478,7 +26314,7 @@ mod tests {
         );
     }
 
-    // ── Step 5 / Step 6 tests ─────────────────────────────────────────────────
+    // -- Step 5 / Step 6 tests -------------------------------------------------
 
     #[test]
     fn compile_workflow_graph_to_ir_emits_parallel_group_for_research_loop_gather_slot() {
@@ -27927,6 +26763,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let response = super::workflows_describe_http(
@@ -28008,6 +26845,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let workflow_id = format!("wf_patch_{suffix}");
@@ -28390,6 +27228,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let workflow_id = format!("wf_actions_{suffix}");
@@ -28659,6 +27498,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let workflow_id = format!("wf_runs_{suffix}");
@@ -29122,6 +27962,10 @@ mod tests {
             run.result_json["resumed_from_wait_resume_id"].as_str(),
             Some("wfwait_resume")
         );
+        assert_eq!(
+            run.result_json["autonomy_decision"]["autonomy_level"].as_str(),
+            Some("request_approval")
+        );
         assert!(run.result_json["paused_at_node_id"].is_null());
         let timeline = run.timeline_json.as_array().expect("timeline array");
         assert_eq!(timeline[1]["status"].as_str(), Some("resumed"));
@@ -29168,6 +28012,14 @@ mod tests {
         assert_eq!(
             dispatch["afp_message"]["metadata"]["origin"].as_str(),
             Some("workflow_wait_resume")
+        );
+        assert_eq!(
+            dispatch["autonomy_decision"]["autonomy_level"].as_str(),
+            Some("request_approval")
+        );
+        assert_eq!(
+            dispatch["afp_message"]["metadata"]["autonomy_decision"]["autonomy_level"].as_str(),
+            Some("request_approval")
         );
     }
 
@@ -29237,8 +28089,17 @@ mod tests {
             Some("approval_rejected")
         );
         assert_eq!(
+            run.result_json["autonomy_decision"]["autonomy_level"].as_str(),
+            Some("request_approval")
+        );
+        assert_eq!(
             run.result_json["approval_decision"]["decision"].as_str(),
             Some("rejected")
+        );
+        assert_eq!(
+            run.result_json["approval_decision"]["autonomy_decision"]["autonomy_level"]
+                .as_str(),
+            Some("request_approval")
         );
         let timeline = run.timeline_json.as_array().expect("timeline array");
         assert_eq!(timeline[1]["status"].as_str(), Some("cancelled"));
@@ -30952,6 +29813,7 @@ mod tests {
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let thread_id = format!("thread.orchestrate.{suffix}");
@@ -31016,6 +29878,7 @@ mod tests {
                 trial_runner: Arc::new(super::TrialRunnerManager::new()),
                 http_client: reqwest::Client::new(),
                 cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+                pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
             })),
             headers,
             Path(thread_id.clone()),
@@ -31160,11 +30023,11 @@ mod tests {
         }
     }
 
-    // ── Cron scheduler unit tests ─────────────────────────────────────────────
+    // -- Cron scheduler unit tests ---------------------------------------------
 
     #[test]
     fn cron_to_quartz_expands_five_field_expression_and_converts_dow() {
-        // unix "1-5" (Mon-Fri) → Quartz "2-6" (Mon-Fri)
+        // unix "1-5" (Mon-Fri) ? Quartz "2-6" (Mon-Fri)
         let q = super::cron_to_quartz("0 9 * * 1-5");
         assert_eq!(q, "0 0 9 * * 2-6 *");
     }
@@ -31177,7 +30040,7 @@ mod tests {
 
     #[test]
     fn cron_to_quartz_sunday_zero_maps_to_quartz_one() {
-        // unix "0" (Sun) → Quartz "1" (Sun)
+        // unix "0" (Sun) ? Quartz "1" (Sun)
         let q = super::cron_to_quartz("0 9 * * 0");
         assert_eq!(q, "0 0 9 * * 1 *");
     }
@@ -31191,7 +30054,7 @@ mod tests {
     #[test]
     fn cron_next_fire_at_returns_next_occurrence_for_hourly_schedule() {
         use chrono::{Datelike as _, TimeZone, Timelike as _, Utc};
-        // 2026-04-02 08:45:00 UTC → next fire for "0 * * * *" is 09:00:00
+        // 2026-04-02 08:45:00 UTC ? next fire for "0 * * * *" is 09:00:00
         let from = Utc.with_ymd_and_hms(2026, 4, 2, 8, 45, 0).unwrap();
         let next = super::cron_next_fire_at("0 * * * *", from).expect("must produce next");
         assert_eq!(next.hour(), 9);
@@ -31218,7 +30081,7 @@ mod tests {
         assert_eq!(next.hour(), 9);
     }
 
-    // ── Trigger hardening unit tests (Phase 3 items 10-11) ───────────────────
+    // -- Trigger hardening unit tests (Phase 3 items 10-11) -------------------
 
     #[test]
     fn trigger_replay_nonce_is_deterministic() {
@@ -31344,7 +30207,7 @@ mod tests {
         assert_eq!(back.replay_nonce.len(), 64);
     }
 
-    // ── Trigger trust boundary unit tests ─────────────────────────────────────
+    // -- Trigger trust boundary unit tests -------------------------------------
 
     #[test]
     fn trigger_dispatch_token_is_deterministic() {
@@ -31507,12 +30370,12 @@ mod tests {
         );
         assert_eq!(
             crate::db::MIGRATIONS.len(),
-            37,
-            "MIGRATIONS array must have exactly 37 entries"
+            64,
+            "MIGRATIONS array must have exactly 64 entries"
         );
     }
 
-    // ── Email trigger dispatcher tests ────────────────────────────────────────
+    // -- Email trigger dispatcher tests ----------------------------------------
 
     #[test]
     fn email_trigger_activation_id_is_unique_per_event_and_registration() {
@@ -31561,7 +30424,7 @@ mod tests {
         }
     }
 
-    // ── Webhook ingress signature tests ───────────────────────────────────────
+    // -- Webhook ingress signature tests ---------------------------------------
 
     #[test]
     fn webhook_ingress_hmac_accepts_valid_token() {
@@ -31620,7 +30483,7 @@ mod tests {
         }
     }
 
-    // ── File-drop trigger adapter tests ───────────────────────────────────────
+    // -- File-drop trigger adapter tests ---------------------------------------
 
     #[test]
     fn file_drop_activation_id_is_unique_per_event_and_registration() {
@@ -31669,7 +30532,7 @@ mod tests {
         assert_ne!(kind, "schedule");
     }
 
-    // ── Internal event dispatcher tests ───────────────────────────────────────
+    // -- Internal event dispatcher tests ---------------------------------------
 
     #[test]
     fn internal_event_activation_id_is_unique_per_event_and_registration() {
@@ -31735,7 +30598,7 @@ mod tests {
         assert_ne!(event_from_none, Some(required_src));
     }
 
-    // ── Item 6: resolve_scheduled_for tests ──────────────────────────────────
+    // -- Item 6: resolve_scheduled_for tests ----------------------------------
 
     #[test]
     fn resolve_scheduled_for_fixed_duration_returns_future_timestamp() {
@@ -31785,7 +30648,7 @@ mod tests {
         assert_eq!(result, None, "approval family must return None");
     }
 
-    // ── Item 7: hybrid validation tests ──────────────────────────────────────
+    // -- Item 7: hybrid validation tests --------------------------------------
 
     #[test]
     fn validate_hybrid_trigger_valid_mode_passes() {
@@ -31831,7 +30694,7 @@ mod tests {
         );
     }
 
-    // ── Item 8: policy check tests ────────────────────────────────────────────
+    // -- Item 8: policy check tests --------------------------------------------
 
     #[test]
     fn policy_check_non_registered_status_blocks() {
@@ -31937,7 +30800,7 @@ mod tests {
         assert!(result.is_err(), "egress_allowed=false should block");
     }
 
-    // ── Item 9: AFP subtype constant tests ────────────────────────────────────
+    // -- Item 9: AFP subtype constant tests ------------------------------------
 
     #[test]
     fn afp_subtype_trigger_initiation_constant_value() {
@@ -31953,7 +30816,7 @@ mod tests {
     }
 }
 
-// ── Cost-aware orchestration HTTP handlers ────────────────────────────────────
+// -- Cost-aware orchestration HTTP handlers ------------------------------------
 
 /// GET /api/cost/summary — aggregate cost totals for the authenticated user.
 async fn cost_summary_http(
@@ -32045,6 +30908,69 @@ async fn upsert_budget_http(
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+/// GET /agent/spend-history?days=30 — return per-user spend history used by dashboard cost views.
+async fn agent_spend_history_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
+    let user = match authenticated_user(&state.db, &headers).await {
+        Ok(u) => u,
+        Err((status, msg)) => {
+            return (status, Json(serde_json::json!({ "error": msg }))).into_response();
+        }
+    };
+
+    let days: i32 = params
+        .get("days")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(30)
+        .min(365);
+
+    use sqlx::Row;
+
+    let query = sqlx::query(
+        r#"
+        SELECT
+            to_char(date_trunc('day', created_at), 'YYYY-MM-DD"T"00:00:00"Z"') AS day,
+            COALESCE(SUM(cost_usd), 0)::double precision AS cost_usd,
+            COUNT(*)::int AS api_calls,
+            COALESCE(SUM(tokens_used), 0)::bigint AS tokens
+        FROM cost_records
+        WHERE user_id = $1
+          AND created_at >= (now() - make_interval(days => $2))
+        GROUP BY date_trunc('day', created_at)
+        ORDER BY date_trunc('day', created_at) ASC
+        "#,
+    )
+    .bind(&user.id)
+    .bind(days)
+    .fetch_all(&state.db.pool)
+    .await;
+
+    match query {
+        Ok(rows) => {
+            let history: Vec<serde_json::Value> = rows
+                .into_iter()
+                .map(|row| {
+                    serde_json::json!({
+                        "day": row.get::<String, _>("day"),
+                        "cost_usd": row.get::<f64, _>("cost_usd"),
+                        "api_calls": row.get::<i32, _>("api_calls"),
+                        "tokens": row.get::<i64, _>("tokens"),
+                    })
+                })
+                .collect();
+            Json(serde_json::json!({ "days": days, "history": history })).into_response()
+        }
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": err.to_string() })),
         )
             .into_response(),
     }

@@ -1,6 +1,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD as B64URL;
+
 use argon2::{
     Argon2,
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
@@ -30,7 +33,7 @@ pub(super) async fn register_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(request): Json<RegisterRequest>,
-) -> Result<Json<SessionResponse>, (StatusCode, String)> {
+) -> Result<Json<AuthResponse>, (StatusCode, String)> {
     enforce_rate_limit(
         &state,
         public_rate_limit_key("register", &headers),
@@ -54,6 +57,15 @@ pub(super) async fn register_http(
             "valid email is required".to_string(),
         ));
     }
+    if email.len() > 254 {
+        return Err((StatusCode::BAD_REQUEST, "email too long".to_string()));
+    }
+    if display_name.len() > 100 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "display_name must be 100 characters or fewer".to_string(),
+        ));
+    }
     if password.len() < 8 {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -61,14 +73,26 @@ pub(super) async fn register_http(
         ));
     }
 
-    if state
+    if let Some(existing_user) = state
         .db
         .find_user_by_email(&email)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?
-        .is_some()
     {
+        let email_verified = state
+            .db
+            .is_user_email_verified(&existing_user.id)
+            .await
+            .map_err(internal_error)
+            .map_err(status_to_http)?;
+        if !email_verified && existing_user.auth_provider == "password" {
+            issue_and_send_verification_email(&state, &existing_user).await?;
+            return Ok(Json(verification_required_response(
+                &existing_user.email,
+                "Account created but not yet verified. We sent a fresh verification email.",
+            )));
+        }
         return Err((
             StatusCode::CONFLICT,
             "account already exists for that email".to_string(),
@@ -95,22 +119,19 @@ pub(super) async fn register_http(
     ensure_user_agents_and_demo_seed(&state, &user)
         .await
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+    issue_and_send_verification_email(&state, &user).await?;
 
-    let session = create_session_for_user(&state.db, &user)
-        .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
-
-    Ok(Json(SessionResponse {
-        token: session.token,
-        user: session_user_response(&user),
-    }))
+    Ok(Json(verification_required_response(
+        &user.email,
+        "Check your email to verify your account before signing in.",
+    )))
 }
 
 pub(super) async fn login_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
-) -> Result<Json<SessionResponse>, (StatusCode, String)> {
+) -> Result<Json<AuthResponse>, (StatusCode, String)> {
     enforce_rate_limit(
         &state,
         public_rate_limit_key("login", &headers),
@@ -149,21 +170,32 @@ pub(super) async fn login_http(
         ));
     }
 
+    let email_verified = state
+        .db
+        .is_user_email_verified(&user.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+    if !email_verified {
+        let _ = issue_and_send_verification_email(&state, &user).await;
+        return Err((
+            StatusCode::FORBIDDEN,
+            "email address not verified; we sent a fresh verification link".to_string(),
+        ));
+    }
+
     let session = create_session_for_user(&state.db, &user)
         .await
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
 
-    Ok(Json(SessionResponse {
-        token: session.token,
-        user: session_user_response(&user),
-    }))
+    Ok(Json(session_auth_response(session, &user)))
 }
 
 pub(super) async fn google_auth_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(request): Json<GoogleAuthRequest>,
-) -> Result<Json<SessionResponse>, (StatusCode, String)> {
+) -> Result<Json<AuthResponse>, (StatusCode, String)> {
     enforce_rate_limit(
         &state,
         public_rate_limit_key("google_auth", &headers),
@@ -226,14 +258,109 @@ pub(super) async fn google_auth_http(
         user
     };
 
+    state
+        .db
+        .mark_email_verified(&user.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+
     let session = create_session_for_user(&state.db, &user)
         .await
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
 
-    Ok(Json(SessionResponse {
-        token: session.token,
-        user: session_user_response(&user),
-    }))
+    Ok(Json(session_auth_response(session, &user)))
+}
+
+/// POST /auth/apple — Sign in with Apple.
+/// The Apple identity token is a signed JWT; the iOS ASAuthorizationController
+/// has already validated it against Apple's servers before the app sends it here.
+/// The payload is decoded (not signature-verified) to extract the stable `sub` claim.
+/// TODO: add RS256 JWKS verification against https://appleid.apple.com/auth/keys for
+///       hardened multi-tenant production deployments.
+#[derive(serde::Deserialize)]
+pub(super) struct AppleAuthRequest {
+    pub identity_token: String,
+    /// Email from the Apple credential; only provided by Apple on first sign-in.
+    /// The iOS client persists it in the Keychain and re-sends it on subsequent logins.
+    #[serde(default)]
+    pub email: String,
+}
+
+pub(super) async fn apple_auth_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<AppleAuthRequest>,
+) -> Result<Json<AuthResponse>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("apple_auth", &headers),
+        RateLimitPolicy { max_requests: 12, window: Duration::from_secs(60) },
+    )
+    .await?;
+
+    let apple_sub = apple_jwt_claim(&request.identity_token, "sub")
+        .map_err(|e| (StatusCode::UNAUTHORIZED, e))?;
+
+    let email = if !request.email.is_empty() {
+        request.email.trim().to_lowercase()
+    } else {
+        apple_jwt_claim(&request.identity_token, "email")
+            .map(|e| e.to_lowercase())
+            .map_err(|_| (StatusCode::BAD_REQUEST,
+                "email is required on first Apple Sign In; ensure your iOS client sends it".to_string()))?
+    };
+
+    let user = if let Some(existing) = state
+        .db
+        .find_user_by_email(&email)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?
+    {
+        existing
+    } else {
+        let display_name = email.split('@').next().unwrap_or("OmnyPulse User").to_string();
+        let new_user = UserRecord {
+            id: Ulid::new().to_string(),
+            email: email.clone(),
+            password_hash: None,
+            auth_provider: "apple".to_string(),
+            // Reuse google_sub column to store the stable Apple subject identifier.
+            google_sub: Some(format!("apple:{apple_sub}")),
+            display_name,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        state.db.create_user(&new_user).await.map_err(internal_error).map_err(status_to_http)?;
+        ensure_user_agents_and_demo_seed(&state, &new_user)
+            .await
+            .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+        new_user
+    };
+
+    state.db.mark_email_verified(&user.id).await.map_err(internal_error).map_err(status_to_http)?;
+    let session = create_session_for_user(&state.db, &user)
+        .await
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+    Ok(Json(session_auth_response(session, &user)))
+}
+
+/// Decode the payload segment of an Apple JWT and return the value of a named claim.
+fn apple_jwt_claim(jwt: &str, claim: &str) -> Result<String, String> {
+    let parts: Vec<&str> = jwt.splitn(3, '.').collect();
+    if parts.len() < 2 {
+        return Err("Malformed Apple identity token".to_string());
+    }
+    let payload_bytes = B64URL
+        .decode(parts[1])
+        .map_err(|_| "Could not base64-decode Apple JWT payload".to_string())?;
+    let payload: Value = serde_json::from_slice(&payload_bytes)
+        .map_err(|_| "Apple JWT payload is not valid JSON".to_string())?;
+    payload
+        .get(claim)
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| format!("Apple JWT missing '{claim}' claim"))
 }
 
 pub(super) async fn auth_session_http(
@@ -242,6 +369,415 @@ pub(super) async fn auth_session_http(
 ) -> Result<Json<SessionUserResponse>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     Ok(Json(session_user_response(&user)))
+}
+
+/// Change password and revoke all other sessions (GAP-006).
+///
+/// Requires the current password for verification. On success all existing
+/// sessions except the current one are invalidated, limiting the damage from
+/// a compromised password.
+pub(super) async fn change_password_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<ChangePasswordRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("change_password", &headers),
+        RateLimitPolicy {
+            max_requests: 5,
+            window: Duration::from_secs(300),
+        },
+    )
+    .await?;
+
+    let user = authenticated_user(&state.db, &headers).await?;
+
+    let password_hash = user.password_hash.as_deref().ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "password change is not supported for OAuth accounts".to_string(),
+        )
+    })?;
+
+    let current_ok = verify_password(password_hash, &request.current_password)
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+    if !current_ok {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "current password is incorrect".to_string(),
+        ));
+    }
+
+    if request.new_password.len() < 8 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "new password must be at least 8 characters".to_string(),
+        ));
+    }
+    if request.new_password == request.current_password {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "new password must differ from the current password".to_string(),
+        ));
+    }
+
+    let new_hash = hash_password(&request.new_password)
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+
+    let updated = state
+        .db
+        .update_user_password(&user.id, &new_hash)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+
+    if !updated {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "password update failed".to_string(),
+        ));
+    }
+
+    // Revoke all sessions so any attacker who obtained the old password loses access.
+    let current_token = bearer_token_from_headers(&headers)
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
+    state
+        .db
+        .revoke_other_sessions(&user.id, &current_token)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+
+    Ok(Json(
+        serde_json::json!({ "ok": true, "sessions_revoked": true }),
+    ))
+}
+
+// ── Email verification (GAP-018) ──────────────────────────────────────────────
+
+/// POST /auth/verify-email/send — resend verification email for the authenticated user.
+pub(super) async fn send_verification_email_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("verify_email_send", &headers),
+        RateLimitPolicy {
+            max_requests: 3,
+            window: Duration::from_secs(300),
+        },
+    )
+    .await?;
+
+    let user = authenticated_user(&state.db, &headers).await?;
+    issue_and_send_verification_email(&state, &user).await?;
+    Ok(Json(
+        serde_json::json!({ "ok": true, "message": "verification email sent" }),
+    ))
+}
+
+/// POST /auth/verify-email — consume a verification token.
+pub(super) async fn verify_email_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<VerifyEmailRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("verify_email", &headers),
+        RateLimitPolicy {
+            max_requests: 10,
+            window: Duration::from_secs(300),
+        },
+    )
+    .await?;
+
+    let token_hash = crate::db::sha256_token(&request.token);
+    let record = state
+        .db
+        .find_auth_token("email_verify", &token_hash)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "invalid or expired verification token".to_string(),
+            )
+        })?;
+
+    if record.used_at.is_some() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "verification token already used".to_string(),
+        ));
+    }
+    if is_auth_token_expired(&record.expires_at) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "verification token has expired".to_string(),
+        ));
+    }
+
+    state
+        .db
+        .consume_auth_token(&record.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+    state
+        .db
+        .mark_email_verified(&record.user_id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+
+    Ok(Json(
+        serde_json::json!({ "ok": true, "email_verified": true }),
+    ))
+}
+
+// ── Password reset (GAP-019) ──────────────────────────────────────────────────
+
+/// POST /auth/forgot-password — create and email a password-reset token.
+pub(super) async fn forgot_password_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<ForgotPasswordRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("forgot_password", &headers),
+        RateLimitPolicy {
+            max_requests: 4,
+            window: Duration::from_secs(300),
+        },
+    )
+    .await?;
+
+    let email = request.email.trim().to_lowercase();
+    // Always return success to avoid confirming whether an email is registered.
+    let Some(user) = state
+        .db
+        .find_user_by_email(&email)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?
+    else {
+        return Ok(Json(serde_json::json!({
+            "ok": true,
+            "message": "if that email is registered, a reset link has been sent"
+        })));
+    };
+
+    if user.auth_provider != "password" {
+        // OAuth accounts cannot reset a password — tell them to sign in with their provider.
+        return Ok(Json(serde_json::json!({
+            "ok": true,
+            "message": "if that email is registered, a reset link has been sent"
+        })));
+    }
+
+    issue_and_send_password_reset_email(&state, &user).await?;
+    Ok(Json(serde_json::json!({
+        "ok": true,
+        "message": "if that email is registered, a reset link has been sent"
+    })))
+}
+
+/// POST /auth/reset-password — consume the reset token and set a new password.
+pub(super) async fn reset_password_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<ResetPasswordRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("reset_password", &headers),
+        RateLimitPolicy {
+            max_requests: 5,
+            window: Duration::from_secs(300),
+        },
+    )
+    .await?;
+
+    if request.new_password.len() < 8 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "password must be at least 8 characters".to_string(),
+        ));
+    }
+
+    let token_hash = crate::db::sha256_token(&request.token);
+    let record = state
+        .db
+        .find_auth_token("password_reset", &token_hash)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "invalid or expired reset token".to_string(),
+            )
+        })?;
+
+    if record.used_at.is_some() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "reset token already used".to_string(),
+        ));
+    }
+    if is_auth_token_expired(&record.expires_at) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "reset token has expired — request a new one".to_string(),
+        ));
+    }
+
+    let new_hash = hash_password(&request.new_password)
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+    let updated = state
+        .db
+        .update_user_password(&record.user_id, &new_hash)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+
+    if !updated {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "password reset is only supported for password accounts".to_string(),
+        ));
+    }
+
+    state
+        .db
+        .consume_auth_token(&record.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+
+    // Revoke all sessions — the account was likely compromised.
+    state
+        .db
+        .revoke_all_sessions(&record.user_id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+
+    Ok(Json(
+        serde_json::json!({ "ok": true, "sessions_revoked": true }),
+    ))
+}
+
+// ── Internal helpers for auth tokens ─────────────────────────────────────────
+
+fn is_auth_token_expired(expires_at: &str) -> bool {
+    chrono::DateTime::parse_from_rfc3339(expires_at)
+        .map(|dt| dt < chrono::Utc::now())
+        .unwrap_or(true)
+}
+
+fn generate_secure_token() -> String {
+    let raw: [u8; 32] = rand::rng().random();
+    hex::encode(raw)
+}
+
+async fn issue_and_send_verification_email(
+    state: &super::AppState,
+    user: &crate::db::UserRecord,
+) -> Result<(), (StatusCode, String)> {
+    let raw_token = generate_secure_token();
+    let token_hash = crate::db::sha256_token(&raw_token);
+    let token_id = ulid::Ulid::new().to_string();
+    let expires_at = (chrono::Utc::now() + chrono::Duration::hours(24)).to_rfc3339();
+
+    state
+        .db
+        .create_auth_token(
+            &token_id,
+            &user.id,
+            "email_verify",
+            &token_hash,
+            &expires_at,
+        )
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+
+    let base_url =
+        std::env::var("OMNYID_BASE_URL").unwrap_or_else(|_| "https://omnyid.com".to_string());
+    let verify_url = format!("{base_url}/verify-email?token={raw_token}");
+
+    let body = format!(
+        "Hi {name},\n\nVerify your OmnyID email address by visiting the link below:\n\n{url}\n\nThis link expires in 24 hours.\n\nIf you did not create an OmnyID account, ignore this email.\n",
+        name = user.display_name,
+        url = verify_url,
+    );
+
+    crate::gateway::smtp_out::send_transactional_email(
+        &user.email,
+        "Verify your OmnyID email",
+        &body,
+    )
+    .await
+    .map_err(|err| {
+        tracing::warn!(%err, user_id = %user.id, "Failed to send verification email");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("failed to send verification email: {err}"),
+        )
+    })
+}
+
+async fn issue_and_send_password_reset_email(
+    state: &super::AppState,
+    user: &crate::db::UserRecord,
+) -> Result<(), (StatusCode, String)> {
+    let raw_token = generate_secure_token();
+    let token_hash = crate::db::sha256_token(&raw_token);
+    let token_id = ulid::Ulid::new().to_string();
+    let expires_at = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+
+    state
+        .db
+        .create_auth_token(
+            &token_id,
+            &user.id,
+            "password_reset",
+            &token_hash,
+            &expires_at,
+        )
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+
+    let base_url =
+        std::env::var("OMNYID_BASE_URL").unwrap_or_else(|_| "https://omnyid.com".to_string());
+    let reset_url = format!("{base_url}/reset-password?token={raw_token}");
+
+    let body = format!(
+        "Hi {name},\n\nReset your OmnyID password by visiting the link below:\n\n{url}\n\nThis link expires in 1 hour. If you did not request a password reset, ignore this email — your password has not changed.\n",
+        name = user.display_name,
+        url = reset_url,
+    );
+
+    crate::gateway::smtp_out::send_transactional_email(
+        &user.email,
+        "Reset your OmnyID password",
+        &body,
+    )
+    .await
+    .map_err(|err| {
+        tracing::warn!(%err, user_id = %user.id, "Failed to send password reset email");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("failed to send password reset email: {err}"),
+        )
+    })
 }
 
 // ── Auth helpers & rate limiting ──────────────────────────────────────────────
@@ -263,7 +799,7 @@ pub(super) async fn authenticated_user(
         return Err((StatusCode::UNAUTHORIZED, "session expired".to_string()));
     }
 
-    let user = sqlx::query(
+    let row_opt = sqlx::query(
         r#"
         SELECT id, email, password_hash, auth_provider, google_sub, display_name, created_at::text as created_at
         FROM users
@@ -275,17 +811,24 @@ pub(super) async fn authenticated_user(
     .fetch_optional(&db.pool)
     .await
     .map_err(internal_error)
-    .map_err(status_to_http)?
-    .map(|row| UserRecord {
-        id: row.try_get("id").unwrap_or_default(),
-        email: row.try_get("email").unwrap_or_default(),
+    .map_err(status_to_http)?;
+
+    let row = row_opt.ok_or_else(|| (StatusCode::UNAUTHORIZED, "user for session not found".to_string()))?;
+
+    // Required columns use `?` so a NULL or type-mismatch surfaces as a 500 rather than
+    // silently producing an empty string that passes downstream authorization checks.
+    let col_err = |col: &'static str| move |_: sqlx::Error| {
+        (StatusCode::INTERNAL_SERVER_ERROR, format!("db column decode failed: {col}"))
+    };
+    let user = UserRecord {
+        id:            row.try_get("id").map_err(col_err("id"))?,
+        email:         row.try_get("email").map_err(col_err("email"))?,
         password_hash: row.try_get("password_hash").unwrap_or(None),
-        auth_provider: row.try_get("auth_provider").unwrap_or_default(),
-        google_sub: row.try_get("google_sub").unwrap_or(None),
-        display_name: row.try_get("display_name").unwrap_or_default(),
-        created_at: row.try_get("created_at").unwrap_or_default(),
-    })
-    .ok_or_else(|| (StatusCode::UNAUTHORIZED, "user for session not found".to_string()))?;
+        auth_provider: row.try_get("auth_provider").map_err(col_err("auth_provider"))?,
+        google_sub:    row.try_get("google_sub").unwrap_or(None),
+        display_name:  row.try_get("display_name").map_err(col_err("display_name"))?,
+        created_at:    row.try_get("created_at").map_err(col_err("created_at"))?,
+    };
 
     Ok(user)
 }
@@ -335,24 +878,21 @@ pub(super) async fn thread_messages_for_headers(
     headers: &HeaderMap,
     thread_id: &str,
 ) -> Result<Vec<crate::afp::Message>, (StatusCode, String)> {
-    if let Some(user) = optional_authenticated_user(db, headers).await? {
-        let private_messages = db
-            .get_private_thread(&user.id, thread_id)
-            .await
-            .map_err(internal_error)
-            .map_err(status_to_http)?;
-        let public_messages = db
-            .get_thread(thread_id)
-            .await
-            .map_err(internal_error)
-            .map_err(status_to_http)?;
-        return Ok(merge_thread_messages(private_messages, public_messages));
-    }
-
-    db.get_thread(thread_id)
+    let user = authenticated_user(db, headers).await?;
+    let private_messages = db
+        .get_private_thread(&user.id, thread_id)
         .await
         .map_err(internal_error)
-        .map_err(status_to_http)
+        .map_err(status_to_http)?;
+    if private_messages.is_empty() {
+        return Err((StatusCode::NOT_FOUND, "thread not found".to_string()));
+    }
+    let public_messages = db
+        .get_thread(thread_id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+    Ok(merge_thread_messages(private_messages, public_messages))
 }
 
 pub(super) async fn store_private_app_message(
@@ -377,12 +917,14 @@ pub(super) async fn store_private_app_message(
 
     if inserted {
         metrics.inc_messages_stored();
+        // Include owner_user_id so the relay socket can filter to the owning user (GAP-060).
         let _ = relay_tx.send(
             serde_json::json!({
                 "event": "message_stored",
                 "message_id": proto.id,
                 "thread_id": proto.thread_id,
-                "type": proto.r#type
+                "type": proto.r#type,
+                "owner_user_id": owner_user_id,
             })
             .to_string(),
         );
@@ -475,7 +1017,26 @@ pub(super) async fn enforce_rate_limit(
     key: String,
     policy: RateLimitPolicy,
 ) -> Result<(), (StatusCode, String)> {
-    if state.rate_limiter.allow(key, policy).await {
+    // Prefer the persistent DB rate limiter (GAP-007). Fall back to in-memory
+    // if the DB call fails (e.g. during startup or connection hiccup) — the
+    // in-memory limiter still blocks within the current process lifetime.
+    let allowed = match state
+        .db
+        .rate_limit_allow(
+            &key,
+            policy.window.as_secs() as i64,
+            policy.max_requests as i64,
+        )
+        .await
+    {
+        Ok(allowed) => allowed,
+        Err(err) => {
+            tracing::warn!(%err, %key, "DB rate limiter unavailable; falling back to in-memory");
+            state.rate_limiter.allow(key, policy).await
+        }
+    };
+
+    if allowed {
         return Ok(());
     }
 
@@ -498,10 +1059,29 @@ pub(super) fn authenticated_rate_limit_key(scope: &str, headers: &HeaderMap) -> 
 }
 
 pub(super) fn request_ip_identity(headers: &HeaderMap) -> String {
-    forwarded_header_identity(headers, "x-forwarded-for")
-        .or_else(|| forwarded_header_identity(headers, "cf-connecting-ip"))
-        .or_else(|| forwarded_header_identity(headers, "x-real-ip"))
-        .unwrap_or_else(|| "unknown".to_string())
+    // X-Forwarded-For and similar headers are client-controlled when the server
+    // is not behind a trusted reverse proxy.  An attacker can set these to any
+    // value, rotating through spoofed IPs to bypass per-IP rate limits.
+    //
+    // Only trust them when OMNYID_BEHIND_TRUSTED_PROXY=true is explicitly set,
+    // meaning the operator has confirmed that the listening socket is only
+    // reachable through a proxy that strips/overwrites these headers.
+    //
+    // Without that flag, all direct connections share the key "direct", which
+    // keeps rate limiting conservative but immune to header spoofing.
+    let behind_trusted_proxy =
+        std::env::var("OMNYID_BEHIND_TRUSTED_PROXY").as_deref() == Ok("true");
+
+    if behind_trusted_proxy {
+        forwarded_header_identity(headers, "x-forwarded-for")
+            .or_else(|| forwarded_header_identity(headers, "cf-connecting-ip"))
+            .or_else(|| forwarded_header_identity(headers, "x-real-ip"))
+            .unwrap_or_else(|| "direct".to_string())
+    } else {
+        // Return a stable placeholder; rate-limit buckets are still enforced
+        // but keyed on the connection rather than on a spoofable IP.
+        "direct".to_string()
+    }
 }
 
 pub(super) fn forwarded_header_identity(headers: &HeaderMap, header_name: &str) -> Option<String> {
@@ -536,6 +1116,12 @@ pub(super) fn random_token() -> String {
     let mut bytes = [0u8; 24];
     rand::rng().fill(&mut bytes);
     hex::encode(bytes)
+}
+
+/// Re-export the DB-layer token hash so server submodules can compare
+/// raw bearer tokens against the stored hashes.
+pub(super) fn sha256_token(raw: &str) -> String {
+    crate::db::sha256_token(raw)
 }
 
 pub(super) fn session_is_expired(expires_at: &str) -> bool {
@@ -587,13 +1173,128 @@ async fn verify_google_id_token(id_token: &str) -> Result<GoogleTokenInfoRespons
         .json::<GoogleTokenInfoResponse>()
         .await
         .map_err(|err| format!("Google token payload was invalid: {err}"))?;
+    validate_google_token_info(&token_info, &client_id, chrono::Utc::now().timestamp())?;
+    Ok(token_info)
+}
+
+fn validate_google_token_info(
+    token_info: &GoogleTokenInfoResponse,
+    client_id: &str,
+    now_epoch_secs: i64,
+) -> Result<(), String> {
     if token_info.aud != client_id {
         return Err("Google token audience does not match Omnyid".to_string());
     }
+
+    match token_info.iss.as_deref() {
+        Some("accounts.google.com") | Some("https://accounts.google.com") => {}
+        _ => return Err("Google token issuer is invalid".to_string()),
+    }
+
     if token_info.email_verified.as_deref() != Some("true") {
         return Err("Google account email is not verified".to_string());
     }
-    Ok(token_info)
+
+    let exp = parse_google_epoch_field(token_info.exp.as_deref(), "exp")?;
+    if exp + 60 < now_epoch_secs {
+        return Err("Google sign-in token has expired".to_string());
+    }
+
+    if let Some(iat_raw) = token_info.iat.as_deref() {
+        let iat = parse_google_epoch_field(Some(iat_raw), "iat")?;
+        if iat > now_epoch_secs + 300 {
+            return Err("Google sign-in token issued-at timestamp is invalid".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+fn parse_google_epoch_field(raw: Option<&str>, field_name: &str) -> Result<i64, String> {
+    let value = raw.ok_or_else(|| format!("Google token is missing {field_name}"))?;
+    value
+        .parse::<i64>()
+        .map_err(|_| format!("Google token {field_name} was invalid"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{allowed_cors_origins, validate_google_token_info};
+    use crate::server::types::GoogleTokenInfoResponse;
+
+    fn sample_google_token_info() -> GoogleTokenInfoResponse {
+        GoogleTokenInfoResponse {
+            sub: "google-subject".to_string(),
+            email: "user@example.com".to_string(),
+            email_verified: Some("true".to_string()),
+            aud: "client-id".to_string(),
+            iss: Some("https://accounts.google.com".to_string()),
+            exp: Some("2000000000".to_string()),
+            iat: Some("1700000000".to_string()),
+            name: Some("Example User".to_string()),
+            given_name: Some("Example".to_string()),
+        }
+    }
+
+    #[test]
+    fn google_token_validation_accepts_valid_verified_token() {
+        let token_info = sample_google_token_info();
+        let result = validate_google_token_info(&token_info, "client-id", 1_800_000_000);
+        assert!(result.is_ok(), "expected valid token, got {result:?}");
+    }
+
+    #[test]
+    fn google_token_validation_rejects_expired_token() {
+        let mut token_info = sample_google_token_info();
+        token_info.exp = Some("100".to_string());
+        let result = validate_google_token_info(&token_info, "client-id", 1_800_000_000);
+        assert!(matches!(result, Err(message) if message.contains("expired")));
+    }
+
+    #[test]
+    fn google_token_validation_rejects_untrusted_issuer() {
+        let mut token_info = sample_google_token_info();
+        token_info.iss = Some("https://evil.example".to_string());
+        let result = validate_google_token_info(&token_info, "client-id", 1_800_000_000);
+        assert!(matches!(result, Err(message) if message.contains("issuer")));
+    }
+
+    #[test]
+    fn allowed_cors_origins_excludes_localhost_when_not_explicitly_allowed() {
+        let previous_allowed = std::env::var("OMNYID_ALLOWED_ORIGINS").ok();
+        let previous_localhost = std::env::var("OMNYID_ALLOW_LOCALHOST_ORIGINS").ok();
+        unsafe {
+            std::env::remove_var("OMNYID_ALLOWED_ORIGINS");
+            std::env::set_var("OMNYID_ALLOW_LOCALHOST_ORIGINS", "false");
+        }
+
+        let origins = allowed_cors_origins()
+            .into_iter()
+            .filter_map(|value| value.to_str().ok().map(str::to_string))
+            .collect::<Vec<_>>();
+
+        assert!(origins.iter().any(|origin| origin == "https://omnyid.com"));
+        assert!(
+            origins
+                .iter()
+                .any(|origin| origin == "https://cloud.omnyid.com")
+        );
+        assert!(!origins.iter().any(|origin| origin.contains("localhost")));
+        assert!(!origins.iter().any(|origin| origin.contains("127.0.0.1")));
+
+        unsafe {
+            if let Some(value) = previous_allowed {
+                std::env::set_var("OMNYID_ALLOWED_ORIGINS", value);
+            } else {
+                std::env::remove_var("OMNYID_ALLOWED_ORIGINS");
+            }
+            if let Some(value) = previous_localhost {
+                std::env::set_var("OMNYID_ALLOW_LOCALHOST_ORIGINS", value);
+            } else {
+                std::env::remove_var("OMNYID_ALLOW_LOCALHOST_ORIGINS");
+            }
+        }
+    }
 }
 
 pub(super) async fn ensure_user_agents_and_demo_seed(
@@ -735,15 +1436,18 @@ pub(super) fn new_server_message(
         normalized_server_message_taxonomy(message_type);
     let message_id = Ulid::new().to_string();
     let timestamp = chrono::Utc::now().to_rfc3339();
+    // AAD canonical format (GAP-009): must match gateway/smtp_in.rs and python-sdk.
     let aad = serde_json::json!({
+        "protocol": "afp-v1",
         "id": message_id,
         "thread_id": thread_id,
+        "parent_id": "",
         "from": from,
         "to": to,
+        "timestamp": timestamp,
         "type": normalized_type,
         "subtype": normalized_subtype,
         "metadata": normalized_metadata,
-        "timestamp": timestamp,
     });
     let encryption = crate::crypto::encrypt_content(&content, &aad, &encryption_key);
     let _views = views;
@@ -782,6 +1486,7 @@ pub(super) fn new_server_message(
             .unwrap_or_default()
             .to_string(),
         r#type: normalized_type.to_string(),
+        kind: None,
         subtype: (!normalized_subtype.is_empty()).then(|| normalized_subtype.to_string()),
         content,
         metadata: if normalized_metadata.is_null() {
@@ -793,6 +1498,7 @@ pub(super) fn new_server_message(
         encryption: Some(encryption),
         views: vec![],
         references,
+        typed_refs: vec![],
         attachments,
         store_in_relational,
         prev_hash: None,
@@ -923,11 +1629,39 @@ pub(super) fn session_user_response(user: &UserRecord) -> SessionUserResponse {
     }
 }
 
+fn session_auth_response(session: AuthSessionRecord, user: &UserRecord) -> AuthResponse {
+    AuthResponse {
+        token: Some(session.token),
+        user: Some(session_user_response(user)),
+        requires_2fa: false,
+        verification_required: false,
+        message: None,
+        email: None,
+    }
+}
+
+fn verification_required_response(email: &str, message: &str) -> AuthResponse {
+    AuthResponse {
+        token: None,
+        user: None,
+        requires_2fa: false,
+        verification_required: true,
+        message: Some(message.to_string()),
+        email: Some(email.to_string()),
+    }
+}
+
 pub(super) fn cors_layer() -> CorsLayer {
     let origins = allowed_cors_origins();
     CorsLayer::new()
         .allow_origin(origins)
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
         .allow_headers([
             axum::http::header::CONTENT_TYPE,
             axum::http::header::AUTHORIZATION,
@@ -937,7 +1671,15 @@ pub(super) fn cors_layer() -> CorsLayer {
 pub(super) fn allowed_cors_origins() -> Vec<HeaderValue> {
     let configured = std::env::var("OMNYID_ALLOWED_ORIGINS")
         .unwrap_or_else(|_| {
-            "https://omnyid.com,https://cloud.omnyid.com,http://localhost:3000,http://127.0.0.1:3000".to_string()
+            let allow_localhost = std::env::var("OMNYID_ALLOW_LOCALHOST_ORIGINS")
+                .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+                .unwrap_or(cfg!(debug_assertions));
+            if allow_localhost {
+                // localhost:4174 is the Vite dev server port (dev.ps1 $VITE_PORT)
+                "https://omnyid.com,https://cloud.omnyid.com,http://localhost:3000,http://127.0.0.1:3000,http://localhost:4174,http://127.0.0.1:4174".to_string()
+            } else {
+                "https://omnyid.com,https://cloud.omnyid.com".to_string()
+            }
         });
 
     configured
@@ -1007,7 +1749,28 @@ pub(super) async fn passkey_register_finish_http(
     crate::webauthn::verify_registration_client_data(&finish.client_data_json, &challenge, &origin)
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
-    let cred = crate::webauthn::build_stored_credential(&finish, &finish.client_data_json);
+    // Extract the COSE public key from the attestation object's authData (GAP-004).
+    let auth_data = crate::webauthn::extract_auth_data(&finish.attestation_object)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let cose_key_cbor_b64 = crate::webauthn::extract_cose_key_from_auth_data(&auth_data)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+        .and_then(|_key| {
+            // Locate the COSE CBOR bytes within authData and store them base64url-encoded.
+            let flags = auth_data.get(32).copied().unwrap_or(0);
+            let at_flag = flags & 0x40 != 0;
+            if !at_flag || auth_data.len() < 55 {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "authData missing credential data".into(),
+                ));
+            }
+            let cred_id_len = u16::from_be_bytes([auth_data[53], auth_data[54]]) as usize;
+            let cose_start = 55 + cred_id_len;
+            let cose_bytes = auth_data.get(cose_start..).unwrap_or(&[]);
+            Ok(B64URL.encode(cose_bytes))
+        })?;
+
+    let cred = crate::webauthn::build_stored_credential(&finish, &cose_key_cbor_b64);
     state
         .db
         .store_passkey_credential(&cred)
@@ -1091,6 +1854,15 @@ pub(super) async fn passkey_authenticate_finish_http(
         .map_err(internal_error)
         .map_err(status_to_http)?
         .ok_or((StatusCode::UNAUTHORIZED, "credential not found".to_string()))?;
+
+    // GAP-004: Verify the assertion signature before accepting authentication.
+    crate::webauthn::verify_assertion_signature(
+        &finish.authenticator_data,
+        &finish.client_data_json,
+        &finish.signature,
+        &cred,
+    )
+    .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
     crate::webauthn::verify_sign_count(cred.sign_count, sign_count)
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
