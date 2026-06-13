@@ -8,7 +8,12 @@ use crate::personalization::{LoraArtifact, PersonalizationEvent};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sqlx::{PgPool, Row};
+use ulid::Ulid;
+use sqlx::{Acquire, PgPool, Row, postgres::PgPoolOptions};
+use std::time::Duration;
+
+mod migration_catalog;
+pub use migration_catalog::MIGRATIONS;
 
 #[derive(Clone)]
 pub struct Db {
@@ -17,7 +22,30 @@ pub struct Db {
 
 impl Db {
     pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
-        let pool = PgPool::connect(database_url).await?;
+        let settings = database_pool_settings_from_env();
+        let statement_timeout_ms = settings.statement_timeout_ms;
+        let idle_tx_timeout_ms = settings.idle_in_transaction_timeout_ms;
+        let pool = PgPoolOptions::new()
+            .max_connections(settings.max_connections)
+            .min_connections(settings.min_connections)
+            .acquire_timeout(Duration::from_secs(settings.acquire_timeout_secs))
+            .idle_timeout(Some(Duration::from_secs(settings.idle_timeout_secs)))
+            .max_lifetime(Some(Duration::from_secs(settings.max_lifetime_secs)))
+            .after_connect(move |conn, _meta| {
+                Box::pin(async move {
+                    sqlx::query(&format!("SET statement_timeout = {statement_timeout_ms}"))
+                        .execute(&mut *conn)
+                        .await?;
+                    sqlx::query(&format!(
+                        "SET idle_in_transaction_session_timeout = {idle_tx_timeout_ms}"
+                    ))
+                    .execute(&mut *conn)
+                    .await?;
+                    Ok(())
+                })
+            })
+            .connect(database_url)
+            .await?;
         apply_migrations(&pool).await?;
         Ok(Db { pool })
     }
@@ -66,14 +94,14 @@ impl Db {
         let result = sqlx::query(
             r#"
             INSERT INTO messages (
-                id, thread_id, parent_id, from_agent, to_agents, timestamp, type, content,
+                id, thread_id, parent_id, from_agent, to_agents, timestamp, type, kind, content,
                 views, summary, embedding, signature, encryption, "references", attachments,
                 store_in_relational, subtype, metadata
             )
             VALUES (
-                $1, $2, $3, $4, $5, $6::timestamptz, $7, $8,
-                $9, $10, $11, $12, $13, $14, $15,
-                $16, $17, $18
+                $1, $2, $3, $4, $5, $6::timestamptz, $7, $8, $9,
+                $10, $11, $12, $13, $14, $15, $16,
+                $17, $18, $19
             )
             ON CONFLICT (id) DO NOTHING
             "#,
@@ -85,6 +113,7 @@ impl Db {
         .bind(serde_json::json!(msg.to))
         .bind(&msg.timestamp)
         .bind(&msg.r#type)
+        .bind(msg.kind.as_deref())
         .bind(persisted_content)
         .bind(persisted_views)
         .bind(summary)
@@ -135,14 +164,14 @@ impl Db {
         let result = sqlx::query(&format!(
             r#"
             INSERT INTO {messages_table} (
-                id, thread_id, parent_id, from_agent, to_agents, timestamp, type, content,
+                id, thread_id, parent_id, from_agent, to_agents, timestamp, type, kind, content,
                 views, summary, embedding, signature, encryption, "references", attachments,
                 store_in_relational, subtype, metadata
             )
             VALUES (
-                $1, $2, $3, $4, $5, $6::timestamptz, $7, $8,
-                $9, $10, $11, $12, $13, $14, $15,
-                $16, $17, $18
+                $1, $2, $3, $4, $5, $6::timestamptz, $7, $8, $9,
+                $10, $11, $12, $13, $14, $15, $16,
+                $17, $18, $19
             )
             ON CONFLICT (id) DO NOTHING
             "#,
@@ -154,6 +183,7 @@ impl Db {
         .bind(serde_json::json!(msg.to))
         .bind(&msg.timestamp)
         .bind(&msg.r#type)
+        .bind(msg.kind.as_deref())
         .bind(persisted_content)
         .bind(persisted_views)
         .bind(summary)
@@ -193,6 +223,7 @@ impl Db {
                 to_agents,
                 timestamp::text as timestamp,
                 type,
+                kind,
                 content,
                 signature,
                 encryption,
@@ -224,6 +255,9 @@ impl Db {
                 to: serde_json::from_value(row.try_get("to_agents")?).unwrap_or_default(),
                 timestamp: row.try_get("timestamp")?,
                 r#type: row.try_get("type")?,
+                kind: row
+                    .try_get::<Option<String>, _>("kind")?
+                    .filter(|value| !value.trim().is_empty()),
                 content: row.try_get::<Value, _>("content")?.to_string(),
                 signature: row.try_get("signature")?,
                 encryption: row
@@ -276,6 +310,7 @@ impl Db {
                 to_agents,
                 timestamp::text as timestamp,
                 type,
+                kind,
                 content,
                 signature,
                 encryption,
@@ -294,7 +329,7 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(proto_message_from_row).collect())
+        Ok(rows.into_iter().map(proto_message_from_row).collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn upsert_backlink_record(&self, record: &BacklinkRecord) -> Result<(), sqlx::Error> {
@@ -302,6 +337,13 @@ impl Db {
             return Ok(());
         }
 
+        // GAP-135/GAP-136: include ref_type in INSERT and ON CONFLICT so the
+        // semantic stance is persisted and the conflict key matches migration 0053.
+        let ref_type = if record.ref_type.is_empty() {
+            "mentions".to_string()
+        } else {
+            record.ref_type.clone()
+        };
         sqlx::query(
             r#"
             INSERT INTO afp_backlinks (
@@ -310,16 +352,18 @@ impl Db {
                 source_id,
                 target_id,
                 link_kind,
+                ref_type,
                 similarity,
                 entities,
                 created_at,
                 curator_run_id
             )
             VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9
+                $1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10
             )
             ON CONFLICT (user_id, source_id, target_id, link_kind) DO UPDATE SET
                 backlink_id = EXCLUDED.backlink_id,
+                ref_type = EXCLUDED.ref_type,
                 similarity = EXCLUDED.similarity,
                 entities = EXCLUDED.entities,
                 created_at = EXCLUDED.created_at,
@@ -331,6 +375,7 @@ impl Db {
         .bind(&record.source_id)
         .bind(&record.target_id)
         .bind(backlink_kind_as_str(&record.link_kind))
+        .bind(&ref_type)
         .bind(record.similarity)
         .bind(&record.entities)
         .bind(&record.created_at)
@@ -354,6 +399,7 @@ impl Db {
                 source_id,
                 target_id,
                 link_kind,
+                COALESCE(ref_type, 'mentions') AS ref_type,
                 similarity,
                 entities,
                 created_at::text AS created_at,
@@ -377,6 +423,9 @@ impl Db {
                 source_id: row.get("source_id"),
                 target_id: row.get("target_id"),
                 link_kind: backlink_kind_from_str(&row.get::<String, _>("link_kind")),
+                ref_type: row
+                    .get::<Option<String>, _>("ref_type")
+                    .unwrap_or_else(|| "mentions".to_string()),
                 similarity: row.get("similarity"),
                 entities: row.get("entities"),
                 created_at: row.get("created_at"),
@@ -437,8 +486,7 @@ impl Db {
         depth: u32,
     ) -> Result<(Vec<String>, Vec<BacklinkRecord>), sqlx::Error> {
         let depth = depth.min(4) as usize;
-        let mut visited_nodes: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
+        let mut visited_nodes: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut visited_edge_ids: std::collections::HashSet<String> =
             std::collections::HashSet::new();
         let mut all_edges: Vec<BacklinkRecord> = Vec::new();
@@ -538,11 +586,14 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(|row| {
-            let thread_id: String = row.try_get("thread_id").unwrap_or_default();
-            let message_id: String = row.try_get("id").unwrap_or_default();
-            (thread_id, message_id)
-        }))
+        Ok(match row {
+            None => None,
+            Some(row) => {
+                let thread_id: String = row.try_get("thread_id")?;
+                let message_id: String = row.try_get("id")?;
+                Some((thread_id, message_id))
+            }
+        })
     }
 
     pub async fn record_outbound_delivery_attempt(
@@ -553,12 +604,19 @@ impl Db {
         status: &str,
         last_error: Option<&str>,
     ) -> Result<(), sqlx::Error> {
+        // GAP-134: use ON CONFLICT to upsert so retries do not create duplicate rows.
+        // The unique key is (message_id, provider); later attempts update status and error.
         sqlx::query(
             r#"
             INSERT INTO outbound_email_receipts (
                 message_id, thread_id, provider, status, last_error
             )
             VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (message_id, provider)
+            DO UPDATE SET
+                status     = EXCLUDED.status,
+                last_error = EXCLUDED.last_error,
+                updated_at = NOW()
             "#,
         )
         .bind(message_id)
@@ -724,7 +782,7 @@ impl Db {
         message_id: &str,
         thread_id: &str,
         message_type: &str,
-        minio_key: &str,
+        seaweedfs_key: &str,
         metadata_stub: Value,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
@@ -735,13 +793,13 @@ impl Db {
                 thread_id,
                 message_type,
                 archived_at,
-                minio_key,
+                seaweedfs_key,
                 metadata_stub,
                 restored_at
             )
             VALUES ($1, $2, $3, $4, NOW(), $5, $6, NULL)
             ON CONFLICT (message_id) DO UPDATE SET
-                minio_key = EXCLUDED.minio_key,
+                seaweedfs_key = EXCLUDED.seaweedfs_key,
                 metadata_stub = EXCLUDED.metadata_stub,
                 archived_at = NOW()
             "#,
@@ -750,12 +808,31 @@ impl Db {
         .bind(user_id)
         .bind(thread_id)
         .bind(message_type)
-        .bind(minio_key)
+        .bind(seaweedfs_key)
         .bind(metadata_stub)
         .execute(&self.pool)
         .await?;
 
         Ok(())
+    }
+
+    pub async fn delete_private_message_by_id(
+        &self,
+        user_id: &str,
+        message_id: &str,
+    ) -> Result<u64, sqlx::Error> {
+        let messages_table = tenant_messages_table(user_id);
+        let result = sqlx::query(&format!(
+            r#"
+            DELETE FROM {}
+            WHERE id = $1
+            "#,
+            messages_table
+        ))
+        .bind(message_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
     }
 
     pub async fn upsert_integration_capability(
@@ -985,7 +1062,7 @@ impl Db {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(sync_device_policy_from_row(row))
+        Ok(sync_device_policy_from_row(row)?)
     }
 
     pub async fn list_sync_device_policies_by_user(
@@ -1019,7 +1096,7 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(sync_device_policy_from_row).collect())
+        Ok(rows.into_iter().map(sync_device_policy_from_row).collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn find_sync_device_policy_by_user(
@@ -1053,7 +1130,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(sync_device_policy_from_row))
+        Ok(row.map(sync_device_policy_from_row).transpose()?)
     }
 
     pub async fn update_sync_device_policy(
@@ -1100,7 +1177,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(sync_device_policy_from_row))
+        Ok(row.map(sync_device_policy_from_row).transpose()?)
     }
 
     // ── Personalization ────────────────────────────────────────────────────────
@@ -1404,6 +1481,148 @@ impl Db {
             .collect())
     }
 
+    pub async fn update_user_password(
+        &self,
+        user_id: &str,
+        new_password_hash: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            r#"UPDATE users SET password_hash = $1 WHERE id = $2 AND auth_provider = 'password'"#,
+        )
+        .bind(new_password_hash)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    // ── Persistent rate limiting (GAP-007) ───────────────────────────────────
+
+    /// Check whether a request is within the sliding-window rate limit and record it if allowed.
+    ///
+    /// Returns `true` if the request should be allowed. Purges entries older than the window
+    /// as part of the same transaction to keep the table small.
+    pub async fn rate_limit_allow(
+        &self,
+        bucket_key: &str,
+        window_secs: i64,
+        max_requests: i64,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            WITH purge AS (
+                DELETE FROM rate_limit_log
+                WHERE bucket_key = $1 AND request_time < NOW() - ($2 || ' seconds')::interval
+            ),
+            recent AS (
+                SELECT COUNT(*) AS cnt FROM rate_limit_log
+                WHERE bucket_key = $1 AND request_time >= NOW() - ($2 || ' seconds')::interval
+            ),
+            maybe_insert AS (
+                INSERT INTO rate_limit_log (bucket_key)
+                SELECT $1 WHERE (SELECT cnt FROM recent) < $3
+                RETURNING 1
+            )
+            SELECT EXISTS(SELECT 1 FROM maybe_insert) AS allowed
+            "#,
+        )
+        .bind(bucket_key)
+        .bind(window_secs)
+        .bind(max_requests)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(result.get::<bool, _>("allowed"))
+    }
+
+    // ── Auth tokens (email verification + password reset) ─────────────────────
+
+    pub async fn create_auth_token(
+        &self,
+        id: &str,
+        user_id: &str,
+        kind: &str,
+        token_hash: &str,
+        expires_at: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO auth_tokens (id, user_id, kind, token_hash, expires_at)
+            VALUES ($1, $2, $3, $4, $5::timestamptz)
+            "#,
+        )
+        .bind(id)
+        .bind(user_id)
+        .bind(kind)
+        .bind(token_hash)
+        .bind(expires_at)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn find_auth_token(
+        &self,
+        kind: &str,
+        token_hash: &str,
+    ) -> Result<Option<AuthTokenRecord>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, user_id, kind, token_hash, expires_at::text AS expires_at,
+                   used_at::text AS used_at, created_at::text AS created_at
+            FROM auth_tokens
+            WHERE kind = $1 AND token_hash = $2
+            LIMIT 1
+            "#,
+        )
+        .bind(kind)
+        .bind(token_hash)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| AuthTokenRecord {
+            id: r.get("id"),
+            user_id: r.get("user_id"),
+            kind: r.get("kind"),
+            token_hash: r.get("token_hash"),
+            expires_at: r.get("expires_at"),
+            used_at: r.get("used_at"),
+            created_at: r.get("created_at"),
+        }))
+    }
+
+    pub async fn consume_auth_token(&self, id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(r#"UPDATE auth_tokens SET used_at = NOW() WHERE id = $1 AND used_at IS NULL"#)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn mark_email_verified(&self, user_id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(r#"UPDATE users SET email_verified = TRUE WHERE id = $1"#)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn is_user_email_verified(&self, user_id: &str) -> Result<bool, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            SELECT email_verified
+            FROM users
+            WHERE id = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row
+            .map(|record| record.get::<bool, _>("email_verified"))
+            .unwrap_or(false))
+    }
+
     pub async fn find_user_by_email(&self, email: &str) -> Result<Option<UserRecord>, sqlx::Error> {
         let row = sqlx::query(
             r#"
@@ -1417,7 +1636,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(user_from_row))
+        Ok(row.map(user_from_row).transpose()?)
     }
 
     pub async fn find_user_by_google_sub(
@@ -1436,7 +1655,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(user_from_row))
+        Ok(row.map(user_from_row).transpose()?)
     }
 
     pub async fn create_session(&self, session: &AuthSessionRecord) -> Result<(), sqlx::Error> {
@@ -1446,7 +1665,8 @@ impl Db {
             VALUES ($1, $2, $3::timestamptz, $4::timestamptz)
             "#,
         )
-        .bind(&session.token)
+        // Store a SHA-256 hash of the bearer token, never the raw token (GAP-005).
+        .bind(sha256_token(&session.token))
         .bind(&session.user_id)
         .bind(&session.created_at)
         .bind(&session.expires_at)
@@ -1468,11 +1688,11 @@ impl Db {
             LIMIT 1
             "#,
         )
-        .bind(token)
+        .bind(sha256_token(token))
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(session_from_row))
+        Ok(row.map(session_from_row).transpose()?)
     }
 
     pub async fn list_sessions_by_user(
@@ -1491,10 +1711,19 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(session_from_row).collect())
+        Ok(rows.into_iter().map(session_from_row).collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn revoke_session(&self, user_id: &str, token: &str) -> Result<bool, sqlx::Error> {
+        self.revoke_session_by_hash(user_id, &sha256_token(token))
+            .await
+    }
+
+    pub async fn revoke_session_by_hash(
+        &self,
+        user_id: &str,
+        token_hash: &str,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r#"
             DELETE FROM auth_sessions
@@ -1503,7 +1732,7 @@ impl Db {
             "#,
         )
         .bind(user_id)
-        .bind(token)
+        .bind(token_hash)
         .execute(&self.pool)
         .await?;
 
@@ -1523,10 +1752,18 @@ impl Db {
             "#,
         )
         .bind(user_id)
-        .bind(current_token)
+        .bind(sha256_token(current_token))
         .execute(&self.pool)
         .await?;
 
+        Ok(result.rows_affected())
+    }
+
+    pub async fn revoke_all_sessions(&self, user_id: &str) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(r#"DELETE FROM auth_sessions WHERE user_id = $1"#)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
         Ok(result.rows_affected())
     }
 
@@ -1618,6 +1855,16 @@ impl Db {
         .execute(&mut *tx)
         .await?;
 
+        // Drop the tenant-private schema so private AFP messages, per-user
+        // workflow tables, and other user-scoped data cannot survive account
+        // deletion in orphaned schemas.
+        let tenant_schema = tenant_schema_name(user_id);
+        sqlx::query(&format!(
+            r#"DROP SCHEMA IF EXISTS "{tenant_schema}" CASCADE"#
+        ))
+        .execute(&mut *tx)
+        .await?;
+
         sqlx::query(
             r#"
             DELETE FROM users
@@ -1682,7 +1929,7 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(managed_agent_from_row).collect())
+        Ok(rows.into_iter().map(managed_agent_from_row).collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn recent_messages_for_agents(
@@ -1727,7 +1974,100 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(proto_message_from_row).collect())
+        Ok(rows.into_iter().map(proto_message_from_row).collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// GAP-075: fetch recent messages from the user's private tenant schema.
+    /// The shared `messages` table only holds public/inter-agent messages;
+    /// personal messages written via `store_private_message` live in the
+    /// tenant-scoped table and were missing from the dashboard bootstrap.
+    pub async fn recent_private_messages_for_user(
+        &self,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ProtoMessage>, sqlx::Error> {
+        let table = tenant_messages_table(user_id);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT
+                id,
+                thread_id,
+                parent_id,
+                from_agent,
+                to_agents,
+                timestamp::text as timestamp,
+                type,
+                content,
+                signature,
+                encryption,
+                views,
+                "references",
+                attachments,
+                store_in_relational
+            FROM {table}
+            ORDER BY timestamp DESC
+            LIMIT $1
+            "#,
+        ))
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(proto_message_from_row).collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// Returns lightweight private-message previews shaped for metadata-first background scans.
+    /// This avoids hydrating full proto messages when a daemon only needs a recent window of
+    /// message ids, headers, and short plaintext previews.
+    pub async fn recent_private_message_previews_for_user(
+        &self,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let table = tenant_messages_table(user_id);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT
+                id,
+                thread_id,
+                timestamp::text as timestamp,
+                type,
+                subtype,
+                from_agent,
+                metadata,
+                COALESCE(
+                    summary,
+                    content->>'text',
+                    content->>'body',
+                    content->>'message',
+                    content->>'description',
+                    content->>'summary',
+                    content->>'title'
+                ) AS content_preview
+            FROM {table}
+            ORDER BY timestamp DESC
+            LIMIT $1
+            "#,
+        ))
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                json!({
+                    "id": row.get::<String, _>("id"),
+                    "thread_id": row.get::<String, _>("thread_id"),
+                    "timestamp": row.get::<String, _>("timestamp"),
+                    "type": row.get::<String, _>("type"),
+                    "subtype": row.get::<Option<String>, _>("subtype"),
+                    "from": row.get::<String, _>("from_agent"),
+                    "metadata": row.get::<Option<Value>, _>("metadata"),
+                    "content_preview": row.get::<Option<String>, _>("content_preview"),
+                })
+            })
+            .collect())
     }
 
     pub async fn recent_action_results_for_threads(
@@ -1753,7 +2093,7 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(action_audit_entry_from_row).collect())
+        Ok(rows.into_iter().map(action_audit_entry_from_row).collect::<Result<Vec<_>, _>>()?)
     }
 
     // ── Runtime deployments & update policy ───────────────────────────────────
@@ -1818,7 +2158,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(runtime_deployment_from_row))
+        Ok(row.map(runtime_deployment_from_row).transpose()?)
     }
 
     pub async fn delete_runtime_deployment_by_user(
@@ -1845,7 +2185,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(runtime_deployment_from_row))
+        Ok(row.map(runtime_deployment_from_row).transpose()?)
     }
 
     pub async fn upsert_runtime_update_policy(
@@ -1886,7 +2226,7 @@ impl Db {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(runtime_update_policy_from_row(row))
+        Ok(runtime_update_policy_from_row(row)?)
     }
 
     pub async fn find_runtime_update_policy(
@@ -1911,7 +2251,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(runtime_update_policy_from_row))
+        Ok(row.map(runtime_update_policy_from_row).transpose()?)
     }
 
     pub async fn create_runtime_update_event(
@@ -1972,7 +2312,7 @@ impl Db {
         Ok(rows
             .into_iter()
             .map(runtime_update_event_from_row)
-            .collect())
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn create_runtime_runner_policy_event(
@@ -2027,7 +2367,7 @@ impl Db {
         Ok(rows
             .into_iter()
             .map(runtime_runner_policy_event_from_row)
-            .collect())
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     // ── User onboarding ────────────────────────────────────────────────────────
@@ -2088,7 +2428,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(user_onboarding_from_row))
+        Ok(row.map(user_onboarding_from_row).transpose()?)
     }
 
     // ── Support access ─────────────────────────────────────────────────────────
@@ -2156,7 +2496,7 @@ impl Db {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(support_access_grant_from_row(row))
+        Ok(support_access_grant_from_row(row)?)
     }
 
     pub async fn revoke_active_support_access(
@@ -2197,7 +2537,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(support_access_grant_from_row))
+        Ok(row.map(support_access_grant_from_row).transpose()?)
     }
 
     pub async fn latest_support_access_grant(
@@ -2229,7 +2569,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(support_access_grant_from_row))
+        Ok(row.map(support_access_grant_from_row).transpose()?)
     }
 
     pub async fn list_support_access_grants(
@@ -2266,7 +2606,7 @@ impl Db {
         Ok(rows
             .into_iter()
             .map(support_access_grant_from_row)
-            .collect())
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     // ── Runtime backups ────────────────────────────────────────────────────────
@@ -2302,7 +2642,7 @@ impl Db {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(runtime_backup_policy_from_row(row))
+        Ok(runtime_backup_policy_from_row(row)?)
     }
 
     pub async fn find_runtime_backup_policy(
@@ -2326,7 +2666,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(runtime_backup_policy_from_row))
+        Ok(row.map(runtime_backup_policy_from_row).transpose()?)
     }
 
     pub async fn create_runtime_backup(
@@ -2418,7 +2758,7 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(runtime_backup_from_row).collect())
+        Ok(rows.into_iter().map(runtime_backup_from_row).collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn find_runtime_backup_by_id(
@@ -2453,7 +2793,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(runtime_backup_from_row))
+        Ok(row.map(runtime_backup_from_row).transpose()?)
     }
 
     pub async fn delete_runtime_backup_by_id(
@@ -2487,7 +2827,7 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(runtime_backup_from_row))
+        Ok(row.map(runtime_backup_from_row).transpose()?)
     }
 
     pub async fn delete_expired_runtime_backups(
@@ -2519,7 +2859,7 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(runtime_backup_from_row).collect())
+        Ok(rows.into_iter().map(runtime_backup_from_row).collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn create_runtime_restore_drill(
@@ -2576,7 +2916,7 @@ impl Db {
         Ok(rows
             .into_iter()
             .map(runtime_restore_drill_from_row)
-            .collect())
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn delete_runtime_backups_by_user(
@@ -2632,11 +2972,6 @@ impl Db {
         &self,
         instance: &crate::agent_template::AgentInstance,
     ) -> Result<String, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(&instance.owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         let id: String = sqlx::query_scalar(
             r#"
             INSERT INTO agent_instances (
@@ -2656,9 +2991,8 @@ impl Db {
         .bind(&instance.status)
         .bind(&instance.system_prompt)
         .bind(&instance.priority_rules)
-        .fetch_one(&mut *tx)
+        .fetch_one(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(id)
     }
 
@@ -2666,11 +3000,6 @@ impl Db {
         &self,
         owner_user_id: &str,
     ) -> Result<Option<serde_json::Value>, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         let row = sqlx::query(
             r#"
             SELECT id, agent_id, name, status, system_prompt,
@@ -2681,9 +3010,8 @@ impl Db {
             "#,
         )
         .bind(owner_user_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(row.map(|r| {
             json!({
                 "id": r.get::<String, _>("id"),
@@ -4026,6 +4354,11 @@ impl Db {
             crate::agent_template::LlmBackend::Ollama => "ollama",
             crate::agent_template::LlmBackend::RunPod => "runpod",
         };
+        // GAP-049: encrypt the BYOK API key before writing it to the database.
+        let stored_key: Option<String> = cfg.encrypted_api_key.as_deref().map(|raw| {
+            let kek = crate::crypto::byok_api_key_kek(&cfg.provider);
+            crate::crypto::encrypt_secret(raw, &kek)
+        });
         sqlx::query(&format!(
             r#"
             INSERT INTO {table} (
@@ -4049,7 +4382,7 @@ impl Db {
         .bind(backend_str)
         .bind(&cfg.provider)
         .bind(&cfg.model)
-        .bind(&cfg.encrypted_api_key)
+        .bind(&stored_key)
         .bind(&cfg.ollama_url)
         .bind(cfg.monthly_budget_cents)
         .bind(cfg.usage_cents_current_month)
@@ -4058,12 +4391,13 @@ impl Db {
         Ok(())
     }
 
-    pub async fn get_llm_config(
+    /// Reset monthly LLM usage to zero if the calendar month has rolled over.
+    /// Call from billing or usage-recording paths only — not from reads.
+    pub async fn reset_llm_monthly_usage_if_needed(
         &self,
         owner_user_id: &str,
-    ) -> Result<Option<serde_json::Value>, sqlx::Error> {
+    ) -> Result<(), sqlx::Error> {
         let config_table = tenant_user_llm_config_table(owner_user_id);
-        // Reset monthly usage if a new month has started before reading
         sqlx::query(&format!(
             r#"
             UPDATE {config_table}
@@ -4077,10 +4411,24 @@ impl Db {
         .bind(owner_user_id)
         .execute(&self.pool)
         .await?;
+        Ok(())
+    }
+
+    pub async fn get_llm_config(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Option<serde_json::Value>, sqlx::Error> {
+        let config_table = tenant_user_llm_config_table(owner_user_id);
+        // GAP-137: pure read — CASE expression returns 0 for usage when a month rollover
+        // is pending without issuing a write. Callers that record usage must call
+        // reset_llm_monthly_usage_if_needed() beforehand.
         let row = sqlx::query(&format!(
             r#"
             SELECT id, backend, provider, model, ollama_url,
-                   monthly_budget_cents, usage_cents_current_month,
+                   monthly_budget_cents,
+                   CASE WHEN usage_reset_at < DATE_TRUNC('month', NOW()) THEN 0
+                        ELSE usage_cents_current_month
+                   END AS usage_cents_current_month,
                    usage_reset_at::text, updated_at::text
             FROM {config_table}
             WHERE owner_user_id = $1
@@ -4092,6 +4440,29 @@ impl Db {
         Ok(row.map(|r| llm_config_json_from_row(&r)))
     }
 
+    /// GAP-049: retrieve and decrypt the BYOK API key for a user.
+    /// Returns `None` if the user has no BYOK config or no key stored.
+    pub async fn get_byok_api_key(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let config_table = tenant_user_llm_config_table(owner_user_id);
+        let row = sqlx::query(&format!(
+            "SELECT provider, encrypted_api_key FROM {config_table} WHERE owner_user_id = $1",
+        ))
+        .bind(owner_user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.and_then(|r| {
+            let provider = r.try_get::<String, _>("provider").ok()?;
+            let enc_key = r.try_get::<String, _>("encrypted_api_key").ok()?;
+            let kek = crate::crypto::byok_api_key_kek(&provider);
+            // Attempt decryption; fall back to the raw value for keys stored before
+            // encryption was introduced so existing users are not locked out.
+            Some(crate::crypto::decrypt_secret(&enc_key, &kek).unwrap_or(enc_key))
+        }))
+    }
+
     pub async fn record_llm_usage(
         &self,
         owner_user_id: &str,
@@ -4101,6 +4472,10 @@ impl Db {
         tokens_output: i32,
         cost_cents: i32,
     ) -> Result<(), sqlx::Error> {
+        // GAP-137: reset the monthly counter before incrementing so the budget
+        // accumulator never spans across a calendar-month boundary.
+        self.reset_llm_monthly_usage_if_needed(owner_user_id)
+            .await?;
         let usage_table = tenant_llm_usage_log_table(owner_user_id);
         let config_table = tenant_user_llm_config_table(owner_user_id);
         sqlx::query(&format!(
@@ -4139,11 +4514,6 @@ impl Db {
         owner_user_id: &str,
         rules: serde_json::Value,
     ) -> Result<(), sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         sqlx::query(
             r#"
             UPDATE agent_instances
@@ -4153,9 +4523,8 @@ impl Db {
         )
         .bind(owner_user_id)
         .bind(rules)
-        .execute(&mut *tx)
+        .execute(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 
@@ -4198,7 +4567,10 @@ impl Db {
         .bind(kind)
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row.map(|r| r.try_get::<String, _>("challenge").unwrap_or_default()))
+        Ok(match row {
+            None => None,
+            Some(r) => Some(r.try_get::<String, _>("challenge")?),
+        })
     }
 
     pub async fn clear_passkey_challenge(
@@ -4253,16 +4625,18 @@ impl Db {
         .await?;
         let creds = rows
             .iter()
-            .map(|r| crate::webauthn::StoredCredential {
-                credential_id: r.try_get("credential_id").unwrap_or_default(),
-                user_id: r.try_get("user_id").unwrap_or_default(),
-                public_key_cbor: r.try_get("public_key_cbor").unwrap_or_default(),
-                sign_count: r.try_get::<i64, _>("sign_count").unwrap_or(0) as u32,
-                aaguid: r.try_get("aaguid").unwrap_or_default(),
-                device_type: r.try_get("device_type").unwrap_or_default(),
-                created_at: r.try_get("created_at").unwrap_or_default(),
+            .map(|r| -> Result<crate::webauthn::StoredCredential, sqlx::Error> {
+                Ok(crate::webauthn::StoredCredential {
+                    credential_id: r.try_get("credential_id")?,
+                    user_id: r.try_get("user_id")?,
+                    public_key_cbor: r.try_get("public_key_cbor")?,
+                    sign_count: r.try_get::<i64, _>("sign_count").unwrap_or(0) as u32,
+                    aaguid: r.try_get("aaguid")?,
+                    device_type: r.try_get("device_type")?,
+                    created_at: r.try_get("created_at")?,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(creds)
     }
 
@@ -4280,15 +4654,18 @@ impl Db {
         .bind(credential_id)
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row.map(|r| crate::webauthn::StoredCredential {
-            credential_id: r.try_get("credential_id").unwrap_or_default(),
-            user_id: r.try_get("user_id").unwrap_or_default(),
-            public_key_cbor: r.try_get("public_key_cbor").unwrap_or_default(),
-            sign_count: r.try_get::<i64, _>("sign_count").unwrap_or(0) as u32,
-            aaguid: r.try_get("aaguid").unwrap_or_default(),
-            device_type: r.try_get("device_type").unwrap_or_default(),
-            created_at: r.try_get("created_at").unwrap_or_default(),
-        }))
+        Ok(match row {
+            None => None,
+            Some(r) => Some(crate::webauthn::StoredCredential {
+                credential_id: r.try_get("credential_id")?,
+                user_id: r.try_get("user_id")?,
+                public_key_cbor: r.try_get("public_key_cbor")?,
+                sign_count: r.try_get::<i64, _>("sign_count").unwrap_or(0) as u32,
+                aaguid: r.try_get("aaguid")?,
+                device_type: r.try_get("device_type")?,
+                created_at: r.try_get("created_at")?,
+            }),
+        })
     }
 
     pub async fn update_passkey_sign_count(
@@ -4321,7 +4698,7 @@ impl Db {
             "#,
         )
         .bind(user_id)
-        .bind(&token)
+        .bind(sha256_token(&token))
         .bind(auth_method)
         .execute(&self.pool)
         .await?;
@@ -4802,11 +5179,6 @@ impl Db {
         followed_agent_id: &str,
     ) -> Result<(), sqlx::Error> {
         let id = ulid::Ulid::new().to_string();
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(follower_user_id)
-            .execute(&mut *tx)
-            .await?;
         sqlx::query(
             r#"
             INSERT INTO agent_follows (id, follower_user_id, followed_agent_id)
@@ -4817,9 +5189,8 @@ impl Db {
         .bind(&id)
         .bind(follower_user_id)
         .bind(followed_agent_id)
-        .execute(&mut *tx)
+        .execute(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 
@@ -4828,19 +5199,13 @@ impl Db {
         follower_user_id: &str,
         followed_agent_id: &str,
     ) -> Result<bool, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(follower_user_id)
-            .execute(&mut *tx)
-            .await?;
         let result = sqlx::query(
             "DELETE FROM agent_follows WHERE follower_user_id = $1 AND followed_agent_id = $2",
         )
         .bind(follower_user_id)
         .bind(followed_agent_id)
-        .execute(&mut *tx)
+        .execute(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -4848,11 +5213,6 @@ impl Db {
         &self,
         follower_user_id: &str,
     ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(follower_user_id)
-            .execute(&mut *tx)
-            .await?;
         let rows = sqlx::query(
             r#"
             SELECT followed_agent_id, created_at::text AS created_at
@@ -4862,9 +5222,8 @@ impl Db {
             "#,
         )
         .bind(follower_user_id)
-        .fetch_all(&mut *tx)
+        .fetch_all(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(rows
             .iter()
             .map(|r| {
@@ -4883,11 +5242,6 @@ impl Db {
         engagement_type: &str,
     ) -> Result<(), sqlx::Error> {
         let id = ulid::Ulid::new().to_string();
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(user_id)
-            .execute(&mut *tx)
-            .await?;
         sqlx::query(
             r#"
             INSERT INTO feed_engagements (id, message_id, user_id, type)
@@ -4899,9 +5253,8 @@ impl Db {
         .bind(message_id)
         .bind(user_id)
         .bind(engagement_type)
-        .execute(&mut *tx)
+        .execute(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 
@@ -4931,11 +5284,13 @@ impl Db {
 
     pub async fn search_agents(
         &self,
+        owner_user_id: &str,
         query: &str,
         limit: i64,
     ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
-        // Full-text search over agent_instances system_prompt and capability names/descriptions.
-        let rows = sqlx::query(
+        // GAP-125: scope search to the user's tenant-private capability registry.
+        let acr_table = tenant_agent_capability_registry_table(owner_user_id);
+        let rows = sqlx::query(&format!(
             r#"
             SELECT DISTINCT
                 ai.id,
@@ -4944,19 +5299,21 @@ impl Db {
                 ai.status,
                 ai.system_prompt
             FROM agent_instances ai
-            LEFT JOIN agent_capability_registry acr ON acr.agent_instance_id = ai.id
-            WHERE ai.status = 'active'
+            LEFT JOIN {acr_table} acr ON acr.agent_instance_id = ai.id
+            WHERE ai.owner_user_id = $1
+              AND ai.status = 'active'
               AND (
                 to_tsvector('english', COALESCE(ai.system_prompt, ''))
-                  @@ plainto_tsquery('english', $1)
+                  @@ plainto_tsquery('english', $2)
                 OR to_tsvector('english',
                      COALESCE(acr.name, '') || ' ' || COALESCE(acr.description, ''))
-                  @@ plainto_tsquery('english', $1)
+                  @@ plainto_tsquery('english', $2)
               )
             ORDER BY ai.created_at DESC
-            LIMIT $2
+            LIMIT $3
             "#,
-        )
+        ))
+        .bind(owner_user_id)
         .bind(query)
         .bind(limit)
         .fetch_all(&self.pool)
@@ -4980,41 +5337,29 @@ impl Db {
 
     pub async fn update_agent_soul(
         &self,
-        owner_user_id: &str,
+        _owner_user_id: &str,
         agent_instance_id: &str,
         soul_md: &str,
     ) -> Result<(), sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         sqlx::query("UPDATE agent_instances SET soul_md = $1, updated_at = NOW() WHERE id = $2")
             .bind(soul_md)
             .bind(agent_instance_id)
-            .execute(&mut *tx)
+            .execute(&self.pool)
             .await?;
-        tx.commit().await?;
         Ok(())
     }
 
     pub async fn update_agent_memory(
         &self,
-        owner_user_id: &str,
+        _owner_user_id: &str,
         agent_instance_id: &str,
         memory_md: &str,
     ) -> Result<(), sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         sqlx::query("UPDATE agent_instances SET memory_md = $1, updated_at = NOW() WHERE id = $2")
             .bind(memory_md)
             .bind(agent_instance_id)
-            .execute(&mut *tx)
+            .execute(&self.pool)
             .await?;
-        tx.commit().await?;
         Ok(())
     }
 
@@ -5022,16 +5367,11 @@ impl Db {
 
     pub async fn update_lora_confidence(
         &self,
-        owner_user_id: &str,
+        _owner_user_id: &str,
         agent_instance_id: &str,
         score: f64,
     ) -> Result<bool, sqlx::Error> {
         let active = score >= crate::agent_template::LORA_TAKEOVER_THRESHOLD;
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         sqlx::query(
             r#"
             UPDATE agent_instances
@@ -5044,17 +5384,15 @@ impl Db {
         .bind(score)
         .bind(active)
         .bind(agent_instance_id)
-        .execute(&mut *tx)
+        .execute(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(active)
     }
 
     /// Update LoRA confidence by AFP `agent_id` string (e.g. `"agent:foo@domain"`).
     ///
     /// Used by the auto-compute path in the personalization event handler where
-    /// only the AFP agent ID is available. Skips the RLS `set_config` because this
-    /// is a trusted internal server-side update triggered by the user's own event.
+    /// only the AFP agent ID is available. Isolation is enforced by the WHERE clause.
     pub async fn update_lora_confidence_by_afp_id(
         &self,
         afp_agent_id: &str,
@@ -5085,6 +5423,9 @@ impl Db {
         limit: i64,
         before_id: Option<&str>,
     ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+        // GAP-133: cursor uses id < $1 so ORDER BY must also use id DESC to stay
+        // consistent. ULIDs are lexicographically monotonic (time-prefixed) so
+        // id ordering is equivalent to chronological ordering in practice.
         let rows = if let Some(bid) = before_id {
             sqlx::query(
                 r#"
@@ -5095,7 +5436,7 @@ impl Db {
                 WHERE (type = 'public_article'
                    OR (type = 'research' AND subtype = 'public_article'))
                   AND id < $1
-                ORDER BY created_at DESC LIMIT $2
+                ORDER BY id DESC LIMIT $2
                 "#,
             )
             .bind(bid)
@@ -5111,26 +5452,35 @@ impl Db {
                 FROM messages
                 WHERE type = 'public_article'
                    OR (type = 'research' AND subtype = 'public_article')
-                ORDER BY created_at DESC LIMIT $1
+                ORDER BY id DESC LIMIT $1
                 "#,
             )
             .bind(limit)
             .fetch_all(&self.pool)
             .await?
         };
-        Ok(rows.iter().map(|r| serde_json::json!({
-            "id": r.try_get::<String, _>("id").unwrap_or_default(),
-            "thread_id": r.try_get::<String, _>("thread_id").unwrap_or_default(),
-            "from_agent": r.try_get::<String, _>("from_agent").unwrap_or_default(),
-            "to_agents": r.try_get::<serde_json::Value, _>("to_agents").unwrap_or(serde_json::json!([])),
-            "type": r.try_get::<String, _>("type").unwrap_or_default(),
-            "content": r.try_get::<serde_json::Value, _>("content").unwrap_or(serde_json::json!({})),
-            "references": r.try_get::<serde_json::Value, _>("references").unwrap_or(serde_json::json!([])),
-            "views": r.try_get::<serde_json::Value, _>("views").unwrap_or(serde_json::json!([])),
-            "timestamp": r.try_get::<String, _>("timestamp").unwrap_or_default(),
-            "signature": r.try_get::<String, _>("signature").unwrap_or_default(),
-            "encryption": r.try_get::<serde_json::Value, _>("encryption").ok(),
-        })).collect())
+        let results = rows.iter().map(|r| -> Result<serde_json::Value, sqlx::Error> {
+            let id: String = r.try_get("id")?;
+            let thread_id: String = r.try_get("thread_id")?;
+            let from_agent: String = r.try_get("from_agent")?;
+            let msg_type: String = r.try_get("type")?;
+            let timestamp: String = r.try_get("timestamp")?;
+            let signature: String = r.try_get("signature")?;
+            Ok(serde_json::json!({
+                "id": id,
+                "thread_id": thread_id,
+                "from_agent": from_agent,
+                "to_agents": r.try_get::<serde_json::Value, _>("to_agents").unwrap_or(serde_json::json!([])),
+                "type": msg_type,
+                "content": r.try_get::<serde_json::Value, _>("content").unwrap_or(serde_json::json!({})),
+                "references": r.try_get::<serde_json::Value, _>("references").unwrap_or(serde_json::json!([])),
+                "views": r.try_get::<serde_json::Value, _>("views").unwrap_or(serde_json::json!([])),
+                "timestamp": timestamp,
+                "signature": signature,
+                "encryption": r.try_get::<serde_json::Value, _>("encryption").ok(),
+            }))
+        }).collect::<Result<Vec<_>, _>>()?;
+        Ok(results)
     }
 
     // ── Agent instance with new fields ────────────────────────────────────────
@@ -5139,11 +5489,6 @@ impl Db {
         &self,
         instance: &crate::agent_template::AgentInstance,
     ) -> Result<String, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(&instance.owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         let id: String = sqlx::query_scalar(
             r#"
             INSERT INTO agent_instances (
@@ -5177,9 +5522,8 @@ impl Db {
         .bind(instance.expires_at.map(|d| d.to_rfc3339()))
         .bind(instance.lora_confidence_score)
         .bind(instance.lora_genome_active)
-        .fetch_one(&mut *tx)
+        .fetch_one(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(id)
     }
 
@@ -5187,11 +5531,6 @@ impl Db {
         &self,
         owner_user_id: &str,
     ) -> Result<Option<serde_json::Value>, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         let row = sqlx::query(
             r#"
             SELECT id, agent_id, name, status, system_prompt,
@@ -5207,9 +5546,8 @@ impl Db {
             "#,
         )
         .bind(owner_user_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(row.map(|r| {
             json!({
                 "id": r.get::<String, _>("id"),
@@ -5237,20 +5575,14 @@ impl Db {
         owner_user_id: &str,
         auto_approve_workflows: bool,
     ) -> Result<(), sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         sqlx::query(
             "UPDATE agent_instances SET auto_approve_workflows = $1, updated_at = NOW() \
              WHERE owner_user_id = $2 AND is_master = TRUE",
         )
         .bind(auto_approve_workflows)
         .bind(owner_user_id)
-        .execute(&mut *tx)
+        .execute(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 
@@ -5264,6 +5596,10 @@ impl Db {
         gmail_email: &str,
         expiry_iso: Option<String>,
     ) -> Result<(), sqlx::Error> {
+        // GAP-062: encrypt OAuth tokens at rest using server encryption key.
+        let key = gmail_token_encryption_key();
+        let enc_access = crate::crypto::encrypt_secret(access_token, &key);
+        let enc_refresh = crate::crypto::encrypt_secret(refresh_token, &key);
         sqlx::query(
             "INSERT INTO user_gmail_tokens (user_id, access_token, refresh_token, gmail_email, token_expiry, updated_at)
              VALUES ($1, $2, $3, $4, $5::timestamptz, NOW())
@@ -5275,8 +5611,8 @@ impl Db {
                updated_at = NOW()",
         )
         .bind(user_id)
-        .bind(access_token)
-        .bind(refresh_token)
+        .bind(&enc_access)
+        .bind(&enc_refresh)
         .bind(gmail_email)
         .bind(expiry_iso)
         .execute(&self.pool)
@@ -5296,9 +5632,17 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(|r| {
+            let key = gmail_token_encryption_key();
+            let raw_access = r.get::<String, _>("access_token");
+            let raw_refresh = r.get::<String, _>("refresh_token");
+            // Attempt decryption; fall back to raw value for tokens stored before encryption was added.
+            let access_token =
+                crate::crypto::decrypt_secret(&raw_access, &key).unwrap_or(raw_access);
+            let refresh_token =
+                crate::crypto::decrypt_secret(&raw_refresh, &key).unwrap_or(raw_refresh);
             serde_json::json!({
-                "access_token": r.get::<String, _>("access_token"),
-                "refresh_token": r.get::<String, _>("refresh_token"),
+                "access_token": access_token,
+                "refresh_token": refresh_token,
                 "gmail_email": r.get::<String, _>("gmail_email"),
                 "token_expiry": r.try_get::<Option<String>, _>("token_expiry").ok().flatten(),
                 "connected_at": r.get::<String, _>("connected_at"),
@@ -5319,11 +5663,6 @@ impl Db {
         all_day: bool,
         location: Option<&str>,
     ) -> Result<serde_json::Value, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         let row = sqlx::query(
             r#"
             INSERT INTO calendar_events
@@ -5341,19 +5680,18 @@ impl Db {
         .bind(end_at)
         .bind(all_day)
         .bind(location)
-        .fetch_one(&mut *tx)
+        .fetch_one(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(serde_json::json!({
-            "id": row.try_get::<String,_>("id").unwrap_or_default(),
-            "title": row.try_get::<String,_>("title").unwrap_or_default(),
+            "id": row.try_get::<String,_>("id")?,
+            "title": row.try_get::<String,_>("title")?,
             "description": row.try_get::<Option<String>,_>("description").ok().flatten(),
-            "start_at": row.try_get::<String,_>("start_at").unwrap_or_default(),
+            "start_at": row.try_get::<String,_>("start_at")?,
             "end_at": row.try_get::<Option<String>,_>("end_at").ok().flatten(),
             "all_day": row.try_get::<bool,_>("all_day").unwrap_or(false),
             "location": row.try_get::<Option<String>,_>("location").ok().flatten(),
             "status": row.try_get::<String,_>("status").unwrap_or_else(|_| "confirmed".to_string()),
-            "created_at": row.try_get::<String,_>("created_at").unwrap_or_default(),
+            "created_at": row.try_get::<String,_>("created_at")?,
         }))
     }
 
@@ -5363,11 +5701,6 @@ impl Db {
         range_start: &str,
         range_end: &str,
     ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         let rows = sqlx::query(
             r#"
             SELECT id, title, description, start_at::text AS start_at,
@@ -5383,19 +5716,20 @@ impl Db {
         .bind(owner_user_id)
         .bind(range_start)
         .bind(range_end)
-        .fetch_all(&mut *tx)
+        .fetch_all(&self.pool)
         .await?;
-        tx.commit().await?;
-        Ok(rows.iter().map(|r| serde_json::json!({
-            "id": r.try_get::<String,_>("id").unwrap_or_default(),
-            "title": r.try_get::<String,_>("title").unwrap_or_default(),
-            "description": r.try_get::<Option<String>,_>("description").ok().flatten(),
-            "start_at": r.try_get::<String,_>("start_at").unwrap_or_default(),
-            "end_at": r.try_get::<Option<String>,_>("end_at").ok().flatten(),
-            "all_day": r.try_get::<bool,_>("all_day").unwrap_or(false),
-            "location": r.try_get::<Option<String>,_>("location").ok().flatten(),
-            "status": r.try_get::<String,_>("status").unwrap_or_else(|_| "confirmed".to_string()),
-        })).collect())
+        rows.iter().map(|r| -> Result<serde_json::Value, sqlx::Error> {
+            Ok(serde_json::json!({
+                "id": r.try_get::<String,_>("id")?,
+                "title": r.try_get::<String,_>("title")?,
+                "description": r.try_get::<Option<String>,_>("description").ok().flatten(),
+                "start_at": r.try_get::<String,_>("start_at")?,
+                "end_at": r.try_get::<Option<String>,_>("end_at").ok().flatten(),
+                "all_day": r.try_get::<bool,_>("all_day").unwrap_or(false),
+                "location": r.try_get::<Option<String>,_>("location").ok().flatten(),
+                "status": r.try_get::<String,_>("status").unwrap_or_else(|_| "confirmed".to_string()),
+            }))
+        }).collect()
     }
 
     pub async fn delete_calendar_event(
@@ -5403,20 +5737,14 @@ impl Db {
         owner_user_id: &str,
         event_id: &str,
     ) -> Result<bool, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(owner_user_id)
-            .execute(&mut *tx)
-            .await?;
         let result = sqlx::query(
             r#"UPDATE calendar_events SET status = 'cancelled', updated_at = NOW()
                WHERE id = $1 AND owner_user_id = $2"#,
         )
         .bind(event_id)
         .bind(owner_user_id)
-        .execute(&mut *tx)
+        .execute(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -5436,14 +5764,17 @@ impl Db {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(|r| AliasRecord {
-            alias: r.try_get("alias").unwrap_or_default(),
-            agent_id: r.try_get("agent_id").unwrap_or_default(),
-            user_id: r.try_get("user_id").unwrap_or_default(),
-            created_at: r.try_get("created_at").unwrap_or_default(),
-            updated_at: r.try_get("updated_at").unwrap_or_default(),
-            last_changed_at: r.try_get("last_changed_at").unwrap_or_default(),
-        }))
+        Ok(match row {
+            None => None,
+            Some(r) => Some(AliasRecord {
+                alias: r.try_get("alias")?,
+                agent_id: r.try_get("agent_id")?,
+                user_id: r.try_get("user_id")?,
+                created_at: r.try_get("created_at")?,
+                updated_at: r.try_get("updated_at")?,
+                last_changed_at: r.try_get("last_changed_at")?,
+            }),
+        })
     }
 
     /// Returns true if the alias is not yet taken (does not check validity).
@@ -5533,23 +5864,19 @@ impl Db {
         &self,
         user_id: &str,
     ) -> Result<Option<serde_json::Value>, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(user_id)
-            .execute(&mut *tx)
-            .await?;
         let row = sqlx::query(
             r#"
             SELECT optimization_mode, auto_confirm_threshold_cents, show_cost_estimates,
-                   default_store_in_history
+                   default_store_in_history,
+                   calendar_notification_filters,
+                   email_notification_filters
             FROM user_agent_preferences
             WHERE owner_user_id = $1
             "#,
         )
         .bind(user_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&self.pool)
         .await?;
-        tx.commit().await?;
 
         use sqlx::Row;
         Ok(row.map(|r| {
@@ -5558,6 +5885,8 @@ impl Db {
                 "auto_confirm_threshold_cents":  r.get::<f64, _>("auto_confirm_threshold_cents"),
                 "show_cost_estimates":           r.get::<bool, _>("show_cost_estimates"),
                 "default_store_in_history":      r.get::<bool, _>("default_store_in_history"),
+                "calendar_notification_filters": r.try_get::<serde_json::Value, _>("calendar_notification_filters").unwrap_or_else(|_| serde_json::json!({})),
+                "email_notification_filters":    r.try_get::<serde_json::Value, _>("email_notification_filters").unwrap_or_else(|_| serde_json::json!({})),
             })
         }))
     }
@@ -5569,22 +5898,21 @@ impl Db {
         auto_confirm_threshold_cents: f64,
         show_cost_estimates: bool,
         default_store_in_history: bool,
+        calendar_notification_filters: &serde_json::Value,
+        email_notification_filters: &serde_json::Value,
     ) -> Result<(), sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
-            .bind(user_id)
-            .execute(&mut *tx)
-            .await?;
         sqlx::query(
             r#"
             INSERT INTO user_agent_preferences
-                (owner_user_id, optimization_mode, auto_confirm_threshold_cents, show_cost_estimates, default_store_in_history, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+                (owner_user_id, optimization_mode, auto_confirm_threshold_cents, show_cost_estimates, default_store_in_history, calendar_notification_filters, email_notification_filters, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
             ON CONFLICT (owner_user_id) DO UPDATE SET
                 optimization_mode             = EXCLUDED.optimization_mode,
                 auto_confirm_threshold_cents  = EXCLUDED.auto_confirm_threshold_cents,
                 show_cost_estimates           = EXCLUDED.show_cost_estimates,
                 default_store_in_history      = EXCLUDED.default_store_in_history,
+                calendar_notification_filters = EXCLUDED.calendar_notification_filters,
+                email_notification_filters    = EXCLUDED.email_notification_filters,
                 updated_at                    = NOW()
             "#,
         )
@@ -5593,204 +5921,1282 @@ impl Db {
         .bind(auto_confirm_threshold_cents)
         .bind(show_cost_estimates)
         .bind(default_store_in_history)
-        .execute(&mut *tx)
+        .bind(calendar_notification_filters)
+        .bind(email_notification_filters)
+        .execute(&self.pool)
         .await?;
-        tx.commit().await?;
         Ok(())
+    }
+
+    // ── Capability enable/disable (0041_capability_enabled_flag) ─────────────
+
+    pub async fn set_capability_enabled(
+        &self,
+        owner_user_id: &str,
+        cap_id: &str,
+        enabled: bool,
+    ) -> Result<bool, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            UPDATE agent_capability_registry
+            SET enabled = $1
+            WHERE id = $2 AND owner_user_id = $3
+            "#,
+        )
+        .bind(enabled)
+        .bind(cap_id)
+        .bind(owner_user_id)
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(rows > 0)
+    }
+
+    // ── Cost spend history (0035_cost_tracking) ───────────────────────────────
+
+    pub async fn spend_history_for_user(
+        &self,
+        user_id: &str,
+        days: i32,
+    ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT date_trunc('day', created_at) AS day,
+                   SUM(cost_usd)   AS total_usd,
+                   SUM(tokens_used) AS total_tokens,
+                   COUNT(*)        AS event_count
+            FROM cost_records
+            WHERE user_id = $1
+              AND created_at >= NOW() - ($2::int * INTERVAL '1 day')
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "#,
+        )
+        .bind(user_id)
+        .bind(days)
+        .fetch_all(&self.pool)
+        .await?;
+
+        use sqlx::Row;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                serde_json::json!({
+                    "day": row.try_get::<String, _>("day").unwrap_or_default(),
+                    "total_usd": row.try_get::<f64, _>("total_usd").unwrap_or(0.0),
+                    "total_tokens": row.try_get::<i64, _>("total_tokens").unwrap_or(0),
+                    "event_count": row.try_get::<i64, _>("event_count").unwrap_or(0),
+                })
+            })
+            .collect())
+    }
+
+    // ── User token budget (0035_cost_tracking budget_configs) ─────────────────
+
+    pub async fn get_user_token_budget(
+        &self,
+        user_id: &str,
+    ) -> Result<(i64, f64, bool), sqlx::Error> {
+        use sqlx::Row;
+        let row = sqlx::query(
+            r#"
+            SELECT COALESCE(u.max_llm_tokens, g.max_llm_tokens, 50000)  AS daily_limit,
+                   COALESCE(u.soft_limit_ratio, g.soft_limit_ratio, 0.8) AS alert_pct,
+                   FALSE AS escalation_enabled
+            FROM (SELECT * FROM budget_configs WHERE user_id = $1 LIMIT 1) u
+            RIGHT JOIN (SELECT * FROM budget_configs WHERE user_id IS NULL LIMIT 1) g ON TRUE
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if let Some(row) = row {
+            Ok((
+                row.try_get::<i64, _>("daily_limit").unwrap_or(50000),
+                row.try_get::<f64, _>("alert_pct").unwrap_or(0.8),
+                row.try_get::<bool, _>("escalation_enabled").unwrap_or(false),
+            ))
+        } else {
+            Ok((50000, 0.8, false))
+        }
+    }
+
+    // ── Trigger enable/disable ────────────────────────────────────────────────
+
+    pub async fn set_trigger_enabled(
+        &self,
+        owner_user_id: &str,
+        trigger_id: &str,
+        enabled: bool,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE agent_triggers
+            SET enabled = $1, updated_at = NOW()
+            WHERE id = $2 AND owner_user_id = $3
+            "#,
+        )
+        .bind(enabled)
+        .bind(trigger_id)
+        .bind(owner_user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // ── Behavioral memory ─────────────────────────────────────────────────────
+
+    pub async fn list_behavioral_memory(
+        &self,
+        owner_user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT content FROM behavioral_memory
+               WHERE owner_user_id = $1
+               ORDER BY updated_at DESC LIMIT $2"#,
+        )
+        .bind(owner_user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        use sqlx::Row;
+        Ok(rows
+            .into_iter()
+            .map(|r| r.try_get::<Value, _>("content").unwrap_or(Value::Null))
+            .collect())
+    }
+
+    pub async fn insert_daemon_afp_message(&self, afp: &Value) -> Result<(), sqlx::Error> {
+        let id = afp["id"].as_str().unwrap_or("").to_string();
+        let owner_user_id = afp["to"]
+            .as_array()
+            .and_then(|a| a.first())
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let afp_type = afp["type"].as_str().unwrap_or("").to_string();
+        let thread_id = afp["thread_id"].as_str().unwrap_or("").to_string();
+        sqlx::query(
+            r#"INSERT INTO afp_messages (id, owner_user_id, type, thread_id, payload, created_at)
+               VALUES ($1, $2, $3, $4, $5, NOW())
+               ON CONFLICT (id) DO NOTHING"#,
+        )
+        .bind(&id)
+        .bind(&owner_user_id)
+        .bind(&afp_type)
+        .bind(&thread_id)
+        .bind(afp)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // ── Training reflection traces ────────────────────────────────────────────
+
+    pub async fn store_training_reflection_trace(
+        &self,
+        owner_user_id: &str,
+        thread_id: &str,
+        problem_id: &str,
+        content: &Value,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"INSERT INTO training_reflection_traces
+               (id, owner_user_id, thread_id, problem_id, content, created_at)
+               VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW())"#,
+        )
+        .bind(owner_user_id)
+        .bind(thread_id)
+        .bind(problem_id)
+        .bind(content)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // ── LLM provider config ───────────────────────────────────────────────────
+
+    pub async fn get_user_llm_providers(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT config FROM user_llm_providers
+               WHERE owner_user_id = $1
+               ORDER BY priority ASC"#,
+        )
+        .bind(owner_user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        use sqlx::Row;
+        Ok(rows
+            .into_iter()
+            .map(|r| r.try_get::<Value, _>("config").unwrap_or(Value::Null))
+            .collect())
+    }
+
+    // ── Proactive token budget ────────────────────────────────────────────────
+
+    pub async fn daily_token_usage(
+        &self,
+        heuristic_id: &str,
+        owner_user_id: &str,
+    ) -> Result<i64, sqlx::Error> {
+        let count: i64 = sqlx::query_scalar(
+            r#"SELECT COALESCE(SUM(tokens_used), 0)
+               FROM proactive_token_usage
+               WHERE heuristic_id = $1 AND owner_user_id = $2
+                 AND created_at > NOW() - INTERVAL '24 hours'"#,
+        )
+        .bind(heuristic_id)
+        .bind(owner_user_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(count)
+    }
+
+    pub async fn log_proactive_token_usage(
+        &self,
+        heuristic_id: &str,
+        owner_user_id: &str,
+        tokens_used: i64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"INSERT INTO proactive_token_usage
+               (id, heuristic_id, owner_user_id, tokens_used, created_at)
+               VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())"#,
+        )
+        .bind(heuristic_id)
+        .bind(owner_user_id)
+        .bind(tokens_used)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // ── Agent session management (stub) ──────────────────────────────────────
+
+    pub async fn get_agent_session_by_thread(
+        &self,
+        _user_id: &str,
+        _thread_id: &str,
+    ) -> Result<Option<AgentSessionRecord>, sqlx::Error> {
+        Ok(None)
+    }
+
+    pub async fn list_session_requests(
+        &self,
+        _user_id: &str,
+        _session_id: &str,
+    ) -> Result<Vec<SessionRequestRecord>, sqlx::Error> {
+        Ok(vec![])
+    }
+
+    pub async fn update_session_request_status(
+        &self,
+        _user_id: &str,
+        _request_id: &str,
+        _status: &str,
+        _result: Option<&Value>,
+        _error: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        Ok(())
+    }
+
+    pub async fn update_agent_session_state(
+        &self,
+        _user_id: &str,
+        _session_id: &str,
+        _state: &str,
+        _queue_depth: i64,
+        _active_request_id: Option<&str>,
+        _error: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        Ok(())
+    }
+
+    pub async fn get_agent_session(
+        &self,
+        _user_id: &str,
+        _session_id: &str,
+    ) -> Result<Option<AgentSessionRecord>, sqlx::Error> {
+        Ok(None)
+    }
+
+    pub async fn log_proactive_action(
+        &self,
+        _user_id: &str,
+        _heuristic_id: &str,
+        _suggestion_id: &str,
+        _action_type: &str,
+        _audit_content: Option<serde_json::Value>,
+        _afp_message_id: Option<&str>,
+        _tier: &str,
+        _tokens_used: i64,
+    ) -> Result<(), sqlx::Error> {
+        Ok(())
+    }
+
+    pub async fn record_proactive_outcome(
+        &self,
+        _record: &crate::proactive_engine::ProactiveOutcomeRecord,
+    ) -> Result<(), sqlx::Error> {
+        Ok(())
+    }
+
+    pub async fn list_proactive_audit_log(
+        &self,
+        _user_id: &str,
+        _limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        Ok(vec![])
+    }
+
+    pub async fn enable_pack(
+        &self,
+        _user_id: &str,
+        _pack_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        Ok(())
+    }
+
+    pub async fn disable_pack(
+        &self,
+        _user_id: &str,
+        _pack_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        Ok(())
+    }
+
+    pub async fn list_tool_execution_registry(
+        &self,
+        _user_id: &str,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        Ok(vec![])
+    }
+
+    // ── Generic AFP message list by type ─────────────────────────────────────
+
+    pub async fn list_afp_messages_by_type(
+        &self,
+        owner_user_id: &str,
+        types: &[&str],
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let type_list: Vec<String> = types.iter().map(|s| s.to_string()).collect();
+        let rows = sqlx::query(
+            r#"SELECT payload FROM afp_messages
+               WHERE owner_user_id = $1 AND type = ANY($2)
+               ORDER BY created_at DESC LIMIT $3"#,
+        )
+        .bind(owner_user_id)
+        .bind(&type_list)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        use sqlx::Row;
+        Ok(rows
+            .into_iter()
+            .map(|r| r.try_get::<Value, _>("payload").unwrap_or(Value::Null))
+            .collect())
+    }
+
+    // ── Proactive suggestions ─────────────────────────────────────────────────
+
+    pub async fn list_proactive_suggestions(
+        &self,
+        owner_user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT content FROM proactive_suggestions
+               WHERE owner_user_id = $1 AND dismissed_at IS NULL
+               ORDER BY created_at DESC LIMIT $2"#,
+        )
+        .bind(owner_user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        use sqlx::Row;
+        Ok(rows
+            .into_iter()
+            .map(|r| r.try_get::<Value, _>("content").unwrap_or(Value::Null))
+            .collect())
+    }
+
+    pub async fn has_active_proactive_suggestion(
+        &self,
+        owner_user_id: &str,
+        heuristic_id: &str,
+    ) -> Result<bool, sqlx::Error> {
+        use sqlx::Row;
+        let row = sqlx::query(
+            r#"SELECT 1 AS present FROM proactive_suggestions
+               WHERE owner_user_id = $1 AND heuristic_id = $2 AND dismissed_at IS NULL
+               LIMIT 1"#,
+        )
+        .bind(owner_user_id)
+        .bind(heuristic_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row
+            .and_then(|value| value.try_get::<i32, _>("present").ok())
+            .is_some())
+    }
+
+    pub async fn get_enabled_packs(&self, owner_user_id: &str) -> Result<Vec<String>, sqlx::Error> {
+        use sqlx::Row;
+        let rows = sqlx::query(
+            r#"SELECT pack_id FROM enabled_heuristic_packs WHERE owner_user_id = $1"#,
+        )
+        .bind(owner_user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| r.try_get::<String, _>("pack_id").ok())
+            .collect())
+    }
+
+    pub async fn heuristic_acceptance_rates(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        use sqlx::Row;
+        let rows = sqlx::query(
+            r#"SELECT heuristic_id,
+                  COUNT(*) FILTER (WHERE outcome = 'accepted') AS accepted,
+                  COUNT(*) FILTER (WHERE outcome = 'dismissed') AS dismissed
+               FROM proactive_outcomes
+               WHERE owner_user_id = $1
+               GROUP BY heuristic_id"#,
+        )
+        .bind(owner_user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        let mut result = Vec::new();
+        for row in rows {
+            let hid = row.try_get::<String, _>("heuristic_id").unwrap_or_default();
+            let acc = row.try_get::<i64, _>("accepted").unwrap_or(0);
+            let dis = row.try_get::<i64, _>("dismissed").unwrap_or(0);
+            let total = acc + dis;
+            let acceptance_rate = if total > 0 { acc as f64 / total as f64 } else { 0.5 };
+            result.push(serde_json::json!({
+                "heuristic_id": hid,
+                "accepted": acc,
+                "dismissed": dis,
+                "total": total,
+                "acceptance_rate": acceptance_rate,
+            }));
+        }
+        Ok(result)
+    }
+
+    pub async fn query_temporal_summary(&self, limit: i64) -> Result<Vec<Value>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT content FROM temporal_summaries ORDER BY created_at DESC LIMIT $1"#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        use sqlx::Row;
+        Ok(rows
+            .into_iter()
+            .map(|r| r.try_get::<Value, _>("content").unwrap_or(Value::Null))
+            .collect())
+    }
+
+    pub async fn get_autonomy_override(
+        &self,
+        owner_user_id: &str,
+        heuristic_id: &str,
+    ) -> Result<Option<String>, sqlx::Error> {
+        use sqlx::Row;
+        let row = sqlx::query(
+            r#"SELECT autonomy_tier FROM autonomy_overrides
+               WHERE owner_user_id = $1 AND heuristic_id = $2"#,
+        )
+        .bind(owner_user_id)
+        .bind(heuristic_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.and_then(|r| r.try_get::<String, _>("autonomy_tier").ok()))
+    }
+
+    pub async fn set_autonomy_override(
+        &self,
+        owner_user_id: &str,
+        heuristic_id: &str,
+        autonomy_tier: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"INSERT INTO autonomy_overrides (owner_user_id, heuristic_id, autonomy_tier, updated_at)
+               VALUES ($1, $2, $3, NOW())
+               ON CONFLICT (owner_user_id, heuristic_id) DO UPDATE SET autonomy_tier = $3, updated_at = NOW()"#,
+        )
+        .bind(owner_user_id)
+        .bind(heuristic_id)
+        .bind(autonomy_tier)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_proactivity_level(&self, owner_user_id: &str) -> Result<i32, sqlx::Error> {
+        use sqlx::Row;
+        let row = sqlx::query(
+            r#"SELECT level FROM proactivity_levels WHERE owner_user_id = $1"#,
+        )
+        .bind(owner_user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row
+            .and_then(|r| r.try_get::<i32, _>("level").ok())
+            .unwrap_or(2))
+    }
+
+    pub async fn set_proactivity_level(
+        &self,
+        owner_user_id: &str,
+        level: i32,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"INSERT INTO proactivity_levels (owner_user_id, level, updated_at)
+               VALUES ($1, $2, NOW())
+               ON CONFLICT (owner_user_id) DO UPDATE SET level = $2, updated_at = NOW()"#,
+        )
+        .bind(owner_user_id)
+        .bind(level)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // ── Email contact groups ──────────────────────────────────────────────────
+
+    pub async fn list_email_contact_groups(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        use sqlx::Row;
+        let rows = sqlx::query(
+            r#"SELECT id, name, color, sla_hours, auto_draft, created_at
+               FROM email_contact_groups WHERE owner_user_id = $1
+               ORDER BY created_at DESC"#,
+        )
+        .bind(owner_user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                serde_json::json!({
+                    "id": r.try_get::<String, _>("id").unwrap_or_default(),
+                    "name": r.try_get::<String, _>("name").unwrap_or_default(),
+                    "color": r.try_get::<String, _>("color").unwrap_or_default(),
+                    "sla_hours": r.try_get::<i32, _>("sla_hours").unwrap_or(24),
+                    "auto_draft": r.try_get::<bool, _>("auto_draft").unwrap_or(false),
+                    "created_at": r.try_get::<String, _>("created_at").unwrap_or_default(),
+                })
+            })
+            .collect())
+    }
+
+    pub async fn upsert_email_contact_group(
+        &self,
+        owner_user_id: &str,
+        id: &str,
+        name: &str,
+        color: &str,
+        sla_hours: i32,
+        auto_draft: bool,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"INSERT INTO email_contact_groups
+               (id, owner_user_id, name, color, sla_hours, auto_draft, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, NOW())
+               ON CONFLICT (id) DO UPDATE SET name=$3, color=$4, sla_hours=$5, auto_draft=$6"#,
+        )
+        .bind(id)
+        .bind(owner_user_id)
+        .bind(name)
+        .bind(color)
+        .bind(sla_hours)
+        .bind(auto_draft)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn delete_email_contact_group(
+        &self,
+        owner_user_id: &str,
+        group_id: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            r#"DELETE FROM email_contact_groups WHERE id = $1 AND owner_user_id = $2"#,
+        )
+        .bind(group_id)
+        .bind(owner_user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn get_contact_group_memberships(
+        &self,
+        owner_user_id: &str,
+        email: &str,
+    ) -> Result<Vec<String>, sqlx::Error> {
+        use sqlx::Row;
+        let rows = sqlx::query(
+            r#"SELECT group_id FROM contact_group_memberships
+               WHERE owner_user_id = $1 AND email = $2"#,
+        )
+        .bind(owner_user_id)
+        .bind(email)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| r.try_get::<String, _>("group_id").ok())
+            .collect())
+    }
+
+    pub async fn set_contact_group_memberships(
+        &self,
+        owner_user_id: &str,
+        email: &str,
+        group_ids: &[String],
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"DELETE FROM contact_group_memberships WHERE owner_user_id = $1 AND email = $2"#,
+        )
+        .bind(owner_user_id)
+        .bind(email)
+        .execute(&self.pool)
+        .await?;
+        for gid in group_ids {
+            sqlx::query(
+                r#"INSERT INTO contact_group_memberships (owner_user_id, email, group_id)
+                   VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"#,
+            )
+            .bind(owner_user_id)
+            .bind(email)
+            .bind(gid)
+            .execute(&self.pool)
+            .await?;
+        }
+        Ok(())
+    }
+
+    // ── Plaza feed ────────────────────────────────────────────────────────────
+
+    pub async fn publish_to_plaza(
+        &self,
+        owner_user_id: &str,
+        message_id: &str,
+        from_agent: &str,
+        title: &str,
+        body: &str,
+    ) -> Result<String, sqlx::Error> {
+        let id = ulid::Ulid::new().to_string();
+        sqlx::query(
+            r#"INSERT INTO plaza_feed (id, owner_user_id, message_id, from_agent, title, body, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, NOW())"#,
+        )
+        .bind(&id)
+        .bind(owner_user_id)
+        .bind(message_id)
+        .bind(from_agent)
+        .bind(title)
+        .bind(body)
+        .execute(&self.pool)
+        .await?;
+        Ok(id)
+    }
+
+    // ── Knowledge triple queries ──────────────────────────────────────────────
+
+    pub async fn query_private_knowledge_triples(
+        &self,
+        owner_user_id: &str,
+        subject: Option<&str>,
+        predicate: Option<&str>,
+        object: Option<&str>,
+        source_message_id: Option<&str>,
+        domain: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        use sqlx::Row;
+        let rows = sqlx::query(
+            r#"SELECT subject, predicate, object, source_message_id, domain, confidence, created_at
+               FROM knowledge_triples
+               WHERE owner_user_id = $1
+                 AND ($2::text IS NULL OR subject ILIKE $2)
+                 AND ($3::text IS NULL OR predicate = $3)
+                 AND ($4::text IS NULL OR object ILIKE $4)
+                 AND ($5::text IS NULL OR source_message_id = $5)
+                 AND ($6::text IS NULL OR domain = $6)
+               ORDER BY created_at DESC LIMIT $7"#,
+        )
+        .bind(owner_user_id)
+        .bind(subject)
+        .bind(predicate)
+        .bind(object)
+        .bind(source_message_id)
+        .bind(domain)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                serde_json::json!({
+                    "subject": r.try_get::<String,_>("subject").unwrap_or_default(),
+                    "predicate": r.try_get::<String,_>("predicate").unwrap_or_default(),
+                    "object": r.try_get::<String,_>("object").unwrap_or_default(),
+                    "source_message_id": r.try_get::<Option<String>,_>("source_message_id").unwrap_or(None),
+                    "domain": r.try_get::<Option<String>,_>("domain").unwrap_or(None),
+                    "confidence": r.try_get::<f64,_>("confidence").unwrap_or(1.0),
+                    "created_at": r.try_get::<String,_>("created_at").unwrap_or_default(),
+                })
+            })
+            .collect())
+    }
+
+    pub async fn query_private_context_window(
+        &self,
+        owner_user_id: &str,
+        anchor_message_id: Option<&str>,
+        anchor_timestamp: Option<&str>,
+        window_minutes: i64,
+        limit: i64,
+        message_type: Option<&str>,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT payload FROM afp_messages
+               WHERE owner_user_id = $1
+                 AND ($2::text IS NULL OR id = $2)
+                 AND ($3::text IS NULL OR created_at BETWEEN $3::timestamptz - ($4 * INTERVAL '1 minute') AND $3::timestamptz + ($4 * INTERVAL '1 minute'))
+                 AND ($5::text IS NULL OR type = $5)
+               ORDER BY created_at DESC LIMIT $6"#,
+        )
+        .bind(owner_user_id)
+        .bind(anchor_message_id)
+        .bind(anchor_timestamp)
+        .bind(window_minutes)
+        .bind(message_type)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        use sqlx::Row;
+        Ok(rows
+            .into_iter()
+            .map(|r| r.try_get::<Value, _>("payload").unwrap_or(Value::Null))
+            .collect())
+    }
+
+    pub async fn query_private_claim_neighborhood(
+        &self,
+        owner_user_id: &str,
+        message_id: &str,
+        limit_per_group: i64,
+        stance: Option<&str>,
+        depth: i64,
+    ) -> Result<Value, sqlx::Error> {
+        let row = sqlx::query(
+            r#"SELECT payload FROM afp_messages WHERE owner_user_id = $1 AND id = $2 LIMIT 1"#,
+        )
+        .bind(owner_user_id)
+        .bind(message_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        use sqlx::Row;
+        let anchor = row
+            .as_ref()
+            .and_then(|r| r.try_get::<Value, _>("payload").ok())
+            .unwrap_or(Value::Null);
+
+        let depth_u32 = (depth as u32).min(3);
+        let (node_set, edges) = self.bfs_backlinks_graph(owner_user_id, message_id, depth_u32).await?;
+
+        let cap = (limit_per_group.max(1).min(50)) as usize;
+        let mut supports: Vec<Value> = Vec::new();
+        let mut refutes: Vec<Value> = Vec::new();
+        let mut mentions: Vec<Value> = Vec::new();
+        let mut part_of: Vec<Value> = Vec::new();
+        let mut caused_by: Vec<Value> = Vec::new();
+        let mut temporally_related: Vec<Value> = Vec::new();
+
+        for edge in &edges {
+            let normalized = normalized_claim_ref_type(&edge.ref_type);
+            if let Some(s) = stance {
+                if s != "all" && normalized != s {
+                    continue;
+                }
+            }
+            let peer_id = if edge.source_id == message_id { &edge.target_id } else { &edge.source_id };
+            let entry = serde_json::json!({
+                "message_id": peer_id,
+                "direction": if edge.source_id == message_id { "outbound" } else { "inbound" },
+                "ref_type": normalized,
+                "link_kind": format!("{:?}", edge.link_kind).to_lowercase(),
+                "similarity": edge.similarity,
+                "created_at": edge.created_at,
+            });
+            match normalized {
+                "supports"            if supports.len() < cap            => supports.push(entry),
+                "refutes"             if refutes.len() < cap             => refutes.push(entry),
+                "part_of"             if part_of.len() < cap             => part_of.push(entry),
+                "caused_by"           if caused_by.len() < cap           => caused_by.push(entry),
+                "temporally_related"  if temporally_related.len() < cap  => temporally_related.push(entry),
+                _                     if mentions.len() < cap            => mentions.push(entry),
+                _ => {}
+            }
+        }
+
+        // Compute hop distances for related_claims summary
+        let mut node_hops: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+        for node_id in &node_set {
+            if node_id != message_id {
+                // Approximate hop: count min path length via BFS edge set
+                let hop = edges.iter().filter(|e| e.source_id == *node_id || e.target_id == *node_id).count().min(depth as usize);
+                node_hops.insert(node_id.clone(), if hop == 0 { 1 } else { hop.min(depth as usize) });
+            }
+        }
+        let related_claims = summarize_related_claims(message_id, &node_hops, &edges, cap);
+
+        let triple_rows = sqlx::query(
+            r#"SELECT subject, predicate_norm AS predicate, object_value AS object, confidence, source_message_id
+               FROM afp_knowledge_triples
+               WHERE user_id = $1 AND source_message_id = $2
+               ORDER BY confidence DESC LIMIT $3"#,
+        )
+        .bind(owner_user_id)
+        .bind(message_id)
+        .bind(cap as i64)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default();
+
+        let triples: Vec<Value> = triple_rows
+            .iter()
+            .map(|r| serde_json::json!({
+                "subject":    r.try_get::<String, _>("subject").unwrap_or_default(),
+                "predicate":  r.try_get::<String, _>("predicate").unwrap_or_default(),
+                "object":     r.try_get::<String, _>("object").unwrap_or_default(),
+                "confidence": r.try_get::<f64, _>("confidence").unwrap_or(0.0),
+                "source_message_id": r.try_get::<Option<String>, _>("source_message_id").ok().flatten(),
+            }))
+            .collect();
+
+        let summary = summarize_claim_neighborhood(&supports, &refutes, &mentions, &triples);
+
+        Ok(serde_json::json!({
+            "anchor":              anchor,
+            "supports":            supports,
+            "refutes":             refutes,
+            "mentions":            mentions,
+            "part_of":             part_of,
+            "caused_by":           caused_by,
+            "temporally_related":  temporally_related,
+            "related_claims":      related_claims,
+            "triples":             triples,
+            "summary":             summary,
+        }))
+    }
+
+    // ── Token budget ──────────────────────────────────────────────────────────
+
+    pub async fn daily_total_token_usage(&self, owner_user_id: &str) -> Result<i64, sqlx::Error> {
+        use sqlx::Row;
+        let row = sqlx::query(
+            r#"SELECT COALESCE(SUM(tokens_used), 0) AS total
+               FROM proactive_token_usage
+               WHERE owner_user_id = $1 AND created_at > NOW() - INTERVAL '24 hours'"#,
+        )
+        .bind(owner_user_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.try_get::<i64, _>("total").unwrap_or(0))
+    }
+
+    pub async fn upsert_user_token_budget(
+        &self,
+        owner_user_id: &str,
+        daily_limit_tokens: i64,
+        alert_threshold: f64,
+        escalation_threshold: f64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"INSERT INTO user_token_budgets
+               (owner_user_id, daily_limit_tokens, alert_threshold, escalation_threshold, updated_at)
+               VALUES ($1, $2, $3, $4, NOW())
+               ON CONFLICT (owner_user_id) DO UPDATE
+               SET daily_limit_tokens=$2, alert_threshold=$3, escalation_threshold=$4, updated_at=NOW()"#,
+        )
+        .bind(owner_user_id)
+        .bind(daily_limit_tokens)
+        .bind(alert_threshold)
+        .bind(escalation_threshold)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn upsert_user_llm_provider(
+        &self,
+        owner_user_id: &str,
+        provider_id: &str,
+        provider: &str,
+        display_name: &str,
+        encrypted_key: Option<&str>,
+        base_url: Option<&str>,
+        model_id: &str,
+        priority: i32,
+        consent: bool,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"INSERT INTO user_llm_providers
+               (id, owner_user_id, provider, display_name, encrypted_key, base_url, model_id, priority, consent_given, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+               ON CONFLICT (id) DO UPDATE
+               SET provider=$3, display_name=$4, encrypted_key=$5, base_url=$6, model_id=$7, priority=$8, consent_given=$9, updated_at=NOW()"#,
+        )
+        .bind(provider_id)
+        .bind(owner_user_id)
+        .bind(provider)
+        .bind(display_name)
+        .bind(encrypted_key)
+        .bind(base_url)
+        .bind(model_id)
+        .bind(priority)
+        .bind(consent)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn disable_user_llm_provider(
+        &self,
+        owner_user_id: &str,
+        provider_id: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            r#"DELETE FROM user_llm_providers WHERE id = $1 AND owner_user_id = $2"#,
+        )
+        .bind(provider_id)
+        .bind(owner_user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    // ── PARA classification methods ───────────────────────────────────────────
+    //
+    // Original AFP messages are NEVER mutated. All PARA queries go through
+    // afp_para_classifications, which is an overlay indexed by (user_id, target_id).
+
+    /// Upsert a para_classification record. Creates on first call, updates on re-classify.
+    pub async fn upsert_para_classification(
+        &self,
+        user_id: &str,
+        classification_id: &str,
+        target_id: &str,
+        para_tags: Vec<String>,
+        status: &str,
+        reason: Option<&str>,
+        context: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        let archived_at: Option<chrono::DateTime<chrono::Utc>> =
+            if status == "archived" { Some(chrono::Utc::now()) } else { None };
+        sqlx::query(
+            r#"INSERT INTO afp_para_classifications
+                   (id, user_id, target_id, para_tags, status, archived_at, reason, context)
+               VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8)
+               ON CONFLICT (user_id, target_id) DO UPDATE SET
+                   para_tags   = EXCLUDED.para_tags,
+                   status      = EXCLUDED.status,
+                   archived_at = CASE WHEN EXCLUDED.status = 'archived'
+                                      THEN COALESCE(afp_para_classifications.archived_at, now())
+                                      ELSE NULL END,
+                   reason      = EXCLUDED.reason,
+                   context     = EXCLUDED.context,
+                   updated_at  = now()"#,
+        )
+        .bind(classification_id)
+        .bind(user_id)
+        .bind(target_id)
+        .bind(para_tags)
+        .bind(status)
+        .bind(archived_at)
+        .bind(reason)
+        .bind(context)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Fetch active classifications whose para_tags contain at least one tag with the given prefix.
+    /// prefix: "project:" | "area:" | "resource:"
+    pub async fn get_para_by_tag_prefix(
+        &self,
+        user_id: &str,
+        prefix: &str,
+        limit: i64,
+    ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+        let pattern = format!("{prefix}%");
+        let rows = sqlx::query(
+            r#"SELECT id, target_id, para_tags, status, reason, context, created_at, updated_at
+               FROM afp_para_classifications
+               WHERE user_id = $1::uuid
+                 AND status = 'active'
+                 AND EXISTS (SELECT 1 FROM unnest(para_tags) t WHERE t LIKE $2)
+               ORDER BY updated_at DESC LIMIT $3"#,
+        )
+        .bind(user_id)
+        .bind(&pattern)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                serde_json::json!({
+                    "id":        r.try_get::<String, _>("id").unwrap_or_default(),
+                    "target_id": r.try_get::<String, _>("target_id").unwrap_or_default(),
+                    "para_tags": r.try_get::<Vec<String>, _>("para_tags").unwrap_or_default(),
+                    "status":    r.try_get::<String, _>("status").unwrap_or_default(),
+                    "reason":    r.try_get::<Option<String>, _>("reason").unwrap_or(None),
+                    "context":   r.try_get::<Option<String>, _>("context").unwrap_or(None),
+                    "created_at": r.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at")
+                        .map(|t| t.to_rfc3339()).unwrap_or_default(),
+                    "updated_at": r.try_get::<chrono::DateTime<chrono::Utc>, _>("updated_at")
+                        .map(|t| t.to_rfc3339()).unwrap_or_default(),
+                })
+            })
+            .collect())
+    }
+
+    /// Fetch archived classifications for this user.
+    pub async fn get_para_archived(
+        &self,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT id, target_id, para_tags, reason, context, archived_at, updated_at
+               FROM afp_para_classifications
+               WHERE user_id = $1::uuid AND status = 'archived'
+               ORDER BY archived_at DESC NULLS LAST LIMIT $2"#,
+        )
+        .bind(user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                serde_json::json!({
+                    "id":          r.try_get::<String, _>("id").unwrap_or_default(),
+                    "target_id":   r.try_get::<String, _>("target_id").unwrap_or_default(),
+                    "para_tags":   r.try_get::<Vec<String>, _>("para_tags").unwrap_or_default(),
+                    "reason":      r.try_get::<Option<String>, _>("reason").unwrap_or(None),
+                    "context":     r.try_get::<Option<String>, _>("context").unwrap_or(None),
+                    "archived_at": r.try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("archived_at")
+                        .unwrap_or(None)
+                        .map(|t| t.to_rfc3339()),
+                    "updated_at":  r.try_get::<chrono::DateTime<chrono::Utc>, _>("updated_at")
+                        .map(|t| t.to_rfc3339()).unwrap_or_default(),
+                })
+            })
+            .collect())
+    }
+
+    /// Count how many active items fall into each PARA section for `user_id`.
+    /// Returns `(projects, areas, resources, archive)` as a 4-tuple.
+    /// A single item may belong to multiple sections if it carries multiple prefixed tags.
+    pub async fn count_para_sections(
+        &self,
+        user_id: &str,
+    ) -> Result<(i64, i64, i64, i64), sqlx::Error> {
+        let row = sqlx::query(
+            r#"SELECT
+                 COUNT(*) FILTER (
+                   WHERE status = 'active'
+                     AND EXISTS (SELECT 1 FROM unnest(para_tags) t WHERE t LIKE 'project:%')
+                 ) AS projects,
+                 COUNT(*) FILTER (
+                   WHERE status = 'active'
+                     AND EXISTS (SELECT 1 FROM unnest(para_tags) t WHERE t LIKE 'area:%')
+                 ) AS areas,
+                 COUNT(*) FILTER (
+                   WHERE status = 'active'
+                     AND EXISTS (SELECT 1 FROM unnest(para_tags) t WHERE t LIKE 'resource:%')
+                 ) AS resources,
+                 COUNT(*) FILTER (WHERE status = 'archived') AS archive
+               FROM afp_para_classifications
+               WHERE user_id = $1::uuid"#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok((
+            row.try_get::<i64, _>("projects").unwrap_or(0),
+            row.try_get::<i64, _>("areas").unwrap_or(0),
+            row.try_get::<i64, _>("resources").unwrap_or(0),
+            row.try_get::<i64, _>("archive").unwrap_or(0),
+        ))
+    }
+
+    /// Candidates for auto-archiving: active classifications older than 180 days.
+    pub async fn get_para_auto_archive_candidates(
+        &self,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT id, target_id, para_tags, created_at
+               FROM afp_para_classifications
+               WHERE user_id = $1::uuid
+                 AND status = 'active'
+                 AND created_at < now() - interval '180 days'
+               ORDER BY created_at ASC LIMIT $2"#,
+        )
+        .bind(user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                serde_json::json!({
+                    "id":        r.try_get::<String, _>("id").unwrap_or_default(),
+                    "target_id": r.try_get::<String, _>("target_id").unwrap_or_default(),
+                    "para_tags": r.try_get::<Vec<String>, _>("para_tags").unwrap_or_default(),
+                    "created_at": r.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at")
+                        .map(|t| t.to_rfc3339()).unwrap_or_default(),
+                })
+            })
+            .collect())
     }
 }
 
-pub const MIGRATIONS: [(&str, &str, &str); 37] = [
-    (
-        "0001_init",
-        "Initial Omnyid schema baseline",
-        include_str!("../postgres/migrations/0001_init.sql"),
-    ),
-    (
-        "0002_workflow_state",
-        "Workflow state, delivery receipts, sync devices, and personalization tables",
-        include_str!("../postgres/migrations/0002_workflow_state.sql"),
-    ),
-    (
-        "0003_accounts",
-        "User accounts, sessions, and managed agent records",
-        include_str!("../postgres/migrations/0003_accounts.sql"),
-    ),
-    (
-        "0004_runtime_deployments",
-        "Per-user runtime deployment records for isolated agent frameworks",
-        include_str!("../postgres/migrations/0004_runtime_deployments.sql"),
-    ),
-    (
-        "0005_user_onboarding",
-        "Persisted onboarding state for account setup and gated runtime deployment",
-        include_str!("../postgres/migrations/0005_user_onboarding.sql"),
-    ),
-    (
-        "0006_waitlist_submissions",
-        "Persisted waitlist submissions with delivery fallback state",
-        include_str!("../postgres/migrations/0006_waitlist_submissions.sql"),
-    ),
-    (
-        "0007_support_access",
-        "Support access grants with time-limited consent and revoke support",
-        include_str!("../postgres/migrations/0007_support_access.sql"),
-    ),
-    (
-        "0008_runtime_backups",
-        "Hosted runtime backup metadata, retention policy, and snapshot inventory",
-        include_str!("../postgres/migrations/0008_runtime_backups.sql"),
-    ),
-    (
-        "0009_runtime_restore_drills",
-        "Runtime restore drill records for backup rehearsal and audit history",
-        include_str!("../postgres/migrations/0009_runtime_restore_drills.sql"),
-    ),
-    (
-        "0010_runtime_update_policies",
-        "Hosted runtime update policies for scaffold refresh checks and manual apply control",
-        include_str!("../postgres/migrations/0010_runtime_update_policies.sql"),
-    ),
-    (
-        "0011_runtime_update_audit",
-        "Hosted runtime update check and apply audit events",
-        include_str!("../postgres/migrations/0011_runtime_update_audit.sql"),
-    ),
-    (
-        "0012_sync_device_policies",
-        "Per-device sync policy registry for local-first clients",
-        include_str!("../postgres/migrations/0012_sync_device_policies.sql"),
-    ),
-    (
-        "0013_sync_device_tokens",
-        "Per-device sync access tokens for local-first client boundaries",
-        include_str!("../postgres/migrations/0013_sync_device_tokens.sql"),
-    ),
-    (
-        "0014_runtime_runner_policy_events",
-        "Metadata-only audit history for hosted Python runner policy changes",
-        include_str!("../postgres/migrations/0014_runtime_runner_policy_events.sql"),
-    ),
-    (
-        "0015_peer_key_cache",
-        "Durable peer key cache and key rotation audit for Phase 2 key lifecycle",
-        include_str!("../postgres/migrations/0015_peer_key_cache.sql"),
-    ),
-    (
-        "0016_billing",
-        "Billing subscriptions and Stripe webhook event history for Phase 12 cloud tier",
-        include_str!("../postgres/migrations/0016_billing.sql"),
-    ),
-    (
-        "0017_agent_template",
-        "Per-user agent instances, task queue, LLM config, and usage log with RLS",
-        include_str!("../postgres/migrations/0017_agent_template.sql"),
-    ),
-    (
-        "0018_webauthn",
-        "Passkey credentials and ephemeral challenges for WebAuthn/passkey authentication",
-        include_str!("../postgres/migrations/0018_webauthn.sql"),
-    ),
-    (
-        "0019_master_agent",
-        "Master agent orchestration: soul/memory, ephemeral agents, LoRA, focus items, triggers, delegations",
-        include_str!("../postgres/migrations/0019_master_agent.sql"),
-    ),
-    (
-        "0020_gmail_tokens",
-        "Per-user Gmail OAuth token storage",
-        include_str!("../postgres/migrations/0020_gmail_tokens.sql"),
-    ),
-    (
-        "0021_capability_registry",
-        "Structured capability descriptors for agent AgentCard and Python SDK @capability decorator",
-        include_str!("../postgres/migrations/0021_capability_registry.sql"),
-    ),
-    (
-        "0022_follow_engage",
-        "Agent follow subscriptions and feed engagement metrics",
-        include_str!("../postgres/migrations/0022_follow_engage.sql"),
-    ),
-    (
-        "0023_llm_runpod_calendar",
-        "Add runpod backend to LLM config check constraint + calendar_events table",
-        include_str!("../postgres/migrations/0023_llm_runpod_calendar.sql"),
-    ),
-    (
-        "0024_aliases",
-        "Global agent alias registry with uniqueness, format constraints, and 30-day change cooldown",
-        include_str!("../postgres/migrations/0024_aliases.sql"),
-    ),
-    (
-        "0025_agent_preferences",
-        "Per-user agent optimization preferences (optimization_mode, auto_confirm_threshold, show_cost_estimates)",
-        include_str!("../postgres/migrations/0025_agent_preferences.sql"),
-    ),
-    (
-        "0026_message_taxonomy",
-        "Optional subtype and metadata columns for broad stable AFP message taxonomy",
-        include_str!("../postgres/migrations/0026_message_taxonomy.sql"),
-    ),
-    (
-        "0027_delegation_hardening",
-        "Per-node capability validation, outbound allowlist, and context snapshot on agent_delegations",
-        include_str!("../postgres/migrations/0027_delegation_hardening.sql"),
-    ),
-    (
-        "0028_trigger_hardening",
-        "Public replay-nonce deduplication table for trigger activation idempotency",
-        include_str!("../postgres/migrations/0028_trigger_hardening.sql"),
-    ),
-    (
-        "0029_webhook_ingress_routing",
-        "Global public-schema routing table for unauthenticated webhook ingress",
-        include_str!("../postgres/migrations/0029_webhook_ingress_routing.sql"),
-    ),
-    (
-        "0030_email_trigger_queue",
-        "Global queue for email ingest events consumed by the email trigger dispatcher",
-        include_str!("../postgres/migrations/0030_email_trigger_queue.sql"),
-    ),
-    (
-        "0031_file_drop_trigger_queue",
-        "Global queue for file-drop/watcher events consumed by the file-drop trigger dispatcher",
-        include_str!("../postgres/migrations/0031_file_drop_trigger_queue.sql"),
-    ),
-    (
-        "0032_internal_event_queue",
-        "Global queue for internal workflow runtime events consumed by the internal event dispatcher",
-        include_str!("../postgres/migrations/0032_internal_event_queue.sql"),
-    ),
-    (
-        "0033_knowledge_curator_daemons",
-        "Knowledge Curator, daemon registrations, archive index, and daemon heartbeats",
-        include_str!("../postgres/migrations/0033_knowledge_curator_daemons.sql"),
-    ),
-    (
-        "0034_agent_settings",
-        "Per-agent settings including workflow auto-approve",
-        include_str!("../postgres/migrations/0034_agent_settings.sql"),
-    ),
-    (
-        "0035_cost_tracking",
-        "Cost tracking cache and trend state",
-        include_str!("../postgres/migrations/0035_cost_tracking.sql"),
-    ),
-    (
-        "0036_daemon_runtime_support",
-        "Daemon runtime support and storage defaults",
-        include_str!("../postgres/migrations/0036_daemon_runtime_support.sql"),
-    ),
-    (
-        "0037_supertag_definitions",
-        "User-authored supertag definition rules and derived index for the Knowledge Curator",
-        include_str!("../postgres/migrations/0037_supertag_definitions.sql"),
-    ),
-];
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct DatabasePoolSettings {
+    max_connections: u32,
+    min_connections: u32,
+    acquire_timeout_secs: u64,
+    idle_timeout_secs: u64,
+    max_lifetime_secs: u64,
+    statement_timeout_ms: u64,
+    idle_in_transaction_timeout_ms: u64,
+}
+
+fn database_pool_settings_from_env() -> DatabasePoolSettings {
+    DatabasePoolSettings {
+        max_connections: parse_env_u32("OMNYID_DB_MAX_CONNECTIONS", 32),
+        min_connections: parse_env_u32("OMNYID_DB_MIN_CONNECTIONS", 4),
+        acquire_timeout_secs: parse_env_u64("OMNYID_DB_ACQUIRE_TIMEOUT_SECS", 10),
+        idle_timeout_secs: parse_env_u64("OMNYID_DB_IDLE_TIMEOUT_SECS", 300),
+        max_lifetime_secs: parse_env_u64("OMNYID_DB_MAX_LIFETIME_SECS", 1800),
+        statement_timeout_ms: parse_env_u64("OMNYID_DB_STATEMENT_TIMEOUT_MS", 30_000),
+        idle_in_transaction_timeout_ms: parse_env_u64(
+            "OMNYID_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
+            15_000,
+        ),
+    }
+}
+
+fn parse_env_u32(name: &str, default: u32) -> u32 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.trim().parse::<u32>().ok())
+        .unwrap_or(default)
+}
+
+fn parse_env_u64(name: &str, default: u64) -> u64 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(default)
+}
+
+#[cfg(test)]
+mod db_pool_settings_tests {
+    use super::{
+        DatabasePoolSettings, database_pool_settings_from_env, migration_catalog::MIGRATIONS,
+    };
+
+    #[test]
+    fn database_pool_settings_use_hardened_defaults() {
+        let keys = [
+            "OMNYID_DB_MAX_CONNECTIONS",
+            "OMNYID_DB_MIN_CONNECTIONS",
+            "OMNYID_DB_ACQUIRE_TIMEOUT_SECS",
+            "OMNYID_DB_IDLE_TIMEOUT_SECS",
+            "OMNYID_DB_MAX_LIFETIME_SECS",
+            "OMNYID_DB_STATEMENT_TIMEOUT_MS",
+            "OMNYID_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
+        ];
+        let previous = keys
+            .iter()
+            .map(|key| ((*key).to_string(), std::env::var(key).ok()))
+            .collect::<Vec<_>>();
+
+        unsafe {
+            for key in keys {
+                std::env::remove_var(key);
+            }
+        }
+
+        let settings = database_pool_settings_from_env();
+        assert_eq!(
+            settings,
+            DatabasePoolSettings {
+                max_connections: 32,
+                min_connections: 4,
+                acquire_timeout_secs: 10,
+                idle_timeout_secs: 300,
+                max_lifetime_secs: 1800,
+                statement_timeout_ms: 30_000,
+                idle_in_transaction_timeout_ms: 15_000,
+            }
+        );
+
+        unsafe {
+            for (key, value) in previous {
+                if let Some(value) = value {
+                    std::env::set_var(key, value);
+                } else {
+                    std::env::remove_var(key);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn migration_catalog_matches_current_embedded_set() {
+        assert_eq!(MIGRATIONS.len(), 64);
+        assert_eq!(MIGRATIONS.first().map(|entry| entry.0), Some("0001_init"));
+        assert_eq!(
+            MIGRATIONS.last().map(|entry| entry.0),
+            Some("0064_afp_kind_and_seaweedfs")
+        );
+    }
+}
 
 fn daemon_kind_label(kind: &DaemonKind) -> &'static str {
     match kind {
         DaemonKind::KnowledgeCurator => "knowledge_curator",
+        DaemonKind::LedgerIngestion => "ledger_ingestion",
         DaemonKind::EmailGateway => "email_gateway",
         DaemonKind::RelationalSync => "relational_sync",
         DaemonKind::ArchiveColdStorage => "archive_cold_storage",
@@ -5825,6 +7231,17 @@ pub struct AuthSessionRecord {
     pub user_id: String,
     pub created_at: String,
     pub expires_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AuthTokenRecord {
+    pub id: String,
+    pub user_id: String,
+    pub kind: String,
+    pub token_hash: String,
+    pub expires_at: String,
+    pub used_at: Option<String>,
+    pub created_at: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -6099,7 +7516,48 @@ pub struct SyncDevicePolicyRecord {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentSessionRecord {
+    pub session_id: String,
+    pub owner_user_id: String,
+    pub state: String,
+    pub queue_depth: i64,
+    pub active_request_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionRequestRecord {
+    pub request_id: String,
+    pub session_id: String,
+    pub owner_user_id: String,
+    pub status: String,
+    pub created_at: String,
+}
+
 async fn apply_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
+    // GAP-029: acquire a session-level advisory lock so only one homeserver instance
+    // runs migrations at startup when multiple containers race on boot.
+    // Lock key 7799887788 is a fixed OmnyID namespace constant.
+    let mut conn = pool.acquire().await?;
+    sqlx::query("SELECT pg_advisory_lock(7799887788)")
+        .execute(&mut *conn)
+        .await?;
+
+    let result = apply_migrations_inner(&mut conn).await;
+
+    // Always release the lock, even on error.
+    let _ = sqlx::query("SELECT pg_advisory_unlock(7799887788)")
+        .execute(&mut *conn)
+        .await;
+
+    result
+}
+
+async fn apply_migrations_inner(
+    conn: &mut sqlx::pool::PoolConnection<sqlx::Postgres>,
+) -> Result<(), sqlx::Error> {
     sqlx::raw_sql(
         r#"
         CREATE TABLE IF NOT EXISTS omnyid_schema_migrations (
@@ -6109,7 +7567,7 @@ async fn apply_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
         )
         "#,
     )
-    .execute(pool)
+    .execute(&mut **conn)
     .await?;
 
     for (version, description, sql) in MIGRATIONS {
@@ -6117,14 +7575,21 @@ async fn apply_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
             "SELECT COUNT(*) FROM omnyid_schema_migrations WHERE version = $1",
         )
         .bind(version)
-        .fetch_one(pool)
+        .fetch_one(&mut **conn)
         .await?;
 
         if already_applied > 0 {
             continue;
         }
 
-        sqlx::raw_sql(sql).execute(pool).await?;
+        // CGAP-003: each migration runs in its own transaction so a partial failure
+        // rolls back cleanly. The advisory lock on the outer connection is session-level
+        // and persists across these inner transactions.
+        let mut tx = conn.begin().await?;
+        if let Err(e) = sqlx::raw_sql(sql).execute(&mut *tx).await {
+            // tx is dropped here, triggering automatic ROLLBACK.
+            return Err(e);
+        }
         sqlx::query(
             r#"
             INSERT INTO omnyid_schema_migrations (version, description)
@@ -6134,11 +7599,123 @@ async fn apply_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
         )
         .bind(version)
         .bind(description)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+        tx.commit().await?;
     }
 
     Ok(())
+}
+
+// ── Claim neighborhood helpers ────────────────────────────────────────────────
+
+/// Normalize semantic stance aliases to canonical ref_type values.
+/// Canonical set: "supports", "refutes", "part_of", "caused_by",
+/// "temporally_related", "mentions" (default).
+pub(crate) fn normalized_claim_ref_type(ref_type: &str) -> &'static str {
+    match ref_type.trim().to_lowercase().as_str() {
+        "supports" | "supported_by" | "support" | "confirms" | "validates" => "supports",
+        "refutes" | "refuted_by" | "contradicts" | "disputes" | "negates" | "challenges" => "refutes",
+        "part_of" | "component_of" | "subset_of" | "belongs_to" | "contained_in" => "part_of",
+        "caused_by" | "causes" | "leads_to" | "results_in" | "triggers" | "explains" => "caused_by",
+        "temporally_related" | "before" | "after" | "concurrent" | "preceded_by" | "followed_by" => {
+            "temporally_related"
+        }
+        _ => "mentions",
+    }
+}
+
+/// Return `true` when `ref_type` (after normalization) satisfies `filter`.
+/// `None` or `"all"` match any stance.
+pub(crate) fn claim_ref_type_matches_filter(ref_type: &str, filter: Option<&str>) -> bool {
+    match filter {
+        None | Some("all") => true,
+        Some(f) => normalized_claim_ref_type(ref_type) == f,
+    }
+}
+
+/// Group knowledge triples by predicate, returning `{predicate, count}` sorted descending.
+pub(crate) fn group_claim_triples_by_predicate(triples: &[Value]) -> Vec<Value> {
+    let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for triple in triples {
+        let predicate = triple["predicate"].as_str().unwrap_or("").to_string();
+        *counts.entry(predicate).or_default() += 1;
+    }
+    let mut groups: Vec<Value> = counts
+        .into_iter()
+        .map(|(predicate, count)| json!({ "predicate": predicate, "count": count }))
+        .collect();
+    groups.sort_by(|a, b| {
+        b["count"]
+            .as_u64()
+            .unwrap_or(0)
+            .cmp(&a["count"].as_u64().unwrap_or(0))
+    });
+    groups
+}
+
+/// Build a summary object for a claim's neighborhood (counts + dominant predicates).
+pub(crate) fn summarize_claim_neighborhood(
+    supports: &[Value],
+    refutes: &[Value],
+    mentions: &[Value],
+    triples: &[Value],
+) -> Value {
+    let triple_groups = group_claim_triples_by_predicate(triples);
+    let dominant_predicates = triple_groups.iter().take(5).cloned().collect::<Vec<_>>();
+    json!({
+        "support_count":       supports.len(),
+        "refute_count":        refutes.len(),
+        "mention_count":       mentions.len(),
+        "triple_count":        triples.len(),
+        "net_support":         supports.len() as i64 - refutes.len() as i64,
+        "dominant_predicates": dominant_predicates,
+        "triple_groups":       triple_groups,
+    })
+}
+
+/// Build a ranked list of related claims ordered by hop distance then total edge count.
+pub(crate) fn summarize_related_claims(
+    anchor_id: &str,
+    node_hops: &std::collections::BTreeMap<String, usize>,
+    edges: &[crate::knowledge_curator::BacklinkRecord],
+    limit: usize,
+) -> Vec<Value> {
+    let mut summaries: Vec<Value> = node_hops
+        .iter()
+        .filter(|(id, _)| id.as_str() != anchor_id)
+        .map(|(node_id, &hop)| {
+            let support_edges = edges
+                .iter()
+                .filter(|e| {
+                    (e.source_id == *node_id || e.target_id == *node_id)
+                        && normalized_claim_ref_type(&e.ref_type) == "supports"
+                })
+                .count();
+            let refute_edges = edges
+                .iter()
+                .filter(|e| {
+                    (e.source_id == *node_id || e.target_id == *node_id)
+                        && normalized_claim_ref_type(&e.ref_type) == "refutes"
+                })
+                .count();
+            json!({
+                "message_id":    node_id,
+                "hop_distance":  hop,
+                "support_edges": support_edges,
+                "refute_edges":  refute_edges,
+            })
+        })
+        .collect();
+    summaries.sort_by(|a, b| {
+        let hop_a = a["hop_distance"].as_u64().unwrap_or(0);
+        let hop_b = b["hop_distance"].as_u64().unwrap_or(0);
+        let total_a = a["support_edges"].as_u64().unwrap_or(0) + a["refute_edges"].as_u64().unwrap_or(0);
+        let total_b = b["support_edges"].as_u64().unwrap_or(0) + b["refute_edges"].as_u64().unwrap_or(0);
+        hop_a.cmp(&hop_b).then(total_b.cmp(&total_a))
+    });
+    summaries.truncate(limit);
+    summaries
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -6296,7 +7873,20 @@ fn backlink_kind_from_str(input: &str) -> BacklinkKind {
     }
 }
 
-fn tenant_schema_name(user_id: &str) -> String {
+pub(crate) fn tenant_schema_name(user_id: &str) -> String {
+    // Log a warning if the user_id contains characters outside the expected
+    // alphanumeric set — this indicates a programming error upstream; the
+    // normalization below still prevents SQL injection but we want visibility.
+    let clean = user_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if !clean && !user_id.is_empty() {
+        tracing::warn!(
+            user_id,
+            "tenant_schema_name: user_id contains unexpected characters; \
+             normalising to alphanumeric — check registration code path"
+        );
+    }
     let mut schema = String::from("user_");
     for ch in user_id.chars().flat_map(|c| c.to_lowercase()) {
         schema.push(if ch.is_ascii_alphanumeric() { ch } else { '_' });
@@ -6369,6 +7959,20 @@ fn tenant_trigger_observations_table(user_id: &str) -> String {
         "\"{}\".workflow_trigger_observations",
         tenant_schema_name(user_id)
     )
+}
+
+/// Derive a 32-byte symmetric key for Gmail OAuth token encryption (GAP-062).
+/// Uses HKDF-SHA256 over the server's signing key with a Gmail-specific info tag
+/// so compromise of one domain doesn't expose another.
+fn gmail_token_encryption_key() -> [u8; 32] {
+    let root_key_hex = std::env::var("OMNYID_ENCRYPTION_KEY_HEX")
+        .or_else(|_| std::env::var("OMNYID_SIGNING_KEY_HEX"))
+        .unwrap_or_default();
+    let root_key = hex::decode(root_key_hex.trim()).unwrap_or_else(|_| vec![0u8; 32]);
+    let derived = crate::post_quantum::hkdf_sha256(&root_key, b"omnyid-gmail-token-kek", b"v1", 32);
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&derived);
+    key
 }
 
 fn tenant_messages_table(user_id: &str) -> String {
@@ -6545,6 +8149,7 @@ fn tenant_private_schema_bootstrap_sql(schema: &str) -> Vec<String> {
                 to_agents JSONB NOT NULL,
                 timestamp TIMESTAMPTZ NOT NULL,
                 type TEXT NOT NULL,
+                kind TEXT,
                 content JSONB NOT NULL,
                 views JSONB NOT NULL DEFAULT '[]'::jsonb,
                 summary TEXT,
@@ -6970,7 +8575,7 @@ fn integration_transport_label(
     }
 }
 
-fn proto_message_from_row(row: sqlx::postgres::PgRow) -> ProtoMessage {
+fn proto_message_from_row(row: sqlx::postgres::PgRow) -> Result<ProtoMessage, sqlx::Error> {
     let encryption = row
         .try_get::<Option<Value>, _>("encryption")
         .unwrap_or(None)
@@ -6979,24 +8584,27 @@ fn proto_message_from_row(row: sqlx::postgres::PgRow) -> ProtoMessage {
         .try_get::<Value, _>("views")
         .unwrap_or_else(|_| Value::Array(vec![]));
 
-    ProtoMessage {
+    Ok(ProtoMessage {
         protocol: "afp-v1".to_string(),
-        id: row.try_get("id").unwrap_or_default(),
-        thread_id: row.try_get("thread_id").unwrap_or_default(),
+        id: row.try_get("id")?,
+        thread_id: row.try_get("thread_id")?,
         parent_id: row
-            .try_get::<Option<String>, _>("parent_id")
-            .unwrap_or_default()
+            .try_get::<Option<String>, _>("parent_id")?
             .unwrap_or_default(),
-        from: row.try_get("from_agent").unwrap_or_default(),
+        from: row.try_get("from_agent")?,
         to: serde_json::from_value(row.try_get("to_agents").unwrap_or(Value::Array(vec![])))
             .unwrap_or_default(),
-        timestamp: row.try_get("timestamp").unwrap_or_default(),
-        r#type: row.try_get("type").unwrap_or_default(),
+        timestamp: row.try_get("timestamp")?,
+        r#type: row.try_get("type")?,
+        kind: row
+            .try_get::<Option<String>, _>("kind")
+            .unwrap_or(None)
+            .filter(|value| !value.trim().is_empty()),
         content: row
             .try_get::<Value, _>("content")
             .unwrap_or_else(|_| Value::Object(Default::default()))
             .to_string(),
-        signature: row.try_get("signature").unwrap_or_default(),
+        signature: row.try_get("signature")?,
         encryption: encryption.to_string(),
         views: redacted_views_for_read(&views, &encryption).to_string(),
         references: row
@@ -7017,80 +8625,89 @@ fn proto_message_from_row(row: sqlx::postgres::PgRow) -> ProtoMessage {
             .unwrap_or(None)
             .map(|value| value.to_string())
             .unwrap_or_default(),
-    }
+    })
 }
 
-fn user_from_row(row: sqlx::postgres::PgRow) -> UserRecord {
-    UserRecord {
-        id: row.try_get("id").unwrap_or_default(),
-        email: row.try_get("email").unwrap_or_default(),
+fn user_from_row(row: sqlx::postgres::PgRow) -> Result<UserRecord, sqlx::Error> {
+    Ok(UserRecord {
+        id: row.try_get("id")?,
+        email: row.try_get("email")?,
         password_hash: row.try_get("password_hash").unwrap_or(None),
-        auth_provider: row.try_get("auth_provider").unwrap_or_default(),
+        auth_provider: row.try_get("auth_provider")?,
         google_sub: row.try_get("google_sub").unwrap_or(None),
-        display_name: row.try_get("display_name").unwrap_or_default(),
-        created_at: row.try_get("created_at").unwrap_or_default(),
-    }
+        display_name: row.try_get("display_name")?,
+        created_at: row.try_get("created_at")?,
+    })
 }
 
-fn session_from_row(row: sqlx::postgres::PgRow) -> AuthSessionRecord {
-    AuthSessionRecord {
-        token: row.try_get("token").unwrap_or_default(),
-        user_id: row.try_get("user_id").unwrap_or_default(),
-        created_at: row.try_get("created_at").unwrap_or_default(),
-        expires_at: row.try_get("expires_at").unwrap_or_default(),
-    }
+/// SHA-256 hash of a raw bearer token for at-rest storage (GAP-005).
+///
+/// Never stored or compared in plain text. Hashing here means a DB
+/// compromise exposes only token hashes, not usable credentials.
+pub(crate) fn sha256_token(raw: &str) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(Sha256::digest(raw.as_bytes()))
 }
 
-fn managed_agent_from_row(row: sqlx::postgres::PgRow) -> ManagedAgentRecord {
-    ManagedAgentRecord {
-        id: row.try_get("id").unwrap_or_default(),
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
-        agent_id: row.try_get("agent_id").unwrap_or_default(),
-        label: row.try_get("label").unwrap_or_default(),
-        email: row.try_get("email").unwrap_or_default(),
-        kind: row.try_get("kind").unwrap_or_default(),
-        created_at: row.try_get("created_at").unwrap_or_default(),
+fn session_from_row(row: sqlx::postgres::PgRow) -> Result<AuthSessionRecord, sqlx::Error> {
+    Ok(AuthSessionRecord {
+        token: row.try_get("token")?,
+        user_id: row.try_get("user_id")?,
+        created_at: row.try_get("created_at")?,
+        expires_at: row.try_get("expires_at")?,
+    })
+}
+
+fn managed_agent_from_row(row: sqlx::postgres::PgRow) -> Result<ManagedAgentRecord, sqlx::Error> {
+    Ok(ManagedAgentRecord {
+        id: row.try_get("id")?,
+        owner_user_id: row.try_get("owner_user_id")?,
+        agent_id: row.try_get("agent_id")?,
+        label: row.try_get("label")?,
+        email: row.try_get("email")?,
+        kind: row.try_get("kind")?,
+        created_at: row.try_get("created_at")?,
         metadata: row
             .try_get("metadata")
             .unwrap_or_else(|_| Value::Object(Default::default())),
-    }
+    })
 }
 
-fn action_audit_entry_from_row(row: sqlx::postgres::PgRow) -> ActionAuditEntry {
-    ActionAuditEntry {
-        capability_id: row.try_get("capability_id").unwrap_or_default(),
-        thread_id: row.try_get("thread_id").unwrap_or_default(),
-        status: row.try_get("status").unwrap_or_default(),
+fn action_audit_entry_from_row(row: sqlx::postgres::PgRow) -> Result<ActionAuditEntry, sqlx::Error> {
+    Ok(ActionAuditEntry {
+        capability_id: row.try_get("capability_id")?,
+        thread_id: row.try_get("thread_id")?,
+        status: row.try_get("status")?,
         output: row
             .try_get("output")
             .unwrap_or_else(|_| Value::Object(Default::default())),
         external_reference: row.try_get("external_reference").unwrap_or(None),
-        recorded_at: row.try_get("recorded_at").unwrap_or_default(),
-    }
+        recorded_at: row.try_get("recorded_at")?,
+    })
 }
 
-fn runtime_deployment_from_row(row: sqlx::postgres::PgRow) -> RuntimeDeploymentRecord {
-    RuntimeDeploymentRecord {
-        id: row.try_get("id").unwrap_or_default(),
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
-        framework: row.try_get("framework").unwrap_or_default(),
+fn runtime_deployment_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeDeploymentRecord, sqlx::Error> {
+    Ok(RuntimeDeploymentRecord {
+        id: row.try_get("id")?,
+        owner_user_id: row.try_get("owner_user_id")?,
+        framework: row.try_get("framework")?,
         gui: row.try_get("gui").unwrap_or(None),
-        status: row.try_get("status").unwrap_or_default(),
-        python_version: row.try_get("python_version").unwrap_or_default(),
-        image_ref: row.try_get("image_ref").unwrap_or_default(),
-        runtime_token: row.try_get("runtime_token").unwrap_or_default(),
-        workspace_path: row.try_get("workspace_path").unwrap_or_default(),
+        status: row.try_get("status")?,
+        python_version: row.try_get("python_version")?,
+        image_ref: row.try_get("image_ref")?,
+        runtime_token: row.try_get("runtime_token")?,
+        workspace_path: row.try_get("workspace_path")?,
         config_json: row
             .try_get("config_json")
             .unwrap_or_else(|_| Value::Object(Default::default())),
-        created_at: row.try_get("created_at").unwrap_or_default(),
-        updated_at: row.try_get("updated_at").unwrap_or_default(),
-    }
+        created_at: row.try_get("created_at")?,
+        updated_at: row.try_get("updated_at")?,
+    })
 }
 
-fn user_onboarding_from_row(row: sqlx::postgres::PgRow) -> UserOnboardingRecord {
-    UserOnboardingRecord {
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
+fn user_onboarding_from_row(row: sqlx::postgres::PgRow) -> Result<UserOnboardingRecord, sqlx::Error> {
+    Ok(UserOnboardingRecord {
+        owner_user_id: row.try_get("owner_user_id")?,
         identity_confirmed: row.try_get("identity_confirmed").unwrap_or(false),
         email_provider: row.try_get("email_provider").unwrap_or(None),
         email_address: row.try_get("email_address").unwrap_or(None),
@@ -7102,15 +8719,15 @@ fn user_onboarding_from_row(row: sqlx::postgres::PgRow) -> UserOnboardingRecord 
         notes: row
             .try_get("notes")
             .unwrap_or_else(|_| Value::Object(Default::default())),
-        updated_at: row.try_get("updated_at").unwrap_or_default(),
+        updated_at: row.try_get("updated_at")?,
         completed_at: row.try_get("completed_at").unwrap_or(None),
-    }
+    })
 }
 
-fn support_access_grant_from_row(row: sqlx::postgres::PgRow) -> SupportAccessGrantRecord {
-    SupportAccessGrantRecord {
-        id: row.try_get("id").unwrap_or_default(),
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
+fn support_access_grant_from_row(row: sqlx::postgres::PgRow) -> Result<SupportAccessGrantRecord, sqlx::Error> {
+    Ok(SupportAccessGrantRecord {
+        id: row.try_get("id")?,
+        owner_user_id: row.try_get("owner_user_id")?,
         status: row
             .try_get("status")
             .unwrap_or_else(|_| "disabled".to_string()),
@@ -7122,37 +8739,37 @@ fn support_access_grant_from_row(row: sqlx::postgres::PgRow) -> SupportAccessGra
         notes: row
             .try_get("notes")
             .unwrap_or_else(|_| Value::Object(Default::default())),
-        granted_at: row.try_get("granted_at").unwrap_or_default(),
-        expires_at: row.try_get("expires_at").unwrap_or_default(),
+        granted_at: row.try_get("granted_at")?,
+        expires_at: row.try_get("expires_at")?,
         revoked_at: row.try_get("revoked_at").unwrap_or(None),
-    }
+    })
 }
 
-fn runtime_backup_policy_from_row(row: sqlx::postgres::PgRow) -> RuntimeBackupPolicyRecord {
-    RuntimeBackupPolicyRecord {
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
+fn runtime_backup_policy_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeBackupPolicyRecord, sqlx::Error> {
+    Ok(RuntimeBackupPolicyRecord {
+        owner_user_id: row.try_get("owner_user_id")?,
         retention_days: row.try_get("retention_days").unwrap_or(14),
         storage_mode: row
             .try_get::<Option<String>, _>("storage_mode")
             .unwrap_or(Some("metadata_only_hosted".to_string()))
             .unwrap_or_else(|| "metadata_only_hosted".to_string()),
         last_snapshot_at: row.try_get("last_snapshot_at").unwrap_or(None),
-        created_at: row.try_get("created_at").unwrap_or_default(),
-        updated_at: row.try_get("updated_at").unwrap_or_default(),
-    }
+        created_at: row.try_get("created_at")?,
+        updated_at: row.try_get("updated_at")?,
+    })
 }
 
-fn runtime_backup_from_row(row: sqlx::postgres::PgRow) -> RuntimeBackupRecord {
-    RuntimeBackupRecord {
-        id: row.try_get("id").unwrap_or_default(),
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
+fn runtime_backup_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeBackupRecord, sqlx::Error> {
+    Ok(RuntimeBackupRecord {
+        id: row.try_get("id")?,
+        owner_user_id: row.try_get("owner_user_id")?,
         runtime_deployment_id: row.try_get("runtime_deployment_id").unwrap_or(None),
-        snapshot_type: row.try_get("snapshot_type").unwrap_or_default(),
+        snapshot_type: row.try_get("snapshot_type")?,
         storage_mode: row
             .try_get::<Option<String>, _>("storage_mode")
             .unwrap_or(Some("metadata_only_hosted".to_string()))
             .unwrap_or_else(|| "metadata_only_hosted".to_string()),
-        status: row.try_get("status").unwrap_or_default(),
+        status: row.try_get("status")?,
         file_count: row.try_get("file_count").unwrap_or_default(),
         total_workspace_bytes: row.try_get("total_workspace_bytes").unwrap_or_default(),
         artifact_size_bytes: row.try_get("artifact_size_bytes").unwrap_or_default(),
@@ -7160,28 +8777,28 @@ fn runtime_backup_from_row(row: sqlx::postgres::PgRow) -> RuntimeBackupRecord {
         manifest_json: row
             .try_get("manifest_json")
             .unwrap_or_else(|_| Value::Object(Default::default())),
-        created_at: row.try_get("created_at").unwrap_or_default(),
-        expires_at: row.try_get("expires_at").unwrap_or_default(),
-    }
+        created_at: row.try_get("created_at")?,
+        expires_at: row.try_get("expires_at")?,
+    })
 }
 
-fn runtime_restore_drill_from_row(row: sqlx::postgres::PgRow) -> RuntimeRestoreDrillRecord {
-    RuntimeRestoreDrillRecord {
-        id: row.try_get("id").unwrap_or_default(),
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
-        backup_id: row.try_get("backup_id").unwrap_or_default(),
-        status: row.try_get("status").unwrap_or_default(),
+fn runtime_restore_drill_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeRestoreDrillRecord, sqlx::Error> {
+    Ok(RuntimeRestoreDrillRecord {
+        id: row.try_get("id")?,
+        owner_user_id: row.try_get("owner_user_id")?,
+        backup_id: row.try_get("backup_id")?,
+        status: row.try_get("status")?,
         notes_json: row
             .try_get("notes_json")
             .unwrap_or_else(|_| Value::Object(Default::default())),
-        started_at: row.try_get("started_at").unwrap_or_default(),
+        started_at: row.try_get("started_at")?,
         completed_at: row.try_get("completed_at").unwrap_or(None),
-    }
+    })
 }
 
-fn runtime_update_policy_from_row(row: sqlx::postgres::PgRow) -> RuntimeUpdatePolicyRecord {
-    RuntimeUpdatePolicyRecord {
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
+fn runtime_update_policy_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeUpdatePolicyRecord, sqlx::Error> {
+    Ok(RuntimeUpdatePolicyRecord {
+        owner_user_id: row.try_get("owner_user_id")?,
         update_channel: row
             .try_get::<Option<String>, _>("update_channel")
             .unwrap_or(Some("stable".to_string()))
@@ -7192,49 +8809,49 @@ fn runtime_update_policy_from_row(row: sqlx::postgres::PgRow) -> RuntimeUpdatePo
             .unwrap_or_else(|| "manual_only".to_string()),
         last_checked_at: row.try_get("last_checked_at").unwrap_or(None),
         last_applied_at: row.try_get("last_applied_at").unwrap_or(None),
-        created_at: row.try_get("created_at").unwrap_or_default(),
-        updated_at: row.try_get("updated_at").unwrap_or_default(),
-    }
+        created_at: row.try_get("created_at")?,
+        updated_at: row.try_get("updated_at")?,
+    })
 }
 
-fn runtime_update_event_from_row(row: sqlx::postgres::PgRow) -> RuntimeUpdateEventRecord {
-    RuntimeUpdateEventRecord {
-        id: row.try_get("id").unwrap_or_default(),
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
+fn runtime_update_event_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeUpdateEventRecord, sqlx::Error> {
+    Ok(RuntimeUpdateEventRecord {
+        id: row.try_get("id")?,
+        owner_user_id: row.try_get("owner_user_id")?,
         runtime_deployment_id: row.try_get("runtime_deployment_id").unwrap_or(None),
-        action: row.try_get("action").unwrap_or_default(),
+        action: row.try_get("action")?,
         from_version: row.try_get("from_version").unwrap_or(None),
         to_version: row.try_get("to_version").unwrap_or(None),
-        status: row.try_get("status").unwrap_or_default(),
+        status: row.try_get("status")?,
         notes_json: row
             .try_get("notes_json")
             .unwrap_or_else(|_| Value::Object(Default::default())),
-        created_at: row.try_get("created_at").unwrap_or_default(),
-    }
+        created_at: row.try_get("created_at")?,
+    })
 }
 
 fn runtime_runner_policy_event_from_row(
     row: sqlx::postgres::PgRow,
-) -> RuntimeRunnerPolicyEventRecord {
-    RuntimeRunnerPolicyEventRecord {
-        id: row.try_get("id").unwrap_or_default(),
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
+) -> Result<RuntimeRunnerPolicyEventRecord, sqlx::Error> {
+    Ok(RuntimeRunnerPolicyEventRecord {
+        id: row.try_get("id")?,
+        owner_user_id: row.try_get("owner_user_id")?,
         runtime_deployment_id: row.try_get("runtime_deployment_id").unwrap_or(None),
-        event_kind: row.try_get("event_kind").unwrap_or_default(),
+        event_kind: row.try_get("event_kind")?,
         summary_json: row
             .try_get("summary_json")
             .unwrap_or_else(|_| Value::Object(Default::default())),
-        created_at: row.try_get("created_at").unwrap_or_default(),
-    }
+        created_at: row.try_get("created_at")?,
+    })
 }
 
-fn sync_device_policy_from_row(row: sqlx::postgres::PgRow) -> SyncDevicePolicyRecord {
-    SyncDevicePolicyRecord {
-        device_id: row.try_get("device_id").unwrap_or_default(),
-        owner_user_id: row.try_get("owner_user_id").unwrap_or_default(),
-        agent_id: row.try_get("agent_id").unwrap_or_default(),
-        device_class: row.try_get("device_class").unwrap_or_default(),
-        policy_profile: row.try_get("policy_profile").unwrap_or_default(),
+fn sync_device_policy_from_row(row: sqlx::postgres::PgRow) -> Result<SyncDevicePolicyRecord, sqlx::Error> {
+    Ok(SyncDevicePolicyRecord {
+        device_id: row.try_get("device_id")?,
+        owner_user_id: row.try_get("owner_user_id")?,
+        agent_id: row.try_get("agent_id")?,
+        device_class: row.try_get("device_class")?,
+        policy_profile: row.try_get("policy_profile")?,
         sync_slices: row
             .try_get("sync_slices")
             .unwrap_or_else(|_| Value::Array(vec![])),
@@ -7242,11 +8859,11 @@ fn sync_device_policy_from_row(row: sqlx::postgres::PgRow) -> SyncDevicePolicyRe
         notes_json: row
             .try_get("notes_json")
             .unwrap_or_else(|_| Value::Object(Default::default())),
-        last_bundle_at: row.try_get("last_bundle_at").unwrap_or_default(),
+        last_bundle_at: row.try_get("last_bundle_at")?,
         last_used_at: row.try_get("last_used_at").unwrap_or(None),
-        created_at: row.try_get("created_at").unwrap_or_default(),
-        updated_at: row.try_get("updated_at").unwrap_or_default(),
-    }
+        created_at: row.try_get("created_at")?,
+        updated_at: row.try_get("updated_at")?,
+    })
 }
 
 fn approval_mode_label(mode: &crate::integration::ApprovalMode) -> &'static str {
@@ -7390,6 +9007,7 @@ mod tests {
             to: vec!["agent:peer@omnyid.local".to_string()],
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "task".to_string(),
+            kind: None,
             content: "{\"secret\":true}".to_string(),
             signature: "demo".to_string(),
             encryption: "{\"scheme\":\"omnyid-envelope-v1\",\"algorithm\":\"xchacha20poly1305-ietf\",\"nonce\":\"abc\",\"ciphertext\":\"def\"}".to_string(),
@@ -7808,6 +9426,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
+            kind: None,
             content: String::new(),
             signature: "smoke-signature".to_string(),
             encryption: String::new(),
@@ -7844,6 +9463,7 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
+            kind: None,
             content: String::new(),
             signature: "smoke-signature".to_string(),
             encryption: String::new(),
@@ -8376,6 +9996,7 @@ mod tests {
             to: vec!["agent:peer@omnyid.test".to_string()],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
+            kind: None,
             content: String::new(),
             signature: "smoke-signature".to_string(),
             encryption: String::new(),
@@ -8438,3 +10059,7 @@ mod tests {
         assert_eq!(public_private_attachment_count, 0);
     }
 }
+
+#[cfg(test)]
+#[path = "db/tests.rs"]
+mod claim_neighborhood_tests;
