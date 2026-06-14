@@ -6227,22 +6227,116 @@ impl Db {
 
     pub async fn log_proactive_action(
         &self,
-        _user_id: &str,
-        _heuristic_id: &str,
-        _suggestion_id: &str,
-        _action_type: &str,
-        _audit_content: Option<serde_json::Value>,
-        _afp_message_id: Option<&str>,
-        _tier: &str,
-        _tokens_used: i64,
+        user_id: &str,
+        heuristic_id: &str,
+        suggestion_id: &str,
+        action_type: &str,
+        audit_content: Option<serde_json::Value>,
+        afp_message_id: Option<&str>,
+        tier: &str,
+        tokens_used: i64,
     ) -> Result<(), sqlx::Error> {
+        let audit_content = audit_content.unwrap_or(Value::Null);
+        let inputs_snapshot = audit_content
+            .get("inputs")
+            .cloned()
+            .unwrap_or_else(|| audit_content.clone());
+        let output_afp_id = afp_message_id
+            .map(ToOwned::to_owned)
+            .or_else(|| {
+                audit_content
+                    .get("output_afp_id")
+                    .and_then(Value::as_str)
+                    .map(ToOwned::to_owned)
+            });
+        let action_afp_type = audit_content
+            .get("action_afp_type")
+            .and_then(Value::as_str)
+            .unwrap_or(action_type);
+
+        sqlx::query(
+            r#"INSERT INTO proactive_action_audit
+               (id, owner_user_id, heuristic_id, suggestion_id, action_afp_type,
+                inputs_snapshot, output_afp_id, autonomy_tier, token_cost)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
+        )
+        .bind(Ulid::new().to_string())
+        .bind(user_id)
+        .bind(heuristic_id)
+        .bind(suggestion_id)
+        .bind(action_afp_type)
+        .bind(inputs_snapshot)
+        .bind(output_afp_id)
+        .bind(tier)
+        .bind(tokens_used)
+        .execute(&self.pool)
+        .await?;
+
         Ok(())
     }
 
     pub async fn record_proactive_outcome(
         &self,
-        _record: &crate::proactive_engine::ProactiveOutcomeRecord,
+        record: &crate::proactive_engine::ProactiveOutcomeRecord,
     ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"INSERT INTO proactive_outcomes
+               (id, owner_user_id, suggestion_id, accepted, outcome_afp_id, heuristic_id)
+               VALUES ($1, $2, $3, $4, $5, $6)"#,
+        )
+        .bind(Ulid::new().to_string())
+        .bind(&record.owner_user_id)
+        .bind(&record.suggestion_id)
+        .bind(record.accepted)
+        .bind(&record.outcome_afp_id)
+        .bind(&record.heuristic_id)
+        .execute(&self.pool)
+        .await?;
+
+        let _ = sqlx::query(
+            r#"UPDATE proactive_suggestions
+               SET dismissed_at = NOW()
+               WHERE owner_user_id = $1 AND id = $2 AND dismissed_at IS NULL"#,
+        )
+        .bind(&record.owner_user_id)
+        .bind(&record.suggestion_id)
+        .execute(&self.pool)
+        .await;
+
+        // Update EMA state for the heuristic — load current, apply EMA update, persist.
+        let current_ema = self
+            .get_heuristic_ema_state(&record.owner_user_id, &record.heuristic_id)
+            .await
+            .unwrap_or(None);
+        let (prev_ema, prev_count) = current_ema
+            .as_ref()
+            .map(|s| {
+                let e = s["ema_acceptance_rate"].as_f64().unwrap_or(0.5);
+                let c = s["sample_count"].as_i64().unwrap_or(0) as i32;
+                (e, c)
+            })
+            .unwrap_or((0.5, 0));
+        let new_ema = crate::heuristic_adaptation::update_acceptance_ema(prev_ema, record.accepted);
+        let new_count = prev_count.saturating_add(1);
+        let signals = crate::heuristic_adaptation::HeuristicSignals {
+            ema_acceptance_rate: new_ema,
+            sample_count: new_count as u32,
+            ..Default::default()
+        };
+        // Use 0.7 as a neutral base for storing the delta — callers apply it
+        // against their actual heuristic base threshold at evaluation time.
+        let adaptation = crate::heuristic_adaptation::compute_threshold_adaptation(0.7, &signals);
+        let _ = self
+            .update_heuristic_ema_state(
+                &record.owner_user_id,
+                &record.heuristic_id,
+                new_ema,
+                new_count,
+                adaptation.threshold_delta,
+                adaptation.adaptation_reason,
+            )
+            .await;
+
         Ok(())
     }
 
@@ -6346,6 +6440,25 @@ impl Db {
             .is_some())
     }
 
+    pub async fn latest_proactive_outcome_accepted(
+        &self,
+        owner_user_id: &str,
+        heuristic_id: &str,
+    ) -> Result<Option<bool>, sqlx::Error> {
+        use sqlx::Row;
+        let row = sqlx::query(
+            r#"SELECT accepted FROM proactive_outcomes
+               WHERE owner_user_id = $1 AND heuristic_id = $2
+               ORDER BY created_at DESC
+               LIMIT 1"#,
+        )
+        .bind(owner_user_id)
+        .bind(heuristic_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.and_then(|value| value.try_get::<bool, _>("accepted").ok()))
+    }
+
     pub async fn get_enabled_packs(&self, owner_user_id: &str) -> Result<Vec<String>, sqlx::Error> {
         use sqlx::Row;
         let rows = sqlx::query(
@@ -6367,8 +6480,8 @@ impl Db {
         use sqlx::Row;
         let rows = sqlx::query(
             r#"SELECT heuristic_id,
-                  COUNT(*) FILTER (WHERE outcome = 'accepted') AS accepted,
-                  COUNT(*) FILTER (WHERE outcome = 'dismissed') AS dismissed
+                  COUNT(*) FILTER (WHERE accepted = TRUE) AS accepted,
+                  COUNT(*) FILTER (WHERE accepted = FALSE) AS dismissed
                FROM proactive_outcomes
                WHERE owner_user_id = $1
                GROUP BY heuristic_id"#,
@@ -6392,6 +6505,159 @@ impl Db {
             }));
         }
         Ok(result)
+    }
+
+    pub async fn heuristic_family_acceptance_rates(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        use sqlx::Row;
+        use std::collections::BTreeMap;
+
+        let rows = sqlx::query(
+            r#"SELECT heuristic_id, accepted
+               FROM proactive_outcomes
+               WHERE owner_user_id = $1"#,
+        )
+        .bind(owner_user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut grouped: BTreeMap<String, (i64, i64)> = BTreeMap::new();
+        for row in rows {
+            let heuristic_id = row.try_get::<String, _>("heuristic_id").unwrap_or_default();
+            let accepted = row.try_get::<bool, _>("accepted").unwrap_or(false);
+            let family_id = proactive_heuristic_family_id(&heuristic_id);
+            let entry = grouped.entry(family_id).or_insert((0, 0));
+            entry.0 += 1;
+            if accepted {
+                entry.1 += 1;
+            }
+        }
+
+        Ok(grouped
+            .into_iter()
+            .map(|(heuristic_id, (total, accepted))| {
+                let acceptance_rate = if total > 0 {
+                    accepted as f64 / total as f64
+                } else {
+                    0.5
+                };
+                serde_json::json!({
+                    "heuristic_id": heuristic_id,
+                    "accepted": accepted,
+                    "dismissed": total - accepted,
+                    "total": total,
+                    "acceptance_rate": acceptance_rate,
+                })
+            })
+            .collect())
+    }
+
+    // ── Phase 8: EMA adaptation helpers ──────────────────────────────────────
+
+    /// Acceptance rates for the sliding window (last `days` days only).
+    /// Feeds `HeuristicSignals.ema_acceptance_rate` for recency-biased inputs.
+    pub async fn heuristic_acceptance_rates_recent(
+        &self,
+        owner_user_id: &str,
+        days: i32,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        use sqlx::Row;
+        let rows = sqlx::query(
+            r#"SELECT heuristic_id,
+                  COUNT(*) FILTER (WHERE accepted = TRUE) AS accepted,
+                  COUNT(*) FILTER (WHERE accepted = FALSE) AS dismissed
+               FROM proactive_outcomes
+               WHERE owner_user_id = $1
+                 AND created_at >= NOW() - ($2 || ' days')::INTERVAL
+               GROUP BY heuristic_id"#,
+        )
+        .bind(owner_user_id)
+        .bind(days)
+        .fetch_all(&self.pool)
+        .await?;
+        let mut result = Vec::new();
+        for row in rows {
+            let hid = row.try_get::<String, _>("heuristic_id").unwrap_or_default();
+            let acc = row.try_get::<i64, _>("accepted").unwrap_or(0);
+            let dis = row.try_get::<i64, _>("dismissed").unwrap_or(0);
+            let total = acc + dis;
+            let acceptance_rate = if total > 0 { acc as f64 / total as f64 } else { 0.5 };
+            result.push(serde_json::json!({
+                "heuristic_id": hid,
+                "accepted": acc,
+                "dismissed": dis,
+                "total": total,
+                "acceptance_rate": acceptance_rate,
+            }));
+        }
+        Ok(result)
+    }
+
+    /// Load the persisted EMA state for a single heuristic.
+    pub async fn get_heuristic_ema_state(
+        &self,
+        owner_user_id: &str,
+        heuristic_id: &str,
+    ) -> Result<Option<Value>, sqlx::Error> {
+        use sqlx::Row;
+        let row = sqlx::query(
+            r#"SELECT ema_acceptance_rate, ema_dismissal_rate, sample_count,
+                      last_threshold_delta, last_adaptation_reason
+               FROM heuristic_ema_state
+               WHERE owner_user_id = $1 AND heuristic_id = $2"#,
+        )
+        .bind(owner_user_id)
+        .bind(heuristic_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| {
+            serde_json::json!({
+                "ema_acceptance_rate": r.try_get::<f64, _>("ema_acceptance_rate").unwrap_or(0.5),
+                "ema_dismissal_rate": r.try_get::<f64, _>("ema_dismissal_rate").unwrap_or(0.5),
+                "sample_count": r.try_get::<i32, _>("sample_count").unwrap_or(0),
+                "last_threshold_delta": r.try_get::<f64, _>("last_threshold_delta").unwrap_or(0.0),
+                "last_adaptation_reason": r.try_get::<String, _>("last_adaptation_reason")
+                    .unwrap_or_else(|_| "insufficient_signal".to_string()),
+            })
+        }))
+    }
+
+    /// Upsert the EMA state after a new outcome is recorded.
+    pub async fn update_heuristic_ema_state(
+        &self,
+        owner_user_id: &str,
+        heuristic_id: &str,
+        ema_acceptance_rate: f64,
+        sample_count: i32,
+        threshold_delta: f64,
+        adaptation_reason: &str,
+    ) -> Result<(), sqlx::Error> {
+        let ema_dismissal_rate = (1.0 - ema_acceptance_rate).clamp(0.0, 1.0);
+        sqlx::query(
+            r#"INSERT INTO heuristic_ema_state
+               (owner_user_id, heuristic_id, ema_acceptance_rate, ema_dismissal_rate,
+                sample_count, last_threshold_delta, last_adaptation_reason, last_updated)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+               ON CONFLICT (owner_user_id, heuristic_id) DO UPDATE SET
+                 ema_acceptance_rate    = EXCLUDED.ema_acceptance_rate,
+                 ema_dismissal_rate     = EXCLUDED.ema_dismissal_rate,
+                 sample_count           = EXCLUDED.sample_count,
+                 last_threshold_delta   = EXCLUDED.last_threshold_delta,
+                 last_adaptation_reason = EXCLUDED.last_adaptation_reason,
+                 last_updated           = NOW()"#,
+        )
+        .bind(owner_user_id)
+        .bind(heuristic_id)
+        .bind(ema_acceptance_rate)
+        .bind(ema_dismissal_rate)
+        .bind(sample_count)
+        .bind(threshold_delta)
+        .bind(adaptation_reason)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     pub async fn query_temporal_summary(&self, limit: i64) -> Result<Vec<Value>, sqlx::Error> {
@@ -8647,6 +8913,16 @@ fn user_from_row(row: sqlx::postgres::PgRow) -> Result<UserRecord, sqlx::Error> 
 pub(crate) fn sha256_token(raw: &str) -> String {
     use sha2::{Digest, Sha256};
     hex::encode(Sha256::digest(raw.as_bytes()))
+}
+
+pub(crate) fn proactive_heuristic_family_id(heuristic_id: &str) -> String {
+    if heuristic_id.starts_with("prepared-draft:") {
+        return heuristic_id
+            .rsplit_once(':')
+            .map(|(prefix, _)| prefix.to_string())
+            .unwrap_or_else(|| heuristic_id.to_string());
+    }
+    heuristic_id.to_string()
 }
 
 fn session_from_row(row: sqlx::postgres::PgRow) -> Result<AuthSessionRecord, sqlx::Error> {

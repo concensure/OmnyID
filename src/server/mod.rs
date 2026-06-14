@@ -1057,7 +1057,6 @@ pub async fn run() {
         )
         .route("/billing/webhook", post(billing_webhook_http))
         .route("/billing/status", get(billing_status_http))
-        .route("/api/cost/summary", get(cost_summary_http))
         .route(
             "/api/cost/budget",
             get(get_budget_http).post(upsert_budget_http),
@@ -1617,6 +1616,10 @@ async fn dashboard_bootstrap_http(
         messages,
         cost_snapshot: None,
         cost_status: None,
+        workflow_runtime_summary: None,
+        browser_runtime_summary: None,
+        trust_runtime_summary: None,
+        file_runtime_summary: None,
         continuity_state: None,
         continuity_brief: None,
         continuity_handoff: None,
@@ -1630,6 +1633,8 @@ async fn dashboard_bootstrap_http(
         continuity_response_items: Vec::new(),
         continuity_prepared_draft_items: Vec::new(),
         continuity_context_panel_items: Vec::new(),
+        continuity_context_pack_items: Vec::new(),
+        continuity_state_fields: Vec::new(),
         action_log,
         onboarding,
         device_sync_policies,
@@ -1754,6 +1759,10 @@ async fn dashboard_export_http(
         agents,
         cost_snapshot: None,
         cost_status: None,
+        workflow_runtime_summary: None,
+        browser_runtime_summary: None,
+        trust_runtime_summary: None,
+        file_runtime_summary: None,
         continuity_state: None,
         continuity_brief: None,
         continuity_handoff: None,
@@ -1767,6 +1776,8 @@ async fn dashboard_export_http(
         continuity_response_items: Vec::new(),
         continuity_prepared_draft_items: Vec::new(),
         continuity_context_panel_items: Vec::new(),
+        continuity_context_pack_items: Vec::new(),
+        continuity_state_fields: Vec::new(),
         onboarding,
         device_sync_policies,
         support_access,
