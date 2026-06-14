@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+﻿#![allow(dead_code)]
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
@@ -108,6 +108,7 @@ mod ingest_routes;
 mod knowledge_routes;
 mod news_routes;
 mod map_routes;
+mod geofence_routes;
 mod privacy_routes;
 mod proactive_routes;
 mod protocol_routes;
@@ -1061,7 +1062,6 @@ pub async fn run() {
             "/api/cost/budget",
             get(get_budget_http).post(upsert_budget_http),
         )
-        .route("/agent/spend-history", get(agent_spend_history_http))
         // â”€â”€ Agent template â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         .route("/agent/provision", post(agent_provision_http))
         .route("/agent/me", get(agent_me_http))
@@ -1143,6 +1143,7 @@ pub async fn run() {
         .merge(para_routes::routes())
         .merge(news_routes::routes())
         .merge(map_routes::routes())
+        .merge(geofence_routes::routes())
         .merge(privacy_routes::routes())
         .merge(proactive_routes::routes())
         .merge(protocol_routes::routes())
@@ -3402,6 +3403,20 @@ async fn record_action_decision_http(
                 .map(str::to_string)
         })
         .unwrap_or_else(|| target_app_message.r#type.clone());
+    let approval_review = build_action_approval_review_payload(&target_app_message);
+    let selected_option = if normalized_decision == "approved" {
+        serde_json::json!({
+            "option_id": "approve",
+            "label": "Approve",
+            "consequence_summary": "Continue with the approved action."
+        })
+    } else {
+        serde_json::json!({
+            "option_id": "deny",
+            "label": "Deny",
+            "consequence_summary": "Stop before any external or high-consequence effect."
+        })
+    };
 
     let mut decision_message = AFPMessage {
         protocol: "afp-v1".to_string(),
@@ -3421,6 +3436,8 @@ async fn record_action_decision_http(
             "status": action_status_json_label(&action_status),
             "approval_mode": "human_approval_required",
             "note": request.note,
+            "approval_review": approval_review,
+            "selected_option": selected_option,
             "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
                 "This action flowed through an explicit human approval boundary."
             ),
@@ -3429,6 +3446,7 @@ async fn record_action_decision_http(
             "origin": "human_approval",
             "status": action_status_json_label(&action_status),
             "capability_id": capability_id,
+            "approval_review": approval_review,
             "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
                 "This action flowed through an explicit human approval boundary."
             )
@@ -3474,6 +3492,8 @@ async fn record_action_decision_http(
             "target_message_id": request.target_message_id,
             "decision": normalized_decision,
             "note": request.note,
+            "approval_review": approval_review,
+            "selected_option": selected_option,
             "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
                 "This action flowed through an explicit human approval boundary."
             ),
@@ -4258,6 +4278,7 @@ async fn handle_inserted_message_effects(
     app_message: &AFPMessage,
 ) {
     if message_requires_human_approval(app_message) {
+        let approval_review = build_action_approval_review_payload(app_message);
         let pending_result = ActionResult {
             capability_id: action_capability_id(app_message),
             thread_id: app_message.thread_id.clone(),
@@ -4265,6 +4286,7 @@ async fn handle_inserted_message_effects(
             output: serde_json::json!({
                 "message_id": app_message.id,
                 "approval_mode": "human_approval_required",
+                "approval_review": approval_review,
                 "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
                     "Outbound or high-risk action requires explicit human approval."
                 ),
@@ -4287,6 +4309,7 @@ async fn handle_inserted_message_effects(
 }
 
 async fn execute_approved_action(db: &Db, metrics: &Arc<Metrics>, app_message: &AFPMessage) {
+    let approval_review = build_action_approval_review_payload(app_message);
     match dispatch_outgoing_message(app_message).await {
         Ok(true) => {
             metrics.inc_gateway_outbound_attempts();
@@ -4315,6 +4338,7 @@ async fn execute_approved_action(db: &Db, metrics: &Arc<Metrics>, app_message: &
                 output: serde_json::json!({
                     "message_id": app_message.id,
                     "dispatch": "queued",
+                    "approval_review": approval_review,
                 }),
                 external_reference: Some(app_message.id.clone()),
                 recorded_at: chrono::Utc::now().to_rfc3339(),
@@ -4357,6 +4381,7 @@ async fn execute_approved_action(db: &Db, metrics: &Arc<Metrics>, app_message: &
                 output: serde_json::json!({
                     "message_id": app_message.id,
                     "error": err,
+                    "approval_review": approval_review,
                 }),
                 external_reference: Some(app_message.id.clone()),
                 recorded_at: chrono::Utc::now().to_rfc3339(),
@@ -13071,6 +13096,13 @@ fn workflow_run_record(
                         active_node_ids.insert(target);
                     }
                 }
+                let approval_review = build_workflow_approval_review_payload(
+                    Some(graph_node_label.as_str()),
+                    Some(source_node_id.as_str()),
+                    approval_reason.as_deref(),
+                    approval_decision_point_id.as_deref(),
+                    &approval_options,
+                );
                 (
                     "waiting_for_approval".to_string(),
                     Value::Null,
@@ -13094,6 +13126,7 @@ fn workflow_run_record(
                         "reason": approval_reason,
                         "decision_point_id": approval_decision_point_id,
                         "option_count": approval_options.len(),
+                        "approval_review": approval_review,
                         "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
                             "Workflow node is paused at an explicit human approval boundary."
                         ),
@@ -13250,6 +13283,17 @@ fn workflow_run_record(
             "approval_reason": approval_reason,
             "approval_decision_point_id": approval_decision_point_id,
             "approval_options": approval_options,
+            "approval_review": if waiting_node_count > 0 {
+                build_workflow_approval_review_payload(
+                    paused_at_label.as_deref(),
+                    paused_at_node_id.as_deref(),
+                    approval_reason.as_deref(),
+                    approval_decision_point_id.as_deref(),
+                    &approval_options,
+                )
+            } else {
+                Value::Null
+            },
             "autonomy_decision": if waiting_node_count > 0 {
                 serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
                     "Workflow is currently paused at a human approval boundary."
@@ -13408,6 +13452,288 @@ fn workflow_wait_resume_records_for_run(
         .collect()
 }
 
+fn approval_option_summaries(options: &[Value]) -> Vec<Value> {
+    options
+        .iter()
+        .filter_map(|option| {
+            let option_id = option.get("option_id").and_then(Value::as_str)?.trim();
+            if option_id.is_empty() {
+                return None;
+            }
+            let label = option
+                .get("label")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or(option_id);
+            let consequence_summary = option
+                .get("consequence_summary")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("");
+            Some(serde_json::json!({
+                "option_id": option_id,
+                "label": label,
+                "consequence_summary": consequence_summary,
+            }))
+        })
+        .collect()
+}
+
+fn infer_workflow_approval_kind(
+    label: Option<&str>,
+    reason: Option<&str>,
+    options: &[Value],
+) -> &'static str {
+    let mut haystack = String::new();
+    if let Some(label) = label {
+        haystack.push_str(label);
+        haystack.push(' ');
+    }
+    if let Some(reason) = reason {
+        haystack.push_str(reason);
+        haystack.push(' ');
+    }
+    for option in options {
+        if let Some(value) = option.get("label").and_then(Value::as_str) {
+            haystack.push_str(value);
+            haystack.push(' ');
+        }
+        if let Some(value) = option.get("consequence_summary").and_then(Value::as_str) {
+            haystack.push_str(value);
+            haystack.push(' ');
+        }
+    }
+    let lower = haystack.to_ascii_lowercase();
+    if ["purchase", "payment", "pay ", "invoice", "refund", "charge"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+    {
+        "purchase"
+    } else if ["book", "booking", "calendar", "meeting slot", "confirm slot"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+    {
+        "booking"
+    } else if ["publish", "public release", "release", "post publicly"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+    {
+        "publish"
+    } else if ["send", "reply", "response delivery", "email", "notify", "notification"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+    {
+        "send"
+    } else if ["delete", "remove", "destroy", "archive permanently"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+    {
+        "destructive"
+    } else if ["submit", "sign", "confirm", "approve", "accept"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+    {
+        "submit"
+    } else {
+        "review"
+    }
+}
+
+fn build_workflow_approval_review_payload(
+    title: Option<&str>,
+    source_graph_node_id: Option<&str>,
+    approval_reason: Option<&str>,
+    approval_decision_point_id: Option<&str>,
+    approval_options: &[Value],
+) -> Value {
+    let title = title
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("Approval review");
+    let reason = approval_reason
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("This workflow step requires explicit review before continuing.");
+    let decision_point_id = approval_decision_point_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let option_summaries = approval_option_summaries(approval_options);
+    let consequence_summary_lines: Vec<Value> = option_summaries
+        .iter()
+        .filter_map(|option| {
+            option
+                .get("consequence_summary")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| Value::String(value.to_string()))
+        })
+        .take(3)
+        .collect();
+    let mut source_refs = Vec::new();
+    if let Some(node_id) = source_graph_node_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        source_refs.push(Value::String(format!("workflow_node:{node_id}")));
+    }
+    if let Some(decision_point_id) = decision_point_id {
+        source_refs.push(Value::String(format!(
+            "approval_decision_point:{decision_point_id}"
+        )));
+    }
+    let approval_kind = infer_workflow_approval_kind(Some(title), Some(reason), approval_options);
+    serde_json::json!({
+        "title": title,
+        "reason": reason,
+        "approval_kind": approval_kind,
+        "decision_point_id": decision_point_id,
+        "requires_human_review": true,
+        "confidence": "high",
+        "option_count": option_summaries.len(),
+        "options": option_summaries,
+        "consequence_summary_lines": consequence_summary_lines,
+        "provenance_summary": format!("Explicit workflow approval gate at {title}."),
+        "source_refs": source_refs,
+        "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+            "Workflow step is paused at an explicit human approval boundary."
+        ),
+    })
+}
+
+fn selected_approval_option_summary(options: &[Value], option_id: Option<&str>) -> Value {
+    let Some(option_id) = option_id.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Value::Null;
+    };
+    approval_option_summaries(options)
+        .into_iter()
+        .find(|option| option.get("option_id").and_then(Value::as_str) == Some(option_id))
+        .unwrap_or_else(|| {
+            serde_json::json!({
+                "option_id": option_id,
+                "label": option_id,
+                "consequence_summary": "",
+            })
+        })
+}
+
+fn build_action_approval_review_payload(message: &AFPMessage) -> Value {
+    if let Some(existing) = message
+        .content
+        .get("approval_review")
+        .cloned()
+        .filter(|value| !value.is_null())
+    {
+        return existing;
+    }
+
+    let message_type = message.r#type.as_str();
+    let subtype = message.subtype.as_deref().unwrap_or_default();
+    let mut title = format!("Review {}", message_type.replace('_', " "));
+    let mut reason = "This action requires explicit human approval before execution.".to_string();
+    let mut approval_kind = "review";
+    let mut consequence_summary_lines: Vec<Value> = vec![
+        Value::String("Approve to continue with the requested action.".to_string()),
+        Value::String("Deny to stop before any external or high-consequence effect.".to_string()),
+    ];
+
+    if message_type == "shell_command" {
+        title = "Review shell command".to_string();
+        reason = message
+            .content
+            .get("reason")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("Shell commands require explicit approval before execution.")
+            .to_string();
+        approval_kind = "destructive";
+        consequence_summary_lines = vec![
+            Value::String("Approve to run the command with the requested timeout and safety mode.".to_string()),
+            Value::String("Deny to cancel before the command touches the workspace or system state.".to_string()),
+        ];
+    } else if message_type == "email_outgoing"
+        || message_type == "action_reply"
+        || message_type == "action_forward"
+        || (message_type == "email"
+            && matches!(subtype, "outgoing" | "reply" | "forward"))
+    {
+        title = "Review outbound communication".to_string();
+        reason = message
+            .content
+            .get("reason")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("Outbound communication should be reviewed before it is sent.")
+            .to_string();
+        approval_kind = "send";
+        consequence_summary_lines = vec![
+            Value::String("Approve to queue the outbound message for delivery.".to_string()),
+            Value::String("Deny to keep the draft internal and prevent external send.".to_string()),
+        ];
+    } else if let Some(operation) = message
+        .content
+        .get("operation")
+        .and_then(Value::as_str)
+        .map(str::to_ascii_lowercase)
+    {
+        if ["send", "reply", "forward", "notify"].iter().any(|needle| operation.contains(needle)) {
+            approval_kind = "send";
+        } else if ["purchase", "pay", "charge", "refund"].iter().any(|needle| operation.contains(needle)) {
+            approval_kind = "purchase";
+        } else if ["delete", "remove", "destroy"].iter().any(|needle| operation.contains(needle)) {
+            approval_kind = "destructive";
+        } else if ["submit", "publish", "book"].iter().any(|needle| operation.contains(needle)) {
+            approval_kind = "submit";
+        }
+        title = format!("Review {}", operation.replace('_', " "));
+        reason = message
+            .content
+            .get("reason")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("This integration action crosses an explicit approval boundary.")
+            .to_string();
+    }
+
+    let mut source_refs = vec![Value::String(format!("message:{}", message.id))];
+    let capability_id = action_capability_id(message);
+    if !capability_id.trim().is_empty() {
+        source_refs.push(Value::String(format!("capability:{capability_id}")));
+    }
+
+    serde_json::json!({
+        "title": title,
+        "reason": reason,
+        "approval_kind": approval_kind,
+        "requires_human_review": true,
+        "confidence": "high",
+        "option_count": 2,
+        "options": [
+            {
+                "option_id": "approve",
+                "label": "Approve",
+                "consequence_summary": consequence_summary_lines.get(0).and_then(Value::as_str).unwrap_or("Approve to continue.")
+            },
+            {
+                "option_id": "deny",
+                "label": "Deny",
+                "consequence_summary": consequence_summary_lines.get(1).and_then(Value::as_str).unwrap_or("Deny to cancel.")
+            }
+        ],
+        "consequence_summary_lines": consequence_summary_lines,
+        "provenance_summary": format!("Approval derived from AFP {}:{}.", message_type, subtype),
+        "source_refs": source_refs,
+        "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+            "This action requires explicit human approval before execution."
+        ),
+    })
+}
+
 fn workflow_wait_resume_wake_dispatch_plan(wait_resume_record: &Value) -> Value {
     let descriptor = wait_resume_record
         .get("descriptor")
@@ -13462,6 +13788,34 @@ fn workflow_wait_resume_approval_dispatch_plan(
         .get("descriptor")
         .cloned()
         .unwrap_or(Value::Null);
+    let approval_reason = descriptor
+        .get("approval")
+        .and_then(Value::as_object)
+        .and_then(|entry| entry.get("approval_reason"))
+        .and_then(Value::as_str);
+    let approval_decision_point_id = descriptor
+        .get("approval")
+        .and_then(Value::as_object)
+        .and_then(|entry| entry.get("decision_point_id"))
+        .and_then(Value::as_str);
+    let approval_options = descriptor
+        .get("approval")
+        .and_then(Value::as_object)
+        .and_then(|entry| entry.get("options"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let approval_review = build_workflow_approval_review_payload(
+        wait_resume_record
+            .get("source_graph_node_id")
+            .and_then(Value::as_str),
+        wait_resume_record
+            .get("source_graph_node_id")
+            .and_then(Value::as_str),
+        approval_reason,
+        approval_decision_point_id,
+        &approval_options,
+    );
     serde_json::json!({
         "wait_resume_id": wait_resume_record.get("wait_resume_id").cloned().unwrap_or(Value::Null),
         "workflow_id": wait_resume_record.get("workflow_id").cloned().unwrap_or(Value::Null),
@@ -13475,6 +13829,7 @@ fn workflow_wait_resume_approval_dispatch_plan(
         "option_id": option_id,
         "note": note,
         "status": "approval_decision_ready",
+        "approval_review": approval_review,
         "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
             "Workflow resume decision is being dispatched from an explicit human approval boundary."
         ),
@@ -13494,6 +13849,8 @@ fn workflow_wait_resume_approval_dispatch_plan(
                 "option_id": option_id,
                 "note": note,
                 "descriptor": descriptor,
+                "approval_review": approval_review,
+                "selected_option": selected_approval_option_summary(&approval_options, option_id),
                 "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
                     "Workflow resume decision is being dispatched from an explicit human approval boundary."
                 ),
@@ -13507,6 +13864,7 @@ fn workflow_wait_resume_approval_dispatch_plan(
                 "resume_family": wait_resume_record.get("resume_family").cloned().unwrap_or(Value::Null),
                 "resume_kind": wait_resume_record.get("resume_kind").cloned().unwrap_or(Value::Null),
                 "decision": decision,
+                "approval_review": approval_review,
                 "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
                     "Workflow resume decision is being dispatched from an explicit human approval boundary."
                 ),
@@ -13702,6 +14060,7 @@ fn apply_wait_resume_to_run_record(
         result_obj.insert("paused_at_label".to_string(), Value::Null);
         result_obj.insert("approval_reason".to_string(), Value::Null);
         result_obj.insert("approval_decision_point_id".to_string(), Value::Null);
+        result_obj.insert("approval_review".to_string(), Value::Null);
         result_obj.insert(
             "waiting_node_count".to_string(),
             Value::Number(serde_json::Number::from(0)),
@@ -13717,6 +14076,30 @@ fn apply_wait_resume_approval_decision_to_run_record(
     option_id: Option<&str>,
     note: Option<&str>,
 ) {
+    let prior_approval_options = run
+        .result_json
+        .get("approval_options")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let prior_approval_review = run
+        .result_json
+        .get("approval_review")
+        .cloned()
+        .filter(|value| !value.is_null())
+        .unwrap_or_else(|| {
+            build_workflow_approval_review_payload(
+                run.result_json.get("paused_at_label").and_then(Value::as_str),
+                wait_resume_record
+                    .get("source_graph_node_id")
+                    .and_then(Value::as_str),
+                run.result_json.get("approval_reason").and_then(Value::as_str),
+                run.result_json
+                    .get("approval_decision_point_id")
+                    .and_then(Value::as_str),
+                &prior_approval_options,
+            )
+        });
     let wait_resume_id = wait_resume_record
         .get("wait_resume_id")
         .and_then(Value::as_str)
@@ -13883,6 +14266,7 @@ fn apply_wait_resume_approval_decision_to_run_record(
             result_obj.insert("paused_at_label".to_string(), Value::Null);
             result_obj.insert("approval_reason".to_string(), Value::Null);
             result_obj.insert("approval_decision_point_id".to_string(), Value::Null);
+            result_obj.insert("approval_review".to_string(), Value::Null);
             result_obj.insert(
                 "waiting_node_count".to_string(),
                 Value::Number(serde_json::Number::from(0)),
@@ -13903,8 +14287,10 @@ fn apply_wait_resume_approval_decision_to_run_record(
                 "decision": decision_label,
                 "wait_resume_id": wait_resume_id,
                 "option_id": option_id,
+                "selected_option": selected_approval_option_summary(&prior_approval_options, option_id),
                 "note": note,
                 "decided_at": decided_at,
+                "approval_review": prior_approval_review,
                 "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
                     "Workflow approval decision was recorded at an explicit approval boundary."
                 ),
@@ -14207,6 +14593,18 @@ fn continue_workflow_run_after_resume(
                 if let Some(trace) = entry_obj.get_mut("trace").and_then(Value::as_object_mut) {
                     trace.insert("kind".to_string(), Value::String(trace_kind.to_string()));
                     trace.insert("reason".to_string(), Value::String(result_summary.clone()));
+                    if next_status == "waiting_for_approval" {
+                        trace.insert(
+                            "approval_review".to_string(),
+                            build_workflow_approval_review_payload(
+                                paused_at_label.as_deref(),
+                                paused_at_node_id.as_deref(),
+                                approval_reason.as_deref(),
+                                approval_decision_point_id.as_deref(),
+                                &approval_options,
+                            ),
+                        );
+                    }
                     if let Some(action) = trace.get_mut("action").and_then(Value::as_object_mut) {
                         action.insert(
                             "outcome".to_string(),
@@ -14334,25 +14732,53 @@ fn continue_workflow_run_after_resume(
             );
             result_obj.insert(
                 "paused_at_node_id".to_string(),
-                paused_at_node_id.map(Value::String).unwrap_or(Value::Null),
+                paused_at_node_id
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
             );
             result_obj.insert(
                 "paused_at_label".to_string(),
-                paused_at_label.map(Value::String).unwrap_or(Value::Null),
+                paused_at_label
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
             );
             result_obj.insert(
                 "approval_reason".to_string(),
-                approval_reason.map(Value::String).unwrap_or(Value::Null),
+                approval_reason
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
             );
             result_obj.insert(
                 "approval_decision_point_id".to_string(),
                 approval_decision_point_id
+                    .clone()
                     .map(Value::String)
                     .unwrap_or(Value::Null),
             );
             result_obj.insert(
                 "approval_options".to_string(),
                 Value::Array(approval_options),
+            );
+            result_obj.insert(
+                "approval_review".to_string(),
+                if run.status == "waiting_for_approval" {
+                    build_workflow_approval_review_payload(
+                        paused_at_label.as_deref(),
+                        paused_at_node_id.as_deref(),
+                        approval_reason.as_deref(),
+                        approval_decision_point_id.as_deref(),
+                        result_obj
+                            .get("approval_options")
+                            .and_then(Value::as_array)
+                            .map(Vec::as_slice)
+                            .unwrap_or(&[]),
+                    )
+                } else {
+                    Value::Null
+                },
             );
             result_obj.insert(
                 "wait_resume_family".to_string(),
@@ -23221,6 +23647,75 @@ mod tests {
     }
 
     #[test]
+    fn action_approval_review_for_shell_command_is_structured() {
+        let message = AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: "msg_shell_1".to_string(),
+            thread_id: "thread_shell_1".to_string(),
+            parent_id: None,
+            from: "agent:test@omnyid.local".to_string(),
+            to: vec![],
+            timestamp: "2026-03-20T00:00:00Z".to_string(),
+            r#type: "shell_command".to_string(),
+            kind: None,
+            subtype: Some("request".to_string()),
+            content: serde_json::json!({
+                "command": "Remove-Item temp.txt",
+                "reason": "This command may modify workspace files."
+            }),
+            metadata: Some(serde_json::json!({"capability_id": "cap_shell_execute"})),
+            signature: String::new(),
+            encryption: None,
+            views: vec![],
+            references: vec![],
+            typed_refs: vec![],
+            attachments: vec![],
+            store_in_relational: false,
+            prev_hash: None,
+        };
+
+        let review = super::build_action_approval_review_payload(&message);
+        assert_eq!(review["approval_kind"].as_str(), Some("destructive"));
+        assert_eq!(
+            review["reason"].as_str(),
+            Some("This command may modify workspace files.")
+        );
+        assert_eq!(review["confidence"].as_str(), Some("high"));
+        assert_eq!(review["option_count"].as_u64(), Some(2));
+    }
+
+    #[test]
+    fn action_approval_review_for_outbound_email_prefers_send_language() {
+        let message = AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: "msg_email_2".to_string(),
+            thread_id: "thread_email_2".to_string(),
+            parent_id: None,
+            from: "agent:test@omnyid.local".to_string(),
+            to: vec!["friend@example.com".to_string()],
+            timestamp: "2026-03-20T00:00:00Z".to_string(),
+            r#type: "email".to_string(),
+            kind: None,
+            subtype: Some("outgoing".to_string()),
+            content: serde_json::json!({"subject": "Hi", "body": "Hello"}),
+            metadata: Some(serde_json::json!({"channel": "smtp"})),
+            signature: String::new(),
+            encryption: None,
+            views: vec![],
+            references: vec![],
+            typed_refs: vec![],
+            attachments: vec![],
+            store_in_relational: false,
+            prev_hash: None,
+        };
+
+        let review = super::build_action_approval_review_payload(&message);
+        assert_eq!(review["approval_kind"].as_str(), Some("send"));
+        assert_eq!(review["confidence"].as_str(), Some("high"));
+        assert_eq!(review["options"][0]["option_id"].as_str(), Some("approve"));
+    }
+
+    #[test]
     fn action_capability_prefers_metadata_capability_id() {
         let message = AFPMessage {
             protocol: "afp-v1".to_string(),
@@ -27764,6 +28259,18 @@ mod tests {
                 .map(|items| items.len()),
             Some(2)
         );
+        assert_eq!(
+            run.result_json["approval_review"]["reason"].as_str(),
+            Some("A manager must approve this workflow.")
+        );
+        assert_eq!(
+            run.result_json["approval_review"]["confidence"].as_str(),
+            Some("high")
+        );
+        assert_eq!(
+            run.result_json["approval_review"]["option_count"].as_u64(),
+            Some(2)
+        );
         let timeline = run.timeline_json.as_array().expect("timeline array");
         assert_eq!(timeline[0]["status"].as_str(), Some("completed"));
         assert_eq!(timeline[1]["status"].as_str(), Some("waiting_for_approval"));
@@ -27804,6 +28311,10 @@ mod tests {
         assert_eq!(
             timeline[1]["trace"]["action"]["result_summary"].as_str(),
             Some("A manager must approve this workflow.")
+        );
+        assert_eq!(
+            timeline[1]["trace"]["approval_review"]["option_count"].as_u64(),
+            Some(2)
         );
         assert_eq!(
             timeline[1]["trace"]["source"].as_str(),
@@ -28018,6 +28529,14 @@ mod tests {
             Some("request_approval")
         );
         assert_eq!(
+            dispatch["approval_review"]["confidence"].as_str(),
+            Some("high")
+        );
+        assert_eq!(
+            dispatch["afp_message"]["content"]["selected_option"]["option_id"].as_str(),
+            Some("approve")
+        );
+        assert_eq!(
             dispatch["afp_message"]["metadata"]["autonomy_decision"]["autonomy_level"].as_str(),
             Some("request_approval")
         );
@@ -28095,6 +28614,14 @@ mod tests {
         assert_eq!(
             run.result_json["approval_decision"]["decision"].as_str(),
             Some("rejected")
+        );
+        assert_eq!(
+            run.result_json["approval_decision"]["selected_option"]["option_id"].as_str(),
+            Some("reject")
+        );
+        assert_eq!(
+            run.result_json["approval_decision"]["approval_review"]["confidence"].as_str(),
+            Some("high")
         );
         assert_eq!(
             run.result_json["approval_decision"]["autonomy_decision"]["autonomy_level"]
