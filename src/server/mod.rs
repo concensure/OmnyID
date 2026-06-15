@@ -954,20 +954,7 @@ pub async fn run() {
         .route("/auth/verify-email", post(verify_email_http))
         .route("/auth/forgot-password", post(forgot_password_http))
         .route("/auth/reset-password", post(reset_password_http))
-        .route("/dashboard/bootstrap", get(dashboard_bootstrap_http))
-        .route("/dashboard/export", get(dashboard_export_http))
-        .route("/dashboard/onboarding", post(update_onboarding_http))
-        .route("/dashboard/onboarding-bundle", get(onboarding_bundle_http))
-        .route(
-            "/dashboard/service-adapter-bundle",
-            get(service_adapter_bundle_http),
-        )
         .route("/dashboard/demo/send", post(demo_send_http))
-        .route(
-            "/installers/local/windows.ps1",
-            get(local_windows_installer_http),
-        )
-        .route("/installers/local/unix.sh", get(local_unix_installer_http))
         .route("/notes/message", post(notes_message_http))
         .route(
             "/ui/command",
@@ -1057,10 +1044,6 @@ pub async fn run() {
         )
         .route("/billing/webhook", post(billing_webhook_http))
         .route("/billing/status", get(billing_status_http))
-        .route(
-            "/api/cost/budget",
-            get(get_budget_http).post(upsert_budget_http),
-        )
         // â”€â”€ Agent template â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         .route("/agent/provision", post(agent_provision_http))
         .route("/agent/me", get(agent_me_http))
