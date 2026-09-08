@@ -3,19 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OmnyID - Your Agent Identity. Your Rules.</title>
+  <title>OmnyID - Turn Digital Chaos Into a Briefing You Can Trust</title>
   <meta
     name="description"
-    content="OmnyID gives every AI agent a permanent cryptographic identity, a private workspace, and real email. Open source. Local-first. Privacy-first."
+    content="OmnyID quietly reads your inbox, calendar, and notes, then hands you a short list of what actually needs a decision. Nothing sends, books, or pays without your approval. Open source. Local-first. Privacy-first."
   >
-  <meta
-    name="omnyid-google-client-id"
-    content="975613409177-nv214f97lors4g5j2dcvuftv5pf9c88p.apps.googleusercontent.com"
-  >
-  <meta property="og:title" content="OmnyID - Your Agent Identity. Your Rules.">
+  <meta property="og:title" content="OmnyID - Turn Digital Chaos Into a Briefing You Can Trust">
   <meta
     property="og:description"
-    content="Privacy-first, local-first, open-source Agent ID infrastructure with real email, encrypted relay, and sovereign workspaces."
+    content="A private, self-hosted assistant that turns your scattered inbox, calendar, and notes into a short daily briefing — with every action logged, reversible, and gated behind your approval."
   >
   <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -95,59 +91,6 @@
       display: none;
     }
 
-    .blinking-caret {
-      display: inline-block;
-      width: 0.62em;
-      border-right: 2px solid rgba(49, 86, 142, 0.9);
-      animation: omnyid-caret 1s steps(1) infinite;
-      vertical-align: text-bottom;
-    }
-
-    .typed-line-shell {
-      display: flex;
-      align-items: center;
-      gap: 0.1rem;
-      min-width: 0;
-      white-space: nowrap;
-      overflow: hidden;
-    }
-
-    .typed-line-shell [data-typed-text] {
-      display: inline-block;
-      min-width: 0;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: clip;
-      white-space: nowrap;
-      vertical-align: bottom;
-    }
-
-    .agent-bubble {
-      position: relative;
-      overflow: hidden;
-    }
-
-    .agent-bubble::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.45) 50%, transparent 100%);
-      transform: translateX(-120%);
-      animation: omnyid-shimmer 5.5s ease-in-out infinite;
-      pointer-events: none;
-    }
-
-    @keyframes omnyid-caret {
-      0%, 49% { opacity: 1; }
-      50%, 100% { opacity: 0; }
-    }
-
-    @keyframes omnyid-shimmer {
-      0% { transform: translateX(-120%); }
-      45% { transform: translateX(-120%); }
-      100% { transform: translateX(140%); }
-    }
-
     @media (prefers-reduced-motion: reduce) {
       html {
         scroll-behavior: auto;
@@ -157,8 +100,7 @@
         transition: none;
       }
 
-      .blinking-caret,
-      .agent-bubble::after {
+      .animate-ping {
         animation: none;
       }
     }
@@ -183,7 +125,7 @@
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-3">
           <button data-open-auth class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white transition hover:opacity-90">
-            Hey JARVIS!
+            Offload my stress
           </button>
           <button
             data-open-auth
@@ -208,23 +150,23 @@
       <div class="mx-auto grid w-full max-w-7xl gap-12 md:grid-cols-[1fr_480px] md:items-center">
         <div class="space-y-8">
           <div class="inline-flex items-center gap-2 rounded-full bg-surface-container-high px-3 py-1">
-            <span class="font-mono text-[10px] uppercase tracking-widest text-secondary">Agent-first identity</span>
+            <span class="font-mono text-[10px] uppercase tracking-widest text-secondary">Clarity, not more chaos</span>
           </div>
 
           <h1 class="font-display text-6xl leading-[1.05] tracking-[-0.03em] md:text-7xl lg:text-8xl">
-            Dispatch agents to browse the web, plan your day and clean up your inbox.
+            Your whole life, <em>off your mind.</em>
           </h1>
 
           <p class="max-w-xl text-lg leading-relaxed text-on-surface-variant md:text-xl">
-            Your frontier to agentic web
+            OmnyID keeps the bills, the forms, the dates, the lists — and prepares the next steps by rules you set once. Each morning it shows what needs a human, what is already ready to review, and what can wait.
           </p>
 
           <div class="flex flex-wrap gap-4 pt-2">
             <button data-open-auth class="rounded-lg bg-primary px-8 py-4 text-base font-medium text-white shadow-lg shadow-primary/10 transition hover:opacity-95">
-              Hey JARVIS!
+              Offload my stress
             </button>
-            <a href="#waitlist" class="flex items-center gap-2 rounded-lg px-8 py-4 font-medium text-on-surface transition hover:bg-surface-container-low">
-              Join Waitlist
+            <a href="#promises" class="flex items-center gap-2 rounded-lg px-8 py-4 font-medium text-on-surface transition hover:bg-surface-container-low">
+              How it works
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
               </svg>
@@ -244,54 +186,309 @@
         </div>
 
         <div class="hidden md:block">
-          <div class="rounded-[1.75rem] border border-outline-variant/15 bg-surface-container-lowest p-8 shadow-sm">
-            <div class="mb-8 flex justify-between">
-              <span class="font-mono text-xs text-outline">AGENT_SESSION</span>
-              <div class="flex gap-1">
-                <div class="h-2 w-2 rounded-full bg-error/20"></div>
-                <div class="h-2 w-2 rounded-full bg-secondary-container"></div>
-              </div>
-            </div>
-            <div class="rounded-2xl border border-outline-variant/15 bg-surface p-5 font-mono text-sm text-on-surface-variant">
-              <div class="flex items-center gap-3">
-                <span class="rounded-full bg-primary-fixed px-3 py-1 text-[10px] uppercase tracking-[0.24em] text-primary">Composer</span>
-                <span class="text-xs uppercase tracking-[0.2em]">drafting secure relay</span>
-              </div>
-              <div class="mt-4 rounded-xl bg-surface-container-high p-4">
-                <div class="typed-line-shell">
-                  <span class="text-primary" data-typed-text>agent:greeter@omnyid.com says hello to agent:ops@omnyid.com</span><span class="blinking-caret" aria-hidden="true"></span>
-                </div>
-              </div>
-            </div>
-            <div class="mt-6 space-y-4">
-              <div class="agent-bubble rounded-2xl border border-outline-variant/15 bg-primary-fixed/55 p-5">
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <div class="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">Sent by Ozan</div>
-                    <h3 class="mt-2 text-lg font-semibold text-on-surface">`agent:greeter@omnyid.com`</h3>
-                  </div>
-                  <span class="rounded-full bg-surface px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-on-surface-variant">capabilities: greet, route, reassure</span>
-                </div>
-                <p class="mt-4 text-sm leading-7 text-on-surface-variant">
-                  "Hello from Sydney. I can greet new agents, explain the relay path, and politely remind everyone that plaintext is not a personality trait."
-                </p>
-              </div>
-              <div class="agent-bubble rounded-2xl border border-outline-variant/15 bg-secondary-container/45 p-5">
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <div class="font-mono text-[10px] uppercase tracking-[0.22em] text-secondary">Sent by OmnyID demo workspace</div>
-                    <h3 class="mt-2 text-lg font-semibold text-on-surface">`agent:ops@omnyid.com`</h3>
-                  </div>
-                  <span class="rounded-full bg-surface px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-on-surface-variant">capabilities: audit, approvals, web actions</span>
-                </div>
-                <p class="mt-4 text-sm leading-7 text-on-surface-variant">
-                  "Acknowledged. I verify signatures, queue actions, and keep a straight face when the booking agent insists it is 'basically DevOps with luggage.'"
-                </p>
-              </div>
+          <div class="atelier-card rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm sm:p-7">
+            <p class="font-mono text-xs uppercase tracking-widest text-outline">Tuesday morning</p>
+            <p class="mt-1 text-sm text-on-surface-variant" id="hero-day-demo-summary">
+              11 things prepared quietly. <span id="hero-day-demo-remaining">3</span> need you.
+            </p>
 
+            <div class="mt-5 space-y-3" id="hero-day-demo-list">
+              <div class="hero-day-demo-item flex items-center gap-3 rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3 transition-all duration-500">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-on-surface">Reply to Coach Daly — practice moved to 4pm</p>
+                  <p class="mt-0.5 text-xs text-on-surface-variant">Draft ready, written the way you write</p>
+                </div>
+                <button type="button" class="hero-day-demo-approve shrink-0 rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 text-xs font-semibold text-on-surface transition hover:bg-surface">
+                  Approve
+                </button>
+              </div>
+              <div class="hero-day-demo-item flex items-center gap-3 rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3 transition-all duration-500">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-on-surface">Review the water bill — $63.20</p>
+                  <p class="mt-0.5 text-xs text-on-surface-variant">Approval-ready under your $100 rule &middot; due Friday</p>
+                </div>
+                <button type="button" class="hero-day-demo-approve shrink-0 rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 text-xs font-semibold text-on-surface transition hover:bg-surface">
+                  Approve
+                </button>
+              </div>
+              <div class="hero-day-demo-item flex items-center gap-3 rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3 transition-all duration-500">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-on-surface">Review Mia's excursion form</p>
+                  <p class="mt-0.5 text-xs text-on-surface-variant">Prepared for review — just needs your okay</p>
+                </div>
+                <button type="button" class="hero-day-demo-approve shrink-0 rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 text-xs font-semibold text-on-surface transition hover:bg-surface">
+                  Approve
+                </button>
+              </div>
+            </div>
+
+            <div id="hero-day-demo-done" class="mt-5 hidden rounded-2xl bg-secondary-container/40 px-4 py-4 text-center">
+              <p class="text-sm font-medium text-secondary">Day closed.</p>
+              <p class="mt-1 text-xs text-on-surface-variant">Nothing is waiting on you. Go be a person.</p>
+            </div>
+            <p id="hero-day-demo-hint" class="mt-5 text-center text-xs text-on-surface-variant">Tap Approve. That's the whole job.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      (function () {
+        var items = document.querySelectorAll(".hero-day-demo-item");
+        var remainingEl = document.getElementById("hero-day-demo-remaining");
+        var summaryEl = document.getElementById("hero-day-demo-summary");
+        var doneEl = document.getElementById("hero-day-demo-done");
+        var hintEl = document.getElementById("hero-day-demo-hint");
+        var remaining = items.length;
+
+        items.forEach(function (item) {
+          var button = item.querySelector(".hero-day-demo-approve");
+          if (!button) return;
+          button.addEventListener("click", function () {
+            item.classList.add("opacity-60");
+            var title = item.querySelector("p.font-medium");
+            var sub = item.querySelector("p.text-xs");
+            if (title) title.classList.add("line-through");
+            if (sub) sub.textContent = "Done. Nothing else to do.";
+            button.remove();
+            remaining -= 1;
+            if (remainingEl) remainingEl.textContent = String(Math.max(remaining, 0));
+            if (remaining <= 0) {
+              if (summaryEl) summaryEl.classList.add("hidden");
+              if (hintEl) hintEl.classList.add("hidden");
+              if (doneEl) doneEl.classList.remove("hidden");
+            }
+          });
+        });
+      })();
+    </script>
+
+    <section id="promises" class="px-6 py-24">
+      <div class="mx-auto max-w-7xl">
+        <div class="mb-16 space-y-4">
+          <span class="font-mono text-xs uppercase tracking-[0.3em] text-outline">How it works</span>
+          <h2 class="font-display text-5xl">Three promises, kept daily.</h2>
+        </div>
+
+        <div class="grid gap-8 md:grid-cols-3">
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">It remembers</span>
+            <h3 class="font-display mt-3 text-2xl leading-snug">Everything you'd rather not carry.</h3>
+            <p class="mt-4 text-sm leading-relaxed text-on-surface-variant">
+              Warranties, due dates, who said what, where the form went, what the doctor said in March. Written down once, found in a second, never lost between Tuesdays.
+            </p>
+          </div>
+
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">You set the rules</span>
+            <h3 class="font-display mt-3 text-2xl leading-snug">It only does what you'd do.</h3>
+            <div class="mt-4 space-y-3">
+              <div class="rounded-xl border border-ember/20 bg-ember/10 px-4 py-3" style="transform: rotate(-1.5deg);">
+                <p class="font-display text-sm text-on-surface">"Flag anything over $40 for approval."</p>
+                <p class="mt-1 text-[11px] text-on-surface-variant">set by you, kept by your agent</p>
+              </div>
+              <div class="rounded-xl border border-ember/20 bg-ember/10 px-4 py-3" style="transform: rotate(1deg);">
+                <p class="font-display text-sm text-on-surface">"Nothing on the calendar before 10am."</p>
+                <p class="mt-1 text-[11px] text-on-surface-variant">your mornings stay yours</p>
+              </div>
+              <div class="rounded-xl border border-ember/20 bg-ember/10 px-4 py-3" style="transform: rotate(-0.5deg);">
+                <p class="font-display text-sm text-on-surface">"Always review replies to family before sending."</p>
+                <p class="mt-1 text-[11px] text-on-surface-variant">some things stay human</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">It works ahead</span>
+            <h3 class="font-display mt-3 text-2xl leading-snug">Finished before you asked.</h3>
+            <div class="mt-4 space-y-3">
+              <div class="rounded-xl border border-outline-variant/10 bg-surface px-4 py-3">
+                <p class="text-[11px] uppercase tracking-wide text-outline">Thursday, 9:12pm</p>
+                <p class="mt-1 text-sm leading-relaxed text-on-surface">Grocery list drafted from what ran out this week. Waiting for your okay.</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/10 bg-surface px-4 py-3">
+                <p class="text-[11px] uppercase tracking-wide text-outline">Sunday, 7:40am</p>
+                <p class="mt-1 text-sm leading-relaxed text-on-surface">Pulled your renewal details and prepared a cheaper-plan comparison for review.</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/10 bg-surface px-4 py-3">
+                <p class="text-[11px] uppercase tracking-wide text-outline">Monday, 6:00am</p>
+                <p class="mt-1 text-sm leading-relaxed text-on-surface">Homework due dates pulled into one list. The essay is the one to start first.</p>
+              </div>
+            </div>
+            <p class="mt-4 text-xs text-on-surface-variant">Nothing sends, pays, or books until you say so.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-6 py-24">
+      <div class="mx-auto grid max-w-7xl gap-6 md:grid-cols-3">
+        <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6">
+          <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-secondary">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7m-9-2v10a1 1 0 001 1h3m10-11l2 2M5 10v10a1 1 0 001 1h3m10-11v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+            </svg>
+          </div>
+          <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">For the busy parent</span>
+          <p class="mt-3 text-sm leading-relaxed text-on-surface-variant">School forms surfaced, dinner ideas queued from your list, bills due this week brought forward with approval-ready next steps. You clear the important things over coffee.</p>
+        </div>
+        <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6">
+          <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary-fixed text-primary">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+            </svg>
+          </div>
+          <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">For the student</span>
+          <p class="mt-3 text-sm leading-relaxed text-on-surface-variant">Lecture slides, readings, rough notes, and late-night ideas become one connected study system with grounded answers first and reusable memory after.</p>
+        </div>
+        <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6">
+          <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-secondary">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+          </div>
+          <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">For everyone else</span>
+          <p class="mt-3 text-sm leading-relaxed text-on-surface-variant">The 23 emails become 2. Renewal options are brought forward for review. The thing you keep forgetting stops being your job to remember.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="students" class="px-6 py-24">
+      <div class="mx-auto max-w-7xl">
+        <div class="mb-12 max-w-4xl space-y-4">
+          <span class="font-mono text-xs uppercase tracking-[0.3em] text-outline">For uni students</span>
+          <h2 class="font-display text-4xl leading-tight md:text-5xl">Stop re-explaining yourself to every AI tool.</h2>
+          <p class="text-lg leading-relaxed text-on-surface-variant">
+            OmnyID is being built so a stressed student can attach one real class source, get a useful grounded answer in the first session, and leave behind connected notes, searchable concepts, and reusable study memory without manual folders or cleanup work.
+          </p>
+        </div>
+
+        <div class="mb-5 rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">First 60 seconds</p>
+              <h3 class="mt-2 font-display text-3xl leading-tight">Immediate value before the student burns out.</h3>
+            </div>
+            <span class="rounded-full border border-primary/15 bg-primary-fixed/30 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Grounded first run</span>
+          </div>
+          <div class="mt-5 grid gap-3 md:grid-cols-3">
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface px-4 py-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-outline">1. Attach one source</p>
+              <p class="mt-2 text-sm leading-6 text-on-surface-variant">Drop in lecture slides, a reading, rough notes, or a voice memo from the file picker.</p>
+            </div>
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface px-4 py-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-outline">2. Ask one real question</p>
+              <p class="mt-2 text-sm leading-6 text-on-surface-variant">Load a study prompt instead of writing from scratch and get a grounded answer from your own material.</p>
+            </div>
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface px-4 py-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-outline">3. Keep only what you want</p>
+              <p class="mt-2 text-sm leading-6 text-on-surface-variant">Choose to keep the original file, the extracted study content only, or nothing after the answer.</p>
             </div>
           </div>
         </div>
+
+        <div class="grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+          <div class="space-y-3">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">What you drop in</p>
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 shadow-sm" style="transform: rotate(-2deg);">
+              <p class="text-sm font-medium text-on-surface">Lecture 4 slides.pdf</p>
+              <p class="mt-0.5 text-xs text-on-surface-variant">Dropped in from your downloads folder</p>
+            </div>
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 shadow-sm" style="transform: rotate(1.5deg);">
+              <p class="text-sm font-medium text-on-surface">"Idea: tie the essay thesis to the week 3 reading" — 11:47pm</p>
+              <p class="mt-0.5 text-xs text-on-surface-variant">Captured before the thought disappears</p>
+            </div>
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 shadow-sm" style="transform: rotate(-1deg);">
+              <p class="text-sm font-medium text-on-surface">Group project brief.docx</p>
+              <p class="mt-0.5 text-xs text-on-surface-variant">Shared in a group chat last Tuesday</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col items-center gap-3 py-2 lg:px-2">
+            <svg class="h-6 w-6 rotate-90 text-outline lg:rotate-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            <div class="w-full space-y-2 rounded-2xl border border-primary/20 bg-primary-fixed/25 p-4 text-center">
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Organizes once, compounds later</p>
+              <div class="mt-3 space-y-1.5">
+                <p class="rounded-lg bg-surface-container-lowest px-3 py-1.5 font-mono text-[11px] text-on-surface-variant">extracted study content</p>
+                <p class="rounded-lg bg-surface-container-lowest px-3 py-1.5 font-mono text-[11px] text-on-surface-variant">supertags + academic metadata</p>
+                <p class="rounded-lg bg-surface-container-lowest px-3 py-1.5 font-mono text-[11px] text-on-surface-variant">linked ideas + note chains</p>
+              </div>
+            </div>
+            <svg class="h-6 w-6 rotate-90 text-outline lg:rotate-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+
+          <div class="atelier-card rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Ask from your study focus</p>
+            <div class="mt-2 flex items-center gap-2 rounded-xl border border-outline-variant/20 bg-surface px-3 py-2">
+              <svg class="h-4 w-4 shrink-0 text-outline" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+              </svg>
+              <span class="text-sm text-on-surface-variant">what's the thesis idea for the essay?</span>
+            </div>
+            <div class="mt-4 space-y-2">
+              <div class="rounded-xl border border-outline-variant/10 bg-surface px-3 py-2.5">
+                <p class="text-sm text-on-surface">Linked to <span class="font-medium">Lecture 4 slides</span>, the <span class="font-medium">week 3 reading</span>, and the same study thread in Files and the graph.</p>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <span class="rounded-full bg-secondary-container/60 px-2.5 py-1 font-mono text-[10px] text-secondary">essay</span>
+                <span class="rounded-full bg-secondary-container/60 px-2.5 py-1 font-mono text-[10px] text-secondary">week 3 reading</span>
+                <span class="rounded-full bg-secondary-container/60 px-2.5 py-1 font-mono text-[10px] text-secondary">study-ready</span>
+              </div>
+            </div>
+            <p class="mt-3 text-xs text-on-surface-variant">Found without folders. Continued without restating context.</p>
+          </div>
+        </div>
+
+        <div class="mt-5 grid gap-5 lg:grid-cols-2">
+          <div class="atelier-card rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">What stays after the answer</p>
+                <h3 class="mt-2 text-xl font-semibold">Not just a one-off chat reply.</h3>
+              </div>
+              <span class="rounded-full bg-secondary-container/55 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-secondary">Student memory</span>
+            </div>
+            <div class="mt-4 space-y-3">
+              <div class="rounded-2xl border border-emerald-200/40 bg-emerald-50/60 p-4">
+                <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-800">Files</p>
+                <p class="mt-2 text-sm leading-6 text-on-surface-variant">A searchable file surface with keyword and tag filtering, so students can find retained class material fast instead of browsing filenames.</p>
+              </div>
+              <div class="rounded-2xl border border-violet-200/40 bg-violet-50/55 p-4">
+                <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-violet-800">Linked ideas</p>
+                <p class="mt-2 text-sm leading-6 text-on-surface-variant">Connected notes and the knowledge graph reuse the same supertags, course tags, week tags, and concept overlaps.</p>
+              </div>
+              <div class="rounded-2xl border border-amber-200/40 bg-amber-50/65 p-4">
+                <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-amber-800">Optional Zettelkasten mode</p>
+                <p class="mt-2 text-sm leading-6 text-on-surface-variant">Students who want deliberate note development can grow source notes, literature notes, review queues, and permanent notes inside the same workspace.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Why this matters</p>
+            <p class="mt-3 text-sm leading-7 text-on-surface-variant">
+              Students do not want another notebook to maintain. They want the first useful answer to become reusable study memory automatically, with enough control to decide whether the system keeps the original file, the extracted content only, or nothing at all.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-10 rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-6 py-5 text-center">
+          <p class="font-display text-xl italic text-on-surface">Your data, your AI, your study system - never leased, never sold.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-6 py-24">
+      <div class="atelier-card mx-auto max-w-5xl rounded-3xl border border-outline-variant/10 bg-surface-container-lowest p-8 text-center sm:p-10">
+        <h2 class="font-display text-3xl sm:text-4xl">Locked, even to us.</h2>
+        <p class="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-on-surface-variant sm:text-base">
+          Your life is encrypted end to end with a key that never leaves your device. No inbox-reading humans, no ad trackers, nothing sold or shared. If someone knocked on our door for your data, we'd have nothing readable to hand over — just locks we can't open either.
+        </p>
       </div>
     </section>
 
@@ -305,11 +502,11 @@
               This is OmnyID's non-technical hosted runner path: sandboxed, template-led, and ephemeral. You get three template runs in twenty-four hours, ten chat turns per run, and no persistent files or memory.
             </p>
           </div>
-          <div class="grid gap-4 md:grid-cols-3">
-            <button id="trial-template-btn-student_day_planner" data-trial-template="student_day_planner" type="button" class="rounded-2xl border-2 border-primary/15 bg-primary-fixed/35 p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/40">
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <button id="trial-template-btn-travel_planner" data-trial-template="travel_planner" type="button" class="rounded-2xl border-2 border-primary/15 bg-primary-fixed/35 p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/40">
               <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Starter 01</div>
-              <h3 class="mt-3 text-lg font-semibold">Student Day Planner</h3>
-              <p class="mt-2 text-sm leading-7 text-on-surface-variant">Turn classes, assignments, and energy into a realistic day plan.</p>
+              <h3 class="mt-3 text-lg font-semibold">Travel Planner</h3>
+              <p class="mt-2 text-sm leading-7 text-on-surface-variant">Turn flights, hotels, and rough plans into a realistic day-by-day itinerary.</p>
             </button>
             <button id="trial-template-btn-research_assistant" data-trial-template="research_assistant" type="button" class="rounded-2xl border-2 border-outline-variant/20 bg-surface p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/30">
               <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Starter 02</div>
@@ -319,7 +516,16 @@
             <button id="trial-template-btn-appointment_assistant" data-trial-template="appointment_assistant" type="button" class="rounded-2xl border-2 border-secondary/20 bg-secondary-container/35 p-5 text-left transition hover:-translate-y-0.5 hover:border-secondary/40">
               <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-secondary">Starter 03</div>
               <h3 class="mt-3 text-lg font-semibold">Appointment Assistant</h3>
-              <p class="mt-2 text-sm leading-7 text-on-surface-variant">Prepare reminder and booking flows without losing context.</p>
+              <p class="mt-2 text-sm leading-7 text-on-surface-variant">Draft reminder and booking prep flows without losing context.</p>
+            </button>
+            <button id="trial-template-btn-student_day_planner" data-trial-template="student_day_planner" type="button" class="rounded-2xl border-2 border-violet-200/40 bg-violet-50/60 p-5 text-left transition hover:-translate-y-0.5 hover:border-violet-300/60">
+              <div class="flex items-center justify-between gap-2">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-violet-700">Starter 04</div>
+                <span class="rounded-full bg-white/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-violet-700">Student first run</span>
+              </div>
+              <h3 class="mt-3 text-lg font-semibold text-on-surface">Connected Study Workspace</h3>
+              <p class="mt-2 text-sm leading-7 text-on-surface-variant">Turn class material into grounded answers, linked notes, and a realistic next-study plan.</p>
+              <p class="mt-3 text-xs text-on-surface-variant">Best for lecture slides, readings, rough notes, and exam-focused follow-up questions.</p>
             </button>
           </div>
         </div>
@@ -341,7 +547,26 @@
               </div>
               <div id="trial-calendar-view" class="hidden rounded-2xl border border-primary/20 bg-surface p-4"></div>
               <form id="trial-chat-form" class="space-y-3">
-                <textarea id="trial-chat-input" class="min-h-[8rem] w-full rounded-2xl border border-outline-variant bg-surface px-4 py-4 outline-none focus:border-primary" placeholder="Ask the runner to plan your day, research something, or prepare an appointment flow."></textarea>
+                <textarea id="trial-chat-input" class="min-h-[8rem] w-full rounded-2xl border border-outline-variant bg-surface px-4 py-4 outline-none focus:border-primary" placeholder="Paste lecture notes, a reading excerpt, or an assignment brief, then ask what to revise first."></textarea>
+                <div class="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-4">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">No file handy?</p>
+                      <p class="mt-1 text-sm leading-6 text-on-surface-variant">Run a sample study source to preview the same workflow as a lecture slide, reading, or assignment upload.</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <button data-trial-sample-source="lecture" type="button" class="rounded-xl border border-violet-200/50 bg-violet-50/70 px-3 py-2 text-xs font-semibold text-violet-800 transition hover:bg-violet-50">
+                      Run lecture notes
+                    </button>
+                    <button data-trial-sample-source="reading" type="button" class="rounded-xl border border-emerald-200/50 bg-emerald-50/70 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-50">
+                      Run reading excerpt
+                    </button>
+                    <button data-trial-sample-source="assignment" type="button" class="rounded-xl border border-sky-200/50 bg-sky-50/70 px-3 py-2 text-xs font-semibold text-sky-800 transition hover:bg-sky-50">
+                      Run assignment brief
+                    </button>
+                  </div>
+                </div>
                 <div class="flex flex-wrap gap-3">
                   <button type="submit" class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90">
                     Send to trial runner
@@ -351,6 +576,54 @@
                   </button>
                 </div>
               </form>
+            </div>
+            <div class="space-y-4">
+              <div id="trial-student-value-panel" class="hidden rounded-[1.5rem] border border-violet-200/40 bg-violet-50/55 p-5 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-violet-700">Connected study preview</p>
+                    <h4 class="mt-2 text-lg font-semibold text-on-surface">What this student run is proving</h4>
+                  </div>
+                  <span class="rounded-full bg-white/80 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-violet-700">Preview only</span>
+                </div>
+                <div id="trial-student-value-content" class="mt-4 space-y-3">
+                  <p class="text-sm leading-6 text-on-surface-variant">Choose the Connected Study Workspace starter to see how a first run turns class material into reusable study structure.</p>
+                </div>
+              </div>
+              <div id="trial-template-summary" class="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Current starter</p>
+                <div id="trial-templates" class="mt-3 space-y-3 text-sm text-on-surface-variant">
+                  <p>Template details appear here after the first session is created.</p>
+                </div>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div class="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                  <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Runner traces</p>
+                  <div id="trial-traces" class="mt-3 space-y-2 text-sm text-on-surface-variant">
+                    <p>No traces yet.</p>
+                  </div>
+                </div>
+                <div class="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                  <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Review queue</p>
+                  <div id="trial-review-queue" class="mt-3 space-y-2 text-sm text-on-surface-variant">
+                    <p>No review items yet.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div class="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                  <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Prompt history</p>
+                  <div id="trial-history" class="mt-3 space-y-2 text-sm text-on-surface-variant">
+                    <p>No prompt history yet.</p>
+                  </div>
+                </div>
+                <div class="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                  <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Runner logs</p>
+                  <div id="trial-logs" class="mt-3 space-y-2 text-sm text-on-surface-variant">
+                    <p>No runner logs yet.</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -387,7 +660,7 @@
       <div class="mx-auto max-w-7xl">
         <div class="mb-16 space-y-4">
           <span class="font-mono text-xs uppercase tracking-[0.3em] text-outline">Capabilities</span>
-          <h2 class="font-display text-5xl">Engineered for sovereignty.</h2>
+          <h2 class="font-display text-5xl">Built to be trusted with everything.</h2>
         </div>
 
         <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
@@ -444,24 +717,24 @@
           <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
             <div class="mb-6 flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-secondary">
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
               </svg>
             </div>
-            <h3 class="mb-3 text-lg font-semibold">Open protocol</h3>
+            <h3 class="mb-3 text-lg font-semibold">Daily decision briefing</h3>
             <p class="text-sm leading-relaxed text-on-surface-variant">
-              AFP is the open, typed message format for agents, notes, actions, views, and secure relay across frameworks.
+              Your inbox, calendar, and notes are read once a day and reduced to the handful of things that actually need a decision from you — not another feed to manage.
             </p>
           </div>
 
           <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
             <div class="mb-6 flex h-10 w-10 items-center justify-center rounded-full bg-primary-fixed text-primary">
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
             </div>
-            <h3 class="mb-3 text-lg font-semibold">Deployable runtimes</h3>
+            <h3 class="mb-3 text-lg font-semibold">Approval &amp; audit trail</h3>
             <p class="text-sm leading-relaxed text-on-surface-variant">
-              OmnyID is being shaped to provision private per-user agent runtimes without mixing message scopes, secrets, or logs across accounts.
+              Every drafted reply, booking, or payment sits in a queue until you approve it. Every action taken is signed, logged, and reversible.
             </p>
           </div>
         </div>
@@ -491,8 +764,14 @@
               <p class="text-xs text-on-surface-variant">OAuth-based email gateway, Oracle deploy, private preview onboarding, and secure relay defaults.</p>
             </div>
             <div class="flex-1 space-y-4">
-              <div class="mb-8 h-4 w-4 rounded-full bg-secondary/40 ring-4 ring-secondary-container/20"></div>
-              <span class="font-mono text-xs text-outline">Q3 2026</span>
+              <div class="relative mb-8 h-4 w-4">
+                <div class="absolute inset-0 h-4 w-4 animate-ping rounded-full bg-primary/50"></div>
+                <div class="relative h-4 w-4 rounded-full bg-primary ring-4 ring-primary-fixed"></div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="font-mono text-xs font-semibold text-primary">Q3 2026</span>
+                <span class="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary">In progress</span>
+              </div>
               <h4 class="font-bold">Private runtime templates</h4>
               <p class="text-xs text-on-surface-variant">One-click private agent runtimes with per-user isolation, secrets, approvals, and runtime management.</p>
             </div>
@@ -636,9 +915,17 @@
               <h3 class="text-lg font-semibold">Start your private assistant</h3>
               <p class="mt-2 text-sm text-on-surface-variant">Create a private preview account, launch your workspace, and let OmnyID provision the Agent ID underneath.</p>
             </div>
+            <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">What changes once you're in</p>
+              <ul class="mt-3 space-y-2 text-sm leading-6 text-on-surface-variant">
+                <li>5 GB of private storage included from day one, encrypted before it leaves your device — no plan to pick, no card required to start (15 GB+ available later if you outgrow it).</li>
+                <li>The morning inbox triage you do on autopilot shrinks to a two-minute approval pass over coffee.</li>
+                <li>The low background worry of "did I forget something" finally has somewhere to live that isn't your head.</li>
+              </ul>
+            </div>
           <label class="grid gap-2 text-sm font-semibold">
             Display name
-            <input id="register-display-name" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="Ozan">
+            <input id="register-display-name" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="Joe">
           </label>
           <label class="grid gap-2 text-sm font-semibold">
             Email
@@ -651,6 +938,9 @@
           <button type="submit" class="w-full cursor-pointer rounded-xl bg-primary px-5 py-4 font-medium text-white transition hover:opacity-90">
             Start private workspace
           </button>
+          <p class="text-xs leading-6 text-on-surface-variant">
+            We'll email you a link to verify your address — click it to finish establishing the account before you sign in.
+          </p>
           <p class="text-xs leading-6 text-on-surface-variant">
             Already built your own agent stack? You can still use this same flow just to mint and manage an OmnyID Agent ID.
           </p>
@@ -706,7 +996,7 @@
           </button>
         </div>
       </div>
-      <p id="export-dashboard-feedback" class="text-sm text-on-surface-variant">Export gives you a local JSON copy of your dashboard state, onboarding, support-consent status, and recent AFP activity.</p>
+      <p id="export-dashboard-feedback" class="text-sm text-on-surface-variant">Export gives you a bounded local JSON copy of your dashboard state, onboarding, support-access history, account sessions, recent AFP activity, and runtime metadata.</p>
 
       <section class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -937,9 +1227,10 @@
                 <label class="mt-3 grid gap-2 text-sm font-semibold">
                   Starter template
                   <select id="runtime-runner-starter-template" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
-                    <option value="student_day_planner">Student Day Planner</option>
+                    <option value="travel_planner">Travel Planner</option>
                     <option value="research_assistant">Research Assistant</option>
                     <option value="appointment_assistant">Appointment Assistant</option>
+                    <option value="student_day_planner">Connected Study Workspace</option>
                   </select>
                 </label>
                 <label class="mt-3 grid gap-2 text-sm font-semibold">
@@ -1360,14 +1651,19 @@
         <span class="text-lg font-display italic text-on-surface">OmnyID</span>
         <p class="font-body text-xs uppercase tracking-widest text-on-surface/50">Copyright 2026 OmnyID. Built for the agentic era.</p>
       </div>
-      <div class="flex gap-8">
+      <div class="flex flex-wrap gap-8">
         <a href="https://github.com/omnyid" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">GitHub</a>
         <a href="#waitlist" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Contact</a>
+        <a href="./privacy.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Privacy</a>
+        <a href="./terms.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Terms</a>
+        <a href="./data-rights.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Data Rights</a>
+        <a href="./security.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Security</a>
       </div>
     </div>
   </footer>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="./genesis-logo.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

@@ -1,11 +1,12 @@
 (function () {
-  const metaClientId = document.querySelector('meta[name="omnyid-google-client-id"]');
-  const GOOGLE_CLIENT_ID = metaClientId ? metaClientId.content : "";
-  const API_BASE = window.location.hostname === "localhost"
+  const IS_LOCAL_DEV_HOST = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const API_BASE = IS_LOCAL_DEV_HOST
     ? "http://127.0.0.1:8080"
     : "https://api.omnyid.com";
   const SESSION_STORAGE_KEY = "omnyid.preview.session";
   const TRIAL_FINGERPRINT_KEY = "omnyid.python.trial.fingerprint";
+  let googleClientId = "";
+  let googleInitialized = false;
 
   const authModal = document.getElementById("auth-modal");
   const authKicker = document.getElementById("auth-kicker");
@@ -24,10 +25,14 @@
   const trialHistory = document.getElementById("trial-history");
   const trialReviewQueue = document.getElementById("trial-review-queue");
   const trialLogs = document.getElementById("trial-logs");
+  const trialStudentValuePanel = document.getElementById("trial-student-value-panel");
+  const trialStudentValueContent = document.getElementById("trial-student-value-content");
   const trialChatForm = document.getElementById("trial-chat-form");
   const trialChatInput = document.getElementById("trial-chat-input");
+  const trialChatInputDefaultPlaceholder = trialChatInput ? trialChatInput.placeholder : "";
   const trialConvertButton = document.getElementById("trial-convert-button");
   const trialTemplateButtons = Array.prototype.slice.call(document.querySelectorAll("[data-trial-template]"));
+  const trialSampleSourceButtons = Array.prototype.slice.call(document.querySelectorAll("[data-trial-sample-source]"));
   const sessionSummary = document.getElementById("session-summary");
   const sessionList = document.getElementById("session-list");
   const sessionSecurityFeedback = document.getElementById("session-security-feedback");
@@ -137,8 +142,6 @@
   const setupLlmMode = document.getElementById("setup-llm-mode");
   const setupPrivacyMode = document.getElementById("setup-privacy-mode");
   const setupDeploymentTarget = document.getElementById("setup-deployment-target");
-  const typedText = document.querySelector("[data-typed-text]");
-
   let session = readSession();
   let currentOnboarding = null;
   let currentRuntimeDeployment = null;
@@ -204,7 +207,11 @@
         body: options && options.body ? JSON.stringify(options.body) : undefined
       });
     } catch {
-      throw new Error("Cannot reach the OmnyID API right now. Check https://api.omnyid.com and try again.");
+      throw new Error(
+        window.location.protocol === "file:"
+          ? "This page was opened directly as a local file, so the browser blocks it from reaching " + API_BASE + ". Serve docs/ from a local web server (or use the hosted site) to use the trial runner."
+          : "Cannot reach the OmnyID API right now. Check " + API_BASE + " and try again."
+      );
     }
 
     if (!response.ok) {
@@ -225,6 +232,24 @@
       : tone === "success"
         ? "text-sm text-secondary"
         : "text-sm text-on-surface-variant";
+  }
+
+  function startInlineGenesisLoader(feedbackEl) {
+    if (!feedbackEl || !feedbackEl.parentNode || !window.OmnyIDGenesisLogo) {
+      return function stop() {};
+    }
+    const canvas = document.createElement("canvas");
+    canvas.className = "mt-2";
+    canvas.style.display = "block";
+    canvas.setAttribute("aria-hidden", "true");
+    feedbackEl.insertAdjacentElement("afterend", canvas);
+    const handle = window.OmnyIDGenesisLogo.mount(canvas, { size: 20, mode: "idle" });
+    return function stop() {
+      handle.stop();
+      if (canvas.parentNode) {
+        canvas.parentNode.removeChild(canvas);
+      }
+    };
   }
 
   function setTrialFeedback(text, tone) {
@@ -362,6 +387,105 @@
       .replaceAll("'", "&#39;");
   }
 
+  function isStudentTrialTemplate(templateId) {
+    return templateId === "student_day_planner";
+  }
+
+  function lastMessageByRole(messages, role) {
+    const list = Array.isArray(messages) ? messages : [];
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      if (list[i] && list[i].role === role) {
+        return list[i];
+      }
+    }
+    return null;
+  }
+
+  function trialSampleSourceText(kind) {
+    if (kind === "reading") {
+      return [
+        "Reading excerpt: Week 3 decision-making and opportunity cost.",
+        "The author argues that students often underestimate opportunity cost because the cost is invisible at the moment of choosing.",
+        "A decision can look cheap in dollars but expensive in attention, sleep, and future study time.",
+        "",
+        "Question: Turn this into connected notes. Show the core concepts, what overlaps with lecture content, and what I should revise first."
+      ].join("\n");
+    }
+    if (kind === "assignment") {
+      return [
+        "Assignment brief: 1200-word essay due next Friday.",
+        "Prompt: Explain how opportunity cost affects everyday decision-making, using one economic theory and one real student example.",
+        "Marking criteria: clear thesis, two academic sources, applied example, concise conclusion.",
+        "",
+        "Question: Break this into a stress-reducing study plan and create connected notes for the thesis, concepts, weak points, and next actions."
+      ].join("\n");
+    }
+    return [
+      "Lecture notes: Week 3 microeconomics.",
+      "Topic: opportunity cost, scarcity, tradeoffs, marginal thinking.",
+      "Professor emphasized that opportunity cost is the value of the next-best alternative, not just money spent.",
+      "Example discussed: choosing an extra work shift before an exam can cost revision time and lower performance.",
+      "",
+      "Question: Organize this into connected notes, identify the likely exam points, and tell me what to revise first."
+    ].join("\n");
+  }
+
+  function renderTrialStudentValuePanel(payload) {
+    if (!trialStudentValuePanel || !trialStudentValueContent) {
+      return;
+    }
+    if (!payload || !isStudentTrialTemplate(payload.active_template_id)) {
+      trialStudentValuePanel.classList.add("hidden");
+      trialStudentValueContent.innerHTML = '<p class="text-sm leading-6 text-on-surface-variant">Choose the Connected Study Workspace starter to see how a first run turns class material into reusable study structure.</p>';
+      return;
+    }
+
+    const messages = Array.isArray(payload.messages) ? payload.messages : [];
+    const lastUser = lastMessageByRole(messages, "user");
+    const lastAssistant = lastMessageByRole(messages, "assistant");
+    const turnCount = Math.max(
+      0,
+      messages.filter(function (entry) { return entry && entry.role === "user"; }).length - 1,
+    );
+    const hasGroundedExchange = Boolean(lastUser && lastAssistant && turnCount > 0);
+    const remainingTurns = typeof payload.remaining_turns === "number" ? payload.remaining_turns : 0;
+    const nextMove = remainingTurns > 0
+      ? "Ask one narrower follow-up from the same study topic so the preview behaves like a connected thread instead of a one-off summary."
+      : "The preview turn limit is spent. Sign in to keep the study thread, retained notes, and follow-up retrieval alive.";
+
+    trialStudentValuePanel.classList.remove("hidden");
+    trialStudentValueContent.innerHTML = [
+      '<div class="rounded-2xl border border-white/80 bg-white/90 p-4">',
+      '<p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700/80">Immediate value</p>',
+      '<p class="mt-2 text-sm leading-6 text-on-surface-variant">',
+      escapeHtml(
+        hasGroundedExchange
+          ? "This run has already shown the student path: use class material, get a grounded answer back, then keep studying from the same topic instead of restarting."
+          : "The fastest proof here is one real lecture note, reading, or rough study prompt that turns into a grounded answer in the first exchange."
+      ),
+      '</p>',
+      '</div>',
+      '<div class="rounded-2xl border border-emerald-200/40 bg-emerald-50/70 p-4">',
+      '<p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">What the full workspace would keep</p>',
+      '<div class="mt-3 space-y-2 text-sm leading-6 text-on-surface-variant">',
+      '<p>Extracted study content so the first useful answer does not disappear after the session.</p>',
+      '<p>Supertags and academic metadata so later search can narrow by topic, course, week, lecture, and study intent.</p>',
+      '<p>Linked ideas or Zettelkasten branches so the same material compounds instead of turning into another isolated upload.</p>',
+      '</div>',
+      '</div>',
+      '<div class="rounded-2xl border border-sky-200/40 bg-sky-50/70 p-4">',
+      '<p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-800">Best next move</p>',
+      '<p class="mt-2 text-sm leading-6 text-on-surface-variant">',
+      escapeHtml(nextMove),
+      '</p>',
+      lastAssistant && lastAssistant.content
+        ? '<p class="mt-3 rounded-xl bg-white/80 px-3 py-2 text-xs leading-5 text-on-surface-variant"><span class="font-mono uppercase tracking-[0.14em] text-outline">Latest answer signal</span><br>' + escapeHtml(String(lastAssistant.content).slice(0, 180)) + (String(lastAssistant.content).length > 180 ? "&hellip;" : "") + '</p>'
+        : '',
+      '</div>',
+      '<p class="text-xs leading-5 text-on-surface-variant">This anonymous preview does not retain files or memory. It is showing the workflow shape the signed-in workspace would preserve through Files, search, supertags, and linked study retrieval.</p>'
+    ].join("");
+  }
+
   function renderTrialSession(payload) {
     currentTrialSession = payload || null;
     if (!trialUsageSummary || !trialMessages) {
@@ -385,6 +509,10 @@
       }
       if (trialLogs) {
         trialLogs.innerHTML = "<p>No runner logs yet.</p>";
+      }
+      renderTrialStudentValuePanel(null);
+      if (trialChatInput) {
+        trialChatInput.placeholder = trialChatInputDefaultPlaceholder;
       }
       return;
     }
@@ -423,6 +551,18 @@
           '</article>'
         ].join("");
       }).join("");
+    }
+
+    if (trialChatInput) {
+      const activeTemplate = (payload.starter_templates || []).find(function (template) {
+        return template.id === payload.active_template_id;
+      });
+      const nextPrompt = activeTemplate && Array.isArray(activeTemplate.suggested_prompts)
+        ? activeTemplate.suggested_prompts[0]
+        : null;
+      trialChatInput.placeholder = nextPrompt
+        ? "Try: \"" + nextPrompt + "\""
+        : trialChatInputDefaultPlaceholder;
     }
 
     if (trialTraces) {
@@ -464,6 +604,8 @@
       }).join("") || "<p>No runner logs yet.</p>";
     }
 
+    renderTrialStudentValuePanel(payload);
+
     // Calendar view
     const calendarViewEl = document.getElementById("trial-calendar-view");
     if (calendarViewEl) {
@@ -476,7 +618,7 @@
         if (confirmBtn && cv.pending_confirmation) {
           confirmBtn.addEventListener("click", function () {
             if (!currentTrialSession || !currentTrialSession.session_id) { return; }
-            trialChatInput.value = "confirm, add to calendar";
+            trialChatInput.value = "confirm this draft calendar plan";
             if (trialChatForm) {
               trialChatForm.dispatchEvent(new Event("submit", { cancelable: true }));
             }
@@ -492,7 +634,11 @@
       setTrialFeedback(
         payload.requires_signup
           ? "Anonymous limit reached. Sign in or create an Agent ID to keep going."
-          : "Anonymous runner ready. Nothing here is persisted once the trial expires.",
+          : isStudentTrialTemplate(payload.active_template_id)
+            ? "Connected Study Workspace preview is ready. This trial stays ephemeral, but the signed-in product would keep extracted study content, supertags, and linked retrieval after the run."
+          : (payload.calendar_view && payload.calendar_view.confirmed
+            ? "Preview draft reviewed. It was added only to this anonymous trial calendar view; nothing was booked, synced, or persisted."
+            : "Anonymous runner ready. Appointment and calendar flows stay in preview mode here, and nothing is persisted once the trial expires."),
         payload.requires_signup ? "error" : "neutral"
       );
     }
@@ -500,12 +646,12 @@
 
   function renderCalendarView(cv) {
     const slots = cv.slots || [];
-    const startHour = cv.start_hour || 17;
+    const startHour = cv.start_hour || 14;
     const endHour = cv.end_hour || 24;
     const totalMinutes = (endHour - startHour) * 60;
     const colorMap = {
-      lesson: "bg-primary-fixed/60 text-primary border-primary/20",
-      chore: "bg-secondary-container/60 text-secondary border-secondary/20",
+      flight: "bg-primary-fixed/60 text-primary border-primary/20",
+      lodging: "bg-secondary-container/60 text-secondary border-secondary/20",
       free: "bg-surface-container-high text-on-surface-variant border-outline-variant/20"
     };
     const slotBlocks = slots.map(function (slot) {
@@ -531,7 +677,8 @@
       timeLabels.push('<span class="absolute text-[10px] font-mono text-on-surface-variant/50" style="top: ' + pct + '%;">' + h + ':00</span>');
     }
     return [
-      '<div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary mb-3">Day Plan</div>',
+      '<div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary mb-3">Draft Trip Plan</div>',
+      cv.preview_notice ? '<p class="mb-3 rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-2 text-xs leading-6 text-on-surface-variant">' + escapeHtml(cv.preview_notice) + '</p>' : '',
       '<div class="flex gap-3">',
       '<div class="relative w-10 flex-shrink-0" style="height: 280px;">' + timeLabels.join("") + '</div>',
       '<div class="relative flex-1" style="height: 280px;">' + slotBlocks + '</div>',
@@ -539,9 +686,9 @@
       cv.pending_confirmation ? [
         '<button id="trial-calendar-confirm" type="button" ',
         'class="mt-4 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90">',
-        'This looks good — add to my calendar',
+        'Review draft and add it to my preview calendar',
         '</button>'
-      ].join("") : (cv.confirmed ? '<p class="mt-3 text-sm font-medium text-green-400">✓ Added to your calendar.</p>' : "")
+      ].join("") : (cv.confirmed ? '<p class="mt-3 text-sm font-medium text-green-400">✓ Reviewed draft added to your preview calendar.</p>' : "")
     ].join("");
   }
 
@@ -577,6 +724,31 @@
       }
     });
     renderTrialSession(payload);
+  }
+
+  async function handleTrialSampleSource(kind) {
+    if (!trialChatInput) {
+      return;
+    }
+    trialChatInput.value = trialSampleSourceText(kind);
+    trialChatInput.focus();
+    setTrialFeedback("Running the sample through the Connected Study Workspace preview...", "neutral");
+    try {
+      if (!currentTrialSession || currentTrialSession.active_template_id !== "student_day_planner") {
+        await handleTrialTemplateSelect("student_day_planner");
+      } else {
+        renderTrialStudentValuePanel(currentTrialSession);
+      }
+      if (trialChatForm) {
+        if (typeof trialChatForm.requestSubmit === "function") {
+          trialChatForm.requestSubmit();
+        } else {
+          trialChatForm.dispatchEvent(new Event("submit", { cancelable: true }));
+        }
+      }
+    } catch (error) {
+      setTrialFeedback(error.message, "error");
+    }
   }
 
   async function handleTrialChatSubmit(event) {
@@ -666,7 +838,7 @@
         '<div class="flex flex-wrap items-center justify-between gap-3">',
         `<div><p class="text-sm font-semibold text-on-surface">${escapeHtml(entry.event_kind || "policy_saved")}</p>`,
         `<p class="mt-1 text-xs text-on-surface-variant">${escapeHtml(entry.created_at || "")}</p></div>`,
-        `<span class="rounded-full bg-primary-fixed px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-primary">${escapeHtml(String(summary.starter_template_id || "student_day_planner"))}</span>`,
+        `<span class="rounded-full bg-primary-fixed px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-primary">${escapeHtml(String(summary.starter_template_id || "travel_planner"))}</span>`,
         '</div>',
         `<p class="mt-3 text-sm leading-6 text-on-surface-variant">Model: <span class="font-medium text-on-surface">${escapeHtml(String(summary.default_model || "gpt-5.4-mini"))}</span> via ${escapeHtml(String(summary.model_mode || "omnyid_managed_default"))}</p>`,
         `<p class="mt-2 text-xs leading-6 text-on-surface-variant">Tools: ${escapeHtml(enabledTools || "none")}<br>Channels: ${escapeHtml(enabledChannels || "none")}<br>Daily / Monthly caps: ${escapeHtml(String(summary.daily_spend_cap_usd ?? "n/a"))} / ${escapeHtml(String(summary.monthly_spend_cap_usd ?? "n/a"))} USD</p>`,
@@ -700,7 +872,7 @@
       if (runtimeRunnerConfigFeedback) {
         setFeedback(runtimeRunnerConfigFeedback, "Deploy a Python runner to manage its policy here.", "neutral");
       }
-      if (runtimeRunnerStarterTemplate) runtimeRunnerStarterTemplate.value = "student_day_planner";
+      if (runtimeRunnerStarterTemplate) runtimeRunnerStarterTemplate.value = "travel_planner";
       if (runtimeRunnerModelMode) runtimeRunnerModelMode.value = "omnyid_managed_default";
       if (runtimeRunnerDefaultModel) runtimeRunnerDefaultModel.value = "gpt-5.4-mini";
       if (runtimeRunnerInputCap) runtimeRunnerInputCap.value = "16000";
@@ -728,7 +900,7 @@
     const channelPolicy = payload && payload.channel_policy ? payload.channel_policy : {};
 
     if (runtimeRunnerStarterTemplate) {
-      runtimeRunnerStarterTemplate.value = payload.starter_template_id || "student_day_planner";
+      runtimeRunnerStarterTemplate.value = payload.starter_template_id || "travel_planner";
     }
     if (runtimeRunnerModelMode) {
       runtimeRunnerModelMode.value = modelPolicy.mode || "omnyid_managed_default";
@@ -840,7 +1012,7 @@
           },
           tool_policy: runnerToolPolicyPayload(),
           channel_policy: runnerChannelPolicyPayload(),
-          starter_template_id: runtimeRunnerStarterTemplate ? runtimeRunnerStarterTemplate.value : "student_day_planner"
+          starter_template_id: runtimeRunnerStarterTemplate ? runtimeRunnerStarterTemplate.value : "travel_planner"
         }
       });
       renderRuntimeDeployment(payload);
@@ -1782,6 +1954,14 @@
           password: document.getElementById("register-password").value
         }
       });
+      if (payload.verification_required) {
+        setFeedback(
+          authFeedback,
+          payload.message || "Check your email for a link to verify your address and finish setting up your account.",
+          "success"
+        );
+        return;
+      }
       await completeAuth(
         payload,
         authModeContext === "advanced-agent-id"
@@ -1806,7 +1986,11 @@
       });
       await completeAuth(payload, "Sign-in complete. Loading your console.");
     } catch (error) {
-      setFeedback(authFeedback, error.message, "error");
+      setFeedback(
+        authFeedback,
+        error.message + " If you just signed up, verify your email first — check your inbox for the link.",
+        "error"
+      );
     }
   }
 
@@ -1820,6 +2004,26 @@
       await completeAuth(payload, "Google sign-in complete. Loading your console.");
     } catch (error) {
       setFeedback(authFeedback, error.message, "error");
+    }
+  }
+
+  async function loadGoogleAuthConfig() {
+    if (googleClientId) {
+      return googleClientId;
+    }
+    try {
+      const response = await fetch(API_BASE + "/auth/google/config");
+      if (!response.ok) {
+        return "";
+      }
+      const payload = await response.json();
+      if (!payload || !payload.enabled || typeof payload.client_id !== "string") {
+        return "";
+      }
+      googleClientId = payload.client_id.trim();
+      return googleClientId;
+    } catch {
+      return "";
     }
   }
 
@@ -1932,6 +2136,7 @@
     }
 
     setFeedback(deployRuntimeFeedback, "Creating a private Crew runtime plan...", "neutral");
+    const stopRuntimeLoader = startInlineGenesisLoader(deployRuntimeFeedback);
     apiFetch("/runtime/deploy", {
       method: "POST",
       body: {
@@ -1939,9 +2144,11 @@
         gui: "crewai-studio"
       }
     }).then(async function () {
+      stopRuntimeLoader();
       setFeedback(deployRuntimeFeedback, "Private Crew runtime plan created. Refreshing dashboard state.", "success");
       await loadDashboard();
     }).catch(function (error) {
+      stopRuntimeLoader();
       setFeedback(deployRuntimeFeedback, error.message, "error");
     });
   }
@@ -1957,6 +2164,7 @@
     }
 
     setFeedback(deployPythonRunnerFeedback, "Creating a private Python runner + chat runtime plan...", "neutral");
+    const stopPythonRunnerLoader = startInlineGenesisLoader(deployPythonRunnerFeedback);
     apiFetch("/runtime/deploy", {
       method: "POST",
       body: {
@@ -1964,9 +2172,11 @@
         gui: "builtin-chat-window"
       }
     }).then(async function () {
+      stopPythonRunnerLoader();
       setFeedback(deployPythonRunnerFeedback, "Private Python runner plan created. Refreshing dashboard state.", "success");
       await loadDashboard();
     }).catch(function (error) {
+      stopPythonRunnerLoader();
       setFeedback(deployPythonRunnerFeedback, error.message, "error");
     });
   }
@@ -2370,7 +2580,7 @@
       setFeedback(exportDashboardFeedback, "Sign in first to export your workspace state.", "error");
       return;
     }
-    setFeedback(exportDashboardFeedback, "Preparing your workspace export...", "neutral");
+    setFeedback(exportDashboardFeedback, "Preparing your bounded workspace export...", "neutral");
     try {
       const payload = await apiFetch("/dashboard/export");
       const stamp = (payload.exported_at || new Date().toISOString()).replaceAll(":", "-");
@@ -2379,7 +2589,7 @@
         JSON.stringify(payload, null, 2),
         "application/json;charset=utf-8"
       );
-      setFeedback(exportDashboardFeedback, "Workspace export downloaded. Keep it somewhere only you control.", "success");
+      setFeedback(exportDashboardFeedback, "Workspace export downloaded. It includes a scope summary so you can see what is and is not covered.", "success");
     } catch (error) {
       setFeedback(exportDashboardFeedback, error.message, "error");
     }
@@ -2639,6 +2849,14 @@
       });
     });
   }
+  if (trialSampleSourceButtons.length) {
+    trialSampleSourceButtons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        const sourceKind = button.dataset.trialSampleSource || "lecture";
+        handleTrialSampleSource(sourceKind);
+      });
+    });
+  }
   if (authModal) {
     authModal.addEventListener("click", function (event) {
       if (event.target === authModal) {
@@ -2653,12 +2871,17 @@
     }
   });
 
-  function maybeInitGoogle() {
-    if (!window.google || !window.google.accounts || !GOOGLE_CLIENT_ID) {
+  async function maybeInitGoogle() {
+    if (!window.google || !window.google.accounts || googleInitialized) {
       return;
     }
+    const clientId = await loadGoogleAuthConfig();
+    if (!clientId) {
+      return;
+    }
+    googleInitialized = true;
     window.google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
+      client_id: clientId,
       callback: handleGoogleCredential,
       ux_mode: "popup"
     });
@@ -2674,47 +2897,8 @@
     }
   }
 
-  function startHeroTyping() {
-    if (!typedText) {
-      return;
-    }
-
-    const scripts = [
-      "agent:greeter@omnyid.com says hello to agent:ops@omnyid.com",
-      "agent:greeter@omnyid.com advertises greet, explain, and calm nervous founders",
-      "agent:ops@omnyid.com replies with audit, approvals, web actions, and very light sarcasm",
-      "agent:greeter@omnyid.com notes: no HTML scraping, no gossip, only signed AFP"
-    ];
-
-    let scriptIndex = 0;
-    let charIndex = 0;
-    let deleting = false;
-
-    window.setInterval(function () {
-      const current = scripts[scriptIndex];
-      if (!deleting) {
-        charIndex = Math.min(current.length, charIndex + 1);
-      } else {
-        charIndex = Math.max(0, charIndex - 1);
-      }
-
-      typedText.textContent = current.slice(0, charIndex);
-
-      if (!deleting && charIndex === current.length) {
-        deleting = true;
-        return;
-      }
-
-      if (deleting && charIndex === 0) {
-        deleting = false;
-        scriptIndex = (scriptIndex + 1) % scripts.length;
-      }
-    }, 75);
-  }
-
   window.addEventListener("load", function () {
     maybeInitGoogle();
-    startHeroTyping();
     renderAuthMode();
     renderTrialSession(null);
     if (session && session.token) {
