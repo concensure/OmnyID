@@ -1,6 +1,19 @@
 services:
+  ui:
+    build:
+      context: .
+      dockerfile: solid-ui/Dockerfile
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-}
+    volumes:
+      - workspace-assets:/srv/workspace
+    restart: "no"
+
   postgres:
     image: pgvector/pgvector:pg18
+    mem_limit: ${OMNYID_POSTGRES_MEM_LIMIT:-2g}
+    cpus: ${OMNYID_POSTGRES_CPUS:-1.5}
+    pids_limit: ${OMNYID_POSTGRES_PIDS_LIMIT:-256}
     command:
       - postgres
       - -c
@@ -10,10 +23,12 @@ services:
       - -c
       - max_wal_senders=10
     environment:
-      POSTGRES_DB: afp
-      POSTGRES_USER: afp
-      POSTGRES_PASSWORD: afp
+      POSTGRES_DB: ${POSTGRES_DB:-afp}
+      POSTGRES_USER: ${POSTGRES_USER:-afp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_PASSWORD_FILE: ${POSTGRES_PASSWORD_FILE:-}
     volumes:
+      - ./.secrets:/run/secrets:ro
       - postgres-data:/var/lib/postgresql
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations
@@ -21,41 +36,62 @@ services:
 
   electric:
     image: electricsql/electric:latest
+    mem_limit: ${OMNYID_ELECTRIC_MEM_LIMIT:-768m}
+    cpus: ${OMNYID_ELECTRIC_CPUS:-0.75}
+    pids_limit: ${OMNYID_ELECTRIC_PIDS_LIMIT:-128}
     depends_on:
       - postgres
+    entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
     environment:
-      DATABASE_URL: postgresql://afp:afp@postgres:5432/afp
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
       ELECTRIC_INSECURE: "true"
       ELECTRIC_USAGE_REPORTING: "false"
     ports:
       - "127.0.0.1:5133:5133"
+    volumes:
+      - ./.secrets:/run/secrets:ro
+      - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
     restart: unless-stopped
 
   seaweedfs:
     image: chrislusf/seaweedfs:3.83
+    mem_limit: ${OMNYID_SEAWEEDFS_MEM_LIMIT:-1536m}
+    cpus: ${OMNYID_SEAWEEDFS_CPUS:-1.0}
+    pids_limit: ${OMNYID_SEAWEEDFS_PIDS_LIMIT:-256}
     command: server /data --console-address ":9001"
     environment:
-      SEAWEEDFS_ROOT_USER: ${SEAWEEDFS_ROOT_USER}
-      SEAWEEDFS_ROOT_PASSWORD: ${SEAWEEDFS_ROOT_PASSWORD}
+      SEAWEEDFS_ROOT_USER: ${SEAWEEDFS_ROOT_USER:-${MINIO_ROOT_USER:-omnyid}}
+      SEAWEEDFS_ROOT_PASSWORD: ${SEAWEEDFS_ROOT_PASSWORD:-${MINIO_ROOT_PASSWORD:-omnyid-dev-secret}}
     volumes:
       - seaweedfs-data:/data
     restart: unless-stopped
 
   homeserver:
     build: .
+    mem_limit: ${OMNYID_HOMESERVER_MEM_LIMIT:-4g}
+    cpus: ${OMNYID_HOMESERVER_CPUS:-2.5}
+    pids_limit: ${OMNYID_HOMESERVER_PIDS_LIMIT:-512}
     depends_on:
       - postgres
       - seaweedfs
+    entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
+    command: ["./omnyid-homeserver"]
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgres://afp:afp@postgres:5432/afp}
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
       OMNYID_AGENT_ID: ${OMNYID_AGENT_ID}
       OMNYID_GATEWAY_AGENT_ID: ${OMNYID_GATEWAY_AGENT_ID}
       OMNYID_HOMESERVER_URL: ${OMNYID_HOMESERVER_URL}
       OMNYID_AFP_DELEGATION: ${OMNYID_AFP_DELEGATION}
       OMNYID_DOMAIN: ${OMNYID_DOMAIN}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
       OMNYID_PUBLIC_KEY_HEX: ${OMNYID_PUBLIC_KEY_HEX}
       OMNYID_SIGNING_KEY_HEX: ${OMNYID_SIGNING_KEY_HEX}
+      OMNYID_SIGNING_KEY_HEX_FILE: ${OMNYID_SIGNING_KEY_HEX_FILE:-/run/secrets/omnyid_signing_key_hex}
       OMNYID_ENCRYPTION_KEY_HEX: ${OMNYID_ENCRYPTION_KEY_HEX}
+      OMNYID_ENCRYPTION_KEY_HEX_FILE: ${OMNYID_ENCRYPTION_KEY_HEX_FILE:-/run/secrets/omnyid_encryption_key_hex}
+      OMNYID_SESSION_SECRET_FILE: ${OMNYID_SESSION_SECRET_FILE:-/run/secrets/omnyid_session_secret}
       OMNYID_RECIPIENT_KEYS_JSON: ${OMNYID_RECIPIENT_KEYS_JSON:-{}}
       OMNYID_ALLOW_INSECURE_UNSIGNED: "false"
       OMNYID_REQUIRE_ENCRYPTION: "true"
@@ -70,21 +106,29 @@ services:
       OMNYID_GMAIL_CLIENT_ID: ${OMNYID_GMAIL_CLIENT_ID:-}
       OMNYID_GOOGLE_CLIENT_ID: ${OMNYID_GOOGLE_CLIENT_ID:-}
       OMNYID_GMAIL_CLIENT_SECRET: ${OMNYID_GMAIL_CLIENT_SECRET:-}
+      OMNYID_GMAIL_CLIENT_SECRET_FILE: ${OMNYID_GMAIL_CLIENT_SECRET_FILE:-/run/secrets/omnyid_gmail_client_secret}
       OMNYID_GMAIL_REFRESH_TOKEN: ${OMNYID_GMAIL_REFRESH_TOKEN:-}
+      OMNYID_GMAIL_REFRESH_TOKEN_FILE: ${OMNYID_GMAIL_REFRESH_TOKEN_FILE:-/run/secrets/omnyid_gmail_refresh_token}
       OMNYID_GMAIL_USER_ID: ${OMNYID_GMAIL_USER_ID:-me}
       OMNYID_IMAP_HOST: ${OMNYID_IMAP_HOST:-}
       OMNYID_IMAP_PORT: ${OMNYID_IMAP_PORT:-993}
       OMNYID_IMAP_USERNAME: ${OMNYID_IMAP_USERNAME:-}
       OMNYID_IMAP_PASSWORD: ${OMNYID_IMAP_PASSWORD:-}
+      OMNYID_IMAP_PASSWORD_FILE: ${OMNYID_IMAP_PASSWORD_FILE:-/run/secrets/omnyid_imap_password}
       FROM_ADDRESS: ${FROM_ADDRESS}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_PASS_FILE: ${SMTP_PASS_FILE:-/run/secrets/omnyid_smtp_pass}
       SMTP_PORT: ${SMTP_PORT:-587}
+      OMNYID_ANTHROPIC_KEY_FILE: ${OMNYID_ANTHROPIC_KEY_FILE:-/run/secrets/omnyid_anthropic_api_key}
+      OMNYID_RUNPOD_API_KEY_FILE: ${OMNYID_RUNPOD_API_KEY_FILE:-/run/secrets/omnyid_runpod_api_key}
+      OMNYID_OPENAI_API_KEY_FILE: ${OMNYID_OPENAI_API_KEY_FILE:-/run/secrets/omnyid_openai_api_key}
       SEAWEEDFS_URL: http://seaweedfs:9000
-      SEAWEEDFS_USER: ${SEAWEEDFS_ROOT_USER}
-      SEAWEEDFS_PASS: ${SEAWEEDFS_ROOT_PASSWORD}
+      SEAWEEDFS_USER: ${SEAWEEDFS_ROOT_USER:-${MINIO_ROOT_USER:-omnyid}}
+      SEAWEEDFS_PASS: ${SEAWEEDFS_ROOT_PASSWORD:-${MINIO_ROOT_PASSWORD:-omnyid-dev-secret}}
       OMNYID_ELECTRIC_URL: ${OMNYID_ELECTRIC_URL:-http://electric:5133}
+      OMNYID_ENABLE_PRIVATE_RUNTIMES: "false"
       OMNYID_ENABLE_WEBTRANSPORT: "true"
       OMNYID_WEBTRANSPORT_BIND_ADDR: 0.0.0.0:8443
       OMNYID_WEBTRANSPORT_CERT_PATH: ${OMNYID_WEBTRANSPORT_CERT_PATH}
@@ -93,17 +137,19 @@ services:
       - "127.0.0.1:18080:8080"
       - "443:8443/udp"
     volumes:
+      - ./.secrets:/run/secrets:ro
+      - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
       - /home/ubuntu/letsencrypt:/letsencrypt:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
-      - /srv/omnyid/runtimes:/srv/omnyid/runtimes
     restart: unless-stopped
 
   caddy:
     image: caddy:2
     restart: unless-stopped
     depends_on:
-      - homeserver
+      homeserver:
+        condition: service_started
+      ui:
+        condition: service_completed_successfully
     environment:
       OMNYID_DOMAIN: ${OMNYID_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL}
@@ -115,7 +161,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - ./docs:/srv/docs:ro
-      - ./solid-ui/dist:/srv/workspace:ro
+      - workspace-assets:/srv/workspace:ro
       - caddy-data:/data
       - caddy-config:/config
 
@@ -123,25 +169,40 @@ services:
   # Runs omnyid-backup.sh at 02:00 UTC every day; keeps 30 days of archives.
   # Set OMNYID_BACKUP_DIR on the host to override /var/backups/omnyid.
   backup:
-    image: postgres:18
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
     depends_on:
       - postgres
     environment:
       OMNYID_PG_HOST: postgres
       OMNYID_PG_PORT: "5432"
-      OMNYID_PG_USER: afp
-      OMNYID_PG_PASSWORD: afp
-      OMNYID_PG_DB: afp
+      OMNYID_PG_USER: ${POSTGRES_USER:-afp}
+      OMNYID_PG_PASSWORD: ${POSTGRES_PASSWORD:-}
+      OMNYID_PG_PASSWORD_FILE: ${POSTGRES_PASSWORD_FILE:-}
+      OMNYID_PG_DB: ${POSTGRES_DB:-afp}
       OMNYID_BACKUP_RETAIN: "${OMNYID_BACKUP_RETAIN:-30}"
     volumes:
+      - ./.secrets:/run/secrets:ro
       - ./scripts/omnyid-backup.sh:/usr/local/bin/omnyid-backup.sh:ro
+      - ./scripts/omnyid-backup-verify.sh:/usr/local/bin/omnyid-backup-verify.sh:ro
       - ${OMNYID_BACKUP_DIR:-/var/backups/omnyid}:/backups
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
         mkdir -p /backups
         while true; do
-          /usr/local/bin/omnyid-backup.sh /backups >> /var/log/omnyid-backup.log 2>&1
+          latest_dir=""
+          if bash /usr/local/bin/omnyid-backup.sh /backups >> /var/log/omnyid-backup.log 2>&1; then
+            latest_dir="$$(find /backups -maxdepth 1 -mindepth 1 -type d -name '20*Z' | sort | tail -n 1)"
+          fi
+          if [[ -n "$${latest_dir}" ]]; then
+            if bash /usr/local/bin/omnyid-backup-verify.sh "$${latest_dir}" >> /var/log/omnyid-backup.log 2>&1; then
+              python3 -c "import json, sys; from datetime import datetime, timezone; path=sys.argv[1]; data=json.load(open(path, 'r', encoding='utf-8')); data['verification']={'status':'passed','verified_at':datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}; json.dump(data, open(path, 'w', encoding='utf-8'), indent=2); open(path, 'a', encoding='utf-8').write('\n')" "$${latest_dir}/manifest.json"
+            else
+              echo "[omnyid-backup] Verification failed for $${latest_dir}" >> /var/log/omnyid-backup.log 2>&1
+            fi
+          fi
           sleep 86400
         done
     restart: unless-stopped
@@ -149,5 +210,6 @@ services:
 volumes:
   postgres-data:
   seaweedfs-data:
+  workspace-assets:
   caddy-data:
   caddy-config:
