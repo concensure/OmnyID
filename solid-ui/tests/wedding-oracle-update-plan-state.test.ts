@@ -34,7 +34,7 @@ test("buildWeddingOracleUpdatePlanState blocks Oracle update while required read
   assert.equal(plan.canUpdateOracle, false);
   assert.ok(plan.blockerLabels.includes("Backend refresh pagination and query tuning"));
   assert.ok(plan.steps.every((step) => step.kind === "blocked"));
-  assert.ok(plan.guardrailLabels.some((label) => /Never upload/i.test(label)));
+  assert.ok(plan.guardrailLabels.some((label) => /Never update the live wedding planner/i.test(label)));
   assert.match(plan.summary, /blocked by/i);
 });
 
@@ -129,7 +129,7 @@ test("buildWeddingOracleUpdatePlanState requires explicit target before update",
   assert.equal(plan.status, "blocked");
   assert.equal(plan.canUpdateOracle, false);
   assert.equal(plan.targetLabel, "Oracle production target");
-  assert.deepEqual(plan.blockerLabels, ["Oracle update target label is missing."]);
+  assert.deepEqual(plan.blockerLabels, ["Live launch target label is missing."]);
   assert.deepEqual(plan.steps.map((step) => step.kind), ["blocked"]);
 });
 
@@ -170,7 +170,7 @@ test("buildWeddingOracleUpdatePlanState blocks Oracle update when aggregate go/n
   assert.equal(plan.canUpdateOracle, false);
   assert.ok(plan.blockerLabels.includes("Production go/no-go: Backend saved-workspace scale proof packet is missing."));
   assert.ok(plan.steps.every((step) => step.kind === "blocked"));
-  assert.ok(plan.guardrailLabels.some((label) => /aggregate wedding production go\/no-go/i.test(label)));
+  assert.ok(plan.guardrailLabels.some((label) => /launch-readiness proof/i.test(label)));
 });
 
 test("buildWeddingOracleUpdatePlanState keeps blocked go/no-go packets actionable without blocker labels", () => {
@@ -225,7 +225,7 @@ test("buildWeddingOracleUpdateTaskItems projects blocked Oracle gates into exist
   assert.ok(tasks.every((task) => task.priority === "urgent"));
   assert.ok(tasks.every((task) => (task.metadata as Record<string, unknown>).oracle_update_plan_task === true));
   assert.ok(tasks.every((task) => (task.metadata as Record<string, unknown>).oracle_update_blocked === true));
-  assert.ok(tasks.some((task) => /Unblock Oracle update/i.test(task.title)));
+  assert.ok(tasks.some((task) => /Finish launch check/i.test(task.title)));
 });
 
 test("buildWeddingOracleUpdateTaskItems projects ready Oracle steps and dedupes existing step ids", () => {

@@ -386,16 +386,16 @@ test("wedding PersonalOS projection ranks expected-behavior gap tasks", () => {
   });
 
   assert.equal(state.rankedItems[0]?.title, "Connect verified weather contingency evidence");
-  assert.ok(state.rankedItems[0]?.evidenceLabels.includes("production readiness gap"));
-  assert.match(state.rankedItems[0]?.explanation ?? "", /not production-ready/i);
+  assert.ok(state.rankedItems[0]?.evidenceLabels.includes("launch check"));
+  assert.match(state.rankedItems[0]?.explanation ?? "", /needs proof/i);
 });
 
-test("wedding PersonalOS projection ranks Oracle update gate tasks", () => {
+test("wedding PersonalOS projection ranks live launch check tasks", () => {
   const state = buildWeddingPersonalOsProjectionState({
     now,
     taskItems: [{
       id: "wedding_oracle_update_task:prod:blocker",
-      title: "Unblock Oracle update: Provider executor integrations",
+      title: "Finish launch check: Provider executor integrations",
       kind: "other",
       priority: "urgent",
       reviewStatus: "accepted",
@@ -413,9 +413,9 @@ test("wedding PersonalOS projection ranks Oracle update gate tasks", () => {
     }],
   });
 
-  assert.equal(state.rankedItems[0]?.title, "Unblock Oracle update: Provider executor integrations");
-  assert.ok(state.rankedItems[0]?.evidenceLabels.includes("Oracle update gate"));
-  assert.match(state.rankedItems[0]?.explanation ?? "", /remains blocked/i);
+  assert.equal(state.rankedItems[0]?.title, "Finish launch check: Provider executor integrations");
+  assert.ok(state.rankedItems[0]?.evidenceLabels.includes("live update check"));
+  assert.match(state.rankedItems[0]?.explanation ?? "", /cannot be updated/i);
 });
 
 test("wedding PersonalOS projection narrows decision-heavy work into a bounded focus list", () => {

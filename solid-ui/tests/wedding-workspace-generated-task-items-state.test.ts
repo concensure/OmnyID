@@ -216,7 +216,7 @@ test("buildWeddingWorkspaceGeneratedTaskItems recovers seeded vendor review task
   ));
 });
 
-test("buildWeddingWorkspaceGeneratedTaskItems includes Oracle update readiness tasks", () => {
+test("buildWeddingWorkspaceGeneratedTaskItems includes live launch readiness tasks", () => {
   const oracleUpdatePlan = buildWeddingOracleUpdatePlanState({
     productionReadiness: buildWeddingProductionReadinessState(),
     targetLabel: "Oracle wedding prod",
@@ -226,7 +226,7 @@ test("buildWeddingWorkspaceGeneratedTaskItems includes Oracle update readiness t
     metadata,
   });
 
-  assert.ok(tasks.some((task) => /Unblock Oracle update/i.test(task.title)));
+  assert.ok(tasks.some((task) => /Finish launch check/i.test(task.title)));
   assert.ok(tasks.some((task) =>
     (task.metadata as Record<string, unknown>).oracle_update_plan_task === true
     && (task.metadata as Record<string, unknown>).production_readiness_oracle_gate === true

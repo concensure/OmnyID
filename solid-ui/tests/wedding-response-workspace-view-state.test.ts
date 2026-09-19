@@ -92,9 +92,9 @@ test("buildWeddingResponseWorkspaceViewState creates category rail and active ar
   assert.equal(state.oracleUpdatePlan.status, "blocked");
   assert.ok(state.projectionQueue?.groups
     .find((group) => group.kind === "task")?.items
-    .some((item) => /Unblock Oracle update/i.test(item.title)));
-  assert.ok(!state.personalOsProjection.rankedItems.some((item) => item.evidenceLabels.includes("Oracle update gate")));
-  assert.ok(!state.personalOsProjection.rankedItems.some((item) => /Unblock Oracle update/i.test(item.title)));
+    .some((item) => /Finish launch check/i.test(item.title)));
+  assert.ok(!state.personalOsProjection.rankedItems.some((item) => item.evidenceLabels.includes("live update check")));
+  assert.ok(!state.personalOsProjection.rankedItems.some((item) => /Finish launch check/i.test(item.title)));
   assert.match(state.personalOsProjection.fieldEngineSummary ?? "", /Wedding .* pressure:/);
   assert.match(state.personalOsProjection.decisionLoadRelief.summaryLabel, /wedding decision|No decision-heavy wedding items/);
   assert.match(state.bundleExportPayload.content, /## What needs your yes\/no/);

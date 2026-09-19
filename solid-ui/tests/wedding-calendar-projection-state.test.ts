@@ -464,7 +464,7 @@ test("wedding task projection preserves Oracle update gate metadata", () => {
   assert.equal(message.metadata?.oracle_update_target_label, "Oracle wedding prod");
   assert.equal(message.metadata?.oracle_update_can_update, true);
   assert.equal(message.metadata?.production_readiness_oracle_gate, true);
-  assert.ok((message.metadata?.searchable_terms as string[]).includes("Oracle update"));
+  assert.ok((message.metadata?.searchable_terms as string[]).includes("live wedding planner update"));
   assert.ok((message.metadata?.searchable_terms as string[]).includes("scripts/deploy-oracle.ps1"));
 });
 

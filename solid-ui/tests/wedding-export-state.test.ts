@@ -178,13 +178,13 @@ test("buildWeddingExportBundleState honors explicit artifact selection before se
   assert.equal(bundle.canExportNow, false);
 });
 
-test("buildWeddingPacketExportCapabilityState exposes ready and worker-gated download formats", () => {
+test("buildWeddingPacketExportCapabilityState exposes ready and setup-gated download formats", () => {
   const state = buildWeddingPacketExportCapabilityState({ title: "Harbour planning bundle" });
 
   assert.deepEqual(state.readyFormats.map((format) => format.id), ["markdown", "html", "word_doc"]);
   assert.ok(state.readyFormats.some((format) => format.id === "word_doc" && /Word-openable/i.test(format.label)));
   assert.deepEqual(state.plannedConversions.map((conversion) => conversion.id), ["zip", "docx", "jpg", "png"]);
   assert.equal(state.plannedConversions[0]?.filename, "harbour-planning-bundle.zip");
-  assert.match(state.plannedConversions[0]?.blockedReason ?? "", /worker/i);
+  assert.match(state.plannedConversions[0]?.blockedReason ?? "", /not available yet/i);
   assert.match(state.summaryLabel, /4 extra download formats/i);
 });

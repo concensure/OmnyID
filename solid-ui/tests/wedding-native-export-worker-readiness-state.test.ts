@@ -23,7 +23,7 @@ test("buildWeddingNativeExportWorkerReadinessState blocks when workers are absen
   assert.equal(state.status, "blocked");
   assert.equal(state.productionEvidenceReady, false);
   assert.deepEqual(state.checks.map((check) => check.status), ["blocked", "blocked", "blocked"]);
-  assert.match(state.summary, /3 native export workers/);
+  assert.match(state.summary, /3 download services/);
 });
 
 test("buildWeddingNativeExportWorkerReadinessState requires privacy, receipts, filenames, and failure copy", () => {
@@ -40,8 +40,8 @@ test("buildWeddingNativeExportWorkerReadinessState requires privacy, receipts, f
 
   const docx = state.checks.find((check) => check.id === "docx_packet_worker");
   assert.equal(docx?.status, "blocked");
-  assert.ok(docx?.blockerLabels.some((label) => /sensitive-artifact filter/i.test(label)));
-  assert.ok(docx?.blockerLabels.some((label) => /durable export receipt/i.test(label)));
+  assert.ok(docx?.blockerLabels.some((label) => /private-file filter/i.test(label)));
+  assert.ok(docx?.blockerLabels.some((label) => /saved export receipt/i.test(label)));
 });
 
 test("buildWeddingNativeExportWorkerReadinessState passes when every planned worker is proven", () => {

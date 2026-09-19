@@ -284,10 +284,10 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
     hasLegalAdministrationTask(task.metadata) ? "legal administration" : "",
     hasVendorSearchReviewTask(task.metadata) ? "vendor search freshness" : "",
     hasVendorSeedReviewTask(task.metadata) ? "seeded vendor data" : "",
-    hasExpectedBehaviorGap(task.metadata) ? "production readiness gap" : "",
-    hasOracleUpdatePlanTask(task.metadata) ? "Oracle update gate" : "",
-    hasBackgroundAutomationTask(task.metadata) ? "background automation gap" : "",
-    hasProviderHandoffTask(task.metadata) ? "provider handoff gap" : "",
+    hasExpectedBehaviorGap(task.metadata) ? "launch check" : "",
+    hasOracleUpdatePlanTask(task.metadata) ? "live update check" : "",
+    hasBackgroundAutomationTask(task.metadata) ? "automation setup gap" : "",
+    hasProviderHandoffTask(task.metadata) ? "vendor connection gap" : "",
     outreachEscalationEvidenceLabel(escalationStage) ?? "",
     ...secondOrderEvidence(task.metadata),
     ...stringArray(record(task.metadata).expected_behavior_blocker_labels),
@@ -316,13 +316,13 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
       hasLegalAdministrationTask(task.metadata) ? "Legal document and NOIM preparation should stay visible before celebrant review; no form is lodged automatically." : null,
       hasVendorSearchReviewTask(task.metadata) ? "Vendor search results need source freshness, price/availability verification, and user selection before reports narrow or outreach is sent." : null,
       hasVendorSeedReviewTask(task.metadata) ? "Seeded vendor rows are planning hints only; refresh source pages and verify fit before using them for recommendations or outreach." : null,
-      hasExpectedBehaviorGap(task.metadata) ? "Expected wedding behavior is not production-ready yet; resolve blocker evidence before claiming the capability works end-to-end." : null,
-      hasBackgroundAutomationTask(task.metadata) ? "Background automation is blocked; resolve this before claiming competitor-style automatic wedding updates are live." : null,
-      hasProviderHandoffTask(task.metadata) ? "Approved internal handoff still needs a connected external provider executor before users can rely on live delivery or sync." : null,
+      hasExpectedBehaviorGap(task.metadata) ? "This wedding feature still needs proof before users can rely on it end-to-end." : null,
+      hasBackgroundAutomationTask(task.metadata) ? "Automatic wedding updates are not fully set up yet; finish this before relying on them." : null,
+      hasProviderHandoffTask(task.metadata) ? "This approved action still needs a connected vendor/email/calendar service before live delivery or sync." : null,
       hasOracleUpdatePlanTask(task.metadata)
         ? oracleUpdateIsBlocked(task.metadata)
-          ? "Oracle update remains blocked until required production-readiness gates pass; this prevents accidental deployment of incomplete wedding behavior."
-          : "Oracle update is ready only as a gated sequence: preflight, deploy, verify remote runtime, then record durable proof."
+          ? "The live wedding planner cannot be updated until required launch checks pass."
+          : "The live wedding planner is ready for the release sequence: preflight, update, verify, then save proof."
         : null,
       hasSecondOrder(task.metadata) ? "This Smart Action is backed by the wedding plan and ready to review." : null,
       task.approvalState === "pending_user_approval" ? "Needs user approval before downstream action." : null,
@@ -518,7 +518,7 @@ export function buildWeddingPersonalOsProjectionState(input: {
       "Uses existing PersonalOS field engine and simulator only.",
       "Does not create a wedding-specific field engine or simulator.",
       "Does not infer booking, payment, lodgement, availability, or legal compliance.",
-      "Demo, ignored, archived, and unsourced speculative items should not outrank actionable AFP evidence.",
+      "Demo, ignored, archived, and unsourced speculative items should not outrank actionable wedding evidence.",
     ],
   };
 }

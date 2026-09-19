@@ -117,7 +117,7 @@ function targetDefinition(id: WeddingExportTargetId): WeddingExportTarget {
       extension: ".docx",
       mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       availability: "planned",
-      detail: "Requires the document conversion worker before direct native DOCX download.",
+      detail: "Coming soon as a one-click Word download.",
     },
     jpg: {
       id,
@@ -149,7 +149,7 @@ function targetDefinition(id: WeddingExportTargetId): WeddingExportTarget {
       extension: ".zip",
       mimeType: "application/zip",
       availability: "planned",
-      detail: "Requires bundle packaging before direct workspace packet download.",
+      detail: "Coming soon as one zipped planning folder.",
     },
   };
   return targets[id];
@@ -310,28 +310,28 @@ export function buildWeddingPacketExportCapabilityState(input: {
       id: "zip",
       label: "ZIP bundle",
       filename: `${base}.zip`,
-      blockedReason: "Bundle packaging worker is not connected yet.",
+      blockedReason: "One-click ZIP download is not available yet.",
       requiresWorker: "zip_packet_worker",
     },
     {
       id: "docx",
       label: "Word bundle",
       filename: `${base}.docx`,
-      blockedReason: "Native document conversion worker is not connected yet.",
+      blockedReason: "One-click Word download is not available yet.",
       requiresWorker: "docx_packet_worker",
     },
     {
       id: "jpg",
       label: "JPG image",
       filename: `${base}.jpg`,
-      blockedReason: "Image rendering worker is not connected yet.",
+      blockedReason: "Image download is not available yet.",
       requiresWorker: "image_packet_worker",
     },
     {
       id: "png",
       label: "PNG image",
       filename: `${base}.png`,
-      blockedReason: "Image rendering worker is not connected yet.",
+      blockedReason: "Image download is not available yet.",
       requiresWorker: "image_packet_worker",
     },
   ];
@@ -342,6 +342,6 @@ export function buildWeddingPacketExportCapabilityState(input: {
       { id: "word_doc", label: "Word-openable .doc", detail: "Ready now as Word-openable HTML saved with a .doc extension." },
     ],
     plannedConversions,
-    summaryLabel: `${plannedConversions.length} extra download format${plannedConversions.length === 1 ? "" : "s"} will be enabled after the export workers are connected.`,
+    summaryLabel: `${plannedConversions.length} extra download format${plannedConversions.length === 1 ? "" : "s"} will be added after final export setup.`,
   };
 }

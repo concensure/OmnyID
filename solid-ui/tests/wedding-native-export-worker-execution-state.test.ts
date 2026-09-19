@@ -54,7 +54,7 @@ test("runWeddingNativeExportWorkerExecution blocks when required worker is not r
 
   assert.equal(state.status, "blocked");
   assert.equal(state.workerId, "zip_packet_worker");
-  assert.match(state.blockerLabels[0] ?? "", /Worker is not connected/i);
+  assert.match(state.blockerLabels[0] ?? "", /Download service is not connected/i);
   assert.equal(state.receipt, null);
 });
 

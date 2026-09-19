@@ -211,7 +211,7 @@ export function buildWeddingProductionReadinessState(
         : check.id === "approval_execution_ui" && evidence.approvalExecutionUiReady && !overrides[check.id]
           ? "Wedding approval UI has controls, rejection path, execution path, disclosure preview, risk labels, provider setup routing, AFP receipt projection, failure copy, keyboard fallback, and blocked-state proof. External provider execution remains covered by the provider executor gate."
           : check.id === "native_export_workers" && evidence.nativeExportWorkersReady && !overrides[check.id]
-            ? "Native ZIP, DOCX, JPG, and PNG packet export workers are connected with sensitive-artifact filtering, deterministic filenames, durable receipts, and safe failure copy."
+            ? "ZIP, DOCX, JPG, and PNG downloads are connected with private-file filtering, repeatable filenames, saved receipts, and safe error messages."
           : check.id === "llm_need_to_know_extraction" && evidence.llmNeedToKnowExtractionReady && !overrides[check.id]
             ? "LLM-backed Need-To-Know extraction has transcript/chat proof, conservative review labels, deterministic fallback, AFP projection, and no overwrite without review."
           : check.id === "seeded_vendor_corpus" && evidence.seededVendorCorpusReady && !overrides[check.id]

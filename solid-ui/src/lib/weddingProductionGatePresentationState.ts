@@ -36,7 +36,7 @@ export function buildWeddingProductionGatePresentationState(
       + (packet.proofManifestCounts.blocked ? `, ${packet.proofManifestCounts.blocked} blocked` : "")
       + (packet.proofManifestCounts.missing ? `, ${packet.proofManifestCounts.missing} missing` : "")
     : null;
-  const nextActionLabels = (packet?.nextActionLabels ?? ["Attach aggregate wedding production go/no-go proof packet."]).slice(0, 4);
+  const nextActionLabels = (packet?.nextActionLabels ?? ["Attach launch-readiness proof."]).slice(0, 4);
   return {
     visible: true,
     canUploadToOracle,

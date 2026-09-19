@@ -26,9 +26,9 @@ export type WeddingNativeExportWorkerReadinessState = {
 };
 
 const WORKER_LABELS: Record<WeddingNativeExportWorkerId, string> = {
-  zip_packet_worker: "Native ZIP packet worker",
-  docx_packet_worker: "Native DOCX packet worker",
-  image_packet_worker: "JPG/PNG image packet worker",
+  zip_packet_worker: "ZIP bundle download",
+  docx_packet_worker: "Word download",
+  image_packet_worker: "JPG/PNG image download",
 };
 
 const REQUIRED_WORKERS: readonly WeddingNativeExportWorkerId[] = [
@@ -46,11 +46,11 @@ function workerInputFor(
 
 function checkWorker(worker: WeddingNativeExportWorkerInput): WeddingNativeExportWorkerCheck {
   const blockerLabels = [
-    worker.connected ? null : "Worker is not connected.",
-    worker.supportsSensitiveFilter ? null : "Worker does not prove the same sensitive-artifact filter as packet exports.",
-    worker.supportsDeterministicFilename ? null : "Worker does not prove deterministic filenames for repeatable downloads.",
-    worker.supportsReceipt ? null : "Worker does not produce a durable export receipt.",
-    worker.supportsFailureCopy ? null : "Worker does not expose safe failure copy when conversion fails.",
+    worker.connected ? null : "Download service is not connected.",
+    worker.supportsSensitiveFilter ? null : "Download service has not proven the same private-file filter.",
+    worker.supportsDeterministicFilename ? null : "Download service has not proven repeatable filenames.",
+    worker.supportsReceipt ? null : "Download service does not produce a saved export receipt.",
+    worker.supportsFailureCopy ? null : "Download service does not show a safe error message when conversion fails.",
   ].filter((value): value is string => Boolean(value));
 
   return {
@@ -76,7 +76,7 @@ export function buildWeddingNativeExportWorkerReadinessState(input: {
     checks,
     nextActions,
     summary: status === "ready"
-      ? "Native ZIP, DOCX, JPG, and PNG packet exports have worker evidence and can be enabled."
-      : `${blockedChecks.length} native export worker${blockedChecks.length === 1 ? "" : "s"} still block direct ZIP/DOCX/JPG/PNG packet exports.`,
+      ? "ZIP, DOCX, JPG, and PNG downloads are verified and can be enabled."
+      : `${blockedChecks.length} download service${blockedChecks.length === 1 ? "" : "s"} still block direct ZIP/DOCX/JPG/PNG downloads.`,
   };
 }

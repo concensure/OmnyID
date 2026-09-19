@@ -349,7 +349,7 @@ test("buildWeddingResponseWorkspaceViewState exposes packet export capability la
   assert.deepEqual(state.packetExportCapability.readyFormats.map((format) => format.id), ["markdown", "html", "word_doc"]);
   assert.ok(state.packetExportCapability.readyFormats.some((format) => /Save as PDF/i.test(format.label)));
   assert.ok(state.packetExportCapability.plannedConversions.some((conversion) => conversion.id === "zip"));
-  assert.ok(state.packetExportCapability.plannedConversions.every((conversion) => /worker/i.test(conversion.blockedReason)));
+  assert.ok(state.packetExportCapability.plannedConversions.every((conversion) => /not available yet/i.test(conversion.blockedReason)));
 });
 
 test("buildWeddingResponseWorkspaceViewState includes selected shortlist decisions in projection queue", () => {

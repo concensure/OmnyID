@@ -238,7 +238,7 @@ test("native export worker evidence clears only the native export gate", () => {
 
   const nativeExportCheck = state.checks.find((check) => check.id === "native_export_workers");
   assert.equal(nativeExportCheck?.status, "pass");
-  assert.match(nativeExportCheck?.detail ?? "", /sensitive-artifact filtering/);
+  assert.match(nativeExportCheck?.detail ?? "", /private-file filtering/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
   assert.ok(state.nextActions.includes("Provider executor integrations"));

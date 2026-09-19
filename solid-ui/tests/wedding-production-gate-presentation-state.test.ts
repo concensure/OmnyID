@@ -58,8 +58,8 @@ test("production gate presentation shows absent packets as blocked missing proof
   assert.equal(state.proofManifestCountLabel, null);
   assert.deepEqual(state.proofReferenceLabels, []);
   assert.deepEqual(state.missingProofLabels, []);
-  assert.equal(state.nextActionLabel, "Attach aggregate wedding production go/no-go proof packet.");
-  assert.deepEqual(state.nextActionLabels, ["Attach aggregate wedding production go/no-go proof packet."]);
+  assert.equal(state.nextActionLabel, "Attach launch-readiness proof.");
+  assert.deepEqual(state.nextActionLabels, ["Attach launch-readiness proof."]);
 });
 
 test("production gate presentation summarizes blocked packets conservatively", () => {
