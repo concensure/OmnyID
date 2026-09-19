@@ -60,6 +60,7 @@ export function WeddingResponseWorkspaceView(props: {
   projectionStorage?: Storage | null;
   importNotice?: string | null;
   importRunning?: boolean | null;
+  compact?: boolean;
   onQueryChange?: (query: string) => void;
   onRefreshWorkspace?: () => void;
   onImportFiles?: (files: File[]) => void;
@@ -84,6 +85,18 @@ export function WeddingResponseWorkspaceView(props: {
   const [importDragActive, setImportDragActive] = createSignal(false);
   const [showTechnicalDetails, setShowTechnicalDetails] = createSignal(false);
   const [showPlanningFiles, setShowPlanningFiles] = createSignal(false);
+  const compactMode = () => Boolean(props.compact);
+  const rootClass = () => compactMode() ? "grid min-w-0 gap-3 xl:grid-cols-2" : "grid min-w-0 gap-4 xl:grid-cols-2";
+  const primaryColumnClass = () => compactMode() ? "min-w-0 space-y-3" : "min-w-0 space-y-4";
+  const sidebarClass = () => compactMode()
+    ? "min-w-0 space-y-3 xl:sticky xl:top-4 xl:self-start"
+    : "min-w-0 space-y-4 xl:sticky xl:top-4 xl:self-start";
+  const cardClass = () => compactMode()
+    ? "rounded-[20px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[24px]"
+    : "rounded-[24px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[28px] sm:p-4";
+  const importCardBaseClass = () => compactMode()
+    ? "grid gap-2 rounded-[20px] border p-3 shadow-card transition sm:rounded-[24px] md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+    : "grid gap-3 rounded-[24px] border p-3 shadow-card transition sm:rounded-[28px] sm:p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center";
 
   function approvedApprovalRequest(request: WeddingApprovalRequestState): WeddingApprovalRequestState {
     return approvedRequests()[request.id] ? approveWeddingApprovalRequestState(request) : request;
@@ -196,11 +209,11 @@ export function WeddingResponseWorkspaceView(props: {
   }
 
   return (
-    <section class="grid min-w-0 gap-4 xl:grid-cols-2">
-      <div class="min-w-0 space-y-4">
+    <section class={rootClass()}>
+      <div class={primaryColumnClass()}>
         <WeddingDecisionFocusCard state={state()} onSidebarAction={handleSidebarAction} />
 
-        <div class="rounded-[24px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[28px] sm:p-4">
+        <div class={cardClass()}>
           <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div class="min-w-0">
               <p class="text-base font-semibold text-on-surface">Your wedding documents</p>
@@ -396,7 +409,7 @@ export function WeddingResponseWorkspaceView(props: {
         </div>
 
         <div
-          class={`grid gap-3 rounded-[24px] border p-3 shadow-card transition sm:rounded-[28px] sm:p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center ${
+          class={`${importCardBaseClass()} ${
             importDragActive()
               ? "border-teal-300 bg-teal-100/90"
               : "border-teal-100/80 bg-teal-50/85"
@@ -457,7 +470,7 @@ export function WeddingResponseWorkspaceView(props: {
 
       </div>
 
-      <aside class="min-w-0 space-y-4 xl:sticky xl:top-4 xl:self-start">
+      <aside class={sidebarClass()}>
         <WeddingWorkspaceContextPanels
           state={state()}
           showTechnicalDetails={showTechnicalDetails()}
