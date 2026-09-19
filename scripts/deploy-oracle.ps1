@@ -2,14 +2,27 @@ param(
     [string]$RemoteHost = "",
     [string]$User = "",
     [string]$KeyPath = "",
-    [string]$ProjectRoot = "C:\Users\ozans\Desktop\projects\Agenton",
+    [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
     [string]$RemoteDir = "",
     [string]$EnvFile = "",
+    [string]$ProofOutDir = "",
+    [string[]]$ComposeServices = @(),
     [switch]$IncludeQuicProfile,
-    [switch]$UseMinimalProfile = $true
+    [switch]$UseMinimalProfile = $true,
+    [switch]$IncludeSimulatedData = $true,
+    [switch]$SkipRemotePreflight,
+    [switch]$SkipPostDeployProof,
+    [switch]$UseDetachedOracleProof = $true,
+    [switch]$SkipComposeBuild,
+    [switch]$SkipCaddyReload,
+    [switch]$SkipWorkspaceSmoke
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+. (Join-Path $PSScriptRoot "oracle-secret-sync.ps1")
+. (Join-Path $PSScriptRoot "oracle-runtime-contract.ps1")
 
 # Load local Oracle config (gitignored) if params were not supplied
 $configFile = Join-Path $PSScriptRoot "oracle-config.local.ps1"
@@ -18,35 +31,275 @@ if (-not $RemoteHost) { $RemoteHost = $ORACLE_HOST }
 if (-not $User)       { $User       = $ORACLE_USER }
 if (-not $KeyPath)    { $KeyPath    = $ORACLE_KEY }
 if (-not $RemoteDir)  { $RemoteDir  = $ORACLE_DIR }
-
-# Use a short relative temp name to avoid Windows drive-letter path issues with tar.exe
-$archiveName = "omnyid-oracle-deploy.tar"
-$archivePath = Join-Path $env:TEMP $archiveName
-
-if (Test-Path $archivePath) {
-    Remove-Item $archivePath -Force
+if ([string]::IsNullOrWhiteSpace($ProofOutDir)) {
+    $ProofOutDir = Join-Path $ProjectRoot "artifacts\oracle-production-proof-deploy"
 }
 
-Push-Location $ProjectRoot
-try {
-    # Pipe to tar via stdout to avoid the C:\ path-as-hostname problem when tar
-    # writes to an absolute Windows path that SSH misinterprets as a remote host.
-    # We write the archive locally using robocopy-style file redirect instead.
-    $excludeArgs = @(
-        "--exclude=.git",
-        "--exclude=target",
-        "--exclude=node_modules",
-        "--exclude=python-sdk/.venv",
-        "--exclude=.env",
-        "--exclude=.env.*",
-        "--exclude=secrets",
-        "--exclude=*.log"
+function Invoke-OracleProductionProofSummary {
+    param(
+        [string]$Destination,
+        [switch]$SkipRestoreDrill
     )
-    # Use -cf with a relative filename inside a temp dir to sidestep the C:\ issue
+
+    $proofFailed = $false
+    try {
+        $proofOutput = & (Join-Path $PSScriptRoot "oracle-production-proof.ps1") `
+            -RemoteHost $RemoteHost `
+            -User $User `
+            -KeyPath $KeyPath `
+            -RemoteDir $RemoteDir `
+            -OutDir $Destination `
+            -UseDetachedRemoteAudit:([bool]($UseDetachedOracleProof -and -not $SkipRestoreDrill)) `
+            -SkipRestoreDrill:$SkipRestoreDrill 2>&1
+    } catch {
+        $proofFailed = $true
+        $proofOutput = $_ | Out-String
+    }
+    $proofJsonPath = Join-Path $Destination "oracle-production-proof.json"
+    if (-not (Test-Path -LiteralPath $proofJsonPath)) {
+        if ($proofFailed -or $LASTEXITCODE -ne 0) {
+            throw "[deploy-oracle] oracle production proof failed without producing json`n$proofOutput"
+        }
+        throw "[deploy-oracle] expected oracle production proof json at $proofJsonPath"
+    }
+
+    $proofReport = Get-Content -LiteralPath $proofJsonPath -Raw | ConvertFrom-Json
+    if (($proofFailed -or $LASTEXITCODE -ne 0) -and $proofReport.failure_step -eq "disk_capacity") {
+        throw "[deploy-oracle] oracle production proof failed`n$proofOutput"
+    }
+
+    return $proofReport
+}
+
+function Convert-ToShellSingleQuotedLiteral {
+    param([string]$Value)
+
+    return "'" + ($Value -replace "'", "'`"'" ) + "'"
+}
+
+function Join-ShellArguments {
+    param([string[]]$Values)
+
+    if ($null -eq $Values -or $Values.Count -eq 0) {
+        return ""
+    }
+
+    return (($Values | ForEach-Object { Convert-ToShellSingleQuotedLiteral $_ }) -join " ")
+}
+
+function Assert-ExternalSuccess {
+    param([string]$Context)
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "[deploy-oracle] $Context failed with exit code $LASTEXITCODE"
+    }
+}
+
+function Invoke-CheckedRemoteCommand {
+    param(
+        [string]$Context,
+        [string]$Command,
+        [switch]$ScanDockerBuildOutput
+    )
+
+    $output = & ssh.exe -i $KeyPath "$User@$RemoteHost" $Command 2>&1
+    $exitCode = $LASTEXITCODE
+    if ($output) {
+        $output | ForEach-Object { Write-Host $_ }
+    }
+    if ($exitCode -ne 0) {
+        throw "[deploy-oracle] $Context failed with exit code $exitCode"
+    }
+
+    if ($ScanDockerBuildOutput) {
+        $outputText = ($output | Out-String)
+        $failurePattern = "(?im)(failed to solve|could not compile|did not complete successfully|target [^`r`n]+ failed to solve)"
+        if ($outputText -match $failurePattern) {
+            throw "[deploy-oracle] $Context printed Docker build failure output even though ssh exited successfully"
+        }
+    }
+}
+
+function Assert-StagedOracleRuntimeManifest {
+    param([string]$ManifestPath)
+
+    if (-not (Test-Path -LiteralPath $ManifestPath)) {
+        throw "[deploy-oracle] expected oracle runtime manifest at $ManifestPath"
+    }
+
+    $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+    $copiedPaths = @($manifest.copied_paths)
+    $requiredScripts = @($manifest.required_runtime_scripts)
+    if ($requiredScripts.Count -eq 0) {
+        $requiredScripts = @(Get-OracleRequiredRuntimeScriptPaths)
+    }
+
+    $missingScripts = @($requiredScripts | Where-Object { $_ -notin $copiedPaths })
+    if ($missingScripts.Count -gt 0) {
+        throw "[deploy-oracle] staged runtime manifest is missing required scripts: $($missingScripts -join ',')"
+    }
+
+    return $manifest
+}
+
+function Assert-RemoteOracleRuntimeScripts {
+    param(
+        [string]$RemoteHostValue,
+        [string]$UserValue,
+        [string]$KeyPathValue,
+        [string]$RemoteDirValue
+    )
+
+    $requiredScripts = @(Get-OracleRequiredRuntimeScriptPaths)
+    $missingScripts = New-Object System.Collections.Generic.List[string]
+
+    foreach ($requiredScript in $requiredScripts) {
+        $fullPath = ($RemoteDirValue.TrimEnd('/') + '/' + $requiredScript.TrimStart('/')).Replace("'", "'\''")
+        $existsResult = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" "if [ -f '$fullPath' ]; then echo present; else echo missing; fi" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "[deploy-oracle] remote runtime script verification failed for $requiredScript"
+        }
+        if ((($existsResult | Out-String).Trim()) -ne "present") {
+            $missingScripts.Add($requiredScript)
+            continue
+        }
+
+        if ($requiredScript.EndsWith(".sh")) {
+            $normalizeResult = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" "sed -i 's/\r$//' '$fullPath' && chmod +x '$fullPath'" 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                throw "[deploy-oracle] remote runtime script normalization failed for $requiredScript"
+            }
+        }
+    }
+
+    if ($missingScripts.Count -gt 0) {
+        throw "[deploy-oracle] remote runtime is missing required scripts after extraction: $($missingScripts -join ',')"
+    }
+}
+
+function Sync-OracleSecrets {
+    param(
+        [string]$RemoteHostValue,
+        [string]$UserValue,
+        [string]$KeyPathValue,
+        [string]$RemoteDirValue,
+        [object[]]$SecretEntries
+    )
+
+    if ($null -eq $SecretEntries -or $SecretEntries.Count -eq 0) {
+        return
+    }
+
+    $remoteDirLiteral = Convert-ToShellSingleQuotedLiteral $RemoteDirValue
+    $remoteSecretsRoot = ($RemoteDirValue.TrimEnd('/') + '/.secrets').Replace("//", "/")
+    $remoteSecretsRootLiteral = Convert-ToShellSingleQuotedLiteral $remoteSecretsRoot
+    $stagingDirName = ".secrets-upload-" + [guid]::NewGuid().ToString("N")
+    $stagingDir = ($RemoteDirValue.TrimEnd('/') + '/' + $stagingDirName).Replace("//", "/")
+    $stagingDirLiteral = Convert-ToShellSingleQuotedLiteral $stagingDir
+
+    & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" "mkdir -p $remoteDirLiteral $stagingDirLiteral"
+    if ($LASTEXITCODE -ne 0) {
+        throw "[deploy-oracle] failed to create remote secret staging directory"
+    }
+
+    try {
+        foreach ($entry in $SecretEntries) {
+            $remoteRelativeDir = Split-Path -Path $entry.RemoteHostRelativePath -Parent
+            $remoteFileName = Split-Path -Path $entry.RemoteHostRelativePath -Leaf
+            if ([string]::IsNullOrWhiteSpace($remoteFileName)) {
+                throw "[deploy-oracle] invalid remote secret target for $($entry.Key)"
+            }
+
+            $stageTarget = ($stagingDir.TrimEnd('/') + '/' + $remoteFileName).Replace("//", "/")
+            & scp.exe -i $KeyPathValue $entry.SourcePath "${UserValue}@${RemoteHostValue}:$stageTarget"
+            if ($LASTEXITCODE -ne 0) {
+                throw "[deploy-oracle] failed to upload secret payload for $($entry.Key)"
+            }
+
+            $remoteSecretsDir = if ([string]::IsNullOrWhiteSpace($remoteRelativeDir)) {
+                $RemoteDirValue
+            } else {
+                ($RemoteDirValue.TrimEnd('/') + '/' + ($remoteRelativeDir -replace '\\', '/').TrimStart('/')).Replace("//", "/")
+            }
+            $remoteSecretsDirLiteral = Convert-ToShellSingleQuotedLiteral $remoteSecretsDir
+            $stageTargetLiteral = Convert-ToShellSingleQuotedLiteral $stageTarget
+            $remoteTarget = ($RemoteDirValue.TrimEnd('/') + '/' + ($entry.RemoteHostRelativePath -replace '\\', '/').TrimStart('/')).Replace("//", "/")
+            $remoteTargetLiteral = Convert-ToShellSingleQuotedLiteral $remoteTarget
+
+            $promoteCommand = @"
+sudo mkdir -p $remoteSecretsDirLiteral &&
+sudo install -m 600 $stageTargetLiteral $remoteTargetLiteral
+"@
+            & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" $promoteCommand
+            if ($LASTEXITCODE -ne 0) {
+                throw "[deploy-oracle] failed to promote secret payload for $($entry.Key)"
+            }
+        }
+
+        $normalizeCommand = @"
+sudo sh -lc 'chmod 700 $remoteSecretsRootLiteral && chmod 600 $remoteSecretsRootLiteral/*'
+"@
+        & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" $normalizeCommand
+        if ($LASTEXITCODE -ne 0) {
+            throw "[deploy-oracle] failed to normalize remote secret permissions"
+        }
+    } finally {
+        & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" "rm -rf $stagingDirLiteral" 2>$null | Out-Null
+    }
+}
+
+# Use a short relative temp name to avoid Windows drive-letter path issues with tar.exe
+$archiveName = "omnyid-oracle-deploy-$([guid]::NewGuid().ToString('N')).tar"
+$archivePath = Join-Path $env:TEMP $archiveName
+$stageDir = Join-Path $env:TEMP "omnyid-oracle-runtime-stage"
+$envStageDir = Join-Path $env:TEMP "omnyid-oracle-env-stage"
+
+if (Test-Path -LiteralPath $archivePath) {
+    Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
+}
+if (Test-Path -LiteralPath $stageDir) {
+    Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+if (Test-Path -LiteralPath $envStageDir) {
+    Remove-Item -LiteralPath $envStageDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+if (-not $SkipRemotePreflight) {
+    $preflightOutDir = Join-Path $ProofOutDir "preflight"
+    $preflightReport = Invoke-OracleProductionProofSummary -Destination $preflightOutDir -SkipRestoreDrill
+    if ($preflightReport.failure_step -eq "disk_capacity") {
+        throw "[deploy-oracle] refusing to deploy while Oracle disk is full ($($preflightReport.remote_root_use_pct)% root, $($preflightReport.remote_var_use_pct)% /var). See $preflightOutDir"
+    }
+    if ($preflightReport.status -ne "pass") {
+        Write-Warning ("[deploy-oracle] Oracle preflight is not fully healthy (status={0}, failure_step={1}, reason={2}). Proceeding because the failure is not disk-capacity-related. See {3}" -f $preflightReport.status, $preflightReport.failure_step, $preflightReport.failure_reason, $preflightOutDir)
+    } else {
+        Write-Host ("[deploy-oracle] Oracle preflight passed. Artifact: {0}" -f $preflightOutDir)
+    }
+}
+
+& (Join-Path $PSScriptRoot "stage-oracle-runtime.ps1") `
+    -SourceRoot $ProjectRoot `
+    -OutputDir $stageDir `
+    -IncludeSimulatedData:$IncludeSimulatedData
+
+$stageManifestPath = Join-Path $stageDir "oracle-runtime-manifest.json"
+if (Test-Path -LiteralPath $stageManifestPath) {
+    $stageManifest = Assert-StagedOracleRuntimeManifest -ManifestPath $stageManifestPath
+    $sizeMiB = [math]::Round(([double]$stageManifest.total_staged_bytes / 1MB), 2)
+    Write-Host ("[deploy-oracle] staged runtime bundle: {0} paths, {1} MiB" -f $stageManifest.copied_path_count, $sizeMiB)
+    foreach ($category in @($stageManifest.category_totals | Where-Object { $_.bytes -gt 0 } | Sort-Object -Property bytes -Descending | Select-Object -First 5)) {
+        $categoryMiB = [math]::Round(([double]$category.bytes / 1MB), 2)
+        Write-Host ("[deploy-oracle]   {0}: {1} MiB across {2} paths" -f $category.name, $categoryMiB, $category.path_count)
+    }
+}
+
+Push-Location $stageDir
+try {
     $tempDir = $env:TEMP
     Push-Location $tempDir
     try {
-        & tar.exe @excludeArgs -cf $archiveName -C $ProjectRoot .
+        & tar.exe -cf $archiveName -C $stageDir .
+        Assert-ExternalSuccess "creating runtime archive"
     } finally {
         Pop-Location
     }
@@ -55,11 +308,29 @@ try {
 }
 
 & ssh.exe -i $KeyPath "$User@$RemoteHost" "mkdir -p $RemoteDir /srv/omnyid/runtimes"
+Assert-ExternalSuccess "creating remote runtime directories"
 & scp.exe -i $KeyPath $archivePath "${User}@${RemoteHost}:$RemoteDir/omnyid.tar"
+Assert-ExternalSuccess "uploading runtime archive"
 & ssh.exe -i $KeyPath "$User@$RemoteHost" "cd $RemoteDir && tar -xf omnyid.tar && rm -f omnyid.tar"
+Assert-ExternalSuccess "extracting runtime archive"
+Assert-RemoteOracleRuntimeScripts -RemoteHostValue $RemoteHost -UserValue $User -KeyPathValue $KeyPath -RemoteDirValue $RemoteDir
 
 if ($EnvFile) {
-    & scp.exe -i $KeyPath $EnvFile "${User}@${RemoteHost}:$RemoteDir/.env.oracle"
+    & (Join-Path $PSScriptRoot "startup-policy-check.ps1") -EnvFile $EnvFile
+    New-Item -ItemType Directory -Path $envStageDir -Force | Out-Null
+    $secretPlan = Get-OracleSecretSyncPlan -EnvFile $EnvFile
+    $rewrittenEnvFile = Join-Path $envStageDir ".env.oracle"
+    Write-OracleRewrittenEnvFile -OutputPath $rewrittenEnvFile -Plan $secretPlan
+    & scp.exe -i $KeyPath $rewrittenEnvFile "${User}@${RemoteHost}:$RemoteDir/.env.oracle"
+    Assert-ExternalSuccess "uploading rewritten env file"
+    if ($secretPlan.SecretEntries.Count -gt 0) {
+        Sync-OracleSecrets `
+            -RemoteHostValue $RemoteHost `
+            -UserValue $User `
+            -KeyPathValue $KeyPath `
+            -RemoteDirValue $RemoteDir `
+            -SecretEntries @($secretPlan.SecretEntries)
+    }
 }
 
 $composeFile = if ($IncludeQuicProfile) {
@@ -69,13 +340,59 @@ $composeFile = if ($IncludeQuicProfile) {
 } else {
     "docker-compose.oracle.yml"
 }
+$remoteDirLiteral = Convert-ToShellSingleQuotedLiteral $RemoteDir
+$serviceArgumentString = Join-ShellArguments -Values @($ComposeServices | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
 $composeCommand = if ($EnvFile) {
-    "cd $RemoteDir && docker compose --env-file .env.oracle -f $composeFile up -d --build"
+    $buildArgument = if ($SkipComposeBuild) { "" } else { " --build" }
+    $serviceArguments = if ([string]::IsNullOrWhiteSpace($serviceArgumentString)) { "" } else { " $serviceArgumentString" }
+    "cd $remoteDirLiteral && docker compose --env-file .env.oracle -f $composeFile up -d$buildArgument$serviceArguments"
 } else {
-    "cd $RemoteDir && docker compose -f $composeFile config"
+    "cd $remoteDirLiteral && docker compose -f $composeFile config"
 }
 
-& ssh.exe -i $KeyPath "$User@$RemoteHost" $composeCommand
+Invoke-CheckedRemoteCommand `
+    -Context "running remote docker compose command" `
+    -Command $composeCommand `
+    -ScanDockerBuildOutput
+
+if ($EnvFile -and -not $SkipCaddyReload) {
+    $reloadCommand = "cd $remoteDirLiteral && docker compose --env-file .env.oracle -f $composeFile up -d --force-recreate caddy"
+    Invoke-CheckedRemoteCommand -Context "reloading caddy" -Command $reloadCommand
+}
+
+if ($EnvFile -and -not $SkipWorkspaceSmoke) {
+    $workspaceSmokeScript = @"
+set -eu
+cd $remoteDirLiteral
+domain=`$(grep '^OMNYID_DOMAIN=' .env.oracle | head -n 1 | cut -d= -f2- | tr -d '\r')
+[ -n "`$domain" ] || {
+  echo 'workspace smoke check failed: OMNYID_DOMAIN missing from .env.oracle' >&2
+  exit 1
+}
+workspace_headers=`$(curl -sSI --resolve "`$domain:443:127.0.0.1" -k "https://`$domain/workspace/")
+printf '%s\n' "`$workspace_headers"
+printf '%s' "`$workspace_headers" | grep -qi '^www-authenticate: basic' && {
+  echo 'workspace smoke check failed: /workspace/ is still behind Basic auth' >&2
+  exit 1
+}
+printf '%s' "`$workspace_headers" | grep -qi '^content-security-policy: .*https://static.cloudflareinsights.com' || {
+  echo 'workspace smoke check failed: workspace CSP is missing Cloudflare Insights allowance' >&2
+  exit 1
+}
+"@
+
+    Invoke-CheckedRemoteCommand -Context "running workspace smoke check" -Command $workspaceSmokeScript
+}
+
+if ($EnvFile -and -not $SkipPostDeployProof) {
+    $postDeployOutDir = Join-Path $ProofOutDir "postdeploy"
+    $postDeployReport = Invoke-OracleProductionProofSummary -Destination $postDeployOutDir
+    if ($postDeployReport.status -ne "pass") {
+        Write-Warning ("[deploy-oracle] post-deploy proof is failing (failure_step={0}, reason={1}). See {2}" -f $postDeployReport.failure_step, $postDeployReport.failure_reason, $postDeployOutDir)
+    } else {
+        Write-Host ("[deploy-oracle] post-deploy proof passed. Artifact: {0}" -f $postDeployOutDir)
+    }
+}
 
 Write-Host "Oracle deployment sync complete."
 if (-not $EnvFile) {
