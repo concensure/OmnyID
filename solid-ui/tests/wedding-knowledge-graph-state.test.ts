@@ -141,7 +141,7 @@ test("buildWeddingKnowledgeGraphState turns second-order task metadata into risk
   assert.equal(taskNode.metadata.second_order_loop, "weather_backup");
   assert.equal((taskNode.metadata.selected_decision_scope as Record<string, unknown>).selected_option_label, "Harbour Hall");
   assert.ok(loopRisk);
-  assert.equal(loopRisk.label, "Weather backup loop needs closure");
+  assert.equal(loopRisk.label, "Weather backup Smart Action");
   assert.ok(loopRisk.supertags.includes("wedding_second_order_loop"));
   assert.ok(state.edges.some((edge) => edge.kind === "next_action" && edge.source === loopRisk.id && edge.target === taskNode.id));
   assert.ok(state.riskNodes.some((node) => node.id === loopRisk.id));

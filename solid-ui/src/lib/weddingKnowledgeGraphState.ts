@@ -265,12 +265,12 @@ function normalizeRisk(input: WeddingRiskInput): WeddingRiskInput {
 }
 
 function secondOrderLoopLabel(loopKind: string): string {
-  if (loopKind === "weather_backup") return "Weather backup loop needs closure";
-  if (loopKind === "commitment_timing") return "Legal, deposit, and contract loop needs closure";
-  if (loopKind === "guest_logistics") return "Transport, access, and guest logistics loop needs closure";
-  if (loopKind === "budget_drift") return "Budget drift and unknown-cost loop needs closure";
-  if (loopKind === "contact_follow_up") return "Email/contact follow-up loop needs closure";
-  return `${loopKind.replace(/_/g, " ")} loop needs closure`;
+  if (loopKind === "weather_backup") return "Weather backup Smart Action";
+  if (loopKind === "commitment_timing") return "Legal and contract Smart Action";
+  if (loopKind === "guest_logistics") return "Guest logistics Smart Action";
+  if (loopKind === "budget_drift") return "Budget check Smart Action";
+  if (loopKind === "contact_follow_up") return "Contact follow-up Smart Action";
+  return `${loopKind.replace(/_/g, " ")} Smart Action`;
 }
 
 function dayOfExecutionCapability(value: string): string | null {
@@ -506,7 +506,7 @@ export function buildWeddingKnowledgeGraphState(input: WeddingKnowledgeGraphInpu
         evidence: secondOrderEvidenceLabels.join("; ") || null,
         selected_decision_scope: Object.keys(selectedDecisionScope).length > 0 ? selectedDecisionScope : null,
       });
-      addEdge(edges, planId, riskId, "has_risk", "has second-order loop");
+      addEdge(edges, planId, riskId, "has_risk", "has Smart Action");
       addEdge(edges, riskId, taskId, "next_action", "closed by task", { second_order_loop: secondOrderLoop });
     }
   }
