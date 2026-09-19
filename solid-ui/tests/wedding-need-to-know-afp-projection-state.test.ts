@@ -1,0 +1,77 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  hasSentWeddingNeedToKnowAfpProjection,
+  loadWeddingNeedToKnowAfpProjectionIds,
+  markWeddingNeedToKnowAfpProjectionSent,
+  weddingNeedToKnowContextToAfpMessage,
+  weddingNeedToKnowContextToAfpSendInput,
+} from "@/lib/weddingNeedToKnowAfpProjectionState";
+import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
+
+function memoryStorage(): Storage {
+  const values = new Map<string, string>();
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  } as Storage;
+}
+
+function projectionContext() {
+  return buildWeddingTemplateFollowUpState({
+    weddingPlanId: "wedding_plan:harbour",
+    responseWorkspaceId: "response_workspace:harbour",
+    dateOrSeason: "2027-10-03",
+    location: "Sydney NSW",
+    guestCount: 80,
+    budgetComfort: "Mid-range",
+    topPriorities: ["food", "photos"],
+    noimDownloaded: "no",
+    celebrantPath: "need_options",
+    projectionStorage: memoryStorage(),
+  }).contextProjection;
+}
+
+test("weddingNeedToKnowContextToAfpMessage creates a searchable AFP context note", () => {
+  const context = projectionContext();
+  const message = weddingNeedToKnowContextToAfpMessage(context, "2026-09-12T00:00:00.000Z");
+
+  assert.equal(message.type, "context");
+  assert.equal(message.kind, "note");
+  assert.equal(message.subtype, "wedding_need_to_know");
+  assert.equal(message.thread_id, "wedding_context:response_workspace:harbour");
+  assert.deepEqual(message.to, ["agent://wedding-planning", "agent://search", "agent://knowledge-graph"]);
+  assert.ok(message.supertags.includes("wedding_need_to_know"));
+  assert.ok(message.supertags.includes("location:sydney-nsw"));
+  assert.equal(message.content.response_workspace_id, "response_workspace:harbour");
+  assert.match(message.content.markdown as string, /Guest count: 80/i);
+  assert.ok((message.metadata?.searchable_terms as string[]).includes("Sydney NSW"));
+  assert.ok(message.views.some((view) => view.format === "document"));
+});
+
+test("weddingNeedToKnowContextToAfpSendInput is relational and dispatch-ready", () => {
+  const input = weddingNeedToKnowContextToAfpSendInput(projectionContext(), "2026-09-12T00:00:00.000Z");
+
+  assert.equal(input.type, "context");
+  assert.equal(input.kind, "note");
+  assert.equal(input.subtype, "wedding_need_to_know");
+  assert.equal(input.store_in_relational, true);
+  assert.equal((input.content as Record<string, unknown>).kind, "wedding_need_to_know");
+});
+
+test("wedding Need-To-Know projection sent markers are isolated", () => {
+  const storage = memoryStorage();
+
+  markWeddingNeedToKnowAfpProjectionSent("response_workspace:harbour", storage);
+  markWeddingNeedToKnowAfpProjectionSent("response_workspace:harbour", storage);
+  markWeddingNeedToKnowAfpProjectionSent("response_workspace:garden", storage);
+
+  assert.deepEqual(loadWeddingNeedToKnowAfpProjectionIds(storage), [
+    "response_workspace:garden",
+    "response_workspace:harbour",
+  ]);
+  assert.equal(hasSentWeddingNeedToKnowAfpProjection("response_workspace:harbour", storage), true);
+  assert.equal(hasSentWeddingNeedToKnowAfpProjection("response_workspace:missing", storage), false);
+});

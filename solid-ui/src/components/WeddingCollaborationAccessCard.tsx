@@ -1,0 +1,139 @@
+// @locs-version: 2.0
+import { For, Show } from "solid-js";
+
+import type { WeddingCollaborationState } from "@/lib/weddingCollaborationState";
+
+export function WeddingCollaborationAccessCard(props: {
+  state: WeddingCollaborationState;
+}) {
+  return (
+    <div class="min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
+      <div class="flex items-start justify-between gap-2">
+        <p class="text-base font-semibold text-sky-950">Share the plan</p>
+        <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-sky-900">
+          {props.state.statusLabel}
+        </span>
+      </div>
+      <p class="mt-2 text-sm leading-6 text-sky-900/75">{props.state.summaryLabel}</p>
+      <div class="mt-3 flex flex-wrap gap-1.5">
+        <For each={props.state.roleAssignmentOptions}>
+          {(role) => (
+            <span
+              class="max-w-full break-words rounded-full border border-sky-100 bg-white/80 px-2 py-1 text-xs font-semibold text-sky-950/75"
+              title={role.hoverHelpLabel}
+            >
+              {role.title}
+            </span>
+          )}
+        </For>
+      </div>
+      <details class="mt-3 rounded-2xl border border-sky-100 bg-white/70 p-3">
+        <summary class="cursor-pointer text-xs font-semibold text-sky-950/70 outline-none focus-visible:ring-2 focus-visible:ring-sky-300">
+          What people can do
+        </summary>
+        <div class="mt-2 space-y-2">
+          <For each={props.state.roleAssignmentOptions}>
+            {(role) => (
+              <article class="rounded-2xl border border-sky-100 bg-sky-50/70 p-2" title={role.hoverHelpLabel}>
+                <p class="text-xs font-semibold text-sky-950">{role.title}</p>
+                <p class="mt-1 text-xs leading-5 text-sky-950/70">{role.summaryLabel}</p>
+                <p class="mt-1 text-xs leading-5 text-sky-950/60">{role.mobileDisclosureLabel}</p>
+              </article>
+            )}
+          </For>
+        </div>
+      </details>
+      <div class="mt-3 space-y-2">
+        <For each={props.state.editingSurfaces.slice(0, 3)}>
+          {(surface) => (
+            <article class="rounded-2xl border border-sky-100 bg-white/75 p-3">
+              <p class="break-words text-xs font-semibold text-sky-950">{surface.title}</p>
+              <p class="mt-1 text-xs leading-5 text-sky-900/70">{surface.summaryLabel}</p>
+              <p class="mt-2 text-xs leading-5 text-sky-950/65">
+                Can edit: {surface.editorRoleLabels.join(", ")}
+              </p>
+            </article>
+          )}
+        </For>
+      </div>
+      <div class="mt-3 rounded-2xl border border-sky-100 bg-white/70 p-3">
+        <p class="text-xs font-semibold text-sky-950/70">Access check</p>
+        <div class="mt-2 flex flex-wrap gap-1.5">
+          <For each={props.state.permissionProofCards}>
+            {(permission) => (
+              <span class={`max-w-full break-words rounded-full border px-2 py-1 text-xs font-semibold ${
+                permission.allowed
+                  ? "border-emerald-100 bg-emerald-50 text-emerald-900"
+                  : "border-sky-100 bg-sky-50 text-sky-950/70"
+              }`}>
+                {permission.statusLabel}: {permission.requiredRoleLabels.join("/")}
+              </span>
+            )}
+          </For>
+        </div>
+      </div>
+      <Show when={props.state.invites.length > 0} fallback={
+        <p class="mt-3 rounded-2xl border border-sky-100 bg-white/70 px-3 py-2 text-sm leading-6 text-sky-950/75">
+          Invite partner as co-owner, planner with planning access, contributors for assigned tasks, or viewers for approved read-only files.
+        </p>
+      }>
+        <div class="mt-3 space-y-2">
+          <For each={props.state.invites.slice(0, 4)}>
+            {(invite) => (
+              <article class="rounded-2xl border border-sky-100 bg-white/75 p-3">
+                <div class="flex items-start justify-between gap-2">
+                  <p class="break-words text-xs font-semibold text-sky-950">{invite.displayName}</p>
+                  <span class="max-w-full break-words rounded-full bg-sky-50 px-2 py-1 text-xs text-sky-900">
+                    {invite.readyForInvite ? "Ready" : "Add details"}
+                  </span>
+                </div>
+                <p class="mt-1 text-xs leading-5 text-sky-900/75">
+                  {invite.roleLabel} - {invite.email || "email needed"}
+                </p>
+                <details class="mt-2 rounded-2xl border border-sky-100 bg-sky-50/70 px-2.5 py-2">
+                  <summary
+                    class="cursor-pointer text-xs font-semibold text-sky-950 outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                    title={`${invite.roleLabel}: ${invite.roleSummaryLabel}`}
+                  >
+                    What this role can do
+                  </summary>
+                  <p class="mt-1 text-xs leading-5 text-sky-950/70">{invite.roleSummaryLabel}</p>
+                  <ul class="mt-2 space-y-1">
+                    <For each={invite.roleCapabilityLabels.slice(0, 3)}>
+                      {(label) => <li class="text-xs leading-5 text-sky-950/65">{label}</li>}
+                    </For>
+                  </ul>
+                  <Show when={invite.roleRestrictionLabels.length > 0}>
+                    <p class="mt-2 text-xs font-semibold text-sky-950/70">Limits</p>
+                    <ul class="mt-1 space-y-1">
+                      <For each={invite.roleRestrictionLabels.slice(0, 2)}>
+                        {(label) => <li class="text-xs leading-5 text-sky-950/65">{label}</li>}
+                      </For>
+                    </ul>
+                  </Show>
+                </details>
+                <p class="mt-1 text-xs leading-5 text-sky-950/65">
+                  {invite.lifecycleLabel} - {invite.nextActionLabel}
+                </p>
+                <Show when={invite.riskLabels.length > 0}>
+                  <ul class="mt-2 space-y-1">
+                    <For each={invite.riskLabels}>
+                      {(label) => <li class="text-xs leading-5 text-sky-950/65">{label}</li>}
+                    </For>
+                  </ul>
+                </Show>
+              </article>
+            )}
+          </For>
+        </div>
+      </Show>
+      <Show when={props.state.blockerLabels.length > 0}>
+        <ul class="mt-3 space-y-1">
+          <For each={props.state.blockerLabels.slice(0, 4)}>
+            {(label) => <li class="text-xs leading-5 text-sky-950/65">{label}</li>}
+          </For>
+        </ul>
+      </Show>
+    </div>
+  );
+}

@@ -1,0 +1,161 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  buildWeddingGuestFinalCountDecisionTaskItems,
+  buildWeddingGuestTrackingState,
+} from "@/lib/weddingGuestTrackingState";
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+test("buildWeddingGuestTrackingState counts RSVP dietary accessibility and follow-up gaps", () => {
+  const state = buildWeddingGuestTrackingState({
+    artifacts: [{
+      title: "Guest list",
+      kind: "guest_list",
+      bodyText: [
+        "| Name | RSVP | Email | Meal | Dietary | Accessibility |",
+        "| --- | --- | --- | --- | --- | --- |",
+        "| Alex | Yes | alex@example.test | Fish | Nut allergy | Wheelchair access |",
+        "| Blair | Pending |  |  | Vegan |  |",
+        "| Casey | No | casey@example.test | N/A | None | None |",
+        "| Drew | Attending | drew@example.test |  |  |  |",
+      ].join("\n"),
+    }],
+  });
+
+  assert.equal(state.guestFileCount, 1);
+  assert.equal(state.guestRowCount, 4);
+  assert.equal(state.attendingCount, 2);
+  assert.equal(state.declinedCount, 1);
+  assert.equal(state.pendingCount, 1);
+  assert.equal(state.householdCount, 4);
+  assert.equal(state.dietaryCount, 2);
+  assert.equal(state.accessibilityCount, 1);
+  assert.equal(state.missingContactCount, 1);
+  assert.equal(state.missingMealCount, 1);
+  assert.ok(state.warningLabels.some((label) => /RSVPs? still pending/i.test(label)));
+  assert.ok(state.warningLabels.some((label) => /contact/i.test(label)));
+  assert.ok(state.warningLabels.some((label) => /meal/i.test(label)));
+  assert.equal(state.finalCountOptions.length, 3);
+  assert.equal(state.finalCountOptions[0]?.id, "submit_current_count");
+  assert.equal(state.finalCountOptions[0]?.headcount, 2);
+  assert.ok(state.followUpTaskCandidates.some((task) => /pending RSVP/i.test(task.title)));
+  assert.ok(state.followUpTaskCandidates.some((task) => /meal choices/i.test(task.title)));
+});
+
+test("buildWeddingGuestTrackingState ignores non guest-list artifacts", () => {
+  const state = buildWeddingGuestTrackingState({
+    artifacts: [{
+      title: "Venue table",
+      kind: "vendor_table",
+      bodyText: "| Vendor | Price |\n| --- | --- |\n| Venue A | $10000 |",
+    }],
+  });
+
+  assert.equal(state.guestFileCount, 0);
+  assert.equal(state.guestRowCount, 0);
+  assert.equal(state.finalCountOptions.length, 0);
+  assert.match(state.summaryLabel, /No structured guest-list rows/i);
+});
+
+test("buildWeddingGuestTrackingState redacts imported guest-list source filenames", () => {
+  const state = buildWeddingGuestTrackingState({
+    artifacts: [{
+      id: "wedding_import:guest_list:workspace:rsvp-csv",
+      title: "Imported CSV: rsvp.csv",
+      kind: "guest_list",
+      metadata: {
+        supertags: ["wedding_import", "wedding_import:csv"],
+      },
+      sourceLabels: ["CSV import: rsvp.csv"],
+      bodyText: [
+        "| Name | RSVP |",
+        "| --- | --- |",
+        "| Alex | Confirmed |",
+      ].join("\n"),
+    }],
+  });
+
+  assert.equal(state.guestRowCount, 1);
+  assert.deepEqual(state.sourceLabels, ["Imported private planning file"]);
+  assert.equal(state.sourceLabels.some((label) => /rsvp\.csv/i.test(label)), false);
+});
+
+test("buildWeddingGuestTrackingState groups households and estimates final-count budget impact", () => {
+  const state = buildWeddingGuestTrackingState({
+    estimatedCostPerGuest: 180,
+    artifacts: [{
+      title: "Guest list",
+      kind: "guest_list",
+      bodyText: [
+        "| Name | Household | RSVP | Email | Meal |",
+        "| --- | --- | --- | --- | --- |",
+        "| Alex Lee | Lee | Confirmed | alex@example.test | Beef |",
+        "| Sam Lee | Lee | Confirmed | sam@example.test | Fish |",
+        "| Priya Singh | Singh | Pending | priya@example.test |  |",
+      ].join("\n"),
+    }],
+  });
+
+  assert.equal(state.householdCount, 2);
+  assert.match(state.summaryLabel, /2 households/i);
+  assert.equal(state.finalCountOptions[0]?.headcount, 2);
+  assert.equal(state.finalCountOptions[0]?.budgetImpactAmount, 360);
+  assert.equal(state.finalCountOptions[1]?.headcount, 3);
+  assert.equal(state.finalCountOptions[1]?.budgetImpactAmount, 540);
+  assert.ok(state.finalCountOptions[1]?.riskLabel.includes("late-count fees"));
+});
+
+test("buildWeddingGuestFinalCountDecisionTaskItems creates a searchable DecisionOS task", () => {
+  const guestTracking = buildWeddingGuestTrackingState({
+    estimatedCostPerGuest: 200,
+    artifacts: [{
+      title: "Guest list",
+      kind: "guest_list",
+      bodyText: [
+        "| Name | RSVP | Email | Meal |",
+        "| --- | --- | --- | --- |",
+        "| Alex | Confirmed | alex@example.test | Beef |",
+        "| Blair | Pending | blair@example.test |  |",
+      ].join("\n"),
+    }],
+  });
+  const tasks = buildWeddingGuestFinalCountDecisionTaskItems({
+    guestTracking,
+    metadata: {
+      wedding_plan_id: "wedding_plan:test",
+      response_workspace_id: "response_workspace:test",
+    },
+  });
+
+  assert.equal(tasks.length, 1);
+  assert.equal(tasks[0]?.kind, "decision");
+  const taskMetadata = record(tasks[0]?.metadata);
+  assert.equal(taskMetadata.guest_final_count_decision, true);
+  assert.deepEqual(taskMetadata.guest_final_count_headcounts, [1, 2, 0]);
+  assert.ok((taskMetadata.searchable_terms as string[]).some((term) => /final guest count/i.test(term)));
+});
+
+test("buildWeddingGuestFinalCountDecisionTaskItems suppresses committed duplicate decisions", () => {
+  const guestTracking = buildWeddingGuestTrackingState({
+    artifacts: [{
+      title: "Guest list",
+      kind: "guest_list",
+      bodyText: "| Name | RSVP |\n| --- | --- |\n| Alex | Confirmed |",
+    }],
+  });
+  const tasks = buildWeddingGuestFinalCountDecisionTaskItems({
+    guestTracking,
+    existingTaskItems: [{
+      id: "task:final-count",
+      title: "Choose final count",
+      kind: "decision",
+      metadata: { guest_final_count_decision: true },
+    }],
+  });
+
+  assert.equal(tasks.length, 0);
+});

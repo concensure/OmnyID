@@ -1,0 +1,162 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import type { SendAfpMessageInput } from "@/lib/api";
+import { buildWeddingArtifactGenerationState } from "@/lib/weddingArtifactGenerationState";
+import { hasSentWeddingArtifactAfpProjection } from "@/lib/weddingArtifactAfpProjectionState";
+import {
+  WEDDING_CALENDAR_AFP_PROJECTIONS_KEY,
+  hasSentWeddingProjection,
+  type WeddingPlanningScheduleItem,
+} from "@/lib/weddingCalendarProjectionState";
+import { buildWeddingProjectionQueueState } from "@/lib/weddingProjectionQueueState";
+import { runWeddingProjectionDispatchQueue } from "@/lib/weddingProjectionDispatchRunnerState";
+
+function memoryStorage(): Storage {
+  const values = new Map<string, string>();
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  } as Storage;
+}
+
+const metadata = {
+  weddingPlanId: "plan-runner",
+  responseWorkspaceId: "workspace-runner",
+  sourceResponseId: "response-runner",
+};
+
+function artifact() {
+  const [result] = buildWeddingArtifactGenerationState({
+    metadata,
+    researchNotes: ["Check photo permits."],
+  }).artifacts;
+  assert.ok(result);
+  return result;
+}
+
+const scheduleItem: WeddingPlanningScheduleItem = {
+  id: "photo-permit-1",
+  title: "Photo permit deadline",
+  kind: "other",
+  startAt: "2026-10-04T00:00:00.000Z",
+  metadata,
+};
+
+test("runWeddingProjectionDispatchQueue saves pending outputs and commits sent markers", async () => {
+  const storage = memoryStorage();
+  const generatedArtifact = artifact();
+  const calls: SendAfpMessageInput[] = [];
+  const queue = buildWeddingProjectionQueueState({
+    artifacts: [generatedArtifact],
+    scheduleItems: [scheduleItem],
+    storage,
+  });
+
+  const result = await runWeddingProjectionDispatchQueue({
+    queue,
+    storage,
+    save: async (input) => {
+      calls.push(input);
+      return { success: true, message_id: `saved-${input.type}` };
+    },
+  });
+
+  assert.equal(result.attemptedCount, 2);
+  assert.equal(result.receipt.savedCount, 2);
+  assert.equal(result.receipt.failedCount, 0);
+  assert.equal(calls.length, 2);
+  assert.equal(hasSentWeddingArtifactAfpProjection(generatedArtifact.summary.id, storage), true);
+  assert.equal(hasSentWeddingProjection(scheduleItem.id, WEDDING_CALENDAR_AFP_PROJECTIONS_KEY, storage), true);
+});
+
+test("runWeddingProjectionDispatchQueue records thrown and negative save results as failures", async () => {
+  const queue = buildWeddingProjectionQueueState({
+    artifacts: [artifact()],
+    scheduleItems: [scheduleItem],
+    storage: memoryStorage(),
+  });
+  let index = 0;
+
+  const result = await runWeddingProjectionDispatchQueue({
+    queue,
+    storage: memoryStorage(),
+    save: async () => {
+      index += 1;
+      if (index === 1) return { success: false, error: "server rejected artifact" };
+      throw new Error("calendar save failed");
+    },
+  });
+
+  assert.equal(result.receipt.savedCount, 0);
+  assert.equal(result.receipt.failedCount, 2);
+  assert.deepEqual(
+    result.receipt.failedItems.map((item) => item.error),
+    ["server rejected artifact", "calendar save failed"],
+  );
+  assert.equal(result.receipt.canRetry, true);
+});
+
+test("runWeddingProjectionDispatchQueue fails closed without explicit success and durable message id", async () => {
+  const queue = buildWeddingProjectionQueueState({
+    artifacts: [artifact()],
+    scheduleItems: [scheduleItem],
+    storage: memoryStorage(),
+  });
+  let index = 0;
+
+  const result = await runWeddingProjectionDispatchQueue({
+    queue,
+    storage: memoryStorage(),
+    save: async () => {
+      index += 1;
+      return index === 1 ? { message_id: "msg-without-success" } : { success: true };
+    },
+  });
+
+  assert.equal(result.receipt.savedCount, 0);
+  assert.equal(result.receipt.failedCount, 2);
+  assert.ok(result.receipt.failedItems.some((item) => /did not confirm success/i.test(item.error ?? "")));
+  assert.ok(result.receipt.failedItems.some((item) => /durable message id/i.test(item.error ?? "")));
+});
+
+test("runWeddingProjectionDispatchQueue does not call save for blocked items", async () => {
+  let calls = 0;
+  const queue = buildWeddingProjectionQueueState({
+    scheduleItems: [{ ...scheduleItem, startAt: null }],
+    storage: memoryStorage(),
+  });
+
+  const result = await runWeddingProjectionDispatchQueue({
+    queue,
+    storage: memoryStorage(),
+    save: async () => {
+      calls += 1;
+      return { success: true };
+    },
+  });
+
+  assert.equal(calls, 0);
+  assert.equal(result.attemptedCount, 0);
+  assert.equal(result.receipt.skippedCount, 1);
+});
+
+test("runWeddingProjectionDispatchQueue can skip local sent-marker commits", async () => {
+  const storage = memoryStorage();
+  const generatedArtifact = artifact();
+  const queue = buildWeddingProjectionQueueState({
+    artifacts: [generatedArtifact],
+    storage,
+  });
+
+  const result = await runWeddingProjectionDispatchQueue({
+    queue,
+    storage,
+    commitSentMarkers: false,
+    save: async () => ({ success: true, id: "msg-1" }),
+  });
+
+  assert.equal(result.committedSentMarkers, false);
+  assert.equal(result.receipt.savedItems[0]?.messageId, "msg-1");
+  assert.equal(hasSentWeddingArtifactAfpProjection(generatedArtifact.summary.id, storage), false);
+});
