@@ -277,10 +277,10 @@ export function buildWeddingSecondOrderLoopCards(input: {
       : null;
     cards.push({
       id: "second_order:weather_backup",
-      title: "Weather and backup loop",
+      title: "Weather backup Smart Action",
       statusLabel: hasBackupEvidence || backupTasks.length > 0 ? "Backup evidence found" : "Needs backup check",
       detailLabel: hasBackupEvidence
-          ? `There is written evidence of a backup plan${selectedDecisionLabels.length > 0 ? " for the selected planning path" : ""}. The remaining Smart Action is owner, timing, and day-before weather trigger.`
+          ? `There is written evidence of a backup plan${selectedDecisionLabels.length > 0 ? " for the selected planning path" : ""}. Next, confirm the owner, timing, and day-before weather reminder.`
         : `The ${selectedDecisionLabels.length > 0 ? "selected planning path" : "plan"} has venue/location evidence but no clear wet-weather or fallback plan in the current workspace evidence.`,
       evidenceLabels,
       nextActionLabel: hasBackupEvidence
@@ -330,11 +330,11 @@ export function buildWeddingSecondOrderLoopCards(input: {
       : null;
     cards.push({
       id: "second_order:commitment_timing",
-      title: "Legal, deposit, and contract loop",
+      title: "Legal and contract Smart Action",
       statusLabel: commitmentTasks.length > 0 || commitmentEvents.length > 0 ? "Commitment timing evidenced" : "Commitment timing needs review",
       detailLabel: commitmentTasks.length > 0 || commitmentEvents.length > 0
         ? `The workspace has commitment timing evidence${selectedDecisionLabels.length > 0 ? " for the selected planning path" : ""}. Keep it closed by checking proof, approval, and due-date follow-through.`
-        : `The ${selectedDecisionLabels.length > 0 ? "selected planning path" : "plan"} mentions legal, deposit, payment, or contract commitments but has no clear task proving the loop is owned.`,
+        : `The ${selectedDecisionLabels.length > 0 ? "selected planning path" : "plan"} mentions legal, deposit, payment, or contract commitments but has no clear task showing who owns the next check.`,
       evidenceLabels,
       nextActionLabel: commitmentTasks.length > 0
         ? "Open the commitment task and verify proof, owner, and due date."
@@ -382,7 +382,7 @@ export function buildWeddingSecondOrderLoopCards(input: {
       : null;
     cards.push({
       id: "second_order:guest_logistics",
-      title: "Transport, access, and guest logistics loop",
+      title: "Guest logistics Smart Action",
       statusLabel: logisticsTasks.length > 0 ? "Guest logistics task found" : "Guest logistics needs check",
       detailLabel: logisticsTasks.length > 0
         ? `The workspace has a logistics task${selectedDecisionLabels.length > 0 ? " for the selected planning path" : ""}. Keep it closed by checking routes, accessibility, accommodation, and guest movement assumptions.`
@@ -434,7 +434,7 @@ export function buildWeddingSecondOrderLoopCards(input: {
       : null;
     cards.push({
       id: "second_order:budget_drift",
-      title: "Budget drift and unknown-cost loop",
+      title: "Budget check Smart Action",
       statusLabel: budgetTasks.length > 0 ? "Budget verification task found" : "Budget needs verification",
       detailLabel: budgetTasks.length > 0
         ? `The workspace has a budget verification task${selectedDecisionLabels.length > 0 ? " for the selected planning path" : ""}. Keep it closed by checking hidden costs, exclusions, and estimate confidence.`
@@ -492,14 +492,14 @@ export function buildWeddingSecondOrderLoopCards(input: {
       : null;
     cards.push({
       id: "second_order:contact_follow_up",
-      title: "Email/contact closure loop",
+      title: "Contact follow-up Smart Action",
       statusLabel: outreachStatusLabel(
         outreachStage,
         unexecutedDraftCount > 0 ? "Drafts not closed" : followUpTasks.length > 0 ? "Follow-up active" : "Contact evidence saved",
       ),
       detailLabel: outreachDetailLabel(outreachStage, selectedDecisionLabels, unexecutedDraftCount > 0
         ? `The workspace has vendor-facing drafts or contacts${selectedDecisionLabels.length > 0 ? " for the selected planning path" : ""} that still need approval/provider execution and a follow-up task.`
-        : `Contact/send receipts exist${selectedDecisionLabels.length > 0 ? " for the selected planning path" : ""}; keep the loop closed by tracking response deadlines, next calls, and unanswered vendors.`),
+        : `Contact/send receipts exist${selectedDecisionLabels.length > 0 ? " for the selected planning path" : ""}; keep this organized by tracking response deadlines, next calls, and unanswered vendors.`),
       evidenceLabels,
       nextActionLabel: outreachNextActionLabel(outreachStage, unexecutedDraftCount > 0
         ? `Approve/send only after review, then add a response follow-up deadline${selectedDecisionLabels.length > 0 ? " for the selected option" : ""}.`
