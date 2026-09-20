@@ -7,6 +7,7 @@ import type { DashboardBootstrap } from "@/lib/api";
 import { QueueDensityToggle } from "@/components/QueueDensityToggle";
 import { ResponseQueueSurface } from "@/components/ResponseQueueSurface";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
+import { WeddingPlannerWalkthrough } from "@/components/WeddingPlannerWalkthrough";
 import { WeddingResponseWorkspaceView } from "@/components/WeddingResponseWorkspaceView";
 import { WeddingRichResponseView } from "@/components/WeddingRichResponseView";
 import { RailIcon, type IconId } from "@/components/RailIcons";
@@ -39,6 +40,10 @@ import {
   saveResponseQueueDensity,
   type QueueDensity,
 } from "@/lib/queueDensityLocalState";
+import {
+  loadShouldShowWeddingPlannerWalkthrough,
+  saveWeddingPlannerWalkthroughSeen,
+} from "@/lib/weddingPlannerWalkthroughLocalState";
 import {
   markWeddingArtifactAfpProjectionSent,
   weddingGeneratedArtifactToAfpSendInput,
@@ -289,6 +294,8 @@ export function ResponseQueueView(props: {
     document.getElementById(`wedding-tab-${nextItem.id}`)?.focus();
   }
   const [showWeddingSharePlan, setShowWeddingSharePlan] = createSignal(false);
+  const [showWeddingWalkthrough, setShowWeddingWalkthrough] = createSignal(false);
+  const [weddingWalkthroughChecked, setWeddingWalkthroughChecked] = createSignal(false);
   const [weddingNavigationIntent, setWeddingNavigationIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
   const [weddingWorkspaceQuery, setWeddingWorkspaceQuery] = createSignal("");
   const [activeWeddingArtifactId, setActiveWeddingArtifactId] = createSignal<string | null>(null);
@@ -318,6 +325,10 @@ export function ResponseQueueView(props: {
   const [weddingImportRunning, setWeddingImportRunning] = createSignal(false);
   const weddingStorageUserId = createMemo(() => bootstrap()?.user?.id ?? null);
   const weddingSignedIn = createMemo(() => Boolean(bootstrap()?.user && bootstrap()?.user.auth_provider !== "guest"));
+  function closeWeddingWalkthrough() {
+    saveWeddingPlannerWalkthroughSeen(weddingStorageUserId());
+    setShowWeddingWalkthrough(false);
+  }
   createEffect(() => {
     const intent = weddingNavigationIntent();
     const userId = weddingStorageUserId();
@@ -492,6 +503,14 @@ export function ResponseQueueView(props: {
       nowIso: new Date().toISOString(),
       projectionStorage: localStorage,
     });
+  });
+
+  createEffect(() => {
+    if (weddingWalkthroughChecked() || !weddingWorkspace()) return;
+    setWeddingWalkthroughChecked(true);
+    if (loadShouldShowWeddingPlannerWalkthrough(weddingStorageUserId())) {
+      setShowWeddingWalkthrough(true);
+    }
   });
 
   onMount(() => {
@@ -849,6 +868,14 @@ export function ResponseQueueView(props: {
       </Show>
       <div class={RESPONSE_QUEUE_VIEW_HEADER_CLASS}>
         <Show when={weddingWorkspace()}>
+          <button
+            type="button"
+            title="Open a short guide to the wedding planner."
+            onClick={() => setShowWeddingWalkthrough(true)}
+            class="min-h-10 rounded-full border border-rose-100 bg-rose-50/80 px-4 text-xs font-semibold text-rose-950 transition hover:border-rose-200 hover:bg-rose-50"
+          >
+            Show guide
+          </button>
           <label class={`group relative inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border px-4 text-xs font-semibold shadow-sm transition ${
             weddingImportRunning()
               ? "cursor-wait border-teal-100 bg-white/50 text-teal-900/50"
@@ -939,6 +966,12 @@ export function ResponseQueueView(props: {
           state={weddingArrivalBanner()}
           onAction={runWeddingArrivalAction}
           onDismiss={() => setWeddingNavigationIntent(null)}
+        />
+      </Show>
+      <Show when={weddingWorkspace() && showWeddingWalkthrough()}>
+        <WeddingPlannerWalkthrough
+          onClose={closeWeddingWalkthrough}
+          onSelectMenu={setWeddingWorkspaceMenu}
         />
       </Show>
 
