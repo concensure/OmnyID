@@ -26,6 +26,7 @@ import type {
   WeddingWorkspaceFilterChip,
 } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
+import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import type { ViewName } from "@/lib/viewNames";
 
 type WeddingProjectionSaveFn = (input: SendAfpMessageInput) => Promise<unknown>;
@@ -60,10 +61,11 @@ export function WeddingResponseWorkspaceView(props: {
   projectionStorage?: Storage | null;
   importNotice?: string | null;
   importRunning?: boolean | null;
+  activeMenu?: WeddingWorkspaceMenuId;
+  sharePlanOpen?: boolean;
   compact?: boolean;
   onQueryChange?: (query: string) => void;
   onRefreshWorkspace?: () => void;
-  onImportFiles?: (files: File[]) => void;
   onAdminDataConsentChange?: (enabled: boolean) => void;
   onSelectArtifact?: (artifactId: string) => void;
   onFilterChip?: (chip: WeddingWorkspaceFilterChip) => void;
@@ -82,9 +84,9 @@ export function WeddingResponseWorkspaceView(props: {
   const [approvalRunning, setApprovalRunning] = createSignal(false);
   const [approvalReceipt, setApprovalReceipt] = createSignal<WeddingApprovalExecutionState | null>(null);
   const [approvalReceiptSaveNotice, setApprovalReceiptSaveNotice] = createSignal<string | null>(null);
-  const [importDragActive, setImportDragActive] = createSignal(false);
-  const [showTechnicalDetails, setShowTechnicalDetails] = createSignal(false);
   const [showPlanningFiles, setShowPlanningFiles] = createSignal(false);
+  const activeMenu = () => props.activeMenu ?? "home";
+  const showTechnicalDetails = () => activeMenu() === "advanced";
   const compactMode = () => Boolean(props.compact);
   const rootClass = () => compactMode() ? "grid min-w-0 gap-3 xl:grid-cols-2" : "grid min-w-0 gap-4 xl:grid-cols-2";
   const primaryColumnClass = () => compactMode() ? "min-w-0 space-y-3" : "min-w-0 space-y-4";
@@ -94,9 +96,6 @@ export function WeddingResponseWorkspaceView(props: {
   const cardClass = () => compactMode()
     ? "rounded-[20px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[24px]"
     : "rounded-[24px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[28px] sm:p-4";
-  const importCardBaseClass = () => compactMode()
-    ? "grid gap-2 rounded-[20px] border p-3 shadow-card transition sm:rounded-[24px] md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
-    : "grid gap-3 rounded-[24px] border p-3 shadow-card transition sm:rounded-[28px] sm:p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center";
 
   function approvedApprovalRequest(request: WeddingApprovalRequestState): WeddingApprovalRequestState {
     return approvedRequests()[request.id] ? approveWeddingApprovalRequestState(request) : request;
@@ -164,20 +163,6 @@ export function WeddingResponseWorkspaceView(props: {
     props.onSidebarAction?.(action);
   }
 
-  function importFiles(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const files = Array.from(input.files ?? []);
-    if (files.length > 0) props.onImportFiles?.(files);
-    input.value = "";
-  }
-
-  function dropImportFiles(event: DragEvent) {
-    event.preventDefault();
-    setImportDragActive(false);
-    const files = Array.from(event.dataTransfer?.files ?? []);
-    if (files.length > 0) props.onImportFiles?.(files);
-  }
-
   function approveRequest(request: WeddingApprovalRequestState) {
     setApprovedRequests((current) => ({ ...current, [request.id]: true }));
     setApprovalReceipt(null);
@@ -209,11 +194,18 @@ export function WeddingResponseWorkspaceView(props: {
   }
 
   return (
-    <section class={rootClass()}>
+    <section
+      class={rootClass()}
+      role="tabpanel"
+      id="wedding-tabpanel"
+      aria-labelledby={`wedding-tab-${activeMenu()}`}
+    >
       <div class={primaryColumnClass()}>
-        <WeddingDecisionFocusCard state={state()} onSidebarAction={handleSidebarAction} />
+        <Show when={activeMenu() === "home"}>
+          <WeddingDecisionFocusCard state={state()} onSidebarAction={handleSidebarAction} />
+        </Show>
 
-        <div class={cardClass()}>
+        <div class={cardClass()} hidden={activeMenu() !== "home"}>
           <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div class="min-w-0">
               <p class="text-base font-semibold text-on-surface">Your wedding documents</p>
@@ -292,13 +284,6 @@ export function WeddingResponseWorkspaceView(props: {
               />
               Include private details
             </label>
-            <button
-              type="button"
-              onClick={() => setShowTechnicalDetails((current) => !current)}
-              class="min-h-10 rounded-full border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-800 transition hover:bg-white"
-            >
-              {showTechnicalDetails() ? "Hide setup details" : "Show setup details"}
-            </button>
           </div>
           <Show when={exportNotice()}>
             {(notice) => <p class="mt-2 text-xs leading-5 text-slate-600">{notice()}</p>}
@@ -408,53 +393,6 @@ export function WeddingResponseWorkspaceView(props: {
           </Show>
         </div>
 
-        <div
-          class={`${importCardBaseClass()} ${
-            importDragActive()
-              ? "border-teal-300 bg-teal-100/90"
-              : "border-teal-100/80 bg-teal-50/85"
-          }`}
-          onDragEnter={(event) => {
-            event.preventDefault();
-            setImportDragActive(true);
-          }}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setImportDragActive(true);
-          }}
-          onDragLeave={() => setImportDragActive(false)}
-          onDrop={dropImportFiles}
-        >
-          <div class="min-w-0">
-            <p class="text-base font-semibold text-teal-950">Bring in your existing lists</p>
-            <p class="mt-1 break-words text-sm leading-6 text-teal-900/75">
-              Upload guest lists, budgets, spreadsheets, Google Sheets exports, or The Knot exports. OmnyID will organize what it can and keep the original files for later.
-            </p>
-            <Show when={props.importNotice}>
-              {(notice) => (
-                <p class="mt-2 rounded-2xl border border-teal-100 bg-white/75 px-2.5 py-2 text-xs leading-5 text-teal-950">
-                  {notice()}
-                </p>
-              )}
-            </Show>
-          </div>
-          <label class={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition ${
-            props.importRunning
-              ? "cursor-wait border-teal-100 bg-white/50 text-teal-900/50"
-              : "border-teal-200 bg-white/85 text-teal-950 hover:border-teal-300 hover:bg-white"
-          }`}>
-            {props.importRunning ? "Importing..." : "Upload lists"}
-            <input
-              type="file"
-              class="sr-only"
-              multiple
-              accept=".csv,.tsv,.txt,.xls,.xlsx,text/csv,text/tab-separated-values,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              disabled={Boolean(props.importRunning)}
-              onChange={importFiles}
-            />
-          </label>
-        </div>
-
         <Show when={showTechnicalDetails() && state().projectionQueue}>
           {(queue) => (
             <WeddingProjectionQueuePanel
@@ -474,6 +412,8 @@ export function WeddingResponseWorkspaceView(props: {
         <WeddingWorkspaceContextPanels
           state={state()}
           showTechnicalDetails={showTechnicalDetails()}
+          activeMenu={activeMenu()}
+          sharePlanOpen={Boolean(props.sharePlanOpen)}
           onSidebarAction={handleSidebarAction}
         />
       </aside>

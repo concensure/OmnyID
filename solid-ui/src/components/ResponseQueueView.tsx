@@ -9,6 +9,13 @@ import { ResponseQueueSurface } from "@/components/ResponseQueueSurface";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
 import { WeddingResponseWorkspaceView } from "@/components/WeddingResponseWorkspaceView";
 import { WeddingRichResponseView } from "@/components/WeddingRichResponseView";
+import { RailIcon, type IconId } from "@/components/RailIcons";
+import {
+  loadWeddingWorkspaceMenu,
+  saveWeddingWorkspaceMenu,
+  weddingWorkspaceMenuBadge,
+  type WeddingWorkspaceMenuId,
+} from "@/lib/weddingWorkspaceMenuState";
 import {
   fetchWeddingVendors,
   recordWeddingVendorContact,
@@ -84,6 +91,87 @@ const RESPONSE_QUEUE_VIEW_CLASS =
   "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm sm:rounded-[32px] sm:p-5";
 const RESPONSE_QUEUE_VIEW_HEADER_CLASS = "flex min-w-0 flex-wrap items-center justify-end gap-3";
 const RESPONSE_QUEUE_VIEW_TITLE_TAG = "h1" as const;
+const WEDDING_WORKSPACE_MENU_ITEMS: Array<{
+  id: WeddingWorkspaceMenuId;
+  icon: IconId;
+  label: string;
+  title: string;
+  className: string;
+  activeClassName: string;
+}> = [
+  {
+    id: "home",
+    icon: "home",
+    label: "Home",
+    title: "Main decision queue, budget remaining, days left, and wedding documents.",
+    className: "border-pink-100 bg-pink-50/80 text-pink-950 hover:border-pink-200",
+    activeClassName: "border-pink-300 bg-pink-100 text-pink-950",
+  },
+  {
+    id: "budget",
+    icon: "cost_dashboard",
+    label: "Budget",
+    title: "Track remaining budget, quotes, payments, and cost risks.",
+    className: "border-emerald-100 bg-emerald-50/80 text-emerald-950 hover:border-emerald-200",
+    activeClassName: "border-emerald-300 bg-emerald-100 text-emerald-950",
+  },
+  {
+    id: "guests",
+    icon: "contacts",
+    label: "Guests",
+    title: "Review guest list, RSVPs, meals, access needs, and guest follow-ups.",
+    className: "border-amber-100 bg-amber-50/80 text-amber-950 hover:border-amber-200",
+    activeClassName: "border-amber-300 bg-amber-100 text-amber-950",
+  },
+  {
+    id: "seating",
+    icon: "seating",
+    label: "Seating",
+    title: "Check assigned seats, table notes, and meal or access notes for vendors.",
+    className: "border-sky-100 bg-sky-50/80 text-sky-950 hover:border-sky-200",
+    activeClassName: "border-sky-300 bg-sky-100 text-sky-950",
+  },
+  {
+    id: "helpers",
+    icon: "tasks",
+    label: "Who helps",
+    title: "See who is helping with each wedding task and what details are still needed.",
+    className: "border-fuchsia-100 bg-fuchsia-50/80 text-fuchsia-950 hover:border-fuchsia-200",
+    activeClassName: "border-fuchsia-300 bg-fuchsia-100 text-fuchsia-950",
+  },
+  {
+    id: "response_queue",
+    icon: "response_queue",
+    label: "Follow-ups",
+    title: "Review vendor follow-ups and planning items waiting for your attention.",
+    className: "border-slate-200 bg-slate-50/80 text-slate-800 hover:border-slate-300",
+    activeClassName: "border-slate-400 bg-slate-100 text-slate-950",
+  },
+  {
+    id: "timeline",
+    icon: "timeline",
+    label: "Timeline",
+    title: "See dated wedding tasks, upcoming timing risks, and the planning timeline.",
+    className: "border-indigo-100 bg-indigo-50/80 text-indigo-950 hover:border-indigo-200",
+    activeClassName: "border-indigo-300 bg-indigo-100 text-indigo-950",
+  },
+  {
+    id: "advanced",
+    icon: "tools",
+    label: "Advanced setup",
+    title: "Connection, approval, and launch checks. Most couples can leave this closed.",
+    className: "border-stone-200 bg-stone-50/80 text-stone-800 hover:border-stone-300",
+    activeClassName: "border-stone-400 bg-stone-100 text-stone-950",
+  },
+];
+
+function weddingMenuKeyDownStep(key: string, currentIndex: number, itemCount: number): number | null {
+  if (key === "ArrowRight") return (currentIndex + 1) % itemCount;
+  if (key === "ArrowLeft") return (currentIndex - 1 + itemCount) % itemCount;
+  if (key === "Home") return 0;
+  if (key === "End") return itemCount - 1;
+  return null;
+}
 
 function rescopeWeddingArtifact(
   artifact: WeddingGeneratedArtifact,
@@ -136,6 +224,20 @@ export function ResponseQueueView(props: {
   const bootstrap = createMemo(() => props.bootstrap);
   const queueCompanion = createMemo(() => decisionOsQueueCompanionState(bootstrap()));
   const [density, setDensity] = createSignal<QueueDensity>(loadResponseQueueDensity());
+  const [weddingWorkspaceMenu, setWeddingWorkspaceMenuSignal] = createSignal<WeddingWorkspaceMenuId>(loadWeddingWorkspaceMenu());
+  function setWeddingWorkspaceMenu(id: WeddingWorkspaceMenuId) {
+    setWeddingWorkspaceMenuSignal(id);
+    saveWeddingWorkspaceMenu(id);
+  }
+  function handleWeddingMenuTabKeyDown(event: KeyboardEvent, currentIndex: number) {
+    const nextIndex = weddingMenuKeyDownStep(event.key, currentIndex, WEDDING_WORKSPACE_MENU_ITEMS.length);
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextItem = WEDDING_WORKSPACE_MENU_ITEMS[nextIndex];
+    setWeddingWorkspaceMenu(nextItem.id);
+    document.getElementById(`wedding-tab-${nextItem.id}`)?.focus();
+  }
+  const [showWeddingSharePlan, setShowWeddingSharePlan] = createSignal(false);
   const [weddingNavigationIntent, setWeddingNavigationIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
   const [weddingWorkspaceQuery, setWeddingWorkspaceQuery] = createSignal("");
   const [activeWeddingArtifactId, setActiveWeddingArtifactId] = createSignal<string | null>(null);
@@ -620,6 +722,13 @@ export function ResponseQueueView(props: {
     }
   }
 
+  function importWeddingFilesFromHeader(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    if (files.length > 0) void importWeddingFiles(files);
+    input.value = "";
+  }
+
   const viewState = createMemo(() => {
     const currentDensity = density();
     return {
@@ -632,19 +741,106 @@ export function ResponseQueueView(props: {
 
   return (
     <div class={RESPONSE_QUEUE_VIEW_CLASS}>
+      <Show when={weddingWorkspace()}>
+        <div role="tablist" aria-label="Wedding planner sections" class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+          <For each={WEDDING_WORKSPACE_MENU_ITEMS}>
+            {(item, index) => {
+              const selected = () => weddingWorkspaceMenu() === item.id;
+              const badge = () => weddingWorkspaceMenuBadge(item.id, weddingWorkspace());
+              return (
+                <button
+                  type="button"
+                  id={`wedding-tab-${item.id}`}
+                  role="tab"
+                  title={item.title}
+                  aria-selected={selected()}
+                  aria-controls="wedding-tabpanel"
+                  tabIndex={selected() ? 0 : -1}
+                  onClick={() => setWeddingWorkspaceMenu(item.id)}
+                  onKeyDown={(event) => handleWeddingMenuTabKeyDown(event, index())}
+                  class={`relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${
+                    selected() ? item.activeClassName : item.className
+                  }`}
+                >
+                  <span class="relative inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/80">
+                    <RailIcon id={item.icon} />
+                    <Show when={badge()}>
+                      {(activeBadge) => (
+                        <span
+                          class={`absolute -right-1 -top-1 inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold leading-4 text-white ${
+                            activeBadge().tone === "urgent" ? "bg-rose-600" : "bg-slate-900"
+                          }`}
+                        >
+                          {activeBadge().label}
+                        </span>
+                      )}
+                    </Show>
+                  </span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            }}
+          </For>
+        </div>
+      </Show>
       <div class={RESPONSE_QUEUE_VIEW_HEADER_CLASS}>
+        <Show when={weddingWorkspace()}>
+          <label class={`group relative inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border px-4 text-xs font-semibold shadow-sm transition ${
+            weddingImportRunning()
+              ? "cursor-wait border-teal-100 bg-white/50 text-teal-900/50"
+              : "border-teal-200 bg-white/85 text-teal-950 hover:border-teal-300 hover:bg-white"
+          }`}>
+            {weddingImportRunning() ? "Importing..." : "Upload lists"}
+            <input
+              type="file"
+              class="sr-only"
+              multiple
+              accept=".csv,.tsv,.txt,.xls,.xlsx,text/csv,text/tab-separated-values,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              disabled={weddingImportRunning()}
+              onChange={importWeddingFilesFromHeader}
+            />
+            <span class="pointer-events-none absolute right-0 top-[calc(100%+0.5rem)] z-30 w-72 rounded-2xl border border-teal-100 bg-white px-3 py-2 text-left text-xs font-normal leading-5 text-teal-950 opacity-0 shadow-xl transition group-hover:opacity-100 group-focus-within:opacity-100">
+              <span class="block font-semibold">Bring in your existing lists</span>
+              <span class="mt-1 block">
+                Upload guest lists, budgets, spreadsheets, Google Sheets exports, or The Knot exports. OmnyID will organize what it can and keep the original files for later.
+              </span>
+            </span>
+          </label>
+          <button
+            type="button"
+            title="Open sharing options for partners, planners, contributors, and viewers."
+            aria-pressed={showWeddingSharePlan()}
+            onClick={() => setShowWeddingSharePlan((current) => !current)}
+            class={`min-h-10 rounded-full border px-4 text-xs font-semibold transition ${
+              showWeddingSharePlan()
+                ? "border-sky-300 bg-sky-100 text-sky-950"
+                : "border-sky-100 bg-sky-50/80 text-sky-950 hover:border-sky-200"
+            }`}
+          >
+            Share the Plan
+          </button>
+        </Show>
         <QueueDensityToggle
           density={viewState().density}
           onSelect={selectDensityMode}
           tone={viewState().densityTone}
         />
       </div>
+      <Show when={weddingWorkspace() && weddingImportNotice()}>
+        {(notice) => (
+          <p class="ml-auto max-w-2xl rounded-2xl border border-teal-100 bg-white/85 px-3 py-2 text-xs leading-5 text-teal-950 shadow-sm">
+            {notice()}
+          </p>
+        )}
+      </Show>
 
-      <WeddingNavigationArrivalBanner
-        state={weddingArrivalBanner()}
-        onAction={runWeddingArrivalAction}
-        onDismiss={() => setWeddingNavigationIntent(null)}
-      />
+      <Show when={!weddingWorkspace()}>
+        <WeddingNavigationArrivalBanner
+          state={weddingArrivalBanner()}
+          onAction={runWeddingArrivalAction}
+          onDismiss={() => setWeddingNavigationIntent(null)}
+        />
+      </Show>
 
       <Show when={weddingTemplateLaunch()}>
         {(launch) => (
@@ -929,10 +1125,11 @@ export function ResponseQueueView(props: {
             projectionStorage={localStorage}
             importNotice={weddingImportNotice()}
             importRunning={weddingImportRunning()}
+            activeMenu={weddingWorkspaceMenu()}
+            sharePlanOpen={showWeddingSharePlan()}
             onQueryChange={setWeddingWorkspaceQuery}
             onAdminDataConsentChange={setWeddingAdminDataConsentEnabled}
             onRefreshWorkspace={() => void refreshWeddingWorkspaceMessages()}
-            onImportFiles={(files) => void importWeddingFiles(files)}
             onSelectArtifact={setActiveWeddingArtifactId}
             onFilterChip={(chip) => setWeddingWorkspaceQuery(chip.query)}
             onSidebarAction={runWeddingWorkspaceAction}
@@ -949,11 +1146,13 @@ export function ResponseQueueView(props: {
         )}
       </Show>
 
-      <ResponseQueueSurface
-        queueCompanionState={viewState().responseSurfaceState}
-        titleTag={RESPONSE_QUEUE_VIEW_TITLE_TAG}
-        compact={viewState().responseSurfaceCompactMode}
-      />
+      <Show when={!weddingWorkspace() || weddingWorkspaceMenu() === "response_queue"}>
+        <ResponseQueueSurface
+          queueCompanionState={viewState().responseSurfaceState}
+          titleTag={RESPONSE_QUEUE_VIEW_TITLE_TAG}
+          compact={viewState().responseSurfaceCompactMode}
+        />
+      </Show>
     </div>
   );
 }

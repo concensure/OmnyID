@@ -1,11 +1,12 @@
 // @locs-version: 2.0
-import { For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 
 import type { WeddingCollaborationState } from "@/lib/weddingCollaborationState";
 
 export function WeddingCollaborationAccessCard(props: {
   state: WeddingCollaborationState;
 }) {
+  const [openRole, setOpenRole] = createSignal<string | null>(null);
   return (
     <div class="min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
       <div class="flex items-start justify-between gap-2">
@@ -35,9 +36,42 @@ export function WeddingCollaborationAccessCard(props: {
           <For each={props.state.roleAssignmentOptions}>
             {(role) => (
               <article class="rounded-2xl border border-sky-100 bg-sky-50/70 p-2" title={role.hoverHelpLabel}>
-                <p class="text-xs font-semibold text-sky-950">{role.title}</p>
+                <div class="flex items-start justify-between gap-2">
+                  <p class="text-xs font-semibold text-sky-950">{role.title}</p>
+                  <button
+                    type="button"
+                    class="rounded-full border border-sky-100 bg-white/85 px-2 py-1 text-[10px] font-semibold text-sky-950 transition hover:border-sky-200 hover:bg-white"
+                    onClick={() => setOpenRole(openRole() === role.role ? null : role.role)}
+                  >
+                    {openRole() === role.role ? "Hide details" : "Review"}
+                  </button>
+                </div>
                 <p class="mt-1 text-xs leading-5 text-sky-950/70">{role.summaryLabel}</p>
-                <p class="mt-1 text-xs leading-5 text-sky-950/60">{role.mobileDisclosureLabel}</p>
+                <button
+                  type="button"
+                  class="mt-1 text-left text-xs font-semibold leading-5 text-sky-900 underline decoration-sky-300 underline-offset-2"
+                  onClick={() => setOpenRole(openRole() === role.role ? null : role.role)}
+                >
+                  {role.mobileDisclosureLabel}
+                </button>
+                <Show when={openRole() === role.role}>
+                  <div class="mt-2 rounded-2xl border border-sky-100 bg-white/80 p-2">
+                    <p class="text-xs font-semibold text-sky-950/70">Can do</p>
+                    <ul class="mt-1 space-y-1">
+                      <For each={role.capabilityLabels}>
+                        {(label) => <li class="text-xs leading-5 text-sky-950/70">{label}</li>}
+                      </For>
+                    </ul>
+                    <Show when={role.restrictionLabels.length > 0}>
+                      <p class="mt-2 text-xs font-semibold text-sky-950/70">Limits</p>
+                      <ul class="mt-1 space-y-1">
+                        <For each={role.restrictionLabels}>
+                          {(label) => <li class="text-xs leading-5 text-sky-950/65">{label}</li>}
+                        </For>
+                      </ul>
+                    </Show>
+                  </div>
+                </Show>
               </article>
             )}
           </For>

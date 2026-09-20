@@ -5,6 +5,7 @@ import type {
   WeddingResponseWorkspaceViewState,
 } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
+import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import { WeddingBackgroundAutomationCard } from "@/components/WeddingBackgroundAutomationCard";
 import { WeddingBudgetTrackerCard } from "@/components/WeddingBudgetTrackerCard";
 import { WeddingCollaborationAccessCard } from "@/components/WeddingCollaborationAccessCard";
@@ -37,6 +38,64 @@ function pressureLabel(label: string): string {
   return label.replace(/_/g, " ");
 }
 
+function currencyLabel(amount: number | null | undefined): string {
+  if (typeof amount !== "number" || !Number.isFinite(amount)) return "Set budget";
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function weddingDayCountdownLabel(state: WeddingResponseWorkspaceViewState): string {
+  const latestEnd = state.ganttTimeline.rows
+    .map((row) => new Date(`${row.endLabel}T09:00:00.000Z`).getTime())
+    .filter((time) => Number.isFinite(time))
+    .sort((left, right) => right - left)[0];
+  if (!latestEnd) return "Add date";
+  const days = Math.ceil((latestEnd - Date.now()) / 86_400_000);
+  if (days < 0) return "Passed";
+  if (days === 0) return "Today";
+  return String(days);
+}
+
+function weddingDayCountdownDetail(state: WeddingResponseWorkspaceViewState): string {
+  const sortedEndLabels = state.ganttTimeline.rows
+    .map((row) => row.endLabel)
+    .filter(Boolean)
+    .sort();
+  const latestEnd = sortedEndLabels[sortedEndLabels.length - 1];
+  return latestEnd ? `Wedding day: ${latestEnd}` : "Add the wedding date to start the countdown.";
+}
+
+function weddingTimelineSidebarAction(
+  kind: Extract<WeddingWorkspaceSidebarAction["kind"], "open_calendar" | "open_tasks">,
+  state: WeddingResponseWorkspaceViewState,
+  rowId?: string,
+): WeddingWorkspaceSidebarAction {
+  const row = rowId ? state.ganttTimeline.rows.find((item) => item.id === rowId) : null;
+  return {
+    kind,
+    label: kind === "open_calendar" ? "Open Calendar" : "Open Tasks",
+    enabled: kind === "open_calendar" ? state.ganttTimeline.rows.length > 0 : true,
+    reason: state.ganttTimeline.rows.length > 0 || kind === "open_tasks"
+      ? null
+      : "Add dated wedding tasks before opening the calendar timeline.",
+    metadata: {
+      wedding_timeline: {
+        version: 1,
+        selected_row_id: row?.id ?? null,
+        selected_title: row?.title ?? null,
+        selected_start: row?.startLabel ?? null,
+        selected_end: row?.endLabel ?? null,
+        dated_count: state.ganttTimeline.rows.length,
+        undated_count: state.ganttTimeline.undatedItems.length,
+      },
+    },
+    contextLabels: row ? [row.title, row.startLabel, row.endLabel] : state.ganttTimeline.rows.slice(0, 3).map((item) => item.title),
+  };
+}
+
 function WeddingPanelSection(props: {
   label: string;
   detail: string;
@@ -58,6 +117,12 @@ export function WeddingDecisionFocusCard(props: {
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
 }) {
   const decisionFocusAction = () => buildWeddingDecisionFocusSidebarAction(props.state.personalOsProjection.decisionLoadRelief);
+  const budgetRemaining = () => {
+    const remaining = props.state.budgetTracking.remainingAmount;
+    if (remaining === null) return currencyLabel(null);
+    return remaining >= 0 ? currencyLabel(remaining) : `${currencyLabel(Math.abs(remaining))} over`;
+  };
+  const countdown = () => weddingDayCountdownLabel(props.state);
   return (
     <Show when={props.state.personalOsProjection.hasWeddingPersonalOsSignal}>
       <div class="min-w-0 rounded-[24px] border border-pink-100/80 bg-pink-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
@@ -70,6 +135,17 @@ export function WeddingDecisionFocusCard(props: {
         <p class="mt-2 text-sm leading-6 text-pink-900/75">
           {props.state.personalOsProjection.decisionLoadRelief.summaryLabel}
         </p>
+        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+          <div class="rounded-2xl border border-pink-100 bg-white/75 px-3 py-2">
+            <p class="text-xs font-semibold text-pink-950/65">Budget left</p>
+            <p class="mt-1 break-words text-2xl font-semibold text-pink-950">{budgetRemaining()}</p>
+          </div>
+          <div class="rounded-2xl border border-pink-100 bg-white/75 px-3 py-2">
+            <p class="text-xs font-semibold text-pink-950/65">Days to wedding</p>
+            <p class="mt-1 break-words text-2xl font-semibold text-pink-950">{countdown()}</p>
+            <p class="mt-1 text-xs leading-5 text-pink-950/60">{weddingDayCountdownDetail(props.state)}</p>
+          </div>
+        </div>
         <Show when={props.state.personalOsProjection.decisionLoadRelief.focusItems.length > 0} fallback={
           <p class="mt-3 rounded-2xl border border-pink-100 bg-white/70 px-3 py-2 text-sm leading-6 text-pink-950/75">
             Nothing needs a yes/no right now.
@@ -125,8 +201,11 @@ export function WeddingDecisionFocusCard(props: {
 export function WeddingWorkspaceContextPanels(props: {
   state: WeddingResponseWorkspaceViewState;
   showTechnicalDetails?: boolean;
+  activeMenu?: WeddingWorkspaceMenuId;
+  sharePlanOpen?: boolean;
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
 }) {
+  const activeMenu = () => props.activeMenu ?? "home";
   return (
     <>
       <Show when={props.showTechnicalDetails}>
@@ -140,13 +219,17 @@ export function WeddingWorkspaceContextPanels(props: {
         <WeddingBackgroundAutomationCard state={props.state.backgroundAutomationCoverage} />
       </Show>
 
-      <WeddingPanelSection
-        label="Planning snapshot"
-        detail="The main wedding details to check today."
-        tone="everyday"
-      />
+      <div hidden={activeMenu() !== "home"}>
+        <WeddingPanelSection
+          label="Planning snapshot"
+          detail="The main wedding details to check today."
+          tone="everyday"
+        />
+      </div>
 
-      <WeddingCollaborationAccessCard state={props.state.collaboration} />
+      <Show when={props.sharePlanOpen}>
+        <WeddingCollaborationAccessCard state={props.state.collaboration} />
+      </Show>
 
       <Show when={props.showTechnicalDetails}>
       <div class="min-w-0 rounded-[24px] border border-teal-100/80 bg-teal-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
@@ -205,10 +288,15 @@ export function WeddingWorkspaceContextPanels(props: {
       </div>
       </Show>
 
-      <WeddingBudgetTrackerCard state={props.state.budgetTracking} />
+      <div hidden={activeMenu() !== "budget"}>
+        <WeddingBudgetTrackerCard state={props.state.budgetTracking} />
+      </div>
 
-      <WeddingGuestOperationsCard state={props.state.guestTracking} />
+      <div hidden={activeMenu() !== "guests"}>
+        <WeddingGuestOperationsCard state={props.state.guestTracking} />
+      </div>
 
+      <div hidden={activeMenu() !== "seating"}>
       <div class="min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
         <div class="flex items-start justify-between gap-2">
           <p class="text-base font-semibold text-sky-950">Seating plan</p>
@@ -320,7 +408,9 @@ export function WeddingWorkspaceContextPanels(props: {
           </p>
         </Show>
       </div>
+      </div>
 
+      <div hidden={activeMenu() !== "helpers"}>
       <div class="min-w-0 rounded-[24px] border border-fuchsia-100/80 bg-fuchsia-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
         <div class="flex items-start justify-between gap-2">
           <p class="text-base font-semibold text-fuchsia-950">Who is helping</p>
@@ -384,13 +474,37 @@ export function WeddingWorkspaceContextPanels(props: {
           </p>
         </Show>
       </div>
+      </div>
 
+      <div hidden={activeMenu() !== "timeline"}>
       <div class="min-w-0 rounded-[24px] border border-indigo-100/80 bg-indigo-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
         <div class="flex items-start justify-between gap-2">
-          <p class="text-base font-semibold text-indigo-950">Timeline</p>
+          <div class="min-w-0">
+            <p class="text-base font-semibold text-indigo-950">Timeline</p>
+            <p class="mt-1 text-sm leading-6 text-indigo-900/70">
+              Open dated items in Calendar, or review all wedding tasks in Tasks.
+            </p>
+          </div>
           <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-indigo-900">
             {props.state.ganttTimeline.rows.length} dated item{props.state.ganttTimeline.rows.length === 1 ? "" : "s"}
           </span>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={props.state.ganttTimeline.rows.length === 0}
+            class="rounded-full border border-indigo-200 bg-white/85 px-3 py-2 text-xs font-semibold text-indigo-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45 sm:py-1.5"
+            onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state))}
+          >
+            Open in Calendar
+          </button>
+          <button
+            type="button"
+            class="rounded-full border border-indigo-200 bg-indigo-100/80 px-3 py-2 text-xs font-semibold text-indigo-950 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45 sm:py-1.5"
+            onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_tasks", props.state))}
+          >
+            Review Tasks
+          </button>
         </div>
         <Show when={props.state.ganttTimeline.undatedItems.length > 0}>
           <div class="mt-3 rounded-2xl border border-indigo-100 bg-white/75 p-3">
@@ -418,9 +532,19 @@ export function WeddingWorkspaceContextPanels(props: {
           </div>
         </Show>
         <Show when={props.state.ganttTimeline.rows.length > 0} fallback={
-          <p class="mt-2 rounded-2xl border border-indigo-100 bg-white/70 px-2.5 py-2 text-xs leading-5 text-indigo-950/75">
-            {props.state.ganttTimeline.blockerLabels[0]}
-          </p>
+          <div class="mt-3 rounded-2xl border border-indigo-100 bg-white/70 px-3 py-3">
+            <p class="text-sm font-semibold text-indigo-950">No dated timeline yet</p>
+            <p class="mt-1 text-sm leading-6 text-indigo-950/70">
+              {props.state.ganttTimeline.blockerLabels[0] ?? "Add wedding tasks with dates, then they will appear here and in Calendar."}
+            </p>
+            <button
+              type="button"
+              class="mt-3 rounded-full border border-indigo-200 bg-indigo-100/80 px-3 py-2 text-xs font-semibold text-indigo-950 transition hover:bg-indigo-50 sm:py-1.5"
+              onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_tasks", props.state))}
+            >
+              Open Tasks
+            </button>
+          </div>
         }>
           <div class="mt-3 space-y-2">
             <For each={props.state.ganttTimeline.rows.slice(0, 6)}>
@@ -443,6 +567,22 @@ export function WeddingWorkspaceContextPanels(props: {
                   <p class="mt-1 break-words text-xs leading-5 text-indigo-950/65">
                     {row.categoryLabel} - {row.durationDays} day{row.durationDays === 1 ? "" : "s"} - {row.statusLabel}
                   </p>
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      class="rounded-full border border-indigo-100 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-950 transition hover:bg-white"
+                      onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state, row.id))}
+                    >
+                      Calendar
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-950 transition hover:bg-white"
+                      onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_tasks", props.state, row.id))}
+                    >
+                      Task
+                    </button>
+                  </div>
                 </article>
               )}
             </For>
@@ -459,8 +599,9 @@ export function WeddingWorkspaceContextPanels(props: {
           </div>
         </Show>
       </div>
+      </div>
 
-      <Show when={props.state.contextCards.length > 0}>
+      <div hidden={activeMenu() !== "home" || props.state.contextCards.length === 0}>
         <div class="min-w-0 rounded-[24px] border border-rose-100/80 bg-rose-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
           <p class="text-base font-semibold text-rose-950">Important details</p>
           <div class="mt-3 space-y-2">
@@ -495,7 +636,7 @@ export function WeddingWorkspaceContextPanels(props: {
             </For>
           </div>
         </div>
-      </Show>
+      </div>
 
       <Show when={props.showTechnicalDetails && props.state.providerHandoffAuditCard}>
         {(card) => (
@@ -535,7 +676,7 @@ export function WeddingWorkspaceContextPanels(props: {
         )}
       </Show>
 
-      <Show when={props.state.vendorContactCards.length > 0}>
+      <div hidden={activeMenu() !== "response_queue" || props.state.vendorContactCards.length === 0}>
         <div class="min-w-0 rounded-[24px] border border-amber-100/80 bg-amber-50/85 p-3 shadow-card sm:rounded-[28px] sm:p-4">
           <div class="flex items-start justify-between gap-2">
             <p class="break-words text-base font-semibold text-amber-950">Vendors to follow up</p>
@@ -574,7 +715,7 @@ export function WeddingWorkspaceContextPanels(props: {
             </For>
           </div>
         </div>
-      </Show>
+      </div>
 
       <Show when={props.showTechnicalDetails}>
       <div class="min-w-0 rounded-[24px] border border-cyan-100/80 bg-cyan-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
