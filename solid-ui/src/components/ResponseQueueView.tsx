@@ -971,6 +971,7 @@ export function ResponseQueueView(props: {
       <Show when={weddingWorkspace() && showWeddingWalkthrough()}>
         <WeddingPlannerWalkthrough
           onClose={closeWeddingWalkthrough}
+          onOpenSharePlan={() => setShowWeddingSharePlan(true)}
           onSelectMenu={setWeddingWorkspaceMenu}
         />
       </Show>

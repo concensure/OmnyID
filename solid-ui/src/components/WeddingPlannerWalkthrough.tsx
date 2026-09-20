@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 
@@ -8,6 +8,8 @@ type WeddingPlannerWalkthroughStep = {
   body: string;
   menuId?: WeddingWorkspaceMenuId;
   menuLabel?: string;
+  shareLabel?: string;
+  sectionLinks?: Array<{ label: string; menuId: WeddingWorkspaceMenuId }>;
   examples: string[];
 };
 
@@ -27,6 +29,12 @@ const WEDDING_PLANNER_WALKTHROUGH_STEPS: WeddingPlannerWalkthroughStep[] = [
   {
     title: "Match each planning job to a section",
     body: "Use the top menu like a wedding planning map. Each section keeps one part of the wedding clear.",
+    sectionLinks: [
+      { label: "Budget", menuId: "budget" },
+      { label: "Guests", menuId: "guests" },
+      { label: "Seating", menuId: "seating" },
+      { label: "Timeline", menuId: "timeline" },
+    ],
     examples: ["Budget for costs and quotes", "Guests for RSVPs and meals", "Seating for tables", "Timeline for dated tasks"],
   },
   {
@@ -39,18 +47,22 @@ const WEDDING_PLANNER_WALKTHROUGH_STEPS: WeddingPlannerWalkthroughStep[] = [
   {
     title: "Use sharing when people help",
     body: "Share the Plan lets you review roles for a partner, planner, helper, or viewer before giving access.",
+    shareLabel: "Open sharing",
     examples: ["Partner can co-manage", "Planner can help with tasks", "Viewer can only read"],
   },
 ];
 
 export function WeddingPlannerWalkthrough(props: {
   onClose: () => void;
+  onOpenSharePlan?: () => void;
   onSelectMenu: (menuId: WeddingWorkspaceMenuId) => void;
 }) {
   const [stepIndex, setStepIndex] = createSignal(0);
+  let closeButtonRef: HTMLButtonElement | undefined;
   const currentStep = () => WEDDING_PLANNER_WALKTHROUGH_STEPS[stepIndex()] ?? WEDDING_PLANNER_WALKTHROUGH_STEPS[0];
   const isFirst = () => stepIndex() === 0;
   const isLast = () => stepIndex() === WEDDING_PLANNER_WALKTHROUGH_STEPS.length - 1;
+  const stepCountLabel = () => `Step ${stepIndex() + 1} of ${WEDDING_PLANNER_WALKTHROUGH_STEPS.length}`;
 
   function close() {
     props.onClose();
@@ -63,31 +75,54 @@ export function WeddingPlannerWalkthrough(props: {
     close();
   }
 
+  function openLinkedSection(menuId: WeddingWorkspaceMenuId) {
+    props.onSelectMenu(menuId);
+    close();
+  }
+
+  function openSharePlan() {
+    props.onOpenSharePlan?.();
+    close();
+  }
+
+  onMount(() => {
+    closeButtonRef?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      close();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+  });
+
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="wedding-walkthrough-title"
+        aria-describedby="wedding-walkthrough-body"
         class="relative w-full max-w-lg rounded-[28px] border border-rose-100 bg-white p-5 shadow-2xl sm:p-6"
       >
         <button
+          ref={closeButtonRef}
           type="button"
           aria-label="Close wedding planner guide"
           onClick={close}
-          class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-100 bg-rose-50 text-sm font-semibold text-rose-950 transition hover:bg-rose-100"
+          class="absolute right-4 top-4 inline-flex min-h-8 items-center justify-center rounded-full border border-rose-100 bg-rose-50 px-3 text-xs font-semibold text-rose-950 transition hover:bg-rose-100"
         >
-          X
+          Close
         </button>
 
         <div class="pr-10">
           <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700/70">
-            Wedding planner guide
+            Wedding planner guide - {stepCountLabel()}
           </p>
           <h2 id="wedding-walkthrough-title" class="mt-2 text-xl font-semibold text-rose-950">
             {currentStep().title}
           </h2>
-          <p class="mt-3 text-sm leading-6 text-rose-950/75">
+          <p id="wedding-walkthrough-body" class="mt-3 text-sm leading-6 text-rose-950/75">
             {currentStep().body}
           </p>
         </div>
@@ -100,6 +135,22 @@ export function WeddingPlannerWalkthrough(props: {
             </For>
           </ul>
         </div>
+
+        <Show when={currentStep().sectionLinks?.length}>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <For each={currentStep().sectionLinks}>
+              {(section) => (
+                <button
+                  type="button"
+                  class="rounded-full border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-950 transition hover:bg-rose-50"
+                  onClick={() => openLinkedSection(section.menuId)}
+                >
+                  Open {section.label}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
 
         <div class="mt-5 flex items-center justify-center gap-1.5" aria-label="Guide progress">
           <For each={WEDDING_PLANNER_WALKTHROUGH_STEPS}>
@@ -131,6 +182,17 @@ export function WeddingPlannerWalkthrough(props: {
               >
                 {currentStep().menuLabel ?? "Open section"}
               </button>
+            </Show>
+            <Show when={currentStep().shareLabel}>
+              {(label) => (
+                <button
+                  type="button"
+                  class="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-950 transition hover:bg-rose-100"
+                  onClick={openSharePlan}
+                >
+                  {label()}
+                </button>
+              )}
             </Show>
             <Show
               when={!isLast()}
