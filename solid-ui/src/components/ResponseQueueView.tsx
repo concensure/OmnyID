@@ -12,8 +12,11 @@ import { WeddingRichResponseView } from "@/components/WeddingRichResponseView";
 import { RailIcon, type IconId } from "@/components/RailIcons";
 import {
   loadWeddingWorkspaceMenu,
+  loadWeddingWorkspaceMenuFromUrl,
+  replaceWeddingWorkspaceMenuInUrl,
   saveWeddingWorkspaceMenu,
   weddingWorkspaceMenuBadge,
+  weddingWorkspaceMenuHint,
   type WeddingWorkspaceMenuId,
 } from "@/lib/weddingWorkspaceMenuState";
 import {
@@ -173,6 +176,53 @@ function weddingMenuKeyDownStep(key: string, currentIndex: number, itemCount: nu
   return null;
 }
 
+function initialWeddingWorkspaceMenu(): WeddingWorkspaceMenuId {
+  if (typeof window !== "undefined") {
+    const urlMenu = loadWeddingWorkspaceMenuFromUrl(window.location.search, window.location.hash);
+    if (urlMenu) return urlMenu;
+  }
+  return loadWeddingWorkspaceMenu();
+}
+
+function weddingSetupChecklistItems(state: WeddingResponseWorkspaceViewState): Array<{
+  id: string;
+  label: string;
+  detail: string;
+  complete: boolean;
+  menu: WeddingWorkspaceMenuId;
+}> {
+  return [
+    {
+      id: "date",
+      label: "Add the wedding date",
+      detail: "Starts the countdown and timeline.",
+      complete: state.ganttTimeline.rows.length > 0,
+      menu: "timeline",
+    },
+    {
+      id: "budget",
+      label: "Set a budget",
+      detail: "Shows how much is left after quotes.",
+      complete: state.budgetTracking.budgetTargetAmount !== null,
+      menu: "budget",
+    },
+    {
+      id: "guests",
+      label: "Start the guest list",
+      detail: "Unlocks RSVPs, meals, and seating.",
+      complete: state.guestTracking.guestRowCount > 0,
+      menu: "guests",
+    },
+    {
+      id: "helpers",
+      label: "Choose who is helping",
+      detail: "Keeps tasks and permissions clear.",
+      complete: state.delegation.items.length > 0,
+      menu: "helpers",
+    },
+  ];
+}
+
 function rescopeWeddingArtifact(
   artifact: WeddingGeneratedArtifact,
   metadata: ReturnType<typeof normalizeWeddingPlanningMetadata>,
@@ -224,10 +274,11 @@ export function ResponseQueueView(props: {
   const bootstrap = createMemo(() => props.bootstrap);
   const queueCompanion = createMemo(() => decisionOsQueueCompanionState(bootstrap()));
   const [density, setDensity] = createSignal<QueueDensity>(loadResponseQueueDensity());
-  const [weddingWorkspaceMenu, setWeddingWorkspaceMenuSignal] = createSignal<WeddingWorkspaceMenuId>(loadWeddingWorkspaceMenu());
+  const [weddingWorkspaceMenu, setWeddingWorkspaceMenuSignal] = createSignal<WeddingWorkspaceMenuId>(initialWeddingWorkspaceMenu());
   function setWeddingWorkspaceMenu(id: WeddingWorkspaceMenuId) {
     setWeddingWorkspaceMenuSignal(id);
     saveWeddingWorkspaceMenu(id);
+    if (typeof window !== "undefined") replaceWeddingWorkspaceMenuInUrl(id);
   }
   function handleWeddingMenuTabKeyDown(event: KeyboardEvent, currentIndex: number) {
     const nextIndex = weddingMenuKeyDownStep(event.key, currentIndex, WEDDING_WORKSPACE_MENU_ITEMS.length);
@@ -738,6 +789,11 @@ export function ResponseQueueView(props: {
       responseSurfaceCompactMode: currentDensity === "compact",
     };
   });
+  const weddingSetupChecklist = createMemo(() => {
+    const state = weddingWorkspace();
+    return state ? weddingSetupChecklistItems(state) : [];
+  });
+  const incompleteWeddingSetupChecklist = createMemo(() => weddingSetupChecklist().filter((item) => !item.complete));
 
   return (
     <div class={RESPONSE_QUEUE_VIEW_CLASS}>
@@ -747,6 +803,7 @@ export function ResponseQueueView(props: {
             {(item, index) => {
               const selected = () => weddingWorkspaceMenu() === item.id;
               const badge = () => weddingWorkspaceMenuBadge(item.id, weddingWorkspace());
+              const hint = () => badge() ? null : weddingWorkspaceMenuHint(item.id, weddingWorkspace());
               return (
                 <button
                   type="button"
@@ -777,6 +834,13 @@ export function ResponseQueueView(props: {
                     </Show>
                   </span>
                   <span>{item.label}</span>
+                  <Show when={hint()}>
+                    {(activeHint) => (
+                      <span class="rounded-full bg-white/75 px-1.5 py-0.5 text-[10px] font-semibold opacity-80">
+                        {activeHint()}
+                      </span>
+                    )}
+                  </Show>
                 </button>
               );
             }}
@@ -832,6 +896,42 @@ export function ResponseQueueView(props: {
             {notice()}
           </p>
         )}
+      </Show>
+
+      <Show when={weddingWorkspace() && weddingWorkspaceMenu() === "home" && incompleteWeddingSetupChecklist().length > 0}>
+        <section class="rounded-[24px] border border-rose-100/80 bg-white/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
+          <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p class="text-sm font-semibold text-rose-950">Start here</p>
+              <p class="mt-1 text-sm leading-6 text-rose-900/70">
+                Add the basics once, then OmnyID can keep the rest of the planner connected.
+              </p>
+            </div>
+            <span class="w-fit rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-900">
+              {incompleteWeddingSetupChecklist().length} to add
+            </span>
+          </div>
+          <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <For each={weddingSetupChecklist()}>
+              {(item) => (
+                <button
+                  type="button"
+                  disabled={item.complete}
+                  onClick={() => setWeddingWorkspaceMenu(item.menu)}
+                  class={`min-w-0 rounded-2xl border px-3 py-2 text-left transition ${
+                    item.complete
+                      ? "cursor-default border-emerald-100 bg-emerald-50/75 text-emerald-950"
+                      : "border-rose-100 bg-rose-50/70 text-rose-950 hover:border-rose-200 hover:bg-rose-50"
+                  }`}
+                >
+                  <span class="block text-xs font-semibold">{item.complete ? "Done" : "Add"}</span>
+                  <span class="mt-1 block break-words text-sm font-semibold">{item.label}</span>
+                  <span class="mt-1 block text-xs leading-5 opacity-70">{item.detail}</span>
+                </button>
+              )}
+            </For>
+          </div>
+        </section>
       </Show>
 
       <Show when={!weddingWorkspace()}>

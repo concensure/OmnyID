@@ -1,0 +1,130 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  isWeddingWorkspaceMenuId,
+  loadWeddingWorkspaceMenu,
+  loadWeddingWorkspaceMenuFromUrl,
+  replaceWeddingWorkspaceMenuInUrl,
+  saveWeddingWorkspaceMenu,
+  weddingWorkspaceMenuBadge,
+  weddingWorkspaceMenuHint,
+  type WeddingWorkspaceMenuBadgeInput,
+} from "../src/lib/weddingWorkspaceMenuState.ts";
+
+function fakeStorage(): Storage {
+  const state = new Map<string, string>();
+  return {
+    getItem: (key: string) => (state.has(key) ? state.get(key)! : null),
+    setItem: (key: string, value: string) => {
+      state.set(key, value);
+    },
+    removeItem: (key: string) => {
+      state.delete(key);
+    },
+    clear: () => state.clear(),
+    key: () => null,
+    length: 0,
+  } as Storage;
+}
+
+function fixture(overrides: Partial<WeddingWorkspaceMenuBadgeInput> = {}): WeddingWorkspaceMenuBadgeInput {
+  return {
+    budgetTracking: { remainingAmount: 100 } as WeddingWorkspaceMenuBadgeInput["budgetTracking"],
+    guestTracking: { pendingCount: 0, guestRowCount: 4, attendingCount: 4 } as WeddingWorkspaceMenuBadgeInput["guestTracking"],
+    seatingPlan: { unassignedAttendingCount: 0, assignedSeatCount: 4 } as WeddingWorkspaceMenuBadgeInput["seatingPlan"],
+    vendorContactCards: [],
+    delegation: { items: [{ id: "helper" }] } as WeddingWorkspaceMenuBadgeInput["delegation"],
+    ganttTimeline: { rows: [{ id: "row" }], undatedItems: [] } as WeddingWorkspaceMenuBadgeInput["ganttTimeline"],
+    ...overrides,
+  };
+}
+
+test("isWeddingWorkspaceMenuId accepts only known menu ids", () => {
+  assert.equal(isWeddingWorkspaceMenuId("budget"), true);
+  assert.equal(isWeddingWorkspaceMenuId("advanced"), true);
+  assert.equal(isWeddingWorkspaceMenuId("not-a-menu"), false);
+  assert.equal(isWeddingWorkspaceMenuId(null), false);
+});
+
+test("loadWeddingWorkspaceMenu defaults to home and round-trips a saved tab", () => {
+  const storage = fakeStorage();
+  assert.equal(loadWeddingWorkspaceMenu(storage), "home");
+  saveWeddingWorkspaceMenu("timeline", storage);
+  assert.equal(loadWeddingWorkspaceMenu(storage), "timeline");
+});
+
+test("loadWeddingWorkspaceMenu falls back to home for a corrupted value", () => {
+  const storage = fakeStorage();
+  storage.setItem("omnyid.wedding.workspace-menu", "not-a-real-tab");
+  assert.equal(loadWeddingWorkspaceMenu(storage), "home");
+});
+
+test("loadWeddingWorkspaceMenuFromUrl accepts query or hash tabs", () => {
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=seating"), "seating");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("", "#weddingMenu=timeline"), "timeline");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=bad"), null);
+});
+
+test("replaceWeddingWorkspaceMenuInUrl keeps the current path and writes the selected tab", () => {
+  const calls: string[] = [];
+  const windowLike = {
+    location: { href: "https://example.test/workspace/?x=1#keep" },
+    history: {
+      state: { ok: true },
+      replaceState: (_state: unknown, _title: string, url: string) => calls.push(url),
+    },
+  } as Pick<Window, "location" | "history">;
+  replaceWeddingWorkspaceMenuInUrl("guests", windowLike);
+  assert.deepEqual(calls, ["/workspace/?x=1&weddingMenu=guests#keep"]);
+});
+
+test("weddingWorkspaceMenuBadge flags an over-budget total on the budget tab", () => {
+  const overBudget = fixture({ budgetTracking: { remainingAmount: -250 } as WeddingWorkspaceMenuBadgeInput["budgetTracking"] });
+  assert.deepEqual(weddingWorkspaceMenuBadge("budget", overBudget), { label: "Over", tone: "urgent" });
+  assert.equal(weddingWorkspaceMenuBadge("budget", fixture()), null);
+});
+
+test("weddingWorkspaceMenuBadge surfaces pending RSVPs and unassigned seats as counts", () => {
+  const pendingGuests = fixture({ guestTracking: { pendingCount: 4 } as WeddingWorkspaceMenuBadgeInput["guestTracking"] });
+  assert.deepEqual(weddingWorkspaceMenuBadge("guests", pendingGuests), { label: "4", tone: "info" });
+  assert.equal(weddingWorkspaceMenuBadge("guests", fixture()), null);
+
+  const unassignedSeats = fixture({ seatingPlan: { unassignedAttendingCount: 2 } as WeddingWorkspaceMenuBadgeInput["seatingPlan"] });
+  assert.deepEqual(weddingWorkspaceMenuBadge("seating", unassignedSeats), { label: "2", tone: "info" });
+});
+
+test("weddingWorkspaceMenuBadge counts only urgent vendor cards on the queue tab", () => {
+  const withVendors = fixture({
+    vendorContactCards: [
+      { tone: "urgent" } as WeddingWorkspaceMenuBadgeInput["vendorContactCards"][number],
+      { tone: "waiting" } as WeddingWorkspaceMenuBadgeInput["vendorContactCards"][number],
+      { tone: "urgent" } as WeddingWorkspaceMenuBadgeInput["vendorContactCards"][number],
+    ],
+  });
+  assert.deepEqual(weddingWorkspaceMenuBadge("response_queue", withVendors), { label: "2", tone: "urgent" });
+  assert.equal(weddingWorkspaceMenuBadge("response_queue", fixture()), null);
+});
+
+test("weddingWorkspaceMenuBadge has no badge for tabs without a live count, or when state is unavailable", () => {
+  assert.equal(weddingWorkspaceMenuBadge("home", fixture()), null);
+  assert.equal(weddingWorkspaceMenuBadge("advanced", fixture()), null);
+  assert.equal(weddingWorkspaceMenuBadge("budget", null), null);
+});
+
+test("weddingWorkspaceMenuHint marks empty first-run sections without replacing live badges", () => {
+  assert.equal(weddingWorkspaceMenuHint("budget", fixture({
+    budgetTracking: { budgetTargetAmount: null } as WeddingWorkspaceMenuBadgeInput["budgetTracking"],
+  })), "Start");
+  assert.equal(weddingWorkspaceMenuHint("guests", fixture({
+    guestTracking: { guestRowCount: 0, pendingCount: 0, attendingCount: 0 } as WeddingWorkspaceMenuBadgeInput["guestTracking"],
+  })), "Start");
+  assert.equal(weddingWorkspaceMenuHint("helpers", fixture({
+    delegation: { items: [] } as WeddingWorkspaceMenuBadgeInput["delegation"],
+  })), "Start");
+  assert.equal(weddingWorkspaceMenuHint("timeline", fixture({
+    ganttTimeline: { rows: [], undatedItems: [] } as WeddingWorkspaceMenuBadgeInput["ganttTimeline"],
+  })), "Start");
+  assert.equal(weddingWorkspaceMenuHint("advanced", fixture()), null);
+  assert.equal(weddingWorkspaceMenuHint("budget", null), null);
+});

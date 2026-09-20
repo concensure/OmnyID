@@ -3,7 +3,7 @@ import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWor
 
 export type WeddingWorkspaceMenuBadgeInput = Pick<
   WeddingResponseWorkspaceViewState,
-  "budgetTracking" | "guestTracking" | "seatingPlan" | "vendorContactCards"
+  "budgetTracking" | "guestTracking" | "seatingPlan" | "vendorContactCards" | "delegation" | "ganttTimeline"
 >;
 
 export type WeddingWorkspaceMenuId =
@@ -32,6 +32,7 @@ export function isWeddingWorkspaceMenuId(value: unknown): value is WeddingWorksp
 }
 
 const WEDDING_WORKSPACE_MENU_STORAGE_KEY = "omnyid.wedding.workspace-menu";
+const WEDDING_WORKSPACE_MENU_URL_PARAM = "weddingMenu";
 
 export function loadWeddingWorkspaceMenu(storage: Storage = localStorage): WeddingWorkspaceMenuId {
   try {
@@ -47,6 +48,27 @@ export function saveWeddingWorkspaceMenu(id: WeddingWorkspaceMenuId, storage: St
     storage.setItem(WEDDING_WORKSPACE_MENU_STORAGE_KEY, id);
   } catch {
     // Ignore localStorage write failures for convenience state.
+  }
+}
+
+export function loadWeddingWorkspaceMenuFromUrl(search: string, hash = ""): WeddingWorkspaceMenuId | null {
+  try {
+    const queryValue = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search).get(WEDDING_WORKSPACE_MENU_URL_PARAM);
+    if (isWeddingWorkspaceMenuId(queryValue)) return queryValue;
+    const hashValue = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash).get(WEDDING_WORKSPACE_MENU_URL_PARAM);
+    return isWeddingWorkspaceMenuId(hashValue) ? hashValue : null;
+  } catch {
+    return null;
+  }
+}
+
+export function replaceWeddingWorkspaceMenuInUrl(id: WeddingWorkspaceMenuId, windowLike: Pick<Window, "location" | "history"> = window): void {
+  try {
+    const url = new URL(windowLike.location.href);
+    url.searchParams.set(WEDDING_WORKSPACE_MENU_URL_PARAM, id);
+    windowLike.history.replaceState(windowLike.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  } catch {
+    // URL sync is convenience only; localStorage still remembers the tab.
   }
 }
 
@@ -80,3 +102,21 @@ export function weddingWorkspaceMenuBadge(
   return null;
 }
 
+/** Gentle "not started" hints for first-run sections. Urgent counts remain handled by weddingWorkspaceMenuBadge. */
+export function weddingWorkspaceMenuHint(
+  id: WeddingWorkspaceMenuId,
+  state: WeddingWorkspaceMenuBadgeInput | null,
+): string | null {
+  if (!state) return null;
+  if (id === "budget") return state.budgetTracking.budgetTargetAmount === null ? "Start" : null;
+  if (id === "guests") return state.guestTracking.guestRowCount === 0 ? "Start" : null;
+  if (id === "seating") {
+    const hasGuestsToSeat = state.guestTracking.attendingCount > 0;
+    return hasGuestsToSeat && state.seatingPlan.assignedSeatCount === 0 ? "Start" : null;
+  }
+  if (id === "helpers") return state.delegation.items.length === 0 ? "Start" : null;
+  if (id === "timeline") {
+    return state.ganttTimeline.rows.length === 0 && state.ganttTimeline.undatedItems.length === 0 ? "Start" : null;
+  }
+  return null;
+}
