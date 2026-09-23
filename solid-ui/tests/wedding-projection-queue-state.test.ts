@@ -14,8 +14,10 @@ import { buildWeddingCollaborationState } from "@/lib/weddingCollaborationState"
 import {
   buildWeddingProjectionQueueSelectionState,
   buildWeddingProjectionQueueState,
+  WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY,
 } from "@/lib/weddingProjectionQueueState";
 import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
+import type { WeddingBoundaryPolicy } from "@/lib/weddingBoundaryLedgerState";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -69,6 +71,17 @@ const taskItem: WeddingPlanningTaskItem = {
   metadata,
 };
 
+const boundaryPolicy: WeddingBoundaryPolicy = {
+  id: "policy:no-extra-plus-ones",
+  kind: "wedding_boundary_policy",
+  title: "No extra plus-ones",
+  status: "active",
+  visibility: "family_visible",
+  ruleType: "plus_one",
+  enforcement: "require_approval",
+  plainLanguage: "Extra plus-ones stay as suggestions until both people in the couple approve them.",
+};
+
 test("buildWeddingProjectionQueueState aggregates pending artifact calendar and task send inputs", () => {
   const state = buildWeddingProjectionQueueState({
     contextItems: [contextItem()],
@@ -120,6 +133,37 @@ test("buildWeddingProjectionQueueState includes collaborator invite access-contr
   assert.equal(state.pendingItems[0]?.kind, "access_control");
   assert.equal(state.pendingSendInputs[0]?.type, "access_control");
   assert.match(state.blockedItems[0]?.blockedReason ?? "", /valid email required/);
+});
+
+test("buildWeddingProjectionQueueState includes boundary ledger records for graph synthesis", () => {
+  const state = buildWeddingProjectionQueueState({
+    boundaryObjects: [boundaryPolicy],
+    boundaryMetadata: metadata,
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.items.length, 1);
+  assert.equal(state.pendingItems[0]?.kind, "boundary");
+  assert.equal(state.pendingItems[0]?.statusLabel, "Ready to save to guest boundaries");
+  assert.equal(state.pendingSendInputs[0]?.type, "ledger");
+  assert.equal(state.pendingSendInputs[0]?.kind, "wedding_boundary_policy");
+  assert.ok(state.pendingSendInputs[0]?.supertags?.includes("topology:wedding_decision_rights"));
+});
+
+test("buildWeddingProjectionQueueState excludes already saved boundary ledger records", () => {
+  const storage = memoryStorage();
+  markWeddingProjectionSent(boundaryPolicy.id, WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY, storage);
+
+  const state = buildWeddingProjectionQueueState({
+    boundaryObjects: [boundaryPolicy],
+    boundaryMetadata: metadata,
+    storage,
+  });
+
+  assert.equal(state.pendingItems.length, 0);
+  assert.equal(state.sentItems[0]?.kind, "boundary");
+  assert.equal(state.pendingSendInputs.length, 0);
 });
 
 test("buildWeddingProjectionQueueState dispatches lifecycle records without fresh invite subtypes", () => {

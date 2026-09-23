@@ -1296,6 +1296,8 @@ test("buildWeddingResponseWorkspaceViewState exposes guest operations tracking",
   assert.equal(state.boundaryState.guestCount, 2);
   assert.ok(state.boundaryTopology.nodes.some((node) => node.kind === "boundary_policy"));
   assert.ok(state.boundaryTopology.nodes.some((node) => node.kind === "guest" && node.label === "Alex"));
+  assert.ok(state.projectionQueue?.queue.pendingItems.some((item) => item.kind === "boundary" && /Guest changes/i.test(item.title)));
+  assert.ok(state.projectionQueue?.dispatchPayload?.sendInputs.some((input) => input.type === "ledger" && input.kind === "wedding_boundary_policy"));
 });
 
 test("buildWeddingResponseWorkspaceViewState exposes seating draft tracking", () => {

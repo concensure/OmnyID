@@ -1193,6 +1193,8 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     taskItems: projectionTaskItems,
     collaborationInvites: collaboration.invites,
     collaborationMetadata: input.metadata ?? artifacts[0]?.metadata,
+    boundaryObjects,
+    boundaryMetadata: input.metadata ?? artifacts[0]?.metadata,
     nowIso: input.nowIso,
     storage: input.projectionStorage,
   });

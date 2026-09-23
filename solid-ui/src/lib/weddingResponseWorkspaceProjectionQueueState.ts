@@ -5,6 +5,7 @@ import type {
   WeddingPlanningTaskItem,
 } from "@/lib/weddingCalendarProjectionState";
 import type { WeddingCollaboratorInviteCard } from "@/lib/weddingCollaborationState";
+import type { WeddingBoundaryLedgerObject } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 import type { WeddingNeedToKnowProjectionContext } from "@/lib/weddingNeedToKnowAfpProjectionState";
 import {
@@ -20,6 +21,8 @@ export type WeddingResponseWorkspaceProjectionQueueInput = {
   taskItems?: readonly WeddingPlanningTaskItem[] | null;
   collaborationInvites?: readonly WeddingCollaboratorInviteCard[] | null;
   collaborationMetadata?: unknown;
+  boundaryObjects?: readonly WeddingBoundaryLedgerObject[] | null;
+  boundaryMetadata?: unknown;
   nowIso?: string | null;
   storage?: Storage | null;
 };
@@ -33,7 +36,8 @@ export function buildWeddingResponseWorkspaceProjectionQueueState(
     || input.artifacts?.length
     || input.scheduleItems?.length
     || input.taskItems?.length
-    || input.collaborationInvites?.length,
+    || input.collaborationInvites?.length
+    || input.boundaryObjects?.length,
   );
   if (!hasProjectionInputs) return null;
   return buildWeddingProjectionQueueViewState({
@@ -44,6 +48,8 @@ export function buildWeddingResponseWorkspaceProjectionQueueState(
     taskItems: input.taskItems,
     collaborationInvites: input.collaborationInvites,
     collaborationMetadata: input.collaborationMetadata,
+    boundaryObjects: input.boundaryObjects,
+    boundaryMetadata: input.boundaryMetadata,
     nowIso: input.nowIso,
     storage: input.storage,
   });

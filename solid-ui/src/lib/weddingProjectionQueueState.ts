@@ -33,8 +33,14 @@ import {
   weddingCollaborationAccessProjectionId,
   weddingCollaborationAccessToAfpSendInput,
 } from "@/lib/weddingCollaborationAfpProjectionState";
+import {
+  weddingBoundaryLedgerObjectToAfpSendInput,
+  type WeddingBoundaryLedgerObject,
+} from "@/lib/weddingBoundaryLedgerState";
 
-export type WeddingProjectionQueueItemKind = "context" | "artifact" | "calendar_event" | "task" | "decision" | "access_control";
+export const WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY = "omnyid.wedding.boundary_afp_projections.v1";
+
+export type WeddingProjectionQueueItemKind = "context" | "artifact" | "calendar_event" | "task" | "decision" | "access_control" | "boundary";
 export type WeddingProjectionQueueItemStatus = "pending" | "sent" | "blocked";
 
 export type WeddingProjectionQueueItem = {
@@ -219,6 +225,37 @@ function collaborationItem(
   };
 }
 
+function boundaryObjectId(object: WeddingBoundaryLedgerObject): string {
+  if (object.kind === "wedding_boundary_household") return object.householdId;
+  if (object.kind === "wedding_boundary_guest_profile") return object.personId;
+  if (object.kind === "wedding_boundary_event_invitation") return object.invitationId;
+  if (object.kind === "wedding_boundary_change_request") return object.requestId;
+  if (object.kind === "wedding_boundary_decision_rationale") return object.decisionId;
+  if (object.kind === "wedding_boundary_decline_template") return object.templateId;
+  if (object.kind === "wedding_boundary_visibility_page") return object.pageId;
+  return object.id;
+}
+
+function boundaryItem(
+  object: WeddingBoundaryLedgerObject,
+  metadata: unknown,
+  nowIso: string,
+  storage: Storage,
+): WeddingProjectionQueueItem {
+  const sourceId = boundaryObjectId(object);
+  const sent = hasSentWeddingProjection(sourceId, WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY, storage);
+  return {
+    id: `boundary:${sourceId}`,
+    sourceId,
+    kind: "boundary",
+    title: object.title,
+    status: sent ? "sent" : "pending",
+    statusLabel: sent ? "Already saved to guest boundaries" : "Ready to save to guest boundaries",
+    blockedReason: null,
+    sendInput: sent ? null : weddingBoundaryLedgerObjectToAfpSendInput(object, metadata, nowIso),
+  };
+}
+
 function summaryLabel(pendingCount: number, sentCount: number, blockedCount: number): string {
   if (pendingCount === 0 && sentCount === 0 && blockedCount === 0) return "No wedding items to save";
   const parts = [
@@ -237,6 +274,8 @@ export function buildWeddingProjectionQueueState(input: {
   taskItems?: readonly WeddingPlanningTaskItem[] | null;
   collaborationInvites?: readonly WeddingCollaboratorInviteCard[] | null;
   collaborationMetadata?: unknown;
+  boundaryObjects?: readonly WeddingBoundaryLedgerObject[] | null;
+  boundaryMetadata?: unknown;
   nowIso?: string | null;
   storage?: Storage | null;
 }): WeddingProjectionQueueState {
@@ -249,6 +288,7 @@ export function buildWeddingProjectionQueueState(input: {
     ...(input.scheduleItems ?? []).map((item) => calendarItem(item, nowIso, storage)),
     ...(input.taskItems ?? []).map((item) => taskItem(item, nowIso, storage)),
     ...(input.collaborationInvites ?? []).map((invite) => collaborationItem(invite, input.collaborationMetadata, nowIso, storage)),
+    ...(input.boundaryObjects ?? []).map((object) => boundaryItem(object, input.boundaryMetadata ?? input.collaborationMetadata, nowIso, storage)),
   ];
   const pendingItems = items.filter((item) => item.status === "pending");
   const sentItems = items.filter((item) => item.status === "sent");

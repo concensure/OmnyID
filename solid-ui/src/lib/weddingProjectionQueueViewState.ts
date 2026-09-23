@@ -14,6 +14,7 @@ import type {
   WeddingPlanningTaskItem,
 } from "@/lib/weddingCalendarProjectionState";
 import type { WeddingCollaboratorInviteCard } from "@/lib/weddingCollaborationState";
+import type { WeddingBoundaryLedgerObject } from "@/lib/weddingBoundaryLedgerState";
 
 export type WeddingProjectionQueueActionKind =
   | "save_pending_outputs"
@@ -55,6 +56,7 @@ const GROUP_LABELS: Record<WeddingProjectionQueueItemKind, string> = {
   context: "Context",
   decision: "Decisions",
   access_control: "Access",
+  boundary: "Guest boundaries",
   artifact: "Files",
   calendar_event: "Calendar",
   task: "Tasks",
@@ -141,6 +143,8 @@ export function buildWeddingProjectionQueueViewState(input: {
   taskItems?: readonly WeddingPlanningTaskItem[] | null;
   collaborationInvites?: readonly WeddingCollaboratorInviteCard[] | null;
   collaborationMetadata?: unknown;
+  boundaryObjects?: readonly WeddingBoundaryLedgerObject[] | null;
+  boundaryMetadata?: unknown;
   nowIso?: string | null;
   storage?: Storage | null;
 }): WeddingProjectionQueueViewState {
