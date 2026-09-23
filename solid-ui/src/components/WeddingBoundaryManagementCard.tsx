@@ -3,17 +3,35 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { buildWeddingBoundaryManagementViewState } from "@/lib/weddingBoundaryManagementViewState";
+import type { WeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
 import type { WeddingBoundaryState } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
 
 export function WeddingBoundaryManagementCard(props: {
   state: WeddingBoundaryState;
   topology: WeddingBoundaryTopologyState;
+  onDecideRequest?: (requestId: string, decision: WeddingBoundaryRequestDecision) => Promise<string>;
 }) {
   const [showRequests, setShowRequests] = createSignal(false);
   const [showRules, setShowRules] = createSignal(false);
   const [showPeople, setShowPeople] = createSignal(false);
+  const [decidingRequestId, setDecidingRequestId] = createSignal<string | null>(null);
+  const [decisionNotice, setDecisionNotice] = createSignal<string | null>(null);
   const viewState = createMemo(() => buildWeddingBoundaryManagementViewState(props));
+
+  async function decideRequest(requestId: string, decision: WeddingBoundaryRequestDecision): Promise<void> {
+    if (!props.onDecideRequest || decidingRequestId()) return;
+    setDecisionNotice(null);
+    setDecidingRequestId(requestId);
+    try {
+      const notice = await props.onDecideRequest(requestId, decision);
+      setDecisionNotice(notice);
+    } catch {
+      setDecisionNotice("Could not save that decision right now. Try again in a moment.");
+    } finally {
+      setDecidingRequestId(null);
+    }
+  }
 
   return (
     <div class="min-w-0 rounded-[24px] border border-cyan-100/80 bg-cyan-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
@@ -90,6 +108,9 @@ export function WeddingBoundaryManagementCard(props: {
 
       <Show when={showRequests()}>
         <div class="mt-3 space-y-2">
+          <Show when={decisionNotice()}>
+            <p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/75">{decisionNotice()}</p>
+          </Show>
           <Show when={viewState().hasApprovalItems} fallback={<p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/70">No guest-list requests need a decision right now.</p>}>
             <For each={viewState().approvalItems}>
               {(item) => (
@@ -104,6 +125,29 @@ export function WeddingBoundaryManagementCard(props: {
                   <p class="mt-2 text-xs leading-5 text-cyan-950/60">
                     Approve only if this still fits your guest rules, budget, and event space.
                   </p>
+                  <Show
+                    when={props.onDecideRequest}
+                    fallback={<p class="mt-2 rounded-2xl bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-950/65">Sign in or reconnect saving to approve requests here.</p>}
+                  >
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={Boolean(decidingRequestId())}
+                        class="rounded-full bg-cyan-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50 sm:py-1.5"
+                        onClick={() => void decideRequest(item.id, "approve")}
+                      >
+                        {decidingRequestId() === item.id ? "Saving..." : "Approve"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(decidingRequestId())}
+                        class="rounded-full border border-cyan-200 bg-white/85 px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:py-1.5"
+                        onClick={() => void decideRequest(item.id, "decline")}
+                      >
+                        Keep unchanged
+                      </button>
+                    </div>
+                  </Show>
                 </article>
               )}
             </For>

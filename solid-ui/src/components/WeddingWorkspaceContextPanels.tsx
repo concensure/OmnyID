@@ -14,6 +14,11 @@ import { WeddingCollaborationAccessCard } from "@/components/WeddingCollaboratio
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingGuestOperationsCard } from "@/components/WeddingGuestOperationsCard";
 import { WeddingProductionGateCard } from "@/components/WeddingProductionGateCard";
+import {
+  buildWeddingBoundaryRequestDecision,
+  type WeddingBoundaryRequestDecision,
+} from "@/lib/weddingBoundaryDecisionState";
+import { weddingBoundaryLedgerObjectToAfpSendInput } from "@/lib/weddingBoundaryLedgerState";
 import { buildWeddingDecisionFocusSidebarAction } from "@/lib/weddingDecisionFocusActionState";
 import type { WeddingVendorContactWorkspaceCard } from "@/lib/weddingResponseWorkspaceViewState";
 
@@ -369,6 +374,25 @@ export function WeddingWorkspaceContextPanels(props: {
     await props.saveProjection(input);
     props.onRefreshWorkspace?.();
   }
+  async function decideBoundaryRequest(requestId: string, decision: WeddingBoundaryRequestDecision): Promise<string> {
+    if (!props.saveProjection) throw new Error("Saving is not connected yet.");
+    const request = props.state.boundaryState.approvalQueue.find((item) => item.requestId === requestId);
+    if (!request) throw new Error("This guest-list request is no longer waiting for review.");
+    const result = buildWeddingBoundaryRequestDecision({
+      request,
+      decision,
+      decidedBy: "couple",
+      publicReason: decision === "approve"
+        ? "Approved by the couple."
+        : "Declined by the couple.",
+    });
+    await props.saveProjection(weddingBoundaryLedgerObjectToAfpSendInput(result.updatedRequest, props.state.workspace.metadata));
+    if (result.rationale) {
+      await props.saveProjection(weddingBoundaryLedgerObjectToAfpSendInput(result.rationale, props.state.workspace.metadata));
+    }
+    props.onRefreshWorkspace?.();
+    return result.statusLabel;
+  }
   return (
     <>
       <Show when={props.showTechnicalDetails}>
@@ -466,7 +490,11 @@ export function WeddingWorkspaceContextPanels(props: {
       <div hidden={activeMenu() !== "guests"}>
         <WeddingGuestOperationsCard state={props.state.guestTracking} />
         <div class="mt-3">
-          <WeddingBoundaryManagementCard state={props.state.boundaryState} topology={props.state.boundaryTopology} />
+          <WeddingBoundaryManagementCard
+            state={props.state.boundaryState}
+            topology={props.state.boundaryTopology}
+            onDecideRequest={decideBoundaryRequest}
+          />
         </div>
       </div>
 
