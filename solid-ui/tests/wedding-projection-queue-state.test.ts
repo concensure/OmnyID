@@ -166,6 +166,25 @@ test("buildWeddingProjectionQueueState excludes already saved boundary ledger re
   assert.equal(state.pendingSendInputs.length, 0);
 });
 
+test("buildWeddingProjectionQueueState treats reloaded boundary ledger records as already saved", () => {
+  const state = buildWeddingProjectionQueueState({
+    boundaryObjects: [{
+      ...boundaryPolicy,
+      metadata: {
+        persisted_boundary_ledger: true,
+        persisted_afp_message_id: "afp-wedding-boundary-policy",
+      },
+    }],
+    boundaryMetadata: metadata,
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.pendingItems.length, 0);
+  assert.equal(state.sentItems[0]?.kind, "boundary");
+  assert.equal(state.sentItems[0]?.statusLabel, "Already saved to guest boundaries");
+  assert.equal(state.pendingSendInputs.length, 0);
+});
+
 test("buildWeddingProjectionQueueState dispatches lifecycle records without fresh invite subtypes", () => {
   const collaboration = buildWeddingCollaborationState({
     nowIso: "2026-02-15T00:00:00Z",

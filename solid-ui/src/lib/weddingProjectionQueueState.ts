@@ -236,6 +236,15 @@ function boundaryObjectId(object: WeddingBoundaryLedgerObject): string {
   return object.id;
 }
 
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function isPersistedBoundaryObject(object: WeddingBoundaryLedgerObject): boolean {
+  const metadata = record(object.metadata);
+  return metadata.persisted_boundary_ledger === true || Boolean(clean(metadata.persisted_afp_message_id));
+}
+
 function boundaryItem(
   object: WeddingBoundaryLedgerObject,
   metadata: unknown,
@@ -243,7 +252,7 @@ function boundaryItem(
   storage: Storage,
 ): WeddingProjectionQueueItem {
   const sourceId = boundaryObjectId(object);
-  const sent = hasSentWeddingProjection(sourceId, WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY, storage);
+  const sent = isPersistedBoundaryObject(object) || hasSentWeddingProjection(sourceId, WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY, storage);
   return {
     id: `boundary:${sourceId}`,
     sourceId,

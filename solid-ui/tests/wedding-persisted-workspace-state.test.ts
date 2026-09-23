@@ -235,6 +235,8 @@ test("buildWeddingPersistedWorkspaceState reloads boundary ledger decisions from
   assert.equal(state.boundaryObjects.length, 3);
   assert.equal(request?.requestStatus, "approved");
   assert.equal(request?.approvalRequired, false);
+  assert.equal((request?.metadata as Record<string, unknown> | undefined)?.persisted_boundary_ledger, true);
+  assert.equal(typeof (request?.metadata as Record<string, unknown> | undefined)?.persisted_afp_message_id, "string");
   assert.ok(state.boundaryObjects.some((object) => object.kind === "wedding_boundary_policy"));
   assert.ok(state.boundaryObjects.some((object) => object.kind === "wedding_boundary_decision_rationale"));
 });

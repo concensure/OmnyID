@@ -693,7 +693,11 @@ function boundaryBase(message: AfpMessage, fallback: WeddingPlanningMetadata): {
     status: clean(contentValue(message, "status")),
     visibility: boundaryVisibilityFrom(contentValue(message, "visibility")),
     createdAt: clean(contentValue(message, "created_at")) ?? message.timestamp,
-    metadata: baseMetadata(message, fallback),
+    metadata: {
+      ...baseMetadata(message, fallback),
+      persisted_afp_message_id: message.id,
+      persisted_boundary_ledger: true,
+    },
   };
 }
 
