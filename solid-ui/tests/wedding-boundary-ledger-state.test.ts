@@ -189,4 +189,71 @@ test("wedding boundary state exposes family-safe objects and keeps private ratio
   assert.ok(state.familyVisibleObjects.some((object) => object.kind === "wedding_boundary_policy"));
   assert.ok(!state.familyVisibleObjects.some((object) => object.kind === "wedding_boundary_decision_rationale"));
   assert.ok(!state.familyVisibleObjects.some((object) => object.kind === "wedding_boundary_change_request"));
+  const familyPolicy = state.familyVisibleObjects.find((object): object is WeddingBoundaryPolicy => object.kind === "wedding_boundary_policy");
+  const familyGuest = state.familyVisibleObjects.find((object): object is WeddingBoundaryGuestProfile => object.kind === "wedding_boundary_guest_profile");
+
+  assert.equal(familyPolicy?.privateRationaleCiphertext, undefined);
+  assert.equal(familyGuest?.privateNotesCiphertext, undefined);
+});
+
+test("wedding boundary state strips private rationale from approved family-visible requests", () => {
+  const approvedRequest: WeddingBoundaryChangeRequest = {
+    ...plusOneRequest,
+    requestStatus: "approved",
+    approvalRequired: false,
+  };
+
+  const state = buildWeddingBoundaryState({
+    metadata,
+    objects: [approvedRequest],
+  });
+
+  const familyRequest = state.familyVisibleObjects.find(
+    (object): object is WeddingBoundaryChangeRequest => object.kind === "wedding_boundary_change_request",
+  );
+
+  assert.equal(familyRequest?.requestStatus, "approved");
+  assert.equal(familyRequest?.privateRationaleCiphertext, undefined);
+});
+
+test("wedding boundary evaluator allows scoped editor changes only when no active policy overrides them", () => {
+  const helperRole: WeddingBoundaryRoleAssignment = {
+    ...parentRole,
+    id: "role:coordinator",
+    personId: "person:coordinator",
+    role: "helper",
+    canSuggest: ["guest_contact_update"],
+    canEdit: ["guest_contact_update"],
+    requiresApprovalFor: [],
+  };
+  const contactRequest: WeddingBoundaryChangeRequest = {
+    ...plusOneRequest,
+    id: "change:update-phone",
+    requestId: "change:update-phone",
+    requestedBy: "person:coordinator",
+    changeType: "guest_contact_update",
+    approvalRequired: false,
+  };
+
+  const allowed = evaluateWeddingBoundaryChangeRequest({
+    request: contactRequest,
+    policies: [],
+    roleAssignments: [helperRole],
+  });
+  const guarded = evaluateWeddingBoundaryChangeRequest({
+    request: contactRequest,
+    policies: [{
+      ...noPlusOnesPolicy,
+      id: "policy:contact-updates-need-review",
+      ruleType: "access",
+      enforcement: "require_approval",
+    }],
+    roleAssignments: [helperRole],
+  });
+
+  assert.equal(allowed.status, "approved");
+  assert.equal(allowed.allowedWithoutApproval, true);
+  assert.equal(guarded.status, "pending");
+  assert.equal(guarded.approvalRequired, true);
+  assert.deepEqual(guarded.policyIds, ["policy:contact-updates-need-review"]);
 });

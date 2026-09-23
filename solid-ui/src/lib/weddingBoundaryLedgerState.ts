@@ -549,6 +549,22 @@ function familyVisible(object: WeddingBoundaryLedgerObject): boolean {
   return object.visibility === "family_visible" || object.visibility === "approved_shared" || object.kind === "wedding_boundary_visibility_page";
 }
 
+function familySafeObject(object: WeddingBoundaryLedgerObject): WeddingBoundaryLedgerObject {
+  if (object.kind === "wedding_boundary_policy") {
+    return { ...object, privateRationaleCiphertext: undefined };
+  }
+  if (object.kind === "wedding_boundary_guest_profile") {
+    return { ...object, privateNotesCiphertext: undefined };
+  }
+  if (object.kind === "wedding_boundary_change_request") {
+    return { ...object, privateRationaleCiphertext: undefined };
+  }
+  if (object.kind === "wedding_boundary_decision_rationale") {
+    return { ...object, rationaleCiphertext: "" };
+  }
+  return object;
+}
+
 export function buildWeddingBoundaryState(input: {
   metadata?: unknown;
   objects?: readonly WeddingBoundaryLedgerObject[] | null;
@@ -564,7 +580,7 @@ export function buildWeddingBoundaryState(input: {
   ));
   const households = objects.filter((object) => object.kind === "wedding_boundary_household");
   const guests = objects.filter((object) => object.kind === "wedding_boundary_guest_profile");
-  const familyObjects = objects.filter(familyVisible);
+  const familyObjects = objects.filter(familyVisible).map(familySafeObject);
   const privateCount = objects.filter((object) => object.visibility === "couple_only" || object.kind === "wedding_boundary_decision_rationale").length;
   const warningLabels = uniqueStrings([
     approvals.length > 0 ? `${approvals.length} family or guest-list request${approvals.length === 1 ? "" : "s"} need review` : null,
