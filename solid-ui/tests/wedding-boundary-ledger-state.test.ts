@@ -216,6 +216,32 @@ test("wedding boundary state strips private rationale from approved family-visib
   assert.equal(familyRequest?.privateRationaleCiphertext, undefined);
 });
 
+test("wedding boundary state uses latest request record after an approval refresh", () => {
+  const decidedRequest: WeddingBoundaryChangeRequest = {
+    ...plusOneRequest,
+    status: "approved",
+    requestStatus: "approved",
+    approvalRequired: false,
+    publicReason: "Approved by the couple.",
+    metadata: {
+      decided_at: "2026-09-24T09:00:00.000Z",
+      decision: "approve",
+    },
+  };
+  const state = buildWeddingBoundaryState({
+    metadata,
+    objects: [decidedRequest, plusOneRequest],
+  });
+
+  assert.equal(state.pendingApprovalCount, 0);
+  assert.equal(state.approvalQueue.length, 0);
+  assert.equal(state.familyVisibleObjects.length, 1);
+  assert.equal(
+    (state.familyVisibleObjects[0] as WeddingBoundaryChangeRequest | undefined)?.requestStatus,
+    "approved",
+  );
+});
+
 test("wedding boundary evaluator allows scoped editor changes only when no active policy overrides them", () => {
   const helperRole: WeddingBoundaryRoleAssignment = {
     ...parentRole,

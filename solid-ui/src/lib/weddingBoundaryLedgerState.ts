@@ -174,6 +174,10 @@ function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
 function uniqueStrings(values: readonly unknown[], limit = 80): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -216,6 +220,26 @@ function objectId(object: WeddingBoundaryLedgerObject): string {
   if (object.kind === "wedding_boundary_decline_template") return object.templateId;
   if (object.kind === "wedding_boundary_visibility_page") return object.pageId;
   return object.id;
+}
+
+function objectTimestampMs(object: WeddingBoundaryLedgerObject, index: number): number {
+  const metadata = record(object.metadata);
+  const timestamp = clean(metadata.decided_at) || clean(object.createdAt);
+  const parsed = timestamp ? Date.parse(timestamp) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : index;
+}
+
+export function coalesceWeddingBoundaryLedgerObjects(
+  objects: readonly WeddingBoundaryLedgerObject[] | null | undefined,
+): WeddingBoundaryLedgerObject[] {
+  const byIdentity = new Map<string, { object: WeddingBoundaryLedgerObject; rank: number }>();
+  (objects ?? []).forEach((object, index) => {
+    const key = `${object.kind}:${objectId(object)}`;
+    const rank = objectTimestampMs(object, index);
+    const existing = byIdentity.get(key);
+    if (!existing || rank >= existing.rank) byIdentity.set(key, { object, rank });
+  });
+  return Array.from(byIdentity.values()).map((entry) => entry.object);
 }
 
 function roleTag(role: WeddingBoundaryRole): string {
@@ -570,7 +594,7 @@ export function buildWeddingBoundaryState(input: {
   objects?: readonly WeddingBoundaryLedgerObject[] | null;
 }): WeddingBoundaryState {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
-  const objects = input.objects ?? [];
+  const objects = coalesceWeddingBoundaryLedgerObjects(input.objects);
   const policies = objects.filter((object): object is WeddingBoundaryPolicy => object.kind === "wedding_boundary_policy");
   const approvals = objects.filter((object): object is WeddingBoundaryChangeRequest => (
     object.kind === "wedding_boundary_change_request"

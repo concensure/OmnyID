@@ -116,6 +116,29 @@ test("buildWeddingBoundaryTopologyState creates queryable household role invitat
   }
 });
 
+test("buildWeddingBoundaryTopologyState uses latest request record for approval nodes", () => {
+  const approvedRequest: WeddingBoundaryChangeRequest = {
+    ...request,
+    status: "approved",
+    requestStatus: "approved",
+    approvalRequired: false,
+    metadata: {
+      decided_at: "2026-09-24T09:00:00.000Z",
+      decision: "approve",
+    },
+  };
+  const state = buildWeddingBoundaryTopologyState({
+    metadata,
+    objects: [approvedRequest, request],
+  });
+
+  const requestNode = state.nodes.find((node) => node.kind === "change_request");
+  assert.equal(state.approvalRequestNodes.length, 0);
+  assert.equal(requestNode?.metadata.request_status, "approved");
+  assert.equal(requestNode?.metadata.approval_required, false);
+  assert.equal(state.edges.some((edge) => edge.kind === "requires_approval"), false);
+});
+
 test("buildWeddingBoundaryTopologyState creates event nodes for policy-scoped event rules", () => {
   const state = buildWeddingBoundaryTopologyState({
     metadata,

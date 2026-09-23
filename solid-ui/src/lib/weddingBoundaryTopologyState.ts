@@ -1,5 +1,6 @@
 // @locs-version: 2.0
 import {
+  coalesceWeddingBoundaryLedgerObjects,
   type WeddingBoundaryChangeRequest,
   type WeddingBoundaryEventInvitation,
   type WeddingBoundaryGuestProfile,
@@ -321,7 +322,7 @@ export function buildWeddingBoundaryTopologyState(input: {
   objects?: readonly WeddingBoundaryLedgerObject[] | null;
 }): WeddingBoundaryTopologyState {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
-  const objects = input.objects ?? [];
+  const objects = coalesceWeddingBoundaryLedgerObjects(input.objects);
   const nodes = new Map<string, WeddingBoundaryTopologyNode>();
   const edges = new Map<string, WeddingBoundaryTopologyEdge>();
   const planId = nodeId("wedding_plan", metadata.weddingPlanId);
