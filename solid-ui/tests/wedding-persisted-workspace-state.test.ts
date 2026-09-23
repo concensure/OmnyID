@@ -18,6 +18,12 @@ import { buildWeddingPersistedWorkspaceState } from "@/lib/weddingPersistedWorks
 import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 import { weddingDecisionProjectionToAfpMessage } from "@/lib/weddingDecisionAfpProjectionState";
 import { buildWeddingImportSynthesisState } from "@/lib/weddingImportSynthesisState";
+import { buildWeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
+import {
+  weddingBoundaryLedgerObjectToAfpMessage,
+  type WeddingBoundaryChangeRequest,
+  type WeddingBoundaryPolicy,
+} from "@/lib/weddingBoundaryLedgerState";
 
 const metadata = {
   weddingPlanId: "wedding_plan:persisted",
@@ -173,7 +179,64 @@ test("buildWeddingPersistedWorkspaceState recovers persisted artifacts dates and
   assert.deepEqual(state.decisionRecords[0]?.sourceProviderLabels, ["google_places"]);
   assert.ok(state.decisionRecords[0]?.sourceLabels?.includes("Venue website"));
   assert.ok(state.decisionRecords[0]?.sourceUrls?.includes("https://harbour.example"));
+  assert.equal(state.boundaryObjects.length, 0);
   assert.deepEqual(state.sourceMessageIds.length, 8);
+});
+
+test("buildWeddingPersistedWorkspaceState reloads boundary ledger decisions from AFP messages", () => {
+  const policy: WeddingBoundaryPolicy = {
+    id: "policy:no-extra-plus-ones",
+    kind: "wedding_boundary_policy",
+    title: "No extra plus-ones",
+    status: "active",
+    visibility: "family_visible",
+    ruleType: "plus_one",
+    enforcement: "require_approval",
+    plainLanguage: "Extra plus-ones need couple approval.",
+  };
+  const pendingRequest: WeddingBoundaryChangeRequest = {
+    id: "request:taylor-plus-one",
+    kind: "wedding_boundary_change_request",
+    title: "Add Taylor's plus-one",
+    visibility: "approved_shared",
+    requestId: "request:taylor-plus-one",
+    requestedBy: "person:janet",
+    changeType: "plus_one_change",
+    targetPersonId: "person:taylor",
+    requestStatus: "pending",
+    approvalRequired: true,
+    policyIds: ["policy:no-extra-plus-ones"],
+    publicReason: "Janet asked for this.",
+  };
+  const decision = buildWeddingBoundaryRequestDecision({
+    request: pendingRequest,
+    decision: "approve",
+    decidedAt: "2026-09-24T09:00:00.000Z",
+    publicReason: "Approved by the couple.",
+    privateRationaleCiphertext: "sealed:private-couple-rationale",
+  });
+  const state = buildWeddingPersistedWorkspaceState({
+    messages: [
+      weddingBoundaryLedgerObjectToAfpMessage(policy, metadata, "2026-09-24T08:00:00.000Z"),
+      weddingBoundaryLedgerObjectToAfpMessage(pendingRequest, metadata, "2026-09-24T08:05:00.000Z"),
+      weddingBoundaryLedgerObjectToAfpMessage(decision.updatedRequest, metadata, "2026-09-24T09:00:00.000Z"),
+      weddingBoundaryLedgerObjectToAfpMessage(decision.rationale!, metadata, "2026-09-24T09:00:00.000Z"),
+    ],
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+  });
+
+  const request = state.boundaryObjects.find(
+    (object): object is WeddingBoundaryChangeRequest => object.kind === "wedding_boundary_change_request",
+  );
+
+  assert.equal(state.hasPersistedData, true);
+  assert.equal(state.boundaryObjects.length, 3);
+  assert.equal(request?.requestStatus, "approved");
+  assert.equal(request?.approvalRequired, false);
+  assert.ok(state.boundaryObjects.some((object) => object.kind === "wedding_boundary_policy"));
+  assert.ok(state.boundaryObjects.some((object) => object.kind === "wedding_boundary_decision_rationale"));
 });
 
 test("buildWeddingPersistedWorkspaceState preserves wedding import original-upload receipts", () => {

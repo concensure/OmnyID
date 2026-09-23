@@ -418,6 +418,7 @@ export function ResponseQueueView(props: {
         contextItems: persisted.contextItems,
         approvalReceipts: persisted.approvalReceipts,
         decisionRecords: persisted.decisionRecords,
+        boundaryObjects: persisted.boundaryObjects,
         query: weddingWorkspaceQuery(),
         activeArtifactId: activeWeddingArtifactId() ?? intent.artifactId,
         recommendations: graph,
