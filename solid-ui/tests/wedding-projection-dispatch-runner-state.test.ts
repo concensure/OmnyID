@@ -10,8 +10,12 @@ import {
   type WeddingPlanningScheduleItem,
   type WeddingPlanningTaskItem,
 } from "@/lib/weddingCalendarProjectionState";
-import { buildWeddingProjectionQueueState } from "@/lib/weddingProjectionQueueState";
+import {
+  buildWeddingProjectionQueueState,
+  WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY,
+} from "@/lib/weddingProjectionQueueState";
 import { runWeddingProjectionDispatchQueue } from "@/lib/weddingProjectionDispatchRunnerState";
+import type { WeddingBoundaryPolicy } from "@/lib/weddingBoundaryLedgerState";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -60,6 +64,17 @@ const budgetTaskItem: WeddingPlanningTaskItem = {
     budget_category_label: "Venue",
     second_order_loop: "budget_drift",
   },
+};
+
+const boundaryPolicy: WeddingBoundaryPolicy = {
+  id: "policy:guest-changes-need-approval",
+  kind: "wedding_boundary_policy",
+  title: "Guest changes need approval",
+  status: "active",
+  visibility: "family_visible",
+  ruleType: "invitation_scope",
+  enforcement: "require_approval",
+  plainLanguage: "Family can suggest guest changes, but the couple approves the final list.",
 };
 
 test("runWeddingProjectionDispatchQueue saves pending outputs and commits sent markers", async () => {
@@ -204,4 +219,29 @@ test("runWeddingProjectionDispatchQueue preserves budget supertags in saved payl
   assert.ok(calls[0]?.supertags?.includes("topology:budget_drift"));
   assert.ok(calls[0]?.to.includes("agent://knowledge-graph"));
   assert.equal(hasSentWeddingProjection(budgetTaskItem.id, WEDDING_TASK_AFP_PROJECTIONS_KEY, storage), true);
+});
+
+test("runWeddingProjectionDispatchQueue commits boundary ledger sent markers", async () => {
+  const storage = memoryStorage();
+  const calls: SendAfpMessageInput[] = [];
+  const queue = buildWeddingProjectionQueueState({
+    boundaryObjects: [boundaryPolicy],
+    boundaryMetadata: metadata,
+    storage,
+  });
+
+  const result = await runWeddingProjectionDispatchQueue({
+    queue,
+    storage,
+    save: async (input) => {
+      calls.push(input);
+      return { success: true, message_id: "msg-boundary-policy" };
+    },
+  });
+
+  assert.equal(result.receipt.savedCount, 1);
+  assert.equal(calls[0]?.type, "ledger");
+  assert.equal(calls[0]?.kind, "wedding_boundary_policy");
+  assert.equal(hasSentWeddingProjection(boundaryPolicy.id, WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY, storage), true);
+  assert.equal(hasSentWeddingProjection(boundaryPolicy.id, WEDDING_TASK_AFP_PROJECTIONS_KEY, storage), false);
 });
