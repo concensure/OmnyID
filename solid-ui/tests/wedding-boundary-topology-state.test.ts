@@ -101,6 +101,7 @@ test("buildWeddingBoundaryTopologyState creates queryable household role invitat
   assert.ok(state.nodes.some((node) => node.kind === "boundary_policy" && node.supertags.includes("wedding_policy:plus_one")));
   assert.ok(state.nodes.some((node) => node.kind === "boundary_role" && node.supertags.includes("wedding_boundary_role:parent_family")));
   assert.ok(state.nodes.some((node) => node.kind === "guest" && node.label === "Taylor Smith"));
+  assert.ok(state.nodes.some((node) => node.kind === "wedding_event" && node.label === "Reception"));
   assert.ok(state.nodes.some((node) => node.kind === "change_request" && node.supertags.includes("wedding_boundary:approval_required")));
   assert.ok(state.edges.some((edge) => edge.kind === "member_of_household"));
   assert.ok(state.edges.some((edge) => edge.kind === "role_grants_visibility"));
@@ -110,6 +111,27 @@ test("buildWeddingBoundaryTopologyState creates queryable household role invitat
   assert.ok(state.edges.some((edge) => edge.kind === "requires_approval"));
   assert.equal(state.approvalRequestNodes.length, 1);
   assert.ok(state.familyVisibleNodes.some((node) => node.kind === "boundary_policy"));
+  for (const edge of state.edges.filter((item) => item.kind === "request_targets_event" || item.kind === "invited_to_event")) {
+    assert.ok(state.nodes.some((node) => node.id === edge.target), `missing event target node for ${edge.id}`);
+  }
+});
+
+test("buildWeddingBoundaryTopologyState creates event nodes for policy-scoped event rules", () => {
+  const state = buildWeddingBoundaryTopologyState({
+    metadata,
+    objects: [{
+      ...policy,
+      id: "policy:rehearsal-dinner",
+      title: "Rehearsal dinner is family only",
+      ruleType: "invitation_scope",
+      appliesToEventIds: ["event:rehearsal_dinner"],
+    }],
+  });
+
+  const eventNode = state.nodes.find((node) => node.kind === "wedding_event" && node.metadata.event_id === "event:rehearsal_dinner");
+
+  assert.equal(eventNode?.label, "Rehearsal Dinner");
+  assert.ok(state.edges.some((edge) => edge.kind === "request_targets_event" && edge.target === eventNode?.id));
 });
 
 test("buildWeddingBoundaryTopologyState keeps couple-only rationales out of family-visible nodes", () => {

@@ -17,6 +17,7 @@ import {
 export type WeddingBoundaryTopologyNodeKind =
   | "wedding_plan"
   | "response_workspace"
+  | "wedding_event"
   | "boundary_policy"
   | "boundary_role"
   | "household"
@@ -104,6 +105,17 @@ function objectIdentity(object: WeddingBoundaryLedgerObject): string {
   if (object.kind === "wedding_boundary_decline_template") return object.templateId;
   if (object.kind === "wedding_boundary_visibility_page") return object.pageId;
   return object.id;
+}
+
+function eventLabel(value: unknown): string {
+  const cleaned = clean(value);
+  if (!cleaned) return "Wedding event";
+  return cleaned
+    .replace(/^event:/i, "")
+    .split(/[_:-]+/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || cleaned;
 }
 
 function baseTags(metadata: WeddingPlanningMetadata, extra: readonly unknown[] = []): string[] {
@@ -227,7 +239,9 @@ function nodeMetadataFor(object: WeddingBoundaryLedgerObject): Record<string, un
 }
 
 function addObjectEdges(
+  nodes: Map<string, WeddingBoundaryTopologyNode>,
   edges: Map<string, WeddingBoundaryTopologyEdge>,
+  metadata: WeddingPlanningMetadata,
   object: WeddingBoundaryLedgerObject,
   sourceId: string,
   planId: string,
@@ -241,8 +255,14 @@ function addObjectEdges(
     addEdge(edges, sourceId, optionalNodeId("household", guest.householdId), "member_of_household", "member of household");
   } else if (object.kind === "wedding_boundary_event_invitation") {
     const invitation = object as WeddingBoundaryEventInvitation;
+    const eventNodeId = nodeId("wedding_event", invitation.eventId);
+    addNode(nodes, metadata, eventNodeId, "wedding_event", eventLabel(invitation.eventId), [
+      `wedding_event:${safeWeddingLabel(invitation.eventId)}`,
+    ], {
+      event_id: invitation.eventId,
+    });
     addEdge(edges, sourceId, nodeId("guest", invitation.personId), "request_targets_guest", "guest");
-    addEdge(edges, sourceId, nodeId("event_invitation", invitation.eventId), "invited_to_event", "invited to event", { status: invitation.invitationStatus });
+    addEdge(edges, sourceId, eventNodeId, "invited_to_event", "invited to event", { status: invitation.invitationStatus });
   } else if (object.kind === "wedding_boundary_role_assignment") {
     const role = object as WeddingBoundaryRoleAssignment;
     addEdge(edges, sourceId, nodeId("guest", role.personId), "role_grants_visibility", "grants visibility", { role: role.role });
@@ -250,13 +270,29 @@ function addObjectEdges(
     const request = object as WeddingBoundaryChangeRequest;
     addEdge(edges, sourceId, nodeId("guest", request.requestedBy), "role_grants_visibility", "requested by");
     addEdge(edges, sourceId, optionalNodeId("guest", request.targetPersonId), "request_targets_guest", "targets guest");
-    addEdge(edges, sourceId, optionalNodeId("event_invitation", request.targetEventId), "request_targets_event", "targets event");
+    if (request.targetEventId) {
+      const eventNodeId = nodeId("wedding_event", request.targetEventId);
+      addNode(nodes, metadata, eventNodeId, "wedding_event", eventLabel(request.targetEventId), [
+        `wedding_event:${safeWeddingLabel(request.targetEventId)}`,
+      ], {
+        event_id: request.targetEventId,
+      });
+      addEdge(edges, sourceId, eventNodeId, "request_targets_event", "targets event");
+    }
     addEdge(edges, sourceId, optionalNodeId("household", request.targetHouseholdId), "request_targets_household", "targets household");
     for (const policyId of request.policyIds ?? []) addEdge(edges, sourceId, nodeId("boundary_policy", policyId), "request_violates_policy", "policy involved");
     if (request.approvalRequired) addEdge(edges, sourceId, planId, "requires_approval", "needs couple approval");
   } else if (object.kind === "wedding_boundary_policy") {
     const policy = object as WeddingBoundaryPolicy;
-    for (const eventId of policy.appliesToEventIds ?? []) addEdge(edges, sourceId, nodeId("event_invitation", eventId), "request_targets_event", "applies to event");
+    for (const eventId of policy.appliesToEventIds ?? []) {
+      const eventNodeId = nodeId("wedding_event", eventId);
+      addNode(nodes, metadata, eventNodeId, "wedding_event", eventLabel(eventId), [
+        `wedding_event:${safeWeddingLabel(eventId)}`,
+      ], {
+        event_id: eventId,
+      });
+      addEdge(edges, sourceId, eventNodeId, "request_targets_event", "applies to event");
+    }
   }
 }
 
@@ -280,7 +316,7 @@ export function buildWeddingBoundaryTopologyState(input: {
     const id = nodeId(kind, objectIdentity(object));
     addNode(nodes, metadata, id, kind, labelFor(object), objectTags(object), nodeMetadataFor(object));
     addEdge(edges, workspaceId, id, "contains", "contains boundary record", { boundary_kind: object.kind });
-    addObjectEdges(edges, object, id, planId);
+    addObjectEdges(nodes, edges, metadata, object, id, planId);
   }
 
   const counts = degreeCounts(edges.values());
