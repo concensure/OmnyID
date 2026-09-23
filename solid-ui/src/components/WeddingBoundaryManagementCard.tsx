@@ -1,7 +1,8 @@
 // @locs-version: 2.0
-import { createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
+import { buildWeddingBoundaryManagementViewState } from "@/lib/weddingBoundaryManagementViewState";
 import type { WeddingBoundaryState } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
 
@@ -11,11 +12,7 @@ export function WeddingBoundaryManagementCard(props: {
 }) {
   const [showRules, setShowRules] = createSignal(false);
   const [showPeople, setShowPeople] = createSignal(false);
-  const [includeText, setIncludeText] = createSignal("Named guests, assigned helpers, approved family viewers");
-  const [excludeText, setExcludeText] = createSignal("Extra plus-ones, private notes, couple-only reasons");
-  const policyNodes = () => props.topology.nodes.filter((node) => node.kind === "boundary_policy");
-  const roleNodes = () => props.topology.nodes.filter((node) => node.kind === "boundary_role");
-  const guestNodes = () => props.topology.nodes.filter((node) => node.kind === "guest");
+  const viewState = createMemo(() => buildWeddingBoundaryManagementViewState(props));
 
   return (
     <div class="min-w-0 rounded-[24px] border border-cyan-100/80 bg-cyan-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
@@ -59,19 +56,21 @@ export function WeddingBoundaryManagementCard(props: {
         <label class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs font-semibold text-cyan-950">
           Include
           <textarea
-            value={includeText()}
-            onInput={(event) => setIncludeText(event.currentTarget.value)}
+            value={viewState().includeText}
+            readOnly
             rows="2"
-            class="mt-1 w-full resize-none rounded-2xl border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs font-normal leading-5 text-cyan-950 outline-none focus:border-cyan-300"
+            aria-label="People and details currently included"
+            class="mt-1 w-full resize-none rounded-2xl border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs font-normal leading-5 text-cyan-950 outline-none"
           />
         </label>
         <label class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs font-semibold text-cyan-950">
           Exclude
           <textarea
-            value={excludeText()}
-            onInput={(event) => setExcludeText(event.currentTarget.value)}
+            value={viewState().excludeText}
+            readOnly
             rows="2"
-            class="mt-1 w-full resize-none rounded-2xl border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs font-normal leading-5 text-cyan-950 outline-none focus:border-cyan-300"
+            aria-label="People and details currently excluded"
+            class="mt-1 w-full resize-none rounded-2xl border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs font-normal leading-5 text-cyan-950 outline-none"
           />
         </label>
       </div>
@@ -95,19 +94,21 @@ export function WeddingBoundaryManagementCard(props: {
 
       <Show when={showRules()}>
         <div class="mt-3 space-y-2">
-          <For each={policyNodes()}>
-            {(node) => (
+          <Show when={viewState().hasRules} fallback={<p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/70">No family rules are set yet.</p>}>
+            <For each={viewState().ruleItems}>
+              {(item) => (
               <article class="rounded-2xl border border-cyan-100 bg-white/75 p-3">
                 <div class="flex items-start justify-between gap-2">
-                  <p class="break-words text-sm font-semibold text-cyan-950">{node.label}</p>
+                  <p class="break-words text-sm font-semibold text-cyan-950">{item.label}</p>
                   <span class="rounded-full bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-900">
-                    {String(node.metadata.enforcement ?? "rule").replace(/_/g, " ")}
+                    Rule
                   </span>
                 </div>
-                <p class="mt-1 text-xs leading-5 text-cyan-950/70">{String(node.metadata.plain_language ?? "This rule protects the couple's decision.")}</p>
+                <p class="mt-1 text-xs leading-5 text-cyan-950/70">{item.detail}</p>
               </article>
-            )}
-          </For>
+              )}
+            </For>
+          </Show>
         </div>
       </Show>
 
@@ -115,24 +116,19 @@ export function WeddingBoundaryManagementCard(props: {
         <div class="mt-3 rounded-2xl border border-cyan-100 bg-white/75 p-3">
           <p class="text-sm font-semibold text-cyan-950">Visibility map</p>
           <div class="mt-2 flex flex-wrap gap-1.5">
-            <For each={roleNodes().slice(0, 8)}>
-              {(node) => (
-                <span class="max-w-full break-words rounded-full border border-cyan-100 bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-950/75">
-                  {node.label}: {String(node.metadata.role ?? "helper").replace(/_/g, " ")}
-                </span>
-              )}
-            </For>
-            <For each={guestNodes().slice(0, 8)}>
-              {(node) => (
-                <span class="max-w-full break-words rounded-full border border-cyan-100 bg-white px-2 py-1 text-xs text-cyan-950/70">
-                  {node.label}
-                </span>
-              )}
-            </For>
+            <Show when={viewState().hasVisibilityItems} fallback={<span class="rounded-full border border-cyan-100 bg-white px-2 py-1 text-xs text-cyan-950/70">No shared people yet</span>}>
+              <For each={viewState().visibilityItems}>
+                {(item) => (
+                  <span class="max-w-full break-words rounded-full border border-cyan-100 bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-950/75">
+                    {item.label}: {item.detail}
+                  </span>
+                )}
+              </For>
+            </Show>
           </div>
-          <Show when={props.state.privateObjectCount > 0}>
+          <Show when={viewState().privateItemsLabel}>
             <p class="mt-2 text-xs leading-5 text-cyan-950/60">
-              {props.state.privateObjectCount} private item{props.state.privateObjectCount === 1 ? "" : "s"} stay visible only to the couple.
+              {viewState().privateItemsLabel}
             </p>
           </Show>
         </div>

@@ -154,3 +154,24 @@ test("buildWeddingBoundaryTopologyState keeps couple-only rationales out of fami
   assert.equal(state.familyVisibleNodes.some((node) => node.kind === "private_rationale"), false);
   assert.equal(JSON.stringify(state).includes("sealed:private-reason"), false);
 });
+
+test("buildWeddingBoundaryTopologyState marks encrypted private fields without exposing ciphertext", () => {
+  const state = buildWeddingBoundaryTopologyState({
+    metadata,
+    objects: [{
+      ...guest,
+      privateNotesCiphertext: "sealed:guest-context",
+    }, {
+      ...policy,
+      privateRationaleCiphertext: "sealed:policy-context",
+    }],
+  });
+
+  const guestNode = state.nodes.find((node) => node.kind === "guest");
+  const policyNode = state.nodes.find((node) => node.kind === "boundary_policy");
+
+  assert.equal(guestNode?.metadata.private_notes_encrypted, true);
+  assert.equal(policyNode?.metadata.private_rationale_encrypted, true);
+  assert.equal(JSON.stringify(state).includes("sealed:guest-context"), false);
+  assert.equal(JSON.stringify(state).includes("sealed:policy-context"), false);
+});

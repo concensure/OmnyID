@@ -221,19 +221,39 @@ function nodeMetadataFor(object: WeddingBoundaryLedgerObject): Record<string, un
     status: object.status ?? null,
   };
   if (object.kind === "wedding_boundary_policy") {
-    return { ...base, rule_type: object.ruleType, enforcement: object.enforcement, plain_language: object.plainLanguage };
+    return {
+      ...base,
+      rule_type: object.ruleType,
+      enforcement: object.enforcement,
+      plain_language: object.plainLanguage,
+      private_rationale_encrypted: Boolean(object.privateRationaleCiphertext),
+    };
   }
   if (object.kind === "wedding_boundary_role_assignment") {
     return { ...base, person_id: object.personId, role: object.role, can_view: object.canView ?? [], can_suggest: object.canSuggest ?? [], can_edit: object.canEdit ?? [] };
   }
   if (object.kind === "wedding_boundary_guest_profile") {
-    return { ...base, person_id: object.personId, household_id: object.householdId ?? null, age_band: object.ageBand ?? "unknown" };
+    return {
+      ...base,
+      person_id: object.personId,
+      household_id: object.householdId ?? null,
+      age_band: object.ageBand ?? "unknown",
+      private_notes_encrypted: Boolean(object.privateNotesCiphertext),
+    };
   }
   if (object.kind === "wedding_boundary_event_invitation") {
     return { ...base, invitation_id: object.invitationId, event_id: object.eventId, person_id: object.personId, invitation_status: object.invitationStatus };
   }
   if (object.kind === "wedding_boundary_change_request") {
-    return { ...base, request_id: object.requestId, requested_by: object.requestedBy, change_type: object.changeType, request_status: object.requestStatus, approval_required: object.approvalRequired === true };
+    return {
+      ...base,
+      request_id: object.requestId,
+      requested_by: object.requestedBy,
+      change_type: object.changeType,
+      request_status: object.requestStatus,
+      approval_required: object.approvalRequired === true,
+      private_rationale_encrypted: Boolean(object.privateRationaleCiphertext),
+    };
   }
   return base;
 }

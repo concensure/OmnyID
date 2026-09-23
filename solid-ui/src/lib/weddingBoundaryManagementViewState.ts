@@ -1,0 +1,94 @@
+// @locs-version: 2.0
+import type { WeddingBoundaryState } from "@/lib/weddingBoundaryLedgerState";
+import type { WeddingBoundaryTopologyNode, WeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
+
+export type WeddingBoundaryManagementViewState = {
+  includeText: string;
+  excludeText: string;
+  ruleItems: WeddingBoundaryManagementListItem[];
+  visibilityItems: WeddingBoundaryManagementListItem[];
+  privateItemsLabel: string | null;
+  hasRules: boolean;
+  hasVisibilityItems: boolean;
+};
+
+export type WeddingBoundaryManagementListItem = {
+  id: string;
+  label: string;
+  detail: string;
+};
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function displayList(values: readonly string[], fallback: string): string {
+  const cleaned = values.map(text).filter(Boolean);
+  if (cleaned.length === 0) return fallback;
+  if (cleaned.length <= 3) return cleaned.join(", ");
+  return `${cleaned.slice(0, 3).join(", ")} and ${cleaned.length - 3} more`;
+}
+
+function words(value: unknown, fallback: string): string {
+  const cleaned = text(value);
+  return cleaned ? cleaned.replace(/_/g, " ") : fallback;
+}
+
+function nodeDetail(node: WeddingBoundaryTopologyNode): string {
+  if (node.kind === "boundary_policy") {
+    return text(node.metadata.plain_language) || `Handled as ${words(node.metadata.enforcement, "a wedding rule")}.`;
+  }
+  if (node.kind === "boundary_role") {
+    return `Can see ${displayList(Array.isArray(node.metadata.can_view) ? node.metadata.can_view : [], "approved wedding details")}.`;
+  }
+  if (node.kind === "guest") {
+    return `Guest profile is ${words(node.metadata.visibility, "shared carefully")}.`;
+  }
+  return "Shown only where the current permissions allow it.";
+}
+
+export function buildWeddingBoundaryManagementViewState(input: {
+  state: WeddingBoundaryState;
+  topology: WeddingBoundaryTopologyState;
+}): WeddingBoundaryManagementViewState {
+  const policyNodes = input.topology.nodes.filter((node) => node.kind === "boundary_policy");
+  const roleNodes = input.topology.nodes.filter((node) => node.kind === "boundary_role");
+  const guestNodes = input.topology.nodes.filter((node) => node.kind === "guest");
+  const visibleRoleLabels = roleNodes.map((node) => node.label);
+  const visibleGuestLabels = guestNodes.map((node) => node.label);
+  const ruleLabels = policyNodes.map((node) => node.label);
+  const hasPrivateSignals = input.state.privateObjectCount > 0
+    || input.topology.nodes.some((node) => (
+      node.supertags.includes("wedding_boundary:couple_only")
+      || node.metadata.private_rationale_encrypted === true
+      || node.metadata.private_notes_encrypted === true
+    ));
+  const includeText = displayList([
+    ...visibleGuestLabels.slice(0, 4),
+    ...visibleRoleLabels.slice(0, 3),
+  ], "Named guests, assigned helpers, and approved family viewers");
+  const excludeText = displayList([
+    hasPrivateSignals ? "private couple notes" : null,
+    ...ruleLabels.filter((label) => /plus|child|private|family/i.test(label)).slice(0, 3),
+  ].filter((value): value is string => Boolean(value)), "Extra plus-ones, private notes, and couple-only reasons");
+
+  return {
+    includeText,
+    excludeText,
+    ruleItems: policyNodes.slice(0, 8).map((node) => ({
+      id: node.id,
+      label: node.label,
+      detail: nodeDetail(node),
+    })),
+    visibilityItems: [...roleNodes, ...guestNodes].slice(0, 16).map((node) => ({
+      id: node.id,
+      label: node.label,
+      detail: node.kind === "boundary_role" ? words(node.metadata.role, "helper") : nodeDetail(node),
+    })),
+    privateItemsLabel: input.state.privateObjectCount > 0
+      ? `${input.state.privateObjectCount} private item${input.state.privateObjectCount === 1 ? "" : "s"} stay visible only to the couple.`
+      : null,
+    hasRules: policyNodes.length > 0,
+    hasVisibilityItems: roleNodes.length > 0 || guestNodes.length > 0,
+  };
+}
