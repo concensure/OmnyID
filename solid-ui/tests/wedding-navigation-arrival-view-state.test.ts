@@ -31,7 +31,7 @@ test("buildWeddingNavigationArrivalBannerState creates a planning workspace bann
   assert.equal(state?.primaryAction.kind, "open_workspace");
   assert.equal(state?.primaryAction.label, "Open wedding documents");
   assert.equal(state?.secondaryActions.find((action) => action.kind === "open_workspace")?.disabled, true);
-  assert.match(state?.subtitle ?? "", /Open artifact_vendor_table/);
+  assert.match(state?.subtitle ?? "", /selected wedding document/);
 });
 
 test("buildWeddingNavigationArrivalBannerState exposes carried context chips", () => {
@@ -50,11 +50,11 @@ test("buildWeddingNavigationArrivalBannerState exposes carried context chips", (
   const state = buildWeddingNavigationArrivalBannerState(stored);
   const chipValues = new Map(state?.chips.map((chip) => [chip.label, chip.value]));
 
-  assert.equal(chipValues.get("Plan"), "wedding_plan_spring");
-  assert.equal(chipValues.get("Workspace"), "wedding_workspace_spring");
-  assert.equal(chipValues.get("Artifact"), "artifact_vendor_table");
-  assert.equal(chipValues.get("Section"), "vendors");
-  assert.equal(chipValues.get("Selected"), "1 decision scope");
+  assert.equal(chipValues.has("Plan"), false);
+  assert.equal(chipValues.has("Workspace"), false);
+  assert.equal(chipValues.has("Artifact"), false);
+  assert.equal(chipValues.has("Section"), false);
+  assert.equal(chipValues.get("Selected"), "1 choice");
   assert.equal(chipValues.get("Loaded"), "2026-09-12T09:30:00.000Z");
 });
 
@@ -131,7 +131,7 @@ test("buildWeddingNavigationArrivalBannerState adds handoff-aware secondary acti
   assert.ok(actions.some((action) => action.kind === "review_calendar" && action.label === "Calendar (2)"));
   assert.equal(actions.some((action) => action.kind === "review_tasks"), false);
   assert.ok(actions.some((action) => action.kind === "review_export" && action.label === "Download safely"));
-  assert.equal(state?.chips.find((chip) => chip.label === "Selected")?.value, "1 decision scope");
+  assert.equal(state?.chips.find((chip) => chip.label === "Selected")?.value, "1 choice");
   assert.equal(state?.chips.find((chip) => chip.label === "Focus")?.value, "2 decisions");
 });
 
@@ -177,9 +177,9 @@ test("buildWeddingNavigationArrivalBannerState foregrounds expected behaviour ga
 
   assert.equal(state?.primaryAction.kind, "review_tasks");
   assert.equal(state?.primaryAction.label, "Review gap tasks");
-  assert.match(state?.primaryAction.description ?? "", /expected-behaviour task candidates/);
-  assert.equal(state?.chips.find((chip) => chip.label === "Gaps")?.value, "4 expected behaviours");
-  assert.ok(state?.bodyItems.some((item) => item.label === "Automation setup gaps" && /weather contingency/.test(item.detail)));
+  assert.match(state?.primaryAction.description ?? "", /planning gap tasks/);
+  assert.equal(state?.chips.find((chip) => chip.label === "Gaps")?.value, "4 planning gaps");
+  assert.ok(state?.bodyItems.some((item) => item.label === "Planning setup gaps" && /weather contingency/.test(item.detail)));
   assert.match(state?.subtitle ?? "", /Review the suggested wedding gap tasks/);
 });
 

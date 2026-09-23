@@ -110,16 +110,23 @@ function extractGuestCount(text: string): string | null {
 }
 
 function extractBudget(text: string): string | null {
-  const amount = text.match(/\b(?:budget(?: is| around| approx(?:imately)?)?|spend)\s*(?:is|around|approx(?:imately)?)?\s*(\$?\d[\d,]*(?:k|K)?)\b/i);
+  const amount = text.match(/\b(?:budget|spend)\b[^.\n$\d]{0,20}(\$?\d[\d,]*(?:\.\d+)?(?:\s*[kK])?)\b/i);
   if (amount?.[1]) return amount[1].startsWith("$") ? amount[1] : `Budget ${amount[1]}`;
   const comfort = text.match(/\b(keep it lean|low budget|tight budget|mid[- ]range|moderate budget|flexible budget|premium|luxury)\b/i);
   return comfort?.[1] ? comfort[1] : null;
 }
 
+// Other slot markers that may appear later in the same sentence as the priorities
+// clause (e.g. "priorities are food and photos, NOIM not downloaded, need celebrant
+// options"): capture stops at the first one so it doesn't swallow unrelated slots.
+const PRIORITIES_STOP_MARKERS = /,?\s*\b(?:NOIM|celebrant|budget|guests?|venue is|location is)\b/i;
+
 function extractPriorities(text: string): string | null {
   const match = text.match(/\b(?:priorities are|top priorities are|top priorities:|priority is|we care most about)\s+([^.;\n]+)/i);
   if (!match?.[1]) return null;
-  const values = match[1]
+  const stopIndex = match[1].search(PRIORITIES_STOP_MARKERS);
+  const scoped = stopIndex >= 0 ? match[1].slice(0, stopIndex) : match[1];
+  const values = scoped
     .split(/,|\band\b/i)
     .map(clean)
     .filter(Boolean)

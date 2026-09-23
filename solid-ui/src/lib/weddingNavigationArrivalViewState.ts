@@ -107,7 +107,7 @@ function actionFor(
       return {
         kind: "review_tasks",
         label: "Review gap tasks",
-        description: "Review expected-behaviour task candidates before committing only the gaps with clear evidence, owners, and due dates.",
+        description: "Review suggested planning gap tasks, then keep only the ones with clear proof, owners, and due dates.",
         disabled: false,
       };
     }
@@ -121,8 +121,8 @@ function actionFor(
   if (surface === "knowledge_graph") {
     return {
       kind: "open_graph",
-      label: "Inspect graph",
-      description: "Inspect wedding dependencies, risks, and missing evidence.",
+      label: "Show related details",
+      description: "Review connected wedding details, risks, and missing proof.",
       disabled: false,
     };
   }
@@ -187,8 +187,8 @@ function baseSecondaryActionsFor(surface: WeddingNavigationSurface): WeddingArri
     },
     {
       kind: "open_graph",
-      label: "Graph",
-      description: "Inspect dependencies and missing evidence.",
+      label: "Related details",
+      description: "Review connected details and missing proof.",
       disabled: surface === "knowledge_graph",
     },
     {
@@ -299,13 +299,9 @@ function chipsFor(
   const decisionFocusCount = decisionFocusCountFrom(intent);
   const expectedBehaviorGapCount = expectedBehaviorGapCountFrom(intent);
   return [
-    { label: "Plan", value: state.weddingPlanId },
-    { label: "Workspace", value: state.responseWorkspaceId },
-    state.artifactId ? { label: "Artifact", value: state.artifactId } : null,
-    state.sectionId ? { label: "Section", value: state.sectionId } : null,
-    decisionScopeCount > 0 ? { label: "Selected", value: `${decisionScopeCount} decision scope${decisionScopeCount === 1 ? "" : "s"}` } : null,
+    decisionScopeCount > 0 ? { label: "Selected", value: `${decisionScopeCount} choice${decisionScopeCount === 1 ? "" : "s"}` } : null,
     decisionFocusCount > 0 ? { label: "Focus", value: `${decisionFocusCount} decision${decisionFocusCount === 1 ? "" : "s"}` } : null,
-    expectedBehaviorGapCount > 0 ? { label: "Gaps", value: `${expectedBehaviorGapCount} expected behaviour${expectedBehaviorGapCount === 1 ? "" : "s"}` } : null,
+    expectedBehaviorGapCount > 0 ? { label: "Gaps", value: `${expectedBehaviorGapCount} planning gap${expectedBehaviorGapCount === 1 ? "" : "s"}` } : null,
     state.savedAt ? { label: "Loaded", value: state.savedAt } : null,
   ].filter((chip): chip is WeddingArrivalChip => chip !== null);
 }

@@ -67,6 +67,8 @@ test("weddingCollaborationInviteToAfpSendInput stores invite projection relation
   assert.equal(sendInput.store_in_relational, true);
   assert.equal(sendInput.type, "access_control");
   assert.equal(sendInput.subtype, "wedding_collaborator_invite");
+  assert.ok(sendInput.supertags?.includes("wedding_collaboration"));
+  assert.ok(sendInput.supertags?.includes("wedding_collaborator_role:viewer"));
   assert.equal((sendInput.content as any).ready_for_invite, false);
   assert.deepEqual((sendInput.content as any).missing_labels, ["valid email required"]);
 });

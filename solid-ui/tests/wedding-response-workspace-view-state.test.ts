@@ -250,10 +250,15 @@ test("buildWeddingResponseWorkspaceViewState keeps unavailable sidebar actions v
   });
 
   assert.equal(state.sidebarActions.find((action) => action.kind === "continue_chat")?.enabled, true);
+  assert.equal(state.sidebarActions.find((action) => action.kind === "continue_chat")?.label, "Ask planner about this");
   assert.equal(state.sidebarActions.find((action) => action.kind === "export_bundle")?.enabled, true);
   assert.equal(state.sidebarActions.find((action) => action.kind === "open_calendar")?.enabled, false);
-  assert.match(state.sidebarActions.find((action) => action.kind === "open_calendar")?.reason ?? "", /linked wedding calendar/i);
+  assert.equal(state.sidebarActions.find((action) => action.kind === "open_calendar")?.label, "Open wedding calendar");
+  assert.match(state.sidebarActions.find((action) => action.kind === "open_calendar")?.reason ?? "", /document with a wedding date/i);
   assert.equal(state.sidebarActions.find((action) => action.kind === "open_graph")?.enabled, false);
+  assert.equal(state.sidebarActions.find((action) => action.kind === "open_graph")?.label, "Show related details");
+  assert.equal(state.sidebarActions.find((action) => action.kind === "open_tasks")?.label, "Open wedding tasks");
+  assert.equal(state.sidebarActions.find((action) => action.kind === "approve_action")?.label, "Review before sending");
 });
 
 test("buildWeddingResponseWorkspaceViewState carries graph-backed recommendations into sidebar cards", () => {
@@ -277,12 +282,14 @@ test("buildWeddingResponseWorkspaceViewState carries graph-backed recommendation
 
   assert.ok(state.recommendationCards.length > 0);
   assert.equal(state.sidebarActions.find((action) => action.kind === "open_graph")?.enabled, true);
+  assert.equal(state.sidebarActions.find((action) => action.kind === "open_graph")?.label, "Show related details");
   assert.equal(state.recommendationCards[0]?.graphAction.kind, "open_graph");
+  assert.equal(state.recommendationCards[0]?.graphAction.label, "Show related details");
   assert.match(String(state.recommendationCards[0]?.graphAction.metadata?.graph_context), /\[object Object\]/);
   const graphContext = state.recommendationCards[0]?.graphAction.metadata?.graph_context as Record<string, unknown> | undefined;
   assert.equal(graphContext?.recommendation_id, state.recommendationCards[0]?.id);
   assert.ok(Array.isArray(graphContext?.source_node_ids));
-  assert.ok(state.recommendationCards[0]?.graphContextLabels.some((label) => /source node/i.test(label)));
+  assert.ok(state.recommendationCards[0]?.graphContextLabels.some((label) => /related detail/i.test(label)));
 });
 
 test("buildWeddingResponseWorkspaceViewState exposes weather backup second-order loops", () => {
@@ -478,7 +485,7 @@ test("buildWeddingResponseWorkspaceViewState redacts imported decision scopes ac
   assert.equal(JSON.stringify(scopes).includes("token=private"), false);
 
   const approvalLines = state.activePreview?.approvalRequest?.disclosureLines ?? [];
-  assert.ok(approvalLines.some((line) => /Selected decision scope: Harbour Hall from Imported private planning file/i.test(line)));
+  assert.ok(approvalLines.some((line) => /Selected choice: Harbour Hall from Imported private planning file/i.test(line)));
   assert.equal(JSON.stringify(approvalLines).includes("venues.xlsx"), false);
 
   assert.match(state.bundleExportPayload.content, /Harbour Hall from Imported private planning file/);
@@ -1285,6 +1292,10 @@ test("buildWeddingResponseWorkspaceViewState exposes guest operations tracking",
   assert.equal(state.guestTracking.dietaryCount, 2);
   assert.equal(state.guestTracking.accessibilityCount, 1);
   assert.ok(state.guestTracking.warningLabels.some((label) => /RSVP/i.test(label)));
+  assert.equal(state.boundaryState.activePolicyCount, 2);
+  assert.equal(state.boundaryState.guestCount, 2);
+  assert.ok(state.boundaryTopology.nodes.some((node) => node.kind === "boundary_policy"));
+  assert.ok(state.boundaryTopology.nodes.some((node) => node.kind === "guest" && node.label === "Alex"));
 });
 
 test("buildWeddingResponseWorkspaceViewState exposes seating draft tracking", () => {

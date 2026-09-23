@@ -5,8 +5,10 @@ import { buildWeddingArtifactGenerationState } from "@/lib/weddingArtifactGenera
 import { hasSentWeddingArtifactAfpProjection } from "@/lib/weddingArtifactAfpProjectionState";
 import {
   WEDDING_CALENDAR_AFP_PROJECTIONS_KEY,
+  WEDDING_TASK_AFP_PROJECTIONS_KEY,
   hasSentWeddingProjection,
   type WeddingPlanningScheduleItem,
+  type WeddingPlanningTaskItem,
 } from "@/lib/weddingCalendarProjectionState";
 import { buildWeddingProjectionQueueState } from "@/lib/weddingProjectionQueueState";
 import { runWeddingProjectionDispatchQueue } from "@/lib/weddingProjectionDispatchRunnerState";
@@ -41,6 +43,23 @@ const scheduleItem: WeddingPlanningScheduleItem = {
   kind: "other",
   startAt: "2026-10-04T00:00:00.000Z",
   metadata,
+};
+
+const budgetTaskItem: WeddingPlanningTaskItem = {
+  id: "budget-payment-review-1",
+  title: "Review venue payment schedule",
+  kind: "budget_review",
+  dueAt: "2027-01-15T09:00:00.000Z",
+  priority: "high",
+  metadata: {
+    ...metadata,
+    budget_payment_review: true,
+    budget_payment_candidate_id: "payment:venue:deposit",
+    budget_payment_due_amount_label: "$3000",
+    budget_vendor_label: "Garden Hall",
+    budget_category_label: "Venue",
+    second_order_loop: "budget_drift",
+  },
 };
 
 test("runWeddingProjectionDispatchQueue saves pending outputs and commits sent markers", async () => {
@@ -159,4 +178,30 @@ test("runWeddingProjectionDispatchQueue can skip local sent-marker commits", asy
   assert.equal(result.committedSentMarkers, false);
   assert.equal(result.receipt.savedItems[0]?.messageId, "msg-1");
   assert.equal(hasSentWeddingArtifactAfpProjection(generatedArtifact.summary.id, storage), false);
+});
+
+test("runWeddingProjectionDispatchQueue preserves budget supertags in saved payloads", async () => {
+  const storage = memoryStorage();
+  const calls: SendAfpMessageInput[] = [];
+  const queue = buildWeddingProjectionQueueState({
+    taskItems: [budgetTaskItem],
+    storage,
+  });
+
+  const result = await runWeddingProjectionDispatchQueue({
+    queue,
+    storage,
+    save: async (input) => {
+      calls.push(input);
+      return { success: true, message_id: "msg-budget-task" };
+    },
+  });
+
+  assert.equal(result.receipt.savedCount, 1);
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0]?.supertags?.includes("wedding_budget"));
+  assert.ok(calls[0]?.supertags?.includes("wedding_budget:payment_schedule"));
+  assert.ok(calls[0]?.supertags?.includes("topology:budget_drift"));
+  assert.ok(calls[0]?.to.includes("agent://knowledge-graph"));
+  assert.equal(hasSentWeddingProjection(budgetTaskItem.id, WEDDING_TASK_AFP_PROJECTIONS_KEY, storage), true);
 });

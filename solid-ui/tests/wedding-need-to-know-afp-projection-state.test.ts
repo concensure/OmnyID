@@ -58,6 +58,8 @@ test("weddingNeedToKnowContextToAfpSendInput is relational and dispatch-ready", 
   assert.equal(input.kind, "note");
   assert.equal(input.subtype, "wedding_need_to_know");
   assert.equal(input.store_in_relational, true);
+  assert.ok(input.supertags?.includes("wedding_need_to_know"));
+  assert.ok(input.supertags?.includes("location:sydney-nsw"));
   assert.equal((input.content as Record<string, unknown>).kind, "wedding_need_to_know");
 });
 

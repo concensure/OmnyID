@@ -209,14 +209,20 @@ function titleForExportFilename(artifact: WeddingArtifactSummary): string {
   return isWeddingImportArtifact(artifact) ? "Imported private planning file" : artifact.title;
 }
 
+function approvalStateLabel(state: string): string {
+  if (state === "approved") return "Approved";
+  if (state === "pending_user_approval") return "Needs approval";
+  if (state === "rejected") return "Not approved";
+  if (state === "draft") return "Draft";
+  return state.replace(/_/g, " ");
+}
+
 function metadataLabelsFor(artifact: WeddingArtifactSummary): string[] {
   return [
     artifact.category,
     artifact.kind.replace(/_/g, " "),
     artifact.metadata.privacyScope.replace(/_/g, " "),
-    artifact.approvalState.replace(/_/g, " "),
-    artifact.metadata.weddingPlanId,
-    artifact.metadata.responseWorkspaceId,
+    approvalStateLabel(artifact.approvalState),
     ...artifact.vendorLabels.slice(0, 3),
     ...artifact.locationLabels.slice(0, 3),
     ...sourceLabelsForExportManifest(artifact),
@@ -233,7 +239,7 @@ export function weddingArtifactWarningLabels(artifact: WeddingArtifactSummary): 
       ? `Export is currently scoped as ${artifact.metadata.privacyScope.replace(/_/g, " ")}.`
       : null,
     artifact.approvalState === "pending_user_approval"
-      ? "This artifact is still pending user approval."
+      ? "This document still needs your approval."
       : null,
   ].filter((value): value is string => Boolean(value));
 }
@@ -337,9 +343,9 @@ export function buildWeddingPacketExportCapabilityState(input: {
   ];
   return {
     readyFormats: [
-      { id: "markdown", label: "Markdown", detail: "Ready now as a portable text file." },
+      { id: "markdown", label: "Text file", detail: "Ready now as a simple text file." },
       { id: "html", label: "Printable HTML / Save as PDF", detail: "Ready now for browser printing or Save as PDF." },
-      { id: "word_doc", label: "Word-openable .doc", detail: "Ready now as Word-openable HTML saved with a .doc extension." },
+      { id: "word_doc", label: "Word document", detail: "Ready now as a file you can open in Microsoft Word." },
     ],
     plannedConversions,
     summaryLabel: `${plannedConversions.length} extra download format${plannedConversions.length === 1 ? "" : "s"} will be added after final export setup.`,

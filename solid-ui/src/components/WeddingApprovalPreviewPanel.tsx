@@ -15,10 +15,21 @@ function approvalLabel(preview: WeddingWorkspaceArtifactPreview): string {
   return preview.approvalRequest?.approvalButtonLabel ?? preview.approvalState.replace(/_/g, " ");
 }
 
-function approvalBlockLabel(request: WeddingApprovalRequestState): string | null {
+function providerMissingLabel(capability: WeddingProviderExecutorReadinessState["capability"]): string {
+  if (capability === "email") return "Connect Gmail to send this";
+  if (capability === "calendar") return "Connect Calendar to schedule this";
+  if (capability === "registry") return "Connect a registry app first";
+  if (capability === "vendor_search") return "Connect vendor search first";
+  return "Connect this app first";
+}
+
+function approvalBlockLabel(
+  request: WeddingApprovalRequestState,
+  readiness: WeddingProviderExecutorReadinessState,
+): string | null {
   if (!request.blockKind) return null;
   if (request.blockKind === "needs_user_approval") return "Needs approval";
-  if (request.blockKind === "provider_missing") return "Connect provider first";
+  if (request.blockKind === "provider_missing") return providerMissingLabel(readiness.capability);
   if (request.blockKind === "privacy_scope") return "Fix privacy scope";
   return "Unsupported integration";
 }
@@ -82,7 +93,7 @@ export function WeddingApprovalPreviewPanel(props: {
                       ? "bg-emerald-100 text-emerald-900"
                       : "bg-amber-100 text-amber-950"
                   }`}>
-                    {providerReadiness().productionReady ? "ready to send" : "manual send needed"}
+                    {providerReadiness().productionReady ? "ready to send" : "needs connected app"}
                   </span>
                   <Show when={providerReadiness().requiredProvider}>
                     {(provider) => (
@@ -107,7 +118,7 @@ export function WeddingApprovalPreviewPanel(props: {
               <Show when={approved().blockedReason}>
                 {(reason) => (
                   <p class="rounded-xl border border-amber-200 bg-white/70 px-3 py-2 text-[11px] leading-5 text-amber-950">
-                    <Show when={approvalBlockLabel(approved())}>
+                    <Show when={approvalBlockLabel(approved(), providerReadiness())}>
                       {(label) => (
                         <span class="mb-1 inline-flex max-w-full break-words rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-950">
                           {label()}

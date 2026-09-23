@@ -79,6 +79,26 @@ test("wedding need-to-know extraction captures downloaded NOIM and public celebr
   assert.equal(state.draft.celebrantPath, "public_or_registry_celebrant");
 });
 
+test("wedding need-to-know extraction does not let a later slot bleed into priorities when there is no sentence break", () => {
+  const state = buildWeddingNeedToKnowExtractionState({
+    responseWorkspaceId: "response_workspace:placeholder",
+    text: "We are planning for October 2027 in Sydney NSW, about 90 guests, mid-range budget, priorities are food and photos, NOIM not downloaded, need celebrant options.",
+  });
+
+  assert.equal(state.draft.prioritiesCsv, "food, photos");
+  assert.equal(state.draft.noimDownloaded, "no");
+  assert.equal(state.draft.celebrantPath, "need_options");
+});
+
+test("wedding need-to-know extraction captures a budget phrased with 'of' rather than 'is'", () => {
+  const state = buildWeddingNeedToKnowExtractionState({
+    responseWorkspaceId: "response_workspace:budget-of",
+    text: "Our wedding budget of $20,000 needs to cover everything.",
+  });
+
+  assert.equal(state.draft.budgetComfort, "$20,000");
+});
+
 test("wedding need-to-know extraction stays empty for unrelated conversation", () => {
   const state = buildWeddingNeedToKnowExtractionState({
     responseWorkspaceId: "response_workspace:empty",

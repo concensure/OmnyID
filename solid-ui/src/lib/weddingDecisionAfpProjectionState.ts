@@ -95,6 +95,7 @@ function messageToSendInput(message: AfpMessage): SendAfpMessageInput {
     views: message.views,
     attachments: message.attachments,
     references: message.references,
+    supertags: message.supertags ?? [],
     metadata: message.metadata,
     store_in_relational: true,
   };
@@ -187,9 +188,13 @@ export function weddingDecisionProjectionToAfpMessage(
   const sourceCountsByProvider = input.sourceCountsByProvider && typeof input.sourceCountsByProvider === "object"
     ? input.sourceCountsByProvider
     : {};
+  const budgetDecision = /\bbudget|quote|price|cost|payment|deposit|invoice|contract\b/i
+    .test(`${input.artifactKind} ${input.artifactTitle} ${input.selectedOption.label} ${input.selectedOption.detail} ${input.selectedOption.cells.join(" ")}`);
   const searchableTerms = uniqueStrings([
     id,
     "wedding decision",
+    budgetDecision ? "wedding budget decision" : null,
+    budgetDecision ? "budget topology" : null,
     artifactTitle,
     input.artifactKind,
     input.artifactId,
@@ -226,6 +231,9 @@ export function weddingDecisionProjectionToAfpMessage(
       "wedding",
       "wedding_decision",
       "decision:selected_option",
+      budgetDecision ? "wedding_budget" : null,
+      budgetDecision ? "topology:wedding_budget" : null,
+      budgetDecision ? "decisionos" : null,
       `artifact:${safeWeddingLabel(input.artifactKind)}`,
       `option:${safeWeddingLabel(input.selectedOption.label)}`,
     ]),
@@ -266,11 +274,13 @@ export function weddingDecisionProjectionToAfpMessage(
       response_workspace_id: metadata.responseWorkspaceId,
       source_response_id: metadata.sourceResponseId,
       privacy_scope: metadata.privacyScope,
+      budget_decision: budgetDecision,
       source: input.source ?? "local_selection",
     },
     metadata: {
       origin: "wedding_planning",
       projection: "wedding_decision_selection_to_afp",
+      budget_decision: budgetDecision,
       decision_id: id,
       selected_option_id: input.selectedOption.id,
       selected_option_label: input.selectedOption.label,

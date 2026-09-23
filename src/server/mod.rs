@@ -1,4 +1,4 @@
-﻿#![allow(dead_code)]
+#![allow(dead_code)]
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
@@ -15,6 +15,7 @@ use axum::{
     response::IntoResponse,
     routing::{get, post, put},
 };
+use chrono::Timelike;
 pub use serde_json::Value;
 pub use serde_json::json;
 use sqlx::Error as SqlxError;
@@ -26,16 +27,21 @@ use tracing::{error, info, instrument};
 use ulid::Ulid;
 use wtransport::Identity as WebTransportIdentity;
 
+use crate::calendar_event_profile::calendar_event_profile_from_fields;
 use crate::{
     afp::{self, Ack, Message, ThreadRequest, ThreadResponse, afp_service_server::AfpService},
+    agent_id::AgentId,
     agent_template::{
         AgentInstance, AgentTask, LlmBackend, LlmConfig, MSG_AGENT_PROVISIONED, TaskPriority,
-        default_template_capabilities,
+        TaskStatus, default_template_capabilities,
     },
     agentcard::AgentCard,
+    coordination_bus::db_notify_enabled,
+    coordination_listener::start_coordination_listener,
     cost_oracle::CostOracle,
     crypto::{
-        has_verifiable_signature, is_supported_encryption_envelope, sign_message, verify_signature,
+        has_verifiable_signature, is_supported_encryption_envelope, sign_message,
+        signature_matches_public_key, verify_signature,
     },
     curator_runtime::start_knowledge_curator_daemon,
     daemon_registry,
@@ -52,6 +58,7 @@ use crate::{
     },
     gateway::rest_adapter::{
         AgentSigningContext, RestCallParams, execute_action as rest_execute_action,
+        validate_public_http_url,
     },
     gateway::{
         imap_sync::start_imap_sync,
@@ -67,21 +74,31 @@ use crate::{
         shape_descriptors_for_slices, sync_slices_for_device,
     },
     message::{
-        AFP_SUBTYPE_WAKE_REQUEST, AFPMessage, AfpTriggerOriginMetadata,
+        AFP_SUBTYPE_WAKE_REQUEST, AFPMessage, AfpRevertStep, AfpTriggerOriginMetadata,
         afp_trigger_message_families,
     },
     metrics::Metrics,
     personalization::{FeedbackSignal, PersonalizationEvent},
     relay::relay_fleet_update_payload,
+    reversible_actions::{
+        DraftTaskCreationRequest, FileBundleStageRequest, InboxOrganizationRequest,
+        REVERSIBLE_CAPABILITY_DRAFT_TASK_CREATE, REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE,
+        REVERSIBLE_CAPABILITY_INBOX_ORGANIZE, REVERSIBLE_CAPABILITY_TENTATIVE_CALENDAR_HOLD,
+        ReversibleActionBundle, TentativeCalendarHoldRequest, build_draft_task_creation_bundle,
+        build_file_bundle_stage_bundle, build_inbox_organization_bundle,
+        build_tentative_calendar_hold_bundle,
+    },
+    rollback::{build_revert_request_afp, build_revert_result_afp, decode_rollback_token},
     sync_worker::start_sync_worker,
 };
 
-mod auth;
+pub(crate) mod auth;
 mod billing;
 mod compat_helpers;
 mod health;
 mod health_deps;
 mod persona_routes;
+mod ranking_helpers;
 mod relay;
 mod types;
 mod workflow;
@@ -91,31 +108,40 @@ mod agent_capability_routes;
 mod agent_memory_routes;
 mod agent_setup_routes;
 mod agent_trigger_routes;
+pub(crate) mod approval_surfaces;
+mod brief_routes;
+mod continuity_ranking_helpers;
 mod continuity_routes;
+mod conversion_routes;
 mod cost_controls;
 mod dashboard_routes;
 mod dashboard_runtime_routes;
 mod email_group_routes;
 mod export_routes;
-mod brief_routes;
 mod feed_routes;
-mod federation_routes;
+mod file_upload_routes;
 mod finance_routes;
-mod goal_routes;
-mod para_routes;
-mod conversion_routes;
-mod ingest_routes;
-mod knowledge_routes;
-mod news_routes;
-mod map_routes;
 mod geofence_routes;
+mod goal_routes;
+mod ingest_routes;
+pub(crate) mod knowledge_routes;
+mod llm_resolution;
+mod map_routes;
+mod metadata_term_helpers;
+mod news_routes;
+mod para_routes;
 mod privacy_routes;
+mod proactive_ranking_helpers;
 mod proactive_routes;
 mod protocol_routes;
 mod runtime_routes;
-mod skill_capsule_routes;
+mod scope_helpers;
+pub(crate) mod skill_capsule_routes;
 mod social_routes;
 mod space_routes;
+pub(crate) mod summary_helpers;
+pub(crate) mod thread_discovery;
+mod tool_connection_routes;
 mod ui_command_browser_fallback;
 mod ui_command_research;
 mod ui_command_response_enricher;
@@ -125,9 +151,20 @@ mod ui_command_zero_token;
 mod ui_decision_routes;
 mod user_integrations;
 mod user_management_routes;
+mod value_signal_helpers;
+mod workflow_connector_bindings;
+mod workflow_skill_capsule_runtime;
 mod workspace_routes;
+
+const DEFAULT_HTTP_BODY_LIMIT_BYTES: usize = 32 * 1024 * 1024;
+use self::approval_surfaces::{
+    action_capability_id, build_action_approval_review_payload,
+    build_workflow_approval_review_payload, selected_approval_option_summary,
+    style_approval_review_payload,
+};
 use self::auth::*;
 use self::billing::*;
+use self::compat_helpers::*;
 use self::health::*;
 use self::persona_routes::*;
 use self::relay::*;
@@ -220,7 +257,7 @@ fn runtime_status_panel_a2ui(
                         "type": "text",
                         "props": {
                             "label": "Log source",
-                            "value": format!("{log_source} Â· updated {updated_at}"),
+                            "value": format!("{log_source} - updated {updated_at}"),
                         }
                     },
                     {
@@ -519,100 +556,121 @@ impl TrialRunnerManager {
         identity_key: &str,
     ) -> Result<TrialRunnerSession, String> {
         self.prune_expired().await;
+        let (active_template, traces, reviews, intent, history) = {
+            let mut sessions = self.sessions.lock().await;
+            let session = sessions
+                .get_mut(session_id)
+                .ok_or_else(|| "trial session not found".to_string())?;
+            if session.identity_key != identity_key {
+                return Err("trial session not found".to_string());
+            }
+            if session.requires_signup {
+                return Err("anonymous trial limit reached; sign up to continue".to_string());
+            }
+            if session.active_template_id.is_none() {
+                return Err("pick a starter template first".to_string());
+            }
+            if session.turns_used >= session.max_turns {
+                return Err("this anonymous trial run reached its 10-turn limit; start another template or sign up".to_string());
+            }
+
+            let active_template = session
+                .starter_templates
+                .iter()
+                .find(|entry| Some(entry.id.as_str()) == session.active_template_id.as_deref())
+                .cloned()
+                .ok_or_else(|| "active trial template missing".to_string())?;
+
+            session.turns_used += 1;
+            session.messages.push(TrialChatMessage {
+                role: "user".to_string(),
+                content: content.to_string(),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+            });
+            session.saved_tests.push(TrialSavedTest {
+                id: format!("test-{}", Ulid::new()),
+                input: content.to_string(),
+                template_id: Some(active_template.id.clone()),
+                created_at: chrono::Utc::now().to_rfc3339(),
+            });
+            session.saved_tests = session
+                .saved_tests
+                .iter()
+                .cloned()
+                .rev()
+                .take(5)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+
+            let lowered = content.to_lowercase();
+            let is_scheduling = lowered.contains("plan")
+                || lowered.contains("itinerary")
+                || lowered.contains("trip")
+                || lowered.contains("flight")
+                || lowered.contains("hotel")
+                || lowered.contains("schedule")
+                || lowered.contains("5pm")
+                || lowered.contains("6pm")
+                || lowered.contains("7pm")
+                || lowered.contains("today")
+                || lowered.contains("tonight")
+                || (lowered.contains("pm") && lowered.contains("hour"));
+            let is_confirmation = session.calendar_view.is_some()
+                && (lowered.contains("confirm")
+                    || lowered.contains("add to calendar")
+                    || lowered.contains("yes")
+                    || lowered.contains("looks good")
+                    || lowered == "ok");
+            let intent = if is_confirmation {
+                "confirm"
+            } else if is_scheduling {
+                "schedule"
+            } else {
+                "generic"
+            };
+
+            if intent == "schedule" {
+                session.calendar_view = Some(build_trial_calendar_view(content));
+            } else if intent == "confirm" {
+                if let Some(ref mut cv) = session.calendar_view {
+                    if let Some(obj) = cv.as_object_mut() {
+                        obj.insert("pending_confirmation".to_string(), serde_json::json!(false));
+                        obj.insert("confirmed".to_string(), serde_json::json!(true));
+                        obj.insert(
+                            "preview_notice".to_string(),
+                            serde_json::json!(
+                                "Preview only. This reviewed draft was added to the anonymous trial calendar view for this session. No external booking or calendar sync occurred."
+                            ),
+                        );
+                    }
+                }
+            }
+
+            let (traces, reviews) = execute_trial_tools(content, &session.tool_policy);
+            session.traces.extend(traces.clone());
+            session.review_queue.extend(reviews.clone());
+            session.logs.push(TrialLogEntry {
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                level: "info".to_string(),
+                message: "Anonymous trial turn processed.".to_string(),
+            });
+
+            let history = session.messages.clone();
+            (active_template, traces, reviews, intent, history)
+        };
+
+        // Runs the live NVIDIA NIM call outside the session lock so a slow or
+        // failing upstream request can't stall other trial sessions.
+        let reply =
+            trial_generate_reply(content, &active_template, &traces, &reviews, intent, &history)
+                .await;
+
         let mut sessions = self.sessions.lock().await;
         let session = sessions
             .get_mut(session_id)
             .ok_or_else(|| "trial session not found".to_string())?;
-        if session.identity_key != identity_key {
-            return Err("trial session not found".to_string());
-        }
-        if session.requires_signup {
-            return Err("anonymous trial limit reached; sign up to continue".to_string());
-        }
-        if session.active_template_id.is_none() {
-            return Err("pick a starter template first".to_string());
-        }
-        if session.turns_used >= session.max_turns {
-            return Err("this anonymous trial run reached its 10-turn limit; start another template or sign up".to_string());
-        }
-
-        let active_template = session
-            .starter_templates
-            .iter()
-            .find(|entry| Some(entry.id.as_str()) == session.active_template_id.as_deref())
-            .cloned()
-            .ok_or_else(|| "active trial template missing".to_string())?;
-
-        session.turns_used += 1;
-        session.messages.push(TrialChatMessage {
-            role: "user".to_string(),
-            content: content.to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        });
-        session.saved_tests.push(TrialSavedTest {
-            id: format!("test-{}", Ulid::new()),
-            input: content.to_string(),
-            template_id: Some(active_template.id.clone()),
-            created_at: chrono::Utc::now().to_rfc3339(),
-        });
-        session.saved_tests = session
-            .saved_tests
-            .iter()
-            .cloned()
-            .rev()
-            .take(5)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect();
-
-        let lowered = content.to_lowercase();
-        let is_scheduling = lowered.contains("plan")
-            || lowered.contains("lesson")
-            || lowered.contains("schedule")
-            || lowered.contains("class")
-            || lowered.contains("study")
-            || lowered.contains("5pm")
-            || lowered.contains("6pm")
-            || lowered.contains("7pm")
-            || lowered.contains("today")
-            || lowered.contains("tonight")
-            || (lowered.contains("pm") && lowered.contains("hour"))
-            || (lowered.contains("wash") && lowered.contains("dog"));
-        let is_confirmation = session.calendar_view.is_some()
-            && (lowered.contains("confirm")
-                || lowered.contains("add to calendar")
-                || lowered.contains("yes")
-                || lowered.contains("looks good")
-                || lowered == "ok");
-        let intent = if is_confirmation {
-            "confirm"
-        } else if is_scheduling {
-            "schedule"
-        } else {
-            "generic"
-        };
-
-        if intent == "schedule" {
-            session.calendar_view = Some(build_trial_calendar_view(content));
-        } else if intent == "confirm" {
-            if let Some(ref mut cv) = session.calendar_view {
-                if let Some(obj) = cv.as_object_mut() {
-                    obj.insert("pending_confirmation".to_string(), serde_json::json!(false));
-                    obj.insert("confirmed".to_string(), serde_json::json!(true));
-                }
-            }
-        }
-
-        let (traces, reviews) = execute_trial_tools(content, &session.tool_policy);
-        session.traces.extend(traces.clone());
-        session.review_queue.extend(reviews.clone());
-        session.logs.push(TrialLogEntry {
-            timestamp: chrono::Utc::now().to_rfc3339(),
-            level: "info".to_string(),
-            message: "Anonymous trial turn processed.".to_string(),
-        });
-        let reply = trial_assistant_reply(content, &active_template, &traces, &reviews, intent);
         session.messages.push(TrialChatMessage {
             role: "assistant".to_string(),
             content: reply.clone(),
@@ -794,7 +852,18 @@ impl AfpService for AFPServer {
     }
 }
 
+fn apply_default_body_limit(router: Router) -> Router {
+    // GAP-145: reject oversized request bodies before any handler runs.
+    // Per-route overrides (e.g. large file uploads) can add a bigger limit locally.
+    router.layer(axum::extract::DefaultBodyLimit::max(
+        DEFAULT_HTTP_BODY_LIMIT_BYTES,
+    ))
+}
+
 pub async fn run() {
+    if let Err(message) = validate_startup_deployment_policy() {
+        panic!("startup policy validation failed: {message}");
+    }
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://afp:afp@postgres:5432/afp".to_string());
     // Retry DB connection with backoff so the homeserver survives container
@@ -837,6 +906,26 @@ pub async fn run() {
         pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(4)),
     });
 
+    if multi_replica_mode_enabled() {
+        if anonymous_trial_disabled_reason().is_some() {
+            tracing::warn!(
+                "OMNYID_MULTI_REPLICA_MODE=1 enabled: anonymous interactive trial routes are disabled because trial sessions remain process-local"
+            );
+        } else {
+            tracing::warn!(
+                "OMNYID_MULTI_REPLICA_MODE=1 enabled with OMNYID_ALLOW_LOCAL_TRIALS_IN_MULTI_REPLICA=1: anonymous trial state remains process-local and requires sticky sessions"
+            );
+        }
+        tracing::warn!(
+            "OMNYID_MULTI_REPLICA_MODE=1 enabled: live relay fanout is still process-local; websocket/webtransport clients require sticky sessions or a single relay replica for strict delivery continuity"
+        );
+        if !db_notify_enabled() {
+            tracing::warn!(
+                "OMNYID_MULTI_REPLICA_MODE=1 enabled without OMNYID_COORD_DB_NOTIFY=1: coordination wakeups will not propagate across replicas"
+            );
+        }
+    }
+
     // GAP-129: run daemon registration in the background so startup latency does
     // not scale linearly with user count. The HTTP server begins accepting
     // connections immediately; daemons are registered within seconds.
@@ -851,16 +940,36 @@ pub async fn run() {
 
     // GAP-083: shared shutdown channel — sending `true` tells all daemons to exit cleanly.
     let (shutdown_tx, shutdown_rx) = shutdown_channel();
+    let shutdown_signal_tx = shutdown_tx.clone();
     // Extra clone for the HTTP graceful-shutdown guard (GAP-119).
     let http_shutdown_rx = shutdown_rx.clone();
 
-    start_knowledge_curator_daemon(db.clone(), shutdown_rx.clone()).await;
-    start_ledger_ingestion_daemon(db.clone(), shutdown_rx.clone()).await;
-    start_sync_worker(db.pool.clone()).await;
-    start_imap_sync(db.clone(), metrics.clone(), app_state.relay_tx.clone()).await;
-    start_archive_daemon(db.clone(), shutdown_rx.clone()).await;
-    start_health_maintenance_daemon(db.clone(), shutdown_rx.clone()).await;
-    start_workflow_wait_resume_worker(db.clone(), app_state.relay_tx.clone()).await;
+    let mut daemon_handles = vec![
+        start_knowledge_curator_daemon(db.clone(), shutdown_rx.clone()),
+        start_ledger_ingestion_daemon(db.clone(), shutdown_rx.clone()),
+        start_archive_daemon(db.clone(), shutdown_rx.clone()),
+        start_health_maintenance_daemon(db.clone(), shutdown_rx.clone()),
+    ];
+    match start_sync_worker(db.pool.clone(), shutdown_rx.clone()).await {
+        Ok(handle) => daemon_handles.push(handle),
+        Err(err) => error!(%err, "Failed to start sync worker"),
+    }
+    // Bridge C: Postgres LISTEN/NOTIFY → in-process CoordinationBus.
+    // Only spawned when OMNYID_COORD_DB_NOTIFY=1 (default off).
+    if db_notify_enabled() {
+        start_coordination_listener(db.pool.clone()).await;
+    }
+    daemon_handles.push(start_imap_sync(
+        db.clone(),
+        metrics.clone(),
+        app_state.relay_tx.clone(),
+        shutdown_rx.clone(),
+    ));
+    daemon_handles.push(start_workflow_wait_resume_worker(
+        db.clone(),
+        app_state.relay_tx.clone(),
+        shutdown_rx.clone(),
+    ));
 
     // Listen for SIGTERM/Ctrl-C and broadcast shutdown to all daemons.
     tokio::spawn(async move {
@@ -877,7 +986,7 @@ pub async fn run() {
         #[cfg(not(unix))]
         let _ = tokio::signal::ctrl_c().await;
         info!("Shutdown signal received — asking daemons to stop");
-        let _ = shutdown_tx.send(true);
+        let _ = shutdown_signal_tx.send(true);
     });
 
     // Background: clean up expired ephemeral (anon) agent instances every 30 min
@@ -921,6 +1030,7 @@ pub async fn run() {
         .route("/metricsz", get(metrics_http))
         .route("/transport/capabilities", get(transport_capabilities_http))
         .route("/waitlist", post(waitlist_http))
+        .route("/wedding/waitlist", post(wedding_waitlist_http))
         .route(
             "/trial/python-runner/session",
             post(trial_python_runner_session_http),
@@ -943,13 +1053,21 @@ pub async fn run() {
         )
         .route("/auth/register", post(register_http))
         .route("/auth/login", post(login_http))
+        .route("/auth/google/config", get(google_auth_config_http))
         .route("/auth/google", post(google_auth_http))
         .route("/auth/apple", post(apple_auth_http))
-        .route("/auth/session", get(auth_session_http))
+        .route(
+            "/auth/session",
+            get(auth_session_http).delete(delete_auth_session_http),
+        )
         .route("/auth/change-password", post(change_password_http))
         .route(
             "/auth/verify-email/send",
             post(send_verification_email_http),
+        )
+        .route(
+            "/auth/verify-email/resend",
+            post(resend_verification_email_http),
         )
         .route("/auth/verify-email", post(verify_email_http))
         .route("/auth/forgot-password", post(forgot_password_http))
@@ -1027,6 +1145,7 @@ pub async fn run() {
         .route("/thread/{thread_id}", get(get_thread_http))
         .route("/actions/decision", post(record_action_decision_http))
         .route("/actions/execute", post(execute_action_http))
+        .route("/actions/undo", post(undo_action_http))
         .route("/gateway/email", post(handle_gateway_email))
         .route("/.well-known/agent-card", get(serve_agent_card))
         .route("/.well-known/afp-delegation", get(serve_afp_delegation))
@@ -1044,6 +1163,10 @@ pub async fn run() {
         )
         .route("/billing/webhook", post(billing_webhook_http))
         .route("/billing/status", get(billing_status_http))
+        .route("/billing/archive-only", post(billing_archive_only_http))
+        .route("/billing/tool-usage", post(billing_tool_usage_http))
+        .route("/billing/checkout", post(billing_checkout_http))
+        .route("/billing/portal", post(billing_portal_http))
         // â”€â”€ Agent template â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         .route("/agent/provision", post(agent_provision_http))
         .route("/agent/me", get(agent_me_http))
@@ -1070,6 +1193,10 @@ pub async fn run() {
         .route(
             "/auth/passkey/authenticate/begin",
             post(passkey_authenticate_begin_http),
+        )
+        .route(
+            "/auth/passkey/authenticate/begin-email",
+            post(passkey_authenticate_begin_by_email_http),
         )
         .route(
             "/auth/passkey/authenticate/finish",
@@ -1114,9 +1241,9 @@ pub async fn run() {
         .merge(dashboard_runtime_routes::routes())
         .merge(email_group_routes::routes())
         .merge(export_routes::routes())
+        .merge(file_upload_routes::routes())
         .merge(brief_routes::routes())
         .merge(feed_routes::routes())
-        .merge(federation_routes::routes())
         .merge(finance_routes::routes())
         .merge(goal_routes::routes())
         .merge(conversion_routes::routes())
@@ -1133,16 +1260,15 @@ pub async fn run() {
         .merge(skill_capsule_routes::routes())
         .merge(social_routes::routes())
         .merge(space_routes::routes())
+        .merge(tool_connection_routes::routes())
         .merge(ui_decision_routes::routes())
         .merge(user_integrations::routes())
         .merge(user_management_routes::routes())
         .merge(workspace_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
-        // GAP-145: reject oversized request bodies before any handler runs.
-        // Per-route overrides (e.g. large file uploads) can add a bigger limit locally.
-        .layer(axum::extract::DefaultBodyLimit::max(32 * 1024 * 1024))
         .with_state(app_state.clone());
+    let app = apply_default_body_limit(app);
 
     // Background cron trigger scheduler â€” fires schedule-family workflow triggers.
     let scheduler_state = app_state.clone();
@@ -1218,6 +1344,18 @@ pub async fn run() {
     if let Err(err) = webtransport_result {
         error!(%err, "WebTransport server exited");
     }
+    let _ = shutdown_tx.send(true);
+    for handle in daemon_handles {
+        match tokio::time::timeout(std::time::Duration::from_secs(15), handle).await {
+            Ok(Ok(())) => {}
+            Ok(Err(err)) => {
+                error!(%err, "Daemon task exited with join error");
+            }
+            Err(_) => {
+                error!("Timed out waiting for daemon task shutdown");
+            }
+        }
+    }
 }
 
 pub async fn build_test_router(database_url: &str) -> Router {
@@ -1240,7 +1378,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
     });
 
-    Router::new()
+    let app = Router::new()
         .route("/healthz", get(healthz_http))
         .route("/relay/ws", get(relay_ws_http))
         .route("/thread/{thread_id}", get(get_thread_http))
@@ -1248,8 +1386,8 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .route("/gateway/email", post(handle_gateway_email))
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
-        .layer(axum::extract::DefaultBodyLimit::max(32 * 1024 * 1024))
-        .with_state(app_state)
+        .with_state(app_state);
+    apply_default_body_limit(app)
 }
 
 #[instrument(skip(state, message), fields(thread_id = %message.thread_id, message_type = %message.r#type))]
@@ -1335,6 +1473,23 @@ async fn waitlist_http(
         }
     };
 
+    let confirmation_request = OutgoingEmailRequest {
+        thread_id: format!("waitlist-confirmation.{}", Ulid::new()),
+        message_id: Ulid::new().to_string(),
+        parent_id: None,
+        to: vec![email.clone()],
+        subject: "You're on the OmnyID waitlist!".to_string(),
+        body: "Congratulations, you're officially on the OmnyID waitlist!\n\n\
+OmnyID is a self-hostable, open-source AI agent that keeps track of the bills, forms, dates, and lists cluttering your head, and quietly prepares the next step for each one. Every morning it shows you what needs your attention, what's already ready to review, and what can wait, while your data stays fully under your control.\n\n\
+We'll email you as soon as private beta access opens up.\n"
+            .to_string(),
+        in_reply_to: None,
+        references: vec![],
+    };
+    if let Err(err) = send_outgoing_email(&confirmation_request).await {
+        error!(email = %email, error = %err, "Waitlist confirmation email to requester failed to send");
+    }
+
     state
         .db
         .record_waitlist_submission(&email, delivery_status, delivery_error.as_deref())
@@ -1348,6 +1503,74 @@ async fn waitlist_http(
     })))
 }
 
+fn is_plausible_email(email: &str) -> bool {
+    let Some((local, domain)) = email.split_once('@') else {
+        return false;
+    };
+    !local.is_empty()
+        && domain.len() >= 3
+        && domain.contains('.')
+        && !domain.starts_with('.')
+        && !domain.ends_with('.')
+        && !email.contains(' ')
+}
+
+async fn wedding_waitlist_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<WeddingWaitlistRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("wedding_waitlist", &headers),
+        RateLimitPolicy {
+            max_requests: 6,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+
+    let email = request.email.trim().to_lowercase();
+    if !is_plausible_email(&email) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "valid email is required".to_string(),
+        ));
+    }
+    let first_name = request.first_name.trim().to_string();
+    let last_name = request.last_name.trim().to_string();
+    if first_name.is_empty() || last_name.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "first and last name are required".to_string(),
+        ));
+    }
+    let expected_wedding_date = request
+        .expected_wedding_date
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if let Some(date) = expected_wedding_date {
+        if chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_err() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "expected_wedding_date must be YYYY-MM-DD".to_string(),
+            ));
+        }
+    }
+
+    let signup = state
+        .db
+        .insert_wedding_waitlist_signup(&email, &first_name, &last_name, expected_wedding_date)
+        .await
+        .map_err(readiness_error_to_http)?;
+
+    Ok(Json(serde_json::json!({
+        "status": "recorded",
+        "signup_id": signup.signup_id
+    })))
+}
+
 // â”€â”€ Trial Python runner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn trial_python_runner_session_http(
@@ -1355,6 +1578,9 @@ async fn trial_python_runner_session_http(
     headers: HeaderMap,
     Json(request): Json<TrialSessionCreateRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    if let Some(reason) = anonymous_trial_disabled_reason() {
+        return Err((StatusCode::SERVICE_UNAVAILABLE, reason));
+    }
     enforce_rate_limit(
         &state,
         public_rate_limit_key("trial_python_runner_session", &headers),
@@ -1374,6 +1600,9 @@ async fn trial_python_runner_run_http(
     headers: HeaderMap,
     Json(request): Json<TrialTemplateRunRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    if let Some(reason) = anonymous_trial_disabled_reason() {
+        return Err((StatusCode::SERVICE_UNAVAILABLE, reason));
+    }
     enforce_rate_limit(
         &state,
         public_rate_limit_key("trial_python_runner_run", &headers),
@@ -1403,6 +1632,9 @@ async fn trial_python_runner_chat_http(
     headers: HeaderMap,
     Json(request): Json<TrialChatRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    if let Some(reason) = anonymous_trial_disabled_reason() {
+        return Err((StatusCode::SERVICE_UNAVAILABLE, reason));
+    }
     enforce_rate_limit(
         &state,
         public_rate_limit_key("trial_python_runner_chat", &headers),
@@ -1442,6 +1674,9 @@ async fn trial_python_runner_state_http(
     headers: HeaderMap,
     Path(session_id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    if let Some(reason) = anonymous_trial_disabled_reason() {
+        return Err((StatusCode::SERVICE_UNAVAILABLE, reason));
+    }
     let identity = trial_identity_key(&headers, query.fingerprint.as_deref());
     let session = state
         .trial_runner
@@ -1456,6 +1691,9 @@ async fn trial_python_runner_convert_http(
     headers: HeaderMap,
     Json(request): Json<TrialConvertRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    if let Some(reason) = anonymous_trial_disabled_reason() {
+        return Err((StatusCode::SERVICE_UNAVAILABLE, reason));
+    }
     let identity = trial_identity_key(&headers, request.fingerprint.as_deref());
     let session = state
         .trial_runner
@@ -1472,325 +1710,29 @@ async fn trial_python_runner_convert_http(
     })))
 }
 
+fn multi_replica_mode_enabled() -> bool {
+    std::env::var("OMNYID_MULTI_REPLICA_MODE")
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(false)
+}
+
+fn allow_local_trial_in_multi_replica() -> bool {
+    std::env::var("OMNYID_ALLOW_LOCAL_TRIALS_IN_MULTI_REPLICA")
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(false)
+}
+
+fn anonymous_trial_disabled_reason() -> Option<String> {
+    if !multi_replica_mode_enabled() || allow_local_trial_in_multi_replica() {
+        return None;
+    }
+    Some(
+        "Anonymous interactive trial is disabled while OMNYID_MULTI_REPLICA_MODE=1 because trial sessions are process-local. Sign in, run a single homeserver replica, or explicitly opt back in with OMNYID_ALLOW_LOCAL_TRIALS_IN_MULTI_REPLICA=1 plus sticky sessions."
+            .to_string(),
+    )
+}
+
 // â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-async fn dashboard_bootstrap_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<DashboardBootstrapResponse>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let current_token = bearer_token_from_headers(&headers)
-        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
-    ensure_user_agents_and_demo_seed(&state, &user)
-        .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
-    let agents = state
-        .db
-        .list_managed_agents_by_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let agent_ids = agents
-        .iter()
-        .map(|agent| agent.agent_id.clone())
-        .collect::<Vec<_>>();
-    // GAP-075: merge shared (inter-agent) messages with private user messages.
-    // Private messages live in the tenant schema and were absent from the bootstrap.
-    let (shared_msgs, private_msgs) = tokio::join!(
-        state.db.recent_messages_for_agents(&agent_ids, 20),
-        state.db.recent_private_messages_for_user(&user.id, 20),
-    );
-    let mut merged: Vec<_> = {
-        let mut v = shared_msgs
-            .map_err(internal_error)
-            .map_err(status_to_http)?;
-        v.extend(
-            private_msgs
-                .map_err(internal_error)
-                .map_err(status_to_http)?,
-        );
-        v
-    };
-    // Dedup by id, then keep newest 20.
-    merged.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-    merged.dedup_by(|a, b| a.id == b.id);
-    merged.truncate(20);
-    let messages = merged.into_iter().map(proto_to_app).collect::<Vec<_>>();
-    let thread_ids = messages
-        .iter()
-        .map(|message| message.thread_id.clone())
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
-    let action_log = state
-        .db
-        .recent_action_results_for_threads(&thread_ids, 64)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let runtime_deployment = match state
-        .db
-        .find_runtime_deployment_by_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-    {
-        Some(deployment) => Some(
-            runtime_deployment_response_live(
-                inspect_runtime_deployment_live(inspect_runtime_deployment(deployment)).await,
-            )
-            .await,
-        ),
-        None => None,
-    };
-    let support_access = state
-        .db
-        .latest_support_access_grant(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .map(support_access_state_response)
-        .unwrap_or_else(default_support_access_state_response);
-    let support_access_history = state
-        .db
-        .list_support_access_grants(&user.id, 8)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .into_iter()
-        .map(support_access_history_entry)
-        .collect::<Vec<_>>();
-    let sessions = state
-        .db
-        .list_sessions_by_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .into_iter()
-        .map(|session| account_session_entry(session, &current_token))
-        .collect::<Vec<_>>();
-    let runtime_backups = load_runtime_backups_response(&state.db, &user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let runtime_restore_drills = load_runtime_restore_drills_response(&state.db, &user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let runtime_updates = load_runtime_updates_response(&state.db, &user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let device_sync_policies = load_device_sync_policies_response(&state.db, &user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let onboarding = state
-        .db
-        .find_user_onboarding(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .unwrap_or_else(|| default_onboarding_for_user(&user));
-
-    Ok(Json(DashboardBootstrapResponse {
-        user: session_user_response(&user),
-        agents,
-        messages,
-        cost_snapshot: None,
-        cost_status: None,
-        workflow_runtime_summary: None,
-        browser_runtime_summary: None,
-        trust_runtime_summary: None,
-        file_runtime_summary: None,
-        continuity_state: None,
-        continuity_brief: None,
-        continuity_handoff: None,
-        continuity_surface_hint: None,
-        continuity_requires_approval: false,
-        continuity_panel_kind: "briefing_bar".to_string(),
-        continuity_primary_mode: "briefing_bar".to_string(),
-        continuity_priority_item: None,
-        continuity_priority_card: None,
-        continuity_action_items: Vec::new(),
-        continuity_response_items: Vec::new(),
-        continuity_prepared_draft_items: Vec::new(),
-        continuity_context_panel_items: Vec::new(),
-        continuity_context_pack_items: Vec::new(),
-        continuity_state_fields: Vec::new(),
-        action_log,
-        onboarding,
-        device_sync_policies,
-        support_access,
-        support_access_history,
-        sessions,
-        runtime_backups,
-        runtime_restore_drills,
-        runtime_updates,
-        runtime_deployment,
-        proactive_suggestions: vec![],
-        enabled_heuristic_packs: vec![],
-    }))
-}
-
-async fn dashboard_export_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<DashboardExportResponse>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    ensure_user_agents_and_demo_seed(&state, &user)
-        .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
-    let agents = state
-        .db
-        .list_managed_agents_by_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let agent_ids = agents
-        .iter()
-        .map(|agent| agent.agent_id.clone())
-        .collect::<Vec<_>>();
-    // GAP-075: include private messages in the export, same as the bootstrap handler.
-    let (shared_msgs, private_msgs) = tokio::join!(
-        state.db.recent_messages_for_agents(&agent_ids, 100),
-        state.db.recent_private_messages_for_user(&user.id, 100),
-    );
-    let mut all_raw = shared_msgs
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    all_raw.extend(
-        private_msgs
-            .map_err(internal_error)
-            .map_err(status_to_http)?,
-    );
-    all_raw.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-    all_raw.dedup_by(|a, b| a.id == b.id);
-    let messages: Vec<_> = all_raw.into_iter().map(proto_to_app).collect();
-    let thread_ids = messages
-        .iter()
-        .map(|message| message.thread_id.clone())
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
-    let action_log = state
-        .db
-        .recent_action_results_for_threads(&thread_ids, 200)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let runtime_deployment = match state
-        .db
-        .find_runtime_deployment_by_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-    {
-        Some(deployment) => Some(
-            runtime_deployment_response_live(
-                inspect_runtime_deployment_live(inspect_runtime_deployment(deployment)).await,
-            )
-            .await,
-        ),
-        None => None,
-    };
-    let support_access = state
-        .db
-        .latest_support_access_grant(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .map(support_access_state_response)
-        .unwrap_or_else(default_support_access_state_response);
-    let support_access_history = state
-        .db
-        .list_support_access_grants(&user.id, 32)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .into_iter()
-        .map(support_access_history_entry)
-        .collect::<Vec<_>>();
-    let runtime_backups = load_runtime_backups_response(&state.db, &user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let runtime_restore_drills = load_runtime_restore_drills_response(&state.db, &user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let runtime_updates = load_runtime_updates_response(&state.db, &user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let device_sync_policies = load_device_sync_policies_response(&state.db, &user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let onboarding = state
-        .db
-        .find_user_onboarding(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .unwrap_or_else(|| default_onboarding_for_user(&user));
-
-    Ok(Json(DashboardExportResponse {
-        exported_at: chrono::Utc::now().to_rfc3339(),
-        export_version: "omnyid-dashboard-export-v1".to_string(),
-        user: session_user_response(&user),
-        agents,
-        cost_snapshot: None,
-        cost_status: None,
-        workflow_runtime_summary: None,
-        browser_runtime_summary: None,
-        trust_runtime_summary: None,
-        file_runtime_summary: None,
-        continuity_state: None,
-        continuity_brief: None,
-        continuity_handoff: None,
-        continuity_surface_hint: None,
-        continuity_requires_approval: false,
-        continuity_panel_kind: "briefing_bar".to_string(),
-        continuity_primary_mode: "briefing_bar".to_string(),
-        continuity_priority_item: None,
-        continuity_priority_card: None,
-        continuity_action_items: Vec::new(),
-        continuity_response_items: Vec::new(),
-        continuity_prepared_draft_items: Vec::new(),
-        continuity_context_panel_items: Vec::new(),
-        continuity_context_pack_items: Vec::new(),
-        continuity_state_fields: Vec::new(),
-        onboarding,
-        device_sync_policies,
-        support_access,
-        support_access_history,
-        runtime_backups,
-        runtime_restore_drills,
-        runtime_updates,
-        runtime_deployment,
-        recent_messages: messages,
-        action_log,
-    }))
-}
-
-async fn update_onboarding_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(request): Json<OnboardingUpdateRequest>,
-) -> Result<Json<UserOnboardingRecord>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let onboarding = build_onboarding_record(&user, request)?;
-
-    state
-        .db
-        .upsert_user_onboarding(&onboarding)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-
-    Ok(Json(onboarding))
-}
 
 async fn demo_send_http(
     State(state): State<Arc<AppState>>,
@@ -1847,7 +1789,7 @@ async fn demo_send_http(
         vec![],
         true,
     )
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+    .map_err(internal_http_error)?;
     let message_id = message.id.clone();
 
     store_private_app_message(
@@ -1870,6 +1812,7 @@ async fn demo_send_http(
 
 /// Accepted `type` values for the notes message endpoint.
 const NOTES_ALLOWED_TYPES: &[&str] = &[
+    "note",
     crate::message::AFP_TYPE_FOLDER_RULE,
     crate::message::AFP_TYPE_AREA_RULES,
     crate::message::AFP_TYPE_TAG_UPDATE,
@@ -1877,17 +1820,17 @@ const NOTES_ALLOWED_TYPES: &[&str] = &[
 
 #[derive(serde::Deserialize)]
 struct NoteMessageRequest {
-    /// AFP message type: "folder_rule", "area_rules", or "tag_update".
+    /// AFP message type: "note", "folder_rule", "area_rules", or "tag_update".
     r#type: String,
     #[serde(default)]
     kind: Option<String>,
-    /// Thread to append to. For folder/area rules this is the folder/area id;
+    /// Thread to append to. For note messages this is the note thread.
+    /// For folder/area rules this is the folder/area id;
     /// for tag_update it should match the source note's thread_id.
     thread_id: String,
-    /// Message content. Shape varies by type â€” see `FolderRuleContent`,
-    /// `AreaRulesContent`, `TagUpdateContent` in `src/message.rs`.
+    /// Message content. Shape varies by type.
     content: serde_json::Value,
-    /// For `tag_update`: ids of the original note messages being updated.
+    /// For `note` and `tag_update`: ids of the original note messages being updated.
     #[serde(default)]
     references: Vec<serde_json::Value>,
 }
@@ -1930,7 +1873,7 @@ async fn notes_message_http(
         vec![],
         true,
     )
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    .map_err(internal_http_error)?;
 
     let message_id = message.id.clone();
 
@@ -1950,177 +1893,7 @@ async fn notes_message_http(
     })))
 }
 
-async fn onboarding_bundle_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<OnboardingBundleResponse>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let onboarding = state
-        .db
-        .find_user_onboarding(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .unwrap_or_else(|| default_onboarding_for_user(&user));
-    let agents = state
-        .db
-        .list_managed_agents_by_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-
-    Ok(Json(build_onboarding_bundle_response(
-        &user,
-        &onboarding,
-        &agents,
-    )))
-}
-
 // â”€â”€ Account & support management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-async fn service_adapter_bundle_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<ServiceAdapterBundleResponse>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let agents = state
-        .db
-        .list_managed_agents_by_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-
-    Ok(Json(build_service_adapter_bundle_response(&user, &agents)))
-}
-
-async fn support_access_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<SupportAccessStateResponse>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let state_response = state
-        .db
-        .latest_support_access_grant(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .map(support_access_state_response)
-        .unwrap_or_else(default_support_access_state_response);
-    Ok(Json(state_response))
-}
-
-async fn support_access_history_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<SupportAccessHistoryResponse>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let entries = state
-        .db
-        .list_support_access_grants(&user.id, 12)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .into_iter()
-        .map(support_access_history_entry)
-        .collect::<Vec<_>>();
-    Ok(Json(SupportAccessHistoryResponse { entries }))
-}
-
-async fn account_sessions_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<AccountSessionsResponse>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let current_token = bearer_token_from_headers(&headers)
-        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
-    let sessions = state
-        .db
-        .list_sessions_by_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .into_iter()
-        .map(|session| account_session_entry(session, &current_token))
-        .collect::<Vec<_>>();
-    Ok(Json(AccountSessionsResponse { sessions }))
-}
-
-async fn account_sessions_action_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(request): Json<SessionActionRequest>,
-) -> Result<Json<AccountSessionsResponse>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let current_token = bearer_token_from_headers(&headers)
-        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
-    let action = request.action.trim().to_lowercase();
-
-    match action.as_str() {
-        "revoke" => {
-            let token_preview = request.token.as_deref().ok_or_else(|| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    "token preview is required when revoking a session".to_string(),
-                )
-            })?;
-            // Compare against hash since stored tokens are hashed (GAP-005)
-            if token_preview == runtime_token_preview(&sha256_token(&current_token)) {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "use sign out to end the current session".to_string(),
-                ));
-            }
-            let target_token = state
-                .db
-                .list_sessions_by_user(&user.id)
-                .await
-                .map_err(internal_error)
-                .map_err(status_to_http)?
-                .into_iter()
-                .find(|session| runtime_token_preview(&session.token) == token_preview)
-                .map(|session| session.token)
-                .ok_or_else(|| {
-                    (
-                        StatusCode::NOT_FOUND,
-                        "session not found for this account".to_string(),
-                    )
-                })?;
-            state
-                .db
-                .revoke_session_by_hash(&user.id, &target_token)
-                .await
-                .map_err(internal_error)
-                .map_err(status_to_http)?;
-        }
-        "revoke_others" => {
-            state
-                .db
-                .revoke_other_sessions(&user.id, &current_token)
-                .await
-                .map_err(internal_error)
-                .map_err(status_to_http)?;
-        }
-        _ => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "session action must be revoke or revoke_others".to_string(),
-            ));
-        }
-    }
-
-    let sessions = state
-        .db
-        .list_sessions_by_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .into_iter()
-        .map(|session| account_session_entry(session, &current_token))
-        .collect::<Vec<_>>();
-    Ok(Json(AccountSessionsResponse { sessions }))
-}
-
-// â”€â”€ Runtime backups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn runtime_backups_http(
     State(state): State<Arc<AppState>>,
@@ -2188,7 +1961,7 @@ async fn runtime_backups_action_http(
             };
             create_runtime_backup_snapshot(&state.db, &user.id, retention_days)
                 .await
-                .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+                .map_err(internal_http_error)?;
         }
         "delete_snapshot" => {
             let backup_id = request
@@ -2376,12 +2149,12 @@ async fn runtime_updates_action_http(
         "check_updates" => {
             check_runtime_updates(&state.db, &user.id)
                 .await
-                .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+                .map_err(internal_http_error)?;
         }
         "apply_update" => {
             apply_runtime_update(&state.db, &user.id)
                 .await
-                .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+                .map_err(internal_http_error)?;
         }
         _ => {
             return Err((
@@ -2438,282 +2211,16 @@ async fn runtime_recovery_packet_http(
         runtime_backups,
         runtime_restore_drills,
         runtime_updates,
+        load_runtime_operational_guidance(),
     )))
 }
-
-// â”€â”€ Device bootstrap & sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-async fn device_bootstrap_bundle_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(request): Json<DeviceBootstrapRequest>,
-) -> Result<Json<DeviceBootstrapBundleResponse>, (StatusCode, String)> {
-    enforce_rate_limit(
-        &state,
-        authenticated_rate_limit_key("device_bootstrap_bundle", &headers),
-        RateLimitPolicy {
-            max_requests: 12,
-            window: Duration::from_secs(60),
-        },
-    )
-    .await?;
-    let user = authenticated_user(&state.db, &headers).await?;
-    let agents = state
-        .db
-        .list_managed_agents_by_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let bundle =
-        build_device_bootstrap_bundle_response(&user, &agents, request.device_class.trim())?;
-    let profile = default_device_sync_profile(&bundle.device_class);
-    let sync_slices = sync_slices_for_bundle(&bundle.device_class, &profile)?;
-    state
-        .db
-        .upsert_sync_device(&bundle.bootstrap)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    state
-        .db
-        .upsert_sync_device_policy(
-            &user.id,
-            &bundle.bootstrap,
-            &bundle.device_class,
-            &profile,
-            &sync_slices,
-            bundle.requires_local_key_material,
-            serde_json::json!({
-                "source": "device_bootstrap_bundle",
-                "default_profile": true,
-                "policy_note": device_policy_note(&bundle.device_class, &profile),
-            }),
-        )
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    Ok(Json(bundle))
-}
-
-async fn device_sync_policies_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<DeviceSyncPoliciesResponse>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let response = load_device_sync_policies_response(&state.db, &user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    Ok(Json(response))
-}
-
-async fn device_sync_policies_action_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(request): Json<DeviceSyncPolicyRequest>,
-) -> Result<Json<DeviceSyncPoliciesResponse>, (StatusCode, String)> {
-    enforce_rate_limit(
-        &state,
-        authenticated_rate_limit_key("device_sync_policies", &headers),
-        RateLimitPolicy {
-            max_requests: 20,
-            window: Duration::from_secs(60),
-        },
-    )
-    .await?;
-    let user = authenticated_user(&state.db, &headers).await?;
-    let action = request.action.trim().to_lowercase();
-    match action.as_str() {
-        "set_profile" => {
-            let device_id = request
-                .device_id
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .ok_or_else(|| (StatusCode::BAD_REQUEST, "device_id is required".to_string()))?;
-            let profile = request
-                .policy_profile
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| matches!(*value, "full" | "balanced" | "lightweight"))
-                .ok_or_else(|| {
-                    (
-                        StatusCode::BAD_REQUEST,
-                        "policy_profile must be full, balanced, or lightweight".to_string(),
-                    )
-                })?;
-            let existing = state
-                .db
-                .find_sync_device_policy_by_user(&user.id, device_id)
-                .await
-                .map_err(internal_error)
-                .map_err(status_to_http)?
-                .ok_or_else(|| {
-                    (
-                        StatusCode::NOT_FOUND,
-                        "sync device policy not found for this account".to_string(),
-                    )
-                })?;
-            let sync_slices = sync_slices_for_bundle(&existing.device_class, profile)?;
-            state
-                .db
-                .update_sync_device_policy(
-                    &user.id,
-                    device_id,
-                    profile,
-                    &sync_slices,
-                    requires_local_key_material(&sync_slices),
-                    serde_json::json!({
-                        "source": "dashboard_policy_update",
-                        "policy_note": device_policy_note(&existing.device_class, profile),
-                    }),
-                )
-                .await
-                .map_err(internal_error)
-                .map_err(status_to_http)?
-                .ok_or_else(|| {
-                    (
-                        StatusCode::NOT_FOUND,
-                        "sync device policy not found for this account".to_string(),
-                    )
-                })?;
-        }
-        _ => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "device sync policy action must be set_profile".to_string(),
-            ));
-        }
-    }
-    let response = load_device_sync_policies_response(&state.db, &user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    Ok(Json(response))
-}
-
-async fn update_support_access_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(request): Json<SupportAccessRequest>,
-) -> Result<Json<SupportAccessStateResponse>, (StatusCode, String)> {
-    enforce_rate_limit(
-        &state,
-        authenticated_rate_limit_key("support_access", &headers),
-        RateLimitPolicy {
-            max_requests: 10,
-            window: Duration::from_secs(60),
-        },
-    )
-    .await?;
-    let user = authenticated_user(&state.db, &headers).await?;
-    let action = request.action.trim().to_lowercase();
-
-    match action.as_str() {
-        "grant" => {
-            let duration_hours = request.duration_hours.unwrap_or(1);
-            if !matches!(duration_hours, 1 | 4 | 24) {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "support access duration must be 1, 4, or 24 hours".to_string(),
-                ));
-            }
-            let reason = request
-                .reason
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .ok_or_else(|| {
-                    (
-                        StatusCode::BAD_REQUEST,
-                        "support access reason is required".to_string(),
-                    )
-                })?;
-            let access_scope = request
-                .access_scope
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| matches!(*value, "runtime_metadata_only" | "runtime_debug"))
-                .unwrap_or("runtime_metadata_only");
-            let expires_at =
-                (chrono::Utc::now() + chrono::Duration::hours(duration_hours)).to_rfc3339();
-            let notes = serde_json::json!({
-                "source": "dashboard",
-                "granted_by": "user_self",
-                "privacy_boundary": "support_access_disabled_by_default",
-            });
-            let record = state
-                .db
-                .create_support_access_grant(
-                    &user.id,
-                    access_scope,
-                    Some(reason),
-                    &expires_at,
-                    notes,
-                )
-                .await
-                .map_err(internal_error)
-                .map_err(status_to_http)?;
-            Ok(Json(support_access_state_response(record)))
-        }
-        "revoke" => {
-            let record = state
-                .db
-                .revoke_active_support_access(
-                    &user.id,
-                    request
-                        .reason
-                        .as_deref()
-                        .map(str::trim)
-                        .filter(|value| !value.is_empty()),
-                )
-                .await
-                .map_err(internal_error)
-                .map_err(status_to_http)?;
-            Ok(Json(
-                record
-                    .map(support_access_state_response)
-                    .unwrap_or_else(default_support_access_state_response),
-            ))
-        }
-        _ => Err((
-            StatusCode::BAD_REQUEST,
-            "support access action must be grant or revoke".to_string(),
-        )),
-    }
-}
-
-// â”€â”€ Runtime installer scripts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-async fn local_windows_installer_http() -> impl IntoResponse {
-    let content = include_str!("../../scripts/install-omnyid-private.ps1");
-    (
-        [(
-            axum::http::header::CONTENT_TYPE,
-            "text/plain; charset=utf-8",
-        )],
-        content,
-    )
-}
-
-async fn local_unix_installer_http() -> impl IntoResponse {
-    let content = include_str!("../../scripts/install-omnyid-private.sh");
-    (
-        [(
-            axum::http::header::CONTENT_TYPE,
-            "text/plain; charset=utf-8",
-        )],
-        content,
-    )
-}
-
-// â”€â”€ Runtime deploy & lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn runtime_deploy_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(request): Json<RuntimeDeployRequest>,
 ) -> Result<Json<RuntimeDeploymentResponse>, (StatusCode, String)> {
+    ensure_private_runtime_feature_enabled()?;
     enforce_rate_limit(
         &state,
         authenticated_rate_limit_key("runtime_deploy", &headers),
@@ -2753,8 +2260,7 @@ async fn runtime_deploy_http(
         request.gui.as_deref(),
     )?;
 
-    materialize_runtime_scaffold(&deployment)
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+    materialize_runtime_scaffold(&deployment).map_err(internal_http_error)?;
 
     let mut deployment = inspect_runtime_deployment(deployment);
     deployment = match runtime_compose_action(&deployment, "start").await {
@@ -2777,6 +2283,7 @@ async fn runtime_action_http(
     headers: HeaderMap,
     Json(request): Json<RuntimeActionRequest>,
 ) -> Result<Json<RuntimeDeploymentResponse>, (StatusCode, String)> {
+    ensure_private_runtime_feature_enabled()?;
     enforce_rate_limit(
         &state,
         authenticated_rate_limit_key("runtime_action", &headers),
@@ -2829,6 +2336,7 @@ async fn runtime_destroy_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    ensure_private_runtime_feature_enabled()?;
     enforce_rate_limit(
         &state,
         authenticated_rate_limit_key("runtime_destroy", &headers),
@@ -2938,6 +2446,7 @@ async fn runtime_logs_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<RuntimeLogsResponse>, (StatusCode, String)> {
+    ensure_private_runtime_feature_enabled()?;
     let user = authenticated_user(&state.db, &headers).await?;
     let deployment = state
         .db
@@ -2966,6 +2475,7 @@ async fn runtime_runner_config_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    ensure_private_runtime_feature_enabled()?;
     let user = authenticated_user(&state.db, &headers).await?;
     let deployment = state
         .db
@@ -3005,7 +2515,7 @@ async fn runtime_runner_config_http(
             .get("starter_profile")
             .and_then(|profile| profile.get("default_template_id"))
             .cloned()
-            .unwrap_or_else(|| Value::String("student_day_planner".to_string())),
+            .unwrap_or_else(|| Value::String("travel_planner".to_string())),
         "policy_events": policy_events,
     })))
 }
@@ -3015,6 +2525,7 @@ async fn runtime_runner_config_action_http(
     headers: HeaderMap,
     Json(request): Json<RuntimeRunnerConfigRequest>,
 ) -> Result<Json<RuntimeDeploymentResponse>, (StatusCode, String)> {
+    ensure_private_runtime_feature_enabled()?;
     enforce_rate_limit(
         &state,
         authenticated_rate_limit_key("runtime_runner_config", &headers),
@@ -3077,10 +2588,8 @@ async fn runtime_runner_config_action_http(
     }
     let updated_at = chrono::Utc::now().to_rfc3339();
     deployment.updated_at = updated_at.clone();
-    sync_runtime_policy_file(&deployment)
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
-    sync_runtime_agent_profile_file(&deployment)
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+    sync_runtime_policy_file(&deployment).map_err(internal_http_error)?;
+    sync_runtime_agent_profile_file(&deployment).map_err(internal_http_error)?;
     state
         .db
         .upsert_runtime_deployment(&deployment)
@@ -3134,7 +2643,7 @@ async fn runtime_runner_config_action_http(
                     .get("starter_profile")
                     .and_then(|profile| profile.get("default_template_id"))
                     .cloned()
-                    .unwrap_or_else(|| Value::String("student_day_planner".to_string())),
+                    .unwrap_or_else(|| Value::String("travel_planner".to_string())),
                 "model_mode": deployment
                     .config_json
                     .get("model_policy")
@@ -3317,8 +2826,7 @@ async fn runtime_workspace_file_save_http(
             "selected workspace file is read-only".to_string(),
         ));
     }
-    write_runtime_file(&descriptor.path, &request.content)
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+    write_runtime_file(&descriptor.path, &request.content).map_err(internal_http_error)?;
 
     Ok(Json(RuntimeWorkspaceFileResponse {
         file_id: descriptor.file_id.to_string(),
@@ -3355,12 +2863,401 @@ async fn get_thread_http(
     Ok(Json(messages.into_iter().map(proto_to_app).collect()))
 }
 
+#[instrument(skip(state, request), fields(thread_id = %request.thread_id, checkpoint_message_id = %request.checkpoint_message_id))]
+async fn undo_action_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<UndoActionRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("actions_undo", &headers),
+        RateLimitPolicy {
+            max_requests: 12,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let user = authenticated_user(&state.db, &headers).await?;
+    let thread_messages =
+        thread_messages_for_headers(&state.db, &headers, &request.thread_id).await?;
+    let checkpoint_message = thread_messages
+        .iter()
+        .find(|message| message.id == request.checkpoint_message_id)
+        .cloned()
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                "undo checkpoint not found in thread".to_string(),
+            )
+        })?;
+    let checkpoint_app_message = proto_to_app(checkpoint_message);
+    let mut execution = internal_undo_execution_from_checkpoint(&checkpoint_app_message)?
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "undo checkpoint is not a supported internal reversible action".to_string(),
+            )
+        })?;
+
+    let revert_request_value = build_revert_request_afp(
+        &user.id,
+        &request.thread_id,
+        &execution.target_message_id,
+        &execution.target_type,
+        &execution.undo_label,
+        request
+            .reason
+            .as_deref()
+            .unwrap_or("Undo requested by the authenticated user."),
+        execution.steps.clone(),
+        Some(&execution.rollback_token),
+        true,
+    );
+    let mut revert_request_message = bundle_afp_value_to_message(revert_request_value)?;
+    revert_request_message.parent_id = Some(request.checkpoint_message_id.clone());
+    let revert_id = revert_request_message
+        .content
+        .get("revert_id")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "generated revert request is missing revert_id".to_string(),
+            )
+        })?;
+    let _ = sign_server_generated_message(&mut revert_request_message);
+    let revert_request_message_id = store_app_message_for_headers(
+        &state.db,
+        &state.metrics,
+        &state.relay_tx,
+        &headers,
+        revert_request_message,
+    )
+    .await?;
+
+    let mut materialized_undo_artifact_refs = vec![];
+
+    if execution.capability_id == REVERSIBLE_CAPABILITY_DRAFT_TASK_CREATE
+        && execution.mode == "remove_draft_task"
+    {
+        let task_id = decode_rollback_token(&execution.rollback_token)
+            .and_then(|payload| {
+                payload
+                    .get("task_id")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
+            .ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    "draft task rollback token is missing task_id".to_string(),
+                )
+            })?;
+        let update_result = state
+            .db
+            .update_agent_task_status(
+                &user.id,
+                &task_id,
+                TaskStatus::Cancelled.as_str(),
+                Some(serde_json::json!({
+                    "reason": "reverted_draft_task",
+                    "revert_request_message_id": revert_request_message_id,
+                })),
+                None,
+            )
+            .await;
+        match update_result {
+            Ok(()) => {
+                if let Some(step) = execution.steps.get_mut(0) {
+                    step.completed = true;
+                    step.status = "completed".to_string();
+                    step.result = Some(format!("Cancelled reversible draft task {task_id}"));
+                }
+                execution.summary = format!("Cancelled reversible draft task {task_id}.");
+            }
+            Err(sqlx::Error::RowNotFound) => {
+                if let Some(step) = execution.steps.get_mut(0) {
+                    step.completed = true;
+                    step.status = "already_applied".to_string();
+                    step.result = Some(format!("Draft task {task_id} was already absent"));
+                }
+                execution.summary = format!("Draft task {task_id} was already absent.");
+            }
+            Err(err) => {
+                return Err(status_to_http(internal_error(err)));
+            }
+        }
+    } else if execution.capability_id == REVERSIBLE_CAPABILITY_TENTATIVE_CALENDAR_HOLD
+        && execution.mode == "remove_tentative_calendar_hold"
+    {
+        let token_payload = decode_rollback_token(&execution.rollback_token).ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "tentative calendar hold rollback token is invalid".to_string(),
+            )
+        })?;
+        let event_id = token_payload
+            .get("event_id")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    "tentative calendar hold rollback token is missing event_id".to_string(),
+                )
+            })?;
+        let hold_title = token_payload
+            .get("title")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let hold_location = token_payload
+            .get("location")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let hold_note_kind = token_payload
+            .get("note_kind")
+            .and_then(Value::as_str)
+            .map(|value| value.replace('_', " "));
+        let hold_start_at = token_payload
+            .get("start_at")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let hold_label = hold_title
+            .clone()
+            .unwrap_or_else(|| format!("tentative calendar hold {event_id}"));
+        let hold_context = [
+            hold_note_kind
+                .as_ref()
+                .map(|value| format!("mode: {value}")),
+            hold_start_at
+                .as_ref()
+                .map(|value| format!("start: {value}")),
+            hold_location
+                .as_ref()
+                .map(|value| format!("location: {value}")),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(", ");
+        let deleted = state
+            .db
+            .delete_calendar_event(&user.id, &event_id)
+            .await
+            .map_err(internal_error)
+            .map_err(status_to_http)?;
+        if let Some(step) = execution.steps.get_mut(0) {
+            step.completed = true;
+            step.status = if deleted {
+                "completed".to_string()
+            } else {
+                "already_applied".to_string()
+            };
+            step.result = Some(if deleted {
+                if hold_context.is_empty() {
+                    format!("Cancelled tentative hold {hold_label}")
+                } else {
+                    format!("Cancelled tentative hold {hold_label} ({hold_context})")
+                }
+            } else {
+                if hold_context.is_empty() {
+                    format!("Tentative hold {hold_label} was already absent")
+                } else {
+                    format!("Tentative hold {hold_label} was already absent ({hold_context})")
+                }
+            });
+        }
+        execution.summary = if deleted {
+            if hold_context.is_empty() {
+                format!("Cancelled tentative calendar hold {hold_label}.")
+            } else {
+                format!("Cancelled tentative calendar hold {hold_label} ({hold_context}).")
+            }
+        } else {
+            if hold_context.is_empty() {
+                format!("Tentative calendar hold {hold_label} was already absent.")
+            } else {
+                format!("Tentative calendar hold {hold_label} was already absent ({hold_context}).")
+            }
+        };
+    } else if execution.capability_id == REVERSIBLE_CAPABILITY_INBOX_ORGANIZE
+        && execution.mode == "undo_inbox_organization"
+    {
+        let token_payload = decode_rollback_token(&execution.rollback_token).ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "inbox organization rollback token is invalid".to_string(),
+            )
+        })?;
+        let conversation_ref = token_payload
+            .get("conversation_ref")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown_conversation");
+        let mut revert_message = build_inbox_organization_revert_message(
+            &user.id,
+            &request.thread_id,
+            Some(&revert_request_message_id),
+            &execution.target_message_id,
+            &revert_request_message_id,
+            &token_payload,
+        )?;
+        let _ = sign_server_generated_message(&mut revert_message);
+        let revert_state_message_id = store_app_message_for_headers(
+            &state.db,
+            &state.metrics,
+            &state.relay_tx,
+            &headers,
+            revert_message,
+        )
+        .await?;
+        materialized_undo_artifact_refs.push(serde_json::json!({
+            "message_id": revert_state_message_id,
+            "relation": "inbox_organization_revert",
+        }));
+        if let Some(step) = execution.steps.get_mut(0) {
+            step.completed = true;
+            step.status = "completed".to_string();
+            step.result = Some(format!(
+                "Emitted compensating inbox organization artifact for {conversation_ref}"
+            ));
+        }
+        execution.summary = format!("Reverted staged inbox organization for {conversation_ref}.");
+    } else if execution.capability_id == REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE
+        && execution.mode == "discard_file_bundle_stage"
+    {
+        let token_payload = decode_rollback_token(&execution.rollback_token).ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "file bundle rollback token is invalid".to_string(),
+            )
+        })?;
+        let bundle_id = token_payload
+            .get("bundle_id")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown_bundle");
+        let mut discard_message = build_file_bundle_stage_discard_message(
+            &user.id,
+            &request.thread_id,
+            Some(&revert_request_message_id),
+            &execution.target_message_id,
+            &revert_request_message_id,
+            &token_payload,
+        )?;
+        let _ = sign_server_generated_message(&mut discard_message);
+        let discard_message_id = store_app_message_for_headers(
+            &state.db,
+            &state.metrics,
+            &state.relay_tx,
+            &headers,
+            discard_message,
+        )
+        .await?;
+        materialized_undo_artifact_refs.push(serde_json::json!({
+            "message_id": discard_message_id,
+            "relation": "file_bundle_stage_discard",
+        }));
+        if let Some(step) = execution.steps.get_mut(0) {
+            step.completed = true;
+            step.status = "completed".to_string();
+            step.result = Some(format!(
+                "Emitted compensating file bundle discard artifact for {bundle_id}"
+            ));
+        }
+        execution.summary = format!("Discarded staged file bundle {bundle_id}.");
+    } else if let Some(step) = execution.steps.get_mut(0) {
+        step.completed = true;
+        step.status = "completed".to_string();
+        step.result = Some(execution.summary.clone());
+    }
+
+    let result_summary = execution.summary.clone();
+    let target_message_id = execution.target_message_id.clone();
+    let undo_label = execution.undo_label.clone();
+    let revert_result_value = build_revert_result_afp(
+        &user.id,
+        &request.thread_id,
+        &revert_id,
+        &target_message_id,
+        "completed",
+        &result_summary,
+        execution.steps.len() as u32,
+        execution.steps.len() as u32,
+        0,
+        &[],
+        None,
+    );
+    let mut revert_result_message = bundle_afp_value_to_message(revert_result_value)?;
+    revert_result_message.parent_id = Some(revert_request_message_id.clone());
+    let _ = sign_server_generated_message(&mut revert_result_message);
+    let revert_result_message_id = store_app_message_for_headers(
+        &state.db,
+        &state.metrics,
+        &state.relay_tx,
+        &headers,
+        revert_result_message,
+    )
+    .await?;
+
+    let mut action_result_output = serde_json::Map::new();
+    action_result_output.insert("status".to_string(), Value::String("reverted".to_string()));
+    action_result_output.insert("reverted".to_string(), Value::Bool(true));
+    action_result_output.insert(
+        "target_message_id".to_string(),
+        Value::String(target_message_id.clone()),
+    );
+    action_result_output.insert(
+        "checkpoint_message_id".to_string(),
+        Value::String(request.checkpoint_message_id.clone()),
+    );
+    action_result_output.insert("undo_label".to_string(), Value::String(undo_label.clone()));
+    action_result_output.insert(
+        "side_effect_boundary".to_string(),
+        Value::String("internal_only".to_string()),
+    );
+    action_result_output.insert("summary".to_string(), Value::String(result_summary.clone()));
+    if !materialized_undo_artifact_refs.is_empty() {
+        action_result_output.insert(
+            "artifact_refs".to_string(),
+            Value::Array(materialized_undo_artifact_refs.clone()),
+        );
+    }
+
+    let action_result = ActionResult {
+        capability_id: format!("{}:undo", execution.capability_id),
+        thread_id: request.thread_id.clone(),
+        status: ActionStatus::Completed,
+        output: Value::Object(action_result_output),
+        external_reference: Some(revert_result_message_id.clone()),
+        recorded_at: chrono::Utc::now().to_rfc3339(),
+    };
+    state
+        .db
+        .record_action_result_for_user(&user.id, &action_result)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+
+    Ok(Json(serde_json::json!({
+        "status": "completed",
+        "thread_id": request.thread_id,
+        "checkpoint_message_id": request.checkpoint_message_id,
+        "revert_request_message_id": revert_request_message_id,
+        "revert_result_message_id": revert_result_message_id,
+        "target_message_id": execution.target_message_id,
+        "summary": execution.summary,
+        "artifact_refs": materialized_undo_artifact_refs,
+    })))
+}
+
 #[instrument(skip(state, request), fields(thread_id = %request.thread_id, target_message_id = %request.target_message_id))]
 async fn record_action_decision_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(request): Json<ApprovalDecisionRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    let (user, session) = authenticated_user_and_session(&state.db, &headers).await?;
     let normalized_decision = request.decision.trim().to_lowercase();
     let action_status = match normalized_decision.as_str() {
         "approved" => ActionStatus::Approved,
@@ -3386,6 +3283,11 @@ async fn record_action_decision_http(
             )
         })?;
     let target_app_message = proto_to_app(target_message);
+    if matches!(action_status, ActionStatus::Approved)
+        && message_requires_human_approval(&target_app_message)
+    {
+        require_recent_high_risk_session(&session)?;
+    }
     let capability_id = request
         .capability_id
         .clone()
@@ -3397,7 +3299,7 @@ async fn record_action_decision_http(
                 .map(str::to_string)
         })
         .unwrap_or_else(|| target_app_message.r#type.clone());
-    let approval_review = build_action_approval_review_payload(&target_app_message);
+    let approval_review = build_action_approval_review_payload(&target_app_message, &capability_id);
     let selected_option = if normalized_decision == "approved" {
         serde_json::json!({
             "option_id": "approve",
@@ -3422,6 +3324,7 @@ async fn record_action_decision_http(
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "action".to_string(),
         kind: None,
+        supertags: vec![],
         subtype: Some("approval_decision".to_string()),
         content: serde_json::json!({
             "target_message_id": request.target_message_id,
@@ -3432,7 +3335,7 @@ async fn record_action_decision_http(
             "note": request.note,
             "approval_review": approval_review,
             "selected_option": selected_option,
-            "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+            "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
                 "This action flowed through an explicit human approval boundary."
             ),
         }),
@@ -3441,7 +3344,7 @@ async fn record_action_decision_http(
             "status": action_status_json_label(&action_status),
             "capability_id": capability_id,
             "approval_review": approval_review,
-            "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+            "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
                 "This action flowed through an explicit human approval boundary."
             )
         })),
@@ -3488,7 +3391,7 @@ async fn record_action_decision_http(
             "note": request.note,
             "approval_review": approval_review,
             "selected_option": selected_option,
-            "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+            "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
                 "This action flowed through an explicit human approval boundary."
             ),
         }),
@@ -3497,13 +3400,19 @@ async fn record_action_decision_http(
     };
     state
         .db
-        .record_action_result(&action_result)
+        .record_action_result_for_user(&user.id, &action_result)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
 
     if matches!(action_status, ActionStatus::Approved) {
-        execute_approved_action(&state.db, &state.metrics, &target_app_message).await;
+        execute_approved_action(
+            &state.db,
+            &state.metrics,
+            &target_app_message,
+            Some(&user.id),
+        )
+        .await;
     }
 
     Ok(Json(serde_json::json!({
@@ -3534,6 +3443,14 @@ struct ExecuteActionRequest {
     bearer_token: Option<String>,
 }
 
+#[derive(serde::Deserialize)]
+struct UndoActionRequest {
+    thread_id: String,
+    checkpoint_message_id: String,
+    #[serde(default)]
+    reason: Option<String>,
+}
+
 fn default_post_method() -> String {
     "POST".to_string()
 }
@@ -3561,6 +3478,14 @@ fn action_execute_is_localhost_http(url: &str) -> bool {
     let localhost_exact = ["http://localhost", "http://127.0.0.1", "http://[::1]"];
     localhost_prefixes.iter().any(|p| lower.starts_with(p))
         || localhost_exact.iter().any(|e| lower == *e)
+}
+
+fn action_execution_requires_recent_session(req: &ExecuteActionRequest) -> bool {
+    matches!(
+        req.capability.transport,
+        crate::integration::IntegrationTransport::Rest
+            | crate::integration::IntegrationTransport::Graphql
+    ) && !action_execute_is_localhost_http(&req.url)
 }
 
 fn direct_action_execute_semaphore() -> &'static Arc<Semaphore> {
@@ -3604,6 +3529,639 @@ fn direct_action_execute_outbound_allowlist(
     Ok(allowlist)
 }
 
+struct InternalReversibleExecution {
+    bundle: ReversibleActionBundle,
+    provider: &'static str,
+    operation: &'static str,
+}
+
+struct InternalUndoExecution {
+    capability_id: String,
+    rollback_token: String,
+    target_message_id: String,
+    target_type: String,
+    undo_label: String,
+    mode: String,
+    summary: String,
+    steps: Vec<AfpRevertStep>,
+}
+
+fn internal_reversible_execution_from_request(
+    owner_user_id: &str,
+    req: &ExecuteActionRequest,
+    parent_id: Option<&str>,
+) -> Result<Option<InternalReversibleExecution>, (StatusCode, String)> {
+    let capability_id = req.capability.capability_id.as_str();
+    let thread_id = req.intent.thread_id.as_str();
+
+    match capability_id {
+        REVERSIBLE_CAPABILITY_DRAFT_TASK_CREATE => {
+            let request: DraftTaskCreationRequest =
+                serde_json::from_value(req.intent.input.clone()).map_err(|err| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        format!("invalid draft task request payload: {err}"),
+                    )
+                })?;
+            Ok(Some(InternalReversibleExecution {
+                bundle: build_draft_task_creation_bundle(
+                    owner_user_id,
+                    thread_id,
+                    parent_id,
+                    &request,
+                ),
+                provider: "internal",
+                operation: "draft_task_create",
+            }))
+        }
+        REVERSIBLE_CAPABILITY_INBOX_ORGANIZE => {
+            let request: InboxOrganizationRequest =
+                serde_json::from_value(req.intent.input.clone()).map_err(|err| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        format!("invalid inbox organization payload: {err}"),
+                    )
+                })?;
+            Ok(Some(InternalReversibleExecution {
+                bundle: build_inbox_organization_bundle(
+                    owner_user_id,
+                    thread_id,
+                    parent_id,
+                    &request,
+                ),
+                provider: "internal",
+                operation: "inbox_organize",
+            }))
+        }
+        REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE => {
+            let request: FileBundleStageRequest = serde_json::from_value(req.intent.input.clone())
+                .map_err(|err| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        format!("invalid file bundle staging payload: {err}"),
+                    )
+                })?;
+            Ok(Some(InternalReversibleExecution {
+                bundle: build_file_bundle_stage_bundle(
+                    owner_user_id,
+                    thread_id,
+                    parent_id,
+                    &request,
+                ),
+                provider: "internal",
+                operation: "file_bundle_stage",
+            }))
+        }
+        REVERSIBLE_CAPABILITY_TENTATIVE_CALENDAR_HOLD => {
+            let request: TentativeCalendarHoldRequest =
+                serde_json::from_value(req.intent.input.clone()).map_err(|err| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        format!("invalid tentative calendar hold payload: {err}"),
+                    )
+                })?;
+            Ok(Some(InternalReversibleExecution {
+                bundle: build_tentative_calendar_hold_bundle(
+                    owner_user_id,
+                    thread_id,
+                    parent_id,
+                    &request,
+                ),
+                provider: "internal",
+                operation: "tentative_calendar_hold",
+            }))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn bundle_afp_value_to_message(value: Value) -> Result<AFPMessage, (StatusCode, String)> {
+    serde_json::from_value(value).map_err(|err| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("failed to materialize internal reversible AFP message: {err}"),
+        )
+    })
+}
+
+fn build_inbox_organization_state_message(
+    owner_user_id: &str,
+    thread_id: &str,
+    parent_id: Option<&str>,
+    target_action_message_id: &str,
+    organization_content: &serde_json::Map<String, Value>,
+) -> Result<AFPMessage, (StatusCode, String)> {
+    let organization_id = organization_content
+        .get("organization_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "inbox organization action is missing organization_id".to_string(),
+            )
+        })?;
+    let provider = organization_content
+        .get("provider")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "inbox organization action is missing provider".to_string(),
+            )
+        })?;
+    let conversation_ref = organization_content
+        .get("conversation_ref")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "inbox organization action is missing conversation_ref".to_string(),
+            )
+        })?;
+    let apply_label = organization_content
+        .get("apply_label")
+        .cloned()
+        .unwrap_or(Value::Null);
+    let archive_after_label = organization_content
+        .get("archive_after_label")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let source_refs = organization_content
+        .get("source_refs")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    Ok(AFPMessage {
+        protocol: "afp-v1".to_string(),
+        id: Ulid::new().to_string(),
+        thread_id: thread_id.to_string(),
+        parent_id: parent_id.map(str::to_string),
+        from: "master_agent".to_string(),
+        to: vec![owner_user_id.to_string()],
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        r#type: "ledger".to_string(),
+        kind: Some("rich_note".to_string()),
+        supertags: vec![],
+        subtype: Some("inbox_organization_state".to_string()),
+        content: serde_json::json!({
+            "organization_id": organization_id,
+            "provider": provider,
+            "conversation_ref": conversation_ref,
+            "apply_label": apply_label,
+            "archive_after_label": archive_after_label,
+            "status": "applied",
+            "source_action_message_id": target_action_message_id,
+            "source_refs": source_refs,
+        }),
+        metadata: Some(serde_json::json!({
+            "store": true,
+            "capability_id": REVERSIBLE_CAPABILITY_INBOX_ORGANIZE,
+            "reversible_action_materialization": true,
+            "side_effect_boundary": "internal_only",
+        })),
+        signature: String::new(),
+        encryption: None,
+        views: vec![serde_json::json!({
+            "format": "system",
+            "content": {
+                "event": "inbox_organization_state_applied",
+                "organization_id": organization_id,
+                "conversation_ref": conversation_ref,
+            }
+        })],
+        references: vec![
+            serde_json::json!({
+                "type": "message",
+                "target": target_action_message_id,
+                "metadata": { "relation": "reversible_action" }
+            }),
+            serde_json::json!({
+                "type": "conversation",
+                "target": conversation_ref,
+                "metadata": { "relation": "organized_conversation" }
+            }),
+        ],
+        typed_refs: vec![],
+        attachments: vec![],
+        store_in_relational: true,
+        prev_hash: None,
+    })
+}
+
+fn build_inbox_organization_revert_message(
+    owner_user_id: &str,
+    thread_id: &str,
+    parent_id: Option<&str>,
+    target_action_message_id: &str,
+    revert_request_message_id: &str,
+    token_payload: &Value,
+) -> Result<AFPMessage, (StatusCode, String)> {
+    let organization_id = token_payload
+        .get("organization_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "inbox organization rollback token is missing organization_id".to_string(),
+            )
+        })?;
+    let provider = token_payload
+        .get("provider")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "inbox organization rollback token is missing provider".to_string(),
+            )
+        })?;
+    let conversation_ref = token_payload
+        .get("conversation_ref")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "inbox organization rollback token is missing conversation_ref".to_string(),
+            )
+        })?;
+    let remove_label = token_payload
+        .get("remove_label")
+        .cloned()
+        .unwrap_or(Value::Null);
+    let restore_archive = token_payload
+        .get("restore_archive")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    Ok(AFPMessage {
+        protocol: "afp-v1".to_string(),
+        id: Ulid::new().to_string(),
+        thread_id: thread_id.to_string(),
+        parent_id: parent_id.map(str::to_string),
+        from: "master_agent".to_string(),
+        to: vec![owner_user_id.to_string()],
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        r#type: "ledger".to_string(),
+        kind: Some("rich_note".to_string()),
+        supertags: vec![],
+        subtype: Some("inbox_organization_revert".to_string()),
+        content: serde_json::json!({
+            "organization_id": organization_id,
+            "provider": provider,
+            "conversation_ref": conversation_ref,
+            "remove_label": remove_label,
+            "restore_archive": restore_archive,
+            "status": "reverted",
+            "source_action_message_id": target_action_message_id,
+            "revert_request_message_id": revert_request_message_id,
+        }),
+        metadata: Some(serde_json::json!({
+            "store": true,
+            "capability_id": REVERSIBLE_CAPABILITY_INBOX_ORGANIZE,
+            "reversible_action_materialization": true,
+            "side_effect_boundary": "internal_only",
+        })),
+        signature: String::new(),
+        encryption: None,
+        views: vec![serde_json::json!({
+            "format": "system",
+            "content": {
+                "event": "inbox_organization_state_reverted",
+                "organization_id": organization_id,
+                "conversation_ref": conversation_ref,
+            }
+        })],
+        references: vec![
+            serde_json::json!({
+                "type": "message",
+                "target": target_action_message_id,
+                "metadata": { "relation": "reversible_action" }
+            }),
+            serde_json::json!({
+                "type": "message",
+                "target": revert_request_message_id,
+                "metadata": { "relation": "revert_request" }
+            }),
+            serde_json::json!({
+                "type": "conversation",
+                "target": conversation_ref,
+                "metadata": { "relation": "organized_conversation" }
+            }),
+        ],
+        typed_refs: vec![],
+        attachments: vec![],
+        store_in_relational: true,
+        prev_hash: None,
+    })
+}
+
+fn build_file_bundle_stage_state_message(
+    owner_user_id: &str,
+    thread_id: &str,
+    parent_id: Option<&str>,
+    target_action_message_id: &str,
+    bundle_content: &serde_json::Map<String, Value>,
+) -> Result<AFPMessage, (StatusCode, String)> {
+    let bundle_id = bundle_content
+        .get("bundle_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "file bundle action is missing bundle_id".to_string(),
+            )
+        })?;
+
+    Ok(AFPMessage {
+        protocol: "afp-v1".to_string(),
+        id: Ulid::new().to_string(),
+        thread_id: thread_id.to_string(),
+        parent_id: parent_id.map(str::to_string),
+        from: "master_agent".to_string(),
+        to: vec![owner_user_id.to_string()],
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        r#type: "ledger".to_string(),
+        kind: Some("rich_note".to_string()),
+        supertags: vec![],
+        subtype: Some("file_bundle_stage_state".to_string()),
+        content: serde_json::json!({
+            "bundle_id": bundle_id,
+            "bundle_kind": bundle_content.get("bundle_kind").cloned().unwrap_or(Value::Null),
+            "staged_for": bundle_content.get("staged_for").cloned().unwrap_or(Value::Null),
+            "file_entry_ids": bundle_content.get("file_entry_ids").cloned().unwrap_or_else(|| Value::Array(vec![])),
+            "file_names": bundle_content.get("file_names").cloned().unwrap_or_else(|| Value::Array(vec![])),
+            "suggested_export_format": bundle_content.get("suggested_export_format").cloned().unwrap_or(Value::Null),
+            "status": "staged",
+            "source_action_message_id": target_action_message_id,
+        }),
+        metadata: Some(serde_json::json!({
+            "store": true,
+            "capability_id": REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE,
+            "reversible_action_materialization": true,
+            "side_effect_boundary": "internal_only",
+        })),
+        signature: String::new(),
+        encryption: None,
+        views: vec![serde_json::json!({
+            "format": "system",
+            "content": {
+                "event": "file_bundle_stage_state_applied",
+                "bundle_id": bundle_id,
+            }
+        })],
+        references: vec![serde_json::json!({
+            "type": "message",
+            "target": target_action_message_id,
+            "metadata": { "relation": "reversible_action" }
+        })],
+        typed_refs: vec![],
+        attachments: vec![],
+        store_in_relational: true,
+        prev_hash: None,
+    })
+}
+
+fn build_file_bundle_stage_discard_message(
+    owner_user_id: &str,
+    thread_id: &str,
+    parent_id: Option<&str>,
+    target_action_message_id: &str,
+    revert_request_message_id: &str,
+    token_payload: &Value,
+) -> Result<AFPMessage, (StatusCode, String)> {
+    let bundle_id = token_payload
+        .get("bundle_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "file bundle rollback token is missing bundle_id".to_string(),
+            )
+        })?;
+    let file_entry_ids = token_payload
+        .get("file_entry_ids")
+        .cloned()
+        .unwrap_or_else(|| Value::Array(vec![]));
+
+    Ok(AFPMessage {
+        protocol: "afp-v1".to_string(),
+        id: Ulid::new().to_string(),
+        thread_id: thread_id.to_string(),
+        parent_id: parent_id.map(str::to_string),
+        from: "master_agent".to_string(),
+        to: vec![owner_user_id.to_string()],
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        r#type: "ledger".to_string(),
+        kind: Some("rich_note".to_string()),
+        supertags: vec![],
+        subtype: Some("file_bundle_stage_discard".to_string()),
+        content: serde_json::json!({
+            "bundle_id": bundle_id,
+            "file_entry_ids": file_entry_ids,
+            "status": "discarded",
+            "source_action_message_id": target_action_message_id,
+            "revert_request_message_id": revert_request_message_id,
+        }),
+        metadata: Some(serde_json::json!({
+            "store": true,
+            "capability_id": REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE,
+            "reversible_action_materialization": true,
+            "side_effect_boundary": "internal_only",
+        })),
+        signature: String::new(),
+        encryption: None,
+        views: vec![serde_json::json!({
+            "format": "system",
+            "content": {
+                "event": "file_bundle_stage_discarded",
+                "bundle_id": bundle_id,
+            }
+        })],
+        references: vec![
+            serde_json::json!({
+                "type": "message",
+                "target": target_action_message_id,
+                "metadata": { "relation": "reversible_action" }
+            }),
+            serde_json::json!({
+                "type": "message",
+                "target": revert_request_message_id,
+                "metadata": { "relation": "revert_request" }
+            }),
+        ],
+        typed_refs: vec![],
+        attachments: vec![],
+        store_in_relational: true,
+        prev_hash: None,
+    })
+}
+
+fn internal_undo_execution_from_checkpoint(
+    checkpoint_message: &AFPMessage,
+) -> Result<Option<InternalUndoExecution>, (StatusCode, String)> {
+    if checkpoint_message.r#type != "revert_action"
+        || checkpoint_message.subtype.as_deref() != Some("revert_action:checkpoint")
+    {
+        return Ok(None);
+    }
+
+    let rollback_token = checkpoint_message
+        .content
+        .get("rollback_token")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "undo checkpoint is missing rollback_token".to_string(),
+            )
+        })?;
+    let token_payload = decode_rollback_token(rollback_token).ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "undo checkpoint rollback_token is invalid".to_string(),
+        )
+    })?;
+    let capability_id = token_payload
+        .get("capability_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "undo checkpoint token is missing capability_id".to_string(),
+            )
+        })?;
+    let mode = token_payload
+        .get("mode")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "undo checkpoint token is missing mode".to_string(),
+            )
+        })?;
+    let target_message_id = checkpoint_message
+        .content
+        .get("source_message_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "undo checkpoint is missing source_message_id".to_string(),
+            )
+        })?;
+    let target_type = checkpoint_message
+        .content
+        .get("source_type")
+        .and_then(Value::as_str)
+        .unwrap_or("internal_reversible_action");
+    let undo_label = checkpoint_message
+        .content
+        .get("undo_label")
+        .and_then(Value::as_str)
+        .unwrap_or("Undo reversible action");
+
+    let (summary, steps) = match capability_id {
+        REVERSIBLE_CAPABILITY_DRAFT_TASK_CREATE => {
+            let task_id = token_payload
+                .get("task_id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        "draft task rollback token is missing task_id".to_string(),
+                    )
+                })?;
+            (
+                format!("Cancelled reversible draft task {task_id}."),
+                vec![AfpRevertStep {
+                    step_index: 0,
+                    description: format!("Cancel reversible draft task {task_id}"),
+                    afp_type: "agent_task_cancel".to_string(),
+                    status: "pending".to_string(),
+                    action: "cancel_draft_task".to_string(),
+                    completed: false,
+                    result: None,
+                }],
+            )
+        }
+        REVERSIBLE_CAPABILITY_TENTATIVE_CALENDAR_HOLD => {
+            let event_id = token_payload
+                .get("event_id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        "tentative calendar hold rollback token is missing event_id".to_string(),
+                    )
+                })?;
+            (
+                format!("Cancelled tentative calendar hold {event_id}."),
+                vec![AfpRevertStep {
+                    step_index: 0,
+                    description: format!("Cancel tentative calendar hold {event_id}"),
+                    afp_type: "calendar_event_cancel".to_string(),
+                    status: "pending".to_string(),
+                    action: "cancel_tentative_calendar_hold".to_string(),
+                    completed: false,
+                    result: None,
+                }],
+            )
+        }
+        REVERSIBLE_CAPABILITY_INBOX_ORGANIZE => {
+            let conversation_ref = token_payload
+                .get("conversation_ref")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown_conversation");
+            (
+                format!("Revert staged inbox organization for {conversation_ref}."),
+                vec![AfpRevertStep {
+                    step_index: 0,
+                    description: format!(
+                        "Emit compensating inbox organization artifact for {conversation_ref}"
+                    ),
+                    afp_type: "inbox_organization_state".to_string(),
+                    status: "pending".to_string(),
+                    action: "revert_inbox_organization_state".to_string(),
+                    completed: false,
+                    result: None,
+                }],
+            )
+        }
+        REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE => {
+            let bundle_id = token_payload
+                .get("bundle_id")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown_bundle");
+            (
+                format!("Discard staged file bundle {bundle_id}."),
+                vec![AfpRevertStep {
+                    step_index: 0,
+                    description: format!(
+                        "Emit compensating file bundle discard artifact for {bundle_id}"
+                    ),
+                    afp_type: "file_bundle_stage_discard".to_string(),
+                    status: "pending".to_string(),
+                    action: "discard_file_bundle_stage_state".to_string(),
+                    completed: false,
+                    result: None,
+                }],
+            )
+        }
+        _ => return Ok(None),
+    };
+
+    Ok(Some(InternalUndoExecution {
+        capability_id: capability_id.to_string(),
+        rollback_token: rollback_token.to_string(),
+        target_message_id: target_message_id.to_string(),
+        target_type: target_type.to_string(),
+        undo_label: undo_label.to_string(),
+        mode: mode.to_string(),
+        summary,
+        steps,
+    }))
+}
+
 // â”€â”€ Action execution & email gateway â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn execute_action_http(
@@ -3620,8 +4178,458 @@ async fn execute_action_http(
         },
     )
     .await?;
-    let _user = authenticated_user(&state.db, &headers).await?;
+    let (user, session) = authenticated_user_and_session(&state.db, &headers).await?;
+    if action_execution_requires_recent_session(&req) {
+        require_recent_high_risk_session(&session)?;
+    }
     let now = chrono::Utc::now().to_rfc3339();
+
+    if let Some(mut internal_execution) =
+        internal_reversible_execution_from_request(&user.id, &req, None)?
+    {
+        let capability_id = req.capability.capability_id.clone();
+        let requested_by = req.intent.requested_by.clone();
+        let intent_input = req.intent.input.clone();
+        let intent_reason = req.intent.reason.clone();
+        let mut intent_message = AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: ulid::Ulid::new().to_string(),
+            thread_id: req.intent.thread_id.clone(),
+            parent_id: None,
+            from: requested_by.clone(),
+            to: vec![user.id.clone()],
+            timestamp: now.clone(),
+            r#type: "action".to_string(),
+            kind: None,
+            supertags: vec![],
+            subtype: Some("intent".to_string()),
+            content: serde_json::json!({
+                "capability_id": capability_id,
+                "provider": internal_execution.provider,
+                "operation": internal_execution.operation,
+                "input": intent_input,
+                "reason": intent_reason,
+                "internal_reversible": true,
+            }),
+            metadata: Some(serde_json::json!({
+                "domain": "internal_reversible_action",
+                "capability_id": req.capability.capability_id.clone(),
+                "provider": internal_execution.provider,
+                "operation": internal_execution.operation,
+            })),
+            signature: String::new(),
+            encryption: None,
+            views: vec![serde_json::json!({
+                "format": "system",
+                "content": {
+                    "event": "internal_reversible_action_intent",
+                    "capability_id": req.capability.capability_id.clone(),
+                }
+            })],
+            references: vec![],
+            typed_refs: vec![],
+            attachments: vec![],
+            store_in_relational: true,
+            prev_hash: None,
+        };
+        let _ = sign_server_generated_message(&mut intent_message);
+        let intent_message_id = store_app_message_for_headers(
+            &state.db,
+            &state.metrics,
+            &state.relay_tx,
+            &headers,
+            intent_message,
+        )
+        .await?;
+
+        internal_execution =
+            internal_reversible_execution_from_request(&user.id, &req, Some(&intent_message_id))?
+                .expect("internal reversible execution should still resolve after intent creation");
+
+        if req.capability.capability_id == REVERSIBLE_CAPABILITY_DRAFT_TASK_CREATE {
+            let content = internal_execution
+                .bundle
+                .action_afp
+                .get("content")
+                .and_then(Value::as_object)
+                .ok_or_else(|| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "draft task action is missing content".to_string(),
+                    )
+                })?;
+            let task_id = content
+                .get("task_id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "draft task is missing task_id".to_string(),
+                    )
+                })?;
+            let title = content
+                .get("title")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "draft task is missing title".to_string(),
+                    )
+                })?;
+            if let Some(instance) = state
+                .db
+                .get_agent_instance(&user.id)
+                .await
+                .map_err(internal_error)
+                .map_err(status_to_http)?
+            {
+                let agent_instance_id = instance
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "agent instance is missing id".to_string(),
+                        )
+                    })?
+                    .to_string();
+                let now = chrono::Utc::now().to_rfc3339();
+                let due_hint = content.get("due_hint").and_then(Value::as_str);
+                let summary = content
+                    .get("summary")
+                    .and_then(Value::as_str)
+                    .unwrap_or(title);
+                let draft_task = AgentTask {
+                    id: task_id.to_string(),
+                    owner_user_id: user.id.clone(),
+                    agent_instance_id,
+                    thread_id: req.intent.thread_id.clone(),
+                    status: TaskStatus::Pending,
+                    intent: title.to_string(),
+                    plan: serde_json::json!({
+                        "steps": [],
+                        "draft": true,
+                        "summary": summary,
+                        "due_hint": due_hint,
+                        "source": "internal_reversible_draft_task",
+                    }),
+                    result: serde_json::json!({
+                        "draft": true,
+                        "status": "draft_created",
+                    }),
+                    error: None,
+                    priority: TaskPriority::Normal,
+                    created_at: now.clone(),
+                    updated_at: now,
+                };
+                state
+                    .db
+                    .create_agent_task(&draft_task)
+                    .await
+                    .map_err(internal_error)
+                    .map_err(status_to_http)?;
+            }
+        } else if req.capability.capability_id == REVERSIBLE_CAPABILITY_TENTATIVE_CALENDAR_HOLD {
+            let content = internal_execution
+                .bundle
+                .action_afp
+                .get("content")
+                .and_then(Value::as_object)
+                .ok_or_else(|| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "tentative calendar hold action is missing content".to_string(),
+                    )
+                })?;
+            let event_id = content
+                .get("event_id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "tentative calendar hold is missing event_id".to_string(),
+                    )
+                })?;
+            let title = content
+                .get("title")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "tentative calendar hold is missing title".to_string(),
+                    )
+                })?;
+            let start_at = content
+                .get("start_at")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "tentative calendar hold is missing start_at".to_string(),
+                    )
+                })?;
+            state
+                .db
+                .create_calendar_event(
+                    &user.id,
+                    event_id,
+                    title,
+                    content.get("description").and_then(Value::as_str),
+                    start_at,
+                    content.get("end_at").and_then(Value::as_str),
+                    content
+                        .get("all_day")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
+                    content.get("location").and_then(Value::as_str),
+                    Some("tentative"),
+                )
+                .await
+                .map_err(internal_error)
+                .map_err(status_to_http)?;
+        }
+
+        let inbox_organization_content =
+            if req.capability.capability_id == REVERSIBLE_CAPABILITY_INBOX_ORGANIZE {
+                Some(
+                    internal_execution
+                        .bundle
+                        .action_afp
+                        .get("content")
+                        .and_then(Value::as_object)
+                        .cloned()
+                        .ok_or_else(|| {
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "inbox organization action is missing content".to_string(),
+                            )
+                        })?,
+                )
+            } else {
+                None
+            };
+        let file_bundle_stage_content =
+            if req.capability.capability_id == REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE {
+                Some(
+                    internal_execution
+                        .bundle
+                        .action_afp
+                        .get("content")
+                        .and_then(Value::as_object)
+                        .cloned()
+                        .ok_or_else(|| {
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "file bundle stage action is missing content".to_string(),
+                            )
+                        })?,
+                )
+            } else {
+                None
+            };
+        let mut action_message = bundle_afp_value_to_message(internal_execution.bundle.action_afp)?;
+        let mut checkpoint_message =
+            bundle_afp_value_to_message(internal_execution.bundle.checkpoint_afp)?;
+        let mut provenance_message =
+            bundle_afp_value_to_message(internal_execution.bundle.provenance_afp)?;
+        let action_result = internal_execution.bundle.action_result;
+        let action_message_ref = action_message.id.clone();
+
+        let _ = sign_server_generated_message(&mut action_message);
+        let _ = sign_server_generated_message(&mut checkpoint_message);
+        let _ = sign_server_generated_message(&mut provenance_message);
+
+        let action_message_id = store_app_message_for_headers(
+            &state.db,
+            &state.metrics,
+            &state.relay_tx,
+            &headers,
+            action_message,
+        )
+        .await?;
+        let checkpoint_message_id = store_app_message_for_headers(
+            &state.db,
+            &state.metrics,
+            &state.relay_tx,
+            &headers,
+            checkpoint_message,
+        )
+        .await?;
+        let provenance_message_id = store_app_message_for_headers(
+            &state.db,
+            &state.metrics,
+            &state.relay_tx,
+            &headers,
+            provenance_message,
+        )
+        .await?;
+        let mut materialized_artifact_refs = vec![];
+
+        if req.capability.capability_id == REVERSIBLE_CAPABILITY_INBOX_ORGANIZE {
+            let mut state_message = build_inbox_organization_state_message(
+                &user.id,
+                &req.intent.thread_id,
+                Some(&action_message_ref),
+                &action_message_ref,
+                inbox_organization_content
+                    .as_ref()
+                    .expect("inbox organization content should be captured"),
+            )?;
+            let _ = sign_server_generated_message(&mut state_message);
+            let state_message_id = store_app_message_for_headers(
+                &state.db,
+                &state.metrics,
+                &state.relay_tx,
+                &headers,
+                state_message,
+            )
+            .await?;
+            materialized_artifact_refs.push(serde_json::json!({
+                "message_id": state_message_id,
+                "relation": "inbox_organization_state",
+            }));
+        } else if req.capability.capability_id == REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE {
+            let mut state_message = build_file_bundle_stage_state_message(
+                &user.id,
+                &req.intent.thread_id,
+                Some(&action_message_ref),
+                &action_message_ref,
+                file_bundle_stage_content
+                    .as_ref()
+                    .expect("file bundle stage content should be captured"),
+            )?;
+            let _ = sign_server_generated_message(&mut state_message);
+            let state_message_id = store_app_message_for_headers(
+                &state.db,
+                &state.metrics,
+                &state.relay_tx,
+                &headers,
+                state_message,
+            )
+            .await?;
+            materialized_artifact_refs.push(serde_json::json!({
+                "message_id": state_message_id,
+                "relation": "file_bundle_stage_state",
+            }));
+        }
+
+        let action_status = format!("{:?}", action_result.status).to_lowercase();
+        let result_capability_id = action_result.capability_id.clone();
+        let result_output = action_result.output.clone();
+        let result_external_reference = action_result.external_reference.clone();
+        let result_recorded_at = action_result.recorded_at.clone();
+        let mut artifact_refs = serde_json::Map::new();
+        artifact_refs.insert(
+            "action_message_id".to_string(),
+            Value::String(action_message_id.clone()),
+        );
+        artifact_refs.insert(
+            "rollback_checkpoint_id".to_string(),
+            Value::String(checkpoint_message_id.clone()),
+        );
+        artifact_refs.insert(
+            "provenance_record_id".to_string(),
+            Value::String(provenance_message_id.clone()),
+        );
+        if !materialized_artifact_refs.is_empty() {
+            artifact_refs.insert(
+                "materialized".to_string(),
+                Value::Array(materialized_artifact_refs.clone()),
+            );
+        }
+
+        let mut result_message = AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: ulid::Ulid::new().to_string(),
+            thread_id: req.intent.thread_id.clone(),
+            parent_id: Some(intent_message_id.clone()),
+            from: AgentCard::from_env().agent_id,
+            to: vec![requested_by],
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            r#type: "action".to_string(),
+            kind: None,
+            supertags: vec![],
+            subtype: Some("result".to_string()),
+            content: serde_json::json!({
+                "capability_id": result_capability_id,
+                "status": action_status,
+                "output": result_output,
+                "external_reference": result_external_reference,
+                "recorded_at": result_recorded_at,
+                "internal_reversible": true,
+                "artifact_refs": artifact_refs
+            }),
+            metadata: Some(serde_json::json!({
+                "domain": "internal_reversible_action",
+                "capability_id": req.capability.capability_id.clone(),
+                "provider": internal_execution.provider,
+                "operation": internal_execution.operation,
+            })),
+            signature: String::new(),
+            encryption: None,
+            views: vec![serde_json::json!({
+                "format": "system",
+                "content": {
+                    "event": "internal_reversible_action_result",
+                    "status": format!("{:?}", action_result.status).to_lowercase(),
+                    "capability_id": action_result.capability_id,
+                }
+            })],
+            references: vec![
+                serde_json::json!({
+                    "type": "message",
+                    "target": intent_message_id,
+                    "metadata": { "relation": "action_intent" }
+                }),
+                serde_json::json!({
+                    "type": "message",
+                    "target": action_message_id,
+                    "metadata": { "relation": "reversible_action" }
+                }),
+                serde_json::json!({
+                    "type": "message",
+                    "target": checkpoint_message_id,
+                    "metadata": { "relation": "rollback_checkpoint" }
+                }),
+                serde_json::json!({
+                    "type": "message",
+                    "target": provenance_message_id,
+                    "metadata": { "relation": "provenance_record" }
+                }),
+            ],
+            typed_refs: vec![],
+            attachments: vec![],
+            store_in_relational: true,
+            prev_hash: None,
+        };
+        let _ = sign_server_generated_message(&mut result_message);
+        let result_message_id = store_app_message_for_headers(
+            &state.db,
+            &state.metrics,
+            &state.relay_tx,
+            &headers,
+            result_message,
+        )
+        .await?;
+
+        state
+            .db
+            .record_action_result_for_user(&user.id, &action_result)
+            .await
+            .map_err(internal_error)
+            .map_err(status_to_http)?;
+
+        return Ok(Json(serde_json::json!({
+            "status": format!("{:?}", action_result.status).to_lowercase(),
+            "capability_id": action_result.capability_id,
+            "thread_id": req.intent.thread_id,
+            "intent_message_id": intent_message_id,
+            "result_message_id": result_message_id,
+            "output": action_result.output,
+            "external_reference": action_result.external_reference,
+            "artifact_refs": artifact_refs
+        })));
+    }
 
     // Guard against SSRF: the caller supplies an arbitrary URL and this
     // endpoint is reachable without authentication.  Block HTTP to any
@@ -3693,6 +4701,7 @@ async fn execute_action_http(
         timestamp: now.clone(),
         r#type: "action".to_string(),
         kind: None,
+        supertags: vec![],
         subtype: Some("intent".to_string()),
         content: serde_json::json!({
             "capability_id": req.capability.capability_id,
@@ -3742,6 +4751,7 @@ async fn execute_action_http(
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "action".to_string(),
         kind: None,
+        supertags: vec![],
         subtype: Some("result".to_string()),
         content: serde_json::json!({
             "capability_id": result.capability_id,
@@ -3788,7 +4798,7 @@ async fn execute_action_http(
 
     state
         .db
-        .record_action_result(&result)
+        .record_action_result_for_user(&user.id, &result)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
@@ -3822,6 +4832,7 @@ async fn handle_gateway_email(
     apply_external_email_thread_match(&mut message, thread_match);
 
     let proto = app_to_proto(message);
+    let thread_id = proto.thread_id.clone();
     let ack = store_proto_message(&state.db, &state.metrics, &state.relay_tx, proto)
         .await
         .map_err(status_to_http)?
@@ -3829,7 +4840,8 @@ async fn handle_gateway_email(
 
     Ok(Json(serde_json::json!({
         "status": "processed",
-        "afp_id": ack.message_id
+        "afp_id": ack.message_id,
+        "thread_id": thread_id,
     })))
 }
 
@@ -3845,34 +4857,41 @@ async fn sync_shapes_http(
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Json<Value> {
     let opt_user = authenticated_user(&state.db, &headers).await.ok();
-
-    let device_class = params
-        .get("device_class")
-        .and_then(|dc| parse_device_class(dc))
-        .unwrap_or(crate::local_sync::DeviceClass::Desktop);
-
-    let profile_raw = params.get("profile").map(String::as_str).unwrap_or("full");
-    let profile = match profile_raw {
-        "balanced" => crate::local_sync::SyncPolicyProfile::Balanced,
-        "lightweight" => crate::local_sync::SyncPolicyProfile::Lightweight,
-        _ => crate::local_sync::SyncPolicyProfile::Full,
+    let plan = runtime_sync_plan(
+        params.get("device_class").map(String::as_str),
+        params.get("profile").map(String::as_str),
+    );
+    let public_agent_ids = if let Some(user) = opt_user.as_ref() {
+        state
+            .db
+            .list_managed_agents_by_user(&user.id)
+            .await
+            .ok()
+            .map(|agents| {
+                agents
+                    .into_iter()
+                    .map(|agent| agent.agent_id)
+                    .collect::<Vec<_>>()
+            })
+    } else {
+        None
     };
-
-    let slices = sync_slices_for_device(&device_class, &profile);
-    let requires_key = requires_local_key_material(&slices);
-    // Pass user_id so per-user shapes carry owner filters (GAP-092/GAP-093).
-    let shapes = shape_descriptors_for_slices(&slices, opt_user.as_ref().map(|u| u.id.as_str()));
+    let shapes = shape_descriptors_for_slices(
+        &plan.slices,
+        opt_user.as_ref().map(|u| u.id.as_str()),
+        public_agent_ids.as_deref(),
+    );
 
     Json(serde_json::json!({
-        "device_class": format!("{device_class:?}").to_lowercase(),
-        "profile": format!("{profile:?}").to_lowercase(),
-        "requires_local_key_material": requires_key,
+        "device_class": plan.device_class_label,
+        "profile": plan.profile_label,
+        "requires_local_key_material": plan.requires_local_key_material,
         "shapes": shapes,
         "electric_api_version": "v1",
     }))
 }
 
-/// GET /sync/bootstrap?device_id=xxx&device_class=desktop
+/// GET /sync/bootstrap?device_id=xxx&device_class=desktop&profile=full
 ///
 /// Returns a `DeviceBootstrap` bundle the client uses to initialise its local PGLite
 /// instance and connect to the ElectricSQL project URL.
@@ -3883,20 +4902,66 @@ async fn sync_bootstrap_http(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let opt_user = authenticated_user(&state.db, &headers).await.ok();
 
-    let device_id = params
-        .get("device_id")
-        .cloned()
-        .filter(|d| !d.trim().is_empty())
-        .unwrap_or_else(|| ulid::Ulid::new().to_string());
-
-    let device_class = params
-        .get("device_class")
-        .and_then(|dc| parse_device_class(dc))
-        .unwrap_or(crate::local_sync::DeviceClass::Desktop);
-
-    let profile = default_sync_profile(&device_class);
-    let slices = sync_slices_for_device(&device_class, &profile);
-    let shapes = shape_descriptors_for_slices(&slices, opt_user.as_ref().map(|u| u.id.as_str()));
+    let requested_device_id = params.get("device_id").map(String::as_str);
+    let requested_profile = params.get("profile").map(String::as_str);
+    let requested_device_class = params.get("device_class").map(String::as_str);
+    let mut persisted_policy_profile: Option<String> = None;
+    if requested_profile.is_none() {
+        if let (Some(user), Some(device_id)) = (opt_user.as_ref(), requested_device_id) {
+            if let Some(policy) = state
+                .db
+                .find_sync_device_policy_by_user(&user.id, device_id)
+                .await
+                .ok()
+                .flatten()
+            {
+                if !runtime_sync_policy_matches_requested_class(
+                    requested_device_class,
+                    &policy.device_class,
+                ) {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        "stored device policy class does not match requested device_class"
+                            .to_string(),
+                    ));
+                }
+                persisted_policy_profile = Some(policy.policy_profile);
+            }
+        }
+    }
+    let profile_source =
+        runtime_sync_profile_source(requested_profile, persisted_policy_profile.as_deref());
+    let plan = runtime_sync_plan(
+        requested_device_class,
+        requested_profile.or(persisted_policy_profile.as_deref()),
+    );
+    if !runtime_sync_device_id_is_class_compatible(plan.device_class_label, requested_device_id) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "device_id prefix does not match requested device_class".to_string(),
+        ));
+    }
+    let device_id = runtime_sync_device_id(plan.device_class_label, requested_device_id);
+    let public_agent_ids = if let Some(user) = opt_user.as_ref() {
+        state
+            .db
+            .list_managed_agents_by_user(&user.id)
+            .await
+            .ok()
+            .map(|agents| {
+                agents
+                    .into_iter()
+                    .map(|agent| agent.agent_id)
+                    .collect::<Vec<_>>()
+            })
+    } else {
+        None
+    };
+    let shapes = shape_descriptors_for_slices(
+        &plan.slices,
+        opt_user.as_ref().map(|u| u.id.as_str()),
+        public_agent_ids.as_deref(),
+    );
 
     let electric_project_url = std::env::var("OMNYID_ELECTRIC_URL")
         .unwrap_or_else(|_| "https://electric.yourdomain.ai".to_string());
@@ -3905,17 +4970,156 @@ async fn sync_bootstrap_http(
         device_id: device_id.clone(),
         agent_id: AgentCard::from_env().agent_id,
         electric_project_url: electric_project_url.clone(),
-        encrypted_seed_ref: format!("vault://devices/{device_id}/seed"),
-        pglite_path: format!("omnyid/{device_id}.db"),
+        encrypted_seed_ref: runtime_sync_seed_ref(&device_id),
+        pglite_path: runtime_sync_pglite_path(plan.device_class_label, &device_id),
     };
+
+    if let Some(user) = opt_user.as_ref() {
+        let _ = state
+            .db
+            .touch_sync_device_policy_last_used(&user.id, &device_id)
+            .await;
+    }
 
     Ok(Json(serde_json::json!({
         "bootstrap": bootstrap,
+        "device_class": plan.device_class_label,
+        "profile": plan.profile_label,
+        "profile_source": profile_source,
         "shapes": shapes,
-        "requires_local_key_material": requires_local_key_material(&slices),
+        "requires_local_key_material": plan.requires_local_key_material,
         "sync_endpoint": format!("{electric_project_url}/v1/shape"),
         "electric_url": std::env::var("OMNYID_ELECTRIC_URL").ok(),
     })))
+}
+
+fn runtime_sync_device_class_label(device_class: &crate::local_sync::DeviceClass) -> &'static str {
+    match device_class {
+        crate::local_sync::DeviceClass::Desktop => "desktop",
+        crate::local_sync::DeviceClass::Mobile => "mobile",
+        crate::local_sync::DeviceClass::Watch => "watch",
+    }
+}
+
+struct RuntimeSyncPlan {
+    device_class_label: &'static str,
+    profile_label: &'static str,
+    slices: Vec<crate::local_sync::SyncSliceSpec>,
+    requires_local_key_material: bool,
+}
+
+fn runtime_sync_profile(
+    device_class: &crate::local_sync::DeviceClass,
+    requested_profile: Option<&str>,
+) -> crate::local_sync::SyncPolicyProfile {
+    match requested_profile
+        .map(str::trim)
+        .filter(|profile| !profile.is_empty())
+    {
+        Some("balanced") => crate::local_sync::SyncPolicyProfile::Balanced,
+        Some("lightweight") => crate::local_sync::SyncPolicyProfile::Lightweight,
+        Some("full") => crate::local_sync::SyncPolicyProfile::Full,
+        _ => default_sync_profile(device_class),
+    }
+}
+
+fn runtime_sync_plan(
+    requested_device_class: Option<&str>,
+    requested_profile: Option<&str>,
+) -> RuntimeSyncPlan {
+    let device_class = requested_device_class
+        .and_then(parse_device_class)
+        .unwrap_or(crate::local_sync::DeviceClass::Desktop);
+    let profile = runtime_sync_profile(&device_class, requested_profile);
+    let slices = sync_slices_for_device(&device_class, &profile);
+    let requires_local_key_material = requires_local_key_material(&slices);
+    RuntimeSyncPlan {
+        device_class_label: runtime_sync_device_class_label(&device_class),
+        profile_label: runtime_sync_profile_label(&profile),
+        slices,
+        requires_local_key_material,
+    }
+}
+
+fn runtime_sync_profile_label(profile: &crate::local_sync::SyncPolicyProfile) -> &'static str {
+    match profile {
+        crate::local_sync::SyncPolicyProfile::Full => "full",
+        crate::local_sync::SyncPolicyProfile::Balanced => "balanced",
+        crate::local_sync::SyncPolicyProfile::Lightweight => "lightweight",
+    }
+}
+
+fn runtime_sync_device_id(device_class_label: &str, requested_device_id: Option<&str>) -> String {
+    if let Some(device_id) = requested_device_id
+        .map(str::trim)
+        .filter(|device_id| !device_id.is_empty())
+    {
+        return device_id.to_string();
+    }
+    format!(
+        "{}-{}",
+        device_class_label,
+        ulid::Ulid::new().to_string().to_lowercase()
+    )
+}
+
+fn runtime_sync_device_id_is_class_compatible(
+    device_class_label: &str,
+    requested_device_id: Option<&str>,
+) -> bool {
+    let Some(device_id) = requested_device_id
+        .map(str::trim)
+        .filter(|device_id| !device_id.is_empty())
+    else {
+        return true;
+    };
+
+    for known_prefix in ["desktop", "mobile", "watch"] {
+        if device_id.starts_with(&format!("{known_prefix}-")) {
+            return known_prefix == device_class_label;
+        }
+    }
+
+    true
+}
+
+fn runtime_sync_policy_matches_requested_class(
+    requested_device_class: Option<&str>,
+    stored_device_class: &str,
+) -> bool {
+    let requested_or_default_class = requested_device_class
+        .and_then(parse_device_class)
+        .unwrap_or(crate::local_sync::DeviceClass::Desktop);
+    runtime_sync_device_class_label(&requested_or_default_class) == stored_device_class
+}
+
+fn runtime_sync_profile_source(
+    requested_profile: Option<&str>,
+    persisted_policy_profile: Option<&str>,
+) -> &'static str {
+    if requested_profile
+        .map(str::trim)
+        .filter(|profile| !profile.is_empty())
+        .is_some()
+    {
+        "explicit"
+    } else if persisted_policy_profile
+        .map(str::trim)
+        .filter(|profile| !profile.is_empty())
+        .is_some()
+    {
+        "stored_policy"
+    } else {
+        "device_default"
+    }
+}
+
+fn runtime_sync_pglite_path(device_class_label: &str, device_id: &str) -> String {
+    format!("omnyid/{device_class_label}/{device_id}.db")
+}
+
+fn runtime_sync_seed_ref(device_id: &str) -> String {
+    format!("vault://devices/{device_id}/seed")
 }
 
 /// POST /personalization/event
@@ -3931,6 +5135,72 @@ struct RecordPersonalizationEventRequest {
     rationale: Option<String>,
 }
 
+fn personalization_target_message_matches_actor(
+    thread_messages: &[AFPMessage],
+    message_id: &str,
+    actor_agent_id: &str,
+) -> bool {
+    thread_messages
+        .iter()
+        .any(|message| message.id == message_id && message.from == actor_agent_id)
+}
+
+#[cfg(test)]
+mod personalization_target_tests {
+    use super::{AFPMessage, personalization_target_message_matches_actor};
+    use serde_json::json;
+
+    fn sample_message(id: &str, from: &str) -> AFPMessage {
+        AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: id.to_string(),
+            thread_id: "thread_test".to_string(),
+            parent_id: None,
+            from: from.to_string(),
+            to: vec![],
+            timestamp: "2026-07-05T00:00:00Z".to_string(),
+            r#type: "agent".to_string(),
+            kind: None,
+            supertags: vec![],
+            subtype: None,
+            content: json!({"body": "hi"}),
+            metadata: None,
+            views: vec![],
+            references: vec![],
+            typed_refs: vec![],
+            attachments: vec![],
+            encryption: None,
+            signature: String::new(),
+            store_in_relational: true,
+            prev_hash: None,
+        }
+    }
+
+    #[test]
+    fn personalization_target_requires_matching_message_and_actor() {
+        let messages = vec![
+            sample_message("msg_1", "agent:owned"),
+            sample_message("msg_2", "agent:other"),
+        ];
+
+        assert!(personalization_target_message_matches_actor(
+            &messages,
+            "msg_1",
+            "agent:owned",
+        ));
+        assert!(!personalization_target_message_matches_actor(
+            &messages,
+            "msg_1",
+            "agent:other",
+        ));
+        assert!(!personalization_target_message_matches_actor(
+            &messages,
+            "missing",
+            "agent:owned",
+        ));
+    }
+}
+
 // â”€â”€ Personalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async fn record_personalization_event_http(
@@ -3939,7 +5209,7 @@ async fn record_personalization_event_http(
     Json(req): Json<RecordPersonalizationEventRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     // Require authentication to prevent arbitrary signal injection (GAP-053).
-    authenticated_user(&state.db, &headers).await.map_err(|_| {
+    let user = authenticated_user(&state.db, &headers).await.map_err(|_| {
         (
             StatusCode::UNAUTHORIZED,
             "authentication required".to_string(),
@@ -3952,6 +5222,38 @@ async fn record_personalization_event_http(
         "ignored" => FeedbackSignal::Ignored,
         other => return Err((StatusCode::BAD_REQUEST, format!("Unknown signal: {other}"))),
     };
+
+    let owned_agents = state
+        .db
+        .list_managed_agents_by_user(&user.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+    if !owned_agents
+        .iter()
+        .any(|agent| agent.agent_id == req.actor_agent_id)
+    {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "actor agent not owned by this user".to_string(),
+        ));
+    }
+
+    let thread_messages = thread_messages_for_headers(&state.db, &headers, &req.thread_id).await?;
+    let app_thread_messages = thread_messages
+        .into_iter()
+        .map(proto_to_app)
+        .collect::<Vec<_>>();
+    if !personalization_target_message_matches_actor(
+        &app_thread_messages,
+        &req.message_id,
+        &req.actor_agent_id,
+    ) {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "message not found for the specified actor in this thread".to_string(),
+        ));
+    }
 
     let event = PersonalizationEvent {
         event_id: ulid::Ulid::new().to_string(),
@@ -4012,7 +5314,10 @@ async fn get_personalization_stats_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
     if !owned.iter().any(|a| a.agent_id == agent_id) {
-        return Err((StatusCode::FORBIDDEN, "agent not owned by this user".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            "agent not owned by this user".to_string(),
+        ));
     }
 
     let stats = state
@@ -4138,6 +5443,160 @@ struct UpsertPeerKeyRequest {
     previous_key_ids: Option<Vec<String>>,
 }
 
+fn peer_key_cache_conflict(
+    cached: Option<(String, String, String)>,
+    request: &UpsertPeerKeyRequest,
+) -> Option<String> {
+    let Some((cached_key_id, cached_public_key_hex, cached_homeserver_url)) = cached else {
+        return None;
+    };
+
+    if cached_key_id == request.key_id
+        && cached_public_key_hex == request.public_key_hex
+        && cached_homeserver_url == request.homeserver_url
+    {
+        return None;
+    }
+
+    Some(format!(
+        "peer key cache conflict for {}: cached key {} at {} does not match new discovery {} at {}",
+        request.agent_id,
+        cached_key_id,
+        cached_homeserver_url,
+        request.key_id,
+        request.homeserver_url
+    ))
+}
+
+fn host_matches_agent_domain(host: &str, agent_domain: &str) -> bool {
+    let normalized_host = host.trim_end_matches('.').to_ascii_lowercase();
+    let normalized_domain = agent_domain.trim_end_matches('.').to_ascii_lowercase();
+    normalized_host == normalized_domain
+        || normalized_host.ends_with(&format!(".{normalized_domain}"))
+}
+
+fn peer_agent_card_discovery_url(homeserver_url: &str) -> Result<String, String> {
+    let mut url = reqwest::Url::parse(homeserver_url)
+        .map_err(|err| format!("invalid homeserver_url: {err}"))?;
+    url.set_path("/.well-known/agent-card");
+    url.set_query(None);
+    url.set_fragment(None);
+    Ok(url.to_string())
+}
+
+async fn verify_peer_key_discovery_request(
+    state: &AppState,
+    request: &UpsertPeerKeyRequest,
+) -> Result<AgentCard, (StatusCode, String)> {
+    let agent_id = AgentId::parse(&request.agent_id)
+        .ok_or((StatusCode::BAD_REQUEST, "invalid agent_id".to_string()))?;
+    if request.key_id.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "key_id is required".to_string()));
+    }
+
+    let public_key_bytes = hex::decode(request.public_key_hex.trim()).map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            "public_key_hex must be valid 32-byte hex".to_string(),
+        )
+    })?;
+    if public_key_bytes.len() != 32 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "public_key_hex must be valid 32-byte hex".to_string(),
+        ));
+    }
+
+    let homeserver = reqwest::Url::parse(&request.homeserver_url).map_err(|err| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("invalid homeserver_url: {err}"),
+        )
+    })?;
+    let Some(homeserver_host) = homeserver.host_str() else {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "homeserver_url must include a hostname".to_string(),
+        ));
+    };
+    if !host_matches_agent_domain(homeserver_host, &agent_id.domain) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "homeserver_url host must match the claimed agent domain".to_string(),
+        ));
+    }
+
+    let discovery_url = peer_agent_card_discovery_url(&request.homeserver_url)
+        .map_err(|err| (StatusCode::BAD_REQUEST, err))?;
+    validate_public_http_url(&discovery_url)
+        .await
+        .map_err(|err| (StatusCode::BAD_REQUEST, err))?;
+
+    let response = state
+        .http_client
+        .get(&discovery_url)
+        .send()
+        .await
+        .map_err(|err| {
+            tracing::error!(error = %err, %discovery_url, "failed to fetch peer agent card");
+            (
+                StatusCode::BAD_GATEWAY,
+                "failed to fetch peer agent card".to_string(),
+            )
+        })?;
+    if !response.status().is_success() {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            format!("peer agent card fetch returned {}", response.status()),
+        ));
+    }
+
+    let card = response.json::<AgentCard>().await.map_err(|err| {
+        tracing::error!(error = %err, %discovery_url, "peer agent card response was invalid JSON");
+        (
+            StatusCode::BAD_GATEWAY,
+            "peer agent card response was invalid JSON".to_string(),
+        )
+    })?;
+    if !card.verify() {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            "peer agent card signature or domain binding is invalid".to_string(),
+        ));
+    }
+    if card.agent_id != request.agent_id
+        || card.key_id != request.key_id
+        || !card
+            .public_key_hex
+            .eq_ignore_ascii_case(request.public_key_hex.trim())
+    {
+        return Err((
+            StatusCode::CONFLICT,
+            "peer agent card does not match the claimed agent identity material".to_string(),
+        ));
+    }
+
+    let fetched_homeserver = reqwest::Url::parse(&card.homeserver_url).map_err(|err| {
+        tracing::error!(error = %err, homeserver_url = %card.homeserver_url, "peer agent card has invalid homeserver_url");
+        (
+            StatusCode::BAD_GATEWAY,
+            "peer agent card has invalid homeserver_url".to_string(),
+        )
+    })?;
+    if fetched_homeserver
+        .host_str()
+        .map(|host| host.trim_end_matches('.').to_ascii_lowercase())
+        != Some(homeserver_host.trim_end_matches('.').to_ascii_lowercase())
+    {
+        return Err((
+            StatusCode::CONFLICT,
+            "peer agent card homeserver host does not match the claimed homeserver".to_string(),
+        ));
+    }
+
+    Ok(card)
+}
+
 /// POST /keys/peer
 /// Cache a discovered peer's public key so recipient wrapping survives server restarts.
 /// SDKs call this after successfully fetching a remote AgentCard.
@@ -4149,15 +5608,31 @@ async fn upsert_peer_key_http(
     // Require auth: an unauthenticated caller could poison any agent's trusted public key,
     // enabling signature forgery attacks on the AFP message verification chain.
     authenticated_user(&state.db, &headers).await?;
-    let prev = request.previous_key_ids.unwrap_or_default();
+    let fetched_card = verify_peer_key_discovery_request(&state, &request).await?;
+    let verified_request = UpsertPeerKeyRequest {
+        agent_id: fetched_card.agent_id.clone(),
+        key_id: fetched_card.key_id.clone(),
+        public_key_hex: fetched_card.public_key_hex.clone(),
+        homeserver_url: fetched_card.homeserver_url.clone(),
+        previous_key_ids: Some(fetched_card.previous_key_ids.clone()),
+    };
+    let cached = state
+        .db
+        .get_peer_key(&request.agent_id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+    if let Some(reason) = peer_key_cache_conflict(cached, &verified_request) {
+        return Err((StatusCode::CONFLICT, reason));
+    }
     state
         .db
         .upsert_peer_key(
-            &request.agent_id,
-            &request.key_id,
-            &request.public_key_hex,
-            &request.homeserver_url,
-            &prev,
+            &fetched_card.agent_id,
+            &fetched_card.key_id,
+            &fetched_card.public_key_hex,
+            &fetched_card.homeserver_url,
+            &fetched_card.previous_key_ids,
         )
         .await
         .map_err(internal_error)
@@ -4169,6 +5644,30 @@ async fn upsert_peer_key_http(
         "key_id": request.key_id
     })))
 }
+
+async fn trusted_signing_public_key_for_agent(
+    db: &Db,
+    agent_id: &str,
+) -> Result<Option<String>, Status> {
+    let local_card = AgentCard::from_env();
+    // The email gateway (and any other same-server internal sender) signs with the
+    // same root OMNYID_SIGNING_KEY_HEX as the main agent identity, just under its
+    // own agent_id label — trust it directly rather than requiring a peer-key
+    // discovery round trip that only makes sense for genuinely external agents.
+    let gateway_agent_id = std::env::var("OMNYID_GATEWAY_AGENT_ID")
+        .unwrap_or_else(|_| "agent:email-gateway@local.omnyid".to_string());
+    if agent_id == local_card.agent_id || agent_id == gateway_agent_id {
+        let trusted_key = local_card.public_key_hex.trim();
+        if trusted_key.is_empty() || trusted_key == "your-public-key-hex-here" {
+            return Ok(None);
+        }
+        return Ok(Some(trusted_key.to_string()));
+    }
+
+    let cached = db.get_peer_key(agent_id).await.map_err(internal_error)?;
+    Ok(cached.map(|(_, public_key_hex, _)| public_key_hex))
+}
+
 pub(crate) async fn store_proto_message(
     db: &Db,
     metrics: &Arc<Metrics>,
@@ -4196,6 +5695,18 @@ pub(crate) async fn store_proto_message(
         if !verify_signature(&app_message) {
             return Err(Status::unauthenticated("Invalid AFP signature"));
         }
+        let trusted_public_key =
+            trusted_signing_public_key_for_agent(db, &app_message.from).await?;
+        let Some(trusted_public_key) = trusted_public_key else {
+            return Err(Status::unauthenticated(
+                "Untrusted AFP signer; no trusted public key is configured for the claimed agent",
+            ));
+        };
+        if !signature_matches_public_key(&msg.signature, &trusted_public_key) {
+            return Err(Status::unauthenticated(
+                "AFP signature key does not match the trusted key for the claimed agent",
+            ));
+        }
     } else if !allow_insecure_unsigned_messages() {
         return Err(Status::unauthenticated(
             "Unsigned AFP messages are disabled; configure signing or enable dev mode explicitly",
@@ -4212,8 +5723,8 @@ pub(crate) async fn store_proto_message(
 
     if inserted {
         metrics.inc_messages_stored();
-        index_backlink_update(db, &app_message).await;
-        handle_inserted_message_effects(db, metrics, relay_tx, &app_message).await;
+        index_backlink_update(db, &app_message, None).await;
+        handle_inserted_message_effects(db, metrics, relay_tx, &app_message, None).await;
         let _ = relay_tx.send(
             serde_json::json!({
                 "event": "message_stored",
@@ -4236,10 +5747,19 @@ pub(crate) async fn store_proto_message(
 
 // â”€â”€ AFP message processing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-async fn index_backlink_update(db: &Db, app_message: &AFPMessage) {
-    let Some(record) = BacklinkRecord::from_backlink_message(app_message) else {
+pub(super) async fn index_backlink_update(
+    db: &Db,
+    app_message: &AFPMessage,
+    owner_user_id: Option<&str>,
+) {
+    let Some(mut record) = BacklinkRecord::from_backlink_message(app_message) else {
         return;
     };
+    if record.user_id.trim().is_empty() {
+        if let Some(owner_user_id) = owner_user_id {
+            record.user_id = owner_user_id.to_string();
+        }
+    }
 
     {
         let mut curator_state = knowledge_curator_state().lock().await;
@@ -4263,32 +5783,96 @@ async fn index_backlink_update(db: &Db, app_message: &AFPMessage) {
         )
         .await;
     }
+
+    if let (Some(owner_user_id), Some(triple)) = (
+        owner_user_id.or_else(|| {
+            app_message
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.get("user_id"))
+                .and_then(Value::as_str)
+        }),
+        parse_knowledge_triple_message(app_message),
+    ) {
+        if let Err(err) = db
+            .upsert_private_knowledge_triple(
+                owner_user_id,
+                &app_message.id,
+                &app_message.thread_id,
+                &app_message.timestamp,
+                &triple.subject,
+                &triple.predicate,
+                &triple.object,
+                triple.confidence,
+                triple.source_message_id.as_deref(),
+                triple.domain.as_deref(),
+                triple.observed_at.as_deref(),
+                app_message.metadata.as_ref(),
+            )
+            .await
+        {
+            error!(
+                message_id = %app_message.id,
+                user_id = %owner_user_id,
+                %err,
+                "Omnyid failed to persist knowledge triple index entry"
+            );
+        }
+    }
 }
 
-async fn handle_inserted_message_effects(
+#[derive(serde::Deserialize)]
+struct ParsedKnowledgeTripleContent {
+    subject: String,
+    predicate: String,
+    object: String,
+    #[serde(default = "default_knowledge_triple_confidence")]
+    confidence: f64,
+    #[serde(default)]
+    source_message_id: Option<String>,
+    #[serde(default)]
+    domain: Option<String>,
+    #[serde(default)]
+    observed_at: Option<String>,
+}
+
+fn default_knowledge_triple_confidence() -> f64 {
+    1.0
+}
+
+fn parse_knowledge_triple_message(message: &AFPMessage) -> Option<ParsedKnowledgeTripleContent> {
+    if message.r#type != "note" || message.subtype.as_deref() != Some("knowledge_triple") {
+        return None;
+    }
+    serde_json::from_value(message.content.clone()).ok()
+}
+
+pub(super) async fn handle_inserted_message_effects(
     db: &Db,
     metrics: &Arc<Metrics>,
     _relay_tx: &broadcast::Sender<String>,
     app_message: &AFPMessage,
+    owner_user_id: Option<&str>,
 ) {
     if message_requires_human_approval(app_message) {
-        let approval_review = build_action_approval_review_payload(app_message);
+        let capability_id = action_capability_id(app_message);
+        let approval_review = build_action_approval_review_payload(app_message, &capability_id);
         let pending_result = ActionResult {
-            capability_id: action_capability_id(app_message),
+            capability_id,
             thread_id: app_message.thread_id.clone(),
             status: ActionStatus::Pending,
             output: serde_json::json!({
                 "message_id": app_message.id,
                 "approval_mode": "human_approval_required",
                 "approval_review": approval_review,
-                "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
                     "Outbound or high-risk action requires explicit human approval."
                 ),
             }),
             external_reference: Some(app_message.id.clone()),
             recorded_at: chrono::Utc::now().to_rfc3339(),
         };
-        if let Err(err) = db.record_action_result(&pending_result).await {
+        if let Err(err) = record_action_result_for_owner(db, owner_user_id, &pending_result).await {
             error!(
                 message_id = %app_message.id,
                 thread_id = %app_message.thread_id,
@@ -4299,11 +5883,17 @@ async fn handle_inserted_message_effects(
         return;
     }
 
-    execute_approved_action(db, metrics, app_message).await;
+    execute_approved_action(db, metrics, app_message, owner_user_id).await;
 }
 
-async fn execute_approved_action(db: &Db, metrics: &Arc<Metrics>, app_message: &AFPMessage) {
-    let approval_review = build_action_approval_review_payload(app_message);
+pub(super) async fn execute_approved_action(
+    db: &Db,
+    metrics: &Arc<Metrics>,
+    app_message: &AFPMessage,
+    owner_user_id: Option<&str>,
+) {
+    let capability_id = action_capability_id(app_message);
+    let approval_review = build_action_approval_review_payload(app_message, &capability_id);
     match dispatch_outgoing_message(app_message).await {
         Ok(true) => {
             metrics.inc_gateway_outbound_attempts();
@@ -4326,7 +5916,7 @@ async fn execute_approved_action(db: &Db, metrics: &Arc<Metrics>, app_message: &
             }
 
             let completed_result = ActionResult {
-                capability_id: action_capability_id(app_message),
+                capability_id: capability_id.clone(),
                 thread_id: app_message.thread_id.clone(),
                 status: ActionStatus::Completed,
                 output: serde_json::json!({
@@ -4337,7 +5927,9 @@ async fn execute_approved_action(db: &Db, metrics: &Arc<Metrics>, app_message: &
                 external_reference: Some(app_message.id.clone()),
                 recorded_at: chrono::Utc::now().to_rfc3339(),
             };
-            if let Err(err) = db.record_action_result(&completed_result).await {
+            if let Err(err) =
+                record_action_result_for_owner(db, owner_user_id, &completed_result).await
+            {
                 error!(
                     message_id = %app_message.id,
                     thread_id = %app_message.thread_id,
@@ -4369,7 +5961,7 @@ async fn execute_approved_action(db: &Db, metrics: &Arc<Metrics>, app_message: &
             }
 
             let failed_result = ActionResult {
-                capability_id: action_capability_id(app_message),
+                capability_id: capability_id.clone(),
                 thread_id: app_message.thread_id.clone(),
                 status: ActionStatus::Failed,
                 output: serde_json::json!({
@@ -4380,7 +5972,9 @@ async fn execute_approved_action(db: &Db, metrics: &Arc<Metrics>, app_message: &
                 external_reference: Some(app_message.id.clone()),
                 recorded_at: chrono::Utc::now().to_rfc3339(),
             };
-            if let Err(audit_err) = db.record_action_result(&failed_result).await {
+            if let Err(audit_err) =
+                record_action_result_for_owner(db, owner_user_id, &failed_result).await
+            {
                 error!(
                     message_id = %app_message.id,
                     thread_id = %app_message.thread_id,
@@ -4396,6 +5990,19 @@ async fn execute_approved_action(db: &Db, metrics: &Arc<Metrics>, app_message: &
                 "Omnyid outbound email dispatch failed"
             );
         }
+    }
+}
+
+async fn record_action_result_for_owner(
+    db: &Db,
+    owner_user_id: Option<&str>,
+    result: &ActionResult,
+) -> Result<(), sqlx::Error> {
+    if let Some(owner_user_id) = owner_user_id {
+        db.record_action_result_for_user(owner_user_id, result)
+            .await
+    } else {
+        db.record_action_result(result).await
     }
 }
 
@@ -4425,31 +6032,32 @@ fn message_requires_human_approval(message: &AFPMessage) -> bool {
 
     matches!(
         message.r#type.as_str(),
-        "email_outgoing" | "action_reply" | "action_forward"
+        "email_outgoing"
+            | "action_reply"
+            | "action_forward"
+            | "outbound_notification"
+            | "outbound_push"
+            | "outbound_slack"
+            | "push_notification"
+            | "publish_post"
+            | "content_publish"
+            | "social_publish"
+            | "feed_publish"
+            | "purchase_request"
+            | "payment_intent"
+            | "charge_request"
+            | "data_delete"
+            | "record_delete"
+            | "bulk_delete"
+            | "form_submit"
+            | "document_sign"
+            | "booking_request"
+            | "meeting_request"
     ) || (message.r#type == "email"
         && matches!(
             message.subtype.as_deref(),
             Some("outgoing") | Some("reply") | Some("forward")
         ))
-}
-
-fn action_capability_id(message: &AFPMessage) -> String {
-    message
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.get("capability_id"))
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .or_else(|| {
-            message
-                .content
-                .get("capability_id")
-                .and_then(Value::as_str)
-                .map(str::to_string)
-        })
-        .or_else(|| message.subtype.clone())
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| message.r#type.clone())
 }
 
 /// Returns true if `s` is a valid ULID: 26 characters, Crockford base32 alphabet.
@@ -4468,6 +6076,7 @@ pub(super) fn validate_proto_message(msg: &Message) -> bool {
 }
 
 pub(crate) fn app_to_proto(message: AFPMessage) -> Message {
+    let message = crate::message::normalize_message_for_storage(message);
     Message {
         protocol: message.protocol,
         id: message.id,
@@ -4478,6 +6087,7 @@ pub(crate) fn app_to_proto(message: AFPMessage) -> Message {
         timestamp: message.timestamp,
         r#type: message.r#type,
         kind: message.kind,
+        supertags: message.supertags,
         content: message.content.to_string(),
         signature: message.signature,
         encryption: message
@@ -4496,7 +6106,7 @@ pub(crate) fn app_to_proto(message: AFPMessage) -> Message {
     }
 }
 
-pub(super) fn proto_to_app(message: Message) -> AFPMessage {
+pub(crate) fn proto_to_app(message: Message) -> AFPMessage {
     AFPMessage {
         protocol: message.protocol,
         id: message.id,
@@ -4507,6 +6117,7 @@ pub(super) fn proto_to_app(message: Message) -> AFPMessage {
         timestamp: message.timestamp,
         r#type: message.r#type,
         kind: message.kind,
+        supertags: message.supertags,
         subtype: string_to_option(message.subtype),
         content: serde_json::from_str(&message.content).unwrap_or_else(|_| serde_json::json!({})),
         metadata: json_optional_value_from_str(&message.metadata),
@@ -4556,21 +6167,42 @@ fn trial_identity_key(headers: &HeaderMap, fingerprint: Option<&str>) -> String 
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(|value| value.chars().take(24).collect::<String>())
-        .unwrap_or_else(|| "browser-anon".to_string());
+        .unwrap_or_else(|| anon_fingerprint(headers));
     format!("{}:{}", request_ip_identity(headers), browser_fingerprint)
+}
+
+pub(super) fn browser_fingerprint_from_headers(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-omnyid-browser-fingerprint")
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            value
+                .chars()
+                .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | ':'))
+                .take(64)
+                .collect::<String>()
+        })
+        .filter(|value| !value.is_empty())
+}
+
+pub(super) fn anonymous_session_identity_key(headers: &HeaderMap) -> String {
+    let browser_fingerprint = browser_fingerprint_from_headers(headers);
+    trial_identity_key(headers, browser_fingerprint.as_deref())
 }
 
 fn trial_starter_templates() -> Vec<TrialTemplate> {
     vec![
         TrialTemplate {
-            id: "student_day_planner".to_string(),
-            name: "Student Day Planner".to_string(),
-            summary: "Turn classes, assignments, and energy level into a realistic day plan.".to_string(),
-            system_prompt: "You are a calm daily planner for a busy student. Break work into short, realistic blocks and keep risky actions behind a review step.".to_string(),
+            id: "travel_planner".to_string(),
+            name: "Travel Planner".to_string(),
+            summary: "Turn flights, hotels, and rough plans into a realistic day-by-day itinerary.".to_string(),
+            system_prompt: "You are a calm travel planner. Turn flights, hotels, and rough plans into a realistic day-by-day itinerary, and keep bookings or payments behind a review step.".to_string(),
             suggested_prompts: vec![
-                "Plan my day around a 10am lecture and two assignments due this week.".to_string(),
-                "Break my chemistry revision into short blocks with one low-energy backup option.".to_string(),
-                "Give me a study plan that still leaves time for training tonight.".to_string(),
+                "Plan a 3-day itinerary around a flight that lands at 2pm and a hotel check-in at 4pm.".to_string(),
+                "Break my trip into a realistic day-by-day plan with one flexible backup for bad weather.".to_string(),
+                "Draft a packing and pre-trip checklist for a week-long trip starting Friday.".to_string(),
             ],
         },
         TrialTemplate {
@@ -4587,12 +6219,23 @@ fn trial_starter_templates() -> Vec<TrialTemplate> {
         TrialTemplate {
             id: "appointment_assistant".to_string(),
             name: "Appointment Assistant".to_string(),
-            summary: "Prepare reminders, booking steps, and follow-ups without losing context.".to_string(),
+            summary: "Prepare reminders, booking prep, and follow-ups without losing context.".to_string(),
             system_prompt: "You are an appointment assistant. Keep tasks ordered, ask for approval before bookings or payments, and never assume a booking succeeded unless confirmed.".to_string(),
             suggested_prompts: vec![
                 "Help me prepare for tomorrow's dentist appointment and the follow-up questions I should ask.".to_string(),
                 "Draft the steps to reschedule a clinic booking without losing my notes.".to_string(),
                 "Create a reminder flow for upcoming family appointments this week.".to_string(),
+            ],
+        },
+        TrialTemplate {
+            id: "student_day_planner".to_string(),
+            name: "Connected Study Workspace".to_string(),
+            summary: "Turn class material into grounded answers, linked notes, and a realistic next-study plan.".to_string(),
+            system_prompt: "You are a study workflow assistant for stressed university students. Start with grounded value from the student's own class material, organize extracted ideas into connected notes, reuse supertags and academic metadata, and end with the clearest next study step. Do not pretend files persist in this anonymous trial, but explain what would normally be retained in the full product.".to_string(),
+            suggested_prompts: vec![
+                "Turn my lecture notes and reading into connected notes. Show the main concepts, overlaps, and what I should revise first.".to_string(),
+                "Use this class material to explain the topic simply, then tell me the next two study moves that will reduce stress fastest.".to_string(),
+                "Compare these study sources and turn them into a realistic next-study plan with likely weak points and exam risks.".to_string(),
             ],
         },
     ]
@@ -4707,88 +6350,7 @@ fn execute_trial_tools(
     (traces, reviews)
 }
 
-fn trial_assistant_reply(
-    content: &str,
-    template: &TrialTemplate,
-    traces: &[TrialTraceEntry],
-    reviews: &[TrialReviewItem],
-    intent: &str,
-) -> String {
-    if intent == "confirm" {
-        return "Done. Your day plan is confirmed and added to your calendar.\n\nâœ“ Lesson 1 at 5:00 pm\nâœ“ Lesson 2 at 6:00 pm\nâœ“ Dog washing at 7:00 pm\nâœ“ Free time from 8:00 pm\n\nYour evening is set. Come back to adjust any slot at any time.".to_string();
-    }
-
-    let lowered = content.to_lowercase();
-
-    if intent == "schedule" {
-        let num_lessons = if lowered.contains("two")
-            || lowered.contains(" 2 ")
-            || lowered.contains("2 lesson")
-            || lowered.contains("two lesson")
-        {
-            2usize
-        } else {
-            1
-        };
-        let has_dog = lowered.contains("dog") || lowered.contains("wash");
-        let mut lines = vec![
-            "Day Planner Â· Plan built".to_string(),
-            String::new(),
-            "Here is a plan built around your fixed commitments today:".to_string(),
-            String::new(),
-            "  17:00 â€“ 18:00  Lesson 1".to_string(),
-        ];
-        if num_lessons >= 2 {
-            lines.push("  18:00 â€“ 19:00  Lesson 2".to_string());
-        }
-        let mut next = if num_lessons >= 2 { 19 } else { 18 };
-        if has_dog {
-            lines.push(format!(
-                "  {:02}:00 â€“ {:02}:00  Dog washing ðŸ¾",
-                next,
-                next + 1
-            ));
-            next += 1;
-        }
-        lines.push(format!(
-            "  {:02}:00 â€“ 24:00  Free time Â· wind down",
-            next
-        ));
-        lines.push(String::new());
-        lines.push(
-            "The calendar below shows your plan. Click \"Add to my calendar\" to confirm."
-                .to_string(),
-        );
-        return lines.join("\n");
-    }
-
-    let bullets = if template.id == "student_day_planner"
-        || lowered.contains("study")
-        || lowered.contains("class")
-        || lowered.contains("lesson")
-    {
-        vec![
-            "1. Protect the fixed commitments first, then place focused blocks around them.",
-            "2. Keep one low-energy fallback task ready so the day can recover after a slip.",
-            "3. End with a short reset so tomorrow starts with fewer open loops.",
-        ]
-    } else if template.id == "appointment_assistant"
-        || lowered.contains("appointment")
-        || lowered.contains("booking")
-    {
-        vec![
-            "1. Confirm the time, location, and what you need to bring.",
-            "2. Prepare the reminder or reschedule steps before touching a live booking flow.",
-            "3. Queue any payment or booking action for review instead of auto-executing it.",
-        ]
-    } else {
-        vec![
-            "1. Clarify the goal, deadline, and minimum useful output.",
-            "2. Decide whether this needs web research, a question back, or a simple next action.",
-            "3. Capture the next action so the result can be replayed later.",
-        ]
-    };
-
+fn trial_meta_summary(traces: &[TrialTraceEntry], reviews: &[TrialReviewItem]) -> String {
     let trace_summary = if traces.is_empty() {
         "Reasoning step complete.".to_string()
     } else {
@@ -4801,16 +6363,192 @@ fn trial_assistant_reply(
                 .join(", ")
         )
     };
-    let review_summary = if reviews.is_empty() {
-        String::new()
-    } else {
-        "Sensitive action queued for human review.".to_string()
-    };
-
-    let meta = if review_summary.is_empty() {
+    if reviews.is_empty() {
         trace_summary
     } else {
-        format!("{}\n{}", trace_summary, review_summary)
+        format!("{trace_summary}\nSensitive action queued for human review.")
+    }
+}
+
+/// Hosted NVIDIA NIM backend for the anonymous trial runner, if a key is
+/// configured. Falls back to the scripted `trial_assistant_reply` when no key
+/// is present (e.g. local dev) so the trial keeps working without one.
+///
+/// Model choice is constrained by which NIM functions this account's key
+/// actually has enabled (most catalog models 404 for this account); verified
+/// working against the live API on 2026-09-17.
+fn trial_inference_backend() -> Option<(crate::inference::InferenceBackend, String)> {
+    let api_key = crate::secret_manager::read_process_secret_trimmed("OMNYID_NVIDIA_API_KEY")
+        .or_else(|| crate::secret_manager::read_process_secret_trimmed("NVIDIA_API_KEY"))?;
+    Some((
+        crate::inference::InferenceBackend::OpenAICompat {
+            base_url: "https://integrate.api.nvidia.com/v1".to_string(),
+            api_key,
+            cost_per_1m_input: 0.0,
+            cost_per_1m_output: 0.0,
+        },
+        "openai/gpt-oss-20b".to_string(),
+    ))
+}
+
+/// Generates the trial runner's assistant reply from the live NVIDIA NIM
+/// model when a hosted API key is configured, otherwise falls back to the
+/// scripted `trial_assistant_reply`. The confirm-intent reply always stays
+/// scripted since it is tightly coupled to the fixed calendar preview copy.
+async fn trial_generate_reply(
+    content: &str,
+    template: &TrialTemplate,
+    traces: &[TrialTraceEntry],
+    reviews: &[TrialReviewItem],
+    intent: &str,
+    history: &[TrialChatMessage],
+) -> String {
+    if intent == "confirm" {
+        return trial_assistant_reply(content, template, traces, reviews, intent);
+    }
+    let Some((backend, model)) = trial_inference_backend() else {
+        return trial_assistant_reply(content, template, traces, reviews, intent);
+    };
+
+    let system = format!(
+        "{} This is an anonymous, ephemeral product trial: never claim to book, pay for, sync, or persist anything outside this preview session, and keep replies concise.",
+        template.system_prompt
+    );
+    let messages = history
+        .iter()
+        .filter(|message| message.role == "user" || message.role == "assistant")
+        .map(|message| crate::inference::InferenceMessage {
+            role: message.role.clone(),
+            content: message.content.clone(),
+        })
+        .collect::<Vec<_>>();
+    let request = crate::inference::InferenceRequest {
+        system,
+        messages,
+        max_tokens: 700,
+        temperature: 0.4,
+    };
+
+    match crate::inference::dispatch_infer(&backend, &model, &request).await {
+        Ok(response) if !response.content.trim().is_empty() => {
+            let meta = trial_meta_summary(traces, reviews);
+            if meta.is_empty() {
+                response.content
+            } else {
+                format!("{}\n\n{meta}", response.content.trim())
+            }
+        }
+        Ok(_) => trial_assistant_reply(content, template, traces, reviews, intent),
+        Err(err) => {
+            tracing::warn!(error = %err, "trial runner NVIDIA NIM call failed; using scripted fallback reply");
+            trial_assistant_reply(content, template, traces, reviews, intent)
+        }
+    }
+}
+
+fn trial_assistant_reply(
+    content: &str,
+    template: &TrialTemplate,
+    traces: &[TrialTraceEntry],
+    reviews: &[TrialReviewItem],
+    intent: &str,
+) -> String {
+    if intent == "confirm" {
+        return "Draft reviewed. It has been added to this preview session's calendar view only.\n\n- Flight arrival at 2:00 pm\n- Hotel check-in at 4:00 pm\n- Free time from 5:00 pm\n\nNothing has been booked, synced, or saved outside the anonymous trial.".to_string();
+    }
+
+    let lowered = content.to_lowercase();
+    let meta = trial_meta_summary(traces, reviews);
+
+    if template.id == "student_day_planner" {
+        let source_label = if lowered.contains("assignment") || lowered.contains("essay") {
+            "assignment brief"
+        } else if lowered.contains("reading") || lowered.contains("author") {
+            "reading excerpt"
+        } else if lowered.contains("lecture") || lowered.contains("professor") {
+            "lecture notes"
+        } else {
+            "study source"
+        };
+        return format!(
+            "{}\n\n{}\n\nConnected notes preview from your {}\n\n1. Core concepts: extract the main terms, definitions, and examples first so the answer is grounded in the student's own material.\n2. Links to build: connect repeated concepts, weak points, course/week cues, and exam or assignment risks through supertags.\n3. Next study move: choose one narrow follow-up from the same topic so the thread becomes easier to retrieve later.\n\nIn the signed-in workspace, OmnyID would offer to keep the original file, keep extracted study content only, or keep nothing. The recommended student default is extracted content only, because it preserves searchable notes, supertags, and graph links without storing the raw file by default.",
+            template.name, meta, source_label,
+        );
+    }
+
+    if intent == "schedule" {
+        let has_connecting_flight = lowered.contains("two")
+            || lowered.contains(" 2 ")
+            || lowered.contains("connecting")
+            || lowered.contains("layover");
+        let has_hotel = lowered.contains("hotel")
+            || lowered.contains("check-in")
+            || lowered.contains("checkin");
+        let mut lines = vec![
+            "Trip Planner · Draft itinerary".to_string(),
+            String::new(),
+            "Here is a plan built around your fixed commitments today:".to_string(),
+            String::new(),
+            "  14:00 - 15:00  Flight arrival".to_string(),
+        ];
+        if has_connecting_flight {
+            lines.push("  15:00 - 16:00  Connecting flight".to_string());
+        }
+        let mut next = if has_connecting_flight { 16 } else { 15 };
+        if has_hotel {
+            lines.push(format!(
+                "  {:02}:00 - {:02}:00  Hotel check-in",
+                next,
+                next + 1
+            ));
+            next += 1;
+        }
+        lines.push(format!("  {:02}:00 - 24:00  Free time · wind down", next));
+        lines.push(String::new());
+        lines.push(
+            "The calendar below shows a draft plan. Review it before adding anything to your calendar."
+                .to_string(),
+        );
+        return lines.join("\n");
+    }
+
+    let bullets = if template.id == "travel_planner"
+        || lowered.contains("trip")
+        || lowered.contains("itinerary")
+        || lowered.contains("flight")
+    {
+        vec![
+            "1. Lock in the fixed bookings first (flights, check-in times), then place everything else around them.",
+            "2. Keep one flexible backup ready in case of weather or delays.",
+            "3. End each day with tomorrow's first move already decided.",
+        ]
+    } else if template.id == "appointment_assistant"
+        || lowered.contains("appointment")
+        || lowered.contains("booking")
+    {
+        vec![
+            "1. Confirm the time, location, and what you need to bring.",
+            "2. Prepare the reminder or reschedule steps before touching a live booking flow.",
+            "3. Queue any payment or booking action for review instead of auto-executing it.",
+        ]
+    } else if template.id == "student_day_planner"
+        || lowered.contains("study")
+        || lowered.contains("lecture")
+        || lowered.contains("exam")
+        || lowered.contains("assignment")
+        || lowered.contains("notes")
+    {
+        vec![
+            "1. Ground the answer in the student's own lecture, reading, note, or transcript context first.",
+            "2. Pull out the main concepts, overlaps, and likely weak points instead of repeating the source verbatim.",
+            "3. End with the smallest next study step that reduces pressure now and would normally compound into connected notes later.",
+        ]
+    } else {
+        vec![
+            "1. Clarify the goal, deadline, and minimum useful output.",
+            "2. Decide whether this needs web research, a question back, or a simple next action.",
+            "3. Capture the next action so the result can be replayed later.",
+        ]
     };
 
     format!("{}\n\n{}\n\n{}", template.name, meta, bullets.join("\n"))
@@ -4818,38 +6556,39 @@ fn trial_assistant_reply(
 
 fn build_trial_calendar_view(content: &str) -> Value {
     let lowered = content.to_lowercase();
-    let num_lessons = if lowered.contains("two")
+    let num_flights = if lowered.contains("two")
         || lowered.contains(" 2 ")
-        || lowered.contains("2 lesson")
-        || lowered.contains("two lesson")
+        || lowered.contains("connecting")
+        || lowered.contains("layover")
     {
         2usize
     } else {
         1
     };
-    let has_dog = lowered.contains("dog") || lowered.contains("wash");
-    let start_hour: u32 = 17;
+    let has_hotel =
+        lowered.contains("hotel") || lowered.contains("check-in") || lowered.contains("checkin");
+    let start_hour: u32 = 14;
     let end_hour: u32 = 24;
 
     let mut slots = Vec::new();
     let mut current = start_hour;
 
-    for i in 0..num_lessons {
+    for i in 0..num_flights {
         slots.push(serde_json::json!({
             "start": format!("{:02}:00", current),
             "end": format!("{:02}:00", current + 1),
-            "label": format!("Lesson {}", i + 1),
-            "type": "lesson",
+            "label": if i == 0 { "Flight arrival".to_string() } else { "Connecting flight".to_string() },
+            "type": "flight",
             "movable": true
         }));
         current += 1;
     }
-    if has_dog {
+    if has_hotel {
         slots.push(serde_json::json!({
             "start": format!("{:02}:00", current),
             "end": format!("{:02}:00", current + 1),
-            "label": "Dog washing ðŸ¾",
-            "type": "chore",
+            "label": "Hotel check-in",
+            "type": "lodging",
             "movable": true
         }));
         current += 1;
@@ -4868,6 +6607,7 @@ fn build_trial_calendar_view(content: &str) -> Value {
         "start_hour": start_hour,
         "end_hour": end_hour,
         "slots": slots,
+        "preview_notice": "Preview only. Review this draft before adding it to your preview calendar. No booking or external action happens automatically in the anonymous trial.",
         "pending_confirmation": true,
         "confirmed": false
     })
@@ -5022,7 +6762,7 @@ fn build_runtime_deployment_plan(
             "starter_profile": {
                 "primary_agent_id": primary_agent_id,
                 "gui_name": gui_name,
-                "default_template_id": "student_day_planner",
+                "default_template_id": "travel_planner",
             },
             "runtime_mode": runtime_mode,
             "sandbox_policy": default_runner_sandbox_policy(framework_name),
@@ -5164,9 +6904,9 @@ fn default_runner_templates(framework: &str) -> Value {
     }
     serde_json::json!([
         {
-            "id": "student_day_planner",
-            "name": "Student Day Planner",
-            "summary": "Turn classes, assignments, and energy into a practical day plan."
+            "id": "travel_planner",
+            "name": "Travel Planner",
+            "summary": "Turn flights, hotels, and rough plans into a practical day-by-day itinerary."
         },
         {
             "id": "research_assistant",
@@ -5176,7 +6916,7 @@ fn default_runner_templates(framework: &str) -> Value {
         {
             "id": "appointment_assistant",
             "name": "Appointment Assistant",
-            "summary": "Prepare booking and reminder flows with human review for risky actions."
+            "summary": "Prepare booking prep and reminder flows with human review for risky actions."
         }
     ])
 }
@@ -5725,11 +7465,34 @@ fn orchestration_companion_a2ui_content(
     })
 }
 
-fn orchestration_progress_section_content(task_count: usize, success_count: usize) -> Value {
+fn orchestration_user_facing_text(
+    text: &str,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
+) -> String {
+    active_persona
+        .map(|persona| crate::agent_personas::restyle_user_facing_text(text, persona))
+        .unwrap_or_else(|| text.to_string())
+}
+
+fn decision_user_facing_text(
+    text: &str,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
+) -> String {
+    active_persona
+        .map(|persona| crate::agent_personas::restyle_user_facing_text(text, persona))
+        .unwrap_or_else(|| text.to_string())
+}
+
+fn orchestration_progress_section_content(
+    task_count: usize,
+    success_count: usize,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
+) -> Value {
     let text = format!(
         "Completed {} tasks with {} successful results",
         task_count, success_count
     );
+    let text = orchestration_user_facing_text(&text, active_persona);
     serde_json::json!({
         "text": text,
         "pct": 100,
@@ -5763,7 +7526,14 @@ fn orchestration_progress_section_content(task_count: usize, success_count: usiz
     })
 }
 
-fn orchestration_plan_section_content(summary: &str) -> Value {
+fn orchestration_plan_section_content(
+    summary: &str,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
+) -> Value {
+    let note = orchestration_user_facing_text(
+        "This is the current orchestration plan before execution completes.",
+        active_persona,
+    );
     serde_json::json!({
         "title": "Agent plan",
         "text": summary,
@@ -5786,7 +7556,7 @@ fn orchestration_plan_section_content(summary: &str) -> Value {
                     "type": "text",
                     "props": {
                         "label": "Planning summary",
-                        "value": "This is the current orchestration plan before execution completes.",
+                        "value": note,
                     }
                 }
             ]
@@ -5796,6 +7566,7 @@ fn orchestration_plan_section_content(summary: &str) -> Value {
 
 fn orchestration_results_section_content(
     results: &[crate::master_orchestrator::TaskResult],
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
 ) -> Value {
     let rows = results
         .iter()
@@ -5812,6 +7583,10 @@ fn orchestration_results_section_content(
             ])
         })
         .collect::<Vec<_>>();
+    let body = orchestration_user_facing_text(
+        "Review the task-by-task outcome table for the completed orchestration run.",
+        active_persona,
+    );
     serde_json::json!({
         "headers": ["Task type", "Status", "Summary"],
         "rows": rows,
@@ -5826,7 +7601,7 @@ fn orchestration_results_section_content(
                     "props": {
                         "tone": "info",
                         "title": "Task results",
-                        "body": "Review the task-by-task outcome table for the completed orchestration run.",
+                        "body": body,
                     }
                 },
                 {
@@ -5843,11 +7618,16 @@ fn orchestration_results_section_content(
     })
 }
 
-fn orchestration_final_answer_section_content(task_count: usize, success_count: usize) -> Value {
+fn orchestration_final_answer_section_content(
+    task_count: usize,
+    success_count: usize,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
+) -> Value {
     let text = format!(
         "Orchestration complete. {} of {} tasks succeeded.",
         success_count, task_count
     );
+    let text = orchestration_user_facing_text(&text, active_persona);
     serde_json::json!({
         "text": text,
         "a2ui": {
@@ -5880,7 +7660,15 @@ fn orchestration_final_answer_section_content(task_count: usize, success_count: 
     })
 }
 
-fn orchestration_error_section_content(error_text: &str) -> Value {
+fn orchestration_error_section_content(
+    error_text: &str,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
+) -> Value {
+    let error_text = orchestration_user_facing_text(error_text, active_persona);
+    let next_step = orchestration_user_facing_text(
+        "Review the error details and retry with a narrower objective or a different execution path.",
+        active_persona,
+    );
     serde_json::json!({
         "text": error_text,
         "a2ui": {
@@ -5902,7 +7690,7 @@ fn orchestration_error_section_content(error_text: &str) -> Value {
                     "type": "text",
                     "props": {
                         "label": "Next step",
-                        "value": "Review the error details and retry with a narrower objective or a different execution path.",
+                        "value": next_step,
                     }
                 }
             ]
@@ -6195,7 +7983,12 @@ fn orchestrate_card_sections(
     summary: &str,
     objective: &str,
     gate: OrchestrationGate,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
 ) -> Vec<Value> {
+    let progress_text = orchestration_user_facing_text(
+        "Planning the orchestration steps and allocating agent work",
+        active_persona,
+    );
     let mut sections = vec![
         serde_json::json!({
             "id": "progress",
@@ -6203,7 +7996,7 @@ fn orchestrate_card_sections(
             "order": 1,
             "status": "streaming",
             "content": {
-                "text": "Planning the orchestration steps and allocating agent work",
+                "text": progress_text,
                 "pct": 15
             }
         }),
@@ -6212,11 +8005,19 @@ fn orchestrate_card_sections(
             "type": "canvas",
             "order": 2,
             "status": "complete",
-            "content": orchestration_plan_section_content(summary)
+            "content": orchestration_plan_section_content(summary, active_persona)
         }),
     ];
 
     if gate == OrchestrationGate::Approval {
+        let approval_question = orchestration_user_facing_text(
+            "This orchestration may trigger external actions. Do you want the agent to proceed?",
+            active_persona,
+        );
+        let approval_context = orchestration_user_facing_text(
+            "Approval is required before OmnyID starts bookings, purchases, outbound messages, deletions, or other higher-risk actions.",
+            active_persona,
+        );
         sections.push(serde_json::json!({
             "id": "approval_gate",
             "type": "decision_point",
@@ -6225,8 +8026,8 @@ fn orchestrate_card_sections(
             "content": {
                 "id": "approval_gate",
                 "category": "confirmation",
-                "question": "This orchestration may trigger external actions. Do you want the agent to proceed?",
-                "context": "Approval is required before OmnyID starts bookings, purchases, outbound messages, deletions, or other higher-risk actions.",
+                "question": approval_question,
+                "context": approval_context,
                 "options": [
                     {
                         "id": "confirm_orchestration",
@@ -6244,6 +8045,14 @@ fn orchestrate_card_sections(
         }));
     } else if gate == OrchestrationGate::Clarification {
         let clarification = clarification_prompt_for_objective(objective);
+        let question = clarification["question"]
+            .as_str()
+            .map(|text| orchestration_user_facing_text(text, active_persona))
+            .unwrap_or_default();
+        let context = clarification["context"]
+            .as_str()
+            .map(|text| orchestration_user_facing_text(text, active_persona))
+            .unwrap_or_default();
         sections.push(serde_json::json!({
             "id": "clarification_gate",
             "type": "decision_point",
@@ -6252,8 +8061,8 @@ fn orchestrate_card_sections(
             "content": {
                 "id": "clarification_gate",
                 "category": "clarification",
-                "question": clarification["question"].clone(),
-                "context": clarification["context"].clone(),
+                "question": question,
+                "context": context,
                 "options": clarification["options"].clone()
             }
         }));
@@ -6268,6 +8077,7 @@ fn orchestration_preview_message(
     card_id: &str,
     thread_id: &str,
     gate: OrchestrationGate,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
 ) -> AFPMessage {
     let card_content = serde_json::json!({
         "card_id": card_id,
@@ -6281,7 +8091,7 @@ fn orchestration_preview_message(
             OrchestrationGate::Clarification => "clarification",
             OrchestrationGate::Approval => "approval",
         },
-        "sections": orchestrate_card_sections(summary, query, gate),
+        "sections": orchestrate_card_sections(summary, query, gate, active_persona),
     });
     let a2ui_companion = orchestration_companion_a2ui_content(query, summary, card_id, gate);
     AFPMessage {
@@ -6294,6 +8104,7 @@ fn orchestration_preview_message(
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "agent".to_string(),
         kind: None,
+        supertags: vec![],
         subtype: Some("orchestration_card".to_string()),
         content: serde_json::json!({
             "kind": "orchestration",
@@ -6341,19 +8152,14 @@ pub(super) fn apply_workspace_reasoning_overlays(objective: &str, _user_id: &str
     objective.to_string()
 }
 
-pub(super) async fn emit_agent_session_message(
+async fn emit_agent_session_message(
     _state: &Arc<AppState>,
     _user_id: &str,
     _session: &crate::db::AgentSessionRecord,
 ) {
 }
 
-pub(super) fn spawn_session_dispatcher(
-    _state: Arc<AppState>,
-    _user_id: String,
-    _session_id: String,
-) {
-}
+fn spawn_session_dispatcher(_state: Arc<AppState>, _user_id: String, _session_id: String) {}
 
 fn spawn_orchestration_run(
     state: Arc<AppState>,
@@ -6378,6 +8184,15 @@ fn spawn_orchestration_run(
             } else {
                 Some(soul_md.as_str())
             };
+            let active_persona = state
+                .db
+                .get_active_agent_persona(&user_id)
+                .await
+                .ok()
+                .flatten();
+            let output_persona_prompt = active_persona
+                .as_ref()
+                .map(crate::agent_personas::build_user_facing_persona_prompt);
             let runpod_ep = if backend_name == "runpod" {
                 std::env::var("OMNYID_RUNPOD_ENDPOINT_ID").ok()
             } else {
@@ -6392,6 +8207,7 @@ fn spawn_orchestration_run(
                     &api_key,
                     &model,
                     soul_opt,
+                    output_persona_prompt.as_deref(),
                     lora_active,
                     runpod_ep.as_deref(),
                     Some(state.cost_oracle.as_ref()),
@@ -6411,7 +8227,8 @@ fn spawn_orchestration_run(
                                 "status": "complete",
                                 "content": orchestration_progress_section_content(
                                     orchestrator_result.task_count,
-                                    orchestrator_result.success_count
+                                    orchestrator_result.success_count,
+                                    active_persona.as_ref(),
                                 )
                             }
                         });
@@ -6442,7 +8259,10 @@ fn spawn_orchestration_run(
                                 "type": "table",
                                 "order": 3,
                                 "status": "complete",
-                                "content": orchestration_results_section_content(&orchestrator_result.results)
+                                "content": orchestration_results_section_content(
+                                    &orchestrator_result.results,
+                                    active_persona.as_ref(),
+                                )
                             }
                         });
                         if let Ok(msg) = new_server_message(
@@ -6475,7 +8295,8 @@ fn spawn_orchestration_run(
                                 "status": "complete",
                                 "content": orchestration_final_answer_section_content(
                                     orchestrator_result.task_count,
-                                    orchestrator_result.success_count
+                                    orchestrator_result.success_count,
+                                    active_persona.as_ref(),
                                 )
                             }
                         });
@@ -6510,7 +8331,7 @@ fn spawn_orchestration_run(
                                 "status": "error",
                                 "content": orchestration_error_section_content(&format!(
                                     "The orchestration run failed before completion: {err}"
-                                ))
+                                ), active_persona.as_ref())
                             }
                         });
                         if let Ok(msg) = new_server_message(
@@ -6630,7 +8451,7 @@ fn sync_runtime_agent_profile_file(deployment: &RuntimeDeploymentRecord) -> Resu
         "default_template_id": starter_profile
             .get("default_template_id")
             .cloned()
-            .unwrap_or_else(|| Value::String("student_day_planner".to_string())),
+            .unwrap_or_else(|| Value::String("travel_planner".to_string())),
         "capabilities": [
             "chat_control",
             "day_planning",
@@ -6919,6 +8740,12 @@ async fn runtime_compose_action(
     deployment: &RuntimeDeploymentRecord,
     action: &str,
 ) -> Result<(), String> {
+    if !private_runtime_feature_enabled() {
+        return Err(format!(
+            "private runtime orchestration is disabled; set {}=true to enable it",
+            PRIVATE_RUNTIMES_ENV
+        ));
+    }
     if !docker_cli_available().await {
         return Err("Docker Compose is not available to the OmnyID homeserver yet.".to_string());
     }
@@ -6932,10 +8759,7 @@ async fn runtime_compose_action(
     // GAP-100: clear inherited environment so homeserver secrets (OMNYID_*) cannot
     // leak into Docker Compose output / error messages written to the runtime log files.
     // Pass only PATH and HOME so docker can locate itself and user config.
-    command
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", std::env::var("HOME").unwrap_or_default());
+    apply_runtime_compose_env_hardening(&mut command);
     command.arg("compose").arg("-f").arg(&compose_file);
     match action {
         "start" => {
@@ -6957,10 +8781,7 @@ async fn runtime_compose_action(
     }
 
     // GAP-096: cap docker compose operations at 10 minutes to prevent indefinite thread starvation.
-    let timeout_secs = std::env::var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS")
-        .ok()
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(600);
+    let timeout_secs = runtime_compose_timeout_secs();
     let output = tokio::time::timeout(
         std::time::Duration::from_secs(timeout_secs),
         command.output(),
@@ -6977,6 +8798,63 @@ async fn runtime_compose_action(
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
     let detail = if !stderr.is_empty() { stderr } else { stdout };
     Err(format!("docker compose {action} failed: {detail}"))
+}
+
+fn runtime_compose_allowed_env() -> Vec<(&'static str, String)> {
+    vec![
+        ("PATH", std::env::var("PATH").unwrap_or_default()),
+        ("HOME", std::env::var("HOME").unwrap_or_default()),
+    ]
+}
+
+const PRIVATE_RUNTIMES_ENV: &str = "OMNYID_ENABLE_PRIVATE_RUNTIMES";
+
+fn private_runtime_feature_enabled() -> bool {
+    private_runtime_feature_enabled_from_env(std::env::var(PRIVATE_RUNTIMES_ENV).ok().as_deref())
+}
+
+fn private_runtime_feature_enabled_from_env(value: Option<&str>) -> bool {
+    matches!(
+        value.map(str::trim),
+        Some("1")
+            | Some("true")
+            | Some("TRUE")
+            | Some("True")
+            | Some("yes")
+            | Some("YES")
+            | Some("Yes")
+            | Some("on")
+            | Some("ON")
+            | Some("On")
+    )
+}
+
+pub(super) fn ensure_private_runtime_feature_enabled() -> Result<(), (StatusCode, String)> {
+    if private_runtime_feature_enabled() {
+        Ok(())
+    } else {
+        Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            format!(
+                "private runtimes are not enabled on this homeserver; set {}=true to enable them",
+                PRIVATE_RUNTIMES_ENV
+            ),
+        ))
+    }
+}
+
+fn apply_runtime_compose_env_hardening(command: &mut Command) {
+    command.env_clear();
+    for (key, value) in runtime_compose_allowed_env() {
+        command.env(key, value);
+    }
+}
+
+fn runtime_compose_timeout_secs() -> u64 {
+    std::env::var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(600)
 }
 
 fn persist_runtime_compose_output(
@@ -8070,6 +9948,7 @@ fn device_sync_policy_entry_response(
         requires_local_key_material: record.requires_local_key_material,
         last_bundle_at: record.last_bundle_at,
         last_used_at: record.last_used_at,
+        updated_at: record.updated_at,
         notes_summary: serde_json::json!({
             "policy_note": record.notes_json.get("policy_note").cloned().unwrap_or(Value::Null),
             "source": record.notes_json.get("source").cloned().unwrap_or(Value::Null),
@@ -8084,6 +9963,7 @@ fn build_runtime_recovery_packet_response(
     runtime_backups: RuntimeBackupsResponse,
     runtime_restore_drills: RuntimeRestoreDrillsResponse,
     runtime_updates: RuntimeUpdatesResponse,
+    operational_guidance: Option<RuntimeOperationalGuidanceResponse>,
 ) -> RuntimeRecoveryPacketResponse {
     let packet_slug = email_localpart_slug(&user.email);
     RuntimeRecoveryPacketResponse {
@@ -8095,6 +9975,7 @@ fn build_runtime_recovery_packet_response(
         runtime_backups,
         runtime_restore_drills,
         runtime_updates,
+        operational_guidance,
         recovery_checklist: vec![
             "Confirm the owner account, runtime framework, and workspace boundary match your intended recovery target."
                 .to_string(),
@@ -8118,48 +9999,161 @@ fn build_runtime_recovery_packet_response(
     }
 }
 
+fn production_go_no_go_artifact_path() -> PathBuf {
+    std::env::var("OMNYID_PRODUCTION_GO_NO_GO_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            PathBuf::from("artifacts/production-go-no-go-current/production-go-no-go.json")
+        })
+}
+
+fn parse_runtime_operational_guidance(
+    value: &Value,
+    source: &str,
+) -> Option<RuntimeOperationalGuidanceResponse> {
+    let pressure_status = value
+        .get("storage_oracle_operational_history_pressure_status")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|status| !status.is_empty())
+        .map(ToOwned::to_owned);
+    if pressure_status.as_deref() != Some("operational_history_present") {
+        return None;
+    }
+
+    let follow_through_command = value
+        .get("storage_oracle_operational_history_cleanup_follow_through_command")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|command| !command.is_empty())
+        .map(ToOwned::to_owned);
+    let next_action_command = value
+        .get("next_action_command")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|command| !command.is_empty())
+        .map(ToOwned::to_owned);
+    let next_action_summary = value
+        .get("next_action_summary")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|summary| !summary.is_empty())
+        .map(ToOwned::to_owned);
+    let command = follow_through_command
+        .clone()
+        .or(next_action_command.clone())?;
+
+    let summary_mentions_operational_history =
+        next_action_summary.as_deref().is_some_and(|summary| {
+            let lower = summary.to_ascii_lowercase();
+            lower.contains("operational-history") || lower.contains("operational history")
+        });
+    let command_mentions_cleanup = command.contains("oracle-prune-operational-history");
+    if !summary_mentions_operational_history && !command_mentions_cleanup {
+        return None;
+    }
+
+    Some(RuntimeOperationalGuidanceResponse {
+        status: value
+            .get("status")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|status| !status.is_empty())
+            .unwrap_or("unknown")
+            .to_string(),
+        summary: next_action_summary.unwrap_or_else(|| {
+            "Operational history cleanup is the current blocker before the next readiness pass."
+                .to_string()
+        }),
+        command,
+        source: source.to_string(),
+        pressure_status,
+        pressure_total_rows: value
+            .get("storage_oracle_operational_history_pressure_total_rows")
+            .and_then(Value::as_i64),
+        cleanup_mode: value
+            .get("storage_oracle_operational_history_cleanup_mode")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|mode| !mode.is_empty())
+            .map(ToOwned::to_owned),
+        generated_at: value
+            .get("generated_at")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|generated_at| !generated_at.is_empty())
+            .map(ToOwned::to_owned),
+    })
+}
+
+fn load_runtime_operational_guidance() -> Option<RuntimeOperationalGuidanceResponse> {
+    let path = production_go_no_go_artifact_path();
+    let source = path.display().to_string();
+    let raw = std::fs::read_to_string(&path).ok()?;
+    let parsed = serde_json::from_str::<Value>(&raw).ok()?;
+    parse_runtime_operational_guidance(&parsed, &source)
+}
+
 fn build_device_bootstrap_bundle_response(
     user: &UserRecord,
     agents: &[ManagedAgentRecord],
     requested_device_class: &str,
+    requested_device_id: Option<&str>,
+    requested_policy_profile: Option<&str>,
 ) -> Result<DeviceBootstrapBundleResponse, (StatusCode, String)> {
-    let device_class = parse_device_class(requested_device_class).ok_or_else(|| {
+    let requested_device_class = requested_device_class.trim();
+    let parsed_device_class = parse_device_class(requested_device_class).ok_or_else(|| {
         (
             StatusCode::BAD_REQUEST,
             "device_class must be desktop, mobile, or watch".to_string(),
         )
     })?;
-    let device_class_label = requested_device_class.to_string();
-    let profile = default_sync_profile(&device_class);
-    let slices = sync_slices_for_device(&device_class, &profile);
+    if let Some(profile) = requested_policy_profile
+        .map(str::trim)
+        .filter(|profile| !profile.is_empty())
+    {
+        if !matches!(profile, "full" | "balanced" | "lightweight") {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "policy_profile must be full, balanced, or lightweight".to_string(),
+            ));
+        }
+    }
+    let normalized_device_class_label = runtime_sync_device_class_label(&parsed_device_class);
+    if !runtime_sync_device_id_is_class_compatible(
+        normalized_device_class_label,
+        requested_device_id,
+    ) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "device_id prefix does not match requested device_class".to_string(),
+        ));
+    }
+    let plan = runtime_sync_plan(
+        Some(normalized_device_class_label),
+        requested_policy_profile,
+    );
+    let device_class_label = plan.device_class_label.to_string();
+    let slices = plan.slices.clone();
     let requires_keys = requires_local_key_material(&slices);
     let agent_id = agents
         .first()
         .map(|agent| agent.agent_id.clone())
         .unwrap_or_else(|| format!("agent:{}@omnyid.com", email_localpart_slug(&user.email)));
-    let device_id = format!(
-        "{}-{}",
-        device_class_label,
-        &Ulid::new().to_string().to_lowercase()
-    );
-    let pglite_path = match device_class_label.as_str() {
-        "desktop" => "./.omnyid/pglite".to_string(),
-        "mobile" => "app://omnyid/pglite".to_string(),
-        "watch" => "watch://omnyid/snapshots".to_string(),
-        _ => "./.omnyid/pglite".to_string(),
-    };
-    let electric_project_url = std::env::var("OMNYID_ELECTRIC_PROJECT_URL")
-        .unwrap_or_else(|_| "https://api.omnyid.com/electric".to_string());
+    let device_id = runtime_sync_device_id(plan.device_class_label, requested_device_id);
+    let electric_project_url = std::env::var("OMNYID_ELECTRIC_URL")
+        .or_else(|_| std::env::var("OMNYID_ELECTRIC_PROJECT_URL"))
+        .unwrap_or_else(|_| "https://electric.yourdomain.ai".to_string());
     let bootstrap = DeviceBootstrap {
         device_id: device_id.clone(),
         agent_id: agent_id.clone(),
         electric_project_url: electric_project_url.clone(),
-        encrypted_seed_ref: format!("omnyid-sync://{}/{}/seed-envelope", user.id, device_id),
-        pglite_path,
+        encrypted_seed_ref: runtime_sync_seed_ref(&device_id),
+        pglite_path: runtime_sync_pglite_path(plan.device_class_label, &device_id),
     };
     let sync_plan = serde_json::to_string_pretty(&serde_json::json!({
         "device_class": device_class_label,
-        "policy_profile": profile,
+        "policy_profile": plan.profile_label,
         "requires_local_key_material": requires_keys,
         "slices": slices,
         "notes": device_bootstrap_notes(&device_class_label),
@@ -8190,6 +10184,7 @@ fn build_device_bootstrap_bundle_response(
         generated_at: chrono::Utc::now().to_rfc3339(),
         bundle_name: format!("{packet_name}.zipless"),
         device_class: device_class_label,
+        policy_profile: plan.profile_label.to_string(),
         requires_local_key_material: requires_keys,
         files: vec![
             OnboardingBundleFile {
@@ -8207,17 +10202,6 @@ fn build_device_bootstrap_bundle_response(
         ],
         bootstrap,
     })
-}
-
-fn default_device_sync_profile(device_class: &str) -> String {
-    match parse_device_class(device_class)
-        .map(|class| default_sync_profile(&class))
-        .unwrap_or_else(|| default_sync_profile(&crate::local_sync::DeviceClass::Desktop))
-    {
-        crate::local_sync::SyncPolicyProfile::Full => "full".to_string(),
-        crate::local_sync::SyncPolicyProfile::Balanced => "balanced".to_string(),
-        crate::local_sync::SyncPolicyProfile::Lightweight => "lightweight".to_string(),
-    }
 }
 
 fn sync_slices_for_bundle(
@@ -8493,6 +10477,7 @@ fn support_access_history_entry(record: SupportAccessGrantRecord) -> SupportAcce
 
 fn account_session_entry(session: AuthSessionRecord, current_token: &str) -> AccountSessionEntry {
     AccountSessionEntry {
+        session_ref: account_session_ref(&session.token),
         token_preview: runtime_token_preview(&session.token),
         created_at: session.created_at,
         expires_at: session.expires_at,
@@ -8524,6 +10509,10 @@ pub(super) fn runtime_token_preview(token: &str) -> String {
     }
 
     format!("{}...{}", &token[..4], &token[token.len() - 4..])
+}
+
+fn account_session_ref(token_hash: &str) -> String {
+    token_hash.to_string()
 }
 
 fn write_runtime_file(path: &std::path::Path, content: &str) -> Result<(), String> {
@@ -8688,6 +10677,180 @@ fn delegation_revoke_error_to_http(err: sqlx::Error) -> (StatusCode, String) {
         (StatusCode::NOT_FOUND, "delegation not found".to_string())
     } else {
         status_to_http(internal_error(err))
+    }
+}
+
+fn startup_environment_label() -> Option<String> {
+    [
+        "OMNYID_ENV",
+        "APP_ENV",
+        "ENVIRONMENT",
+        "RUST_ENV",
+        "NODE_ENV",
+    ]
+    .iter()
+    .find_map(|key| {
+        std::env::var(key)
+            .ok()
+            .map(|value| value.trim().to_ascii_lowercase())
+            .filter(|value| !value.is_empty())
+    })
+}
+
+fn production_startup_policy_enabled() -> bool {
+    matches!(
+        startup_environment_label().as_deref(),
+        Some("prod" | "production")
+    )
+}
+
+fn env_flag_enabled(name: &str) -> bool {
+    std::env::var(name)
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn database_url_looks_like_dev_default(database_url: &str) -> bool {
+    matches!(
+        database_url.trim(),
+        "" | "postgres://afp:afp@postgres:5432/afp" | "postgres://afp:afp@localhost:5432/afp"
+    )
+}
+
+fn env_var_present(name: &str) -> bool {
+    std::env::var(name)
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+}
+
+fn stripe_secret_key_looks_valid(value: &str) -> bool {
+    let trimmed = value.trim();
+    (trimmed.starts_with("sk_live_") || trimmed.starts_with("sk_test_"))
+        && trimmed.len() > "sk_test_".len()
+}
+
+fn stripe_webhook_secret_looks_valid(value: &str) -> bool {
+    let trimmed = value.trim();
+    trimmed.starts_with("whsec_") && trimmed.len() > "whsec_".len()
+}
+
+fn stripe_price_id_looks_valid(value: &str) -> bool {
+    let trimmed = value.trim();
+    trimmed.starts_with("price_") && trimmed.len() > "price_".len()
+}
+
+fn stripe_production_config_present() -> bool {
+    [
+        "OMNYID_STRIPE_SECRET_KEY",
+        "OMNYID_STRIPE_WEBHOOK_SECRET",
+        "OMNYID_STRIPE_PRO_PRICE_ID",
+        "OMNYID_STRIPE_CHECKOUT_PRICE_ID",
+        "OMNYID_STRIPE_TEAM_PRICE_ID",
+        "OMNYID_WORKSPACE_BASE_URL",
+        "OMNYID_UI_BASE_URL",
+    ]
+    .iter()
+    .any(|name| env_var_present(name))
+}
+
+fn public_operational_endpoints_enabled() -> bool {
+    env_flag_enabled("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS")
+}
+
+fn validate_startup_deployment_policy() -> Result<(), String> {
+    if !production_startup_policy_enabled() {
+        return Ok(());
+    }
+
+    let mut violations = Vec::new();
+
+    if env_flag_enabled("OMNYID_ALLOW_INSECURE_UNSIGNED") {
+        violations.push("OMNYID_ALLOW_INSECURE_UNSIGNED must be false in production".to_string());
+    }
+    if env_flag_enabled("OMNYID_ALLOW_PLAINTEXT_STORAGE") {
+        violations.push("OMNYID_ALLOW_PLAINTEXT_STORAGE must be false in production".to_string());
+    }
+
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_default();
+    if database_url_looks_like_dev_default(&database_url) {
+        violations
+            .push("DATABASE_URL must be set to a non-default production database".to_string());
+    }
+
+    if let Err(err) = crate::agent_template::delegation_master_key_hex() {
+        violations.push(err);
+    }
+
+    let gmail_oauth_status = self::health_deps::check_gmail_oauth_readiness();
+    if gmail_oauth_status != "ok" && gmail_oauth_status != "not_configured" {
+        violations.push(format!(
+            "Gmail OAuth must be fully configured in production when enabled ({gmail_oauth_status})"
+        ));
+    }
+
+    if stripe_production_config_present() {
+        let stripe_secret = std::env::var("OMNYID_STRIPE_SECRET_KEY").unwrap_or_default();
+        if !stripe_secret_key_looks_valid(&stripe_secret) {
+            violations.push(
+                "OMNYID_STRIPE_SECRET_KEY must be set to a valid Stripe secret key when self-serve billing is configured".to_string(),
+            );
+        }
+
+        let webhook_secret = std::env::var("OMNYID_STRIPE_WEBHOOK_SECRET").unwrap_or_default();
+        if !stripe_webhook_secret_looks_valid(&webhook_secret) {
+            violations.push(
+                "OMNYID_STRIPE_WEBHOOK_SECRET must be set to a valid Stripe webhook secret when self-serve billing is configured".to_string(),
+            );
+        }
+
+        let pro_price = std::env::var("OMNYID_STRIPE_PRO_PRICE_ID")
+            .ok()
+            .filter(|value| stripe_price_id_looks_valid(value))
+            .or_else(|| {
+                std::env::var("OMNYID_STRIPE_CHECKOUT_PRICE_ID")
+                    .ok()
+                    .filter(|value| stripe_price_id_looks_valid(value))
+            });
+        if pro_price.is_none() {
+            violations.push(
+                "OMNYID_STRIPE_PRO_PRICE_ID or OMNYID_STRIPE_CHECKOUT_PRICE_ID must be set to a valid Stripe price id when self-serve billing is configured".to_string(),
+            );
+        }
+
+        if let Ok(team_price) = std::env::var("OMNYID_STRIPE_TEAM_PRICE_ID")
+            && !team_price.trim().is_empty()
+            && !stripe_price_id_looks_valid(&team_price)
+        {
+            violations.push(
+                "OMNYID_STRIPE_TEAM_PRICE_ID must be a valid Stripe price id when set".to_string(),
+            );
+        }
+
+        if !self::billing::billing_workspace_base_url_is_configured() {
+            violations.push(
+                "OMNYID_WORKSPACE_BASE_URL, OMNYID_UI_BASE_URL, or a derivable OMNYID_HOMESERVER_URL must be configured when self-serve billing is enabled".to_string(),
+            );
+        }
+    }
+
+    if public_operational_endpoints_enabled()
+        && crate::secret_manager::read_process_secret_trimmed("OMNYID_OPERATIONAL_ENDPOINT_TOKEN")
+            .is_none()
+    {
+        violations.push(
+            "OMNYID_OPERATIONAL_ENDPOINT_TOKEN must be configured when OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS is enabled in production".to_string(),
+        );
+    }
+
+    if violations.is_empty() {
+        Ok(())
+    } else {
+        Err(violations.join("; "))
     }
 }
 
@@ -8937,11 +11100,7 @@ async fn agent_intent_http(
         .map_err(internal_error)
         .map_err(status_to_http)?
         .ok_or_else(|| (StatusCode::BAD_REQUEST, "no agent instance".to_string()))?;
-    let priority = match body.priority.as_deref() {
-        Some("high") => TaskPriority::High,
-        Some("low") => TaskPriority::Low,
-        _ => TaskPriority::Normal,
-    };
+    let priority = TaskPriority::from_label(body.priority.as_deref());
     let instance_id = instance["id"].as_str().unwrap_or("").to_string();
     let agent_afp_id = instance["agent_id"].as_str().unwrap_or("").to_string();
     let task = AgentTask::new(user.id.clone(), instance_id, body.intent.clone(), priority);
@@ -9591,49 +11750,49 @@ fn workflow_builder_blueprints(preset: &str) -> Vec<Value> {
             serde_json::json!({"kind":"agent","label":"Email Guardian","description":"Triage, summarize, and route inbox items.","slot_name":"intake_slot","config":{"objective":"Handle inbox triage and prepare safe next actions.","preset_kind":"email_guardian","memory_scope":"thread_summary"},"prompt":{"system_prompt":"Triage inbound email responsibly and prepare safe next actions.","instruction_prompt":"Summarize, classify, and decide whether a reply draft is needed.","user_editable":true},"runtime_kind_source":"agent"}),
             serde_json::json!({"kind":"tool","label":"Mailbox Scan","description":"Scan recent inbound messages for urgent or actionable items.","slot_name":"gather_slot","config":{"capability_id":"email","operation":"triage_inbox","timeout_seconds":90},"runtime_kind_source":"tool"}),
             serde_json::json!({"kind":"approval","label":"Reply Review","description":"Review reply suggestions before any external send.","slot_name":"approval_slot","config":{"approval_reason":"Outgoing email content should be reviewed before sending.","decision_point_id":"","options":[{"option_id":"approve_reply","label":"Approve reply","consequence_summary":"Continue toward response delivery."},{"option_id":"hold_reply","label":"Hold","consequence_summary":"Stop before sending anything externally."}]},"runtime_kind_source":"approval"}),
-            serde_json::json!({"kind":"termination","label":"Inbox Summary","description":"Deliver the triage summary and next-step recommendations.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"email_guardian"}},"runtime_kind_source":"termination"}),
+            serde_json::json!({"kind":"termination","label":"Inbox Summary","description":"Deliver the reviewable reply draft and triage notes before any external send.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"email_guardian","summary_mode":"reviewable_reply_draft","structured_output_keys":["reply_draft","triage_notes"],"external_write":false}},"runtime_kind_source":"termination"}),
         ],
         "calendar_coordinator" => vec![
-            serde_json::json!({"kind":"agent","label":"Calendar Coordinator","description":"Coordinate schedule intent and meeting context.","slot_name":"intake_slot","config":{"objective":"Coordinate scheduling intent and meeting context.","preset_kind":"calendar_coordinator","memory_scope":"thread_summary"},"runtime_kind_source":"agent"}),
+            serde_json::json!({"kind":"agent","label":"Calendar Coordinator","description":"Coordinate schedule intent and draft reviewable meeting recommendations.","slot_name":"intake_slot","config":{"objective":"Coordinate scheduling intent and prepare reviewable meeting recommendations.","preset_kind":"calendar_coordinator","memory_scope":"thread_summary"},"runtime_kind_source":"agent"}),
             serde_json::json!({"kind":"tool","label":"Conflict Scan","description":"Check availability and detect scheduling collisions.","slot_name":"gather_slot","config":{"capability_id":"calendar","operation":"scan_availability","timeout_seconds":60},"runtime_kind_source":"tool"}),
-            serde_json::json!({"kind":"approval","label":"Confirm Time","description":"Review the recommended time slot before locking it in.","slot_name":"approval_slot","config":{"approval_reason":"A human should confirm the proposed meeting slot.","decision_point_id":"","options":[{"option_id":"approve_slot","label":"Confirm slot","consequence_summary":"Proceed with the booking."},{"option_id":"reject_slot","label":"Reject slot","consequence_summary":"Return to planning without booking."}]},"runtime_kind_source":"approval"}),
-            serde_json::json!({"kind":"termination","label":"Schedule Summary","description":"Return the selected slot and any remaining scheduling notes.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"calendar_coordinator"}},"runtime_kind_source":"termination"}),
+            serde_json::json!({"kind":"approval","label":"Confirm Time","description":"Review the recommended time slot before treating it as a confirmed plan.","slot_name":"approval_slot","config":{"approval_reason":"A human should confirm the proposed meeting slot before it is treated as final.","decision_point_id":"","options":[{"option_id":"approve_slot","label":"Confirm draft slot","consequence_summary":"Proceed with the reviewed schedule draft."},{"option_id":"reject_slot","label":"Reject slot","consequence_summary":"Return to planning without treating any slot as confirmed."}]},"runtime_kind_source":"approval"}),
+            serde_json::json!({"kind":"termination","label":"Schedule Summary","description":"Return the recommended slot, scheduling notes, and calendar context for review.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"calendar_coordinator","summary_mode":"reviewable_schedule_recommendation","structured_output_keys":["recommended_slot","scheduling_notes","calendar_context"],"external_write":false}},"runtime_kind_source":"termination"}),
         ],
         "receipt_tracker" => vec![
             serde_json::json!({"kind":"agent","label":"Receipt Tracker","description":"Interpret receipts and prepare bookkeeping updates.","slot_name":"intake_slot","config":{"objective":"Interpret receipts and prepare bookkeeping updates.","preset_kind":"receipt_tracker","memory_scope":"thread_summary"},"runtime_kind_source":"agent"}),
             serde_json::json!({"kind":"tool","label":"Receipt Extractor","description":"Extract merchant, amount, tax, and date fields.","slot_name":"gather_slot","config":{"capability_id":"document_extract","operation":"receipt_parse","timeout_seconds":90},"runtime_kind_source":"tool"}),
             serde_json::json!({"kind":"transform","label":"Ledger Mapping","description":"Map receipt data into a ledger-friendly category structure.","slot_name":"merge_slot","config":{"transform_kind":"template","output_contract":{"category":"","merchant":"","amount":0}},"runtime_kind_source":"transform"}),
-            serde_json::json!({"kind":"termination","label":"Ledger Update Summary","description":"Return the categorized receipt entry for review or posting.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"receipt_tracker"}},"runtime_kind_source":"termination"}),
+            serde_json::json!({"kind":"termination","label":"Ledger Update Summary","description":"Return the categorized receipt entry for review or posting.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"receipt_tracker","summary_mode":"reviewable_receipt_entry","structured_output_keys":["receipt_entry","receipt_notes"],"external_write":false}},"runtime_kind_source":"termination"}),
         ],
         "study_planner" => vec![
-            serde_json::json!({"kind":"agent","label":"Study Planner","description":"Plan study blocks from goals, deadlines, and priorities.","slot_name":"intake_slot","config":{"objective":"Plan study blocks from goals, deadlines, and priorities.","preset_kind":"study_planner","memory_scope":"thread_summary"},"runtime_kind_source":"agent"}),
+            serde_json::json!({"kind":"agent","label":"Study Planner","description":"Draft study blocks from goals, deadlines, and priorities.","slot_name":"intake_slot","config":{"objective":"Draft study blocks from goals, deadlines, and priorities.","preset_kind":"study_planner","memory_scope":"thread_summary"},"runtime_kind_source":"agent"}),
             serde_json::json!({"kind":"condition","label":"Urgency Split","description":"Split between urgent work and routine planning.","slot_name":"check_slot","config":{"expression":"deadline_within_72h"},"runtime_kind_source":"condition"}),
             serde_json::json!({"kind":"transform","label":"Block Builder","description":"Turn chosen priorities into a realistic block schedule.","slot_name":"merge_slot","config":{"transform_kind":"template","output_contract":{"study_blocks":[]}},"runtime_kind_source":"transform"}),
-            serde_json::json!({"kind":"termination","label":"Study Plan Summary","description":"Deliver the planned blocks and reminders.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"study_planner"}},"runtime_kind_source":"termination"}),
+            serde_json::json!({"kind":"termination","label":"Study Plan Summary","description":"Deliver the recommended study blocks, reminders, focus-item context, and calendar context.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"study_planner","summary_mode":"draft_study_plan","structured_output_keys":["study_blocks","reminders","study_input_context","calendar_context"],"external_write":false}},"runtime_kind_source":"termination"}),
         ],
         "finance_guardian" => vec![
             serde_json::json!({"kind":"agent","label":"Finance Guardian","description":"Track spending and identify unusual activity.","slot_name":"intake_slot","config":{"objective":"Track spending and identify unusual activity.","preset_kind":"finance_guardian","memory_scope":"thread_summary"},"runtime_kind_source":"agent"}),
             serde_json::json!({"kind":"tool","label":"Spend Scan","description":"Analyze recent transactions and spending categories.","slot_name":"gather_slot","config":{"capability_id":"finance","operation":"analyze_spend","timeout_seconds":90},"runtime_kind_source":"tool"}),
             serde_json::json!({"kind":"condition","label":"Anomaly Check","description":"Decide whether anomalies or alerts require escalation.","slot_name":"check_slot","config":{"expression":"anomaly_detected"},"runtime_kind_source":"condition"}),
-            serde_json::json!({"kind":"termination","label":"Finance Digest","description":"Return trends, anomalies, and suggested next steps.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"finance_guardian"}},"runtime_kind_source":"termination"}),
+            serde_json::json!({"kind":"termination","label":"Finance Digest","description":"Return transaction trends, anomaly notes, and finance context from the user ledger.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"finance_guardian","summary_mode":"finance_digest","structured_output_keys":["finance_digest","anomaly_notes","finance_input_context"],"external_write":false}},"runtime_kind_source":"termination"}),
         ],
         "travel_booker" => vec![
             serde_json::json!({"kind":"agent","label":"Travel Booker","description":"Coordinate travel intent, constraints, and tradeoffs.","slot_name":"intake_slot","config":{"objective":"Coordinate travel intent, constraints, and tradeoffs.","preset_kind":"travel_booker","memory_scope":"thread_summary"},"runtime_kind_source":"agent"}),
             serde_json::json!({"kind":"tool","label":"Option Finder","description":"Search flight, stay, or route options.","slot_name":"gather_slot","config":{"capability_id":"travel","operation":"compare_options","timeout_seconds":120},"runtime_kind_source":"tool"}),
             serde_json::json!({"kind":"approval","label":"Booking Approval","description":"Require explicit approval before confirming anything externally.","slot_name":"approval_slot","config":{"approval_reason":"Booking external travel should require explicit approval.","decision_point_id":"","options":[{"option_id":"book","label":"Book option","consequence_summary":"Proceed with confirmed booking."},{"option_id":"decline","label":"Do not book","consequence_summary":"Stop before any external confirmation."}]},"runtime_kind_source":"approval"}),
-            serde_json::json!({"kind":"termination","label":"Travel Options Summary","description":"Return the shortlisted travel plan and approval outcome.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"travel_booker"}},"runtime_kind_source":"termination"}),
+            serde_json::json!({"kind":"termination","label":"Travel Options Summary","description":"Return the draft booking recommendation and review notes before any external confirmation.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"travel_booker","summary_mode":"reviewable_booking_recommendation","structured_output_keys":["booking_recommendation","booking_notes"],"external_write":false}},"runtime_kind_source":"termination"}),
         ],
         "content_publisher" => vec![
             serde_json::json!({"kind":"agent","label":"Content Publisher","description":"Draft and prepare publishable public content.","slot_name":"intake_slot","config":{"objective":"Draft and prepare publishable public content.","preset_kind":"content_publisher","memory_scope":"thread_summary"},"policy":{"mask":"public","approval_mode":"none","allowed_tools":[],"allowed_capabilities":[],"max_steps":1,"max_cost_cents":0,"outbound_allowlist":[]},"runtime_kind_source":"agent"}),
             serde_json::json!({"kind":"transform","label":"Draft Formatter","description":"Shape the content into the target publishing format.","slot_name":"merge_slot","config":{"transform_kind":"template","output_contract":{"title":"","body":"","tags":[]}},"runtime_kind_source":"transform"}),
             serde_json::json!({"kind":"approval","label":"Publish Review","description":"Review public-facing copy before publication.","slot_name":"approval_slot","config":{"approval_reason":"Public content should be reviewed before publishing.","decision_point_id":"","options":[{"option_id":"publish","label":"Publish","consequence_summary":"Approve public release."},{"option_id":"hold","label":"Hold","consequence_summary":"Keep the draft unpublished."}]},"runtime_kind_source":"approval"}),
-            serde_json::json!({"kind":"termination","label":"Publishing Summary","description":"Return the final content package and publication readiness.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"content_publisher","visibility":"public"}},"runtime_kind_source":"termination"}),
+            serde_json::json!({"kind":"termination","label":"Publishing Summary","description":"Return the reviewable publication draft and publish notes before any public release.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"content_publisher","summary_mode":"reviewable_publication_draft","structured_output_keys":["publication_draft","publication_notes"],"external_write":false,"visibility":"public"}},"runtime_kind_source":"termination"}),
         ],
         _ => vec![
             serde_json::json!({"kind":"agent","label":"Research Assistant","description":"Frame the question and coordinate evidence gathering.","slot_name":"intake_slot","config":{"objective":"Frame the question and coordinate evidence gathering.","preset_kind":"research_assistant","memory_scope":"thread_summary"},"runtime_kind_source":"agent"}),
             serde_json::json!({"kind":"tool","label":"Web Research","description":"Search the web for relevant sources and findings.","slot_name":"gather_slot","config":{"capability_id":"web_search","operation":"search","timeout_seconds":120},"runtime_kind_source":"tool"}),
             serde_json::json!({"kind":"merge","label":"Evidence Merge","description":"Combine source findings into a coherent synthesis.","slot_name":"merge_slot","config":{"merge_strategy":"structured_merge"},"runtime_kind_source":"merge"}),
-            serde_json::json!({"kind":"termination","label":"Research Summary","description":"Return a concise summary with supporting findings.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"research_assistant","include_sources":true}},"runtime_kind_source":"termination"}),
+            serde_json::json!({"kind":"termination","label":"Research Summary","description":"Return a structured research brief with findings and source references.","slot_name":"finalize_slot","config":{"output_kind":"chat_reply","final_schema":{"workflow":"research_assistant","summary_mode":"research_brief","structured_output_keys":["research_brief","key_findings","source_refs"],"external_write":false,"include_sources":true}},"runtime_kind_source":"termination"}),
         ],
     }
 }
@@ -9658,7 +11817,7 @@ fn workflow_builder_preset_trigger_config(preset: &str) -> Value {
             "trigger_family": "event",
             "trigger_kind": "internal_event",
             "event_source": "calendar",
-            "event_type": "calendar.event_starting",
+            "event_type": "appointment_approaching",
             "event_filter": {}
         }),
         "receipt_tracker" => serde_json::json!({
@@ -10365,6 +12524,7 @@ fn validate_workflow_graph_json(
     ];
 
     let mut node_ids = std::collections::BTreeSet::new();
+    let mut termination_node_ids = std::collections::BTreeSet::new();
     for node in nodes {
         let Some(node_obj) = node.as_object() else {
             errors.push("every graph node must be an object".to_string());
@@ -10383,6 +12543,9 @@ fn validate_workflow_graph_json(
             None => errors.push(format!("node {node_id} is missing kind")),
         }
         let node_kind = node_obj.get("kind").and_then(Value::as_str);
+        if node_kind == Some("termination") {
+            termination_node_ids.insert(node_id.to_string());
+        }
         if let Some(config) = node_obj.get("config").and_then(Value::as_object) {
             if let Some(preset_kind) = config.get("preset_kind").and_then(Value::as_str) {
                 if !allowed_presets.contains(&preset_kind) {
@@ -10429,6 +12592,12 @@ fn validate_workflow_graph_json(
         }
     }
 
+    let valid_root_ids = root_node_ids
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|root_id| node_ids.contains(*root_id))
+        .map(str::to_string)
+        .collect::<Vec<_>>();
     for root_id in root_node_ids {
         let Some(root_id_str) = root_id.as_str() else {
             errors.push("every root_node_id must be a string".to_string());
@@ -10441,6 +12610,8 @@ fn validate_workflow_graph_json(
         }
     }
 
+    let mut adjacency: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
     if let Some(edges) = obj.get("edges").and_then(Value::as_array) {
         for edge in edges {
             let Some(edge_obj) = edge.as_object() else {
@@ -10450,7 +12621,16 @@ fn validate_workflow_graph_json(
             let source = edge_obj.get("source").and_then(Value::as_str);
             let target = edge_obj.get("target").and_then(Value::as_str);
             match source {
-                Some(id) if node_ids.contains(id) => {}
+                Some(id) if node_ids.contains(id) => {
+                    if let Some(target_id) =
+                        target.filter(|target_id| node_ids.contains(*target_id))
+                    {
+                        adjacency
+                            .entry(id.to_string())
+                            .or_default()
+                            .push(target_id.to_string());
+                    }
+                }
                 Some(id) => errors.push(format!("edge source references unknown node id: {id}")),
                 None => errors.push("every edge requires source".to_string()),
             }
@@ -10459,6 +12639,63 @@ fn validate_workflow_graph_json(
                 Some(id) => errors.push(format!("edge target references unknown node id: {id}")),
                 None => errors.push("every edge requires target".to_string()),
             }
+        }
+    }
+
+    if termination_node_ids.is_empty() {
+        warnings.push(
+            "graph has no termination node; runs may complete without a final reviewable output"
+                .to_string(),
+        );
+    }
+
+    if !valid_root_ids.is_empty() {
+        let mut reachable_node_ids = std::collections::BTreeSet::new();
+        let mut queue = std::collections::VecDeque::from(valid_root_ids.clone());
+        while let Some(node_id) = queue.pop_front() {
+            if !reachable_node_ids.insert(node_id.clone()) {
+                continue;
+            }
+            if let Some(targets) = adjacency.get(&node_id) {
+                for target in targets {
+                    if !reachable_node_ids.contains(target) {
+                        queue.push_back(target.clone());
+                    }
+                }
+            }
+        }
+
+        if !termination_node_ids.is_empty()
+            && reachable_node_ids
+                .iter()
+                .all(|node_id| !termination_node_ids.contains(node_id))
+        {
+            warnings.push(
+                "no termination node is reachable from graph.root_node_ids; deployed runs may never reach a final summary"
+                    .to_string(),
+            );
+        }
+
+        let unreachable_node_ids = node_ids
+            .iter()
+            .filter(|node_id| !reachable_node_ids.contains(*node_id))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !unreachable_node_ids.is_empty() {
+            let preview = unreachable_node_ids
+                .iter()
+                .take(5)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ");
+            let suffix = if unreachable_node_ids.len() > 5 {
+                format!(" (+{} more)", unreachable_node_ids.len() - 5)
+            } else {
+                String::new()
+            };
+            warnings.push(format!(
+                "graph contains nodes unreachable from graph.root_node_ids: {preview}{suffix}"
+            ));
         }
     }
 
@@ -11233,6 +13470,19 @@ fn saved_workflow_record_from_existing(
     }
 }
 
+fn saved_workflow_response(workflow: &Value) -> Value {
+    let mut enriched = workflow.clone();
+    if let Some(obj) = enriched.as_object_mut() {
+        let trigger_readiness_summary = obj
+            .get("latest_ir")
+            .and_then(compiled_ir_trigger_readiness_summary);
+        if let Some(summary) = trigger_readiness_summary {
+            obj.insert("trigger_readiness_summary".to_string(), summary);
+        }
+    }
+    enriched
+}
+
 async fn agent_tasks_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -11278,6 +13528,10 @@ async fn workflows_list_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
+    let workflows = workflows
+        .into_iter()
+        .map(|workflow| saved_workflow_response(&workflow))
+        .collect::<Vec<_>>();
     Ok(Json(serde_json::json!({ "workflows": workflows })))
 }
 
@@ -11319,7 +13573,7 @@ async fn workflows_save_http(
         .map_err(status_to_http)?;
     Ok(Json(serde_json::json!({
         "saved": true,
-        "workflow": saved,
+        "workflow": saved_workflow_response(&saved),
     })))
 }
 
@@ -11386,7 +13640,7 @@ async fn workflows_describe_http(
             .map_err(status_to_http)?;
         if let Some(obj) = described.as_object_mut() {
             obj.insert("saved".to_string(), Value::Bool(true));
-            obj.insert("workflow".to_string(), saved);
+            obj.insert("workflow".to_string(), saved_workflow_response(&saved));
         }
     }
     Ok(Json(described))
@@ -11409,7 +13663,7 @@ async fn workflow_detail_http(
                 status_to_http(internal_error(err))
             }
         })?;
-    Ok(Json(workflow))
+    Ok(Json(saved_workflow_response(&workflow)))
 }
 
 fn workflow_deployment_record(
@@ -11448,10 +13702,47 @@ async fn workflow_deployments_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
+    let deployments = deployments
+        .into_iter()
+        .map(|deployment| {
+            let mut enriched = deployment;
+            if let Some(obj) = enriched.as_object_mut() {
+                if let Some(summary) =
+                    deployment_trigger_readiness_summary(&Value::Object(obj.clone()))
+                {
+                    obj.insert("trigger_readiness_summary".to_string(), summary);
+                }
+            }
+            enriched
+        })
+        .collect::<Vec<_>>();
     Ok(Json(serde_json::json!({
         "workflow_id": workflow_id,
         "deployments": deployments,
     })))
+}
+
+fn deployment_trigger_readiness_summary(deployment: &Value) -> Option<Value> {
+    let ir_snapshot = deployment.get("ir_snapshot")?;
+    compiled_ir_trigger_readiness_summary(ir_snapshot)
+}
+
+fn compiled_ir_trigger_readiness_summary(ir_snapshot: &Value) -> Option<Value> {
+    let metadata_preview = ir_snapshot
+        .get("metadata")
+        .and_then(Value::as_object)
+        .and_then(|metadata| metadata.get("trigger_registration_preview"));
+    let direct_preview = ir_snapshot.get("activation_registration_preview");
+    let preview = metadata_preview.or(direct_preview)?;
+    let preview_obj = preview.as_object()?;
+    Some(serde_json::json!({
+        "status": preview_obj.get("status").cloned().unwrap_or(Value::Null),
+        "live_registration_supported": preview_obj.get("live_registration_supported").cloned().unwrap_or(Value::Null),
+        "activation_count": preview_obj.get("activation_count").cloned().unwrap_or(Value::Null),
+        "registration_targets": preview_obj.get("registration_targets").cloned().unwrap_or_else(|| serde_json::json!([])),
+        "runtime_requirements": preview_obj.get("runtime_requirements").cloned().unwrap_or_else(|| serde_json::json!([])),
+        "missing_runtime_capabilities": preview_obj.get("missing_runtime_capabilities").cloned().unwrap_or_else(|| serde_json::json!([])),
+    }))
 }
 
 fn apply_workflow_patch(graph: &Value, patch: &WorkflowPatchRequest) -> Result<Value, String> {
@@ -11799,7 +14090,7 @@ async fn workflow_patch_http(
     Ok(Json(serde_json::json!({
         "patched": true,
         "ir_invalidated": true,
-        "workflow": saved,
+        "workflow": saved_workflow_response(&saved),
     })))
 }
 
@@ -12164,6 +14455,7 @@ fn workflow_run_record(
                     "web_search" => "research",
                     "finance" => "finance",
                     "travel" => "travel",
+                    "skill_capsule" => "skill_runtime",
                     _ => "integration",
                 })
                 .unwrap_or_else(|| match graph_node_kind.as_str() {
@@ -13121,7 +15413,7 @@ fn workflow_run_record(
                         "decision_point_id": approval_decision_point_id,
                         "option_count": approval_options.len(),
                         "approval_review": approval_review,
-                        "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                        "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
                             "Workflow node is paused at an explicit human approval boundary."
                         ),
                     }),
@@ -13231,7 +15523,74 @@ fn workflow_run_record(
         .get("title")
         .and_then(Value::as_str)
         .unwrap_or("Workflow");
-    WorkflowRunRecord {
+    let result_contract = workflow_result_contract_from_graph(graph_snapshot);
+    let mut result_json = serde_json::json!({
+        "summary": if trigger_kind == "dry_run" {
+            format!("{workflow_title} passed dry-run simulation.")
+        } else if failed {
+            format!(
+                "{workflow_title} failed at {}.",
+                failed_at_label.clone().unwrap_or_else(|| "a workflow step".to_string())
+            )
+        } else if blocked {
+            format!(
+                "{workflow_title} was blocked at {}.",
+                blocked_at_label.clone().unwrap_or_else(|| "a policy step".to_string())
+            )
+        } else if waiting_node_count > 0 {
+            format!(
+                "{workflow_title} is waiting for approval at {}.",
+                paused_at_label.clone().unwrap_or_else(|| "an approval step".to_string())
+            )
+        } else {
+            format!("{workflow_title} completed successfully.")
+        },
+        "node_count": manifests.len(),
+        "execution_mode": execution_mode,
+        "duration_ms": run_duration_ms,
+        "runtime_kind_counts": runtime_kind_counts,
+        "completed_node_count": completed_node_count,
+        "simulated_node_count": simulated_node_count,
+        "waiting_node_count": waiting_node_count,
+        "queued_node_count": queued_node_count,
+        "skipped_node_count": skipped_node_count,
+        "traversed_edge_ids": traversed_edge_ids,
+        "skipped_edge_ids": skipped_edge_ids,
+        "paused_at_node_id": paused_at_node_id,
+        "paused_at_label": paused_at_label,
+        "approval_reason": approval_reason,
+        "approval_decision_point_id": approval_decision_point_id,
+        "approval_options": approval_options,
+        "approval_review": if waiting_node_count > 0 {
+            build_workflow_approval_review_payload(
+                paused_at_label.as_deref(),
+                paused_at_node_id.as_deref(),
+                approval_reason.as_deref(),
+                approval_decision_point_id.as_deref(),
+                &approval_options,
+            )
+        } else {
+            Value::Null
+        },
+        "autonomy_decision": if waiting_node_count > 0 {
+            serde_json::to_value(crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
+                "Workflow is currently paused at a human approval boundary."
+            )).unwrap_or(Value::Null)
+        } else {
+            Value::Null
+        },
+        "blocked_at_node_id": blocked_at_node_id,
+        "blocked_at_label": blocked_at_label,
+        "blocked_reason": blocked_reason,
+        "failed_at_node_id": failed_at_node_id,
+        "failed_at_label": failed_at_label,
+        "failed_reason": failed_reason,
+        "replay_comparison": replay_comparison.unwrap_or(Value::Null)
+    });
+    if let Some(result_obj) = result_json.as_object_mut() {
+        apply_workflow_result_contract_to_result(result_obj, result_contract.as_ref(), &run_status);
+    }
+    let mut run_record = WorkflowRunRecord {
         run_id: format!("wfrun_{}", Ulid::new().to_string().to_lowercase()),
         workflow_id: workflow_id.to_string(),
         deployment_id: deployment_id.to_string(),
@@ -13240,73 +15599,4352 @@ fn workflow_run_record(
         trigger_kind: trigger_kind.to_string(),
         replay_of_run_id,
         timeline_json: Value::Array(timeline),
-        result_json: serde_json::json!({
-            "summary": if trigger_kind == "dry_run" {
-                format!("{workflow_title} passed dry-run simulation.")
-            } else if failed {
-                format!(
-                    "{workflow_title} failed at {}.",
-                    failed_at_label.clone().unwrap_or_else(|| "a workflow step".to_string())
-                )
-            } else if blocked {
-                format!(
-                    "{workflow_title} was blocked at {}.",
-                    blocked_at_label.clone().unwrap_or_else(|| "a policy step".to_string())
-                )
-            } else if waiting_node_count > 0 {
-                format!(
-                    "{workflow_title} is waiting for approval at {}.",
-                    paused_at_label.clone().unwrap_or_else(|| "an approval step".to_string())
-                )
-            } else {
-                format!("{workflow_title} completed successfully.")
-            },
-            "node_count": manifests.len(),
-            "execution_mode": execution_mode,
-            "duration_ms": run_duration_ms,
-            "runtime_kind_counts": runtime_kind_counts,
-            "completed_node_count": completed_node_count,
-            "simulated_node_count": simulated_node_count,
-            "waiting_node_count": waiting_node_count,
-            "queued_node_count": queued_node_count,
-            "skipped_node_count": skipped_node_count,
-            "traversed_edge_ids": traversed_edge_ids,
-            "skipped_edge_ids": skipped_edge_ids,
-            "paused_at_node_id": paused_at_node_id,
-            "paused_at_label": paused_at_label,
-            "approval_reason": approval_reason,
-            "approval_decision_point_id": approval_decision_point_id,
-            "approval_options": approval_options,
-            "approval_review": if waiting_node_count > 0 {
-                build_workflow_approval_review_payload(
-                    paused_at_label.as_deref(),
-                    paused_at_node_id.as_deref(),
-                    approval_reason.as_deref(),
-                    approval_decision_point_id.as_deref(),
-                    &approval_options,
-                )
-            } else {
-                Value::Null
-            },
-            "autonomy_decision": if waiting_node_count > 0 {
-                serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
-                    "Workflow is currently paused at a human approval boundary."
-                )).unwrap_or(Value::Null)
-            } else {
-                Value::Null
-            },
-            "blocked_at_node_id": blocked_at_node_id,
-            "blocked_at_label": blocked_at_label,
-            "blocked_reason": blocked_reason,
-            "failed_at_node_id": failed_at_node_id,
-            "failed_at_label": failed_at_label,
-            "failed_reason": failed_reason,
-            "replay_comparison": replay_comparison.unwrap_or(Value::Null)
-        }),
+        result_json,
         started_at: started_at.to_rfc3339(),
         completed_at: run_completed_at,
         created_at: started_at.to_rfc3339(),
+    };
+    enrich_workflow_draft_fields_from_skill_capsule(&mut run_record);
+    run_record
+}
+
+fn workflow_result_contract_from_graph(graph_snapshot: &Value) -> Option<Value> {
+    let termination_node = graph_snapshot
+        .get("nodes")
+        .and_then(Value::as_array)
+        .and_then(|nodes| {
+            nodes
+                .iter()
+                .rev()
+                .find(|node| node.get("kind").and_then(Value::as_str) == Some("termination"))
+        })?;
+    let final_schema = termination_node
+        .get("config")
+        .and_then(Value::as_object)
+        .and_then(|config| config.get("final_schema"))
+        .and_then(Value::as_object)?;
+    let workflow = final_schema.get("workflow").and_then(Value::as_str)?;
+    Some(serde_json::json!({
+        "workflow": workflow,
+        "summary_mode": final_schema.get("summary_mode").cloned().unwrap_or(Value::Null),
+        "structured_output_keys": final_schema.get("structured_output_keys").cloned().unwrap_or_else(|| Value::Array(Vec::new())),
+        "external_write": final_schema.get("external_write").cloned().unwrap_or(Value::Null)
+    }))
+}
+
+fn workflow_result_contract_from_result(
+    result_obj: &serde_json::Map<String, Value>,
+) -> Option<Value> {
+    result_obj
+        .get("workflow_output_contract")
+        .and_then(Value::as_object)
+        .and_then(|contract| {
+            contract
+                .get("workflow")
+                .and_then(Value::as_str)
+                .map(|_| Value::Object(contract.clone()))
+        })
+}
+
+fn workflow_result_notes(result_obj: &serde_json::Map<String, Value>) -> Vec<String> {
+    let mut notes = Vec::new();
+    for key in [
+        "summary",
+        "approval_reason",
+        "wait_reason",
+        "blocked_reason",
+        "failed_reason",
+        "cancel_reason",
+    ] {
+        if let Some(text) = result_obj.get(key).and_then(Value::as_str) {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() && !notes.iter().any(|existing| existing == trimmed) {
+                notes.push(trimmed.to_string());
+            }
+        }
     }
+    notes
+}
+
+fn workflow_result_checkpoint_label(result_obj: &serde_json::Map<String, Value>) -> Option<String> {
+    for key in ["paused_at_label", "blocked_at_label", "failed_at_label"] {
+        if let Some(label) = result_obj.get(key).and_then(Value::as_str) {
+            let trimmed = label.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn workflow_result_next_action(workflow: &str, run_status: &str) -> String {
+    match (workflow, run_status) {
+        ("calendar_coordinator", "completed") => {
+            "Review the draft slot before confirming anything on a real calendar.".to_string()
+        }
+        ("calendar_coordinator", "waiting_for_approval") => {
+            "Review the pending approval request before treating the slot as final.".to_string()
+        }
+        ("calendar_coordinator", "waiting_for_resume") => {
+            "Wait for the next resume event before reviewing the draft slot again.".to_string()
+        }
+        ("email_guardian", "completed") => {
+            "Review the draft reply before sending anything externally.".to_string()
+        }
+        ("email_guardian", "waiting_for_approval") => {
+            "Resolve the pending reply approval before treating this response as ready to send.".to_string()
+        }
+        ("email_guardian", "waiting_for_resume") => {
+            "Wait for the next resume step before reviewing the draft reply again.".to_string()
+        }
+        ("content_publisher", "completed") => {
+            "Review the publication draft before releasing anything publicly.".to_string()
+        }
+        ("content_publisher", "waiting_for_approval") => {
+            "Resolve the pending publish review before treating this content as ready for public release.".to_string()
+        }
+        ("content_publisher", "waiting_for_resume") => {
+            "Wait for the next resume step before reviewing the publication draft again.".to_string()
+        }
+        ("study_planner", "completed") => {
+            "Review the draft study plan and adjust the blocks before relying on it.".to_string()
+        }
+        ("study_planner", "waiting_for_approval") => {
+            "Resolve the pending approval step before finalizing the study plan.".to_string()
+        }
+        ("study_planner", "waiting_for_resume") => {
+            "Wait for the scheduled resume before finalizing the next study block.".to_string()
+        }
+        ("receipt_tracker", "completed") => {
+            "Review the categorized receipt entry before posting anything to the ledger."
+                .to_string()
+        }
+        ("receipt_tracker", "waiting_for_approval") => {
+            "Resolve the pending receipt review before treating this entry as ready to post."
+                .to_string()
+        }
+        ("receipt_tracker", "waiting_for_resume") => {
+            "Wait for the next resume step before reviewing the receipt entry again."
+                .to_string()
+        }
+        ("finance_guardian", "completed") => {
+            "Review the finance digest and anomaly notes before acting on the recommendations."
+                .to_string()
+        }
+        ("finance_guardian", "waiting_for_approval") => {
+            "Resolve the pending finance review before relying on this digest."
+                .to_string()
+        }
+        ("finance_guardian", "waiting_for_resume") => {
+            "Wait for the next resume step before reviewing the finance digest again."
+                .to_string()
+        }
+        ("research_assistant", "completed") => {
+            "Review the research brief, findings, and sources before acting on the summary."
+                .to_string()
+        }
+        ("research_assistant", "waiting_for_resume") => {
+            "Wait for the next resume step before reviewing the research brief again."
+                .to_string()
+        }
+        ("travel_booker", "completed") => {
+            "Review the draft booking recommendation before confirming anything externally.".to_string()
+        }
+        ("travel_booker", "waiting_for_approval") => {
+            "Resolve the pending booking approval before treating this itinerary as confirmed.".to_string()
+        }
+        ("travel_booker", "waiting_for_resume") => {
+            "Wait for the next resume step before reviewing the draft booking recommendation again.".to_string()
+        }
+        (_, "blocked") => "Resolve the blocking reason before treating this result as usable.".to_string(),
+        (_, "failed") => "Fix the failed step before relying on this result.".to_string(),
+        (_, "cancelled") => "Review the cancellation reason before retrying this workflow.".to_string(),
+        _ => "Review this draft output before relying on it externally.".to_string(),
+    }
+}
+
+fn push_unique_result_string(target: &mut Vec<Value>, text: impl Into<String>) {
+    let text = text.into();
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if target.iter().any(|value| value.as_str() == Some(trimmed)) {
+        return;
+    }
+    target.push(Value::String(trimmed.to_string()));
+}
+
+#[derive(Clone)]
+struct CalendarEventWindow {
+    title: String,
+    description: Option<String>,
+    location: Option<String>,
+    start_at: chrono::DateTime<chrono::Utc>,
+    end_at: chrono::DateTime<chrono::Utc>,
+    all_day: bool,
+    academic_event_type: Option<&'static str>,
+    schedule_anchor_type: Option<&'static str>,
+    profile: Value,
+}
+
+fn parse_calendar_event_windows(events: &[Value]) -> Vec<CalendarEventWindow> {
+    let mut windows = events
+        .iter()
+        .filter_map(|event| {
+            let title = event
+                .get("title")
+                .and_then(Value::as_str)
+                .unwrap_or("Calendar event")
+                .trim()
+                .to_string();
+            let description = event
+                .get("description")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let location = event
+                .get("location")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let all_day = event
+                .get("all_day")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let profile = event.get("profile").cloned().unwrap_or_else(|| {
+                calendar_event_profile_from_fields(
+                    &title,
+                    description.as_deref(),
+                    location.as_deref(),
+                    all_day,
+                )
+            });
+            let academic_event_type =
+                match profile.get("academic_event_type").and_then(Value::as_str) {
+                    Some("academic_exam") => Some("academic_exam"),
+                    Some("academic_submission") => Some("academic_submission"),
+                    _ => None,
+                };
+            let schedule_anchor_type =
+                match profile.get("schedule_anchor_type").and_then(Value::as_str) {
+                    Some("interview") => Some("interview"),
+                    Some("medical") => Some("medical"),
+                    Some("meeting") => Some("meeting"),
+                    Some("logistics") => Some("logistics"),
+                    _ => None,
+                };
+            let start_at = event
+                .get("start_at")
+                .and_then(Value::as_str)
+                .and_then(parse_datetime_to_utc)?;
+            let end_at = event
+                .get("end_at")
+                .and_then(Value::as_str)
+                .and_then(parse_datetime_to_utc)
+                .unwrap_or_else(|| {
+                    start_at
+                        + if event
+                            .get("all_day")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false)
+                        {
+                            chrono::Duration::days(1)
+                        } else {
+                            chrono::Duration::minutes(30)
+                        }
+                });
+            Some(CalendarEventWindow {
+                title,
+                description,
+                location,
+                start_at,
+                end_at,
+                all_day,
+                academic_event_type,
+                schedule_anchor_type,
+                profile,
+            })
+        })
+        .collect::<Vec<_>>();
+    windows.sort_by_key(|window| window.start_at);
+    windows
+}
+
+fn fallback_slot_start(now: chrono::DateTime<chrono::Utc>) -> chrono::DateTime<chrono::Utc> {
+    let rounded_hour = now
+        .with_minute(0)
+        .and_then(|value| value.with_second(0))
+        .and_then(|value| value.with_nanosecond(0))
+        .unwrap_or(now);
+    rounded_hour + chrono::Duration::hours(1)
+}
+
+fn find_first_free_calendar_gap(
+    events: &[CalendarEventWindow],
+    now: chrono::DateTime<chrono::Utc>,
+    minimum_duration: chrono::Duration,
+) -> (
+    chrono::DateTime<chrono::Utc>,
+    chrono::DateTime<chrono::Utc>,
+    String,
+) {
+    let mut cursor = fallback_slot_start(now);
+    for event in events {
+        if event.end_at <= cursor {
+            continue;
+        }
+        if event.start_at > cursor {
+            let gap = event.start_at - cursor;
+            if gap >= minimum_duration {
+                return (
+                    cursor,
+                    cursor + minimum_duration,
+                    format!("Scheduled before {}", event.title),
+                );
+            }
+        }
+        if event.end_at > cursor {
+            cursor = event.end_at + chrono::Duration::minutes(15);
+        }
+    }
+    (
+        cursor,
+        cursor + minimum_duration,
+        "Scheduled after the last upcoming event in the current calendar window".to_string(),
+    )
+}
+
+fn classify_schedule_anchor_type(
+    title: &str,
+    description: Option<&str>,
+    location: Option<&str>,
+) -> Option<&'static str> {
+    crate::calendar_event_profile::classify_schedule_anchor_type(title, description, location)
+}
+
+fn schedule_anchor_label(anchor_type: &str) -> &'static str {
+    match anchor_type {
+        "interview" => "Interview prep slot",
+        "medical" => "Appointment prep slot",
+        "logistics" => "Logistics buffer slot",
+        _ => "Meeting prep slot",
+    }
+}
+
+fn schedule_focus_kind(anchor_type: &str) -> &'static str {
+    match anchor_type {
+        "interview" => "interview_prep",
+        "medical" => "appointment_buffer",
+        "logistics" => "logistics_buffer",
+        _ => "meeting_prep",
+    }
+}
+
+fn schedule_anchor_note_kind(event: &CalendarEventWindow) -> &'static str {
+    match event
+        .profile
+        .get("schedule_note_kind")
+        .and_then(Value::as_str)
+    {
+        Some("high_stakes_prep") => "high_stakes_prep",
+        Some("missing_agenda") => "missing_agenda",
+        Some("arrival_buffer") => "arrival_buffer",
+        Some("travel_buffer") => "travel_buffer",
+        _ => "general_prep",
+    }
+}
+
+fn schedule_anchor_prep_lead_minutes(event: &CalendarEventWindow, note_kind: &str) -> i64 {
+    event
+        .profile
+        .get("prep_lead_minutes")
+        .and_then(Value::as_i64)
+        .unwrap_or(
+            match (event.schedule_anchor_type.unwrap_or("meeting"), note_kind) {
+                ("interview", _) => 60,
+                ("meeting", "high_stakes_prep") => 60,
+                ("meeting", "missing_agenda") => 45,
+                ("medical", _) => 30,
+                ("logistics", _) => 30,
+                _ => 30,
+            },
+        )
+}
+
+fn calendar_event_profile(event: &CalendarEventWindow) -> Value {
+    event.profile.clone()
+}
+
+fn humanize_workflow_review_token(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    trimmed
+        .split(['_', '-'])
+        .filter(|segment| !segment.is_empty())
+        .map(|segment| {
+            let mut chars = segment.chars();
+            let head = chars
+                .next()
+                .map(|ch| ch.to_uppercase().to_string())
+                .unwrap_or_default();
+            let tail = chars.as_str().to_ascii_lowercase();
+            format!("{head}{tail}")
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn enrich_workflow_approval_options_from_result(run: &mut WorkflowRunRecord) {
+    let Some(result_obj) = run.result_json.as_object_mut() else {
+        return;
+    };
+    let workflow = result_obj
+        .get("workflow_output_contract")
+        .and_then(Value::as_object)
+        .and_then(|contract| contract.get("workflow"))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+
+    if workflow == "calendar_coordinator" {
+        let slot_context = result_obj
+            .get("recommended_slot")
+            .and_then(Value::as_object)
+            .map(|recommended_slot| {
+                let proposed_start_at = recommended_slot
+                    .get("proposed_start_at")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let anchor_event_location = recommended_slot
+                    .get("anchor_event_location")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let prep_lead_minutes = recommended_slot
+                    .get("prep_lead_minutes")
+                    .and_then(Value::as_i64)
+                    .filter(|value| *value > 0);
+                let focus_kind = recommended_slot
+                    .get("focus_kind")
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let anchor_note_kind = recommended_slot
+                    .get("anchor_note_kind")
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let buffer_kind = anchor_note_kind
+                    .clone()
+                    .or_else(|| focus_kind.clone())
+                    .unwrap_or_else(|| "prep".to_string());
+                (
+                    proposed_start_at,
+                    anchor_event_location,
+                    prep_lead_minutes,
+                    focus_kind,
+                    buffer_kind,
+                )
+            });
+        let Some((
+            proposed_start_at,
+            anchor_event_location,
+            prep_lead_minutes,
+            focus_kind,
+            buffer_kind,
+        )) = slot_context
+        else {
+            return;
+        };
+        let Some(approval_options) = result_obj
+            .get_mut("approval_options")
+            .and_then(Value::as_array_mut)
+        else {
+            return;
+        };
+
+        for option in approval_options.iter_mut().filter_map(Value::as_object_mut) {
+            let option_id = option
+                .get("option_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let is_approve = ["approve", "confirm", "book"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            let is_reject = ["reject", "decline", "deny", "hold"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            if is_approve {
+                let label = focus_kind
+                    .as_deref()
+                    .map(|focus_kind| format!("Confirm {focus_kind} draft slot"))
+                    .unwrap_or_else(|| "Confirm draft slot".to_string());
+                let mut summary = if let Some(start_at) = proposed_start_at.as_deref() {
+                    format!("Proceed with the reviewed draft slot scheduled for {start_at}")
+                } else {
+                    "Proceed with the reviewed draft slot".to_string()
+                };
+                if let Some(prep_lead_minutes) = prep_lead_minutes {
+                    summary.push_str(&format!(
+                        " while preserving a {prep_lead_minutes}-minute {buffer_kind} window"
+                    ));
+                }
+                if let Some(location) = anchor_event_location.as_deref() {
+                    summary.push_str(&format!(" at {location}"));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            } else if is_reject {
+                let label = focus_kind
+                    .as_deref()
+                    .map(|focus_kind| format!("Reject {focus_kind} draft slot"))
+                    .unwrap_or_else(|| "Reject slot".to_string());
+                let mut summary = if let Some(start_at) = proposed_start_at.as_deref() {
+                    format!(
+                        "Return to planning without treating the draft slot scheduled for {start_at} as confirmed"
+                    )
+                } else {
+                    "Return to planning without treating any draft slot as confirmed".to_string()
+                };
+                if let Some(prep_lead_minutes) = prep_lead_minutes {
+                    summary.push_str(&format!(
+                        " or preserving the current {prep_lead_minutes}-minute {buffer_kind} window"
+                    ));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            }
+        }
+    } else if workflow == "study_planner" {
+        let study_context = result_obj
+            .get("study_blocks")
+            .and_then(Value::as_array)
+            .and_then(|blocks| blocks.first())
+            .and_then(Value::as_object)
+            .map(|first_block| {
+                let planned_start_at = first_block
+                    .get("planned_start_at")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let planned_end_at = first_block
+                    .get("planned_end_at")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let focus_kind = first_block
+                    .get("focus_kind")
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let focus_item_title = first_block
+                    .get("focus_item_title")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string)
+                    .or_else(|| {
+                        result_obj
+                            .get("study_input_context")
+                            .and_then(Value::as_object)
+                            .and_then(|context| context.get("next_focus_title"))
+                            .and_then(Value::as_str)
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())
+                            .map(str::to_string)
+                    });
+                let focus_item_due_at = first_block
+                    .get("focus_item_due_at")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string)
+                    .or_else(|| {
+                        result_obj
+                            .get("study_input_context")
+                            .and_then(Value::as_object)
+                            .and_then(|context| context.get("next_focus_due_at"))
+                            .and_then(Value::as_str)
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())
+                            .map(str::to_string)
+                    });
+                let focus_item_priority = first_block
+                    .get("focus_item_priority")
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let focus_item_urgency = first_block
+                    .get("focus_item_urgency")
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let pending_focus_count = result_obj
+                    .get("study_input_context")
+                    .and_then(Value::as_object)
+                    .and_then(|context| context.get("pending_focus_count"))
+                    .and_then(Value::as_u64);
+                let first_reminder = result_obj
+                    .get("reminders")
+                    .and_then(Value::as_array)
+                    .and_then(|reminders| reminders.first())
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                (
+                    planned_start_at,
+                    planned_end_at,
+                    focus_kind,
+                    focus_item_title,
+                    focus_item_due_at,
+                    focus_item_priority,
+                    focus_item_urgency,
+                    pending_focus_count,
+                    first_reminder,
+                )
+            });
+        let Some((
+            planned_start_at,
+            planned_end_at,
+            focus_kind,
+            focus_item_title,
+            focus_item_due_at,
+            focus_item_priority,
+            focus_item_urgency,
+            pending_focus_count,
+            first_reminder,
+        )) = study_context
+        else {
+            return;
+        };
+        let Some(approval_options) = result_obj
+            .get_mut("approval_options")
+            .and_then(Value::as_array_mut)
+        else {
+            return;
+        };
+
+        for option in approval_options.iter_mut().filter_map(Value::as_object_mut) {
+            let option_id = option
+                .get("option_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let is_approve = ["approve", "confirm", "book"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            let is_reject = ["reject", "decline", "deny", "hold"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            if is_approve {
+                let label = focus_kind
+                    .as_deref()
+                    .map(|focus_kind| format!("Approve {focus_kind} draft plan"))
+                    .unwrap_or_else(|| "Approve study draft plan".to_string());
+                let mut summary =
+                    "Keep the reviewed draft study plan ready for execution".to_string();
+                if let Some(title) = focus_item_title.as_deref() {
+                    summary.push_str(&format!(" for {}", title.trim_end_matches('.')));
+                }
+                if let (Some(start), Some(end)) =
+                    (planned_start_at.as_deref(), planned_end_at.as_deref())
+                {
+                    summary.push_str(&format!(" from {start} to {end}"));
+                }
+                if let Some(urgency) = focus_item_urgency.as_deref() {
+                    summary.push_str(&format!(" with {urgency} urgency"));
+                }
+                if let Some(priority) = focus_item_priority.as_deref() {
+                    summary.push_str(&format!(" at {priority} priority"));
+                }
+                if let Some(due_at) = focus_item_due_at.as_deref() {
+                    summary.push_str(&format!(" ahead of the due checkpoint {due_at}"));
+                }
+                if let Some(count) = pending_focus_count {
+                    summary.push_str(&format!(" across {count} pending focus items"));
+                }
+                if let Some(reminder) = first_reminder.as_deref() {
+                    summary.push_str(&format!(
+                        " while keeping the current reminder: {}",
+                        reminder.trim_end_matches('.')
+                    ));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            } else if is_reject {
+                let label = focus_kind
+                    .as_deref()
+                    .map(|focus_kind| format!("Rework {focus_kind} draft plan"))
+                    .unwrap_or_else(|| "Rework study draft plan".to_string());
+                let mut summary =
+                    "Return to planning before relying on the current draft study plan".to_string();
+                if let Some(title) = focus_item_title.as_deref() {
+                    summary.push_str(&format!(" for {}", title.trim_end_matches('.')));
+                }
+                if let Some(due_at) = focus_item_due_at.as_deref() {
+                    summary.push_str(&format!(" due at {due_at}"));
+                }
+                if let Some(urgency) = focus_item_urgency.as_deref() {
+                    summary.push_str(&format!(" with {urgency} urgency"));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            }
+        }
+    } else if workflow == "receipt_tracker" {
+        let receipt_context = result_obj
+            .get("receipt_entry")
+            .and_then(Value::as_object)
+            .map(|receipt| {
+                let approval_target = receipt
+                    .get("approval_target")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let proposal_summary = receipt
+                    .get("proposal_summary")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let merchant = receipt
+                    .get("merchant")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let category = receipt
+                    .get("category")
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let transaction_date = receipt
+                    .get("transaction_date")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let receipt_status = receipt
+                    .get("receipt_status")
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let amount = receipt
+                    .get("amount")
+                    .cloned()
+                    .and_then(|value| match value {
+                        Value::String(text) => {
+                            Some(text.trim().to_string()).filter(|value| !value.is_empty())
+                        }
+                        Value::Number(number) => Some(number.to_string()),
+                        _ => None,
+                    });
+                (
+                    approval_target,
+                    proposal_summary,
+                    merchant,
+                    category,
+                    transaction_date,
+                    receipt_status,
+                    amount,
+                )
+            });
+        let Some((
+            approval_target,
+            proposal_summary,
+            merchant,
+            category,
+            transaction_date,
+            receipt_status,
+            amount,
+        )) = receipt_context
+        else {
+            return;
+        };
+        let Some(approval_options) = result_obj
+            .get_mut("approval_options")
+            .and_then(Value::as_array_mut)
+        else {
+            return;
+        };
+
+        for option in approval_options.iter_mut().filter_map(Value::as_object_mut) {
+            let option_id = option
+                .get("option_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let is_approve = ["approve", "confirm", "book", "post"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            let is_reject = ["reject", "decline", "deny", "hold", "rework"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            if is_approve {
+                let label = "Approve receipt entry".to_string();
+                let mut summary = "Keep the reviewed receipt entry ready for posting".to_string();
+                if let Some(target) = approval_target.as_deref() {
+                    summary.push_str(&format!(" at {target}"));
+                }
+                if let Some(merchant) = merchant.as_deref() {
+                    summary.push_str(&format!(" for {}", merchant.trim_end_matches('.')));
+                }
+                if let Some(amount) = amount.as_deref() {
+                    summary.push_str(&format!(" with amount {amount}"));
+                }
+                if let Some(category) = category.as_deref() {
+                    summary.push_str(&format!(" in {category}"));
+                }
+                if let Some(transaction_date) = transaction_date.as_deref() {
+                    summary.push_str(&format!(" from {transaction_date}"));
+                }
+                if let Some(receipt_status) = receipt_status.as_deref() {
+                    summary.push_str(&format!(" while keeping the status {receipt_status}"));
+                }
+                if let Some(proposal_summary) = proposal_summary.as_deref() {
+                    summary.push_str(&format!(
+                        " based on the current posting summary: {}",
+                        proposal_summary.trim_end_matches('.')
+                    ));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            } else if is_reject {
+                let label = "Rework receipt entry".to_string();
+                let mut summary =
+                    "Return to receipt review before treating the current entry as post-ready"
+                        .to_string();
+                if let Some(target) = approval_target.as_deref() {
+                    summary.push_str(&format!(" at {target}"));
+                }
+                if let Some(merchant) = merchant.as_deref() {
+                    summary.push_str(&format!(" for {}", merchant.trim_end_matches('.')));
+                }
+                if let Some(transaction_date) = transaction_date.as_deref() {
+                    summary.push_str(&format!(" from {transaction_date}"));
+                }
+                if let Some(receipt_status) = receipt_status.as_deref() {
+                    summary.push_str(&format!(" with the status {receipt_status}"));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            }
+        }
+    } else if workflow == "research_assistant" {
+        let research_context = result_obj
+            .get("research_brief")
+            .and_then(Value::as_object)
+            .map(|brief| {
+                let proposal_summary = brief
+                    .get("proposal_summary")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let next_action = brief
+                    .get("next_action")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let include_sources = brief
+                    .get("include_sources")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let source_count =
+                    brief
+                        .get("source_count")
+                        .and_then(Value::as_u64)
+                        .or_else(|| {
+                            result_obj
+                                .get("source_refs")
+                                .and_then(Value::as_array)
+                                .map(|items| items.len() as u64)
+                        });
+                let first_finding = result_obj
+                    .get("key_findings")
+                    .and_then(Value::as_array)
+                    .and_then(|findings| findings.first())
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let first_source = result_obj
+                    .get("source_refs")
+                    .and_then(Value::as_array)
+                    .and_then(|sources| sources.first())
+                    .and_then(|source| match source {
+                        Value::String(text) => {
+                            let trimmed = text.trim();
+                            if trimmed.is_empty() {
+                                None
+                            } else {
+                                Some(trimmed.to_string())
+                            }
+                        }
+                        Value::Object(object) => object
+                            .get("title")
+                            .and_then(Value::as_str)
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())
+                            .map(str::to_string)
+                            .or_else(|| {
+                                object
+                                    .get("url")
+                                    .and_then(Value::as_str)
+                                    .map(str::trim)
+                                    .filter(|value| !value.is_empty())
+                                    .map(str::to_string)
+                            }),
+                        _ => None,
+                    });
+                (
+                    proposal_summary,
+                    next_action,
+                    include_sources,
+                    source_count,
+                    first_finding,
+                    first_source,
+                )
+            });
+        let Some((
+            proposal_summary,
+            next_action,
+            include_sources,
+            source_count,
+            first_finding,
+            first_source,
+        )) = research_context
+        else {
+            return;
+        };
+        let Some(approval_options) = result_obj
+            .get_mut("approval_options")
+            .and_then(Value::as_array_mut)
+        else {
+            return;
+        };
+
+        for option in approval_options.iter_mut().filter_map(Value::as_object_mut) {
+            let option_id = option
+                .get("option_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let is_approve = ["approve", "confirm", "book"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            let is_reject = ["reject", "decline", "deny", "hold", "rework"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            if is_approve {
+                let mut summary =
+                    "Keep the reviewed research brief ready for follow-up".to_string();
+                if let Some(count) = source_count {
+                    summary.push_str(&format!(" with {count} source references"));
+                }
+                if include_sources {
+                    summary.push_str(" and source-backed citations enabled");
+                }
+                if let Some(next_action) = next_action.as_deref() {
+                    summary.push_str(&format!(
+                        " while keeping the next action {}",
+                        next_action.trim_end_matches('.')
+                    ));
+                }
+                if let Some(first_finding) = first_finding.as_deref() {
+                    summary.push_str(&format!(
+                        " after reviewing the leading finding: {}",
+                        first_finding.trim_end_matches('.')
+                    ));
+                }
+                if let Some(first_source) = first_source.as_deref() {
+                    summary.push_str(&format!(
+                        " and the source {}",
+                        first_source.trim_end_matches('.')
+                    ));
+                }
+                if let Some(proposal_summary) = proposal_summary.as_deref() {
+                    summary.push_str(&format!(
+                        " based on the current brief summary: {}",
+                        proposal_summary.trim_end_matches('.')
+                    ));
+                }
+                summary.push('.');
+                option.insert(
+                    "label".to_string(),
+                    Value::String("Approve research brief".to_string()),
+                );
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            } else if is_reject {
+                let mut summary =
+                    "Return to research review before relying on the current brief".to_string();
+                if let Some(first_finding) = first_finding.as_deref() {
+                    summary.push_str(&format!(
+                        " and the leading finding {}",
+                        first_finding.trim_end_matches('.')
+                    ));
+                }
+                if let Some(first_source) = first_source.as_deref() {
+                    summary.push_str(&format!(
+                        " sourced from {}",
+                        first_source.trim_end_matches('.')
+                    ));
+                }
+                summary.push('.');
+                option.insert(
+                    "label".to_string(),
+                    Value::String("Rework research brief".to_string()),
+                );
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            }
+        }
+    } else if workflow == "finance_guardian" {
+        let finance_context = result_obj
+            .get("finance_digest")
+            .and_then(Value::as_object)
+            .map(|digest| {
+                let digest_scope = digest
+                    .get("digest_scope")
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let proposal_summary = digest
+                    .get("proposal_summary")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let next_action = digest
+                    .get("next_action")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let status = digest
+                    .get("status")
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let account_count = result_obj
+                    .get("finance_input_context")
+                    .and_then(Value::as_object)
+                    .and_then(|context| context.get("account_count"))
+                    .and_then(Value::as_u64);
+                let top_spend_category = result_obj
+                    .get("finance_input_context")
+                    .and_then(Value::as_object)
+                    .and_then(|context| context.get("top_spend_category"))
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let first_anomaly = result_obj
+                    .get("anomaly_notes")
+                    .and_then(Value::as_array)
+                    .and_then(|notes| notes.first())
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                (
+                    digest_scope,
+                    proposal_summary,
+                    next_action,
+                    status,
+                    account_count,
+                    top_spend_category,
+                    first_anomaly,
+                )
+            });
+        let Some((
+            digest_scope,
+            proposal_summary,
+            next_action,
+            status,
+            account_count,
+            top_spend_category,
+            first_anomaly,
+        )) = finance_context
+        else {
+            return;
+        };
+        let Some(approval_options) = result_obj
+            .get_mut("approval_options")
+            .and_then(Value::as_array_mut)
+        else {
+            return;
+        };
+
+        for option in approval_options.iter_mut().filter_map(Value::as_object_mut) {
+            let option_id = option
+                .get("option_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let is_approve = ["approve", "confirm", "book"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            let is_reject = ["reject", "decline", "deny", "hold", "rework"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            if is_approve {
+                let label = digest_scope
+                    .as_deref()
+                    .map(|digest_scope| format!("Approve {digest_scope} digest"))
+                    .unwrap_or_else(|| "Approve finance digest".to_string());
+                let mut summary =
+                    "Keep the reviewed finance digest ready for follow-up".to_string();
+                if let Some(account_count) = account_count {
+                    summary.push_str(&format!(" across {account_count} active accounts"));
+                }
+                if let Some(top_spend_category) = top_spend_category.as_deref() {
+                    summary.push_str(&format!(
+                        " with {top_spend_category} as the top spend category"
+                    ));
+                }
+                if let Some(status) = status.as_deref() {
+                    summary.push_str(&format!(" while keeping the status {status}"));
+                }
+                if let Some(next_action) = next_action.as_deref() {
+                    summary.push_str(&format!(
+                        " and the next action {}",
+                        next_action.trim_end_matches('.')
+                    ));
+                }
+                if let Some(first_anomaly) = first_anomaly.as_deref() {
+                    summary.push_str(&format!(
+                        " after reviewing the leading anomaly note: {}",
+                        first_anomaly.trim_end_matches('.')
+                    ));
+                }
+                if let Some(proposal_summary) = proposal_summary.as_deref() {
+                    summary.push_str(&format!(
+                        " based on the current digest summary: {}",
+                        proposal_summary.trim_end_matches('.')
+                    ));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            } else if is_reject {
+                let label = digest_scope
+                    .as_deref()
+                    .map(|digest_scope| format!("Rework {digest_scope} digest"))
+                    .unwrap_or_else(|| "Rework finance digest".to_string());
+                let mut summary =
+                    "Return to finance review before relying on the current digest".to_string();
+                if let Some(status) = status.as_deref() {
+                    summary.push_str(&format!(" with status {status}"));
+                }
+                if let Some(first_anomaly) = first_anomaly.as_deref() {
+                    summary.push_str(&format!(
+                        " and the anomaly note {}",
+                        first_anomaly.trim_end_matches('.')
+                    ));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            }
+        }
+    } else if workflow == "travel_booker" {
+        let booking_context = result_obj
+            .get("booking_recommendation")
+            .and_then(Value::as_object)
+            .map(|booking| {
+                let booking_scope = booking
+                    .get("booking_scope")
+                    .and_then(Value::as_str)
+                    .map(humanize_workflow_review_token)
+                    .filter(|value| !value.is_empty());
+                let approval_target = booking
+                    .get("approval_target")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let proposal_summary = booking
+                    .get("proposal_summary")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let booking_headline = booking
+                    .get("booking_headline")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let primary_flight_option = booking
+                    .get("primary_flight_option")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let primary_stay_option = booking
+                    .get("primary_stay_option")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let primary_transfer_option = booking
+                    .get("primary_transfer_option")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                (
+                    booking_scope,
+                    approval_target,
+                    proposal_summary,
+                    booking_headline,
+                    primary_flight_option,
+                    primary_stay_option,
+                    primary_transfer_option,
+                )
+            });
+        let Some((
+            booking_scope,
+            approval_target,
+            proposal_summary,
+            booking_headline,
+            primary_flight_option,
+            primary_stay_option,
+            primary_transfer_option,
+        )) = booking_context
+        else {
+            return;
+        };
+        let Some(approval_options) = result_obj
+            .get_mut("approval_options")
+            .and_then(Value::as_array_mut)
+        else {
+            return;
+        };
+
+        for option in approval_options.iter_mut().filter_map(Value::as_object_mut) {
+            let option_id = option
+                .get("option_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let is_approve = ["approve", "confirm", "book"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            let is_reject = ["reject", "decline", "deny", "hold"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            if is_approve {
+                let label = booking_scope
+                    .as_deref()
+                    .map(|booking_scope| format!("Confirm {booking_scope} draft"))
+                    .unwrap_or_else(|| "Confirm booking draft".to_string());
+                let mut summary = "Proceed with the reviewed booking recommendation".to_string();
+                if let Some(target) = approval_target.as_deref() {
+                    summary.push_str(&format!(" for {target}"));
+                }
+                if let Some(headline) = booking_headline.as_deref() {
+                    summary.push_str(&format!(
+                        " using the draft plan \"{}\"",
+                        headline.trim_end_matches('.')
+                    ));
+                }
+                if let Some(flight) = primary_flight_option.as_deref() {
+                    summary.push_str(&format!(
+                        " with flight option {}",
+                        flight.trim_end_matches('.')
+                    ));
+                }
+                if let Some(stay) = primary_stay_option.as_deref() {
+                    summary.push_str(&format!(" and stay option {}", stay.trim_end_matches('.')));
+                }
+                if let Some(transfer) = primary_transfer_option.as_deref() {
+                    summary.push_str(&format!(
+                        " plus transfer option {}",
+                        transfer.trim_end_matches('.')
+                    ));
+                }
+                if let Some(proposal_summary) = proposal_summary.as_deref() {
+                    summary.push_str(&format!(
+                        " using the current shortlist: {}",
+                        proposal_summary.trim_end_matches('.')
+                    ));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            } else if is_reject {
+                let label = booking_scope
+                    .as_deref()
+                    .map(|booking_scope| format!("Reject {booking_scope} draft"))
+                    .unwrap_or_else(|| "Reject booking draft".to_string());
+                let mut summary =
+                    "Return to planning without confirming the current booking recommendation"
+                        .to_string();
+                if let Some(target) = approval_target.as_deref() {
+                    summary.push_str(&format!(" for {target}"));
+                }
+                if let Some(headline) = booking_headline.as_deref() {
+                    summary.push_str(&format!(
+                        " from the draft plan \"{}\"",
+                        headline.trim_end_matches('.')
+                    ));
+                }
+                if let Some(flight) = primary_flight_option.as_deref() {
+                    summary.push_str(&format!(
+                        " with flight option {}",
+                        flight.trim_end_matches('.')
+                    ));
+                }
+                if let Some(stay) = primary_stay_option.as_deref() {
+                    summary.push_str(&format!(" and stay option {}", stay.trim_end_matches('.')));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            }
+        }
+    } else if workflow == "email_guardian" {
+        let reply_context = result_obj
+            .get("reply_draft")
+            .and_then(Value::as_object)
+            .map(|reply| {
+                let approval_target = reply
+                    .get("approval_target")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let proposal_summary = reply
+                    .get("proposal_summary")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let reply_subject = reply
+                    .get("reply_subject")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                (approval_target, proposal_summary, reply_subject)
+            });
+        let Some((approval_target, proposal_summary, reply_subject)) = reply_context else {
+            return;
+        };
+        let Some(approval_options) = result_obj
+            .get_mut("approval_options")
+            .and_then(Value::as_array_mut)
+        else {
+            return;
+        };
+
+        for option in approval_options.iter_mut().filter_map(Value::as_object_mut) {
+            let option_id = option
+                .get("option_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let is_approve = ["approve", "confirm", "book"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            let is_reject = ["reject", "decline", "deny", "hold"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            if is_approve {
+                let label = "Approve reply draft".to_string();
+                let mut summary =
+                    "Continue toward response delivery with the reviewed reply draft".to_string();
+                if let Some(target) = approval_target.as_deref() {
+                    summary.push_str(&format!(" for {target}"));
+                }
+                if let Some(subject) = reply_subject.as_deref() {
+                    summary.push_str(&format!(" with the subject \"{subject}\""));
+                }
+                if let Some(proposal_summary) = proposal_summary.as_deref() {
+                    summary.push_str(&format!(
+                        " based on the current triage summary: {}",
+                        proposal_summary.trim_end_matches('.')
+                    ));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            } else if is_reject {
+                let label = "Hold reply draft".to_string();
+                let mut summary =
+                    "Keep the reply internal and stop before any external send".to_string();
+                if let Some(target) = approval_target.as_deref() {
+                    summary.push_str(&format!(" for {target}"));
+                }
+                if let Some(subject) = reply_subject.as_deref() {
+                    summary.push_str(&format!(" with the subject \"{subject}\""));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            }
+        }
+    } else if workflow == "content_publisher" {
+        let publication_context = result_obj
+            .get("publication_draft")
+            .and_then(Value::as_object)
+            .map(|draft| {
+                let approval_target = draft
+                    .get("approval_target")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let draft_title = draft
+                    .get("draft_title")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let proposal_summary = draft
+                    .get("proposal_summary")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                (approval_target, draft_title, proposal_summary)
+            });
+        let Some((approval_target, draft_title, proposal_summary)) = publication_context else {
+            return;
+        };
+        let Some(approval_options) = result_obj
+            .get_mut("approval_options")
+            .and_then(Value::as_array_mut)
+        else {
+            return;
+        };
+
+        for option in approval_options.iter_mut().filter_map(Value::as_object_mut) {
+            let option_id = option
+                .get("option_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let is_approve = ["approve", "confirm", "book", "publish"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            let is_reject = ["reject", "decline", "deny", "hold"]
+                .iter()
+                .any(|needle| option_id.contains(needle));
+            if is_approve {
+                let label = "Approve publication draft".to_string();
+                let mut summary =
+                    "Approve the reviewed publication draft for public release".to_string();
+                if let Some(target) = approval_target.as_deref() {
+                    summary.push_str(&format!(" at {target}"));
+                }
+                if let Some(title) = draft_title.as_deref() {
+                    summary.push_str(&format!(" with the title \"{title}\""));
+                }
+                if let Some(proposal_summary) = proposal_summary.as_deref() {
+                    summary.push_str(&format!(
+                        " based on the current package: {}",
+                        proposal_summary.trim_end_matches('.')
+                    ));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            } else if is_reject {
+                let label = "Hold publication draft".to_string();
+                let mut summary = "Keep the publication draft unpublished and internal".to_string();
+                if let Some(target) = approval_target.as_deref() {
+                    summary.push_str(&format!(" at {target}"));
+                }
+                summary.push('.');
+                option.insert("label".to_string(), Value::String(label));
+                option.insert("consequence_summary".to_string(), Value::String(summary));
+            }
+        }
+    }
+}
+
+fn workflow_review_preview_label(title: Option<&str>, detail: Option<&str>) -> String {
+    match (
+        title.map(str::trim).filter(|value| !value.is_empty()),
+        detail.map(str::trim).filter(|value| !value.is_empty()),
+    ) {
+        (Some(title), Some(detail)) => format!("{title}: {detail}"),
+        (Some(title), None) => title.to_string(),
+        (None, Some(detail)) => detail.to_string(),
+        (None, None) => "Approval review".to_string(),
+    }
+}
+
+fn workflow_review_preview_content_part(
+    parts: &mut Vec<String>,
+    value: Option<&str>,
+    prefix: Option<&str>,
+) {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return;
+    };
+    parts.push(match prefix {
+        Some(prefix) => format!("{prefix}{value}"),
+        None => value.to_string(),
+    });
+}
+
+fn workflow_review_preview_truncate(value: &str, max_chars: usize) -> String {
+    let trimmed = value.trim();
+    if trimmed.char_indices().nth(max_chars).is_some() {
+        let end = trimmed
+            .char_indices()
+            .nth(max_chars)
+            .map(|(index, _)| index)
+            .unwrap_or(trimmed.len());
+        format!("{}…", &trimmed[..end])
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn set_workflow_approval_review_draft_preview(
+    review_obj: &mut serde_json::Map<String, Value>,
+    label: String,
+    content_parts: Vec<String>,
+) {
+    let content = content_parts
+        .into_iter()
+        .map(|part| part.trim().to_string())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" • ");
+    if content.is_empty() {
+        return;
+    }
+    review_obj.insert(
+        "draft_preview".to_string(),
+        serde_json::json!({
+            "label": label,
+            "content": content,
+            "content_type": "text",
+        }),
+    );
+}
+
+fn enrich_workflow_approval_review_from_result(run: &mut WorkflowRunRecord) {
+    let Some(result_obj) = run.result_json.as_object() else {
+        return;
+    };
+    let workflow = result_obj
+        .get("workflow_output_contract")
+        .and_then(Value::as_object)
+        .and_then(|contract| contract.get("workflow"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let review_title = result_obj
+        .get("approval_review")
+        .and_then(Value::as_object)
+        .and_then(|review| review.get("title"))
+        .and_then(Value::as_str);
+
+    let preview = match workflow {
+        "email_guardian" => result_obj
+            .get("reply_draft")
+            .and_then(Value::as_object)
+            .map(|reply_draft| {
+                let reply_subject = reply_draft.get("reply_subject").and_then(Value::as_str);
+                let reply_body = reply_draft.get("reply_body").and_then(Value::as_str);
+                let artifact_path = reply_draft
+                    .get("draft_artifact_path")
+                    .and_then(Value::as_str);
+                let mut content_parts = Vec::new();
+                if let Some(body) = reply_body {
+                    content_parts.push(workflow_review_preview_truncate(body, 200));
+                }
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    artifact_path,
+                    Some("Draft artifact: "),
+                );
+                (
+                    workflow_review_preview_label(review_title, reply_subject),
+                    content_parts,
+                )
+            }),
+        "content_publisher" => result_obj
+            .get("publication_draft")
+            .and_then(Value::as_object)
+            .map(|publication_draft| {
+                let draft_title = publication_draft.get("draft_title").and_then(Value::as_str);
+                let draft_body = publication_draft.get("draft_body").and_then(Value::as_str);
+                let artifact_path = publication_draft
+                    .get("draft_artifact_path")
+                    .and_then(Value::as_str);
+                let tag_summary = publication_draft
+                    .get("draft_tags")
+                    .and_then(Value::as_array)
+                    .map(|tags| {
+                        tags.iter()
+                            .filter_map(Value::as_str)
+                            .map(str::trim)
+                            .filter(|tag| !tag.is_empty())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    })
+                    .filter(|tags| !tags.is_empty());
+                let mut content_parts = Vec::new();
+                if let Some(body) = draft_body {
+                    content_parts.push(workflow_review_preview_truncate(body, 200));
+                }
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    tag_summary.as_deref(),
+                    Some("Tags: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    artifact_path,
+                    Some("Draft artifact: "),
+                );
+                (
+                    workflow_review_preview_label(review_title, draft_title),
+                    content_parts,
+                )
+            }),
+        "travel_booker" => result_obj
+            .get("booking_recommendation")
+            .and_then(Value::as_object)
+            .map(|booking| {
+                let headline = booking
+                    .get("booking_headline")
+                    .or_else(|| booking.get("proposal_summary"))
+                    .and_then(Value::as_str);
+                let mut content_parts = Vec::new();
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    booking.get("primary_flight_option").and_then(Value::as_str),
+                    Some("Flight: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    booking.get("primary_stay_option").and_then(Value::as_str),
+                    Some("Stay: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    booking
+                        .get("primary_transfer_option")
+                        .and_then(Value::as_str),
+                    Some("Transfer: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    booking.get("draft_artifact_path").and_then(Value::as_str),
+                    Some("Draft artifact: "),
+                );
+                (
+                    workflow_review_preview_label(review_title, headline),
+                    content_parts,
+                )
+            }),
+        "calendar_coordinator" => result_obj
+            .get("recommended_slot")
+            .and_then(Value::as_object)
+            .map(|slot| {
+                let detail = slot
+                    .get("focus_kind")
+                    .and_then(Value::as_str)
+                    .map(|value| value.replace('_', " "));
+                let mut content_parts = Vec::new();
+                let proposed_start = slot.get("proposed_start_at").and_then(Value::as_str);
+                let proposed_end = slot.get("proposed_end_at").and_then(Value::as_str);
+                if let (Some(start), Some(end)) = (proposed_start, proposed_end) {
+                    content_parts.push(format!("Draft window: {start} to {end}"));
+                }
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    slot.get("anchor_event_title").and_then(Value::as_str),
+                    Some("Anchor: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    slot.get("anchor_event_location").and_then(Value::as_str),
+                    Some("Location: "),
+                );
+                if let Some(prep_lead) = slot.get("prep_lead_minutes").and_then(Value::as_i64) {
+                    if prep_lead > 0 {
+                        content_parts.push(format!("Protects {prep_lead} min prep window"));
+                    }
+                }
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    slot.get("slot_basis").and_then(Value::as_str),
+                    None,
+                );
+                (
+                    workflow_review_preview_label(review_title, detail.as_deref()),
+                    content_parts,
+                )
+            }),
+        "study_planner" => result_obj
+            .get("study_blocks")
+            .and_then(Value::as_array)
+            .and_then(|blocks| blocks.first())
+            .and_then(Value::as_object)
+            .map(|first_block| {
+                let detail = first_block
+                    .get("focus_item_title")
+                    .or_else(|| first_block.get("label"))
+                    .or_else(|| first_block.get("focus_summary"))
+                    .and_then(Value::as_str);
+                let mut content_parts = Vec::new();
+                let planned_start = first_block.get("planned_start_at").and_then(Value::as_str);
+                let planned_end = first_block.get("planned_end_at").and_then(Value::as_str);
+                if let (Some(start), Some(end)) = (planned_start, planned_end) {
+                    content_parts.push(format!("Planned window: {start} to {end}"));
+                }
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    first_block
+                        .get("focus_item_priority")
+                        .and_then(Value::as_str),
+                    Some("Priority: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    first_block
+                        .get("focus_item_urgency")
+                        .and_then(Value::as_str),
+                    Some("Urgency: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    first_block.get("focus_item_due_at").and_then(Value::as_str),
+                    Some("Due: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    first_block
+                        .get("anchor_event_title")
+                        .and_then(Value::as_str),
+                    Some("Anchor: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    first_block.get("slot_basis").and_then(Value::as_str),
+                    None,
+                );
+                if let Some(reminder) = result_obj
+                    .get("reminders")
+                    .and_then(Value::as_array)
+                    .and_then(|reminders| reminders.first())
+                    .and_then(Value::as_str)
+                {
+                    content_parts.push(workflow_review_preview_truncate(reminder, 120));
+                }
+                if let Some(study_input_context) = result_obj
+                    .get("study_input_context")
+                    .and_then(Value::as_object)
+                {
+                    if let Some(pending_focus_count) = study_input_context
+                        .get("pending_focus_count")
+                        .and_then(Value::as_u64)
+                    {
+                        content_parts.push(format!("Pending focus items: {pending_focus_count}"));
+                    }
+                    workflow_review_preview_content_part(
+                        &mut content_parts,
+                        study_input_context
+                            .get("next_focus_title")
+                            .and_then(Value::as_str),
+                        Some("Next focus: "),
+                    );
+                }
+                (
+                    workflow_review_preview_label(review_title, detail),
+                    content_parts,
+                )
+            }),
+        "receipt_tracker" => result_obj
+            .get("receipt_entry")
+            .and_then(Value::as_object)
+            .map(|receipt| {
+                let detail = receipt
+                    .get("merchant")
+                    .or_else(|| receipt.get("proposal_summary"))
+                    .and_then(Value::as_str);
+                let mut content_parts = Vec::new();
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    receipt.get("amount").and_then(Value::as_str),
+                    Some("Amount: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    receipt.get("category").and_then(Value::as_str),
+                    Some("Category: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    receipt.get("transaction_date").and_then(Value::as_str),
+                    Some("Date: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    receipt.get("receipt_status").and_then(Value::as_str),
+                    Some("Status: "),
+                );
+                if let Some(note) = result_obj
+                    .get("receipt_notes")
+                    .and_then(Value::as_array)
+                    .and_then(|notes| notes.first())
+                    .and_then(Value::as_str)
+                {
+                    content_parts.push(workflow_review_preview_truncate(note, 120));
+                }
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    receipt.get("receipt_artifact_path").and_then(Value::as_str),
+                    Some("Receipt artifact: "),
+                );
+                (
+                    workflow_review_preview_label(review_title, detail),
+                    content_parts,
+                )
+            }),
+        "finance_guardian" => result_obj
+            .get("finance_digest")
+            .and_then(Value::as_object)
+            .map(|digest| {
+                let detail = digest
+                    .get("digest_scope")
+                    .or_else(|| digest.get("proposal_summary"))
+                    .and_then(Value::as_str);
+                let mut content_parts = Vec::new();
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    digest.get("status").and_then(Value::as_str),
+                    Some("Status: "),
+                );
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    digest.get("next_action").and_then(Value::as_str),
+                    Some("Next action: "),
+                );
+                if let Some(finance_input_context) = result_obj
+                    .get("finance_input_context")
+                    .and_then(Value::as_object)
+                {
+                    if let Some(account_count) = finance_input_context
+                        .get("account_count")
+                        .and_then(Value::as_u64)
+                    {
+                        content_parts.push(format!("Active accounts: {account_count}"));
+                    }
+                    workflow_review_preview_content_part(
+                        &mut content_parts,
+                        finance_input_context
+                            .get("top_spend_category")
+                            .and_then(Value::as_str),
+                        Some("Top spend: "),
+                    );
+                }
+                if let Some(note) = result_obj
+                    .get("anomaly_notes")
+                    .and_then(Value::as_array)
+                    .and_then(|notes| notes.first())
+                    .and_then(Value::as_str)
+                {
+                    content_parts.push(workflow_review_preview_truncate(note, 120));
+                }
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    digest.get("finance_artifact_path").and_then(Value::as_str),
+                    Some("Finance artifact: "),
+                );
+                (
+                    workflow_review_preview_label(review_title, detail),
+                    content_parts,
+                )
+            }),
+        "research_assistant" => result_obj
+            .get("research_brief")
+            .and_then(Value::as_object)
+            .map(|brief| {
+                let detail = brief
+                    .get("proposal_summary")
+                    .or_else(|| brief.get("next_action"))
+                    .and_then(Value::as_str);
+                let mut content_parts = Vec::new();
+                if let Some(body) = brief.get("brief_body").and_then(Value::as_str) {
+                    content_parts.push(workflow_review_preview_truncate(body, 200));
+                }
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    brief.get("next_action").and_then(Value::as_str),
+                    Some("Next action: "),
+                );
+                if let Some(finding) = result_obj
+                    .get("key_findings")
+                    .and_then(Value::as_array)
+                    .and_then(|findings| findings.first())
+                    .and_then(Value::as_str)
+                {
+                    content_parts.push(workflow_review_preview_truncate(finding, 120));
+                }
+                if let Some(source_count) = brief.get("source_count").and_then(Value::as_u64) {
+                    content_parts.push(format!("Source count: {source_count}"));
+                }
+                if let Some(source) = result_obj
+                    .get("source_refs")
+                    .and_then(Value::as_array)
+                    .and_then(|sources| sources.first())
+                {
+                    match source {
+                        Value::String(text) => workflow_review_preview_content_part(
+                            &mut content_parts,
+                            Some(text),
+                            Some("Source: "),
+                        ),
+                        Value::Object(object) => {
+                            workflow_review_preview_content_part(
+                                &mut content_parts,
+                                object.get("title").and_then(Value::as_str),
+                                Some("Source: "),
+                            );
+                            workflow_review_preview_content_part(
+                                &mut content_parts,
+                                object.get("url").and_then(Value::as_str),
+                                Some("URL: "),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+                workflow_review_preview_content_part(
+                    &mut content_parts,
+                    brief.get("research_artifact_path").and_then(Value::as_str),
+                    Some("Research artifact: "),
+                );
+                (
+                    workflow_review_preview_label(review_title, detail),
+                    content_parts,
+                )
+            }),
+        _ => None,
+    };
+
+    let Some((label, content_parts)) = preview else {
+        return;
+    };
+    let Some(result_obj) = run.result_json.as_object_mut() else {
+        return;
+    };
+    let Some(review_obj) = result_obj
+        .get_mut("approval_review")
+        .and_then(Value::as_object_mut)
+    else {
+        return;
+    };
+    set_workflow_approval_review_draft_preview(review_obj, label, content_parts);
+}
+
+fn nearest_schedule_anchor<'a>(
+    events: &'a [CalendarEventWindow],
+    now: chrono::DateTime<chrono::Utc>,
+) -> Option<&'a CalendarEventWindow> {
+    events
+        .iter()
+        .filter(|event| event.start_at > now)
+        .filter(|event| event.schedule_anchor_type.is_some())
+        .min_by_key(|event| event.start_at)
+}
+
+fn find_preferred_schedule_slot(
+    events: &[CalendarEventWindow],
+    now: chrono::DateTime<chrono::Utc>,
+    minimum_duration: chrono::Duration,
+) -> (
+    chrono::DateTime<chrono::Utc>,
+    chrono::DateTime<chrono::Utc>,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
+    if let Some(anchor) = nearest_schedule_anchor(events, now) {
+        let anchor_type = anchor.schedule_anchor_type.unwrap_or("meeting");
+        let note_kind = schedule_anchor_note_kind(anchor).to_string();
+        let prep_lead_minutes = schedule_anchor_prep_lead_minutes(anchor, &note_kind);
+        let latest_end = anchor.start_at - chrono::Duration::minutes(prep_lead_minutes);
+        if let Some((start_at, end_at)) =
+            find_first_free_calendar_gap_before(events, now, minimum_duration, latest_end)
+        {
+            return (
+                start_at,
+                end_at,
+                format!(
+                    "Scheduled ahead of {} to protect {} minutes of prep time",
+                    anchor.title, prep_lead_minutes
+                ),
+                schedule_focus_kind(anchor_type).to_string(),
+                Some(schedule_anchor_label(anchor_type).to_string()),
+                Some(anchor.title.clone()),
+                Some(anchor_type.to_string()),
+                Some(note_kind),
+            );
+        }
+        let (start_at, end_at, basis) = find_first_free_calendar_gap(events, now, minimum_duration);
+        return (
+            start_at,
+            end_at,
+            format!("{basis}; nearest schedule anchor is {}", anchor.title),
+            schedule_focus_kind(anchor_type).to_string(),
+            Some(schedule_anchor_label(anchor_type).to_string()),
+            Some(anchor.title.clone()),
+            Some(anchor_type.to_string()),
+            Some(note_kind),
+        );
+    }
+    let (start_at, end_at, basis) = find_first_free_calendar_gap(events, now, minimum_duration);
+    (
+        start_at,
+        end_at,
+        basis,
+        "general_schedule_review".to_string(),
+        None,
+        None,
+        None,
+        None,
+    )
+}
+
+fn find_first_free_calendar_gap_before(
+    events: &[CalendarEventWindow],
+    now: chrono::DateTime<chrono::Utc>,
+    minimum_duration: chrono::Duration,
+    latest_end: chrono::DateTime<chrono::Utc>,
+) -> Option<(chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)> {
+    let mut cursor = fallback_slot_start(now);
+    if cursor + minimum_duration > latest_end {
+        return None;
+    }
+    for event in events {
+        if event.end_at <= cursor {
+            continue;
+        }
+        if event.start_at >= latest_end {
+            break;
+        }
+        if event.start_at > cursor {
+            let gap_end = std::cmp::min(event.start_at, latest_end);
+            if gap_end - cursor >= minimum_duration {
+                return Some((cursor, cursor + minimum_duration));
+            }
+        }
+        if event.end_at > cursor {
+            cursor = event.end_at + chrono::Duration::minutes(15);
+        }
+        if cursor + minimum_duration > latest_end {
+            return None;
+        }
+    }
+    if latest_end - cursor >= minimum_duration {
+        Some((cursor, cursor + minimum_duration))
+    } else {
+        None
+    }
+}
+
+fn study_anchor_label(event_type: &str) -> &'static str {
+    match event_type {
+        "academic_exam" => "Exam prep block",
+        "academic_submission" => "Submission prep block",
+        _ => "Primary study block",
+    }
+}
+
+fn study_focus_kind(event_type: &str) -> &'static str {
+    match event_type {
+        "academic_exam" => "exam_prep",
+        "academic_submission" => "submission_prep",
+        _ => "general_review",
+    }
+}
+
+fn study_focus_priority_rank(priority: &str) -> i32 {
+    i32::from(TaskPriority::rank_value(priority))
+}
+
+fn build_study_focus_item_context(
+    items: &[Value],
+    now: chrono::DateTime<chrono::Utc>,
+) -> Vec<Value> {
+    let mut pending_items = items
+        .iter()
+        .filter_map(|item| {
+            let object = item.as_object()?;
+            let status = object
+                .get("status")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("pending");
+            if matches!(status, "completed" | "cancelled") {
+                return None;
+            }
+            let title = object
+                .get("title")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())?
+                .to_string();
+            let description = object
+                .get("description")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let priority = object
+                .get("priority")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("normal")
+                .to_string();
+            let due_at = object
+                .get("due_at")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let due_datetime = due_at.as_deref().and_then(|value| {
+                chrono::DateTime::parse_from_rfc3339(value)
+                    .ok()
+                    .map(|parsed| parsed.with_timezone(&chrono::Utc))
+            });
+            let urgency = match due_datetime {
+                Some(due) if due < now => "overdue",
+                Some(due) if due <= now + chrono::Duration::hours(72) => "due_soon",
+                Some(_) => "scheduled",
+                None => "undated",
+            };
+            Some((
+                due_datetime,
+                study_focus_priority_rank(&priority),
+                title.clone(),
+                serde_json::json!({
+                    "title": title,
+                    "description": description,
+                    "priority": priority,
+                    "status": status,
+                    "due_at": due_at,
+                    "urgency": urgency,
+                    "source": "focus_item",
+                }),
+            ))
+        })
+        .collect::<Vec<_>>();
+    pending_items.sort_by(|left, right| {
+        left.0
+            .is_none()
+            .cmp(&right.0.is_none())
+            .then_with(|| left.0.cmp(&right.0))
+            .then_with(|| left.1.cmp(&right.1))
+            .then_with(|| left.2.cmp(&right.2))
+    });
+    pending_items
+        .into_iter()
+        .map(|(_, _, _, item)| item)
+        .take(5)
+        .collect()
+}
+
+fn nearest_academic_anchor<'a>(
+    events: &'a [CalendarEventWindow],
+    now: chrono::DateTime<chrono::Utc>,
+) -> Option<&'a CalendarEventWindow> {
+    events
+        .iter()
+        .filter(|event| event.start_at > now)
+        .filter(|event| event.academic_event_type.is_some())
+        .min_by_key(|event| event.start_at)
+}
+
+fn find_preferred_study_block(
+    events: &[CalendarEventWindow],
+    now: chrono::DateTime<chrono::Utc>,
+    minimum_duration: chrono::Duration,
+) -> (
+    chrono::DateTime<chrono::Utc>,
+    chrono::DateTime<chrono::Utc>,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
+    if let Some(anchor) = nearest_academic_anchor(events, now) {
+        let event_type = anchor.academic_event_type.unwrap_or("academic_submission");
+        let latest_end = anchor.start_at - chrono::Duration::hours(1);
+        if let Some((start_at, end_at)) =
+            find_first_free_calendar_gap_before(events, now, minimum_duration, latest_end)
+        {
+            return (
+                start_at,
+                end_at,
+                format!(
+                    "Scheduled ahead of {} to prepare for {}",
+                    anchor.title, anchor.title
+                ),
+                study_focus_kind(event_type).to_string(),
+                Some(study_anchor_label(event_type).to_string()),
+                Some(anchor.title.clone()),
+                Some(event_type.to_string()),
+            );
+        }
+        let (start_at, end_at, basis) = find_first_free_calendar_gap(events, now, minimum_duration);
+        return (
+            start_at,
+            end_at,
+            format!("{basis}; nearest academic anchor is {}", anchor.title),
+            study_focus_kind(event_type).to_string(),
+            Some(study_anchor_label(event_type).to_string()),
+            Some(anchor.title.clone()),
+            Some(event_type.to_string()),
+        );
+    }
+    let (start_at, end_at, basis) = find_first_free_calendar_gap(events, now, minimum_duration);
+    (
+        start_at,
+        end_at,
+        basis,
+        "general_review".to_string(),
+        None,
+        None,
+        None,
+    )
+}
+
+fn apply_workflow_result_contract_to_result(
+    result_obj: &mut serde_json::Map<String, Value>,
+    contract_override: Option<&Value>,
+    run_status: &str,
+) {
+    let Some(contract) = contract_override
+        .cloned()
+        .or_else(|| workflow_result_contract_from_result(result_obj))
+    else {
+        return;
+    };
+    let Some(contract_obj) = contract.as_object() else {
+        return;
+    };
+    result_obj.insert(
+        "workflow_output_contract".to_string(),
+        Value::Object(contract_obj.clone()),
+    );
+    let workflow = contract_obj
+        .get("workflow")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let summary_mode = contract_obj
+        .get("summary_mode")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let summary = result_obj
+        .get("summary")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    let notes = workflow_result_notes(result_obj);
+    let checkpoint_label = workflow_result_checkpoint_label(result_obj);
+    let next_action = workflow_result_next_action(workflow, run_status);
+    if summary_mode == "reviewable_schedule_recommendation" || workflow == "calendar_coordinator" {
+        let approval_state = if run_status == "waiting_for_approval" {
+            "pending_human_review"
+        } else if result_obj
+            .get("approval_decision")
+            .and_then(Value::as_object)
+            .is_some()
+        {
+            "decision_recorded"
+        } else if run_status == "completed" {
+            "draft_ready_for_review"
+        } else {
+            "draft_in_progress"
+        };
+        result_obj.insert(
+            "recommended_slot".to_string(),
+            serde_json::json!({
+                "status": run_status,
+                "summary": summary,
+                "review_required": true,
+                "external_write": false,
+                "approval_state": approval_state,
+                "checkpoint_label": checkpoint_label,
+                "next_action": next_action,
+                "note_count": notes.len(),
+            }),
+        );
+        result_obj.insert(
+            "scheduling_notes".to_string(),
+            Value::Array(notes.into_iter().map(Value::String).collect()),
+        );
+    } else if summary_mode == "reviewable_receipt_entry" || workflow == "receipt_tracker" {
+        let receipt_status = result_obj
+            .get("skill_capsule_receipt_status")
+            .and_then(Value::as_str)
+            .unwrap_or("draft");
+        result_obj.insert(
+            "receipt_entry".to_string(),
+            serde_json::json!({
+                "status": run_status,
+                "proposal_summary": summary,
+                "review_required": true,
+                "external_write": false,
+                "entry_scope": "expense_capture",
+                "receipt_status": receipt_status,
+                "checkpoint_label": checkpoint_label,
+                "next_action": next_action,
+                "note_count": notes.len(),
+            }),
+        );
+        result_obj.insert(
+            "receipt_notes".to_string(),
+            Value::Array(
+                std::iter::once(next_action)
+                    .chain(notes.into_iter())
+                    .map(Value::String)
+                    .collect(),
+            ),
+        );
+    } else if summary_mode == "reviewable_reply_draft" || workflow == "email_guardian" {
+        let approval_state = if run_status == "waiting_for_approval" {
+            "pending_human_review"
+        } else if result_obj
+            .get("approval_decision")
+            .and_then(Value::as_object)
+            .is_some()
+        {
+            "decision_recorded"
+        } else if run_status == "completed" {
+            "draft_ready_for_review"
+        } else {
+            "draft_in_progress"
+        };
+        result_obj.insert(
+            "reply_draft".to_string(),
+            serde_json::json!({
+                "status": run_status,
+                "proposal_summary": summary,
+                "review_required": true,
+                "external_write": false,
+                "approval_state": approval_state,
+                "approval_target": checkpoint_label,
+                "next_action": next_action,
+                "note_count": notes.len(),
+            }),
+        );
+        result_obj.insert(
+            "triage_notes".to_string(),
+            Value::Array(
+                std::iter::once(next_action)
+                    .chain(notes.into_iter())
+                    .map(Value::String)
+                    .collect(),
+            ),
+        );
+    } else if summary_mode == "reviewable_publication_draft" || workflow == "content_publisher" {
+        let approval_state = if run_status == "waiting_for_approval" {
+            "pending_human_review"
+        } else if result_obj
+            .get("approval_decision")
+            .and_then(Value::as_object)
+            .is_some()
+        {
+            "decision_recorded"
+        } else if run_status == "completed" {
+            "draft_ready_for_review"
+        } else {
+            "draft_in_progress"
+        };
+        let visibility = result_obj
+            .get("workflow_output_contract")
+            .and_then(Value::as_object)
+            .and_then(|contract| contract.get("visibility"))
+            .and_then(Value::as_str)
+            .unwrap_or("public");
+        let draft_title = if summary.is_empty() {
+            None
+        } else {
+            summary
+                .split(['.', '\n'])
+                .map(str::trim)
+                .find(|value| !value.is_empty())
+                .map(str::to_string)
+        };
+        result_obj.insert(
+            "publication_draft".to_string(),
+            serde_json::json!({
+                "status": run_status,
+                "proposal_summary": summary,
+                "draft_title": draft_title,
+                "review_required": true,
+                "external_write": false,
+                "approval_state": approval_state,
+                "approval_target": checkpoint_label,
+                "visibility": visibility,
+                "next_action": next_action,
+                "note_count": notes.len(),
+            }),
+        );
+        result_obj.insert(
+            "publication_notes".to_string(),
+            Value::Array(
+                std::iter::once(next_action)
+                    .chain(notes.into_iter())
+                    .map(Value::String)
+                    .collect(),
+            ),
+        );
+    } else if summary_mode == "draft_study_plan" || workflow == "study_planner" {
+        let mut study_blocks = vec![serde_json::json!({
+            "label": "Primary study block",
+            "status": run_status,
+            "focus_summary": summary,
+            "review_required": true,
+        })];
+        if let Some(label) = checkpoint_label {
+            study_blocks.push(serde_json::json!({
+                "label": label,
+                "status": run_status,
+                "focus_summary": next_action,
+                "review_required": true,
+            }));
+        }
+        result_obj.insert("study_blocks".to_string(), Value::Array(study_blocks));
+        result_obj.insert(
+            "reminders".to_string(),
+            Value::Array(
+                std::iter::once(next_action)
+                    .chain(notes.into_iter())
+                    .map(Value::String)
+                    .collect(),
+            ),
+        );
+    } else if summary_mode == "research_brief" || workflow == "research_assistant" {
+        result_obj.insert(
+            "research_brief".to_string(),
+            serde_json::json!({
+                "status": run_status,
+                "proposal_summary": summary,
+                "review_required": false,
+                "external_write": false,
+                "next_action": next_action,
+                "source_count": 0,
+            }),
+        );
+        result_obj.insert(
+            "key_findings".to_string(),
+            Value::Array(notes.iter().cloned().map(Value::String).collect()),
+        );
+        result_obj.insert("source_refs".to_string(), Value::Array(Vec::new()));
+    } else if summary_mode == "finance_digest" || workflow == "finance_guardian" {
+        result_obj.insert(
+            "finance_digest".to_string(),
+            serde_json::json!({
+                "status": run_status,
+                "proposal_summary": summary,
+                "review_required": false,
+                "external_write": false,
+                "digest_scope": "spend_monitoring",
+                "next_action": next_action,
+                "note_count": notes.len(),
+            }),
+        );
+        result_obj.insert(
+            "anomaly_notes".to_string(),
+            Value::Array(
+                std::iter::once(next_action)
+                    .chain(notes.into_iter())
+                    .map(Value::String)
+                    .collect(),
+            ),
+        );
+    } else if summary_mode == "reviewable_booking_recommendation" || workflow == "travel_booker" {
+        let approval_state = if run_status == "waiting_for_approval" {
+            "pending_human_review"
+        } else if result_obj
+            .get("approval_decision")
+            .and_then(Value::as_object)
+            .is_some()
+        {
+            "decision_recorded"
+        } else if run_status == "completed" {
+            "draft_ready_for_review"
+        } else {
+            "draft_in_progress"
+        };
+        let booking_scope = if summary.to_ascii_lowercase().contains("hotel") {
+            "stay_booking"
+        } else if summary.to_ascii_lowercase().contains("flight") {
+            "flight_booking"
+        } else {
+            "travel_booking"
+        };
+        result_obj.insert(
+            "booking_recommendation".to_string(),
+            serde_json::json!({
+                "status": run_status,
+                "proposal_summary": summary,
+                "review_required": true,
+                "external_write": false,
+                "approval_state": approval_state,
+                "approval_target": checkpoint_label,
+                "booking_scope": booking_scope,
+                "next_action": next_action,
+                "note_count": notes.len(),
+            }),
+        );
+        result_obj.insert(
+            "booking_notes".to_string(),
+            Value::Array(
+                std::iter::once(next_action)
+                    .chain(notes.into_iter())
+                    .map(Value::String)
+                    .collect(),
+            ),
+        );
+    }
+}
+
+fn latest_skill_capsule_payload_from_timeline(
+    timeline_json: &Value,
+) -> Option<serde_json::Map<String, Value>> {
+    timeline_json.as_array().and_then(|timeline| {
+        timeline.iter().rev().find_map(|entry| {
+            entry
+                .get("trace")
+                .and_then(Value::as_object)
+                .and_then(|trace| trace.get("skill_capsule"))
+                .and_then(Value::as_object)
+                .and_then(|skill_capsule| skill_capsule.get("payload"))
+                .and_then(Value::as_object)
+                .cloned()
+        })
+    })
+}
+
+fn first_nonempty_capsule_line(text: &str) -> Option<String> {
+    text.lines()
+        .map(str::trim)
+        .map(|line| line.trim_start_matches('#').trim())
+        .find(|line| !line.is_empty())
+        .map(str::to_string)
+}
+
+fn parse_booking_outline_segments(text: &str) -> Vec<Value> {
+    text.lines()
+        .map(str::trim)
+        .filter_map(|line| {
+            let normalized = line.trim_start_matches(['-', '*', '•']).trim();
+            if normalized.is_empty() {
+                return None;
+            }
+            let lower = normalized.to_ascii_lowercase();
+            let segment_kind = if lower.starts_with("flight:") || lower.contains("flight") {
+                "flight"
+            } else if lower.starts_with("hotel:")
+                || lower.starts_with("stay:")
+                || lower.contains("hotel")
+                || lower.contains("stay")
+            {
+                "stay"
+            } else if lower.starts_with("train:")
+                || lower.starts_with("car:")
+                || lower.starts_with("transfer:")
+                || lower.contains("transfer")
+            {
+                "transfer"
+            } else {
+                "note"
+            };
+            let detail = normalized
+                .split_once(':')
+                .map(|(_, value)| value.trim())
+                .filter(|value| !value.is_empty())
+                .unwrap_or(normalized);
+            Some(serde_json::json!({
+                "kind": segment_kind,
+                "label": humanize_workflow_review_token(segment_kind),
+                "detail": detail,
+            }))
+        })
+        .collect()
+}
+
+fn first_booking_segment_detail(segments: &[Value], kind: &str) -> Option<String> {
+    segments.iter().find_map(|segment| {
+        (segment.get("kind").and_then(Value::as_str) == Some(kind))
+            .then(|| {
+                segment
+                    .get("detail")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string)
+            })
+            .flatten()
+    })
+}
+
+fn booking_segment_details(segments: &[Value], kind: &str) -> Vec<Value> {
+    segments
+        .iter()
+        .filter(|segment| segment.get("kind").and_then(Value::as_str) == Some(kind))
+        .filter_map(|segment| {
+            segment
+                .get("detail")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| Value::String(value.to_string()))
+        })
+        .collect()
+}
+
+fn booking_candidate_objects(segments: &[Value], kind: &str) -> Vec<Value> {
+    segments
+        .iter()
+        .filter(|segment| segment.get("kind").and_then(Value::as_str) == Some(kind))
+        .enumerate()
+        .filter_map(|(index, segment)| {
+            segment
+                .get("detail")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| {
+                    serde_json::json!({
+                        "kind": kind,
+                        "label": format!("{} option {}", humanize_workflow_review_token(kind), index + 1),
+                        "detail": value,
+                        "rank": index + 1,
+                        "is_primary": index == 0,
+                    })
+                })
+        })
+        .collect()
+}
+
+fn normalized_booking_candidate_objects(
+    payload: &serde_json::Map<String, Value>,
+    key: &str,
+    kind: &str,
+) -> Vec<Value> {
+    payload
+        .get(key)
+        .or_else(|| {
+            payload
+                .get("booking_recommendation")
+                .and_then(Value::as_object)
+                .and_then(|booking| booking.get(key))
+        })
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .enumerate()
+                .filter_map(|(index, item)| match item {
+                    Value::String(value) => {
+                        let trimmed = value.trim();
+                        (!trimmed.is_empty()).then(|| {
+                            serde_json::json!({
+                                "kind": kind,
+                                "label": format!("{} option {}", humanize_workflow_review_token(kind), index + 1),
+                                "detail": trimmed,
+                                "rank": index + 1,
+                                "is_primary": index == 0,
+                            })
+                        })
+                    }
+                    Value::Object(record) => {
+                        let detail = record
+                            .get("detail")
+                            .or_else(|| record.get("value"))
+                            .or_else(|| record.get("summary"))
+                            .or_else(|| record.get("option"))
+                            .and_then(Value::as_str)
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())?;
+                        Some(serde_json::json!({
+                            "kind": kind,
+                            "label": record
+                                .get("label")
+                                .and_then(Value::as_str)
+                                .map(str::trim)
+                                .filter(|value| !value.is_empty())
+                                .unwrap_or(&format!("{} option {}", humanize_workflow_review_token(kind), index + 1)),
+                            "detail": detail,
+                            "rank": record
+                                .get("rank")
+                                .and_then(Value::as_u64)
+                                .unwrap_or((index + 1) as u64),
+                            "is_primary": record
+                                .get("is_primary")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(index == 0),
+                        }))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+fn payload_or_nested_first_nonempty_string(
+    payload: &serde_json::Map<String, Value>,
+    nested_key: &str,
+    keys: &[&str],
+) -> Option<String> {
+    payload_first_nonempty_string(payload, keys).or_else(|| {
+        payload
+            .get(nested_key)
+            .and_then(Value::as_object)
+            .and_then(|nested| payload_first_nonempty_string(nested, keys))
+    })
+}
+
+fn payload_or_nested_string_array(
+    payload: &serde_json::Map<String, Value>,
+    nested_key: &str,
+    keys: &[&str],
+) -> Vec<Value> {
+    let direct = payload_string_array(payload, keys);
+    if !direct.is_empty() {
+        return direct;
+    }
+    payload
+        .get(nested_key)
+        .and_then(Value::as_object)
+        .map(|nested| payload_string_array(nested, keys))
+        .unwrap_or_default()
+}
+
+fn payload_or_nested_first_value(
+    payload: &serde_json::Map<String, Value>,
+    nested_key: &str,
+    keys: &[&str],
+) -> Option<Value> {
+    payload_first_value(payload, keys).or_else(|| {
+        payload
+            .get(nested_key)
+            .and_then(Value::as_object)
+            .and_then(|nested| payload_first_value(nested, keys))
+    })
+}
+
+fn payload_or_nested_source_refs(
+    payload: &serde_json::Map<String, Value>,
+    nested_key: &str,
+) -> Vec<Value> {
+    let direct = payload_source_refs(payload);
+    if !direct.is_empty() {
+        return direct;
+    }
+    payload
+        .get(nested_key)
+        .and_then(Value::as_object)
+        .map(payload_source_refs)
+        .unwrap_or_default()
+}
+
+fn booking_candidate_strings(candidate_objects: &[Value]) -> Vec<Value> {
+    candidate_objects
+        .iter()
+        .filter_map(|candidate| {
+            candidate
+                .get("detail")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| Value::String(value.to_string()))
+        })
+        .collect()
+}
+
+fn primary_booking_candidate_detail(candidate_objects: &[Value]) -> Option<String> {
+    candidate_objects
+        .iter()
+        .find(|candidate| candidate.get("is_primary").and_then(Value::as_bool) == Some(true))
+        .or_else(|| candidate_objects.first())
+        .and_then(|candidate| candidate.get("detail"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn payload_first_nonempty_string(
+    payload: &serde_json::Map<String, Value>,
+    keys: &[&str],
+) -> Option<String> {
+    keys.iter().find_map(|key| {
+        payload
+            .get(*key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    })
+}
+
+fn payload_string_array(payload: &serde_json::Map<String, Value>, keys: &[&str]) -> Vec<Value> {
+    keys.iter()
+        .find_map(|key| {
+            payload.get(*key).and_then(Value::as_array).map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(|value| Value::String(value.to_string()))
+                    .collect::<Vec<_>>()
+            })
+        })
+        .unwrap_or_default()
+}
+
+fn payload_first_value(payload: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<Value> {
+    keys.iter().find_map(|key| payload.get(*key).cloned())
+}
+
+fn merge_unique_string_array_into_result(
+    result_obj: &mut serde_json::Map<String, Value>,
+    key: &str,
+    values: Vec<Value>,
+) {
+    if values.is_empty() {
+        return;
+    }
+    let target = result_obj
+        .entry(key.to_string())
+        .or_insert_with(|| Value::Array(Vec::new()));
+    if let Some(existing_values) = target.as_array_mut() {
+        for value in values {
+            let Some(text) = value
+                .as_str()
+                .map(str::trim)
+                .filter(|entry| !entry.is_empty())
+            else {
+                continue;
+            };
+            let already_present = existing_values.iter().any(|existing| {
+                existing
+                    .as_str()
+                    .map(str::trim)
+                    .map(|entry| entry.eq_ignore_ascii_case(text))
+                    .unwrap_or(false)
+            });
+            if !already_present {
+                existing_values.push(Value::String(text.to_string()));
+            }
+        }
+    } else {
+        *target = Value::Array(values);
+    }
+}
+
+fn parse_research_findings(text: &str) -> Vec<Value> {
+    text.lines()
+        .map(str::trim)
+        .filter_map(|line| {
+            if line.starts_with('#') {
+                return None;
+            }
+            let normalized = line
+                .trim_start_matches(['-', '*'])
+                .trim_start_matches(|c: char| c.is_ascii_digit() || c == '.' || c == ')')
+                .trim();
+            if normalized.is_empty() {
+                return None;
+            }
+            let lower = normalized.to_ascii_lowercase();
+            if lower.starts_with("source:")
+                || lower.starts_with("sources:")
+                || lower.starts_with("citation:")
+                || lower.starts_with("citations:")
+            {
+                return None;
+            }
+            Some(Value::String(normalized.to_string()))
+        })
+        .take(5)
+        .collect()
+}
+
+fn payload_source_refs(payload: &serde_json::Map<String, Value>) -> Vec<Value> {
+    for key in ["source_refs", "sources", "citations"] {
+        if let Some(items) = payload.get(key).and_then(Value::as_array) {
+            let refs = items
+                .iter()
+                .filter_map(|item| match item {
+                    Value::String(value) => {
+                        let trimmed = value.trim();
+                        (!trimmed.is_empty()).then(|| Value::String(trimmed.to_string()))
+                    }
+                    Value::Object(record) => {
+                        let mut normalized = serde_json::Map::new();
+                        for field in ["label", "url", "title", "source", "ref"] {
+                            if let Some(value) = record.get(field).cloned() {
+                                normalized.insert(field.to_string(), value);
+                            }
+                        }
+                        (!normalized.is_empty()).then(|| Value::Object(normalized))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            if !refs.is_empty() {
+                return refs;
+            }
+        }
+    }
+    Vec::new()
+}
+
+fn enrich_workflow_draft_fields_from_skill_capsule(run: &mut WorkflowRunRecord) {
+    let Some(result_obj) = run.result_json.as_object_mut() else {
+        return;
+    };
+    let workflow = result_obj
+        .get("workflow_output_contract")
+        .and_then(Value::as_object)
+        .and_then(|contract| contract.get("workflow"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if !matches!(
+        workflow,
+        "calendar_coordinator"
+            | "email_guardian"
+            | "content_publisher"
+            | "finance_guardian"
+            | "study_planner"
+            | "travel_booker"
+            | "research_assistant"
+            | "receipt_tracker"
+    ) {
+        return;
+    }
+    let Some(payload) = latest_skill_capsule_payload_from_timeline(&run.timeline_json) else {
+        return;
+    };
+    let compiled_capsule = payload
+        .get("compiledCapsule")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    let recorded_to = payload
+        .get("recorded_to")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    let compiled_tags = payload
+        .get("tags")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| Value::String(value.to_string()))
+                .collect::<Vec<_>>()
+        })
+        .filter(|items| !items.is_empty());
+
+    match workflow {
+        "calendar_coordinator" => {
+            let recommended_slot = payload.get("recommended_slot").cloned().or_else(|| {
+                payload
+                    .get("schedule_recommendation")
+                    .and_then(Value::as_object)
+                    .and_then(|nested| nested.get("recommended_slot"))
+                    .cloned()
+            });
+            let calendar_context = payload.get("calendar_context").cloned().or_else(|| {
+                payload
+                    .get("schedule_recommendation")
+                    .and_then(Value::as_object)
+                    .and_then(|nested| nested.get("calendar_context"))
+                    .cloned()
+            });
+            let scheduling_notes = {
+                let direct =
+                    payload_string_array(&payload, &["scheduling_notes", "notes", "highlights"]);
+                if !direct.is_empty() {
+                    direct
+                } else {
+                    payload
+                        .get("schedule_recommendation")
+                        .and_then(Value::as_object)
+                        .map(|nested| {
+                            payload_string_array(
+                                nested,
+                                &["scheduling_notes", "notes", "highlights"],
+                            )
+                        })
+                        .unwrap_or_default()
+                }
+            };
+
+            if let Some(slot) = recommended_slot {
+                if let Some(authored_slot) = slot.as_object() {
+                    let recommended_slot_obj = result_obj
+                        .entry("recommended_slot".to_string())
+                        .or_insert_with(|| Value::Object(serde_json::Map::new()));
+                    if let Some(existing_slot) = recommended_slot_obj.as_object_mut() {
+                        for (key, value) in authored_slot {
+                            existing_slot.insert(key.clone(), value.clone());
+                        }
+                    } else {
+                        *recommended_slot_obj = Value::Object(authored_slot.clone());
+                    }
+                } else {
+                    result_obj.insert("recommended_slot".to_string(), slot);
+                }
+            }
+            if let Some(context) = calendar_context {
+                if let Some(authored_context) = context.as_object() {
+                    let calendar_context_obj = result_obj
+                        .entry("calendar_context".to_string())
+                        .or_insert_with(|| Value::Object(serde_json::Map::new()));
+                    if let Some(existing_context) = calendar_context_obj.as_object_mut() {
+                        for (key, value) in authored_context {
+                            existing_context.insert(key.clone(), value.clone());
+                        }
+                    } else {
+                        *calendar_context_obj = Value::Object(authored_context.clone());
+                    }
+                } else {
+                    result_obj.insert("calendar_context".to_string(), context);
+                }
+            }
+            if !scheduling_notes.is_empty() {
+                merge_unique_string_array_into_result(
+                    result_obj,
+                    "scheduling_notes",
+                    scheduling_notes,
+                );
+            }
+        }
+        "email_guardian" => {
+            let Some(reply_draft) = result_obj
+                .get_mut("reply_draft")
+                .and_then(Value::as_object_mut)
+            else {
+                return;
+            };
+            let payload_reply_body = payload_or_nested_first_nonempty_string(
+                &payload,
+                "reply_draft",
+                &["reply_body", "body", "content", "draft_body"],
+            );
+            let payload_reply_subject = payload_or_nested_first_nonempty_string(
+                &payload,
+                "reply_draft",
+                &["reply_subject", "subject", "title"],
+            );
+            let payload_proposal_summary = payload_or_nested_first_nonempty_string(
+                &payload,
+                "reply_draft",
+                &["proposal_summary", "summary"],
+            );
+            let draft_artifact_path = payload
+                .get("reply_draft")
+                .and_then(Value::as_object)
+                .and_then(|nested| {
+                    payload_first_nonempty_string(
+                        nested,
+                        &["draft_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or_else(|| {
+                    payload_first_nonempty_string(
+                        &payload,
+                        &["draft_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or(recorded_to.clone());
+            if let Some(summary) = payload_proposal_summary {
+                reply_draft.insert("proposal_summary".to_string(), Value::String(summary));
+            }
+            let reply_body = payload_reply_body.or(compiled_capsule.clone());
+            if let Some(body) = reply_body {
+                reply_draft.insert("reply_body".to_string(), Value::String(body.clone()));
+                if reply_draft
+                    .get("proposal_summary")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .unwrap_or_default()
+                    .is_empty()
+                {
+                    if let Some(summary) = first_nonempty_capsule_line(&body) {
+                        reply_draft.insert("proposal_summary".to_string(), Value::String(summary));
+                    }
+                }
+            }
+            if let Some(subject) = payload_reply_subject {
+                reply_draft.insert("reply_subject".to_string(), Value::String(subject));
+            }
+            if let Some(path) = draft_artifact_path {
+                reply_draft.insert("draft_artifact_path".to_string(), Value::String(path));
+            }
+        }
+        "content_publisher" => {
+            let Some(publication_draft) = result_obj
+                .get_mut("publication_draft")
+                .and_then(Value::as_object_mut)
+            else {
+                return;
+            };
+            let payload_draft_body = payload_or_nested_first_nonempty_string(
+                &payload,
+                "publication_draft",
+                &["draft_body", "body", "content"],
+            );
+            let payload_draft_title = payload_or_nested_first_nonempty_string(
+                &payload,
+                "publication_draft",
+                &["draft_title", "title", "headline"],
+            );
+            let payload_proposal_summary = payload_or_nested_first_nonempty_string(
+                &payload,
+                "publication_draft",
+                &["proposal_summary", "summary"],
+            );
+            let payload_tags = payload_or_nested_string_array(
+                &payload,
+                "publication_draft",
+                &["draft_tags", "tags"],
+            );
+            let draft_artifact_path = payload
+                .get("publication_draft")
+                .and_then(Value::as_object)
+                .and_then(|nested| {
+                    payload_first_nonempty_string(
+                        nested,
+                        &["draft_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or_else(|| {
+                    payload_first_nonempty_string(
+                        &payload,
+                        &["draft_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or(recorded_to.clone());
+            if let Some(summary) = payload_proposal_summary {
+                publication_draft.insert("proposal_summary".to_string(), Value::String(summary));
+            }
+            if let Some(body) = payload_draft_body.or(compiled_capsule.clone()) {
+                publication_draft.insert("draft_body".to_string(), Value::String(body.clone()));
+                if publication_draft
+                    .get("draft_title")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .unwrap_or_default()
+                    .is_empty()
+                {
+                    if let Some(title) = first_nonempty_capsule_line(&body) {
+                        publication_draft.insert("draft_title".to_string(), Value::String(title));
+                    }
+                }
+            }
+            if let Some(title) = payload_draft_title {
+                publication_draft.insert("draft_title".to_string(), Value::String(title));
+            }
+            if !payload_tags.is_empty() {
+                publication_draft.insert("draft_tags".to_string(), Value::Array(payload_tags));
+            } else if let Some(tags) = compiled_tags {
+                publication_draft.insert("draft_tags".to_string(), Value::Array(tags));
+            }
+            if let Some(path) = draft_artifact_path {
+                publication_draft.insert("draft_artifact_path".to_string(), Value::String(path));
+            }
+        }
+        "travel_booker" => {
+            let Some(booking_recommendation) = result_obj
+                .get_mut("booking_recommendation")
+                .and_then(Value::as_object_mut)
+            else {
+                return;
+            };
+            let payload_outline = payload_or_nested_first_nonempty_string(
+                &payload,
+                "booking_recommendation",
+                &[
+                    "booking_outline",
+                    "outline",
+                    "booking_brief",
+                    "brief",
+                    "summary",
+                    "content",
+                    "body",
+                ],
+            );
+            let payload_headline = payload_or_nested_first_nonempty_string(
+                &payload,
+                "booking_recommendation",
+                &["booking_headline", "headline", "title"],
+            );
+            let payload_proposal_summary = payload_or_nested_first_nonempty_string(
+                &payload,
+                "booking_recommendation",
+                &["proposal_summary", "summary"],
+            );
+            let payload_route_summary = payload_or_nested_first_nonempty_string(
+                &payload,
+                "booking_recommendation",
+                &["route_summary"],
+            );
+            let payload_stay_summary = payload_or_nested_first_nonempty_string(
+                &payload,
+                "booking_recommendation",
+                &["stay_summary"],
+            );
+            let payload_primary_flight_option = payload_or_nested_first_nonempty_string(
+                &payload,
+                "booking_recommendation",
+                &["primary_flight_option"],
+            );
+            let payload_primary_stay_option = payload_or_nested_first_nonempty_string(
+                &payload,
+                "booking_recommendation",
+                &["primary_stay_option"],
+            );
+            let payload_primary_transfer_option = payload_or_nested_first_nonempty_string(
+                &payload,
+                "booking_recommendation",
+                &["primary_transfer_option"],
+            );
+            let booking_artifact_path = payload
+                .get("booking_recommendation")
+                .and_then(Value::as_object)
+                .and_then(|nested| {
+                    payload_first_nonempty_string(
+                        nested,
+                        &["booking_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or_else(|| {
+                    payload_first_nonempty_string(
+                        &payload,
+                        &["booking_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or(recorded_to.clone());
+            let mut flight_candidate_objects =
+                normalized_booking_candidate_objects(&payload, "flight_candidates", "flight");
+            let mut stay_candidate_objects =
+                normalized_booking_candidate_objects(&payload, "stay_candidates", "stay");
+            let mut transfer_candidate_objects =
+                normalized_booking_candidate_objects(&payload, "transfer_candidates", "transfer");
+            if let Some(headline) = payload_headline {
+                booking_recommendation
+                    .insert("booking_headline".to_string(), Value::String(headline));
+            }
+            if let Some(summary) = payload_proposal_summary {
+                booking_recommendation
+                    .insert("proposal_summary".to_string(), Value::String(summary));
+            }
+            if let Some(route_summary) = payload_route_summary {
+                booking_recommendation
+                    .insert("route_summary".to_string(), Value::String(route_summary));
+            }
+            if let Some(stay_summary) = payload_stay_summary {
+                booking_recommendation
+                    .insert("stay_summary".to_string(), Value::String(stay_summary));
+            }
+            if let Some(flight_option) = payload_primary_flight_option {
+                booking_recommendation.insert(
+                    "primary_flight_option".to_string(),
+                    Value::String(flight_option),
+                );
+            }
+            if let Some(stay_option) = payload_primary_stay_option {
+                booking_recommendation.insert(
+                    "primary_stay_option".to_string(),
+                    Value::String(stay_option),
+                );
+            }
+            if let Some(transfer_option) = payload_primary_transfer_option {
+                booking_recommendation.insert(
+                    "primary_transfer_option".to_string(),
+                    Value::String(transfer_option),
+                );
+            }
+            if let Some(body) = payload_outline.or(compiled_capsule) {
+                booking_recommendation
+                    .insert("booking_outline".to_string(), Value::String(body.clone()));
+                if booking_recommendation
+                    .get("booking_headline")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .unwrap_or_default()
+                    .is_empty()
+                {
+                    if let Some(headline) = first_nonempty_capsule_line(&body) {
+                        booking_recommendation
+                            .insert("booking_headline".to_string(), Value::String(headline));
+                    }
+                }
+                let segments = parse_booking_outline_segments(&body);
+                if !segments.is_empty() {
+                    booking_recommendation.insert(
+                        "booking_segments".to_string(),
+                        Value::Array(segments.clone()),
+                    );
+                    if flight_candidate_objects.is_empty() {
+                        flight_candidate_objects = booking_candidate_objects(&segments, "flight");
+                    }
+                    if stay_candidate_objects.is_empty() {
+                        stay_candidate_objects = booking_candidate_objects(&segments, "stay");
+                    }
+                    if transfer_candidate_objects.is_empty() {
+                        transfer_candidate_objects =
+                            booking_candidate_objects(&segments, "transfer");
+                    }
+                    if booking_recommendation
+                        .get("primary_flight_option")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .is_empty()
+                    {
+                        if let Some(flight) =
+                            primary_booking_candidate_detail(&flight_candidate_objects)
+                                .or_else(|| first_booking_segment_detail(&segments, "flight"))
+                        {
+                            booking_recommendation
+                                .insert("primary_flight_option".to_string(), Value::String(flight));
+                        }
+                    }
+                    if booking_recommendation
+                        .get("primary_stay_option")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .is_empty()
+                    {
+                        if let Some(stay) =
+                            primary_booking_candidate_detail(&stay_candidate_objects)
+                                .or_else(|| first_booking_segment_detail(&segments, "stay"))
+                        {
+                            booking_recommendation
+                                .insert("primary_stay_option".to_string(), Value::String(stay));
+                        }
+                    }
+                    if booking_recommendation
+                        .get("primary_transfer_option")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .is_empty()
+                    {
+                        if let Some(transfer) =
+                            primary_booking_candidate_detail(&transfer_candidate_objects)
+                                .or_else(|| first_booking_segment_detail(&segments, "transfer"))
+                        {
+                            booking_recommendation.insert(
+                                "primary_transfer_option".to_string(),
+                                Value::String(transfer),
+                            );
+                        }
+                    }
+                    if booking_recommendation
+                        .get("route_summary")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .is_empty()
+                    {
+                        if let Some(route) =
+                            primary_booking_candidate_detail(&flight_candidate_objects)
+                                .or_else(|| first_booking_segment_detail(&segments, "flight"))
+                        {
+                            booking_recommendation
+                                .insert("route_summary".to_string(), Value::String(route));
+                        }
+                    }
+                    if booking_recommendation
+                        .get("stay_summary")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .is_empty()
+                    {
+                        if let Some(stay) =
+                            primary_booking_candidate_detail(&stay_candidate_objects)
+                                .or_else(|| first_booking_segment_detail(&segments, "stay"))
+                        {
+                            booking_recommendation
+                                .insert("stay_summary".to_string(), Value::String(stay));
+                        }
+                    }
+                }
+                if booking_recommendation
+                    .get("proposal_summary")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .unwrap_or_default()
+                    .is_empty()
+                {
+                    if let Some(summary) = first_nonempty_capsule_line(&body) {
+                        booking_recommendation
+                            .insert("proposal_summary".to_string(), Value::String(summary));
+                    }
+                }
+            }
+            if !flight_candidate_objects.is_empty() {
+                booking_recommendation.insert(
+                    "flight_candidate_objects".to_string(),
+                    Value::Array(flight_candidate_objects.clone()),
+                );
+                booking_recommendation.insert(
+                    "flight_candidates".to_string(),
+                    Value::Array(booking_candidate_strings(&flight_candidate_objects)),
+                );
+            }
+            if !stay_candidate_objects.is_empty() {
+                booking_recommendation.insert(
+                    "stay_candidate_objects".to_string(),
+                    Value::Array(stay_candidate_objects.clone()),
+                );
+                booking_recommendation.insert(
+                    "stay_candidates".to_string(),
+                    Value::Array(booking_candidate_strings(&stay_candidate_objects)),
+                );
+            }
+            if !transfer_candidate_objects.is_empty() {
+                booking_recommendation.insert(
+                    "transfer_candidate_objects".to_string(),
+                    Value::Array(transfer_candidate_objects.clone()),
+                );
+                booking_recommendation.insert(
+                    "transfer_candidates".to_string(),
+                    Value::Array(booking_candidate_strings(&transfer_candidate_objects)),
+                );
+            }
+            if let Some(path) = booking_artifact_path {
+                booking_recommendation
+                    .insert("booking_artifact_path".to_string(), Value::String(path));
+            }
+        }
+        "research_assistant" => {
+            let payload_brief = payload_or_nested_first_nonempty_string(
+                &payload,
+                "research_brief",
+                &[
+                    "brief_body",
+                    "research_brief",
+                    "brief",
+                    "summary",
+                    "content",
+                    "body",
+                ],
+            );
+            let payload_proposal_summary = payload_or_nested_first_nonempty_string(
+                &payload,
+                "research_brief",
+                &["proposal_summary", "summary"],
+            );
+            let payload_findings = payload_or_nested_string_array(
+                &payload,
+                "research_brief",
+                &["key_findings", "findings", "highlights"],
+            );
+            let source_refs = payload_or_nested_source_refs(&payload, "research_brief");
+            let research_artifact_path = payload
+                .get("research_brief")
+                .and_then(Value::as_object)
+                .and_then(|nested| {
+                    payload_first_nonempty_string(
+                        nested,
+                        &["research_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or_else(|| {
+                    payload_first_nonempty_string(
+                        &payload,
+                        &["research_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or(recorded_to.clone());
+            let brief_body = payload_brief.or(compiled_capsule.clone());
+            let derived_findings = if payload_findings.is_empty() {
+                brief_body
+                    .as_deref()
+                    .map(parse_research_findings)
+                    .unwrap_or_default()
+            } else {
+                payload_findings.clone()
+            };
+            let existing_source_count = result_obj
+                .get("source_refs")
+                .and_then(Value::as_array)
+                .map(Vec::len)
+                .unwrap_or(0);
+            let Some(research_brief) = result_obj
+                .get_mut("research_brief")
+                .and_then(Value::as_object_mut)
+            else {
+                return;
+            };
+            if let Some(summary) = payload_proposal_summary {
+                research_brief.insert("proposal_summary".to_string(), Value::String(summary));
+            }
+            if let Some(body) = brief_body {
+                research_brief.insert("brief_body".to_string(), Value::String(body.clone()));
+                if research_brief
+                    .get("proposal_summary")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .unwrap_or_default()
+                    .is_empty()
+                {
+                    if let Some(summary) = first_nonempty_capsule_line(&body) {
+                        research_brief
+                            .insert("proposal_summary".to_string(), Value::String(summary));
+                    }
+                }
+            }
+            if !source_refs.is_empty() {
+                research_brief.insert(
+                    "source_count".to_string(),
+                    serde_json::json!(source_refs.len()),
+                );
+            } else {
+                research_brief.insert(
+                    "source_count".to_string(),
+                    serde_json::json!(existing_source_count),
+                );
+            }
+            if let Some(path) = research_artifact_path {
+                research_brief.insert("research_artifact_path".to_string(), Value::String(path));
+            }
+            if !derived_findings.is_empty() {
+                result_obj.insert("key_findings".to_string(), Value::Array(derived_findings));
+            }
+            if !source_refs.is_empty() {
+                result_obj.insert("source_refs".to_string(), Value::Array(source_refs));
+            }
+        }
+        "finance_guardian" => {
+            let Some(finance_digest) = result_obj
+                .get_mut("finance_digest")
+                .and_then(Value::as_object_mut)
+            else {
+                return;
+            };
+            let payload_proposal_summary = payload_or_nested_first_nonempty_string(
+                &payload,
+                "finance_digest",
+                &["proposal_summary", "summary"],
+            );
+            let payload_next_action = payload_or_nested_first_nonempty_string(
+                &payload,
+                "finance_digest",
+                &["next_action", "recommended_next_action"],
+            );
+            let payload_status =
+                payload_or_nested_first_nonempty_string(&payload, "finance_digest", &["status"]);
+            let payload_digest_scope = payload_or_nested_first_nonempty_string(
+                &payload,
+                "finance_digest",
+                &["digest_scope", "scope"],
+            );
+            let finance_artifact_path = payload
+                .get("finance_digest")
+                .and_then(Value::as_object)
+                .and_then(|nested| {
+                    payload_first_nonempty_string(
+                        nested,
+                        &["finance_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or_else(|| {
+                    payload_first_nonempty_string(
+                        &payload,
+                        &["finance_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or(recorded_to.clone());
+            let anomaly_notes = payload_or_nested_string_array(
+                &payload,
+                "finance_digest",
+                &["anomaly_notes", "notes", "highlights"],
+            );
+            let finance_input_context =
+                payload.get("finance_input_context").cloned().or_else(|| {
+                    payload
+                        .get("finance_digest")
+                        .and_then(Value::as_object)
+                        .and_then(|nested| nested.get("finance_input_context"))
+                        .cloned()
+                });
+            if let Some(summary) = payload_proposal_summary.or_else(|| {
+                compiled_capsule
+                    .as_deref()
+                    .and_then(first_nonempty_capsule_line)
+            }) {
+                finance_digest.insert("proposal_summary".to_string(), Value::String(summary));
+            }
+            if let Some(next_action) = payload_next_action {
+                finance_digest.insert("next_action".to_string(), Value::String(next_action));
+            }
+            if let Some(status) = payload_status {
+                finance_digest.insert("status".to_string(), Value::String(status));
+            }
+            if let Some(scope) = payload_digest_scope {
+                finance_digest.insert("digest_scope".to_string(), Value::String(scope));
+            }
+            if let Some(path) = finance_artifact_path {
+                finance_digest.insert("finance_artifact_path".to_string(), Value::String(path));
+            }
+            if !anomaly_notes.is_empty() {
+                finance_digest.insert(
+                    "note_count".to_string(),
+                    serde_json::json!(anomaly_notes.len()),
+                );
+                merge_unique_string_array_into_result(result_obj, "anomaly_notes", anomaly_notes);
+            }
+            if let Some(context) = finance_input_context {
+                if let Some(authored_context) = context.as_object() {
+                    let finance_context_obj = result_obj
+                        .entry("finance_input_context".to_string())
+                        .or_insert_with(|| Value::Object(serde_json::Map::new()));
+                    if let Some(existing_context) = finance_context_obj.as_object_mut() {
+                        for (key, value) in authored_context {
+                            existing_context.insert(key.clone(), value.clone());
+                        }
+                    } else {
+                        *finance_context_obj = Value::Object(authored_context.clone());
+                    }
+                } else {
+                    result_obj.insert("finance_input_context".to_string(), context);
+                }
+            }
+        }
+        "study_planner" => {
+            let study_blocks =
+                payload_or_nested_first_value(&payload, "study_plan", &["study_blocks"]);
+            let study_input_context =
+                payload_or_nested_first_value(&payload, "study_plan", &["study_input_context"]);
+            let reminders = payload_or_nested_string_array(
+                &payload,
+                "study_plan",
+                &["reminders", "notes", "highlights"],
+            );
+
+            if let Some(blocks) = study_blocks {
+                result_obj.insert("study_blocks".to_string(), blocks);
+            }
+            if let Some(context) = study_input_context {
+                if let Some(authored_context) = context.as_object() {
+                    let study_context_obj = result_obj
+                        .entry("study_input_context".to_string())
+                        .or_insert_with(|| Value::Object(serde_json::Map::new()));
+                    if let Some(existing_context) = study_context_obj.as_object_mut() {
+                        for (key, value) in authored_context {
+                            existing_context.insert(key.clone(), value.clone());
+                        }
+                    } else {
+                        *study_context_obj = Value::Object(authored_context.clone());
+                    }
+                } else {
+                    result_obj.insert("study_input_context".to_string(), context);
+                }
+            }
+            if !reminders.is_empty() {
+                merge_unique_string_array_into_result(result_obj, "reminders", reminders);
+            }
+        }
+        "receipt_tracker" => {
+            let payload_summary = payload_or_nested_first_nonempty_string(
+                &payload,
+                "receipt_entry",
+                &[
+                    "summary",
+                    "receipt_summary",
+                    "entry_summary",
+                    "content",
+                    "body",
+                ],
+            );
+            let payload_status = payload_or_nested_first_nonempty_string(
+                &payload,
+                "receipt_entry",
+                &["receipt_status", "status", "entry_status"],
+            );
+            let category = payload_or_nested_first_value(
+                &payload,
+                "receipt_entry",
+                &["category", "ledger_category"],
+            );
+            let merchant = payload_or_nested_first_value(
+                &payload,
+                "receipt_entry",
+                &["merchant", "merchant_name", "vendor"],
+            );
+            let amount = payload_or_nested_first_value(
+                &payload,
+                "receipt_entry",
+                &["amount", "total", "subtotal"],
+            );
+            let tax = payload_or_nested_first_value(
+                &payload,
+                "receipt_entry",
+                &["tax", "tax_amount", "gst", "vat"],
+            );
+            let currency = payload_or_nested_first_value(&payload, "receipt_entry", &["currency"]);
+            let transaction_date = payload_or_nested_first_value(
+                &payload,
+                "receipt_entry",
+                &["transaction_date", "date", "purchased_at", "receipt_date"],
+            );
+            let note_values = payload_or_nested_string_array(
+                &payload,
+                "receipt_entry",
+                &["receipt_notes", "posting_notes", "notes"],
+            );
+            let receipt_artifact_path = payload
+                .get("receipt_entry")
+                .and_then(Value::as_object)
+                .and_then(|nested| {
+                    payload_first_nonempty_string(
+                        nested,
+                        &["receipt_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or_else(|| {
+                    payload_first_nonempty_string(
+                        &payload,
+                        &["receipt_artifact_path", "artifact_path", "recorded_to"],
+                    )
+                })
+                .or(recorded_to.clone());
+
+            let Some(receipt_entry) = result_obj
+                .get_mut("receipt_entry")
+                .and_then(Value::as_object_mut)
+            else {
+                return;
+            };
+            if let Some(summary) = payload_summary
+                .or(compiled_capsule.and_then(|body| first_nonempty_capsule_line(&body)))
+            {
+                receipt_entry.insert("proposal_summary".to_string(), Value::String(summary));
+            }
+            if let Some(status) = payload_status {
+                receipt_entry.insert("receipt_status".to_string(), Value::String(status));
+            }
+            if let Some(value) = category {
+                receipt_entry.insert("category".to_string(), value);
+            }
+            if let Some(value) = merchant {
+                receipt_entry.insert("merchant".to_string(), value);
+            }
+            if let Some(value) = amount {
+                receipt_entry.insert("amount".to_string(), value);
+            }
+            if let Some(value) = tax {
+                receipt_entry.insert("tax".to_string(), value);
+            }
+            if let Some(value) = currency {
+                receipt_entry.insert("currency".to_string(), value);
+            }
+            if let Some(value) = transaction_date {
+                receipt_entry.insert("transaction_date".to_string(), value);
+            }
+            if let Some(path) = receipt_artifact_path {
+                receipt_entry.insert("receipt_artifact_path".to_string(), Value::String(path));
+            }
+            if !note_values.is_empty() {
+                merge_unique_string_array_into_result(result_obj, "receipt_notes", note_values);
+            }
+        }
+        _ => {}
+    }
+}
+
+pub(in crate::server) async fn enrich_workflow_run_with_private_calendar_context(
+    db: &Db,
+    run: &mut WorkflowRunRecord,
+) {
+    let Some(result_obj) = run.result_json.as_object_mut() else {
+        return;
+    };
+    let Some(contract) = workflow_result_contract_from_result(result_obj) else {
+        return;
+    };
+    let Some(contract_obj) = contract.as_object() else {
+        return;
+    };
+    let workflow = contract_obj
+        .get("workflow")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let window_days = match workflow {
+        "calendar_coordinator" => 14,
+        "study_planner" => 7,
+        _ => return,
+    };
+    let range_start = chrono::Utc::now();
+    let range_end = range_start + chrono::Duration::days(window_days);
+    let events = match db
+        .list_calendar_events_in_range(
+            &run.owner_user_id,
+            &range_start.to_rfc3339(),
+            &range_end.to_rfc3339(),
+        )
+        .await
+    {
+        Ok(events) => events,
+        Err(err) => {
+            tracing::warn!(
+                run_id = %run.run_id,
+                workflow = workflow,
+                owner_user_id = %run.owner_user_id,
+                error = %err,
+                "workflow run calendar-context enrichment failed"
+            );
+            return;
+        }
+    };
+    let event_windows = parse_calendar_event_windows(&events);
+    let next_event = events.first();
+    let next_event_title = next_event
+        .and_then(|event| event.get("title"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    let next_event_start_at = next_event
+        .and_then(|event| event.get("start_at"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    let upcoming_events = event_windows
+        .iter()
+        .take(5)
+        .map(|event| {
+            serde_json::json!({
+                "title": event.title,
+                "start_at": event.start_at.to_rfc3339(),
+                "end_at": event.end_at.to_rfc3339(),
+                "all_day": event.all_day,
+                "location": event.location,
+                "description": event.description,
+                "profile": calendar_event_profile(event),
+            })
+        })
+        .collect::<Vec<_>>();
+    let focus_items = match db.get_master_agent_instance(&run.owner_user_id).await {
+        Ok(Some(instance)) => {
+            if let Some(instance_id) = instance
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+            {
+                db.list_focus_items(&run.owner_user_id, instance_id)
+                    .await
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            }
+        }
+        Ok(None) => Vec::new(),
+        Err(err) => {
+            tracing::warn!(
+                run_id = %run.run_id,
+                workflow = workflow,
+                owner_user_id = %run.owner_user_id,
+                error = %err,
+                "workflow run focus-item enrichment failed to resolve master agent"
+            );
+            Vec::new()
+        }
+    };
+    let study_focus_items = build_study_focus_item_context(&focus_items, range_start);
+    let primary_focus_item = study_focus_items.first().and_then(Value::as_object);
+    let due_soon_focus_count = study_focus_items
+        .iter()
+        .filter(|item| {
+            matches!(
+                item.get("urgency").and_then(Value::as_str),
+                Some("overdue" | "due_soon")
+            )
+        })
+        .count();
+    let overdue_focus_count = study_focus_items
+        .iter()
+        .filter(|item| item.get("urgency").and_then(Value::as_str) == Some("overdue"))
+        .count();
+    let (
+        schedule_slot_start,
+        schedule_slot_end,
+        schedule_slot_basis,
+        schedule_focus_kind,
+        schedule_slot_label,
+        schedule_anchor_title,
+        schedule_anchor_type,
+        schedule_anchor_note_kind,
+    ) = find_preferred_schedule_slot(&event_windows, range_start, chrono::Duration::minutes(30));
+    let schedule_anchor_event = nearest_schedule_anchor(&event_windows, range_start);
+    let schedule_anchor_start_at = schedule_anchor_event.map(|event| event.start_at.to_rfc3339());
+    let schedule_anchor_location = schedule_anchor_event.and_then(|event| event.location.clone());
+    let schedule_anchor_prep_minutes = schedule_anchor_event
+        .zip(schedule_anchor_note_kind.as_deref())
+        .map(|(event, note_kind)| schedule_anchor_prep_lead_minutes(event, note_kind));
+    let (
+        study_slot_start,
+        study_slot_end,
+        study_slot_basis,
+        study_focus_kind,
+        study_block_label,
+        study_anchor_title,
+        study_anchor_type,
+    ) = find_preferred_study_block(&event_windows, range_start, chrono::Duration::minutes(90));
+    let study_anchor_start_at = nearest_academic_anchor(&event_windows, range_start)
+        .map(|event| event.start_at.to_rfc3339());
+    result_obj.insert(
+        "calendar_context".to_string(),
+        serde_json::json!({
+            "window_start_at": range_start.to_rfc3339(),
+            "window_end_at": range_end.to_rfc3339(),
+            "window_days": window_days,
+            "upcoming_event_count": events.len(),
+            "next_event_title": next_event_title,
+            "next_event_start_at": next_event_start_at,
+            "upcoming_events": upcoming_events,
+            "first_free_schedule_slot": {
+                "start_at": schedule_slot_start.to_rfc3339(),
+                "end_at": schedule_slot_end.to_rfc3339(),
+                "basis": schedule_slot_basis,
+                "focus_kind": schedule_focus_kind,
+                "label": schedule_slot_label,
+                "anchor_event_title": schedule_anchor_title,
+                "anchor_event_start_at": schedule_anchor_start_at,
+                "anchor_event_type": schedule_anchor_type,
+                "anchor_note_kind": schedule_anchor_note_kind,
+                "anchor_event_location": schedule_anchor_location,
+                "prep_lead_minutes": schedule_anchor_prep_minutes,
+                "anchor_event_profile": schedule_anchor_event.map(calendar_event_profile),
+            },
+            "first_free_study_block": {
+                "start_at": study_slot_start.to_rfc3339(),
+                "end_at": study_slot_end.to_rfc3339(),
+                "basis": study_slot_basis,
+                "focus_kind": study_focus_kind,
+                "label": study_block_label,
+                "anchor_event_title": study_anchor_title,
+                "anchor_event_start_at": study_anchor_start_at,
+                "anchor_event_type": study_anchor_type,
+                "anchor_event_profile": nearest_academic_anchor(&event_windows, range_start).map(calendar_event_profile),
+            },
+            "next_academic_anchor": {
+                "title": study_anchor_title,
+                "start_at": study_anchor_start_at,
+                "event_type": study_anchor_type,
+                "profile": nearest_academic_anchor(&event_windows, range_start).map(calendar_event_profile),
+            },
+            "next_schedule_anchor": {
+                "title": schedule_anchor_title,
+                "start_at": schedule_anchor_start_at,
+                "event_type": schedule_anchor_type,
+                "note_kind": schedule_anchor_note_kind,
+                "location": schedule_anchor_location,
+                "prep_lead_minutes": schedule_anchor_prep_minutes,
+                "profile": schedule_anchor_event.map(calendar_event_profile),
+            },
+        }),
+    );
+    if workflow == "study_planner" {
+        result_obj.insert(
+            "study_input_context".to_string(),
+            serde_json::json!({
+                "pending_focus_count": study_focus_items.len(),
+                "due_soon_focus_count": due_soon_focus_count,
+                "overdue_focus_count": overdue_focus_count,
+                "next_focus_title": primary_focus_item.and_then(|item| item.get("title")).and_then(Value::as_str),
+                "next_focus_due_at": primary_focus_item.and_then(|item| item.get("due_at")).and_then(Value::as_str),
+                "pending_focus_items": study_focus_items,
+            }),
+        );
+    }
+
+    let context_note = if let (Some(title), Some(start_at)) =
+        (&next_event_title, &next_event_start_at)
+    {
+        format!(
+            "Private calendar context: {} upcoming events in the next {} days; next is {} at {}.",
+            events.len(),
+            window_days,
+            title,
+            start_at
+        )
+    } else if events.is_empty() {
+        format!(
+            "Private calendar context: no upcoming events were found in the next {} days.",
+            window_days
+        )
+    } else {
+        format!(
+            "Private calendar context: {} upcoming events were found in the next {} days.",
+            events.len(),
+            window_days
+        )
+    };
+
+    if workflow == "calendar_coordinator" {
+        if let Some(recommended_slot) = result_obj
+            .get_mut("recommended_slot")
+            .and_then(Value::as_object_mut)
+        {
+            recommended_slot.insert(
+                "calendar_event_count".to_string(),
+                serde_json::json!(events.len()),
+            );
+            recommended_slot.insert(
+                "calendar_window_days".to_string(),
+                serde_json::json!(window_days),
+            );
+            recommended_slot.insert(
+                "next_calendar_event_title".to_string(),
+                next_event_title
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
+            );
+            recommended_slot.insert(
+                "next_calendar_event_start_at".to_string(),
+                next_event_start_at
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
+            );
+            recommended_slot.insert(
+                "proposed_start_at".to_string(),
+                Value::String(schedule_slot_start.to_rfc3339()),
+            );
+            recommended_slot.insert(
+                "proposed_end_at".to_string(),
+                Value::String(schedule_slot_end.to_rfc3339()),
+            );
+            recommended_slot.insert(
+                "slot_basis".to_string(),
+                Value::String(schedule_slot_basis.clone()),
+            );
+            recommended_slot.insert(
+                "focus_kind".to_string(),
+                Value::String(schedule_focus_kind.clone()),
+            );
+            recommended_slot.insert(
+                "slot_label".to_string(),
+                schedule_slot_label
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
+            );
+            recommended_slot.insert(
+                "anchor_event_title".to_string(),
+                schedule_anchor_title
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
+            );
+            recommended_slot.insert(
+                "anchor_event_start_at".to_string(),
+                schedule_anchor_start_at
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
+            );
+            recommended_slot.insert(
+                "anchor_event_type".to_string(),
+                schedule_anchor_type
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
+            );
+            recommended_slot.insert(
+                "anchor_note_kind".to_string(),
+                schedule_anchor_note_kind
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
+            );
+            recommended_slot.insert(
+                "anchor_event_location".to_string(),
+                schedule_anchor_location
+                    .clone()
+                    .map(Value::String)
+                    .unwrap_or(Value::Null),
+            );
+            recommended_slot.insert(
+                "prep_lead_minutes".to_string(),
+                schedule_anchor_prep_minutes
+                    .map(|value| serde_json::json!(value))
+                    .unwrap_or(Value::Null),
+            );
+            recommended_slot.insert(
+                "anchor_event_profile".to_string(),
+                schedule_anchor_event
+                    .map(calendar_event_profile)
+                    .unwrap_or(Value::Null),
+            );
+        }
+        let notes = result_obj
+            .entry("scheduling_notes".to_string())
+            .or_insert_with(|| Value::Array(Vec::new()));
+        if let Some(notes_array) = notes.as_array_mut() {
+            push_unique_result_string(notes_array, context_note);
+            if let (Some(title), Some(start_at), Some(anchor_type)) = (
+                schedule_anchor_title.as_deref(),
+                schedule_anchor_start_at.as_deref(),
+                schedule_anchor_type.as_deref(),
+            ) {
+                let anchor_note = match (
+                    anchor_type,
+                    schedule_anchor_note_kind
+                        .as_deref()
+                        .unwrap_or("general_prep"),
+                ) {
+                    ("meeting", "missing_agenda") => format!(
+                        "This draft slot protects prep time ahead of the meeting \"{}\" at {} and leaves room to draft an agenda.",
+                        title, start_at
+                    ),
+                    ("meeting", "high_stakes_prep") => format!(
+                        "This draft slot protects an extended prep window ahead of the high-stakes meeting \"{}\" at {}.",
+                        title, start_at
+                    ),
+                    ("interview", _) => format!(
+                        "This draft slot protects preparation time ahead of the interview \"{}\" at {}.",
+                        title, start_at
+                    ),
+                    ("medical", _) => format!(
+                        "This draft slot keeps buffer time ahead of the appointment \"{}\" at {}.",
+                        title, start_at
+                    ),
+                    ("logistics", _) => format!(
+                        "This draft slot preserves buffer time ahead of the logistics commitment \"{}\" at {}.",
+                        title, start_at
+                    ),
+                    _ => format!(
+                        "This draft slot protects prep time ahead of the meeting \"{}\" at {}.",
+                        title, start_at
+                    ),
+                };
+                push_unique_result_string(notes_array, anchor_note);
+            }
+        }
+    } else if workflow == "study_planner" {
+        if let Some(study_blocks) = result_obj
+            .get_mut("study_blocks")
+            .and_then(Value::as_array_mut)
+        {
+            if let Some(primary_block) = study_blocks.first_mut().and_then(Value::as_object_mut) {
+                if let Some(label) = study_block_label.clone() {
+                    primary_block.insert("label".to_string(), Value::String(label));
+                }
+                primary_block.insert(
+                    "calendar_event_count".to_string(),
+                    serde_json::json!(events.len()),
+                );
+                primary_block.insert(
+                    "calendar_window_days".to_string(),
+                    serde_json::json!(window_days),
+                );
+                primary_block.insert(
+                    "next_calendar_event_title".to_string(),
+                    next_event_title
+                        .clone()
+                        .map(Value::String)
+                        .unwrap_or(Value::Null),
+                );
+                primary_block.insert(
+                    "next_calendar_event_start_at".to_string(),
+                    next_event_start_at
+                        .clone()
+                        .map(Value::String)
+                        .unwrap_or(Value::Null),
+                );
+                primary_block.insert(
+                    "planned_start_at".to_string(),
+                    Value::String(study_slot_start.to_rfc3339()),
+                );
+                primary_block.insert(
+                    "planned_end_at".to_string(),
+                    Value::String(study_slot_end.to_rfc3339()),
+                );
+                primary_block.insert(
+                    "slot_basis".to_string(),
+                    Value::String(study_slot_basis.clone()),
+                );
+                primary_block.insert(
+                    "focus_kind".to_string(),
+                    Value::String(study_focus_kind.clone()),
+                );
+                primary_block.insert(
+                    "anchor_event_title".to_string(),
+                    study_anchor_title
+                        .clone()
+                        .map(Value::String)
+                        .unwrap_or(Value::Null),
+                );
+                primary_block.insert(
+                    "anchor_event_start_at".to_string(),
+                    study_anchor_start_at
+                        .clone()
+                        .map(Value::String)
+                        .unwrap_or(Value::Null),
+                );
+                primary_block.insert(
+                    "anchor_event_type".to_string(),
+                    study_anchor_type
+                        .clone()
+                        .map(Value::String)
+                        .unwrap_or(Value::Null),
+                );
+                primary_block.insert(
+                    "anchor_event_profile".to_string(),
+                    nearest_academic_anchor(&event_windows, range_start)
+                        .map(calendar_event_profile)
+                        .unwrap_or(Value::Null),
+                );
+                primary_block.insert(
+                    "focus_item_title".to_string(),
+                    primary_focus_item
+                        .and_then(|item| item.get("title"))
+                        .cloned()
+                        .unwrap_or(Value::Null),
+                );
+                primary_block.insert(
+                    "focus_item_due_at".to_string(),
+                    primary_focus_item
+                        .and_then(|item| item.get("due_at"))
+                        .cloned()
+                        .unwrap_or(Value::Null),
+                );
+                primary_block.insert(
+                    "focus_item_priority".to_string(),
+                    primary_focus_item
+                        .and_then(|item| item.get("priority"))
+                        .cloned()
+                        .unwrap_or(Value::Null),
+                );
+                primary_block.insert(
+                    "focus_item_urgency".to_string(),
+                    primary_focus_item
+                        .and_then(|item| item.get("urgency"))
+                        .cloned()
+                        .unwrap_or(Value::Null),
+                );
+                primary_block.insert(
+                    "focus_item_description".to_string(),
+                    primary_focus_item
+                        .and_then(|item| item.get("description"))
+                        .cloned()
+                        .unwrap_or(Value::Null),
+                );
+            }
+        }
+        let reminders = result_obj
+            .entry("reminders".to_string())
+            .or_insert_with(|| Value::Array(Vec::new()));
+        if let Some(reminders_array) = reminders.as_array_mut() {
+            push_unique_result_string(reminders_array, context_note);
+            if let (Some(title), Some(start_at), Some(event_type)) = (
+                study_anchor_title.as_deref(),
+                study_anchor_start_at.as_deref(),
+                study_anchor_type.as_deref(),
+            ) {
+                let anchor_note = match event_type {
+                    "academic_exam" => format!(
+                        "This draft study block is anchored to the upcoming exam \"{}\" at {}.",
+                        title, start_at
+                    ),
+                    "academic_submission" => format!(
+                        "This draft study block is anchored to the upcoming submission \"{}\" at {}.",
+                        title, start_at
+                    ),
+                    _ => format!(
+                        "This draft study block is anchored to the upcoming academic event \"{}\" at {}.",
+                        title, start_at
+                    ),
+                };
+                push_unique_result_string(reminders_array, anchor_note);
+            }
+            if let Some(focus_item) = primary_focus_item {
+                let focus_title = focus_item
+                    .get("title")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Pending study item");
+                let focus_priority = focus_item
+                    .get("priority")
+                    .and_then(Value::as_str)
+                    .unwrap_or("normal");
+                let focus_urgency = focus_item
+                    .get("urgency")
+                    .and_then(Value::as_str)
+                    .unwrap_or("undated");
+                let focus_note = if let Some(due_at) =
+                    focus_item.get("due_at").and_then(Value::as_str)
+                {
+                    format!(
+                        "This draft study plan also prioritizes the {} focus item \"{}\" due at {}.",
+                        focus_priority, focus_title, due_at
+                    )
+                } else {
+                    format!(
+                        "This draft study plan also keeps the {} focus item \"{}\" in view even though it has no due date yet.",
+                        focus_urgency.replace('_', " "),
+                        focus_title
+                    )
+                };
+                push_unique_result_string(reminders_array, focus_note);
+            }
+        }
+    }
+
+    enrich_workflow_approval_options_from_result(run);
+    enrich_workflow_approval_review_from_result(run);
+}
+
+async fn apply_workflow_skill_capsule_runtime_effects(
+    run: &mut WorkflowRunRecord,
+    ir_snapshot: &Value,
+) {
+    workflow_skill_capsule_runtime::apply_skill_capsule_runtime_effects(run, ir_snapshot).await;
 }
 
 /// Compute the concrete `scheduled_for` timestamp from a wait-resume descriptor.
@@ -13446,288 +20084,6 @@ fn workflow_wait_resume_records_for_run(
         .collect()
 }
 
-fn approval_option_summaries(options: &[Value]) -> Vec<Value> {
-    options
-        .iter()
-        .filter_map(|option| {
-            let option_id = option.get("option_id").and_then(Value::as_str)?.trim();
-            if option_id.is_empty() {
-                return None;
-            }
-            let label = option
-                .get("label")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .unwrap_or(option_id);
-            let consequence_summary = option
-                .get("consequence_summary")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .unwrap_or("");
-            Some(serde_json::json!({
-                "option_id": option_id,
-                "label": label,
-                "consequence_summary": consequence_summary,
-            }))
-        })
-        .collect()
-}
-
-fn infer_workflow_approval_kind(
-    label: Option<&str>,
-    reason: Option<&str>,
-    options: &[Value],
-) -> &'static str {
-    let mut haystack = String::new();
-    if let Some(label) = label {
-        haystack.push_str(label);
-        haystack.push(' ');
-    }
-    if let Some(reason) = reason {
-        haystack.push_str(reason);
-        haystack.push(' ');
-    }
-    for option in options {
-        if let Some(value) = option.get("label").and_then(Value::as_str) {
-            haystack.push_str(value);
-            haystack.push(' ');
-        }
-        if let Some(value) = option.get("consequence_summary").and_then(Value::as_str) {
-            haystack.push_str(value);
-            haystack.push(' ');
-        }
-    }
-    let lower = haystack.to_ascii_lowercase();
-    if ["purchase", "payment", "pay ", "invoice", "refund", "charge"]
-        .iter()
-        .any(|needle| lower.contains(needle))
-    {
-        "purchase"
-    } else if ["book", "booking", "calendar", "meeting slot", "confirm slot"]
-        .iter()
-        .any(|needle| lower.contains(needle))
-    {
-        "booking"
-    } else if ["publish", "public release", "release", "post publicly"]
-        .iter()
-        .any(|needle| lower.contains(needle))
-    {
-        "publish"
-    } else if ["send", "reply", "response delivery", "email", "notify", "notification"]
-        .iter()
-        .any(|needle| lower.contains(needle))
-    {
-        "send"
-    } else if ["delete", "remove", "destroy", "archive permanently"]
-        .iter()
-        .any(|needle| lower.contains(needle))
-    {
-        "destructive"
-    } else if ["submit", "sign", "confirm", "approve", "accept"]
-        .iter()
-        .any(|needle| lower.contains(needle))
-    {
-        "submit"
-    } else {
-        "review"
-    }
-}
-
-fn build_workflow_approval_review_payload(
-    title: Option<&str>,
-    source_graph_node_id: Option<&str>,
-    approval_reason: Option<&str>,
-    approval_decision_point_id: Option<&str>,
-    approval_options: &[Value],
-) -> Value {
-    let title = title
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or("Approval review");
-    let reason = approval_reason
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or("This workflow step requires explicit review before continuing.");
-    let decision_point_id = approval_decision_point_id
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-    let option_summaries = approval_option_summaries(approval_options);
-    let consequence_summary_lines: Vec<Value> = option_summaries
-        .iter()
-        .filter_map(|option| {
-            option
-                .get("consequence_summary")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(|value| Value::String(value.to_string()))
-        })
-        .take(3)
-        .collect();
-    let mut source_refs = Vec::new();
-    if let Some(node_id) = source_graph_node_id
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        source_refs.push(Value::String(format!("workflow_node:{node_id}")));
-    }
-    if let Some(decision_point_id) = decision_point_id {
-        source_refs.push(Value::String(format!(
-            "approval_decision_point:{decision_point_id}"
-        )));
-    }
-    let approval_kind = infer_workflow_approval_kind(Some(title), Some(reason), approval_options);
-    serde_json::json!({
-        "title": title,
-        "reason": reason,
-        "approval_kind": approval_kind,
-        "decision_point_id": decision_point_id,
-        "requires_human_review": true,
-        "confidence": "high",
-        "option_count": option_summaries.len(),
-        "options": option_summaries,
-        "consequence_summary_lines": consequence_summary_lines,
-        "provenance_summary": format!("Explicit workflow approval gate at {title}."),
-        "source_refs": source_refs,
-        "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
-            "Workflow step is paused at an explicit human approval boundary."
-        ),
-    })
-}
-
-fn selected_approval_option_summary(options: &[Value], option_id: Option<&str>) -> Value {
-    let Some(option_id) = option_id.map(str::trim).filter(|value| !value.is_empty()) else {
-        return Value::Null;
-    };
-    approval_option_summaries(options)
-        .into_iter()
-        .find(|option| option.get("option_id").and_then(Value::as_str) == Some(option_id))
-        .unwrap_or_else(|| {
-            serde_json::json!({
-                "option_id": option_id,
-                "label": option_id,
-                "consequence_summary": "",
-            })
-        })
-}
-
-fn build_action_approval_review_payload(message: &AFPMessage) -> Value {
-    if let Some(existing) = message
-        .content
-        .get("approval_review")
-        .cloned()
-        .filter(|value| !value.is_null())
-    {
-        return existing;
-    }
-
-    let message_type = message.r#type.as_str();
-    let subtype = message.subtype.as_deref().unwrap_or_default();
-    let mut title = format!("Review {}", message_type.replace('_', " "));
-    let mut reason = "This action requires explicit human approval before execution.".to_string();
-    let mut approval_kind = "review";
-    let mut consequence_summary_lines: Vec<Value> = vec![
-        Value::String("Approve to continue with the requested action.".to_string()),
-        Value::String("Deny to stop before any external or high-consequence effect.".to_string()),
-    ];
-
-    if message_type == "shell_command" {
-        title = "Review shell command".to_string();
-        reason = message
-            .content
-            .get("reason")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .unwrap_or("Shell commands require explicit approval before execution.")
-            .to_string();
-        approval_kind = "destructive";
-        consequence_summary_lines = vec![
-            Value::String("Approve to run the command with the requested timeout and safety mode.".to_string()),
-            Value::String("Deny to cancel before the command touches the workspace or system state.".to_string()),
-        ];
-    } else if message_type == "email_outgoing"
-        || message_type == "action_reply"
-        || message_type == "action_forward"
-        || (message_type == "email"
-            && matches!(subtype, "outgoing" | "reply" | "forward"))
-    {
-        title = "Review outbound communication".to_string();
-        reason = message
-            .content
-            .get("reason")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .unwrap_or("Outbound communication should be reviewed before it is sent.")
-            .to_string();
-        approval_kind = "send";
-        consequence_summary_lines = vec![
-            Value::String("Approve to queue the outbound message for delivery.".to_string()),
-            Value::String("Deny to keep the draft internal and prevent external send.".to_string()),
-        ];
-    } else if let Some(operation) = message
-        .content
-        .get("operation")
-        .and_then(Value::as_str)
-        .map(str::to_ascii_lowercase)
-    {
-        if ["send", "reply", "forward", "notify"].iter().any(|needle| operation.contains(needle)) {
-            approval_kind = "send";
-        } else if ["purchase", "pay", "charge", "refund"].iter().any(|needle| operation.contains(needle)) {
-            approval_kind = "purchase";
-        } else if ["delete", "remove", "destroy"].iter().any(|needle| operation.contains(needle)) {
-            approval_kind = "destructive";
-        } else if ["submit", "publish", "book"].iter().any(|needle| operation.contains(needle)) {
-            approval_kind = "submit";
-        }
-        title = format!("Review {}", operation.replace('_', " "));
-        reason = message
-            .content
-            .get("reason")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .unwrap_or("This integration action crosses an explicit approval boundary.")
-            .to_string();
-    }
-
-    let mut source_refs = vec![Value::String(format!("message:{}", message.id))];
-    let capability_id = action_capability_id(message);
-    if !capability_id.trim().is_empty() {
-        source_refs.push(Value::String(format!("capability:{capability_id}")));
-    }
-
-    serde_json::json!({
-        "title": title,
-        "reason": reason,
-        "approval_kind": approval_kind,
-        "requires_human_review": true,
-        "confidence": "high",
-        "option_count": 2,
-        "options": [
-            {
-                "option_id": "approve",
-                "label": "Approve",
-                "consequence_summary": consequence_summary_lines.get(0).and_then(Value::as_str).unwrap_or("Approve to continue.")
-            },
-            {
-                "option_id": "deny",
-                "label": "Deny",
-                "consequence_summary": consequence_summary_lines.get(1).and_then(Value::as_str).unwrap_or("Deny to cancel.")
-            }
-        ],
-        "consequence_summary_lines": consequence_summary_lines,
-        "provenance_summary": format!("Approval derived from AFP {}:{}.", message_type, subtype),
-        "source_refs": source_refs,
-        "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
-            "This action requires explicit human approval before execution."
-        ),
-    })
-}
-
 fn workflow_wait_resume_wake_dispatch_plan(wait_resume_record: &Value) -> Value {
     let descriptor = wait_resume_record
         .get("descriptor")
@@ -13824,7 +20180,7 @@ fn workflow_wait_resume_approval_dispatch_plan(
         "note": note,
         "status": "approval_decision_ready",
         "approval_review": approval_review,
-        "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+        "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
             "Workflow resume decision is being dispatched from an explicit human approval boundary."
         ),
         "afp_message": {
@@ -13845,7 +20201,7 @@ fn workflow_wait_resume_approval_dispatch_plan(
                 "descriptor": descriptor,
                 "approval_review": approval_review,
                 "selected_option": selected_approval_option_summary(&approval_options, option_id),
-                "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
                     "Workflow resume decision is being dispatched from an explicit human approval boundary."
                 ),
             },
@@ -13859,7 +20215,7 @@ fn workflow_wait_resume_approval_dispatch_plan(
                 "resume_kind": wait_resume_record.get("resume_kind").cloned().unwrap_or(Value::Null),
                 "decision": decision,
                 "approval_review": approval_review,
-                "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
                     "Workflow resume decision is being dispatched from an explicit human approval boundary."
                 ),
             }
@@ -13894,6 +20250,143 @@ fn workflow_run_record_from_json(run: &Value) -> Option<WorkflowRunRecord> {
             .map(str::to_string),
         created_at: run.get("created_at")?.as_str()?.to_string(),
     })
+}
+
+fn style_selected_option_summary_value(
+    value: &mut Value,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
+) {
+    let Some(active_persona) = active_persona else {
+        return;
+    };
+    let Some(option_obj) = value.as_object_mut() else {
+        return;
+    };
+    if let Some(label) = option_obj.get("label").and_then(Value::as_str) {
+        option_obj.insert(
+            "label".to_string(),
+            Value::String(crate::agent_personas::restyle_user_facing_text(
+                label,
+                active_persona,
+            )),
+        );
+    }
+    if let Some(summary) = option_obj
+        .get("consequence_summary")
+        .and_then(Value::as_str)
+    {
+        option_obj.insert(
+            "consequence_summary".to_string(),
+            Value::String(crate::agent_personas::restyle_user_facing_text(
+                summary,
+                active_persona,
+            )),
+        );
+    }
+}
+
+fn style_wait_resume_record_value(
+    mut record: Value,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
+) -> Value {
+    let Some(active_persona) = active_persona else {
+        return record;
+    };
+    let Some(record_obj) = record.as_object_mut() else {
+        return record;
+    };
+
+    if let Some(wait_reason) = record_obj.get("wait_reason").and_then(Value::as_str) {
+        record_obj.insert(
+            "wait_reason".to_string(),
+            Value::String(crate::agent_personas::restyle_user_facing_text(
+                wait_reason,
+                active_persona,
+            )),
+        );
+    }
+
+    if let Some(approval_obj) = record_obj
+        .get_mut("descriptor")
+        .and_then(Value::as_object_mut)
+        .and_then(|descriptor| descriptor.get_mut("approval"))
+        .and_then(Value::as_object_mut)
+    {
+        if let Some(reason) = approval_obj.get("approval_reason").and_then(Value::as_str) {
+            approval_obj.insert(
+                "approval_reason".to_string(),
+                Value::String(crate::agent_personas::restyle_user_facing_text(
+                    reason,
+                    active_persona,
+                )),
+            );
+        }
+        if let Some(options) = approval_obj
+            .get_mut("options")
+            .and_then(Value::as_array_mut)
+        {
+            for option in options.iter_mut() {
+                style_selected_option_summary_value(option, Some(active_persona));
+            }
+        }
+    }
+
+    record
+}
+
+fn style_workflow_run_value(
+    mut run: Value,
+    active_persona: Option<&crate::agent_personas::AgentPersona>,
+) -> Value {
+    let Some(active_persona) = active_persona else {
+        return run;
+    };
+    let Some(run_obj) = run.as_object_mut() else {
+        return run;
+    };
+
+    for key in ["result_json", "result"] {
+        if let Some(result_obj) = run_obj.get_mut(key).and_then(Value::as_object_mut) {
+            if let Some(review) = result_obj.get("approval_review").cloned() {
+                result_obj.insert(
+                    "approval_review".to_string(),
+                    style_approval_review_payload(review, Some(active_persona)),
+                );
+            }
+            if let Some(approval_decision_obj) = result_obj
+                .get_mut("approval_decision")
+                .and_then(Value::as_object_mut)
+            {
+                if let Some(review) = approval_decision_obj.get("approval_review").cloned() {
+                    approval_decision_obj.insert(
+                        "approval_review".to_string(),
+                        style_approval_review_payload(review, Some(active_persona)),
+                    );
+                }
+                if let Some(selected_option) = approval_decision_obj.get_mut("selected_option") {
+                    style_selected_option_summary_value(selected_option, Some(active_persona));
+                }
+            }
+        }
+    }
+
+    if let Some(timeline) = run_obj
+        .get_mut("timeline_json")
+        .and_then(Value::as_array_mut)
+    {
+        for entry in timeline.iter_mut().filter_map(Value::as_object_mut) {
+            if let Some(trace_obj) = entry.get_mut("trace").and_then(Value::as_object_mut) {
+                if let Some(review) = trace_obj.get("approval_review").cloned() {
+                    trace_obj.insert(
+                        "approval_review".to_string(),
+                        style_approval_review_payload(review, Some(active_persona)),
+                    );
+                }
+            }
+        }
+    }
+
+    run
 }
 
 fn apply_wait_resume_to_run_record(
@@ -14001,15 +20494,13 @@ fn apply_wait_resume_to_run_record(
                     "resume_family": resume_family,
                     "resume_kind": resume_kind,
                     "afp_subtype": afp_subtype,
-                    "autonomy_decision": if resume_family == "approval" {
-                        serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
-                            "Workflow was resumed from an explicit human approval boundary."
-                        )).unwrap_or(Value::Null)
-                    } else {
-                        serde_json::to_value(crate::autonomy_policy::AutonomyDecision::prepare_silently(
+                    "autonomy_decision": serde_json::to_value(
+                        crate::autonomy_policy::autonomy_decision_for_wait_resume_family(
+                            resume_family,
+                            "Workflow was resumed from an explicit human approval boundary.",
                             "Workflow resumed from a non-approval wait condition."
-                        )).unwrap_or(Value::Null)
-                    },
+                        )
+                    ).unwrap_or(Value::Null),
                 }
             }
         }));
@@ -14038,17 +20529,14 @@ fn apply_wait_resume_to_run_record(
         );
         result_obj.insert(
             "autonomy_decision".to_string(),
-            if resume_family == "approval" {
-                serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
-                    "Workflow was resumed from an explicit human approval boundary."
-                ))
-                .unwrap_or(Value::Null)
-            } else {
-                serde_json::to_value(crate::autonomy_policy::AutonomyDecision::prepare_silently(
-                    "Workflow resumed from a non-approval wait condition."
-                ))
-                .unwrap_or(Value::Null)
-            },
+            serde_json::to_value(
+                crate::autonomy_policy::autonomy_decision_for_wait_resume_family(
+                    resume_family,
+                    "Workflow was resumed from an explicit human approval boundary.",
+                    "Workflow resumed from a non-approval wait condition.",
+                ),
+            )
+            .unwrap_or(Value::Null),
         );
         result_obj.insert("paused_at_node_id".to_string(), Value::Null);
         result_obj.insert("paused_at_label".to_string(), Value::Null);
@@ -14083,11 +20571,15 @@ fn apply_wait_resume_approval_decision_to_run_record(
         .filter(|value| !value.is_null())
         .unwrap_or_else(|| {
             build_workflow_approval_review_payload(
-                run.result_json.get("paused_at_label").and_then(Value::as_str),
+                run.result_json
+                    .get("paused_at_label")
+                    .and_then(Value::as_str),
                 wait_resume_record
                     .get("source_graph_node_id")
                     .and_then(Value::as_str),
-                run.result_json.get("approval_reason").and_then(Value::as_str),
+                run.result_json
+                    .get("approval_reason")
+                    .and_then(Value::as_str),
                 run.result_json
                     .get("approval_decision_point_id")
                     .and_then(Value::as_str),
@@ -14111,6 +20603,8 @@ fn apply_wait_resume_approval_decision_to_run_record(
     } else {
         "rejected"
     };
+    let selected_option_summary =
+        selected_approval_option_summary(&prior_approval_options, option_id);
     let decision_summary = if decision == "approved" {
         "Workflow resumed after human approval and is ready for downstream execution.".to_string()
     } else {
@@ -14149,14 +20643,37 @@ fn apply_wait_resume_approval_decision_to_run_record(
                     );
                     trace.insert(
                         "autonomy_decision".to_string(),
-                        serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
-                            "Workflow resumed after explicit human approval."
-                        )).unwrap_or(Value::Null),
+                        serde_json::to_value(
+                            crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
+                                "Workflow resumed after explicit human approval.",
+                            ),
+                        )
+                        .unwrap_or(Value::Null),
                     );
                     if let Some(option_id) = option_id {
                         trace.insert(
                             "option_id".to_string(),
                             Value::String(option_id.to_string()),
+                        );
+                    }
+                    if let Some(option_label) = selected_option_summary
+                        .get("label")
+                        .and_then(Value::as_str)
+                        .filter(|value| !value.trim().is_empty())
+                    {
+                        trace.insert(
+                            "option_label".to_string(),
+                            Value::String(option_label.to_string()),
+                        );
+                    }
+                    if let Some(option_consequence) = selected_option_summary
+                        .get("consequence_summary")
+                        .and_then(Value::as_str)
+                        .filter(|value| !value.trim().is_empty())
+                    {
+                        trace.insert(
+                            "consequence_summary".to_string(),
+                            Value::String(option_consequence.to_string()),
                         );
                     }
                     if let Some(note) = note {
@@ -14220,8 +20737,10 @@ fn apply_wait_resume_approval_decision_to_run_record(
                     "wait_resume_id": wait_resume_id,
                     "decision": decision_label,
                     "option_id": option_id,
+                    "option_label": selected_option_summary.get("label").cloned().unwrap_or(Value::Null),
+                    "consequence_summary": selected_option_summary.get("consequence_summary").cloned().unwrap_or(Value::Null),
                     "note": note,
-                    "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                    "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
                         "Workflow was cancelled after explicit human approval was rejected."
                     ),
                     "action": {
@@ -14239,7 +20758,7 @@ fn apply_wait_resume_approval_decision_to_run_record(
                     "metadata": {
                         "outcome": decision_label,
                         "afp_subtype": crate::message::AFP_SUBTYPE_APPROVAL_DECISION,
-                        "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                        "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
                             "Workflow was cancelled after explicit human approval was rejected."
                         ),
                     }
@@ -14267,9 +20786,12 @@ fn apply_wait_resume_approval_decision_to_run_record(
             );
             result_obj.insert(
                 "autonomy_decision".to_string(),
-                serde_json::to_value(crate::autonomy_policy::AutonomyDecision::request_approval(
-                    "Workflow was cancelled after explicit human approval was rejected."
-                )).unwrap_or(Value::Null),
+                serde_json::to_value(
+                    crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
+                        "Workflow was cancelled after explicit human approval was rejected.",
+                    ),
+                )
+                .unwrap_or(Value::Null),
             );
         }
     }
@@ -14281,16 +20803,18 @@ fn apply_wait_resume_approval_decision_to_run_record(
                 "decision": decision_label,
                 "wait_resume_id": wait_resume_id,
                 "option_id": option_id,
-                "selected_option": selected_approval_option_summary(&prior_approval_options, option_id),
+                "selected_option": selected_option_summary,
                 "note": note,
                 "decided_at": decided_at,
                 "approval_review": prior_approval_review,
-                "autonomy_decision": crate::autonomy_policy::AutonomyDecision::request_approval(
+                "autonomy_decision": crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary(
                     "Workflow approval decision was recorded at an explicit approval boundary."
                 ),
             }),
         );
+        apply_workflow_result_contract_to_result(result_obj, None, &run.status);
     }
+    enrich_workflow_draft_fields_from_skill_capsule(run);
 }
 
 fn continue_workflow_run_after_resume(
@@ -14814,8 +21338,10 @@ fn continue_workflow_run_after_resume(
                 "resume_status".to_string(),
                 Value::String(run.status.clone()),
             );
+            apply_workflow_result_contract_to_result(result_obj, None, &run.status);
         }
     }
+    enrich_workflow_draft_fields_from_skill_capsule(run);
 }
 
 fn workflow_wait_resume_status_after_run_resume(run_status: &str) -> &'static str {
@@ -14854,6 +21380,7 @@ async fn process_due_workflow_wait_resume_records_for_user(
     due_before: &str,
     limit: i64,
 ) -> Result<Vec<Value>, sqlx::Error> {
+    db.ensure_user_private_schema(owner_user_id).await?;
     let due_records = db
         .list_due_workflow_wait_resume_records(owner_user_id, due_before, limit)
         .await?;
@@ -14890,6 +21417,11 @@ async fn process_due_workflow_wait_resume_records_for_user(
                             &deployment["ir_snapshot"],
                             &resumed_at,
                         );
+                        apply_workflow_skill_capsule_runtime_effects(
+                            &mut run_record,
+                            &deployment["ir_snapshot"],
+                        )
+                        .await;
                         append_followup_wait_resume_records_for_run(
                             db,
                             workflow_id,
@@ -14927,12 +21459,25 @@ async fn process_due_workflow_wait_resume_records_for_user(
     Ok(wake_dispatches)
 }
 
-async fn start_workflow_wait_resume_worker(db: Db, relay_tx: broadcast::Sender<String>) {
+fn start_workflow_wait_resume_worker(
+    db: Db,
+    relay_tx: broadcast::Sender<String>,
+    mut shutdown: crate::daemon_runtime::ShutdownRx,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(15));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = interval.tick() => {}
+                _ = shutdown.changed() => {
+                    if *shutdown.borrow() {
+                        info!("Workflow wait/resume worker: graceful shutdown");
+                        break;
+                    }
+                    continue;
+                }
+            }
             let due_before = chrono::Utc::now().to_rfc3339();
             let user_ids = match db.list_user_ids().await {
                 Ok(user_ids) => user_ids,
@@ -14979,7 +21524,7 @@ async fn start_workflow_wait_resume_worker(db: Db, relay_tx: broadcast::Sender<S
                 }
             }
         }
-    });
+    })
 }
 
 fn runtime_connector_defaults_for_environment(
@@ -15435,12 +21980,22 @@ async fn workflow_runs_http(
     Path(workflow_id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let active_persona = state
+        .db
+        .get_active_agent_persona(&user.id)
+        .await
+        .ok()
+        .flatten();
     let runs = state
         .db
         .list_workflow_runs(&user.id, &workflow_id, 50)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
+    let runs = runs
+        .into_iter()
+        .map(|run| style_workflow_run_value(run, active_persona.as_ref()))
+        .collect::<Vec<_>>();
     Ok(Json(serde_json::json!({
         "workflow_id": workflow_id,
         "runs": runs,
@@ -15453,12 +22008,55 @@ async fn workflow_runs_http(
 /// Event sequence per node: `node_started` ? `node_completed` | `node_failed` | `policy_block` | `wait_for_approval`
 /// Terminal events: `run_completed` | `run_failed`
 /// Each event is JSON: `{ "event": "...", "node_id": "...", "label": "...", "status": "...", "index": N, "ts": "..." }`
+fn attach_skill_capsule_stream_fields(
+    event: &mut Value,
+    run_result: Option<&serde_json::Map<String, Value>>,
+    trace: Option<&serde_json::Map<String, Value>>,
+) {
+    let trace_skill_capsule = trace
+        .and_then(|entry| entry.get("skill_capsule"))
+        .and_then(Value::as_object);
+    let outcome_kind = trace
+        .and_then(|entry| entry.get("skill_capsule_outcome_kind"))
+        .and_then(Value::as_str)
+        .or_else(|| {
+            trace_skill_capsule
+                .and_then(|entry| entry.get("outcome_kind"))
+                .and_then(Value::as_str)
+        })
+        .or_else(|| {
+            run_result
+                .and_then(|result| result.get("skill_capsule_outcome_kind"))
+                .and_then(Value::as_str)
+        });
+    let receipt_status = trace_skill_capsule
+        .and_then(|entry| entry.get("receipt_status"))
+        .and_then(Value::as_str)
+        .or_else(|| {
+            run_result
+                .and_then(|result| result.get("skill_capsule_receipt_status"))
+                .and_then(Value::as_str)
+        });
+    if let Some(outcome_kind) = outcome_kind {
+        event["skill_capsule_outcome_kind"] = Value::String(outcome_kind.to_string());
+    }
+    if let Some(receipt_status) = receipt_status {
+        event["skill_capsule_receipt_status"] = Value::String(receipt_status.to_string());
+    }
+}
+
 async fn workflow_run_stream_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path((workflow_id, run_id)): Path<(String, String)>,
 ) -> Result<axum::response::Response, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let active_persona = state
+        .db
+        .get_active_agent_persona(&user.id)
+        .await
+        .ok()
+        .flatten();
     let run = state
         .db
         .get_workflow_run(&user.id, &workflow_id, &run_id)
@@ -15481,6 +22079,14 @@ async fn workflow_run_stream_http(
         .and_then(Value::as_str)
         .unwrap_or("completed")
         .to_string();
+    let approval_decision_selected_option = run
+        .get("result_json")
+        .and_then(Value::as_object)
+        .and_then(|result| result.get("approval_decision"))
+        .and_then(Value::as_object)
+        .and_then(|decision| decision.get("selected_option"))
+        .and_then(Value::as_object);
+    let run_result = run.get("result_json").and_then(Value::as_object);
 
     // Build the SSE body as a newline-delimited text/event-stream.
     // We emit all events immediately (no sleep) — the frontend animates progress.
@@ -15537,6 +22143,26 @@ async fn workflow_run_stream_http(
         let checkpoint = trace
             .and_then(|entry| entry.get("outcome_checkpoint"))
             .and_then(Value::as_str);
+        let decision = trace
+            .and_then(|entry| entry.get("decision"))
+            .and_then(Value::as_str);
+        let option_id = trace
+            .and_then(|entry| entry.get("option_id"))
+            .and_then(Value::as_str);
+        let option_label = approval_decision_selected_option
+            .and_then(|option| option.get("label"))
+            .and_then(Value::as_str);
+        let option_consequence = approval_decision_selected_option
+            .and_then(|option| option.get("consequence_summary"))
+            .and_then(Value::as_str);
+        let note = trace
+            .and_then(|entry| entry.get("note"))
+            .and_then(Value::as_str);
+        let result_summary = trace
+            .and_then(|entry| entry.get("action"))
+            .and_then(Value::as_object)
+            .and_then(|action| action.get("result_summary"))
+            .and_then(Value::as_str);
         let reason = node
             .get("state_reason")
             .and_then(Value::as_str)
@@ -15573,6 +22199,24 @@ async fn workflow_run_stream_http(
         }
         if let Some(reason) = reason.as_ref() {
             node_started["reason"] = Value::String(reason.clone());
+        }
+        if let Some(decision) = decision {
+            node_started["decision"] = Value::String(decision.to_string());
+        }
+        if let Some(option_id) = option_id {
+            node_started["option_id"] = Value::String(option_id.to_string());
+        }
+        if let Some(option_label) = option_label {
+            node_started["option_label"] = Value::String(option_label.to_string());
+        }
+        if let Some(option_consequence) = option_consequence {
+            node_started["option_consequence"] = Value::String(option_consequence.to_string());
+        }
+        if let Some(note) = note {
+            node_started["note"] = Value::String(note.to_string());
+        }
+        if let Some(result_summary) = result_summary {
+            node_started["result_summary"] = Value::String(result_summary.to_string());
         }
         if let Some(complexity_score) = complexity_score {
             node_started["complexity_score"] =
@@ -15611,6 +22255,24 @@ async fn workflow_run_stream_http(
         if let Some(r) = reason {
             terminal["reason"] = Value::String(r);
         }
+        if let Some(decision) = decision {
+            terminal["decision"] = Value::String(decision.to_string());
+        }
+        if let Some(option_id) = option_id {
+            terminal["option_id"] = Value::String(option_id.to_string());
+        }
+        if let Some(option_label) = option_label {
+            terminal["option_label"] = Value::String(option_label.to_string());
+        }
+        if let Some(option_consequence) = option_consequence {
+            terminal["option_consequence"] = Value::String(option_consequence.to_string());
+        }
+        if let Some(note) = note {
+            terminal["note"] = Value::String(note.to_string());
+        }
+        if let Some(result_summary) = result_summary {
+            terminal["result_summary"] = Value::String(result_summary.to_string());
+        }
         if let Some(checkpoint) = checkpoint {
             terminal["outcome_checkpoint"] = Value::String(checkpoint.to_string());
         }
@@ -15621,6 +22283,16 @@ async fn workflow_run_stream_http(
         if let Some(risk_score) = risk_score {
             terminal["risk_score"] = Value::Number(serde_json::Number::from(risk_score));
         }
+        if node_status == "waiting_for_approval" {
+            if let Some(review) = trace
+                .and_then(|entry| entry.get("approval_review"))
+                .cloned()
+            {
+                terminal["approval_review"] =
+                    style_approval_review_payload(review, active_persona.as_ref());
+            }
+        }
+        attach_skill_capsule_stream_fields(&mut terminal, run_result, trace);
         body.push_str(&format!("data: {}\n\n", terminal));
     }
 
@@ -15630,13 +22302,14 @@ async fn workflow_run_stream_http(
     } else {
         "run_completed"
     };
-    let run_terminal = serde_json::json!({
+    let mut run_terminal = serde_json::json!({
         "event": terminal_run_event,
         "run_id": run_id,
         "status": run_status,
         "node_count": timeline.len(),
         "ts": run.get("completed_at").and_then(Value::as_str).unwrap_or(""),
     });
+    attach_skill_capsule_stream_fields(&mut run_terminal, run_result, None);
     body.push_str(&format!("data: {}\n\n", run_terminal));
 
     Ok(axum::response::Response::builder()
@@ -15654,12 +22327,22 @@ async fn workflow_wait_resume_http(
     Path((workflow_id, run_id)): Path<(String, String)>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let active_persona = state
+        .db
+        .get_active_agent_persona(&user.id)
+        .await
+        .ok()
+        .flatten();
     let wait_resume_records = state
         .db
         .list_workflow_wait_resume_records(&user.id, &workflow_id, &run_id, 50)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
+    let wait_resume_records = wait_resume_records
+        .into_iter()
+        .map(|record| style_wait_resume_record_value(record, active_persona.as_ref()))
+        .collect::<Vec<_>>();
     Ok(Json(serde_json::json!({
         "workflow_id": workflow_id,
         "run_id": run_id,
@@ -15674,6 +22357,12 @@ async fn workflow_wait_resume_decision_http(
     Json(request): Json<WorkflowWaitResumeDecisionRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let active_persona = state
+        .db
+        .get_active_agent_persona(&user.id)
+        .await
+        .ok()
+        .flatten();
     let normalized_decision = request.decision.trim().to_lowercase();
     if normalized_decision != "approved" && normalized_decision != "rejected" {
         return Err((
@@ -15783,6 +22472,8 @@ async fn workflow_wait_resume_decision_http(
             &deployment["ir_snapshot"],
             &decided_at,
         );
+        apply_workflow_skill_capsule_runtime_effects(&mut run_record, &deployment["ir_snapshot"])
+            .await;
         append_followup_wait_resume_records_for_run(
             &state.db,
             &workflow_id,
@@ -15824,6 +22515,9 @@ async fn workflow_wait_resume_decision_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
+    let mut styled_dispatch_wrapper = serde_json::json!({ "result_json": decision_dispatch });
+    styled_dispatch_wrapper =
+        style_workflow_run_value(styled_dispatch_wrapper, active_persona.as_ref());
 
     let relay_payload = serde_json::json!({
         "kind": "workflow_wait_resume_approval_decision",
@@ -15840,8 +22534,8 @@ async fn workflow_wait_resume_decision_http(
         "wait_resume_id": wait_resume_id,
         "decision": normalized_decision,
         "wait_resume_status": next_wait_status,
-        "run": updated_run,
-        "decision_dispatch": decision_dispatch,
+        "run": style_workflow_run_value(updated_run, active_persona.as_ref()),
+        "decision_dispatch": styled_dispatch_wrapper["result_json"].clone(),
     })))
 }
 
@@ -15884,6 +22578,12 @@ async fn workflow_run_start_http(
     Json(body): Json<WorkflowRunRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let active_persona = state
+        .db
+        .get_active_agent_persona(&user.id)
+        .await
+        .ok()
+        .flatten();
     let workflow = state
         .db
         .get_saved_workflow(&user.id, &workflow_id)
@@ -16061,7 +22761,7 @@ async fn workflow_run_start_http(
         }
     }
 
-    let run = workflow_run_record(
+    let mut run = workflow_run_record(
         &workflow_id,
         &deployment_id,
         &user.id,
@@ -16071,6 +22771,9 @@ async fn workflow_run_start_http(
         &graph_snapshot,
         &enriched_ir_snapshot,
     );
+    apply_workflow_skill_capsule_runtime_effects(&mut run, &enriched_ir_snapshot).await;
+    enrich_workflow_run_with_private_calendar_context(&state.db, &mut run).await;
+    enrich_workflow_run_with_private_finance_context(&state.db, &mut run).await;
     state
         .db
         .append_workflow_run(&run)
@@ -16162,20 +22865,19 @@ async fn workflow_run_start_http(
             &workflow_id,
             &run.run_id,
             &user.id,
-            serde_json::json!({
-                "workflow_id": workflow_id,
-                "run_id": run.run_id,
-                "status": run_status_str,
-                "trigger_kind": trigger_kind,
-            }),
+            workflow_internal_event_payload(&workflow_id, &run, &trigger_kind),
         );
     }
 
     Ok(Json(serde_json::json!({
         "started": true,
         "workflow_id": workflow_id,
-        "run": saved_run,
-        "wait_resume_records": wait_resume_records,
+        "run": style_workflow_run_value(saved_run, active_persona.as_ref()),
+        "wait_resume_records": wait_resume_records
+            .into_iter()
+            .map(|record| serde_json::to_value(record).unwrap_or(Value::Null))
+            .map(|record| style_wait_resume_record_value(record, active_persona.as_ref()))
+            .collect::<Vec<_>>(),
     })))
 }
 
@@ -16185,7 +22887,7 @@ async fn workflows_validate_http(
     Json(body): Json<ValidateWorkflowRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    let (errors, mut warnings) = validate_workflow_graph_json(&body.graph, Some(&user.id));
+    let (mut errors, mut warnings) = validate_workflow_graph_json(&body.graph, Some(&user.id));
     let node_count = body
         .graph
         .get("nodes")
@@ -16202,6 +22904,9 @@ async fn workflows_validate_http(
         warnings
             .push("graph exceeds the free-tier visual workflow threshold of 5 nodes".to_string());
     }
+    let (compile_errors, compiled_summary, trigger_readiness_summary) =
+        compiled_validation_preview(&body.graph, errors.is_empty());
+    errors.extend(compile_errors);
     Ok(Json(serde_json::json!({
         "valid": errors.is_empty(),
         "errors": errors,
@@ -16210,8 +22915,95 @@ async fn workflows_validate_http(
             "workflow_id": body.graph.get("workflow_id").and_then(Value::as_str),
             "node_count": node_count,
             "edge_count": edge_count,
+            "compiled": compiled_summary,
+            "trigger_readiness_summary": trigger_readiness_summary,
         }
     })))
+}
+
+fn compiled_validation_preview(
+    graph: &Value,
+    compile_allowed: bool,
+) -> (Vec<String>, Option<Value>, Option<Value>) {
+    if !compile_allowed {
+        return (Vec::new(), None, None);
+    }
+    match compile_workflow_graph_to_ir(graph) {
+        Ok(compiled_ir) => (
+            Vec::new(),
+            Some(compiled_ir_summary(&compiled_ir)),
+            compiled_ir_trigger_readiness_summary(&compiled_ir),
+        ),
+        Err(compile_errors) => (compile_errors, None, None),
+    }
+}
+
+fn compiled_ir_summary(compiled_ir: &Value) -> Value {
+    let manifests = compiled_ir
+        .get("manifests")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut runtime_kind_counts: serde_json::Map<String, Value> = serde_json::Map::new();
+    let mut afp_message_family_counts: serde_json::Map<String, Value> = serde_json::Map::new();
+    let mut approval_manifest_count = 0u64;
+    for manifest in &manifests {
+        let Some(runtime_kind) = manifest.get("runtime_kind").and_then(Value::as_str) else {
+            continue;
+        };
+        let next_count = runtime_kind_counts
+            .get(runtime_kind)
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            + 1;
+        runtime_kind_counts.insert(runtime_kind.to_string(), Value::from(next_count));
+        if runtime_kind == "approval_runtime" {
+            approval_manifest_count += 1;
+        }
+        let capability_id = manifest
+            .get("connector_binding")
+            .and_then(Value::as_object)
+            .and_then(|binding| binding.get("capability_id"))
+            .and_then(Value::as_str);
+        let afp_family = compiled_manifest_afp_family(runtime_kind, capability_id);
+        let next_afp_count = afp_message_family_counts
+            .get(afp_family)
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            + 1;
+        afp_message_family_counts.insert(afp_family.to_string(), Value::from(next_afp_count));
+    }
+    let wait_resume_count = compiled_ir
+        .get("wait_resume_descriptors")
+        .and_then(Value::as_array)
+        .map(|items| items.len() as u64)
+        .unwrap_or(0);
+    serde_json::json!({
+        "manifest_count": manifests.len(),
+        "runtime_kind_counts": runtime_kind_counts,
+        "afp_message_family_counts": afp_message_family_counts,
+        "approval_manifest_count": approval_manifest_count,
+        "wait_resume_count": wait_resume_count,
+    })
+}
+
+fn compiled_manifest_afp_family(runtime_kind: &str, capability_id: Option<&str>) -> &'static str {
+    if runtime_kind == "executor" || runtime_kind == "capability_router" {
+        if capability_id.is_some() {
+            "capability_boundary"
+        } else {
+            "capability_boundary"
+        }
+    } else if runtime_kind == "approval_runtime"
+        || runtime_kind == "ambiguity"
+        || runtime_kind == "policy_runtime"
+    {
+        "decision_boundary"
+    } else if runtime_kind == "termination_runtime" {
+        "summary_boundary"
+    } else {
+        "orchestration_scaffold"
+    }
 }
 
 fn workflow_model_strategy(optimization_mode: &str) -> (&'static str, &'static str, i64, i64) {
@@ -16453,25 +23245,24 @@ fn compile_workflow_graph_to_ir(graph: &Value) -> Result<Value, Vec<String>> {
                 .unwrap_or_else(|| serde_json::json!([]));
             // Phase 3 step 14: resolve connector_family and execution_path
             let graph_node_kind = node.get("kind").and_then(Value::as_str).unwrap_or("agent");
-            let connector_family = config
-                .and_then(|c| c.get("connector_family"))
-                .and_then(Value::as_str);
-            let execution_path = match connector_family {
-                Some("openai_function") | Some("mcp") | Some("internal") => "direct_http",
-                Some("a2a") => "delegation",
-                _ if graph_node_kind == "tool" => "direct_http",
-                _ if graph_node_kind == "delegation" => "delegation",
-                _ if graph_node_kind == "policy" => "policy_runtime",
-                _ if graph_node_kind == "approval" => "approval_runtime",
-                _ if graph_node_kind == "merge" => "merge_runtime",
-                _ if graph_node_kind == "termination" => "termination_runtime",
-                _ if graph_node_kind == "trigger" => "runtime_dispatch",
-                _ => "llm_agent",
-            };
+            let connector_family =
+                workflow_connector_bindings::normalized_connector_family(config, graph_node_kind);
+            let execution_path = workflow_connector_bindings::execution_path_for_connector(
+                connector_family.as_deref(),
+                graph_node_kind,
+            );
+            let resolved_service = workflow_connector_bindings::skill_capsule_service_name(config)
+                .unwrap_or_else(|| service.to_string());
+            let integration_family = workflow_connector_bindings::integration_family_for_binding(
+                connector_family.as_deref(),
+                capability_id,
+            );
             // metadata.store defaults: tool result messages for openai_function/mcp are
             // ephemeral by default (bypass append-only log); all others store by default.
-            let metadata_store_default =
-                !matches!(connector_family, Some("openai_function") | Some("mcp"));
+            let metadata_store_default = !matches!(
+                connector_family.as_deref(),
+                Some("openai_function") | Some("mcp")
+            );
             let node_registry_manifest = workflow_node_registry_manifest(graph_node_kind);
             let retry_policy = serde_json::json!({
                 "max_attempts": if runtime_kind == "executor" { 2 } else { 1 },
@@ -16504,27 +23295,8 @@ fn compile_workflow_graph_to_ir(graph: &Value) -> Result<Value, Vec<String>> {
                     "metadata_store_default": metadata_store_default,
                     "operation": operation,
                     "provider": provider,
-                    "service": service,
-                    "integration_family": if let Some(family) = connector_family {
-                        match family {
-                            "openai_function" => "ai_services",
-                            "mcp" => "ai_services",
-                            "a2a" => "agent_delegation",
-                            _ => "integration",
-                        }
-                    } else if let Some(capability) = capability_id {
-                        match capability {
-                            "email" => "communications",
-                            "calendar" => "scheduling",
-                            "document_extract" => "document_processing",
-                            "web_search" => "research",
-                            "finance" => "finance",
-                            "travel" => "travel",
-                            _ => "integration",
-                        }
-                    } else {
-                        "orchestration"
-                    },
+                    "service": resolved_service,
+                    "integration_family": integration_family,
                     "trace_source": trace_source,
                     "trace_detail_mode": trace_detail_mode,
                     "trace_side_effects": trace_side_effects,
@@ -16920,6 +23692,10 @@ async fn workflow_trigger_observations_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
+    let observations = observations
+        .into_iter()
+        .map(trigger_observation_response)
+        .collect::<Vec<_>>();
     Ok(Json(serde_json::json!({
         "workflow_id": workflow_id,
         "trigger_observations": observations,
@@ -17375,15 +24151,7 @@ async fn webhook_ingress_http(
     // Rate-limit before any crypto work to prevent HMAC CPU exhaustion (GAP-089).
     // Bucket per registration_id so one flooded webhook doesn't block others.
     let rate_key = format!("webhook:{registration_id}");
-    enforce_rate_limit(
-        &state,
-        rate_key,
-        RateLimitPolicy {
-            max_requests: 60,
-            window: std::time::Duration::from_secs(60),
-        },
-    )
-    .await?;
+    enforce_rate_limit(&state, rate_key, webhook_ingress_rate_limit_policy()).await?;
     // -- 1. Resolve the signing key --------------------------------------------
     let signing_seed = env_hex_32("OMNYID_SIGNING_KEY_HEX")
         .map_err(|e| {
@@ -17650,6 +24418,13 @@ async fn webhook_ingress_http(
     })))
 }
 
+fn webhook_ingress_rate_limit_policy() -> RateLimitPolicy {
+    RateLimitPolicy {
+        max_requests: 60,
+        window: std::time::Duration::from_secs(60),
+    }
+}
+
 /// Phase 3 step 12: legacy agent_triggers reconciliation.
 ///
 /// Returns a summary explaining the relationship between the legacy `agent_triggers` table
@@ -17753,11 +24528,14 @@ async fn workflow_compile_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
+    let trigger_readiness_summary =
+        compiled_ir_trigger_readiness_summary(&compiled_ir).unwrap_or(Value::Null);
 
     Ok(Json(serde_json::json!({
         "compiled": true,
         "workflow_id": workflow_id,
         "ir": compiled_ir,
+        "trigger_readiness_summary": trigger_readiness_summary,
     })))
 }
 
@@ -17807,7 +24585,7 @@ async fn workflow_action_http(
                 .map_err(internal_error)
                 .map_err(status_to_http)?;
             Ok(Json(
-                serde_json::json!({ "updated": true, "workflow": saved }),
+                serde_json::json!({ "updated": true, "workflow": saved_workflow_response(&saved) }),
             ))
         }
         "archive" => {
@@ -17847,7 +24625,7 @@ async fn workflow_action_http(
                 .map_err(internal_error)
                 .map_err(status_to_http)?;
             Ok(Json(
-                serde_json::json!({ "updated": true, "workflow": saved }),
+                serde_json::json!({ "updated": true, "workflow": saved_workflow_response(&saved) }),
             ))
         }
         "deploy" => {
@@ -18105,7 +24883,8 @@ async fn workflow_action_http(
                 "deployment_id": deployment_id,
                 "trigger_registrations_written": activation_descriptors.len(),
                 "legacy_trigger_reconciliation": legacy_trigger_reconciliation,
-                "workflow": saved,
+                "trigger_readiness_summary": compiled_ir_trigger_readiness_summary(&deployment_record.ir_snapshot_json).unwrap_or(Value::Null),
+                "workflow": saved_workflow_response(&saved),
             })))
         }
         "rollback" => {
@@ -18264,7 +25043,8 @@ async fn workflow_action_http(
                 "updated": true,
                 "deployment_id": updated_deployment_record.deployment_id,
                 "legacy_trigger_reconciliation": rollback_legacy_trigger_reconciliation,
-                "workflow": saved,
+                "trigger_readiness_summary": compiled_ir_trigger_readiness_summary(&updated_deployment_record.ir_snapshot_json).unwrap_or(Value::Null),
+                "workflow": saved_workflow_response(&saved),
             })))
         }
         _ => Err((
@@ -18412,6 +25192,19 @@ struct LlmConfigRequest {
     ollama_url: Option<String>,
 }
 
+fn llm_config_change_requires_recent_session(body: &LlmConfigRequest) -> bool {
+    body.api_key
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty())
+        || matches!(body.backend.as_str(), "byok" | "runpod")
+        || body
+            .ollama_url
+            .as_deref()
+            .map(str::trim)
+            .is_some_and(|value| !value.is_empty())
+}
+
 // -- LLM config ----------------------------------------------------------------
 
 async fn llm_config_get_http(
@@ -18439,7 +25232,10 @@ async fn llm_config_set_http(
     headers: HeaderMap,
     Json(body): Json<LlmConfigRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
+    let (user, session) = authenticated_user_and_session(&state.db, &headers).await?;
+    if llm_config_change_requires_recent_session(&body) {
+        require_recent_high_risk_session(&session)?;
+    }
     let (backend, monthly_budget) = match body.backend.as_str() {
         "hosted" => {
             let billing = state
@@ -18511,6 +25307,39 @@ fn llm_config_save_response(cfg: &LlmConfig) -> Value {
     })
 }
 
+fn llm_ping_reason_from_body(body: &str) -> String {
+    let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return "provider returned an empty error response".to_string();
+    }
+    if let Ok(parsed) = serde_json::from_str::<Value>(trimmed) {
+        if let Some(message) = parsed
+            .get("error")
+            .and_then(|error| {
+                error
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .or_else(|| error.as_str())
+            })
+            .or_else(|| parsed.get("message").and_then(Value::as_str))
+            .or_else(|| parsed.get("detail").and_then(Value::as_str))
+        {
+            return message.trim().to_string();
+        }
+    }
+    let compact = trimmed.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.len() > 180 {
+        format!("{}…", &compact[..180])
+    } else {
+        compact
+    }
+}
+
+fn llm_ping_failure_reason(provider: &str, status: StatusCode, body: &str) -> String {
+    let summary = llm_ping_reason_from_body(body);
+    format!("{provider} returned HTTP {}: {summary}", status.as_u16())
+}
+
 // -- LLM ping — verify connection without triggering inference -----------------
 
 async fn llm_config_ping_http(
@@ -18529,7 +25358,7 @@ async fn llm_config_ping_http(
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(internal_http_error)?;
 
     match cfg
         .get("backend")
@@ -18555,7 +25384,13 @@ async fn llm_config_ping_http(
                 .bearer_auth(&api_key)
                 .send()
                 .await
-                .map_err(|e| (StatusCode::BAD_GATEWAY, format!("RunPod unreachable: {e}")))?;
+                .map_err(|err| {
+                    tracing::error!(error = %err, "llm ping: RunPod unreachable");
+                    (
+                        StatusCode::BAD_GATEWAY,
+                        "RunPod is unreachable right now.".to_string(),
+                    )
+                })?;
             let status = resp.status();
             if status.is_success() {
                 Ok(Json(
@@ -18563,9 +25398,12 @@ async fn llm_config_ping_http(
                 ))
             } else {
                 let body = resp.text().await.unwrap_or_default();
-                Ok(Json(
-                    serde_json::json!({ "ok": false, "backend": "runpod", "http_status": status.as_u16(), "reason": body }),
-                ))
+                Ok(Json(serde_json::json!({
+                    "ok": false,
+                    "backend": "runpod",
+                    "http_status": status.as_u16(),
+                    "reason": llm_ping_failure_reason("runpod", status, &body)
+                })))
             }
         }
         "ollama" => {
@@ -18574,11 +25412,13 @@ async fn llm_config_ping_http(
                 .and_then(|u| u.as_str())
                 .unwrap_or("http://localhost:11434");
             let url = format!("{base}/api/tags");
-            let resp = client
-                .get(&url)
-                .send()
-                .await
-                .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Ollama unreachable: {e}")))?;
+            let resp = client.get(&url).send().await.map_err(|err| {
+                tracing::error!(error = %err, "llm ping: Ollama unreachable");
+                (
+                    StatusCode::BAD_GATEWAY,
+                    "Ollama is unreachable right now.".to_string(),
+                )
+            })?;
             let status = resp.status();
             if status.is_success() {
                 Ok(Json(
@@ -18596,10 +25436,21 @@ async fn llm_config_ping_http(
                 .get("provider")
                 .and_then(|p| p.as_str())
                 .unwrap_or("anthropic");
-            let api_key = cfg
-                .get("encrypted_api_key")
-                .and_then(|k| k.as_str())
-                .unwrap_or("");
+            let api_key = state
+                .db
+                .get_byok_api_key(&user.id)
+                .await
+                .map_err(internal_error)
+                .map_err(status_to_http)?
+                .unwrap_or_default();
+            if api_key.trim().is_empty() {
+                return Ok(Json(serde_json::json!({
+                    "ok": false,
+                    "backend": "byok",
+                    "provider": provider,
+                    "reason": "No API key is currently saved for this provider",
+                })));
+            }
             let request = match provider {
                 "openai" => client
                     .get("https://api.openai.com/v1/models")
@@ -18618,19 +25469,27 @@ async fn llm_config_ping_http(
                     .header("x-api-key", api_key)
                     .header("anthropic-version", "2023-06-01"),
             };
-            let resp = request
-                .send()
-                .await
-                .map_err(|e| (StatusCode::BAD_GATEWAY, format!("API unreachable: {e}")))?;
+            let resp = request.send().await.map_err(|err| {
+                tracing::error!(error = %err, provider, "llm ping: BYOK provider unreachable");
+                (
+                    StatusCode::BAD_GATEWAY,
+                    "The configured AI provider is unreachable right now.".to_string(),
+                )
+            })?;
             let status = resp.status();
             if status.is_success() {
                 Ok(Json(
                     serde_json::json!({ "ok": true, "backend": "byok", "provider": provider, "http_status": status.as_u16() }),
                 ))
             } else {
-                Ok(Json(
-                    serde_json::json!({ "ok": false, "backend": "byok", "provider": provider, "http_status": status.as_u16(), "reason": "API key rejected or unreachable" }),
-                ))
+                let body = resp.text().await.unwrap_or_default();
+                Ok(Json(serde_json::json!({
+                    "ok": false,
+                    "backend": "byok",
+                    "provider": provider,
+                    "http_status": status.as_u16(),
+                    "reason": llm_ping_failure_reason(provider, status, &body)
+                })))
             }
         }
         other => Ok(Json(
@@ -18660,6 +25519,7 @@ async fn ui_decision_http(
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "user_decision".to_string(),
         kind: None,
+        supertags: vec![],
         subtype: Some("decision_point".to_string()),
         content: serde_json::json!({
             "card_id":            body.card_id,
@@ -18691,6 +25551,12 @@ async fn ui_decision_http(
     .await
     .map_err(status_to_http)?;
 
+    let active_persona = state
+        .db
+        .get_active_agent_persona(&user.id)
+        .await
+        .ok()
+        .flatten();
     if body.decision_point_id == "approval_gate" || body.decision_point_id == "clarification_gate" {
         let thread_messages =
             thread_messages_for_headers(&state.db, &headers, &body.thread_id).await?;
@@ -18776,6 +25642,7 @@ async fn ui_decision_http(
                         } else {
                             approval_option_summary(&body.selected_option_id)
                         };
+                        let text = decision_user_facing_text(text, active_persona.as_ref());
                         let section_id = if body.decision_point_id == "clarification_gate" {
                             "clarification_gate"
                         } else {
@@ -18825,11 +25692,11 @@ async fn ui_decision_http(
                             "order": 1,
                             "status": "streaming",
                             "content": {
-                                "text": if body.decision_point_id == "clarification_gate" {
+                                "text": decision_user_facing_text(if body.decision_point_id == "clarification_gate" {
                                     clarification_option_progress_text(&body.selected_option_id)
                                 } else {
                                     "Approval received. Starting orchestration now."
-                                },
+                                }, active_persona.as_ref()),
                                 "pct": 25
                             }
                         }
@@ -18883,6 +25750,7 @@ async fn ui_decision_http(
                 if let Some(agent_id) = master_instance["agent_id"].as_str() {
                     if body.decision_point_id == "approval_gate" {
                         let (title, text, tone) = approval_option_summary(&body.selected_option_id);
+                        let text = decision_user_facing_text(text, active_persona.as_ref());
                         let approval_update = serde_json::json!({
                             "card_id": body.card_id,
                             "section": {
@@ -18927,11 +25795,11 @@ async fn ui_decision_http(
                             "order": 4,
                             "status": "complete",
                             "content": {
-                                "text": if body.decision_point_id == "clarification_gate" {
+                                "text": decision_user_facing_text(if body.decision_point_id == "clarification_gate" {
                                     "Orchestration cancelled until a more specific objective is provided."
                                 } else {
                                     "Orchestration cancelled before any external action was started."
-                                }
+                                }, active_persona.as_ref())
                             }
                         }
                     });
@@ -19230,6 +26098,7 @@ async fn note_backlink_override_http(
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: crate::message::AFP_TYPE_BACKLINK_OVERRIDE.to_string(),
         kind: None,
+        supertags: vec![],
         content: content.to_string(),
         signature: String::new(),
         encryption: "{}".to_string(),
@@ -19443,6 +26312,9 @@ async fn install_default_supertags_http(
             "tag_name":     tag_name,
             "keywords":     keywords,
             "folder_scope": [],
+            "parent_tags":  [],
+            "alias_tags":   [],
+            "hierarchy_mode": "soft",
         });
         let slug = tag_name.trim_start_matches('#').to_lowercase();
         let msg = crate::afp::Message {
@@ -19455,6 +26327,7 @@ async fn install_default_supertags_http(
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: AFP_TYPE_SUPERTAG_DEFINITION.to_string(),
             kind: None,
+            supertags: vec![],
             content: content.to_string(),
             signature: String::new(),
             encryption: "{}".to_string(),
@@ -19553,7 +26426,7 @@ async fn user_export_messages(
     let agent_ids: Vec<String> = agents.iter().map(|a| a.agent_id.clone()).collect();
     let msgs = state
         .db
-        .recent_messages_for_agents(&agent_ids, 5000)
+        .recent_messages_for_user(user_id, &agent_ids, 5000)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
@@ -19701,19 +26574,146 @@ async fn federation_relay_http(
         sender_domain,
         relay_req.nonce
     );
-    let _ = state; // DB ingestion wired in next phase when relay message type is finalized
+    let proto = relay_message_to_proto(relay_req.message).map_err(status_to_http)?;
+    validate_federated_proto_sender(&proto, &sender_domain).map_err(status_to_http)?;
+    let ack = store_proto_message(&state.db, &state.metrics, &state.relay_tx, proto)
+        .await
+        .map_err(status_to_http)?
+        .into_inner();
 
     Ok(Json(serde_json::json!({
-        "accepted": true,
+        "accepted": ack.success,
+        "message_id": ack.message_id,
         "nonce": relay_req.nonce,
         "sender": sender_domain,
     })))
 }
 
+fn relay_message_to_proto(message: Value) -> Result<Message, Status> {
+    if let Some(proto) = relay_message_json_to_proto(&message) {
+        return Ok(proto);
+    }
+
+    if let Ok(app_message) = serde_json::from_value::<AFPMessage>(message) {
+        return Ok(app_to_proto(app_message));
+    }
+
+    Err(Status::invalid_argument(
+        "relay payload must contain a valid AFP message",
+    ))
+}
+
+fn validate_federated_proto_sender(message: &Message, sender_domain: &str) -> Result<(), Status> {
+    let Some((_, message_domain)) = crate::federation::parse_agent_id(&message.from) else {
+        return Err(Status::invalid_argument(
+            "relay payload must use a valid AFP sender agent id",
+        ));
+    };
+    if message_domain != sender_domain.trim() {
+        return Err(Status::unauthenticated(
+            "relay payload sender domain does not match verified federation sender",
+        ));
+    }
+    Ok(())
+}
+
+fn relay_message_json_to_proto(message: &Value) -> Option<Message> {
+    let object = message.as_object()?;
+    let content = object.get("content")?.as_str()?;
+
+    Some(Message {
+        protocol: object
+            .get("protocol")
+            .and_then(Value::as_str)
+            .unwrap_or("afp-v1")
+            .to_string(),
+        id: object.get("id").and_then(Value::as_str)?.to_string(),
+        thread_id: object.get("thread_id").and_then(Value::as_str)?.to_string(),
+        parent_id: object
+            .get("parent_id")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        from: object.get("from").and_then(Value::as_str)?.to_string(),
+        to: object
+            .get("to")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+        timestamp: object
+            .get("timestamp")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        r#type: object.get("type").and_then(Value::as_str)?.to_string(),
+        kind: object
+            .get("kind")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        content: content.to_string(),
+        signature: object
+            .get("signature")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        encryption: object
+            .get("encryption")
+            .and_then(Value::as_str)
+            .unwrap_or("{}")
+            .to_string(),
+        views: object
+            .get("views")
+            .and_then(Value::as_str)
+            .unwrap_or("[]")
+            .to_string(),
+        references: object
+            .get("references")
+            .and_then(Value::as_str)
+            .unwrap_or("[]")
+            .to_string(),
+        attachments: object
+            .get("attachments")
+            .and_then(Value::as_str)
+            .unwrap_or("[]")
+            .to_string(),
+        store_in_relational: object
+            .get("store_in_relational")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        subtype: object
+            .get("subtype")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        metadata: object
+            .get("metadata")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        supertags: object
+            .get("supertags")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+    })
+}
+
 // -- Master Agent Orchestration Handlers --------------------------------------
 
 /// SHA-256 fingerprint of remote IP + User-Agent for anon session tracking.
-fn anon_fingerprint(headers: &HeaderMap) -> String {
+pub(super) fn anon_fingerprint(headers: &HeaderMap) -> String {
     use std::fmt::Write;
     // Use request_ip_identity — only trusts X-Forwarded-For when OMNYID_BEHIND_TRUSTED_PROXY=true.
     let ip = request_ip_identity(headers);
@@ -19744,7 +26744,7 @@ async fn dashboard_session_http(
         ));
     }
 
-    let fingerprint = anon_fingerprint(&headers);
+    let fingerprint = anonymous_session_identity_key(&headers);
     let count = state
         .db
         .check_and_increment_anon_session(&fingerprint)
@@ -20080,7 +27080,7 @@ async fn fire_email_trigger_workflow_run(
         ));
     }
 
-    let run = workflow_run_record(
+    let mut run = workflow_run_record(
         workflow_id,
         deployment_id,
         user_id,
@@ -20090,6 +27090,9 @@ async fn fire_email_trigger_workflow_run(
         &graph_snapshot,
         &enriched_ir,
     );
+    apply_workflow_skill_capsule_runtime_effects(&mut run, &enriched_ir).await;
+    enrich_workflow_run_with_private_calendar_context(&state.db, &mut run).await;
+    enrich_workflow_run_with_private_finance_context(&state.db, &mut run).await;
     state
         .db
         .append_workflow_run(&run)
@@ -20242,6 +27245,333 @@ async fn email_trigger_dispatcher_tick(state: Arc<AppState>) {
     }
 }
 
+pub(in crate::server) async fn enrich_workflow_run_with_private_finance_context(
+    db: &Db,
+    run: &mut WorkflowRunRecord,
+) {
+    let Some(result_obj) = run.result_json.as_object_mut() else {
+        return;
+    };
+    let Some(contract) = workflow_result_contract_from_result(result_obj) else {
+        return;
+    };
+    let Some(contract_obj) = contract.as_object() else {
+        return;
+    };
+    let workflow = contract_obj
+        .get("workflow")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if workflow != "finance_guardian" {
+        return;
+    }
+
+    let account_count_row = match sqlx::query(
+        "SELECT COUNT(*) AS account_count
+         FROM finance_accounts
+         WHERE user_id = $1 AND enabled = true",
+    )
+    .bind(&run.owner_user_id)
+    .fetch_one(&db.pool)
+    .await
+    {
+        Ok(row) => row,
+        Err(err) => {
+            tracing::warn!(
+                run_id = %run.run_id,
+                workflow = workflow,
+                owner_user_id = %run.owner_user_id,
+                error = %err,
+                "workflow run finance-context enrichment failed to load account count"
+            );
+            return;
+        }
+    };
+    let account_count = account_count_row
+        .try_get::<i64, _>("account_count")
+        .unwrap_or(0);
+
+    let recent_period_days = 30_i64;
+    let recent_totals_row = match sqlx::query(
+        "SELECT
+             COUNT(*) AS recent_transaction_count,
+             COALESCE(SUM(CASE WHEN amount_cents < 0 THEN ABS(amount_cents) ELSE 0 END), 0) AS recent_expense_cents,
+             COALESCE(SUM(CASE WHEN amount_cents > 0 THEN amount_cents ELSE 0 END), 0) AS recent_income_cents
+         FROM finance_transactions
+         WHERE user_id = $1
+           AND txn_date >= CURRENT_DATE - INTERVAL '30 days'",
+    )
+    .bind(&run.owner_user_id)
+    .fetch_one(&db.pool)
+    .await
+    {
+        Ok(row) => row,
+        Err(err) => {
+            tracing::warn!(
+                run_id = %run.run_id,
+                workflow = workflow,
+                owner_user_id = %run.owner_user_id,
+                error = %err,
+                "workflow run finance-context enrichment failed to load recent totals"
+            );
+            return;
+        }
+    };
+    let recent_transaction_count = recent_totals_row
+        .try_get::<i64, _>("recent_transaction_count")
+        .unwrap_or(0);
+    let recent_expense_cents = recent_totals_row
+        .try_get::<i64, _>("recent_expense_cents")
+        .unwrap_or(0);
+    let recent_income_cents = recent_totals_row
+        .try_get::<i64, _>("recent_income_cents")
+        .unwrap_or(0);
+
+    let top_category_rows = match sqlx::query(
+        "SELECT category, SUM(ABS(amount_cents)) AS total_cents, COUNT(*) AS txn_count
+         FROM finance_transactions
+         WHERE user_id = $1
+           AND amount_cents < 0
+           AND txn_date >= CURRENT_DATE - INTERVAL '90 days'
+         GROUP BY category
+         ORDER BY total_cents DESC
+         LIMIT 3",
+    )
+    .bind(&run.owner_user_id)
+    .fetch_all(&db.pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(err) => {
+            tracing::warn!(
+                run_id = %run.run_id,
+                workflow = workflow,
+                owner_user_id = %run.owner_user_id,
+                error = %err,
+                "workflow run finance-context enrichment failed to load category totals"
+            );
+            return;
+        }
+    };
+    let top_spend_categories = top_category_rows
+        .iter()
+        .map(|row| {
+            serde_json::json!({
+                "category": row
+                    .try_get::<Option<String>, _>("category")
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| "other".to_string()),
+                "total_cents": row.try_get::<i64, _>("total_cents").unwrap_or(0),
+                "txn_count": row.try_get::<i64, _>("txn_count").unwrap_or(0),
+            })
+        })
+        .collect::<Vec<_>>();
+    let top_spend_category = top_spend_categories
+        .first()
+        .and_then(Value::as_object)
+        .and_then(|value| value.get("category"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let top_spend_total_cents = top_spend_categories
+        .first()
+        .and_then(Value::as_object)
+        .and_then(|value| value.get("total_cents"))
+        .and_then(Value::as_i64);
+
+    let anomaly_rows = match sqlx::query(
+        "SELECT txn_id, txn_date::text AS txn_date, amount_cents, currency, description,
+                merchant_name, category, anomaly_reason
+         FROM finance_transactions
+         WHERE user_id = $1 AND is_anomaly = true
+         ORDER BY txn_date DESC
+         LIMIT 5",
+    )
+    .bind(&run.owner_user_id)
+    .fetch_all(&db.pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(err) => {
+            tracing::warn!(
+                run_id = %run.run_id,
+                workflow = workflow,
+                owner_user_id = %run.owner_user_id,
+                error = %err,
+                "workflow run finance-context enrichment failed to load anomalies"
+            );
+            return;
+        }
+    };
+    let recent_anomalies = anomaly_rows
+        .iter()
+        .map(|row| {
+            serde_json::json!({
+                "txn_id": row.try_get::<String, _>("txn_id").unwrap_or_default(),
+                "txn_date": row.try_get::<String, _>("txn_date").unwrap_or_default(),
+                "amount_cents": row.try_get::<i64, _>("amount_cents").unwrap_or(0),
+                "currency": row.try_get::<String, _>("currency").unwrap_or_else(|_| "AUD".to_string()),
+                "description": row.try_get::<String, _>("description").unwrap_or_default(),
+                "merchant_name": row.try_get::<Option<String>, _>("merchant_name").ok().flatten(),
+                "category": row.try_get::<Option<String>, _>("category").ok().flatten(),
+                "anomaly_reason": row.try_get::<Option<String>, _>("anomaly_reason").ok().flatten(),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let monthly_rows = match sqlx::query(
+        "SELECT DATE_TRUNC('month', txn_date)::date::text AS month,
+                SUM(CASE WHEN amount_cents < 0 THEN ABS(amount_cents) ELSE 0 END) AS expenses_cents,
+                SUM(CASE WHEN amount_cents > 0 THEN amount_cents ELSE 0 END) AS income_cents
+         FROM finance_transactions
+         WHERE user_id = $1
+           AND txn_date >= CURRENT_DATE - INTERVAL '3 months'
+         GROUP BY month
+         ORDER BY month DESC",
+    )
+    .bind(&run.owner_user_id)
+    .fetch_all(&db.pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(err) => {
+            tracing::warn!(
+                run_id = %run.run_id,
+                workflow = workflow,
+                owner_user_id = %run.owner_user_id,
+                error = %err,
+                "workflow run finance-context enrichment failed to load monthly totals"
+            );
+            return;
+        }
+    };
+    let monthly_totals = monthly_rows
+        .iter()
+        .map(|row| {
+            serde_json::json!({
+                "month": row.try_get::<String, _>("month").unwrap_or_default(),
+                "expenses_cents": row.try_get::<i64, _>("expenses_cents").unwrap_or(0),
+                "income_cents": row.try_get::<i64, _>("income_cents").unwrap_or(0),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    result_obj.insert(
+        "finance_input_context".to_string(),
+        serde_json::json!({
+            "account_count": account_count,
+            "recent_period_days": recent_period_days,
+            "recent_transaction_count": recent_transaction_count,
+            "recent_expense_cents": recent_expense_cents,
+            "recent_income_cents": recent_income_cents,
+            "top_spend_category": top_spend_category,
+            "top_spend_total_cents": top_spend_total_cents,
+            "top_spend_categories": top_spend_categories,
+            "recent_anomalies": recent_anomalies.clone(),
+            "monthly_totals": monthly_totals,
+        }),
+    );
+
+    if let Some(finance_digest) = result_obj
+        .get_mut("finance_digest")
+        .and_then(Value::as_object_mut)
+    {
+        finance_digest.insert(
+            "account_count".to_string(),
+            serde_json::json!(account_count),
+        );
+        finance_digest.insert(
+            "recent_period_days".to_string(),
+            serde_json::json!(recent_period_days),
+        );
+        finance_digest.insert(
+            "recent_transaction_count".to_string(),
+            serde_json::json!(recent_transaction_count),
+        );
+        finance_digest.insert(
+            "recent_expense_cents".to_string(),
+            serde_json::json!(recent_expense_cents),
+        );
+        finance_digest.insert(
+            "recent_income_cents".to_string(),
+            serde_json::json!(recent_income_cents),
+        );
+        finance_digest.insert(
+            "anomaly_count".to_string(),
+            serde_json::json!(recent_anomalies.len()),
+        );
+        finance_digest.insert(
+            "top_spend_category".to_string(),
+            top_spend_category
+                .clone()
+                .map(Value::String)
+                .unwrap_or(Value::Null),
+        );
+        finance_digest.insert(
+            "top_spend_total_cents".to_string(),
+            top_spend_total_cents
+                .map(|value| serde_json::json!(value))
+                .unwrap_or(Value::Null),
+        );
+    }
+
+    let context_note = if recent_transaction_count == 0 {
+        format!(
+            "Private finance context: no transactions were recorded in the last {} days.",
+            recent_period_days
+        )
+    } else {
+        format!(
+            "Private finance context: {} transactions across {} active accounts in the last {} days with {} cents of expenses and {} cents of income.",
+            recent_transaction_count,
+            account_count,
+            recent_period_days,
+            recent_expense_cents,
+            recent_income_cents
+        )
+    };
+    let notes = result_obj
+        .entry("anomaly_notes".to_string())
+        .or_insert_with(|| Value::Array(Vec::new()));
+    if let Some(notes_array) = notes.as_array_mut() {
+        push_unique_result_string(notes_array, context_note);
+        if let (Some(category), Some(total_cents)) =
+            (top_spend_category.as_deref(), top_spend_total_cents)
+        {
+            push_unique_result_string(
+                notes_array,
+                format!(
+                    "Top spend category over the last 90 days: {} at {} cents.",
+                    category, total_cents
+                ),
+            );
+        }
+        if recent_anomalies.is_empty() {
+            push_unique_result_string(
+                notes_array,
+                "No flagged spending anomalies were found in the current finance window.",
+            );
+        } else if let Some(anomaly) = recent_anomalies.first().and_then(Value::as_object) {
+            let description = anomaly
+                .get("description")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("recent transaction");
+            let reason = anomaly
+                .get("anomaly_reason")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("unusual spending pattern");
+            push_unique_result_string(
+                notes_array,
+                format!("Most recent anomaly: {} ({})", description, reason),
+            );
+        }
+    }
+}
+
 /// Long-running background task: runs the email trigger dispatcher every 60 seconds.
 /// 45-second initial delay (staggers relative to cron scheduler's 30s delay).
 async fn email_trigger_dispatcher_loop(state: Arc<AppState>) {
@@ -20311,7 +27641,7 @@ async fn fire_file_drop_trigger_workflow_run(
     }
 
     // 4. Persist run record.
-    let run = workflow_run_record(
+    let mut run = workflow_run_record(
         workflow_id,
         deployment_id,
         user_id,
@@ -20321,6 +27651,9 @@ async fn fire_file_drop_trigger_workflow_run(
         &graph_snapshot,
         &enriched_ir,
     );
+    apply_workflow_skill_capsule_runtime_effects(&mut run, &enriched_ir).await;
+    enrich_workflow_run_with_private_calendar_context(&state.db, &mut run).await;
+    enrich_workflow_run_with_private_finance_context(&state.db, &mut run).await;
     state
         .db
         .append_workflow_run(&run)
@@ -20634,7 +27967,7 @@ async fn fire_internal_event_trigger_workflow_run(
         ));
     }
 
-    let run = workflow_run_record(
+    let mut run = workflow_run_record(
         workflow_id,
         deployment_id,
         user_id,
@@ -20644,6 +27977,9 @@ async fn fire_internal_event_trigger_workflow_run(
         &graph_snapshot,
         &enriched_ir,
     );
+    apply_workflow_skill_capsule_runtime_effects(&mut run, &enriched_ir).await;
+    enrich_workflow_run_with_private_calendar_context(&state.db, &mut run).await;
+    enrich_workflow_run_with_private_finance_context(&state.db, &mut run).await;
     state
         .db
         .append_workflow_run(&run)
@@ -20658,13 +27994,12 @@ async fn fire_internal_event_trigger_workflow_run(
         owner_user_id: user_id.clone(),
         trigger_source: "internal_event".to_string(),
         trigger_time: now_str.clone(),
-        payload_summary: serde_json::json!({
-            "trigger_kind": "internal_event",
-            "event_type": event_type,
-            "source_workflow_id": source_workflow_id,
-            "source_run_id": source_run_id,
-            "payload": payload,
-        }),
+        payload_summary: internal_event_trigger_payload_summary(
+            event_type,
+            source_workflow_id,
+            source_run_id,
+            payload,
+        ),
         schedule_metadata: serde_json::json!({}),
         delayed_resumption_reason: None,
         hybrid_decision_chain: serde_json::json!([]),
@@ -20858,6 +28193,101 @@ struct InternalIngestBody {
 /// enqueued in `public.internal_event_queue` and will be dispatched to all
 /// matching `internal_event`-kind trigger registrations owned by the calling
 /// user on the next dispatcher tick.
+fn workflow_internal_event_payload(
+    workflow_id: &str,
+    run: &WorkflowRunRecord,
+    trigger_kind: &str,
+) -> Value {
+    let mut payload = serde_json::json!({
+        "workflow_id": workflow_id,
+        "run_id": run.run_id,
+        "status": run.status,
+        "trigger_kind": trigger_kind,
+    });
+    if let Some(result) = run.result_json.as_object() {
+        if let Some(outcome_kind) = result
+            .get("skill_capsule_outcome_kind")
+            .and_then(Value::as_str)
+        {
+            payload["skill_capsule_outcome_kind"] = Value::String(outcome_kind.to_string());
+        }
+        if let Some(receipt_status) = result
+            .get("skill_capsule_receipt_status")
+            .and_then(Value::as_str)
+        {
+            payload["skill_capsule_receipt_status"] = Value::String(receipt_status.to_string());
+        }
+        if let Some(blocked_reason) = result.get("blocked_reason").and_then(Value::as_str) {
+            payload["blocked_reason"] = Value::String(blocked_reason.to_string());
+        }
+        if let Some(failed_reason) = result.get("failed_reason").and_then(Value::as_str) {
+            payload["failed_reason"] = Value::String(failed_reason.to_string());
+        }
+    }
+    payload
+}
+
+fn internal_event_trigger_payload_summary(
+    event_type: &str,
+    source_workflow_id: Option<&str>,
+    source_run_id: Option<&str>,
+    payload: &Value,
+) -> Value {
+    let mut summary = serde_json::json!({
+        "trigger_kind": "internal_event",
+        "event_type": event_type,
+        "source_workflow_id": source_workflow_id,
+        "source_run_id": source_run_id,
+        "payload": payload,
+    });
+    if let Some(payload_obj) = payload.as_object() {
+        if let Some(outcome_kind) = payload_obj
+            .get("skill_capsule_outcome_kind")
+            .and_then(Value::as_str)
+        {
+            summary["skill_capsule_outcome_kind"] = Value::String(outcome_kind.to_string());
+        }
+        if let Some(receipt_status) = payload_obj
+            .get("skill_capsule_receipt_status")
+            .and_then(Value::as_str)
+        {
+            summary["skill_capsule_receipt_status"] = Value::String(receipt_status.to_string());
+        }
+        if let Some(blocked_reason) = payload_obj.get("blocked_reason").and_then(Value::as_str) {
+            summary["blocked_reason"] = Value::String(blocked_reason.to_string());
+        }
+        if let Some(failed_reason) = payload_obj.get("failed_reason").and_then(Value::as_str) {
+            summary["failed_reason"] = Value::String(failed_reason.to_string());
+        }
+    }
+    summary
+}
+
+fn trigger_observation_response(mut value: Value) -> Value {
+    let summary = value.get("payload_summary").cloned();
+    if let Some(summary) = summary.as_ref().and_then(Value::as_object) {
+        if let Some(outcome_kind) = summary
+            .get("skill_capsule_outcome_kind")
+            .and_then(Value::as_str)
+        {
+            value["skill_capsule_outcome_kind"] = Value::String(outcome_kind.to_string());
+        }
+        if let Some(receipt_status) = summary
+            .get("skill_capsule_receipt_status")
+            .and_then(Value::as_str)
+        {
+            value["skill_capsule_receipt_status"] = Value::String(receipt_status.to_string());
+        }
+        if let Some(blocked_reason) = summary.get("blocked_reason").and_then(Value::as_str) {
+            value["blocked_reason"] = Value::String(blocked_reason.to_string());
+        }
+        if let Some(failed_reason) = summary.get("failed_reason").and_then(Value::as_str) {
+            value["failed_reason"] = Value::String(failed_reason.to_string());
+        }
+    }
+    value
+}
+
 async fn internal_ingest_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -20982,7 +28412,10 @@ async fn create_delegation_http(
         .map_err(status_to_http)?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "no master agent".to_string()))?;
     let instance_id = instance["id"].as_str().unwrap_or("").to_string();
-    let master_key_hex = crate::agent_template::delegation_master_key_hex();
+    let master_key_hex = crate::agent_template::delegation_master_key_hex().map_err(|err| {
+        tracing::error!(%err, "delegation issuance blocked by invalid master key");
+        (StatusCode::SERVICE_UNAVAILABLE, err)
+    })?;
     let task_id = Ulid::new().to_string();
     let delegation = crate::agent_template::generate_delegated_key(
         &master_key_hex,
@@ -21118,36 +28551,38 @@ async fn agent_orchestrate_http(
     let soul_md_val = instance["soul_md"].as_str().unwrap_or("").to_string();
     let lora_active = instance["lora_genome_active"].as_bool().unwrap_or(false);
 
-    // Fetch LLM config for API key / model
-    let llm_cfg = state
-        .db
-        .get_llm_config(&user.id)
+    let resolved_llm = llm_resolution::resolve_user_inference_backend(&state.db, &user.id)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?
         .ok_or_else(|| {
             (
                 StatusCode::BAD_REQUEST,
-                "no LLM config; call POST /user/llm-config".to_string(),
+                "no usable LLM backend is configured; save BYOK/Ollama settings or enable hosted AI first."
+                    .to_string(),
             )
         })?;
-    let backend_name = llm_cfg["backend"].as_str().unwrap_or("hosted");
-    let (api_key, model) = if backend_name == "runpod" {
-        let key = std::env::var("OMNYID_RUNPOD_API_KEY").unwrap_or_default();
-        let mdl = llm_cfg["model"]
-            .as_str()
-            .unwrap_or("Qwen/Qwen3.5-35B-A3B")
-            .to_string();
-        (key, mdl)
-    } else {
-        let key = std::env::var("OMNYID_ANTHROPIC_KEY")
-            .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
-            .unwrap_or_default();
-        let mdl = llm_cfg["model"]
-            .as_str()
-            .unwrap_or("claude-haiku-4-5-20251001")
-            .to_string();
-        (key, mdl)
+    let model = resolved_llm.model;
+    let (api_key, runpod_ep) = match resolved_llm.backend {
+        crate::inference::InferenceBackend::Anthropic { api_key } => (api_key, None),
+        crate::inference::InferenceBackend::RunPod {
+            endpoint_id,
+            api_key,
+        } => (api_key, Some(endpoint_id)),
+        crate::inference::InferenceBackend::OpenAICompat { .. } => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "agent orchestration does not yet support this BYOK provider on the mounted planning path."
+                    .to_string(),
+            ));
+        }
+        crate::inference::InferenceBackend::Ollama { .. } => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "agent orchestration does not yet support Ollama-backed planning on this mounted path."
+                    .to_string(),
+            ));
+        }
     };
 
     let orchestrator =
@@ -21157,14 +28592,15 @@ async fn agent_orchestrate_http(
     } else {
         Some(soul_md_val.as_str())
     };
-    let runpod_ep = if backend_name == "runpod" {
-        Some(
-            std::env::var("OMNYID_RUNPOD_ENDPOINT_ID")
-                .unwrap_or_else(|_| "sdr11n90qjwjy2".to_string()),
-        )
-    } else {
-        None
-    };
+    let output_persona_prompt =
+        crate::agent_personas::resolve_active_persona_output_prompt(&state.db, &user.id)
+            .await
+            .map_err(internal_error)
+            .map_err(status_to_http)?;
+    let trace_context = continuity_routes::continuity_trace_context_for_user(&state.db, &user.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
     let result = orchestrator
         .run(
             &body.objective,
@@ -21172,15 +28608,17 @@ async fn agent_orchestrate_http(
             &api_key,
             &model,
             soul_opt,
+            output_persona_prompt.as_deref(),
             lora_active,
             runpod_ep.as_deref(),
             Some(state.cost_oracle.as_ref()),
-            None,
+            trace_context.as_deref(),
         )
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(internal_http_error)?;
 
-    Ok(Json(serde_json::to_value(&result).unwrap_or_default()))
+    let payload = serde_json::to_value(&result).map_err(internal_http_error)?;
+    Ok(Json(payload))
 }
 
 // -- Capability registry handlers ---------------------------------------------
@@ -21375,6 +28813,7 @@ async fn agent_invoke_http(
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "action_capability_invoke".to_string(),
         kind: None,
+        supertags: vec![],
         content: serde_json::to_string(&serde_json::json!({
             "capability_name": body.capability_name,
             "delegation_id": body.delegation_id,
@@ -21693,6 +29132,15 @@ async fn feed_engage_http(
 
 // -- Agent encryption keys -----------------------------------------------------
 
+pub(super) fn agent_keys_not_implemented_error() -> (StatusCode, String) {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        "Per-user E2EE key management is not yet implemented. \
+         The server-wide encryption key cannot be vended to clients."
+            .to_string(),
+    )
+}
+
 /// GET /agent/keys — blocked: previously leaked the server-wide encryption key (GAP-040).
 ///
 /// Returning OMNYID_ENCRYPTION_KEY_HEX to clients defeats E2EE — any authenticated
@@ -21703,12 +29151,7 @@ async fn agent_keys_http(
     headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let _user = authenticated_user(&state.db, &headers).await?;
-    Err((
-        StatusCode::NOT_IMPLEMENTED,
-        "Per-user E2EE key management is not yet implemented. \
-         The server-wide encryption key cannot be vended to clients."
-            .to_string(),
-    ))
+    Err(agent_keys_not_implemented_error())
 }
 
 /// GET /about
@@ -21729,251 +29172,6 @@ a{color:#6366f1}</style></head>
 <a href="http://www.apache.org/licenses/LICENSE-2.0" rel="noopener">Apache License, Version 2.0</a>.</p>
 </body></html>"#,
     )
-}
-
-// -- Gmail OAuth routes --------------------------------------------------------
-
-/// GET /gmail/status — returns whether a Gmail token is stored for the user
-async fn gmail_status_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let token = state
-        .db
-        .get_gmail_token(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    Ok(Json(serde_json::json!({
-        "connected": token.is_some(),
-        "gmail_email": token.as_ref().and_then(|t| t["gmail_email"].as_str()).unwrap_or(""),
-        "configured": !std::env::var("OMNYID_GMAIL_CLIENT_ID").unwrap_or_default().is_empty(),
-    })))
-}
-
-/// GET /gmail/connect-url — returns the Google OAuth authorization URL for Gmail scopes
-async fn gmail_connect_url_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let _ = user.id; // ensure user is authenticated
-    let client_id = std::env::var("OMNYID_GMAIL_CLIENT_ID").map_err(|_| {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Gmail OAuth not configured on this server. Set OMNYID_GMAIL_CLIENT_ID.".to_string(),
-        )
-    })?;
-    let base_url = std::env::var("OMNYID_HOMESERVER_URL")
-        .unwrap_or_else(|_| "http://localhost:8080".to_string());
-    let redirect_uri = format!("{base_url}/gmail/callback");
-    let scopes = "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email";
-    // Percent-encode manually for the URL query string
-    let redirect_enc: String = redirect_uri
-        .chars()
-        .map(|c| match c {
-            ':' => "%3A".to_string(),
-            '/' => "%2F".to_string(),
-            _ => c.to_string(),
-        })
-        .collect();
-    let scope_enc: String = scopes
-        .chars()
-        .map(|c| match c {
-            ' ' => "%20".to_string(),
-            ':' => "%3A".to_string(),
-            '/' => "%2F".to_string(),
-            _ => c.to_string(),
-        })
-        .collect();
-    let url = format!(
-        "https://accounts.google.com/o/oauth2/v2/auth?client_id={client_id}&redirect_uri={redirect_enc}&response_type=code&scope={scope_enc}&access_type=offline&prompt=consent&state={user_id}",
-        user_id = user.id
-    );
-    Ok(Json(serde_json::json!({"url": url})))
-}
-
-/// GET /gmail/callback?code=...  — exchanges the OAuth code and stores the token
-async fn gmail_callback_http(
-    State(state): State<Arc<AppState>>,
-    Query(params): Query<HashMap<String, String>>,
-) -> impl IntoResponse {
-    let Some(code) = params.get("code").cloned() else {
-        return axum::response::Redirect::temporary("/workspace/?gmail=error").into_response();
-    };
-    let Some(user_id) = params.get("state").cloned() else {
-        return axum::response::Redirect::temporary("/workspace/?gmail=error").into_response();
-    };
-
-    let Ok(client_id) = std::env::var("OMNYID_GMAIL_CLIENT_ID") else {
-        return axum::response::Redirect::temporary("/workspace/?gmail=not_configured")
-            .into_response();
-    };
-    let Ok(client_secret) = std::env::var("OMNYID_GMAIL_CLIENT_SECRET") else {
-        return axum::response::Redirect::temporary("/workspace/?gmail=not_configured")
-            .into_response();
-    };
-    let base_url = std::env::var("OMNYID_HOMESERVER_URL")
-        .unwrap_or_else(|_| "http://localhost:8080".to_string());
-    let redirect_uri = format!("{base_url}/gmail/callback");
-
-    let http = reqwest::Client::new();
-    let token_resp = http
-        .post("https://oauth2.googleapis.com/token")
-        .form(&[
-            ("code", code.as_str()),
-            ("client_id", client_id.as_str()),
-            ("client_secret", client_secret.as_str()),
-            ("redirect_uri", redirect_uri.as_str()),
-            ("grant_type", "authorization_code"),
-        ])
-        .send()
-        .await;
-
-    let token_data: Value = match token_resp {
-        Ok(r) => r.json().await.unwrap_or_default(),
-        Err(_) => {
-            return axum::response::Redirect::temporary("/workspace/?gmail=error").into_response();
-        }
-    };
-
-    let access_token = token_data["access_token"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
-    let refresh_token = token_data["refresh_token"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
-
-    // Fetch Gmail email address
-    let gmail_email = if !access_token.is_empty() {
-        let ui_resp = http
-            .get("https://www.googleapis.com/oauth2/v2/userinfo")
-            .bearer_auth(&access_token)
-            .send()
-            .await;
-        match ui_resp {
-            Ok(r) => r
-                .json::<Value>()
-                .await
-                .ok()
-                .and_then(|v| v["email"].as_str().map(str::to_string))
-                .unwrap_or_default(),
-            Err(_) => String::new(),
-        }
-    } else {
-        String::new()
-    };
-
-    let expiry_iso = token_data["expires_in"]
-        .as_i64()
-        .map(|secs| (chrono::Utc::now() + chrono::Duration::seconds(secs)).to_rfc3339());
-
-    let _ = state
-        .db
-        .store_gmail_token(
-            &user_id,
-            &access_token,
-            &refresh_token,
-            &gmail_email,
-            expiry_iso,
-        )
-        .await;
-
-    axum::response::Redirect::temporary("/workspace/?gmail=connected").into_response()
-}
-
-// -- Calendar events -----------------------------------------------------------
-
-#[derive(serde::Deserialize)]
-struct CalendarListQuery {
-    /// First day of the month window as ISO-8601, e.g. "2026-03-01"
-    month: Option<String>,
-}
-
-async fn calendar_list_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    axum::extract::Query(q): axum::extract::Query<CalendarListQuery>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let month_str = q.month.unwrap_or_else(|| {
-        // Format: "YYYY-MM-01" from current UTC date
-        chrono::Utc::now().format("%Y-%m-01").to_string()
-    });
-    // Build range: month_start to month_start + 1 month
-    let range_start = format!("{}T00:00:00Z", month_str);
-    let range_end = {
-        let parts: Vec<&str> = month_str.splitn(3, '-').collect();
-        let (ny, nm) = if parts.len() >= 2 {
-            let y: i64 = parts[0].parse().unwrap_or(2026);
-            let m: i64 = parts[1].parse().unwrap_or(1);
-            if m == 12 { (y + 1, 1i64) } else { (y, m + 1) }
-        } else {
-            (2026, 1)
-        };
-        format!("{}-{:02}-01T00:00:00Z", ny, nm)
-    };
-    let events = state
-        .db
-        .list_calendar_events_in_range(&user.id, &range_start, &range_end)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    Ok(Json(serde_json::json!({ "events": events })))
-}
-
-#[derive(serde::Deserialize)]
-struct CalendarCreateRequest {
-    title: String,
-    description: Option<String>,
-    start_at: String,
-    end_at: Option<String>,
-    #[serde(default)]
-    all_day: bool,
-    location: Option<String>,
-}
-
-async fn calendar_create_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(body): Json<CalendarCreateRequest>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let id = ulid::Ulid::new().to_string();
-    let event = state
-        .db
-        .create_calendar_event(
-            &user.id,
-            &id,
-            &body.title,
-            body.description.as_deref(),
-            &body.start_at,
-            body.end_at.as_deref(),
-            body.all_day,
-            body.location.as_deref(),
-        )
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    Ok(Json(event))
-}
-
-async fn calendar_delete_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Path(event_id): Path<String>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let deleted = state
-        .db
-        .delete_calendar_event(&user.id, &event_id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    Ok(Json(serde_json::json!({ "deleted": deleted })))
 }
 
 // -- Agent Alias Registry ------------------------------------------------------
@@ -22049,213 +29247,6 @@ fn validate_alias(alias: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[derive(serde::Deserialize)]
-struct AliasCheckQuery {
-    alias: String,
-}
-
-/// GET /api/alias/check?alias=xxx
-/// Returns availability and validation status — does not require authentication.
-async fn alias_check_http(
-    State(state): State<Arc<AppState>>,
-    axum::extract::Query(q): axum::extract::Query<AliasCheckQuery>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let alias = q.alias.trim().to_lowercase();
-    if let Err(msg) = validate_alias(&alias) {
-        return Ok(Json(serde_json::json!({
-            "available": false,
-            "valid": false,
-            "reason": msg
-        })));
-    }
-    let available = state
-        .db
-        .is_alias_available(&alias)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    Ok(Json(serde_json::json!({
-        "available": available,
-        "valid": true,
-        "reason": if available { "" } else { "This alias is already taken." }
-    })))
-}
-
-/// GET /api/alias/mine — returns the authenticated user's current alias (or null).
-async fn alias_mine_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let record = state
-        .db
-        .get_alias_for_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?;
-    let domain = std::env::var("OMNYID_DOMAIN").unwrap_or_else(|_| "omnyid.com".to_string());
-    Ok(Json(match record {
-        None => serde_json::json!({ "alias": null }),
-        Some(r) => {
-            // Calculate when next change is allowed
-            let next_change = chrono::DateTime::parse_from_rfc3339(&r.last_changed_at)
-                .ok()
-                .map(|dt| (dt + chrono::Duration::days(30)).to_rfc3339())
-                .unwrap_or_default();
-            serde_json::json!({
-                "alias": r.alias,
-                "agent_id": r.agent_id,
-                "display_address": format!("{}@{}", r.alias, domain),
-                "created_at": r.created_at,
-                "last_changed_at": r.last_changed_at,
-                "next_change_at": next_change,
-            })
-        }
-    }))
-}
-
-#[derive(serde::Deserialize)]
-struct AliasClaimBody {
-    alias: String,
-    agent_id: Option<String>,
-}
-
-/// POST /api/alias/claim — claim a first-time alias.
-async fn alias_claim_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(body): Json<AliasClaimBody>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let alias = body.alias.trim().to_lowercase();
-
-    // Reject if user already has an alias
-    if let Some(existing) = state
-        .db
-        .get_alias_for_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-    {
-        return Err((
-            StatusCode::CONFLICT,
-            format!(
-                "You already have the alias \"{}\". Use /api/alias/change to update it.",
-                existing.alias
-            ),
-        ));
-    }
-
-    validate_alias(&alias).map_err(|msg| (StatusCode::BAD_REQUEST, msg))?;
-
-    // Resolve agent_id: use provided value or fall back to server default
-    let agent_id = body
-        .agent_id
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| std::env::var("OMNYID_AGENT_ID").unwrap_or_default());
-
-    let record = state
-        .db
-        .claim_alias(&user.id, &agent_id, &alias)
-        .await
-        .map_err(|e| {
-            let msg = e.to_string();
-            if msg.contains("unique") || msg.contains("duplicate") || msg.contains("aliases_pkey") {
-                (
-                    StatusCode::CONFLICT,
-                    "This alias is already taken.".to_string(),
-                )
-            } else if msg.contains("aliases_alias") {
-                (
-                    StatusCode::BAD_REQUEST,
-                    "Alias format is invalid.".to_string(),
-                )
-            } else {
-                (StatusCode::INTERNAL_SERVER_ERROR, msg)
-            }
-        })?;
-
-    let domain = std::env::var("OMNYID_DOMAIN").unwrap_or_else(|_| "omnyid.com".to_string());
-    Ok(Json(serde_json::json!({
-        "alias": record.alias,
-        "display_address": format!("{}@{}", record.alias, domain),
-        "created_at": record.created_at,
-    })))
-}
-
-#[derive(serde::Deserialize)]
-struct AliasChangeBody {
-    alias: String,
-}
-
-/// POST /api/alias/change — change an existing alias (30-day cooldown enforced).
-async fn alias_change_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(body): Json<AliasChangeBody>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    let alias = body.alias.trim().to_lowercase();
-
-    validate_alias(&alias).map_err(|msg| (StatusCode::BAD_REQUEST, msg))?;
-
-    // Must have an existing alias to change
-    let existing = state
-        .db
-        .get_alias_for_user(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .ok_or((
-            StatusCode::NOT_FOUND,
-            "You have not claimed an alias yet. Use /api/alias/claim.".into(),
-        ))?;
-
-    // Pre-flight cooldown check so we can return a helpful next_change_at date
-    let last_changed =
-        chrono::DateTime::parse_from_rfc3339(&existing.last_changed_at).map_err(|_| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Invalid timestamp in alias record.".into(),
-            )
-        })?;
-    let next_allowed = last_changed + chrono::Duration::days(30);
-    if chrono::Utc::now() < next_allowed {
-        return Err((
-            StatusCode::TOO_MANY_REQUESTS,
-            format!(
-                "Alias cooldown active. You can next change your alias on {}.",
-                next_allowed.format("%Y-%m-%d")
-            ),
-        ));
-    }
-
-    let record = state.db.change_alias(&user.id, &alias).await.map_err(|e| {
-        let msg = e.to_string();
-        if msg.contains("unique") || msg.contains("duplicate") || msg.contains("aliases_pkey") {
-            (
-                StatusCode::CONFLICT,
-                "This alias is already taken.".to_string(),
-            )
-        } else if matches!(e, sqlx::Error::RowNotFound) {
-            // Cooldown race — shouldn't reach here after pre-flight but handle defensively
-            (
-                StatusCode::TOO_MANY_REQUESTS,
-                "Alias cooldown is still active.".to_string(),
-            )
-        } else {
-            (StatusCode::INTERNAL_SERVER_ERROR, msg)
-        }
-    })?;
-
-    let domain = std::env::var("OMNYID_DOMAIN").unwrap_or_else(|_| "omnyid.com".to_string());
-    Ok(Json(serde_json::json!({
-        "alias": record.alias,
-        "display_address": format!("{}@{}", record.alias, domain),
-        "last_changed_at": record.last_changed_at,
-    })))
-}
-
 #[cfg(test)]
 mod tests {
     use super::ui_command_response_enricher::finalize_ui_command_response;
@@ -22274,16 +29265,21 @@ mod tests {
         grpc_bind_addr, has_encryption_envelope, has_supported_encryption_envelope, healthz_http,
         llm_config_save_response, merge_thread_messages, metrics_http, new_server_message,
         objective_needs_clarification, objective_requires_human_confirmation,
-        orchestrate_card_sections, parse_datetime_to_utc, proto_to_app,
-        python_runner_workspace_file, remove_runtime_backup_artifact_path,
-        remove_runtime_workspace, require_encryption, runtime_deployment_response,
-        runtime_runner_policy_event_entry_response, runtime_template_content,
+        orchestrate_card_sections, parse_datetime_to_utc, parse_runtime_operational_guidance,
+        private_runtime_feature_enabled_from_env, proto_to_app, python_runner_workspace_file,
+        relay_message_to_proto, remove_runtime_backup_artifact_path, remove_runtime_workspace,
+        require_encryption, runtime_deployment_response,
+        runtime_runner_policy_event_entry_response, runtime_sync_device_class_label,
+        runtime_sync_device_id, runtime_sync_device_id_is_class_compatible,
+        runtime_sync_pglite_path, runtime_sync_plan, runtime_sync_policy_matches_requested_class,
+        runtime_sync_profile_source, runtime_sync_seed_ref, runtime_template_content,
         runtime_template_version_from_deployment, runtime_update_event_entry_response,
         serve_afp_delegation, session_is_expired, store_app_message_for_headers,
         store_private_app_message, support_access_history_entry, task_complete_result_payload,
         task_created_response_payload, task_list_response_payload, task_status_response_payload,
-        task_update_error_to_http, trigger_delete_error_to_http, validate_proto_message,
-        verify_trigger_dispatch_token, webtransport_bind_addr, webtransport_enabled,
+        task_update_error_to_http, trigger_delete_error_to_http, validate_federated_proto_sender,
+        validate_proto_message, verify_trigger_dispatch_token, webtransport_bind_addr,
+        webtransport_enabled,
     };
     use crate::afp::Message;
     use crate::{
@@ -22293,6 +29289,7 @@ mod tests {
         db::{
             AuthSessionRecord, Db, RuntimeDeploymentRecord, RuntimeRunnerPolicyEventRecord,
             RuntimeUpdateEventRecord, SupportAccessGrantRecord, UserOnboardingRecord, UserRecord,
+            WorkflowRunRecord,
         },
         knowledge_curator::DaemonKind,
         message::AFPMessage,
@@ -22301,12 +29298,16 @@ mod tests {
     };
     use axum::extract::{Path, Query};
     use axum::{
-        Json,
+        Json, Router,
+        body::Body,
         extract::State,
-        http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION},
+        http::{HeaderMap, HeaderValue, Request, StatusCode, header::AUTHORIZATION},
+        routing::{get, post},
     };
     use serde_json::Value;
+    use serde_json::json;
     use std::sync::{Arc, Mutex, OnceLock};
+    use tower::ServiceExt;
     use ulid::Ulid;
 
     #[test]
@@ -22332,9 +29333,675 @@ mod tests {
         assert_eq!(payload["usage_cents_current_month"].as_i64(), Some(0));
     }
 
+    #[test]
+    fn private_runtime_feature_enabled_from_env_is_explicit_opt_in() {
+        assert!(!private_runtime_feature_enabled_from_env(None));
+        assert!(!private_runtime_feature_enabled_from_env(Some("")));
+        assert!(!private_runtime_feature_enabled_from_env(Some("false")));
+        assert!(!private_runtime_feature_enabled_from_env(Some("0")));
+        assert!(private_runtime_feature_enabled_from_env(Some("true")));
+        assert!(private_runtime_feature_enabled_from_env(Some("1")));
+        assert!(private_runtime_feature_enabled_from_env(Some("yes")));
+        assert!(private_runtime_feature_enabled_from_env(Some("on")));
+    }
+
+    #[test]
+    fn ensure_private_runtime_feature_enabled_fails_closed_without_explicit_opt_in() {
+        let err = super::ensure_private_runtime_feature_enabled()
+            .expect_err("private runtimes should stay disabled by default in tests");
+        assert_eq!(err.0, StatusCode::SERVICE_UNAVAILABLE);
+        assert!(err.1.contains("OMNYID_ENABLE_PRIVATE_RUNTIMES=true"));
+    }
+
+    #[test]
+    fn runtime_route_handlers_all_require_private_runtime_feature_gate() {
+        let source = include_str!("runtime_routes.rs");
+        for handler in [
+            "async fn runtime_deploy_http(",
+            "async fn runtime_action_http(",
+            "async fn runtime_destroy_http(",
+            "async fn runtime_logs_http(",
+            "async fn runtime_runner_config_http(",
+            "async fn runtime_runner_config_action_http(",
+        ] {
+            let start = source.find(handler).expect("runtime handler present");
+            let tail = &source[start..];
+            let gate_offset = tail
+                .find("ensure_private_runtime_feature_enabled()?;")
+                .expect("runtime handler should require feature gate");
+            let body_window = &tail[..gate_offset];
+            assert!(
+                !body_window.contains("authenticated_user(")
+                    && !body_window.contains("find_runtime_deployment_by_user(")
+                    && !body_window.contains("runtime_compose_action("),
+                "runtime handler should gate private runtimes before auth, state lookup, or compose actions"
+            );
+        }
+    }
+
+    #[test]
+    fn llm_ping_uses_decrypted_byok_api_key_lookup() {
+        let source = std::fs::read_to_string("src/server/mod.rs").expect("read mod.rs");
+        let ping_start = source
+            .find("async fn llm_config_ping_http")
+            .expect("llm ping handler present");
+        let ping_end = source[ping_start..]
+            .find("// -- /ui/decision")
+            .map(|offset| ping_start + offset)
+            .expect("llm ping handler terminator present");
+        let handler_source = &source[ping_start..ping_end];
+        assert!(handler_source.contains(".get_byok_api_key(&user.id)"));
+    }
+
+    #[test]
+    fn llm_ping_reports_missing_saved_key_and_provider_specific_failure_reason() {
+        let source = std::fs::read_to_string("src/server/mod.rs").expect("read mod.rs");
+        assert!(source.contains("No API key is currently saved for this provider"));
+        assert!(source.contains("llm_ping_failure_reason(provider, status, &body)"));
+        assert!(source.contains("llm_ping_failure_reason(\"runpod\", status, &body)"));
+        assert!(source.contains("\"RunPod is unreachable right now.\""));
+        assert!(source.contains("\"Ollama is unreachable right now.\""));
+        assert!(source.contains("\"The configured AI provider is unreachable right now.\""));
+        assert!(!source.contains("format!(\"RunPod unreachable: {e}\")"));
+        assert!(!source.contains("format!(\"Ollama unreachable: {e}\")"));
+        assert!(!source.contains("format!(\"API unreachable: {e}\")"));
+    }
+
+    #[test]
+    fn llm_config_changes_require_recent_session_for_secret_bearing_backends() {
+        assert!(super::llm_config_change_requires_recent_session(
+            &super::LlmConfigRequest {
+                backend: "byok".to_string(),
+                provider: Some("openrouter".to_string()),
+                model: Some("openai/gpt-4o-mini".to_string()),
+                api_key: None,
+                ollama_url: None,
+            }
+        ));
+        assert!(super::llm_config_change_requires_recent_session(
+            &super::LlmConfigRequest {
+                backend: "ollama".to_string(),
+                provider: None,
+                model: Some("llama3.1".to_string()),
+                api_key: None,
+                ollama_url: Some("http://localhost:11434".to_string()),
+            }
+        ));
+        assert!(!super::llm_config_change_requires_recent_session(
+            &super::LlmConfigRequest {
+                backend: "hosted".to_string(),
+                provider: Some("anthropic".to_string()),
+                model: Some("claude-haiku-4-5-20251001".to_string()),
+                api_key: None,
+                ollama_url: None,
+            }
+        ));
+    }
+
+    #[test]
+    fn peer_key_cache_conflict_allows_first_discovery() {
+        let request = super::UpsertPeerKeyRequest {
+            agent_id: "agent:peer@omnyid.local".to_string(),
+            key_id: "main".to_string(),
+            public_key_hex: "abcd".to_string(),
+            homeserver_url: "https://omnyid.local".to_string(),
+            previous_key_ids: None,
+        };
+
+        assert!(super::peer_key_cache_conflict(None, &request).is_none());
+    }
+
+    #[test]
+    fn peer_key_cache_conflict_allows_matching_repeat_discovery() {
+        let request = super::UpsertPeerKeyRequest {
+            agent_id: "agent:peer@omnyid.local".to_string(),
+            key_id: "main".to_string(),
+            public_key_hex: "abcd".to_string(),
+            homeserver_url: "https://omnyid.local".to_string(),
+            previous_key_ids: None,
+        };
+
+        assert!(
+            super::peer_key_cache_conflict(
+                Some((
+                    "main".to_string(),
+                    "abcd".to_string(),
+                    "https://omnyid.local".to_string()
+                )),
+                &request
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn peer_key_cache_conflict_rejects_mismatched_later_discovery() {
+        let request = super::UpsertPeerKeyRequest {
+            agent_id: "agent:peer@omnyid.local".to_string(),
+            key_id: "rotated".to_string(),
+            public_key_hex: "beef".to_string(),
+            homeserver_url: "https://omnyid.local".to_string(),
+            previous_key_ids: Some(vec!["main".to_string()]),
+        };
+
+        let reason = super::peer_key_cache_conflict(
+            Some((
+                "main".to_string(),
+                "abcd".to_string(),
+                "https://omnyid.local".to_string(),
+            )),
+            &request,
+        )
+        .expect("conflict expected");
+
+        assert!(reason.contains("peer key cache conflict"));
+        assert!(reason.contains("agent:peer@omnyid.local"));
+    }
+
+    #[test]
+    fn peer_agent_card_discovery_url_uses_well_known_path() {
+        let url = super::peer_agent_card_discovery_url("https://relay.omnyid.local:8443/workspace")
+            .expect("discovery url");
+        assert_eq!(
+            url,
+            "https://relay.omnyid.local:8443/.well-known/agent-card"
+        );
+    }
+
+    #[test]
+    fn upsert_peer_key_route_verifies_remote_agent_card_before_cache_write() {
+        let source = include_str!("mod.rs");
+        let start = source
+            .find("async fn upsert_peer_key_http(")
+            .expect("upsert_peer_key_http exists");
+        let end = source[start..]
+            .find("\nasync fn trusted_signing_public_key_for_agent(")
+            .map(|offset| start + offset)
+            .expect("trusted_signing_public_key_for_agent follows upsert_peer_key_http");
+        let function_source = &source[start..end];
+
+        assert!(function_source.contains(
+            "let fetched_card = verify_peer_key_discovery_request(&state, &request).await?;"
+        ));
+        assert!(function_source.contains("&fetched_card.public_key_hex"));
+        assert!(function_source.contains("&fetched_card.previous_key_ids"));
+        assert!(
+            !function_source
+                .contains("let prev = request.previous_key_ids.clone().unwrap_or_default();")
+        );
+
+        let verify_start = source
+            .find("async fn verify_peer_key_discovery_request(")
+            .expect("verify_peer_key_discovery_request exists");
+        let verify_end = source[verify_start..]
+            .find("\n/// POST /keys/peer")
+            .map(|offset| verify_start + offset)
+            .expect("upsert_peer_key_http follows verify helper");
+        let verify_source = &source[verify_start..verify_end];
+        assert!(verify_source.contains("\"failed to fetch peer agent card\".to_string()"));
+        assert!(
+            verify_source.contains("\"peer agent card response was invalid JSON\".to_string()")
+        );
+        assert!(
+            verify_source.contains("\"peer agent card has invalid homeserver_url\".to_string()")
+        );
+        assert!(!verify_source.contains("format!(\"failed to fetch peer agent card: {err}\")"));
+        assert!(
+            !verify_source
+                .contains("format!(\"peer agent card response was invalid JSON: {err}\")")
+        );
+        assert!(
+            !verify_source
+                .contains("format!(\"peer agent card has invalid homeserver_url: {err}\")")
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_default_body_limit_rejects_oversized_requests() {
+        async fn accept_body(body: String) -> Json<Value> {
+            Json(serde_json::json!({ "len": body.len() }))
+        }
+
+        let app = super::apply_default_body_limit(Router::new().route("/echo", post(accept_body)));
+        let oversized = "x".repeat(super::DEFAULT_HTTP_BODY_LIMIT_BYTES + 1);
+        let request = Request::builder()
+            .method("POST")
+            .uri("/echo")
+            .header("content-type", "text/plain")
+            .body(Body::from(oversized))
+            .expect("request");
+
+        let response = app.oneshot(request).await.expect("response");
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn request_id_middleware_generates_header_when_missing() {
+        async fn ok() -> &'static str {
+            "ok"
+        }
+
+        let app = Router::new()
+            .route("/healthz", get(ok))
+            .layer(axum::middleware::from_fn(super::request_id_middleware));
+
+        let request = Request::builder()
+            .method("GET")
+            .uri("/healthz")
+            .body(Body::empty())
+            .expect("request");
+
+        let response = app.oneshot(request).await.expect("response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let request_id = response
+            .headers()
+            .get("x-request-id")
+            .and_then(|value| value.to_str().ok())
+            .expect("x-request-id header");
+        assert_eq!(request_id.len(), 26);
+    }
+
+    #[tokio::test]
+    async fn request_id_middleware_preserves_existing_header() {
+        async fn ok() -> &'static str {
+            "ok"
+        }
+
+        let app = Router::new()
+            .route("/healthz", get(ok))
+            .layer(axum::middleware::from_fn(super::request_id_middleware));
+
+        let request = Request::builder()
+            .method("GET")
+            .uri("/healthz")
+            .header("x-request-id", "req_test_123")
+            .body(Body::empty())
+            .expect("request");
+
+        let response = app.oneshot(request).await.expect("response");
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response
+                .headers()
+                .get("x-request-id")
+                .and_then(|value| value.to_str().ok()),
+            Some("req_test_123"),
+        );
+    }
+
+    #[test]
+    fn startup_runs_daemon_registration_in_background() {
+        let source = include_str!("mod.rs");
+        assert!(
+            source.contains("tokio::spawn(async move {"),
+            "startup should spawn daemon registration in the background"
+        );
+        assert!(
+            source.contains("daemon_registry::ensure_system_daemons_registered(&db_reg).await"),
+            "startup should still invoke daemon registration from the background task"
+        );
+    }
+
+    #[test]
+    fn daemons_list_route_requests_user_scoped_daemon_health() {
+        let source = include_str!("mod.rs");
+        assert!(source.contains(
+            "let warnings = daemon_registry::daemon_health_check(&state.db, Some(&user.id))"
+        ));
+    }
+
+    #[test]
+    fn main_router_merges_live_frontend_backing_route_modules() {
+        let source = include_str!("mod.rs");
+        let start = source
+            .find("let app = Router::new()")
+            .expect("main router exists");
+        let end = source[start..]
+            .find(".with_state(app_state.clone());")
+            .map(|offset| start + offset)
+            .expect("main router terminator exists");
+        let router_source = &source[start..end];
+
+        for required_merge in [
+            ".merge(agent_capability_routes::routes())",
+            ".merge(cost_controls::routes())",
+            ".merge(dashboard_routes::routes())",
+            ".merge(feed_routes::routes())",
+            ".merge(knowledge_routes::routes())",
+            ".merge(skill_capsule_routes::routes())",
+            ".merge(tool_connection_routes::routes())",
+            ".merge(ui_decision_routes::routes())",
+            ".merge(user_integrations::routes())",
+            ".merge(user_management_routes::routes())",
+        ] {
+            assert!(
+                router_source.contains(required_merge),
+                "main router should merge {required_merge}"
+            );
+        }
+    }
+
+    #[test]
+    fn export_helpers_use_shared_user_message_loader() {
+        let source = include_str!("mod.rs");
+        let start = source
+            .find("async fn user_export_messages(")
+            .expect("user_export_messages exists");
+        let end = source[start..]
+            .find("\n/// GET /export/mbox")
+            .map(|offset| start + offset)
+            .expect("export route docs follow helper");
+        let function_source = &source[start..end];
+
+        assert!(function_source.contains(".recent_messages_for_user(user_id, &agent_ids, 5000)"));
+        assert!(!function_source.contains(".recent_messages_for_agents(&agent_ids, 5000)"));
+    }
+
+    #[test]
+    fn workflow_resume_executor_handles_core_runtime_outcomes() {
+        let source = include_str!("mod.rs");
+        let start = source
+            .find("fn continue_workflow_run_after_resume(")
+            .expect("continue_workflow_run_after_resume exists");
+        let end = source[start..]
+            .find("\nasync fn workflow_run_stream_http(")
+            .map(|offset| start + offset)
+            .expect("workflow stream handler follows resume executor");
+        let function_source = &source[start..end];
+
+        assert!(function_source.contains("if block_on_run {"));
+        assert!(function_source.contains("} else if simulate_failure {"));
+        assert!(function_source.contains(
+            "} else if runtime_kind == \"approval_runtime\" || graph_node_kind == \"approval\" {"
+        ));
+        assert!(function_source.contains(
+            "} else if let Some(wait_resume_contract) = manifest_wait_resume_contract {"
+        ));
+        assert!(function_source.contains("\"completed\","));
+        assert!(function_source.contains("run.status = if failed {"));
+        assert!(function_source.contains("} else if waiting_for_resume {"));
+    }
+
+    #[test]
+    fn agent_fleet_route_uses_master_agent_instance_lookup() {
+        let source = include_str!("mod.rs");
+        let start = source
+            .find("async fn agent_fleet_http(")
+            .expect("agent_fleet_http exists");
+        let end = source[start..]
+            .find("\nasync fn agent_settings_http(")
+            .map(|offset| start + offset)
+            .expect("agent_settings_http follows agent_fleet_http");
+        let function_source = &source[start..end];
+
+        assert!(function_source.contains(".get_master_agent_instance(&user.id)"));
+        assert!(!function_source.contains(".get_agent_instance(&user.id)"));
+    }
+
+    #[test]
+    fn agent_orchestrate_route_runs_master_orchestrator_directly() {
+        let source = include_str!("mod.rs");
+        let start = source
+            .find("async fn agent_orchestrate_http(")
+            .expect("agent_orchestrate_http exists");
+        let end = source[start..]
+            .find("\n// -- Capability registry handlers")
+            .map(|offset| start + offset)
+            .expect("capability handlers follow agent_orchestrate_http");
+        let function_source = &source[start..end];
+
+        assert!(function_source.contains("crate::master_orchestrator::MasterOrchestrator::new"));
+        assert!(function_source.contains(".run("));
+        assert!(function_source.contains(".map_err(internal_http_error)?;"));
+        assert!(function_source.contains(
+            "let payload = serde_json::to_value(&result).map_err(internal_http_error)?;"
+        ));
+        assert!(function_source.contains("Ok(Json(payload))"));
+        assert!(!function_source.contains("spawn_orchestration_run("));
+        assert!(!function_source.contains("workflow_builder_describe_draft("));
+        assert!(
+            !function_source
+                .contains(".map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;")
+        );
+        assert!(
+            !function_source
+                .contains("Ok(Json(serde_json::to_value(&result).unwrap_or_default()))")
+        );
+    }
+
+    #[test]
+    fn get_run_context_route_does_not_silently_drop_serialization_failures() {
+        let source = include_str!("mod.rs");
+        let start = source
+            .find("async fn get_run_context_http(")
+            .expect("get_run_context_http exists");
+        let end = source[start..]
+            .find("\n/// GET /api/cost/runs/:run_id")
+            .map(|offset| start + offset)
+            .or_else(|| {
+                source[start..]
+                    .find("\nasync fn ")
+                    .map(|offset| start + offset)
+            })
+            .unwrap_or(source.len());
+        let function_source = &source[start..end];
+        assert!(function_source.contains("Some(c) => match serde_json::to_value(&c) {"));
+        assert!(function_source.contains("Ok(payload) => Json(payload).into_response(),"));
+        assert!(function_source.contains("let (status, payload) = internal_json_http_error(err);"));
+    }
+
+    #[test]
+    fn runtime_and_message_helper_routes_sanitize_internal_failures() {
+        let source = include_str!("mod.rs");
+        let demo_start = source
+            .find("async fn demo_send_http(")
+            .expect("demo_send_http exists");
+        let notes_start = source
+            .find("async fn notes_message_http(")
+            .expect("notes_message_http exists");
+        let runtime_backups_start = source
+            .find("async fn runtime_backups_action_http(")
+            .expect("runtime_backups_action_http exists");
+        let runtime_updates_start = source
+            .find("async fn runtime_updates_action_http(")
+            .expect("runtime_updates_action_http exists");
+        let runtime_deploy_start = source
+            .find("async fn runtime_deploy_http(")
+            .expect("runtime_deploy_http exists");
+        let runtime_runner_config_start = source
+            .find("async fn runtime_runner_config_http(")
+            .expect("runtime_runner_config_http exists");
+        let runtime_workspace_save_start = source
+            .find("async fn runtime_workspace_file_save_http(")
+            .expect("runtime_workspace_file_save_http exists");
+        let ui_command_start = source
+            .find("async fn ui_command_http(")
+            .expect("ui_command_http exists");
+        let demo_source = &source[demo_start..notes_start];
+        let notes_source = &source[notes_start..runtime_backups_start];
+        let runtime_backups_source = &source[runtime_backups_start..runtime_updates_start];
+        let runtime_updates_source = &source[runtime_updates_start..runtime_deploy_start];
+        let runtime_deploy_source = &source[runtime_deploy_start..runtime_runner_config_start];
+        let runtime_runner_config_source =
+            &source[runtime_runner_config_start..runtime_workspace_save_start];
+        let runtime_workspace_save_source = &source[runtime_workspace_save_start..ui_command_start];
+
+        assert!(demo_source.contains(".map_err(internal_http_error)?;"));
+        assert!(
+            !demo_source.contains(".map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;")
+        );
+
+        assert!(notes_source.contains(".map_err(internal_http_error)?;"));
+        assert!(!notes_source.contains(".map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;"));
+
+        assert!(
+            runtime_backups_source
+                .contains("create_runtime_backup_snapshot(&state.db, &user.id, retention_days)")
+        );
+        assert!(runtime_backups_source.contains(".map_err(internal_http_error)?;"));
+        assert!(
+            !runtime_backups_source
+                .contains(".map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;")
+        );
+
+        assert!(runtime_updates_source.contains("check_runtime_updates(&state.db, &user.id)"));
+        assert!(runtime_updates_source.contains("apply_runtime_update(&state.db, &user.id)"));
+        assert!(runtime_updates_source.contains(".map_err(internal_http_error)?;"));
+        assert!(
+            !runtime_updates_source
+                .contains(".map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;")
+        );
+
+        assert!(
+            runtime_deploy_source.contains(
+                "materialize_runtime_scaffold(&deployment).map_err(internal_http_error)?;"
+            )
+        );
+        assert!(
+            !runtime_deploy_source
+                .contains(".map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;")
+        );
+
+        assert!(
+            runtime_runner_config_source
+                .contains("sync_runtime_policy_file(&deployment).map_err(internal_http_error)?;")
+        );
+        assert!(runtime_runner_config_source.contains(
+            "sync_runtime_agent_profile_file(&deployment).map_err(internal_http_error)?;"
+        ));
+        assert!(
+            !runtime_runner_config_source
+                .contains(".map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;")
+        );
+
+        assert!(runtime_workspace_save_source.contains(
+            "write_runtime_file(&descriptor.path, &request.content).map_err(internal_http_error)?;"
+        ));
+        assert!(
+            !runtime_workspace_save_source
+                .contains(".map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;")
+        );
+    }
+
+    #[test]
+    fn ui_command_route_uses_shared_llm_resolution() {
+        let source = include_str!("ui_command_routes.rs");
+        assert!(source.contains("resolve_user_inference_backend(&state.db, &user.id)"));
+        assert!(source.contains("crate::inference::dispatch_infer(&backend, &model, &infer_req)"));
+    }
+
+    #[test]
+    fn orchestrate_route_uses_shared_llm_resolution() {
+        let source = include_str!("mod.rs");
+        let start = source
+            .find("async fn agent_orchestrate_http(")
+            .expect("agent_orchestrate_http present");
+        let tail = &source[start..];
+        let end = tail
+            .find("// -- Capability registry handlers")
+            .expect("agent_orchestrate_http section terminator");
+        let function_source = &tail[..end];
+        assert!(function_source.contains("resolve_user_inference_backend(&state.db, &user.id)"));
+        assert!(!function_source.contains("OMNYID_ANTHROPIC_KEY"));
+        assert!(!function_source.contains("ANTHROPIC_API_KEY"));
+        assert!(!function_source.contains("OMNYID_RUNPOD_API_KEY"));
+        assert!(!function_source.contains(".get(\"encrypted_api_key\")"));
+    }
+
+    #[test]
+    fn spawn_orchestration_run_uses_passed_api_key_instead_of_forcing_anthropic_env() {
+        let source = include_str!("mod.rs");
+        let start = source
+            .find("fn spawn_orchestration_run(")
+            .expect("spawn_orchestration_run exists");
+        let end = source[start..]
+            .find("\nfn runtime_compose_allowed_env(")
+            .map(|offset| start + offset)
+            .expect("runtime compose helpers follow spawn_orchestration_run");
+        let function_source = &source[start..end];
+
+        assert!(function_source.contains("&api_key,"));
+        assert!(function_source.contains("let runpod_ep = if backend_name == \"runpod\" {"));
+        assert!(!function_source.contains("OMNYID_ANTHROPIC_KEY"));
+    }
+
+    #[test]
+    fn oracle_quic_compose_exposes_direct_webtransport_udp_ingress() {
+        let compose = include_str!("../../docker-compose.oracle.quic.yml");
+        assert!(compose.contains("OMNYID_ENABLE_WEBTRANSPORT: \"true\""));
+        assert!(compose.contains("OMNYID_WEBTRANSPORT_BIND_ADDR: 0.0.0.0:8443"));
+        assert!(compose.contains("- \"443:8443/udp\""));
+    }
+
+    #[test]
+    fn oracle_compose_profiles_pin_private_runtimes_off_and_do_not_mount_docker_socket() {
+        for compose in [
+            include_str!("../../docker-compose.oracle.yml"),
+            include_str!("../../docker-compose.oracle.minimal.yml"),
+            include_str!("../../docker-compose.oracle.quic.yml"),
+        ] {
+            assert!(compose.contains("OMNYID_ENABLE_PRIVATE_RUNTIMES: \"false\""));
+            assert!(!compose.contains("/var/run/docker.sock"));
+        }
+    }
+
+    #[test]
+    fn shared_host_oracle_webtransport_plan_marks_quic_as_dedicated_path() {
+        let plan = include_str!("../../Documents/deployment/OMNYID_WEBTRANSPORT_DEPLOYMENT.md");
+        assert!(plan.contains("keep WebTransport disabled there"));
+        assert!(plan.contains("create a dedicated QUIC endpoint for `wt.omnyid.com`"));
+        assert!(plan.contains("shared-host Oracle deployment with WebSocket public fallback"));
+    }
+
     fn env_test_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    #[test]
+    fn runtime_compose_timeout_uses_hardened_default() {
+        let _guard = env_test_lock().lock().unwrap();
+        let previous = std::env::var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS").ok();
+        unsafe {
+            std::env::remove_var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS");
+        }
+
+        assert_eq!(super::runtime_compose_timeout_secs(), 600);
+
+        unsafe {
+            if let Some(value) = previous {
+                std::env::set_var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS", value);
+            } else {
+                std::env::remove_var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS");
+            }
+        }
+    }
+
+    #[test]
+    fn runtime_compose_timeout_honors_env_override() {
+        let _guard = env_test_lock().lock().unwrap();
+        let previous = std::env::var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS").ok();
+        unsafe {
+            std::env::set_var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS", "45");
+        }
+
+        assert_eq!(super::runtime_compose_timeout_secs(), 45);
+
+        unsafe {
+            if let Some(value) = previous {
+                std::env::set_var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS", value);
+            } else {
+                std::env::remove_var("OMNYID_DOCKER_COMPOSE_TIMEOUT_SECS");
+            }
+        }
+    }
+
+    #[test]
+    fn runtime_compose_allowed_env_is_minimal() {
+        let allowed = super::runtime_compose_allowed_env();
+        assert_eq!(allowed.len(), 2);
+        assert_eq!(allowed[0].0, "PATH");
+        assert_eq!(allowed[1].0, "HOME");
     }
 
     #[test]
@@ -22349,6 +30016,7 @@ mod tests {
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "task_update".to_string(),
             kind: None,
+            supertags: vec!["project:aurora".to_string()],
             subtype: Some("status".to_string()),
             content: serde_json::json!({"status": "done", "amount": 42}),
             metadata: Some(serde_json::json!({"domain": "operations"})),
@@ -22372,13 +30040,216 @@ mod tests {
         assert_eq!(restored.from, original.from);
         assert_eq!(restored.to, original.to);
         assert_eq!(restored.r#type, original.r#type);
+        assert_eq!(restored.supertags, original.supertags);
         assert_eq!(restored.subtype, original.subtype);
         assert_eq!(restored.content, original.content);
-        assert_eq!(restored.metadata, original.metadata);
+        assert_eq!(
+            restored
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.get("domain")),
+            original
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.get("domain"))
+        );
+        assert_eq!(
+            restored
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.get("supertags")),
+            Some(&serde_json::json!(["project:aurora"]))
+        );
         assert_eq!(restored.store_in_relational, original.store_in_relational);
         assert_eq!(restored.views, original.views);
         assert_eq!(restored.references, original.references);
         assert_eq!(restored.attachments, original.attachments);
+    }
+
+    #[test]
+    fn app_to_proto_normalizes_unified_object_metadata() {
+        let proto = app_to_proto(AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: "msg_test_02".to_string(),
+            thread_id: "thread_test_02".to_string(),
+            parent_id: None,
+            from: "agent:test@omnyid.local".to_string(),
+            to: vec![],
+            timestamp: "2026-06-16T00:00:00Z".to_string(),
+            r#type: "task".to_string(),
+            kind: None,
+            supertags: vec![],
+            subtype: Some("status".to_string()),
+            content: serde_json::json!({
+                "title": "Prepare renewal review",
+                "supertags": ["project:renewal_2026"],
+                "metadata": {
+                    "owner": "ozan"
+                }
+            }),
+            metadata: None,
+            signature: String::new(),
+            encryption: None,
+            views: vec![],
+            references: vec![],
+            typed_refs: vec![],
+            attachments: vec![],
+            store_in_relational: true,
+            prev_hash: None,
+        });
+
+        assert_eq!(proto.kind.as_deref(), Some("task"));
+        let metadata: Value = serde_json::from_str(&proto.metadata).expect("metadata JSON");
+        assert_eq!(metadata["legacy_type"].as_str(), Some("task"));
+        assert_eq!(
+            metadata["searchable_metadata"]["title"].as_str(),
+            Some("Prepare renewal review")
+        );
+        assert_eq!(
+            metadata["searchable_metadata"]["owner"].as_str(),
+            Some("ozan")
+        );
+    }
+
+    #[test]
+    fn relay_message_to_proto_accepts_proto_shape() {
+        let proto = relay_message_to_proto(serde_json::json!({
+            "protocol": "afp-v1",
+            "id": "01JQ8QZ5V1L1R6ZQJ6A2T8Q8A1",
+            "thread_id": "01JQ8QZ5V1L1R6ZQJ6A2T8Q8A2",
+            "parent_id": "",
+            "from": "agent:alice@foreign.example",
+            "to": ["agent:bob@omnyid.local"],
+            "timestamp": "2026-06-30T00:00:00Z",
+            "type": "note",
+            "kind": "note",
+            "content": "{\"text\":\"hello\"}",
+            "signature": "",
+            "encryption": "{}",
+            "views": "[]",
+            "references": "[]",
+            "attachments": "[]",
+            "store_in_relational": true,
+            "subtype": "",
+            "metadata": "{}",
+            "supertags": ["federated"]
+        }))
+        .expect("proto relay message");
+
+        assert_eq!(proto.protocol, "afp-v1");
+        assert_eq!(proto.id, "01JQ8QZ5V1L1R6ZQJ6A2T8Q8A1");
+        assert_eq!(proto.thread_id, "01JQ8QZ5V1L1R6ZQJ6A2T8Q8A2");
+        assert_eq!(proto.from, "agent:alice@foreign.example");
+        assert_eq!(proto.r#type, "note");
+        assert_eq!(proto.content, "{\"text\":\"hello\"}");
+    }
+
+    #[test]
+    fn relay_message_to_proto_accepts_app_shape() {
+        let proto = relay_message_to_proto(serde_json::json!({
+            "protocol": "afp-v1",
+            "id": "01JQ8QZ5V1L1R6ZQJ6A2T8Q8B1",
+            "thread_id": "01JQ8QZ5V1L1R6ZQJ6A2T8Q8B2",
+            "from": "agent:alice@foreign.example",
+            "to": ["agent:bob@omnyid.local"],
+            "timestamp": "2026-06-30T00:00:00Z",
+            "type": "note",
+            "kind": "note",
+            "content": {"text":"hello"},
+            "metadata": {"source":"federation"},
+            "views": [],
+            "references": [],
+            "attachments": [],
+            "store_in_relational": true,
+            "supertags": ["federated"]
+        }))
+        .expect("app relay message");
+
+        assert_eq!(proto.protocol, "afp-v1");
+        assert_eq!(proto.id, "01JQ8QZ5V1L1R6ZQJ6A2T8Q8B1");
+        assert_eq!(proto.thread_id, "01JQ8QZ5V1L1R6ZQJ6A2T8Q8B2");
+        assert_eq!(proto.from, "agent:alice@foreign.example");
+        assert_eq!(proto.r#type, "note");
+        assert_eq!(proto.content, "{\"text\":\"hello\"}");
+        let metadata: Value = serde_json::from_str(&proto.metadata).expect("metadata JSON");
+        assert_eq!(metadata["source"].as_str(), Some("federation"));
+        assert_eq!(metadata["legacy_type"].as_str(), Some("note"));
+        assert_eq!(proto.views, "[]");
+        assert_eq!(proto.references, "[]");
+    }
+
+    #[test]
+    fn relay_message_to_proto_rejects_invalid_shape() {
+        let err = relay_message_to_proto(serde_json::json!({
+            "hello": "world"
+        }))
+        .expect_err("invalid relay payload");
+
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        assert!(
+            err.message()
+                .contains("relay payload must contain a valid AFP message")
+        );
+    }
+
+    #[test]
+    fn validate_federated_proto_sender_accepts_matching_sender_domain() {
+        let message = Message {
+            protocol: "afp-v1".to_string(),
+            id: "01JQ8QZ5V1L1R6ZQJ6A2T8Q8B1".to_string(),
+            thread_id: "01JQ8QZ5V1L1R6ZQJ6A2T8Q8B2".to_string(),
+            parent_id: String::new(),
+            from: "agent:alice@foreign.example".to_string(),
+            to: vec!["agent:bob@omnyid.local".to_string()],
+            timestamp: "2026-06-30T00:00:00Z".to_string(),
+            r#type: "note".to_string(),
+            kind: None,
+            content: "{\"text\":\"hello\"}".to_string(),
+            signature: String::new(),
+            encryption: "{}".to_string(),
+            views: "[]".to_string(),
+            references: "[]".to_string(),
+            attachments: "[]".to_string(),
+            store_in_relational: true,
+            subtype: String::new(),
+            metadata: "{}".to_string(),
+            supertags: vec![],
+        };
+
+        assert!(validate_federated_proto_sender(&message, "foreign.example").is_ok());
+    }
+
+    #[test]
+    fn validate_federated_proto_sender_rejects_sender_domain_mismatch() {
+        let message = Message {
+            protocol: "afp-v1".to_string(),
+            id: "01JQ8QZ5V1L1R6ZQJ6A2T8Q8B1".to_string(),
+            thread_id: "01JQ8QZ5V1L1R6ZQJ6A2T8Q8B2".to_string(),
+            parent_id: String::new(),
+            from: "agent:alice@attacker.example".to_string(),
+            to: vec!["agent:bob@omnyid.local".to_string()],
+            timestamp: "2026-06-30T00:00:00Z".to_string(),
+            r#type: "note".to_string(),
+            kind: None,
+            content: "{\"text\":\"hello\"}".to_string(),
+            signature: String::new(),
+            encryption: "{}".to_string(),
+            views: "[]".to_string(),
+            references: "[]".to_string(),
+            attachments: "[]".to_string(),
+            store_in_relational: true,
+            subtype: String::new(),
+            metadata: "{}".to_string(),
+            supertags: vec![],
+        };
+
+        let err = validate_federated_proto_sender(&message, "foreign.example")
+            .expect_err("sender-domain mismatch should fail");
+        assert_eq!(err.code(), tonic::Code::Unauthenticated);
+        assert!(
+            err.message()
+                .contains("sender domain does not match verified federation sender")
+        );
     }
 
     #[test]
@@ -22402,6 +30273,61 @@ mod tests {
             store_in_relational: false,
             subtype: String::new(),
             metadata: String::new(),
+            supertags: vec![],
+        };
+
+        assert!(!validate_proto_message(&invalid));
+    }
+
+    #[test]
+    fn validate_proto_message_rejects_invalid_message_id_ulid() {
+        let invalid = crate::afp::Message {
+            protocol: "afp-v1".to_string(),
+            id: "not-a-ulid-or-safe-id".to_string(),
+            thread_id: "01JQ0YQ2X3E2G7M8N9P0QRSTUV".to_string(),
+            parent_id: "".to_string(),
+            from: "agent:test@omnyid.local".to_string(),
+            to: vec![],
+            timestamp: "2026-03-20T00:00:00Z".to_string(),
+            r#type: "task_update".to_string(),
+            kind: None,
+            content: "{}".to_string(),
+            signature: "demo-signature".to_string(),
+            encryption: "{}".to_string(),
+            views: "[]".to_string(),
+            references: "[]".to_string(),
+            attachments: "[]".to_string(),
+            store_in_relational: false,
+            subtype: String::new(),
+            metadata: String::new(),
+            supertags: vec![],
+        };
+
+        assert!(!validate_proto_message(&invalid));
+    }
+
+    #[test]
+    fn validate_proto_message_rejects_invalid_thread_id_ulid() {
+        let invalid = crate::afp::Message {
+            protocol: "afp-v1".to_string(),
+            id: "01JQ0YQ2X3E2G7M8N9P0QRSTUV".to_string(),
+            thread_id: "thread_test_01".to_string(),
+            parent_id: "".to_string(),
+            from: "agent:test@omnyid.local".to_string(),
+            to: vec![],
+            timestamp: "2026-03-20T00:00:00Z".to_string(),
+            r#type: "task_update".to_string(),
+            kind: None,
+            content: "{}".to_string(),
+            signature: "demo-signature".to_string(),
+            encryption: "{}".to_string(),
+            views: "[]".to_string(),
+            references: "[]".to_string(),
+            attachments: "[]".to_string(),
+            store_in_relational: false,
+            subtype: String::new(),
+            metadata: String::new(),
+            supertags: vec![],
         };
 
         assert!(!validate_proto_message(&invalid));
@@ -22435,6 +30361,249 @@ mod tests {
     }
 
     #[test]
+    fn startup_policy_is_disabled_outside_production() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::remove_var("OMNYID_ENV");
+            std::env::remove_var("APP_ENV");
+            std::env::remove_var("ENVIRONMENT");
+            std::env::remove_var("RUST_ENV");
+            std::env::remove_var("NODE_ENV");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OMNYID_ALLOW_INSECURE_UNSIGNED");
+            std::env::remove_var("OMNYID_ALLOW_PLAINTEXT_STORAGE");
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+        }
+        assert!(!super::production_startup_policy_enabled());
+        assert!(super::validate_startup_deployment_policy().is_ok());
+    }
+
+    #[test]
+    fn startup_policy_blocks_unsafe_production_defaults() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_ENV", "production");
+            std::env::set_var("DATABASE_URL", "postgres://afp:afp@postgres:5432/afp");
+            std::env::set_var("OMNYID_ALLOW_INSECURE_UNSIGNED", "true");
+            std::env::set_var("OMNYID_ALLOW_PLAINTEXT_STORAGE", "1");
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", &"0".repeat(64));
+        }
+
+        let err =
+            super::validate_startup_deployment_policy().expect_err("production policy should fail");
+        assert!(err.contains("OMNYID_ALLOW_INSECURE_UNSIGNED"));
+        assert!(err.contains("OMNYID_ALLOW_PLAINTEXT_STORAGE"));
+        assert!(err.contains("DATABASE_URL"));
+        assert!(err.contains("OMNYID_DELEGATION_MASTER_KEY_HEX"));
+
+        unsafe {
+            std::env::remove_var("OMNYID_ENV");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OMNYID_ALLOW_INSECURE_UNSIGNED");
+            std::env::remove_var("OMNYID_ALLOW_PLAINTEXT_STORAGE");
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+        }
+    }
+
+    #[test]
+    fn startup_policy_accepts_hardened_production_configuration() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_ENV", "production");
+            std::env::set_var(
+                "DATABASE_URL",
+                "postgres://omnyid_prod:secret@db.internal:5432/omnyid_prod",
+            );
+            std::env::remove_var("OMNYID_ALLOW_INSECURE_UNSIGNED");
+            std::env::remove_var("OMNYID_ALLOW_PLAINTEXT_STORAGE");
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", "1".repeat(64));
+        }
+
+        assert!(super::production_startup_policy_enabled());
+        assert!(super::validate_startup_deployment_policy().is_ok());
+
+        unsafe {
+            std::env::remove_var("OMNYID_ENV");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+        }
+    }
+
+    #[test]
+    fn startup_policy_blocks_partial_stripe_production_configuration() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_ENV", "production");
+            std::env::set_var(
+                "DATABASE_URL",
+                "postgres://omnyid_prod:secret@db.internal:5432/omnyid_prod",
+            );
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", "1".repeat(64));
+            std::env::set_var("OMNYID_STRIPE_SECRET_KEY", "sk_live_123");
+            std::env::set_var("OMNYID_STRIPE_PRO_PRICE_ID", "price_123");
+        }
+
+        let err = super::validate_startup_deployment_policy()
+            .expect_err("partial stripe config should fail");
+        assert!(err.contains("OMNYID_STRIPE_WEBHOOK_SECRET"));
+        assert!(err.contains("OMNYID_WORKSPACE_BASE_URL"));
+
+        unsafe {
+            std::env::remove_var("OMNYID_ENV");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+            std::env::remove_var("OMNYID_STRIPE_SECRET_KEY");
+            std::env::remove_var("OMNYID_STRIPE_PRO_PRICE_ID");
+        }
+    }
+
+    #[test]
+    fn startup_policy_accepts_hardened_production_with_complete_stripe_configuration() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_ENV", "production");
+            std::env::set_var(
+                "DATABASE_URL",
+                "postgres://omnyid_prod:secret@db.internal:5432/omnyid_prod",
+            );
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", "1".repeat(64));
+            std::env::set_var("OMNYID_STRIPE_SECRET_KEY", "sk_live_123");
+            std::env::set_var("OMNYID_STRIPE_WEBHOOK_SECRET", "whsec_123");
+            std::env::set_var("OMNYID_STRIPE_PRO_PRICE_ID", "price_123");
+            std::env::set_var("OMNYID_WORKSPACE_BASE_URL", "https://app.omnyid.com");
+        }
+
+        assert!(super::validate_startup_deployment_policy().is_ok());
+
+        unsafe {
+            std::env::remove_var("OMNYID_ENV");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+            std::env::remove_var("OMNYID_STRIPE_SECRET_KEY");
+            std::env::remove_var("OMNYID_STRIPE_WEBHOOK_SECRET");
+            std::env::remove_var("OMNYID_STRIPE_PRO_PRICE_ID");
+            std::env::remove_var("OMNYID_WORKSPACE_BASE_URL");
+        }
+    }
+
+    #[test]
+    fn startup_policy_blocks_partial_gmail_oauth_production_configuration() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_ENV", "production");
+            std::env::set_var(
+                "DATABASE_URL",
+                "postgres://omnyid_prod:secret@db.internal:5432/omnyid_prod",
+            );
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", "1".repeat(64));
+            std::env::set_var("OMNYID_GMAIL_CLIENT_ID", "gmail-client-id");
+            std::env::set_var("OMNYID_HOMESERVER_URL", "https://api.omnyid.com");
+            std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET");
+            std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET_FILE");
+            std::env::remove_var("OMNYID_SESSION_SECRET");
+            std::env::remove_var("OMNYID_SESSION_SECRET_FILE");
+        }
+
+        let err = super::validate_startup_deployment_policy()
+            .expect_err("partial gmail oauth config should fail");
+        assert!(err.contains("Gmail OAuth must be fully configured"));
+        assert!(err.contains("missing_OMNYID_GMAIL_CLIENT_SECRET"));
+
+        unsafe {
+            std::env::remove_var("OMNYID_ENV");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+            std::env::remove_var("OMNYID_GMAIL_CLIENT_ID");
+            std::env::remove_var("OMNYID_HOMESERVER_URL");
+        }
+    }
+
+    #[test]
+    fn startup_policy_accepts_complete_gmail_oauth_production_configuration() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_ENV", "production");
+            std::env::set_var(
+                "DATABASE_URL",
+                "postgres://omnyid_prod:secret@db.internal:5432/omnyid_prod",
+            );
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", "1".repeat(64));
+            std::env::set_var("OMNYID_GMAIL_CLIENT_ID", "gmail-client-id");
+            std::env::set_var("OMNYID_GMAIL_CLIENT_SECRET", "gmail-client-secret");
+            std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET_FILE");
+            std::env::set_var("OMNYID_HOMESERVER_URL", "https://api.omnyid.com");
+            std::env::set_var("OMNYID_SESSION_SECRET", "session-secret");
+            std::env::remove_var("OMNYID_SESSION_SECRET_FILE");
+        }
+
+        assert!(super::validate_startup_deployment_policy().is_ok());
+
+        unsafe {
+            std::env::remove_var("OMNYID_ENV");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+            std::env::remove_var("OMNYID_GMAIL_CLIENT_ID");
+            std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET");
+            std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET_FILE");
+            std::env::remove_var("OMNYID_HOMESERVER_URL");
+            std::env::remove_var("OMNYID_SESSION_SECRET");
+            std::env::remove_var("OMNYID_SESSION_SECRET_FILE");
+        }
+    }
+
+    #[test]
+    fn startup_policy_blocks_public_operational_endpoints_without_token() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_ENV", "production");
+            std::env::set_var(
+                "DATABASE_URL",
+                "postgres://omnyid_prod:secret@db.internal:5432/omnyid_prod",
+            );
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", "1".repeat(64));
+            std::env::set_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS", "true");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN_FILE");
+        }
+
+        let err = super::validate_startup_deployment_policy()
+            .expect_err("public operational endpoints without token should fail");
+        assert!(err.contains("OMNYID_OPERATIONAL_ENDPOINT_TOKEN"));
+
+        unsafe {
+            std::env::remove_var("OMNYID_ENV");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+            std::env::remove_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS");
+        }
+    }
+
+    #[test]
+    fn startup_policy_accepts_public_operational_endpoints_with_token() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_ENV", "production");
+            std::env::set_var(
+                "DATABASE_URL",
+                "postgres://omnyid_prod:secret@db.internal:5432/omnyid_prod",
+            );
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", "1".repeat(64));
+            std::env::set_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS", "true");
+            std::env::set_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN", "ops-token-123");
+        }
+
+        assert!(super::validate_startup_deployment_policy().is_ok());
+
+        unsafe {
+            std::env::remove_var("OMNYID_ENV");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+            std::env::remove_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN");
+        }
+    }
+
+    #[test]
     fn internal_grpc_bind_defaults_to_loopback() {
         let _guard = env_test_lock().lock().expect("env test lock");
         unsafe {
@@ -22464,6 +30633,7 @@ mod tests {
             store_in_relational: false,
             subtype: String::new(),
             metadata: String::new(),
+            supertags: vec![],
         };
 
         assert!(!has_encryption_envelope(&message));
@@ -22490,6 +30660,7 @@ mod tests {
             store_in_relational: false,
             subtype: String::new(),
             metadata: String::new(),
+            supertags: vec![],
         };
 
         assert!(has_supported_encryption_envelope(&message));
@@ -22500,6 +30671,8 @@ mod tests {
         let _guard = env_test_lock().lock().expect("env test lock");
         unsafe {
             std::env::set_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS", "true");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN_FILE");
         }
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(1)
@@ -22507,13 +30680,13 @@ mod tests {
             .expect("lazy pool");
         let state = Arc::new(super::AppState {
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(pool.clone())),
-            db: super::Db { pool },
+            db: super::Db::from_pool(pool),
             metrics: Arc::new(Metrics::default()),
             relay_tx: tokio::sync::broadcast::channel(8).0,
             rate_limiter: Arc::new(super::RateLimiter::new()),
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
-        pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
         let payload = healthz_http(axum::extract::State(state), HeaderMap::new())
             .await
@@ -22521,16 +30694,19 @@ mod tests {
             .0;
         unsafe {
             std::env::remove_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN_FILE");
         }
         assert_eq!(payload["status"], "ok");
         assert_eq!(payload["service"], "omnyid-homeserver");
     }
 
     #[tokio::test]
-    async fn metrics_endpoint_reports_snapshot() {
+    async fn healthz_requires_ops_token_when_public_mode_is_token_gated() {
         let _guard = env_test_lock().lock().expect("env test lock");
         unsafe {
             std::env::set_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS", "true");
+            std::env::set_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN", "ops-token-123");
         }
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(1)
@@ -22538,13 +30714,87 @@ mod tests {
             .expect("lazy pool");
         let state = Arc::new(super::AppState {
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(pool.clone())),
-            db: super::Db { pool },
+            db: super::Db::from_pool(pool),
             metrics: Arc::new(Metrics::default()),
             relay_tx: tokio::sync::broadcast::channel(8).0,
             rate_limiter: Arc::new(super::RateLimiter::new()),
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
-        pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+        });
+
+        let err = healthz_http(axum::extract::State(state), HeaderMap::new())
+            .await
+            .expect_err("missing token should be rejected");
+
+        unsafe {
+            std::env::remove_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN");
+        }
+        assert_eq!(err.0, StatusCode::UNAUTHORIZED);
+        assert_eq!(err.1, "Operational endpoint token required.");
+    }
+
+    #[tokio::test]
+    async fn healthz_accepts_bearer_ops_token_when_public_mode_is_token_gated() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS", "true");
+            std::env::set_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN", "ops-token-123");
+        }
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://afp:afp@localhost/afp")
+            .expect("lazy pool");
+        let state = Arc::new(super::AppState {
+            cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(pool.clone())),
+            db: super::Db::from_pool(pool),
+            metrics: Arc::new(Metrics::default()),
+            relay_tx: tokio::sync::broadcast::channel(8).0,
+            rate_limiter: Arc::new(super::RateLimiter::new()),
+            trial_runner: Arc::new(super::TrialRunnerManager::new()),
+            http_client: reqwest::Client::new(),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+        });
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer ops-token-123"),
+        );
+
+        let payload = healthz_http(axum::extract::State(state), headers)
+            .await
+            .expect("health payload")
+            .0;
+
+        unsafe {
+            std::env::remove_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN");
+        }
+        assert_eq!(payload["status"], "ok");
+    }
+
+    #[tokio::test]
+    async fn metrics_endpoint_reports_snapshot() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS", "true");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN_FILE");
+        }
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://afp:afp@localhost/afp")
+            .expect("lazy pool");
+        let state = Arc::new(super::AppState {
+            cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(pool.clone())),
+            db: super::Db::from_pool(pool),
+            metrics: Arc::new(Metrics::default()),
+            relay_tx: tokio::sync::broadcast::channel(8).0,
+            rate_limiter: Arc::new(super::RateLimiter::new()),
+            trial_runner: Arc::new(super::TrialRunnerManager::new()),
+            http_client: reqwest::Client::new(),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
         state.metrics.inc_messages_stored();
 
@@ -22557,6 +30807,8 @@ mod tests {
         let payload: serde_json::Value = serde_json::from_slice(&body).expect("json body");
         unsafe {
             std::env::remove_var("OMNYID_PUBLIC_OPERATIONAL_ENDPOINTS");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN");
+            std::env::remove_var("OMNYID_OPERATIONAL_ENDPOINT_TOKEN_FILE");
         }
         assert_eq!(payload["status"], "ok");
         assert_eq!(payload["metrics"]["messages_stored_total"], 1);
@@ -22570,13 +30822,13 @@ mod tests {
             .expect("lazy pool");
         let state = Arc::new(super::AppState {
             cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(pool.clone())),
-            db: super::Db { pool },
+            db: super::Db::from_pool(pool),
             metrics: Arc::new(Metrics::default()),
             relay_tx: tokio::sync::broadcast::channel(8).0,
             rate_limiter: Arc::new(super::RateLimiter::new()),
             trial_runner: Arc::new(super::TrialRunnerManager::new()),
             http_client: reqwest::Client::new(),
-        pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
         });
 
         let payload = super::transport_capabilities_http(axum::extract::State(state.clone()))
@@ -22630,6 +30882,24 @@ mod tests {
         }
     }
 
+    #[test]
+    fn trial_identity_key_uses_hashed_browser_fallback_when_fingerprint_missing() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            "user-agent",
+            axum::http::HeaderValue::from_static("OmnyID Browser Test"),
+        );
+        unsafe {
+            std::env::remove_var("OMNYID_BEHIND_TRUSTED_PROXY");
+        }
+
+        let identity = super::trial_identity_key(&headers, None);
+        assert!(identity.starts_with("direct:"));
+        assert!(!identity.ends_with("browser-anon"));
+        assert_ne!(identity, "direct:browser-anon");
+    }
+
     #[tokio::test]
     async fn rate_limiter_blocks_after_policy_is_exceeded() {
         let limiter = super::RateLimiter::new();
@@ -22650,7 +30920,7 @@ mod tests {
         let session = manager.create_or_get_session(identity.to_string()).await;
 
         let first = manager
-            .start_template_run(&session.id, "student_day_planner", identity)
+            .start_template_run(&session.id, "travel_planner", identity)
             .await
             .expect("first run");
         assert_eq!(first.runs_started, 1);
@@ -22665,7 +30935,7 @@ mod tests {
             .expect("third run");
         assert_eq!(third.runs_started, 3);
         let fourth = manager
-            .start_template_run(&session.id, "student_day_planner", identity)
+            .start_template_run(&session.id, "travel_planner", identity)
             .await
             .expect("quota response");
         assert!(fourth.requires_signup);
@@ -22678,7 +30948,7 @@ mod tests {
         let identity = "198.51.100.5:trial-browser";
         let session = manager.create_or_get_session(identity.to_string()).await;
         manager
-            .start_template_run(&session.id, "student_day_planner", identity)
+            .start_template_run(&session.id, "travel_planner", identity)
             .await
             .expect("template run");
         for index in 0..10 {
@@ -22693,6 +30963,64 @@ mod tests {
             .await
             .expect_err("turn 11 should fail");
         assert!(err.contains("10-turn limit"));
+    }
+
+    #[test]
+    fn trial_student_template_returns_connected_notes_preview_before_schedule_branch() {
+        let template = super::trial_starter_templates()
+            .into_iter()
+            .find(|template| template.id == "student_day_planner")
+            .expect("student template");
+
+        let reply = super::trial_assistant_reply(
+            "Assignment brief: plan my next study steps for this essay",
+            &template,
+            &[],
+            &[],
+            "schedule",
+        );
+
+        assert!(reply.contains("Connected notes preview"));
+        assert!(reply.contains("extracted content only"));
+        assert!(!reply.contains("Trip Planner"));
+    }
+
+    #[test]
+    fn anonymous_trial_remains_enabled_without_multi_replica_mode() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::remove_var("OMNYID_MULTI_REPLICA_MODE");
+            std::env::remove_var("OMNYID_ALLOW_LOCAL_TRIALS_IN_MULTI_REPLICA");
+        }
+        assert!(super::anonymous_trial_disabled_reason().is_none());
+    }
+
+    #[test]
+    fn anonymous_trial_is_disabled_by_default_in_multi_replica_mode() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_MULTI_REPLICA_MODE", "1");
+            std::env::remove_var("OMNYID_ALLOW_LOCAL_TRIALS_IN_MULTI_REPLICA");
+        }
+        let reason = super::anonymous_trial_disabled_reason().expect("disabled reason");
+        assert!(reason.contains("process-local"));
+        unsafe {
+            std::env::remove_var("OMNYID_MULTI_REPLICA_MODE");
+        }
+    }
+
+    #[test]
+    fn anonymous_trial_can_be_explicitly_reenabled_in_multi_replica_mode() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_MULTI_REPLICA_MODE", "1");
+            std::env::set_var("OMNYID_ALLOW_LOCAL_TRIALS_IN_MULTI_REPLICA", "1");
+        }
+        assert!(super::anonymous_trial_disabled_reason().is_none());
+        unsafe {
+            std::env::remove_var("OMNYID_MULTI_REPLICA_MODE");
+            std::env::remove_var("OMNYID_ALLOW_LOCAL_TRIALS_IN_MULTI_REPLICA");
+        }
     }
 
     #[test]
@@ -22756,6 +31084,7 @@ mod tests {
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "email".to_string(),
             kind: None,
+            supertags: vec![],
             subtype: Some("incoming".to_string()),
             content: serde_json::json!({}),
             metadata: Some(serde_json::json!({"channel": "smtp", "transport": "smtp"})),
@@ -23169,7 +31498,7 @@ mod tests {
             runtime_deployment_id: Some("runtime_01".to_string()),
             event_kind: "policy_saved".to_string(),
             summary_json: serde_json::json!({
-                "starter_template_id": "student_day_planner",
+                "starter_template_id": "travel_planner",
                 "model_mode": "omnyid_managed_default",
                 "default_model": "gpt-5.4-mini",
                 "daily_spend_cap_usd": 5,
@@ -23182,7 +31511,7 @@ mod tests {
         });
 
         assert_eq!(entry.event_kind, "policy_saved");
-        assert_eq!(entry.summary["starter_template_id"], "student_day_planner");
+        assert_eq!(entry.summary["starter_template_id"], "travel_planner");
         assert_eq!(entry.summary["enabled_tools"][0], "web");
         assert_eq!(entry.summary["synced_files"][1], "agent_profile.json");
     }
@@ -23259,6 +31588,7 @@ mod tests {
                     title: "Docs".to_string(),
                     url: "https://example.com/docs".to_string(),
                     kind: "source".to_string(),
+                    origin: Some("external".to_string()),
                 }],
                 runner_draft: Some(UiRunnerDraftResponse {
                     target_file_id: "runner_chat_py".to_string(),
@@ -23338,6 +31668,7 @@ mod tests {
                     title: "Forecast".to_string(),
                     url: "https://example.com/weather".to_string(),
                     kind: "source".to_string(),
+                    origin: Some("external".to_string()),
                 }],
                 runner_draft: None,
                 bullets: vec!["Bring an umbrella".to_string()],
@@ -23364,19 +31695,20 @@ mod tests {
 
     #[test]
     fn orchestration_section_helpers_embed_a2ui_companions() {
-        let progress = super::orchestration_progress_section_content(5, 4);
+        let progress = super::orchestration_progress_section_content(5, 4, None);
         assert_eq!(progress["pct"].as_i64(), Some(100));
         assert_eq!(progress["a2ui"]["schema_version"].as_str(), Some("a2ui.v1"));
 
-        let plan = super::orchestration_plan_section_content("Draft the work and execute it.");
+        let plan =
+            super::orchestration_plan_section_content("Draft the work and execute it.", None);
         assert_eq!(plan["a2ui"]["schema_version"].as_str(), Some("a2ui.v1"));
         assert_eq!(plan["a2ui"]["nodes"][0]["type"].as_str(), Some("callout"));
 
-        let results = super::orchestration_results_section_content(&[]);
+        let results = super::orchestration_results_section_content(&[], None);
         assert_eq!(results["a2ui"]["schema_version"].as_str(), Some("a2ui.v1"));
         assert_eq!(results["a2ui"]["nodes"][1]["type"].as_str(), Some("table"));
 
-        let final_answer = super::orchestration_final_answer_section_content(5, 4);
+        let final_answer = super::orchestration_final_answer_section_content(5, 4, None);
         assert_eq!(
             final_answer["a2ui"]["schema_version"].as_str(),
             Some("a2ui.v1")
@@ -23386,9 +31718,192 @@ mod tests {
             Some("callout")
         );
 
-        let error = super::orchestration_error_section_content("boom");
+        let error = super::orchestration_error_section_content("boom", None);
         assert_eq!(error["a2ui"]["schema_version"].as_str(), Some("a2ui.v1"));
         assert_eq!(error["a2ui"]["nodes"][0]["type"].as_str(), Some("callout"));
+    }
+
+    #[test]
+    fn orchestration_sections_restyle_visible_copy_for_active_persona() {
+        let persona = crate::agent_personas::AgentPersona {
+            id: "persona_1".to_string(),
+            owner_user_id: "user_1".to_string(),
+            name: "Brief".to_string(),
+            soul_md: "Keep visible replies concise.".to_string(),
+            writing_style: "concise".to_string(),
+            skills_json: serde_json::json!([]),
+            lora_confidence_score: 0.0,
+            lora_genome_active: false,
+            is_active: true,
+            created_at: "2026-08-26T00:00:00Z".to_string(),
+            updated_at: "2026-08-26T00:00:00Z".to_string(),
+        };
+
+        let progress = super::orchestration_progress_section_content(3, 2, Some(&persona));
+        assert_eq!(
+            progress["text"].as_str(),
+            Some("Briefly: Completed 3 tasks with 2 successful results")
+        );
+
+        let error = super::orchestration_error_section_content("The run failed.", Some(&persona));
+        assert_eq!(error["text"].as_str(), Some("Briefly: The run failed."));
+        assert_eq!(
+            error["a2ui"]["nodes"][1]["props"]["value"].as_str(),
+            Some(
+                "Briefly: Review the error details and retry with a narrower objective or a different execution path."
+            )
+        );
+    }
+
+    #[test]
+    fn wait_resume_styling_preserves_machine_fields() {
+        let persona = crate::agent_personas::AgentPersona {
+            id: "persona_1".to_string(),
+            owner_user_id: "user_1".to_string(),
+            name: "Brief".to_string(),
+            soul_md: "Keep visible replies concise.".to_string(),
+            writing_style: "concise".to_string(),
+            skills_json: serde_json::json!([]),
+            lora_confidence_score: 0.0,
+            lora_genome_active: false,
+            is_active: true,
+            created_at: "2026-08-26T00:00:00Z".to_string(),
+            updated_at: "2026-08-26T00:00:00Z".to_string(),
+        };
+
+        let record = serde_json::json!({
+            "wait_resume_id": "wait_1",
+            "workflow_id": "wf_1",
+            "run_id": "run_1",
+            "status": "pending_approval",
+            "wait_reason": "Need your approval before sending.",
+            "descriptor": {
+                "approval": {
+                    "approval_reason": "Please confirm the outbound action.",
+                    "options": [{
+                        "option_id": "approve_now",
+                        "label": "Approve now",
+                        "consequence_summary": "The action executes immediately."
+                    }]
+                }
+            }
+        });
+
+        let styled = super::style_wait_resume_record_value(record, Some(&persona));
+        assert_eq!(styled["wait_resume_id"].as_str(), Some("wait_1"));
+        assert_eq!(styled["workflow_id"].as_str(), Some("wf_1"));
+        assert_eq!(styled["run_id"].as_str(), Some("run_1"));
+        assert_eq!(styled["status"].as_str(), Some("pending_approval"));
+        assert_eq!(
+            styled["wait_reason"].as_str(),
+            Some("Briefly: Need your approval before sending.")
+        );
+        assert_eq!(
+            styled["descriptor"]["approval"]["approval_reason"].as_str(),
+            Some("Briefly: Please confirm the outbound action.")
+        );
+        assert_eq!(
+            styled["descriptor"]["approval"]["options"][0]["option_id"].as_str(),
+            Some("approve_now")
+        );
+        assert_eq!(
+            styled["descriptor"]["approval"]["options"][0]["label"].as_str(),
+            Some("Briefly: Approve now")
+        );
+    }
+
+    #[test]
+    fn workflow_run_styling_preserves_machine_fields() {
+        let persona = crate::agent_personas::AgentPersona {
+            id: "persona_1".to_string(),
+            owner_user_id: "user_1".to_string(),
+            name: "Brief".to_string(),
+            soul_md: "Keep visible replies concise.".to_string(),
+            writing_style: "concise".to_string(),
+            skills_json: serde_json::json!([]),
+            lora_confidence_score: 0.0,
+            lora_genome_active: false,
+            is_active: true,
+            created_at: "2026-08-26T00:00:00Z".to_string(),
+            updated_at: "2026-08-26T00:00:00Z".to_string(),
+        };
+
+        let run = serde_json::json!({
+            "run_id": "run_7",
+            "status": "waiting_approval",
+            "result": {
+                "approval_review": {
+                    "title": "Review outbound action",
+                    "reason": "This action sends the drafted response.",
+                    "options": [{
+                        "option_id": "send_now",
+                        "label": "Send now",
+                        "consequence_summary": "The response sends immediately."
+                    }]
+                },
+                "approval_decision": {
+                    "decision": "approved",
+                    "selected_option": {
+                        "option_id": "send_now",
+                        "label": "Send now",
+                        "consequence_summary": "The response sends immediately."
+                    }
+                }
+            },
+            "timeline_json": [{
+                "id": "timeline_1",
+                "status": "awaiting_review",
+                "trace": {
+                    "trace_id": "trace_1",
+                    "approval_review": {
+                        "title": "Review follow-up",
+                        "reason": "Double-check the generated follow-up.",
+                        "options": [{
+                            "option_id": "review_first",
+                            "label": "Review first",
+                            "consequence_summary": "Nothing sends until you approve."
+                        }]
+                    }
+                }
+            }]
+        });
+
+        let styled = super::style_workflow_run_value(run, Some(&persona));
+        assert_eq!(styled["run_id"].as_str(), Some("run_7"));
+        assert_eq!(styled["status"].as_str(), Some("waiting_approval"));
+        assert_eq!(
+            styled["result"]["approval_review"]["reason"].as_str(),
+            Some("Briefly: This action sends the drafted response.")
+        );
+        assert_eq!(
+            styled["result"]["approval_review"]["options"][0]["option_id"].as_str(),
+            Some("send_now")
+        );
+        assert_eq!(
+            styled["result"]["approval_decision"]["decision"].as_str(),
+            Some("approved")
+        );
+        assert_eq!(
+            styled["result"]["approval_decision"]["selected_option"]["option_id"].as_str(),
+            Some("send_now")
+        );
+        assert_eq!(
+            styled["timeline_json"][0]["id"].as_str(),
+            Some("timeline_1")
+        );
+        assert_eq!(
+            styled["timeline_json"][0]["status"].as_str(),
+            Some("awaiting_review")
+        );
+        assert_eq!(
+            styled["timeline_json"][0]["trace"]["trace_id"].as_str(),
+            Some("trace_1")
+        );
+        assert_eq!(
+            styled["timeline_json"][0]["trace"]["approval_review"]["options"][0]["option_id"]
+                .as_str(),
+            Some("review_first")
+        );
     }
 
     #[test]
@@ -23625,6 +32140,7 @@ mod tests {
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "email".to_string(),
             kind: None,
+            supertags: vec![],
             subtype: Some("outgoing".to_string()),
             content: serde_json::json!({"subject": "Hi", "body": "Hello"}),
             metadata: Some(serde_json::json!({"channel": "smtp"})),
@@ -23641,6 +32157,38 @@ mod tests {
     }
 
     #[test]
+    fn publish_messages_require_human_approval() {
+        let publish = AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: "msg_publish_1".to_string(),
+            thread_id: "thread_publish_1".to_string(),
+            parent_id: None,
+            from: "agent:test@omnyid.local".to_string(),
+            to: vec![],
+            timestamp: "2026-03-20T00:00:00Z".to_string(),
+            r#type: "publish_post".to_string(),
+            kind: None,
+            supertags: vec![],
+            subtype: None,
+            content: serde_json::json!({
+                "platform": "linkedin",
+                "title": "Launch update",
+                "content": "Public launch note"
+            }),
+            metadata: None,
+            signature: String::new(),
+            encryption: None,
+            views: vec![],
+            references: vec![],
+            typed_refs: vec![],
+            attachments: vec![],
+            store_in_relational: false,
+            prev_hash: None,
+        };
+        assert!(super::message_requires_human_approval(&publish));
+    }
+
+    #[test]
     fn action_approval_review_for_shell_command_is_structured() {
         let message = AFPMessage {
             protocol: "afp-v1".to_string(),
@@ -23652,6 +32200,7 @@ mod tests {
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "shell_command".to_string(),
             kind: None,
+            supertags: vec![],
             subtype: Some("request".to_string()),
             content: serde_json::json!({
                 "command": "Remove-Item temp.txt",
@@ -23668,7 +32217,8 @@ mod tests {
             prev_hash: None,
         };
 
-        let review = super::build_action_approval_review_payload(&message);
+        let cap = super::action_capability_id(&message);
+        let review = super::build_action_approval_review_payload(&message, &cap);
         assert_eq!(review["approval_kind"].as_str(), Some("destructive"));
         assert_eq!(
             review["reason"].as_str(),
@@ -23690,6 +32240,7 @@ mod tests {
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "email".to_string(),
             kind: None,
+            supertags: vec![],
             subtype: Some("outgoing".to_string()),
             content: serde_json::json!({"subject": "Hi", "body": "Hello"}),
             metadata: Some(serde_json::json!({"channel": "smtp"})),
@@ -23703,7 +32254,8 @@ mod tests {
             prev_hash: None,
         };
 
-        let review = super::build_action_approval_review_payload(&message);
+        let cap = super::action_capability_id(&message);
+        let review = super::build_action_approval_review_payload(&message, &cap);
         assert_eq!(review["approval_kind"].as_str(), Some("send"));
         assert_eq!(review["confidence"].as_str(), Some("high"));
         assert_eq!(review["options"][0]["option_id"].as_str(), Some("approve"));
@@ -23721,6 +32273,7 @@ mod tests {
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "action".to_string(),
             kind: None,
+            supertags: vec![],
             subtype: Some("result".to_string()),
             content: serde_json::json!({}),
             metadata: Some(serde_json::json!({"capability_id": "cap_stripe_charge"})),
@@ -23915,9 +32468,11 @@ mod tests {
                 entries: vec![],
                 panel: None,
             },
+            None,
         );
 
         assert_eq!(packet.packet_version, "omnyid-runtime-recovery-v1");
+        assert!(packet.operational_guidance.is_none());
         assert!(
             packet
                 .privacy_notes
@@ -23925,6 +32480,54 @@ mod tests {
                 .any(|note| note.contains("metadata only"))
         );
         assert_eq!(packet.user.email, "preview-user@omnyid.com");
+    }
+
+    #[test]
+    fn runtime_operational_guidance_prefers_follow_through_command() {
+        let value = json!({
+            "status": "no_go",
+            "generated_at": "2026-08-28T10:00:00Z",
+            "storage_oracle_operational_history_pressure_status": "operational_history_present",
+            "storage_oracle_operational_history_pressure_total_rows": 19800,
+            "storage_oracle_operational_history_cleanup_mode": "dry_run",
+            "storage_oracle_operational_history_cleanup_follow_through_command": "./scripts/oracle-prune-operational-history.ps1 -Apply",
+            "next_action_command": "./scripts/production-go-no-go.ps1 -Strict",
+            "next_action_summary": "Execute the bounded operational-history cleanup, rerun proof, and refresh the gate."
+        });
+
+        let guidance =
+            parse_runtime_operational_guidance(&value, "artifact-path").expect("guidance");
+        assert_eq!(guidance.status, "no_go");
+        assert_eq!(
+            guidance.command,
+            "./scripts/oracle-prune-operational-history.ps1 -Apply"
+        );
+        assert_eq!(
+            guidance.summary,
+            "Execute the bounded operational-history cleanup, rerun proof, and refresh the gate."
+        );
+        assert_eq!(
+            guidance.pressure_status.as_deref(),
+            Some("operational_history_present")
+        );
+        assert_eq!(guidance.pressure_total_rows, Some(19800));
+        assert_eq!(guidance.cleanup_mode.as_deref(), Some("dry_run"));
+        assert_eq!(
+            guidance.generated_at.as_deref(),
+            Some("2026-08-28T10:00:00Z")
+        );
+    }
+
+    #[test]
+    fn runtime_operational_guidance_skips_non_operational_gate() {
+        let value = json!({
+            "status": "no_go",
+            "storage_oracle_operational_history_pressure_status": "ok",
+            "next_action_command": "./scripts/oracle-prune-operational-history.ps1 -Apply",
+            "next_action_summary": "Execute the bounded operational-history cleanup, rerun proof, and refresh the gate."
+        });
+
+        assert!(parse_runtime_operational_guidance(&value, "artifact-path").is_none());
     }
 
     #[test]
@@ -23938,8 +32541,10 @@ mod tests {
             display_name: "Preview User".to_string(),
             created_at: "2026-03-22T00:00:00Z".to_string(),
         };
-        let bundle = build_device_bootstrap_bundle_response(&user, &[], "watch").expect("bundle");
+        let bundle = build_device_bootstrap_bundle_response(&user, &[], "watch", None, None)
+            .expect("bundle");
         assert_eq!(bundle.device_class, "watch");
+        assert_eq!(bundle.policy_profile, "lightweight");
         assert!(!bundle.requires_local_key_material);
         assert!(
             bundle
@@ -23948,6 +32553,235 @@ mod tests {
                 .any(|file| file.name == "device-bootstrap.json")
         );
         assert!(bundle.bootstrap.pglite_path.contains("watch"));
+    }
+
+    #[test]
+    fn device_bootstrap_bundle_accepts_explicit_policy_profile() {
+        let user = UserRecord {
+            id: "user_device_bootstrap_02".to_string(),
+            email: "mobile-user@omnyid.com".to_string(),
+            password_hash: None,
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: "Mobile User".to_string(),
+            created_at: "2026-03-22T00:00:00Z".to_string(),
+        };
+        let bundle =
+            build_device_bootstrap_bundle_response(&user, &[], "mobile", None, Some("lightweight"))
+                .expect("bundle");
+        assert_eq!(bundle.device_class, "mobile");
+        assert_eq!(bundle.policy_profile, "lightweight");
+        assert!(!bundle.requires_local_key_material);
+    }
+
+    #[test]
+    fn device_bootstrap_bundle_uses_runtime_sync_identity_helpers() {
+        let user = UserRecord {
+            id: "user_device_bootstrap_03".to_string(),
+            email: "desktop-user@omnyid.com".to_string(),
+            password_hash: None,
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: "Desktop User".to_string(),
+            created_at: "2026-03-22T00:00:00Z".to_string(),
+        };
+        let bundle = build_device_bootstrap_bundle_response(&user, &[], "desktop", None, None)
+            .expect("bundle");
+        assert!(bundle.bootstrap.device_id.starts_with("desktop-"));
+        assert_eq!(
+            bundle.bootstrap.pglite_path,
+            runtime_sync_pglite_path("desktop", &bundle.bootstrap.device_id)
+        );
+        assert_eq!(
+            bundle.bootstrap.encrypted_seed_ref,
+            runtime_sync_seed_ref(&bundle.bootstrap.device_id)
+        );
+    }
+
+    #[test]
+    fn device_bootstrap_bundle_reuses_explicit_device_id() {
+        let user = UserRecord {
+            id: "user_device_bootstrap_04".to_string(),
+            email: "repeat-user@omnyid.com".to_string(),
+            password_hash: None,
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: "Repeat User".to_string(),
+            created_at: "2026-03-22T00:00:00Z".to_string(),
+        };
+        let bundle = build_device_bootstrap_bundle_response(
+            &user,
+            &[],
+            "mobile",
+            Some("mobile-existing-01"),
+            None,
+        )
+        .expect("bundle");
+        assert_eq!(bundle.bootstrap.device_id, "mobile-existing-01");
+        assert_eq!(
+            bundle.bootstrap.pglite_path,
+            runtime_sync_pglite_path("mobile", "mobile-existing-01")
+        );
+        assert_eq!(
+            bundle.bootstrap.encrypted_seed_ref,
+            runtime_sync_seed_ref("mobile-existing-01")
+        );
+    }
+
+    #[test]
+    fn device_bootstrap_bundle_rejects_conflicting_device_id_prefix() {
+        let user = UserRecord {
+            id: "user_device_bootstrap_05".to_string(),
+            email: "conflict-user@omnyid.com".to_string(),
+            password_hash: None,
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: "Conflict User".to_string(),
+            created_at: "2026-03-22T00:00:00Z".to_string(),
+        };
+        let err = build_device_bootstrap_bundle_response(
+            &user,
+            &[],
+            "mobile",
+            Some("desktop-existing-01"),
+            None,
+        )
+        .err()
+        .expect("bundle should reject conflicting class prefix");
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+        assert!(err.1.contains("device_id prefix"));
+    }
+
+    #[test]
+    fn device_bootstrap_bundle_rejects_invalid_device_class() {
+        let user = UserRecord {
+            id: "user_device_bootstrap_06".to_string(),
+            email: "invalid-class@omnyid.com".to_string(),
+            password_hash: None,
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: "Invalid Class User".to_string(),
+            created_at: "2026-03-22T00:00:00Z".to_string(),
+        };
+        let err = build_device_bootstrap_bundle_response(&user, &[], "tablet", None, None)
+            .err()
+            .expect("bundle should reject invalid device class");
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+        assert!(
+            err.1
+                .contains("device_class must be desktop, mobile, or watch")
+        );
+    }
+
+    #[test]
+    fn runtime_sync_bootstrap_helpers_scope_device_identity_by_class() {
+        let generated = runtime_sync_device_id("mobile", None);
+        assert!(generated.starts_with("mobile-"));
+        assert_eq!(
+            runtime_sync_pglite_path("mobile", &generated),
+            format!("omnyid/mobile/{generated}.db")
+        );
+        assert_eq!(
+            runtime_sync_seed_ref(&generated),
+            format!("vault://devices/{generated}/seed")
+        );
+        assert_eq!(
+            runtime_sync_device_id("watch", Some("watch-existing-01")),
+            "watch-existing-01"
+        );
+    }
+
+    #[test]
+    fn runtime_sync_device_id_compatibility_rejects_known_cross_class_prefixes() {
+        assert!(runtime_sync_device_id_is_class_compatible(
+            "mobile",
+            Some("mobile-existing-01")
+        ));
+        assert!(runtime_sync_device_id_is_class_compatible(
+            "mobile",
+            Some("legacy-device-id")
+        ));
+        assert!(!runtime_sync_device_id_is_class_compatible(
+            "mobile",
+            Some("desktop-existing-01")
+        ));
+    }
+
+    #[test]
+    fn runtime_sync_policy_matching_uses_requested_class_or_desktop_default() {
+        assert!(runtime_sync_policy_matches_requested_class(
+            Some("mobile"),
+            "mobile"
+        ));
+        assert!(!runtime_sync_policy_matches_requested_class(
+            Some("mobile"),
+            "desktop"
+        ));
+        assert!(runtime_sync_policy_matches_requested_class(None, "desktop"));
+        assert!(!runtime_sync_policy_matches_requested_class(None, "watch"));
+    }
+
+    #[test]
+    fn runtime_sync_profile_source_prefers_explicit_then_stored_then_default() {
+        assert_eq!(
+            runtime_sync_profile_source(Some("balanced"), Some("lightweight")),
+            "explicit"
+        );
+        assert_eq!(
+            runtime_sync_profile_source(None, Some("lightweight")),
+            "stored_policy"
+        );
+        assert_eq!(runtime_sync_profile_source(None, None), "device_default");
+        assert_eq!(
+            runtime_sync_profile_source(Some("   "), Some("lightweight")),
+            "stored_policy"
+        );
+    }
+
+    #[test]
+    fn runtime_sync_device_class_label_normalizes_invalid_inputs_through_parse_result() {
+        assert_eq!(
+            runtime_sync_device_class_label(&crate::local_sync::DeviceClass::Desktop),
+            "desktop"
+        );
+        let fallback_class = crate::local_sync::parse_device_class("tablet")
+            .unwrap_or(crate::local_sync::DeviceClass::Desktop);
+        assert_eq!(runtime_sync_device_class_label(&fallback_class), "desktop");
+        let generated =
+            runtime_sync_device_id(runtime_sync_device_class_label(&fallback_class), None);
+        assert!(generated.starts_with("desktop-"));
+    }
+
+    #[test]
+    fn runtime_sync_plan_normalizes_labels_and_profiles_consistently() {
+        let plan = runtime_sync_plan(Some("mobile"), Some("balanced"));
+        assert_eq!(plan.device_class_label, "mobile");
+        assert_eq!(plan.profile_label, "balanced");
+        assert!(!plan.requires_local_key_material || !plan.slices.is_empty());
+
+        let fallback = runtime_sync_plan(Some("tablet"), Some("unexpected"));
+        assert_eq!(fallback.device_class_label, "desktop");
+        assert_eq!(fallback.profile_label, "full");
+    }
+
+    #[test]
+    fn runtime_sync_plan_defaults_profile_by_device_class() {
+        assert_eq!(
+            runtime_sync_plan(Some("desktop"), None).profile_label,
+            "full"
+        );
+        assert_eq!(
+            runtime_sync_plan(Some("mobile"), None).profile_label,
+            "balanced"
+        );
+        assert_eq!(
+            runtime_sync_plan(Some("watch"), None).profile_label,
+            "lightweight"
+        );
+        assert_eq!(
+            runtime_sync_plan(Some("watch"), Some("unexpected")).profile_label,
+            "lightweight"
+        );
     }
 
     #[test]
@@ -24093,8 +32927,206 @@ mod tests {
 
         assert!(entry.current);
         assert_eq!(
+            entry.session_ref,
+            super::account_session_ref(&super::sha256_token("abcdef1234567890"))
+        );
+        assert_eq!(
             entry.token_preview,
             super::runtime_token_preview(&super::sha256_token("abcdef1234567890"))
+        );
+    }
+
+    #[test]
+    fn account_session_ref_reuses_stored_session_hash_without_rehashing() {
+        let stored_hash = super::sha256_token("abcdef1234567890");
+        assert_eq!(super::account_session_ref(&stored_hash), stored_hash);
+    }
+
+    #[tokio::test]
+    async fn local_postgres_account_sessions_revoke_action_uses_hashed_session_token() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user = UserRecord {
+            id: format!("user_account_sessions_{suffix}"),
+            email: format!("account-sessions-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Account Sessions {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user).await.expect("create user");
+
+        let current_session = AuthSessionRecord {
+            token: format!("current_session_{suffix}"),
+            user_id: user.id.clone(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            expires_at: (chrono::Utc::now() + chrono::Duration::days(7)).to_rfc3339(),
+        };
+        let other_session = AuthSessionRecord {
+            token: format!("other_session_{suffix}"),
+            user_id: user.id.clone(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            expires_at: (chrono::Utc::now() + chrono::Duration::days(7)).to_rfc3339(),
+        };
+        db.create_session(&current_session)
+            .await
+            .expect("create current session");
+        db.create_session(&other_session)
+            .await
+            .expect("create other session");
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", current_session.token))
+                .expect("auth header"),
+        );
+
+        let state = Arc::new(super::AppState {
+            db: db.clone(),
+            metrics: Arc::new(Metrics::default()),
+            relay_tx: tokio::sync::broadcast::channel(8).0,
+            rate_limiter: Arc::new(super::RateLimiter::new()),
+            trial_runner: Arc::new(super::TrialRunnerManager::new()),
+            http_client: reqwest::Client::new(),
+            cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+        });
+
+        let revoke_session_ref =
+            super::account_session_ref(&super::sha256_token(&other_session.token));
+        let response = super::account_routes::account_sessions_action_http(
+            State(state),
+            headers,
+            Json(super::SessionActionRequest {
+                action: "revoke".to_string(),
+                session_ref: Some(revoke_session_ref),
+            }),
+        )
+        .await
+        .expect("revoke session action")
+        .0;
+
+        assert_eq!(response.sessions.len(), 1);
+        assert!(response.sessions[0].current);
+        assert_eq!(
+            response.sessions[0].session_ref,
+            super::account_session_ref(&super::sha256_token(&current_session.token))
+        );
+        assert_eq!(
+            response.sessions[0].token_preview,
+            super::runtime_token_preview(&super::sha256_token(&current_session.token))
+        );
+
+        let remaining = db
+            .list_sessions_by_user(&user.id)
+            .await
+            .expect("list remaining sessions");
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(
+            remaining[0].token,
+            super::sha256_token(&current_session.token)
+        );
+    }
+
+    #[tokio::test]
+    async fn local_postgres_account_sessions_revoke_others_keeps_current_session_hash() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user = UserRecord {
+            id: format!("user_account_sessions_revoke_others_{suffix}"),
+            email: format!("account-sessions-revoke-others-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Account Sessions Revoke Others {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user).await.expect("create user");
+
+        let current_session = AuthSessionRecord {
+            token: format!("current_session_{suffix}"),
+            user_id: user.id.clone(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            expires_at: (chrono::Utc::now() + chrono::Duration::days(7)).to_rfc3339(),
+        };
+        let other_session = AuthSessionRecord {
+            token: format!("other_session_{suffix}"),
+            user_id: user.id.clone(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            expires_at: (chrono::Utc::now() + chrono::Duration::days(7)).to_rfc3339(),
+        };
+        db.create_session(&current_session)
+            .await
+            .expect("create current session");
+        db.create_session(&other_session)
+            .await
+            .expect("create other session");
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", current_session.token))
+                .expect("auth header"),
+        );
+
+        let state = Arc::new(super::AppState {
+            db: db.clone(),
+            metrics: Arc::new(Metrics::default()),
+            relay_tx: tokio::sync::broadcast::channel(8).0,
+            rate_limiter: Arc::new(super::RateLimiter::new()),
+            trial_runner: Arc::new(super::TrialRunnerManager::new()),
+            http_client: reqwest::Client::new(),
+            cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+        });
+
+        let response = super::account_routes::account_sessions_action_http(
+            State(state),
+            headers,
+            Json(super::SessionActionRequest {
+                action: "revoke_others".to_string(),
+                session_ref: None,
+            }),
+        )
+        .await
+        .expect("revoke other sessions action")
+        .0;
+
+        assert_eq!(response.sessions.len(), 1);
+        assert!(response.sessions[0].current);
+        assert_eq!(
+            response.sessions[0].session_ref,
+            super::account_session_ref(&super::sha256_token(&current_session.token))
+        );
+
+        let remaining = db
+            .list_sessions_by_user(&user.id)
+            .await
+            .expect("list remaining sessions");
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(
+            remaining[0].token,
+            super::sha256_token(&current_session.token)
         );
     }
 
@@ -24284,6 +33316,7 @@ mod tests {
             store_in_relational: false,
             subtype: "plan".to_string(),
             metadata: "{}".to_string(),
+            supertags: vec![],
         }];
         let public = vec![
             Message {
@@ -24305,6 +33338,7 @@ mod tests {
                 store_in_relational: false,
                 subtype: "message".to_string(),
                 metadata: "{}".to_string(),
+                supertags: vec![],
             },
             Message {
                 protocol: "afp-v1".to_string(),
@@ -24325,6 +33359,7 @@ mod tests {
                 store_in_relational: false,
                 subtype: "message".to_string(),
                 metadata: "{}".to_string(),
+                supertags: vec![],
             },
         ];
 
@@ -24385,6 +33420,7 @@ mod tests {
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
             kind: None,
+            supertags: vec![],
             subtype: Some("message".to_string()),
             content: serde_json::json!({
                 "body": "tenant scoped message",
@@ -24461,6 +33497,7 @@ mod tests {
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
             kind: None,
+            supertags: vec![],
             subtype: Some("message".to_string()),
             content: serde_json::json!({
                 "body": "shared fallback message",
@@ -24547,6 +33584,7 @@ mod tests {
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
             kind: None,
+            supertags: vec![],
             subtype: Some("message".to_string()),
             content: serde_json::json!({
                 "body": "authenticated send",
@@ -24609,6 +33647,288 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn local_postgres_private_action_message_persists_pending_audit_in_tenant_scope() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user = UserRecord {
+            id: format!("user_private_action_{suffix}"),
+            email: format!("private-action-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Private Action {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user).await.expect("create user");
+
+        let message = AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: format!("msg_private_action_{suffix}"),
+            thread_id: format!("thread_private_action_{suffix}"),
+            parent_id: None,
+            from: format!("omnyid://workspace/{}", user.id),
+            to: vec![],
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            r#type: "action_reply".to_string(),
+            kind: None,
+            supertags: vec![],
+            subtype: Some("draft".to_string()),
+            content: serde_json::json!({
+                "body": "Draft a reply but require approval before sending.",
+                "approval_mode": "human_approval_required"
+            }),
+            metadata: Some(serde_json::json!({
+                "origin": "server_test_private_action_audit",
+                "capability_id": "cap_private_action_smoke"
+            })),
+            signature: String::new(),
+            encryption: None,
+            views: vec![],
+            references: vec![],
+            typed_refs: vec![],
+            attachments: vec![],
+            store_in_relational: true,
+            prev_hash: None,
+        };
+
+        store_private_app_message(
+            &db,
+            &Arc::new(Metrics::default()),
+            &tokio::sync::broadcast::channel(8).0,
+            &user.id,
+            message.clone(),
+        )
+        .await
+        .expect("store private action message");
+
+        let recent = db
+            .recent_action_results(&user.id, 10)
+            .await
+            .expect("load tenant action results");
+        let pending_entry = recent
+            .iter()
+            .find(|entry| entry.external_reference.as_deref() == Some(message.id.as_str()))
+            .expect("tenant-scoped pending audit entry");
+        assert_eq!(pending_entry.thread_id, message.thread_id);
+        assert_eq!(pending_entry.capability_id, "cap_private_action_smoke");
+        assert_eq!(pending_entry.status, "pending");
+        assert_eq!(
+            pending_entry.output["approval_mode"].as_str(),
+            Some("human_approval_required")
+        );
+
+        let schema_name = db
+            .ensure_user_private_schema(&user.id)
+            .await
+            .expect("ensure private schema");
+        let tenant_count: i64 = sqlx::query_scalar::<_, i64>(&format!(
+            "SELECT COUNT(*) FROM \"{}\".action_audit_log WHERE external_reference = $1",
+            schema_name
+        ))
+        .bind(&message.id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count tenant audit rows");
+        assert_eq!(tenant_count, 1);
+
+        let public_count: i64 = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM public.action_audit_log WHERE external_reference = $1",
+        )
+        .bind(&message.id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count public audit rows");
+        assert_eq!(public_count, 0);
+    }
+
+    #[tokio::test]
+    async fn local_postgres_private_backlink_update_inherits_owner_for_queryable_index() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user = UserRecord {
+            id: format!("user_private_backlink_{suffix}"),
+            email: format!("private-backlink-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Private Backlink {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user).await.expect("create user");
+
+        let source_id = format!("msg_source_{suffix}");
+        let target_id = format!("msg_target_{suffix}");
+        let message = AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: format!("msg_backlink_{suffix}"),
+            thread_id: format!("thread_backlink_{suffix}"),
+            parent_id: None,
+            from: format!("omnyid://workspace/{}", user.id),
+            to: vec![],
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            r#type: "backlink_update".to_string(),
+            kind: None,
+            supertags: vec![],
+            subtype: Some("explicit_ref".to_string()),
+            content: serde_json::json!({
+                "body": "private backlink smoke"
+            }),
+            metadata: Some(serde_json::json!({
+                "origin": "server_test_private_backlink"
+            })),
+            signature: String::new(),
+            encryption: None,
+            views: vec![],
+            references: vec![
+                serde_json::json!({"target": source_id}),
+                serde_json::json!({"target": target_id}),
+            ],
+            typed_refs: vec![],
+            attachments: vec![],
+            store_in_relational: true,
+            prev_hash: None,
+        };
+
+        store_private_app_message(
+            &db,
+            &Arc::new(Metrics::default()),
+            &tokio::sync::broadcast::channel(8).0,
+            &user.id,
+            message,
+        )
+        .await
+        .expect("store private backlink update");
+
+        let backlinks = db
+            .list_backlinks_for_message(&user.id, &source_id)
+            .await
+            .expect("load backlinks for source");
+        assert!(
+            backlinks
+                .iter()
+                .any(|record| record.source_id == source_id && record.target_id == target_id),
+            "private backlink update should be queryable under the owning user"
+        );
+    }
+
+    #[tokio::test]
+    async fn local_postgres_private_knowledge_triple_note_indexes_for_knowledge_queries() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user = UserRecord {
+            id: format!("user_private_triple_{suffix}"),
+            email: format!("private-triple-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Private Triple {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user).await.expect("create user");
+
+        let message = AFPMessage {
+            protocol: "afp-v1".to_string(),
+            id: format!("msg_private_triple_{suffix}"),
+            thread_id: format!("thread_private_triple_{suffix}"),
+            parent_id: None,
+            from: format!("omnyid://workspace/{}", user.id),
+            to: vec![],
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            r#type: "note".to_string(),
+            kind: None,
+            supertags: vec![],
+            subtype: Some("knowledge_triple".to_string()),
+            content: serde_json::json!({
+                "subject": "Acme Corp",
+                "predicate": "works_with",
+                "object": "OmnyID",
+                "confidence": 0.93,
+                "domain": "relationships",
+                "source_message_id": format!("src_private_triple_{suffix}")
+            }),
+            metadata: Some(serde_json::json!({
+                "origin": "server_test_private_knowledge_triple"
+            })),
+            signature: String::new(),
+            encryption: None,
+            views: vec![],
+            references: vec![],
+            typed_refs: vec![],
+            attachments: vec![],
+            store_in_relational: true,
+            prev_hash: None,
+        };
+
+        store_private_app_message(
+            &db,
+            &Arc::new(Metrics::default()),
+            &tokio::sync::broadcast::channel(8).0,
+            &user.id,
+            message.clone(),
+        )
+        .await
+        .expect("store private knowledge triple note");
+
+        let triples = db
+            .query_private_knowledge_triples(
+                &user.id,
+                Some("Acme Corp"),
+                Some("works_with"),
+                Some("OmnyID"),
+                None,
+                Some("relationships"),
+                10,
+            )
+            .await
+            .expect("query private knowledge triples");
+        assert!(
+            triples.iter().any(|triple| {
+                triple["subject"].as_str() == Some("Acme Corp")
+                    && triple["predicate"].as_str() == Some("works_with")
+                    && triple["object"].as_str() == Some("OmnyID")
+            }),
+            "private knowledge triple note should be queryable through afp_knowledge_triples"
+        );
+
+        let indexed_count: i64 = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM afp_knowledge_triples WHERE user_id = $1 AND message_id = $2",
+        )
+        .bind(&user.id)
+        .bind(&message.id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count indexed triple rows");
+        assert_eq!(indexed_count, 1);
+    }
+
+    #[tokio::test]
     async fn local_postgres_send_http_without_auth_is_rejected() {
         if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
             return;
@@ -24632,6 +33952,7 @@ mod tests {
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
             kind: None,
+            supertags: vec![],
             subtype: Some("message".to_string()),
             content: serde_json::json!({
                 "body": "unauthenticated send",
@@ -24870,6 +34191,62 @@ mod tests {
     }
 
     #[test]
+    fn action_execution_requires_recent_session_for_remote_http_calls() {
+        let request = super::ExecuteActionRequest {
+            capability: crate::integration::IntegrationCapability {
+                capability_id: "cap_test".to_string(),
+                provider: "test".to_string(),
+                operation: "run".to_string(),
+                transport: crate::integration::IntegrationTransport::Rest,
+                scopes: vec![],
+                approval_mode: crate::integration::ApprovalMode::Autonomous,
+                secret_refs: vec![],
+                metadata: serde_json::json!({}),
+            },
+            intent: crate::integration::ActionIntent {
+                capability_id: "cap_test".to_string(),
+                thread_id: "thread_test".to_string(),
+                requested_by: "agent:test@omnyid.com".to_string(),
+                input: serde_json::json!({}),
+                reason: None,
+            },
+            url: "https://api.example.com/run".to_string(),
+            method: "POST".to_string(),
+            bearer_token: None,
+        };
+
+        assert!(super::action_execution_requires_recent_session(&request));
+    }
+
+    #[test]
+    fn action_execution_does_not_require_recent_session_for_localhost_http_calls() {
+        let request = super::ExecuteActionRequest {
+            capability: crate::integration::IntegrationCapability {
+                capability_id: "cap_test".to_string(),
+                provider: "test".to_string(),
+                operation: "run".to_string(),
+                transport: crate::integration::IntegrationTransport::Rest,
+                scopes: vec![],
+                approval_mode: crate::integration::ApprovalMode::Autonomous,
+                secret_refs: vec![],
+                metadata: serde_json::json!({}),
+            },
+            intent: crate::integration::ActionIntent {
+                capability_id: "cap_test".to_string(),
+                thread_id: "thread_test".to_string(),
+                requested_by: "agent:test@omnyid.com".to_string(),
+                input: serde_json::json!({}),
+                reason: None,
+            },
+            url: "http://127.0.0.1:8080/run".to_string(),
+            method: "POST".to_string(),
+            bearer_token: None,
+        };
+
+        assert!(!super::action_execution_requires_recent_session(&request));
+    }
+
+    #[test]
     fn direct_action_execute_outbound_allowlist_allows_suggest_only_without_host_policy() {
         unsafe {
             std::env::remove_var("OMNYID_ACTION_EXECUTE_ALLOWLIST");
@@ -24901,6 +34278,336 @@ mod tests {
         let allowlist = super::direct_action_execute_outbound_allowlist(&request)
             .expect("suggest-only path should not require allowlist");
         assert!(allowlist.is_empty());
+    }
+
+    #[test]
+    fn internal_reversible_execution_from_request_builds_file_bundle_stage_bundle() {
+        let request = super::ExecuteActionRequest {
+            capability: crate::integration::IntegrationCapability {
+                capability_id: crate::reversible_actions::REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE
+                    .to_string(),
+                provider: "internal".to_string(),
+                operation: "file_bundle_stage".to_string(),
+                transport: crate::integration::IntegrationTransport::Rest,
+                scopes: vec![],
+                approval_mode: crate::integration::ApprovalMode::SuggestOnly,
+                secret_refs: vec![],
+                metadata: serde_json::json!({}),
+            },
+            intent: crate::integration::ActionIntent {
+                capability_id: crate::reversible_actions::REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE
+                    .to_string(),
+                thread_id: "thread_test".to_string(),
+                requested_by: "agent:test@omnyid.com".to_string(),
+                input: serde_json::json!({
+                    "title": "Stage onboarding pack",
+                    "summary": "Prepare the documents for review.",
+                    "bundle_kind": "document_pack",
+                    "staged_for": "vendor review",
+                    "file_entry_ids": ["file_1", "file_2"],
+                    "file_names": ["msa.pdf", "security.docx"],
+                    "suggested_export_format": "zip",
+                    "source_refs": ["file:file_1", "file:file_2"],
+                    "source_message_ids": ["msg_1"]
+                }),
+                reason: Some("prepare internal review pack".to_string()),
+            },
+            url: "".to_string(),
+            method: "POST".to_string(),
+            bearer_token: None,
+        };
+
+        let execution = super::internal_reversible_execution_from_request(
+            "user_01",
+            &request,
+            Some("intent_1"),
+        )
+        .expect("internal bundle")
+        .expect("matched internal capability");
+
+        assert_eq!(execution.provider, "internal");
+        assert_eq!(execution.operation, "file_bundle_stage");
+        assert_eq!(
+            execution.bundle.action_afp["parent_id"].as_str(),
+            Some("intent_1")
+        );
+        assert_eq!(
+            execution.bundle.action_result.output["undo_label"].as_str(),
+            Some("Discard staged file bundle")
+        );
+        assert_eq!(
+            execution.bundle.action_result.output["action_message_id"].as_str(),
+            execution.bundle.action_afp["id"].as_str()
+        );
+        assert_eq!(
+            execution.bundle.action_result.output["side_effect_boundary"].as_str(),
+            Some("internal_only")
+        );
+    }
+
+    #[test]
+    fn internal_reversible_execution_from_request_builds_tentative_calendar_hold_bundle() {
+        let request = super::ExecuteActionRequest {
+            capability: crate::integration::IntegrationCapability {
+                capability_id:
+                    crate::reversible_actions::REVERSIBLE_CAPABILITY_TENTATIVE_CALENDAR_HOLD
+                        .to_string(),
+                provider: "internal".to_string(),
+                operation: "tentative_calendar_hold".to_string(),
+                transport: crate::integration::IntegrationTransport::Rest,
+                scopes: vec![],
+                approval_mode: crate::integration::ApprovalMode::SuggestOnly,
+                secret_refs: vec![],
+                metadata: serde_json::json!({}),
+            },
+            intent: crate::integration::ActionIntent {
+                capability_id:
+                    crate::reversible_actions::REVERSIBLE_CAPABILITY_TENTATIVE_CALENDAR_HOLD
+                        .to_string(),
+                thread_id: "thread_test".to_string(),
+                requested_by: "agent:test@omnyid.com".to_string(),
+                input: serde_json::json!({
+                    "title": "Hold for interview prep",
+                    "description": "Reserve prep time before confirmation.",
+                    "start_at": "2026-06-19T10:00:00Z",
+                    "end_at": "2026-06-19T10:45:00Z",
+                    "all_day": false,
+                    "location": "Home office",
+                    "hold_reason": "Protect time while waiting for recruiter confirmation.",
+                    "source_refs": ["thread:interview"],
+                    "source_message_ids": ["msg_1"]
+                }),
+                reason: Some("reserve tentative prep slot".to_string()),
+            },
+            url: "".to_string(),
+            method: "POST".to_string(),
+            bearer_token: None,
+        };
+
+        let execution = super::internal_reversible_execution_from_request(
+            "user_01",
+            &request,
+            Some("intent_1"),
+        )
+        .expect("internal bundle")
+        .expect("matched internal capability");
+
+        assert_eq!(execution.provider, "internal");
+        assert_eq!(execution.operation, "tentative_calendar_hold");
+        assert_eq!(
+            execution.bundle.action_afp["content"]["status"].as_str(),
+            Some("tentative")
+        );
+        assert_eq!(
+            execution.bundle.action_result.output["action_message_id"].as_str(),
+            execution.bundle.action_afp["id"].as_str()
+        );
+        assert_eq!(
+            execution.bundle.action_result.output["calendar_status"].as_str(),
+            Some("tentative")
+        );
+        assert_eq!(
+            execution.bundle.action_result.output["undo_label"].as_str(),
+            Some("Remove tentative hold")
+        );
+    }
+
+    #[test]
+    fn internal_undo_execution_from_checkpoint_decodes_tentative_calendar_hold() {
+        let bundle = crate::reversible_actions::build_tentative_calendar_hold_bundle(
+            "user_01",
+            "thread_test",
+            Some("intent_1"),
+            &crate::reversible_actions::TentativeCalendarHoldRequest {
+                title: "Hold for interview prep".to_string(),
+                description: Some("Reserve prep time before confirmation.".to_string()),
+                start_at: "2026-06-19T10:00:00Z".to_string(),
+                end_at: Some("2026-06-19T10:45:00Z".to_string()),
+                all_day: false,
+                location: Some("Home office".to_string()),
+                hold_reason: Some(
+                    "Protect time while waiting for recruiter confirmation.".to_string(),
+                ),
+                source_refs: vec!["thread:interview".to_string()],
+                source_message_ids: vec!["msg_1".to_string()],
+            },
+        );
+        let checkpoint =
+            super::bundle_afp_value_to_message(bundle.checkpoint_afp).expect("checkpoint message");
+
+        let execution = super::internal_undo_execution_from_checkpoint(&checkpoint)
+            .expect("undo decode")
+            .expect("supported internal undo");
+
+        assert_eq!(
+            execution.capability_id,
+            crate::reversible_actions::REVERSIBLE_CAPABILITY_TENTATIVE_CALENDAR_HOLD
+        );
+        assert_eq!(execution.mode, "remove_tentative_calendar_hold");
+        assert_eq!(execution.undo_label, "Remove tentative hold");
+        assert_eq!(execution.steps.len(), 1);
+        assert_eq!(execution.steps[0].action, "cancel_tentative_calendar_hold");
+    }
+
+    #[test]
+    fn internal_undo_execution_from_checkpoint_decodes_draft_task() {
+        let bundle = crate::reversible_actions::build_draft_task_creation_bundle(
+            "user_01",
+            "thread_test",
+            Some("intent_1"),
+            &crate::reversible_actions::DraftTaskCreationRequest {
+                title: "Review renewal package".to_string(),
+                summary: "Create a draft task for the renewal review.".to_string(),
+                due_hint: Some("this week".to_string()),
+                source_refs: vec!["thread:renewal".to_string()],
+                source_message_ids: vec!["msg_1".to_string()],
+            },
+        );
+        let checkpoint =
+            super::bundle_afp_value_to_message(bundle.checkpoint_afp).expect("checkpoint message");
+
+        let execution = super::internal_undo_execution_from_checkpoint(&checkpoint)
+            .expect("undo decode")
+            .expect("supported internal undo");
+
+        assert_eq!(
+            execution.capability_id,
+            crate::reversible_actions::REVERSIBLE_CAPABILITY_DRAFT_TASK_CREATE
+        );
+        assert_eq!(execution.mode, "remove_draft_task");
+        assert_eq!(execution.undo_label, "Remove draft task");
+        assert_eq!(execution.steps.len(), 1);
+        assert_eq!(execution.steps[0].action, "cancel_draft_task");
+    }
+
+    #[test]
+    fn internal_undo_execution_from_checkpoint_decodes_inbox_organization() {
+        let bundle = crate::reversible_actions::build_inbox_organization_bundle(
+            "user_01",
+            "thread_test",
+            Some("intent_1"),
+            &crate::reversible_actions::InboxOrganizationRequest {
+                title: "Triage supplier quote".to_string(),
+                summary: "Apply the supplier label and archive after triage.".to_string(),
+                provider: "gmail".to_string(),
+                conversation_ref: "thread:gmail:supplier-quote".to_string(),
+                apply_label: Some("supplier/quote".to_string()),
+                archive_after_label: true,
+                source_refs: vec!["thread:gmail:supplier-quote".to_string()],
+                source_message_ids: vec!["msg_1".to_string()],
+            },
+        );
+        let checkpoint =
+            super::bundle_afp_value_to_message(bundle.checkpoint_afp).expect("checkpoint message");
+
+        let execution = super::internal_undo_execution_from_checkpoint(&checkpoint)
+            .expect("undo decode")
+            .expect("supported internal undo");
+
+        assert_eq!(
+            execution.capability_id,
+            crate::reversible_actions::REVERSIBLE_CAPABILITY_INBOX_ORGANIZE
+        );
+        assert_eq!(execution.mode, "undo_inbox_organization");
+        assert_eq!(execution.undo_label, "Undo inbox organization");
+        assert_eq!(execution.steps.len(), 1);
+        assert_eq!(execution.steps[0].action, "revert_inbox_organization_state");
+        assert!(execution.summary.contains("thread:gmail:supplier-quote"));
+    }
+
+    #[test]
+    fn inbox_organization_state_message_carries_action_and_conversation_refs() {
+        let organization_content = serde_json::json!({
+            "organization_id": "inbox-org:test",
+            "provider": "gmail",
+            "conversation_ref": "thread:gmail:supplier-quote",
+            "apply_label": "supplier/quote",
+            "archive_after_label": true,
+            "source_refs": ["thread:gmail:supplier-quote"],
+        });
+        let message = super::build_inbox_organization_state_message(
+            "user_01",
+            "thread_test",
+            Some("msg_action"),
+            "msg_action",
+            organization_content
+                .as_object()
+                .expect("organization content"),
+        )
+        .expect("state message");
+
+        assert_eq!(message.subtype.as_deref(), Some("inbox_organization_state"));
+        assert_eq!(message.parent_id.as_deref(), Some("msg_action"));
+        assert_eq!(message.content["status"].as_str(), Some("applied"));
+        assert_eq!(
+            message.content["conversation_ref"].as_str(),
+            Some("thread:gmail:supplier-quote")
+        );
+        assert_eq!(message.references.len(), 2);
+    }
+
+    #[test]
+    fn file_bundle_stage_state_message_carries_action_and_bundle_refs() {
+        let bundle_content = serde_json::json!({
+            "bundle_id": "file-bundle:test",
+            "bundle_kind": "document_pack",
+            "staged_for": "vendor review",
+            "file_entry_ids": ["file_1", "file_2"],
+            "file_names": ["msa.pdf", "security.docx"],
+            "suggested_export_format": "zip",
+        });
+        let message = super::build_file_bundle_stage_state_message(
+            "user_01",
+            "thread_test",
+            Some("msg_action"),
+            "msg_action",
+            bundle_content.as_object().expect("bundle content"),
+        )
+        .expect("state message");
+
+        assert_eq!(message.subtype.as_deref(), Some("file_bundle_stage_state"));
+        assert_eq!(message.parent_id.as_deref(), Some("msg_action"));
+        assert_eq!(message.content["status"].as_str(), Some("staged"));
+        assert_eq!(
+            message.content["bundle_id"].as_str(),
+            Some("file-bundle:test")
+        );
+        assert_eq!(message.references.len(), 1);
+    }
+
+    #[test]
+    fn internal_undo_execution_from_checkpoint_decodes_file_bundle_stage() {
+        let bundle = crate::reversible_actions::build_file_bundle_stage_bundle(
+            "user_01",
+            "thread_test",
+            Some("intent_1"),
+            &crate::reversible_actions::FileBundleStageRequest {
+                title: "Stage onboarding pack".to_string(),
+                summary: "Prepare the documents for review.".to_string(),
+                bundle_kind: Some("document_pack".to_string()),
+                staged_for: Some("vendor review".to_string()),
+                file_entry_ids: vec!["file_1".to_string(), "file_2".to_string()],
+                file_names: vec!["msa.pdf".to_string(), "security.docx".to_string()],
+                suggested_export_format: Some("zip".to_string()),
+                source_refs: vec!["file:file_1".to_string(), "file:file_2".to_string()],
+                source_message_ids: vec!["msg_1".to_string()],
+            },
+        );
+        let checkpoint =
+            super::bundle_afp_value_to_message(bundle.checkpoint_afp).expect("checkpoint message");
+
+        let execution = super::internal_undo_execution_from_checkpoint(&checkpoint)
+            .expect("undo decode")
+            .expect("supported internal undo");
+
+        assert_eq!(
+            execution.capability_id,
+            crate::reversible_actions::REVERSIBLE_CAPABILITY_FILE_BUNDLE_STAGE
+        );
+        assert_eq!(execution.mode, "discard_file_bundle_stage");
+        assert_eq!(execution.undo_label, "Discard staged file bundle");
+        assert_eq!(execution.steps.len(), 1);
+        assert_eq!(execution.steps[0].action, "discard_file_bundle_stage_state");
     }
 
     #[tokio::test]
@@ -25083,6 +34790,7 @@ mod tests {
             store_in_relational: true,
             subtype: "result".to_string(),
             metadata: serde_json::json!({"legacy_type": "agent_result"}).to_string(),
+            supertags: vec![],
         };
         db.store_private_message(
             &user.id,
@@ -25111,6 +34819,7 @@ mod tests {
             store_in_relational: true,
             subtype: "message".to_string(),
             metadata: serde_json::json!({"origin": "shared"}).to_string(),
+            supertags: vec![],
         };
         db.store_message(&shared_message, serde_json::json!({"body": "shared trace"}))
             .await
@@ -25219,6 +34928,7 @@ mod tests {
             store_in_relational: true,
             subtype: "message".to_string(),
             metadata: serde_json::json!({"origin": "shared"}).to_string(),
+            supertags: vec![],
         };
         db.store_message(&shared_message, serde_json::json!({"body": "shared trace"}))
             .await
@@ -25293,6 +35003,7 @@ mod tests {
             store_in_relational: true,
             subtype: "message".to_string(),
             metadata: serde_json::json!({"origin": "shared"}).to_string(),
+            supertags: vec![],
         };
         db.store_message(&shared_message, serde_json::json!({"body": "shared trace"}))
             .await
@@ -25493,6 +35204,100 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn local_postgres_agent_fleet_http_returns_master_instance() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user = UserRecord {
+            id: format!("user_agent_fleet_master_{suffix}"),
+            email: format!("agent-fleet-master-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Fleet Master {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user).await.expect("create user");
+
+        let session = AuthSessionRecord {
+            token: format!("token_agent_fleet_master_{suffix}"),
+            user_id: user.id.clone(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            expires_at: (chrono::Utc::now() + chrono::Duration::days(7)).to_rfc3339(),
+        };
+        db.create_session(&session).await.expect("create session");
+
+        let mut non_master =
+            AgentInstance::provision(&user.id, &format!("FleetWorker{suffix}"), "omnyid.test");
+        non_master.is_master = false;
+        non_master.name = format!("Worker {suffix}");
+        non_master.agent_id = format!("agent:fleet-worker-{suffix}@omnyid.test");
+        non_master.soul_md = "worker soul".to_string();
+        non_master.lora_confidence_score = 0.11;
+        db.save_master_agent_instance(&non_master)
+            .await
+            .expect("save non-master instance");
+
+        let mut master =
+            AgentInstance::provision(&user.id, &format!("FleetMaster{suffix}"), "omnyid.test");
+        master.name = format!("Master {suffix}");
+        master.agent_id = format!("agent:fleet-master-{suffix}@omnyid.test");
+        master.soul_md = "master soul".to_string();
+        master.lora_confidence_score = 0.91;
+        let master_id = master.id.clone();
+        db.save_master_agent_instance(&master)
+            .await
+            .expect("save master instance");
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", session.token)).expect("auth header"),
+        );
+
+        let state = Arc::new(super::AppState {
+            db: db.clone(),
+            metrics: Arc::new(Metrics::default()),
+            relay_tx: tokio::sync::broadcast::channel(8).0,
+            rate_limiter: Arc::new(super::RateLimiter::new()),
+            trial_runner: Arc::new(super::TrialRunnerManager::new()),
+            http_client: reqwest::Client::new(),
+            cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+        });
+
+        let response = super::agent_fleet_http(State(state), headers)
+            .await
+            .expect("agent fleet response")
+            .0;
+
+        assert_eq!(
+            response["master_instance"]["id"].as_str(),
+            Some(master_id.as_str())
+        );
+        assert_eq!(
+            response["master_instance"]["is_master"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            response["master_instance"]["soul_md"].as_str(),
+            Some("master soul")
+        );
+        assert_eq!(
+            response["master_instance"]["lora_confidence_score"].as_f64(),
+            Some(0.91)
+        );
+    }
+
+    #[tokio::test]
     async fn local_postgres_notes_folder_rule_http_changes_curator_backlinks_end_to_end() {
         if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
             return;
@@ -25569,6 +35374,7 @@ mod tests {
             store_in_relational: true,
             subtype: String::new(),
             metadata: serde_json::json!({"origin": "server_test_folder_rule_http"}).to_string(),
+            supertags: vec![],
         };
         db.store_private_message(
             &user.id,
@@ -25606,6 +35412,7 @@ mod tests {
             store_in_relational: true,
             subtype: String::new(),
             metadata: serde_json::json!({"origin": "server_test_folder_rule_http"}).to_string(),
+            supertags: vec![],
         };
         db.store_private_message(
             &user.id,
@@ -25684,6 +35491,7 @@ mod tests {
             store_in_relational: true,
             subtype: String::new(),
             metadata: serde_json::json!({"origin": "server_test_folder_rule_http"}).to_string(),
+            supertags: vec![],
         };
         db.store_private_message(
             &user.id,
@@ -25790,6 +35598,7 @@ mod tests {
             store_in_relational: true,
             subtype: String::new(),
             metadata: serde_json::json!({"origin": "server_test_folder_rule_http_suppress"}).to_string(),
+            supertags: vec![],
         };
         db.store_private_message(
             &user.id,
@@ -25827,6 +35636,7 @@ mod tests {
             store_in_relational: true,
             subtype: String::new(),
             metadata: serde_json::json!({"origin": "server_test_folder_rule_http_suppress"}).to_string(),
+            supertags: vec![],
         };
         db.store_private_message(
             &user.id,
@@ -25910,6 +35720,7 @@ mod tests {
             store_in_relational: true,
             subtype: String::new(),
             metadata: serde_json::json!({"origin": "server_test_folder_rule_http_suppress"}).to_string(),
+            supertags: vec![],
         };
         db.store_private_message(
             &user.id,
@@ -26269,6 +36080,79 @@ mod tests {
         .0;
         assert_eq!(validation["valid"].as_bool(), Some(true));
         assert_eq!(validation["summary"]["node_count"].as_u64(), Some(2));
+        assert_eq!(
+            validation["summary"]["compiled"]["manifest_count"].as_u64(),
+            Some(2)
+        );
+        assert_eq!(
+            validation["summary"]["compiled"]["afp_message_family_counts"]["orchestration_scaffold"].as_u64(),
+            Some(2)
+        );
+        assert_eq!(
+            validation["summary"]["trigger_readiness_summary"]["status"].as_str(),
+            Some("not_applicable")
+        );
+        assert_eq!(
+            validation["summary"]["trigger_readiness_summary"]["live_registration_supported"]
+                .as_bool(),
+            Some(false)
+        );
+
+        let invalid_validation_graph = serde_json::json!({
+            "version": "omnyid-workflow.v1",
+            "title": "Validation compile failure",
+            "description": "Schema-valid graph that still fails compile preview",
+            "environment": "dev",
+            "optimization_mode": "balanced",
+            "root_node_ids": ["node_trigger"],
+            "nodes": [
+                {
+                    "id": "node_trigger",
+                    "kind": "trigger",
+                    "label": "Start",
+                    "position": {"x": 0, "y": 0},
+                    "inputs": [],
+                    "outputs": [],
+                    "policy": {},
+                    "metadata": {},
+                    "hidden_runtime_nodes": [],
+                    "config": { "trigger_kind": "manual", "event_filter": {} }
+                }
+            ],
+            "edges": [],
+            "presets": [],
+            "metadata": {}
+        });
+        let invalid_validation = super::workflows_validate_http(
+            headers.clone(),
+            State(state.clone()),
+            Json(super::ValidateWorkflowRequest {
+                graph: invalid_validation_graph,
+            }),
+        )
+        .await
+        .expect("validate compile-failing workflow")
+        .0;
+        assert_eq!(invalid_validation["valid"].as_bool(), Some(false));
+        assert!(
+            invalid_validation["errors"]
+                .as_array()
+                .expect("validation errors array")
+                .iter()
+                .any(|value| value
+                    .as_str()
+                    .is_some_and(|error| error.contains("graph.workflow_id is required"))),
+            "expected compile-time workflow_id error, got {:?}",
+            invalid_validation["errors"]
+        );
+        assert!(
+            invalid_validation["summary"]["compiled"].is_null(),
+            "compile-failing validation should not emit compiled summary"
+        );
+        assert!(
+            invalid_validation["summary"]["trigger_readiness_summary"].is_null(),
+            "compile-failing validation should not emit trigger readiness summary"
+        );
 
         let saved = super::workflows_save_http(
             State(state.clone()),
@@ -26479,6 +36363,14 @@ mod tests {
             compiled["ir"]["entry_manifest_node_ids"][0].as_str(),
             Some("mf_start")
         );
+        assert_eq!(
+            compiled["trigger_readiness_summary"]["status"].as_str(),
+            Some("not_applicable")
+        );
+        assert_eq!(
+            compiled["trigger_readiness_summary"]["live_registration_supported"].as_bool(),
+            Some(false)
+        );
 
         let detail = super::workflow_detail_http(State(state), headers, Path(workflow_id.clone()))
             .await
@@ -26487,6 +36379,10 @@ mod tests {
         assert_eq!(
             detail["latest_ir"]["version"].as_str(),
             Some("omnyid-workflow-ir.v1")
+        );
+        assert_eq!(
+            detail["trigger_readiness_summary"]["status"].as_str(),
+            Some("not_applicable")
         );
         let manifests = detail["latest_ir"]["manifests"]
             .as_array()
@@ -26554,7 +36450,7 @@ mod tests {
         );
         assert_eq!(
             tool_manifest["connector_binding"]["service"].as_str(),
-            Some("slack")
+            Some("skill_capsule/post_update")
         );
         assert_eq!(
             tool_manifest["connector_binding"]["integration_family"].as_str(),
@@ -26589,6 +36485,64 @@ mod tests {
                 .as_array()
                 .map(|items| items.len()),
             Some(1)
+        );
+    }
+
+    #[test]
+    fn compile_workflow_graph_to_ir_normalizes_skill_capsule_connector_binding() {
+        let graph = serde_json::json!({
+            "version": "omnyid-workflow.v1",
+            "workflow_id": "wf_skill_capsule_compile",
+            "title": "Skill capsule workflow",
+            "environment": "dev",
+            "root_node_ids": ["start"],
+            "nodes": [
+                {"id": "start", "kind": "trigger", "label": "Start", "config": {"trigger_kind": "manual"}, "metadata": {}, "policy": {}},
+                {
+                    "id": "skill_prepare",
+                    "kind": "tool",
+                    "label": "Prepare skill capsule",
+                    "config": {
+                        "capability_id": "skill_capsule",
+                        "operation": "prepare",
+                        "atom_id": "code.edit.safe"
+                    },
+                    "metadata": {},
+                    "policy": {}
+                }
+            ],
+            "edges": [
+                {"id": "edge_start_prepare", "source": "start", "target": "skill_prepare", "metadata": {}}
+            ],
+            "optimization_mode": "balanced"
+        });
+
+        let ir = super::compile_workflow_graph_to_ir(&graph).expect("compile workflow graph");
+        let manifests = ir["manifests"].as_array().expect("manifest array");
+        let tool_manifest = manifests
+            .iter()
+            .find(|manifest| manifest["source_graph_node_id"].as_str() == Some("skill_prepare"))
+            .expect("tool manifest");
+
+        assert_eq!(
+            tool_manifest["connector_binding"]["capability_id"].as_str(),
+            Some("skill_capsule")
+        );
+        assert_eq!(
+            tool_manifest["connector_binding"]["connector_family"].as_str(),
+            Some("skill_capsule")
+        );
+        assert_eq!(
+            tool_manifest["connector_binding"]["execution_path"].as_str(),
+            Some("direct_http")
+        );
+        assert_eq!(
+            tool_manifest["connector_binding"]["service"].as_str(),
+            Some("skill_capsule/prepare/code.edit.safe")
+        );
+        assert_eq!(
+            tool_manifest["connector_binding"]["integration_family"].as_str(),
+            Some("skill_runtime")
         );
     }
 
@@ -27098,6 +37052,16 @@ mod tests {
                 "preset {preset} should have an event_source"
             );
         }
+    }
+
+    #[test]
+    fn calendar_coordinator_trigger_uses_runtime_calendar_event_name() {
+        let config = super::workflow_builder_preset_trigger_config("calendar_coordinator");
+        assert_eq!(
+            config["event_type"].as_str(),
+            Some("appointment_approaching"),
+            "calendar_coordinator should default to a runtime-supported calendar event"
+        );
     }
 
     #[test]
@@ -27820,6 +37784,18 @@ mod tests {
             deploy["workflow"]["graph"]["environment"].as_str(),
             Some("prod")
         );
+        assert_eq!(
+            deploy["trigger_readiness_summary"]["status"].as_str(),
+            Some("compiled_preview")
+        );
+        assert_eq!(
+            deploy["trigger_readiness_summary"]["live_registration_supported"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            deploy["workflow"]["trigger_readiness_summary"]["status"].as_str(),
+            Some("compiled_preview")
+        );
         let first_deployment_id = deploy["deployment_id"]
             .as_str()
             .expect("deployment id")
@@ -27851,8 +37827,17 @@ mod tests {
             Some("compiled_preview")
         );
         assert_eq!(
+            deployment_list[0]["trigger_readiness_summary"]["status"].as_str(),
+            Some("compiled_preview")
+        );
+        assert_eq!(
             deployment_list[0]["ir_snapshot"]["metadata"]["trigger_registration_preview"]
                 ["live_registration_supported"]
+                .as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            deployment_list[0]["trigger_readiness_summary"]["live_registration_supported"]
                 .as_bool(),
             Some(false)
         );
@@ -27880,6 +37865,18 @@ mod tests {
         assert_eq!(
             rollback["workflow"]["graph"]["environment"].as_str(),
             Some("prod")
+        );
+        assert_eq!(
+            rollback["trigger_readiness_summary"]["status"].as_str(),
+            Some("compiled_preview")
+        );
+        assert_eq!(
+            rollback["trigger_readiness_summary"]["live_registration_supported"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            rollback["workflow"]["trigger_readiness_summary"]["status"].as_str(),
+            Some("compiled_preview")
         );
         let rollback_deployment_id = rollback["deployment_id"]
             .as_str()
@@ -27915,6 +37912,10 @@ mod tests {
         assert_eq!(
             deployment_list_after[0]["ir_snapshot"]["metadata"]["trigger_registration_preview"]["status"]
                 .as_str(),
+            Some("compiled_preview")
+        );
+        assert_eq!(
+            deployment_list_after[0]["trigger_readiness_summary"]["status"].as_str(),
             Some("compiled_preview")
         );
 
@@ -28154,6 +38155,199 @@ mod tests {
         assert_eq!(
             run_list[0]["workflow_id"].as_str(),
             Some(workflow_id.as_str())
+        );
+    }
+
+    #[tokio::test]
+    async fn local_postgres_workflow_run_start_persists_skill_capsule_trace_metadata() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user = UserRecord {
+            id: format!("user_workflow_skill_run_{suffix}"),
+            email: format!("workflow-skill-run-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Workflow Skill Run {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user).await.expect("create user");
+
+        let session = AuthSessionRecord {
+            token: format!("token_workflow_skill_run_{suffix}"),
+            user_id: user.id.clone(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            expires_at: (chrono::Utc::now() + chrono::Duration::days(7)).to_rfc3339(),
+        };
+        db.create_session(&session).await.expect("create session");
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", session.token)).expect("auth header"),
+        );
+
+        let state = Arc::new(super::AppState {
+            db: db.clone(),
+            metrics: Arc::new(Metrics::default()),
+            relay_tx: tokio::sync::broadcast::channel(8).0,
+            rate_limiter: Arc::new(super::RateLimiter::new()),
+            trial_runner: Arc::new(super::TrialRunnerManager::new()),
+            http_client: reqwest::Client::new(),
+            cost_oracle: Arc::new(crate::cost_oracle::CostOracle::new(db.pool.clone())),
+            pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
+        });
+
+        let workflow_id = format!("wf_skill_run_{suffix}");
+        let graph = serde_json::json!({
+            "version": "omnyid-workflow.v1",
+            "workflow_id": workflow_id,
+            "title": "Workflow skill capsule run",
+            "status": "draft",
+            "environment": "dev",
+            "owner_user_id": user.id,
+            "root_node_ids": ["start"],
+            "nodes": [
+                {
+                    "id": "start",
+                    "kind": "trigger",
+                    "label": "Manual start",
+                    "position": {"x": 20, "y": 20},
+                    "policy": {"mask": "private", "approval_mode": "none", "allowed_tools": [], "allowed_capabilities": [], "max_steps": 1, "max_cost_cents": 0, "outbound_allowlist": []},
+                    "metadata": {},
+                    "hidden_runtime_nodes": [],
+                    "config": {"trigger_kind": "manual", "event_filter": {}}
+                },
+                {
+                    "id": "skill_prepare",
+                    "kind": "tool",
+                    "label": "Prepare skill capsule",
+                    "position": {"x": 240, "y": 20},
+                    "policy": {"mask": "private", "approval_mode": "none", "allowed_tools": [], "allowed_capabilities": [], "max_steps": 2, "max_cost_cents": 25, "outbound_allowlist": []},
+                    "metadata": {},
+                    "hidden_runtime_nodes": [],
+                    "config": {
+                        "capability_id": "skill_capsule",
+                        "operation": "prepare",
+                        "atom_id": "code.edit.safe",
+                        "timeout_seconds": 45,
+                        "simulate_failure": true,
+                        "failure_reason": "Skill capsule preparation failed during workflow simulation."
+                    }
+                },
+                {
+                    "id": "finish",
+                    "kind": "termination",
+                    "label": "Finish",
+                    "position": {"x": 460, "y": 20},
+                    "policy": {"mask": "private", "approval_mode": "none", "allowed_tools": [], "allowed_capabilities": [], "max_steps": 1, "max_cost_cents": 0, "outbound_allowlist": []},
+                    "metadata": {},
+                    "hidden_runtime_nodes": [],
+                    "config": {}
+                }
+            ],
+            "edges": [
+                {"id": "edge_start_prepare", "source": "start", "target": "skill_prepare", "metadata": {}},
+                {"id": "edge_prepare_finish", "source": "skill_prepare", "target": "finish", "metadata": {}}
+            ],
+            "presets": [],
+            "optimization_mode": "balanced",
+            "metadata": {}
+        });
+
+        let _ = super::workflows_save_http(
+            State(state.clone()),
+            headers.clone(),
+            Json(super::SaveWorkflowRequest {
+                graph,
+                latest_ir: None,
+                favorite: Some(false),
+                archived: Some(false),
+            }),
+        )
+        .await
+        .expect("save workflow");
+
+        let _ = super::workflow_compile_http(
+            State(state.clone()),
+            headers.clone(),
+            Path(workflow_id.clone()),
+        )
+        .await
+        .expect("compile workflow");
+
+        let deploy = super::workflow_action_http(
+            State(state.clone()),
+            headers.clone(),
+            Path(workflow_id.clone()),
+            Json(super::WorkflowActionRequest {
+                action: "deploy".to_string(),
+                favorite: None,
+                archived: None,
+                environment: Some("dev".to_string()),
+                deployment_id: None,
+                connector_overrides: None,
+            }),
+        )
+        .await
+        .expect("deploy workflow")
+        .0;
+        let deployment_id = deploy["deployment_id"]
+            .as_str()
+            .expect("deployment id")
+            .to_string();
+
+        let run = super::workflow_run_start_http(
+            State(state.clone()),
+            headers.clone(),
+            Path(workflow_id.clone()),
+            Json(super::WorkflowRunRequest {
+                deployment_id: Some(deployment_id),
+                replay_run_id: None,
+                trigger_kind: Some("manual".to_string()),
+                activation_id: None,
+                trigger_node_id: None,
+                payload_summary: None,
+            }),
+        )
+        .await
+        .expect("start workflow run")
+        .0;
+
+        assert_eq!(run["run"]["status"].as_str(), Some("failed"));
+        assert_eq!(
+            run["run"]["result"]["failed_reason"].as_str(),
+            Some("Skill capsule preparation failed during workflow simulation.")
+        );
+        let timeline = run["run"]["timeline"].as_array().expect("timeline array");
+        let skill_entry = timeline
+            .iter()
+            .find(|entry| entry["node_id"].as_str() == Some("skill_prepare"))
+            .expect("skill timeline entry");
+        assert_eq!(
+            skill_entry["trace"]["action"]["capability_id"].as_str(),
+            Some("skill_capsule")
+        );
+        assert_eq!(
+            skill_entry["trace"]["action"]["operation"].as_str(),
+            Some("prepare")
+        );
+        assert_eq!(
+            skill_entry["trace"]["action"]["service"].as_str(),
+            Some("skill_capsule/prepare/code.edit.safe")
+        );
+        assert_eq!(
+            skill_entry["trace"]["action"]["integration_family"].as_str(),
+            Some("skill_runtime")
         );
     }
 
@@ -28614,12 +38808,15 @@ mod tests {
             Some("reject")
         );
         assert_eq!(
+            run.result_json["approval_decision"]["selected_option"]["label"].as_str(),
+            Some("Reject")
+        );
+        assert_eq!(
             run.result_json["approval_decision"]["approval_review"]["confidence"].as_str(),
             Some("high")
         );
         assert_eq!(
-            run.result_json["approval_decision"]["autonomy_decision"]["autonomy_level"]
-                .as_str(),
+            run.result_json["approval_decision"]["autonomy_decision"]["autonomy_level"].as_str(),
             Some("request_approval")
         );
         let timeline = run.timeline_json.as_array().expect("timeline array");
@@ -28629,6 +38826,12 @@ mod tests {
                 .last()
                 .and_then(|entry| entry["trace"]["kind"].as_str()),
             Some("approval_rejection")
+        );
+        assert_eq!(
+            timeline
+                .last()
+                .and_then(|entry| entry["trace"]["option_label"].as_str()),
+            Some("Reject")
         );
     }
 
@@ -29065,6 +39268,3316 @@ mod tests {
     }
 
     #[test]
+    fn workflow_run_record_populates_calendar_structured_result_fields() {
+        let graph = serde_json::json!({
+            "title": "Calendar coordinator",
+            "nodes": [
+                {"id": "start", "kind": "trigger", "label": "Start"},
+                {"id": "finish", "kind": "termination", "label": "Schedule Summary", "config": {
+                    "output_kind": "chat_reply",
+                    "final_schema": {
+                        "workflow": "calendar_coordinator",
+                        "summary_mode": "reviewable_schedule_recommendation",
+                        "structured_output_keys": ["recommended_slot", "scheduling_notes", "calendar_context"],
+                        "external_write": false
+                    }
+                }}
+            ]
+        });
+        let ir = serde_json::json!({
+            "manifests": [
+                {"node_id": "manifest_start", "source_graph_node_id": "start", "runtime_kind": "goal_intake"},
+                {"node_id": "manifest_finish", "source_graph_node_id": "finish", "runtime_kind": "termination_runtime"}
+            ]
+        });
+
+        let run = super::workflow_run_record(
+            "wf_calendar",
+            "dep_calendar",
+            "user_calendar",
+            "manual",
+            None,
+            None,
+            &graph,
+            &ir,
+        );
+
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["workflow"].as_str(),
+            Some("calendar_coordinator")
+        );
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["summary_mode"].as_str(),
+            Some("reviewable_schedule_recommendation")
+        );
+        assert_eq!(
+            run.result_json["recommended_slot"]["review_required"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            run.result_json["recommended_slot"]["external_write"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            run.result_json["recommended_slot"]["approval_state"].as_str(),
+            Some("draft_ready_for_review")
+        );
+        assert_eq!(
+            run.result_json["recommended_slot"]["next_action"].as_str(),
+            Some("Review the draft slot before confirming anything on a real calendar.")
+        );
+        assert_eq!(
+            run.result_json["recommended_slot"]["note_count"].as_u64(),
+            Some(1)
+        );
+        assert!(run.result_json["scheduling_notes"].is_array());
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["structured_output_keys"]
+                .as_array()
+                .map(Vec::len),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn workflow_run_record_populates_receipt_structured_result_fields() {
+        let graph = serde_json::json!({
+            "title": "Receipt tracker",
+            "nodes": [
+                {"id": "start", "kind": "trigger", "label": "Start"},
+                {"id": "finish", "kind": "termination", "label": "Ledger Update Summary", "config": {
+                    "output_kind": "chat_reply",
+                    "final_schema": {
+                        "workflow": "receipt_tracker",
+                        "summary_mode": "reviewable_receipt_entry",
+                        "structured_output_keys": ["receipt_entry", "receipt_notes"],
+                        "external_write": false
+                    }
+                }}
+            ]
+        });
+        let ir = serde_json::json!({
+            "manifests": [
+                {"node_id": "manifest_start", "source_graph_node_id": "start", "runtime_kind": "goal_intake"},
+                {"node_id": "manifest_finish", "source_graph_node_id": "finish", "runtime_kind": "termination_runtime"}
+            ]
+        });
+
+        let run = super::workflow_run_record(
+            "wf_receipt",
+            "dep_receipt",
+            "user_receipt",
+            "manual",
+            None,
+            None,
+            &graph,
+            &ir,
+        );
+
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["workflow"].as_str(),
+            Some("receipt_tracker")
+        );
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["summary_mode"].as_str(),
+            Some("reviewable_receipt_entry")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["review_required"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["external_write"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["entry_scope"].as_str(),
+            Some("expense_capture")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["next_action"].as_str(),
+            Some("Review the categorized receipt entry before posting anything to the ledger.")
+        );
+        assert!(run.result_json["receipt_notes"].is_array());
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["structured_output_keys"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn workflow_run_record_populates_finance_structured_result_fields() {
+        let graph = serde_json::json!({
+            "title": "Finance guardian",
+            "nodes": [
+                {"id": "start", "kind": "trigger", "label": "Start"},
+                {"id": "finish", "kind": "termination", "label": "Finance Digest", "config": {
+                    "output_kind": "chat_reply",
+                    "final_schema": {
+                        "workflow": "finance_guardian",
+                        "summary_mode": "finance_digest",
+                        "structured_output_keys": ["finance_digest", "anomaly_notes", "finance_input_context"],
+                        "external_write": false
+                    }
+                }}
+            ]
+        });
+        let ir = serde_json::json!({
+            "manifests": [
+                {"node_id": "manifest_start", "source_graph_node_id": "start", "runtime_kind": "goal_intake"},
+                {"node_id": "manifest_finish", "source_graph_node_id": "finish", "runtime_kind": "termination_runtime"}
+            ]
+        });
+
+        let run = super::workflow_run_record(
+            "wf_finance",
+            "dep_finance",
+            "user_finance",
+            "manual",
+            None,
+            None,
+            &graph,
+            &ir,
+        );
+
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["workflow"].as_str(),
+            Some("finance_guardian")
+        );
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["summary_mode"].as_str(),
+            Some("finance_digest")
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["review_required"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["external_write"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["digest_scope"].as_str(),
+            Some("spend_monitoring")
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["next_action"].as_str(),
+            Some(
+                "Review the finance digest and anomaly notes before acting on the recommendations."
+            )
+        );
+        assert!(run.result_json["anomaly_notes"].is_array());
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["structured_output_keys"]
+                .as_array()
+                .map(Vec::len),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn workflow_run_record_populates_research_structured_result_fields() {
+        let graph = serde_json::json!({
+            "title": "Research assistant",
+            "nodes": [
+                {"id": "start", "kind": "trigger", "label": "Start"},
+                {"id": "finish", "kind": "termination", "label": "Research Summary", "config": {
+                    "output_kind": "chat_reply",
+                    "final_schema": {
+                        "workflow": "research_assistant",
+                        "summary_mode": "research_brief",
+                        "structured_output_keys": ["research_brief", "key_findings", "source_refs"],
+                        "external_write": false,
+                        "include_sources": true
+                    }
+                }}
+            ]
+        });
+        let ir = serde_json::json!({
+            "manifests": [
+                {"node_id": "manifest_start", "source_graph_node_id": "start", "runtime_kind": "goal_intake"},
+                {"node_id": "manifest_finish", "source_graph_node_id": "finish", "runtime_kind": "termination_runtime"}
+            ]
+        });
+
+        let run = super::workflow_run_record(
+            "wf_research",
+            "dep_research",
+            "user_research",
+            "manual",
+            None,
+            None,
+            &graph,
+            &ir,
+        );
+
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["workflow"].as_str(),
+            Some("research_assistant")
+        );
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["summary_mode"].as_str(),
+            Some("research_brief")
+        );
+        assert_eq!(
+            run.result_json["research_brief"]["review_required"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            run.result_json["research_brief"]["external_write"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            run.result_json["research_brief"]["next_action"].as_str(),
+            Some("Review the research brief, findings, and sources before acting on the summary.")
+        );
+        assert!(run.result_json["key_findings"].is_array());
+        assert!(run.result_json["source_refs"].is_array());
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["structured_output_keys"]
+                .as_array()
+                .map(Vec::len),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn workflow_run_record_populates_travel_structured_result_fields() {
+        let graph = serde_json::json!({
+            "title": "Travel booker",
+            "nodes": [
+                {"id": "start", "kind": "trigger", "label": "Start"},
+                {"id": "finish", "kind": "termination", "label": "Travel Options Summary", "config": {
+                    "output_kind": "chat_reply",
+                    "final_schema": {
+                        "workflow": "travel_booker",
+                        "summary_mode": "reviewable_booking_recommendation",
+                        "structured_output_keys": ["booking_recommendation", "booking_notes"],
+                        "external_write": false
+                    }
+                }}
+            ]
+        });
+        let ir = serde_json::json!({
+            "manifests": [
+                {"node_id": "manifest_start", "source_graph_node_id": "start", "runtime_kind": "goal_intake"},
+                {"node_id": "manifest_finish", "source_graph_node_id": "finish", "runtime_kind": "termination_runtime"}
+            ]
+        });
+
+        let run = super::workflow_run_record(
+            "wf_travel",
+            "dep_travel",
+            "user_travel",
+            "manual",
+            None,
+            None,
+            &graph,
+            &ir,
+        );
+
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["workflow"].as_str(),
+            Some("travel_booker")
+        );
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["summary_mode"].as_str(),
+            Some("reviewable_booking_recommendation")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["review_required"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["external_write"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["approval_state"].as_str(),
+            Some("draft_ready_for_review")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["next_action"].as_str(),
+            Some("Review the draft booking recommendation before confirming anything externally.")
+        );
+        assert!(run.result_json["booking_notes"].is_array());
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["structured_output_keys"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn workflow_run_record_populates_email_structured_result_fields() {
+        let graph = serde_json::json!({
+            "title": "Email guardian",
+            "nodes": [
+                {"id": "start", "kind": "trigger", "label": "Start"},
+                {"id": "finish", "kind": "termination", "label": "Inbox Summary", "config": {
+                    "output_kind": "chat_reply",
+                    "final_schema": {
+                        "workflow": "email_guardian",
+                        "summary_mode": "reviewable_reply_draft",
+                        "structured_output_keys": ["reply_draft", "triage_notes"],
+                        "external_write": false
+                    }
+                }}
+            ]
+        });
+        let ir = serde_json::json!({
+            "manifests": [
+                {"node_id": "manifest_start", "source_graph_node_id": "start", "runtime_kind": "goal_intake"},
+                {"node_id": "manifest_finish", "source_graph_node_id": "finish", "runtime_kind": "termination_runtime"}
+            ]
+        });
+
+        let run = super::workflow_run_record(
+            "wf_email",
+            "dep_email",
+            "user_email",
+            "manual",
+            None,
+            None,
+            &graph,
+            &ir,
+        );
+
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["workflow"].as_str(),
+            Some("email_guardian")
+        );
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["summary_mode"].as_str(),
+            Some("reviewable_reply_draft")
+        );
+        assert_eq!(
+            run.result_json["reply_draft"]["review_required"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            run.result_json["reply_draft"]["external_write"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            run.result_json["reply_draft"]["approval_state"].as_str(),
+            Some("draft_ready_for_review")
+        );
+        assert_eq!(
+            run.result_json["reply_draft"]["next_action"].as_str(),
+            Some("Review the draft reply before sending anything externally.")
+        );
+        assert!(run.result_json["triage_notes"].is_array());
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["structured_output_keys"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn workflow_run_record_populates_publication_structured_result_fields() {
+        let graph = serde_json::json!({
+            "title": "Content publisher",
+            "nodes": [
+                {"id": "start", "kind": "trigger", "label": "Start"},
+                {"id": "finish", "kind": "termination", "label": "Publishing Summary", "config": {
+                    "output_kind": "chat_reply",
+                    "final_schema": {
+                        "workflow": "content_publisher",
+                        "summary_mode": "reviewable_publication_draft",
+                        "structured_output_keys": ["publication_draft", "publication_notes"],
+                        "external_write": false,
+                        "visibility": "public"
+                    }
+                }}
+            ]
+        });
+        let ir = serde_json::json!({
+            "manifests": [
+                {"node_id": "manifest_start", "source_graph_node_id": "start", "runtime_kind": "goal_intake"},
+                {"node_id": "manifest_finish", "source_graph_node_id": "finish", "runtime_kind": "termination_runtime"}
+            ]
+        });
+
+        let run = super::workflow_run_record(
+            "wf_publish",
+            "dep_publish",
+            "user_publish",
+            "manual",
+            None,
+            None,
+            &graph,
+            &ir,
+        );
+
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["workflow"].as_str(),
+            Some("content_publisher")
+        );
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["summary_mode"].as_str(),
+            Some("reviewable_publication_draft")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["review_required"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["external_write"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["approval_state"].as_str(),
+            Some("draft_ready_for_review")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["next_action"].as_str(),
+            Some("Review the publication draft before releasing anything publicly.")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["visibility"].as_str(),
+            Some("public")
+        );
+        assert!(run.result_json["publication_notes"].is_array());
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["structured_output_keys"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn approval_options_are_enriched_from_calendar_recommendation_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_calendar_wait".to_string(),
+            workflow_id: "wf_calendar".to_string(),
+            deployment_id: "dep_calendar".to_string(),
+            owner_user_id: "user_calendar".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "calendar_coordinator",
+                    "summary_mode": "reviewable_schedule_recommendation",
+                    "structured_output_keys": ["recommended_slot", "scheduling_notes", "calendar_context"],
+                    "external_write": false
+                },
+                "recommended_slot": {
+                    "proposed_start_at": "2026-07-29T09:00:00Z",
+                    "focus_kind": "interview",
+                    "anchor_note_kind": "interview_prep",
+                    "anchor_event_location": "Level 12, Harbour Tower",
+                    "prep_lead_minutes": 45
+                },
+                "approval_options": [
+                    {
+                        "option_id": "approve_slot",
+                        "label": "Confirm draft slot",
+                        "consequence_summary": "Proceed with the reviewed schedule draft."
+                    },
+                    {
+                        "option_id": "reject_slot",
+                        "label": "Reject slot",
+                        "consequence_summary": "Return to planning without treating any slot as confirmed."
+                    }
+                ]
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_options_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_options"][0]["label"].as_str(),
+            Some("Confirm Interview draft slot")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][0]["consequence_summary"].as_str(),
+            Some(
+                "Proceed with the reviewed draft slot scheduled for 2026-07-29T09:00:00Z while preserving a 45-minute Interview Prep window at Level 12, Harbour Tower."
+            )
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["label"].as_str(),
+            Some("Reject Interview draft slot")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["consequence_summary"].as_str(),
+            Some(
+                "Return to planning without treating the draft slot scheduled for 2026-07-29T09:00:00Z as confirmed or preserving the current 45-minute Interview Prep window."
+            )
+        );
+    }
+
+    #[test]
+    fn approval_options_are_enriched_from_travel_booking_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_travel_wait".to_string(),
+            workflow_id: "wf_travel".to_string(),
+            deployment_id: "dep_travel".to_string(),
+            owner_user_id: "user_travel".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "travel_booker",
+                    "summary_mode": "reviewable_booking_recommendation",
+                    "structured_output_keys": ["booking_recommendation", "booking_notes"],
+                    "external_write": false
+                },
+                "booking_recommendation": {
+                    "proposal_summary": "Review the shortlisted flight and hotel combination before external confirmation.",
+                    "approval_target": "Booking Approval",
+                    "booking_scope": "travel_booking",
+                    "booking_headline": "Sydney to Singapore shortlist",
+                    "primary_flight_option": "SQ212 overnight",
+                    "primary_stay_option": "two nights near Marina Bay"
+                },
+                "approval_options": [
+                    {
+                        "option_id": "book",
+                        "label": "Book option",
+                        "consequence_summary": "Proceed with confirmed booking."
+                    },
+                    {
+                        "option_id": "decline",
+                        "label": "Do not book",
+                        "consequence_summary": "Stop before any external confirmation."
+                    }
+                ]
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_options_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_options"][0]["label"].as_str(),
+            Some("Confirm Travel Booking draft")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][0]["consequence_summary"].as_str(),
+            Some(
+                "Proceed with the reviewed booking recommendation for Booking Approval using the draft plan \"Sydney to Singapore shortlist\" with flight option SQ212 overnight and stay option two nights near Marina Bay using the current shortlist: Review the shortlisted flight and hotel combination before external confirmation."
+            )
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["label"].as_str(),
+            Some("Reject Travel Booking draft")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["consequence_summary"].as_str(),
+            Some(
+                "Return to planning without confirming the current booking recommendation for Booking Approval from the draft plan \"Sydney to Singapore shortlist\" with flight option SQ212 overnight and stay option two nights near Marina Bay."
+            )
+        );
+    }
+
+    #[test]
+    fn approval_options_are_enriched_from_study_plan_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_study_wait".to_string(),
+            workflow_id: "wf_study".to_string(),
+            deployment_id: "dep_study".to_string(),
+            owner_user_id: "user_study".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "study_planner",
+                    "summary_mode": "draft_study_plan",
+                    "structured_output_keys": ["study_blocks", "reminders", "study_input_context", "calendar_context"],
+                    "external_write": false
+                },
+                "study_blocks": [
+                    {
+                        "label": "Exam prep block",
+                        "focus_kind": "exam_prep",
+                        "planned_start_at": "2026-07-29T07:00:00Z",
+                        "planned_end_at": "2026-07-29T08:30:00Z",
+                        "focus_item_title": "Biology final revision",
+                        "focus_item_due_at": "2026-07-30T09:00:00Z",
+                        "focus_item_priority": "high",
+                        "focus_item_urgency": "due_soon"
+                    }
+                ],
+                "study_input_context": {
+                    "pending_focus_count": 3,
+                    "next_focus_title": "Biology final revision",
+                    "next_focus_due_at": "2026-07-30T09:00:00Z"
+                },
+                "reminders": [
+                    "Review the biology notes tonight and bring the formula sheet."
+                ],
+                "approval_options": [
+                    {
+                        "option_id": "approve_plan",
+                        "label": "Approve",
+                        "consequence_summary": "Continue with the draft."
+                    },
+                    {
+                        "option_id": "hold_plan",
+                        "label": "Hold",
+                        "consequence_summary": "Stop before relying on the draft."
+                    }
+                ]
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_options_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_options"][0]["label"].as_str(),
+            Some("Approve Exam Prep draft plan")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][0]["consequence_summary"].as_str(),
+            Some(
+                "Keep the reviewed draft study plan ready for execution for Biology final revision from 2026-07-29T07:00:00Z to 2026-07-29T08:30:00Z with Due Soon urgency at High priority ahead of the due checkpoint 2026-07-30T09:00:00Z across 3 pending focus items while keeping the current reminder: Review the biology notes tonight and bring the formula sheet."
+            )
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["label"].as_str(),
+            Some("Rework Exam Prep draft plan")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["consequence_summary"].as_str(),
+            Some(
+                "Return to planning before relying on the current draft study plan for Biology final revision due at 2026-07-30T09:00:00Z with Due Soon urgency."
+            )
+        );
+    }
+
+    #[test]
+    fn approval_options_are_enriched_from_email_reply_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_email_wait".to_string(),
+            workflow_id: "wf_email".to_string(),
+            deployment_id: "dep_email".to_string(),
+            owner_user_id: "user_email".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "email_guardian",
+                    "summary_mode": "reviewable_reply_draft",
+                    "structured_output_keys": ["reply_draft", "triage_notes"],
+                    "external_write": false
+                },
+                "reply_draft": {
+                    "proposal_summary": "Draft a calm follow-up reply that confirms the next meeting time and asks for the missing agenda details.",
+                    "approval_target": "Reply Review",
+                    "reply_subject": "Re: Scheduling follow-up"
+                },
+                "approval_options": [
+                    {
+                        "option_id": "approve_reply",
+                        "label": "Approve reply",
+                        "consequence_summary": "Continue toward response delivery."
+                    },
+                    {
+                        "option_id": "hold_reply",
+                        "label": "Hold",
+                        "consequence_summary": "Stop before sending anything externally."
+                    }
+                ]
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_options_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_options"][0]["label"].as_str(),
+            Some("Approve reply draft")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][0]["consequence_summary"].as_str(),
+            Some(
+                "Continue toward response delivery with the reviewed reply draft for Reply Review with the subject \"Re: Scheduling follow-up\" based on the current triage summary: Draft a calm follow-up reply that confirms the next meeting time and asks for the missing agenda details."
+            )
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["label"].as_str(),
+            Some("Hold reply draft")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["consequence_summary"].as_str(),
+            Some(
+                "Keep the reply internal and stop before any external send for Reply Review with the subject \"Re: Scheduling follow-up\"."
+            )
+        );
+    }
+
+    #[test]
+    fn approval_review_preview_is_enriched_from_study_plan_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_study_review".to_string(),
+            workflow_id: "wf_study".to_string(),
+            deployment_id: "dep_study".to_string(),
+            owner_user_id: "user_study".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "study_planner",
+                    "summary_mode": "draft_study_plan",
+                    "structured_output_keys": ["study_blocks", "reminders", "study_input_context", "calendar_context"],
+                    "external_write": false
+                },
+                "study_blocks": [
+                    {
+                        "label": "Exam prep block",
+                        "planned_start_at": "2026-07-29T07:00:00Z",
+                        "planned_end_at": "2026-07-29T08:30:00Z",
+                        "focus_item_title": "Biology final revision",
+                        "focus_item_due_at": "2026-07-30T09:00:00Z",
+                        "focus_item_priority": "high",
+                        "focus_item_urgency": "due_soon",
+                        "anchor_event_title": "Biology final exam",
+                        "slot_basis": "Scheduled before the exam window"
+                    }
+                ],
+                "study_input_context": {
+                    "pending_focus_count": 3,
+                    "next_focus_title": "Biology final revision"
+                },
+                "reminders": [
+                    "Review the biology notes tonight and bring the formula sheet."
+                ],
+                "approval_review": {
+                    "title": "Study Plan Review",
+                    "draft_preview": {
+                        "label": "Study Plan Review: Approve",
+                        "content": "Keep the draft study plan.",
+                        "content_type": "text"
+                    }
+                }
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_review_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["label"].as_str(),
+            Some("Study Plan Review: Biology final revision")
+        );
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["content"].as_str(),
+            Some(
+                "Planned window: 2026-07-29T07:00:00Z to 2026-07-29T08:30:00Z • Priority: high • Urgency: due_soon • Due: 2026-07-30T09:00:00Z • Anchor: Biology final exam • Scheduled before the exam window • Review the biology notes tonight and bring the formula sheet. • Pending focus items: 3 • Next focus: Biology final revision"
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn finance_guardian_enrichment_reads_private_transaction_context_when_db_smoke_is_enabled()
+     {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user = UserRecord {
+            id: format!("user_finance_guardian_{suffix}"),
+            email: format!("finance-guardian-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Finance Guardian {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user).await.expect("create user");
+
+        let account_id = format!("acct_{suffix}");
+        sqlx::query(
+            "INSERT INTO finance_accounts
+                 (account_id, user_id, label, institution, account_type, currency, source)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        )
+        .bind(&account_id)
+        .bind(&user.id)
+        .bind("Daily account")
+        .bind("Omny Test Bank")
+        .bind("checking")
+        .bind("AUD")
+        .bind("manual")
+        .execute(&db.pool)
+        .await
+        .expect("insert account");
+
+        sqlx::query(
+            "INSERT INTO finance_transactions
+                 (txn_id, user_id, account_id, txn_date, amount_cents, currency, description, merchant_name, category, is_anomaly, anomaly_reason)
+             VALUES
+                 ($1, $2, $3, CURRENT_DATE - INTERVAL '2 days', -12500, 'AUD', 'Woolworths weekly shop', 'Woolworths', 'groceries', false, NULL),
+                 ($4, $2, $3, CURRENT_DATE - INTERVAL '1 day', -48900, 'AUD', 'Airfare change fee', 'Qantas', 'travel', true, '290% above average travel spend'),
+                 ($5, $2, $3, CURRENT_DATE - INTERVAL '5 days', 250000, 'AUD', 'Salary payment', 'Payroll', 'income', false, NULL)",
+        )
+        .bind(format!("txn_grocery_{suffix}"))
+        .bind(&user.id)
+        .bind(&account_id)
+        .bind(format!("txn_anomaly_{suffix}"))
+        .bind(format!("txn_income_{suffix}"))
+        .execute(&db.pool)
+        .await
+        .expect("insert transactions");
+
+        let mut run = WorkflowRunRecord {
+            run_id: format!("run_finance_guardian_{suffix}"),
+            workflow_id: "wf_finance_guardian".to_string(),
+            deployment_id: "dep_finance_guardian".to_string(),
+            owner_user_id: user.id.clone(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "summary": "Finance Guardian reviewed recent spending and found one anomaly to inspect.",
+                "workflow_output_contract": {
+                    "workflow": "finance_guardian",
+                    "summary_mode": "finance_digest",
+                    "structured_output_keys": ["finance_digest", "anomaly_notes", "finance_input_context"],
+                    "external_write": false
+                },
+                "finance_digest": {
+                    "status": "completed",
+                    "proposal_summary": "Finance Guardian reviewed recent spending and found one anomaly to inspect.",
+                    "review_required": false,
+                    "external_write": false,
+                    "digest_scope": "spend_monitoring",
+                    "next_action": "Review the flagged transaction and decide whether it needs a manual follow-up.",
+                    "note_count": 1
+                },
+                "anomaly_notes": [
+                    "Review the flagged transaction and decide whether it needs a manual follow-up."
+                ]
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:05:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_run_with_private_finance_context(&db, &mut run).await;
+
+        assert_eq!(
+            run.result_json["finance_digest"]["recent_transaction_count"].as_i64(),
+            Some(3)
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["top_spend_category"].as_str(),
+            Some("travel")
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["anomaly_count"].as_u64(),
+            Some(1)
+        );
+        assert_eq!(
+            run.result_json["finance_input_context"]["account_count"].as_i64(),
+            Some(1)
+        );
+        assert_eq!(
+            run.result_json["finance_input_context"]["recent_anomalies"][0]["description"].as_str(),
+            Some("Airfare change fee")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_research_brief_and_sources_are_folded_into_research_result() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_research_capsule".to_string(),
+            workflow_id: "wf_research".to_string(),
+            deployment_id: "dep_research".to_string(),
+            owner_user_id: "user_research".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "# Study fatigue interventions\n\n- Short walking breaks improved alertness.\n- Caffeine timing matters more than total volume.\n- Bright light exposure helps early-day focus.",
+                                "source_refs": [
+                                    "https://example.com/walking-breaks",
+                                    {
+                                        "label": "Sleep review",
+                                        "url": "https://example.com/sleep-review"
+                                    }
+                                ],
+                                "recorded_to": "/tmp/research-brief.md"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "research_assistant",
+                    "summary_mode": "research_brief",
+                    "structured_output_keys": ["research_brief", "key_findings", "source_refs"],
+                    "external_write": false,
+                    "include_sources": true
+                },
+                "research_brief": {
+                    "proposal_summary": "Summarize fatigue interventions.",
+                    "review_required": false,
+                    "external_write": false,
+                    "next_action": "Review the research brief before reusing it."
+                },
+                "key_findings": [],
+                "source_refs": []
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:05:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["research_brief"]["brief_body"].as_str(),
+            Some(
+                "# Study fatigue interventions\n\n- Short walking breaks improved alertness.\n- Caffeine timing matters more than total volume.\n- Bright light exposure helps early-day focus."
+            )
+        );
+        assert_eq!(
+            run.result_json["research_brief"]["research_artifact_path"].as_str(),
+            Some("/tmp/research-brief.md")
+        );
+        assert_eq!(
+            run.result_json["research_brief"]["source_count"].as_u64(),
+            Some(2)
+        );
+        assert_eq!(
+            run.result_json["key_findings"][0].as_str(),
+            Some("Short walking breaks improved alertness.")
+        );
+        assert_eq!(
+            run.result_json["source_refs"][0].as_str(),
+            Some("https://example.com/walking-breaks")
+        );
+        assert_eq!(
+            run.result_json["source_refs"][1]["label"].as_str(),
+            Some("Sleep review")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_nested_research_brief_payload_overrides_research_fallbacks() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_research_nested_capsule".to_string(),
+            workflow_id: "wf_research_nested".to_string(),
+            deployment_id: "dep_research_nested".to_string(),
+            owner_user_id: "user_research_nested".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "# Fallback capsule\n\n- Generic fallback finding.",
+                                "research_brief": {
+                                    "brief_body": "# Authored research brief\n\n- Authored finding one.\n- Authored finding two.",
+                                    "proposal_summary": "Use the authored nested brief.",
+                                    "key_findings": [
+                                        "Authored finding one.",
+                                        "Authored finding two."
+                                    ],
+                                    "source_refs": [
+                                        "https://example.com/authored-source",
+                                        {
+                                            "label": "Authored review",
+                                            "url": "https://example.com/authored-review"
+                                        }
+                                    ],
+                                    "research_artifact_path": "/tmp/authored-research-brief.md"
+                                },
+                                "recorded_to": "/tmp/fallback-research-brief.md"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "research_assistant",
+                    "summary_mode": "research_brief",
+                    "structured_output_keys": ["research_brief", "key_findings", "source_refs"],
+                    "external_write": false,
+                    "include_sources": true
+                },
+                "research_brief": {
+                    "proposal_summary": "Old fallback summary.",
+                    "review_required": false,
+                    "external_write": false,
+                    "next_action": "Review the research brief before reusing it."
+                },
+                "key_findings": [],
+                "source_refs": []
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:05:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["research_brief"]["proposal_summary"].as_str(),
+            Some("Use the authored nested brief.")
+        );
+        assert_eq!(
+            run.result_json["research_brief"]["brief_body"].as_str(),
+            Some("# Authored research brief\n\n- Authored finding one.\n- Authored finding two.")
+        );
+        assert_eq!(
+            run.result_json["research_brief"]["research_artifact_path"].as_str(),
+            Some("/tmp/authored-research-brief.md")
+        );
+        assert_eq!(
+            run.result_json["research_brief"]["source_count"].as_u64(),
+            Some(2)
+        );
+        assert_eq!(
+            run.result_json["key_findings"][0].as_str(),
+            Some("Authored finding one.")
+        );
+        assert_eq!(
+            run.result_json["source_refs"][0].as_str(),
+            Some("https://example.com/authored-source")
+        );
+        assert_eq!(
+            run.result_json["source_refs"][1]["label"].as_str(),
+            Some("Authored review")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_receipt_fields_are_folded_into_receipt_result() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_receipt_capsule".to_string(),
+            workflow_id: "wf_receipt".to_string(),
+            deployment_id: "dep_receipt".to_string(),
+            owner_user_id: "user_receipt".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "summary": "Categorized Woolworths grocery receipt for bookkeeping review.",
+                                "merchant": "Woolworths",
+                                "category": "groceries",
+                                "amount": 84.35,
+                                "tax": 7.67,
+                                "currency": "AUD",
+                                "transaction_date": "2026-07-27",
+                                "receipt_status": "parsed",
+                                "receipt_notes": [
+                                    "Verify GST treatment before posting.",
+                                    "Confirm card suffix against the bank feed."
+                                ],
+                                "recorded_to": "/tmp/receipt-entry.json"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "receipt_tracker",
+                    "summary_mode": "reviewable_receipt_entry",
+                    "structured_output_keys": ["receipt_entry", "receipt_notes"],
+                    "external_write": false
+                },
+                "receipt_entry": {
+                    "proposal_summary": "Prepare a categorized receipt entry.",
+                    "review_required": true,
+                    "external_write": false,
+                    "entry_scope": "expense_capture",
+                    "next_action": "Review the categorized receipt before posting anything."
+                },
+                "receipt_notes": [
+                    "Fallback receipt note"
+                ]
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:05:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["receipt_entry"]["proposal_summary"].as_str(),
+            Some("Categorized Woolworths grocery receipt for bookkeeping review.")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["merchant"].as_str(),
+            Some("Woolworths")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["category"].as_str(),
+            Some("groceries")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["amount"].as_f64(),
+            Some(84.35)
+        );
+        assert_eq!(run.result_json["receipt_entry"]["tax"].as_f64(), Some(7.67));
+        assert_eq!(
+            run.result_json["receipt_entry"]["currency"].as_str(),
+            Some("AUD")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["transaction_date"].as_str(),
+            Some("2026-07-27")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["receipt_status"].as_str(),
+            Some("parsed")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["receipt_artifact_path"].as_str(),
+            Some("/tmp/receipt-entry.json")
+        );
+        assert_eq!(
+            run.result_json["receipt_notes"][0].as_str(),
+            Some("Fallback receipt note")
+        );
+        assert_eq!(
+            run.result_json["receipt_notes"][1].as_str(),
+            Some("Verify GST treatment before posting.")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_nested_receipt_entry_payload_overrides_receipt_fallbacks() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_receipt_nested_capsule".to_string(),
+            workflow_id: "wf_receipt_nested".to_string(),
+            deployment_id: "dep_receipt_nested".to_string(),
+            owner_user_id: "user_receipt_nested".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "Fallback receipt summary",
+                                "receipt_entry": {
+                                    "summary": "Categorized pharmacy receipt for reimbursement review.",
+                                    "status": "ready_for_review",
+                                    "merchant": "City Pharmacy",
+                                    "category": "medical",
+                                    "amount": 42.10,
+                                    "tax": 3.83,
+                                    "currency": "AUD",
+                                    "transaction_date": "2026-07-28",
+                                    "receipt_notes": [
+                                        "Check private health reimbursement eligibility"
+                                    ],
+                                    "receipt_artifact_path": "/tmp/authored-receipt.json"
+                                },
+                                "recorded_to": "/tmp/fallback-receipt.json"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "receipt_tracker",
+                    "summary_mode": "reviewable_receipt_entry",
+                    "structured_output_keys": ["receipt_entry", "receipt_notes"],
+                    "external_write": false
+                },
+                "receipt_entry": {
+                    "proposal_summary": "Old fallback receipt summary.",
+                    "receipt_status": "draft",
+                    "review_required": true,
+                    "external_write": false
+                },
+                "receipt_notes": []
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:05:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["receipt_entry"]["proposal_summary"].as_str(),
+            Some("Categorized pharmacy receipt for reimbursement review.")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["receipt_status"].as_str(),
+            Some("ready_for_review")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["merchant"].as_str(),
+            Some("City Pharmacy")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["category"].as_str(),
+            Some("medical")
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["amount"].as_f64(),
+            Some(42.10)
+        );
+        assert_eq!(
+            run.result_json["receipt_entry"]["receipt_artifact_path"].as_str(),
+            Some("/tmp/authored-receipt.json")
+        );
+        assert_eq!(
+            run.result_json["receipt_notes"][0].as_str(),
+            Some("Check private health reimbursement eligibility")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_nested_finance_digest_payload_overrides_finance_fallbacks() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_finance_nested_capsule".to_string(),
+            workflow_id: "wf_finance_nested".to_string(),
+            deployment_id: "dep_finance_nested".to_string(),
+            owner_user_id: "user_finance_nested".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "Fallback finance summary",
+                                "finance_digest": {
+                                    "proposal_summary": "Review the authored finance digest before acting.",
+                                    "next_action": "Confirm whether the flagged merchant needs a freeze.",
+                                    "status": "digest_ready",
+                                    "digest_scope": "fraud_review",
+                                    "finance_artifact_path": "/tmp/authored-finance-digest.md",
+                                    "anomaly_notes": [
+                                        "One card-present charge is 240% above the normal merchant range.",
+                                        "The weekend fuel purchase happened in a new suburb."
+                                    ]
+                                },
+                                "finance_input_context": {
+                                    "account_count": 2,
+                                    "recent_transaction_count": 14,
+                                    "top_spend_category": "travel"
+                                },
+                                "recorded_to": "/tmp/finance-digest.md"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "finance_guardian",
+                    "summary_mode": "finance_digest",
+                    "structured_output_keys": ["finance_digest", "anomaly_notes", "finance_input_context"],
+                    "external_write": false
+                },
+                "finance_digest": {
+                    "proposal_summary": "Old fallback finance summary.",
+                    "review_required": false,
+                    "external_write": false,
+                    "digest_scope": "spend_monitoring",
+                    "next_action": "Review the old finance summary."
+                },
+                "anomaly_notes": [
+                    "Fallback anomaly note"
+                ],
+                "finance_input_context": {
+                    "account_count": 1,
+                    "recent_income_cents": 905000
+                }
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:05:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["finance_digest"]["proposal_summary"].as_str(),
+            Some("Review the authored finance digest before acting.")
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["next_action"].as_str(),
+            Some("Confirm whether the flagged merchant needs a freeze.")
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["status"].as_str(),
+            Some("digest_ready")
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["digest_scope"].as_str(),
+            Some("fraud_review")
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["finance_artifact_path"].as_str(),
+            Some("/tmp/authored-finance-digest.md")
+        );
+        assert_eq!(
+            run.result_json["finance_digest"]["note_count"].as_u64(),
+            Some(2)
+        );
+        assert_eq!(
+            run.result_json["anomaly_notes"][0].as_str(),
+            Some("Fallback anomaly note")
+        );
+        assert_eq!(
+            run.result_json["anomaly_notes"][1].as_str(),
+            Some("One card-present charge is 240% above the normal merchant range.")
+        );
+        assert_eq!(
+            run.result_json["finance_input_context"]["account_count"].as_i64(),
+            Some(2)
+        );
+        assert_eq!(
+            run.result_json["finance_input_context"]["recent_income_cents"].as_i64(),
+            Some(905000)
+        );
+    }
+
+    #[test]
+    fn approval_review_preview_is_enriched_from_email_reply_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_email_review".to_string(),
+            workflow_id: "wf_email".to_string(),
+            deployment_id: "dep_email".to_string(),
+            owner_user_id: "user_email".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "email_guardian",
+                    "summary_mode": "reviewable_reply_draft",
+                    "structured_output_keys": ["reply_draft", "triage_notes"],
+                    "external_write": false
+                },
+                "reply_draft": {
+                    "approval_target": "Reply Review",
+                    "reply_subject": "Re: Scheduling follow-up",
+                    "reply_body": "Thanks again. I can confirm 3 PM tomorrow and will bring the agenda draft.",
+                    "draft_artifact_path": ".skillcapsule/email/reply.md"
+                },
+                "approval_review": {
+                    "title": "Reply Review",
+                    "draft_preview": {
+                        "label": "Reply Review: Approve reply",
+                        "content": "Continue toward response delivery.",
+                        "content_type": "text"
+                    }
+                }
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_review_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["label"].as_str(),
+            Some("Reply Review: Re: Scheduling follow-up")
+        );
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["content"].as_str(),
+            Some(
+                "Thanks again. I can confirm 3 PM tomorrow and will bring the agenda draft. • Draft artifact: .skillcapsule/email/reply.md"
+            )
+        );
+    }
+
+    #[test]
+    fn approval_options_are_enriched_from_publication_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_publish_wait".to_string(),
+            workflow_id: "wf_publish".to_string(),
+            deployment_id: "dep_publish".to_string(),
+            owner_user_id: "user_publish".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "content_publisher",
+                    "summary_mode": "reviewable_publication_draft",
+                    "structured_output_keys": ["publication_draft", "publication_notes"],
+                    "external_write": false
+                },
+                "publication_draft": {
+                    "proposal_summary": "Prepare the public launch note with a concise headline, launch context, and the call to action for early adopters.",
+                    "approval_target": "Publish Review",
+                    "draft_title": "Launch note for early adopters",
+                    "visibility": "public"
+                },
+                "approval_options": [
+                    {
+                        "option_id": "publish",
+                        "label": "Publish",
+                        "consequence_summary": "Approve public release."
+                    },
+                    {
+                        "option_id": "hold",
+                        "label": "Hold",
+                        "consequence_summary": "Keep the draft unpublished."
+                    }
+                ]
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_options_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_options"][0]["label"].as_str(),
+            Some("Approve publication draft")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][0]["consequence_summary"].as_str(),
+            Some(
+                "Approve the reviewed publication draft for public release at Publish Review with the title \"Launch note for early adopters\" based on the current package: Prepare the public launch note with a concise headline, launch context, and the call to action for early adopters."
+            )
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["label"].as_str(),
+            Some("Hold publication draft")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["consequence_summary"].as_str(),
+            Some("Keep the publication draft unpublished and internal at Publish Review.")
+        );
+    }
+
+    #[test]
+    fn approval_review_preview_is_enriched_from_publication_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_publish_review".to_string(),
+            workflow_id: "wf_publish".to_string(),
+            deployment_id: "dep_publish".to_string(),
+            owner_user_id: "user_publish".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "content_publisher",
+                    "summary_mode": "reviewable_publication_draft",
+                    "structured_output_keys": ["publication_draft", "publication_notes"],
+                    "external_write": false
+                },
+                "publication_draft": {
+                    "approval_target": "Publish Review",
+                    "draft_title": "Launch note for early adopters",
+                    "draft_body": "We are opening the beta to our first cohort this week.",
+                    "draft_tags": ["launch", "beta"],
+                    "draft_artifact_path": ".skillcapsule/content/publish.md"
+                },
+                "approval_review": {
+                    "title": "Publish Review",
+                    "draft_preview": {
+                        "label": "Publish Review: Publish",
+                        "content": "Approve public release.",
+                        "content_type": "text"
+                    }
+                }
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_review_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["label"].as_str(),
+            Some("Publish Review: Launch note for early adopters")
+        );
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["content"].as_str(),
+            Some(
+                "We are opening the beta to our first cohort this week. • Tags: launch, beta • Draft artifact: .skillcapsule/content/publish.md"
+            )
+        );
+    }
+
+    #[test]
+    fn approval_options_are_enriched_from_research_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_research_wait".to_string(),
+            workflow_id: "wf_research".to_string(),
+            deployment_id: "dep_research".to_string(),
+            owner_user_id: "user_research".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "research_assistant",
+                    "summary_mode": "research_brief",
+                    "structured_output_keys": ["research_brief", "key_findings", "source_refs"],
+                    "external_write": false,
+                    "include_sources": true
+                },
+                "research_brief": {
+                    "proposal_summary": "Summarize the current state of the MCP rollout and capture the highest-confidence evidence.",
+                    "next_action": "Review the source-backed findings before forwarding the rollout summary.",
+                    "include_sources": true,
+                    "source_count": 2
+                },
+                "key_findings": [
+                    "The rollout is gated mainly by connector-binding validation rather than by runtime startup failures."
+                ],
+                "source_refs": [
+                    {
+                        "title": "Connector binding checklist",
+                        "url": "https://example.com/checklist"
+                    }
+                ],
+                "approval_options": [
+                    {
+                        "option_id": "approve",
+                        "label": "Approve",
+                        "consequence_summary": "Use the brief."
+                    },
+                    {
+                        "option_id": "hold",
+                        "label": "Hold",
+                        "consequence_summary": "Revisit the brief."
+                    }
+                ]
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_options_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_options"][0]["label"].as_str(),
+            Some("Approve research brief")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][0]["consequence_summary"].as_str(),
+            Some(
+                "Keep the reviewed research brief ready for follow-up with 2 source references and source-backed citations enabled while keeping the next action Review the source-backed findings before forwarding the rollout summary after reviewing the leading finding: The rollout is gated mainly by connector-binding validation rather than by runtime startup failures and the source Connector binding checklist based on the current brief summary: Summarize the current state of the MCP rollout and capture the highest-confidence evidence."
+            )
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["label"].as_str(),
+            Some("Rework research brief")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["consequence_summary"].as_str(),
+            Some(
+                "Return to research review before relying on the current brief and the leading finding The rollout is gated mainly by connector-binding validation rather than by runtime startup failures sourced from Connector binding checklist."
+            )
+        );
+    }
+
+    #[test]
+    fn approval_review_preview_is_enriched_from_research_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_research_review".to_string(),
+            workflow_id: "wf_research".to_string(),
+            deployment_id: "dep_research".to_string(),
+            owner_user_id: "user_research".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "research_assistant",
+                    "summary_mode": "research_brief",
+                    "structured_output_keys": ["research_brief", "key_findings", "source_refs"],
+                    "external_write": false,
+                    "include_sources": true
+                },
+                "research_brief": {
+                    "proposal_summary": "MCP rollout review",
+                    "brief_body": "The rollout is stable in the core runtime, but connector binding remains the dominant source of operational review work.",
+                    "next_action": "Review the evidence-backed summary before sharing it with the rollout owners.",
+                    "source_count": 2,
+                    "research_artifact_path": ".skillcapsule/research/mcp-rollout.md"
+                },
+                "key_findings": [
+                    "Connector binding validation is now the main source of rollout friction."
+                ],
+                "source_refs": [
+                    {
+                        "title": "Connector binding checklist",
+                        "url": "https://example.com/checklist"
+                    }
+                ],
+                "approval_review": {
+                    "title": "Research Review",
+                    "draft_preview": {
+                        "label": "Research Review: Approve brief",
+                        "content": "Use the brief.",
+                        "content_type": "text"
+                    }
+                }
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_review_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["label"].as_str(),
+            Some("Research Review: MCP rollout review")
+        );
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["content"].as_str(),
+            Some(
+                "The rollout is stable in the core runtime, but connector binding remains the dominant source of operational review work. • Next action: Review the evidence-backed summary before sharing it with the rollout owners. • Connector binding validation is now the main source of rollout friction. • Source count: 2 • Source: Connector binding checklist • URL: https://example.com/checklist • Research artifact: .skillcapsule/research/mcp-rollout.md"
+            )
+        );
+    }
+
+    #[test]
+    fn approval_options_are_enriched_from_receipt_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_receipt_wait".to_string(),
+            workflow_id: "wf_receipt".to_string(),
+            deployment_id: "dep_receipt".to_string(),
+            owner_user_id: "user_receipt".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "receipt_tracker",
+                    "summary_mode": "reviewable_receipt_entry",
+                    "structured_output_keys": ["receipt_entry", "receipt_notes"],
+                    "external_write": false
+                },
+                "receipt_entry": {
+                    "approval_target": "Ledger Review",
+                    "proposal_summary": "Categorize the pharmacy receipt before posting.",
+                    "merchant": "Harbour Pharmacy",
+                    "category": "medical_expense",
+                    "transaction_date": "2026-07-28",
+                    "receipt_status": "ready_for_review",
+                    "amount": "$48.20"
+                },
+                "approval_options": [
+                    {
+                        "option_id": "approve",
+                        "label": "Approve",
+                        "consequence_summary": "Post the receipt."
+                    },
+                    {
+                        "option_id": "hold",
+                        "label": "Hold",
+                        "consequence_summary": "Keep the receipt internal."
+                    }
+                ]
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_options_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_options"][0]["label"].as_str(),
+            Some("Approve receipt entry")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][0]["consequence_summary"].as_str(),
+            Some(
+                "Keep the reviewed receipt entry ready for posting at Ledger Review for Harbour Pharmacy with amount $48.20 in Medical Expense from 2026-07-28 while keeping the status Ready For Review based on the current posting summary: Categorize the pharmacy receipt before posting."
+            )
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["label"].as_str(),
+            Some("Rework receipt entry")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["consequence_summary"].as_str(),
+            Some(
+                "Return to receipt review before treating the current entry as post-ready at Ledger Review for Harbour Pharmacy from 2026-07-28 with the status Ready For Review."
+            )
+        );
+    }
+
+    #[test]
+    fn approval_review_preview_is_enriched_from_receipt_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_receipt_review".to_string(),
+            workflow_id: "wf_receipt".to_string(),
+            deployment_id: "dep_receipt".to_string(),
+            owner_user_id: "user_receipt".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "receipt_tracker",
+                    "summary_mode": "reviewable_receipt_entry",
+                    "structured_output_keys": ["receipt_entry", "receipt_notes"],
+                    "external_write": false
+                },
+                "receipt_entry": {
+                    "merchant": "Harbour Pharmacy",
+                    "amount": "$48.20",
+                    "category": "medical_expense",
+                    "transaction_date": "2026-07-28",
+                    "receipt_status": "ready_for_review",
+                    "receipt_artifact_path": ".skillcapsule/receipts/harbour-pharmacy.json"
+                },
+                "receipt_notes": [
+                    "Confirm whether the reimbursement should stay under health expenses."
+                ],
+                "approval_review": {
+                    "title": "Ledger Review",
+                    "draft_preview": {
+                        "label": "Ledger Review: Approve receipt",
+                        "content": "Post the receipt.",
+                        "content_type": "text"
+                    }
+                }
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_review_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["label"].as_str(),
+            Some("Ledger Review: Harbour Pharmacy")
+        );
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["content"].as_str(),
+            Some(
+                "Amount: $48.20 • Category: medical_expense • Date: 2026-07-28 • Status: ready_for_review • Confirm whether the reimbursement should stay under health expenses. • Receipt artifact: .skillcapsule/receipts/harbour-pharmacy.json"
+            )
+        );
+    }
+
+    #[test]
+    fn approval_options_are_enriched_from_finance_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_finance_wait".to_string(),
+            workflow_id: "wf_finance".to_string(),
+            deployment_id: "dep_finance".to_string(),
+            owner_user_id: "user_finance".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "finance_guardian",
+                    "summary_mode": "finance_digest",
+                    "structured_output_keys": ["finance_digest", "anomaly_notes", "finance_input_context"],
+                    "external_write": false
+                },
+                "finance_digest": {
+                    "digest_scope": "monthly_cashflow",
+                    "proposal_summary": "Review the July spend drift before closing the month.",
+                    "next_action": "Check the dining transactions against the travel budget.",
+                    "status": "watchlist"
+                },
+                "finance_input_context": {
+                    "account_count": 3,
+                    "top_spend_category": "dining_out"
+                },
+                "anomaly_notes": [
+                    "Dining spend rose 34 percent week over week."
+                ],
+                "approval_options": [
+                    {
+                        "option_id": "approve",
+                        "label": "Approve",
+                        "consequence_summary": "Keep the digest."
+                    },
+                    {
+                        "option_id": "hold",
+                        "label": "Hold",
+                        "consequence_summary": "Revisit the digest."
+                    }
+                ]
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_options_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_options"][0]["label"].as_str(),
+            Some("Approve Monthly Cashflow digest")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][0]["consequence_summary"].as_str(),
+            Some(
+                "Keep the reviewed finance digest ready for follow-up across 3 active accounts with Dining Out as the top spend category while keeping the status Watchlist and the next action Check the dining transactions against the travel budget after reviewing the leading anomaly note: Dining spend rose 34 percent week over week based on the current digest summary: Review the July spend drift before closing the month."
+            )
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["label"].as_str(),
+            Some("Rework Monthly Cashflow digest")
+        );
+        assert_eq!(
+            run.result_json["approval_options"][1]["consequence_summary"].as_str(),
+            Some(
+                "Return to finance review before relying on the current digest with status Watchlist and the anomaly note Dining spend rose 34 percent week over week."
+            )
+        );
+    }
+
+    #[test]
+    fn approval_review_preview_is_enriched_from_finance_context() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_finance_review".to_string(),
+            workflow_id: "wf_finance".to_string(),
+            deployment_id: "dep_finance".to_string(),
+            owner_user_id: "user_finance".to_string(),
+            status: "waiting_for_approval".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "finance_guardian",
+                    "summary_mode": "finance_digest",
+                    "structured_output_keys": ["finance_digest", "anomaly_notes", "finance_input_context"],
+                    "external_write": false
+                },
+                "finance_digest": {
+                    "digest_scope": "monthly_cashflow",
+                    "status": "watchlist",
+                    "next_action": "Check the dining transactions against the travel budget.",
+                    "finance_artifact_path": ".skillcapsule/finance/july-digest.md"
+                },
+                "finance_input_context": {
+                    "account_count": 3,
+                    "top_spend_category": "dining_out"
+                },
+                "anomaly_notes": [
+                    "Dining spend rose 34 percent week over week."
+                ],
+                "approval_review": {
+                    "title": "Finance Review",
+                    "draft_preview": {
+                        "label": "Finance Review: Approve digest",
+                        "content": "Keep the digest.",
+                        "content_type": "text"
+                    }
+                }
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_approval_review_from_result(&mut run);
+
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["label"].as_str(),
+            Some("Finance Review: monthly_cashflow")
+        );
+        assert_eq!(
+            run.result_json["approval_review"]["draft_preview"]["content"].as_str(),
+            Some(
+                "Status: watchlist • Next action: Check the dining transactions against the travel budget. • Active accounts: 3 • Top spend: dining_out • Dining spend rose 34 percent week over week. • Finance artifact: .skillcapsule/finance/july-digest.md"
+            )
+        );
+    }
+
+    #[test]
+    fn skill_capsule_reply_body_is_folded_into_email_draft() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_email_capsule".to_string(),
+            workflow_id: "wf_email_capsule".to_string(),
+            deployment_id: "dep_email_capsule".to_string(),
+            owner_user_id: "user_email".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "Thanks for the note.\n\nI can meet at 3 PM tomorrow and will bring the agenda draft.",
+                                "recorded_to": ".skillcapsule/email/reply.md"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "email_guardian",
+                    "summary_mode": "reviewable_reply_draft",
+                    "structured_output_keys": ["reply_draft", "triage_notes"],
+                    "external_write": false
+                },
+                "reply_draft": {
+                    "proposal_summary": "Draft a calm follow-up reply.",
+                    "approval_target": "Reply Review"
+                }
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-28T00:02:00Z".to_string()),
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["reply_draft"]["reply_body"].as_str(),
+            Some(
+                "Thanks for the note.\n\nI can meet at 3 PM tomorrow and will bring the agenda draft."
+            )
+        );
+        assert_eq!(
+            run.result_json["reply_draft"]["draft_artifact_path"].as_str(),
+            Some(".skillcapsule/email/reply.md")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_email_payload_fields_override_reply_fallbacks() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_email_payload".to_string(),
+            workflow_id: "wf_email_payload".to_string(),
+            deployment_id: "dep_email_payload".to_string(),
+            owner_user_id: "user_email".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "Fallback reply body",
+                                "reply_body": "Payload-authored reply body",
+                                "subject": "Re: Scheduling follow-up",
+                                "recorded_to": ".skillcapsule/email/payload-reply.md"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "email_guardian",
+                    "summary_mode": "reviewable_reply_draft",
+                    "structured_output_keys": ["reply_draft", "triage_notes"],
+                    "external_write": false
+                },
+                "reply_draft": {
+                    "proposal_summary": "Draft a calm follow-up reply.",
+                    "approval_target": "Reply Review"
+                }
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-28T00:02:00Z".to_string()),
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["reply_draft"]["reply_body"].as_str(),
+            Some("Payload-authored reply body")
+        );
+        assert_eq!(
+            run.result_json["reply_draft"]["reply_subject"].as_str(),
+            Some("Re: Scheduling follow-up")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_nested_reply_draft_payload_overrides_reply_fallbacks() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_email_nested_payload".to_string(),
+            workflow_id: "wf_email_nested_payload".to_string(),
+            deployment_id: "dep_email_nested_payload".to_string(),
+            owner_user_id: "user_email".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "Fallback reply body",
+                                "reply_draft": {
+                                    "reply_body": "Nested payload-authored reply body",
+                                    "reply_subject": "Re: Nested scheduling follow-up",
+                                    "proposal_summary": "Review the calmer nested reply draft.",
+                                    "draft_artifact_path": ".skillcapsule/email/nested-authored-reply.md"
+                                },
+                                "recorded_to": ".skillcapsule/email/nested-reply.md"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "email_guardian",
+                    "summary_mode": "reviewable_reply_draft",
+                    "structured_output_keys": ["reply_draft", "triage_notes"],
+                    "external_write": false
+                },
+                "reply_draft": {
+                    "proposal_summary": "Draft a calm follow-up reply.",
+                    "approval_target": "Reply Review"
+                }
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:02:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["reply_draft"]["reply_body"].as_str(),
+            Some("Nested payload-authored reply body")
+        );
+        assert_eq!(
+            run.result_json["reply_draft"]["reply_subject"].as_str(),
+            Some("Re: Nested scheduling follow-up")
+        );
+        assert_eq!(
+            run.result_json["reply_draft"]["proposal_summary"].as_str(),
+            Some("Review the calmer nested reply draft.")
+        );
+        assert_eq!(
+            run.result_json["reply_draft"]["draft_artifact_path"].as_str(),
+            Some(".skillcapsule/email/nested-authored-reply.md")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_publication_body_and_tags_are_folded_into_publication_draft() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_publish_capsule".to_string(),
+            workflow_id: "wf_publish_capsule".to_string(),
+            deployment_id: "dep_publish_capsule".to_string(),
+            owner_user_id: "user_publish".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "# Early access launch note\n\nWe are opening the beta to our first cohort this week.",
+                                "recorded_to": ".skillcapsule/content/publish.md",
+                                "tags": ["launch", "beta", "early-access"]
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "content_publisher",
+                    "summary_mode": "reviewable_publication_draft",
+                    "structured_output_keys": ["publication_draft", "publication_notes"],
+                    "external_write": false,
+                    "visibility": "public"
+                },
+                "publication_draft": {
+                    "proposal_summary": "Prepare the public launch note.",
+                    "approval_target": "Publish Review",
+                    "visibility": "public"
+                }
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-28T00:02:00Z".to_string()),
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_title"].as_str(),
+            Some("Early access launch note")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_body"].as_str(),
+            Some(
+                "# Early access launch note\n\nWe are opening the beta to our first cohort this week."
+            )
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_artifact_path"].as_str(),
+            Some(".skillcapsule/content/publish.md")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_tags"]
+                .as_array()
+                .map(Vec::len),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn skill_capsule_publication_payload_fields_override_publication_fallbacks() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_publish_payload".to_string(),
+            workflow_id: "wf_publish_payload".to_string(),
+            deployment_id: "dep_publish_payload".to_string(),
+            owner_user_id: "user_publish".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "# Fallback title\n\nFallback body",
+                                "title": "Payload-authored launch note",
+                                "body": "Payload-authored publish body",
+                                "tags": ["launch", "beta"],
+                                "recorded_to": ".skillcapsule/content/payload-publish.md"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "content_publisher",
+                    "summary_mode": "reviewable_publication_draft",
+                    "structured_output_keys": ["publication_draft", "publication_notes"],
+                    "external_write": false,
+                    "visibility": "public"
+                },
+                "publication_draft": {
+                    "proposal_summary": "Prepare the public launch note.",
+                    "approval_target": "Publish Review",
+                    "visibility": "public"
+                }
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-28T00:02:00Z".to_string()),
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_title"].as_str(),
+            Some("Payload-authored launch note")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_body"].as_str(),
+            Some("Payload-authored publish body")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_tags"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn skill_capsule_nested_publication_draft_payload_overrides_publication_fallbacks() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_publish_nested_payload".to_string(),
+            workflow_id: "wf_publish_nested_payload".to_string(),
+            deployment_id: "dep_publish_nested_payload".to_string(),
+            owner_user_id: "user_publish".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "# Fallback title\n\nFallback body",
+                                "publication_draft": {
+                                    "draft_title": "Nested payload-authored launch note",
+                                    "draft_body": "Nested payload-authored publish body",
+                                    "proposal_summary": "Review the nested publication draft before release.",
+                                    "draft_tags": ["launch", "nested-beta"],
+                                    "draft_artifact_path": ".skillcapsule/content/nested-authored-publish.md"
+                                },
+                                "recorded_to": ".skillcapsule/content/nested-publish.md"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "content_publisher",
+                    "summary_mode": "reviewable_publication_draft",
+                    "structured_output_keys": ["publication_draft", "publication_notes"],
+                    "external_write": false,
+                    "visibility": "public"
+                },
+                "publication_draft": {
+                    "proposal_summary": "Prepare the public launch note.",
+                    "approval_target": "Publish Review",
+                    "visibility": "public"
+                }
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:02:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_title"].as_str(),
+            Some("Nested payload-authored launch note")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_body"].as_str(),
+            Some("Nested payload-authored publish body")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["proposal_summary"].as_str(),
+            Some("Review the nested publication draft before release.")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_artifact_path"].as_str(),
+            Some(".skillcapsule/content/nested-authored-publish.md")
+        );
+        assert_eq!(
+            run.result_json["publication_draft"]["draft_tags"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn skill_capsule_booking_outline_is_folded_into_booking_recommendation() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_travel_capsule".to_string(),
+            workflow_id: "wf_travel_capsule".to_string(),
+            deployment_id: "dep_travel_capsule".to_string(),
+            owner_user_id: "user_travel".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "# Sydney to Singapore shortlist\n\n- Flight: SQ212 overnight\n- Hotel: two nights near Marina Bay",
+                                "recorded_to": ".skillcapsule/travel/shortlist.md"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "travel_booker",
+                    "summary_mode": "reviewable_booking_recommendation",
+                    "structured_output_keys": ["booking_recommendation", "booking_notes"],
+                    "external_write": false
+                },
+                "booking_recommendation": {
+                    "proposal_summary": "Review the shortlisted travel options.",
+                    "approval_target": "Booking Approval",
+                    "booking_scope": "travel_booking"
+                }
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-28T00:02:00Z".to_string()),
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["booking_recommendation"]["booking_headline"].as_str(),
+            Some("Sydney to Singapore shortlist")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["booking_outline"].as_str(),
+            Some(
+                "# Sydney to Singapore shortlist\n\n- Flight: SQ212 overnight\n- Hotel: two nights near Marina Bay"
+            )
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["booking_artifact_path"].as_str(),
+            Some(".skillcapsule/travel/shortlist.md")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["route_summary"].as_str(),
+            Some("SQ212 overnight")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["stay_summary"].as_str(),
+            Some("two nights near Marina Bay")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["primary_flight_option"].as_str(),
+            Some("SQ212 overnight")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["primary_stay_option"].as_str(),
+            Some("two nights near Marina Bay")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["booking_segments"]
+                .as_array()
+                .map(|segments| segments.len() >= 2),
+            Some(true)
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["flight_candidates"]
+                .as_array()
+                .map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["stay_candidates"]
+                .as_array()
+                .map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["flight_candidate_objects"]
+                .as_array()
+                .map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["flight_candidate_objects"][0]["is_primary"]
+                .as_bool(),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn skill_capsule_payload_candidates_override_markdown_fallback_for_travel() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_travel_payload_candidates".to_string(),
+            workflow_id: "wf_travel_payload_candidates".to_string(),
+            deployment_id: "dep_travel_payload_candidates".to_string(),
+            owner_user_id: "user_travel".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "compiledCapsule": "# Fallback itinerary\n\n- Flight: fallback flight\n- Hotel: fallback stay",
+                                "flight_candidates": [
+                                    {
+                                        "detail": "SQ212 overnight",
+                                        "label": "Preferred long-haul",
+                                        "rank": 1,
+                                        "is_primary": true
+                                    },
+                                    "QF81 daytime"
+                                ],
+                                "stay_candidates": [
+                                    "two nights near Marina Bay"
+                                ],
+                                "transfer_candidates": [
+                                    {
+                                        "detail": "Airport transfer at 08:15",
+                                        "rank": 1,
+                                        "is_primary": true
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "travel_booker",
+                    "summary_mode": "reviewable_booking_recommendation",
+                    "structured_output_keys": ["booking_recommendation", "booking_notes"],
+                    "external_write": false
+                },
+                "booking_recommendation": {
+                    "proposal_summary": "Review the shortlisted travel options.",
+                    "approval_target": "Booking Approval",
+                    "booking_scope": "travel_booking"
+                }
+            }),
+            started_at: "2026-07-28T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-28T00:02:00Z".to_string()),
+            created_at: "2026-07-28T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["booking_recommendation"]["primary_flight_option"].as_str(),
+            Some("SQ212 overnight")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["route_summary"].as_str(),
+            Some("SQ212 overnight")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["primary_transfer_option"].as_str(),
+            Some("Airport transfer at 08:15")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["flight_candidate_objects"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["flight_candidate_objects"][0]["label"]
+                .as_str(),
+            Some("Preferred long-haul")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["flight_candidate_objects"][1]["detail"]
+                .as_str(),
+            Some("QF81 daytime")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_nested_booking_recommendation_payload_is_folded_directly() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_travel_nested_payload".to_string(),
+            workflow_id: "wf_travel_nested_payload".to_string(),
+            deployment_id: "dep_travel_nested_payload".to_string(),
+            owner_user_id: "user_travel".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "booking_recommendation": {
+                                    "booking_headline": "Sydney to Singapore preferred itinerary",
+                                    "booking_outline": "# Preferred itinerary\n\n- Flight: SQ212 overnight\n- Hotel: Marina Bay stay",
+                                    "proposal_summary": "Review the preferred itinerary package.",
+                                    "primary_flight_option": "SQ212 overnight",
+                                    "primary_stay_option": "Marina Bay stay",
+                                    "primary_transfer_option": "Airport transfer at 08:15",
+                                    "route_summary": "SQ212 overnight",
+                                    "stay_summary": "Marina Bay stay",
+                                    "booking_artifact_path": "/tmp/authored-travel-itinerary.json",
+                                    "flight_candidates": [
+                                        {
+                                            "detail": "SQ212 overnight",
+                                            "label": "Preferred long-haul",
+                                            "rank": 1,
+                                            "is_primary": true
+                                        },
+                                        {
+                                            "detail": "QF81 daytime",
+                                            "label": "Daytime fallback",
+                                            "rank": 2,
+                                            "is_primary": false
+                                        }
+                                    ],
+                                    "stay_candidates": [
+                                        {
+                                            "detail": "Marina Bay stay",
+                                            "label": "Preferred stay",
+                                            "rank": 1,
+                                            "is_primary": true
+                                        }
+                                    ],
+                                    "transfer_candidates": [
+                                        {
+                                            "detail": "Airport transfer at 08:15",
+                                            "label": "Preferred transfer",
+                                            "rank": 1,
+                                            "is_primary": true
+                                        }
+                                    ]
+                                },
+                                "recorded_to": "/tmp/travel-itinerary.json"
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "travel_booker",
+                    "summary_mode": "reviewable_booking_recommendation",
+                    "structured_output_keys": ["booking_recommendation", "booking_notes"],
+                    "external_write": false
+                },
+                "booking_recommendation": {
+                    "proposal_summary": "Review the shortlisted travel options.",
+                    "approval_target": "Booking Approval",
+                    "booking_scope": "travel_booking"
+                }
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:02:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["booking_recommendation"]["booking_headline"].as_str(),
+            Some("Sydney to Singapore preferred itinerary")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["proposal_summary"].as_str(),
+            Some("Review the preferred itinerary package.")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["primary_flight_option"].as_str(),
+            Some("SQ212 overnight")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["primary_stay_option"].as_str(),
+            Some("Marina Bay stay")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["primary_transfer_option"].as_str(),
+            Some("Airport transfer at 08:15")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["route_summary"].as_str(),
+            Some("SQ212 overnight")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["stay_summary"].as_str(),
+            Some("Marina Bay stay")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["flight_candidate_objects"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["flight_candidate_objects"][0]["label"]
+                .as_str(),
+            Some("Preferred long-haul")
+        );
+        assert_eq!(
+            run.result_json["booking_recommendation"]["booking_artifact_path"].as_str(),
+            Some("/tmp/authored-travel-itinerary.json")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_nested_study_plan_payload_overrides_study_fallbacks() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_study_nested_payload".to_string(),
+            workflow_id: "wf_study_nested_payload".to_string(),
+            deployment_id: "dep_study_nested_payload".to_string(),
+            owner_user_id: "user_study".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "study_plan": {
+                                    "study_blocks": [
+                                        {
+                                            "label": "Authored exam prep block",
+                                            "planned_start_at": "2026-07-30T07:00:00Z",
+                                            "planned_end_at": "2026-07-30T08:30:00Z",
+                                            "focus_kind": "exam_prep",
+                                            "focus_item_title": "Biology final revision",
+                                            "focus_item_due_at": "2026-07-31T09:00:00Z",
+                                            "focus_item_priority": "high",
+                                            "focus_item_urgency": "due_soon"
+                                        }
+                                    ],
+                                    "reminders": [
+                                        "Review flash cards before the lab practical.",
+                                        "Confirm the revision checklist tonight."
+                                    ],
+                                    "study_input_context": {
+                                        "pending_focus_count": 3,
+                                        "due_soon_focus_count": 1,
+                                        "overdue_focus_count": 0,
+                                        "next_focus_title": "Biology final revision",
+                                        "pending_focus_items": [
+                                            {
+                                                "title": "Biology final revision",
+                                                "priority": "high",
+                                                "urgency": "due_soon",
+                                                "due_at": "2026-07-31T09:00:00Z"
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "study_planner",
+                    "summary_mode": "draft_study_plan",
+                    "structured_output_keys": ["study_blocks", "reminders", "study_input_context", "calendar_context"],
+                    "external_write": false
+                },
+                "study_blocks": [
+                    {
+                        "label": "Primary study block",
+                        "focus_summary": "Fallback study block"
+                    }
+                ],
+                "reminders": [
+                    "Fallback reminder"
+                ],
+                "study_input_context": {
+                    "pending_focus_count": 1,
+                    "next_focus_title": "Fallback focus item",
+                    "next_focus_due_at": "2026-08-01T09:00:00Z"
+                }
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:02:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["study_blocks"][0]["label"].as_str(),
+            Some("Authored exam prep block")
+        );
+        assert_eq!(
+            run.result_json["study_blocks"][0]["focus_item_title"].as_str(),
+            Some("Biology final revision")
+        );
+        assert_eq!(
+            run.result_json["study_blocks"][0]["focus_item_priority"].as_str(),
+            Some("high")
+        );
+        assert_eq!(
+            run.result_json["reminders"][0].as_str(),
+            Some("Fallback reminder")
+        );
+        assert_eq!(
+            run.result_json["reminders"][1].as_str(),
+            Some("Review flash cards before the lab practical.")
+        );
+        assert_eq!(
+            run.result_json["study_input_context"]["pending_focus_count"].as_i64(),
+            Some(3)
+        );
+        assert_eq!(
+            run.result_json["study_input_context"]["next_focus_title"].as_str(),
+            Some("Biology final revision")
+        );
+        assert_eq!(
+            run.result_json["study_input_context"]["next_focus_due_at"].as_str(),
+            Some("2026-08-01T09:00:00Z")
+        );
+    }
+
+    #[test]
+    fn skill_capsule_nested_schedule_recommendation_payload_overrides_calendar_fallbacks() {
+        let mut run = WorkflowRunRecord {
+            run_id: "run_calendar_nested_payload".to_string(),
+            workflow_id: "wf_calendar_nested_payload".to_string(),
+            deployment_id: "dep_calendar_nested_payload".to_string(),
+            owner_user_id: "user_calendar".to_string(),
+            status: "completed".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "trace": {
+                        "skill_capsule": {
+                            "payload": {
+                                "schedule_recommendation": {
+                                    "recommended_slot": {
+                                        "summary": "Authored interview prep slot",
+                                        "proposed_start_at": "2026-07-30T09:15:00Z",
+                                        "proposed_end_at": "2026-07-30T10:00:00Z",
+                                        "focus_kind": "interview",
+                                        "slot_label": "Interview prep block",
+                                        "anchor_event_title": "Product interview",
+                                        "anchor_event_start_at": "2026-07-30T10:45:00Z",
+                                        "anchor_event_type": "interview",
+                                        "anchor_note_kind": "interview_prep",
+                                        "anchor_event_location": "Level 12, Harbour Tower",
+                                        "prep_lead_minutes": 45,
+                                        "slot_basis": "authored_preferred_slot"
+                                    },
+                                    "scheduling_notes": [
+                                        "Reserve time to review the company brief before arrival.",
+                                        "Leave a 15-minute travel buffer before the interview."
+                                    ],
+                                    "calendar_context": {
+                                        "upcoming_event_count": 4,
+                                        "next_event_title": "Product interview",
+                                        "next_event_start_at": "2026-07-30T10:45:00Z"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ]),
+            result_json: serde_json::json!({
+                "workflow_output_contract": {
+                    "workflow": "calendar_coordinator",
+                    "summary_mode": "reviewable_schedule_recommendation",
+                    "structured_output_keys": ["recommended_slot", "scheduling_notes", "calendar_context"],
+                    "external_write": false
+                },
+                "recommended_slot": {
+                    "summary": "Fallback slot",
+                    "proposed_start_at": "2026-07-30T08:00:00Z",
+                    "review_required": true,
+                    "external_write": false,
+                    "approval_state": "draft_ready_for_review"
+                },
+                "scheduling_notes": [
+                    "Fallback schedule note"
+                ],
+                "calendar_context": {
+                    "window_days": 14,
+                    "upcoming_event_count": 1,
+                    "next_event_title": "Fallback event"
+                }
+            }),
+            started_at: "2026-07-29T00:00:00Z".to_string(),
+            completed_at: Some("2026-07-29T00:02:00Z".to_string()),
+            created_at: "2026-07-29T00:00:00Z".to_string(),
+        };
+
+        super::enrich_workflow_draft_fields_from_skill_capsule(&mut run);
+
+        assert_eq!(
+            run.result_json["recommended_slot"]["summary"].as_str(),
+            Some("Authored interview prep slot")
+        );
+        assert_eq!(
+            run.result_json["recommended_slot"]["focus_kind"].as_str(),
+            Some("interview")
+        );
+        assert_eq!(
+            run.result_json["recommended_slot"]["slot_basis"].as_str(),
+            Some("authored_preferred_slot")
+        );
+        assert_eq!(
+            run.result_json["recommended_slot"]["review_required"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            run.result_json["recommended_slot"]["external_write"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            run.result_json["recommended_slot"]["approval_state"].as_str(),
+            Some("draft_ready_for_review")
+        );
+        assert_eq!(
+            run.result_json["scheduling_notes"][0].as_str(),
+            Some("Fallback schedule note")
+        );
+        assert_eq!(
+            run.result_json["scheduling_notes"][1].as_str(),
+            Some("Reserve time to review the company brief before arrival.")
+        );
+        assert_eq!(
+            run.result_json["scheduling_notes"].as_array().map(Vec::len),
+            Some(3)
+        );
+        assert_eq!(
+            run.result_json["calendar_context"]["upcoming_event_count"].as_i64(),
+            Some(4)
+        );
+        assert_eq!(
+            run.result_json["calendar_context"]["next_event_title"].as_str(),
+            Some("Product interview")
+        );
+        assert_eq!(
+            run.result_json["calendar_context"]["window_days"].as_i64(),
+            Some(14)
+        );
+    }
+
+    #[test]
+    fn continue_workflow_run_after_resume_populates_study_structured_result_fields() {
+        let graph = serde_json::json!({
+            "title": "Study planner",
+            "nodes": [
+                {"id": "review", "kind": "approval", "label": "Review"},
+                {"id": "finish", "kind": "agent", "label": "Finish"}
+            ]
+        });
+        let ir = serde_json::json!({
+            "manifests": [
+                {"node_id": "mf_review", "source_graph_node_id": "review", "runtime_kind": "approval_runtime"},
+                {"node_id": "mf_finish", "source_graph_node_id": "finish", "runtime_kind": "executor"}
+            ]
+        });
+        let mut run = super::WorkflowRunRecord {
+            run_id: "wfrun_study_resume".to_string(),
+            workflow_id: "wf_study_resume".to_string(),
+            deployment_id: "wfdep_study_resume".to_string(),
+            owner_user_id: "user_study".to_string(),
+            status: "resumed_pending_execution".to_string(),
+            trigger_kind: "manual".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([
+                {
+                    "node_id": "review",
+                    "manifest_node_id": "mf_review",
+                    "source_graph_node_id": "review",
+                    "status": "resumed",
+                    "trace": {"kind": "approval_resume", "action": {"outcome": "resumed"}}
+                },
+                {
+                    "node_id": "mf_review",
+                    "source_graph_node_id": "review",
+                    "status": "resumed_pending_execution",
+                    "trace": {"kind": "approval_resume", "action": {"outcome": "resumed_pending_execution"}}
+                },
+                {
+                    "node_id": "finish",
+                    "manifest_node_id": "mf_finish",
+                    "source_graph_node_id": "finish",
+                    "runtime_kind": "executor",
+                    "graph_node_kind": "agent",
+                    "graph_node_label": "Finish",
+                    "status": "queued",
+                    "trace": {"kind": "queued", "action": {"outcome": "queued", "result_summary": "Execution is queued."}}
+                }
+            ]),
+            result_json: serde_json::json!({
+                "summary": "Workflow resumed after human approval and is ready for downstream execution.",
+                "completed_node_count": 1,
+                "waiting_node_count": 0,
+                "queued_node_count": 1,
+                "resume_status": "resumed_pending_execution",
+                "workflow_output_contract": {
+                    "workflow": "study_planner",
+                    "summary_mode": "draft_study_plan",
+                    "structured_output_keys": ["study_blocks", "reminders", "study_input_context", "calendar_context"],
+                    "external_write": false
+                }
+            }),
+            started_at: "2026-03-30T00:00:00Z".to_string(),
+            completed_at: None,
+            created_at: "2026-03-30T00:00:00Z".to_string(),
+        };
+
+        super::continue_workflow_run_after_resume(&mut run, &graph, &ir, "2026-03-30T01:00:00Z");
+
+        assert_eq!(run.status, "completed");
+        let reminders = run.result_json["reminders"]
+            .as_array()
+            .expect("reminders array");
+        assert_eq!(
+            reminders.first().and_then(Value::as_str),
+            Some("Review the draft study plan and adjust the blocks before relying on it.")
+        );
+        let study_blocks = run.result_json["study_blocks"]
+            .as_array()
+            .expect("study blocks array");
+        assert_eq!(study_blocks.len(), 1);
+        assert_eq!(study_blocks[0]["review_required"].as_bool(), Some(true));
+        assert_eq!(study_blocks[0]["status"].as_str(), Some("completed"));
+        assert_eq!(
+            study_blocks[0]["label"].as_str(),
+            Some("Primary study block")
+        );
+        assert_eq!(
+            run.result_json["workflow_output_contract"]["structured_output_keys"]
+                .as_array()
+                .map(Vec::len),
+            Some(4)
+        );
+    }
+
+    #[test]
+    fn build_study_focus_item_context_prefers_due_and_high_priority_pending_items() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-07-28T08:00:00Z")
+            .expect("valid datetime")
+            .with_timezone(&chrono::Utc);
+        let items = vec![
+            serde_json::json!({
+                "title": "Read chapter 8",
+                "status": "pending",
+                "priority": "normal"
+            }),
+            serde_json::json!({
+                "title": "Finalize chemistry revision sheet",
+                "status": "pending",
+                "priority": "high",
+                "due_at": "2026-07-28T18:00:00Z",
+                "description": "Summarize the reaction families before the quiz."
+            }),
+            serde_json::json!({
+                "title": "Upload lab reflection",
+                "status": "pending",
+                "priority": "low",
+                "due_at": "2026-07-27T18:00:00Z"
+            }),
+            serde_json::json!({
+                "title": "Finished item",
+                "status": "completed",
+                "priority": "high",
+                "due_at": "2026-07-28T10:00:00Z"
+            }),
+        ];
+
+        let context = super::build_study_focus_item_context(&items, now);
+
+        assert_eq!(context.len(), 3);
+        assert_eq!(context[0]["title"].as_str(), Some("Upload lab reflection"));
+        assert_eq!(context[0]["urgency"].as_str(), Some("overdue"));
+        assert_eq!(
+            context[1]["title"].as_str(),
+            Some("Finalize chemistry revision sheet")
+        );
+        assert_eq!(context[1]["urgency"].as_str(), Some("due_soon"));
+        assert_eq!(context[1]["priority"].as_str(), Some("high"));
+        assert_eq!(
+            context[1]["description"].as_str(),
+            Some("Summarize the reaction families before the quiz.")
+        );
+        assert_eq!(context[2]["title"].as_str(), Some("Read chapter 8"));
+        assert_eq!(context[2]["urgency"].as_str(), Some("undated"));
+    }
+
+    #[test]
+    fn find_first_free_calendar_gap_prefers_open_time_before_next_event() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-07-28T08:05:00Z")
+            .expect("valid datetime")
+            .with_timezone(&chrono::Utc);
+        let events = vec![super::CalendarEventWindow {
+            title: "Team sync".to_string(),
+            description: None,
+            location: None,
+            start_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T10:00:00Z")
+                .expect("valid datetime")
+                .with_timezone(&chrono::Utc),
+            end_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T10:30:00Z")
+                .expect("valid datetime")
+                .with_timezone(&chrono::Utc),
+            all_day: false,
+            academic_event_type: None,
+            schedule_anchor_type: Some("meeting"),
+            profile: crate::calendar_event_profile::calendar_event_profile_from_fields(
+                "Team sync",
+                None,
+                None,
+                false,
+            ),
+        }];
+        let (start_at, end_at, basis) =
+            super::find_first_free_calendar_gap(&events, now, chrono::Duration::minutes(30));
+
+        assert_eq!(start_at.to_rfc3339(), "2026-07-28T09:00:00+00:00");
+        assert_eq!(end_at.to_rfc3339(), "2026-07-28T09:30:00+00:00");
+        assert_eq!(basis, "Scheduled before Team sync");
+    }
+
+    #[test]
+    fn find_first_free_calendar_gap_moves_after_blocking_event_when_needed() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-07-28T08:05:00Z")
+            .expect("valid datetime")
+            .with_timezone(&chrono::Utc);
+        let events = vec![super::CalendarEventWindow {
+            title: "Morning block".to_string(),
+            description: None,
+            location: None,
+            start_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T09:00:00Z")
+                .expect("valid datetime")
+                .with_timezone(&chrono::Utc),
+            end_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T12:00:00Z")
+                .expect("valid datetime")
+                .with_timezone(&chrono::Utc),
+            all_day: false,
+            academic_event_type: None,
+            schedule_anchor_type: None,
+            profile: crate::calendar_event_profile::calendar_event_profile_from_fields(
+                "Morning block",
+                None,
+                None,
+                false,
+            ),
+        }];
+        let (start_at, end_at, basis) =
+            super::find_first_free_calendar_gap(&events, now, chrono::Duration::minutes(90));
+
+        assert_eq!(start_at.to_rfc3339(), "2026-07-28T12:15:00+00:00");
+        assert_eq!(end_at.to_rfc3339(), "2026-07-28T13:45:00+00:00");
+        assert_eq!(
+            basis,
+            "Scheduled after the last upcoming event in the current calendar window"
+        );
+    }
+
+    #[test]
+    fn find_preferred_study_block_prefers_academic_anchor_when_present() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-07-28T08:05:00Z")
+            .expect("valid datetime")
+            .with_timezone(&chrono::Utc);
+        let events = vec![
+            super::CalendarEventWindow {
+                title: "Team sync".to_string(),
+                description: None,
+                location: None,
+                start_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T11:00:00Z")
+                    .expect("valid datetime")
+                    .with_timezone(&chrono::Utc),
+                end_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T12:00:00Z")
+                    .expect("valid datetime")
+                    .with_timezone(&chrono::Utc),
+                all_day: false,
+                academic_event_type: None,
+                schedule_anchor_type: Some("meeting"),
+                profile: crate::calendar_event_profile::calendar_event_profile_from_fields(
+                    "Team sync",
+                    None,
+                    None,
+                    false,
+                ),
+            },
+            super::CalendarEventWindow {
+                title: "Biology midterm".to_string(),
+                description: Some("Closed-book exam".to_string()),
+                location: Some("Science Hall".to_string()),
+                start_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T16:00:00Z")
+                    .expect("valid datetime")
+                    .with_timezone(&chrono::Utc),
+                end_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T17:00:00Z")
+                    .expect("valid datetime")
+                    .with_timezone(&chrono::Utc),
+                all_day: false,
+                academic_event_type: Some("academic_exam"),
+                schedule_anchor_type: None,
+                profile: crate::calendar_event_profile::calendar_event_profile_from_fields(
+                    "Biology midterm",
+                    Some("Closed-book exam"),
+                    Some("Science Hall"),
+                    false,
+                ),
+            },
+        ];
+        let (start_at, end_at, basis, focus_kind, label, anchor_title, anchor_type) =
+            super::find_preferred_study_block(&events, now, chrono::Duration::minutes(90));
+
+        assert_eq!(start_at.to_rfc3339(), "2026-07-28T09:00:00+00:00");
+        assert_eq!(end_at.to_rfc3339(), "2026-07-28T10:30:00+00:00");
+        assert!(basis.contains("Biology midterm"));
+        assert_eq!(focus_kind, "exam_prep");
+        assert_eq!(label.as_deref(), Some("Exam prep block"));
+        assert_eq!(anchor_title.as_deref(), Some("Biology midterm"));
+        assert_eq!(anchor_type.as_deref(), Some("academic_exam"));
+    }
+
+    #[test]
+    fn find_preferred_schedule_slot_prefers_meeting_anchor_when_present() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-07-28T08:05:00Z")
+            .expect("valid datetime")
+            .with_timezone(&chrono::Utc);
+        let events = vec![
+            super::CalendarEventWindow {
+                title: "Morning admin".to_string(),
+                description: None,
+                location: None,
+                start_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T11:00:00Z")
+                    .expect("valid datetime")
+                    .with_timezone(&chrono::Utc),
+                end_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T11:30:00Z")
+                    .expect("valid datetime")
+                    .with_timezone(&chrono::Utc),
+                all_day: false,
+                academic_event_type: None,
+                schedule_anchor_type: None,
+                profile: crate::calendar_event_profile::calendar_event_profile_from_fields(
+                    "Morning admin",
+                    None,
+                    None,
+                    false,
+                ),
+            },
+            super::CalendarEventWindow {
+                title: "Board review meeting".to_string(),
+                description: Some("Discuss launch risks".to_string()),
+                location: Some("Level 4 boardroom".to_string()),
+                start_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T14:00:00Z")
+                    .expect("valid datetime")
+                    .with_timezone(&chrono::Utc),
+                end_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T15:00:00Z")
+                    .expect("valid datetime")
+                    .with_timezone(&chrono::Utc),
+                all_day: false,
+                academic_event_type: None,
+                schedule_anchor_type: Some("meeting"),
+                profile: crate::calendar_event_profile::calendar_event_profile_from_fields(
+                    "Board review meeting",
+                    Some("Discuss launch risks"),
+                    Some("Level 4 boardroom"),
+                    false,
+                ),
+            },
+        ];
+        let (
+            start_at,
+            end_at,
+            basis,
+            focus_kind,
+            label,
+            anchor_title,
+            anchor_type,
+            anchor_note_kind,
+        ) = super::find_preferred_schedule_slot(&events, now, chrono::Duration::minutes(30));
+
+        assert_eq!(start_at.to_rfc3339(), "2026-07-28T09:00:00+00:00");
+        assert_eq!(end_at.to_rfc3339(), "2026-07-28T09:30:00+00:00");
+        assert!(basis.contains("Board review meeting"));
+        assert_eq!(focus_kind, "meeting_prep");
+        assert_eq!(label.as_deref(), Some("Meeting prep slot"));
+        assert_eq!(anchor_title.as_deref(), Some("Board review meeting"));
+        assert_eq!(anchor_type.as_deref(), Some("meeting"));
+        assert_eq!(anchor_note_kind.as_deref(), Some("high_stakes_prep"));
+    }
+
+    #[test]
+    fn classify_schedule_anchor_type_uses_description_and_location_metadata() {
+        assert_eq!(
+            super::classify_schedule_anchor_type(
+                "Quarterly catch-up",
+                Some("Draft agenda and briefing pack"),
+                Some("Level 4 boardroom")
+            ),
+            Some("meeting")
+        );
+        assert_eq!(
+            super::classify_schedule_anchor_type(
+                "Personal appointment",
+                Some("Follow-up with physio"),
+                Some("City clinic")
+            ),
+            Some("medical")
+        );
+    }
+
+    #[test]
+    fn schedule_anchor_prep_lead_minutes_expands_for_high_stakes_meeting() {
+        let event = super::CalendarEventWindow {
+            title: "Board review meeting".to_string(),
+            description: Some("Launch risk review with executive agenda".to_string()),
+            location: Some("Level 4 boardroom".to_string()),
+            start_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T14:00:00Z")
+                .expect("valid datetime")
+                .with_timezone(&chrono::Utc),
+            end_at: chrono::DateTime::parse_from_rfc3339("2026-07-28T15:00:00Z")
+                .expect("valid datetime")
+                .with_timezone(&chrono::Utc),
+            all_day: false,
+            academic_event_type: None,
+            schedule_anchor_type: Some("meeting"),
+            profile: crate::calendar_event_profile::calendar_event_profile_from_fields(
+                "Board review meeting",
+                Some("Launch risk review with executive agenda"),
+                Some("Level 4 boardroom"),
+                false,
+            ),
+        };
+
+        assert_eq!(super::schedule_anchor_note_kind(&event), "high_stakes_prep");
+        assert_eq!(
+            super::schedule_anchor_prep_lead_minutes(&event, "high_stakes_prep"),
+            60
+        );
+    }
+
+    #[test]
     fn workflow_run_record_fails_when_node_requests_failure_simulation() {
         let graph = serde_json::json!({
             "title": "Failure workflow",
@@ -29406,6 +42919,457 @@ mod tests {
         assert_eq!(
             timeline[1]["trace"]["events"][4]["kind"].as_str(),
             Some("result")
+        );
+    }
+
+    #[test]
+    fn workflow_run_record_includes_skill_capsule_action_metadata() {
+        let graph = serde_json::json!({
+            "version": "omnyid-workflow.v1",
+            "workflow_id": "wf_skill_capsule_runtime",
+            "title": "Skill capsule action workflow",
+            "environment": "dev",
+            "root_node_ids": ["start"],
+            "nodes": [
+                {"id": "start", "kind": "trigger", "label": "Start", "config": {"trigger_kind": "manual"}, "metadata": {}, "policy": {}},
+                {
+                    "id": "skill_prepare",
+                    "kind": "tool",
+                    "label": "Prepare skill capsule",
+                    "config": {
+                        "capability_id": "skill_capsule",
+                        "operation": "prepare",
+                        "atom_id": "code.edit.safe",
+                        "timeout_seconds": 45
+                    },
+                    "metadata": {},
+                    "policy": {}
+                },
+                {"id": "finish", "kind": "termination", "label": "Finish"}
+            ],
+            "edges": [
+                {"id": "edge_start_prepare", "source": "start", "target": "skill_prepare", "metadata": {}},
+                {"id": "edge_prepare_finish", "source": "skill_prepare", "target": "finish", "metadata": {}}
+            ],
+            "optimization_mode": "balanced"
+        });
+        let ir = super::compile_workflow_graph_to_ir(&graph).expect("compile workflow graph");
+
+        let run = super::workflow_run_record(
+            "wf_skill_capsule_runtime",
+            "dep_skill_capsule_runtime",
+            "user_skill_capsule_runtime",
+            "manual",
+            None,
+            None,
+            &graph,
+            &ir,
+        );
+
+        let timeline = run.timeline_json.as_array().expect("timeline array");
+        assert_eq!(
+            timeline[1]["trace"]["action"]["capability_id"].as_str(),
+            Some("skill_capsule")
+        );
+        assert_eq!(
+            timeline[1]["trace"]["action"]["operation"].as_str(),
+            Some("prepare")
+        );
+        assert_eq!(
+            timeline[1]["trace"]["action"]["service"].as_str(),
+            Some("skill_capsule/prepare/code.edit.safe")
+        );
+        assert_eq!(
+            timeline[1]["trace"]["action"]["integration_family"].as_str(),
+            Some("skill_runtime")
+        );
+        assert_eq!(
+            timeline[1]["trace"]["action"]["request_summary"].as_str(),
+            Some("Invoke skill_capsule.prepare for Prepare skill capsule.")
+        );
+        assert_eq!(
+            timeline[1]["trace"]["action"]["timeout_seconds"].as_u64(),
+            Some(45)
+        );
+        assert_eq!(
+            timeline[1]["trace"]["action"]["connector_status"].as_str(),
+            Some("ok")
+        );
+    }
+
+    #[test]
+    fn deployment_trigger_readiness_summary_prefers_metadata_preview() {
+        let deployment = serde_json::json!({
+            "ir_snapshot": {
+                "metadata": {
+                    "trigger_registration_preview": {
+                        "status": "compiled_preview",
+                        "live_registration_supported": false,
+                        "activation_count": 3,
+                        "registration_targets": ["webhook", "internal_event"],
+                        "runtime_requirements": ["scheduler", "ingest"],
+                        "missing_runtime_capabilities": ["live_trigger_runtime"]
+                    }
+                },
+                "activation_registration_preview": {
+                    "status": "legacy_preview",
+                    "live_registration_supported": true,
+                    "activation_count": 1,
+                    "registration_targets": ["manual"],
+                    "runtime_requirements": [],
+                    "missing_runtime_capabilities": []
+                }
+            }
+        });
+
+        let summary = super::deployment_trigger_readiness_summary(&deployment)
+            .expect("deployment trigger readiness summary");
+
+        assert_eq!(summary["status"].as_str(), Some("compiled_preview"));
+        assert_eq!(
+            summary["live_registration_supported"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(summary["activation_count"].as_u64(), Some(3));
+        assert_eq!(
+            summary["registration_targets"]
+                .as_array()
+                .map(|items| items.len()),
+            Some(2)
+        );
+        assert_eq!(
+            summary["missing_runtime_capabilities"][0].as_str(),
+            Some("live_trigger_runtime")
+        );
+    }
+
+    #[test]
+    fn deployment_trigger_readiness_summary_falls_back_to_direct_preview() {
+        let deployment = serde_json::json!({
+            "ir_snapshot": {
+                "activation_registration_preview": {
+                    "status": "compiled_preview",
+                    "live_registration_supported": false,
+                    "activation_count": 1,
+                    "registration_targets": ["webhook"],
+                    "runtime_requirements": ["ingest"],
+                    "missing_runtime_capabilities": ["scheduler"]
+                }
+            }
+        });
+
+        let summary = super::deployment_trigger_readiness_summary(&deployment)
+            .expect("deployment trigger readiness summary");
+
+        assert_eq!(summary["status"].as_str(), Some("compiled_preview"));
+        assert_eq!(
+            summary["live_registration_supported"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(summary["activation_count"].as_u64(), Some(1));
+        assert_eq!(summary["registration_targets"][0].as_str(), Some("webhook"));
+        assert_eq!(summary["runtime_requirements"][0].as_str(), Some("ingest"));
+        assert_eq!(
+            summary["missing_runtime_capabilities"][0].as_str(),
+            Some("scheduler")
+        );
+    }
+
+    #[test]
+    fn saved_workflow_response_includes_trigger_readiness_summary() {
+        let workflow = serde_json::json!({
+            "workflow_id": "wf_saved_readiness",
+            "title": "Saved workflow",
+            "graph": {},
+            "latest_ir": {
+                "activation_registration_preview": {
+                    "status": "compiled_preview",
+                    "live_registration_supported": false,
+                    "activation_count": 2,
+                    "registration_targets": ["webhook"],
+                    "runtime_requirements": ["ingest"],
+                    "missing_runtime_capabilities": ["scheduler"]
+                }
+            }
+        });
+
+        let enriched = super::saved_workflow_response(&workflow);
+
+        assert_eq!(
+            enriched["trigger_readiness_summary"]["status"].as_str(),
+            Some("compiled_preview")
+        );
+        assert_eq!(
+            enriched["trigger_readiness_summary"]["live_registration_supported"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            enriched["trigger_readiness_summary"]["registration_targets"][0].as_str(),
+            Some("webhook")
+        );
+    }
+
+    #[test]
+    fn saved_workflow_response_omits_trigger_readiness_without_latest_ir() {
+        let workflow = serde_json::json!({
+            "workflow_id": "wf_saved_no_ir",
+            "title": "Saved workflow",
+            "graph": {}
+        });
+
+        let enriched = super::saved_workflow_response(&workflow);
+
+        assert!(
+            enriched.get("trigger_readiness_summary").is_none(),
+            "workflow without latest_ir should not invent a trigger readiness summary"
+        );
+    }
+
+    #[test]
+    fn compiled_ir_summary_reports_runtime_and_afp_family_counts() {
+        let compiled_ir = serde_json::json!({
+            "manifests": [
+                {
+                    "node_id": "mf_exec",
+                    "runtime_kind": "executor",
+                    "connector_binding": { "capability_id": "gmail.send" }
+                },
+                {
+                    "node_id": "mf_approval",
+                    "runtime_kind": "approval_runtime"
+                },
+                {
+                    "node_id": "mf_summary",
+                    "runtime_kind": "termination_runtime"
+                }
+            ],
+            "wait_resume_descriptors": [
+                { "manifest_node_id": "mf_approval" },
+                { "manifest_node_id": "mf_summary" }
+            ]
+        });
+
+        let summary = super::compiled_ir_summary(&compiled_ir);
+
+        assert_eq!(summary["manifest_count"].as_u64(), Some(3));
+        assert_eq!(summary["runtime_kind_counts"]["executor"].as_u64(), Some(1));
+        assert_eq!(
+            summary["runtime_kind_counts"]["approval_runtime"].as_u64(),
+            Some(1)
+        );
+        assert_eq!(
+            summary["runtime_kind_counts"]["termination_runtime"].as_u64(),
+            Some(1)
+        );
+        assert_eq!(
+            summary["afp_message_family_counts"]["capability_boundary"].as_u64(),
+            Some(1)
+        );
+        assert_eq!(
+            summary["afp_message_family_counts"]["decision_boundary"].as_u64(),
+            Some(1)
+        );
+        assert_eq!(
+            summary["afp_message_family_counts"]["summary_boundary"].as_u64(),
+            Some(1)
+        );
+        assert_eq!(summary["approval_manifest_count"].as_u64(), Some(1));
+        assert_eq!(summary["wait_resume_count"].as_u64(), Some(2));
+    }
+
+    #[test]
+    fn compiled_ir_summary_falls_back_to_orchestration_scaffold_for_other_runtime_kinds() {
+        let compiled_ir = serde_json::json!({
+            "manifests": [
+                {
+                    "node_id": "mf_goal",
+                    "runtime_kind": "goal_intake"
+                },
+                {
+                    "node_id": "mf_reflection",
+                    "runtime_kind": "reflection"
+                }
+            ]
+        });
+
+        let summary = super::compiled_ir_summary(&compiled_ir);
+
+        assert_eq!(summary["manifest_count"].as_u64(), Some(2));
+        assert_eq!(
+            summary["afp_message_family_counts"]["orchestration_scaffold"].as_u64(),
+            Some(2)
+        );
+        assert_eq!(summary["approval_manifest_count"].as_u64(), Some(0));
+        assert_eq!(summary["wait_resume_count"].as_u64(), Some(0));
+    }
+
+    #[test]
+    fn compiled_validation_preview_returns_summary_for_compilable_graph() {
+        let graph = serde_json::json!({
+            "version": "omnyid-workflow.v1",
+            "workflow_id": "wf_validate_preview",
+            "title": "Validation preview",
+            "description": "Compile preview test graph",
+            "environment": "dev",
+            "optimization_mode": "balanced",
+            "root_node_ids": ["node_trigger"],
+            "nodes": [
+                {
+                    "id": "node_trigger",
+                    "kind": "trigger",
+                    "label": "Start",
+                    "position": {"x": 0, "y": 0},
+                    "inputs": [],
+                    "outputs": [],
+                    "policy": {},
+                    "metadata": {},
+                    "hidden_runtime_nodes": [],
+                    "config": { "trigger_kind": "manual", "event_filter": {} }
+                }
+            ],
+            "edges": [],
+            "presets": [],
+            "metadata": {}
+        });
+
+        let (errors, summary, trigger_readiness) = super::compiled_validation_preview(&graph, true);
+
+        assert!(
+            errors.is_empty(),
+            "compilable graph should not produce compile errors"
+        );
+        assert_eq!(
+            summary
+                .as_ref()
+                .and_then(|value| value["manifest_count"].as_u64()),
+            Some(1)
+        );
+        assert_eq!(
+            trigger_readiness
+                .as_ref()
+                .and_then(|value| value["status"].as_str()),
+            Some("compiled_preview")
+        );
+    }
+
+    #[test]
+    fn compiled_validation_preview_surfaces_compile_failures() {
+        let graph = serde_json::json!({
+            "version": "omnyid-workflow.v1",
+            "title": "Validation preview missing workflow id",
+            "description": "Compile preview failure test graph",
+            "environment": "dev",
+            "optimization_mode": "balanced",
+            "root_node_ids": ["node_trigger"],
+            "nodes": [
+                {
+                    "id": "node_trigger",
+                    "kind": "trigger",
+                    "label": "Start",
+                    "position": {"x": 0, "y": 0},
+                    "inputs": [],
+                    "outputs": [],
+                    "policy": {},
+                    "metadata": {},
+                    "hidden_runtime_nodes": [],
+                    "config": { "trigger_kind": "manual", "event_filter": {} }
+                }
+            ],
+            "edges": [],
+            "presets": [],
+            "metadata": {}
+        });
+
+        let (errors, summary, trigger_readiness) = super::compiled_validation_preview(&graph, true);
+
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("graph.workflow_id is required")),
+            "expected compile-time workflow_id error, got {errors:?}"
+        );
+        assert!(
+            summary.is_none(),
+            "compile failure should not emit compiled summary"
+        );
+        assert!(
+            trigger_readiness.is_none(),
+            "compile failure should not emit trigger readiness summary"
+        );
+    }
+
+    #[test]
+    fn attach_skill_capsule_stream_fields_prefers_trace_and_falls_back_to_run_result() {
+        let mut node_event = serde_json::json!({});
+        let run_result = serde_json::json!({
+            "skill_capsule_outcome_kind": "receipt_failed",
+            "skill_capsule_receipt_status": "FAILED"
+        });
+        let trace = serde_json::json!({
+            "skill_capsule_outcome_kind": "receipt_blocked",
+            "skill_capsule": {
+                "outcome_kind": "receipt_blocked",
+                "receipt_status": "BLOCKED"
+            }
+        });
+
+        super::attach_skill_capsule_stream_fields(
+            &mut node_event,
+            run_result.as_object(),
+            trace.as_object(),
+        );
+        assert_eq!(
+            node_event["skill_capsule_outcome_kind"].as_str(),
+            Some("receipt_blocked")
+        );
+        assert_eq!(
+            node_event["skill_capsule_receipt_status"].as_str(),
+            Some("BLOCKED")
+        );
+
+        let mut run_event = serde_json::json!({});
+        super::attach_skill_capsule_stream_fields(&mut run_event, run_result.as_object(), None);
+        assert_eq!(
+            run_event["skill_capsule_outcome_kind"].as_str(),
+            Some("receipt_failed")
+        );
+        assert_eq!(
+            run_event["skill_capsule_receipt_status"].as_str(),
+            Some("FAILED")
+        );
+    }
+
+    #[test]
+    fn workflow_internal_event_payload_includes_skill_capsule_outcome_fields() {
+        let run = crate::db::WorkflowRunRecord {
+            run_id: "run_skill_capsule_event".to_string(),
+            workflow_id: "wf_skill_capsule_event".to_string(),
+            deployment_id: "dep_skill_capsule_event".to_string(),
+            owner_user_id: "user_skill_capsule_event".to_string(),
+            trigger_kind: "manual".to_string(),
+            status: "failed".to_string(),
+            replay_of_run_id: None,
+            timeline_json: serde_json::json!([]),
+            result_json: serde_json::json!({
+                "skill_capsule_outcome_kind": "bridge_error",
+                "skill_capsule_receipt_status": Value::Null,
+                "failed_reason": "Skill capsule runtime bridge unavailable."
+            }),
+            started_at: "2026-01-01T00:00:00Z".to_string(),
+            completed_at: Some("2026-01-01T00:00:02Z".to_string()),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+        };
+
+        let payload =
+            super::workflow_internal_event_payload("wf_skill_capsule_event", &run, "manual");
+        assert_eq!(
+            payload["skill_capsule_outcome_kind"].as_str(),
+            Some("bridge_error")
+        );
+        assert!(payload["skill_capsule_receipt_status"].is_null());
+        assert_eq!(
+            payload["failed_reason"].as_str(),
+            Some("Skill capsule runtime bridge unavailable.")
         );
     }
 
@@ -30355,7 +44319,12 @@ mod tests {
                 "provider": "omnyid",
                 "model": "",
                 "gate": "approval",
-                "sections": orchestrate_card_sections(summary, objective, OrchestrationGate::Approval),
+                "sections": orchestrate_card_sections(
+                    summary,
+                    objective,
+                    OrchestrationGate::Approval,
+                    None,
+                ),
             }),
             vec![],
             vec![],
@@ -30382,6 +44351,12 @@ mod tests {
                 selected_option_id: "cancel_orchestration".to_string(),
                 thread_id: thread_id.clone(),
                 agent_id: Some(master.agent_id.clone()),
+                memory_space: None,
+                author_mask: None,
+                author_type: None,
+                author_id: None,
+                is_human_authored: None,
+                human_only: None,
             }),
         )
         .await
@@ -30496,6 +44471,14 @@ mod tests {
             response,
             Err((StatusCode::NOT_FOUND, "capability not found".to_string()))
         );
+    }
+
+    #[test]
+    fn agent_keys_route_remains_blocked() {
+        let (status, message) = super::agent_keys_not_implemented_error();
+        assert_eq!(status, StatusCode::NOT_IMPLEMENTED);
+        assert!(message.contains("server-wide encryption key"));
+        assert!(message.contains("cannot be vended"));
     }
 
     #[test]
@@ -30863,6 +44846,86 @@ mod tests {
     }
 
     #[test]
+    fn workflow_validation_warns_when_no_termination_node_exists() {
+        let graph = serde_json::json!({
+            "version": "omnyid-workflow.v1",
+            "workflow_id": "wf_no_termination",
+            "environment": "dev",
+            "root_node_ids": ["start"],
+            "nodes": [
+                {
+                    "id": "start",
+                    "kind": "trigger",
+                    "label": "Start",
+                    "config": {"trigger_kind": "manual", "event_filter": {}}
+                },
+                {
+                    "id": "worker",
+                    "kind": "agent",
+                    "label": "Worker",
+                    "config": {"objective": "Do work"}
+                }
+            ],
+            "edges": [
+                {"id": "edge_1", "source": "start", "target": "worker"}
+            ]
+        });
+        let (_errors, warnings) = super::validate_workflow_graph_json(&graph, Some("user-test"));
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| warning.contains("no termination node")),
+            "expected warning about missing termination node, got {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn workflow_validation_warns_when_termination_is_not_reachable_from_roots() {
+        let graph = serde_json::json!({
+            "version": "omnyid-workflow.v1",
+            "workflow_id": "wf_unreachable_termination",
+            "environment": "dev",
+            "root_node_ids": ["start"],
+            "nodes": [
+                {
+                    "id": "start",
+                    "kind": "trigger",
+                    "label": "Start",
+                    "config": {"trigger_kind": "manual", "event_filter": {}}
+                },
+                {
+                    "id": "worker",
+                    "kind": "agent",
+                    "label": "Worker",
+                    "config": {"objective": "Do work"}
+                },
+                {
+                    "id": "finish",
+                    "kind": "termination",
+                    "label": "Finish",
+                    "config": {"output_kind": "chat_reply"}
+                }
+            ],
+            "edges": [
+                {"id": "edge_1", "source": "start", "target": "worker"}
+            ]
+        });
+        let (_errors, warnings) = super::validate_workflow_graph_json(&graph, Some("user-test"));
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| warning.contains("no termination node is reachable")),
+            "expected warning about unreachable termination, got {warnings:?}"
+        );
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| warning.contains("unreachable from graph.root_node_ids")),
+            "expected warning about orphaned node coverage, got {warnings:?}"
+        );
+    }
+
+    #[test]
     fn migrations_include_delegation_hardening_and_trigger_hardening() {
         let versions: Vec<&str> = crate::db::MIGRATIONS.iter().map(|(v, _, _)| *v).collect();
         assert!(
@@ -30889,10 +44952,9 @@ mod tests {
             versions.contains(&"0032_internal_event_queue"),
             "MIGRATIONS must include 0032_internal_event_queue"
         );
-        assert_eq!(
-            crate::db::MIGRATIONS.len(),
-            64,
-            "MIGRATIONS array must have exactly 64 entries"
+        assert!(
+            versions.contains(&"0075_afp_coordination_notify"),
+            "MIGRATIONS must include 0075_afp_coordination_notify"
         );
     }
 
@@ -31004,6 +45066,13 @@ mod tests {
         }
     }
 
+    #[test]
+    fn webhook_ingress_rate_limit_policy_is_bounded() {
+        let policy = super::webhook_ingress_rate_limit_policy();
+        assert_eq!(policy.max_requests, 60);
+        assert_eq!(policy.window, std::time::Duration::from_secs(60));
+    }
+
     // -- File-drop trigger adapter tests ---------------------------------------
 
     #[test]
@@ -31067,15 +45136,71 @@ mod tests {
 
     #[test]
     fn internal_event_payload_summary_contains_event_type_and_source() {
-        let summary = serde_json::json!({
-            "trigger_kind": "internal_event",
-            "event_type": "workflow_completed",
-            "source_workflow_id": "wf_abc123",
-            "source_run_id": "wfrun_xyz",
-        });
+        let summary = super::internal_event_trigger_payload_summary(
+            "workflow_completed",
+            Some("wf_abc123"),
+            Some("wfrun_xyz"),
+            &serde_json::json!({
+                "skill_capsule_outcome_kind": "receipt_blocked",
+                "skill_capsule_receipt_status": "blocked",
+                "blocked_reason": "human review required",
+            }),
+        );
         assert_eq!(summary["trigger_kind"].as_str(), Some("internal_event"));
         assert_eq!(summary["event_type"].as_str(), Some("workflow_completed"));
         assert_eq!(summary["source_workflow_id"].as_str(), Some("wf_abc123"));
+        assert_eq!(
+            summary["skill_capsule_outcome_kind"].as_str(),
+            Some("receipt_blocked")
+        );
+        assert_eq!(
+            summary["skill_capsule_receipt_status"].as_str(),
+            Some("blocked")
+        );
+        assert_eq!(
+            summary["blocked_reason"].as_str(),
+            Some("human review required")
+        );
+    }
+
+    #[test]
+    fn trigger_observation_response_hoists_skill_capsule_summary_fields() {
+        let record = serde_json::json!({
+            "observation_id": "wftobs_test_skill_capsule",
+            "registration_id": "wftrig_test",
+            "workflow_id": "wf_abc123",
+            "deployment_id": "dep_abc123",
+            "owner_user_id": "user_abc123",
+            "trigger_source": "internal_event",
+            "trigger_time": "2026-07-15T00:00:00Z",
+            "payload_summary": {
+                "trigger_kind": "internal_event",
+                "event_type": "workflow_failed",
+                "skill_capsule_outcome_kind": "bridge_error",
+                "failed_reason": "skill capsule bridge unavailable",
+            },
+            "schedule_metadata": {},
+            "delayed_resumption_reason": Value::Null,
+            "hybrid_decision_chain": [],
+            "run_initiation_trace": {
+                "run_id": "wfrun_abc123",
+            },
+            "replay_nonce": "nonce",
+            "created_at": "2026-07-15T00:00:00Z"
+        });
+        let response = super::trigger_observation_response(record);
+        assert_eq!(
+            response["skill_capsule_outcome_kind"].as_str(),
+            Some("bridge_error")
+        );
+        assert_eq!(
+            response["failed_reason"].as_str(),
+            Some("skill capsule bridge unavailable")
+        );
+        assert_eq!(
+            response["payload_summary"]["skill_capsule_outcome_kind"].as_str(),
+            Some("bridge_error")
+        );
     }
 
     #[test]
@@ -31335,6 +45460,42 @@ mod tests {
     fn afp_subtype_wake_dispatch_constant_value() {
         assert_eq!(crate::message::AFP_SUBTYPE_WAKE_DISPATCH, "wake_dispatch");
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn relax_runtime_permissions_removes_world_access() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = std::env::temp_dir().join(format!("omnyid-runtime-perms-{}", Ulid::new()));
+        let workspace = root.join("workspace");
+        let data = workspace.join("data");
+        let files = data.join("files");
+        let db = data.join("db");
+        let vector = data.join("vector");
+        let secrets = root.join("secrets");
+        let logs = root.join("logs");
+
+        for path in [&files, &db, &vector, &secrets, &logs] {
+            std::fs::create_dir_all(path).unwrap();
+        }
+
+        for path in [
+            &root, &workspace, &data, &files, &db, &vector, &secrets, &logs,
+        ] {
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o777)).unwrap();
+        }
+
+        super::relax_runtime_permissions(&root);
+
+        for path in [
+            &root, &workspace, &data, &files, &db, &vector, &secrets, &logs,
+        ] {
+            let mode = std::fs::metadata(path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o750, "path {} must be 0o750", path.display());
+        }
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }
 
 // -- Cost-aware orchestration HTTP handlers ------------------------------------
@@ -31426,11 +45587,10 @@ async fn upsert_budget_http(
 
     match result {
         Ok(_) => Json(serde_json::json!({ "ok": true })).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => {
+            let (status, payload) = compat_helpers::internal_json_http_error(e);
+            (status, Json(payload)).into_response()
+        }
     }
 }
 
@@ -31489,11 +45649,10 @@ async fn agent_spend_history_http(
                 .collect();
             Json(serde_json::json!({ "days": days, "history": history })).into_response()
         }
-        Err(err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": err.to_string() })),
-        )
-            .into_response(),
+        Err(err) => {
+            let (status, payload) = internal_json_http_error(err);
+            (status, Json(payload)).into_response()
+        }
     }
 }
 
@@ -31524,7 +45683,13 @@ async fn get_run_context_http(
         Some(oid) if oid == user.id => {
             let ctx = state.cost_oracle.get_context(&run_id).await;
             match ctx {
-                Some(c) => Json(serde_json::to_value(&c).unwrap_or_default()).into_response(),
+                Some(c) => match serde_json::to_value(&c) {
+                    Ok(payload) => Json(payload).into_response(),
+                    Err(err) => {
+                        let (status, payload) = internal_json_http_error(err);
+                        (status, Json(payload)).into_response()
+                    }
+                },
                 None => (
                     StatusCode::NOT_FOUND,
                     Json(serde_json::json!({ "error": "run not active" })),

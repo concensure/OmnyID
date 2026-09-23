@@ -89,6 +89,8 @@ test("weddingApprovalReceiptToAfpSendInput preserves blocked receipt context", (
 
   assert.equal(input.type, "approval_receipt");
   assert.equal(input.store_in_relational, true);
+  assert.ok(input.supertags?.includes("wedding_approval_receipt"));
+  assert.ok(input.supertags?.includes("approval_status:blocked"));
   assert.equal(input.content.status, "blocked");
   assert.match(String(input.content.blocked_reason), /Explicit user approval/i);
   assert.equal(input.content.block_kind, "needs_user_approval");

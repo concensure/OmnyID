@@ -43,10 +43,11 @@ export function WeddingCollaborationAccessCard(props: {
                     class="rounded-full border border-sky-100 bg-white/85 px-2 py-1 text-[10px] font-semibold text-sky-950 transition hover:border-sky-200 hover:bg-white"
                     onClick={() => setOpenRole(openRole() === role.role ? null : role.role)}
                   >
-                    {openRole() === role.role ? "Hide details" : "Review"}
+                    {openRole() === role.role ? "Hide details" : "Show details"}
                   </button>
                 </div>
                 <p class="mt-1 text-xs leading-5 text-sky-950/70">{role.summaryLabel}</p>
+                <p class="mt-1 text-xs leading-5 text-sky-950/60">{role.hoverHelpLabel}</p>
                 <button
                   type="button"
                   class="mt-1 text-left text-xs font-semibold leading-5 text-sky-900 underline decoration-sky-300 underline-offset-2"

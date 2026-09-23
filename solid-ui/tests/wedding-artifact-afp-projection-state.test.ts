@@ -171,7 +171,7 @@ test("pending email drafts include approval projection metadata", () => {
   assert.equal(message.content.approval_state, "pending_user_approval");
   assert.ok(message.supertags.includes("approval:pending_user_approval"));
   assert.ok(message.views.some((view) => view.format === "approvals"));
-  assert.ok((message.metadata?.warning_labels as string[]).some((label) => label.includes("pending user approval")));
+  assert.ok((message.metadata?.warning_labels as string[]).some((label) => label.includes("needs your approval")));
 });
 
 test("builds relational AFP send inputs for artifact persistence", () => {
@@ -182,6 +182,8 @@ test("builds relational AFP send inputs for artifact persistence", () => {
   assert.equal(input.kind, "file");
   assert.equal(input.subtype, "wedding_artifact");
   assert.equal(input.store_in_relational, true);
+  assert.ok(input.supertags?.includes("wedding_artifact"));
+  assert.ok(input.supertags?.includes("wedding_artifact:research"));
   assert.ok(Array.isArray(input.views));
   assert.equal((input.content as Record<string, unknown>).artifact_id, artifact.summary.id);
 });

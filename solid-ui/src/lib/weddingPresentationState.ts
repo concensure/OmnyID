@@ -187,11 +187,22 @@ function cardFromArtifact(
   sectionId: WeddingPresentationSectionId,
   workspace: WeddingResponseWorkspaceState,
 ): WeddingPresentationCard {
+  const body = sectionId === "map"
+    ? artifact.locationLabels.length > 0
+      ? `Map details found for ${artifact.locationLabels.slice(0, 3).join(", ")}. Check live address, travel time, and availability before booking.`
+      : "No clear map details were found yet. Add a venue, vendor address, or travel location to use the map tools."
+    : sectionId === "timeline"
+      ? "Timeline details for dates, run sheets, reminders, or planning milestones."
+      : sectionId === "tasks"
+        ? "Wedding tasks that need an owner, due date, and final check."
+        : sectionId === "drafts"
+          ? "Message draft to review before anything is sent."
+          : "Wedding planning document ready to review.";
   return {
     id: `${sectionId}:${artifact.id}`,
     sectionId,
     title: presentationTitleForArtifact(artifact),
-    body: `${artifact.category} file with ${artifact.exportTargets.length} export option${artifact.exportTargets.length === 1 ? "" : "s"}.`,
+    body,
     badges: badgesForArtifact(artifact),
     evidenceLabel: presentationEvidenceLabelForArtifact(artifact),
     primaryAction: sectionId === "drafts"
@@ -227,7 +238,7 @@ function sectionCards(
   }
   if (sectionId === "map") {
     return workspace.results
-      .filter((artifact) => artifact.kind === "map_collection" || artifact.locationLabels.length > 0)
+      .filter((artifact) => artifact.kind === "map_collection" || (artifact.locationLabels.length > 0 && artifact.kind !== "timeline"))
       .slice(0, 3)
       .map((artifact) => ({
         ...cardFromArtifact(artifact, sectionId, workspace),

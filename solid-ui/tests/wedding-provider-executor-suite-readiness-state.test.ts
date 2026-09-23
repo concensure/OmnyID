@@ -145,7 +145,7 @@ test("provider executor readiness can represent multi-provider vendor research p
   assert.equal(blocked.requiredProvider, "Brave Search, Google Places, or OSM/Overpass provider");
   assert.equal(blocked.productionReady, false);
   assert.equal(blocked.setupView, "connected_apps");
-  assert.match(blocked.detail, /external delivery needs a connected executor implementation/i);
+  assert.match(blocked.detail, /needs a connected app/i);
   assert.equal(ready.productionReady, true);
-  assert.match(ready.summary, /Google Places, or OSM\/Overpass provider executor ready/i);
+  assert.match(ready.summary, /Google Places, or OSM\/Overpass provider ready/i);
 });

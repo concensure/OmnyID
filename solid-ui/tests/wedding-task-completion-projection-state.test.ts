@@ -61,6 +61,7 @@ test("wedding task completion projection exposes relational send input and rejec
   assert.ok(input);
   assert.equal(input.type, "task_status");
   assert.equal(input.store_in_relational, true);
+  assert.ok(input.supertags?.includes("wedding_task_status:done"));
   assert.equal(weddingTaskCompletionToAfpMessage({ record: null }), null);
   assert.equal(weddingTaskCompletionToAfpSendInput({ record: { ...record, taskId: "" } }), null);
 });

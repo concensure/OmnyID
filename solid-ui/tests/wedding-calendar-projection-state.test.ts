@@ -377,6 +377,45 @@ test("wedding task projection preserves vendor-search freshness and outreach met
   assert.ok((message.metadata?.searchable_terms as string[]).includes("Photographer"));
 });
 
+test("wedding task projection routes budget work to DecisionOS and knowledge graph", () => {
+  const message = weddingTaskItemToAfpTaskMessage({
+    ...taskItem,
+    id: "budget-payment-garden-hall",
+    title: "Review Garden Hall payment schedule",
+    kind: "budget_review",
+    dueAt: "2027-01-15T17:00:00.000Z",
+    metadata: {
+      ...(taskItem.metadata as Record<string, unknown>),
+      budget_payment_review: true,
+      budget_payment_candidate_id: "payment:garden-hall:deposit",
+      budget_payment_due_amount_label: "$3000",
+      budget_payment_due_date_label: "2027-01-15",
+      budget_vendor_label: "Garden Hall",
+      budget_category_label: "Venue",
+      budget_source_label: "Uploaded contract",
+      second_order_loop: "budget_drift",
+      second_order_evidence_labels: ["Payment schedule needs follow-up."],
+      preparation_checklist: true,
+      preparation_checklist_item: "payment_review",
+    },
+  }, "2026-09-11T00:00:00.000Z");
+
+  assert.ok(message);
+  assert.ok(message.to?.includes("agent://decision-queue"));
+  assert.ok(message.to?.includes("agent://knowledge-graph"));
+  assert.ok(message.to?.includes("agent://topology"));
+  assert.ok(message.supertags?.includes("wedding_budget"));
+  assert.ok(message.supertags?.includes("wedding_budget:payment_schedule"));
+  assert.ok(message.supertags?.includes("topology:budget_drift"));
+  assert.equal(message.content.budget_payment_review, true);
+  assert.equal(message.content.budget_payment_due_amount_label, "$3000");
+  assert.equal(message.content.budget_vendor_label, "Garden Hall");
+  assert.equal(message.metadata?.budget_payment_review, true);
+  assert.equal(message.metadata?.budget_payment_candidate_id, "payment:garden-hall:deposit");
+  assert.ok((message.metadata?.searchable_terms as string[]).includes("budget payment review"));
+  assert.equal(message.views[0]?.content.budget_vendor_label, "Garden Hall");
+});
+
 test("wedding task projection preserves seeded-vendor review metadata", () => {
   const message = weddingTaskItemToAfpTaskMessage({
     ...taskItem,
@@ -526,6 +565,7 @@ test("wedding projections expose send inputs for persistence wiring", () => {
   assert.ok(taskInput);
   assert.equal(taskInput.thread_id, "wedding_task:follow-up-caterer");
   assert.equal(taskInput.store_in_relational, true);
+  assert.ok(taskInput.supertags?.includes("wedding_task:vendor_follow_up"));
 });
 
 test("wedding projection sent markers are isolated by projection family", () => {

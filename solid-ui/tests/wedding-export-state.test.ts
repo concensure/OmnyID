@@ -97,7 +97,7 @@ test("weddingArtifactWarningLabels flags sensitive or pending artifacts", () => 
   const warnings = weddingArtifactWarningLabels(budget);
   assert.ok(warnings.some((warning) => /Budget exports/i.test(warning)));
   assert.ok(warnings.some((warning) => /shared partner/i.test(warning)));
-  assert.ok(warnings.some((warning) => /pending user approval/i.test(warning)));
+  assert.ok(warnings.some((warning) => /needs your approval/i.test(warning)));
 });
 
 test("buildWeddingExportBundleState excludes sensitive artifacts unless explicitly included", () => {
@@ -182,7 +182,7 @@ test("buildWeddingPacketExportCapabilityState exposes ready and setup-gated down
   const state = buildWeddingPacketExportCapabilityState({ title: "Harbour planning bundle" });
 
   assert.deepEqual(state.readyFormats.map((format) => format.id), ["markdown", "html", "word_doc"]);
-  assert.ok(state.readyFormats.some((format) => format.id === "word_doc" && /Word-openable/i.test(format.label)));
+  assert.ok(state.readyFormats.some((format) => format.id === "word_doc" && /Word document/i.test(format.label)));
   assert.deepEqual(state.plannedConversions.map((conversion) => conversion.id), ["zip", "docx", "jpg", "png"]);
   assert.equal(state.plannedConversions[0]?.filename, "harbour-planning-bundle.zip");
   assert.match(state.plannedConversions[0]?.blockedReason ?? "", /not available yet/i);

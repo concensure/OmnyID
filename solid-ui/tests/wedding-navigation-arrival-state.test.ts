@@ -26,8 +26,10 @@ test("buildWeddingNavigationArrivalState explains planning file arrival context"
   assert.equal(state?.badge, "Wedding documents");
   assert.equal(state?.view, "response_queue");
   assert.equal(state?.artifactId, "artifact_budget");
-  assert.match(state?.cards[0]?.detail ?? "", /Artifact: artifact_budget/);
-  assert.match(state?.nextStep ?? "", /Open artifact_budget/);
+  assert.equal(state?.cards.some((card) => card.label === "What carried over"), false);
+  assert.equal(state?.cards.some((card) => card.label === "Why this surface"), false);
+  assert.match(state?.detail ?? "", /research, tables, drafts/i);
+  assert.match(state?.nextStep ?? "", /selected wedding document/i);
 });
 
 test("buildWeddingNavigationArrivalState keeps savedAt from stored intents", () => {
@@ -52,7 +54,7 @@ test("buildWeddingNavigationArrivalState gives calendar-specific guidance", () =
   });
 
   assert.equal(state?.badge, "Calendar context");
-  assert.match(state?.cards[1]?.detail ?? "", /first-class calendar context/);
+  assert.match(state?.detail ?? "", /calendar context/i);
   assert.match(state?.nextStep ?? "", /before syncing or inviting/);
 });
 
@@ -72,8 +74,8 @@ test("buildWeddingNavigationArrivalState gives task and graph guidance", () => {
 
   assert.equal(taskState?.badge, "Task context");
   assert.match(taskState?.nextStep ?? "", /Confirm owner/);
-  assert.equal(graphState?.badge, "Dependency context");
-  assert.match(graphState?.nextStep ?? "", /dependencies and missing evidence/);
+  assert.equal(graphState?.badge, "Related details");
+  assert.match(graphState?.nextStep ?? "", /connected details and missing proof/);
 });
 
 test("buildWeddingNavigationArrivalState surfaces decision-focus task context", () => {
@@ -131,11 +133,11 @@ test("buildWeddingNavigationArrivalState surfaces expected behaviour audit task 
     },
   });
 
-  const auditCard = state?.cards.find((card) => card.label === "Automation setup gaps");
+  const auditCard = state?.cards.find((card) => card.label === "Planning setup gaps");
   assert.ok(auditCard);
-  assert.match(auditCard.detail, /5 ready behaviours/);
-  assert.match(auditCard.detail, /10 gaps/);
-  assert.match(auditCard.detail, /8 task candidates/);
+  assert.match(auditCard.detail, /5 ready checks/);
+  assert.match(auditCard.detail, /10 planning gaps/);
+  assert.match(auditCard.detail, /8 suggested tasks/);
   assert.match(auditCard.detail, /vendor matching, weather contingency/);
   assert.match(auditCard.detail, /Connect source-verified vendor search/);
   assert.match(state?.nextStep ?? "", /Review the suggested wedding gap tasks/);
@@ -167,8 +169,8 @@ test("buildWeddingNavigationArrivalState explains connected app provider setup c
   assert.match(state?.nextStep ?? "", /Connect missing providers/);
   assert.ok(providerCard);
   assert.match(providerCard.detail, /external provider required/);
-  assert.match(providerCard.detail, /2 pending provider handoffs/);
-  assert.match(providerCard.detail, /1 connected provider handoff/);
+  assert.match(providerCard.detail, /2 connected app setups still needed/);
+  assert.match(providerCard.detail, /1 connected app ready/);
   assert.match(providerCard.detail, /send_email, publish_registry/);
   assert.match(providerCard.detail, /gmail, registry_provider/);
 });
@@ -191,11 +193,11 @@ test("buildWeddingNavigationArrivalState surfaces graph focus packets", () => {
     },
   });
 
-  const graphCard = state?.cards.find((card) => card.label === "Graph focus");
+  const graphCard = state?.cards.find((card) => card.label === "Related details");
   assert.ok(graphCard);
   assert.match(graphCard.detail, /No wet-weather backup confirmed/);
-  assert.match(graphCard.detail, /2 source nodes/);
-  assert.match(graphCard.detail, /1 linked edge/);
+  assert.match(graphCard.detail, /2 related details/);
+  assert.match(graphCard.detail, /1 connection/);
   assert.match(graphCard.detail, /Confirm wet-weather backup/);
 });
 
@@ -217,7 +219,7 @@ test("buildWeddingNavigationArrivalState surfaces continue-chat context packets"
   });
 
   const packetCard = state?.cards.find((card) => card.label === "Chat context");
-  const decisionCard = state?.cards.find((card) => card.label === "Selected decision scope");
+  const decisionCard = state?.cards.find((card) => card.label === "Selected choice");
   const guidanceCard = state?.cards.find((card) => card.label === "How to use selected scope");
   assert.ok(packetCard);
   assert.match(packetCard.detail, /3 planning files/);
@@ -264,12 +266,12 @@ test("buildWeddingNavigationArrivalState surfaces workspace handoff packets", ()
   assert.match(packetCard.detail, /1 selected decision scope/);
   assert.match(packetCard.detail, /1 source-linked file/);
   assert.match(packetCard.detail, /2 source-labelled files/);
-  assert.match(packetCard.detail, /1 source-unverified file/);
+  assert.match(packetCard.detail, /1 file needs a fact check/);
   assert.match(packetCard.detail, /1 approval prompt/);
   assert.match(packetCard.detail, /2 sensitive exports excluded by default/);
   assert.match(packetCard.detail, /1 imported private planning file in workspace/);
   assert.match(packetCard.detail, /1 imported file requires handoff review/);
-  assert.match(packetCard.detail, /5 unsaved planning outputs/);
+  assert.match(packetCard.detail, /5 planning outputs waiting to be approved/);
 });
 
 test("buildWeddingNavigationArrivalState accepts generated provider handoff audit metadata", () => {
@@ -290,8 +292,8 @@ test("buildWeddingNavigationArrivalState accepts generated provider handoff audi
 
   const providerCard = state?.cards.find((card) => card.label === "Connected apps");
   assert.ok(providerCard);
-  assert.match(providerCard.detail, /2 pending provider handoffs/);
-  assert.match(providerCard.detail, /1 connected provider handoff/);
+  assert.match(providerCard.detail, /2 connected app setups still needed/);
+  assert.match(providerCard.detail, /1 connected app ready/);
   assert.match(providerCard.detail, /send_email, calendar/);
   assert.match(providerCard.detail, /gmail, google_calendar/);
 });
@@ -312,7 +314,7 @@ test("buildWeddingNavigationArrivalState surfaces structured selected decision s
     },
   });
 
-  const decisionCard = state?.cards.find((card) => card.label === "Selected decision scope");
+  const decisionCard = state?.cards.find((card) => card.label === "Selected choice");
   const guidanceCard = state?.cards.find((card) => card.label === "How to use selected scope");
   assert.ok(decisionCard);
   assert.match(decisionCard.detail, /Harbour Hall from Venue shortlist/);
@@ -336,7 +338,7 @@ test("buildWeddingNavigationArrivalState redacts imported selected decision scop
     },
   });
   const serialized = JSON.stringify(state);
-  const decisionCard = state?.cards.find((card) => card.label === "Selected decision scope");
+  const decisionCard = state?.cards.find((card) => card.label === "Selected choice");
 
   assert.ok(decisionCard);
   assert.match(decisionCard.detail, /Garden Hall from Imported private planning file/);
@@ -381,7 +383,7 @@ test("buildWeddingNavigationArrivalState gives approval and export safety warnin
   });
 
   assert.equal(approvalState?.badge, "Approval gate");
-  assert.match(approvalState?.cards[2]?.detail ?? "", /explicitly approved/);
+  assert.match(approvalState?.cards.find((card) => card.label === "What not to assume")?.detail ?? "", /explicitly approved/);
   assert.equal(exportState?.badge, "Export context");
   assert.match(exportState?.nextStep ?? "", /review sensitive files/);
 });

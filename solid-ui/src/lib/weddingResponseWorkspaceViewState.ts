@@ -122,6 +122,16 @@ import {
   type WeddingCollaboratorInviteInput,
   type WeddingCollaborationState,
 } from "@/lib/weddingCollaborationState";
+import {
+  buildWeddingBoundaryState,
+  type WeddingBoundaryLedgerObject,
+  type WeddingBoundaryState,
+} from "@/lib/weddingBoundaryLedgerState";
+import {
+  buildWeddingBoundaryTopologyState,
+  type WeddingBoundaryTopologyState,
+} from "@/lib/weddingBoundaryTopologyState";
+import { buildWeddingBoundaryStarterObjects } from "@/lib/weddingBoundaryDefaultsState";
 import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
 import type { WeddingArtifactKind, WeddingApprovalState } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
@@ -241,6 +251,10 @@ export type WeddingResponseWorkspaceViewState = {
   importParserReadiness: WeddingImportParserReadinessState;
   backgroundAutomationCoverage: WeddingBackgroundAutomationCoverageState;
   collaboration: WeddingCollaborationState;
+  boundaryState: WeddingBoundaryState;
+  boundaryTopology: WeddingBoundaryTopologyState;
+  planningTaskItems: WeddingPlanningTaskItem[];
+  helperContactNames: string[];
   recommendationCards: WeddingWorkspaceRecommendationCard[];
   secondOrderLoopCards: WeddingSecondOrderLoopCard[];
   adminDataConsent: WeddingAdminDataConsentState;
@@ -272,6 +286,33 @@ function isUserFacingWeddingPlanningTask(task: WeddingPlanningTaskItem): boolean
     || metadata.provider_handoff_task === true
     || metadata.expected_behavior_gap === true
   );
+}
+
+function uniqueHelperNames(values: readonly unknown[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const label = clean(value);
+    const key = label.toLowerCase();
+    if (!label || !key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(label);
+  }
+  return result.slice(0, 40);
+}
+
+function guestNamesFromArtifacts(artifacts: readonly WeddingArtifactInput[]): string[] {
+  return artifacts
+    .filter((artifact) => artifact.kind === "guest_list")
+    .flatMap((artifact) => {
+      const body = clean(artifact.bodyText);
+      const lines = body.split(/\r?\n/).filter((line) => line.trim().startsWith("|"));
+      if (lines.length < 3) return [];
+      const headers = lines[0]!.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+      const nameIndex = headers.findIndex((header) => /\b(name|guest)\b/i.test(header));
+      if (nameIndex < 0) return [];
+      return lines.slice(2).map((line) => line.replace(/^\|/, "").replace(/\|$/, "").split("|")[nameIndex]?.trim());
+    });
 }
 
 function usableSourceUrls(values: readonly unknown[] | null | undefined): string[] {
@@ -785,12 +826,12 @@ function recommendationCards(
       ...recommendation,
       graphContextLabels: [
         recommendation.kind.replace(/_/g, " "),
-        nodeCount > 0 ? `${nodeCount} source node${nodeCount === 1 ? "" : "s"}` : "no source nodes",
-        edgeCount > 0 ? `${edgeCount} edge${edgeCount === 1 ? "" : "s"}` : "no linked edges",
+        nodeCount > 0 ? `${nodeCount} related detail${nodeCount === 1 ? "" : "s"}` : "no related details yet",
+        edgeCount > 0 ? `${edgeCount} connection${edgeCount === 1 ? "" : "s"}` : "no connections yet",
       ],
       graphAction: {
         kind: "open_graph",
-        label: "Show in graph",
+        label: "Show related details",
         enabled: true,
         reason: null,
         metadata: graphMetadataForRecommendation(recommendation),
@@ -857,7 +898,7 @@ function sidebarActions(input: {
   return [
     {
       kind: "continue_chat",
-      label: "Continue chat",
+      label: "Ask planner about this",
       enabled: true,
       reason: "Continues with this wedding plan and the selected document.",
       metadata: decisionMetadata,
@@ -865,9 +906,9 @@ function sidebarActions(input: {
     },
     {
       kind: "open_graph",
-      label: "Show graph",
+      label: "Show related details",
       enabled: input.recommendations.length > 0,
-      reason: input.recommendations.length > 0 ? null : "Suggested connections are not available yet.",
+      reason: input.recommendations.length > 0 ? null : "Related details are not available yet.",
       metadata: {
         ...(primaryRecommendation ? graphMetadataForRecommendation(primaryRecommendation) : {}),
         ...(decisionMetadata ?? {}),
@@ -879,17 +920,17 @@ function sidebarActions(input: {
     },
     {
       kind: "open_calendar",
-      label: "Open calendar",
+      label: "Open wedding calendar",
       enabled: input.workspace.results.some((artifact) => artifact.linkedCalendarEventIds.length > 0),
-      reason: "Requires a linked wedding calendar event.",
+      reason: "Add or select a document with a wedding date first.",
       metadata: decisionMetadata,
       contextLabels: selectedDecisionLabels,
     },
     {
       kind: "open_tasks",
-      label: "Open tasks",
+      label: "Open wedding tasks",
       enabled: input.workspace.results.some((artifact) => artifact.linkedTaskIds.length > 0),
-      reason: "Requires a linked wedding task.",
+      reason: "Add or select a document with a wedding task first.",
       metadata: decisionMetadata,
       contextLabels: selectedDecisionLabels,
     },
@@ -903,9 +944,9 @@ function sidebarActions(input: {
     },
     {
       kind: "approve_action",
-      label: "Review approval",
+      label: "Review before sending",
       enabled: Boolean(input.preview?.approvalRequest),
-      reason: input.preview?.approvalRequest ? null : "No approval is needed for the selected document.",
+      reason: input.preview?.approvalRequest ? null : "This document does not need approval before it is used.",
       metadata: decisionMetadata,
       contextLabels: selectedDecisionLabels,
     },
@@ -919,6 +960,7 @@ export type WeddingResponseWorkspaceViewInput = WeddingWorkspaceProductionReadin
   activeArtifactId?: string | null;
   adminDataConsentEnabled?: boolean | null;
   collaboratorInvites?: readonly WeddingCollaboratorInviteInput[] | null;
+  boundaryObjects?: readonly WeddingBoundaryLedgerObject[] | null;
   collaborationBackendReady?: boolean | null;
   collaborationEncryptionReady?: boolean | null;
   collaborationAuditReady?: boolean | null;
@@ -1004,6 +1046,26 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     scheduleItems: projectionScheduleItems,
   });
   const collaboration = buildWeddingCollaborationState({ invites: input.collaboratorInvites, backendReady: input.collaborationBackendReady, encryptionReady: input.collaborationEncryptionReady, auditReady: input.collaborationAuditReady, conflictPolicyReady: input.collaborationConflictPolicyReady });
+  const helperContactNames = uniqueHelperNames([
+    ...delegation.items.map((item) => item.personName),
+    ...collaboration.invites.map((invite) => invite.displayName),
+    ...taskItems.map((item) => item.assignee),
+    ...guestNamesFromArtifacts(artifacts),
+  ]);
+  const boundaryObjects = input.boundaryObjects ?? buildWeddingBoundaryStarterObjects({
+    metadata: input.metadata ?? artifacts[0]?.metadata,
+    guestNames: guestNamesFromArtifacts(artifacts),
+    helperNames: helperContactNames,
+    collaboratorInvites: collaboration.invites,
+  });
+  const boundaryState = buildWeddingBoundaryState({
+    metadata: input.metadata ?? artifacts[0]?.metadata,
+    objects: boundaryObjects,
+  });
+  const boundaryTopology = buildWeddingBoundaryTopologyState({
+    metadata: input.metadata ?? artifacts[0]?.metadata,
+    objects: boundaryObjects,
+  });
   const loopCards = buildWeddingSecondOrderLoopCards({
     metadata: input.metadata,
     artifacts,
@@ -1168,6 +1230,10 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     importParserReadiness,
     backgroundAutomationCoverage,
     collaboration,
+    boundaryState,
+    boundaryTopology,
+    planningTaskItems: userFacingProjectionTaskItems,
+    helperContactNames,
     recommendationCards: cards,
     secondOrderLoopCards: loopCards,
     adminDataConsent,

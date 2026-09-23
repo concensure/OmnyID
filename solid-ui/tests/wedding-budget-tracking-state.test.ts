@@ -233,6 +233,8 @@ test("buildWeddingBudgetPaymentTaskItems creates searchable payment-review task 
   const taskMetadata = record(tasks[0]?.metadata);
   assert.equal(taskMetadata.budget_payment_review, true);
   assert.equal(taskMetadata.budget_vendor_label, "Garden Hall");
+  assert.equal(taskMetadata.second_order_loop, "budget_drift");
+  assert.ok((taskMetadata.second_order_evidence_labels as string[]).some((term) => /Payment schedule/i.test(term)));
   assert.ok((taskMetadata.searchable_terms as string[]).some((term) => /payment review/i.test(term)));
 
   const duplicate = buildWeddingBudgetPaymentTaskItems({
@@ -245,4 +247,172 @@ test("buildWeddingBudgetPaymentTaskItems creates searchable payment-review task 
     }],
   });
   assert.equal(duplicate.length, 0);
+});
+
+test("buildWeddingBudgetTrackingState surfaces a saved budget allocation without treating it as a vendor spend line", () => {
+  const state = buildWeddingBudgetTrackingState({
+    decisionRecords: [
+      decision(), // a real vendor pick — must still produce a line item
+      decision({
+        id: "wedding_decision:workspace-1:wedding-budget-allocation:1",
+        artifactId: "wedding-budget-allocation",
+        artifactTitle: "Wedding Budget",
+        artifactKind: "budget_sheet",
+        selectedOptionId: "total-budget",
+        selectedOptionLabel: "$30,000 total",
+        selectedOptionDetail: "Allocated across 7 categories.",
+        selectedOptionCells: [
+          "Venue & Ceremony: $10,000",
+          "Catering & Drinks: $8,000",
+          "Photography & Video: $4,000",
+          "Attire & Beauty: $2,000",
+          "Flowers & Decor: $2,500",
+          "Entertainment & Music: $2,000",
+          "Stationery, Transport & Other: $1,500",
+        ],
+        createdAt: "2026-09-20T00:00:00.000Z",
+      }),
+    ],
+  });
+
+  // Regression guard: a budget_sheet decision record must not become a bogus vendor line item
+  // (its artifactKind contains the word "budget", which the vendor-line detector matches on).
+  assert.equal(state.lineItems.length, 1, "only the real vendor pick should produce a line item");
+  assert.equal(state.lineItems[0]?.vendorName, "Harbour Photos");
+
+  assert.equal(state.budgetAllocation.length, 7);
+  assert.equal(state.budgetAllocation.find((c) => c.categoryId === "venue_ceremony")?.amount, 10_000);
+  // The couple's own explicit allocation must win as the target amount over any text-derived guess.
+  assert.equal(state.budgetTargetAmount, 30_000);
+});
+
+test("buildWeddingBudgetTrackingState still treats ordinary budget-sheet decisions as spend lines", () => {
+  const state = buildWeddingBudgetTrackingState({
+    decisionRecords: [
+      decision({
+        id: "decision:budget-sheet-row",
+        artifactId: "artifact:budget-sheet",
+        artifactTitle: "Wedding budget sheet",
+        artifactKind: "budget_sheet",
+        selectedOptionId: "row-venue",
+        selectedOptionLabel: "Garden Hall deposit",
+        selectedOptionDetail: "Quoted package AUD 12000 including ceremony room",
+        selectedOptionCells: ["Garden Hall", "Venue", "Quoted AUD 12,000", "Contract quote"],
+      }),
+    ],
+  });
+
+  assert.equal(state.lineItems.length, 1);
+  assert.equal(state.lineItems[0]?.vendorName, "Garden Hall deposit");
+  assert.equal(state.totalQuotedAmount, 12_000);
+  assert.equal(state.budgetAllocation.length, 0, "ordinary budget-sheet rows must not become the user's allocation target");
+});
+
+test("buildWeddingBudgetTrackingState normalizes quote fields and scenario budgets", () => {
+  const state = buildWeddingBudgetTrackingState({
+    budgetTargetText: "Total budget AUD 30000",
+    artifacts: [{
+      id: "artifact:budget",
+      title: "Sydney wedding budget",
+      kind: "budget_sheet",
+      bodyText: [
+        "Wedding date 2027-06-01. Guest count 80. Priorities: photography and food.",
+        "Contribution from Alex parents: $5000 condition: venue only.",
+        "| Category | Vendor | Paid | Due | Due date |",
+        "| --- | --- | --- | --- | --- |",
+        "| Venue | Garden Hall | No | $6000 | 2027-02-01 |",
+        "| Photography | Harbour Photos | Paid $1000 | $3500 | 2027-05-01 |",
+      ].join("\n"),
+    }],
+    decisionRecords: [
+      decision({
+        selectedOptionCells: [
+          "Harbour Photos",
+          "Photography",
+          "$4,500 includes 8 hours and 80 guests. GST included. Travel fee $200. Overtime $500/hr. Cancellation: deposit non-refundable. Deposit $1000, balance due 2027-05-01.",
+        ],
+      }),
+    ],
+  });
+
+  assert.equal(state.insights.committedAmount, 0);
+  assert.equal(state.insights.estimatedAmount, 4500);
+  assert.equal(state.insights.paidAmount, 1000);
+  assert.equal(state.insights.remainingAmount, 25500);
+  assert.equal(state.insights.monthlyCashNeeds.length, 2);
+  assert.equal(state.insights.scenarios.find((scenario) => scenario.id === "safe")?.targetAmount, 27000);
+  assert.equal(state.insights.contributionRows[0]?.personLabel, "Alex parents");
+  assert.equal(state.insights.quoteNormalForms[0]?.hoursLabel, "8 hours");
+  assert.match(state.insights.quoteNormalForms[0]?.taxLabel ?? "", /GST included/i);
+  assert.match(state.insights.quoteNormalForms[0]?.cancellationLabel ?? "", /Cancellation/i);
+  assert.deepEqual(state.insights.missingContextLabels, []);
+});
+
+test("buildWeddingBudgetTrackingState asks for missing budget context and flags unaffordable category choices", () => {
+  const state = buildWeddingBudgetTrackingState({
+    decisionRecords: [
+      decision({
+        id: "wedding_decision:workspace-1:wedding-budget-allocation:1",
+        artifactId: "wedding-budget-allocation",
+        artifactTitle: "Wedding Budget",
+        artifactKind: "budget_sheet",
+        selectedOptionId: "total-budget",
+        selectedOptionLabel: "$10,000 total",
+        selectedOptionDetail: "Allocated across 7 categories.",
+        selectedOptionCells: [
+          "Venue & Ceremony: $1,000",
+          "Catering & Drinks: $1,000",
+          "Photography & Video: $1,000",
+          "Attire & Beauty: $1,000",
+          "Flowers & Decor: $1,000",
+          "Entertainment & Music: $1,000",
+          "Stationery, Transport & Other: $4,000",
+        ],
+        createdAt: "2026-09-20T00:00:00.000Z",
+      }),
+      decision({
+        id: "decision:venue",
+        artifactTitle: "Venue shortlist",
+        selectedOptionLabel: "Garden Hall",
+        selectedOptionDetail: "Quoted AUD 12000",
+        selectedOptionCells: ["Garden Hall", "Venue", "Quoted AUD 12,000"],
+      }),
+    ],
+  });
+
+  assert.ok(state.insights.missingContextLabels.includes("location"));
+  assert.ok(state.insights.missingContextLabels.includes("wedding date"));
+  assert.ok(state.insights.unaffordableWarningLabels.some((label) => /over the total budget/i.test(label)));
+});
+
+test("buildWeddingBudgetTrackingState extracts payment dates from uploaded contract or quote text", () => {
+  const state = buildWeddingBudgetTrackingState({
+    budgetTargetText: "Total budget AUD 30000",
+    artifacts: [{
+      id: "artifact:venue-contract",
+      title: "Garden Hall contract",
+      kind: "legal",
+      vendorLabels: ["Garden Hall"],
+      bodyText: [
+        "Deposit $3000 due 2027-01-15. Non-refundable after signing.",
+        "Final balance $9000 due 2027-05-15.",
+        "A quiet design note with no money should not create a payment task.",
+      ].join("\n"),
+    }, {
+      id: "artifact:photo-quote",
+      title: "Harbour Photos quote",
+      kind: "vendor_table",
+      vendorLabels: ["Harbour Photos"],
+      bodyText: "Payment schedule: $1000 deposit due 2027-02-01 and cancellation terms apply.",
+    }],
+  });
+
+  assert.equal(state.paymentTaskCandidates.length, 3);
+  assert.equal(state.paymentTaskCandidates[0]?.vendorName, "Garden Hall");
+  assert.equal(state.paymentTaskCandidates[0]?.dueAt, "2027-01-15");
+  assert.equal(state.paymentTaskCandidates[2]?.vendorName, "Harbour Photos");
+  assert.deepEqual(
+    state.insights.monthlyCashNeeds.map((row) => row.monthLabel),
+    ["Jan 2027", "Feb 2027", "May 2027"],
+  );
 });

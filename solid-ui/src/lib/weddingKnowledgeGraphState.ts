@@ -460,10 +460,15 @@ export function buildWeddingKnowledgeGraphState(input: WeddingKnowledgeGraphInpu
     const expectedCapability = clean(itemMetadata.expected_behavior_capability);
     const dayOfCapability = dayOfExecutionCapability(expectedCapability) ?? dayOfExecutionCapability(`${item.title} ${item.notes ?? ""}`);
     const outreachEscalationStage = clean(itemMetadata.outreach_escalation_stage);
+    const budgetPaymentReview = itemMetadata.budget_payment_review === true;
+    const budgetQuoteVerification = itemMetadata.budget_quote_verification === true;
     addNode(nodes, metadata, taskId, "task", item.title, [
       "wedding_task",
       `wedding_task:${item.kind}`,
       clean(item.priority) ? `priority:${clean(item.priority)}` : null,
+      budgetPaymentReview || budgetQuoteVerification ? "wedding_budget" : null,
+      budgetPaymentReview ? "wedding_budget:payment_schedule" : null,
+      budgetQuoteVerification ? "wedding_budget:quote_verification" : null,
       secondOrderLoop ? "wedding_second_order_task" : null,
       secondOrderLoop ? `second_order_loop:${secondOrderLoop}` : null,
       outreachEscalationStage ? "wedding_outreach_escalation" : null,
@@ -478,6 +483,12 @@ export function buildWeddingKnowledgeGraphState(input: WeddingKnowledgeGraphInpu
       second_order_loop: secondOrderLoop || null,
       second_order_evidence_labels: secondOrderEvidenceLabels,
       selected_decision_scope: Object.keys(selectedDecisionScope).length > 0 ? selectedDecisionScope : null,
+      budget_payment_review: budgetPaymentReview,
+      budget_quote_verification: budgetQuoteVerification,
+      budget_vendor_label: clean(itemMetadata.budget_vendor_label) || null,
+      budget_category_label: clean(itemMetadata.budget_category_label) || null,
+      budget_payment_due_amount_label: clean(itemMetadata.budget_payment_due_amount_label) || null,
+      budget_payment_due_date_label: clean(itemMetadata.budget_payment_due_date_label) || null,
       expected_behavior_capability: expectedCapability || null,
       day_of_execution_capability: dayOfCapability,
       outreach_escalation_stage: outreachEscalationStage || null,
@@ -514,12 +525,17 @@ export function buildWeddingKnowledgeGraphState(input: WeddingKnowledgeGraphInpu
   for (const decision of decisions) {
     const decisionId = nodeId("decision", decision.id);
     const decisionMetadata = record(decision.metadata);
+    const budgetDecision = decisionMetadata.budget_decision === true
+      || /\bbudget|quote|price|cost|payment|deposit|invoice|contract\b/i.test(`${decision.sourceArtifactId ?? ""} ${decision.title} ${decision.selectedOptionDetail ?? ""}`);
     addNode(nodes, metadata, decisionId, "decision", decision.title, [
       "wedding_decision",
       `decision_status:${decision.status}`,
+      budgetDecision ? "wedding_budget" : null,
+      budgetDecision ? "topology:wedding_budget" : null,
     ], {
       decision_id: decision.id,
       decision_status: decision.status,
+      budget_decision: budgetDecision,
       source_artifact_id: clean(decision.sourceArtifactId) || null,
       artifact_title: clean(decisionMetadata.artifact_title) || null,
       selected_option_id: clean(decision.selectedOptionId) || null,

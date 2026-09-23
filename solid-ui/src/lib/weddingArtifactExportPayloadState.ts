@@ -192,7 +192,7 @@ function markdownBundleContent(input: {
     ...input.included.map((artifact) => `- ${artifact.title} (${artifact.category})`),
     input.included.length === 0 ? "- No files included." : null,
     "",
-    "## Selected decision scope",
+    "## Selected choice",
     "",
     ...input.decisionScopes.map((scope) => {
       const artifactTitle = decisionScopeArtifactTitleForExport(scope);

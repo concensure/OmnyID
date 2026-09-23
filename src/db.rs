@@ -1,23 +1,150 @@
 use crate::afp::Message as ProtoMessage;
+use crate::calendar_event_profile::calendar_event_profile_from_fields;
+use crate::coordination_bus::{coord_family_of, coordination_bus};
 use crate::crypto::is_supported_encryption_envelope;
 use crate::integration::{ActionResult, IntegrationCapability};
 use crate::knowledge_curator::{BacklinkKind, BacklinkRecord, DaemonHeartbeat, DaemonKind};
 use crate::local_sync::{DeviceBootstrap, SyncSliceSpec};
-use crate::message::metadata_store_flag;
+use crate::message::{
+    AFP_TYPE_SUPERTAG_DEFINITION, SupertagDefinitionContent, collect_search_facets_from_parts,
+    metadata_store_flag,
+};
 use crate::personalization::{LoraArtifact, PersonalizationEvent};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use ulid::Ulid;
 use sqlx::{Acquire, PgPool, Row, postgres::PgPoolOptions};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 use std::time::Duration;
+use ulid::Ulid;
 
 mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
+mod wedding_onboarding_state;
+
+const TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES: &[&str] = &[
+    "messages",
+    "attachments",
+    "action_audit_log",
+    "sync_devices",
+    "personalization_events",
+    "agent_task_queue",
+    "agent_focus_items",
+    "agent_triggers",
+    "agent_delegations",
+    "agent_capability_registry",
+    "user_llm_config",
+    "llm_usage_log",
+    "saved_workflows",
+    "workflow_deployments",
+    "workflow_runs",
+    "workflow_wait_resume",
+    "workflow_trigger_registrations",
+    "workflow_trigger_observations",
+];
+
+const TENANT_PRIVATE_SCHEMA_REQUIRED_MESSAGE_COLUMNS: &[&str] = &[
+    "kind",
+    "supertags",
+    "reference_targets",
+    "reference_types",
+    "link_types",
+    "metadata_keys",
+    "metadata_values",
+    "metadata_terms",
+];
+
+const TENANT_PRIVATE_SCHEMA_REQUIRED_INDEXES: &[&str] = &[
+    "idx_thread",
+    "idx_embedding",
+    "idx_references",
+    "idx_supertags",
+    "idx_messages_kind",
+    "idx_reference_targets",
+    "idx_reference_types",
+    "idx_link_types",
+    "idx_metadata_keys",
+    "idx_metadata_values",
+    "idx_metadata_terms",
+    "idx_attachments_message_id",
+    "idx_attachments_thread_id",
+    "idx_action_audit_log_thread_id",
+    "idx_personalization_events_thread_id",
+    "idx_agent_task_queue_owner",
+    "idx_agent_task_queue_agent",
+    "idx_agent_focus_items_owner",
+    "idx_agent_triggers_owner",
+    "idx_agent_delegations_owner",
+    "idx_agent_capability_registry_owner",
+    "idx_llm_usage_log_owner_month",
+    "idx_saved_workflows_owner_updated",
+    "idx_saved_workflows_owner_favorite",
+    "idx_workflow_deployments_workflow_deployed",
+    "idx_workflow_deployments_owner_workflow",
+    "idx_workflow_runs_workflow_started",
+    "idx_workflow_runs_owner_workflow",
+    "idx_workflow_wait_resume_run_created",
+    "idx_workflow_wait_resume_owner_workflow",
+    "idx_wf_trigger_reg_deployment",
+    "idx_wf_trigger_reg_workflow",
+    "idx_wf_trigger_obs_registration",
+    "idx_wf_trigger_obs_workflow",
+];
+
+const USER_EXTERNAL_TOOL_USAGE_RETENTION_DAYS: i64 = 90;
+const USER_EXTERNAL_TOOL_USAGE_MAX_EVENTS_PER_USER: i64 = 5_000;
+const OPERATOR_RUNTIME_REMEDIATION_RECEIPT_RETENTION_DAYS: i64 = 30;
+const OPERATOR_RUNTIME_REMEDIATION_RECEIPT_MAX_ROWS_PER_OPERATOR: i64 = 100;
+const PROACTIVE_SUGGESTION_RETENTION_DAYS: i64 = 90;
+const PROACTIVE_SUGGESTION_MAX_ROWS_PER_USER: i64 = 2_000;
+const PUBLIC_OPERATIONAL_MESSAGE_RETENTION_DAYS: i64 = 30;
+const PUBLIC_OPERATIONAL_MESSAGE_MAX_ROWS_PER_USER: i64 = 500;
+const DAEMON_OPERATIONAL_AFP_RETENTION_DAYS: i64 = 30;
+const DAEMON_OPERATIONAL_AFP_MAX_ROWS_PER_USER: i64 = 500;
+const TRAINING_REFLECTION_TRACE_RETENTION_DAYS: i64 = 30;
+const TRAINING_REFLECTION_TRACE_MAX_ROWS_PER_USER: i64 = 1_000;
+const PROACTIVE_TOKEN_USAGE_RETENTION_DAYS: i64 = 30;
+const PROACTIVE_TOKEN_USAGE_MAX_ROWS_PER_USER: i64 = 5_000;
+const TENANT_LLM_USAGE_LOG_RETENTION_DAYS: i64 = 180;
+const TENANT_LLM_USAGE_LOG_MAX_ROWS_PER_USER: i64 = 10_000;
+const WORKFLOW_TRIGGER_OBSERVATION_RETENTION_DAYS: i64 = 90;
+const WORKFLOW_TRIGGER_OBSERVATION_MAX_ROWS_PER_WORKFLOW: i64 = 2_000;
+const TENANT_ACTION_AUDIT_LOG_RETENTION_DAYS: i64 = 180;
+const TENANT_ACTION_AUDIT_LOG_MAX_ROWS_PER_USER: i64 = 5_000;
+const TRIGGER_REPLAY_NONCE_RETENTION_DAYS: i64 = 90;
+const TRIGGER_REPLAY_NONCE_MAX_ROWS_PER_USER: i64 = 10_000;
+
+pub(crate) fn operator_runtime_remediation_receipt_retention_days() -> i64 {
+    OPERATOR_RUNTIME_REMEDIATION_RECEIPT_RETENTION_DAYS.max(1)
+}
+
+pub(crate) fn operator_runtime_remediation_receipt_max_rows_per_operator() -> i64 {
+    OPERATOR_RUNTIME_REMEDIATION_RECEIPT_MAX_ROWS_PER_OPERATOR.max(1)
+}
+
+#[derive(Clone, Debug)]
+struct ExternalEmailThreadMatch {
+    thread_id: String,
+    message_id: String,
+    timestamp: String,
+}
+
+fn external_email_match_is_newer(
+    candidate: Option<&ExternalEmailThreadMatch>,
+    current: Option<&ExternalEmailThreadMatch>,
+) -> bool {
+    match (candidate, current) {
+        (Some(candidate), Some(current)) => candidate.timestamp > current.timestamp,
+        (Some(_), None) => true,
+        _ => false,
+    }
+}
 
 #[derive(Clone)]
 pub struct Db {
     pub pool: PgPool,
+    bootstrapped_private_schemas: Arc<tokio::sync::Mutex<HashSet<String>>>,
 }
 
 impl Db {
@@ -47,7 +174,14 @@ impl Db {
             .connect(database_url)
             .await?;
         apply_migrations(&pool).await?;
-        Ok(Db { pool })
+        Ok(Self::from_pool(pool))
+    }
+
+    pub fn from_pool(pool: PgPool) -> Self {
+        Self {
+            pool,
+            bootstrapped_private_schemas: Arc::new(tokio::sync::Mutex::new(HashSet::new())),
+        }
     }
 
     pub async fn healthcheck(&self) -> Result<(), sqlx::Error> {
@@ -57,13 +191,64 @@ impl Db {
 
     pub async fn ensure_user_private_schema(&self, user_id: &str) -> Result<String, sqlx::Error> {
         let schema = tenant_schema_name(user_id);
+        let mut bootstrapped = self.bootstrapped_private_schemas.lock().await;
+        if bootstrapped.contains(&schema) {
+            return Ok(schema);
+        }
+        if self.tenant_private_schema_is_bootstrapped(&schema).await? {
+            bootstrapped.insert(schema.clone());
+            return Ok(schema);
+        }
         let statements = tenant_private_schema_bootstrap_sql(&schema);
         let mut tx = self.pool.begin().await?;
         for statement in statements {
             sqlx::query(&statement).execute(&mut *tx).await?;
         }
         tx.commit().await?;
+        bootstrapped.insert(schema.clone());
         Ok(schema)
+    }
+
+    async fn tenant_private_schema_is_bootstrapped(
+        &self,
+        schema: &str,
+    ) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT
+                EXISTS (
+                    SELECT 1
+                    FROM information_schema.schemata
+                    WHERE schema_name = $1
+                )
+                AND (
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = $1
+                      AND table_name = ANY($2::text[])
+                ) = array_length($2::text[], 1)
+                AND (
+                    SELECT COUNT(*)
+                    FROM information_schema.columns
+                    WHERE table_schema = $1
+                      AND table_name = 'messages'
+                      AND column_name = ANY($3::text[])
+                ) = array_length($3::text[], 1)
+                AND (
+                    SELECT COUNT(*)
+                    FROM pg_class c
+                    INNER JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = $1
+                      AND c.relname = ANY($4::text[])
+                ) = array_length($4::text[], 1)
+            "#,
+        )
+        .bind(schema)
+        .bind(TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES)
+        .bind(TENANT_PRIVATE_SCHEMA_REQUIRED_MESSAGE_COLUMNS)
+        .bind(TENANT_PRIVATE_SCHEMA_REQUIRED_INDEXES)
+        .fetch_one(&self.pool)
+        .await
     }
 
     // ── Messages & threads ────────────────────────────────────────────────────
@@ -83,6 +268,13 @@ impl Db {
         let references_json = parse_json_array_string(&msg.references);
         let attachments_json = parse_json_array_string(&msg.attachments);
         let encryption_json = parse_json_object_string(&msg.encryption);
+        let metadata_json = parse_json_optional_object_string(&msg.metadata);
+        let reference_facets = reference_facets_for_storage(
+            msg,
+            &content_json,
+            metadata_json.as_ref(),
+            &references_json,
+        );
 
         let storage_mode = effective_storage_mode(msg, &content_json, &encryption_json);
         let persisted_content =
@@ -96,12 +288,13 @@ impl Db {
             INSERT INTO messages (
                 id, thread_id, parent_id, from_agent, to_agents, timestamp, type, kind, content,
                 views, summary, embedding, signature, encryption, "references", attachments,
-                store_in_relational, subtype, metadata
+                store_in_relational, subtype, metadata, supertags, reference_targets,
+                reference_types, link_types
             )
             VALUES (
                 $1, $2, $3, $4, $5, $6::timestamptz, $7, $8, $9,
                 $10, $11, $12, $13, $14, $15, $16,
-                $17, $18, $19
+                $17, $18, $19, $20, $21, $22, $23
             )
             ON CONFLICT (id) DO NOTHING
             "#,
@@ -124,16 +317,76 @@ impl Db {
         .bind(&attachments_json)
         .bind(msg.store_in_relational)
         .bind(nullable_string(&msg.subtype))
-        .bind(parse_json_optional_object_string(&msg.metadata))
+        .bind(metadata_json)
+        .bind(&msg.supertags)
+        .bind(&reference_facets.reference_targets)
+        .bind(&reference_facets.reference_types)
+        .bind(&reference_facets.link_types)
         .execute(&self.pool)
         .await?;
 
         if result.rows_affected() == 1 {
             persist_attachment_metadata(&self.pool, &msg.id, &msg.thread_id, &attachments_json)
                 .await?;
+            if let Some(owner_user_id) = msg.to.first().map(String::as_str) {
+                if public_operational_message_retention_applies(&msg.r#type) {
+                    self.prune_public_operational_message_history(owner_user_id, &msg.r#type)
+                        .await?;
+                }
+            }
+            if let Some(family) = coord_family_of(
+                &msg.r#type,
+                &msg.subtype,
+                msg.store_in_relational,
+                &msg.metadata,
+            ) {
+                // Public messages have no explicit owner_user_id; use the first
+                // `to` address as the coordination target.
+                let owner = msg.to.first().map(String::as_str).unwrap_or("");
+                coordination_bus().notify(family, owner);
+            }
         }
 
         Ok(result.rows_affected() == 1)
+    }
+
+    async fn prune_public_operational_message_history(
+        &self,
+        owner_user_id: &str,
+        message_type: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"DELETE FROM messages
+               WHERE type = $1
+                 AND to_agents->>0 = $2
+                 AND timestamp < NOW() - ($3 * INTERVAL '1 day')"#,
+        )
+        .bind(message_type)
+        .bind(owner_user_id)
+        .bind(PUBLIC_OPERATIONAL_MESSAGE_RETENTION_DAYS)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"DELETE FROM messages
+               WHERE type = $1
+                 AND to_agents->>0 = $2
+                 AND id NOT IN (
+                    SELECT id
+                    FROM messages
+                    WHERE type = $1
+                      AND to_agents->>0 = $2
+                    ORDER BY timestamp DESC, id DESC
+                    LIMIT $3
+                 )"#,
+        )
+        .bind(message_type)
+        .bind(owner_user_id)
+        .bind(PUBLIC_OPERATIONAL_MESSAGE_MAX_ROWS_PER_USER)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 
     pub async fn store_private_message(
@@ -152,6 +405,13 @@ impl Db {
         let references_json = parse_json_array_string(&msg.references);
         let attachments_json = parse_json_array_string(&msg.attachments);
         let encryption_json = parse_json_object_string(&msg.encryption);
+        let metadata_json = parse_json_optional_object_string(&msg.metadata);
+        let reference_facets = reference_facets_for_storage(
+            msg,
+            &content_json,
+            metadata_json.as_ref(),
+            &references_json,
+        );
 
         let storage_mode = effective_storage_mode(msg, &content_json, &encryption_json);
         let persisted_content =
@@ -166,12 +426,13 @@ impl Db {
             INSERT INTO {messages_table} (
                 id, thread_id, parent_id, from_agent, to_agents, timestamp, type, kind, content,
                 views, summary, embedding, signature, encryption, "references", attachments,
-                store_in_relational, subtype, metadata
+                store_in_relational, subtype, metadata, supertags, reference_targets,
+                reference_types, link_types, metadata_keys, metadata_values, metadata_terms
             )
             VALUES (
                 $1, $2, $3, $4, $5, $6::timestamptz, $7, $8, $9,
                 $10, $11, $12, $13, $14, $15, $16,
-                $17, $18, $19
+                $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
             )
             ON CONFLICT (id) DO NOTHING
             "#,
@@ -194,7 +455,14 @@ impl Db {
         .bind(&attachments_json)
         .bind(msg.store_in_relational)
         .bind(nullable_string(&msg.subtype))
-        .bind(parse_json_optional_object_string(&msg.metadata))
+        .bind(metadata_json)
+        .bind(&msg.supertags)
+        .bind(&reference_facets.reference_targets)
+        .bind(&reference_facets.reference_types)
+        .bind(&reference_facets.link_types)
+        .bind(&reference_facets.metadata_keys)
+        .bind(&reference_facets.metadata_values)
+        .bind(&reference_facets.metadata_terms)
         .execute(&self.pool)
         .await?;
 
@@ -207,9 +475,694 @@ impl Db {
                 &attachments_json,
             )
             .await?;
+            Self::persist_supertag_definition_to_table(
+                &self.pool,
+                owner_user_id,
+                msg,
+                &content_json,
+            )
+            .await?;
+            if let Some(family) = coord_family_of(
+                &msg.r#type,
+                &msg.subtype,
+                msg.store_in_relational,
+                &msg.metadata,
+            ) {
+                coordination_bus().notify(family, owner_user_id);
+            }
         }
 
         Ok(result.rows_affected() == 1)
+    }
+
+    pub async fn upsert_private_message(
+        &self,
+        owner_user_id: &str,
+        msg: &ProtoMessage,
+        content_json: Value,
+    ) -> Result<(), sqlx::Error> {
+        if !metadata_store_flag(&msg.metadata) {
+            return Ok(());
+        }
+
+        let views_json = parse_json_array_string(&msg.views);
+        let references_json = parse_json_array_string(&msg.references);
+        let attachments_json = parse_json_array_string(&msg.attachments);
+        let encryption_json = parse_json_object_string(&msg.encryption);
+        let metadata_json = parse_json_optional_object_string(&msg.metadata);
+        let reference_facets = reference_facets_for_storage(
+            msg,
+            &content_json,
+            metadata_json.as_ref(),
+            &references_json,
+        );
+
+        let storage_mode = effective_storage_mode(msg, &content_json, &encryption_json);
+        let persisted_content =
+            persisted_content_for_mode(&storage_mode, &content_json, &encryption_json);
+        let persisted_views =
+            persisted_views_for_mode(&storage_mode, &views_json, &encryption_json);
+        let (summary, embedding) = summary_and_embedding_for_mode(&storage_mode, &content_json);
+
+        let messages_table = tenant_messages_table(owner_user_id);
+        sqlx::query(&format!(
+            r#"
+            INSERT INTO {messages_table} (
+                id, thread_id, parent_id, from_agent, to_agents, timestamp, type, kind, content,
+                views, summary, embedding, signature, encryption, "references", attachments,
+                store_in_relational, subtype, metadata, supertags, reference_targets,
+                reference_types, link_types, metadata_keys, metadata_values, metadata_terms
+            )
+            VALUES (
+                $1, $2, $3, $4, $5, $6::timestamptz, $7, $8, $9,
+                $10, $11, $12, $13, $14, $15, $16,
+                $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+            )
+            ON CONFLICT (id) DO UPDATE SET
+                thread_id = EXCLUDED.thread_id,
+                parent_id = EXCLUDED.parent_id,
+                from_agent = EXCLUDED.from_agent,
+                to_agents = EXCLUDED.to_agents,
+                timestamp = EXCLUDED.timestamp,
+                type = EXCLUDED.type,
+                kind = EXCLUDED.kind,
+                content = EXCLUDED.content,
+                views = EXCLUDED.views,
+                summary = EXCLUDED.summary,
+                embedding = EXCLUDED.embedding,
+                signature = EXCLUDED.signature,
+                encryption = EXCLUDED.encryption,
+                "references" = EXCLUDED."references",
+                attachments = EXCLUDED.attachments,
+                store_in_relational = EXCLUDED.store_in_relational,
+                subtype = EXCLUDED.subtype,
+                metadata = EXCLUDED.metadata,
+                supertags = EXCLUDED.supertags,
+                reference_targets = EXCLUDED.reference_targets,
+                reference_types = EXCLUDED.reference_types,
+                link_types = EXCLUDED.link_types,
+                metadata_keys = EXCLUDED.metadata_keys,
+                metadata_values = EXCLUDED.metadata_values,
+                metadata_terms = EXCLUDED.metadata_terms,
+                created_at = NOW()
+            "#,
+        ))
+        .bind(&msg.id)
+        .bind(&msg.thread_id)
+        .bind(nullable_string(&msg.parent_id))
+        .bind(&msg.from)
+        .bind(serde_json::json!(msg.to))
+        .bind(&msg.timestamp)
+        .bind(&msg.r#type)
+        .bind(msg.kind.as_deref())
+        .bind(persisted_content)
+        .bind(persisted_views)
+        .bind(summary)
+        .bind(embedding.as_deref())
+        .bind(&msg.signature)
+        .bind(encryption_json)
+        .bind(references_json)
+        .bind(&attachments_json)
+        .bind(msg.store_in_relational)
+        .bind(nullable_string(&msg.subtype))
+        .bind(metadata_json)
+        .bind(&msg.supertags)
+        .bind(&reference_facets.reference_targets)
+        .bind(&reference_facets.reference_types)
+        .bind(&reference_facets.link_types)
+        .bind(&reference_facets.metadata_keys)
+        .bind(&reference_facets.metadata_values)
+        .bind(&reference_facets.metadata_terms)
+        .execute(&self.pool)
+        .await?;
+
+        persist_attachment_metadata_to_table(
+            &self.pool,
+            &tenant_attachments_table(owner_user_id),
+            &msg.id,
+            &msg.thread_id,
+            &attachments_json,
+        )
+        .await?;
+        Self::persist_supertag_definition_to_table(&self.pool, owner_user_id, msg, &content_json)
+            .await?;
+        if let Some(family) = coord_family_of(
+            &msg.r#type,
+            &msg.subtype,
+            msg.store_in_relational,
+            &msg.metadata,
+        ) {
+            coordination_bus().notify(family, owner_user_id);
+        }
+
+        Ok(())
+    }
+
+    pub async fn store_private_snapshot_message(
+        &self,
+        owner_user_id: &str,
+        msg: &ProtoMessage,
+        content_json: Value,
+    ) -> Result<bool, sqlx::Error> {
+        if !metadata_store_flag(&msg.metadata) {
+            return Ok(false);
+        }
+
+        if self
+            .private_message_content_by_id(owner_user_id, &msg.id)
+            .await?
+            .as_ref()
+            == Some(&content_json)
+        {
+            self.prune_private_messages_by_selector(
+                owner_user_id,
+                &msg.r#type,
+                &msg.subtype,
+                &msg.from,
+                std::slice::from_ref(&msg.id),
+            )
+            .await?;
+            return Ok(false);
+        }
+
+        if let Some((latest_id, latest_content)) = self
+            .latest_private_message_snapshot_entry(
+                owner_user_id,
+                &msg.r#type,
+                &msg.subtype,
+                &msg.from,
+            )
+            .await?
+        {
+            if latest_content == content_json {
+                if latest_id != msg.id {
+                    self.upsert_private_message(owner_user_id, msg, content_json)
+                        .await?;
+                    self.prune_private_messages_by_selector(
+                        owner_user_id,
+                        &msg.r#type,
+                        &msg.subtype,
+                        &msg.from,
+                        std::slice::from_ref(&msg.id),
+                    )
+                    .await?;
+                } else {
+                    self.prune_private_messages_by_selector(
+                        owner_user_id,
+                        &msg.r#type,
+                        &msg.subtype,
+                        &msg.from,
+                        std::slice::from_ref(&latest_id),
+                    )
+                    .await?;
+                }
+                return Ok(false);
+            }
+        }
+
+        self.upsert_private_message(owner_user_id, msg, content_json)
+            .await?;
+        self.prune_private_messages_by_selector(
+            owner_user_id,
+            &msg.r#type,
+            &msg.subtype,
+            &msg.from,
+            std::slice::from_ref(&msg.id),
+        )
+        .await?;
+        Ok(true)
+    }
+
+    pub async fn latest_private_message_snapshot_entry(
+        &self,
+        owner_user_id: &str,
+        message_type: &str,
+        subtype: &str,
+        from_agent: &str,
+    ) -> Result<Option<(String, Value)>, sqlx::Error> {
+        let messages_table = tenant_messages_table(owner_user_id);
+        let row = sqlx::query(&format!(
+            r#"
+            SELECT id, content
+            FROM {messages_table}
+            WHERE type = $1
+              AND subtype = $2
+              AND from_agent = $3
+            ORDER BY timestamp DESC, created_at DESC, id DESC
+            LIMIT 1
+            "#,
+        ))
+        .bind(message_type)
+        .bind(subtype)
+        .bind(from_agent)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|entry| {
+            (
+                entry.get::<String, _>("id"),
+                entry.get::<Value, _>("content"),
+            )
+        }))
+    }
+
+    pub async fn latest_private_message_content(
+        &self,
+        owner_user_id: &str,
+        message_type: &str,
+        subtype: &str,
+        from_agent: &str,
+    ) -> Result<Option<Value>, sqlx::Error> {
+        Ok(self
+            .latest_private_message_snapshot_entry(owner_user_id, message_type, subtype, from_agent)
+            .await?
+            .map(|(_, content)| content))
+    }
+
+    pub async fn private_message_content_by_id(
+        &self,
+        owner_user_id: &str,
+        message_id: &str,
+    ) -> Result<Option<Value>, sqlx::Error> {
+        let messages_table = tenant_messages_table(owner_user_id);
+        let row = sqlx::query(&format!(
+            r#"
+            SELECT content
+            FROM {messages_table}
+            WHERE id = $1
+            LIMIT 1
+            "#,
+        ))
+        .bind(message_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|entry| entry.get::<Value, _>("content")))
+    }
+
+    pub async fn private_message_type_and_metadata_by_id(
+        &self,
+        owner_user_id: &str,
+        message_id: &str,
+    ) -> Result<Option<(String, Option<Value>)>, sqlx::Error> {
+        let messages_table = tenant_messages_table(owner_user_id);
+        let row = sqlx::query(&format!(
+            r#"
+            SELECT type, metadata
+            FROM {messages_table}
+            WHERE id = $1
+            LIMIT 1
+            "#,
+        ))
+        .bind(message_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|entry| {
+            (
+                entry.get::<String, _>("type"),
+                entry.get::<Option<Value>, _>("metadata"),
+            )
+        }))
+    }
+
+    pub async fn prune_private_messages_by_selector(
+        &self,
+        owner_user_id: &str,
+        message_type: &str,
+        subtype: &str,
+        from_agent: &str,
+        keep_ids: &[String],
+    ) -> Result<u64, sqlx::Error> {
+        let messages_table = tenant_messages_table(owner_user_id);
+        let result = sqlx::query(&format!(
+            r#"
+            DELETE FROM {messages_table}
+            WHERE type = $1
+              AND subtype = $2
+              AND from_agent = $3
+              AND (
+                COALESCE(array_length($4::text[], 1), 0) = 0
+                OR NOT (id = ANY($4::text[]))
+              )
+            "#,
+        ))
+        .bind(message_type)
+        .bind(subtype)
+        .bind(from_agent)
+        .bind(keep_ids)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    pub async fn prune_private_messages_by_reference_targets(
+        &self,
+        owner_user_id: &str,
+        message_type: &str,
+        subtype: &str,
+        from_agent: &str,
+        reference_targets: &[String],
+        keep_ids: &[String],
+    ) -> Result<u64, sqlx::Error> {
+        let messages_table = tenant_messages_table(owner_user_id);
+        let result = sqlx::query(&format!(
+            r#"
+            DELETE FROM {messages_table}
+            WHERE type = $1
+              AND subtype = $2
+              AND from_agent = $3
+              AND (
+                COALESCE(array_length($4::text[], 1), 0) = 0
+                OR reference_targets @> $4::text[]
+              )
+              AND (
+                COALESCE(array_length($5::text[], 1), 0) = 0
+                OR NOT (id = ANY($5::text[]))
+              )
+            "#,
+        ))
+        .bind(message_type)
+        .bind(subtype)
+        .bind(from_agent)
+        .bind(reference_targets)
+        .bind(keep_ids)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    pub async fn prune_private_messages_to_recent_limit(
+        &self,
+        owner_user_id: &str,
+        message_type: &str,
+        subtype: &str,
+        from_agent: &str,
+        keep_limit: i64,
+    ) -> Result<u64, sqlx::Error> {
+        let messages_table = tenant_messages_table(owner_user_id);
+        let result = sqlx::query(&format!(
+            r#"
+            DELETE FROM {messages_table}
+            WHERE id IN (
+                SELECT id
+                FROM (
+                    SELECT
+                        id,
+                        ROW_NUMBER() OVER (
+                            ORDER BY timestamp DESC, created_at DESC, id DESC
+                        ) AS row_num
+                    FROM {messages_table}
+                    WHERE type = $1
+                      AND subtype = $2
+                      AND from_agent = $3
+                ) ranked
+                WHERE ranked.row_num > $4
+            )
+            "#,
+        ))
+        .bind(message_type)
+        .bind(subtype)
+        .bind(from_agent)
+        .bind(keep_limit.max(1))
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    fn normalized_non_empty_vec(values: &[String]) -> Vec<String> {
+        let mut seen = HashSet::new();
+        values
+            .iter()
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty())
+            .filter(|value| seen.insert(value.to_ascii_lowercase()))
+            .map(str::to_string)
+            .collect()
+    }
+
+    fn normalized_hierarchy_mode(value: Option<&str>) -> String {
+        match value
+            .map(str::trim)
+            .unwrap_or("")
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "strict" => "strict".to_string(),
+            _ => "soft".to_string(),
+        }
+    }
+
+    fn normalized_supertag_key(value: &str) -> Option<String> {
+        let trimmed = value.trim().trim_start_matches('#').trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        Some(trimmed.to_ascii_lowercase())
+    }
+
+    fn expand_supertag_query_tags_from_definitions(
+        definitions: &[(String, Vec<String>, Vec<String>)],
+        requested: &[String],
+    ) -> Vec<String> {
+        let mut canonical_by_key = HashMap::new();
+        let mut children_by_parent: HashMap<String, Vec<String>> = HashMap::new();
+
+        for (tag_name, parent_tags, alias_tags) in definitions {
+            let Some(tag_key) = Self::normalized_supertag_key(tag_name) else {
+                continue;
+            };
+            canonical_by_key.insert(tag_key.clone(), tag_name.clone());
+            for alias in alias_tags {
+                if let Some(alias_key) = Self::normalized_supertag_key(alias) {
+                    canonical_by_key.insert(alias_key, tag_name.clone());
+                }
+            }
+            for parent in parent_tags {
+                if let Some(parent_key) = Self::normalized_supertag_key(parent) {
+                    children_by_parent
+                        .entry(parent_key)
+                        .or_default()
+                        .push(tag_name.clone());
+                }
+            }
+        }
+
+        let mut queue = VecDeque::new();
+        let mut visited = HashSet::new();
+        let mut expanded = Vec::new();
+
+        for raw in requested {
+            let Some(raw_key) = Self::normalized_supertag_key(raw) else {
+                continue;
+            };
+            let canonical = canonical_by_key
+                .get(&raw_key)
+                .cloned()
+                .unwrap_or_else(|| raw_key.clone());
+            if visited.insert(canonical.clone()) {
+                queue.push_back(canonical.clone());
+                expanded.push(canonical);
+            }
+        }
+
+        while let Some(current) = queue.pop_front() {
+            let Some(current_key) = Self::normalized_supertag_key(&current) else {
+                continue;
+            };
+            for child in children_by_parent.get(&current_key).into_iter().flatten() {
+                if visited.insert(child.clone()) {
+                    queue.push_back(child.clone());
+                    expanded.push(child.clone());
+                }
+            }
+        }
+
+        expanded
+    }
+
+    fn canonicalize_supertags_from_definitions(
+        definitions: &[(String, Vec<String>, Vec<String>)],
+        raw_tags: &[String],
+    ) -> Vec<String> {
+        let mut canonical_by_key = HashMap::new();
+
+        for (tag_name, _, alias_tags) in definitions {
+            let Some(tag_key) = Self::normalized_supertag_key(tag_name) else {
+                continue;
+            };
+            canonical_by_key.insert(tag_key.clone(), tag_name.clone());
+            for alias in alias_tags {
+                if let Some(alias_key) = Self::normalized_supertag_key(alias) {
+                    canonical_by_key.insert(alias_key, tag_name.clone());
+                }
+            }
+        }
+
+        let mut seen = HashSet::new();
+        let mut canonicalized = Vec::new();
+
+        for raw_tag in raw_tags {
+            let trimmed = raw_tag.trim().trim_start_matches('#').trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let Some(tag_key) = Self::normalized_supertag_key(trimmed) else {
+                continue;
+            };
+            let canonical = canonical_by_key
+                .get(&tag_key)
+                .cloned()
+                .unwrap_or_else(|| trimmed.to_string());
+            let Some(canonical_key) = Self::normalized_supertag_key(&canonical) else {
+                continue;
+            };
+            if seen.insert(canonical_key) {
+                canonicalized.push(canonical);
+            }
+        }
+
+        canonicalized
+    }
+
+    fn canonicalize_tag_count_facet_from_definitions(
+        definitions: &[(String, Vec<String>, Vec<String>)],
+        top_tags: &Value,
+        limit: usize,
+    ) -> Value {
+        let Some(items) = top_tags.as_array() else {
+            return Value::Array(Vec::new());
+        };
+
+        let mut merged: HashMap<String, (String, i64)> = HashMap::new();
+        for item in items {
+            let Some(tag) = item.get("tag").and_then(Value::as_str) else {
+                continue;
+            };
+            let canonical =
+                Self::canonicalize_supertags_from_definitions(definitions, &[tag.to_string()])
+                    .into_iter()
+                    .next()
+                    .unwrap_or_else(|| tag.trim().trim_start_matches('#').trim().to_string());
+            if canonical.is_empty() {
+                continue;
+            }
+            let Some(key) = Self::normalized_supertag_key(&canonical) else {
+                continue;
+            };
+            let count = item.get("count").and_then(Value::as_i64).unwrap_or(0);
+            let entry = merged.entry(key).or_insert((canonical, 0));
+            entry.1 += count;
+        }
+
+        let mut entries = merged.into_values().collect::<Vec<_>>();
+        entries.sort_by(|(tag_a, count_a), (tag_b, count_b)| {
+            count_b.cmp(count_a).then_with(|| tag_a.cmp(tag_b))
+        });
+        entries.truncate(limit);
+
+        Value::Array(
+            entries
+                .into_iter()
+                .map(|(tag, count)| serde_json::json!({ "tag": tag, "count": count }))
+                .collect(),
+        )
+    }
+
+    async fn load_supertag_definitions_for_user(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<(String, Vec<String>, Vec<String>)>, sqlx::Error> {
+        Ok(sqlx::query(
+            r#"
+            SELECT tag_name, parent_tags, alias_tags
+            FROM afp_supertag_definitions
+            WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .map(|row| {
+            (
+                row.try_get::<String, _>("tag_name").unwrap_or_default(),
+                row.try_get::<Vec<String>, _>("parent_tags")
+                    .unwrap_or_default(),
+                row.try_get::<Vec<String>, _>("alias_tags")
+                    .unwrap_or_default(),
+            )
+        })
+        .collect())
+    }
+
+    async fn persist_supertag_definition_to_table(
+        pool: &PgPool,
+        owner_user_id: &str,
+        msg: &ProtoMessage,
+        content_json: &Value,
+    ) -> Result<(), sqlx::Error> {
+        if msg.r#type != AFP_TYPE_SUPERTAG_DEFINITION {
+            return Ok(());
+        }
+
+        let Ok(content) = serde_json::from_value::<SupertagDefinitionContent>(content_json.clone())
+        else {
+            return Ok(());
+        };
+        let tag_name = content.tag_name.trim();
+        if tag_name.is_empty() {
+            return Ok(());
+        }
+
+        let keywords = Self::normalized_non_empty_vec(&content.keywords);
+        let folder_scope = Self::normalized_non_empty_vec(&content.folder_scope);
+        let parent_tags = Self::normalized_non_empty_vec(&content.parent_tags);
+        let alias_tags = Self::normalized_non_empty_vec(&content.alias_tags);
+        let hierarchy_mode = Self::normalized_hierarchy_mode(content.hierarchy_mode.as_deref());
+
+        sqlx::query(
+            r#"
+        INSERT INTO afp_supertag_definitions (
+            definition_id,
+            user_id,
+            tag_name,
+            keywords,
+            folder_scope,
+            parent_tags,
+            alias_tags,
+            hierarchy_mode,
+            afp_message_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (definition_id) DO UPDATE
+        SET
+            user_id = EXCLUDED.user_id,
+            tag_name = EXCLUDED.tag_name,
+            keywords = EXCLUDED.keywords,
+            folder_scope = EXCLUDED.folder_scope,
+            parent_tags = EXCLUDED.parent_tags,
+            alias_tags = EXCLUDED.alias_tags,
+            hierarchy_mode = EXCLUDED.hierarchy_mode,
+            afp_message_id = EXCLUDED.afp_message_id
+        "#,
+        )
+        .bind(&msg.id)
+        .bind(owner_user_id)
+        .bind(tag_name)
+        .bind(&keywords)
+        .bind(&folder_scope)
+        .bind(&parent_tags)
+        .bind(&alias_tags)
+        .bind(&hierarchy_mode)
+        .bind(&msg.id)
+        .execute(pool)
+        .await?;
+
+        Ok(())
     }
 
     pub async fn get_thread(&self, thread_id: &str) -> Result<Vec<ProtoMessage>, sqlx::Error> {
@@ -224,6 +1177,7 @@ impl Db {
                 timestamp::text as timestamp,
                 type,
                 kind,
+                supertags,
                 content,
                 signature,
                 encryption,
@@ -258,6 +1212,9 @@ impl Db {
                 kind: row
                     .try_get::<Option<String>, _>("kind")?
                     .filter(|value| !value.trim().is_empty()),
+                supertags: row
+                    .try_get::<Vec<String>, _>("supertags")
+                    .unwrap_or_default(),
                 content: row.try_get::<Value, _>("content")?.to_string(),
                 signature: row.try_get("signature")?,
                 encryption: row
@@ -311,6 +1268,7 @@ impl Db {
                 timestamp::text as timestamp,
                 type,
                 kind,
+                supertags,
                 content,
                 signature,
                 encryption,
@@ -329,7 +1287,237 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(proto_message_from_row).collect::<Result<Vec<_>, _>>()?)
+        Ok(rows
+            .into_iter()
+            .map(proto_message_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
+    }
+
+    pub async fn list_private_messages_by_supertags(
+        &self,
+        owner_user_id: &str,
+        supertags: &[String],
+        kind_filter: Option<&str>, match_all: bool, limit: i64, offset: i64,
+    ) -> Result<Vec<ProtoMessage>, sqlx::Error> {
+        if supertags.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let messages_table = tenant_messages_table(owner_user_id);
+        let operator = if match_all { "@>" } else { "&&" };
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT
+                id,
+                thread_id,
+                parent_id,
+                from_agent,
+                to_agents,
+                timestamp::text as timestamp,
+                type,
+                kind,
+                supertags,
+                content,
+                signature,
+                encryption,
+                views,
+                "references",
+                attachments,
+                store_in_relational,
+                subtype,
+                metadata
+            FROM {messages_table}
+            WHERE supertags {operator} $1::text[]
+              AND ($2::text IS NULL OR LOWER(COALESCE(kind, '')) = $2::text)
+            ORDER BY timestamp DESC
+            LIMIT $3
+            OFFSET $4
+            "#,
+        ))
+        .bind(supertags)
+        .bind(kind_filter.map(|kind| kind.to_ascii_lowercase()))
+        .bind(limit.max(1)).bind(offset.max(0))
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(proto_message_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
+    }
+
+    pub async fn list_private_messages_by_reference_targets(
+        &self,
+        owner_user_id: &str,
+        targets: &[String],
+        reference_type: Option<&str>,
+        link_type: Option<&str>,
+        kind_filter: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<ProtoMessage>, sqlx::Error> {
+        if targets.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let messages_table = tenant_messages_table(owner_user_id);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT
+                id,
+                thread_id,
+                parent_id,
+                from_agent,
+                to_agents,
+                timestamp::text as timestamp,
+                type,
+                kind,
+                supertags,
+                content,
+                signature,
+                encryption,
+                views,
+                "references",
+                attachments,
+                store_in_relational,
+                subtype,
+                metadata
+            FROM (
+                SELECT DISTINCT ON (m.id)
+                    m.id,
+                    m.thread_id,
+                    m.parent_id,
+                    m.from_agent,
+                    m.to_agents,
+                    m.timestamp,
+                    m.type,
+                    m.kind,
+                    m.supertags,
+                    m.content,
+                    m.signature,
+                    m.encryption,
+                    m.views,
+                    m."references",
+                    m.attachments,
+                    m.store_in_relational,
+                    m.subtype,
+                    m.metadata
+                FROM {messages_table} m
+                WHERE m.reference_targets && $1::text[]
+                  AND ($2::text IS NULL OR $2::text = ANY(m.reference_types))
+                  AND ($3::text IS NULL OR $3::text = ANY(m.link_types))
+                  AND ($4::text IS NULL OR LOWER(COALESCE(m.kind, '')) = $4::text)
+                ORDER BY m.id, m.timestamp DESC
+            ) dedup
+            ORDER BY dedup.timestamp DESC
+            LIMIT $5
+            "#,
+        ))
+        .bind(targets)
+        .bind(
+            reference_type
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+        )
+        .bind(
+            link_type
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+        )
+        .bind(kind_filter.map(|kind| kind.to_ascii_lowercase()))
+        .bind(limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(proto_message_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
+    }
+
+    pub async fn list_private_messages_by_object_facets(
+        &self,
+        owner_user_id: &str,
+        kind_filter: Option<&str>,
+        supertags: &[String],
+        match_all_supertags: bool,
+        reference_targets: &[String],
+        reference_type: Option<&str>,
+        link_type: Option<&str>,
+        metadata_keys: &[String],
+        metadata_values: &[String],
+        limit: i64,
+    ) -> Result<Vec<ProtoMessage>, sqlx::Error> {
+        let messages_table = tenant_messages_table(owner_user_id);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT
+                id,
+                thread_id,
+                parent_id,
+                from_agent,
+                to_agents,
+                timestamp::text as timestamp,
+                type,
+                kind,
+                supertags,
+                content,
+                signature,
+                encryption,
+                views,
+                "references",
+                attachments,
+                store_in_relational,
+                subtype,
+                metadata
+            FROM {messages_table}
+            WHERE ($1::text IS NULL OR LOWER(COALESCE(kind, '')) = $1::text)
+              AND (
+                COALESCE(array_length($2::text[], 1), 0) = 0
+                OR ($3::bool = TRUE AND supertags @> $2::text[])
+                OR ($3::bool = FALSE AND supertags && $2::text[])
+              )
+              AND (
+                COALESCE(array_length($4::text[], 1), 0) = 0
+                OR reference_targets && $4::text[]
+              )
+              AND ($5::text IS NULL OR $5::text = ANY(reference_types))
+              AND ($6::text IS NULL OR $6::text = ANY(link_types))
+              AND (
+                COALESCE(array_length($7::text[], 1), 0) = 0
+                OR metadata_keys && $7::text[]
+              )
+              AND (
+                COALESCE(array_length($8::text[], 1), 0) = 0
+                OR metadata_values && $8::text[]
+              )
+            ORDER BY timestamp DESC
+            LIMIT $9
+            "#,
+        ))
+        .bind(kind_filter.map(|kind| kind.to_ascii_lowercase()))
+        .bind(supertags)
+        .bind(match_all_supertags)
+        .bind(reference_targets)
+        .bind(
+            reference_type
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+        )
+        .bind(
+            link_type
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+        )
+        .bind(metadata_keys)
+        .bind(metadata_values)
+        .bind(limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(proto_message_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn upsert_backlink_record(&self, record: &BacklinkRecord) -> Result<(), sqlx::Error> {
@@ -361,7 +1549,7 @@ impl Db {
             VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10
             )
-            ON CONFLICT (user_id, source_id, target_id, link_kind) DO UPDATE SET
+            ON CONFLICT (user_id, source_id, target_id, link_kind, ref_type) DO UPDATE SET
                 backlink_id = EXCLUDED.backlink_id,
                 ref_type = EXCLUDED.ref_type,
                 similarity = EXCLUDED.similarity,
@@ -443,17 +1631,27 @@ impl Db {
         user_id: &str,
         limit: i64,
     ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
-        let rows = sqlx::query(
+        let messages_table = tenant_messages_table(user_id);
+        let rows = sqlx::query(&format!(
             r#"
-            SELECT tag, COUNT(*) AS freq
-            FROM afp_knowledge_cards,
-                 UNNEST(supertags) AS tag
-            WHERE user_id = $1
+            SELECT tag, SUM(freq)::bigint AS freq
+            FROM (
+                SELECT tag, COUNT(*)::bigint AS freq
+                FROM {messages_table},
+                     UNNEST(supertags) AS tag
+                GROUP BY tag
+                UNION ALL
+                SELECT tag, COUNT(*)::bigint AS freq
+                FROM afp_knowledge_cards,
+                     UNNEST(supertags) AS tag
+                WHERE user_id = $1
+                GROUP BY tag
+            ) tag_counts
             GROUP BY tag
-            ORDER BY freq DESC
+            ORDER BY freq DESC, tag ASC
             LIMIT $2
             "#,
-        )
+        ))
         .bind(user_id)
         .bind(limit)
         .fetch_all(&self.pool)
@@ -467,6 +1665,175 @@ impl Db {
                     "count": row.try_get::<i64, _>("freq").unwrap_or(0),
                 })
             })
+            .collect())
+    }
+
+    pub async fn list_supertag_definitions(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                definition_id,
+                tag_name,
+                keywords,
+                folder_scope,
+                parent_tags,
+                alias_tags,
+                hierarchy_mode,
+                afp_message_id,
+                created_at::text AS created_at
+            FROM afp_supertag_definitions
+            WHERE user_id = $1
+            ORDER BY tag_name ASC, created_at ASC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                serde_json::json!({
+                    "definition_id": row.try_get::<String, _>("definition_id").unwrap_or_default(),
+                    "tag_name": row.try_get::<String, _>("tag_name").unwrap_or_default(),
+                    "keywords": row.try_get::<Vec<String>, _>("keywords").unwrap_or_default(),
+                    "folder_scope": row.try_get::<Vec<String>, _>("folder_scope").unwrap_or_default(),
+                    "parent_tags": row.try_get::<Vec<String>, _>("parent_tags").unwrap_or_default(),
+                    "alias_tags": row.try_get::<Vec<String>, _>("alias_tags").unwrap_or_default(),
+                    "hierarchy_mode": row.try_get::<String, _>("hierarchy_mode").unwrap_or_else(|_| "soft".to_string()),
+                    "afp_message_id": row.try_get::<String, _>("afp_message_id").unwrap_or_default(),
+                    "created_at": row.try_get::<String, _>("created_at").unwrap_or_default(),
+                })
+            })
+            .collect())
+    }
+
+    pub async fn expand_supertag_query_tags(
+        &self,
+        user_id: &str,
+        requested: &[String],
+    ) -> Result<Vec<String>, sqlx::Error> {
+        if requested.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let definitions = self.load_supertag_definitions_for_user(user_id).await?;
+
+        Ok(Self::expand_supertag_query_tags_from_definitions(
+            &definitions,
+            requested,
+        ))
+    }
+
+    pub async fn canonicalize_supertags(
+        &self,
+        user_id: &str,
+        raw_tags: &[String],
+    ) -> Result<Vec<String>, sqlx::Error> {
+        if raw_tags.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let definitions = self.load_supertag_definitions_for_user(user_id).await?;
+        Ok(Self::canonicalize_supertags_from_definitions(
+            &definitions,
+            raw_tags,
+        ))
+    }
+
+    pub async fn search_private_thread_ids(
+        &self,
+        owner_user_id: &str,
+        query: Option<&str>,
+        supertags: &[String],
+        reference_targets: &[String],
+        metadata_values: &[String],
+        metadata_terms: &[String],
+        thread_ids: &[String],
+        from_agents: &[String],
+        time_from: Option<&str>,
+        time_to: Option<&str>,
+        match_all_supertags: bool,
+        limit: i64,
+    ) -> Result<Vec<String>, sqlx::Error> {
+        let messages_table = tenant_messages_table(owner_user_id);
+        let pattern = query
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| format!("%{value}%"));
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT thread_id, MAX(timestamp) AS latest_timestamp
+            FROM {messages_table}
+            WHERE (
+                $1::text IS NULL
+                OR thread_id ILIKE $1
+                OR from_agent ILIKE $1
+                OR type ILIKE $1
+                OR COALESCE(kind, '') ILIKE $1
+                OR COALESCE(subtype, '') ILIKE $1
+                OR COALESCE(summary, '') ILIKE $1
+                OR COALESCE(metadata::text, '') ILIKE $1
+                OR COALESCE(content::text, '') ILIKE $1
+            )
+              AND (
+                COALESCE(array_length($2::text[], 1), 0) = 0
+                OR ($3::bool = TRUE AND supertags @> $2::text[])
+                OR ($3::bool = FALSE AND supertags && $2::text[])
+              )
+              AND (
+                COALESCE(array_length($4::text[], 1), 0) = 0
+                OR reference_targets && $4::text[]
+              )
+              AND (
+                COALESCE(array_length($5::text[], 1), 0) = 0
+                OR metadata_values && $5::text[]
+              )
+              AND (
+                COALESCE(array_length($6::text[], 1), 0) = 0
+                OR metadata_terms && $6::text[]
+              )
+              AND (
+                COALESCE(array_length($7::text[], 1), 0) = 0
+                OR thread_id = ANY($7::text[])
+              )
+              AND (
+                $8::text IS NULL
+                OR LOWER(from_agent) = ANY($8::text[])
+              )
+              AND (
+                $9::text IS NULL
+                OR timestamp >= $9::timestamptz
+              )
+              AND (
+                $10::text IS NULL
+                OR timestamp <= ($10::date + INTERVAL '1 day' - INTERVAL '1 second')
+              )
+            GROUP BY thread_id
+            ORDER BY latest_timestamp DESC
+            LIMIT $11
+            "#,
+        ))
+        .bind(pattern)
+        .bind(supertags)
+        .bind(match_all_supertags)
+        .bind(reference_targets)
+        .bind(metadata_values)
+        .bind(metadata_terms)
+        .bind(thread_ids)
+        .bind(from_agents)
+        .bind(time_from)
+        .bind(time_to)
+        .bind(limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| row.try_get::<String, _>("thread_id").ok())
             .collect())
     }
 
@@ -571,28 +1938,50 @@ impl Db {
             return Ok(None);
         }
 
-        let row = sqlx::query(
+        let mut best_match = self
+            .find_external_email_match_in_table("messages", targets)
+            .await?;
+
+        for user_id in self.list_user_ids().await? {
+            let tenant_messages = tenant_messages_table(&user_id);
+            let candidate = self
+                .find_external_email_match_in_table(&tenant_messages, targets)
+                .await?;
+            if external_email_match_is_newer(candidate.as_ref(), best_match.as_ref()) {
+                best_match = candidate;
+            }
+        }
+
+        Ok(best_match.map(|entry| (entry.thread_id, entry.message_id)))
+    }
+
+    async fn find_external_email_match_in_table(
+        &self,
+        table_name: &str,
+        targets: &[String],
+    ) -> Result<Option<ExternalEmailThreadMatch>, sqlx::Error> {
+        let row = sqlx::query(&format!(
             r#"
-            SELECT m.thread_id, m.id
-            FROM messages m
+            SELECT m.thread_id, m.id, m.timestamp
+            FROM {table_name} m
             CROSS JOIN LATERAL jsonb_array_elements(m."references") AS ref
             WHERE ref->>'type' = 'external_email'
               AND ref->>'target' = ANY($1)
             ORDER BY m.timestamp DESC
             LIMIT 1
-            "#,
-        )
+            "#
+        ))
         .bind(targets)
         .fetch_optional(&self.pool)
         .await?;
 
         Ok(match row {
             None => None,
-            Some(row) => {
-                let thread_id: String = row.try_get("thread_id")?;
-                let message_id: String = row.try_get("id")?;
-                Some((thread_id, message_id))
-            }
+            Some(row) => Some(ExternalEmailThreadMatch {
+                thread_id: row.try_get("thread_id")?,
+                message_id: row.try_get("id")?,
+                timestamp: row.try_get("timestamp")?,
+            }),
         })
     }
 
@@ -735,42 +2124,99 @@ impl Db {
         projection_json: Value,
         source_timestamp: Option<&str>,
     ) -> Result<(), sqlx::Error> {
+        sqlx::query(relational_projection_upsert_sql())
+            .bind(message_id)
+            .bind(owner_user_id)
+            .bind(thread_id)
+            .bind(message_type)
+            .bind(subtype)
+            .bind(projection_kind)
+            .bind(workspace_id)
+            .bind(projection_json)
+            .bind(source_timestamp)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn upsert_private_knowledge_triple(
+        &self,
+        owner_user_id: &str,
+        message_id: &str,
+        thread_id: &str,
+        message_timestamp: &str,
+        subject: &str,
+        predicate: &str,
+        object_value: &str,
+        confidence: f64,
+        source_message_id: Option<&str>,
+        domain: Option<&str>,
+        observed_at: Option<&str>,
+        metadata: Option<&Value>,
+    ) -> Result<(), sqlx::Error> {
+        let normalized_subject = subject.trim();
+        let normalized_predicate = predicate.trim();
+        let normalized_object = object_value.trim();
+        if owner_user_id.trim().is_empty()
+            || normalized_subject.is_empty()
+            || normalized_predicate.is_empty()
+            || normalized_object.is_empty()
+        {
+            return Ok(());
+        }
+
         sqlx::query(
             r#"
-            INSERT INTO afp_relational_projections (
+            INSERT INTO afp_knowledge_triples (
                 message_id,
-                owner_user_id,
+                user_id,
                 thread_id,
-                message_type,
-                subtype,
-                projection_kind,
-                workspace_id,
-                projection_json,
-                synced_at,
-                source_timestamp
+                subject,
+                subject_norm,
+                predicate,
+                predicate_norm,
+                object_value,
+                object_norm,
+                confidence,
+                source_message_id,
+                domain,
+                observed_at,
+                message_timestamp,
+                metadata
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9::timestamptz)
+            VALUES (
+                $1, $2, $3, $4, LOWER($4), $5, LOWER($5), $6, LOWER($6), $7, $8, $9,
+                $10::timestamptz, $11::timestamptz, COALESCE($12::jsonb, '{}'::jsonb)
+            )
             ON CONFLICT (message_id) DO UPDATE SET
-                owner_user_id = EXCLUDED.owner_user_id,
+                user_id = EXCLUDED.user_id,
                 thread_id = EXCLUDED.thread_id,
-                message_type = EXCLUDED.message_type,
-                subtype = EXCLUDED.subtype,
-                projection_kind = EXCLUDED.projection_kind,
-                workspace_id = EXCLUDED.workspace_id,
-                projection_json = EXCLUDED.projection_json,
-                synced_at = NOW(),
-                source_timestamp = EXCLUDED.source_timestamp
+                subject = EXCLUDED.subject,
+                subject_norm = EXCLUDED.subject_norm,
+                predicate = EXCLUDED.predicate,
+                predicate_norm = EXCLUDED.predicate_norm,
+                object_value = EXCLUDED.object_value,
+                object_norm = EXCLUDED.object_norm,
+                confidence = EXCLUDED.confidence,
+                source_message_id = EXCLUDED.source_message_id,
+                domain = EXCLUDED.domain,
+                observed_at = EXCLUDED.observed_at,
+                message_timestamp = EXCLUDED.message_timestamp,
+                metadata = EXCLUDED.metadata
             "#,
         )
         .bind(message_id)
         .bind(owner_user_id)
         .bind(thread_id)
-        .bind(message_type)
-        .bind(subtype)
-        .bind(projection_kind)
-        .bind(workspace_id)
-        .bind(projection_json)
-        .bind(source_timestamp)
+        .bind(normalized_subject)
+        .bind(normalized_predicate)
+        .bind(normalized_object)
+        .bind(confidence)
+        .bind(source_message_id)
+        .bind(domain)
+        .bind(observed_at)
+        .bind(message_timestamp)
+        .bind(metadata.cloned())
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -785,33 +2231,15 @@ impl Db {
         seaweedfs_key: &str,
         metadata_stub: Value,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            r#"
-            INSERT INTO afp_archive_index (
-                message_id,
-                user_id,
-                thread_id,
-                message_type,
-                archived_at,
-                seaweedfs_key,
-                metadata_stub,
-                restored_at
-            )
-            VALUES ($1, $2, $3, $4, NOW(), $5, $6, NULL)
-            ON CONFLICT (message_id) DO UPDATE SET
-                seaweedfs_key = EXCLUDED.seaweedfs_key,
-                metadata_stub = EXCLUDED.metadata_stub,
-                archived_at = NOW()
-            "#,
-        )
-        .bind(message_id)
-        .bind(user_id)
-        .bind(thread_id)
-        .bind(message_type)
-        .bind(seaweedfs_key)
-        .bind(metadata_stub)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query(archive_index_upsert_sql())
+            .bind(message_id)
+            .bind(user_id)
+            .bind(thread_id)
+            .bind(message_type)
+            .bind(seaweedfs_key)
+            .bind(metadata_stub)
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }
@@ -830,6 +2258,24 @@ impl Db {
             messages_table
         ))
         .bind(message_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn delete_private_attachment_by_id(
+        &self,
+        user_id: &str,
+        attachment_id: &str,
+    ) -> Result<u64, sqlx::Error> {
+        let attachments_table = tenant_attachments_table(user_id);
+        let result = sqlx::query(&format!(
+            r#"
+            DELETE FROM {attachments_table}
+            WHERE id = $1
+            "#
+        ))
+        .bind(attachment_id)
         .execute(&self.pool)
         .await?;
         Ok(result.rows_affected())
@@ -870,6 +2316,787 @@ impl Db {
         Ok(())
     }
 
+    pub async fn upsert_user_connected_capability(
+        &self,
+        record: &UserConnectedCapabilityRecord,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO user_connected_capabilities (
+                user_id,
+                provider,
+                account_ref,
+                capability_family,
+                capability_id,
+                transport,
+                granted_scopes_json,
+                approval_mode,
+                secret_ref,
+                health_state,
+                last_checked_at,
+                revoked_at,
+                metadata_json
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11::timestamptz, $12::timestamptz, $13::jsonb)
+            ON CONFLICT (user_id, provider, capability_id, account_ref) DO UPDATE SET
+                capability_family = EXCLUDED.capability_family,
+                transport = EXCLUDED.transport,
+                granted_scopes_json = EXCLUDED.granted_scopes_json,
+                approval_mode = EXCLUDED.approval_mode,
+                secret_ref = EXCLUDED.secret_ref,
+                health_state = EXCLUDED.health_state,
+                last_checked_at = EXCLUDED.last_checked_at,
+                revoked_at = EXCLUDED.revoked_at,
+                metadata_json = EXCLUDED.metadata_json
+            "#,
+        )
+        .bind(&record.user_id)
+        .bind(&record.provider)
+        .bind(&record.account_ref)
+        .bind(&record.capability_family)
+        .bind(&record.capability_id)
+        .bind(&record.transport)
+        .bind(json!(record.granted_scopes))
+        .bind(&record.approval_mode)
+        .bind(&record.secret_ref)
+        .bind(&record.health_state)
+        .bind(&record.last_checked_at)
+        .bind(&record.revoked_at)
+        .bind(record.metadata_json.clone())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn list_user_connected_capabilities(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<UserConnectedCapabilityRecord>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                id,
+                user_id,
+                provider,
+                account_ref,
+                capability_family,
+                capability_id,
+                transport,
+                granted_scopes_json,
+                approval_mode,
+                secret_ref,
+                health_state,
+                last_checked_at::text AS last_checked_at,
+                connected_at::text AS connected_at,
+                revoked_at::text AS revoked_at,
+                metadata_json
+            FROM user_connected_capabilities
+            WHERE user_id = $1
+            ORDER BY provider ASC, capability_family ASC, capability_id ASC, account_ref ASC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| UserConnectedCapabilityRecord {
+                id: row.get("id"),
+                user_id: row.get("user_id"),
+                provider: row.get("provider"),
+                account_ref: row.get("account_ref"),
+                capability_family: row.get("capability_family"),
+                capability_id: row.get("capability_id"),
+                transport: row.get("transport"),
+                granted_scopes: row
+                    .try_get::<Value, _>("granted_scopes_json")
+                    .ok()
+                    .and_then(|value| serde_json::from_value(value).ok())
+                    .unwrap_or_default(),
+                approval_mode: row.get("approval_mode"),
+                secret_ref: row.try_get("secret_ref").unwrap_or(None),
+                health_state: row.get("health_state"),
+                last_checked_at: row.try_get("last_checked_at").unwrap_or(None),
+                connected_at: row.get("connected_at"),
+                revoked_at: row.try_get("revoked_at").unwrap_or(None),
+                metadata_json: row
+                    .try_get("metadata_json")
+                    .unwrap_or_else(|_| Value::Object(Default::default())),
+            })
+            .collect())
+    }
+
+    pub async fn delete_user_connected_capabilities_for_provider(
+        &self,
+        user_id: &str,
+        provider: &str,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "DELETE FROM user_connected_capabilities WHERE user_id = $1 AND provider = $2",
+        )
+        .bind(user_id)
+        .bind(provider)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn delete_user_connected_capabilities_for_provider_account(
+        &self,
+        user_id: &str,
+        provider: &str,
+        account_ref: &str,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "DELETE FROM user_connected_capabilities WHERE user_id = $1 AND provider = $2 AND account_ref = $3",
+        )
+        .bind(user_id)
+        .bind(provider)
+        .bind(account_ref)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn list_mcp_tool_connections(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<McpToolConnectionRecord>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                id,
+                tool_slug,
+                tool_name,
+                mcp_server_url,
+                connected_at,
+                connection_provider,
+                external_user_id,
+                composio_connected_account_id,
+                tool_descriptor
+            FROM mcp_tool_connections
+            WHERE user_id = $1
+            ORDER BY connected_at DESC, tool_name ASC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| McpToolConnectionRecord {
+                id: row.get("id"),
+                tool_slug: row.get("tool_slug"),
+                tool_name: row.get("tool_name"),
+                mcp_server_url: row.get("mcp_server_url"),
+                connected_at: row.get("connected_at"),
+                connection_provider: row.get("connection_provider"),
+                external_user_id: row.try_get("external_user_id").unwrap_or(None),
+                composio_connected_account_id: row
+                    .try_get("composio_connected_account_id")
+                    .unwrap_or(None),
+                tool_descriptor: row.try_get("tool_descriptor").unwrap_or(None),
+            })
+            .collect())
+    }
+
+    pub async fn find_mcp_tool_connection(
+        &self,
+        user_id: &str,
+        tool_slug: &str,
+    ) -> Result<Option<McpToolConnectionRecord>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            SELECT
+                id,
+                tool_slug,
+                tool_name,
+                mcp_server_url,
+                connected_at,
+                connection_provider,
+                external_user_id,
+                composio_connected_account_id,
+                tool_descriptor
+            FROM mcp_tool_connections
+            WHERE user_id = $1 AND tool_slug = $2
+            "#,
+        )
+        .bind(user_id)
+        .bind(tool_slug)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|row| McpToolConnectionRecord {
+            id: row.get("id"),
+            tool_slug: row.get("tool_slug"),
+            tool_name: row.get("tool_name"),
+            mcp_server_url: row.get("mcp_server_url"),
+            connected_at: row.get("connected_at"),
+            connection_provider: row.get("connection_provider"),
+            external_user_id: row.try_get("external_user_id").unwrap_or(None),
+            composio_connected_account_id: row
+                .try_get("composio_connected_account_id")
+                .unwrap_or(None),
+            tool_descriptor: row.try_get("tool_descriptor").unwrap_or(None),
+        }))
+    }
+
+    pub async fn upsert_mcp_tool_connection(
+        &self,
+        record: &McpToolConnectionUpsert,
+    ) -> Result<McpToolConnectionRecord, sqlx::Error> {
+        let api_key_enc = record
+            .api_key
+            .as_ref()
+            .filter(|value| !value.trim().is_empty())
+            .map(|value| {
+                crate::crypto::encrypt_secret(value.trim(), &tool_connection_encryption_key())
+            })
+            .unwrap_or_default();
+        let row = sqlx::query(
+            r#"
+            INSERT INTO mcp_tool_connections (
+                id,
+                user_id,
+                tool_slug,
+                tool_name,
+                mcp_server_url,
+                api_key_enc,
+                connection_provider,
+                external_user_id,
+                composio_connected_account_id,
+                tool_descriptor
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+            ON CONFLICT (user_id, tool_slug) DO UPDATE SET
+                tool_name = EXCLUDED.tool_name,
+                mcp_server_url = EXCLUDED.mcp_server_url,
+                api_key_enc = CASE
+                    WHEN EXCLUDED.api_key_enc <> '' THEN EXCLUDED.api_key_enc
+                    ELSE mcp_tool_connections.api_key_enc
+                END,
+                connection_provider = EXCLUDED.connection_provider,
+                external_user_id = EXCLUDED.external_user_id,
+                composio_connected_account_id = EXCLUDED.composio_connected_account_id,
+                tool_descriptor = EXCLUDED.tool_descriptor,
+                connected_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+            RETURNING
+                id,
+                tool_slug,
+                tool_name,
+                mcp_server_url,
+                connected_at,
+                connection_provider,
+                external_user_id,
+                composio_connected_account_id,
+                tool_descriptor
+            "#,
+        )
+        .bind(Ulid::new().to_string())
+        .bind(&record.user_id)
+        .bind(&record.tool_slug)
+        .bind(&record.tool_name)
+        .bind(&record.mcp_server_url)
+        .bind(api_key_enc)
+        .bind(&record.connection_provider)
+        .bind(&record.external_user_id)
+        .bind(&record.composio_connected_account_id)
+        .bind(record.tool_descriptor.clone())
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(McpToolConnectionRecord {
+            id: row.get("id"),
+            tool_slug: row.get("tool_slug"),
+            tool_name: row.get("tool_name"),
+            mcp_server_url: row.get("mcp_server_url"),
+            connected_at: row.get("connected_at"),
+            connection_provider: row.get("connection_provider"),
+            external_user_id: row.try_get("external_user_id").unwrap_or(None),
+            composio_connected_account_id: row
+                .try_get("composio_connected_account_id")
+                .unwrap_or(None),
+            tool_descriptor: row.try_get("tool_descriptor").unwrap_or(None),
+        })
+    }
+
+    pub async fn delete_mcp_tool_connection(
+        &self,
+        user_id: &str,
+        tool_slug: &str,
+    ) -> Result<u64, sqlx::Error> {
+        let result =
+            sqlx::query("DELETE FROM mcp_tool_connections WHERE user_id = $1 AND tool_slug = $2")
+                .bind(user_id)
+                .bind(tool_slug)
+                .execute(&self.pool)
+                .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn record_user_external_tool_usage_event(
+        &self,
+        event: &UserExternalToolUsageEventInsert,
+    ) -> Result<UserExternalToolUsageEventRecord, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+        let row = sqlx::query(
+            r#"
+            INSERT INTO user_external_tool_usage_events (
+                id,
+                user_id,
+                tool_slug,
+                tool_name,
+                provider_key,
+                provider_category,
+                billing_category,
+                usage_unit,
+                quantity,
+                estimated_cost_usd,
+                currency,
+                source,
+                occurred_at,
+                metadata_json
+            )
+            VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                COALESCE($13::timestamptz, NOW()),
+                COALESCE($14::jsonb, '{}'::jsonb)
+            )
+            RETURNING
+                id,
+                user_id,
+                tool_slug,
+                tool_name,
+                provider_key,
+                provider_category,
+                billing_category,
+                usage_unit,
+                quantity,
+                estimated_cost_usd,
+                currency,
+                source,
+                occurred_at,
+                recorded_at,
+                metadata_json
+            "#,
+        )
+        .bind(Ulid::new().to_string())
+        .bind(&event.user_id)
+        .bind(&event.tool_slug)
+        .bind(&event.tool_name)
+        .bind(&event.provider_key)
+        .bind(&event.provider_category)
+        .bind(&event.billing_category)
+        .bind(&event.usage_unit)
+        .bind(event.quantity)
+        .bind(event.estimated_cost_usd)
+        .bind(event.currency.as_deref().unwrap_or("USD"))
+        .bind(event.source.as_deref().unwrap_or("manual"))
+        .bind(event.occurred_at.as_deref())
+        .bind(event.metadata_json.clone())
+        .fetch_one(&mut *tx)
+        .await?;
+
+        self.prune_user_external_tool_usage_events_in_tx(&mut tx, &event.user_id)
+            .await?;
+        tx.commit().await?;
+
+        Ok(UserExternalToolUsageEventRecord {
+            id: row.get("id"),
+            user_id: row.get("user_id"),
+            tool_slug: row.get("tool_slug"),
+            tool_name: row.get("tool_name"),
+            provider_key: row.get("provider_key"),
+            provider_category: row.get("provider_category"),
+            billing_category: row.get("billing_category"),
+            usage_unit: row.get("usage_unit"),
+            quantity: row.get("quantity"),
+            estimated_cost_usd: row.get("estimated_cost_usd"),
+            currency: row.get("currency"),
+            source: row.get("source"),
+            occurred_at: row.get("occurred_at"),
+            recorded_at: row.get("recorded_at"),
+            metadata_json: row.get("metadata_json"),
+        })
+    }
+
+    async fn prune_user_external_tool_usage_events_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        user_id: &str,
+    ) -> Result<u64, sqlx::Error> {
+        let retention_days = USER_EXTERNAL_TOOL_USAGE_RETENTION_DAYS.max(1);
+        let max_events = USER_EXTERNAL_TOOL_USAGE_MAX_EVENTS_PER_USER.max(1);
+
+        let aged_result = sqlx::query(
+            r#"
+            DELETE FROM user_external_tool_usage_events
+            WHERE user_id = $1
+              AND occurred_at < (NOW() - make_interval(days => $2::int))
+            "#,
+        )
+        .bind(user_id)
+        .bind(retention_days as i32)
+        .execute(&mut **tx)
+        .await?;
+
+        let overflow_result = sqlx::query(
+            r#"
+            WITH overflow AS (
+                SELECT id
+                FROM user_external_tool_usage_events
+                WHERE user_id = $1
+                ORDER BY occurred_at DESC, recorded_at DESC, id DESC
+                OFFSET $2
+            )
+            DELETE FROM user_external_tool_usage_events
+            WHERE id IN (SELECT id FROM overflow)
+            "#,
+        )
+        .bind(user_id)
+        .bind(max_events)
+        .execute(&mut **tx)
+        .await?;
+
+        Ok(aged_result.rows_affected() + overflow_result.rows_affected())
+    }
+
+    pub async fn list_user_external_tool_usage_events(
+        &self,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<UserExternalToolUsageEventRecord>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                id,
+                user_id,
+                tool_slug,
+                tool_name,
+                provider_key,
+                provider_category,
+                billing_category,
+                usage_unit,
+                quantity,
+                estimated_cost_usd,
+                currency,
+                source,
+                occurred_at,
+                recorded_at,
+                metadata_json
+            FROM user_external_tool_usage_events
+            WHERE user_id = $1
+            ORDER BY occurred_at DESC, recorded_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(user_id)
+        .bind(limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| UserExternalToolUsageEventRecord {
+                id: row.get("id"),
+                user_id: row.get("user_id"),
+                tool_slug: row.get("tool_slug"),
+                tool_name: row.get("tool_name"),
+                provider_key: row.get("provider_key"),
+                provider_category: row.get("provider_category"),
+                billing_category: row.get("billing_category"),
+                usage_unit: row.get("usage_unit"),
+                quantity: row.get("quantity"),
+                estimated_cost_usd: row.get("estimated_cost_usd"),
+                currency: row.get("currency"),
+                source: row.get("source"),
+                occurred_at: row.get("occurred_at"),
+                recorded_at: row.get("recorded_at"),
+                metadata_json: row.get("metadata_json"),
+            })
+            .collect())
+    }
+
+    pub async fn summarize_user_external_tool_usage_current_month(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<UserExternalToolUsageSummaryRow>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                provider_category,
+                billing_category,
+                tool_slug,
+                tool_name,
+                provider_key,
+                usage_unit,
+                SUM(quantity) AS total_quantity,
+                SUM(estimated_cost_usd) AS total_estimated_cost_usd,
+                MAX(occurred_at) AS latest_occurred_at,
+                COUNT(*)::bigint AS event_count
+            FROM user_external_tool_usage_events
+            WHERE user_id = $1
+              AND occurred_at >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
+            GROUP BY
+                provider_category,
+                billing_category,
+                tool_slug,
+                tool_name,
+                provider_key,
+                usage_unit
+            ORDER BY total_estimated_cost_usd DESC, tool_name ASC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| UserExternalToolUsageSummaryRow {
+                provider_category: row.get("provider_category"),
+                billing_category: row.get("billing_category"),
+                tool_slug: row.get("tool_slug"),
+                tool_name: row.get("tool_name"),
+                provider_key: row.get("provider_key"),
+                usage_unit: row.get("usage_unit"),
+                total_quantity: row.get("total_quantity"),
+                total_estimated_cost_usd: row.get("total_estimated_cost_usd"),
+                latest_occurred_at: row
+                    .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("latest_occurred_at")
+                    .ok()
+                    .flatten()
+                    .map(|value| value.to_rfc3339()),
+                event_count: row
+                    .try_get::<i64, _>("event_count")
+                    .unwrap_or_default()
+                    .max(0) as u64,
+            })
+            .collect())
+    }
+
+    pub async fn refresh_gmail_connected_capabilities(
+        &self,
+        user_id: &str,
+        gmail_email: &str,
+    ) -> Result<(), sqlx::Error> {
+        self.delete_user_connected_capabilities_for_provider(user_id, "gmail")
+            .await?;
+
+        let gmail_email = gmail_email.trim();
+        if gmail_email.is_empty() {
+            return Ok(());
+        }
+
+        let last_checked_at = Some(chrono::Utc::now().to_rfc3339());
+        let secret_ref = Some(format!("user_gmail_tokens:{user_id}"));
+
+        for record in [
+            UserConnectedCapabilityRecord {
+                id: String::new(),
+                user_id: user_id.to_string(),
+                provider: "gmail".to_string(),
+                account_ref: gmail_email.to_string(),
+                capability_family: "communications".to_string(),
+                capability_id: "gmail.read".to_string(),
+                transport: "rest".to_string(),
+                granted_scopes: vec![
+                    "https://www.googleapis.com/auth/gmail.modify".to_string(),
+                    "https://www.googleapis.com/auth/userinfo.email".to_string(),
+                ],
+                approval_mode: "autonomous".to_string(),
+                secret_ref: secret_ref.clone(),
+                health_state: "healthy".to_string(),
+                last_checked_at: last_checked_at.clone(),
+                connected_at: chrono::Utc::now().to_rfc3339(),
+                revoked_at: None,
+                metadata_json: json!({
+                    "provider_label": "Gmail",
+                    "operation": "read_mailbox"
+                }),
+            },
+            UserConnectedCapabilityRecord {
+                id: String::new(),
+                user_id: user_id.to_string(),
+                provider: "gmail".to_string(),
+                account_ref: gmail_email.to_string(),
+                capability_family: "communications".to_string(),
+                capability_id: "gmail.draft".to_string(),
+                transport: "rest".to_string(),
+                granted_scopes: vec!["https://www.googleapis.com/auth/gmail.modify".to_string()],
+                approval_mode: "suggest_only".to_string(),
+                secret_ref: secret_ref.clone(),
+                health_state: "healthy".to_string(),
+                last_checked_at: last_checked_at.clone(),
+                connected_at: chrono::Utc::now().to_rfc3339(),
+                revoked_at: None,
+                metadata_json: json!({
+                    "provider_label": "Gmail",
+                    "operation": "create_draft"
+                }),
+            },
+            UserConnectedCapabilityRecord {
+                id: String::new(),
+                user_id: user_id.to_string(),
+                provider: "gmail".to_string(),
+                account_ref: gmail_email.to_string(),
+                capability_family: "communications".to_string(),
+                capability_id: "gmail.send".to_string(),
+                transport: "rest".to_string(),
+                granted_scopes: vec!["https://www.googleapis.com/auth/gmail.modify".to_string()],
+                approval_mode: "human_approval_required".to_string(),
+                secret_ref: secret_ref.clone(),
+                health_state: "healthy".to_string(),
+                last_checked_at: last_checked_at.clone(),
+                connected_at: chrono::Utc::now().to_rfc3339(),
+                revoked_at: None,
+                metadata_json: json!({
+                    "provider_label": "Gmail",
+                    "operation": "send_message"
+                }),
+            },
+        ] {
+            self.upsert_user_connected_capability(&record).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn upsert_personal_automation_conversation(
+        &self,
+        record: &PersonalAutomationConversationRecord,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO personal_automation_conversations (
+                user_id,
+                provider,
+                account_ref,
+                conversation_key,
+                conversation_family,
+                display_label,
+                latest_message_ref,
+                latest_subject,
+                latest_sender,
+                health_state,
+                first_observed_at,
+                last_observed_at,
+                metadata_json
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::timestamptz, $12::timestamptz, $13::jsonb)
+            ON CONFLICT (user_id, provider, account_ref, conversation_key) DO UPDATE SET
+                conversation_family = EXCLUDED.conversation_family,
+                display_label = EXCLUDED.display_label,
+                latest_message_ref = EXCLUDED.latest_message_ref,
+                latest_subject = EXCLUDED.latest_subject,
+                latest_sender = EXCLUDED.latest_sender,
+                health_state = EXCLUDED.health_state,
+                last_observed_at = EXCLUDED.last_observed_at,
+                metadata_json = EXCLUDED.metadata_json
+            "#,
+        )
+        .bind(&record.user_id)
+        .bind(&record.provider)
+        .bind(&record.account_ref)
+        .bind(&record.conversation_key)
+        .bind(&record.conversation_family)
+        .bind(&record.display_label)
+        .bind(&record.latest_message_ref)
+        .bind(&record.latest_subject)
+        .bind(&record.latest_sender)
+        .bind(&record.health_state)
+        .bind(&record.first_observed_at)
+        .bind(&record.last_observed_at)
+        .bind(record.metadata_json.clone())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn list_personal_automation_conversations(
+        &self,
+        user_id: &str,
+        conversation_family: Option<&str>,
+        health_state: Option<&str>,
+        needs_attention: Option<bool>,
+        limit: i64,
+    ) -> Result<Vec<PersonalAutomationConversationRecord>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                id,
+                user_id,
+                provider,
+                account_ref,
+                conversation_key,
+                conversation_family,
+                display_label,
+                latest_message_ref,
+                latest_subject,
+                latest_sender,
+                health_state,
+                first_observed_at::text AS first_observed_at,
+                last_observed_at::text AS last_observed_at,
+                metadata_json
+            FROM personal_automation_conversations
+            WHERE user_id = $1
+              AND ($2::text IS NULL OR conversation_family = $2)
+              AND ($3::text IS NULL OR health_state = $3)
+              AND (
+                $4::bool IS NULL
+                OR COALESCE((metadata_json->>'needs_attention')::bool, false) = $4
+              )
+            ORDER BY
+              COALESCE((metadata_json->>'attention_rank')::bigint, 0) DESC,
+              last_observed_at DESC,
+              provider ASC,
+              account_ref ASC
+            LIMIT $5
+            "#,
+        )
+        .bind(user_id)
+        .bind(
+            conversation_family
+                .map(str::trim)
+                .filter(|value| !value.is_empty()),
+        )
+        .bind(
+            health_state
+                .map(str::trim)
+                .filter(|value| !value.is_empty()),
+        )
+        .bind(needs_attention)
+        .bind(limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| PersonalAutomationConversationRecord {
+                id: row.get("id"),
+                user_id: row.get("user_id"),
+                provider: row.get("provider"),
+                account_ref: row.get("account_ref"),
+                conversation_key: row.get("conversation_key"),
+                conversation_family: row.get("conversation_family"),
+                display_label: row.get("display_label"),
+                latest_message_ref: row.try_get("latest_message_ref").unwrap_or(None),
+                latest_subject: row.try_get("latest_subject").unwrap_or(None),
+                latest_sender: row.try_get("latest_sender").unwrap_or(None),
+                health_state: row.get("health_state"),
+                first_observed_at: row.get("first_observed_at"),
+                last_observed_at: row.get("last_observed_at"),
+                metadata_json: row
+                    .try_get("metadata_json")
+                    .unwrap_or_else(|_| Value::Object(Default::default())),
+            })
+            .collect())
+    }
+
     pub async fn record_action_result(&self, result: &ActionResult) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
@@ -885,6 +3112,66 @@ impl Db {
         .bind(result.output.clone())
         .bind(&result.external_reference)
         .bind(&result.recorded_at)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn record_action_result_for_user(
+        &self,
+        owner_user_id: &str,
+        result: &ActionResult,
+    ) -> Result<(), sqlx::Error> {
+        let audit_table = format!("\"{}\".action_audit_log", tenant_schema_name(owner_user_id));
+        sqlx::query(&format!(
+            r#"
+            INSERT INTO {audit_table} (
+                capability_id, thread_id, status, output, external_reference, recorded_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6::timestamptz)
+            "#
+        ))
+        .bind(&result.capability_id)
+        .bind(&result.thread_id)
+        .bind(action_status_label(&result.status))
+        .bind(result.output.clone())
+        .bind(&result.external_reference)
+        .bind(&result.recorded_at)
+        .execute(&self.pool)
+        .await?;
+        self.prune_tenant_action_audit_log(owner_user_id).await?;
+
+        Ok(())
+    }
+
+    pub async fn prune_tenant_action_audit_log(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        let audit_table = format!("\"{}\".action_audit_log", tenant_schema_name(owner_user_id));
+        sqlx::query(&format!(
+            r#"
+            DELETE FROM {audit_table}
+            WHERE recorded_at < NOW() - make_interval(days => $1)
+            "#,
+        ))
+        .bind(TENANT_ACTION_AUDIT_LOG_RETENTION_DAYS as i32)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(&format!(
+            r#"
+            DELETE FROM {audit_table}
+            WHERE id NOT IN (
+                SELECT id
+                FROM {audit_table}
+                ORDER BY recorded_at DESC, id DESC
+                LIMIT $1
+            )
+            "#,
+        ))
+        .bind(TENANT_ACTION_AUDIT_LOG_MAX_ROWS_PER_USER)
         .execute(&self.pool)
         .await?;
 
@@ -1096,7 +3383,10 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(sync_device_policy_from_row).collect::<Result<Vec<_>, _>>()?)
+        Ok(rows
+            .into_iter()
+            .map(sync_device_policy_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn find_sync_device_policy_by_user(
@@ -1123,6 +3413,42 @@ impl Db {
             WHERE owner_user_id = $1
               AND device_id = $2
             LIMIT 1
+            "#,
+        )
+        .bind(owner_user_id)
+        .bind(device_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(sync_device_policy_from_row).transpose()?)
+    }
+
+    pub async fn touch_sync_device_policy_last_used(
+        &self,
+        owner_user_id: &str,
+        device_id: &str,
+    ) -> Result<Option<SyncDevicePolicyRecord>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            UPDATE sync_device_policies
+            SET
+                last_used_at = NOW(),
+                updated_at = NOW()
+            WHERE owner_user_id = $1
+              AND device_id = $2
+            RETURNING
+                device_id,
+                owner_user_id,
+                agent_id,
+                device_class,
+                policy_profile,
+                sync_slices,
+                requires_local_key_material,
+                notes_json,
+                last_bundle_at::text AS last_bundle_at,
+                last_used_at::text AS last_used_at,
+                created_at::text AS created_at,
+                updated_at::text AS updated_at
             "#,
         )
         .bind(owner_user_id)
@@ -1327,15 +3653,16 @@ impl Db {
             r#"
             INSERT INTO billing_subscriptions (
                 account_id, stripe_customer_id, stripe_subscription_id,
-                plan, status, current_period_end, updated_at
+                plan, status, current_period_end, archive_only_enabled, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6::timestamptz, NOW())
+            VALUES ($1, $2, $3, $4, $5, $6::timestamptz, FALSE, NOW())
             ON CONFLICT (account_id) DO UPDATE SET
                 stripe_customer_id     = COALESCE(EXCLUDED.stripe_customer_id, billing_subscriptions.stripe_customer_id),
                 stripe_subscription_id = COALESCE(EXCLUDED.stripe_subscription_id, billing_subscriptions.stripe_subscription_id),
                 plan                   = EXCLUDED.plan,
                 status                 = EXCLUDED.status,
                 current_period_end     = EXCLUDED.current_period_end,
+                archive_only_enabled   = billing_subscriptions.archive_only_enabled,
                 updated_at             = NOW()
             "#,
         )
@@ -1357,8 +3684,8 @@ impl Db {
         stripe_event_id: &str,
         event_type: &str,
         payload: &serde_json::Value,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
             r#"
             INSERT INTO billing_events (account_id, stripe_event_id, event_type, payload)
             VALUES ($1, $2, $3, $4)
@@ -1371,7 +3698,7 @@ impl Db {
         .bind(payload)
         .execute(&self.pool)
         .await?;
-        Ok(())
+        Ok(result.rows_affected() > 0)
     }
 
     /// Fetch the current billing subscription for an account.
@@ -1382,7 +3709,7 @@ impl Db {
         let row = sqlx::query(
             r#"
             SELECT plan, status, stripe_customer_id, stripe_subscription_id,
-                   current_period_end, updated_at
+                   current_period_end, archive_only_enabled, updated_at
             FROM billing_subscriptions
             WHERE account_id = $1
             "#,
@@ -1399,16 +3726,54 @@ impl Db {
                 "stripe_customer_id": r.try_get::<Option<String>, _>("stripe_customer_id").ok().flatten(),
                 "stripe_subscription_id": r.try_get::<Option<String>, _>("stripe_subscription_id").ok().flatten(),
                 "current_period_end": r.try_get::<Option<String>, _>("current_period_end").ok().flatten(),
+                "archive_only_enabled": r.try_get::<bool, _>("archive_only_enabled").unwrap_or(false),
             }),
             None => serde_json::json!({
                 "account_id": account_id,
                 "plan": "free",
                 "status": "inactive",
+                "archive_only_enabled": false,
             }),
         })
     }
 
+    pub async fn set_archive_only_mode(
+        &self,
+        account_id: &str,
+        enabled: bool,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO billing_subscriptions (
+                account_id, plan, status, archive_only_enabled, updated_at
+            )
+            VALUES ($1, 'free', 'inactive', $2, NOW())
+            ON CONFLICT (account_id) DO UPDATE SET
+                archive_only_enabled = EXCLUDED.archive_only_enabled,
+                updated_at = NOW()
+            "#,
+        )
+        .bind(account_id)
+        .bind(enabled)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     // ── LoRA artifacts ─────────────────────────────────────────────────────────
+
+    pub async fn attachment_storage_bytes_for_user(
+        &self,
+        user_id: &str,
+    ) -> Result<i64, sqlx::Error> {
+        let attachments_table = tenant_attachments_table(user_id);
+        let used = sqlx::query_scalar::<_, i64>(&format!(
+            "SELECT COALESCE(SUM(size_bytes), 0) FROM {attachments_table}"
+        ))
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(used.max(0))
+    }
 
     pub async fn upsert_lora_artifact(&self, artifact: &LoraArtifact) -> Result<(), sqlx::Error> {
         sqlx::query(
@@ -1470,6 +3835,7 @@ impl Db {
             r#"
             SELECT id
             FROM users
+            WHERE COALESCE(account_status, 'active') = 'active'
             ORDER BY created_at ASC, id ASC
             "#,
         )
@@ -1479,6 +3845,744 @@ impl Db {
             .into_iter()
             .filter_map(|row| row.try_get::<String, _>("id").ok())
             .collect())
+    }
+
+    pub async fn list_operator_user_summaries(
+        &self,
+        limit: i64,
+        query: Option<&str>,
+    ) -> Result<Vec<OperatorUserSummaryRecord>, sqlx::Error> {
+        let normalized_query = query
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let effective_limit = limit.clamp(1, 200);
+        let rows = sqlx::query(
+            r#"
+            WITH latest_support AS (
+                SELECT DISTINCT ON (owner_user_id)
+                    owner_user_id,
+                    status,
+                    expires_at::text AS expires_at,
+                    revoked_at::text AS revoked_at,
+                    granted_at
+                FROM support_access_grants
+                ORDER BY owner_user_id, granted_at DESC
+            )
+            SELECT
+                u.id AS user_id,
+                u.email,
+                u.display_name,
+                u.auth_provider,
+                u.created_at::text AS created_at,
+                COALESCE(u.email_verified, FALSE) AS email_verified,
+                COALESCE(bs.plan, 'free') AS plan,
+                COALESCE(bs.status, 'inactive') AS billing_status,
+                (
+                    SELECT MAX(s.created_at)::text
+                    FROM auth_sessions s
+                    WHERE s.user_id = u.id
+                ) AS last_session_at,
+                COALESCE(u.account_status, 'active') AS account_status,
+                u.account_status_reason,
+                CASE
+                    WHEN ls.owner_user_id IS NULL THEN 'disabled'
+                    WHEN ls.status = 'active' AND ls.revoked_at IS NULL THEN 'active'
+                    ELSE ls.status
+                END AS support_access_status,
+                ls.expires_at AS support_access_expires_at
+            FROM users u
+            LEFT JOIN billing_subscriptions bs
+                ON bs.account_id = u.id
+            LEFT JOIN latest_support ls
+                ON ls.owner_user_id = u.id
+            WHERE (
+                $1::text IS NULL
+                OR lower(u.email) LIKE '%' || lower($1) || '%'
+                OR lower(u.display_name) LIKE '%' || lower($1) || '%'
+                OR u.id = $1
+            )
+            ORDER BY u.created_at DESC, u.id DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(normalized_query)
+        .bind(effective_limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| OperatorUserSummaryRecord {
+                user_id: row.get("user_id"),
+                email: row.get("email"),
+                display_name: row.get("display_name"),
+                auth_provider: row.get("auth_provider"),
+                created_at: row.get("created_at"),
+                email_verified: row.get("email_verified"),
+                plan: row.get("plan"),
+                billing_status: row.get("billing_status"),
+                last_session_at: row.get("last_session_at"),
+                account_status: row.get("account_status"),
+                account_status_reason: row.get("account_status_reason"),
+                support_access_status: row.get("support_access_status"),
+                support_access_expires_at: row.get("support_access_expires_at"),
+            })
+            .collect())
+    }
+
+    pub async fn insert_wedding_waitlist_signup(
+        &self,
+        email: &str,
+        first_name: &str,
+        last_name: &str,
+        expected_wedding_date: Option<&str>,
+    ) -> Result<WeddingWaitlistSignupRecord, sqlx::Error> {
+        let signup_id = Ulid::new().to_string();
+        let row = sqlx::query(
+            r#"
+            INSERT INTO wedding_waitlist_signups (
+                signup_id,
+                email,
+                first_name,
+                last_name,
+                expected_wedding_date,
+                source
+            )
+            VALUES ($1, $2, $3, $4, $5::date, 'wedding_site')
+            RETURNING
+                signup_id,
+                email,
+                first_name,
+                last_name,
+                expected_wedding_date::text AS expected_wedding_date,
+                source,
+                created_at::text AS created_at
+            "#,
+        )
+        .bind(&signup_id)
+        .bind(email)
+        .bind(first_name)
+        .bind(last_name)
+        .bind(expected_wedding_date)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(WeddingWaitlistSignupRecord {
+            signup_id: row.get("signup_id"),
+            email: row.get("email"),
+            first_name: row.get("first_name"),
+            last_name: row.get("last_name"),
+            expected_wedding_date: row.get("expected_wedding_date"),
+            source: row.get("source"),
+            created_at: row.get("created_at"),
+        })
+    }
+
+    pub async fn list_wedding_waitlist_signups(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<WeddingWaitlistSignupRecord>, sqlx::Error> {
+        let effective_limit = limit.clamp(1, 500);
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                signup_id,
+                email,
+                first_name,
+                last_name,
+                expected_wedding_date::text AS expected_wedding_date,
+                source,
+                created_at::text AS created_at
+            FROM wedding_waitlist_signups
+            ORDER BY created_at DESC
+            LIMIT $1
+            "#,
+        )
+        .bind(effective_limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| WeddingWaitlistSignupRecord {
+                signup_id: row.get("signup_id"),
+                email: row.get("email"),
+                first_name: row.get("first_name"),
+                last_name: row.get("last_name"),
+                expected_wedding_date: row.get("expected_wedding_date"),
+                source: row.get("source"),
+                created_at: row.get("created_at"),
+            })
+            .collect())
+    }
+
+    pub async fn list_wedding_vendors(
+        &self,
+        limit: i64,
+        query: Option<&str>,
+    ) -> Result<Vec<WeddingVendorRecord>, sqlx::Error> {
+        let effective_limit = limit.clamp(1, 500);
+        let normalized_query = query.map(str::trim).filter(|value| !value.is_empty());
+        let vendor_rows = sqlx::query(
+            r#"
+            SELECT
+                vendor_id,
+                vendor_slug,
+                vendor_name,
+                category,
+                service_area,
+                address,
+                website_url,
+                contact_phone,
+                contact_email,
+                source_url,
+                source_label,
+                source_checked_at::text AS source_checked_at,
+                status,
+                notes,
+                evidence,
+                caveat_labels,
+                created_by_user_id,
+                updated_by_user_id,
+                created_at::text AS created_at,
+                updated_at::text AS updated_at
+            FROM wedding_vendors
+            WHERE (
+                $1::text IS NULL
+                OR lower(vendor_name) LIKE '%' || lower($1) || '%'
+                OR lower(category) LIKE '%' || lower($1) || '%'
+                OR lower(service_area) LIKE '%' || lower($1) || '%'
+                OR lower(vendor_slug) LIKE '%' || lower($1) || '%'
+                OR vendor_id = $1
+            )
+            ORDER BY updated_at DESC, vendor_name ASC
+            LIMIT $2
+            "#,
+        )
+        .bind(normalized_query)
+        .bind(effective_limit)
+        .fetch_all(&self.pool)
+        .await?;
+        let vendor_ids = vendor_rows
+            .iter()
+            .map(|row| row.get::<String, _>("vendor_id"))
+            .collect::<Vec<_>>();
+        let mut photos_by_vendor: HashMap<String, Vec<WeddingVendorPhotoRecord>> = HashMap::new();
+        if !vendor_ids.is_empty() {
+            let photo_rows = sqlx::query(
+                r#"
+                SELECT
+                    photo_id,
+                    vendor_id,
+                    slot,
+                    photo_url,
+                    alt_text,
+                    source_label,
+                    created_at::text AS created_at
+                FROM wedding_vendor_photos
+                WHERE vendor_id = ANY($1)
+                ORDER BY vendor_id ASC, slot ASC
+                "#,
+            )
+            .bind(&vendor_ids)
+            .fetch_all(&self.pool)
+            .await?;
+            for row in photo_rows {
+                photos_by_vendor
+                    .entry(row.get("vendor_id"))
+                    .or_default()
+                    .push(WeddingVendorPhotoRecord {
+                        photo_id: row.get("photo_id"),
+                        vendor_id: row.get("vendor_id"),
+                        slot: row.get("slot"),
+                        photo_url: row.get("photo_url"),
+                        alt_text: row.get("alt_text"),
+                        source_label: row.get("source_label"),
+                        created_at: row.get("created_at"),
+                    });
+            }
+        }
+
+        Ok(vendor_rows
+            .into_iter()
+            .map(|row| {
+                let vendor_id: String = row.get("vendor_id");
+                WeddingVendorRecord {
+                    photos: photos_by_vendor.remove(&vendor_id).unwrap_or_default(),
+                    vendor_id,
+                    vendor_slug: row.get("vendor_slug"),
+                    vendor_name: row.get("vendor_name"),
+                    category: row.get("category"),
+                    service_area: row.get("service_area"),
+                    address: row.get("address"),
+                    website_url: row.get("website_url"),
+                    contact_phone: row.get("contact_phone"),
+                    contact_email: row.get("contact_email"),
+                    source_url: row.get("source_url"),
+                    source_label: row.get("source_label"),
+                    source_checked_at: row.get("source_checked_at"),
+                    status: row.get("status"),
+                    notes: row.get("notes"),
+                    evidence: row.get("evidence"),
+                    caveat_labels: row.get("caveat_labels"),
+                    created_by_user_id: row.get("created_by_user_id"),
+                    updated_by_user_id: row.get("updated_by_user_id"),
+                    created_at: row.get("created_at"),
+                    updated_at: row.get("updated_at"),
+                    user_contact: None,
+                }
+            })
+            .collect())
+    }
+
+    pub async fn list_active_wedding_vendors_for_user(
+        &self,
+        user_id: &str,
+        limit: i64,
+        query: Option<&str>,
+    ) -> Result<Vec<WeddingVendorRecord>, sqlx::Error> {
+        let effective_limit = limit.clamp(1, 500);
+        let normalized_query = query.map(str::trim).filter(|value| !value.is_empty());
+        let vendor_rows = sqlx::query(
+            r#"
+            SELECT
+                v.vendor_id,
+                v.vendor_slug,
+                v.vendor_name,
+                v.category,
+                v.service_area,
+                v.address,
+                v.website_url,
+                v.contact_phone,
+                v.contact_email,
+                v.source_url,
+                v.source_label,
+                v.source_checked_at::text AS source_checked_at,
+                v.status,
+                v.notes,
+                v.evidence,
+                v.caveat_labels,
+                v.created_by_user_id,
+                v.updated_by_user_id,
+                v.created_at::text AS created_at,
+                v.updated_at::text AS updated_at,
+                c.contact_id,
+                c.user_id AS contact_user_id,
+                c.contact_method,
+                c.last_contact_at::text AS last_contact_at,
+                c.response_received_at::text AS response_received_at,
+                c.follow_up_due_at::text AS follow_up_due_at,
+                c.thread_id,
+                c.receipt_ref,
+                c.notes AS contact_notes,
+                c.created_at::text AS contact_created_at,
+                c.updated_at::text AS contact_updated_at
+            FROM wedding_vendors v
+            LEFT JOIN wedding_vendor_user_contacts c
+                ON c.vendor_id = v.vendor_id
+                AND c.user_id = $1
+            WHERE v.status = 'active'
+                AND (
+                    $2::text IS NULL
+                    OR lower(v.vendor_name) LIKE '%' || lower($2) || '%'
+                    OR lower(v.category) LIKE '%' || lower($2) || '%'
+                    OR lower(v.service_area) LIKE '%' || lower($2) || '%'
+                    OR lower(v.vendor_slug) LIKE '%' || lower($2) || '%'
+                    OR v.vendor_id = $2
+                )
+            ORDER BY v.vendor_name ASC, v.updated_at DESC
+            LIMIT $3
+            "#,
+        )
+        .bind(user_id)
+        .bind(normalized_query)
+        .bind(effective_limit)
+        .fetch_all(&self.pool)
+        .await?;
+        let vendor_ids = vendor_rows
+            .iter()
+            .map(|row| row.get::<String, _>("vendor_id"))
+            .collect::<Vec<_>>();
+        let mut photos_by_vendor: HashMap<String, Vec<WeddingVendorPhotoRecord>> = HashMap::new();
+        if !vendor_ids.is_empty() {
+            let photo_rows = sqlx::query(
+                r#"
+                SELECT
+                    photo_id,
+                    vendor_id,
+                    slot,
+                    photo_url,
+                    alt_text,
+                    source_label,
+                    created_at::text AS created_at
+                FROM wedding_vendor_photos
+                WHERE vendor_id = ANY($1)
+                ORDER BY vendor_id ASC, slot ASC
+                "#,
+            )
+            .bind(&vendor_ids)
+            .fetch_all(&self.pool)
+            .await?;
+            for row in photo_rows {
+                photos_by_vendor
+                    .entry(row.get("vendor_id"))
+                    .or_default()
+                    .push(WeddingVendorPhotoRecord {
+                        photo_id: row.get("photo_id"),
+                        vendor_id: row.get("vendor_id"),
+                        slot: row.get("slot"),
+                        photo_url: row.get("photo_url"),
+                        alt_text: row.get("alt_text"),
+                        source_label: row.get("source_label"),
+                        created_at: row.get("created_at"),
+                    });
+            }
+        }
+
+        Ok(vendor_rows
+            .into_iter()
+            .map(|row| {
+                let vendor_id: String = row.get("vendor_id");
+                let contact_id: Option<String> = row.get("contact_id");
+                WeddingVendorRecord {
+                    photos: photos_by_vendor.remove(&vendor_id).unwrap_or_default(),
+                    user_contact: contact_id.map(|contact_id| WeddingVendorUserContactRecord {
+                        contact_id,
+                        user_id: row.get("contact_user_id"),
+                        vendor_id: vendor_id.clone(),
+                        contact_method: row.get("contact_method"),
+                        last_contact_at: row.get("last_contact_at"),
+                        response_received_at: row.get("response_received_at"),
+                        follow_up_due_at: row.get("follow_up_due_at"),
+                        thread_id: row.get("thread_id"),
+                        receipt_ref: row.get("receipt_ref"),
+                        notes: row.get("contact_notes"),
+                        created_at: row.get("contact_created_at"),
+                        updated_at: row.get("contact_updated_at"),
+                    }),
+                    vendor_id,
+                    vendor_slug: row.get("vendor_slug"),
+                    vendor_name: row.get("vendor_name"),
+                    category: row.get("category"),
+                    service_area: row.get("service_area"),
+                    address: row.get("address"),
+                    website_url: row.get("website_url"),
+                    contact_phone: row.get("contact_phone"),
+                    contact_email: row.get("contact_email"),
+                    source_url: row.get("source_url"),
+                    source_label: row.get("source_label"),
+                    source_checked_at: row.get("source_checked_at"),
+                    status: row.get("status"),
+                    notes: row.get("notes"),
+                    evidence: row.get("evidence"),
+                    caveat_labels: row.get("caveat_labels"),
+                    created_by_user_id: row.get("created_by_user_id"),
+                    updated_by_user_id: row.get("updated_by_user_id"),
+                    created_at: row.get("created_at"),
+                    updated_at: row.get("updated_at"),
+                }
+            })
+            .collect())
+    }
+
+    pub async fn upsert_wedding_vendor(
+        &self,
+        vendor_id: Option<&str>,
+        input: &WeddingVendorUpsertRecord,
+        operator_user_id: &str,
+    ) -> Result<WeddingVendorRecord, sqlx::Error> {
+        let next_vendor_id = vendor_id
+            .map(str::to_string)
+            .unwrap_or_else(|| Ulid::new().to_string());
+        let mut tx = self.pool.begin().await?;
+        let row = sqlx::query(
+            r#"
+            INSERT INTO wedding_vendors (
+                vendor_id,
+                vendor_slug,
+                vendor_name,
+                category,
+                service_area,
+                address,
+                website_url,
+                contact_phone,
+                contact_email,
+                source_url,
+                source_label,
+                source_checked_at,
+                status,
+                notes,
+                evidence,
+                caveat_labels,
+                created_by_user_id,
+                updated_by_user_id
+            )
+            VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::date,
+                $13, $14, $15, $16, $17, $17
+            )
+            ON CONFLICT (vendor_id) DO UPDATE SET
+                vendor_slug = EXCLUDED.vendor_slug,
+                vendor_name = EXCLUDED.vendor_name,
+                category = EXCLUDED.category,
+                service_area = EXCLUDED.service_area,
+                address = EXCLUDED.address,
+                website_url = EXCLUDED.website_url,
+                contact_phone = EXCLUDED.contact_phone,
+                contact_email = EXCLUDED.contact_email,
+                source_url = EXCLUDED.source_url,
+                source_label = EXCLUDED.source_label,
+                source_checked_at = EXCLUDED.source_checked_at,
+                status = EXCLUDED.status,
+                notes = EXCLUDED.notes,
+                evidence = EXCLUDED.evidence,
+                caveat_labels = EXCLUDED.caveat_labels,
+                updated_by_user_id = EXCLUDED.updated_by_user_id,
+                updated_at = NOW()
+            RETURNING
+                vendor_id,
+                vendor_slug,
+                vendor_name,
+                category,
+                service_area,
+                address,
+                website_url,
+                contact_phone,
+                contact_email,
+                source_url,
+                source_label,
+                source_checked_at::text AS source_checked_at,
+                status,
+                notes,
+                evidence,
+                caveat_labels,
+                created_by_user_id,
+                updated_by_user_id,
+                created_at::text AS created_at,
+                updated_at::text AS updated_at
+            "#,
+        )
+        .bind(&next_vendor_id)
+        .bind(&input.vendor_slug)
+        .bind(&input.vendor_name)
+        .bind(&input.category)
+        .bind(&input.service_area)
+        .bind(&input.address)
+        .bind(&input.website_url)
+        .bind(&input.contact_phone)
+        .bind(&input.contact_email)
+        .bind(&input.source_url)
+        .bind(&input.source_label)
+        .bind(&input.source_checked_at)
+        .bind(&input.status)
+        .bind(&input.notes)
+        .bind(&input.evidence)
+        .bind(&input.caveat_labels)
+        .bind(operator_user_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        sqlx::query("DELETE FROM wedding_vendor_photos WHERE vendor_id = $1")
+            .bind(&next_vendor_id)
+            .execute(&mut *tx)
+            .await?;
+        for photo in input.photos.iter().take(3) {
+            sqlx::query(
+                r#"
+                INSERT INTO wedding_vendor_photos (
+                    photo_id,
+                    vendor_id,
+                    slot,
+                    photo_url,
+                    alt_text,
+                    source_label
+                )
+                VALUES ($1, $2, $3, $4, $5, $6)
+                "#,
+            )
+            .bind(Ulid::new().to_string())
+            .bind(&next_vendor_id)
+            .bind(photo.slot)
+            .bind(&photo.photo_url)
+            .bind(&photo.alt_text)
+            .bind(&photo.source_label)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+
+        let mut records = self
+            .list_wedding_vendors(1, Some(&row.get::<String, _>("vendor_id")))
+            .await?;
+        Ok(records.pop().unwrap_or_else(|| WeddingVendorRecord {
+            vendor_id: row.get("vendor_id"),
+            vendor_slug: row.get("vendor_slug"),
+            vendor_name: row.get("vendor_name"),
+            category: row.get("category"),
+            service_area: row.get("service_area"),
+            address: row.get("address"),
+            website_url: row.get("website_url"),
+            contact_phone: row.get("contact_phone"),
+            contact_email: row.get("contact_email"),
+            source_url: row.get("source_url"),
+            source_label: row.get("source_label"),
+            source_checked_at: row.get("source_checked_at"),
+            status: row.get("status"),
+            notes: row.get("notes"),
+            evidence: row.get("evidence"),
+            caveat_labels: row.get("caveat_labels"),
+            created_by_user_id: row.get("created_by_user_id"),
+            updated_by_user_id: row.get("updated_by_user_id"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+            photos: Vec::new(),
+            user_contact: None,
+        }))
+    }
+
+    pub async fn delete_wedding_vendor(&self, vendor_id: &str) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM wedding_vendors WHERE vendor_id = $1")
+            .bind(vendor_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn record_wedding_vendor_contact(
+        &self,
+        user_id: &str,
+        vendor_id: &str,
+        contact_method: &str,
+        follow_up_due_at: Option<&str>,
+        response_received_at: Option<&str>,
+        thread_id: Option<&str>,
+        receipt_ref: Option<&str>,
+        notes: Option<&str>,
+    ) -> Result<WeddingVendorUserContactRecord, sqlx::Error> {
+        let contact_id = Ulid::new().to_string();
+        let row = sqlx::query(
+            r#"
+            INSERT INTO wedding_vendor_user_contacts (
+                contact_id,
+                user_id,
+                vendor_id,
+                contact_method,
+                follow_up_due_at,
+                response_received_at,
+                thread_id,
+                receipt_ref,
+                notes
+            )
+            VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8, $9)
+            ON CONFLICT (user_id, vendor_id) DO UPDATE SET
+                contact_method = EXCLUDED.contact_method,
+                last_contact_at = NOW(),
+                follow_up_due_at = EXCLUDED.follow_up_due_at,
+                response_received_at = EXCLUDED.response_received_at,
+                thread_id = COALESCE(EXCLUDED.thread_id, wedding_vendor_user_contacts.thread_id),
+                receipt_ref = COALESCE(EXCLUDED.receipt_ref, wedding_vendor_user_contacts.receipt_ref),
+                notes = COALESCE(EXCLUDED.notes, wedding_vendor_user_contacts.notes),
+                updated_at = NOW()
+            RETURNING
+                contact_id,
+                user_id,
+                vendor_id,
+                contact_method,
+                last_contact_at::text AS last_contact_at,
+                response_received_at::text AS response_received_at,
+                follow_up_due_at::text AS follow_up_due_at,
+                thread_id,
+                receipt_ref,
+                notes,
+                created_at::text AS created_at,
+                updated_at::text AS updated_at
+            "#,
+        )
+        .bind(&contact_id)
+        .bind(user_id)
+        .bind(vendor_id)
+        .bind(contact_method)
+        .bind(follow_up_due_at)
+        .bind(response_received_at)
+        .bind(thread_id)
+        .bind(receipt_ref)
+        .bind(notes)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(WeddingVendorUserContactRecord {
+            contact_id: row.get("contact_id"),
+            user_id: row.get("user_id"),
+            vendor_id: row.get("vendor_id"),
+            contact_method: row.get("contact_method"),
+            last_contact_at: row.get("last_contact_at"),
+            response_received_at: row.get("response_received_at"),
+            follow_up_due_at: row.get("follow_up_due_at"),
+            thread_id: row.get("thread_id"),
+            receipt_ref: row.get("receipt_ref"),
+            notes: row.get("notes"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
+    }
+
+    pub async fn user_account_status(
+        &self,
+        user_id: &str,
+    ) -> Result<Option<UserAccountStatusRecord>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            SELECT
+                id AS user_id,
+                COALESCE(account_status, 'active') AS account_status,
+                account_status_reason
+            FROM users
+            WHERE id = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|row| UserAccountStatusRecord {
+            user_id: row.get("user_id"),
+            account_status: row.get("account_status"),
+            account_status_reason: row.get("account_status_reason"),
+        }))
+    }
+
+    pub async fn update_user_account_status(
+        &self,
+        user_id: &str,
+        account_status: &str,
+        account_status_reason: Option<&str>,
+    ) -> Result<Option<UserAccountStatusRecord>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            UPDATE users
+            SET
+                account_status = $2,
+                account_status_reason = $3
+            WHERE id = $1
+            RETURNING
+                id AS user_id,
+                account_status,
+                account_status_reason
+            "#,
+        )
+        .bind(user_id)
+        .bind(account_status)
+        .bind(account_status_reason)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|row| UserAccountStatusRecord {
+            user_id: row.get("user_id"),
+            account_status: row.get("account_status"),
+            account_status_reason: row.get("account_status_reason"),
+        }))
     }
 
     pub async fn update_user_password(
@@ -1639,6 +4743,22 @@ impl Db {
         Ok(row.map(user_from_row).transpose()?)
     }
 
+    pub async fn find_user_by_id(&self, user_id: &str) -> Result<Option<UserRecord>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, email, password_hash, auth_provider, google_sub, display_name, created_at::text as created_at
+            FROM users
+            WHERE id = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(user_from_row).transpose()?)
+    }
+
     pub async fn find_user_by_google_sub(
         &self,
         google_sub: &str,
@@ -1656,6 +4776,71 @@ impl Db {
         .await?;
 
         Ok(row.map(user_from_row).transpose()?)
+    }
+
+    pub async fn find_user_by_any_google_sub(
+        &self,
+        google_subs: &[String],
+    ) -> Result<Option<UserRecord>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, email, password_hash, auth_provider, google_sub, display_name, created_at::text as created_at
+            FROM users
+            WHERE google_sub = ANY($1)
+            LIMIT 1
+            "#,
+        )
+        .bind(google_subs)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(user_from_row).transpose()?)
+    }
+
+    pub async fn bind_user_google_sub_if_unset_or_matching(
+        &self,
+        user_id: &str,
+        google_sub: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE users
+            SET google_sub = $2
+            WHERE id = $1
+              AND (google_sub IS NULL OR google_sub = $2)
+            "#,
+        )
+        .bind(user_id)
+        .bind(google_sub)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    pub async fn bind_user_google_sub_if_unset_or_matching_any(
+        &self,
+        user_id: &str,
+        google_sub: &str,
+        legacy_google_subs: &[String],
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE users
+            SET google_sub = $2
+            WHERE id = $1
+              AND (
+                    google_sub IS NULL
+                    OR google_sub = $2
+                    OR google_sub = ANY($3)
+                  )
+            "#,
+        )
+        .bind(user_id)
+        .bind(google_sub)
+        .bind(legacy_google_subs)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
     }
 
     pub async fn create_session(&self, session: &AuthSessionRecord) -> Result<(), sqlx::Error> {
@@ -1711,7 +4896,10 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(session_from_row).collect::<Result<Vec<_>, _>>()?)
+        Ok(rows
+            .into_iter()
+            .map(session_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn revoke_session(&self, user_id: &str, token: &str) -> Result<bool, sqlx::Error> {
@@ -1858,12 +5046,9 @@ impl Db {
         // Drop the tenant-private schema so private AFP messages, per-user
         // workflow tables, and other user-scoped data cannot survive account
         // deletion in orphaned schemas.
-        let tenant_schema = tenant_schema_name(user_id);
-        sqlx::query(&format!(
-            r#"DROP SCHEMA IF EXISTS "{tenant_schema}" CASCADE"#
-        ))
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query(&tenant_schema_drop_sql(user_id))
+            .execute(&mut *tx)
+            .await?;
 
         sqlx::query(
             r#"
@@ -1929,7 +5114,10 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(managed_agent_from_row).collect::<Result<Vec<_>, _>>()?)
+        Ok(rows
+            .into_iter()
+            .map(managed_agent_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn recent_messages_for_agents(
@@ -1974,7 +5162,36 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(proto_message_from_row).collect::<Result<Vec<_>, _>>()?)
+        Ok(rows
+            .into_iter()
+            .map(proto_message_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// Fetch recent messages visible to a user by combining shared agent traffic
+    /// with tenant-private messages, then sorting and deduplicating by message id.
+    pub async fn recent_messages_for_user(
+        &self,
+        user_id: &str,
+        agent_ids: &[String],
+        limit: i64,
+    ) -> Result<Vec<ProtoMessage>, sqlx::Error> {
+        if limit <= 0 {
+            return Ok(vec![]);
+        }
+
+        let (shared_msgs, private_msgs) = tokio::join!(
+            self.recent_messages_for_agents(agent_ids, limit),
+            self.recent_private_messages_for_user(user_id, limit),
+        );
+        let mut merged = shared_msgs?;
+        merged.extend(private_msgs?);
+        merged.sort_by(|left, right| right.timestamp.cmp(&left.timestamp));
+
+        let mut seen_ids = HashSet::new();
+        merged.retain(|message| seen_ids.insert(message.id.clone()));
+        merged.truncate(limit as usize);
+        Ok(merged)
     }
 
     /// GAP-075: fetch recent messages from the user's private tenant schema.
@@ -2013,7 +5230,10 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(proto_message_from_row).collect::<Result<Vec<_>, _>>()?)
+        Ok(rows
+            .into_iter()
+            .map(proto_message_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     /// Returns lightweight private-message previews shaped for metadata-first background scans.
@@ -2072,6 +5292,7 @@ impl Db {
 
     pub async fn recent_action_results_for_threads(
         &self,
+        owner_user_id: &str,
         thread_ids: &[String],
         limit: i64,
     ) -> Result<Vec<ActionAuditEntry>, sqlx::Error> {
@@ -2079,24 +5300,188 @@ impl Db {
             return Ok(vec![]);
         }
 
-        let rows = sqlx::query(
+        let audit_table = format!("\"{}\".action_audit_log", tenant_schema_name(owner_user_id));
+        let rows = sqlx::query(&format!(
             r#"
             SELECT capability_id, thread_id, status, output, external_reference, recorded_at::text as recorded_at
-            FROM action_audit_log
+            FROM {audit_table}
             WHERE thread_id = ANY($1)
             ORDER BY recorded_at DESC
             LIMIT $2
             "#,
-        )
+        ))
         .bind(thread_ids)
         .bind(limit)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(action_audit_entry_from_row).collect::<Result<Vec<_>, _>>()?)
+        Ok(rows
+            .into_iter()
+            .map(action_audit_entry_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
+    }
+
+    pub async fn recent_action_results(
+        &self,
+        owner_user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ActionAuditEntry>, sqlx::Error> {
+        let audit_table = format!("\"{}\".action_audit_log", tenant_schema_name(owner_user_id));
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT capability_id, thread_id, status, output, external_reference, recorded_at::text as recorded_at
+            FROM {audit_table}
+            ORDER BY recorded_at DESC
+            LIMIT $1
+            "#,
+        ))
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(action_audit_entry_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
+    }
+
+    pub async fn recent_action_results_for_capabilities(
+        &self,
+        owner_user_id: &str,
+        capability_ids: &[String],
+        limit: i64,
+    ) -> Result<Vec<ActionAuditEntry>, sqlx::Error> {
+        if capability_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let audit_table = format!("\"{}\".action_audit_log", tenant_schema_name(owner_user_id));
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT capability_id, thread_id, status, output, external_reference, recorded_at::text as recorded_at
+            FROM {audit_table}
+            WHERE capability_id = ANY($1)
+            ORDER BY recorded_at DESC
+            LIMIT $2
+            "#,
+        ))
+        .bind(capability_ids)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(action_audit_entry_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     // ── Runtime deployments & update policy ───────────────────────────────────
+
+    pub async fn recent_undone_action_rate(
+        &self,
+        owner_user_id: &str,
+        action_limit: i64,
+        min_samples: u32,
+    ) -> Result<f64, sqlx::Error> {
+        use sqlx::Row;
+
+        let audit_table = format!("\"{}\".action_audit_log", tenant_schema_name(owner_user_id));
+        let action_rows = sqlx::query(&format!(
+            r#"
+            SELECT external_reference
+            FROM {audit_table}
+            WHERE status = 'completed'
+              AND external_reference IS NOT NULL
+              AND COALESCE(output->>'reversible', 'false') = 'true'
+            ORDER BY recorded_at DESC
+            LIMIT $1
+            "#
+        ))
+        .bind(action_limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        let action_message_ids = action_rows
+            .into_iter()
+            .filter_map(|row| {
+                row.try_get::<Option<String>, _>("external_reference")
+                    .ok()
+                    .flatten()
+            })
+            .collect::<Vec<_>>();
+
+        if action_message_ids.len() < min_samples.max(1) as usize {
+            return Ok(0.0);
+        }
+
+        let reverted_rows = sqlx::query(
+            r#"
+            SELECT DISTINCT payload #>> '{content,target_message_id}' AS target_message_id
+            FROM afp_messages
+            WHERE owner_user_id = $1
+              AND type = 'revert_action'
+              AND subtype = 'revert_action:result'
+              AND (payload #>> '{content,target_message_id}') = ANY($2)
+            "#,
+        )
+        .bind(owner_user_id)
+        .bind(&action_message_ids)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let reverted_count = reverted_rows
+            .into_iter()
+            .filter_map(|row| {
+                row.try_get::<Option<String>, _>("target_message_id")
+                    .ok()
+                    .flatten()
+            })
+            .collect::<std::collections::BTreeSet<_>>()
+            .len() as u32;
+
+        Ok(crate::heuristic_adaptation::normalise_undone_action_rate(
+            reverted_count,
+            action_message_ids.len() as u32,
+            min_samples,
+        ))
+    }
+
+    pub async fn recent_prepared_draft_usage_rate(
+        &self,
+        owner_user_id: &str,
+        outcome_limit: i64,
+        min_samples: u32,
+    ) -> Result<f64, sqlx::Error> {
+        use sqlx::Row;
+
+        let rows = sqlx::query(
+            r#"
+            SELECT accepted
+            FROM proactive_outcomes
+            WHERE owner_user_id = $1
+              AND heuristic_id LIKE 'prepared-draft:%'
+            ORDER BY created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(owner_user_id)
+        .bind(outcome_limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        let outcomes = rows
+            .into_iter()
+            .filter_map(|row| row.try_get::<bool, _>("accepted").ok())
+            .collect::<Vec<_>>();
+
+        if outcomes.len() < min_samples.max(1) as usize {
+            return Ok(0.0);
+        }
+
+        let accepted = outcomes.iter().filter(|accepted| **accepted).count() as f64;
+        Ok((accepted / outcomes.len() as f64).clamp(0.0, 1.0))
+    }
 
     pub async fn upsert_runtime_deployment(
         &self,
@@ -2611,6 +5996,224 @@ impl Db {
 
     // ── Runtime backups ────────────────────────────────────────────────────────
 
+    pub async fn create_operator_runtime_remediation_receipt(
+        &self,
+        record: &OperatorRuntimeRemediationReceiptRecord,
+    ) -> Result<OperatorRuntimeRemediationReceiptRecord, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+        let row = sqlx::query(
+            r#"
+            INSERT INTO operator_runtime_remediation_receipts (
+                id,
+                operator_user_id,
+                action,
+                lifecycle_status,
+                execution_mode,
+                approval_required,
+                summary,
+                command,
+                source,
+                guidance_status,
+                pressure_status,
+                pressure_total_rows,
+                cleanup_mode,
+                artifact_generated_at,
+                note,
+                issued_at,
+                completed_at,
+                outcome_note,
+                proof_reference
+            )
+            VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::timestamptz, $15, $16::timestamptz, $17::timestamptz, $18, $19
+            )
+            RETURNING
+                id,
+                operator_user_id,
+                action,
+                lifecycle_status,
+                execution_mode,
+                approval_required,
+                summary,
+                command,
+                source,
+                guidance_status,
+                pressure_status,
+                pressure_total_rows,
+                cleanup_mode,
+                artifact_generated_at::text AS artifact_generated_at,
+                note,
+                issued_at::text AS issued_at,
+                completed_at::text AS completed_at,
+                outcome_note,
+                proof_reference
+            "#,
+        )
+        .bind(&record.id)
+        .bind(&record.operator_user_id)
+        .bind(&record.action)
+        .bind(&record.lifecycle_status)
+        .bind(&record.execution_mode)
+        .bind(record.approval_required)
+        .bind(&record.summary)
+        .bind(&record.command)
+        .bind(&record.source)
+        .bind(&record.guidance_status)
+        .bind(&record.pressure_status)
+        .bind(record.pressure_total_rows)
+        .bind(&record.cleanup_mode)
+        .bind(&record.artifact_generated_at)
+        .bind(&record.note)
+        .bind(&record.issued_at)
+        .bind(&record.completed_at)
+        .bind(&record.outcome_note)
+        .bind(&record.proof_reference)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        self.prune_operator_runtime_remediation_receipts_in_tx(&mut tx, &record.operator_user_id)
+            .await?;
+        tx.commit().await?;
+
+        operator_runtime_remediation_receipt_from_row(row)
+    }
+
+    async fn prune_operator_runtime_remediation_receipts_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        operator_user_id: &str,
+    ) -> Result<u64, sqlx::Error> {
+        let retention_days = OPERATOR_RUNTIME_REMEDIATION_RECEIPT_RETENTION_DAYS.max(1);
+        let max_rows = OPERATOR_RUNTIME_REMEDIATION_RECEIPT_MAX_ROWS_PER_OPERATOR.max(1);
+
+        let aged_result = sqlx::query(
+            r#"
+            DELETE FROM operator_runtime_remediation_receipts
+            WHERE operator_user_id = $1
+              AND issued_at < (NOW() - make_interval(days => $2::int))
+            "#,
+        )
+        .bind(operator_user_id)
+        .bind(retention_days as i32)
+        .execute(&mut **tx)
+        .await?;
+
+        let overflow_result = sqlx::query(
+            r#"
+            WITH overflow AS (
+                SELECT id
+                FROM operator_runtime_remediation_receipts
+                WHERE operator_user_id = $1
+                ORDER BY issued_at DESC, id DESC
+                OFFSET $2
+            )
+            DELETE FROM operator_runtime_remediation_receipts
+            WHERE id IN (SELECT id FROM overflow)
+            "#,
+        )
+        .bind(operator_user_id)
+        .bind(max_rows)
+        .execute(&mut **tx)
+        .await?;
+
+        Ok(aged_result.rows_affected() + overflow_result.rows_affected())
+    }
+
+    pub async fn list_operator_runtime_remediation_receipts(
+        &self,
+        operator_user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<OperatorRuntimeRemediationReceiptRecord>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                id,
+                operator_user_id,
+                action,
+                lifecycle_status,
+                execution_mode,
+                approval_required,
+                summary,
+                command,
+                source,
+                guidance_status,
+                pressure_status,
+                pressure_total_rows,
+                cleanup_mode,
+                artifact_generated_at::text AS artifact_generated_at,
+                note,
+                issued_at::text AS issued_at,
+                completed_at::text AS completed_at,
+                outcome_note,
+                proof_reference
+            FROM operator_runtime_remediation_receipts
+            WHERE operator_user_id = $1
+            ORDER BY issued_at DESC, id DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(operator_user_id)
+        .bind(limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(operator_runtime_remediation_receipt_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
+    }
+
+    pub async fn complete_operator_runtime_remediation_receipt(
+        &self,
+        operator_user_id: &str,
+        receipt_id: &str,
+        outcome_note: &str,
+        proof_reference: Option<&str>,
+    ) -> Result<Option<OperatorRuntimeRemediationReceiptRecord>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            UPDATE operator_runtime_remediation_receipts
+            SET
+                lifecycle_status = 'completed',
+                completed_at = NOW(),
+                outcome_note = $3,
+                proof_reference = $4
+            WHERE operator_user_id = $1
+              AND id = $2
+            RETURNING
+                id,
+                operator_user_id,
+                action,
+                lifecycle_status,
+                execution_mode,
+                approval_required,
+                summary,
+                command,
+                source,
+                guidance_status,
+                pressure_status,
+                pressure_total_rows,
+                cleanup_mode,
+                artifact_generated_at::text AS artifact_generated_at,
+                note,
+                issued_at::text AS issued_at,
+                completed_at::text AS completed_at,
+                outcome_note,
+                proof_reference
+            "#,
+        )
+        .bind(operator_user_id)
+        .bind(receipt_id)
+        .bind(outcome_note)
+        .bind(proof_reference)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row
+            .map(operator_runtime_remediation_receipt_from_row)
+            .transpose()?)
+    }
+
     pub async fn upsert_runtime_backup_policy(
         &self,
         owner_user_id: &str,
@@ -2758,7 +6361,10 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(runtime_backup_from_row).collect::<Result<Vec<_>, _>>()?)
+        Ok(rows
+            .into_iter()
+            .map(runtime_backup_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn find_runtime_backup_by_id(
@@ -2859,7 +6465,10 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(runtime_backup_from_row).collect::<Result<Vec<_>, _>>()?)
+        Ok(rows
+            .into_iter()
+            .map(runtime_backup_from_row)
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn create_runtime_restore_drill(
@@ -4233,7 +7842,7 @@ impl Db {
         record: &TriggerObservabilityRecord,
     ) -> Result<(), sqlx::Error> {
         let table = tenant_trigger_observations_table(&record.owner_user_id);
-        sqlx::query(&format!(
+        let result = sqlx::query(&format!(
             r#"
             INSERT INTO {table} (
                 observation_id, registration_id, workflow_id, deployment_id,
@@ -4267,6 +7876,10 @@ impl Db {
         .bind(&record.created_at)
         .execute(&self.pool)
         .await?;
+        if result.rows_affected() == 1 {
+            self.prune_trigger_observations(&record.owner_user_id, Some(&record.workflow_id))
+                .await?;
+        }
         Ok(())
     }
 
@@ -4292,7 +7905,47 @@ impl Db {
         .bind(owner_user_id)
         .execute(&self.pool)
         .await?;
+        if result.rows_affected() == 1 {
+            self.prune_trigger_replay_nonces(owner_user_id).await?;
+        }
         Ok(result.rows_affected() == 1)
+    }
+
+    pub async fn prune_trigger_replay_nonces(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            DELETE FROM public.trigger_replay_nonces
+            WHERE owner_user_id = $1
+              AND claimed_at < NOW() - make_interval(days => $2)
+            "#,
+        )
+        .bind(owner_user_id)
+        .bind(TRIGGER_REPLAY_NONCE_RETENTION_DAYS as i32)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            DELETE FROM public.trigger_replay_nonces
+            WHERE owner_user_id = $1
+              AND replay_nonce NOT IN (
+                  SELECT replay_nonce
+                  FROM public.trigger_replay_nonces
+                  WHERE owner_user_id = $1
+                  ORDER BY claimed_at DESC, replay_nonce DESC
+                  LIMIT $2
+              )
+            "#,
+        )
+        .bind(owner_user_id)
+        .bind(TRIGGER_REPLAY_NONCE_MAX_ROWS_PER_USER)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 
     pub async fn list_trigger_observations(
@@ -4371,7 +8024,7 @@ impl Db {
                 backend = EXCLUDED.backend,
                 provider = EXCLUDED.provider,
                 model = EXCLUDED.model,
-                encrypted_api_key = EXCLUDED.encrypted_api_key,
+                encrypted_api_key = COALESCE(EXCLUDED.encrypted_api_key, {table}.encrypted_api_key),
                 ollama_url = EXCLUDED.ollama_url,
                 monthly_budget_cents = EXCLUDED.monthly_budget_cents,
                 updated_at = NOW()
@@ -4493,6 +8146,7 @@ impl Db {
         .bind(cost_cents)
         .execute(&self.pool)
         .await?;
+        self.prune_tenant_llm_usage_log(owner_user_id).await?;
         // Increment running total on the config row
         sqlx::query(&format!(
             r#"
@@ -4506,6 +8160,102 @@ impl Db {
         .bind(cost_cents)
         .execute(&self.pool)
         .await?;
+        Ok(())
+    }
+
+    pub async fn prune_tenant_llm_usage_log(&self, owner_user_id: &str) -> Result<(), sqlx::Error> {
+        let usage_table = tenant_llm_usage_log_table(owner_user_id);
+        sqlx::query(&format!(
+            r#"
+            DELETE FROM {usage_table}
+            WHERE owner_user_id = $1
+              AND recorded_at < NOW() - make_interval(days => $2)
+            "#,
+        ))
+        .bind(owner_user_id)
+        .bind(TENANT_LLM_USAGE_LOG_RETENTION_DAYS as i32)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(&format!(
+            r#"
+            DELETE FROM {usage_table}
+            WHERE owner_user_id = $1
+              AND id NOT IN (
+                  SELECT id
+                  FROM {usage_table}
+                  WHERE owner_user_id = $1
+                  ORDER BY recorded_at DESC, id DESC
+                  LIMIT $2
+              )
+            "#,
+        ))
+        .bind(owner_user_id)
+        .bind(TENANT_LLM_USAGE_LOG_MAX_ROWS_PER_USER)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn prune_trigger_observations(
+        &self,
+        owner_user_id: &str,
+        workflow_id: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        let table = tenant_trigger_observations_table(owner_user_id);
+        match workflow_id {
+            Some(workflow_id) => {
+                sqlx::query(&format!(
+                    r#"
+                    DELETE FROM {table}
+                    WHERE owner_user_id = $1
+                      AND workflow_id = $2
+                      AND created_at < NOW() - make_interval(days => $3)
+                    "#,
+                ))
+                .bind(owner_user_id)
+                .bind(workflow_id)
+                .bind(WORKFLOW_TRIGGER_OBSERVATION_RETENTION_DAYS as i32)
+                .execute(&self.pool)
+                .await?;
+
+                sqlx::query(&format!(
+                    r#"
+                    DELETE FROM {table}
+                    WHERE owner_user_id = $1
+                      AND workflow_id = $2
+                      AND observation_id NOT IN (
+                          SELECT observation_id
+                          FROM {table}
+                          WHERE owner_user_id = $1
+                            AND workflow_id = $2
+                          ORDER BY created_at DESC, observation_id DESC
+                          LIMIT $3
+                      )
+                    "#,
+                ))
+                .bind(owner_user_id)
+                .bind(workflow_id)
+                .bind(WORKFLOW_TRIGGER_OBSERVATION_MAX_ROWS_PER_WORKFLOW)
+                .execute(&self.pool)
+                .await?;
+            }
+            None => {
+                sqlx::query(&format!(
+                    r#"
+                    DELETE FROM {table}
+                    WHERE owner_user_id = $1
+                      AND created_at < NOW() - make_interval(days => $2)
+                    "#,
+                ))
+                .bind(owner_user_id)
+                .bind(WORKFLOW_TRIGGER_OBSERVATION_RETENTION_DAYS as i32)
+                .execute(&self.pool)
+                .await?;
+            }
+        }
+
         Ok(())
     }
 
@@ -4625,17 +8375,19 @@ impl Db {
         .await?;
         let creds = rows
             .iter()
-            .map(|r| -> Result<crate::webauthn::StoredCredential, sqlx::Error> {
-                Ok(crate::webauthn::StoredCredential {
-                    credential_id: r.try_get("credential_id")?,
-                    user_id: r.try_get("user_id")?,
-                    public_key_cbor: r.try_get("public_key_cbor")?,
-                    sign_count: r.try_get::<i64, _>("sign_count").unwrap_or(0) as u32,
-                    aaguid: r.try_get("aaguid")?,
-                    device_type: r.try_get("device_type")?,
-                    created_at: r.try_get("created_at")?,
-                })
-            })
+            .map(
+                |r| -> Result<crate::webauthn::StoredCredential, sqlx::Error> {
+                    Ok(crate::webauthn::StoredCredential {
+                        credential_id: r.try_get("credential_id")?,
+                        user_id: r.try_get("user_id")?,
+                        public_key_cbor: r.try_get("public_key_cbor")?,
+                        sign_count: r.try_get::<i64, _>("sign_count").unwrap_or(0) as u32,
+                        aaguid: r.try_get("aaguid")?,
+                        device_type: r.try_get("device_type")?,
+                        created_at: r.try_get("created_at")?,
+                    })
+                },
+            )
             .collect::<Result<Vec<_>, _>>()?;
         Ok(creds)
     }
@@ -5569,6 +9321,25 @@ impl Db {
         }))
     }
 
+    pub async fn user_owns_agent_id(
+        &self,
+        owner_user_id: &str,
+        agent_id: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let row = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)
+            FROM agent_instances
+            WHERE owner_user_id = $1 AND agent_id = $2
+            "#,
+        )
+        .bind(owner_user_id)
+        .bind(agent_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row > 0)
+    }
+
     /// PATCH /agent/settings — persist per-user agent settings on the master instance.
     pub async fn update_agent_settings(
         &self,
@@ -5620,6 +9391,30 @@ impl Db {
         Ok(())
     }
 
+    async fn backfill_gmail_token_encryption(
+        &self,
+        user_id: &str,
+        access_token: Option<&str>,
+        refresh_token: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        let key = gmail_token_encryption_key();
+        let enc_access = access_token.map(|value| crate::crypto::encrypt_secret(value, &key));
+        let enc_refresh = refresh_token.map(|value| crate::crypto::encrypt_secret(value, &key));
+        sqlx::query(
+            "UPDATE user_gmail_tokens
+             SET access_token = COALESCE($2, access_token),
+                 refresh_token = COALESCE($3, refresh_token),
+                 updated_at = NOW()
+             WHERE user_id = $1",
+        )
+        .bind(user_id)
+        .bind(enc_access)
+        .bind(enc_refresh)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     pub async fn get_gmail_token(
         &self,
         user_id: &str,
@@ -5631,26 +9426,298 @@ impl Db {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row.map(|r| {
+        if let Some(r) = row {
             let key = gmail_token_encryption_key();
             let raw_access = r.get::<String, _>("access_token");
             let raw_refresh = r.get::<String, _>("refresh_token");
-            // Attempt decryption; fall back to raw value for tokens stored before encryption was added.
-            let access_token =
-                crate::crypto::decrypt_secret(&raw_access, &key).unwrap_or(raw_access);
-            let refresh_token =
-                crate::crypto::decrypt_secret(&raw_refresh, &key).unwrap_or(raw_refresh);
-            serde_json::json!({
+            let (access_token, reencrypt_access) =
+                decrypt_gmail_token_or_legacy_plaintext(&raw_access, &key);
+            let (refresh_token, reencrypt_refresh) =
+                decrypt_gmail_token_or_legacy_plaintext(&raw_refresh, &key);
+            if reencrypt_access || reencrypt_refresh {
+                self.backfill_gmail_token_encryption(
+                    user_id,
+                    reencrypt_access.then_some(access_token.as_str()),
+                    reencrypt_refresh.then_some(refresh_token.as_str()),
+                )
+                .await?;
+            }
+            return Ok(Some(serde_json::json!({
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "gmail_email": r.get::<String, _>("gmail_email"),
                 "token_expiry": r.try_get::<Option<String>, _>("token_expiry").ok().flatten(),
                 "connected_at": r.get::<String, _>("connected_at"),
-            })
-        }))
+            })));
+        }
+        Ok(None)
+    }
+
+    pub async fn store_google_calendar_token(
+        &self,
+        user_id: &str,
+        access_token: &str,
+        refresh_token: &str,
+        google_email: &str,
+        expiry_iso: Option<String>,
+    ) -> Result<(), sqlx::Error> {
+        let key = google_calendar_token_encryption_key();
+        let enc_access = crate::crypto::encrypt_secret(access_token, &key);
+        let enc_refresh = crate::crypto::encrypt_secret(refresh_token, &key);
+        sqlx::query(
+            "INSERT INTO user_google_calendar_tokens (user_id, access_token, refresh_token, google_email, token_expiry, updated_at)
+             VALUES ($1, $2, $3, $4, $5::timestamptz, NOW())
+             ON CONFLICT (user_id) DO UPDATE SET
+               access_token = EXCLUDED.access_token,
+               refresh_token = EXCLUDED.refresh_token,
+               google_email = EXCLUDED.google_email,
+               token_expiry = EXCLUDED.token_expiry,
+               updated_at = NOW()",
+        )
+        .bind(user_id)
+        .bind(&enc_access)
+        .bind(&enc_refresh)
+        .bind(google_email)
+        .bind(expiry_iso)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_google_calendar_token(
+        &self,
+        user_id: &str,
+    ) -> Result<Option<serde_json::Value>, sqlx::Error> {
+        let row = sqlx::query(
+            "SELECT access_token, refresh_token, google_email, token_expiry::text as token_expiry, connected_at::text as connected_at
+             FROM user_google_calendar_tokens WHERE user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        if let Some(r) = row {
+            let key = google_calendar_token_encryption_key();
+            let raw_access = r.get::<String, _>("access_token");
+            let raw_refresh = r.get::<String, _>("refresh_token");
+            let access_token =
+                crate::crypto::decrypt_secret(&raw_access, &key).unwrap_or(raw_access);
+            let refresh_token =
+                crate::crypto::decrypt_secret(&raw_refresh, &key).unwrap_or(raw_refresh);
+            return Ok(Some(serde_json::json!({
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "google_email": r.get::<String, _>("google_email"),
+                "token_expiry": r.try_get::<Option<String>, _>("token_expiry").ok().flatten(),
+                "connected_at": r.get::<String, _>("connected_at"),
+            })));
+        }
+        Ok(None)
+    }
+
+    pub async fn update_google_calendar_access_token(
+        &self,
+        user_id: &str,
+        access_token: &str,
+        expiry_iso: Option<String>,
+    ) -> Result<(), sqlx::Error> {
+        let key = google_calendar_token_encryption_key();
+        let enc_access = crate::crypto::encrypt_secret(access_token, &key);
+        sqlx::query(
+            "UPDATE user_google_calendar_tokens
+             SET access_token = $2, token_expiry = $3::timestamptz, updated_at = NOW()
+             WHERE user_id = $1",
+        )
+        .bind(user_id)
+        .bind(enc_access)
+        .bind(expiry_iso)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn delete_google_calendar_token(&self, user_id: &str) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM user_google_calendar_tokens WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn refresh_google_calendar_connected_capabilities(
+        &self,
+        user_id: &str,
+        google_email: &str,
+    ) -> Result<(), sqlx::Error> {
+        self.delete_user_connected_capabilities_for_provider(user_id, "google_calendar")
+            .await?;
+
+        let google_email = google_email.trim();
+        if google_email.is_empty() {
+            return Ok(());
+        }
+
+        let now_iso = chrono::Utc::now().to_rfc3339();
+        let secret_ref = Some(format!("user_google_calendar_tokens:{user_id}"));
+
+        for record in [
+            UserConnectedCapabilityRecord {
+                id: String::new(),
+                user_id: user_id.to_string(),
+                provider: "google_calendar".to_string(),
+                account_ref: google_email.to_string(),
+                capability_family: "productivity".to_string(),
+                capability_id: "google_calendar.read".to_string(),
+                transport: "rest".to_string(),
+                granted_scopes: vec![
+                    "https://www.googleapis.com/auth/calendar.events".to_string(),
+                    "https://www.googleapis.com/auth/userinfo.email".to_string(),
+                ],
+                approval_mode: "autonomous".to_string(),
+                secret_ref: secret_ref.clone(),
+                health_state: "healthy".to_string(),
+                last_checked_at: Some(now_iso.clone()),
+                connected_at: now_iso.clone(),
+                revoked_at: None,
+                metadata_json: json!({
+                    "provider_label": "Google Calendar",
+                    "operation": "list_events"
+                }),
+            },
+            UserConnectedCapabilityRecord {
+                id: String::new(),
+                user_id: user_id.to_string(),
+                provider: "google_calendar".to_string(),
+                account_ref: google_email.to_string(),
+                capability_family: "productivity".to_string(),
+                capability_id: "google_calendar.create_event".to_string(),
+                transport: "rest".to_string(),
+                granted_scopes: vec!["https://www.googleapis.com/auth/calendar.events".to_string()],
+                approval_mode: "suggest_only".to_string(),
+                secret_ref: secret_ref.clone(),
+                health_state: "healthy".to_string(),
+                last_checked_at: Some(now_iso.clone()),
+                connected_at: now_iso.clone(),
+                revoked_at: None,
+                metadata_json: json!({
+                    "provider_label": "Google Calendar",
+                    "operation": "create_event"
+                }),
+            },
+        ] {
+            self.upsert_user_connected_capability(&record).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Idempotent upsert used when pulling events from Google Calendar: matches
+    /// on (owner_user_id, google_event_id) so re-syncing updates in place rather
+    /// than duplicating rows.
+    pub async fn upsert_calendar_event_from_google_sync(
+        &self,
+        owner_user_id: &str,
+        id: &str,
+        google_event_id: &str,
+        title: &str,
+        description: Option<&str>,
+        start_at: &str,
+        end_at: Option<&str>,
+        all_day: bool,
+        location: Option<&str>,
+        status: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO calendar_events
+                (id, owner_user_id, title, description, start_at, end_at, all_day, location, status, source, google_event_id)
+            VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8, $9, 'google', $10)
+            ON CONFLICT (owner_user_id, google_event_id) WHERE google_event_id IS NOT NULL
+            DO UPDATE SET
+                title = EXCLUDED.title,
+                description = EXCLUDED.description,
+                start_at = EXCLUDED.start_at,
+                end_at = EXCLUDED.end_at,
+                all_day = EXCLUDED.all_day,
+                location = EXCLUDED.location,
+                status = EXCLUDED.status,
+                updated_at = NOW()
+            "#,
+        )
+        .bind(id)
+        .bind(owner_user_id)
+        .bind(title)
+        .bind(description)
+        .bind(start_at)
+        .bind(end_at)
+        .bind(all_day)
+        .bind(location)
+        .bind(status)
+        .bind(google_event_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn set_calendar_event_google_id(
+        &self,
+        owner_user_id: &str,
+        event_id: &str,
+        google_event_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE calendar_events SET google_event_id = $3, updated_at = NOW()
+             WHERE id = $1 AND owner_user_id = $2",
+        )
+        .bind(event_id)
+        .bind(owner_user_id)
+        .bind(google_event_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     // ── Calendar events ───────────────────────────────────────────────────────
+
+    pub async fn list_connected_gmail_tokens(&self) -> Result<Vec<GmailTokenRecord>, sqlx::Error> {
+        let rows = sqlx::query(
+            "SELECT user_id, refresh_token, gmail_email
+             FROM user_gmail_tokens
+             WHERE coalesce(trim(refresh_token), '') <> ''
+               AND coalesce(trim(gmail_email), '') <> ''
+             ORDER BY connected_at ASC, user_id ASC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let key = gmail_token_encryption_key();
+        let mut tokens = Vec::new();
+        for row in rows {
+            let Ok(user_id) = row.try_get::<String, _>("user_id") else {
+                continue;
+            };
+            let Ok(gmail_email) = row.try_get::<String, _>("gmail_email") else {
+                continue;
+            };
+            let Ok(raw_refresh) = row.try_get::<String, _>("refresh_token") else {
+                continue;
+            };
+            let (refresh_token, reencrypt_refresh) =
+                decrypt_gmail_token_or_legacy_plaintext(&raw_refresh, &key);
+            if reencrypt_refresh {
+                self.backfill_gmail_token_encryption(&user_id, None, Some(&refresh_token))
+                    .await?;
+            }
+            if gmail_email.trim().is_empty() || refresh_token.trim().is_empty() {
+                continue;
+            }
+            tokens.push(GmailTokenRecord {
+                user_id,
+                gmail_email,
+                refresh_token,
+            });
+        }
+        Ok(tokens)
+    }
 
     pub async fn create_calendar_event(
         &self,
@@ -5662,12 +9729,13 @@ impl Db {
         end_at: Option<&str>,
         all_day: bool,
         location: Option<&str>,
+        status: Option<&str>,
     ) -> Result<serde_json::Value, sqlx::Error> {
         let row = sqlx::query(
             r#"
             INSERT INTO calendar_events
-                (id, owner_user_id, title, description, start_at, end_at, all_day, location)
-            VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8)
+                (id, owner_user_id, title, description, start_at, end_at, all_day, location, status)
+            VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8, COALESCE($9, 'confirmed'))
             RETURNING id, title, description, start_at::text AS start_at,
                       end_at::text AS end_at, all_day, location, status, created_at::text AS created_at
             "#,
@@ -5680,18 +9748,32 @@ impl Db {
         .bind(end_at)
         .bind(all_day)
         .bind(location)
+        .bind(status)
         .fetch_one(&self.pool)
         .await?;
+        let title_value = row.try_get::<String, _>("title")?;
+        let description_value = row
+            .try_get::<Option<String>, _>("description")
+            .ok()
+            .flatten();
+        let all_day_value = row.try_get::<bool, _>("all_day").unwrap_or(false);
+        let location_value = row.try_get::<Option<String>, _>("location").ok().flatten();
         Ok(serde_json::json!({
             "id": row.try_get::<String,_>("id")?,
-            "title": row.try_get::<String,_>("title")?,
-            "description": row.try_get::<Option<String>,_>("description").ok().flatten(),
+            "title": title_value,
+            "description": description_value,
             "start_at": row.try_get::<String,_>("start_at")?,
             "end_at": row.try_get::<Option<String>,_>("end_at").ok().flatten(),
-            "all_day": row.try_get::<bool,_>("all_day").unwrap_or(false),
-            "location": row.try_get::<Option<String>,_>("location").ok().flatten(),
+            "all_day": all_day_value,
+            "location": location_value,
             "status": row.try_get::<String,_>("status").unwrap_or_else(|_| "confirmed".to_string()),
             "created_at": row.try_get::<String,_>("created_at")?,
+            "profile": calendar_event_profile_from_fields(
+                &title_value,
+                description_value.as_deref(),
+                location_value.as_deref(),
+                all_day_value,
+            ),
         }))
     }
 
@@ -5719,15 +9801,25 @@ impl Db {
         .fetch_all(&self.pool)
         .await?;
         rows.iter().map(|r| -> Result<serde_json::Value, sqlx::Error> {
+            let title_value = r.try_get::<String,_>("title")?;
+            let description_value = r.try_get::<Option<String>,_>("description").ok().flatten();
+            let all_day_value = r.try_get::<bool,_>("all_day").unwrap_or(false);
+            let location_value = r.try_get::<Option<String>,_>("location").ok().flatten();
             Ok(serde_json::json!({
                 "id": r.try_get::<String,_>("id")?,
-                "title": r.try_get::<String,_>("title")?,
-                "description": r.try_get::<Option<String>,_>("description").ok().flatten(),
+                "title": title_value,
+                "description": description_value,
                 "start_at": r.try_get::<String,_>("start_at")?,
                 "end_at": r.try_get::<Option<String>,_>("end_at").ok().flatten(),
-                "all_day": r.try_get::<bool,_>("all_day").unwrap_or(false),
-                "location": r.try_get::<Option<String>,_>("location").ok().flatten(),
+                "all_day": all_day_value,
+                "location": location_value,
                 "status": r.try_get::<String,_>("status").unwrap_or_else(|_| "confirmed".to_string()),
+                "profile": calendar_event_profile_from_fields(
+                    &title_value,
+                    description_value.as_deref(),
+                    location_value.as_deref(),
+                    all_day_value,
+                ),
             }))
         }).collect()
     }
@@ -6015,7 +10107,8 @@ impl Db {
             Ok((
                 row.try_get::<i64, _>("daily_limit").unwrap_or(50000),
                 row.try_get::<f64, _>("alert_pct").unwrap_or(0.8),
-                row.try_get::<bool, _>("escalation_enabled").unwrap_or(false),
+                row.try_get::<bool, _>("escalation_enabled")
+                    .unwrap_or(false),
             ))
         } else {
             Ok((50000, 0.8, false))
@@ -6077,8 +10170,10 @@ impl Db {
             .unwrap_or("")
             .to_string();
         let afp_type = afp["type"].as_str().unwrap_or("").to_string();
+        let afp_subtype = afp["subtype"].as_str().unwrap_or("");
         let thread_id = afp["thread_id"].as_str().unwrap_or("").to_string();
-        sqlx::query(
+        let metadata_str = afp["metadata"].as_str().unwrap_or("{}");
+        let result = sqlx::query(
             r#"INSERT INTO afp_messages (id, owner_user_id, type, thread_id, payload, created_at)
                VALUES ($1, $2, $3, $4, $5, NOW())
                ON CONFLICT (id) DO NOTHING"#,
@@ -6090,6 +10185,54 @@ impl Db {
         .bind(afp)
         .execute(&self.pool)
         .await?;
+        if result.rows_affected() == 1 {
+            if let Some(family) = coord_family_of(&afp_type, afp_subtype, false, metadata_str) {
+                coordination_bus().notify(family, &owner_user_id);
+            }
+            if daemon_operational_afp_retention_applies(&afp_type) && !owner_user_id.is_empty() {
+                self.prune_daemon_operational_afp_history(&owner_user_id, &afp_type)
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn prune_daemon_operational_afp_history(
+        &self,
+        owner_user_id: &str,
+        afp_type: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"DELETE FROM afp_messages
+               WHERE owner_user_id = $1
+                 AND type = $2
+                 AND created_at < NOW() - make_interval(days => $3)"#,
+        )
+        .bind(owner_user_id)
+        .bind(afp_type)
+        .bind(DAEMON_OPERATIONAL_AFP_RETENTION_DAYS as i32)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"DELETE FROM afp_messages
+               WHERE owner_user_id = $1
+                 AND type = $2
+                 AND id NOT IN (
+                     SELECT id
+                     FROM afp_messages
+                     WHERE owner_user_id = $1
+                       AND type = $2
+                     ORDER BY created_at DESC, id DESC
+                     LIMIT $3
+                 )"#,
+        )
+        .bind(owner_user_id)
+        .bind(afp_type)
+        .bind(DAEMON_OPERATIONAL_AFP_MAX_ROWS_PER_USER)
+        .execute(&self.pool)
+        .await?;
+
         Ok(())
     }
 
@@ -6113,6 +10256,7 @@ impl Db {
         .bind(content)
         .execute(&self.pool)
         .await?;
+        self.prune_training_reflection_traces(owner_user_id).await?;
         Ok(())
     }
 
@@ -6173,6 +10317,73 @@ impl Db {
         .bind(tokens_used)
         .execute(&self.pool)
         .await?;
+        self.prune_proactive_token_usage(owner_user_id).await?;
+        Ok(())
+    }
+
+    pub async fn prune_training_reflection_traces(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"DELETE FROM training_reflection_traces
+               WHERE owner_user_id = $1
+                 AND created_at < NOW() - make_interval(days => $2)"#,
+        )
+        .bind(owner_user_id)
+        .bind(TRAINING_REFLECTION_TRACE_RETENTION_DAYS as i32)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"DELETE FROM training_reflection_traces
+               WHERE owner_user_id = $1
+                 AND id NOT IN (
+                     SELECT id
+                     FROM training_reflection_traces
+                     WHERE owner_user_id = $1
+                     ORDER BY created_at DESC, id DESC
+                     LIMIT $2
+                 )"#,
+        )
+        .bind(owner_user_id)
+        .bind(TRAINING_REFLECTION_TRACE_MAX_ROWS_PER_USER)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn prune_proactive_token_usage(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"DELETE FROM proactive_token_usage
+               WHERE owner_user_id = $1
+                 AND created_at < NOW() - make_interval(days => $2)"#,
+        )
+        .bind(owner_user_id)
+        .bind(PROACTIVE_TOKEN_USAGE_RETENTION_DAYS as i32)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"DELETE FROM proactive_token_usage
+               WHERE owner_user_id = $1
+                 AND id NOT IN (
+                     SELECT id
+                     FROM proactive_token_usage
+                     WHERE owner_user_id = $1
+                     ORDER BY created_at DESC, id DESC
+                     LIMIT $2
+                 )"#,
+        )
+        .bind(owner_user_id)
+        .bind(PROACTIVE_TOKEN_USAGE_MAX_ROWS_PER_USER)
+        .execute(&self.pool)
+        .await?;
+
         Ok(())
     }
 
@@ -6241,14 +10452,12 @@ impl Db {
             .get("inputs")
             .cloned()
             .unwrap_or_else(|| audit_content.clone());
-        let output_afp_id = afp_message_id
-            .map(ToOwned::to_owned)
-            .or_else(|| {
-                audit_content
-                    .get("output_afp_id")
-                    .and_then(Value::as_str)
-                    .map(ToOwned::to_owned)
-            });
+        let output_afp_id = afp_message_id.map(ToOwned::to_owned).or_else(|| {
+            audit_content
+                .get("output_afp_id")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned)
+        });
         let action_afp_type = audit_content
             .get("action_afp_type")
             .and_then(Value::as_str)
@@ -6302,6 +10511,9 @@ impl Db {
         .bind(&record.suggestion_id)
         .execute(&self.pool)
         .await;
+        let _ = self
+            .prune_proactive_suggestion_history(&record.owner_user_id)
+            .await;
 
         // Update EMA state for the heuristic — load current, apply EMA update, persist.
         let current_ema = self
@@ -6348,19 +10560,11 @@ impl Db {
         Ok(vec![])
     }
 
-    pub async fn enable_pack(
-        &self,
-        _user_id: &str,
-        _pack_id: &str,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn enable_pack(&self, _user_id: &str, _pack_id: &str) -> Result<(), sqlx::Error> {
         Ok(())
     }
 
-    pub async fn disable_pack(
-        &self,
-        _user_id: &str,
-        _pack_id: &str,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn disable_pack(&self, _user_id: &str, _pack_id: &str) -> Result<(), sqlx::Error> {
         Ok(())
     }
 
@@ -6420,6 +10624,32 @@ impl Db {
             .collect())
     }
 
+    pub async fn list_active_proactive_suggestion_headers(
+        &self,
+        owner_user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<(String, String)>, sqlx::Error> {
+        use sqlx::Row;
+        let rows = sqlx::query(
+            r#"SELECT id, heuristic_id FROM proactive_suggestions
+               WHERE owner_user_id = $1 AND dismissed_at IS NULL
+               ORDER BY created_at DESC LIMIT $2"#,
+        )
+        .bind(owner_user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| {
+                Some((
+                    row.try_get::<String, _>("id").ok()?,
+                    row.try_get::<String, _>("heuristic_id").ok()?,
+                ))
+            })
+            .collect())
+    }
+
     pub async fn has_active_proactive_suggestion(
         &self,
         owner_user_id: &str,
@@ -6438,6 +10668,61 @@ impl Db {
         Ok(row
             .and_then(|value| value.try_get::<i32, _>("present").ok())
             .is_some())
+    }
+
+    pub async fn dismiss_active_proactive_suggestion(
+        &self,
+        owner_user_id: &str,
+        suggestion_id: &str,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"UPDATE proactive_suggestions
+               SET dismissed_at = NOW()
+               WHERE owner_user_id = $1 AND id = $2 AND dismissed_at IS NULL"#,
+        )
+        .bind(owner_user_id)
+        .bind(suggestion_id)
+        .execute(&self.pool)
+        .await?;
+        self.prune_proactive_suggestion_history(owner_user_id)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn prune_proactive_suggestion_history(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"DELETE FROM proactive_suggestions
+               WHERE owner_user_id = $1
+                 AND created_at < NOW() - ($2 * INTERVAL '1 day')"#,
+        )
+        .bind(owner_user_id)
+        .bind(PROACTIVE_SUGGESTION_RETENTION_DAYS)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"DELETE FROM proactive_suggestions
+               WHERE owner_user_id = $1
+                 AND id NOT IN (
+                    SELECT id
+                    FROM proactive_suggestions
+                    WHERE owner_user_id = $1
+                    ORDER BY
+                        CASE WHEN dismissed_at IS NULL THEN 0 ELSE 1 END,
+                        created_at DESC,
+                        id DESC
+                    LIMIT $2
+                 )"#,
+        )
+        .bind(owner_user_id)
+        .bind(PROACTIVE_SUGGESTION_MAX_ROWS_PER_USER)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 
     pub async fn latest_proactive_outcome_accepted(
@@ -6461,12 +10746,11 @@ impl Db {
 
     pub async fn get_enabled_packs(&self, owner_user_id: &str) -> Result<Vec<String>, sqlx::Error> {
         use sqlx::Row;
-        let rows = sqlx::query(
-            r#"SELECT pack_id FROM enabled_heuristic_packs WHERE owner_user_id = $1"#,
-        )
-        .bind(owner_user_id)
-        .fetch_all(&self.pool)
-        .await?;
+        let rows =
+            sqlx::query(r#"SELECT pack_id FROM enabled_heuristic_packs WHERE owner_user_id = $1"#)
+                .bind(owner_user_id)
+                .fetch_all(&self.pool)
+                .await?;
         Ok(rows
             .into_iter()
             .filter_map(|r| r.try_get::<String, _>("pack_id").ok())
@@ -6495,7 +10779,11 @@ impl Db {
             let acc = row.try_get::<i64, _>("accepted").unwrap_or(0);
             let dis = row.try_get::<i64, _>("dismissed").unwrap_or(0);
             let total = acc + dis;
-            let acceptance_rate = if total > 0 { acc as f64 / total as f64 } else { 0.5 };
+            let acceptance_rate = if total > 0 {
+                acc as f64 / total as f64
+            } else {
+                0.5
+            };
             result.push(serde_json::json!({
                 "heuristic_id": hid,
                 "accepted": acc,
@@ -6583,7 +10871,11 @@ impl Db {
             let acc = row.try_get::<i64, _>("accepted").unwrap_or(0);
             let dis = row.try_get::<i64, _>("dismissed").unwrap_or(0);
             let total = acc + dis;
-            let acceptance_rate = if total > 0 { acc as f64 / total as f64 } else { 0.5 };
+            let acceptance_rate = if total > 0 {
+                acc as f64 / total as f64
+            } else {
+                0.5
+            };
             result.push(serde_json::json!({
                 "heuristic_id": hid,
                 "accepted": acc,
@@ -6622,6 +10914,48 @@ impl Db {
                     .unwrap_or_else(|_| "insufficient_signal".to_string()),
             })
         }))
+    }
+
+    /// Load persisted EMA state for a bounded set of heuristics in one query.
+    pub async fn list_heuristic_ema_states(
+        &self,
+        owner_user_id: &str,
+        heuristic_ids: &[String],
+    ) -> Result<std::collections::HashMap<String, Value>, sqlx::Error> {
+        use sqlx::Row;
+
+        if heuristic_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let rows = sqlx::query(
+            r#"SELECT heuristic_id, ema_acceptance_rate, ema_dismissal_rate, sample_count,
+                      last_threshold_delta, last_adaptation_reason
+               FROM heuristic_ema_state
+               WHERE user_id = $1
+                 AND heuristic_id = ANY($2)"#,
+        )
+        .bind(owner_user_id)
+        .bind(heuristic_ids)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut result = std::collections::HashMap::new();
+        for row in rows {
+            let heuristic_id = row.try_get::<String, _>("heuristic_id").unwrap_or_default();
+            result.insert(
+                heuristic_id,
+                serde_json::json!({
+                    "ema_acceptance_rate": row.try_get::<f64, _>("ema_acceptance_rate").unwrap_or(0.5),
+                    "ema_dismissal_rate": row.try_get::<f64, _>("ema_dismissal_rate").unwrap_or(0.5),
+                    "sample_count": row.try_get::<i32, _>("sample_count").unwrap_or(0),
+                    "last_threshold_delta": row.try_get::<f64, _>("last_threshold_delta").unwrap_or(0.0),
+                    "last_adaptation_reason": row.try_get::<String, _>("last_adaptation_reason")
+                        .unwrap_or_else(|_| "insufficient_signal".to_string()),
+                }),
+            );
+        }
+        Ok(result)
     }
 
     /// Upsert the EMA state after a new outcome is recorded.
@@ -6712,12 +11046,10 @@ impl Db {
 
     pub async fn get_proactivity_level(&self, owner_user_id: &str) -> Result<i32, sqlx::Error> {
         use sqlx::Row;
-        let row = sqlx::query(
-            r#"SELECT level FROM proactivity_levels WHERE owner_user_id = $1"#,
-        )
-        .bind(owner_user_id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let row = sqlx::query(r#"SELECT level FROM proactivity_levels WHERE owner_user_id = $1"#)
+            .bind(owner_user_id)
+            .fetch_optional(&self.pool)
+            .await?;
         Ok(row
             .and_then(|r| r.try_get::<i32, _>("level").ok())
             .unwrap_or(2))
@@ -6801,13 +11133,12 @@ impl Db {
         owner_user_id: &str,
         group_id: &str,
     ) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
-            r#"DELETE FROM email_contact_groups WHERE id = $1 AND owner_user_id = $2"#,
-        )
-        .bind(group_id)
-        .bind(owner_user_id)
-        .execute(&self.pool)
-        .await?;
+        let result =
+            sqlx::query(r#"DELETE FROM email_contact_groups WHERE id = $1 AND owner_user_id = $2"#)
+                .bind(group_id)
+                .bind(owner_user_id)
+                .execute(&self.pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -6829,6 +11160,69 @@ impl Db {
             .into_iter()
             .filter_map(|r| r.try_get::<String, _>("group_id").ok())
             .collect())
+    }
+
+    pub async fn get_contact_reply_policy_metadata(
+        &self,
+        owner_user_id: &str,
+        email: &str,
+    ) -> Result<Option<Value>, sqlx::Error> {
+        use sqlx::Row;
+
+        let group_ids = self
+            .get_contact_group_memberships(owner_user_id, email)
+            .await?;
+        if group_ids.is_empty() {
+            return Ok(None);
+        }
+
+        let rows = sqlx::query(
+            r#"SELECT id, name, sla_hours, auto_draft
+               FROM email_contact_groups
+               WHERE owner_user_id = $1 AND id = ANY($2)"#,
+        )
+        .bind(owner_user_id)
+        .bind(&group_ids)
+        .fetch_all(&self.pool)
+        .await?;
+
+        if rows.is_empty() {
+            return Ok(None);
+        }
+
+        let mut group_names = Vec::new();
+        let mut min_sla_hours: Option<i32> = None;
+        let mut auto_draft = false;
+
+        for row in rows {
+            if let Ok(name) = row.try_get::<String, _>("name") {
+                let trimmed = name.trim();
+                if !trimmed.is_empty() {
+                    group_names.push(trimmed.to_string());
+                }
+            }
+
+            if row.try_get::<bool, _>("auto_draft").unwrap_or(false) {
+                auto_draft = true;
+            }
+
+            if let Ok(sla_hours) = row.try_get::<i32, _>("sla_hours") {
+                min_sla_hours = Some(match min_sla_hours {
+                    Some(current) => current.min(sla_hours),
+                    None => sla_hours,
+                });
+            }
+        }
+
+        group_names.sort();
+        group_names.dedup();
+
+        Ok(Some(serde_json::json!({
+            "sender_group_ids": group_ids,
+            "sender_group_names": group_names,
+            "sender_auto_draft": auto_draft,
+            "sender_sla_hours": min_sla_hours,
+        })))
     }
 
     pub async fn set_contact_group_memberships(
@@ -6898,12 +11292,12 @@ impl Db {
     ) -> Result<Vec<Value>, sqlx::Error> {
         use sqlx::Row;
         let rows = sqlx::query(
-            r#"SELECT subject, predicate, object, source_message_id, domain, confidence, created_at
-               FROM knowledge_triples
+            r#"SELECT subject, predicate_norm AS predicate, object_value AS object, source_message_id, domain, confidence, created_at
+               FROM afp_knowledge_triples
                WHERE owner_user_id = $1
                  AND ($2::text IS NULL OR subject ILIKE $2)
-                 AND ($3::text IS NULL OR predicate = $3)
-                 AND ($4::text IS NULL OR object ILIKE $4)
+                 AND ($3::text IS NULL OR predicate_norm = LOWER($3))
+                 AND ($4::text IS NULL OR object_value ILIKE $4)
                  AND ($5::text IS NULL OR source_message_id = $5)
                  AND ($6::text IS NULL OR domain = $6)
                ORDER BY created_at DESC LIMIT $7"#,
@@ -6965,6 +11359,191 @@ impl Db {
             .collect())
     }
 
+    pub async fn recent_private_incoming_email_context(
+        &self,
+        owner_user_id: &str,
+        sender_email: &str,
+        exclude_original_smtp_id: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        let messages_table = tenant_messages_table(owner_user_id);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT
+                id,
+                timestamp::text as timestamp,
+                COALESCE(
+                    metadata->>'email_subject',
+                    content->>'subject',
+                    summary,
+                    ''
+                ) AS subject,
+                COALESCE(
+                    summary,
+                    content->>'body',
+                    content->>'message',
+                    content->>'summary',
+                    ''
+                ) AS body_preview,
+                metadata->>'original_smtp_id' AS original_smtp_id,
+                metadata->>'in_reply_to' AS in_reply_to
+            FROM {messages_table}
+            WHERE type = 'email'
+              AND subtype = 'incoming'
+              AND LOWER(COALESCE(metadata->>'email_from', '')) = LOWER($1)
+              AND ($2::text IS NULL OR COALESCE(metadata->>'original_smtp_id', '') <> $2)
+            ORDER BY timestamp DESC
+            LIMIT $3
+            "#,
+        ))
+        .bind(sender_email.trim())
+        .bind(exclude_original_smtp_id)
+        .bind(limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        use sqlx::Row;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                json!({
+                    "id": row.get::<String, _>("id"),
+                    "timestamp": row.get::<String, _>("timestamp"),
+                    "subject": row.get::<String, _>("subject"),
+                    "body_preview": row.get::<String, _>("body_preview"),
+                    "original_smtp_id": row.get::<Option<String>, _>("original_smtp_id"),
+                    "in_reply_to": row.get::<Option<String>, _>("in_reply_to"),
+                })
+            })
+            .collect())
+    }
+
+    pub async fn recent_private_incoming_email_thread_context(
+        &self,
+        owner_user_id: &str,
+        reference_targets: &[String],
+        exclude_original_smtp_id: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        if reference_targets.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let messages_table = tenant_messages_table(owner_user_id);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT
+                id,
+                timestamp::text as timestamp,
+                COALESCE(
+                    metadata->>'email_subject',
+                    content->>'subject',
+                    summary,
+                    ''
+                ) AS subject,
+                COALESCE(
+                    summary,
+                    content->>'body',
+                    content->>'message',
+                    content->>'summary',
+                    ''
+                ) AS body_preview,
+                metadata->>'email_from' AS email_from,
+                metadata->>'original_smtp_id' AS original_smtp_id
+            FROM {messages_table}
+            WHERE type = 'email'
+              AND subtype = 'incoming'
+              AND reference_targets && $1::text[]
+              AND ($2::text IS NULL OR COALESCE(metadata->>'original_smtp_id', '') <> $2)
+            ORDER BY timestamp DESC
+            LIMIT $3
+            "#,
+        ))
+        .bind(reference_targets)
+        .bind(exclude_original_smtp_id)
+        .bind(limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        use sqlx::Row;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                json!({
+                    "id": row.get::<String, _>("id"),
+                    "timestamp": row.get::<String, _>("timestamp"),
+                    "subject": row.get::<String, _>("subject"),
+                    "body_preview": row.get::<String, _>("body_preview"),
+                    "email_from": row.get::<Option<String>, _>("email_from"),
+                    "original_smtp_id": row.get::<Option<String>, _>("original_smtp_id"),
+                })
+            })
+            .collect())
+    }
+
+    pub async fn recent_private_incoming_email_conversation_context(
+        &self,
+        owner_user_id: &str,
+        external_conversation_key: &str,
+        exclude_original_smtp_id: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Value>, sqlx::Error> {
+        if external_conversation_key.trim().is_empty() {
+            return Ok(vec![]);
+        }
+
+        let messages_table = tenant_messages_table(owner_user_id);
+        let rows = sqlx::query(&format!(
+            r#"
+            SELECT
+                id,
+                timestamp::text as timestamp,
+                COALESCE(
+                    metadata->>'email_subject',
+                    content->>'subject',
+                    summary,
+                    ''
+                ) AS subject,
+                COALESCE(
+                    summary,
+                    content->>'body',
+                    content->>'message',
+                    content->>'summary',
+                    ''
+                ) AS body_preview,
+                metadata->>'email_from' AS email_from,
+                metadata->>'original_smtp_id' AS original_smtp_id
+            FROM {messages_table}
+            WHERE type = 'email'
+              AND subtype = 'incoming'
+              AND COALESCE(metadata->>'external_conversation_key', '') = $1
+              AND ($2::text IS NULL OR COALESCE(metadata->>'original_smtp_id', '') <> $2)
+            ORDER BY timestamp DESC
+            LIMIT $3
+            "#,
+        ))
+        .bind(external_conversation_key.trim())
+        .bind(exclude_original_smtp_id)
+        .bind(limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        use sqlx::Row;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                json!({
+                    "id": row.get::<String, _>("id"),
+                    "timestamp": row.get::<String, _>("timestamp"),
+                    "subject": row.get::<String, _>("subject"),
+                    "body_preview": row.get::<String, _>("body_preview"),
+                    "email_from": row.get::<Option<String>, _>("email_from"),
+                    "original_smtp_id": row.get::<Option<String>, _>("original_smtp_id"),
+                })
+            })
+            .collect())
+    }
+
     pub async fn query_private_claim_neighborhood(
         &self,
         owner_user_id: &str,
@@ -6987,7 +11566,9 @@ impl Db {
             .unwrap_or(Value::Null);
 
         let depth_u32 = (depth as u32).min(3);
-        let (node_set, edges) = self.bfs_backlinks_graph(owner_user_id, message_id, depth_u32).await?;
+        let (node_set, edges) = self
+            .bfs_backlinks_graph(owner_user_id, message_id, depth_u32)
+            .await?;
 
         let cap = (limit_per_group.max(1).min(50)) as usize;
         let mut supports: Vec<Value> = Vec::new();
@@ -7004,7 +11585,11 @@ impl Db {
                     continue;
                 }
             }
-            let peer_id = if edge.source_id == message_id { &edge.target_id } else { &edge.source_id };
+            let peer_id = if edge.source_id == message_id {
+                &edge.target_id
+            } else {
+                &edge.source_id
+            };
             let entry = serde_json::json!({
                 "message_id": peer_id,
                 "direction": if edge.source_id == message_id { "outbound" } else { "inbound" },
@@ -7014,23 +11599,33 @@ impl Db {
                 "created_at": edge.created_at,
             });
             match normalized {
-                "supports"            if supports.len() < cap            => supports.push(entry),
-                "refutes"             if refutes.len() < cap             => refutes.push(entry),
-                "part_of"             if part_of.len() < cap             => part_of.push(entry),
-                "caused_by"           if caused_by.len() < cap           => caused_by.push(entry),
-                "temporally_related"  if temporally_related.len() < cap  => temporally_related.push(entry),
-                _                     if mentions.len() < cap            => mentions.push(entry),
+                "supports" if supports.len() < cap => supports.push(entry),
+                "refutes" if refutes.len() < cap => refutes.push(entry),
+                "part_of" if part_of.len() < cap => part_of.push(entry),
+                "caused_by" if caused_by.len() < cap => caused_by.push(entry),
+                "temporally_related" if temporally_related.len() < cap => {
+                    temporally_related.push(entry)
+                }
+                _ if mentions.len() < cap => mentions.push(entry),
                 _ => {}
             }
         }
 
         // Compute hop distances for related_claims summary
-        let mut node_hops: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+        let mut node_hops: std::collections::BTreeMap<String, usize> =
+            std::collections::BTreeMap::new();
         for node_id in &node_set {
             if node_id != message_id {
                 // Approximate hop: count min path length via BFS edge set
-                let hop = edges.iter().filter(|e| e.source_id == *node_id || e.target_id == *node_id).count().min(depth as usize);
-                node_hops.insert(node_id.clone(), if hop == 0 { 1 } else { hop.min(depth as usize) });
+                let hop = edges
+                    .iter()
+                    .filter(|e| e.source_id == *node_id || e.target_id == *node_id)
+                    .count()
+                    .min(depth as usize);
+                node_hops.insert(
+                    node_id.clone(),
+                    if hop == 0 { 1 } else { hop.min(depth as usize) },
+                );
             }
         }
         let related_claims = summarize_related_claims(message_id, &node_hops, &edges, cap);
@@ -7076,6 +11671,22 @@ impl Db {
     }
 
     // ── Token budget ──────────────────────────────────────────────────────────
+
+    pub async fn get_private_message_payload(
+        &self,
+        owner_user_id: &str,
+        message_id: &str,
+    ) -> Result<Option<Value>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"SELECT payload FROM afp_messages WHERE owner_user_id = $1 AND id = $2 LIMIT 1"#,
+        )
+        .bind(owner_user_id)
+        .bind(message_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        use sqlx::Row;
+        Ok(row.and_then(|record| record.try_get::<Value, _>("payload").ok()))
+    }
 
     pub async fn daily_total_token_usage(&self, owner_user_id: &str) -> Result<i64, sqlx::Error> {
         use sqlx::Row;
@@ -7151,13 +11762,12 @@ impl Db {
         owner_user_id: &str,
         provider_id: &str,
     ) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
-            r#"DELETE FROM user_llm_providers WHERE id = $1 AND owner_user_id = $2"#,
-        )
-        .bind(provider_id)
-        .bind(owner_user_id)
-        .execute(&self.pool)
-        .await?;
+        let result =
+            sqlx::query(r#"DELETE FROM user_llm_providers WHERE id = $1 AND owner_user_id = $2"#)
+                .bind(provider_id)
+                .bind(owner_user_id)
+                .execute(&self.pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -7177,8 +11787,11 @@ impl Db {
         reason: Option<&str>,
         context: Option<&str>,
     ) -> Result<(), sqlx::Error> {
-        let archived_at: Option<chrono::DateTime<chrono::Utc>> =
-            if status == "archived" { Some(chrono::Utc::now()) } else { None };
+        let archived_at: Option<chrono::DateTime<chrono::Utc>> = if status == "archived" {
+            Some(chrono::Utc::now())
+        } else {
+            None
+        };
         sqlx::query(
             r#"INSERT INTO afp_para_classifications
                    (id, user_id, target_id, para_tags, status, archived_at, reason, context)
@@ -7282,6 +11895,986 @@ impl Db {
                 })
             })
             .collect())
+    }
+
+    /// Fetch retained file-backed and note-backed resources for the user's
+    /// private workspace, joined with source-message supertags so file
+    /// browsing can reuse the existing tagging and knowledge-linking model.
+    pub async fn list_private_attachments_library(
+        &self,
+        user_id: &str,
+        query: Option<&str>,
+        tag: Option<&str>,
+        category: Option<&str>,
+        source_kind: Option<&str>,
+        availability: Option<&str>,
+        knowledge_mode: Option<&str>,
+        retention_mode: Option<&str>,
+        academic_kind: Option<&str>,
+        course_tag: Option<&str>,
+        week_tag: Option<&str>,
+        lecture_tag: Option<&str>,
+        chapter_tag: Option<&str>,
+        unit_tag: Option<&str>,
+        zettelkasten_stage: Option<&str>,
+        sort: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+        let messages_table = tenant_messages_table(user_id);
+        let attachments_table = tenant_attachments_table(user_id);
+        let mut supertag_definitions = Vec::new();
+        let query_pattern = query
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| format!("%{}%", value.to_ascii_lowercase()));
+        let tag_filter = tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let expanded_tag_filter = if let Some(tag_filter_value) = &tag_filter {
+            supertag_definitions = self.load_supertag_definitions_for_user(user_id).await?;
+            let expanded = Self::expand_supertag_query_tags_from_definitions(
+                &supertag_definitions,
+                std::slice::from_ref(tag_filter_value),
+            );
+            let lowered = expanded
+                .into_iter()
+                .filter_map(|value| Self::normalized_supertag_key(&value))
+                .collect::<Vec<_>>();
+            Some(if lowered.is_empty() {
+                vec![tag_filter_value.to_ascii_lowercase()]
+            } else {
+                lowered
+            })
+        } else {
+            None
+        };
+        let category_filter = category
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let source_kind_filter = source_kind
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let availability_filter = availability
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let knowledge_mode_filter = knowledge_mode
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let retention_mode_filter = retention_mode
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let academic_kind_filter = academic_kind
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let course_tag_filter = course_tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let week_tag_filter = week_tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let lecture_tag_filter = lecture_tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let chapter_tag_filter = chapter_tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let unit_tag_filter = unit_tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let zettelkasten_stage_filter = zettelkasten_stage
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let category_case = r#"CASE
+                   WHEN LOWER(r.mime_type) ~ 'pdf|word|document|text|markdown|presentation|powerpoint'
+                     OR LOWER(r.name) ~ '\.(pdf|doc|docx|txt|md|ppt|pptx)$'
+                     THEN 'study'
+                   WHEN LOWER(r.mime_type) ~ 'audio|mpeg|wav|m4a|aac|ogg'
+                     OR LOWER(r.name) ~ '\.(mp3|wav|m4a|aac|ogg)$'
+                     THEN 'audio'
+                   WHEN LOWER(r.mime_type) ~ 'image|png|jpeg|jpg|gif|webp'
+                     OR LOWER(r.name) ~ '\.(png|jpg|jpeg|gif|webp)$'
+                     THEN 'image'
+                   WHEN LOWER(r.mime_type) ~ 'csv|json|sheet|excel|spreadsheet'
+                     OR LOWER(r.name) ~ '\.(csv|tsv|json|xls|xlsx)$'
+                     THEN 'data'
+                   ELSE 'other'
+               END"#;
+        let order_by = match sort.map(str::trim).filter(|value| !value.is_empty()) {
+            Some("oldest") => "r.created_at ASC, r.id ASC",
+            Some("largest") => "r.size_bytes DESC, r.created_at DESC, r.id DESC",
+            Some("smallest") => "r.size_bytes ASC, r.created_at ASC, r.id ASC",
+            Some("name") => "LOWER(r.name) ASC, r.created_at DESC, r.id DESC",
+            _ => "r.created_at DESC, r.id DESC",
+        };
+        let rows = sqlx::query(&format!(
+            r#"WITH attachment_resources AS (
+                   SELECT
+                       a.id,
+                       a.message_id,
+                       a.thread_id,
+                       a.thread_id AS source_thread_id,
+                       a.name,
+                       a.mime_type,
+                       a.size_bytes,
+                       a.storage,
+                       a.encryption,
+                       a.sha256,
+                       a.created_at,
+                       m.timestamp AS source_timestamp,
+                       m.type AS source_type,
+                       COALESCE(NULLIF(m.kind, ''), m.type) AS source_kind,
+                       m.summary AS source_summary,
+                       m.metadata AS source_metadata,
+                       m.supertags,
+                       derived.id AS derived_message_id,
+                       derived.thread_id AS derived_thread_id,
+                       derived.type AS derived_type
+                   FROM {attachments_table} a
+                   JOIN {messages_table} m ON m.id = a.message_id
+                   LEFT JOIN LATERAL (
+                       SELECT d.id, d.thread_id, d.type
+                       FROM {messages_table} d
+                       WHERE COALESCE(d.metadata->>'knowledge_pipeline', '') = 'connected_notes_ingest'
+                         AND LOWER(COALESCE(d.metadata->>'ephemeral_output', 'false')) <> 'true'
+                         AND COALESCE(d.metadata->>'source_message_id', '') = a.message_id
+                       ORDER BY d.timestamp DESC, d.id DESC
+                       LIMIT 1
+                   ) derived ON TRUE
+               ),
+               derived_only_resources AS (
+                   SELECT
+                       CONCAT('derived:', m.id) AS id,
+                       COALESCE(m.metadata->>'source_message_id', m.id) AS message_id,
+                       m.thread_id,
+                       NULL::text AS source_thread_id,
+                       COALESCE(
+                           NULLIF(m.metadata->>'source_file_name', ''),
+                           NULLIF(m.content->>'title', ''),
+                           NULLIF(m.summary, ''),
+                           m.id
+                       ) AS name,
+                       COALESCE(
+                           NULLIF(m.metadata->>'mime_type', ''),
+                           NULLIF(m.content->>'content_type', ''),
+                           'text/plain'
+                       ) AS mime_type,
+                       OCTET_LENGTH(COALESCE(m.content->>'content_text', m.content->>'text', m.summary, ''))::bigint AS size_bytes,
+                       '{{}}'::jsonb AS storage,
+                       COALESCE(m.encryption, '{{}}'::jsonb) AS encryption,
+                       NULL::text AS sha256,
+                       m.created_at,
+                       m.timestamp AS source_timestamp,
+                       m.type AS source_type,
+                       COALESCE(NULLIF(m.kind, ''), m.type) AS source_kind,
+                       m.summary AS source_summary,
+                       m.metadata AS source_metadata,
+                       m.supertags,
+                       m.id AS derived_message_id,
+                       m.thread_id AS derived_thread_id,
+                       m.type AS derived_type
+                   FROM {messages_table} m
+                   WHERE COALESCE(m.metadata->>'knowledge_pipeline', '') = 'connected_notes_ingest'
+                     AND LOWER(COALESCE(m.metadata->>'source_persisted', 'false')) = 'false'
+                     AND LOWER(COALESCE(m.metadata->>'derived_content_persisted', 'false')) = 'true'
+                     AND LOWER(COALESCE(m.metadata->>'ephemeral_output', 'false')) <> 'true'
+                     AND COALESCE(m.metadata->>'source_message_id', '') <> ''
+                     AND NOT EXISTS (
+                         SELECT 1
+                         FROM {attachments_table} a
+                         WHERE a.message_id = COALESCE(m.metadata->>'source_message_id', '')
+                     )
+               ),
+               library_resources AS (
+                   SELECT * FROM attachment_resources
+                   UNION ALL
+                   SELECT * FROM derived_only_resources
+               )
+               SELECT
+                   r.id,
+                   r.message_id,
+                   r.thread_id,
+                   r.source_thread_id,
+                   r.name,
+                   r.mime_type,
+                   r.size_bytes,
+                   r.storage,
+                   r.encryption,
+                   r.sha256,
+                   r.created_at,
+                   r.source_timestamp,
+                   r.source_type,
+                   r.source_kind,
+                   r.source_summary,
+                   r.source_metadata,
+                   r.supertags,
+                   r.derived_message_id,
+                   r.derived_thread_id,
+                   r.derived_type
+               FROM library_resources r
+               WHERE ($1::text IS NULL
+                      OR LOWER(r.name) LIKE $1
+                      OR LOWER(r.mime_type) LIKE $1
+                      OR LOWER(COALESCE(r.sha256, '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_summary, '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_kind, '')) LIKE $1
+                      OR LOWER(COALESCE(r.derived_type, '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'source_file_name', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'knowledge_mode', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_kind', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_course_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_week_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_lecture_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_chapter_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_unit_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_module_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_instructor_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_summary', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'zettelkasten_stage', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'zettelkasten_entry_type', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'zettelkasten_next_action', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'knowledge_graph_group_key', '')) LIKE $1
+                      OR EXISTS (
+                          SELECT 1
+                          FROM jsonb_array_elements_text(
+                              CASE
+                                  WHEN jsonb_typeof(r.source_metadata->'knowledge_graph_link_tags') = 'array'
+                                  THEN r.source_metadata->'knowledge_graph_link_tags'
+                                  ELSE '[]'::jsonb
+                              END
+                          ) AS graph_tag
+                          WHERE LOWER(graph_tag) LIKE $1
+                      )
+                      OR LOWER(COALESCE(r.source_metadata->>'attachment_retention_label', '')) LIKE $1
+                      OR EXISTS (
+                          SELECT 1
+                          FROM unnest(r.supertags) AS t
+                          WHERE LOWER(t) LIKE $1
+                      ))
+                 AND ($2::text[] IS NULL
+                      OR EXISTS (
+                          SELECT 1
+                          FROM unnest(r.supertags) AS t
+                          WHERE LOWER(t) = ANY($2)
+                      ))
+                 AND (
+                      $3::text IS NULL
+                      OR {category_case} = $3
+                 )
+                 AND (
+                      $4::text IS NULL
+                      OR ($4 = 'unclassified' AND COALESCE(r.source_kind, '') = '')
+                      OR LOWER(COALESCE(r.source_kind, '')) = LOWER($4)
+                 )
+                 AND (
+                      $5::text IS NULL
+                      OR (
+                          $5 = 'downloadable'
+                          AND COALESCE(r.storage->>'download_url', '') <> ''
+                      )
+                      OR (
+                          $5 = 'extracted_only'
+                          AND COALESCE(r.storage->>'download_url', '') = ''
+                          AND LOWER(COALESCE(r.source_metadata->>'attachment_retention_mode', '')) = 'keep_extracted_only'
+                      )
+                      OR (
+                          $5 = 'session_only'
+                          AND COALESCE(r.storage->>'download_url', '') = ''
+                          AND LOWER(COALESCE(r.source_metadata->>'attachment_retention_mode', '')) = 'keep_nothing'
+                      )
+                      OR (
+                          $5 = 'unavailable'
+                          AND COALESCE(r.storage->>'download_url', '') = ''
+                          AND COALESCE(r.source_metadata->>'attachment_retention_mode', '') = ''
+                      )
+                 )
+                 AND (
+                      $6::text IS NULL
+                      OR ($6 = 'unclassified' AND COALESCE(r.source_metadata->>'knowledge_mode', '') = '')
+                      OR LOWER(COALESCE(r.source_metadata->>'knowledge_mode', '')) = LOWER($6)
+                 )
+                 AND (
+                      $7::text IS NULL
+                      OR ($7 = 'unknown' AND COALESCE(r.source_metadata->>'attachment_retention_mode', '') = '')
+                      OR LOWER(COALESCE(r.source_metadata->>'attachment_retention_mode', '')) = LOWER($7)
+                 )
+                 AND (
+                      $8::text IS NULL
+                      OR ($8 = 'unclassified' AND COALESCE(r.source_metadata->>'academic_kind', '') = '')
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_kind', '')) = LOWER($8)
+                 )
+                 AND (
+                      $9::text IS NULL
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_course_tag', '')) = LOWER($9)
+                 )
+                 AND (
+                      $10::text IS NULL
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_week_tag', '')) = LOWER($10)
+                 )
+                 AND (
+                      $11::text IS NULL
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_lecture_tag', '')) = LOWER($11)
+                 )
+                 AND (
+                      $12::text IS NULL
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_chapter_tag', '')) = LOWER($12)
+                 )
+                 AND (
+                      $13::text IS NULL
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_unit_tag', '')) = LOWER($13)
+                 )
+                 AND (
+                      $14::text IS NULL
+                      OR ($14 = 'unclassified' AND COALESCE(r.source_metadata->>'zettelkasten_stage', '') = '')
+                      OR LOWER(COALESCE(r.source_metadata->>'zettelkasten_stage', '')) = LOWER($14)
+                 )
+               ORDER BY {order_by}
+               LIMIT $15"#,
+            category_case = category_case,
+        ))
+        .bind(query_pattern)
+        .bind(expanded_tag_filter)
+        .bind(category_filter)
+        .bind(source_kind_filter)
+        .bind(availability_filter)
+        .bind(knowledge_mode_filter)
+        .bind(retention_mode_filter)
+        .bind(academic_kind_filter)
+        .bind(course_tag_filter)
+        .bind(week_tag_filter)
+        .bind(lecture_tag_filter)
+        .bind(chapter_tag_filter)
+        .bind(unit_tag_filter)
+        .bind(zettelkasten_stage_filter)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let definitions = if rows.is_empty() {
+            supertag_definitions
+        } else {
+            if supertag_definitions.is_empty() {
+                self.load_supertag_definitions_for_user(user_id).await?
+            } else {
+                supertag_definitions
+            }
+        };
+
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let storage = row
+                    .try_get::<Option<Value>, _>("storage")
+                    .unwrap_or(None)
+                    .unwrap_or_else(|| Value::Object(Default::default()));
+                let source_metadata = row
+                    .try_get::<Option<Value>, _>("source_metadata")
+                    .unwrap_or(None)
+                    .unwrap_or_else(|| Value::Object(Default::default()));
+                let download_url = storage
+                    .get("download_url")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                let raw_supertags = row.try_get::<Vec<String>, _>("supertags").unwrap_or_default();
+                let source_supertags =
+                    Self::canonicalize_supertags_from_definitions(&definitions, &raw_supertags);
+                serde_json::json!({
+                    "id": row.try_get::<String, _>("id").unwrap_or_default(),
+                    "message_id": row.try_get::<String, _>("message_id").unwrap_or_default(),
+                    "thread_id": row.try_get::<String, _>("thread_id").unwrap_or_default(),
+                    "source_thread_id": row.try_get::<Option<String>, _>("source_thread_id").unwrap_or(None),
+                    "name": row.try_get::<String, _>("name").unwrap_or_default(),
+                    "mime_type": row.try_get::<String, _>("mime_type").unwrap_or_default(),
+                    "size_bytes": row.try_get::<i64, _>("size_bytes").unwrap_or(0),
+                    "storage": storage,
+                    "encryption": row
+                        .try_get::<Option<Value>, _>("encryption")
+                        .unwrap_or(None)
+                        .unwrap_or_else(|| Value::Object(Default::default())),
+                    "sha256": row.try_get::<Option<String>, _>("sha256").unwrap_or(None),
+                    "created_at": row
+                        .try_get::<chrono::DateTime<chrono::Utc>, _>("created_at")
+                        .map(|value| value.to_rfc3339())
+                        .unwrap_or_default(),
+                    "source_timestamp": row
+                        .try_get::<chrono::DateTime<chrono::Utc>, _>("source_timestamp")
+                        .map(|value| value.to_rfc3339())
+                        .unwrap_or_default(),
+                    "source_type": row.try_get::<String, _>("source_type").unwrap_or_default(),
+                    "source_kind": row.try_get::<Option<String>, _>("source_kind").unwrap_or(None),
+                    "source_summary": row.try_get::<Option<String>, _>("source_summary").unwrap_or(None),
+                    "source_metadata": source_metadata,
+                    "source_supertags": source_supertags,
+                    "download_url": download_url,
+                    "derived_message_id": row.try_get::<Option<String>, _>("derived_message_id").unwrap_or(None),
+                    "derived_thread_id": row.try_get::<Option<String>, _>("derived_thread_id").unwrap_or(None),
+                    "derived_type": row.try_get::<Option<String>, _>("derived_type").unwrap_or(None),
+                })
+            })
+            .collect())
+    }
+
+    pub async fn summarize_private_attachments_library(
+        &self,
+        user_id: &str,
+        query: Option<&str>,
+        tag: Option<&str>,
+        category: Option<&str>,
+        source_kind: Option<&str>,
+        availability: Option<&str>,
+        knowledge_mode: Option<&str>,
+        retention_mode: Option<&str>,
+        academic_kind: Option<&str>,
+        course_tag: Option<&str>,
+        week_tag: Option<&str>,
+        lecture_tag: Option<&str>,
+        chapter_tag: Option<&str>,
+        unit_tag: Option<&str>,
+        zettelkasten_stage: Option<&str>,
+    ) -> Result<serde_json::Value, sqlx::Error> {
+        let messages_table = tenant_messages_table(user_id);
+        let attachments_table = tenant_attachments_table(user_id);
+        let mut supertag_definitions = Vec::new();
+        let query_pattern = query
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| format!("%{}%", value.to_ascii_lowercase()));
+        let tag_filter = tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let expanded_tag_filter = if let Some(tag_filter_value) = &tag_filter {
+            supertag_definitions = self.load_supertag_definitions_for_user(user_id).await?;
+            let expanded = Self::expand_supertag_query_tags_from_definitions(
+                &supertag_definitions,
+                std::slice::from_ref(tag_filter_value),
+            );
+            let lowered = expanded
+                .into_iter()
+                .filter_map(|value| Self::normalized_supertag_key(&value))
+                .collect::<Vec<_>>();
+            Some(if lowered.is_empty() {
+                vec![tag_filter_value.to_ascii_lowercase()]
+            } else {
+                lowered
+            })
+        } else {
+            None
+        };
+        let category_filter = category
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let source_kind_filter = source_kind
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let availability_filter = availability
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let knowledge_mode_filter = knowledge_mode
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let retention_mode_filter = retention_mode
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let academic_kind_filter = academic_kind
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let course_tag_filter = course_tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let week_tag_filter = week_tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let lecture_tag_filter = lecture_tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let chapter_tag_filter = chapter_tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let unit_tag_filter = unit_tag
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let zettelkasten_stage_filter = zettelkasten_stage
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let category_case = r#"CASE
+                                WHEN LOWER(name) ~ '\.(pdf|doc|docx|txt|md|ppt|pptx)$'
+                                  OR LOWER(mime_type) ~ 'pdf|word|document|text|markdown|presentation|powerpoint'
+                                  THEN 'study'
+                                WHEN LOWER(name) ~ '\.(mp3|wav|m4a|aac|ogg)$'
+                                  OR LOWER(mime_type) ~ 'audio|mpeg|wav|m4a|aac|ogg'
+                                  THEN 'audio'
+                                WHEN LOWER(name) ~ '\.(png|jpg|jpeg|gif|webp)$'
+                                  OR LOWER(mime_type) ~ 'image|png|jpeg|jpg|gif|webp'
+                                  THEN 'image'
+                                WHEN LOWER(name) ~ '\.(csv|tsv|json|xls|xlsx)$'
+                                  OR LOWER(mime_type) ~ 'csv|json|sheet|excel|spreadsheet'
+                                  THEN 'data'
+                                ELSE 'other'
+                            END"#;
+        let row = sqlx::query(&format!(
+            r#"
+            WITH attachment_resources AS (
+                SELECT
+                    a.name,
+                    a.mime_type,
+                    a.size_bytes,
+                    a.sha256,
+                    a.storage,
+                    COALESCE(NULLIF(m.kind, ''), m.type) AS source_kind,
+                    m.summary AS source_summary,
+                    m.metadata AS source_metadata,
+                    m.supertags
+                FROM {attachments_table} a
+                JOIN {messages_table} m ON m.id = a.message_id
+            ),
+            derived_only_resources AS (
+                SELECT
+                    COALESCE(
+                        NULLIF(m.metadata->>'source_file_name', ''),
+                        NULLIF(m.content->>'title', ''),
+                        NULLIF(m.summary, ''),
+                        m.id
+                    ) AS name,
+                    COALESCE(
+                        NULLIF(m.metadata->>'mime_type', ''),
+                        NULLIF(m.content->>'content_type', ''),
+                        'text/plain'
+                    ) AS mime_type,
+                    OCTET_LENGTH(COALESCE(m.content->>'content_text', m.content->>'text', m.summary, ''))::bigint AS size_bytes,
+                    NULL::text AS sha256,
+                    '{{}}'::jsonb AS storage,
+                    COALESCE(NULLIF(m.kind, ''), m.type) AS source_kind,
+                    m.summary AS source_summary,
+                    m.metadata AS source_metadata,
+                    m.supertags
+                FROM {messages_table} m
+                WHERE COALESCE(m.metadata->>'knowledge_pipeline', '') = 'connected_notes_ingest'
+                  AND LOWER(COALESCE(m.metadata->>'source_persisted', 'false')) = 'false'
+                  AND LOWER(COALESCE(m.metadata->>'derived_content_persisted', 'false')) = 'true'
+                  AND LOWER(COALESCE(m.metadata->>'ephemeral_output', 'false')) <> 'true'
+                  AND COALESCE(m.metadata->>'source_message_id', '') <> ''
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM {attachments_table} a
+                      WHERE a.message_id = COALESCE(m.metadata->>'source_message_id', '')
+                  )
+            ),
+            library_resources AS (
+                SELECT * FROM attachment_resources
+                UNION ALL
+                SELECT * FROM derived_only_resources
+            ),
+            filtered AS (
+                SELECT
+                    r.name,
+                    r.mime_type,
+                    r.size_bytes,
+                    r.sha256,
+                    r.storage,
+                    r.source_kind,
+                    r.source_summary,
+                    r.source_metadata,
+                    r.supertags
+                FROM library_resources r
+                WHERE ($1::text IS NULL
+                       OR LOWER(r.name) LIKE $1
+                       OR LOWER(r.mime_type) LIKE $1
+                       OR LOWER(COALESCE(r.sha256, '')) LIKE $1
+                       OR LOWER(COALESCE(r.source_summary, '')) LIKE $1
+                       OR LOWER(COALESCE(r.source_kind, '')) LIKE $1
+                       OR LOWER(COALESCE(r.source_metadata->>'knowledge_mode', '')) LIKE $1
+                       OR LOWER(COALESCE(r.source_metadata->>'academic_kind', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_course_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_week_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_lecture_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_chapter_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_unit_tag', '')) LIKE $1
+                      OR LOWER(COALESCE(r.source_metadata->>'academic_module_tag', '')) LIKE $1
+                       OR LOWER(COALESCE(r.source_metadata->>'academic_instructor_tag', '')) LIKE $1
+                       OR LOWER(COALESCE(r.source_metadata->>'academic_summary', '')) LIKE $1
+                       OR LOWER(COALESCE(r.source_metadata->>'zettelkasten_stage', '')) LIKE $1
+                       OR LOWER(COALESCE(r.source_metadata->>'zettelkasten_entry_type', '')) LIKE $1
+                       OR LOWER(COALESCE(r.source_metadata->>'zettelkasten_next_action', '')) LIKE $1
+                       OR LOWER(COALESCE(r.source_metadata->>'knowledge_graph_group_key', '')) LIKE $1
+                       OR EXISTS (
+                           SELECT 1
+                           FROM jsonb_array_elements_text(
+                               CASE
+                                   WHEN jsonb_typeof(r.source_metadata->'knowledge_graph_link_tags') = 'array'
+                                   THEN r.source_metadata->'knowledge_graph_link_tags'
+                                   ELSE '[]'::jsonb
+                               END
+                           ) AS graph_tag
+                           WHERE LOWER(graph_tag) LIKE $1
+                       )
+                       OR LOWER(COALESCE(r.source_metadata->>'attachment_retention_label', '')) LIKE $1
+                       OR EXISTS (
+                           SELECT 1
+                           FROM unnest(r.supertags) AS t
+                           WHERE LOWER(t) LIKE $1
+                       ))
+                  AND ($2::text[] IS NULL
+                       OR EXISTS (
+                           SELECT 1
+                           FROM unnest(r.supertags) AS t
+                           WHERE LOWER(t) = ANY($2)
+                       ))
+                  AND (
+                       $3::text IS NULL
+                       OR {category_case} = $3
+                  )
+                  AND (
+                       $4::text IS NULL
+                       OR ($4 = 'unclassified' AND COALESCE(r.source_kind, '') = '')
+                       OR LOWER(COALESCE(r.source_kind, '')) = LOWER($4)
+                  )
+                  AND (
+                       $5::text IS NULL
+                       OR (
+                           $5 = 'downloadable'
+                           AND COALESCE(r.storage->>'download_url', '') <> ''
+                       )
+                       OR (
+                           $5 = 'extracted_only'
+                           AND COALESCE(r.storage->>'download_url', '') = ''
+                           AND LOWER(COALESCE(r.source_metadata->>'attachment_retention_mode', '')) = 'keep_extracted_only'
+                       )
+                       OR (
+                           $5 = 'session_only'
+                           AND COALESCE(r.storage->>'download_url', '') = ''
+                           AND LOWER(COALESCE(r.source_metadata->>'attachment_retention_mode', '')) = 'keep_nothing'
+                       )
+                       OR (
+                           $5 = 'unavailable'
+                           AND COALESCE(r.storage->>'download_url', '') = ''
+                           AND COALESCE(r.source_metadata->>'attachment_retention_mode', '') = ''
+                       )
+                  )
+                  AND (
+                       $6::text IS NULL
+                       OR ($6 = 'unclassified' AND COALESCE(r.source_metadata->>'knowledge_mode', '') = '')
+                       OR LOWER(COALESCE(r.source_metadata->>'knowledge_mode', '')) = LOWER($6)
+                  )
+                  AND (
+                       $7::text IS NULL
+                       OR ($7 = 'unknown' AND COALESCE(r.source_metadata->>'attachment_retention_mode', '') = '')
+                       OR LOWER(COALESCE(r.source_metadata->>'attachment_retention_mode', '')) = LOWER($7)
+                  )
+                  AND (
+                       $8::text IS NULL
+                       OR ($8 = 'unclassified' AND COALESCE(r.source_metadata->>'academic_kind', '') = '')
+                       OR LOWER(COALESCE(r.source_metadata->>'academic_kind', '')) = LOWER($8)
+                  )
+                  AND (
+                       $9::text IS NULL
+                       OR LOWER(COALESCE(r.source_metadata->>'academic_course_tag', '')) = LOWER($9)
+                  )
+                  AND (
+                       $10::text IS NULL
+                       OR LOWER(COALESCE(r.source_metadata->>'academic_week_tag', '')) = LOWER($10)
+                  )
+                  AND (
+                       $11::text IS NULL
+                       OR LOWER(COALESCE(r.source_metadata->>'academic_lecture_tag', '')) = LOWER($11)
+                  )
+                  AND (
+                       $12::text IS NULL
+                       OR LOWER(COALESCE(r.source_metadata->>'academic_chapter_tag', '')) = LOWER($12)
+                  )
+                  AND (
+                       $13::text IS NULL
+                       OR LOWER(COALESCE(r.source_metadata->>'academic_unit_tag', '')) = LOWER($13)
+                  )
+                  AND (
+                       $14::text IS NULL
+                       OR ($14 = 'unclassified' AND COALESCE(r.source_metadata->>'zettelkasten_stage', '') = '')
+                       OR LOWER(COALESCE(r.source_metadata->>'zettelkasten_stage', '')) = LOWER($14)
+                  )
+            )
+            SELECT
+                COUNT(*)::bigint AS matching_count,
+                COALESCE(SUM(size_bytes), 0)::bigint AS visible_bytes,
+                COUNT(*) FILTER (
+                    WHERE cardinality(COALESCE(supertags, ARRAY[]::text[])) > 0
+                )::bigint AS linked_count,
+                COALESCE((
+                    SELECT jsonb_build_object(
+                        'downloadable', COUNT(*) FILTER (
+                            WHERE COALESCE(storage->>'download_url', '') <> ''
+                        ),
+                        'extracted_only', COUNT(*) FILTER (
+                            WHERE LOWER(COALESCE(source_metadata->>'attachment_retention_mode', '')) = 'keep_extracted_only'
+                        ),
+                        'session_only', COUNT(*) FILTER (
+                            WHERE LOWER(COALESCE(source_metadata->>'attachment_retention_mode', '')) = 'keep_nothing'
+                        ),
+                        'unavailable', COUNT(*) FILTER (
+                            WHERE COALESCE(storage->>'download_url', '') = ''
+                              AND COALESCE(source_metadata->>'attachment_retention_mode', '') = ''
+                        )
+                    )
+                    FROM filtered
+                ), '{{}}'::jsonb) AS availability_counts,
+                COALESCE((
+                    SELECT jsonb_agg(
+                        jsonb_build_object('tag', tag, 'count', tag_count)
+                        ORDER BY tag_count DESC, tag ASC
+                    )
+                    FROM (
+                        SELECT
+                            t AS tag,
+                            COUNT(*)::bigint AS tag_count
+                        FROM filtered
+                        CROSS JOIN LATERAL unnest(supertags) AS t
+                        WHERE BTRIM(t) <> ''
+                        GROUP BY t
+                        ORDER BY COUNT(*) DESC, t ASC
+                        LIMIT 64
+                    ) top_tags
+                ), '[]'::jsonb) AS top_tags,
+                COALESCE((
+                    SELECT jsonb_object_agg(category_key, category_count)
+                    FROM (
+                        SELECT
+                            {category_case} AS category_key,
+                            COUNT(*)::bigint AS category_count
+                        FROM filtered
+                        GROUP BY 1
+                    ) category_totals
+                ), '{{}}'::jsonb) AS category_counts,
+                COALESCE((
+                    SELECT jsonb_object_agg(kind_key, kind_count)
+                    FROM (
+                        SELECT
+                            CASE
+                                WHEN COALESCE(NULLIF(LOWER(source_kind), ''), '') = ''
+                                    THEN 'unclassified'
+                                ELSE LOWER(source_kind)
+                            END AS kind_key,
+                            COUNT(*)::bigint AS kind_count
+                        FROM filtered
+                        GROUP BY 1
+                    ) source_kind_totals
+                ), '{{}}'::jsonb) AS source_kind_counts,
+                COALESCE((
+                    SELECT jsonb_object_agg(mode_key, mode_count)
+                    FROM (
+                        SELECT
+                            CASE
+                                WHEN COALESCE(NULLIF(LOWER(source_metadata->>'knowledge_mode'), ''), '') = ''
+                                    THEN 'unclassified'
+                                ELSE LOWER(source_metadata->>'knowledge_mode')
+                            END AS mode_key,
+                            COUNT(*)::bigint AS mode_count
+                        FROM filtered
+                        GROUP BY 1
+                    ) knowledge_totals
+                ), '{{}}'::jsonb) AS knowledge_counts,
+                COALESCE((
+                    SELECT jsonb_object_agg(mode_key, mode_count)
+                    FROM (
+                        SELECT
+                            CASE
+                                WHEN COALESCE(NULLIF(LOWER(source_metadata->>'attachment_retention_mode'), ''), '') = ''
+                                    THEN 'unknown'
+                                ELSE LOWER(source_metadata->>'attachment_retention_mode')
+                            END AS mode_key,
+                            COUNT(*)::bigint AS mode_count
+                        FROM filtered
+                        GROUP BY 1
+                    ) retention_totals
+                ), '{{}}'::jsonb) AS retention_counts,
+                COALESCE((
+                    SELECT jsonb_object_agg(kind_key, kind_count)
+                    FROM (
+                        SELECT
+                            CASE
+                                WHEN COALESCE(NULLIF(LOWER(source_metadata->>'academic_kind'), ''), '') = ''
+                                    THEN 'unclassified'
+                                ELSE LOWER(source_metadata->>'academic_kind')
+                            END AS kind_key,
+                            COUNT(*)::bigint AS kind_count
+                        FROM filtered
+                        GROUP BY 1
+                    ) academic_kind_totals
+                ), '{{}}'::jsonb) AS academic_kind_counts,
+                COALESCE((
+                    SELECT jsonb_object_agg(course_key, course_count)
+                    FROM (
+                        SELECT
+                            LOWER(source_metadata->>'academic_course_tag') AS course_key,
+                            COUNT(*)::bigint AS course_count
+                        FROM filtered
+                        WHERE COALESCE(NULLIF(source_metadata->>'academic_course_tag', ''), '') <> ''
+                        GROUP BY 1
+                    ) course_totals
+                ), '{{}}'::jsonb) AS course_tag_counts,
+                COALESCE((
+                    SELECT jsonb_object_agg(unit_key, unit_count)
+                    FROM (
+                        SELECT
+                            LOWER(source_metadata->>'academic_unit_tag') AS unit_key,
+                            COUNT(*)::bigint AS unit_count
+                        FROM filtered
+                        WHERE COALESCE(NULLIF(source_metadata->>'academic_unit_tag', ''), '') <> ''
+                        GROUP BY 1
+                    ) unit_totals
+                ), '{{}}'::jsonb) AS unit_tag_counts,
+                COALESCE((
+                    SELECT jsonb_object_agg(chapter_key, chapter_count)
+                    FROM (
+                        SELECT
+                            LOWER(source_metadata->>'academic_chapter_tag') AS chapter_key,
+                            COUNT(*)::bigint AS chapter_count
+                        FROM filtered
+                        WHERE COALESCE(NULLIF(source_metadata->>'academic_chapter_tag', ''), '') <> ''
+                        GROUP BY 1
+                    ) chapter_totals
+                ), '{{}}'::jsonb) AS chapter_tag_counts,
+                COALESCE((
+                    SELECT jsonb_object_agg(week_key, week_count)
+                    FROM (
+                        SELECT
+                            LOWER(source_metadata->>'academic_week_tag') AS week_key,
+                            COUNT(*)::bigint AS week_count
+                        FROM filtered
+                        WHERE COALESCE(NULLIF(source_metadata->>'academic_week_tag', ''), '') <> ''
+                        GROUP BY 1
+                    ) week_totals
+                ), '{{}}'::jsonb) AS week_tag_counts,
+                COALESCE((
+                    SELECT jsonb_object_agg(lecture_key, lecture_count)
+                    FROM (
+                        SELECT
+                            LOWER(source_metadata->>'academic_lecture_tag') AS lecture_key,
+                            COUNT(*)::bigint AS lecture_count
+                        FROM filtered
+                        WHERE COALESCE(NULLIF(source_metadata->>'academic_lecture_tag', ''), '') <> ''
+                        GROUP BY 1
+                    ) lecture_totals
+                ), '{{}}'::jsonb) AS lecture_tag_counts,
+                COALESCE((
+                    SELECT jsonb_object_agg(stage_key, stage_count)
+                    FROM (
+                        SELECT
+                            CASE
+                                WHEN COALESCE(NULLIF(LOWER(source_metadata->>'zettelkasten_stage'), ''), '') = ''
+                                    THEN 'unclassified'
+                                ELSE LOWER(source_metadata->>'zettelkasten_stage')
+                            END AS stage_key,
+                            COUNT(*)::bigint AS stage_count
+                        FROM filtered
+                        GROUP BY 1
+                    ) zettelkasten_stage_totals
+                ), '{{}}'::jsonb) AS zettelkasten_stage_counts
+            "#,
+            category_case = category_case,
+        ))
+        .bind(query_pattern)
+        .bind(expanded_tag_filter)
+        .bind(category_filter)
+        .bind(source_kind_filter)
+        .bind(availability_filter)
+        .bind(knowledge_mode_filter)
+        .bind(retention_mode_filter)
+        .bind(academic_kind_filter)
+        .bind(course_tag_filter)
+        .bind(week_tag_filter)
+        .bind(lecture_tag_filter)
+        .bind(chapter_tag_filter)
+        .bind(unit_tag_filter)
+        .bind(zettelkasten_stage_filter)
+        .fetch_one(&self.pool)
+        .await?;
+
+        if supertag_definitions.is_empty() {
+            supertag_definitions = self.load_supertag_definitions_for_user(user_id).await?;
+        }
+
+        let top_tags = row
+            .try_get::<Option<Value>, _>("top_tags")
+            .unwrap_or(None)
+            .unwrap_or_else(|| Value::Array(Vec::new()));
+
+        Ok(serde_json::json!({
+            "matching_count": row.try_get::<i64, _>("matching_count").unwrap_or(0),
+            "visible_bytes": row.try_get::<i64, _>("visible_bytes").unwrap_or(0),
+            "linked_count": row.try_get::<i64, _>("linked_count").unwrap_or(0),
+            "top_tags": Self::canonicalize_tag_count_facet_from_definitions(&supertag_definitions, &top_tags, 24),
+            "availability_counts": row
+                .try_get::<Option<Value>, _>("availability_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "category_counts": row
+                .try_get::<Option<Value>, _>("category_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "source_kind_counts": row
+                .try_get::<Option<Value>, _>("source_kind_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "knowledge_counts": row
+                .try_get::<Option<Value>, _>("knowledge_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "retention_counts": row
+                .try_get::<Option<Value>, _>("retention_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "academic_kind_counts": row
+                .try_get::<Option<Value>, _>("academic_kind_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "course_tag_counts": row
+                .try_get::<Option<Value>, _>("course_tag_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "unit_tag_counts": row
+                .try_get::<Option<Value>, _>("unit_tag_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "chapter_tag_counts": row
+                .try_get::<Option<Value>, _>("chapter_tag_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "week_tag_counts": row
+                .try_get::<Option<Value>, _>("week_tag_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "lecture_tag_counts": row
+                .try_get::<Option<Value>, _>("lecture_tag_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+            "zettelkasten_stage_counts": row
+                .try_get::<Option<Value>, _>("zettelkasten_stage_counts")
+                .unwrap_or(None)
+                .unwrap_or_else(|| Value::Object(Default::default())),
+        }))
     }
 
     /// Count how many active items fall into each PARA section for `user_id`.
@@ -7400,9 +12993,17 @@ mod db_pool_settings_tests {
     use super::{
         DatabasePoolSettings, database_pool_settings_from_env, migration_catalog::MIGRATIONS,
     };
+    use std::path::PathBuf;
+    use std::sync::{Mutex, OnceLock};
+
+    fn db_pool_env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn database_pool_settings_use_hardened_defaults() {
+        let _guard = db_pool_env_lock().lock().unwrap();
         let keys = [
             "OMNYID_DB_MAX_CONNECTIONS",
             "OMNYID_DB_MIN_CONNECTIONS",
@@ -7449,13 +13050,81 @@ mod db_pool_settings_tests {
     }
 
     #[test]
-    fn migration_catalog_matches_current_embedded_set() {
-        assert_eq!(MIGRATIONS.len(), 64);
-        assert_eq!(MIGRATIONS.first().map(|entry| entry.0), Some("0001_init"));
+    fn database_pool_settings_accept_hardened_env_overrides() {
+        let _guard = db_pool_env_lock().lock().unwrap();
+        let keys = [
+            "OMNYID_DB_MAX_CONNECTIONS",
+            "OMNYID_DB_MIN_CONNECTIONS",
+            "OMNYID_DB_ACQUIRE_TIMEOUT_SECS",
+            "OMNYID_DB_IDLE_TIMEOUT_SECS",
+            "OMNYID_DB_MAX_LIFETIME_SECS",
+            "OMNYID_DB_STATEMENT_TIMEOUT_MS",
+            "OMNYID_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
+        ];
+        let previous = keys
+            .iter()
+            .map(|key| ((*key).to_string(), std::env::var(key).ok()))
+            .collect::<Vec<_>>();
+
+        unsafe {
+            std::env::set_var("OMNYID_DB_MAX_CONNECTIONS", "48");
+            std::env::set_var("OMNYID_DB_MIN_CONNECTIONS", "6");
+            std::env::set_var("OMNYID_DB_ACQUIRE_TIMEOUT_SECS", "15");
+            std::env::set_var("OMNYID_DB_IDLE_TIMEOUT_SECS", "600");
+            std::env::set_var("OMNYID_DB_MAX_LIFETIME_SECS", "2400");
+            std::env::set_var("OMNYID_DB_STATEMENT_TIMEOUT_MS", "45000");
+            std::env::set_var("OMNYID_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS", "20000");
+        }
+
+        let settings = database_pool_settings_from_env();
         assert_eq!(
-            MIGRATIONS.last().map(|entry| entry.0),
-            Some("0064_afp_kind_and_seaweedfs")
+            settings,
+            DatabasePoolSettings {
+                max_connections: 48,
+                min_connections: 6,
+                acquire_timeout_secs: 15,
+                idle_timeout_secs: 600,
+                max_lifetime_secs: 2400,
+                statement_timeout_ms: 45_000,
+                idle_in_transaction_timeout_ms: 20_000,
+            }
         );
+
+        unsafe {
+            for (key, value) in previous {
+                if let Some(value) = value {
+                    std::env::set_var(key, value);
+                } else {
+                    std::env::remove_var(key);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn migration_catalog_matches_current_embedded_set() {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let migrations_dir = manifest_dir.join("postgres").join("migrations");
+        let expected_versions = std::fs::read_dir(&migrations_dir)
+            .expect("postgres/migrations must exist")
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("sql"))
+            .filter_map(|path| {
+                path.file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .map(|stem| stem.to_string())
+            })
+            .collect::<Vec<_>>();
+        let mut expected_versions = expected_versions;
+        expected_versions.sort();
+
+        let actual_versions = MIGRATIONS
+            .iter()
+            .map(|entry| entry.0.to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(actual_versions, expected_versions);
     }
 }
 
@@ -7492,6 +13161,249 @@ pub struct UserRecord {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UserAccountStatusRecord {
+    pub user_id: String,
+    pub account_status: String,
+    pub account_status_reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OperatorUserSummaryRecord {
+    pub user_id: String,
+    pub email: String,
+    pub display_name: String,
+    pub auth_provider: String,
+    pub created_at: String,
+    pub email_verified: bool,
+    pub plan: String,
+    pub billing_status: String,
+    pub last_session_at: Option<String>,
+    pub account_status: String,
+    pub account_status_reason: Option<String>,
+    pub support_access_status: String,
+    pub support_access_expires_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WeddingWaitlistSignupRecord {
+    pub signup_id: String,
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub expected_wedding_date: Option<String>,
+    pub source: String,
+    pub created_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WeddingVendorPhotoRecord {
+    pub photo_id: String,
+    pub vendor_id: String,
+    pub slot: i32,
+    pub photo_url: String,
+    pub alt_text: Option<String>,
+    pub source_label: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WeddingVendorRecord {
+    pub vendor_id: String,
+    pub vendor_slug: String,
+    pub vendor_name: String,
+    pub category: String,
+    pub service_area: String,
+    pub address: Option<String>,
+    pub website_url: Option<String>,
+    pub contact_phone: Option<String>,
+    pub contact_email: Option<String>,
+    pub source_url: Option<String>,
+    pub source_label: Option<String>,
+    pub source_checked_at: Option<String>,
+    pub status: String,
+    pub notes: Option<String>,
+    pub evidence: Value,
+    pub caveat_labels: Vec<String>,
+    pub created_by_user_id: Option<String>,
+    pub updated_by_user_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub photos: Vec<WeddingVendorPhotoRecord>,
+    pub user_contact: Option<WeddingVendorUserContactRecord>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WeddingVendorUpsertRecord {
+    pub vendor_slug: String,
+    pub vendor_name: String,
+    pub category: String,
+    pub service_area: String,
+    pub address: Option<String>,
+    pub website_url: Option<String>,
+    pub contact_phone: Option<String>,
+    pub contact_email: Option<String>,
+    pub source_url: Option<String>,
+    pub source_label: Option<String>,
+    pub source_checked_at: Option<String>,
+    pub status: String,
+    pub notes: Option<String>,
+    pub evidence: Value,
+    pub caveat_labels: Vec<String>,
+    pub photos: Vec<WeddingVendorPhotoUpsertRecord>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WeddingVendorPhotoUpsertRecord {
+    pub slot: i32,
+    pub photo_url: String,
+    pub alt_text: Option<String>,
+    pub source_label: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WeddingVendorUserContactRecord {
+    pub contact_id: String,
+    pub user_id: String,
+    pub vendor_id: String,
+    pub contact_method: String,
+    pub last_contact_at: String,
+    pub response_received_at: Option<String>,
+    pub follow_up_due_at: Option<String>,
+    pub thread_id: Option<String>,
+    pub receipt_ref: Option<String>,
+    pub notes: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GmailTokenRecord {
+    pub user_id: String,
+    pub gmail_email: String,
+    pub refresh_token: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UserConnectedCapabilityRecord {
+    pub id: String,
+    pub user_id: String,
+    pub provider: String,
+    pub account_ref: String,
+    pub capability_family: String,
+    pub capability_id: String,
+    pub transport: String,
+    pub granted_scopes: Vec<String>,
+    pub approval_mode: String,
+    pub secret_ref: Option<String>,
+    pub health_state: String,
+    pub last_checked_at: Option<String>,
+    pub connected_at: String,
+    pub revoked_at: Option<String>,
+    pub metadata_json: Value,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct McpToolConnectionRecord {
+    pub id: String,
+    pub tool_slug: String,
+    pub tool_name: String,
+    pub mcp_server_url: String,
+    pub connected_at: String,
+    pub connection_provider: String,
+    pub external_user_id: Option<String>,
+    pub composio_connected_account_id: Option<String>,
+    pub tool_descriptor: Option<Value>,
+}
+
+#[derive(Clone, Debug)]
+pub struct McpToolConnectionUpsert {
+    pub user_id: String,
+    pub tool_slug: String,
+    pub tool_name: String,
+    pub mcp_server_url: String,
+    pub api_key: Option<String>,
+    pub connection_provider: String,
+    pub external_user_id: Option<String>,
+    pub composio_connected_account_id: Option<String>,
+    pub tool_descriptor: Option<Value>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UserExternalToolUsageEventRecord {
+    pub id: String,
+    pub user_id: String,
+    pub tool_slug: String,
+    pub tool_name: String,
+    pub provider_key: String,
+    pub provider_category: String,
+    pub billing_category: String,
+    pub usage_unit: String,
+    pub quantity: f64,
+    pub estimated_cost_usd: f64,
+    pub currency: String,
+    pub source: String,
+    pub occurred_at: chrono::DateTime<chrono::Utc>,
+    pub recorded_at: chrono::DateTime<chrono::Utc>,
+    pub metadata_json: Value,
+}
+
+#[derive(Clone, Debug)]
+pub struct UserExternalToolUsageEventInsert {
+    pub user_id: String,
+    pub tool_slug: String,
+    pub tool_name: String,
+    pub provider_key: String,
+    pub provider_category: String,
+    pub billing_category: String,
+    pub usage_unit: String,
+    pub quantity: f64,
+    pub estimated_cost_usd: f64,
+    pub currency: Option<String>,
+    pub source: Option<String>,
+    pub occurred_at: Option<String>,
+    pub metadata_json: Option<Value>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UserExternalToolUsageSummaryRow {
+    pub provider_category: String,
+    pub billing_category: String,
+    pub tool_slug: String,
+    pub tool_name: String,
+    pub provider_key: String,
+    pub usage_unit: String,
+    pub total_quantity: f64,
+    pub total_estimated_cost_usd: f64,
+    pub latest_occurred_at: Option<String>,
+    pub event_count: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PersonalAutomationConversationRecord {
+    pub id: String,
+    pub user_id: String,
+    pub provider: String,
+    pub account_ref: String,
+    pub conversation_key: String,
+    pub conversation_family: String,
+    pub display_label: String,
+    pub latest_message_ref: Option<String>,
+    pub latest_subject: Option<String>,
+    pub latest_sender: Option<String>,
+    pub health_state: String,
+    pub first_observed_at: String,
+    pub last_observed_at: String,
+    pub metadata_json: Value,
+}
+
+fn decrypt_gmail_token_or_legacy_plaintext(raw_value: &str, key: &[u8; 32]) -> (String, bool) {
+    match crate::crypto::decrypt_secret(raw_value, key) {
+        Some(value) => (value, false),
+        None => (raw_value.to_string(), !raw_value.trim().is_empty()),
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthSessionRecord {
     pub token: String,
     pub user_id: String,
@@ -7523,6 +13435,21 @@ pub struct ManagedAgentRecord {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ReversibleActionAuditSummary {
+    pub reversible: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub undo_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_message_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollback_checkpoint_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provenance_record_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub side_effect_boundary: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ActionAuditEntry {
     pub capability_id: String,
     pub thread_id: String,
@@ -7530,6 +13457,8 @@ pub struct ActionAuditEntry {
     pub output: Value,
     pub external_reference: Option<String>,
     pub recorded_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reversible_summary: Option<ReversibleActionAuditSummary>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -7692,6 +13621,29 @@ pub struct SupportAccessGrantRecord {
     pub granted_at: String,
     pub expires_at: String,
     pub revoked_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OperatorRuntimeRemediationReceiptRecord {
+    pub id: String,
+    pub operator_user_id: String,
+    pub action: String,
+    pub lifecycle_status: String,
+    pub execution_mode: String,
+    pub approval_required: bool,
+    pub summary: String,
+    pub command: String,
+    pub source: String,
+    pub guidance_status: String,
+    pub pressure_status: Option<String>,
+    pub pressure_total_rows: Option<i64>,
+    pub cleanup_mode: Option<String>,
+    pub artifact_generated_at: Option<String>,
+    pub note: Option<String>,
+    pub issued_at: String,
+    pub completed_at: Option<String>,
+    pub outcome_note: Option<String>,
+    pub proof_reference: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -7881,18 +13833,20 @@ async fn apply_migrations_inner(
 pub(crate) fn normalized_claim_ref_type(ref_type: &str) -> &'static str {
     match ref_type.trim().to_lowercase().as_str() {
         "supports" | "supported_by" | "support" | "confirms" | "validates" => "supports",
-        "refutes" | "refuted_by" | "contradicts" | "disputes" | "negates" | "challenges" => "refutes",
+        "refutes" | "refuted_by" | "contradicts" | "disputes" | "negates" | "challenges" => {
+            "refutes"
+        }
         "part_of" | "component_of" | "subset_of" | "belongs_to" | "contained_in" => "part_of",
         "caused_by" | "causes" | "leads_to" | "results_in" | "triggers" | "explains" => "caused_by",
-        "temporally_related" | "before" | "after" | "concurrent" | "preceded_by" | "followed_by" => {
-            "temporally_related"
-        }
+        "temporally_related" | "before" | "after" | "concurrent" | "preceded_by"
+        | "followed_by" => "temporally_related",
         _ => "mentions",
     }
 }
 
 /// Return `true` when `ref_type` (after normalization) satisfies `filter`.
 /// `None` or `"all"` match any stance.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn claim_ref_type_matches_filter(ref_type: &str, filter: Option<&str>) -> bool {
     match filter {
         None | Some("all") => true,
@@ -7976,8 +13930,10 @@ pub(crate) fn summarize_related_claims(
     summaries.sort_by(|a, b| {
         let hop_a = a["hop_distance"].as_u64().unwrap_or(0);
         let hop_b = b["hop_distance"].as_u64().unwrap_or(0);
-        let total_a = a["support_edges"].as_u64().unwrap_or(0) + a["refute_edges"].as_u64().unwrap_or(0);
-        let total_b = b["support_edges"].as_u64().unwrap_or(0) + b["refute_edges"].as_u64().unwrap_or(0);
+        let total_a =
+            a["support_edges"].as_u64().unwrap_or(0) + a["refute_edges"].as_u64().unwrap_or(0);
+        let total_b =
+            b["support_edges"].as_u64().unwrap_or(0) + b["refute_edges"].as_u64().unwrap_or(0);
         hop_a.cmp(&hop_b).then(total_b.cmp(&total_a))
     });
     summaries.truncate(limit);
@@ -8113,6 +14069,55 @@ fn parse_json_optional_object_string(input: &str) -> Option<Value> {
     }
 }
 
+fn public_operational_message_retention_applies(message_type: &str) -> bool {
+    matches!(message_type, "proactive_trigger" | "token_budget_log")
+}
+
+fn daemon_operational_afp_retention_applies(message_type: &str) -> bool {
+    matches!(
+        message_type,
+        "watcher_resolution_event"
+            | "synthesis_invalidation_event"
+            | "reflection_trace"
+            | "minimal_context_packet"
+            | "proactive_trigger"
+            | "token_budget_log"
+    )
+}
+
+fn reference_facets_for_storage(
+    msg: &ProtoMessage,
+    content_json: &Value,
+    metadata_json: Option<&Value>,
+    references_json: &Value,
+) -> crate::message::AfpSearchFacets {
+    let top_level_supertags = if msg.supertags.is_empty() {
+        None
+    } else {
+        Some(Value::Array(
+            msg.supertags
+                .iter()
+                .cloned()
+                .map(Value::String)
+                .collect::<Vec<_>>(),
+        ))
+    };
+    let references = references_json.as_array().cloned().unwrap_or_default();
+    collect_search_facets_from_parts(
+        Some(&msg.r#type),
+        msg.kind.as_deref(),
+        if msg.subtype.trim().is_empty() {
+            None
+        } else {
+            Some(msg.subtype.as_str())
+        },
+        top_level_supertags.as_ref(),
+        metadata_json,
+        Some(content_json),
+        &references,
+    )
+}
+
 fn nullable_string(input: &str) -> Option<String> {
     if input.trim().is_empty() {
         None
@@ -8164,6 +14169,11 @@ pub(crate) fn tenant_schema_name(user_id: &str) -> String {
         schema.push_str("tenant");
     }
     schema
+}
+
+pub(crate) fn tenant_schema_drop_sql(user_id: &str) -> String {
+    let tenant_schema = tenant_schema_name(user_id);
+    format!(r#"DROP SCHEMA IF EXISTS "{tenant_schema}" CASCADE"#)
 }
 
 fn tenant_agent_task_queue_table(user_id: &str) -> String {
@@ -8231,11 +14241,44 @@ fn tenant_trigger_observations_table(user_id: &str) -> String {
 /// Uses HKDF-SHA256 over the server's signing key with a Gmail-specific info tag
 /// so compromise of one domain doesn't expose another.
 fn gmail_token_encryption_key() -> [u8; 32] {
-    let root_key_hex = std::env::var("OMNYID_ENCRYPTION_KEY_HEX")
-        .or_else(|_| std::env::var("OMNYID_SIGNING_KEY_HEX"))
-        .unwrap_or_default();
+    let root_key_hex =
+        crate::secret_manager::read_process_secret_trimmed("OMNYID_ENCRYPTION_KEY_HEX")
+            .or_else(|| {
+                crate::secret_manager::read_process_secret_trimmed("OMNYID_SIGNING_KEY_HEX")
+            })
+            .unwrap_or_default();
     let root_key = hex::decode(root_key_hex.trim()).unwrap_or_else(|_| vec![0u8; 32]);
     let derived = crate::post_quantum::hkdf_sha256(&root_key, b"omnyid-gmail-token-kek", b"v1", 32);
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&derived);
+    key
+}
+
+fn google_calendar_token_encryption_key() -> [u8; 32] {
+    let root_key_hex =
+        crate::secret_manager::read_process_secret_trimmed("OMNYID_ENCRYPTION_KEY_HEX")
+            .or_else(|| {
+                crate::secret_manager::read_process_secret_trimmed("OMNYID_SIGNING_KEY_HEX")
+            })
+            .unwrap_or_default();
+    let root_key = hex::decode(root_key_hex.trim()).unwrap_or_else(|_| vec![0u8; 32]);
+    let derived =
+        crate::post_quantum::hkdf_sha256(&root_key, b"omnyid-google-calendar-token-kek", b"v1", 32);
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&derived);
+    key
+}
+
+fn tool_connection_encryption_key() -> [u8; 32] {
+    let root_key_hex =
+        crate::secret_manager::read_process_secret_trimmed("OMNYID_ENCRYPTION_KEY_HEX")
+            .or_else(|| {
+                crate::secret_manager::read_process_secret_trimmed("OMNYID_SIGNING_KEY_HEX")
+            })
+            .unwrap_or_default();
+    let root_key = hex::decode(root_key_hex.trim()).unwrap_or_else(|_| vec![0u8; 32]);
+    let derived =
+        crate::post_quantum::hkdf_sha256(&root_key, b"omnyid-tool-connection-kek", b"v1", 32);
     let mut key = [0u8; 32];
     key.copy_from_slice(&derived);
     key
@@ -8416,6 +14459,13 @@ fn tenant_private_schema_bootstrap_sql(schema: &str) -> Vec<String> {
                 timestamp TIMESTAMPTZ NOT NULL,
                 type TEXT NOT NULL,
                 kind TEXT,
+                supertags TEXT[] NOT NULL DEFAULT '{{}}',
+                reference_targets TEXT[] NOT NULL DEFAULT '{{}}',
+                reference_types TEXT[] NOT NULL DEFAULT '{{}}',
+                link_types TEXT[] NOT NULL DEFAULT '{{}}',
+                metadata_keys TEXT[] NOT NULL DEFAULT '{{}}',
+                metadata_values TEXT[] NOT NULL DEFAULT '{{}}',
+                metadata_terms TEXT[] NOT NULL DEFAULT '{{}}',
                 content JSONB NOT NULL,
                 views JSONB NOT NULL DEFAULT '[]'::jsonb,
                 summary TEXT,
@@ -8433,12 +14483,92 @@ fn tenant_private_schema_bootstrap_sql(schema: &str) -> Vec<String> {
             )
             "#
         ),
+        format!("ALTER TABLE {schema_quoted}.messages ADD COLUMN IF NOT EXISTS kind TEXT"),
+        format!(
+            "ALTER TABLE {schema_quoted}.messages ADD COLUMN IF NOT EXISTS supertags TEXT[] NOT NULL DEFAULT '{{}}'"
+        ),
+        format!(
+            "ALTER TABLE {schema_quoted}.messages ADD COLUMN IF NOT EXISTS reference_targets TEXT[] NOT NULL DEFAULT '{{}}'"
+        ),
+        format!(
+            "ALTER TABLE {schema_quoted}.messages ADD COLUMN IF NOT EXISTS reference_types TEXT[] NOT NULL DEFAULT '{{}}'"
+        ),
+        format!(
+            "ALTER TABLE {schema_quoted}.messages ADD COLUMN IF NOT EXISTS link_types TEXT[] NOT NULL DEFAULT '{{}}'"
+        ),
+        format!(
+            "ALTER TABLE {schema_quoted}.messages ADD COLUMN IF NOT EXISTS metadata_keys TEXT[] NOT NULL DEFAULT '{{}}'"
+        ),
+        format!(
+            "ALTER TABLE {schema_quoted}.messages ADD COLUMN IF NOT EXISTS metadata_values TEXT[] NOT NULL DEFAULT '{{}}'"
+        ),
+        format!(
+            "ALTER TABLE {schema_quoted}.messages ADD COLUMN IF NOT EXISTS metadata_terms TEXT[] NOT NULL DEFAULT '{{}}'"
+        ),
+        format!(
+            r#"
+            UPDATE {schema_quoted}.messages
+            SET
+                reference_targets = COALESCE((
+                    SELECT ARRAY(
+                        SELECT DISTINCT ref->>'target'
+                        FROM jsonb_array_elements("references") AS ref
+                        WHERE COALESCE(ref->>'target', '') <> ''
+                        ORDER BY ref->>'target'
+                    )
+                ), '{{}}'),
+                reference_types = COALESCE((
+                    SELECT ARRAY(
+                        SELECT DISTINCT ref->>'type'
+                        FROM jsonb_array_elements("references") AS ref
+                        WHERE COALESCE(ref->>'type', '') <> ''
+                        ORDER BY ref->>'type'
+                    )
+                ), '{{}}'),
+                link_types = COALESCE((
+                    SELECT ARRAY(
+                        SELECT DISTINCT ref->'metadata'->>'link_type'
+                        FROM jsonb_array_elements("references") AS ref
+                        WHERE COALESCE(ref->'metadata'->>'link_type', '') <> ''
+                        ORDER BY ref->'metadata'->>'link_type'
+                    )
+                ), '{{}}')
+            WHERE jsonb_array_length("references") > 0
+              AND (
+                cardinality(reference_targets) = 0
+                OR cardinality(reference_types) = 0
+                OR cardinality(link_types) = 0
+              )
+            "#
+        ),
         format!("CREATE INDEX IF NOT EXISTS idx_thread ON {schema_quoted}.messages(thread_id)"),
         format!(
             "CREATE INDEX IF NOT EXISTS idx_embedding ON {schema_quoted}.messages USING hnsw (embedding vector_cosine_ops)"
         ),
         format!(
             "CREATE INDEX IF NOT EXISTS idx_references ON {schema_quoted}.messages USING gin (\"references\")"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_supertags ON {schema_quoted}.messages USING GIN (supertags)"
+        ),
+        format!("CREATE INDEX IF NOT EXISTS idx_messages_kind ON {schema_quoted}.messages (kind)"),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_reference_targets ON {schema_quoted}.messages USING GIN (reference_targets)"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_reference_types ON {schema_quoted}.messages USING GIN (reference_types)"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_link_types ON {schema_quoted}.messages USING GIN (link_types)"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_metadata_keys ON {schema_quoted}.messages USING GIN (metadata_keys)"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_metadata_values ON {schema_quoted}.messages USING GIN (metadata_values)"
+        ),
+        format!(
+            "CREATE INDEX IF NOT EXISTS idx_metadata_terms ON {schema_quoted}.messages USING GIN (metadata_terms)"
         ),
         format!(
             r#"
@@ -8866,6 +14996,9 @@ fn proto_message_from_row(row: sqlx::postgres::PgRow) -> Result<ProtoMessage, sq
             .try_get::<Option<String>, _>("kind")
             .unwrap_or(None)
             .filter(|value| !value.trim().is_empty()),
+        supertags: row
+            .try_get::<Vec<String>, _>("supertags")
+            .unwrap_or_default(),
         content: row
             .try_get::<Value, _>("content")
             .unwrap_or_else(|_| Value::Object(Default::default()))
@@ -8949,20 +15082,98 @@ fn managed_agent_from_row(row: sqlx::postgres::PgRow) -> Result<ManagedAgentReco
     })
 }
 
-fn action_audit_entry_from_row(row: sqlx::postgres::PgRow) -> Result<ActionAuditEntry, sqlx::Error> {
+fn action_audit_entry_from_row(
+    row: sqlx::postgres::PgRow,
+) -> Result<ActionAuditEntry, sqlx::Error> {
+    let output: Value = row
+        .try_get("output")
+        .unwrap_or_else(|_| Value::Object(Default::default()));
     Ok(ActionAuditEntry {
         capability_id: row.try_get("capability_id")?,
         thread_id: row.try_get("thread_id")?,
         status: row.try_get("status")?,
-        output: row
-            .try_get("output")
-            .unwrap_or_else(|_| Value::Object(Default::default())),
+        reversible_summary: reversible_action_audit_summary_from_output(&output),
+        output,
         external_reference: row.try_get("external_reference").unwrap_or(None),
         recorded_at: row.try_get("recorded_at")?,
     })
 }
 
-fn runtime_deployment_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeDeploymentRecord, sqlx::Error> {
+fn reversible_action_audit_summary_from_output(
+    output: &Value,
+) -> Option<ReversibleActionAuditSummary> {
+    let reversible = output
+        .get("reversible")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let undo_label = output
+        .get("undo_label")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let action_message_id = output
+        .get("action_message_id")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .or_else(|| {
+            output
+                .get("artifact_refs")
+                .and_then(Value::as_object)
+                .and_then(|artifact_refs| artifact_refs.get("action_message_id"))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        });
+    let rollback_checkpoint_id = output
+        .get("rollback_checkpoint_id")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .or_else(|| {
+            output
+                .get("artifact_refs")
+                .and_then(Value::as_object)
+                .and_then(|artifact_refs| artifact_refs.get("rollback_checkpoint_id"))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        });
+    let provenance_record_id = output
+        .get("provenance_record_id")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .or_else(|| {
+            output
+                .get("artifact_refs")
+                .and_then(Value::as_object)
+                .and_then(|artifact_refs| artifact_refs.get("provenance_record_id"))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        });
+    let side_effect_boundary = output
+        .get("side_effect_boundary")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+
+    if !reversible
+        && undo_label.is_none()
+        && action_message_id.is_none()
+        && rollback_checkpoint_id.is_none()
+        && provenance_record_id.is_none()
+        && side_effect_boundary.is_none()
+    {
+        return None;
+    }
+
+    Some(ReversibleActionAuditSummary {
+        reversible,
+        undo_label,
+        action_message_id,
+        rollback_checkpoint_id,
+        provenance_record_id,
+        side_effect_boundary,
+    })
+}
+
+fn runtime_deployment_from_row(
+    row: sqlx::postgres::PgRow,
+) -> Result<RuntimeDeploymentRecord, sqlx::Error> {
     Ok(RuntimeDeploymentRecord {
         id: row.try_get("id")?,
         owner_user_id: row.try_get("owner_user_id")?,
@@ -8981,7 +15192,9 @@ fn runtime_deployment_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeDepl
     })
 }
 
-fn user_onboarding_from_row(row: sqlx::postgres::PgRow) -> Result<UserOnboardingRecord, sqlx::Error> {
+fn user_onboarding_from_row(
+    row: sqlx::postgres::PgRow,
+) -> Result<UserOnboardingRecord, sqlx::Error> {
     Ok(UserOnboardingRecord {
         owner_user_id: row.try_get("owner_user_id")?,
         identity_confirmed: row.try_get("identity_confirmed").unwrap_or(false),
@@ -9000,7 +15213,9 @@ fn user_onboarding_from_row(row: sqlx::postgres::PgRow) -> Result<UserOnboarding
     })
 }
 
-fn support_access_grant_from_row(row: sqlx::postgres::PgRow) -> Result<SupportAccessGrantRecord, sqlx::Error> {
+fn support_access_grant_from_row(
+    row: sqlx::postgres::PgRow,
+) -> Result<SupportAccessGrantRecord, sqlx::Error> {
     Ok(SupportAccessGrantRecord {
         id: row.try_get("id")?,
         owner_user_id: row.try_get("owner_user_id")?,
@@ -9021,7 +15236,38 @@ fn support_access_grant_from_row(row: sqlx::postgres::PgRow) -> Result<SupportAc
     })
 }
 
-fn runtime_backup_policy_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeBackupPolicyRecord, sqlx::Error> {
+fn operator_runtime_remediation_receipt_from_row(
+    row: sqlx::postgres::PgRow,
+) -> Result<OperatorRuntimeRemediationReceiptRecord, sqlx::Error> {
+    Ok(OperatorRuntimeRemediationReceiptRecord {
+        id: row.try_get("id")?,
+        operator_user_id: row.try_get("operator_user_id")?,
+        action: row.try_get("action")?,
+        lifecycle_status: row
+            .try_get::<Option<String>, _>("lifecycle_status")
+            .unwrap_or(Some("issued".to_string()))
+            .unwrap_or_else(|| "issued".to_string()),
+        execution_mode: row.try_get("execution_mode")?,
+        approval_required: row.try_get("approval_required").unwrap_or(true),
+        summary: row.try_get("summary")?,
+        command: row.try_get("command")?,
+        source: row.try_get("source")?,
+        guidance_status: row.try_get("guidance_status")?,
+        pressure_status: row.try_get("pressure_status").unwrap_or(None),
+        pressure_total_rows: row.try_get("pressure_total_rows").unwrap_or(None),
+        cleanup_mode: row.try_get("cleanup_mode").unwrap_or(None),
+        artifact_generated_at: row.try_get("artifact_generated_at").unwrap_or(None),
+        note: row.try_get("note").unwrap_or(None),
+        issued_at: row.try_get("issued_at")?,
+        completed_at: row.try_get("completed_at").unwrap_or(None),
+        outcome_note: row.try_get("outcome_note").unwrap_or(None),
+        proof_reference: row.try_get("proof_reference").unwrap_or(None),
+    })
+}
+
+fn runtime_backup_policy_from_row(
+    row: sqlx::postgres::PgRow,
+) -> Result<RuntimeBackupPolicyRecord, sqlx::Error> {
     Ok(RuntimeBackupPolicyRecord {
         owner_user_id: row.try_get("owner_user_id")?,
         retention_days: row.try_get("retention_days").unwrap_or(14),
@@ -9058,7 +15304,9 @@ fn runtime_backup_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeBackupRe
     })
 }
 
-fn runtime_restore_drill_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeRestoreDrillRecord, sqlx::Error> {
+fn runtime_restore_drill_from_row(
+    row: sqlx::postgres::PgRow,
+) -> Result<RuntimeRestoreDrillRecord, sqlx::Error> {
     Ok(RuntimeRestoreDrillRecord {
         id: row.try_get("id")?,
         owner_user_id: row.try_get("owner_user_id")?,
@@ -9072,7 +15320,9 @@ fn runtime_restore_drill_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeR
     })
 }
 
-fn runtime_update_policy_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeUpdatePolicyRecord, sqlx::Error> {
+fn runtime_update_policy_from_row(
+    row: sqlx::postgres::PgRow,
+) -> Result<RuntimeUpdatePolicyRecord, sqlx::Error> {
     Ok(RuntimeUpdatePolicyRecord {
         owner_user_id: row.try_get("owner_user_id")?,
         update_channel: row
@@ -9090,7 +15340,9 @@ fn runtime_update_policy_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeU
     })
 }
 
-fn runtime_update_event_from_row(row: sqlx::postgres::PgRow) -> Result<RuntimeUpdateEventRecord, sqlx::Error> {
+fn runtime_update_event_from_row(
+    row: sqlx::postgres::PgRow,
+) -> Result<RuntimeUpdateEventRecord, sqlx::Error> {
     Ok(RuntimeUpdateEventRecord {
         id: row.try_get("id")?,
         owner_user_id: row.try_get("owner_user_id")?,
@@ -9121,7 +15373,9 @@ fn runtime_runner_policy_event_from_row(
     })
 }
 
-fn sync_device_policy_from_row(row: sqlx::postgres::PgRow) -> Result<SyncDevicePolicyRecord, sqlx::Error> {
+fn sync_device_policy_from_row(
+    row: sqlx::postgres::PgRow,
+) -> Result<SyncDevicePolicyRecord, sqlx::Error> {
     Ok(SyncDevicePolicyRecord {
         device_id: row.try_get("device_id")?,
         owner_user_id: row.try_get("owner_user_id")?,
@@ -9257,20 +15511,77 @@ async fn persist_attachment_metadata_to_table(
     Ok(())
 }
 
+fn relational_projection_upsert_sql() -> &'static str {
+    r#"
+    INSERT INTO afp_relational_projections (
+        message_id,
+        owner_user_id,
+        thread_id,
+        message_type,
+        subtype,
+        projection_kind,
+        workspace_id,
+        projection_json,
+        synced_at,
+        source_timestamp
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9::timestamptz)
+    ON CONFLICT (message_id, owner_user_id) DO UPDATE SET
+        thread_id = EXCLUDED.thread_id,
+        message_type = EXCLUDED.message_type,
+        subtype = EXCLUDED.subtype,
+        projection_kind = EXCLUDED.projection_kind,
+        workspace_id = EXCLUDED.workspace_id,
+        projection_json = EXCLUDED.projection_json,
+        synced_at = NOW(),
+        source_timestamp = EXCLUDED.source_timestamp
+    "#
+}
+
+fn archive_index_upsert_sql() -> &'static str {
+    r#"
+    INSERT INTO afp_archive_index (
+        message_id,
+        user_id,
+        thread_id,
+        message_type,
+        archived_at,
+        seaweedfs_key,
+        metadata_stub,
+        restored_at
+    )
+    VALUES ($1, $2, $3, $4, NOW(), $5, $6, NULL)
+    ON CONFLICT (message_id, user_id) DO UPDATE SET
+        thread_id = EXCLUDED.thread_id,
+        message_type = EXCLUDED.message_type,
+        seaweedfs_key = EXCLUDED.seaweedfs_key,
+        metadata_stub = EXCLUDED.metadata_stub,
+        archived_at = NOW(),
+        restored_at = NULL
+    "#
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        Db, SavedWorkflowRecord, StorageMode, UserRecord, WorkflowDeploymentRecord,
-        WorkflowRunRecord, WorkflowWaitResumeRecord, effective_storage_mode,
+        Db, McpToolConnectionUpsert, SavedWorkflowRecord, StorageMode,
+        TENANT_PRIVATE_SCHEMA_REQUIRED_INDEXES, TENANT_PRIVATE_SCHEMA_REQUIRED_MESSAGE_COLUMNS,
+        TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES, UserRecord, WorkflowDeploymentRecord,
+        WorkflowRunRecord, WorkflowWaitResumeRecord, archive_index_upsert_sql,
+        decrypt_gmail_token_or_legacy_plaintext, effective_storage_mode,
         enable_server_summarization, persisted_content_for_mode, persisted_views_for_mode,
-        redacted_views_for_read, summary_and_embedding_for_mode,
-        tenant_private_schema_bootstrap_sql, tenant_schema_name,
+        redacted_views_for_read, relational_projection_upsert_sql, sha256_token,
+        summary_and_embedding_for_mode, tenant_private_schema_bootstrap_sql,
+        tenant_schema_drop_sql, tenant_schema_name,
     };
     use crate::afp::Message;
     use crate::agent_template::{
         AgentInstance, AgentTask, FocusItem, TaskPriority, TriggerType, generate_delegated_key,
     };
+    use crate::integration::{ActionResult, ActionStatus};
+    use crate::knowledge_curator::{BacklinkKind, BacklinkRecord};
     use serde_json::json;
+    use sqlx::Row;
     use ulid::Ulid;
 
     fn sample_proto_message() -> Message {
@@ -9284,6 +15595,7 @@ mod tests {
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "task".to_string(),
             kind: None,
+            supertags: vec![],
             content: "{\"secret\":true}".to_string(),
             signature: "demo".to_string(),
             encryption: "{\"scheme\":\"omnyid-envelope-v1\",\"algorithm\":\"xchacha20poly1305-ietf\",\"nonce\":\"abc\",\"ciphertext\":\"def\"}".to_string(),
@@ -9363,6 +15675,18 @@ mod tests {
     }
 
     #[test]
+    fn archive_index_upsert_sql_uses_composite_tenant_conflict_target() {
+        assert!(archive_index_upsert_sql().contains("ON CONFLICT (message_id, user_id)"));
+    }
+
+    #[test]
+    fn relational_projection_upsert_sql_uses_composite_tenant_conflict_target() {
+        assert!(
+            relational_projection_upsert_sql().contains("ON CONFLICT (message_id, owner_user_id)")
+        );
+    }
+
+    #[test]
     fn server_summarization_defaults_to_disabled() {
         unsafe {
             std::env::remove_var("OMNYID_ENABLE_SERVER_SUMMARIZATION");
@@ -9379,9 +15703,36 @@ mod tests {
     }
 
     #[test]
+    fn gmail_token_ciphertext_decrypts_without_reencryption() {
+        let key = [7u8; 32];
+        let ciphertext = crate::crypto::encrypt_secret("refresh-token", &key);
+        let (decrypted, needs_reencrypt) =
+            decrypt_gmail_token_or_legacy_plaintext(&ciphertext, &key);
+        assert_eq!(decrypted, "refresh-token");
+        assert!(!needs_reencrypt);
+    }
+
+    #[test]
+    fn gmail_token_plaintext_is_flagged_for_reencryption() {
+        let key = [9u8; 32];
+        let (decrypted, needs_reencrypt) =
+            decrypt_gmail_token_or_legacy_plaintext("legacy-plaintext-refresh", &key);
+        assert_eq!(decrypted, "legacy-plaintext-refresh");
+        assert!(needs_reencrypt);
+    }
+
+    #[test]
     fn bootstrap_schema_contains_mail_sync_checkpoints_table() {
         let schema = include_str!("../postgres/migrations/0001_init.sql");
         assert!(schema.contains("CREATE TABLE IF NOT EXISTS mail_sync_checkpoints"));
+    }
+
+    #[test]
+    fn afp_coordination_migration_guards_optional_daemon_table_trigger() {
+        let migration = include_str!("../postgres/migrations/0075_afp_coordination_notify.sql");
+        assert!(migration.contains("IF EXISTS ("));
+        assert!(migration.contains("table_name = 'afp_messages'"));
+        assert!(migration.contains("trigger_afp_coordination_daemon"));
     }
 
     #[test]
@@ -9395,11 +15746,66 @@ mod tests {
     }
 
     #[test]
+    fn tenant_schema_name_strips_sql_metacharacters_from_malicious_input() {
+        let schema = tenant_schema_name("foo\";DROP SCHEMA public CASCADE;--");
+        assert!(schema.starts_with("user_"));
+        assert!(!schema.contains('"'));
+        assert!(!schema.contains(';'));
+        assert!(!schema.contains('-'));
+        assert!(
+            schema
+                .chars()
+                .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
+        );
+    }
+
+    #[test]
+    fn tenant_schema_drop_sql_uses_sanitized_schema_identifier() {
+        let sql = tenant_schema_drop_sql("foo\";DROP SCHEMA public CASCADE;--");
+        assert!(sql.starts_with("DROP SCHEMA IF EXISTS \"user_"));
+        assert!(sql.ends_with("\" CASCADE"));
+        assert!(!sql.contains("public CASCADE;--"));
+    }
+
+    #[test]
+    fn sha256_token_is_stable_for_the_same_session_token() {
+        let token = "session_token_example_123";
+        assert_eq!(sha256_token(token), sha256_token(token));
+    }
+
+    #[test]
+    fn sha256_token_is_not_plaintext_and_has_sha256_length() {
+        let token = "session_token_example_123";
+        let hashed = sha256_token(token);
+        assert_ne!(hashed, token);
+        assert_eq!(hashed.len(), 64);
+        assert!(hashed.chars().all(|ch| ch.is_ascii_hexdigit()));
+    }
+
+    #[test]
     fn tenant_private_schema_bootstrap_contains_core_private_tables() {
         let statements = tenant_private_schema_bootstrap_sql("user_test");
         let joined = statements.join("\n");
         assert!(joined.contains("CREATE SCHEMA IF NOT EXISTS \"user_test\""));
         assert!(joined.contains("\"user_test\".messages"));
+        assert!(joined.contains("ADD COLUMN IF NOT EXISTS kind TEXT"));
+        assert!(joined.contains("ADD COLUMN IF NOT EXISTS supertags TEXT[] NOT NULL DEFAULT '{}'"));
+        assert!(
+            joined.contains(
+                "ADD COLUMN IF NOT EXISTS reference_targets TEXT[] NOT NULL DEFAULT '{}'"
+            )
+        );
+        assert!(
+            joined.contains("ADD COLUMN IF NOT EXISTS metadata_keys TEXT[] NOT NULL DEFAULT '{}'")
+        );
+        assert!(
+            joined
+                .contains("ADD COLUMN IF NOT EXISTS metadata_values TEXT[] NOT NULL DEFAULT '{}'")
+        );
+        assert!(
+            joined.contains("ADD COLUMN IF NOT EXISTS metadata_terms TEXT[] NOT NULL DEFAULT '{}'")
+        );
+        assert!(joined.contains("idx_metadata_terms"));
         assert!(joined.contains("\"user_test\".attachments"));
         assert!(joined.contains("\"user_test\".agent_task_queue"));
         assert!(joined.contains("\"user_test\".agent_focus_items"));
@@ -9415,6 +15821,245 @@ mod tests {
         assert!(joined.contains("\"user_test\".sync_devices"));
         assert!(joined.contains("\"user_test\".personalization_events"));
         assert!(joined.contains("public.notify_new_message()"));
+    }
+
+    #[test]
+    fn tenant_private_schema_bootstrap_covers_all_readiness_contract_tables_and_indexes() {
+        let statements = tenant_private_schema_bootstrap_sql("user_test");
+        let joined = statements.join("\n");
+
+        for table in TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES {
+            assert!(
+                joined.contains(&format!("\"user_test\".{table}")),
+                "bootstrap SQL missing required tenant-private table {table}"
+            );
+        }
+
+        for column in TENANT_PRIVATE_SCHEMA_REQUIRED_MESSAGE_COLUMNS {
+            assert!(
+                joined.contains(&format!("ADD COLUMN IF NOT EXISTS {column} ")),
+                "bootstrap SQL missing required messages column upgrade {column}"
+            );
+        }
+
+        for index in TENANT_PRIVATE_SCHEMA_REQUIRED_INDEXES {
+            assert!(
+                joined.contains(&format!("CREATE INDEX IF NOT EXISTS {index} ")),
+                "bootstrap SQL missing required tenant-private index {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn supertag_hierarchy_helpers_normalize_optional_values() {
+        let values = vec![
+            " #Work ".to_string(),
+            "#work".to_string(),
+            "".to_string(),
+            "  ".to_string(),
+            "#Ideas".to_string(),
+        ];
+        assert_eq!(
+            Db::normalized_non_empty_vec(&values),
+            vec!["#Work".to_string(), "#Ideas".to_string()]
+        );
+        assert_eq!(Db::normalized_hierarchy_mode(Some("strict")), "strict");
+        assert_eq!(Db::normalized_hierarchy_mode(Some("STRICT")), "strict");
+        assert_eq!(Db::normalized_hierarchy_mode(Some("soft")), "soft");
+        assert_eq!(Db::normalized_hierarchy_mode(Some("unknown")), "soft");
+        assert_eq!(Db::normalized_hierarchy_mode(None), "soft");
+    }
+
+    #[test]
+    fn supertag_hierarchy_helpers_expand_descendants_and_aliases() {
+        let definitions = vec![
+            ("work".to_string(), vec![], vec!["office".to_string()]),
+            (
+                "project:aurora".to_string(),
+                vec!["work".to_string()],
+                vec!["aurora".to_string()],
+            ),
+            (
+                "project:beacon".to_string(),
+                vec!["work".to_string()],
+                vec![],
+            ),
+            (
+                "deep-child".to_string(),
+                vec!["project:aurora".to_string()],
+                vec![],
+            ),
+        ];
+
+        assert_eq!(
+            Db::expand_supertag_query_tags_from_definitions(&definitions, &["office".to_string()]),
+            vec![
+                "work".to_string(),
+                "project:aurora".to_string(),
+                "project:beacon".to_string(),
+                "deep-child".to_string(),
+            ]
+        );
+        assert_eq!(
+            Db::expand_supertag_query_tags_from_definitions(
+                &definitions,
+                &["project:aurora".to_string()]
+            ),
+            vec!["project:aurora".to_string(), "deep-child".to_string()]
+        );
+    }
+
+    #[test]
+    fn supertag_hierarchy_helpers_canonicalize_aliases_without_duplication() {
+        let definitions = vec![
+            (
+                "study:economics".to_string(),
+                vec!["study".to_string()],
+                vec!["econ".to_string(), "microeconomics".to_string()],
+            ),
+            (
+                "course:eco101".to_string(),
+                vec!["study:economics".to_string()],
+                vec!["econ101".to_string()],
+            ),
+        ];
+
+        assert_eq!(
+            Db::canonicalize_supertags_from_definitions(
+                &definitions,
+                &[
+                    "econ".to_string(),
+                    "study:economics".to_string(),
+                    "#Econ101".to_string(),
+                    "Lecture Week 3".to_string(),
+                    "  ".to_string(),
+                ]
+            ),
+            vec![
+                "study:economics".to_string(),
+                "course:eco101".to_string(),
+                "Lecture Week 3".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn supertag_hierarchy_helpers_merge_tag_facets_into_canonical_counts() {
+        let definitions = vec![
+            (
+                "study:economics".to_string(),
+                vec!["study".to_string()],
+                vec!["econ".to_string(), "microeconomics".to_string()],
+            ),
+            (
+                "course:eco101".to_string(),
+                vec!["study:economics".to_string()],
+                vec!["econ101".to_string()],
+            ),
+        ];
+
+        let top_tags = serde_json::json!([
+            { "tag": "econ", "count": 3 },
+            { "tag": "study:economics", "count": 2 },
+            { "tag": "#Econ101", "count": 4 },
+            { "tag": "Lecture Week 3", "count": 1 }
+        ]);
+
+        assert_eq!(
+            Db::canonicalize_tag_count_facet_from_definitions(&definitions, &top_tags, 24),
+            serde_json::json!([
+                { "tag": "study:economics", "count": 5 },
+                { "tag": "course:eco101", "count": 4 },
+                { "tag": "Lecture Week 3", "count": 1 }
+            ])
+        );
+    }
+
+    #[test]
+    fn tenant_private_schema_readiness_probe_tracks_core_tables_columns_and_indexes() {
+        assert!(TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES.contains(&"messages"));
+        assert!(TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES.contains(&"workflow_runs"));
+        assert!(TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES.contains(&"agent_capability_registry"));
+        assert!(TENANT_PRIVATE_SCHEMA_REQUIRED_MESSAGE_COLUMNS.contains(&"kind"));
+        assert!(TENANT_PRIVATE_SCHEMA_REQUIRED_MESSAGE_COLUMNS.contains(&"link_types"));
+        assert!(TENANT_PRIVATE_SCHEMA_REQUIRED_INDEXES.contains(&"idx_messages_kind"));
+        assert!(TENANT_PRIVATE_SCHEMA_REQUIRED_INDEXES.contains(&"idx_wf_trigger_obs_workflow"));
+    }
+
+    #[test]
+    fn agent_template_migration_enables_rls_for_agent_instances() {
+        let migration = super::MIGRATIONS
+            .iter()
+            .find(|(version, _, _)| *version == "0017_agent_template")
+            .expect("0017_agent_template migration exists")
+            .2;
+        assert!(migration.contains("ALTER TABLE agent_instances ENABLE ROW LEVEL SECURITY"));
+        assert!(migration.contains("ALTER TABLE agent_instances FORCE ROW LEVEL SECURITY"));
+        assert!(migration.contains("CREATE POLICY rls_agent_instances ON agent_instances"));
+        assert!(migration.contains("current_setting('app.current_user_id', true)"));
+    }
+
+    #[test]
+    fn db_source_has_no_lingering_app_current_user_id_set_config_calls() {
+        let source = include_str!("db.rs");
+        let test_module_start = source.find("#[cfg(test)]").expect("db.rs test module");
+        let non_test_source = &source[..test_module_start];
+        assert!(
+            non_test_source
+                .matches("set_config('app.current_user_id'")
+                .count()
+                == 0,
+            "src/db.rs should not rely on lingering set_config scoping shims in live DB code"
+        );
+    }
+
+    #[test]
+    fn agent_preferences_migration_enables_rls() {
+        let migration = super::MIGRATIONS
+            .iter()
+            .find(|(version, _, _)| *version == "0025_agent_preferences")
+            .expect("0025_agent_preferences migration exists")
+            .2;
+        assert!(migration.contains("ALTER TABLE user_agent_preferences ENABLE ROW LEVEL SECURITY"));
+        assert!(migration.contains(
+            "CREATE POLICY user_agent_preferences_owner_policy ON user_agent_preferences"
+        ));
+        assert!(migration.contains("current_setting('app.current_user_id', true)"));
+    }
+
+    #[test]
+    fn db_source_uses_explicit_owner_scoping_for_agent_preferences_queries() {
+        let source = include_str!("db.rs");
+        assert!(
+            source.contains("FROM user_agent_preferences\n            WHERE owner_user_id = $1")
+        );
+        assert!(source.contains("ON CONFLICT (owner_user_id) DO UPDATE SET"));
+    }
+
+    #[test]
+    fn llm_config_upsert_preserves_existing_encrypted_key_when_no_replacement_is_provided() {
+        let source = include_str!("db.rs");
+        assert!(
+            source.contains("encrypted_api_key = COALESCE(EXCLUDED.encrypted_api_key, {table}.encrypted_api_key)"),
+            "LLM config upsert should preserve the stored encrypted key when the user saves settings without supplying a new API key",
+        );
+    }
+
+    #[test]
+    fn get_agent_instance_source_is_owner_scoped_without_set_config() {
+        let source = include_str!("db.rs");
+        let start = source
+            .find("pub async fn get_agent_instance(")
+            .expect("get_agent_instance exists");
+        let end = source[start..]
+            .find("\n    pub async fn create_agent_task(")
+            .map(|offset| start + offset)
+            .expect("create_agent_task follows get_agent_instance");
+        let function_source = &source[start..end];
+
+        assert!(function_source.contains("FROM agent_instances"));
+        assert!(function_source.contains("WHERE owner_user_id = $1"));
+        assert!(!function_source.contains("set_config('app.current_user_id'"));
     }
 
     #[test]
@@ -9592,6 +16237,458 @@ mod tests {
         assert!(query.contains("external_email"));
     }
 
+    #[test]
+    fn external_email_lookup_source_scans_public_and_tenant_message_tables() {
+        let source = std::fs::read_to_string(file!()).expect("db source");
+        let start = source
+            .find("pub async fn find_message_by_external_email_targets(")
+            .expect("find_message_by_external_email_targets exists");
+        let tail = &source[start..];
+        let end = tail
+            .find("async fn find_external_email_match_in_table(")
+            .expect("tenant lookup helper follows external email lookup");
+        let function_source = &tail[..end];
+
+        assert!(
+            function_source.contains("find_external_email_match_in_table(\"messages\", targets)")
+        );
+        assert!(function_source.contains("for user_id in self.list_user_ids().await?"));
+        assert!(function_source.contains("tenant_messages_table(&user_id)"));
+    }
+
+    #[test]
+    fn recent_messages_for_user_source_merges_shared_and_private_messages() {
+        let source = std::fs::read_to_string(file!()).expect("db source");
+        let start = source
+            .find("pub async fn recent_messages_for_user(")
+            .expect("recent_messages_for_user exists");
+        let tail = &source[start..];
+        let end = tail
+            .find("/// GAP-075: fetch recent messages from the user's private tenant schema.")
+            .expect("recent_private_messages_for_user follows merged helper");
+        let function_source = &tail[..end];
+
+        assert!(function_source.contains("self.recent_messages_for_agents(agent_ids, limit)"));
+        assert!(function_source.contains("self.recent_private_messages_for_user(user_id, limit)"));
+        assert!(
+            function_source
+                .contains("merged.sort_by(|left, right| right.timestamp.cmp(&left.timestamp))")
+        );
+        assert!(function_source.contains("seen_ids.insert(message.id.clone())"));
+    }
+
+    #[test]
+    fn tenant_private_schema_bootstrap_keeps_vector_embedding_column() {
+        let statements = tenant_private_schema_bootstrap_sql("user_test");
+        let create_messages = statements
+            .iter()
+            .find(|statement| {
+                statement.contains("CREATE TABLE IF NOT EXISTS \"user_test\".messages")
+            })
+            .expect("tenant messages bootstrap statement");
+        assert!(create_messages.contains("embedding VECTOR(768)"));
+        assert!(!create_messages.contains("embedding REAL[]"));
+    }
+
+    #[test]
+    fn external_email_match_prefers_newest_timestamp() {
+        let older = super::ExternalEmailThreadMatch {
+            thread_id: "thread_old".to_string(),
+            message_id: "msg_old".to_string(),
+            timestamp: "2026-07-04T10:00:00Z".to_string(),
+        };
+        let newer = super::ExternalEmailThreadMatch {
+            thread_id: "thread_new".to_string(),
+            message_id: "msg_new".to_string(),
+            timestamp: "2026-07-04T11:00:00Z".to_string(),
+        };
+
+        assert!(super::external_email_match_is_newer(
+            Some(&newer),
+            Some(&older)
+        ));
+        assert!(!super::external_email_match_is_newer(
+            Some(&older),
+            Some(&newer)
+        ));
+        assert!(super::external_email_match_is_newer(Some(&older), None));
+    }
+
+    #[tokio::test]
+    async fn local_postgres_list_public_messages_cursor_stays_id_descending() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let base = "Z".repeat(24);
+        let ids = vec![
+            format!("7{base}1"),
+            format!("7{base}2"),
+            format!("7{base}3"),
+        ];
+
+        for id in &ids {
+            sqlx::query("DELETE FROM messages WHERE id = $1")
+                .bind(id)
+                .execute(&db.pool)
+                .await
+                .expect("delete preexisting public message");
+        }
+
+        for (index, id) in ids.iter().enumerate() {
+            let message = Message {
+                protocol: "afp-v1".to_string(),
+                id: id.clone(),
+                thread_id: format!("thread_public_feed_cursor_{index}"),
+                parent_id: String::new(),
+                from: "agent:public-feed@omnyid.test".to_string(),
+                to: vec![],
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                r#type: "public_article".to_string(),
+                kind: None,
+                content: String::new(),
+                signature: "public-feed-signature".to_string(),
+                encryption: String::new(),
+                views: "[]".to_string(),
+                references: "[]".to_string(),
+                attachments: "[]".to_string(),
+                store_in_relational: true,
+                subtype: String::new(),
+                metadata: "{}".to_string(),
+                supertags: vec![],
+            };
+            db.store_message(
+                &message,
+                json!({ "title": format!("Public article {index}") }),
+            )
+            .await
+            .expect("store public article");
+        }
+
+        let mut expected_ids = ids.clone();
+        expected_ids.sort_by(|a, b| b.cmp(a));
+
+        let first_page = db
+            .list_public_messages(2, None)
+            .await
+            .expect("first public page");
+        let first_page_ids = first_page
+            .iter()
+            .take(2)
+            .map(|value| value["id"].as_str().unwrap_or_default().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(first_page_ids, expected_ids[..2].to_vec());
+
+        let second_page = db
+            .list_public_messages(2, first_page.last().and_then(|value| value["id"].as_str()))
+            .await
+            .expect("second public page");
+        let second_page_ids = second_page
+            .iter()
+            .map(|value| value["id"].as_str().unwrap_or_default().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(second_page_ids, expected_ids[2..].to_vec());
+    }
+
+    #[tokio::test]
+    async fn local_postgres_outbound_delivery_attempt_upserts_same_message_and_provider() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let message_id = format!("msg_delivery_receipt_{suffix}");
+        let provider = "smtp";
+
+        sqlx::query("DELETE FROM outbound_email_receipts WHERE message_id = $1 AND provider = $2")
+            .bind(&message_id)
+            .bind(provider)
+            .execute(&db.pool)
+            .await
+            .expect("delete preexisting outbound receipts");
+
+        db.record_outbound_delivery_attempt(
+            &message_id,
+            "thread_delivery_receipt_1",
+            provider,
+            "pending",
+            Some("temporary failure"),
+        )
+        .await
+        .expect("insert first delivery attempt");
+
+        db.record_outbound_delivery_attempt(
+            &message_id,
+            "thread_delivery_receipt_2",
+            provider,
+            "delivered",
+            None,
+        )
+        .await
+        .expect("upsert second delivery attempt");
+
+        let row = sqlx::query(
+            r#"
+            SELECT thread_id, status, last_error
+            FROM outbound_email_receipts
+            WHERE message_id = $1 AND provider = $2
+            "#,
+        )
+        .bind(&message_id)
+        .bind(provider)
+        .fetch_all(&db.pool)
+        .await
+        .expect("fetch outbound receipts");
+
+        assert_eq!(row.len(), 1);
+        assert_eq!(
+            row[0].get::<String, _>("thread_id"),
+            "thread_delivery_receipt_2"
+        );
+        assert_eq!(row[0].get::<String, _>("status"), "delivered");
+        assert_eq!(row[0].get::<Option<String>, _>("last_error"), None);
+    }
+
+    #[tokio::test]
+    async fn local_postgres_backlink_ref_type_round_trip_and_conflict_key_are_preserved() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user_id = format!("user_backlink_ref_type_{suffix}");
+        let source_id = format!("msg_source_{suffix}");
+        let target_id = format!("msg_target_{suffix}");
+
+        sqlx::query("DELETE FROM afp_backlinks WHERE user_id = $1")
+            .bind(&user_id)
+            .execute(&db.pool)
+            .await
+            .expect("delete preexisting backlinks");
+
+        let support_original = BacklinkRecord {
+            backlink_id: format!("backlink_support_original_{suffix}"),
+            user_id: user_id.clone(),
+            source_id: source_id.clone(),
+            target_id: target_id.clone(),
+            link_kind: BacklinkKind::SemanticSimilarity,
+            ref_type: "supports".to_string(),
+            similarity: Some(0.71),
+            entities: vec!["project aurora".to_string()],
+            created_at: chrono::Utc::now().to_rfc3339(),
+            curator_run_id: format!("curator_support_original_{suffix}"),
+        };
+        db.upsert_backlink_record(&support_original)
+            .await
+            .expect("insert support backlink");
+
+        let support_updated = BacklinkRecord {
+            backlink_id: format!("backlink_support_updated_{suffix}"),
+            user_id: user_id.clone(),
+            source_id: source_id.clone(),
+            target_id: target_id.clone(),
+            link_kind: BacklinkKind::SemanticSimilarity,
+            ref_type: "supports".to_string(),
+            similarity: Some(0.93),
+            entities: vec!["project aurora".to_string(), "renewal".to_string()],
+            created_at: chrono::Utc::now().to_rfc3339(),
+            curator_run_id: format!("curator_support_updated_{suffix}"),
+        };
+        db.upsert_backlink_record(&support_updated)
+            .await
+            .expect("upsert support backlink");
+
+        let refute_record = BacklinkRecord {
+            backlink_id: format!("backlink_refute_{suffix}"),
+            user_id: user_id.clone(),
+            source_id: source_id.clone(),
+            target_id: target_id.clone(),
+            link_kind: BacklinkKind::SemanticSimilarity,
+            ref_type: "refutes".to_string(),
+            similarity: Some(0.42),
+            entities: vec!["renewal".to_string()],
+            created_at: chrono::Utc::now().to_rfc3339(),
+            curator_run_id: format!("curator_refute_{suffix}"),
+        };
+        db.upsert_backlink_record(&refute_record)
+            .await
+            .expect("insert refute backlink");
+
+        let backlinks = db
+            .list_backlinks_for_message(&user_id, &source_id)
+            .await
+            .expect("list backlinks");
+        assert_eq!(backlinks.len(), 2);
+
+        let support = backlinks
+            .iter()
+            .find(|edge| edge.ref_type == "supports")
+            .expect("supports backlink");
+        assert_eq!(support.backlink_id, support_updated.backlink_id);
+        assert_eq!(support.similarity, Some(0.93));
+        assert_eq!(
+            support.entities,
+            vec!["project aurora".to_string(), "renewal".to_string()]
+        );
+
+        let refute = backlinks
+            .iter()
+            .find(|edge| edge.ref_type == "refutes")
+            .expect("refutes backlink");
+        assert_eq!(refute.backlink_id, refute_record.backlink_id);
+        assert_eq!(refute.similarity, Some(0.42));
+    }
+
+    #[tokio::test]
+    async fn local_postgres_search_agents_uses_tenant_private_capability_registry() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user_a = UserRecord {
+            id: format!("user_search_agents_a_{suffix}"),
+            email: format!("search-agents-a-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Search Agent A {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        let user_b = UserRecord {
+            id: format!("user_search_agents_b_{suffix}"),
+            email: format!("search-agents-b-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Search Agent B {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user_a).await.expect("create user a");
+        db.create_user(&user_b).await.expect("create user b");
+
+        let agent_a =
+            AgentInstance::provision(&user_a.id, &format!("Strategist{suffix}"), "omnyid.test");
+        let agent_b =
+            AgentInstance::provision(&user_b.id, &format!("Analyst{suffix}"), "omnyid.test");
+        let agent_a_id = db
+            .provision_agent(&agent_a)
+            .await
+            .expect("provision agent a");
+        let agent_b_id = db
+            .provision_agent(&agent_b)
+            .await
+            .expect("provision agent b");
+
+        db.create_capability(
+            &user_a.id,
+            &agent_a_id,
+            "calendar_orchestration",
+            &json!({
+                "description": "Coordinate renewal calendar orchestration for focused work",
+                "version": "1.0.0",
+                "approval_mode": "suggest_only",
+                "tags": ["calendar", "renewal"]
+            }),
+        )
+        .await
+        .expect("create tenant capability for user a");
+
+        db.create_capability(
+            &user_b.id,
+            &agent_b_id,
+            "finance_review",
+            &json!({
+                "description": "Review finance dashboards and variance reports",
+                "version": "1.0.0",
+                "approval_mode": "suggest_only",
+                "tags": ["finance"]
+            }),
+        )
+        .await
+        .expect("create tenant capability for user b");
+
+        let search_a = db
+            .search_agents(&user_a.id, "renewal orchestration", 10)
+            .await
+            .expect("search agents for user a");
+        assert_eq!(search_a.len(), 1);
+        assert_eq!(search_a[0]["id"].as_str(), Some(agent_a_id.as_str()));
+
+        let search_b = db
+            .search_agents(&user_b.id, "renewal orchestration", 10)
+            .await
+            .expect("search agents for user b");
+        assert!(search_b.is_empty());
+    }
+
+    #[tokio::test]
+    async fn local_postgres_check_and_increment_anon_session_counts_per_fingerprint() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let fingerprint = format!(
+            "anon-fingerprint-{}",
+            Ulid::new().to_string().to_lowercase()
+        );
+        sqlx::query("DELETE FROM anon_dashboard_sessions WHERE fingerprint = $1")
+            .bind(&fingerprint)
+            .execute(&db.pool)
+            .await
+            .expect("delete preexisting anon session row");
+
+        let first = db
+            .check_and_increment_anon_session(&fingerprint)
+            .await
+            .expect("first anon session increment");
+        let second = db
+            .check_and_increment_anon_session(&fingerprint)
+            .await
+            .expect("second anon session increment");
+
+        assert_eq!(first, 1);
+        assert_eq!(second, 2);
+
+        let row =
+            sqlx::query("SELECT session_count FROM anon_dashboard_sessions WHERE fingerprint = $1")
+                .bind(&fingerprint)
+                .fetch_one(&db.pool)
+                .await
+                .expect("fetch anon session row");
+        assert_eq!(row.get::<i32, _>("session_count"), 2);
+    }
+
     #[tokio::test]
     async fn local_postgres_tenant_private_workflow_round_trip() {
         if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
@@ -9703,6 +16800,7 @@ mod tests {
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
             kind: None,
+            supertags: vec![],
             content: String::new(),
             signature: "smoke-signature".to_string(),
             encryption: String::new(),
@@ -9740,6 +16838,7 @@ mod tests {
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
             kind: None,
+            supertags: vec![],
             content: String::new(),
             signature: "smoke-signature".to_string(),
             encryption: String::new(),
@@ -10052,6 +17151,48 @@ mod tests {
             .expect("llm config exists after usage");
         assert_eq!(llm_view["usage_cents_current_month"], 33);
 
+        sqlx::query(&format!(
+            r#"
+            UPDATE "{}".user_llm_config
+            SET usage_cents_current_month = 88,
+                usage_reset_at = DATE '2000-01-01'
+            WHERE owner_user_id = $1
+            "#,
+            schema_name
+        ))
+        .bind(&user.id)
+        .execute(&db.pool)
+        .await
+        .expect("set stale monthly llm usage state");
+
+        let llm_view = db
+            .get_llm_config(&user.id)
+            .await
+            .expect("get llm config with stale month")
+            .expect("llm config exists with stale month");
+        assert_eq!(llm_view["usage_cents_current_month"], 0);
+
+        let stored_usage_row = sqlx::query(&format!(
+            r#"
+            SELECT usage_cents_current_month, usage_reset_at::text AS usage_reset_at
+            FROM "{}".user_llm_config
+            WHERE owner_user_id = $1
+            "#,
+            schema_name
+        ))
+        .bind(&user.id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("fetch stale monthly llm usage state");
+        assert_eq!(
+            stored_usage_row.get::<i32, _>("usage_cents_current_month"),
+            88
+        );
+        assert_eq!(
+            stored_usage_row.get::<String, _>("usage_reset_at"),
+            "2000-01-01"
+        );
+
         let saved_workflow = SavedWorkflowRecord {
             workflow_id: format!("wf_{suffix}"),
             owner_user_id: user.id.clone(),
@@ -10273,6 +17414,7 @@ mod tests {
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "agent".to_string(),
             kind: None,
+            supertags: vec![],
             content: String::new(),
             signature: "smoke-signature".to_string(),
             encryption: String::new(),
@@ -10333,6 +17475,505 @@ mod tests {
                 .await
                 .expect("count public private attachment rows");
         assert_eq!(public_private_attachment_count, 0);
+    }
+
+    #[tokio::test]
+    async fn local_postgres_snapshot_messages_stay_bounded_to_one_current_row() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user = UserRecord {
+            id: format!("user_snapshot_{suffix}"),
+            email: format!("snapshot-{suffix}@omnyid.test"),
+            password_hash: Some("hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Snapshot User {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user)
+            .await
+            .expect("create snapshot smoke user");
+
+        let schema_name = tenant_schema_name(&user.id);
+        let current_id = "insight.health-maintenance.current".to_string();
+        let message_type = "insight".to_string();
+        let subtype = "maintenance_summary".to_string();
+        let from_agent = "omnyid://daemon/health-maintenance".to_string();
+        let thread_id = "thread.insight.health-maintenance".to_string();
+        let initial_content = json!({
+            "title": "Knowledge maintenance summary",
+            "body": "Archive backlog: 0. Knowledge cards indexed: 0. Messages archived in the last day: 0.",
+            "metrics": {
+                "archive_backlog": 0,
+                "knowledge_cards": 0,
+                "archived_last_day": 0
+            }
+        });
+
+        for index in 0..3 {
+            let stale = Message {
+                protocol: "afp-v1".to_string(),
+                id: format!("insight.health-maintenance.stale-{suffix}-{index}"),
+                thread_id: thread_id.clone(),
+                parent_id: String::new(),
+                from: from_agent.clone(),
+                to: vec!["omnyid://workspace/user".to_string()],
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                r#type: message_type.clone(),
+                kind: None,
+                supertags: vec![],
+                content: String::new(),
+                signature: String::new(),
+                encryption: "{}".to_string(),
+                views: "[]".to_string(),
+                references: "[]".to_string(),
+                attachments: "[]".to_string(),
+                store_in_relational: false,
+                subtype: subtype.clone(),
+                metadata: json!({"created_by": "health_maintenance"}).to_string(),
+            };
+            db.store_private_message(&user.id, &stale, initial_content.clone())
+                .await
+                .expect("store stale maintenance summary row");
+        }
+
+        let snapshot = Message {
+            protocol: "afp-v1".to_string(),
+            id: current_id.clone(),
+            thread_id: thread_id.clone(),
+            parent_id: String::new(),
+            from: from_agent.clone(),
+            to: vec!["omnyid://workspace/user".to_string()],
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            r#type: message_type.clone(),
+            kind: None,
+            supertags: vec![],
+            content: String::new(),
+            signature: String::new(),
+            encryption: "{}".to_string(),
+            views: "[]".to_string(),
+            references: "[]".to_string(),
+            attachments: "[]".to_string(),
+            store_in_relational: false,
+            subtype: subtype.clone(),
+            metadata: json!({"created_by": "health_maintenance"}).to_string(),
+        };
+
+        let changed = db
+            .store_private_snapshot_message(&user.id, &snapshot, initial_content.clone())
+            .await
+            .expect("store current snapshot message");
+        assert!(!changed);
+
+        let bounded_count: i64 = sqlx::query_scalar(&format!(
+            r#"
+            SELECT COUNT(*)
+            FROM "{schema_name}".messages
+            WHERE type = $1
+              AND subtype = $2
+              AND from_agent = $3
+            "#
+        ))
+        .bind(&message_type)
+        .bind(&subtype)
+        .bind(&from_agent)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count bounded snapshot rows");
+        assert_eq!(bounded_count, 1);
+
+        let kept_id: String = sqlx::query_scalar(&format!(
+            r#"
+            SELECT id
+            FROM "{schema_name}".messages
+            WHERE type = $1
+              AND subtype = $2
+              AND from_agent = $3
+            LIMIT 1
+            "#
+        ))
+        .bind(&message_type)
+        .bind(&subtype)
+        .bind(&from_agent)
+        .fetch_one(&db.pool)
+        .await
+        .expect("read kept snapshot id");
+        assert_eq!(kept_id, current_id);
+
+        let unchanged = db
+            .store_private_snapshot_message(&user.id, &snapshot, initial_content.clone())
+            .await
+            .expect("repeat identical snapshot message");
+        assert!(!unchanged);
+
+        let unchanged_count: i64 = sqlx::query_scalar(&format!(
+            r#"
+            SELECT COUNT(*)
+            FROM "{schema_name}".messages
+            WHERE type = $1
+              AND subtype = $2
+              AND from_agent = $3
+            "#
+        ))
+        .bind(&message_type)
+        .bind(&subtype)
+        .bind(&from_agent)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count unchanged snapshot rows");
+        assert_eq!(unchanged_count, 1);
+
+        let updated_content = json!({
+            "title": "Knowledge maintenance summary",
+            "body": "Archive backlog: 2. Knowledge cards indexed: 5. Messages archived in the last day: 1.",
+            "metrics": {
+                "archive_backlog": 2,
+                "knowledge_cards": 5,
+                "archived_last_day": 1
+            }
+        });
+        let updated = db
+            .store_private_snapshot_message(&user.id, &snapshot, updated_content.clone())
+            .await
+            .expect("update snapshot message");
+        assert!(updated);
+
+        let final_count: i64 = sqlx::query_scalar(&format!(
+            r#"
+            SELECT COUNT(*)
+            FROM "{schema_name}".messages
+            WHERE type = $1
+              AND subtype = $2
+              AND from_agent = $3
+            "#
+        ))
+        .bind(&message_type)
+        .bind(&subtype)
+        .bind(&from_agent)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count final snapshot rows");
+        assert_eq!(final_count, 1);
+
+        let persisted = db
+            .private_message_content_by_id(&user.id, &current_id)
+            .await
+            .expect("load final snapshot content")
+            .expect("expected final snapshot content");
+        assert_eq!(persisted, updated_content);
+    }
+
+    #[tokio::test]
+    async fn local_postgres_mcp_tool_connections_remain_user_scoped() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user_a = UserRecord {
+            id: format!("user_tool_connection_a_{suffix}"),
+            email: format!("tool-connection-a-{suffix}@omnyid.test"),
+            password_hash: Some("hash-a".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Tool Connection A {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        let user_b = UserRecord {
+            id: format!("user_tool_connection_b_{suffix}"),
+            email: format!("tool-connection-b-{suffix}@omnyid.test"),
+            password_hash: Some("hash-b".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Tool Connection B {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user_a).await.expect("create user a");
+        db.create_user(&user_b).await.expect("create user b");
+
+        let first = db
+            .upsert_mcp_tool_connection(&McpToolConnectionUpsert {
+                user_id: user_a.id.clone(),
+                tool_slug: "github".to_string(),
+                tool_name: "GitHub".to_string(),
+                mcp_server_url: "https://mcp-a.example.com".to_string(),
+                api_key: Some("secret-a".to_string()),
+                connection_provider: "mcp".to_string(),
+                external_user_id: None,
+                composio_connected_account_id: None,
+                tool_descriptor: Some(json!({"tool": "github"})),
+            })
+            .await
+            .expect("upsert first user connection");
+        let second = db
+            .upsert_mcp_tool_connection(&McpToolConnectionUpsert {
+                user_id: user_b.id.clone(),
+                tool_slug: "github".to_string(),
+                tool_name: "GitHub".to_string(),
+                mcp_server_url: "https://mcp-b.example.com".to_string(),
+                api_key: Some("secret-b".to_string()),
+                connection_provider: "composio".to_string(),
+                external_user_id: Some(user_b.id.clone()),
+                composio_connected_account_id: Some(format!("ca_{suffix}")),
+                tool_descriptor: Some(json!({"tool": "github", "provider": "composio"})),
+            })
+            .await
+            .expect("upsert second user connection");
+
+        assert_ne!(first.id, second.id);
+
+        let listed_a = db
+            .list_mcp_tool_connections(&user_a.id)
+            .await
+            .expect("list connections for user a");
+        let listed_b = db
+            .list_mcp_tool_connections(&user_b.id)
+            .await
+            .expect("list connections for user b");
+
+        assert_eq!(listed_a.len(), 1);
+        assert_eq!(listed_b.len(), 1);
+        assert_eq!(listed_a[0].mcp_server_url, "https://mcp-a.example.com");
+        assert_eq!(listed_b[0].mcp_server_url, "https://mcp-b.example.com");
+        assert_eq!(listed_a[0].connection_provider, "mcp");
+        assert_eq!(listed_b[0].connection_provider, "composio");
+        assert_eq!(listed_a[0].composio_connected_account_id, None);
+        assert_eq!(
+            listed_b[0].composio_connected_account_id,
+            Some(format!("ca_{suffix}"))
+        );
+
+        let deleted_a = db
+            .delete_mcp_tool_connection(&user_a.id, "github")
+            .await
+            .expect("delete first user connection");
+        assert_eq!(deleted_a, 1);
+
+        let remaining_a = db
+            .list_mcp_tool_connections(&user_a.id)
+            .await
+            .expect("list remaining connections for user a");
+        let remaining_b = db
+            .list_mcp_tool_connections(&user_b.id)
+            .await
+            .expect("list remaining connections for user b");
+        assert!(remaining_a.is_empty());
+        assert_eq!(remaining_b.len(), 1);
+        assert_eq!(remaining_b[0].mcp_server_url, "https://mcp-b.example.com");
+    }
+
+    #[tokio::test]
+    async fn local_postgres_recent_action_result_helpers_stay_tenant_scoped() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://afp:afp@127.0.0.1:5432/afp".to_string());
+        let Ok(db) = Db::new(&database_url).await else {
+            return;
+        };
+
+        let suffix = Ulid::new().to_string().to_lowercase();
+        let user_a = UserRecord {
+            id: format!("user_audit_a_{suffix}"),
+            email: format!("audit-a-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Audit A {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        let user_b = UserRecord {
+            id: format!("user_audit_b_{suffix}"),
+            email: format!("audit-b-{suffix}@omnyid.test"),
+            password_hash: Some("smoke-hash".to_string()),
+            auth_provider: "password".to_string(),
+            google_sub: None,
+            display_name: format!("Audit B {suffix}"),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        db.create_user(&user_a)
+            .await
+            .expect("create audit smoke user a");
+        db.create_user(&user_b)
+            .await
+            .expect("create audit smoke user b");
+
+        let action_a = ActionResult {
+            capability_id: crate::reversible_actions::REVERSIBLE_CAPABILITY_DRAFT_TASK_CREATE
+                .to_string(),
+            thread_id: format!("thread_a_{suffix}"),
+            status: ActionStatus::Completed,
+            output: json!({
+                "task_id": format!("task_a_{suffix}"),
+                "action_message_id": format!("action_a_{suffix}"),
+                "reversible": true,
+                "rollback_checkpoint_id": format!("checkpoint_a_{suffix}"),
+            }),
+            external_reference: Some(format!("action_a_{suffix}")),
+            recorded_at: "2026-06-18T10:00:00Z".to_string(),
+        };
+        let action_b = ActionResult {
+            capability_id: crate::reversible_actions::REVERSIBLE_CAPABILITY_DRAFT_TASK_CREATE
+                .to_string(),
+            thread_id: format!("thread_b_{suffix}"),
+            status: ActionStatus::Completed,
+            output: json!({
+                "task_id": format!("task_b_{suffix}"),
+                "action_message_id": format!("action_b_{suffix}"),
+                "reversible": true,
+                "rollback_checkpoint_id": format!("checkpoint_b_{suffix}"),
+            }),
+            external_reference: Some(format!("action_b_{suffix}")),
+            recorded_at: "2026-06-18T10:05:00Z".to_string(),
+        };
+
+        db.record_action_result_for_user(&user_a.id, &action_a)
+            .await
+            .expect("record tenant-scoped action result a");
+        db.record_action_result_for_user(&user_b.id, &action_b)
+            .await
+            .expect("record tenant-scoped action result b");
+
+        let recent_for_a = db
+            .recent_action_results(&user_a.id, 10)
+            .await
+            .expect("load recent tenant action results");
+        assert_eq!(recent_for_a.len(), 1);
+        assert_eq!(recent_for_a[0].thread_id, action_a.thread_id);
+
+        let by_thread_for_a = db
+            .recent_action_results_for_threads(
+                &user_a.id,
+                std::slice::from_ref(&action_a.thread_id),
+                10,
+            )
+            .await
+            .expect("load recent tenant action results by thread");
+        assert_eq!(by_thread_for_a.len(), 1);
+        assert_eq!(by_thread_for_a[0].thread_id, action_a.thread_id);
+
+        let by_capability_for_a = db
+            .recent_action_results_for_capabilities(
+                &user_a.id,
+                &[crate::reversible_actions::REVERSIBLE_CAPABILITY_DRAFT_TASK_CREATE.to_string()],
+                10,
+            )
+            .await
+            .expect("load recent tenant action results by capability");
+        assert_eq!(by_capability_for_a.len(), 1);
+        assert_eq!(by_capability_for_a[0].thread_id, action_a.thread_id);
+        assert_eq!(
+            by_capability_for_a[0].external_reference.as_deref(),
+            action_a.external_reference.as_deref()
+        );
+    }
+
+    #[tokio::test]
+    async fn local_postgres_touch_sync_device_policy_last_used_smoke_path() {
+        if std::env::var("OMNYID_RUN_DB_SMOKE").ok().as_deref() != Some("1") {
+            return;
+        }
+    }
+
+    #[test]
+    fn reversible_action_audit_summary_reads_undo_metadata_from_output() {
+        let summary = super::reversible_action_audit_summary_from_output(&json!({
+            "status": "file_bundle_staged",
+            "reversible": true,
+            "undo_label": "Discard staged file bundle",
+            "artifact_refs": {
+                "action_message_id": "action_1",
+                "rollback_checkpoint_id": "checkpoint_1",
+                "provenance_record_id": "prov_1"
+            },
+            "side_effect_boundary": "internal_only"
+        }))
+        .expect("summary");
+
+        assert!(summary.reversible);
+        assert_eq!(
+            summary.undo_label.as_deref(),
+            Some("Discard staged file bundle")
+        );
+        assert_eq!(summary.action_message_id.as_deref(), Some("action_1"));
+        assert_eq!(
+            summary.rollback_checkpoint_id.as_deref(),
+            Some("checkpoint_1")
+        );
+        assert_eq!(summary.provenance_record_id.as_deref(), Some("prov_1"));
+        assert_eq!(
+            summary.side_effect_boundary.as_deref(),
+            Some("internal_only")
+        );
+    }
+
+    #[test]
+    fn reversible_action_audit_summary_returns_none_for_plain_outputs() {
+        assert!(
+            super::reversible_action_audit_summary_from_output(&json!({
+                "dispatch": "queued"
+            }))
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn daemon_operational_afp_retention_policy_targets_only_audit_types() {
+        assert!(super::daemon_operational_afp_retention_applies(
+            "watcher_resolution_event"
+        ));
+        assert!(super::daemon_operational_afp_retention_applies(
+            "synthesis_invalidation_event"
+        ));
+        assert!(super::daemon_operational_afp_retention_applies(
+            "reflection_trace"
+        ));
+        assert!(super::daemon_operational_afp_retention_applies(
+            "minimal_context_packet"
+        ));
+        assert!(super::daemon_operational_afp_retention_applies(
+            "proactive_trigger"
+        ));
+        assert!(super::daemon_operational_afp_retention_applies(
+            "token_budget_log"
+        ));
+        assert!(!super::daemon_operational_afp_retention_applies(
+            "behavior_pattern"
+        ));
+        assert!(!super::daemon_operational_afp_retention_applies("ledger"));
+    }
+
+    #[test]
+    fn bounded_operational_history_limits_remain_above_recent_query_windows() {
+        assert!(super::TRAINING_REFLECTION_TRACE_MAX_ROWS_PER_USER >= 100);
+        assert!(super::PROACTIVE_TOKEN_USAGE_MAX_ROWS_PER_USER >= 1_000);
+        assert!(super::TRAINING_REFLECTION_TRACE_RETENTION_DAYS >= 7);
+        assert!(super::PROACTIVE_TOKEN_USAGE_RETENTION_DAYS >= 7);
+        assert!(super::TENANT_LLM_USAGE_LOG_RETENTION_DAYS >= 90);
+        assert!(super::TENANT_LLM_USAGE_LOG_MAX_ROWS_PER_USER >= 1_000);
+        assert!(super::WORKFLOW_TRIGGER_OBSERVATION_RETENTION_DAYS >= 30);
+        assert!(super::WORKFLOW_TRIGGER_OBSERVATION_MAX_ROWS_PER_WORKFLOW >= 100);
+        assert!(super::TENANT_ACTION_AUDIT_LOG_RETENTION_DAYS >= 90);
+        assert!(super::TENANT_ACTION_AUDIT_LOG_MAX_ROWS_PER_USER >= 500);
+        assert!(super::TRIGGER_REPLAY_NONCE_RETENTION_DAYS >= 30);
+        assert!(super::TRIGGER_REPLAY_NONCE_MAX_ROWS_PER_USER >= 1_000);
     }
 }
 

@@ -118,6 +118,7 @@ export function weddingTaskCompletionToAfpSendInput(
     views: message.views,
     attachments: message.attachments,
     references: message.references,
+    supertags: message.supertags ?? [],
     metadata: message.metadata,
     store_in_relational: true,
   };

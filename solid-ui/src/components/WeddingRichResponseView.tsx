@@ -1,5 +1,5 @@
 // @locs-version: 2.0
-import { For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 
 import type {
   WeddingRichResponseAction,
@@ -67,6 +67,7 @@ function RichBlock(props: {
   block: WeddingRichResponseBlock;
   onAction?: (action: WeddingRichResponseAction) => void;
 }) {
+  const [showDetails, setShowDetails] = createSignal(false);
   return (
     <article class={`min-w-0 rounded-[24px] border p-4 shadow-sm ${blockShellClass(props.block)} ${
       props.block.layoutHint === "wide" ? "md:col-span-2" : ""
@@ -78,20 +79,30 @@ function RichBlock(props: {
           </p>
           <h3 class="mt-1 break-words text-sm font-semibold text-on-surface">{props.block.title}</h3>
         </div>
-        <span class="max-w-full break-words rounded-full border border-white/70 bg-white/75 px-2 py-1 text-xs font-medium text-slate-600">
-          {props.block.evidenceLabel}
-        </span>
+        <button
+          type="button"
+          class="rounded-full border border-white/70 bg-white/75 px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-white"
+          onClick={() => setShowDetails((current) => !current)}
+          aria-expanded={showDetails()}
+        >
+          {showDetails() ? "Hide details" : "Details"}
+        </button>
       </div>
       <p class="mt-2 break-words text-sm leading-6 text-on-surface-variant">{props.block.body}</p>
-      <div class="mt-3 flex flex-wrap gap-1.5">
-        <For each={props.block.badges.slice(0, 5)}>
-          {(badge) => (
-            <span class="max-w-full break-words rounded-full border border-white/70 bg-white/70 px-2 py-1 text-xs font-medium text-slate-600">
-              {badge}
-            </span>
-          )}
-        </For>
-      </div>
+      <Show when={showDetails()}>
+        <div class="mt-3 rounded-2xl border border-white/70 bg-white/60 p-3">
+          <p class="break-words text-xs font-semibold text-slate-700">{props.block.evidenceLabel}</p>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <For each={props.block.badges.slice(0, 5)}>
+              {(badge) => (
+                <span class="max-w-full break-words rounded-full border border-white/70 bg-white/70 px-2 py-1 text-xs font-medium text-slate-600">
+                  {badge}
+                </span>
+              )}
+            </For>
+          </div>
+        </div>
+      </Show>
       <div class="mt-4 grid gap-2 sm:flex sm:flex-wrap">
         <RichActionButton action={props.block.primaryAction} primary onAction={props.onAction} />
         <RichActionButton action={props.block.secondaryAction} onAction={props.onAction} />

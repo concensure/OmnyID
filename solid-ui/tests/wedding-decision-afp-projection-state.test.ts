@@ -99,6 +99,30 @@ test("weddingDecisionProjectionToAfpMessage drops malformed source URLs", () => 
   assert.doesNotMatch(String(message.metadata?.searchable_terms), /not-a-url/);
 });
 
+test("weddingDecisionProjectionToAfpMessage supertags budget decisions for graph synthesis", () => {
+  const message = weddingDecisionProjectionToAfpMessage({
+    ...decision,
+    artifactId: "wedding-budget-allocation",
+    artifactTitle: "Wedding Budget",
+    artifactKind: "budget_sheet",
+    selectedOption: {
+      ...decision.selectedOption,
+      id: "total-budget",
+      label: "$30,000 total",
+      detail: "Allocated across categories.",
+      cells: ["Venue & Ceremony: $10,000", "Catering & Drinks: $8,000"],
+      preferenceSummaryLabel: "Overall budget and category allocation set by the couple.",
+    },
+  }, "2026-09-12T00:00:00.000Z");
+
+  assert.equal(message.content.budget_decision, true);
+  assert.equal(message.metadata?.budget_decision, true);
+  assert.ok(message.supertags?.includes("wedding_budget"));
+  assert.ok(message.supertags?.includes("topology:wedding_budget"));
+  assert.ok(message.supertags?.includes("decisionos"));
+  assert.ok((message.metadata?.searchable_terms as string[]).includes("wedding budget decision"));
+});
+
 test("weddingDecisionProjectionToAfpMessage redacts imported source labels", () => {
   const message = weddingDecisionProjectionToAfpMessage({
     ...decision,
@@ -145,6 +169,7 @@ test("weddingDecisionProjectionToAfpSendInput is dispatch-ready", () => {
   assert.equal(sendInput.type, "decision");
   assert.equal(sendInput.subtype, "wedding_decision_selection");
   assert.equal(sendInput.store_in_relational, true);
+  assert.ok(sendInput.supertags?.includes("wedding_decision"));
   assert.ok(sendInput.references?.some((reference) => reference.target === "artifact:venue-shortlist"));
 });
 

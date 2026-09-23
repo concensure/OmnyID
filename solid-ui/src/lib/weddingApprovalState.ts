@@ -117,7 +117,7 @@ function requestId(input: WeddingApprovalRequestInput, metadata: WeddingPlanning
 function actionLabel(kind: WeddingApprovalActionKind): string {
   const labels: Record<WeddingApprovalActionKind, string> = {
     send_email: "Send email",
-    share_artifact: "Share artifact",
+    share_artifact: "Share document",
     invite_collaborator: "Invite collaborator",
     create_external_calendar_event: "Create external calendar event",
     contact_vendor: "Contact vendor",
@@ -199,7 +199,7 @@ function decisionScopeDisclosure(scopes: NonNullable<WeddingApprovalRequestInput
     const artifactTitle = decisionScopeArtifactTitleForDisclosure(scope.artifactTitle);
     const source = artifactTitle ? ` from ${artifactTitle}` : "";
     const detail = clean(scope.detail);
-    return [`Selected decision scope: ${title}${source}${detail ? ` - ${detail}` : ""}`];
+    return [`Selected choice: ${title}${source}${detail ? ` - ${detail}` : ""}`];
   });
 }
 
@@ -256,7 +256,7 @@ function vendorBlockedShareReason(input: {
     .slice(0, 3)
     .map((artifact) => isWeddingImportArtifact(artifact) ? "imported file" : artifact.kind.replace(/_/g, " "))
     .join(", ");
-  return `Vendor-facing shares cannot include private planning files by default (${labels}). Remove those artifacts or choose a non-vendor share scope.`;
+  return `Vendor-facing shares cannot include private planning files by default (${labels}). Remove those files or choose a non-vendor sharing level.`;
 }
 
 export function buildWeddingApprovalRequestState(input: WeddingApprovalRequestInput): WeddingApprovalRequestState {
@@ -276,7 +276,7 @@ export function buildWeddingApprovalRequestState(input: WeddingApprovalRequestIn
   });
   const disclosureLines = uniqueStrings([
     `Action: ${actionLabel(input.actionKind)}`,
-    `Scope: ${shareScope.replace(/_/g, " ")}`,
+    `Sharing level: ${shareScope.replace(/_/g, " ")}`,
     recipients.length > 0 ? `Recipients: ${recipients.join(", ")}` : null,
     clean(input.externalProvider) ? `Provider: ${clean(input.externalProvider)}` : null,
     ...artifactDisclosure(artifacts, shareScope),
@@ -329,7 +329,7 @@ export function buildWeddingApprovalRequestState(input: WeddingApprovalRequestIn
     artifactIds: artifacts.map((artifact) => artifact.id),
     scheduleItemIds: scheduleItems.map((item) => item.id),
     taskItemIds: taskItems.map((item) => item.id),
-    approvalButtonLabel: "Approve wedding action",
+    approvalButtonLabel: "Approve this action",
     executeButtonLabel: canExecute ? actionLabel(input.actionKind) : "Approval required",
   };
 }
@@ -399,7 +399,7 @@ export function buildWeddingIntegrationReadinessState(
       providerLabel,
       title: providerLabel ? `${providerLabel} calendar ready` : "Calendar provider needed",
       detail: providerLabel
-        ? "Calendar creation can run only after user approval and through the connected executor."
+        ? "Calendar creation can run only after user approval and through the connected calendar app."
         : "Connect Google Calendar or another supported calendar provider before creating external wedding events.",
       setupActionLabel: providerLabel ? null : "Connect calendar",
     };
@@ -411,7 +411,7 @@ export function buildWeddingIntegrationReadinessState(
       providerLabel,
       title: providerLabel ? `${providerLabel} email ready` : "Email provider needed",
       detail: providerLabel
-        ? "Email/contact execution can run only after user approval and through the connected executor."
+        ? "Email or vendor contact can run only after user approval and through the connected email app."
         : "Connect Gmail or another supported email provider before sending vendor messages from OmnyID.",
       setupActionLabel: providerLabel ? null : "Connect email",
     };
@@ -423,7 +423,7 @@ export function buildWeddingIntegrationReadinessState(
       providerLabel,
       title: providerLabel ? `${providerLabel} registry ready` : "Registry provider needed",
       detail: providerLabel
-        ? "Registry publishing can run only after user approval and through the connected executor."
+        ? "Registry publishing can run only after user approval and through the connected registry app."
         : "Registry drafts can be approved and staged in OmnyID, but external publishing needs a supported registry provider.",
       setupActionLabel: providerLabel ? null : "Connect registry",
     };

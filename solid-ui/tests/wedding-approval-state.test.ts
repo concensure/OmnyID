@@ -45,7 +45,7 @@ test("buildWeddingApprovalRequestState blocks consequential actions until explic
   assert.match(request.blockedReason ?? "", /Explicit user approval/i);
   assert.ok(request.disclosureLines.some((line) => /Recipients: events@harbour\.example/i.test(line)));
   assert.ok(request.disclosureLines.some((line) => /Venue email/i.test(line)));
-  assert.ok(request.riskLabels.some((line) => /pending user approval/i.test(line)));
+  assert.ok(request.riskLabels.some((line) => /needs your approval/i.test(line)));
 });
 
 test("buildWeddingApprovalRequestState discloses selected decision scope", () => {
@@ -62,7 +62,7 @@ test("buildWeddingApprovalRequestState discloses selected decision scope", () =>
     }],
   });
 
-  assert.ok(request.disclosureLines.some((line) => /Selected decision scope: Harbour Hall from Venue shortlist/i.test(line)));
+  assert.ok(request.disclosureLines.some((line) => /Selected choice: Harbour Hall from Venue shortlist/i.test(line)));
   assert.ok(request.riskLabels.some((line) => /scoped to the selected shortlist item/i.test(line)));
 });
 
@@ -81,7 +81,7 @@ test("buildWeddingApprovalRequestState redacts imported selected decision scope 
   });
   const serialized = JSON.stringify(request.disclosureLines);
 
-  assert.ok(request.disclosureLines.some((line) => /Selected decision scope: Garden Hall from Imported private planning file/i.test(line)));
+  assert.ok(request.disclosureLines.some((line) => /Selected choice: Garden Hall from Imported private planning file/i.test(line)));
   assert.equal(serialized.includes("private-family-budget.xlsx"), false);
   assert.equal(serialized.includes("Imported XLSX"), false);
 });
@@ -112,7 +112,7 @@ test("buildWeddingApprovalRequestState blocks unsafe vendor-facing shares", () =
   assert.match(request.blockedReason ?? "", /Vendor-facing shares cannot include private planning files/i);
   assert.ok(request.riskLabels.some((label) => /private budget ceilings/i.test(label)));
   assert.ok(request.riskLabels.some((label) => /unrelated guest details/i.test(label)));
-  assert.ok(request.disclosureLines.some((line) => /Scope: shared vendor/i.test(line)));
+  assert.ok(request.disclosureLines.some((line) => /Sharing level: shared vendor/i.test(line)));
 });
 
 test("buildWeddingApprovalRequestState blocks imported research in vendor-facing shares", () => {

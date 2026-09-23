@@ -259,7 +259,7 @@ test("buildWeddingWorkspaceBundleExportPayload includes selected decision scope 
     }],
   });
 
-  assert.match(payload.content, /## Selected decision scope/);
+  assert.match(payload.content, /## Selected choice/);
   assert.match(payload.content, /Harbour Hall from Venue shortlist: Selected waterfront venue/);
   assert.match(payload.content, /providers: google_places/);
   assert.match(payload.content, /sources: Google Places API/);

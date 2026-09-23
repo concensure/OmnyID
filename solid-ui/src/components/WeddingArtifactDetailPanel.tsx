@@ -20,6 +20,14 @@ function approvalTagClass(state: string): string {
   return "border-slate-200 bg-white/80 text-slate-700";
 }
 
+export function weddingApprovalStateLabel(state: string): string {
+  if (state === "approved") return "Approved";
+  if (state === "pending_user_approval") return "Needs approval";
+  if (state === "rejected") return "Not approved";
+  if (state === "draft") return "Draft";
+  return state.replace(/_/g, " ");
+}
+
 function userFacingHighlight(line: string): { heading: string; detail: string | null } {
   const trimmed = line.trim();
   const separatorIndex = trimmed.search(/[:.]\s/);
@@ -369,6 +377,11 @@ export function WeddingArtifactDetailPanel(props: {
   onExecute: (request: WeddingApprovalRequestState) => void;
   onProviderSetup?: (view: ViewName) => void;
 }) {
+  const [showDocumentDetails, setShowDocumentDetails] = createSignal(false);
+  createEffect(() => {
+    props.preview?.artifactId;
+    setShowDocumentDetails(false);
+  });
   return (
     <article class="min-w-0 rounded-[24px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[28px] sm:p-5">
       <Show when={props.preview} fallback={
@@ -386,61 +399,73 @@ export function WeddingArtifactDetailPanel(props: {
                 </p>
                 <h2 class="mt-1 break-words text-lg font-semibold text-on-surface sm:text-xl">{preview().title}</h2>
               </div>
-              <span class={`inline-flex max-w-full shrink-0 break-words rounded-full border px-2.5 py-1 text-xs font-semibold ${approvalTagClass(preview().approvalState)}`}>
-                {preview().approvalState.replace(/_/g, " ")}
-              </span>
-            </div>
-            <div class="mt-3 flex flex-wrap gap-2">
-              <For each={preview().metadataLabels}>
-                {(label) => (
-                  <span class="rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 text-xs text-slate-700">
-                    {label}
-                  </span>
-                )}
-              </For>
-            </div>
-            <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/85 p-3">
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <p class="text-sm font-semibold text-slate-950">Where this came from</p>
-                <span class="rounded-full bg-white/85 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                  {preview().evidenceSummary.statusLabel}
+              <div class="flex shrink-0 flex-wrap items-center gap-2">
+                <span class={`inline-flex max-w-full break-words rounded-full border px-2.5 py-1 text-xs font-semibold ${approvalTagClass(preview().approvalState)}`}>
+                  {weddingApprovalStateLabel(preview().approvalState)}
                 </span>
+                <button
+                  type="button"
+                  class="rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                  onClick={() => setShowDocumentDetails((current) => !current)}
+                  aria-expanded={showDocumentDetails()}
+                >
+                  {showDocumentDetails() ? "Hide details" : "Details"}
+                </button>
               </div>
-              <p class="mt-1 text-sm leading-6 text-slate-700/80">
-                {preview().evidenceSummary.sourceCountLabel}
-              </p>
-              <Show when={preview().evidenceSummary.warningLabel}>
-                {(warning) => (
-                  <p class="mt-2 rounded-xl border border-amber-100 bg-amber-50/80 px-3 py-2 text-sm leading-6 text-amber-900">
-                    {warning()}
-                  </p>
-                )}
-              </Show>
-              <Show when={preview().evidenceSummary.labels.length > 0}>
-                <div class="mt-2 flex flex-wrap gap-1.5">
-                  <For each={preview().evidenceSummary.labels}>
-                    {(label) => (
-                      <span class="max-w-full break-words rounded-full border border-slate-200 bg-white/80 px-2 py-1 text-xs text-slate-700">
-                        {label}
-                      </span>
-                    )}
-                  </For>
-                </div>
-              </Show>
             </div>
-            <Show when={preview().sourceLinks.length > 0}>
-              <div class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/75 p-3">
-                <p class="text-xs font-semibold text-emerald-950">Source links</p>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <For each={preview().sourceLinks}>
-                    {(source) => (
-                      <a href={source.url} target="_blank" rel="noreferrer" class="rounded-full border border-emerald-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-emerald-900 transition hover:bg-white">
-                        {source.label}
-                      </a>
-                    )}
-                  </For>
-                </div>
+            <Show when={showDocumentDetails()}>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <For each={preview().metadataLabels}>
+                  {(label) => (
+                    <span class="rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 text-xs text-slate-700">
+                      {label}
+                    </span>
+                  )}
+                </For>
               </div>
+              <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/85 p-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p class="text-sm font-semibold text-slate-950">Where this came from</p>
+                  <span class="rounded-full bg-white/85 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                    {preview().evidenceSummary.statusLabel}
+                  </span>
+                </div>
+                <p class="mt-1 text-sm leading-6 text-slate-700/80">
+                  {preview().evidenceSummary.sourceCountLabel}
+                </p>
+                <Show when={preview().evidenceSummary.warningLabel}>
+                  {(warning) => (
+                    <p class="mt-2 rounded-xl border border-amber-100 bg-amber-50/80 px-3 py-2 text-sm leading-6 text-amber-900">
+                      {warning()}
+                    </p>
+                  )}
+                </Show>
+                <Show when={preview().evidenceSummary.labels.length > 0}>
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    <For each={preview().evidenceSummary.labels}>
+                      {(label) => (
+                        <span class="max-w-full break-words rounded-full border border-slate-200 bg-white/80 px-2 py-1 text-xs text-slate-700">
+                          {label}
+                        </span>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </div>
+              <Show when={preview().sourceLinks.length > 0}>
+                <div class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/75 p-3">
+                  <p class="text-xs font-semibold text-emerald-950">Source links</p>
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    <For each={preview().sourceLinks}>
+                      {(source) => (
+                        <a href={source.url} target="_blank" rel="noreferrer" class="rounded-full border border-emerald-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-emerald-900 transition hover:bg-white">
+                          {source.label}
+                        </a>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
             </Show>
             <Show when={preview().bodyText} fallback={
               <p class="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-on-surface-variant">
@@ -468,9 +493,16 @@ export function WeddingArtifactDetailPanel(props: {
                 </button>
                 <For each={preview().exportManifest.entries}>
                   {(entry) => (
-                    <button type="button" disabled={!entry.enabled || !preview().bodyText} title={entry.detail} onClick={() => props.onExport(entry)} class="rounded-full border border-sky-200 bg-white/80 px-3 py-2 text-xs font-semibold text-sky-900 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-45 sm:py-1.5">
-                      {entry.action === "print" ? `Print ${entry.label}` : `Download ${entry.label}`}
-                    </button>
+                    <div class="min-w-0">
+                      <button type="button" disabled={!entry.enabled || !preview().bodyText} title={entry.detail} onClick={() => props.onExport(entry)} class="w-full rounded-full border border-sky-200 bg-white/80 px-3 py-2 text-xs font-semibold text-sky-900 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:py-1.5">
+                        {entry.action === "print" ? `Print ${entry.label}` : `Download ${entry.label}`}
+                      </button>
+                      <Show when={(!entry.enabled || !preview().bodyText) && entry.detail}>
+                        <p class="mt-1 max-w-xs px-2 text-xs leading-5 text-slate-600">
+                          {entry.detail}
+                        </p>
+                      </Show>
+                    </div>
                   )}
                 </For>
               </div>

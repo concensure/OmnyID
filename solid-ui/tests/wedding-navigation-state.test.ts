@@ -41,7 +41,7 @@ test("buildWeddingNavigationIntentFromPresentationAction maps existing surfaces"
   assert.equal(buildWeddingNavigationIntentFromPresentationAction(presentationAction({ kind: "open_task_list" })).view, "tasks");
   assert.equal(buildWeddingNavigationIntentFromPresentationAction(presentationAction({ kind: "approve_draft" })).view, "decision_queue");
   assert.equal(buildWeddingNavigationIntentFromPresentationAction(presentationAction({ kind: "continue_chat" })).view, "threads");
-  assert.equal(buildWeddingNavigationIntentFromPresentationAction(presentationAction({ kind: "open_map" })).view, "search");
+  assert.equal(buildWeddingNavigationIntentFromPresentationAction(presentationAction({ kind: "open_map" })).view, "response_queue");
 });
 
 test("buildWeddingNavigationIntentFromSidebarAction carries workspace and active artifact context", () => {

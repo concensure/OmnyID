@@ -127,8 +127,8 @@ export function buildWeddingProviderExecutorReadinessState(
       executorStatus,
       productionReady,
       setupView: null,
-      summary: "OmnyID privacy-gated sharing",
-      detail: "This action is governed by OmnyID approval, disclosure, and privacy checks rather than a third-party executor.",
+      summary: "OmnyID sharing checks",
+      detail: "OmnyID will ask for approval and show what is included before anything is shared.",
     };
   }
 
@@ -140,15 +140,15 @@ export function buildWeddingProviderExecutorReadinessState(
     productionReady,
     setupView: setupViewFor(capability),
     summary: productionReady
-      ? `${requiredProvider} executor ready`
-      : `${requiredProvider} executor not production-ready`,
+      ? `${requiredProvider} ready`
+      : `${requiredProvider} needs setup`,
     detail: executorStatus === "missing"
-      ? "The action can be approved and staged in OmnyID, but real external delivery needs a connected executor implementation."
+      ? "You can approve this in OmnyID now, but sending or syncing it outside OmnyID needs a connected app."
       : credentialStatus === "stale"
-        ? "The executor exists, but credentials need reconnection before production use."
+        ? "The connected app needs to be signed in again before it can send or sync."
         : credentialStatus === "missing"
-          ? "Connect the provider account before external execution can run."
-          : "Provider credentials and executor are both available.",
+          ? "Connect the app account before this can be sent or synced outside OmnyID."
+          : "The connected app is ready.",
   };
 }
 

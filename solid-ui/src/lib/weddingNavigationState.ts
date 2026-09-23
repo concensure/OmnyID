@@ -90,7 +90,7 @@ function viewForSurface(surface: WeddingNavigationSurface): ViewName {
   if (surface === "connected_apps") return "connected_apps";
   if (surface === "approval") return "decision_queue";
   if (surface === "export") return "files";
-  if (surface === "map") return "search";
+  if (surface === "map") return "response_queue";
   if (surface === "continue_chat" || surface === "probe") return "threads";
   return "response_queue";
 }

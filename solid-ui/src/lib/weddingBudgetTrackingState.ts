@@ -1,9 +1,18 @@
-// @locs-version: 2.0
+// @locs-version: 2.1
 import type { WeddingPersistedDecisionRecord } from "@/lib/weddingPersistedWorkspaceState";
 import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
 import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import { normalizeWeddingPlanningMetadata, safeWeddingLabel } from "@/lib/weddingPlanningTemplateState";
+import {
+  isWeddingBudgetAllocationDecisionRecord,
+  weddingBudgetAllocationFromDecisionRecords,
+  type WeddingBudgetAllocationCategoryAmount,
+} from "@/lib/weddingBudgetAllocationState";
+import {
+  buildWeddingBudgetInsightsState,
+  type WeddingBudgetInsightsState,
+} from "@/lib/weddingBudgetInsightsState";
 
 export type WeddingBudgetLinePriceStatus = "quoted" | "projected" | "unknown";
 
@@ -59,6 +68,10 @@ export type WeddingBudgetTrackingState = {
   categoryRollups: WeddingBudgetCategoryRollup[];
   quoteTaskCandidates: WeddingBudgetTaskCandidate[];
   paymentTaskCandidates: WeddingBudgetPaymentTaskCandidate[];
+  /** The couple's own set-and-allocated budget (see weddingBudgetAllocationState.ts), distinct
+   * from categoryRollups, which tracks actual selected-vendor spend per category. */
+  budgetAllocation: WeddingBudgetAllocationCategoryAmount[];
+  insights: WeddingBudgetInsightsState;
   budgetTargetAmount: number | null;
   remainingAmount: number | null;
   overBudgetAmount: number;
@@ -205,6 +218,10 @@ function warningLabelsFor(status: WeddingBudgetLinePriceStatus, amount: number |
 }
 
 function lineItemFor(record: WeddingPersistedDecisionRecord): WeddingBudgetLineItem | null {
+  // The user's own overall-budget allocation is a target, not a vendor spend line — and
+  // its artifactKind ("budget_sheet") would otherwise match the "budget" keyword below and
+  // get miscounted as a single vendor line. It's summarized separately (see budgetAllocation).
+  if (isWeddingBudgetAllocationDecisionRecord(record)) return null;
   if (!/vendor|venue|budget|quote|package|price|cost|photographer|florist|caterer|band|dj|celebrant|officiant/i.test(`${record.artifactKind} ${record.artifactTitle} ${record.selectedOptionDetail}`)) {
     return null;
   }
@@ -345,6 +362,40 @@ function isoDateFromCell(value: string): string | null {
   return `${slash[3]}-${month}-${day}`;
 }
 
+function artifactHasPaymentSignals(artifact: WeddingArtifactInput): boolean {
+  return /\b(budget|quote|contract|invoice|receipt|deposit|instalment|installment|payment|balance|due|cancellation|refund|non-refundable)\b/i
+    .test(`${artifact.kind ?? ""} ${artifact.title ?? ""} ${artifact.bodyText ?? ""}`);
+}
+
+function paymentTaskCandidateFromTextLine(input: {
+  artifact: WeddingArtifactInput;
+  line: string;
+  lineIndex: number;
+  fallbackVendor: string;
+}): WeddingBudgetPaymentTaskCandidate | null {
+  const line = clean(input.line);
+  if (!/\b(deposit|instalment|installment|payment|balance|invoice|receipt|due|refund|cancellation|non-refundable)\b/i.test(line)) {
+    return null;
+  }
+  const dueAmount = moneyValue(line) !== null ? line.match(/(?:\$|aud|usd|gbp|eur)?\s*\d[\d,]*(?:\.\d+)?/i)?.[0] ?? null : null;
+  const dueAt = isoDateFromCell(line);
+  if (!dueAmount && !dueAt && !/\b(deposit|balance due|payment schedule|non-refundable)\b/i.test(line)) return null;
+  const vendor = clean(input.artifact.vendorLabels?.[0]) || input.fallbackVendor;
+  return {
+    id: `wedding_budget_payment_task:${safeWeddingLabel(clean(input.artifact.id) || clean(input.artifact.title) || "payment")}:line-${input.lineIndex + 1}`,
+    title: `Review payment detail for ${vendor}`,
+    categoryLabel: "Payment schedule",
+    vendorName: vendor,
+    dueAmountLabel: dueAmount,
+    dueDateLabel: dueAt ?? null,
+    dueAt,
+    priorityLabel: dueAt || dueAmount ? "High: payment deadline or due amount" : "Medium: payment terms need review",
+    reasonLabel: `Payment detail found: ${line.slice(0, 180)}${line.length > 180 ? "..." : ""}`,
+    sourceLabel: artifactSourceLabelForBudget(input.artifact, "Uploaded file"),
+    linkedArtifactId: clean(input.artifact.id) || null,
+  };
+}
+
 function quoteTaskCandidates(lineItems: readonly WeddingBudgetLineItem[]): WeddingBudgetTaskCandidate[] {
   return lineItems
     .filter((item) => item.priceStatus !== "quoted" || item.warningLabels.length > 0)
@@ -363,10 +414,18 @@ function quoteTaskCandidates(lineItems: readonly WeddingBudgetLineItem[]): Weddi
 
 function paymentTaskCandidates(artifacts: readonly WeddingArtifactInput[]): WeddingBudgetPaymentTaskCandidate[] {
   return artifacts
-    .filter((artifact) => artifact.kind === "budget_sheet")
+    .filter(artifactHasPaymentSignals)
     .flatMap((artifact): WeddingBudgetPaymentTaskCandidate[] => {
       const table = parseMarkdownTable(clean(artifact.bodyText));
-      if (!table) return [];
+      const fallbackVendor = clean(artifact.vendorLabels?.[0]) || clean(artifact.title) || "vendor";
+      if (!table) {
+        return clean(artifact.bodyText)
+          .split(/\r?\n/)
+          .flatMap((line, lineIndex): WeddingBudgetPaymentTaskCandidate[] => {
+            const candidate = paymentTaskCandidateFromTextLine({ artifact, line, lineIndex, fallbackVendor });
+            return candidate ? [candidate] : [];
+          });
+      }
       const categoryIndex = headerIndex(table.headers, /\b(category|item|vendor|supplier|service)\b/i);
       const vendorIndex = headerIndex(table.headers, /\b(vendor|supplier|provider|name)\b/i);
       const paidIndex = headerIndex(table.headers, /\bpaid|settled|status\b/i);
@@ -456,6 +515,12 @@ export function buildWeddingBudgetQuoteTaskItems(input: WeddingBudgetQuoteTaskIn
         budget_vendor_label: candidate.vendorName,
         budget_category_label: candidate.categoryLabel,
         budget_source_label: candidate.sourceLabel,
+        second_order_loop: "budget_drift",
+        second_order_evidence_labels: [
+          "Selected vendor amount still needs quote verification.",
+          `Vendor: ${candidate.vendorName}.`,
+          `Category: ${candidate.categoryLabel}.`,
+        ],
         preparation_checklist: true,
         preparation_checklist_item: "quote_verification",
         user_selectable: true,
@@ -511,6 +576,12 @@ export function buildWeddingBudgetPaymentTaskItems(input: WeddingBudgetPaymentTa
         budget_vendor_label: candidate.vendorName,
         budget_category_label: candidate.categoryLabel,
         budget_source_label: candidate.sourceLabel,
+        second_order_loop: "budget_drift",
+        second_order_evidence_labels: [
+          "Payment schedule needs follow-up so monthly cash needs stay accurate.",
+          candidate.dueAmountLabel ? `Due amount: ${candidate.dueAmountLabel}.` : null,
+          candidate.dueDateLabel ? `Due date: ${candidate.dueDateLabel}.` : null,
+        ].filter(Boolean),
         preparation_checklist: true,
         preparation_checklist_item: "payment_review",
         user_selectable: true,
@@ -545,10 +616,12 @@ export function buildWeddingBudgetTrackingState(input: {
   budgetTargetAmount?: number | null;
   budgetTargetText?: string | null;
 }): WeddingBudgetTrackingState {
-  const lineItems = mergedBudgetDecisionRecords(input).flatMap((record): WeddingBudgetLineItem[] => {
+  const mergedRecords = mergedBudgetDecisionRecords(input);
+  const lineItems = mergedRecords.flatMap((record): WeddingBudgetLineItem[] => {
     const item = lineItemFor(record);
     return item ? [item] : [];
   });
+  const budgetAllocationSummary = weddingBudgetAllocationFromDecisionRecords(mergedRecords);
   const totalProjectedAmount = lineItems
     .filter((item) => item.priceStatus === "projected" && item.amount !== null)
     .reduce((total, item) => total + (item.amount ?? 0), 0);
@@ -560,7 +633,9 @@ export function buildWeddingBudgetTrackingState(input: {
   const quotedCount = lineItems.filter((item) => item.priceStatus === "quoted").length;
   const totalKnownAmount = totalProjectedAmount + totalQuotedAmount;
   const targetAmount = budgetTargetAmount({
-    explicitTargetAmount: input.budgetTargetAmount,
+    // A structured allocation the couple actually set always wins over a number merely
+    // guessed from free text — it's an explicit decision, not an inference.
+    explicitTargetAmount: budgetAllocationSummary?.totalAmount ?? input.budgetTargetAmount,
     budgetTargetText: input.budgetTargetText,
     artifacts: input.artifacts,
   });
@@ -572,6 +647,17 @@ export function buildWeddingBudgetTrackingState(input: {
   const rollups = categoryRollups(lineItems);
   const tasks = quoteTaskCandidates(lineItems);
   const paymentTasks = paymentTaskCandidates(input.artifacts ?? []);
+  const insights = buildWeddingBudgetInsightsState({
+    lineItems,
+    paymentTaskCandidates: paymentTasks,
+    budgetAllocation: budgetAllocationSummary?.categories ?? [],
+    budgetTargetAmount: targetAmount,
+    totalKnownAmount,
+    totalProjectedAmount,
+    totalQuotedAmount,
+    remainingAmount,
+    artifacts: input.artifacts,
+  });
   const warningLabels = [
     overBudgetAmount > 0 ? `Selected vendor path is ${overBudgetAmount.toLocaleString(undefined, { style: "currency", currency: lineItems[0]?.currency ?? "AUD", maximumFractionDigits: 0 })} over the explicit budget target` : null,
     projectedCount > 0 ? `${projectedCount} selected vendor amount${projectedCount === 1 ? "" : "s"} still projected` : null,
@@ -583,6 +669,8 @@ export function buildWeddingBudgetTrackingState(input: {
     categoryRollups: rollups,
     quoteTaskCandidates: tasks,
     paymentTaskCandidates: paymentTasks,
+    budgetAllocation: budgetAllocationSummary?.categories ?? [],
+    insights,
     budgetTargetAmount: targetAmount,
     remainingAmount,
     overBudgetAmount,

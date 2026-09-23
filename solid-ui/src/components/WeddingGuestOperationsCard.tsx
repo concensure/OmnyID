@@ -1,6 +1,7 @@
 // @locs-version: 2.0
 import { For, Show } from "solid-js";
 
+import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
 
 export function WeddingGuestOperationsCard(props: {
@@ -9,7 +10,12 @@ export function WeddingGuestOperationsCard(props: {
   return (
     <div class="min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
       <div class="flex items-start justify-between gap-2">
-        <p class="text-base font-semibold text-sky-950">Guests</p>
+        <div class="flex items-center gap-2">
+          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #0F766E" aria-hidden="true">
+            <WeddingDashboardIcon id="users" class="h-4 w-4" />
+          </span>
+          <p class="text-lg font-bold tracking-tight text-sky-950">Guests</p>
+        </div>
         <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-sky-900">
           {props.state.guestRowCount} guest{props.state.guestRowCount === 1 ? "" : "s"}
         </span>

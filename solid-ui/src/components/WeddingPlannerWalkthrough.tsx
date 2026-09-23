@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 
@@ -96,14 +96,24 @@ export function WeddingPlannerWalkthrough(props: {
     onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
   });
 
+  // Keep the background workspace pointed at whatever section the current
+  // guide step is describing, so the guide narrates the section the user
+  // can already see behind it instead of a hidden/unrelated one.
+  createEffect(() => {
+    const step = currentStep();
+    const targetMenuId = step.menuId ?? step.sectionLinks?.[0]?.menuId;
+    if (targetMenuId) props.onSelectMenu(targetMenuId);
+    else if (step.shareLabel) props.onOpenSharePlan?.();
+  });
+
   return (
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
+    <div class="pointer-events-none fixed inset-0 z-50 flex items-end justify-center p-4 sm:justify-end sm:p-6">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="wedding-walkthrough-title"
         aria-describedby="wedding-walkthrough-body"
-        class="relative w-full max-w-lg rounded-[28px] border border-rose-100 bg-white p-5 shadow-2xl sm:p-6"
+        class="pointer-events-auto relative w-full max-w-md rounded-[28px] border border-rose-100 bg-white p-5 shadow-2xl sm:p-6"
       >
         <button
           ref={closeButtonRef}

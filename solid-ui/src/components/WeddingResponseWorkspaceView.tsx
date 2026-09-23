@@ -1,7 +1,7 @@
 // @locs-version: 2.0
 import { createSignal, For, Show } from "solid-js";
 
-import { WeddingArtifactDetailPanel } from "@/components/WeddingArtifactDetailPanel";
+import { WeddingArtifactDetailPanel, weddingApprovalStateLabel } from "@/components/WeddingArtifactDetailPanel";
 import { WeddingProjectionQueuePanel } from "@/components/WeddingProjectionQueuePanel";
 import {
   WeddingDecisionFocusCard,
@@ -263,13 +263,14 @@ export function WeddingResponseWorkspaceView(props: {
               aria-label="Download format"
               class="min-h-10 rounded-full border border-slate-200 bg-white/85 px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-sky-300"
             >
-              <option value="markdown">Markdown</option>
+              <option value="markdown">Text file</option>
               <option value="html">Printable page</option>
               <option value="word_doc">Word document</option>
             </select>
             <button
               type="button"
               disabled={state().bundleExportPayload.disabledReason !== null}
+              title={state().bundleExportPayload.disabledReason ?? undefined}
               onClick={runBundleExport}
               class="min-h-10 rounded-full bg-slate-900 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
@@ -285,6 +286,13 @@ export function WeddingResponseWorkspaceView(props: {
               Include private details
             </label>
           </div>
+          <Show when={state().bundleExportPayload.disabledReason}>
+            {(reason) => (
+              <p class="mt-2 text-xs leading-5 text-slate-600">
+                {reason()}
+              </p>
+            )}
+          </Show>
           <Show when={exportNotice()}>
             {(notice) => <p class="mt-2 text-xs leading-5 text-slate-600">{notice()}</p>}
           </Show>
@@ -366,7 +374,7 @@ export function WeddingResponseWorkspaceView(props: {
                       >
                         <p class="break-words text-sm font-semibold text-on-surface">{artifact.title}</p>
                         <p class="mt-1 break-words text-xs text-on-surface-variant">
-                          {artifact.category} - {artifact.approvalState.replace(/_/g, " ")}
+                          {artifact.category} - {weddingApprovalStateLabel(artifact.approvalState)}
                         </p>
                       </button>
                     )}
@@ -414,6 +422,8 @@ export function WeddingResponseWorkspaceView(props: {
           showTechnicalDetails={showTechnicalDetails()}
           activeMenu={activeMenu()}
           sharePlanOpen={Boolean(props.sharePlanOpen)}
+          saveProjection={props.saveProjection}
+          onRefreshWorkspace={props.onRefreshWorkspace}
           onSidebarAction={handleSidebarAction}
         />
       </aside>

@@ -36,7 +36,7 @@ test("outreach escalation approval maps day-five follow-up to vendor contact app
   assert.equal(selection.readiness.providerLabel, "Gmail");
   assert.ok(selection.request.artifactIds.includes(escalation.artifactInput.id));
   assert.ok(selection.request.taskItemIds.includes(escalation.taskItem.id));
-  assert.ok(selection.disclosureLines.some((line) => /Selected decision scope: Harbour Hall/i.test(line)));
+  assert.ok(selection.disclosureLines.some((line) => /Selected choice: Harbour Hall/i.test(line)));
   assert.ok(selection.riskLabels.some((line) => /No-spam ladder/i.test(line)));
 });
 

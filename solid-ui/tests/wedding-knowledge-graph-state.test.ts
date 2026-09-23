@@ -233,6 +233,55 @@ test("buildWeddingKnowledgeGraphState tags outreach escalation stages in task an
   assert.equal(riskNode.metadata.outreach_escalation_stage, "escalate_to_user");
 });
 
+test("buildWeddingKnowledgeGraphState tags budget payment and quote tasks for topology", () => {
+  const state = buildWeddingKnowledgeGraphState({
+    metadata: baseMetadata,
+    taskItems: [{
+      id: "budget-payment-garden-hall",
+      title: "Review Garden Hall payment schedule",
+      kind: "budget_review",
+      priority: "high",
+      dueAt: "2027-01-15T17:00:00.000Z",
+      metadata: {
+        ...baseMetadata,
+        budget_payment_review: true,
+        budget_payment_due_amount_label: "$3000",
+        budget_payment_due_date_label: "2027-01-15",
+        budget_vendor_label: "Garden Hall",
+        budget_category_label: "Venue",
+        second_order_loop: "budget_drift",
+        second_order_evidence_labels: ["Payment schedule needs follow-up."],
+      },
+    }, {
+      id: "budget-quote-harbour-photos",
+      title: "Verify Harbour Photos pricing before deposit",
+      kind: "budget_review",
+      metadata: {
+        ...baseMetadata,
+        budget_quote_verification: true,
+        budget_vendor_label: "Harbour Photos",
+        budget_category_label: "Photography",
+        second_order_loop: "budget_drift",
+      },
+    }],
+  });
+
+  const paymentTask = state.nodes.find((node) => node.kind === "task" && node.label === "Review Garden Hall payment schedule");
+  const quoteTask = state.nodes.find((node) => node.kind === "task" && node.label === "Verify Harbour Photos pricing before deposit");
+  const budgetRisk = state.riskNodes.find((node) => node.metadata.second_order_loop === "budget_drift");
+
+  assert.ok(paymentTask);
+  assert.ok(paymentTask.supertags.includes("wedding_budget"));
+  assert.ok(paymentTask.supertags.includes("wedding_budget:payment_schedule"));
+  assert.equal(paymentTask.metadata.budget_vendor_label, "Garden Hall");
+  assert.equal(paymentTask.metadata.budget_payment_due_amount_label, "$3000");
+  assert.ok(quoteTask);
+  assert.ok(quoteTask.supertags.includes("wedding_budget:quote_verification"));
+  assert.ok(budgetRisk);
+  assert.ok(budgetRisk.supertags.includes("second_order_loop:budget_drift"));
+  assert.ok(state.edges.some((edge) => edge.kind === "next_action" && edge.source === budgetRisk.id));
+});
+
 test("buildWeddingKnowledgeGraphState marks day-of execution gaps in topology", () => {
   const state = buildWeddingKnowledgeGraphState({
     metadata: baseMetadata,

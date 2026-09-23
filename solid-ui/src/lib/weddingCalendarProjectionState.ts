@@ -186,6 +186,28 @@ function projectionTags(
   ]);
 }
 
+function taskGraphProjectionTags(projectedMetadata: Record<string, unknown>): string[] {
+  const tags = [
+    projectedMetadata.budget_payment_review === true || projectedMetadata.budget_quote_verification === true ? "wedding_budget" : null,
+    projectedMetadata.budget_payment_review === true ? "wedding_budget:payment_schedule" : null,
+    projectedMetadata.budget_quote_verification === true ? "wedding_budget:quote_verification" : null,
+    projectedMetadata.budget_payment_review === true || projectedMetadata.budget_quote_verification === true ? "decisionos" : null,
+    projectedMetadata.second_order_task === true ? "topology:wedding_planning" : null,
+    projectedMetadata.second_order_loop ? `topology:${safeWeddingLabel(projectedMetadata.second_order_loop)}` : null,
+  ];
+  return uniqueTags(tags);
+}
+
+function taskMessageRecipients(projectedMetadata: Record<string, unknown>): string[] {
+  return uniqueTags([
+    "agent://tasks",
+    "agent://wedding-planning",
+    projectedMetadata.budget_payment_review === true || projectedMetadata.budget_quote_verification === true ? "agent://decision-queue" : null,
+    projectedMetadata.budget_payment_review === true || projectedMetadata.budget_quote_verification === true ? "agent://knowledge-graph" : null,
+    projectedMetadata.second_order_task === true ? "agent://topology" : null,
+  ]);
+}
+
 function referencesFor(item: WeddingPlanningScheduleItem | WeddingPlanningTaskItem, metadata: WeddingPlanningMetadata) {
   return [
     metadata.sourceResponseId
@@ -272,6 +294,7 @@ function projectionMetadata(
   const vendorContactThreadId = clean(itemMetadata.vendor_contact_thread_id);
   const followUpDueAt = clean(itemMetadata.follow_up_due_at);
   const budgetPaymentReview = itemMetadata.budget_payment_review === true;
+  const budgetQuoteVerification = itemMetadata.budget_quote_verification === true;
   const guestFollowUp = itemMetadata.guest_follow_up === true;
   const guestFinalCountDecision = itemMetadata.guest_final_count_decision === true;
   const postWeddingWrapUp = itemMetadata.post_wedding_wrap_up === true;
@@ -319,6 +342,8 @@ function projectionMetadata(
       : null,
     approval_required_option_ids: outreachApprovalOptionIds,
     budget_payment_review: budgetPaymentReview,
+    budget_quote_verification: budgetQuoteVerification,
+    budget_line_item_id: clean(itemMetadata.budget_line_item_id),
     budget_payment_candidate_id: clean(itemMetadata.budget_payment_candidate_id),
     budget_payment_due_amount_label: clean(itemMetadata.budget_payment_due_amount_label),
     budget_payment_due_date_label: clean(itemMetadata.budget_payment_due_date_label),
@@ -410,6 +435,8 @@ function projectionMetadata(
       vendorContactReceiptRef,
       vendorContactThreadId,
       followUpDueAt,
+      budgetQuoteVerification ? "budget quote verification" : null,
+      clean(itemMetadata.budget_line_item_id),
       budgetPaymentReview ? "budget payment review" : null,
       clean(itemMetadata.budget_payment_candidate_id),
       clean(itemMetadata.budget_payment_due_amount_label),
@@ -581,7 +608,7 @@ export function weddingTaskItemToAfpTaskMessage(
     id: taskId,
     thread_id: `wedding_task:${safeWeddingLabel(item.id)}`,
     from: "system://wedding-planning",
-    to: ["agent://tasks", "agent://wedding-planning"],
+    to: taskMessageRecipients(projectedMetadata),
     timestamp: nowIso,
     type: "task",
     kind: "task",
@@ -589,6 +616,7 @@ export function weddingTaskItemToAfpTaskMessage(
     supertags: projectionTags(metadata, "task", item.kind, [
       clean(item.priority) ? `priority:${clean(item.priority)}` : null,
       clean(item.assignee) ? `assignee:${safeWeddingLabel(item.assignee)}` : null,
+      ...taskGraphProjectionTags(projectedMetadata),
     ]),
     content: {
       kind: "task",
@@ -620,6 +648,15 @@ export function weddingTaskItemToAfpTaskMessage(
       vendor_contact_receipt_ref: projectedMetadata.vendor_contact_receipt_ref,
       vendor_contact_thread_id: projectedMetadata.vendor_contact_thread_id,
       follow_up_due_at: projectedMetadata.follow_up_due_at,
+      budget_quote_verification: projectedMetadata.budget_quote_verification,
+      budget_line_item_id: projectedMetadata.budget_line_item_id,
+      budget_payment_review: projectedMetadata.budget_payment_review,
+      budget_payment_candidate_id: projectedMetadata.budget_payment_candidate_id,
+      budget_payment_due_amount_label: projectedMetadata.budget_payment_due_amount_label,
+      budget_payment_due_date_label: projectedMetadata.budget_payment_due_date_label,
+      budget_vendor_label: projectedMetadata.budget_vendor_label,
+      budget_category_label: projectedMetadata.budget_category_label,
+      budget_source_label: projectedMetadata.budget_source_label,
       guest_follow_up: projectedMetadata.guest_follow_up,
       guest_follow_up_candidate_id: projectedMetadata.guest_follow_up_candidate_id,
       guest_follow_up_reason: projectedMetadata.guest_follow_up_reason,
@@ -654,6 +691,12 @@ export function weddingTaskItemToAfpTaskMessage(
           vendor_contact_receipt_ref: projectedMetadata.vendor_contact_receipt_ref,
           vendor_contact_thread_id: projectedMetadata.vendor_contact_thread_id,
           follow_up_due_at: projectedMetadata.follow_up_due_at,
+          budget_quote_verification: projectedMetadata.budget_quote_verification,
+          budget_payment_review: projectedMetadata.budget_payment_review,
+          budget_vendor_label: projectedMetadata.budget_vendor_label,
+          budget_category_label: projectedMetadata.budget_category_label,
+          budget_payment_due_amount_label: projectedMetadata.budget_payment_due_amount_label,
+          budget_payment_due_date_label: projectedMetadata.budget_payment_due_date_label,
           guest_follow_up: projectedMetadata.guest_follow_up,
           seating_action: projectedMetadata.seating_action,
         },
@@ -788,6 +831,7 @@ function messageToSendInput(message: AfpMessage): SendAfpMessageInput {
     views: message.views,
     attachments: message.attachments,
     references: message.references,
+    supertags: message.supertags ?? [],
     metadata: message.metadata,
     store_in_relational: true,
   };

@@ -275,7 +275,7 @@ test("buildWeddingResponseWorkspaceViewState exposes persisted decision record c
   const scopes = continueAction?.metadata?.decision_scopes as Array<Record<string, unknown>> | undefined;
   assert.equal(scopes?.[0]?.selected_option_label, "Harbour Hall");
   assert.ok(continueAction?.contextLabels?.includes("Selected vendor table: Harbour Hall"));
-  assert.match(state.bundleExportPayload.content, /## Selected decision scope/);
+  assert.match(state.bundleExportPayload.content, /## Selected choice/);
   assert.match(state.bundleExportPayload.content, /Harbour Hall from Venue shortlist/);
   assert.match(state.htmlBundleExportPayload.content, /Harbour Hall from Venue shortlist/);
 });
@@ -307,7 +307,7 @@ test("buildWeddingResponseWorkspaceViewState carries selected scope into approva
   });
 
   assert.ok(state.activePreview?.approvalRequest);
-  assert.ok(state.activePreview?.approvalRequest?.disclosureLines.some((line) => /Selected decision scope: Harbour Hall/i.test(line)));
+  assert.ok(state.activePreview?.approvalRequest?.disclosureLines.some((line) => /Selected choice: Harbour Hall/i.test(line)));
   assert.ok(state.activePreview?.approvalRequest?.riskLabels.some((line) => /scoped to the selected shortlist item/i.test(line)));
 });
 

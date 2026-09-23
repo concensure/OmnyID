@@ -74,7 +74,7 @@ export function WeddingWorkspaceActionsPanel(props: {
               checked={props.bundleExportFormat === "markdown"}
               onChange={() => props.onBundleExportFormatChange("markdown")}
             />
-            Markdown
+            Text file
           </label>
           <label class="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white/80 px-2.5 py-2 text-xs font-semibold text-slate-700 sm:min-h-0 sm:py-1">
             <input
@@ -94,7 +94,7 @@ export function WeddingWorkspaceActionsPanel(props: {
               checked={props.bundleExportFormat === "word_doc"}
               onChange={() => props.onBundleExportFormatChange("word_doc")}
             />
-            Word .doc
+            Word document
           </label>
         </div>
         <p class="mt-2 text-xs leading-5 text-on-surface-variant">
@@ -135,15 +135,24 @@ export function WeddingWorkspaceActionsPanel(props: {
       <div class="mt-3 grid gap-2">
         <For each={props.state.sidebarActions}>
           {(action) => (
-            <button
-              type="button"
-              disabled={!action.enabled}
-              title={action.reason ?? undefined}
-              onClick={() => props.onSidebarAction(actionWithDecisionScope(action, props.state))}
-              class={`rounded-2xl border px-3 py-2.5 text-left text-xs font-semibold transition disabled:opacity-50 sm:rounded-full sm:py-2 ${actionClass(action)}`}
-            >
-              {action.label}
-            </button>
+            <div class="min-w-0">
+              <button
+                type="button"
+                disabled={!action.enabled}
+                title={action.reason ?? undefined}
+                onClick={() => props.onSidebarAction(actionWithDecisionScope(action, props.state))}
+                class={`w-full rounded-2xl border px-3 py-2.5 text-left text-xs font-semibold transition disabled:opacity-50 sm:rounded-full sm:py-2 ${actionClass(action)}`}
+              >
+                {action.label}
+              </button>
+              <Show when={!action.enabled && action.reason}>
+                {(reason) => (
+                  <p class="mt-1 px-2 text-xs leading-5 text-slate-600">
+                    {reason()}
+                  </p>
+                )}
+              </Show>
+            </div>
           )}
         </For>
       </div>

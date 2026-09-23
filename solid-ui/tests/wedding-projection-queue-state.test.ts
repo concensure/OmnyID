@@ -88,6 +88,7 @@ test("buildWeddingProjectionQueueState aggregates pending artifact calendar and 
   assert.equal(state.nextActionLabel, "Save 4 planning items");
   assert.equal(state.canDispatch, true);
   assert.deepEqual(state.pendingSendInputs.map((input) => input.type), ["context", "artifact", "calendar_event", "task"]);
+  assert.ok(state.pendingSendInputs.some((input) => input.supertags?.includes("wedding_task:budget_review")));
 });
 
 test("buildWeddingProjectionQueueState includes collaborator invite access-control records", () => {
@@ -241,6 +242,7 @@ test("buildWeddingProjectionQueueSelectionState dispatches only selected pending
   assert.equal(selection.queue.summaryLabel, "2 selected items ready");
   assert.equal(selection.queue.nextActionLabel, "Save 2 selected items");
   assert.deepEqual(selection.queue.pendingItems.map((item) => item.kind), ["calendar_event", "task"]);
+  assert.ok(selection.queue.pendingSendInputs.some((input) => input.supertags?.includes("wedding_task:budget_review")));
 });
 
 test("buildWeddingProjectionQueueSelectionState keeps sent and blocked outputs visible when pending outputs are deselected", () => {
