@@ -66,3 +66,26 @@ test("buildWeddingBoundaryRequestDecision records declined requests with encrypt
   assert.deepEqual(sendInput.metadata?.private_fields, ["encrypted_private_payload"]);
   assert.equal(sendInput.content.encrypted_private_payload, "sealed:budget-and-family-context");
 });
+
+test("buildWeddingBoundaryRequestDecision does not overwrite an already recorded request", () => {
+  const approvedRequest: WeddingBoundaryChangeRequest = {
+    ...request,
+    status: "approved",
+    requestStatus: "approved",
+    approvalRequired: false,
+    publicReason: "Already approved.",
+  };
+
+  const result = buildWeddingBoundaryRequestDecision({
+    request: approvedRequest,
+    decision: "decline",
+    publicReason: "Late conflicting click.",
+    privateRationaleCiphertext: "sealed:should-not-save",
+  });
+
+  assert.equal(result.updatedRequest, approvedRequest);
+  assert.equal(result.updatedRequest.requestStatus, "approved");
+  assert.equal(result.updatedRequest.publicReason, "Already approved.");
+  assert.equal(result.rationale, null);
+  assert.match(result.statusLabel, /already recorded/i);
+});

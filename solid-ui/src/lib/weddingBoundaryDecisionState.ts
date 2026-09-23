@@ -34,6 +34,18 @@ export function buildWeddingBoundaryRequestDecision(input: {
   publicReason?: unknown;
   privateRationaleCiphertext?: unknown;
 }): WeddingBoundaryRequestDecisionResult {
+  const existingStatus = clean(input.request.status);
+  const alreadyFinal = input.request.requestStatus !== "pending"
+    || existingStatus === "approved"
+    || existingStatus === "declined"
+    || existingStatus === "auto_blocked";
+  if (alreadyFinal) {
+    return {
+      updatedRequest: input.request,
+      rationale: null,
+      statusLabel: "This guest-list request is already recorded.",
+    };
+  }
   const status = nextStatus(input.decision);
   const decidedAt = clean(input.decidedAt) || new Date().toISOString();
   const decidedBy = clean(input.decidedBy) || "couple";
