@@ -10,6 +10,7 @@ export function WeddingBoundaryManagementCard(props: {
   state: WeddingBoundaryState;
   topology: WeddingBoundaryTopologyState;
 }) {
+  const [showRequests, setShowRequests] = createSignal(false);
   const [showRules, setShowRules] = createSignal(false);
   const [showPeople, setShowPeople] = createSignal(false);
   const viewState = createMemo(() => buildWeddingBoundaryManagementViewState(props));
@@ -25,7 +26,7 @@ export function WeddingBoundaryManagementCard(props: {
             <p class="text-lg font-bold tracking-tight text-cyan-950">Family boundaries</p>
           </div>
           <p class="mt-1 text-sm leading-6 text-cyan-900/75">
-            Make it clear who can see, suggest, or approve guest-list changes.
+            Keep guest-list choices calm by showing who can suggest changes and what needs your approval.
           </p>
         </div>
         <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-cyan-900">
@@ -53,29 +54,24 @@ export function WeddingBoundaryManagementCard(props: {
       </p>
 
       <div class="mt-3 grid gap-2 md:grid-cols-2">
-        <label class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs font-semibold text-cyan-950">
-          Include
-          <textarea
-            value={viewState().includeText}
-            readOnly
-            rows="2"
-            aria-label="People and details currently included"
-            class="mt-1 w-full resize-none rounded-2xl border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs font-normal leading-5 text-cyan-950 outline-none"
-          />
-        </label>
-        <label class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs font-semibold text-cyan-950">
-          Exclude
-          <textarea
-            value={viewState().excludeText}
-            readOnly
-            rows="2"
-            aria-label="People and details currently excluded"
-            class="mt-1 w-full resize-none rounded-2xl border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs font-normal leading-5 text-cyan-950 outline-none"
-          />
-        </label>
+        <section class="rounded-2xl border border-cyan-100 bg-white/75 p-3" aria-label="People and details currently included">
+          <p class="text-xs font-semibold text-cyan-950">Included for sharing</p>
+          <p class="mt-1 text-xs font-normal leading-5 text-cyan-950/75">{viewState().includeText}</p>
+        </section>
+        <section class="rounded-2xl border border-cyan-100 bg-white/75 p-3" aria-label="People and details currently excluded">
+          <p class="text-xs font-semibold text-cyan-950">Kept private or blocked</p>
+          <p class="mt-1 text-xs font-normal leading-5 text-cyan-950/75">{viewState().excludeText}</p>
+        </section>
       </div>
 
       <div class="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="rounded-full border border-cyan-200 bg-white/85 px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-white sm:py-1.5"
+          onClick={() => setShowRequests(!showRequests())}
+        >
+          {showRequests() ? "Hide requests" : "Review requests"}
+        </button>
         <button
           type="button"
           class="rounded-full border border-cyan-200 bg-white/85 px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-white sm:py-1.5"
@@ -91,6 +87,29 @@ export function WeddingBoundaryManagementCard(props: {
           {showPeople() ? "Hide people" : "Who can see what"}
         </button>
       </div>
+
+      <Show when={showRequests()}>
+        <div class="mt-3 space-y-2">
+          <Show when={viewState().hasApprovalItems} fallback={<p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/70">No guest-list requests need a decision right now.</p>}>
+            <For each={viewState().approvalItems}>
+              {(item) => (
+                <article class="rounded-2xl border border-cyan-100 bg-white/75 p-3">
+                  <div class="flex items-start justify-between gap-2">
+                    <p class="break-words text-sm font-semibold text-cyan-950">{item.label}</p>
+                    <span class="rounded-full bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-900">
+                      Needs decision
+                    </span>
+                  </div>
+                  <p class="mt-1 text-xs leading-5 text-cyan-950/70">{item.detail}</p>
+                  <p class="mt-2 text-xs leading-5 text-cyan-950/60">
+                    Approve only if this still fits your guest rules, budget, and event space.
+                  </p>
+                </article>
+              )}
+            </For>
+          </Show>
+        </div>
+      </Show>
 
       <Show when={showRules()}>
         <div class="mt-3 space-y-2">

@@ -5,9 +5,11 @@ import type { WeddingBoundaryTopologyNode, WeddingBoundaryTopologyState } from "
 export type WeddingBoundaryManagementViewState = {
   includeText: string;
   excludeText: string;
+  approvalItems: WeddingBoundaryManagementListItem[];
   ruleItems: WeddingBoundaryManagementListItem[];
   visibilityItems: WeddingBoundaryManagementListItem[];
   privateItemsLabel: string | null;
+  hasApprovalItems: boolean;
   hasRules: boolean;
   hasVisibilityItems: boolean;
 };
@@ -32,6 +34,16 @@ function displayList(values: readonly string[], fallback: string): string {
 function words(value: unknown, fallback: string): string {
   const cleaned = text(value);
   return cleaned ? cleaned.replace(/_/g, " ") : fallback;
+}
+
+function sentence(value: unknown, fallback: string): string {
+  const label = words(value, fallback);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function personLabel(value: unknown): string {
+  const cleaned = text(value).replace(/^person:/i, "").replace(/[_-]+/g, " ").trim();
+  return cleaned || "a helper";
 }
 
 function nodeDetail(node: WeddingBoundaryTopologyNode): string {
@@ -75,6 +87,11 @@ export function buildWeddingBoundaryManagementViewState(input: {
   return {
     includeText,
     excludeText,
+    approvalItems: input.state.approvalQueue.slice(0, 8).map((request) => ({
+      id: request.requestId,
+      label: request.title,
+      detail: `${sentence(request.changeType, "Guest-list change")} from ${personLabel(request.requestedBy)}${request.publicReason ? `: ${request.publicReason}` : "."}`,
+    })),
     ruleItems: policyNodes.slice(0, 8).map((node) => ({
       id: node.id,
       label: node.label,
@@ -88,6 +105,7 @@ export function buildWeddingBoundaryManagementViewState(input: {
     privateItemsLabel: input.state.privateObjectCount > 0
       ? `${input.state.privateObjectCount} private item${input.state.privateObjectCount === 1 ? "" : "s"} stay visible only to the couple.`
       : null,
+    hasApprovalItems: input.state.approvalQueue.length > 0,
     hasRules: policyNodes.length > 0,
     hasVisibilityItems: roleNodes.length > 0 || guestNodes.length > 0,
   };

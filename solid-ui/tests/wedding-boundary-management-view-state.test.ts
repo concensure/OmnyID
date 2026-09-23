@@ -8,6 +8,7 @@ import type {
   WeddingBoundaryGuestProfile,
   WeddingBoundaryPolicy,
   WeddingBoundaryRoleAssignment,
+  WeddingBoundaryChangeRequest,
 } from "@/lib/weddingBoundaryLedgerState";
 
 const metadata = {
@@ -50,8 +51,24 @@ const guest: WeddingBoundaryGuestProfile = {
   privateNotesCiphertext: "sealed:private-family-context",
 };
 
+const request: WeddingBoundaryChangeRequest = {
+  id: "request:plus-one-for-taylor",
+  kind: "wedding_boundary_change_request",
+  title: "Add a plus-one for Taylor",
+  visibility: "approved_shared",
+  requestId: "request:plus-one-for-taylor",
+  requestedBy: "person:janet",
+  changeType: "plus_one_change",
+  targetPersonId: "person:taylor",
+  requestStatus: "pending",
+  approvalRequired: true,
+  policyIds: ["policy:no-extra-plus-ones"],
+  publicReason: "Janet says Taylor may not know many people.",
+  privateRationaleCiphertext: "sealed:couple-response-notes",
+};
+
 test("buildWeddingBoundaryManagementViewState derives non-editable user guidance from boundary topology", () => {
-  const objects = [policy, role, guest];
+  const objects = [policy, role, guest, request];
   const state = buildWeddingBoundaryState({ metadata, objects });
   const topology = buildWeddingBoundaryTopologyState({ metadata, objects });
   const view = buildWeddingBoundaryManagementViewState({ state, topology });
@@ -61,7 +78,11 @@ test("buildWeddingBoundaryManagementViewState derives non-editable user guidance
   assert.match(view.excludeText, /private couple notes/);
   assert.match(view.excludeText, /No extra plus-ones/);
   assert.equal(view.hasRules, true);
+  assert.equal(view.hasApprovalItems, true);
   assert.equal(view.hasVisibilityItems, true);
+  assert.equal(view.approvalItems[0]?.label, "Add a plus-one for Taylor");
+  assert.match(view.approvalItems[0]?.detail ?? "", /Plus one change from janet/);
+  assert.doesNotMatch(view.approvalItems[0]?.detail ?? "", /sealed:/);
   assert.equal(view.ruleItems[0]?.detail, "We are not adding extra plus-ones unless both of us approve it.");
   assert.ok(view.visibilityItems.some((item) => item.label === "Janet family access" && item.detail === "parent family"));
   assert.equal(view.privateItemsLabel, null);
@@ -74,6 +95,7 @@ test("buildWeddingBoundaryManagementViewState has calm empty-state labels", () =
 
   assert.equal(view.includeText, "Named guests, assigned helpers, and approved family viewers");
   assert.equal(view.excludeText, "Extra plus-ones, private notes, and couple-only reasons");
+  assert.equal(view.hasApprovalItems, false);
   assert.equal(view.hasRules, false);
   assert.equal(view.hasVisibilityItems, false);
   assert.equal(view.privateItemsLabel, null);
