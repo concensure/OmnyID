@@ -1,6 +1,7 @@
 // @locs-version: 2.0
 import type { WeddingCollaboratorInviteCard } from "@/lib/weddingCollaborationState";
 import type {
+  WeddingBoundaryHousehold,
   WeddingBoundaryLedgerObject,
   WeddingBoundaryPolicy,
   WeddingBoundaryRoleAssignment,
@@ -80,7 +81,11 @@ export function buildWeddingBoundaryStarterObjects(input: {
     id: `policy:${safeWeddingLabel(metadata.responseWorkspaceId)}:${safeWeddingLabel(policy.title)}`,
   }));
   const inviteRoles = (input.collaboratorInvites ?? []).map(roleForInvite);
+  const guestNames = uniqueStrings(input.guestNames ?? [], 20);
+  const guestNameKeys = new Set(guestNames.map((name) => name.toLowerCase()));
+  const householdId = `household:${safeWeddingLabel(metadata.responseWorkspaceId)}:guest-list`;
   const helperRoles = uniqueStrings(input.helperNames ?? [])
+    .filter((name) => !guestNameKeys.has(name.toLowerCase()))
     .filter((name) => !inviteRoles.some((role) => role.title.toLowerCase().startsWith(name.toLowerCase())))
     .slice(0, 12)
     .map((name): WeddingBoundaryRoleAssignment => ({
@@ -96,14 +101,28 @@ export function buildWeddingBoundaryStarterObjects(input: {
       requiresApprovalFor: ["add_guest", "remove_guest", "plus_one_change", "event_invite_change"],
       privateNotesVisible: false,
     }));
-  const guests = uniqueStrings(input.guestNames ?? [], 20).map((name): WeddingBoundaryLedgerObject => ({
+  const household: WeddingBoundaryHousehold | null = guestNames.length > 0
+    ? {
+      id: householdId,
+      kind: "wedding_boundary_household",
+      householdId,
+      title: "Imported guest list",
+      displayName: "Imported guest list",
+      visibility: "approved_shared",
+      primaryContactPersonId: `person:${safeWeddingLabel(guestNames[0])}`,
+      memberPersonIds: guestNames.map((name) => `person:${safeWeddingLabel(name)}`),
+      familySide: "shared",
+    }
+    : null;
+  const guests = guestNames.map((name): WeddingBoundaryLedgerObject => ({
     id: `person:${safeWeddingLabel(name)}`,
     kind: "wedding_boundary_guest_profile",
     personId: `person:${safeWeddingLabel(name)}`,
     title: name,
     displayName: name,
     visibility: "approved_shared",
+    householdId,
     ageBand: "unknown",
   }));
-  return [...policies, ...inviteRoles, ...helperRoles, ...guests];
+  return [...policies, ...inviteRoles, ...helperRoles, ...(household ? [household] : []), ...guests];
 }
