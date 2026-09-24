@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildWeddingBoundaryState } from "@/lib/weddingBoundaryLedgerState";
-import { buildWeddingBoundaryManagementViewState } from "@/lib/weddingBoundaryManagementViewState";
+import {
+  buildWeddingBoundaryManagementViewState,
+  visibleWeddingBoundaryApprovalItems,
+} from "@/lib/weddingBoundaryManagementViewState";
 import { buildWeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
 import type {
   WeddingBoundaryGuestProfile,
@@ -99,4 +102,16 @@ test("buildWeddingBoundaryManagementViewState has calm empty-state labels", () =
   assert.equal(view.hasRules, false);
   assert.equal(view.hasVisibilityItems, false);
   assert.equal(view.privateItemsLabel, null);
+});
+
+test("visibleWeddingBoundaryApprovalItems hides requests already completed in the UI", () => {
+  const state = buildWeddingBoundaryState({ metadata, objects: [request] });
+  const topology = buildWeddingBoundaryTopologyState({ metadata, objects: [request] });
+  const view = buildWeddingBoundaryManagementViewState({ state, topology });
+
+  assert.equal(view.approvalItems.length, 1);
+  assert.deepEqual(
+    visibleWeddingBoundaryApprovalItems(view.approvalItems, { [request.requestId]: true }),
+    [],
+  );
 });

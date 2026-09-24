@@ -2,7 +2,10 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
-import { buildWeddingBoundaryManagementViewState } from "@/lib/weddingBoundaryManagementViewState";
+import {
+  buildWeddingBoundaryManagementViewState,
+  visibleWeddingBoundaryApprovalItems,
+} from "@/lib/weddingBoundaryManagementViewState";
 import type { WeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
 import type { WeddingBoundaryState } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
@@ -17,7 +20,13 @@ export function WeddingBoundaryManagementCard(props: {
   const [showPeople, setShowPeople] = createSignal(false);
   const [decidingRequestId, setDecidingRequestId] = createSignal<string | null>(null);
   const [decisionNotice, setDecisionNotice] = createSignal<string | null>(null);
+  const [completedRequestIds, setCompletedRequestIds] = createSignal<Record<string, boolean>>({});
   const viewState = createMemo(() => buildWeddingBoundaryManagementViewState(props));
+  const visibleApprovalItems = createMemo(() => visibleWeddingBoundaryApprovalItems(
+    viewState().approvalItems,
+    completedRequestIds(),
+  ));
+  const pendingReviewCount = createMemo(() => Math.max(0, props.state.pendingApprovalCount - Object.keys(completedRequestIds()).length));
 
   async function decideRequest(requestId: string, decision: WeddingBoundaryRequestDecision): Promise<void> {
     if (!props.onDecideRequest || decidingRequestId()) return;
@@ -26,6 +35,7 @@ export function WeddingBoundaryManagementCard(props: {
     try {
       const notice = await props.onDecideRequest(requestId, decision);
       setDecisionNotice(notice);
+      setCompletedRequestIds((current) => ({ ...current, [requestId]: true }));
     } catch {
       setDecisionNotice("Could not save that decision right now. Try again in a moment.");
     } finally {
@@ -48,7 +58,7 @@ export function WeddingBoundaryManagementCard(props: {
           </p>
         </div>
         <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-cyan-900">
-          {props.state.pendingApprovalCount} to review
+          {pendingReviewCount()} to review
         </span>
       </div>
 
@@ -111,8 +121,8 @@ export function WeddingBoundaryManagementCard(props: {
           <Show when={decisionNotice()}>
             <p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/75">{decisionNotice()}</p>
           </Show>
-          <Show when={viewState().hasApprovalItems} fallback={<p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/70">No guest-list requests need a decision right now.</p>}>
-            <For each={viewState().approvalItems}>
+          <Show when={visibleApprovalItems().length > 0} fallback={<p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/70">No guest-list requests need a decision right now.</p>}>
+            <For each={visibleApprovalItems()}>
               {(item) => (
                 <article class="rounded-2xl border border-cyan-100 bg-white/75 p-3">
                   <div class="flex items-start justify-between gap-2">

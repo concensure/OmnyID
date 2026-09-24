@@ -20,6 +20,14 @@ export type WeddingBoundaryManagementListItem = {
   detail: string;
 };
 
+export function visibleWeddingBoundaryApprovalItems(
+  items: readonly WeddingBoundaryManagementListItem[],
+  completedRequestIds?: Readonly<Record<string, boolean>> | null,
+): WeddingBoundaryManagementListItem[] {
+  const completed = completedRequestIds ?? {};
+  return items.filter((item) => completed[item.id] !== true);
+}
+
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
