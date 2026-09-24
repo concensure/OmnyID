@@ -265,6 +265,25 @@ test("wedding boundary state does not ask couples to review auto-blocked request
   assert.ok(!state.warningLabels.some((label) => /need review/i.test(label)));
 });
 
+test("auto-blocked wedding boundary AFP records do not present as review work", () => {
+  const blockedRequest: WeddingBoundaryChangeRequest = {
+    ...plusOneRequest,
+    id: "change:auto-blocked-plus-one",
+    requestId: "change:auto-blocked-plus-one",
+    requestStatus: "auto_blocked",
+    approvalRequired: true,
+    publicReason: "A couple-approved rule blocks this change.",
+  };
+
+  const message = weddingBoundaryLedgerObjectToAfpMessage(blockedRequest, metadata, "2026-09-23T00:00:00.000Z");
+  const view = message.views.find((item) => item.format === "a2ui");
+
+  assert.ok(!message.supertags?.includes("wedding_boundary:approval_required"));
+  assert.equal(view?.content.tone, "calm");
+  assert.equal(view?.content.primary_action, "View details");
+  assert.match(String(message.content.markdown), /No couple review is waiting/i);
+});
+
 test("wedding boundary evaluator allows scoped editor changes only when no active policy overrides them", () => {
   const helperRole: WeddingBoundaryRoleAssignment = {
     ...parentRole,

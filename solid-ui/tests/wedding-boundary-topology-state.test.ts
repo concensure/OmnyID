@@ -139,6 +139,29 @@ test("buildWeddingBoundaryTopologyState uses latest request record for approval 
   assert.equal(state.edges.some((edge) => edge.kind === "requires_approval"), false);
 });
 
+test("buildWeddingBoundaryTopologyState keeps auto-blocked requests queryable but out of approvals", () => {
+  const blockedRequest: WeddingBoundaryChangeRequest = {
+    ...request,
+    id: "change:auto-blocked-plus-one",
+    requestId: "change:auto-blocked-plus-one",
+    requestStatus: "auto_blocked",
+    approvalRequired: true,
+  };
+  const state = buildWeddingBoundaryTopologyState({
+    metadata,
+    objects: [blockedRequest],
+  });
+
+  const requestNode = state.nodes.find((node) => node.kind === "change_request");
+
+  assert.equal(state.approvalRequestNodes.length, 0);
+  assert.equal(requestNode?.metadata.request_status, "auto_blocked");
+  assert.equal(requestNode?.metadata.approval_required, false);
+  assert.equal(requestNode?.metadata.approval_gate_recorded, true);
+  assert.equal(requestNode?.supertags.includes("wedding_boundary:approval_required"), false);
+  assert.equal(state.edges.some((edge) => edge.kind === "requires_approval"), false);
+});
+
 test("buildWeddingBoundaryTopologyState creates event nodes for policy-scoped event rules", () => {
   const state = buildWeddingBoundaryTopologyState({
     metadata,

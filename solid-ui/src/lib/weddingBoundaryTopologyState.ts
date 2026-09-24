@@ -209,9 +209,13 @@ function objectTags(object: WeddingBoundaryLedgerObject): string[] {
     object.visibility === "family_visible" || object.visibility === "approved_shared" ? "wedding_boundary:family_visible" : null,
     object.kind === "wedding_boundary_policy" ? `wedding_policy:${safeWeddingLabel(object.ruleType)}` : null,
     object.kind === "wedding_boundary_role_assignment" ? `wedding_boundary_role:${safeWeddingLabel(object.role)}` : null,
-    object.kind === "wedding_boundary_change_request" && object.approvalRequired ? "wedding_boundary:approval_required" : null,
+    object.kind === "wedding_boundary_change_request" && changeRequestNeedsCoupleReview(object) ? "wedding_boundary:approval_required" : null,
     object.kind === "wedding_boundary_guest_profile" && object.ageBand ? `wedding_guest:${safeWeddingLabel(object.ageBand)}` : null,
   ]);
+}
+
+function changeRequestNeedsCoupleReview(object: WeddingBoundaryChangeRequest): boolean {
+  return object.approvalRequired === true && object.requestStatus === "pending";
 }
 
 function nodeMetadataFor(object: WeddingBoundaryLedgerObject): Record<string, unknown> {
@@ -252,7 +256,8 @@ function nodeMetadataFor(object: WeddingBoundaryLedgerObject): Record<string, un
       requested_by: object.requestedBy,
       change_type: object.changeType,
       request_status: object.requestStatus,
-      approval_required: object.approvalRequired === true,
+      approval_required: changeRequestNeedsCoupleReview(object),
+      approval_gate_recorded: object.approvalRequired === true,
       private_rationale_encrypted: Boolean(object.privateRationaleCiphertext),
     };
   }
@@ -302,7 +307,7 @@ function addObjectEdges(
     }
     addEdge(edges, sourceId, optionalNodeId("household", request.targetHouseholdId), "request_targets_household", "targets household");
     for (const policyId of request.policyIds ?? []) addEdge(edges, sourceId, nodeId("boundary_policy", policyId), "request_violates_policy", "policy involved");
-    if (request.approvalRequired) addEdge(edges, sourceId, planId, "requires_approval", "needs couple approval");
+    if (changeRequestNeedsCoupleReview(request)) addEdge(edges, sourceId, planId, "requires_approval", "needs couple approval");
   } else if (object.kind === "wedding_boundary_policy") {
     const policy = object as WeddingBoundaryPolicy;
     for (const eventId of policy.appliesToEventIds ?? []) {

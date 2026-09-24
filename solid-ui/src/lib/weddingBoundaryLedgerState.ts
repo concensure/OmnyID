@@ -229,6 +229,10 @@ function objectTimestampMs(object: WeddingBoundaryLedgerObject, index: number): 
   return Number.isFinite(parsed) ? parsed : index;
 }
 
+function changeRequestNeedsCoupleReview(object: WeddingBoundaryChangeRequest): boolean {
+  return object.approvalRequired === true && object.requestStatus === "pending";
+}
+
 export function coalesceWeddingBoundaryLedgerObjects(
   objects: readonly WeddingBoundaryLedgerObject[] | null | undefined,
 ): WeddingBoundaryLedgerObject[] {
@@ -267,7 +271,7 @@ function supertagsFor(object: WeddingBoundaryLedgerObject, metadata: WeddingPlan
     object.kind === "wedding_boundary_policy" ? policyTag(object) : null,
     object.kind === "wedding_boundary_role_assignment" ? roleTag(object.role) : null,
     object.kind === "wedding_boundary_event_invitation" ? `wedding_invitation:${safeWeddingLabel(object.invitationStatus)}` : null,
-    object.kind === "wedding_boundary_change_request" && object.approvalRequired ? "wedding_boundary:approval_required" : null,
+    object.kind === "wedding_boundary_change_request" && changeRequestNeedsCoupleReview(object) ? "wedding_boundary:approval_required" : null,
     object.kind === "wedding_boundary_guest_profile" && object.ageBand ? `wedding_guest:${safeWeddingLabel(object.ageBand)}` : null,
     object.kind === "wedding_boundary_event_invitation" && object.plusOneAllowed === true ? "wedding_guest:plus_one_allowed" : null,
     object.kind === "wedding_boundary_event_invitation" && object.plusOneAllowed === false ? "wedding_guest:plus_one_blocked" : null,
@@ -430,7 +434,7 @@ function markdownFor(object: WeddingBoundaryLedgerObject): string {
       `Status: ${object.requestStatus}`,
       `Change: ${object.changeType.replace(/_/g, " ")}`,
       object.publicReason ? `Reason shown to family: ${object.publicReason}` : null,
-      object.approvalRequired ? "Needs couple approval before it changes the guest list." : "Does not need couple approval under current rules.",
+      changeRequestNeedsCoupleReview(object) ? "Needs couple approval before it changes the guest list." : "No couple review is waiting for this request.",
     ].filter((line): line is string => line !== null).join("\n");
   }
   if (object.kind === "wedding_boundary_policy") {
@@ -491,9 +495,9 @@ export function weddingBoundaryLedgerObjectToAfpMessage(
       content: {
         kind: "wedding_boundary_card",
         title: object.title,
-        tone: object.kind === "wedding_boundary_change_request" && object.approvalRequired ? "attention" : "calm",
+        tone: object.kind === "wedding_boundary_change_request" && changeRequestNeedsCoupleReview(object) ? "attention" : "calm",
         summary: object.kind === "wedding_boundary_policy" ? object.plainLanguage : markdownFor(object).split(/\r?\n/)[2] ?? object.title,
-        primary_action: object.kind === "wedding_boundary_change_request" && object.approvalRequired ? "Review request" : "View details",
+        primary_action: object.kind === "wedding_boundary_change_request" && changeRequestNeedsCoupleReview(object) ? "Review request" : "View details",
       },
     }],
     attachments: [],
