@@ -6,6 +6,7 @@ import {
   buildWeddingBoundaryManagementViewState,
   visibleWeddingBoundaryApprovalCount,
   visibleWeddingBoundaryApprovalItems,
+  weddingBoundaryDecisionNoticeFromError,
 } from "@/lib/weddingBoundaryManagementViewState";
 import { buildWeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
 import type {
@@ -125,5 +126,20 @@ test("visibleWeddingBoundaryApprovalCount only subtracts completed current reque
   assert.equal(
     visibleWeddingBoundaryApprovalCount(["request:new", "request:old"], { "request:old": true }),
     1,
+  );
+});
+
+test("weddingBoundaryDecisionNoticeFromError keeps approval failures user-facing", () => {
+  assert.match(
+    weddingBoundaryDecisionNoticeFromError(new Error("This guest-list request is no longer waiting for review.")),
+    /already handled/i,
+  );
+  assert.match(
+    weddingBoundaryDecisionNoticeFromError(new Error("Saving is not connected yet.")),
+    /Saving is not connected/i,
+  );
+  assert.match(
+    weddingBoundaryDecisionNoticeFromError("network failed"),
+    /Could not save/i,
   );
 });

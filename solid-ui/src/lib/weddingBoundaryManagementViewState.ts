@@ -36,6 +36,17 @@ export function visibleWeddingBoundaryApprovalCount(
   return requestIds.filter((id) => completed[id] !== true).length;
 }
 
+export function weddingBoundaryDecisionNoticeFromError(error: unknown): string {
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (/no longer waiting|already/i.test(message)) {
+    return "That request was already handled. Refresh the wedding planner to see the latest guest-list state.";
+  }
+  if (/saving is not connected|sign in|reconnect/i.test(message)) {
+    return "Saving is not connected right now. Sign in again or reconnect saving, then try once more.";
+  }
+  return "Could not save that decision right now. Try again in a moment.";
+}
+
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }

@@ -6,6 +6,7 @@ import {
   buildWeddingBoundaryManagementViewState,
   visibleWeddingBoundaryApprovalCount,
   visibleWeddingBoundaryApprovalItems,
+  weddingBoundaryDecisionNoticeFromError,
 } from "@/lib/weddingBoundaryManagementViewState";
 import type { WeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
 import type { WeddingBoundaryState } from "@/lib/weddingBoundaryLedgerState";
@@ -40,8 +41,8 @@ export function WeddingBoundaryManagementCard(props: {
       const notice = await props.onDecideRequest(requestId, decision);
       setDecisionNotice(notice);
       setCompletedRequestIds((current) => ({ ...current, [requestId]: true }));
-    } catch {
-      setDecisionNotice("Could not save that decision right now. Try again in a moment.");
+    } catch (error) {
+      setDecisionNotice(weddingBoundaryDecisionNoticeFromError(error));
     } finally {
       setDecidingRequestId(null);
     }
@@ -99,6 +100,8 @@ export function WeddingBoundaryManagementCard(props: {
       <div class="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
+          aria-expanded={showRequests()}
+          aria-controls="wedding-boundary-requests"
           class="rounded-full border border-cyan-200 bg-white/85 px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-white sm:py-1.5"
           onClick={() => setShowRequests(!showRequests())}
         >
@@ -106,6 +109,8 @@ export function WeddingBoundaryManagementCard(props: {
         </button>
         <button
           type="button"
+          aria-expanded={showRules()}
+          aria-controls="wedding-boundary-rules"
           class="rounded-full border border-cyan-200 bg-white/85 px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-white sm:py-1.5"
           onClick={() => setShowRules(!showRules())}
         >
@@ -113,6 +118,8 @@ export function WeddingBoundaryManagementCard(props: {
         </button>
         <button
           type="button"
+          aria-expanded={showPeople()}
+          aria-controls="wedding-boundary-people"
           class="rounded-full border border-cyan-200 bg-white/85 px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-white sm:py-1.5"
           onClick={() => setShowPeople(!showPeople())}
         >
@@ -121,7 +128,7 @@ export function WeddingBoundaryManagementCard(props: {
       </div>
 
       <Show when={showRequests()}>
-        <div class="mt-3 space-y-2">
+        <div id="wedding-boundary-requests" class="mt-3 space-y-2">
           <Show when={decisionNotice()}>
             <p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/75">{decisionNotice()}</p>
           </Show>
@@ -170,7 +177,7 @@ export function WeddingBoundaryManagementCard(props: {
       </Show>
 
       <Show when={showRules()}>
-        <div class="mt-3 space-y-2">
+        <div id="wedding-boundary-rules" class="mt-3 space-y-2">
           <Show when={viewState().hasRules} fallback={<p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/70">No family rules are set yet.</p>}>
             <For each={viewState().ruleItems}>
               {(item) => (
@@ -190,7 +197,7 @@ export function WeddingBoundaryManagementCard(props: {
       </Show>
 
       <Show when={showPeople()}>
-        <div class="mt-3 rounded-2xl border border-cyan-100 bg-white/75 p-3">
+        <div id="wedding-boundary-people" class="mt-3 rounded-2xl border border-cyan-100 bg-white/75 p-3">
           <p class="text-sm font-semibold text-cyan-950">Visibility map</p>
           <div class="mt-2 flex flex-wrap gap-1.5">
             <Show when={viewState().hasVisibilityItems} fallback={<span class="rounded-full border border-cyan-100 bg-white px-2 py-1 text-xs text-cyan-950/70">No shared people yet</span>}>
