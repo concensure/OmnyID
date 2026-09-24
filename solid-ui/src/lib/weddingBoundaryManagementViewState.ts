@@ -28,6 +28,14 @@ export function visibleWeddingBoundaryApprovalItems(
   return items.filter((item) => completed[item.id] !== true);
 }
 
+export function visibleWeddingBoundaryApprovalCount(
+  requestIds: readonly string[],
+  completedRequestIds?: Readonly<Record<string, boolean>> | null,
+): number {
+  const completed = completedRequestIds ?? {};
+  return requestIds.filter((id) => completed[id] !== true).length;
+}
+
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }

@@ -4,6 +4,7 @@ import test from "node:test";
 import { buildWeddingBoundaryState } from "@/lib/weddingBoundaryLedgerState";
 import {
   buildWeddingBoundaryManagementViewState,
+  visibleWeddingBoundaryApprovalCount,
   visibleWeddingBoundaryApprovalItems,
 } from "@/lib/weddingBoundaryManagementViewState";
 import { buildWeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
@@ -113,5 +114,16 @@ test("visibleWeddingBoundaryApprovalItems hides requests already completed in th
   assert.deepEqual(
     visibleWeddingBoundaryApprovalItems(view.approvalItems, { [request.requestId]: true }),
     [],
+  );
+});
+
+test("visibleWeddingBoundaryApprovalCount only subtracts completed current requests", () => {
+  assert.equal(
+    visibleWeddingBoundaryApprovalCount(["request:new"], { "request:old": true }),
+    1,
+  );
+  assert.equal(
+    visibleWeddingBoundaryApprovalCount(["request:new", "request:old"], { "request:old": true }),
+    1,
   );
 });

@@ -4,6 +4,7 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import {
   buildWeddingBoundaryManagementViewState,
+  visibleWeddingBoundaryApprovalCount,
   visibleWeddingBoundaryApprovalItems,
 } from "@/lib/weddingBoundaryManagementViewState";
 import type { WeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
@@ -26,7 +27,10 @@ export function WeddingBoundaryManagementCard(props: {
     viewState().approvalItems,
     completedRequestIds(),
   ));
-  const pendingReviewCount = createMemo(() => Math.max(0, props.state.pendingApprovalCount - Object.keys(completedRequestIds()).length));
+  const pendingReviewCount = createMemo(() => visibleWeddingBoundaryApprovalCount(
+    props.state.approvalQueue.map((request) => request.requestId),
+    completedRequestIds(),
+  ));
 
   async function decideRequest(requestId: string, decision: WeddingBoundaryRequestDecision): Promise<void> {
     if (!props.onDecideRequest || decidingRequestId()) return;
