@@ -44,6 +44,7 @@
     "@tiptap/suggestion": "^2.11.5",
     "@types/libsodium-wrappers": "^0.7.14",
     "afp-ts": "file:../typescript-sdk",
+    "d3": "^7.9.0",
     "docx": "^9.7.1",
     "gridstack": "^11.4.0",
     "jszip": "^3.10.2",
