@@ -789,7 +789,7 @@ function messageToBoundaryObject(message: AfpMessage, fallback: WeddingPlanningM
       targetEventId: clean(contentValue(message, "target_event_id")),
       targetHouseholdId: clean(contentValue(message, "target_household_id")),
       requestStatus: boundaryRequestStatusFrom(contentValue(message, "request_status")),
-      approvalRequired: bool(contentValue(message, "approval_required")),
+      approvalRequired: bool(contentValue(message, "approval_gate_recorded")) || bool(contentValue(message, "approval_required")),
       policyIds: strings(contentValue(message, "policy_ids")),
       publicReason: clean(contentValue(message, "public_reason")),
     };

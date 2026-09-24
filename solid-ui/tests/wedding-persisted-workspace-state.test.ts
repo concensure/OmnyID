@@ -241,6 +241,38 @@ test("buildWeddingPersistedWorkspaceState reloads boundary ledger decisions from
   assert.ok(state.boundaryObjects.some((object) => object.kind === "wedding_boundary_decision_rationale"));
 });
 
+test("buildWeddingPersistedWorkspaceState preserves auto-blocked boundary gate history without pending review", () => {
+  const blockedRequest: WeddingBoundaryChangeRequest = {
+    id: "request:auto-blocked-child",
+    kind: "wedding_boundary_change_request",
+    title: "Add a child guest",
+    visibility: "approved_shared",
+    requestId: "request:auto-blocked-child",
+    requestedBy: "person:janet",
+    changeType: "add_guest",
+    targetPersonId: "person:child",
+    requestStatus: "auto_blocked",
+    approvalRequired: true,
+    policyIds: ["policy:no-children"],
+    publicReason: "A couple-approved rule blocks this change.",
+  };
+  const message = weddingBoundaryLedgerObjectToAfpMessage(blockedRequest, metadata, "2026-09-24T08:05:00.000Z");
+  const state = buildWeddingPersistedWorkspaceState({
+    messages: [message],
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+  });
+  const request = state.boundaryObjects.find(
+    (object): object is WeddingBoundaryChangeRequest => object.kind === "wedding_boundary_change_request",
+  );
+
+  assert.equal(message.content.approval_required, false);
+  assert.equal(message.content.approval_gate_recorded, true);
+  assert.equal(request?.requestStatus, "auto_blocked");
+  assert.equal(request?.approvalRequired, true);
+});
+
 test("buildWeddingPersistedWorkspaceState preserves wedding import original-upload receipts", () => {
   const imports = buildWeddingImportSynthesisState({
     metadata,

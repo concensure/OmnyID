@@ -278,6 +278,8 @@ test("auto-blocked wedding boundary AFP records do not present as review work", 
   const message = weddingBoundaryLedgerObjectToAfpMessage(blockedRequest, metadata, "2026-09-23T00:00:00.000Z");
   const view = message.views.find((item) => item.format === "a2ui");
 
+  assert.equal(message.content.approval_required, false);
+  assert.equal(message.content.approval_gate_recorded, true);
   assert.ok(!message.supertags?.includes("wedding_boundary:approval_required"));
   assert.equal(view?.content.tone, "calm");
   assert.equal(view?.content.primary_action, "View details");
