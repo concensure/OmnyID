@@ -127,6 +127,24 @@ test("buildWeddingNavigationIntentFromSidebarAction routes provider setup to Con
   });
 });
 
+test("buildWeddingNavigationIntentFromSidebarAction routes budget summaries to the wedding budget", () => {
+  const action: WeddingWorkspaceSidebarAction = {
+    kind: "open_budget",
+    label: "Open budget",
+    enabled: true,
+    reason: null,
+  };
+  const intent = buildWeddingNavigationIntentFromSidebarAction({
+    action,
+    weddingPlanId: "wedding_plan:budget",
+    responseWorkspaceId: "response_workspace:budget",
+  });
+
+  assert.equal(intent.view, "response_queue");
+  assert.equal(intent.surface, "budget");
+  assert.match(intent.notice, /wedding budget/i);
+});
+
 test("buildWeddingNavigationIntentFromSidebarAction preserves decision-focus handoff packets", () => {
   const action: WeddingWorkspaceSidebarAction = {
     kind: "open_tasks",

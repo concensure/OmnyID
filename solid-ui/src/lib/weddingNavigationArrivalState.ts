@@ -57,6 +57,7 @@ function headlineFor(surface: WeddingNavigationSurface): string {
   if (surface === "continue_chat") return "This chat continues the wedding plan.";
   if (surface === "probe") return "The next wedding planning question is in focus.";
   if (surface === "map") return "Wedding map context is in focus.";
+  if (surface === "budget") return "Your wedding budget is in focus.";
   if (surface === "calendar") return "Wedding dates are in focus.";
   if (surface === "knowledge_graph") return "Related wedding details are in focus.";
   if (surface === "tasks") return "Wedding tasks are in focus.";
@@ -69,6 +70,7 @@ function badgeFor(surface: WeddingNavigationSurface): string {
   if (surface === "planning_files") return "Wedding documents";
   if (surface === "continue_chat" || surface === "probe") return "Context carried";
   if (surface === "map") return "Map context";
+  if (surface === "budget") return "Budget";
   if (surface === "calendar") return "Calendar context";
   if (surface === "knowledge_graph") return "Related details";
   if (surface === "tasks") return "Task context";
@@ -89,6 +91,9 @@ function reasonFor(surface: WeddingNavigationSurface): string {
   }
   if (surface === "map") {
     return "Inspect place-based vendor or venue context before relying on addresses, availability, pricing, or travel assumptions.";
+  }
+  if (surface === "budget") {
+    return "Review budget totals, category targets, booked costs, upcoming payments, and what is still safe to spend.";
   }
   if (surface === "calendar") {
     return "Review timeline items as first-class calendar context before syncing, inviting, or treating them as committed.";
@@ -114,6 +119,7 @@ function nextStepFor(surface: WeddingNavigationSurface, artifactId: string | nul
       return "Continue from the selected option first; ask to compare alternatives only if the user requests it.";
     }
     if (surface === "map") return "Verify the selected option's live place details before acting on map results.";
+    if (surface === "budget") return "Check how the selected option changes the budget before approving it.";
     if (surface === "calendar") return "Review tentative dates for the selected option before syncing or inviting anyone.";
     if (surface === "knowledge_graph") {
       return "Review connected details and missing proof for the selected option before changing the plan.";
@@ -132,6 +138,7 @@ function nextStepFor(surface: WeddingNavigationSurface, artifactId: string | nul
     return "Answer the next need-to-know question or ask for the next planning document.";
   }
   if (surface === "map") return "Verify live venue and vendor details before acting on map results.";
+  if (surface === "budget") return "Set or adjust the budget, then review any choices that may become unaffordable.";
   if (surface === "calendar") return "Review tentative dates before syncing or inviting anyone.";
   if (surface === "knowledge_graph") {
     return "Review connected details and missing proof before choosing vendors or changing the plan.";

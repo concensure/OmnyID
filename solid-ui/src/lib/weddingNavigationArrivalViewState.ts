@@ -102,6 +102,14 @@ function actionFor(
       disabled: false,
     };
   }
+  if (surface === "budget") {
+    return {
+      kind: "open_workspace",
+      label: "Open budget",
+      description: "Review budget totals, remaining spend, and upcoming payment pressure.",
+      disabled: false,
+    };
+  }
   if (surface === "tasks") {
     if (hasExpectedBehaviorAudit(intent)) {
       return {
@@ -284,6 +292,7 @@ function handoffSecondaryActionsFor(
 
 function toneFor(surface: WeddingNavigationSurface): WeddingNavigationArrivalTone {
   if (surface === "connected_apps") return "amber";
+  if (surface === "budget") return "emerald";
   if (surface === "approval" || surface === "export") return "amber";
   if (surface === "calendar" || surface === "tasks") return "emerald";
   if (surface === "knowledge_graph") return "violet";

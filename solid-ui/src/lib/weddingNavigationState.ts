@@ -17,6 +17,7 @@ export type WeddingNavigationSurface =
   | "continue_chat"
   | "probe"
   | "map"
+  | "budget"
   | "calendar"
   | "knowledge_graph"
   | "tasks"
@@ -41,6 +42,7 @@ const WEDDING_NAVIGATION_SURFACES = new Set<WeddingNavigationSurface>([
   "continue_chat",
   "probe",
   "map",
+  "budget",
   "calendar",
   "knowledge_graph",
   "tasks",
@@ -76,6 +78,7 @@ function surfaceForPresentationAction(kind: WeddingPresentationActionKind): Wedd
 function surfaceForSidebarAction(kind: WeddingWorkspaceSidebarActionKind): WeddingNavigationSurface {
   if (kind === "continue_chat") return "continue_chat";
   if (kind === "open_graph") return "knowledge_graph";
+  if (kind === "open_budget") return "budget";
   if (kind === "open_calendar") return "calendar";
   if (kind === "open_tasks") return "tasks";
   if (kind === "open_connected_apps") return "connected_apps";
@@ -85,6 +88,7 @@ function surfaceForSidebarAction(kind: WeddingWorkspaceSidebarActionKind): Weddi
 
 function viewForSurface(surface: WeddingNavigationSurface): ViewName {
   if (surface === "calendar") return "calendar";
+  if (surface === "budget") return "response_queue";
   if (surface === "knowledge_graph") return "knowledge_graph";
   if (surface === "tasks") return "tasks";
   if (surface === "connected_apps") return "connected_apps";
@@ -100,6 +104,7 @@ function noticeFor(surface: WeddingNavigationSurface, responseWorkspaceId: strin
   if (surface === "continue_chat") return `Continuing chat with wedding workspace ${responseWorkspaceId}.`;
   if (surface === "probe") return "Continuing the wedding plan with the next need-to-know question.";
   if (surface === "map") return "Opening wedding map/search context from this response.";
+  if (surface === "budget") return "Opening the wedding budget.";
   if (surface === "calendar") return "Opening wedding dates in Calendar.";
   if (surface === "knowledge_graph") return "Opening wedding topology in Knowledge Graph.";
   if (surface === "tasks") return "Opening wedding tasks and critical-path items.";

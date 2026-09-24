@@ -2,6 +2,7 @@
 import { For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
+import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
 
 export function WeddingGuestOperationsCard(props: {
@@ -15,6 +16,9 @@ export function WeddingGuestOperationsCard(props: {
             <WeddingDashboardIcon id="users" class="h-4 w-4" />
           </span>
           <p class="text-lg font-bold tracking-tight text-sky-950">Guests</p>
+          <WeddingInfoTip title="Guest list tip" tone="sky">
+            Set the RSVP cutoff before final catering numbers are due. Keep meal, access, household, and plus-one notes here so seating and vendor counts stay consistent.
+          </WeddingInfoTip>
         </div>
         <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-sky-900">
           {props.state.guestRowCount} guest{props.state.guestRowCount === 1 ? "" : "s"}

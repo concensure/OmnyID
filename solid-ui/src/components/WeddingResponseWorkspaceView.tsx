@@ -5,6 +5,7 @@ import { WeddingArtifactDetailPanel, weddingApprovalStateLabel } from "@/compone
 import { WeddingProjectionQueuePanel } from "@/components/WeddingProjectionQueuePanel";
 import {
   WeddingDecisionFocusCard,
+  WeddingHomeOverviewGrid,
   WeddingWorkspaceContextPanels,
 } from "@/components/WeddingWorkspaceContextPanels";
 import type { SendAfpMessageInput } from "@/lib/api";
@@ -74,6 +75,7 @@ export function WeddingResponseWorkspaceView(props: {
   onReviewBlockedOutputs?: () => void;
   onOpenSavedOutputs?: () => void;
   onProviderSetup?: (view: ViewName) => void;
+  onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
 }) {
   const state = () => props.state;
   const activePreview = () => state().activePreview;
@@ -163,6 +165,12 @@ export function WeddingResponseWorkspaceView(props: {
     props.onSidebarAction?.(action);
   }
 
+  function openArtifactFromContext(artifactId: string) {
+    props.onSelectArtifact?.(artifactId);
+    props.onSelectMenu?.("home");
+    setShowPlanningFiles(true);
+  }
+
   function approveRequest(request: WeddingApprovalRequestState) {
     setApprovedRequests((current) => ({ ...current, [request.id]: true }));
     setApprovalReceipt(null);
@@ -202,6 +210,11 @@ export function WeddingResponseWorkspaceView(props: {
     >
       <div class={primaryColumnClass()}>
         <Show when={activeMenu() === "home"}>
+          <WeddingHomeOverviewGrid
+            state={state()}
+            onSelectMenu={props.onSelectMenu}
+            onSidebarAction={handleSidebarAction}
+          />
           <WeddingDecisionFocusCard state={state()} onSidebarAction={handleSidebarAction} />
         </Show>
 
@@ -420,10 +433,14 @@ export function WeddingResponseWorkspaceView(props: {
         <WeddingWorkspaceContextPanels
           state={state()}
           showTechnicalDetails={showTechnicalDetails()}
+          showHomeOverview={false}
           activeMenu={activeMenu()}
           sharePlanOpen={Boolean(props.sharePlanOpen)}
           saveProjection={props.saveProjection}
           onRefreshWorkspace={props.onRefreshWorkspace}
+          onSelectMenu={props.onSelectMenu}
+          onOpenArtifact={openArtifactFromContext}
+          onOpenSavedOutputs={props.onOpenSavedOutputs}
           onSidebarAction={handleSidebarAction}
         />
       </aside>

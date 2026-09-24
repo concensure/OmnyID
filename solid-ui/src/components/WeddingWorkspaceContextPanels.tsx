@@ -1,18 +1,22 @@
 // @locs-version: 2.1
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import type {
   WeddingResponseWorkspaceViewState,
 } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
-import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
+import {
+  isWeddingWorkspaceMenuId,
+  type WeddingWorkspaceMenuId,
+} from "@/lib/weddingWorkspaceMenuState";
 import { WeddingBackgroundAutomationCard } from "@/components/WeddingBackgroundAutomationCard";
 import { WeddingBoundaryManagementCard } from "@/components/WeddingBoundaryManagementCard";
 import { WeddingBudgetTrackerCard } from "@/components/WeddingBudgetTrackerCard";
 import { WeddingCollaborationAccessCard } from "@/components/WeddingCollaborationAccessCard";
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingGuestOperationsCard } from "@/components/WeddingGuestOperationsCard";
+import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import { WeddingProductionGateCard } from "@/components/WeddingProductionGateCard";
 import {
   buildWeddingBoundaryRequestDecision,
@@ -53,6 +57,13 @@ function currencyLabel(amount: number | null | undefined): string {
     currency: "AUD",
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function weddingLocationAdviceLabel(state: WeddingResponseWorkspaceViewState): string {
+  const locationLabel = state.workspace.artifacts
+    .flatMap((artifact) => artifact.locationLabels)
+    .find((label) => label.trim().length > 0);
+  return locationLabel ?? "your wedding location";
 }
 
 function weddingDayCountdownLabel(state: WeddingResponseWorkspaceViewState): string {
@@ -104,6 +115,28 @@ function weddingTimelineSidebarAction(
   };
 }
 
+function weddingBudgetSidebarAction(state: WeddingResponseWorkspaceViewState): WeddingWorkspaceSidebarAction {
+  return {
+    kind: "open_budget",
+    label: "Open wedding budget",
+    enabled: true,
+    reason: null,
+    metadata: {
+      wedding_budget: {
+        version: 1,
+        target_amount: state.budgetTracking.budgetTargetAmount,
+        remaining_amount: state.budgetTracking.remainingAmount,
+        known_amount: state.budgetTracking.totalKnownAmount,
+      },
+    },
+    contextLabels: ["Budget", currencyLabel(state.budgetTracking.remainingAmount)],
+  };
+}
+
+function calendarActionLabel(state: WeddingResponseWorkspaceViewState): string {
+  return state.ganttTimeline.rows.length > 0 ? "Open wedding calendar" : "Add wedding date";
+}
+
 function taskDueLabel(task: WeddingResponseWorkspaceViewState["planningTaskItems"][number]): string {
   if (task.dueLabel?.trim()) return task.dueLabel;
   if (task.dueAt?.trim()) return task.dueAt.slice(0, 10);
@@ -122,13 +155,302 @@ function taskPriorityLabel(task: WeddingResponseWorkspaceViewState["planningTask
   return "Normal";
 }
 
+function timelineStatusLabel(status: string | null | undefined): string {
+  const normalized = (status ?? "").trim().toLowerCase();
+  if (normalized === "accepted" || normalized === "complete" || normalized === "completed") return "Done";
+  if (normalized === "draft") return "Draft";
+  if (normalized === "high") return "High";
+  if (normalized === "urgent") return "Urgent";
+  if (normalized === "normal") return "Normal";
+  if (normalized === "low") return "Low";
+  if (normalized === "planned") return "Planned";
+  if (normalized === "anytime") return "Anytime";
+  return status?.trim() || "Planned";
+}
+
+function timelineBarWidth(widthPercent: number, offsetPercent = 0): number {
+  if (!Number.isFinite(widthPercent)) return 8;
+  const normalized = Math.max(8, Math.min(28, widthPercent));
+  return Math.max(4, Math.min(normalized, 100 - Math.max(0, offsetPercent)));
+}
+
+function seatingTaskSidebarAction(
+  actionTitle: string,
+  state: WeddingResponseWorkspaceViewState,
+): WeddingWorkspaceSidebarAction {
+  return {
+    kind: "open_tasks",
+    label: "Open wedding tasks",
+    enabled: true,
+    reason: null,
+    metadata: {
+      wedding_seating_task: {
+        version: 1,
+        title: actionTitle,
+        unassigned_attending_count: state.seatingPlan.unassignedAttendingCount,
+        table_count: state.seatingPlan.tableCount,
+      },
+    },
+    contextLabels: [actionTitle, "Seating plan"],
+  };
+}
+
+type WeddingCustomWorkspaceItem = {
+  id: string;
+  menu: WeddingWorkspaceMenuId;
+  kind: "image" | "text";
+  title: string;
+  body: string;
+  imageUrl: string | null;
+};
+
+function customWorkspaceStorageKey(scope: string): string {
+  return `omnyid:wedding_custom_surface:${scope}`;
+}
+
+function customWorkspaceItem(value: unknown): WeddingCustomWorkspaceItem | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Partial<WeddingCustomWorkspaceItem>;
+  if (typeof record.id !== "string" || !isWeddingWorkspaceMenuId(record.menu) || typeof record.title !== "string") return null;
+  if (record.kind !== "image" && record.kind !== "text") return null;
+  return {
+    id: record.id,
+    menu: record.menu,
+    kind: record.kind,
+    title: record.title,
+    body: typeof record.body === "string" ? record.body : "",
+    imageUrl: typeof record.imageUrl === "string" ? record.imageUrl : null,
+  };
+}
+
+function loadCustomWorkspaceItems(scope: string): WeddingCustomWorkspaceItem[] {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(customWorkspaceStorageKey(scope)) ?? "[]");
+    return Array.isArray(parsed)
+      ? parsed.map(customWorkspaceItem).filter((item): item is WeddingCustomWorkspaceItem => item !== null)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomWorkspaceItems(scope: string, items: readonly WeddingCustomWorkspaceItem[]): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(customWorkspaceStorageKey(scope), JSON.stringify(items.slice(0, 24)));
+  } catch {
+    // Storage can be unavailable or full; the in-page draft still remains usable.
+  }
+}
+
+function WeddingCustomSurfaceTools(props: {
+  activeMenu: WeddingWorkspaceMenuId;
+  storageKey: string;
+}) {
+  const [open, setOpen] = createSignal(false);
+  const [mode, setMode] = createSignal<WeddingCustomWorkspaceItem["kind"] | null>(null);
+  const [title, setTitle] = createSignal("");
+  const [body, setBody] = createSignal("");
+  const [imageUrl, setImageUrl] = createSignal<string | null>(null);
+  const [items, setItems] = createSignal<WeddingCustomWorkspaceItem[]>(loadCustomWorkspaceItems(props.storageKey));
+  const visibleItems = createMemo(() => items().filter((item) => item.menu === props.activeMenu));
+
+  createEffect(() => {
+    saveCustomWorkspaceItems(props.storageKey, items());
+  });
+
+  function resetDraft() {
+    setTitle("");
+    setBody("");
+    setImageUrl(null);
+    setMode(null);
+  }
+
+  function addItem(kind: WeddingCustomWorkspaceItem["kind"]) {
+    const safeTitle = title().trim() || (kind === "image" ? "Wedding image" : "Planning note");
+    const safeBody = body().trim();
+    if (kind === "text" && !safeBody) return;
+    if (kind === "image" && !imageUrl()) return;
+    setItems((current) => [
+      ...current,
+      {
+        id: `wedding-custom-${Date.now()}-${current.length}`,
+        menu: props.activeMenu,
+        kind,
+        title: safeTitle,
+        body: safeBody,
+        imageUrl: imageUrl(),
+      },
+    ]);
+    resetDraft();
+    setOpen(false);
+  }
+
+  function moveItem(id: string, direction: -1 | 1) {
+    setItems((current) => {
+      const pageItems = current.filter((item) => item.menu === props.activeMenu);
+      const pageIndex = pageItems.findIndex((item) => item.id === id);
+      const swapIndex = pageIndex + direction;
+      if (pageIndex < 0 || swapIndex < 0 || swapIndex >= pageItems.length) return current;
+      const reordered = [...pageItems];
+      const moving = reordered[pageIndex]!;
+      reordered[pageIndex] = reordered[swapIndex]!;
+      reordered[swapIndex] = moving;
+      let nextPageIndex = 0;
+      return current.map((item) => item.menu === props.activeMenu ? reordered[nextPageIndex++]! : item);
+    });
+  }
+
+  function removeItem(id: string) {
+    setItems((current) => current.filter((item) => item.id !== id));
+  }
+
+  function selectImage(event: Event) {
+    const file = (event.currentTarget as HTMLInputElement).files?.[0];
+    if (!file) return;
+    if (!title().trim()) setTitle(file.name.replace(/\.[^.]+$/, ""));
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") setImageUrl(reader.result);
+    });
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div class="rounded-[24px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[28px]">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-on-surface">Add something here</p>
+          <p class="mt-1 text-xs leading-5 text-on-surface-variant">
+            Add a photo or note to this wedding page and move it into the order you like.
+          </p>
+        </div>
+        <div class="relative">
+          <button
+            type="button"
+            class="flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-lg font-bold text-rose-950 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+            title="Add a photo or note"
+            aria-label="Add a photo or note"
+            aria-expanded={open()}
+            onClick={() => setOpen((current) => !current)}
+          >
+            +
+          </button>
+          <Show when={open()}>
+            <div class="absolute right-0 z-20 mt-2 w-52 rounded-2xl border border-stone-200 bg-white p-2 shadow-xl">
+              <button
+                type="button"
+                class="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-stone-800 transition hover:bg-stone-50"
+                onClick={() => setMode(mode() === "image" ? null : "image")}
+              >
+                Image
+              </button>
+              <button
+                type="button"
+                class="mt-1 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-stone-800 transition hover:bg-stone-50"
+                onClick={() => setMode(mode() === "text" ? null : "text")}
+              >
+                Text note
+              </button>
+            </div>
+          </Show>
+        </div>
+      </div>
+
+      <Show when={mode()}>
+        {(selectedMode) => (
+          <div class="mt-3 rounded-2xl border border-stone-200 bg-white/80 p-3">
+            <label class="text-xs font-semibold text-stone-700">
+              Title
+              <input
+                class="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                value={title()}
+                onInput={(event) => setTitle(event.currentTarget.value)}
+                placeholder={selectedMode() === "image" ? "Photo title" : "Note title"}
+              />
+            </label>
+            <Show when={selectedMode() === "image"} fallback={
+              <label class="mt-3 block text-xs font-semibold text-stone-700">
+                Text
+                <textarea
+                  class="mt-1 min-h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                  value={body()}
+                  onInput={(event) => setBody(event.currentTarget.value)}
+                  placeholder="Write the note you want to keep here."
+                />
+              </label>
+            }>
+              <label class="mt-3 block text-xs font-semibold text-stone-700">
+                Upload image
+                <input
+                  class="mt-1 block w-full text-sm text-stone-700 file:mr-3 file:rounded-full file:border-0 file:bg-rose-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-rose-950"
+                  type="file"
+                  accept="image/*"
+                  onChange={selectImage}
+                />
+              </label>
+              <Show when={imageUrl()}>
+                {(url) => <img src={url()} alt={title() || "Uploaded wedding image"} class="mt-3 max-h-48 w-full rounded-2xl object-cover" />}
+              </Show>
+            </Show>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="rounded-full bg-rose-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={selectedMode() === "image" ? !imageUrl() : !body().trim()}
+                onClick={() => addItem(selectedMode())}
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                class="rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700 transition hover:bg-stone-50"
+                onClick={resetDraft}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </Show>
+
+      <Show when={visibleItems().length > 0}>
+        <div class="mt-3 space-y-2">
+          <For each={visibleItems()}>
+            {(item, index) => (
+              <article class="rounded-2xl border border-stone-200 bg-white/80 p-3">
+                <div class="flex items-start justify-between gap-2">
+                  <p class="break-words text-sm font-semibold text-stone-900">{item.title}</p>
+                  <div class="flex shrink-0 flex-wrap justify-end gap-1">
+                    <button type="button" class="rounded-full border border-stone-200 px-2 py-1 text-xs font-semibold text-stone-700 disabled:opacity-40" disabled={index() === 0} onClick={() => moveItem(item.id, -1)}>Up</button>
+                    <button type="button" class="rounded-full border border-stone-200 px-2 py-1 text-xs font-semibold text-stone-700 disabled:opacity-40" disabled={index() === visibleItems().length - 1} onClick={() => moveItem(item.id, 1)}>Down</button>
+                    <button type="button" class="rounded-full border border-stone-200 px-2 py-1 text-xs font-semibold text-stone-700" onClick={() => removeItem(item.id)}>Remove</button>
+                  </div>
+                </div>
+                <Show when={item.imageUrl} fallback={<p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-stone-700">{item.body}</p>}>
+                  {(url) => <img src={url()} alt={item.title} class="mt-2 max-h-72 w-full rounded-2xl object-cover" />}
+                </Show>
+              </article>
+            )}
+          </For>
+        </div>
+      </Show>
+    </div>
+  );
+}
+
 // Always-visible at-a-glance summary for the Home tab — unlike WeddingDecisionFocusCard
 // (which only renders once personalOsProjection.hasWeddingPersonalOsSignal is true), this
 // has nothing to hide behind, so a first-time couple with nothing set up yet still sees
 // where things stand instead of a blank Home tab. Deliberately asymmetric (one wide hero
 // tile + three square ones) with a category icon on each, per feedback that a uniform
 // grid of text-only cards reads as flat and unclear.
-function WeddingHomeOverviewGrid(props: { state: WeddingResponseWorkspaceViewState }) {
+export function WeddingHomeOverviewGrid(props: {
+  state: WeddingResponseWorkspaceViewState;
+  onSidebarAction?: (action: WeddingWorkspaceSidebarAction) => void;
+  onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
+}) {
   const countdown = () => weddingDayCountdownLabel(props.state);
   const countdownDetail = () => weddingDayCountdownDetail(props.state);
   const nextMilestone = () => {
@@ -150,6 +472,14 @@ function WeddingHomeOverviewGrid(props: { state: WeddingResponseWorkspaceViewSta
   const guests = () => props.state.guestTracking;
   const respondedCount = () => guests().attendingCount + guests().declinedCount;
   const seating = () => props.state.seatingPlan;
+  function openBudget() {
+    props.onSelectMenu?.("budget");
+    props.onSidebarAction?.(weddingBudgetSidebarAction(props.state));
+  }
+  function openCalendar() {
+    props.onSelectMenu?.("timeline");
+    props.onSidebarAction?.(weddingTimelineSidebarAction("open_calendar", props.state));
+  }
 
   return (
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -162,18 +492,30 @@ function WeddingHomeOverviewGrid(props: { state: WeddingResponseWorkspaceViewSta
         </div>
         <p class="mt-3 text-3xl font-bold tracking-tight text-indigo-950">{countdown()}</p>
         <p class="text-xs text-indigo-900/70">days to the wedding</p>
-        <p class="mt-2 break-words text-xs leading-5 text-indigo-950/70">{countdownDetail()}</p>
+        <button
+          type="button"
+          class="mt-2 break-words text-left text-xs font-semibold leading-5 text-indigo-950/75 underline decoration-indigo-300 underline-offset-2"
+          title={calendarActionLabel(props.state)}
+          onClick={openCalendar}
+        >
+          {countdownDetail()}
+        </button>
         <p class="mt-1 break-words text-xs leading-5 text-indigo-950/70">{nextMilestone()}</p>
       </div>
 
-      <div class="min-w-0 rounded-[24px] border border-emerald-100/80 bg-emerald-50/80 p-3 shadow-card">
+      <button
+        type="button"
+        class="min-w-0 rounded-[24px] border border-emerald-100/80 bg-emerald-50/80 p-3 text-left shadow-card transition hover:border-emerald-200 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+        title="Open wedding budget"
+        onClick={openBudget}
+      >
         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #B45309" aria-hidden="true">
           <WeddingDashboardIcon id="banknotes" class="h-4 w-4" />
         </span>
         <p class="mt-2 break-words text-xl font-bold text-emerald-950">{budgetRemaining()}</p>
         <p class="text-xs text-emerald-900/70">budget left</p>
         <p class="mt-0.5 break-words text-[11px] text-emerald-900/60">{budgetDetail()}</p>
-      </div>
+      </button>
 
       <div class="min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 shadow-card">
         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #0F766E" aria-hidden="true">
@@ -222,6 +564,12 @@ export function WeddingDecisionFocusCard(props: {
     return remaining >= 0 ? currencyLabel(remaining) : `${currencyLabel(Math.abs(remaining))} over`;
   };
   const countdown = () => weddingDayCountdownLabel(props.state);
+  function openBudget() {
+    props.onSidebarAction(weddingBudgetSidebarAction(props.state));
+  }
+  function openCalendar() {
+    props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state));
+  }
   return (
     <Show when={props.state.personalOsProjection.hasWeddingPersonalOsSignal}>
       <div class="min-w-0 rounded-[24px] border border-pink-100/80 bg-pink-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
@@ -235,15 +583,25 @@ export function WeddingDecisionFocusCard(props: {
           {props.state.personalOsProjection.decisionLoadRelief.summaryLabel}
         </p>
         <div class="mt-3 grid gap-2 sm:grid-cols-2">
-          <div class="rounded-2xl border border-pink-100 bg-white/75 px-3 py-2">
+          <button
+            type="button"
+            class="rounded-2xl border border-pink-100 bg-white/75 px-3 py-2 text-left transition hover:border-pink-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
+            title="Open wedding budget"
+            onClick={openBudget}
+          >
             <p class="text-xs font-semibold text-pink-950/65">Budget left</p>
             <p class="mt-1 break-words text-2xl font-semibold text-pink-950">{budgetRemaining()}</p>
-          </div>
-          <div class="rounded-2xl border border-pink-100 bg-white/75 px-3 py-2">
+          </button>
+          <button
+            type="button"
+            class="rounded-2xl border border-pink-100 bg-white/75 px-3 py-2 text-left transition hover:border-pink-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
+            title={calendarActionLabel(props.state)}
+            onClick={openCalendar}
+          >
             <p class="text-xs font-semibold text-pink-950/65">Days to wedding</p>
             <p class="mt-1 break-words text-2xl font-semibold text-pink-950">{countdown()}</p>
             <p class="mt-1 text-xs leading-5 text-pink-950/60">{weddingDayCountdownDetail(props.state)}</p>
-          </div>
+          </button>
         </div>
         <Show when={props.state.personalOsProjection.decisionLoadRelief.focusItems.length > 0} fallback={
           <p class="mt-3 rounded-2xl border border-pink-100 bg-white/70 px-3 py-2 text-sm leading-6 text-pink-950/75">
@@ -300,16 +658,21 @@ export function WeddingDecisionFocusCard(props: {
 export function WeddingWorkspaceContextPanels(props: {
   state: WeddingResponseWorkspaceViewState;
   showTechnicalDetails?: boolean;
+  showHomeOverview?: boolean;
   activeMenu?: WeddingWorkspaceMenuId;
   sharePlanOpen?: boolean;
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
   onRefreshWorkspace?: () => void;
+  onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
+  onOpenArtifact?: (artifactId: string) => void;
+  onOpenSavedOutputs?: () => void;
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
 }) {
   const activeMenu = () => props.activeMenu ?? "home";
   const [doneTaskIds, setDoneTaskIds] = createSignal<Record<string, true>>({});
   const [taskAssignees, setTaskAssignees] = createSignal<Record<string, string>>({});
   const [taskConsultedPeople, setTaskConsultedPeople] = createSignal<Record<string, string>>({});
+  const [taskLastContactDates, setTaskLastContactDates] = createSignal<Record<string, string>>({});
   const [customHelperName, setCustomHelperName] = createSignal("");
   const [customHelpers, setCustomHelpers] = createSignal<string[]>([]);
   const helperPeople = createMemo(() => {
@@ -406,16 +769,27 @@ export function WeddingWorkspaceContextPanels(props: {
         <WeddingBackgroundAutomationCard state={props.state.backgroundAutomationCoverage} />
       </Show>
 
-      <div hidden={activeMenu() !== "home"}>
+      <Show when={activeMenu() !== "advanced"}>
+        <WeddingCustomSurfaceTools
+          activeMenu={activeMenu()}
+          storageKey={props.state.workspace.metadata.responseWorkspaceId}
+        />
+      </Show>
+
+      <Show when={(props.showHomeOverview ?? true) && activeMenu() === "home"}>
         <WeddingPanelSection
           label="Planning snapshot"
           detail="The main wedding details to check today."
           tone="everyday"
         />
         <div class="mt-3">
-          <WeddingHomeOverviewGrid state={props.state} />
+          <WeddingHomeOverviewGrid
+            state={props.state}
+            onSelectMenu={props.onSelectMenu}
+            onSidebarAction={props.onSidebarAction}
+          />
         </div>
-      </div>
+      </Show>
 
       <Show when={props.sharePlanOpen}>
         <WeddingCollaborationAccessCard state={props.state.collaboration} />
@@ -482,6 +856,7 @@ export function WeddingWorkspaceContextPanels(props: {
         <WeddingBudgetTrackerCard
           state={props.state.budgetTracking}
           weddingPlanId={props.state.workspace.metadata.weddingPlanId}
+          locationLabel={weddingLocationAdviceLabel(props.state)}
           metadata={props.state.workspace.metadata}
           onSaveAllocation={saveBudgetAllocation}
         />
@@ -506,6 +881,9 @@ export function WeddingWorkspaceContextPanels(props: {
               <WeddingDashboardIcon id="table-cells" class="h-4 w-4" />
             </span>
             <p class="text-lg font-bold tracking-tight text-sky-950">Seating plan</p>
+            <WeddingInfoTip title="Seating tip" tone="sky">
+              Start with households, VIPs, accessibility needs, and known guest tensions. Share table counts and meal needs with vendors, but keep private relationship notes only for the couple.
+            </WeddingInfoTip>
           </div>
           <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-sky-900">
             {props.state.seatingPlan.statusLabel}
@@ -514,6 +892,23 @@ export function WeddingWorkspaceContextPanels(props: {
         <p class="mt-2 text-sm leading-6 text-sky-900/75">
           {props.state.seatingPlan.summaryLabel}
         </p>
+        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 px-3 py-2">
+          <p class="text-sm font-semibold text-sky-950">
+            {props.state.seatingPlan.guestRowsConsidered > 0 ? "Seating draft can start from your guest list." : "Add attending guests to start a seating draft."}
+          </p>
+          <p class="mt-1 text-xs leading-5 text-sky-950/70">
+            {props.state.seatingPlan.guestRowsConsidered > 0
+              ? "OmnyID can group guests into a first draft when the guest list includes names and attendance. Household, meal, access, and table notes make the draft better."
+              : "Once attending guests are saved, this page can suggest table counts and seating follow-ups."}
+          </p>
+          <button
+            type="button"
+            class="mt-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-950 transition hover:bg-white"
+            onClick={() => props.onSelectMenu?.("guests")}
+          >
+            Open guest list
+          </button>
+        </div>
         <div class="mt-3 grid grid-cols-3 gap-2">
           <div class="rounded-2xl border border-sky-100 bg-white/75 px-2.5 py-2">
             <p class="text-xs font-semibold text-sky-950/65">Assigned</p>
@@ -550,11 +945,20 @@ export function WeddingWorkspaceContextPanels(props: {
         <Show when={props.state.seatingPlan.actionItems.length > 0}>
           <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
             <p class="text-xs font-semibold text-sky-950/70">Seating to-dos</p>
-            <ul class="mt-2 space-y-1">
+            <ul class="mt-2 space-y-2">
               <For each={props.state.seatingPlan.actionItems.slice(0, 4)}>
                 {(item) => (
-                  <li class="text-xs leading-5 text-sky-950/70">
-                    <span class="font-semibold">{item.title}</span> - {item.priorityLabel}
+                  <li class="rounded-xl border border-sky-100 bg-sky-50/70 px-2.5 py-2 text-xs leading-5 text-sky-950/70">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <span><span class="font-semibold">{item.title}</span> - {item.priorityLabel}</span>
+                      <button
+                        type="button"
+                        class="rounded-full border border-sky-100 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-sky-950 transition hover:bg-white"
+                        onClick={() => props.onSidebarAction(seatingTaskSidebarAction(item.title, props.state))}
+                      >
+                        Open task
+                      </button>
+                    </div>
                   </li>
                 )}
               </For>
@@ -626,6 +1030,9 @@ export function WeddingWorkspaceContextPanels(props: {
                 <WeddingDashboardIcon id="user-plus" class="h-4 w-4" />
               </span>
               <p class="text-lg font-bold tracking-tight text-fuchsia-950">Who is helping</p>
+              <WeddingInfoTip title="Helper tip" tone="fuchsia">
+                Give each task one owner and one due date. Use Consult when someone should be asked, but should not become responsible for finishing the task.
+              </WeddingInfoTip>
             </div>
             <p class="mt-1 text-sm leading-6 text-fuchsia-900/75">
               Give every wedding task one clear owner, a due date, and someone to consult when needed.
@@ -697,7 +1104,16 @@ export function WeddingWorkspaceContextPanels(props: {
                     <div class="min-w-0">
                       <p class="break-words text-sm font-semibold text-fuchsia-950">{task.title}</p>
                       <p class="mt-1 text-xs leading-5 text-fuchsia-900/70">
-                        Due: {taskDueLabel(task)} - Priority: {taskPriorityLabel(task)}
+                        Due:{" "}
+                        <button
+                          type="button"
+                          class="font-semibold underline decoration-fuchsia-300 underline-offset-2"
+                          title="Open this task"
+                          onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_tasks", props.state, task.id))}
+                        >
+                          {taskDueLabel(task)}
+                        </button>
+                        {" "}- Priority: {taskPriorityLabel(task)}
                       </p>
                     </div>
                     <span class="max-w-full break-words rounded-full bg-fuchsia-50 px-2 py-1 text-xs text-fuchsia-900">
@@ -731,12 +1147,18 @@ export function WeddingWorkspaceContextPanels(props: {
                         </For>
                       </select>
                     </label>
-                    <div class="text-xs font-semibold text-fuchsia-950">
-                      Decision owner
-                      <p class="mt-1 rounded-full border border-fuchsia-100 bg-fuchsia-50 px-3 py-2 text-xs font-medium text-fuchsia-950">
-                        {taskAssignee(task)}
-                      </p>
-                    </div>
+                    <label class="text-xs font-semibold text-fuchsia-950">
+                      Last contact
+                      <input
+                        type="date"
+                        value={taskLastContactDates()[task.id] ?? ""}
+                        onInput={(event) => setTaskLastContactDates((current) => ({ ...current, [task.id]: event.currentTarget.value }))}
+                        class="mt-1 w-full rounded-full border border-fuchsia-100 bg-white px-3 py-2 text-xs font-medium text-fuchsia-950 outline-none"
+                      />
+                      <span class="mt-1 block text-[11px] font-normal leading-4 text-fuchsia-900/60">
+                        For this page. Vendor follow-ups are tracked in Response queue.
+                      </span>
+                    </label>
                   </div>
                   <button
                     type="button"
@@ -778,7 +1200,12 @@ export function WeddingWorkspaceContextPanels(props: {
       <div class="min-w-0 rounded-[24px] border border-indigo-100/80 bg-indigo-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <p class="text-base font-semibold text-indigo-950">Timeline</p>
+            <div class="flex items-center gap-2">
+              <p class="text-base font-semibold text-indigo-950">Timeline</p>
+              <WeddingInfoTip title="Timeline tip" tone="indigo">
+                Put legal deadlines, payment due dates, and vendor lock-in dates on the calendar. If a date is still uncertain, keep it as a task until it is confirmed.
+              </WeddingInfoTip>
+            </div>
             <p class="mt-1 text-sm leading-6 text-indigo-900/70">
               Open dated items in Calendar, or review all wedding tasks in Tasks.
             </p>
@@ -811,27 +1238,51 @@ export function WeddingWorkspaceContextPanels(props: {
         </Show>
         <Show when={props.state.ganttTimeline.undatedItems.length > 0}>
           <div class="mt-3 rounded-2xl border border-indigo-100 bg-white/75 p-3">
-            <p class="text-xs font-semibold text-indigo-950/70">Can do anytime</p>
-            <ul class="mt-2 space-y-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-xs font-semibold text-indigo-950/70">Done or no-date items</p>
+              <button
+                type="button"
+                disabled={!props.onOpenSavedOutputs}
+                class="rounded-full border border-indigo-100 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+                onClick={() => props.onOpenSavedOutputs?.()}
+              >
+                All files
+              </button>
+            </div>
+            <ul class="mt-2 space-y-2">
               <For each={props.state.ganttTimeline.undatedItems.slice(0, 4)}>
                 {(item) => (
-                  <li class="text-xs leading-5 text-indigo-950/70">
-                    <span class="font-semibold">{item.title}</span> - {item.categoryLabel} - {item.statusLabel}
+                  <li class="rounded-xl border border-indigo-100 bg-indigo-50/60 px-2.5 py-2 text-xs leading-5 text-indigo-950/70">
+                    <button
+                      type="button"
+                      class="text-left font-semibold underline decoration-indigo-300 underline-offset-2"
+                      onClick={() => item.linkedArtifactId
+                        ? props.onOpenArtifact?.(item.linkedArtifactId)
+                        : props.onSidebarAction(weddingTimelineSidebarAction("open_tasks", props.state, item.id))}
+                    >
+                      {item.title}
+                    </button>
+                    <span> - {item.categoryLabel} - </span>
+                    <button
+                      type="button"
+                      class="font-semibold underline decoration-indigo-300 underline-offset-2"
+                      onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_tasks", props.state, item.id))}
+                    >
+                      {timelineStatusLabel(item.statusLabel)}
+                    </button>
+                    <Show when={item.linkedArtifactId}>
+                      <button
+                        type="button"
+                        class="ml-2 rounded-full border border-indigo-100 bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-indigo-950 transition hover:bg-white"
+                        onClick={() => props.onOpenArtifact?.(item.linkedArtifactId!)}
+                      >
+                        View file
+                      </button>
+                    </Show>
                   </li>
                 )}
               </For>
             </ul>
-          </div>
-        </Show>
-        <Show when={props.state.ganttTimeline.riskLabels.length > 0}>
-          <div class="mt-3 flex flex-wrap gap-1.5">
-            <For each={props.state.ganttTimeline.riskLabels.slice(0, 4)}>
-              {(risk) => (
-                <span class="max-w-full break-words rounded-full border border-indigo-100 bg-white/80 px-2 py-1 text-xs font-semibold text-indigo-950/75">
-                  {risk.label}
-                </span>
-              )}
-            </For>
           </div>
         </Show>
         <Show when={props.state.ganttTimeline.rows.length > 0} fallback={
@@ -855,20 +1306,27 @@ export function WeddingWorkspaceContextPanels(props: {
                 <article class="min-w-0">
                   <div class="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                     <p class="min-w-0 break-words text-sm font-semibold text-indigo-950">{row.title}</p>
-                    <span class="shrink-0 text-xs text-indigo-900/65">{row.startLabel}</span>
+                    <button
+                      type="button"
+                      class="shrink-0 text-left text-xs font-semibold text-indigo-900/75 underline decoration-indigo-300 underline-offset-2"
+                      title="Open this date in the wedding calendar"
+                      onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state, row.id))}
+                    >
+                      {row.startLabel}
+                    </button>
                   </div>
                   <div class="h-3 rounded-full bg-white/80">
                     <div
                       class="h-3 rounded-full"
                       style={{
                         "margin-left": `${row.offsetPercent}%`,
-                        width: `${row.widthPercent}%`,
+                        width: `${timelineBarWidth(row.widthPercent, row.offsetPercent)}%`,
                         "background-color": row.color,
                       }}
                     />
                   </div>
                   <p class="mt-1 break-words text-xs leading-5 text-indigo-950/65">
-                    {row.categoryLabel} - {row.durationDays} day{row.durationDays === 1 ? "" : "s"} - {row.statusLabel}
+                    {row.categoryLabel} - {row.durationDays} day{row.durationDays === 1 ? "" : "s"} - {timelineStatusLabel(row.statusLabel)}
                   </p>
                   <div class="mt-2 flex flex-wrap gap-1.5">
                     <button
@@ -885,6 +1343,15 @@ export function WeddingWorkspaceContextPanels(props: {
                     >
                       View task
                     </button>
+                    <Show when={row.linkedArtifactId}>
+                      <button
+                        type="button"
+                        class="rounded-full border border-indigo-100 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-950 transition hover:bg-white"
+                        onClick={() => props.onOpenArtifact?.(row.linkedArtifactId!)}
+                      >
+                        View file
+                      </button>
+                    </Show>
                   </div>
                 </article>
               )}
@@ -982,7 +1449,12 @@ export function WeddingWorkspaceContextPanels(props: {
       <div hidden={activeMenu() !== "response_queue" || props.state.vendorContactCards.length === 0}>
         <div class="min-w-0 rounded-[24px] border border-amber-100/80 bg-amber-50/85 p-3 shadow-card sm:rounded-[28px] sm:p-4">
           <div class="flex items-start justify-between gap-2">
-            <p class="break-words text-base font-semibold text-amber-950">Vendors to follow up</p>
+            <div class="flex items-center gap-2">
+              <p class="break-words text-base font-semibold text-amber-950">Vendors to follow up</p>
+              <WeddingInfoTip title="Follow-up tip" tone="rose">
+                After an outreach email, wait about 3 to 5 business days before nudging. Keep the last-contact date updated so the planner can suggest the next step without guesswork.
+              </WeddingInfoTip>
+            </div>
             <span class="max-w-full break-words rounded-full bg-white/85 px-2 py-1 text-xs font-semibold text-amber-900">
               {props.state.vendorContactCards.length} tracked
             </span>

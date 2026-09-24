@@ -8,6 +8,7 @@ export type WeddingGanttInputItem = {
   dueDate?: string | null;
   dueLabel?: string | null;
   status?: string | null;
+  linkedArtifactId?: string | null;
 };
 
 export type WeddingGanttTimelineRow = {
@@ -22,6 +23,7 @@ export type WeddingGanttTimelineRow = {
   offsetPercent: number;
   widthPercent: number;
   statusLabel: string;
+  linkedArtifactId: string | null;
 };
 
 export type WeddingGanttUndatedItem = {
@@ -30,6 +32,7 @@ export type WeddingGanttUndatedItem = {
   category: string;
   categoryLabel: string;
   statusLabel: string;
+  linkedArtifactId: string | null;
 };
 
 export type WeddingGanttRiskLabel = {
@@ -218,6 +221,7 @@ export function buildWeddingGanttTimelineState(input: {
         category,
         categoryLabel: labelFor(category),
         statusLabel: clean(item.status) ?? "anytime",
+        linkedArtifactId: clean(item.linkedArtifactId),
       };
     });
   const minTime = Math.min(...dated.map((entry) => entry.start.getTime()));
@@ -243,6 +247,7 @@ export function buildWeddingGanttTimelineState(input: {
         offsetPercent: Math.round((offsetDays / totalDays) * 1000) / 10,
         widthPercent: Math.max(4, Math.round((durationDays / totalDays) * 1000) / 10),
         statusLabel: clean(item.status) ?? "planned",
+        linkedArtifactId: clean(item.linkedArtifactId),
       };
     });
   const usedCategories = Array.from(new Set(rows.map((row) => row.category)));

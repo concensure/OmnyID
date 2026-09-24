@@ -1009,6 +1009,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
         endAt: item.endAt,
         dueLabel: item.dateLabel,
         status: item.reviewStatus ?? item.approvalState ?? null,
+        linkedArtifactId: item.linkedArtifactId,
       })),
       ...taskItems.map((item) => ({
         id: item.id,
@@ -1017,6 +1018,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
         dueDate: item.dueAt,
         dueLabel: item.dueLabel,
         status: item.reviewStatus ?? item.approvalState ?? item.priority ?? null,
+        linkedArtifactId: item.linkedArtifactId,
       })),
     ],
   });

@@ -2,6 +2,7 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
+import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import {
   buildWeddingBoundaryManagementViewState,
   visibleWeddingBoundaryApprovalCount,
@@ -57,6 +58,9 @@ export function WeddingBoundaryManagementCard(props: {
               <WeddingDashboardIcon id="shield-check" class="h-4 w-4" />
             </span>
             <p class="text-lg font-bold tracking-tight text-cyan-950">Family boundaries</p>
+            <WeddingInfoTip title="Boundary tip" tone="sky">
+              Write rules as calm policy, not as personal blame. For example: "venue limit is 80 guests" or "children are only invited for immediate family."
+            </WeddingInfoTip>
           </div>
           <p class="mt-1 text-sm leading-6 text-cyan-900/75">
             Keep guest-list choices calm by showing who can suggest changes and what needs your approval.

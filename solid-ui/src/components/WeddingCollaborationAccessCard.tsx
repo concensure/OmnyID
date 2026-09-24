@@ -1,21 +1,140 @@
 // @locs-version: 2.0
 import { createSignal, For, Show } from "solid-js";
 
-import type { WeddingCollaborationState } from "@/lib/weddingCollaborationState";
+import { WeddingInfoTip } from "@/components/WeddingInfoTip";
+import type {
+  WeddingCollaborationState,
+  WeddingCollaboratorRole,
+} from "@/lib/weddingCollaborationState";
+
+type DraftRoleAssignment = {
+  id: string;
+  name: string;
+  email: string;
+  role: WeddingCollaboratorRole;
+  roleLabel: string;
+};
 
 export function WeddingCollaborationAccessCard(props: {
   state: WeddingCollaborationState;
 }) {
   const [openRole, setOpenRole] = createSignal<string | null>(null);
+  const [personName, setPersonName] = createSignal("");
+  const [personEmail, setPersonEmail] = createSignal("");
+  const [selectedRole, setSelectedRole] = createSignal<WeddingCollaboratorRole>("co_owner");
+  const [draftAssignments, setDraftAssignments] = createSignal<DraftRoleAssignment[]>([]);
+
+  function roleLabel(role: WeddingCollaboratorRole): string {
+    return props.state.roleAssignmentOptions.find((option) => option.role === role)?.title ?? role;
+  }
+
+  function addDraftAssignment() {
+    const name = personName().trim();
+    const email = personEmail().trim();
+    if (!name && !email) return;
+    const role = selectedRole();
+    setDraftAssignments((current) => [
+      ...current,
+      {
+        id: `wedding-role-${Date.now()}-${current.length}`,
+        name: name || email,
+        email,
+        role,
+        roleLabel: roleLabel(role),
+      },
+    ]);
+    setPersonName("");
+    setPersonEmail("");
+  }
+
   return (
     <div class="min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
       <div class="flex items-start justify-between gap-2">
-        <p class="text-base font-semibold text-sky-950">Share the plan</p>
+        <div class="flex items-center gap-2">
+          <p class="text-base font-semibold text-sky-950">Share the plan</p>
+          <WeddingInfoTip title="Sharing tip" tone="sky">
+            Start with the smallest useful access. Give helpers logistics access, give family suggestion access, and keep budget notes private unless you choose to share them.
+          </WeddingInfoTip>
+        </div>
         <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-sky-900">
           {props.state.statusLabel}
         </span>
       </div>
       <p class="mt-2 text-sm leading-6 text-sky-900/75">{props.state.summaryLabel}</p>
+      <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
+        <p class="text-sm font-semibold text-sky-950">Add someone</p>
+        <p class="mt-1 text-xs leading-5 text-sky-950/70">
+          Choose a contact or type a name, then pick what they can help with.
+        </p>
+        <div class="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+          <label class="text-xs font-semibold text-sky-950">
+            Name or contact
+            <input
+              class="mt-1 w-full rounded-full border border-sky-100 bg-white px-3 py-2 text-xs font-medium text-sky-950 outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+              value={personName()}
+              onInput={(event) => setPersonName(event.currentTarget.value)}
+              placeholder="Alex, Sam, Mum..."
+            />
+          </label>
+          <label class="text-xs font-semibold text-sky-950">
+            Email optional
+            <input
+              class="mt-1 w-full rounded-full border border-sky-100 bg-white px-3 py-2 text-xs font-medium text-sky-950 outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+              value={personEmail()}
+              onInput={(event) => setPersonEmail(event.currentTarget.value)}
+              placeholder="name@example.com"
+            />
+          </label>
+          <label class="text-xs font-semibold text-sky-950">
+            Role
+            <select
+              class="mt-1 w-full rounded-full border border-sky-100 bg-white px-3 py-2 text-xs font-medium text-sky-950 outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+              value={selectedRole()}
+              onChange={(event) => setSelectedRole(event.currentTarget.value as WeddingCollaboratorRole)}
+            >
+              <For each={props.state.roleAssignmentOptions}>
+                {(role) => <option value={role.role}>{role.title}</option>}
+              </For>
+            </select>
+          </label>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            class="rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!personName().trim() && !personEmail().trim()}
+            onClick={addDraftAssignment}
+          >
+            Add person
+          </button>
+          <span class="text-xs leading-5 text-sky-950/60">
+            Send the invite after you review their role.
+          </span>
+        </div>
+        <Show when={draftAssignments().length > 0}>
+          <div class="mt-3 space-y-2">
+            <For each={draftAssignments()}>
+              {(assignment) => (
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2">
+                  <div class="min-w-0">
+                    <p class="break-words text-xs font-semibold text-sky-950">{assignment.name}</p>
+                    <p class="break-words text-xs leading-5 text-sky-950/65">
+                      {assignment.roleLabel}{assignment.email ? ` - ${assignment.email}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="rounded-full border border-sky-100 bg-white px-2 py-1 text-[11px] font-semibold text-sky-950"
+                    onClick={() => setDraftAssignments((current) => current.filter((item) => item.id !== assignment.id))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
       <div class="mt-3 flex flex-wrap gap-1.5">
         <For each={props.state.roleAssignmentOptions}>
           {(role) => (

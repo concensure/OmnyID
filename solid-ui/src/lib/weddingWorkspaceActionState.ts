@@ -2,6 +2,7 @@
 export type WeddingWorkspaceSidebarActionKind =
   | "continue_chat"
   | "open_graph"
+  | "open_budget"
   | "open_calendar"
   | "open_tasks"
   | "open_connected_apps"

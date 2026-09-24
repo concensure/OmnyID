@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
+import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import { weddingDecisionProjectionToAfpSendInput } from "@/lib/weddingDecisionAfpProjectionState";
 import type { WeddingBudgetTrackingState } from "@/lib/weddingBudgetTrackingState";
 import {
@@ -19,6 +20,7 @@ import {
   type WeddingBudgetAllocationDraft,
   type WeddingBudgetCategoryId,
 } from "@/lib/weddingBudgetAllocationState";
+import { buildWeddingBudgetCategoryGuidanceLabel } from "@/lib/weddingBudgetGuidanceState";
 
 function moneyLabel(amount: number, currency: string): string {
   return amount.toLocaleString(undefined, {
@@ -45,6 +47,7 @@ function budgetAllocationSignature(state: WeddingBudgetTrackingState): string {
 export function WeddingBudgetTrackerCard(props: {
   state: WeddingBudgetTrackingState;
   weddingPlanId?: string | null;
+  locationLabel?: string | null;
   metadata?: unknown;
   onSaveAllocation?: (input: SendAfpMessageInput) => Promise<unknown>;
 }) {
@@ -121,6 +124,9 @@ export function WeddingBudgetTrackerCard(props: {
             <WeddingDashboardIcon id="banknotes" class="h-4 w-4" />
           </span>
           <p class="text-lg font-bold tracking-tight text-emerald-950">Budget</p>
+          <WeddingInfoTip title="Budget guide" tone="emerald">
+            These are planning ranges, not quotes. Costs change by location, season, guest count, venue rules, and whether tax, service fees, delivery, and gratuity are included.
+          </WeddingInfoTip>
         </div>
         <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-emerald-900">
           {props.state.lineItems.length} selected
@@ -209,11 +215,24 @@ export function WeddingBudgetTrackerCard(props: {
               return (
                 <div class="rounded-2xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5">
                   <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs font-semibold text-emerald-950">
-                      {category.label}
-                      <Show when={category.id === "other_misc"}>
-                        {" "}<span class="font-normal text-emerald-900/60">(auto-balances)</span>
-                      </Show>
+                    <span class="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-emerald-950">
+                      <span class="min-w-0 break-words">
+                        {category.label}
+                        <Show when={category.id === "other_misc"}>
+                          {" "}<span class="font-normal text-emerald-900/60">(auto-balances)</span>
+                        </Show>
+                      </span>
+                      <WeddingInfoTip title={`${category.label} guide`} tone="emerald">
+                        {(() => {
+                          const guidance = buildWeddingBudgetCategoryGuidanceLabel({
+                            categoryId: category.id,
+                            totalAmount: draft().totalAmount,
+                            currency: draft().currency,
+                            locationLabel: props.locationLabel,
+                          });
+                          return `${guidance.rangeLabel} ${guidance.averageLabel} ${guidance.locationNote} ${guidance.practicalTip}`;
+                        })()}
+                      </WeddingInfoTip>
                     </span>
                     <span class="shrink-0 text-xs font-semibold text-emerald-950">{moneyLabel(amount(), draft().currency)}</span>
                   </div>
