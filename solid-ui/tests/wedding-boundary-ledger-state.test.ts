@@ -242,6 +242,29 @@ test("wedding boundary state uses latest request record after an approval refres
   );
 });
 
+test("wedding boundary state does not ask couples to review auto-blocked requests", () => {
+  const blockedRequest: WeddingBoundaryChangeRequest = {
+    ...plusOneRequest,
+    id: "change:auto-blocked-child",
+    requestId: "change:auto-blocked-child",
+    title: "Add a child guest",
+    changeType: "add_guest",
+    requestStatus: "auto_blocked",
+    approvalRequired: true,
+    publicReason: "A couple-approved rule blocks this change.",
+  };
+
+  const state = buildWeddingBoundaryState({
+    metadata,
+    objects: [blockedRequest],
+  });
+
+  assert.equal(state.pendingApprovalCount, 0);
+  assert.equal(state.approvalQueue.length, 0);
+  assert.equal(state.summaryLabel, "0 guest profiles, 0 households, 0 requests waiting for review.");
+  assert.ok(!state.warningLabels.some((label) => /need review/i.test(label)));
+});
+
 test("wedding boundary evaluator allows scoped editor changes only when no active policy overrides them", () => {
   const helperRole: WeddingBoundaryRoleAssignment = {
     ...parentRole,

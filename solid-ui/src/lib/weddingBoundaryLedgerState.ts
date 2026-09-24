@@ -601,6 +601,7 @@ export function buildWeddingBoundaryState(input: {
     && (object.approvalRequired === true || object.requestStatus === "pending")
     && object.requestStatus !== "approved"
     && object.requestStatus !== "declined"
+    && object.requestStatus !== "auto_blocked"
   ));
   const households = objects.filter((object) => object.kind === "wedding_boundary_household");
   const guests = objects.filter((object) => object.kind === "wedding_boundary_guest_profile");
