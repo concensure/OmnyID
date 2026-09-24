@@ -15,7 +15,8 @@ param(
     [switch]$UseDetachedOracleProof = $true,
     [switch]$SkipComposeBuild,
     [switch]$SkipCaddyReload,
-    [switch]$SkipWorkspaceSmoke
+    [switch]$SkipWorkspaceSmoke,
+    [switch]$SkipRemoteSourcePrune
 )
 
 Set-StrictMode -Version Latest
@@ -102,8 +103,20 @@ function Invoke-CheckedRemoteCommand {
         [switch]$ScanDockerBuildOutput
     )
 
-    $output = & ssh.exe -i $KeyPath "$User@$RemoteHost" $Command 2>&1
-    $exitCode = $LASTEXITCODE
+    # A local ErrorActionPreference override (not just 2>&1 capture) is required: under
+    # $ErrorActionPreference = "Stop", PowerShell 5.1 escalates ANY stderr line from a
+    # native call into a terminating NativeCommandError even when the process exits 0 and
+    # the output is captured into a variable — and a remote `docker compose ... --build`
+    # (cargo + npm) is virtually guaranteed to print something to stderr. $exitCode below
+    # still catches genuine failures.
+    $previousEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & ssh.exe -i $KeyPath "$User@$RemoteHost" $Command 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousEap
+    }
     if ($output) {
         $output | ForEach-Object { Write-Host $_ }
     }
@@ -197,7 +210,8 @@ function Sync-OracleSecrets {
     $stagingDir = ($RemoteDirValue.TrimEnd('/') + '/' + $stagingDirName).Replace("//", "/")
     $stagingDirLiteral = Convert-ToShellSingleQuotedLiteral $stagingDir
 
-    & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" "mkdir -p $remoteDirLiteral $stagingDirLiteral"
+    $mkdirSecretsOutput = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" "mkdir -p $remoteDirLiteral $stagingDirLiteral" 2>&1
+    if ($mkdirSecretsOutput) { $mkdirSecretsOutput | ForEach-Object { Write-Host $_ } }
     if ($LASTEXITCODE -ne 0) {
         throw "[deploy-oracle] failed to create remote secret staging directory"
     }
@@ -211,7 +225,8 @@ function Sync-OracleSecrets {
             }
 
             $stageTarget = ($stagingDir.TrimEnd('/') + '/' + $remoteFileName).Replace("//", "/")
-            & scp.exe -i $KeyPathValue $entry.SourcePath "${UserValue}@${RemoteHostValue}:$stageTarget"
+            $scpSecretOutput = & scp.exe -i $KeyPathValue $entry.SourcePath "${UserValue}@${RemoteHostValue}:$stageTarget" 2>&1
+            if ($scpSecretOutput) { $scpSecretOutput | ForEach-Object { Write-Host $_ } }
             if ($LASTEXITCODE -ne 0) {
                 throw "[deploy-oracle] failed to upload secret payload for $($entry.Key)"
             }
@@ -230,7 +245,8 @@ function Sync-OracleSecrets {
 sudo mkdir -p $remoteSecretsDirLiteral &&
 sudo install -m 600 $stageTargetLiteral $remoteTargetLiteral
 "@
-            & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" $promoteCommand
+            $promoteOutput = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" $promoteCommand 2>&1
+            if ($promoteOutput) { $promoteOutput | ForEach-Object { Write-Host $_ } }
             if ($LASTEXITCODE -ne 0) {
                 throw "[deploy-oracle] failed to promote secret payload for $($entry.Key)"
             }
@@ -239,7 +255,8 @@ sudo install -m 600 $stageTargetLiteral $remoteTargetLiteral
         $normalizeCommand = @"
 sudo sh -lc 'chmod 700 $remoteSecretsRootLiteral && chmod 600 $remoteSecretsRootLiteral/*'
 "@
-        & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" $normalizeCommand
+        $normalizeOutput = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" $normalizeCommand 2>&1
+        if ($normalizeOutput) { $normalizeOutput | ForEach-Object { Write-Host $_ } }
         if ($LASTEXITCODE -ne 0) {
             throw "[deploy-oracle] failed to normalize remote secret permissions"
         }
@@ -298,7 +315,8 @@ try {
     $tempDir = $env:TEMP
     Push-Location $tempDir
     try {
-        & tar.exe -cf $archiveName -C $stageDir .
+        $tarCreateOutput = & tar.exe -cf $archiveName -C $stageDir . 2>&1
+        if ($tarCreateOutput) { $tarCreateOutput | ForEach-Object { Write-Host $_ } }
         Assert-ExternalSuccess "creating runtime archive"
     } finally {
         Pop-Location
@@ -307,11 +325,61 @@ try {
     Pop-Location
 }
 
-& ssh.exe -i $KeyPath "$User@$RemoteHost" "mkdir -p $RemoteDir /srv/omnyid/runtimes"
+# Under $ErrorActionPreference = "Stop", PowerShell 5.1 escalates ANY stderr line from a
+# native call into a terminating NativeCommandError even when the process exits 0 and
+# merely capturing the output (2>&1 into a variable) does not prevent that escalation —
+# e.g. GNU tar's harmless "Ignoring unknown extended header keyword 'SCHILY.fflags'"
+# warning (a benign cross-platform artifact of Windows' bsdtar writing PAX headers GNU
+# tar doesn't know) was aborting otherwise-successful deploys. Only a local
+# ErrorActionPreference override actually suppresses that escalation; Assert-ExternalSuccess
+# below still catches genuine failures via $LASTEXITCODE regardless.
+$previousEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $mkdirOutput = & ssh.exe -i $KeyPath "$User@$RemoteHost" "mkdir -p $RemoteDir /srv/omnyid/runtimes" 2>&1
+    if ($mkdirOutput) { $mkdirOutput | ForEach-Object { Write-Host $_ } }
+    $mkdirExit = $LASTEXITCODE
+
+    $remotePruneExit = 0
+    if (-not $SkipRemoteSourcePrune) {
+        # Do not prune live bind-mounted static roots such as docs/ or wedding/:
+        # deleting and recreating those directories can leave Caddy mounted to a
+        # removed inode until restart. The archive still overwrites them in place.
+        $remotePrunePaths = @(
+            "postgres",
+            "proto",
+            "runtime-templates",
+            "service-adapter-templates",
+            "solid-ui/public",
+            "solid-ui/src",
+            "src",
+            "typescript-sdk/scripts",
+            "typescript-sdk/src"
+        )
+        $remoteDirLiteralForPrune = Convert-ToShellSingleQuotedLiteral $RemoteDir
+        $remotePrunePathArguments = Join-ShellArguments -Values $remotePrunePaths
+        $remotePruneCommand = "cd $remoteDirLiteralForPrune && rm -rf -- $remotePrunePathArguments"
+        $remotePruneOutput = & ssh.exe -i $KeyPath "$User@$RemoteHost" $remotePruneCommand 2>&1
+        if ($remotePruneOutput) { $remotePruneOutput | ForEach-Object { Write-Host $_ } }
+        $remotePruneExit = $LASTEXITCODE
+    }
+
+    $scpOutput = & scp.exe -i $KeyPath $archivePath "${User}@${RemoteHost}:$RemoteDir/omnyid.tar" 2>&1
+    if ($scpOutput) { $scpOutput | ForEach-Object { Write-Host $_ } }
+    $scpExit = $LASTEXITCODE
+    $extractOutput = & ssh.exe -i $KeyPath "$User@$RemoteHost" "cd $RemoteDir && tar -xf omnyid.tar && rm -f omnyid.tar" 2>&1
+    if ($extractOutput) { $extractOutput | ForEach-Object { Write-Host $_ } }
+    $extractExit = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousEap
+}
+$LASTEXITCODE = $mkdirExit
 Assert-ExternalSuccess "creating remote runtime directories"
-& scp.exe -i $KeyPath $archivePath "${User}@${RemoteHost}:$RemoteDir/omnyid.tar"
+$LASTEXITCODE = $remotePruneExit
+Assert-ExternalSuccess "pruning stale remote runtime source directories"
+$LASTEXITCODE = $scpExit
 Assert-ExternalSuccess "uploading runtime archive"
-& ssh.exe -i $KeyPath "$User@$RemoteHost" "cd $RemoteDir && tar -xf omnyid.tar && rm -f omnyid.tar"
+$LASTEXITCODE = $extractExit
 Assert-ExternalSuccess "extracting runtime archive"
 Assert-RemoteOracleRuntimeScripts -RemoteHostValue $RemoteHost -UserValue $User -KeyPathValue $KeyPath -RemoteDirValue $RemoteDir
 
@@ -321,7 +389,8 @@ if ($EnvFile) {
     $secretPlan = Get-OracleSecretSyncPlan -EnvFile $EnvFile
     $rewrittenEnvFile = Join-Path $envStageDir ".env.oracle"
     Write-OracleRewrittenEnvFile -OutputPath $rewrittenEnvFile -Plan $secretPlan
-    & scp.exe -i $KeyPath $rewrittenEnvFile "${User}@${RemoteHost}:$RemoteDir/.env.oracle"
+    $envUploadOutput = & scp.exe -i $KeyPath $rewrittenEnvFile "${User}@${RemoteHost}:$RemoteDir/.env.oracle" 2>&1
+    if ($envUploadOutput) { $envUploadOutput | ForEach-Object { Write-Host $_ } }
     Assert-ExternalSuccess "uploading rewritten env file"
     if ($secretPlan.SecretEntries.Count -gt 0) {
         Sync-OracleSecrets `
@@ -375,7 +444,11 @@ printf '%s' "`$workspace_headers" | grep -qi '^www-authenticate: basic' && {
   echo 'workspace smoke check failed: /workspace/ is still behind Basic auth' >&2
   exit 1
 }
-printf '%s' "`$workspace_headers" | grep -qi '^content-security-policy: .*https://static.cloudflareinsights.com' || {
+printf '%s' "`$workspace_headers" | grep -qi '^content-security-policy:' || {
+  echo 'workspace smoke check failed: workspace CSP header is missing' >&2
+  exit 1
+}
+printf '%s' "`$workspace_headers" | grep -qi 'https://static.cloudflareinsights.com' || {
   echo 'workspace smoke check failed: workspace CSP is missing Cloudflare Insights allowance' >&2
   exit 1
 }
