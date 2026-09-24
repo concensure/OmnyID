@@ -457,6 +457,30 @@ printf '%s' "`$workspace_headers" | grep -qi 'https://static.cloudflareinsights.
     Invoke-CheckedRemoteCommand -Context "running workspace smoke check" -Command $workspaceSmokeScript
 }
 
+if (-not $EnvFile -and -not $SkipWorkspaceSmoke) {
+    $publicRouteSmokeScript = @"
+set -eu
+domain=`$(docker exec omnyid-caddy-1 printenv OMNYID_DOMAIN 2>/dev/null || true)
+[ -n "`$domain" ] || {
+  echo 'public route smoke check skipped: OMNYID_DOMAIN missing from running caddy container' >&2
+  exit 0
+}
+check_public_routes() {
+  curl -fsSI --resolve "`$domain:443:127.0.0.1" -k "https://`$domain/" >/dev/null
+  curl -fsSI --resolve "`$domain:443:127.0.0.1" -k "https://`$domain/wedding/" >/dev/null
+  curl -fsSI --resolve "`$domain:443:127.0.0.1" -k "https://`$domain/workspace/" >/dev/null
+}
+if ! check_public_routes; then
+  echo 'public route smoke check failed after sync; restarting caddy once and retrying' >&2
+  docker restart omnyid-caddy-1 >/dev/null
+  sleep 2
+  check_public_routes
+fi
+"@
+
+    Invoke-CheckedRemoteCommand -Context "running sync-only public route smoke check" -Command $publicRouteSmokeScript
+}
+
 if ($EnvFile -and -not $SkipPostDeployProof) {
     $postDeployOutDir = Join-Path $ProofOutDir "postdeploy"
     $postDeployReport = Invoke-OracleProductionProofSummary -Destination $postDeployOutDir
