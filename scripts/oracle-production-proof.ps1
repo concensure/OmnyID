@@ -106,7 +106,6 @@ function Invoke-DetachedRemoteAudit {
     Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "mkdir -p $jobDirLiteral"))
     Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "cat > $scriptPathLiteral")) -InputText ("#!/usr/bin/env bash`n" + $normalizedScriptText + "`n")
     Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "chmod 700 $scriptPathLiteral"))
-    Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "LC_ALL=C sed -i '1s/^\xEF\xBB\xBF//; s/\r$//' $scriptPathLiteral"))
 
     $runnerScript = @"
 #!/usr/bin/env bash
@@ -119,7 +118,6 @@ exit "`$exit_code"
     $normalizedRunnerScript = ($runnerScript -replace "`r`n", "`n").TrimEnd("`n")
     Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "cat > $runnerPathLiteral")) -InputText ($normalizedRunnerScript + "`n")
     Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "chmod 700 $runnerPathLiteral"))
-    Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "LC_ALL=C sed -i '1s/^\xEF\xBB\xBF//; s/\r$//' $runnerPathLiteral"))
     Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "nohup bash $runnerPathLiteral >/dev/null 2>&1 & printf '%s' \$! > $pidPathLiteral"))
 
     $deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max($RemoteAuditMaxWaitSeconds, 30))
