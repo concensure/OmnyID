@@ -7,17 +7,21 @@ edition = "2024"
 tokio = { version = "1.50", features = ["full"] }
 tonic = "0.14.5"
 prost = "0.14"
-axum = { version = "0.8", features = ["http2", "ws"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-native-tls", "postgres", "json"] }
+axum = { version = "0.8", features = ["http2", "ws", "multipart"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-native-tls", "postgres", "json", "chrono"] }
+urlencoding = "2"
+anyhow = "1"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 chacha20poly1305 = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+jsonwebtoken = "9"
 ulid = { version = "1.2", features = ["serde"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 chrono = { version = "0.4", features = ["serde"] }
 cron = "0.12"
 aws-sdk-s3 = "1"
@@ -25,7 +29,7 @@ base64 = "0.22"
 hex = "0.4"
 imap = "3.0.0-alpha.15"
 lettre = { version = "0.11", features = ["tokio1", "tokio1-native-tls", "smtp-transport", "builder"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
 mail-parser = "0.10"
 tonic-prost = "0.14.5"
 futures-util = "0.3"
@@ -34,9 +38,13 @@ argon2 = "0.5"
 rand = "0.9"
 hmac = "0.12"
 sha2 = "0.10"
+p256 = { version = "0.13", features = ["ecdsa"] }
 async-trait = "0.1"
 subtle = "2.6"
 flate2 = "1.0"
+snow = "0.9"
+rust_xlsxwriter = "0"
+ammonia = "4"
 
 [features]
 tui = []
@@ -50,3 +58,6 @@ required-features = ["tui"]
 tonic-build = "0.14.5"
 tonic-prost-build = "0.14.2"
 protoc-bin-vendored = "3"
+
+[dev-dependencies]
+http-body-util = "0.1"
