@@ -41,6 +41,17 @@ fn clean_support_access_reason(
     Ok(reason)
 }
 
+fn support_access_scope(value: Option<&str>) -> Result<&'static str, (StatusCode, String)> {
+    match value.map(str::trim).filter(|value| !value.is_empty()) {
+        None | Some("runtime_metadata_only") => Ok("runtime_metadata_only"),
+        Some("runtime_debug") => Ok("runtime_debug"),
+        Some(_) => Err((
+            StatusCode::BAD_REQUEST,
+            "support access scope must be runtime_metadata_only or runtime_debug".to_string(),
+        )),
+    }
+}
+
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route(
@@ -213,12 +224,7 @@ async fn update_support_access_http(
             }
             let reason = clean_support_access_reason(request.reason.as_deref(), true)?
                 .expect("required support reason");
-            let access_scope = request
-                .access_scope
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| matches!(*value, "runtime_metadata_only" | "runtime_debug"))
-                .unwrap_or("runtime_metadata_only");
+            let access_scope = support_access_scope(request.access_scope.as_deref())?;
             let expires_at =
                 (chrono::Utc::now() + chrono::Duration::hours(duration_hours)).to_rfc3339();
             let notes = serde_json::json!({
@@ -335,7 +341,7 @@ async fn account_delete_http(
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_SUPPORT_ACCESS_REASON_LEN, clean_support_access_reason};
+    use super::{MAX_SUPPORT_ACCESS_REASON_LEN, clean_support_access_reason, support_access_scope};
 
     #[test]
     fn support_access_reason_is_required_for_grants() {
@@ -360,5 +366,18 @@ mod tests {
             clean_support_access_reason(Some(" "), false).expect("optional"),
             None
         );
+    }
+
+    #[test]
+    fn support_access_scope_is_explicit() {
+        assert_eq!(
+            support_access_scope(None).expect("default"),
+            "runtime_metadata_only"
+        );
+        assert_eq!(
+            support_access_scope(Some(" runtime_debug ")).expect("debug scope"),
+            "runtime_debug"
+        );
+        assert!(support_access_scope(Some("full_disk")).is_err());
     }
 }
