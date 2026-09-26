@@ -21,6 +21,10 @@ fn graph_client() -> &'static Client {
     })
 }
 
+fn graph_upstream_status_error(operation: &str, status: reqwest::StatusCode) -> String {
+    format!("{operation} failed with status {status}")
+}
+
 use super::smtp_out::OutgoingEmailRequest;
 
 const MS_TOKEN_URL_BASE: &str = "https://login.microsoftonline.com";
@@ -135,8 +139,8 @@ async fn refresh_access_token(
         .await
         .map_err(|e| format!("MS token request failed: {e}"))?;
     if !resp.status().is_success() {
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("MS token error: {text}"));
+        let status = resp.status();
+        return Err(graph_upstream_status_error("MS token refresh", status));
     }
     let token: MsTokenResponse = resp
         .json()
@@ -185,8 +189,7 @@ pub async fn send_graph_message(
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("Graph sendMail error ({}): {}", status, text));
+        return Err(graph_upstream_status_error("Graph sendMail", status));
     }
     Ok(())
 }
@@ -216,8 +219,8 @@ pub async fn list_inbox_messages(
         .await
         .map_err(|e| format!("Graph list messages failed: {e}"))?;
     if !resp.status().is_success() {
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("Graph list error: {text}"));
+        let status = resp.status();
+        return Err(graph_upstream_status_error("Graph message list", status));
     }
     let list: GraphMessageListResponse = resp
         .json()
@@ -245,8 +248,11 @@ pub async fn fetch_raw_message(
         .await
         .map_err(|e| format!("Graph fetch raw failed: {e}"))?;
     if !resp.status().is_success() {
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("Graph fetch raw error: {text}"));
+        let status = resp.status();
+        return Err(graph_upstream_status_error(
+            "Graph raw message fetch",
+            status,
+        ));
     }
     let bytes = resp
         .bytes()
@@ -262,10 +268,20 @@ pub fn raw_to_base64(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::graph_client;
+    use super::{graph_client, graph_upstream_status_error};
 
     #[test]
     fn graph_client_is_shared_singleton() {
         assert!(std::ptr::eq(graph_client(), graph_client()));
+    }
+
+    #[test]
+    fn graph_upstream_status_error_omits_provider_body() {
+        let err =
+            graph_upstream_status_error("MS token refresh", reqwest::StatusCode::UNAUTHORIZED);
+
+        assert_eq!(err, "MS token refresh failed with status 401 Unauthorized");
+        assert!(!err.contains("refresh_token"));
+        assert!(!err.contains("client_secret"));
     }
 }
