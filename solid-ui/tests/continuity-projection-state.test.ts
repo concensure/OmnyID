@@ -87,6 +87,60 @@ test("buildContinuityProjectionQueueSelectionState filters deselected pending it
   assert.equal(selection.queue.pendingSendInputs.length, 1);
 });
 
+test("buildContinuityProjectionQueueState dedupes repeated items before dispatch", () => {
+  const queue = buildContinuityProjectionQueueState({
+    items: [
+      {
+        id: "task:1",
+        sourceId: "1",
+        kind: "task",
+        title: "Duplicate task",
+        status: "blocked",
+        statusLabel: "Blocked",
+        blockedReason: "Needs title",
+        sendInput: null,
+      },
+      {
+        id: "task:1",
+        sourceId: "1",
+        kind: "task",
+        title: "Duplicate task",
+        status: "pending",
+        statusLabel: "Ready",
+        blockedReason: null,
+        sendInput: { thread_id: "thread", type: "task", content: { title: "Duplicate task" } },
+      },
+      {
+        id: "task:2",
+        sourceId: "2",
+        kind: "task",
+        title: "Saved duplicate task",
+        status: "pending",
+        statusLabel: "Ready",
+        blockedReason: null,
+        sendInput: { thread_id: "thread", type: "task", content: { title: "Saved duplicate task" } },
+      },
+      {
+        id: "task:2",
+        sourceId: "2",
+        kind: "task",
+        title: "Saved duplicate task",
+        status: "sent",
+        statusLabel: "Saved",
+        blockedReason: null,
+        sendInput: null,
+      },
+    ],
+  });
+
+  assert.deepEqual(queue.items.map((item) => [item.id, item.status]), [
+    ["task:1", "pending"],
+    ["task:2", "sent"],
+  ]);
+  assert.equal(queue.pendingSendInputs.length, 1);
+  assert.equal(queue.canDispatch, true);
+});
+
 test("buildContinuityPersonalOsProjectionState ranks pressure and limits decision focus", () => {
   const items: ContinuityRankedItem[] = [
     {

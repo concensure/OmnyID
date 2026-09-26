@@ -71,12 +71,32 @@ function summaryLabel(
   ].filter(Boolean).join(", ");
 }
 
+function queueItemPrecedence(item: ContinuityProjectionQueueItem): number {
+  if (item.status === "sent") return 3;
+  if (item.status === "pending" && item.sendInput) return 2;
+  if (item.status === "pending") return 1;
+  return 0;
+}
+
+function dedupeQueueItems<TKind extends string>(
+  items: readonly ContinuityProjectionQueueItem<TKind>[],
+): ContinuityProjectionQueueItem<TKind>[] {
+  const byId = new Map<string, ContinuityProjectionQueueItem<TKind>>();
+  for (const item of items) {
+    const existing = byId.get(item.id);
+    if (!existing || queueItemPrecedence(item) > queueItemPrecedence(existing)) {
+      byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()];
+}
+
 export function buildContinuityProjectionQueueState<TKind extends string>(input: {
   items: readonly ContinuityProjectionQueueItem<TKind>[];
   copy?: Partial<ContinuityProjectionSummaryCopy> | null;
 }): ContinuityProjectionQueueState<TKind> {
   const copy = { ...DEFAULT_CONTINUITY_PROJECTION_SUMMARY_COPY, ...(input.copy ?? {}) };
-  const items = [...input.items];
+  const items = dedupeQueueItems(input.items);
   const pendingItems = items.filter((item) => item.status === "pending");
   const sentItems = items.filter((item) => item.status === "sent");
   const blockedItems = items.filter((item) => item.status === "blocked");
