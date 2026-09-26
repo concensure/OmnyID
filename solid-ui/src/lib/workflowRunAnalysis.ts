@@ -2,7 +2,33 @@
 // timeline step inspection.  No Solid.js signals or JSX — safe to import from
 // any module without pulling in the full component tree.
 
+import {
+  approvalDraftPreviewSummary,
+  approvalReviewTrustSummary,
+  type AutonomyDecisionLike,
+} from "afp-ts/continuity";
 import type { WorkflowRun } from "@/lib/api";
+import {
+  approvalReviewFromUnknown,
+  approvalDraftPreviewFromUnknown,
+  approvalStateRecord,
+  approvalStateString,
+  approvalStateStringArray,
+  autonomyDecisionWithTierFallback,
+} from "@/lib/approvalReviewState";
+import { isRecord } from "@/lib/eventDetail";
+import type { WorkflowExecutionExplanationChip } from "@/lib/workflowExecutionExplanationChip";
+import {
+  workflowApprovalGateLabel,
+  workflowApprovalBranchStatusSummary,
+  workflowApprovalPendingSummary,
+  workflowApprovalReasonSummary,
+} from "@/lib/workflowGraphCopy";
+import {
+  workflowApprovalDecisionFollowUpParts,
+  workflowApprovalDecisionFollowUpSummary,
+  workflowApprovalRunStatusSummary,
+} from "@/lib/workflowApprovalState";
 import type {
   EdgeExecutionState,
   RunTimelineFilterMode,
@@ -10,6 +36,241 @@ import type {
   WorkflowGraphDraft,
   WorkflowNodeDraft,
 } from "./workflowGraphTypes";
+
+type WorkflowApprovalReview = {
+  title: string;
+  reason: string;
+  approvalKind: string | null;
+  confidence: string | null;
+  provenanceSummary: string | null;
+  sourceRefs: string[];
+  consequenceSummaryLines: string[];
+  optionCount: number;
+  draftPreviewLabel: string | null;
+  draftPreviewContent: string | null;
+  draftPreviewContentType: string | null;
+  autonomy_decision: AutonomyDecisionLike | null;
+};
+
+export type WorkflowApprovalReviewPanelState = {
+  reviewValue: ReturnType<typeof approvalReviewFromUnknown>;
+  showPanel: boolean;
+  fallbackReasonText: string | null;
+  autonomyDecision: AutonomyDecisionLike | null;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null;
+}
+
+function skillCapsuleTraceRecord(trace: Record<string, unknown> | null): Record<string, unknown> | null {
+  return isRecord(trace?.skill_capsule) ? trace.skill_capsule : null;
+}
+
+function skillCapsuleOutcomeKind(
+  result: Record<string, unknown> | null,
+  trace?: Record<string, unknown> | null,
+): string | null {
+  const traceSkillCapsule = skillCapsuleTraceRecord(trace ?? null);
+  return approvalStateString(trace?.skill_capsule_outcome_kind)
+    ?? approvalStateString(traceSkillCapsule?.outcome_kind)
+    ?? approvalStateString(result?.skill_capsule_outcome_kind);
+}
+
+function skillCapsuleReceiptStatus(
+  result: Record<string, unknown> | null,
+  trace?: Record<string, unknown> | null,
+): string | null {
+  const traceSkillCapsule = skillCapsuleTraceRecord(trace ?? null);
+  return approvalStateString(traceSkillCapsule?.receipt_status)
+    ?? approvalStateString(result?.skill_capsule_receipt_status);
+}
+
+function skillCapsuleOutcomeMessage(args: {
+  label?: string | null;
+  outcomeKind: string | null;
+  receiptStatus?: string | null;
+  status: "blocked" | "failed";
+}): string | null {
+  const label = args.label?.trim() || "This workflow step";
+  switch (args.outcomeKind) {
+    case "receipt_blocked":
+      return `${label} was blocked by the skill capsule runtime receipt.`;
+    case "receipt_failed":
+      return args.status === "failed"
+        ? `${label} failed because the skill capsule runtime receipt reported a failed execution.`
+        : `${label} was blocked after the skill capsule runtime receipt reported a failed execution.`;
+    case "bridge_error":
+      return `${label} could not reach the skill capsule runtime bridge during execution.`;
+    case "receipt_completed":
+      return args.status === "failed"
+        ? `${label} failed after the skill capsule runtime completed.`
+        : `${label} was blocked after the skill capsule runtime completed.`;
+    default:
+      if (args.receiptStatus === "BLOCKED") {
+        return `${label} was blocked by the skill capsule runtime receipt.`;
+      }
+      if (args.receiptStatus === "FAILED") {
+        return `${label} failed because the skill capsule runtime receipt reported a failed execution.`;
+      }
+      return null;
+  }
+}
+
+export function workflowRunApprovalReview(run: WorkflowRun | null): WorkflowApprovalReview | null {
+  const review = approvalStateRecord(run?.result?.approval_review);
+  if (!review) return null;
+  const title = approvalStateString(review.title) ?? "Approval review";
+  const reason = approvalStateString(review.reason) ?? workflowApprovalReasonSummary();
+  const consequenceSummaryLines = approvalStateStringArray(review.consequence_summary_lines);
+  const draftPreview = approvalDraftPreviewFromUnknown(review.draft_preview);
+  const optionCountRaw = review.option_count;
+  const optionCount =
+    typeof optionCountRaw === "number" && Number.isFinite(optionCountRaw) ? optionCountRaw : 0;
+  return {
+    title,
+    reason,
+    approvalKind: approvalStateString(review.approval_kind),
+    confidence: approvalStateString(review.confidence),
+    provenanceSummary: approvalStateString(review.provenance_summary),
+    sourceRefs: approvalStateStringArray(review.source_refs),
+    consequenceSummaryLines,
+    optionCount,
+    draftPreviewLabel: draftPreview?.label ?? null,
+    draftPreviewContent: draftPreview?.content ?? null,
+    draftPreviewContentType: draftPreview?.content_type ?? null,
+    autonomy_decision: autonomyDecisionWithTierFallback(
+      review.autonomy_decision,
+      review.autonomy_tier,
+    ),
+  };
+}
+
+export function workflowRunApprovalReviewPanelState(
+  run: WorkflowRun | null,
+): WorkflowApprovalReviewPanelState {
+  const reviewRecord = approvalStateRecord(run?.result?.approval_review);
+  const reviewValue = approvalReviewFromUnknown(reviewRecord) ?? null;
+  const fallbackReasonText = approvalStateString(reviewRecord?.reason)
+    ?? approvalStateString(run?.result?.approval_reason)
+    ?? null;
+  const autonomyDecision =
+    autonomyDecisionWithTierFallback(reviewRecord?.autonomy_decision, reviewRecord?.autonomy_tier)
+    ?? reviewValue?.autonomy_decision
+    ?? null;
+  return {
+    reviewValue,
+    showPanel: Boolean(reviewValue || autonomyDecision),
+    fallbackReasonText,
+    autonomyDecision,
+  };
+}
+
+export function workflowApprovalPreviewSummary(review: WorkflowApprovalReview | null): string | null {
+  return approvalDraftPreviewSummary({
+    draft_preview: review
+      ? {
+          content: review.draftPreviewContent,
+          content_type: review.draftPreviewContentType,
+        }
+      : null,
+  });
+}
+
+function workflowApprovalReviewTrustSummary(review: WorkflowApprovalReview | null): string | null {
+  if (!review) return null;
+  return approvalReviewTrustSummary({
+    source_refs: review.sourceRefs,
+    provenance_summary: review.provenanceSummary,
+    consequence_summary_lines: review.consequenceSummaryLines,
+  });
+}
+
+function workflowApprovalReviewConfidenceSummary(review: WorkflowApprovalReview | null): string | null {
+  const confidence = review?.confidence?.trim() ?? "";
+  return confidence ? `${confidence} confidence.` : null;
+}
+
+export function workflowApprovalReviewCompactSummary(review: WorkflowApprovalReview | null): string | null {
+  return [
+    workflowApprovalReviewConfidenceSummary(review),
+    workflowApprovalReviewTrustSummary(review),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" ")
+    || null;
+}
+
+export function workflowRunActionFeedback(args: {
+  kind: "start" | "replay";
+  replayRunId?: string | null;
+  run: WorkflowRun;
+}): string {
+  if (args.run.status === "waiting_for_approval") {
+    const approvalReview = workflowRunApprovalReview(args.run);
+    return workflowApprovalRunStatusSummary({
+      runId: args.run.run_id,
+      reason: approvalReview?.reason,
+      trustSummary: workflowApprovalReviewCompactSummary(approvalReview),
+      consequenceSummary: approvalReview?.consequenceSummaryLines?.[0] ?? null,
+      provenanceSummary: approvalReview?.provenanceSummary ?? null,
+      previewSummary: workflowApprovalPreviewSummary(approvalReview),
+    });
+  }
+  if (args.run.status === "waiting_for_resume") {
+    return `Workflow run ${args.run.run_id} is waiting for a delayed resume.`;
+  }
+  if (args.run.status === "blocked") {
+    return `Workflow run ${args.run.run_id} was blocked by policy.`;
+  }
+  if (args.run.status === "failed") {
+    return `Workflow run ${args.run.run_id} failed.`;
+  }
+  return args.kind === "replay"
+    ? `Replay started from run ${args.replayRunId} as ${args.run.run_id}.`
+    : `Workflow run ${args.run.run_id} completed.`;
+}
+
+export function workflowDryRunFeedback(run: WorkflowRun): string {
+  if (run.status === "waiting_for_approval") {
+    const approvalReview = workflowRunApprovalReview(run);
+    return workflowApprovalRunStatusSummary({
+      runId: run.run_id,
+      reason: approvalReview?.reason,
+      trustSummary: workflowApprovalReviewCompactSummary(approvalReview),
+      consequenceSummary: approvalReview?.consequenceSummaryLines?.[0] ?? null,
+      provenanceSummary: approvalReview?.provenanceSummary ?? null,
+      previewSummary: workflowApprovalPreviewSummary(approvalReview),
+      dryRun: true,
+    });
+  }
+  if (run.status === "waiting_for_resume") {
+    return `Dry run ${run.run_id} paused at a delayed resume boundary.`;
+  }
+  if (run.status === "blocked") {
+    return `Dry run ${run.run_id} was blocked by policy.`;
+  }
+  if (run.status === "failed") {
+    return `Dry run ${run.run_id} failed.`;
+  }
+  return `Dry run ${run.run_id} completed.`;
+}
+
+function workflowRunApprovalDecisionSummary(run: WorkflowRun | null): {
+  decision: string | null;
+  consequenceSummary: string | null;
+  note: string | null;
+  optionLabel: string | null;
+} {
+  const decisionRecord = asRecord(run?.result?.approval_decision);
+  const selectedOption = approvalStateRecord(decisionRecord?.selected_option);
+  return {
+    decision: approvalStateString(decisionRecord?.decision),
+    consequenceSummary: approvalStateString(selectedOption?.consequence_summary),
+    note: approvalStateString(decisionRecord?.note),
+    optionLabel: approvalStateString(selectedOption?.label) ?? approvalStateString(selectedOption?.option_id),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Canvas geometry
@@ -30,17 +291,24 @@ export function edgeLine(graph: WorkflowGraphDraft, edge: WorkflowEdgeDraft) {
 export function truncateCanvasLabel(value: string, maxLength = 46): string {
   const normalized = value.replace(/\s+/g, " ").trim();
   if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
 }
 
 // ---------------------------------------------------------------------------
 // Run timeline indexing
 // ---------------------------------------------------------------------------
 
+export function runTimelineSteps(run: unknown): Array<Record<string, unknown>> {
+  if (!run || typeof run !== "object") return [];
+  const timeline = (run as { timeline?: unknown }).timeline;
+  return Array.isArray(timeline)
+    ? timeline.filter((step): step is Record<string, unknown> => Boolean(step) && typeof step === "object" && !Array.isArray(step))
+    : [];
+}
+
 export function runNodeStatuses(run: WorkflowRun | null): Map<string, string> {
   const statuses = new Map<string, string>();
-  if (!run || !Array.isArray(run.timeline)) return statuses;
-  for (const step of run.timeline) {
+  for (const step of runTimelineSteps(run)) {
     const nodeId = typeof step.node_id === "string" ? step.node_id : null;
     const status = typeof step.status === "string" ? step.status : null;
     if (nodeId && status) statuses.set(nodeId, status);
@@ -50,12 +318,47 @@ export function runNodeStatuses(run: WorkflowRun | null): Map<string, string> {
 
 export function runStepOrder(run: WorkflowRun | null): Map<string, number> {
   const order = new Map<string, number>();
-  if (!run || !Array.isArray(run.timeline)) return order;
-  for (const [index, step] of run.timeline.entries()) {
+  for (const [index, step] of runTimelineSteps(run).entries()) {
     const nodeId = typeof step.node_id === "string" ? step.node_id : null;
     if (nodeId && !order.has(nodeId)) order.set(nodeId, index + 1);
   }
   return order;
+}
+
+export function recentFailedRunNodeIds(runs: readonly unknown[], recentRunLimit = 3): Set<string> {
+  const failedNodeIds = new Set<string>();
+  if (recentRunLimit <= 0) return failedNodeIds;
+  for (const run of runs.slice(0, recentRunLimit)) {
+    for (const step of runTimelineSteps(run)) {
+      if (step.status !== "failed" && step.status !== "error") continue;
+      const nodeId = typeof step.node_id === "string" && step.node_id.trim()
+        ? step.node_id.trim()
+        : null;
+      if (nodeId) failedNodeIds.add(nodeId);
+    }
+  }
+  return failedNodeIds;
+}
+
+export type ReplayStepState = {
+  done: boolean;
+  nextIndex: number;
+  nextNodeId: string | null;
+};
+
+export function nextReplayStepState(
+  currentIndex: number,
+  steps: readonly Record<string, unknown>[],
+): ReplayStepState {
+  if (currentIndex >= steps.length - 1) {
+    return { done: true, nextIndex: currentIndex, nextNodeId: null };
+  }
+  const nextIndex = currentIndex + 1;
+  const step = steps[nextIndex];
+  const nextNodeId = typeof step?.node_id === "string" && step.node_id.trim()
+    ? step.node_id.trim()
+    : null;
+  return { done: false, nextIndex, nextNodeId };
 }
 
 // ---------------------------------------------------------------------------
@@ -155,8 +458,8 @@ export function edgeExecutionVisual(state?: EdgeExecutionState): {
         badgeFill: "rgba(255, 251, 235, 0.96)",
         badgeBorder: "rgba(252, 211, 77, 0.95)",
         badgeText: "#b45309",
-        label: "approval gate",
-        legend: "Approval gate",
+        label: workflowApprovalGateLabel(),
+        legend: workflowApprovalGateLabel(1, true),
       };
     case "waiting_for_resume":
       return {
@@ -234,26 +537,51 @@ export function runEdgeCanvasCallout(
   let text: string;
   switch (edgeState) {
     case "waiting_for_approval": {
+      const approvalReview = workflowRunApprovalReview(run);
       const approvalReason =
-        typeof result.approval_reason === "string" && result.approval_reason.trim()
-          ? result.approval_reason.trim()
-          : "Waiting for approval";
-      text = `${prefix}${approvalReason}`;
+        approvalReview?.reason
+          ?? (typeof result.approval_reason === "string" && result.approval_reason.trim()
+            ? result.approval_reason.trim()
+            : null)
+          ?? workflowApprovalPendingSummary();
+      const compactTrustSummary = workflowApprovalReviewCompactSummary(approvalReview);
+      const consequencePreview = approvalReview?.consequenceSummaryLines?.[0];
+      const draftPreview = workflowApprovalPreviewSummary(approvalReview);
+      text = consequencePreview
+        ? `${prefix}${approvalReason}${compactTrustSummary ? ` ${compactTrustSummary}` : ""} Next: ${consequencePreview}`
+        : draftPreview
+          ? `${prefix}${approvalReason}${compactTrustSummary ? ` ${compactTrustSummary}` : ""} Preview: ${draftPreview}`
+          : workflowApprovalPendingSummary();
+      if (!consequencePreview && !draftPreview) {
+        text = `${prefix}${approvalReason}${compactTrustSummary ? ` ${compactTrustSummary}` : ""}`;
+      }
       break;
     }
     case "blocked": {
       const blockedReason =
-        typeof result.blocked_reason === "string" && result.blocked_reason.trim()
+        skillCapsuleOutcomeMessage({
+          label: routeLabel ? `${routeLabel} path` : "This path",
+          outcomeKind: skillCapsuleOutcomeKind(result),
+          receiptStatus: skillCapsuleReceiptStatus(result),
+          status: "blocked",
+        })
+        ?? (typeof result.blocked_reason === "string" && result.blocked_reason.trim()
           ? result.blocked_reason.trim()
-          : "Blocked by policy";
+          : "Blocked by policy");
       text = `${prefix}${blockedReason}`;
       break;
     }
     case "failed": {
       const failedReason =
-        typeof result.failed_reason === "string" && result.failed_reason.trim()
+        skillCapsuleOutcomeMessage({
+          label: routeLabel ? `${routeLabel} path` : "This path",
+          outcomeKind: skillCapsuleOutcomeKind(result),
+          receiptStatus: skillCapsuleReceiptStatus(result),
+          status: "failed",
+        })
+        ?? (typeof result.failed_reason === "string" && result.failed_reason.trim()
           ? result.failed_reason.trim()
-          : "Execution failed";
+          : "Execution failed");
       text = `${prefix}${failedReason}`;
       break;
     }
@@ -281,6 +609,8 @@ export function runEdgeCanvasCallout(
   };
 }
 
+import { surfaceDateTimeLabel } from "./surfaceTimestampPresentation";
+
 // ---------------------------------------------------------------------------
 // Timeline step helpers
 // ---------------------------------------------------------------------------
@@ -289,18 +619,16 @@ export function formatTimelineStamp(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toLocaleString();
+  return surfaceDateTimeLabel(parsed.toISOString()) || null;
 }
 
 export function timelineStepTrace(step: Record<string, unknown>): Record<string, unknown> | null {
-  return step.trace && typeof step.trace === "object" ? step.trace as Record<string, unknown> : null;
+  return isRecord(step.trace) ? step.trace : null;
 }
 
 export function timelineStepAction(step: Record<string, unknown>): Record<string, unknown> | null {
   const trace = timelineStepTrace(step);
-  return trace?.action && typeof trace.action === "object"
-    ? trace.action as Record<string, unknown>
-    : null;
+  return isRecord(trace?.action) ? trace.action : null;
 }
 
 export function timelineStepNodeId(step: Record<string, unknown>): string | null {
@@ -346,6 +674,8 @@ export function timelineStepMatchesFilter(
       return timelineStepHasDeploymentContext(step);
     case "replay_drift":
       return timelineStepHasReplayDrift(step);
+    case "failed":
+      return typeof step.status === "string" && step.status === "failed";
     case "all":
     default:
       return true;
@@ -358,6 +688,8 @@ export function timelineFilterSummaryLabel(filterMode: RunTimelineFilterMode): s
       return "deployment context";
     case "replay_drift":
       return "replay drift";
+    case "failed":
+      return "failed steps";
     case "all":
     default:
       return "all steps";
@@ -414,15 +746,12 @@ export function timelineTraceEvents(
   const raw = Array.isArray(trace?.events) ? trace.events : [];
   return raw
     .map((event) => {
-      if (!event || typeof event !== "object") return null;
-      const record = event as Record<string, unknown>;
+      if (!isRecord(event)) return null;
+      const record = event;
       const kind = typeof record.kind === "string" ? record.kind : "event";
       const title = typeof record.title === "string" ? record.title : "Event";
       const summary = typeof record.summary === "string" ? record.summary : "";
-      const payload =
-        record.payload && typeof record.payload === "object"
-          ? record.payload as Record<string, unknown>
-          : {};
+      const payload = isRecord(record.payload) ? record.payload : {};
       return { kind, title, summary, payload };
     })
     .filter(
@@ -431,42 +760,58 @@ export function timelineTraceEvents(
     );
 }
 
-export function timelineEventPayloadChips(payload: Record<string, unknown>): string[] {
+export function timelineEventPayloadChips(payload: unknown): string[] {
+  const normalizedPayload = asRecord(payload) ?? {};
   const chips: string[] = [];
+  const actionPayload = asRecord(normalizedPayload.action);
   const pushIf = (label: string, value: unknown) => {
     if (typeof value === "string" && value.trim()) chips.push(`${label} ${value}`);
     else if (typeof value === "number" && Number.isFinite(value)) chips.push(`${label} ${value}`);
   };
-  pushIf("source", payload.trace_source);
-  pushIf("detail", payload.trace_detail_mode);
-  pushIf("effects", payload.trace_side_effects);
-  pushIf("execution", payload.trace_execution_mode);
-  pushIf("request", payload.provider_request_id);
-  pushIf("provider", payload.provider_status_text);
-  pushIf("latency", typeof payload.provider_latency_ms === "number" ? `${payload.provider_latency_ms}ms` : null);
-  pushIf("deployment", payload.deployment_id);
-  pushIf("env", payload.deployment_environment);
-  pushIf("trigger", payload.runtime_trigger_kind);
-  pushIf("replay", payload.replay_of_run_id);
-  pushIf("tier", payload.delivery_tier);
-  pushIf("route", payload.provider_route);
-  pushIf("attempt", payload.attempt);
-  pushIf("service", payload.service);
-  pushIf("operation", payload.operation);
-  pushIf("auth", payload.auth_mode);
-  pushIf("routing", payload.routing_mode);
-  pushIf("decision", payload.decision_point_id);
-  pushIf("options", payload.option_count);
-  pushIf("status", payload.connector_status);
-  pushIf("code", payload.status_code);
-  pushIf("retries", payload.retry_count);
-  pushIf("attempts", payload.max_attempts);
-  pushIf("timeout", typeof payload.timeout_seconds === "number" ? `${payload.timeout_seconds}s` : null);
-  pushIf("on timeout", payload.on_timeout);
+  pushIf("source", normalizedPayload.trace_source);
+  pushIf("detail", normalizedPayload.trace_detail_mode);
+  pushIf("effects", normalizedPayload.trace_side_effects);
+  pushIf("execution", normalizedPayload.trace_execution_mode);
+  pushIf("request", normalizedPayload.provider_request_id);
+  pushIf("provider", normalizedPayload.provider_status_text);
+  pushIf(
+    "latency",
+    typeof normalizedPayload.provider_latency_ms === "number"
+      ? `${normalizedPayload.provider_latency_ms}ms`
+      : null,
+  );
+  pushIf("deployment", normalizedPayload.deployment_id);
+  pushIf("env", normalizedPayload.deployment_environment);
+  pushIf("trigger", normalizedPayload.runtime_trigger_kind);
+  pushIf("replay", normalizedPayload.replay_of_run_id);
+  pushIf("tier", normalizedPayload.delivery_tier);
+  pushIf("route", normalizedPayload.provider_route);
+  pushIf("attempt", normalizedPayload.attempt);
+  pushIf("service", normalizedPayload.service);
+  pushIf("operation", normalizedPayload.operation);
+  pushIf("auth", normalizedPayload.auth_mode);
+  pushIf("routing", normalizedPayload.routing_mode);
+  pushIf("approval", normalizedPayload.decision);
+  pushIf("decision", normalizedPayload.decision_point_id);
+  pushIf("option", normalizedPayload.option_id);
+  pushIf("option label", normalizedPayload.option_label);
+  pushIf("options", normalizedPayload.option_count);
+  pushIf("status", normalizedPayload.connector_status);
+  pushIf("code", normalizedPayload.status_code);
+  pushIf("retries", normalizedPayload.retry_count);
+  pushIf("attempts", normalizedPayload.max_attempts);
+  pushIf(
+    "timeout",
+    typeof normalizedPayload.timeout_seconds === "number" ? `${normalizedPayload.timeout_seconds}s` : null,
+  );
+  pushIf("on timeout", normalizedPayload.on_timeout);
+  pushIf("consequence", normalizedPayload.consequence_summary ?? normalizedPayload.option_consequence);
+  pushIf("result", normalizedPayload.result_summary ?? actionPayload?.result_summary);
+  pushIf("note", normalizedPayload.note);
 
-  const selectedLabels = Array.isArray(payload.selected_labels)
-    ? payload.selected_labels.filter(
-        (value): value is string => typeof value === "string" && value.trim().length > 0,
+  const selectedLabels = Array.isArray(normalizedPayload.selected_labels)
+    ? normalizedPayload.selected_labels.filter(
+        (value: unknown): value is string => typeof value === "string" && value.trim().length > 0,
       )
     : [];
   if (selectedLabels.length > 0) chips.push(`labels ${selectedLabels.join(", ")}`);
@@ -481,6 +826,7 @@ export function timelineEventPayloadChips(payload: Record<string, unknown>): str
 export function timelineStepNarrative(
   step: Record<string, unknown>,
   run: WorkflowRun | null,
+  options?: { includeApprovalDecisionDetails?: boolean },
 ): { text: string; toneClass: string } {
   const status = typeof step.status === "string" ? step.status : "completed";
   const label = typeof step.graph_node_label === "string" ? step.graph_node_label : "Workflow node";
@@ -488,20 +834,54 @@ export function timelineStepNarrative(
   const explicitReason =
     typeof step.state_reason === "string" && step.state_reason.trim() ? step.state_reason.trim() : null;
   const result = run?.result ?? {};
+  const trace = timelineStepTrace(step);
+  const skillCapsuleOutcome = skillCapsuleOutcomeKind(result, trace);
+  const skillCapsuleReceipt = skillCapsuleReceiptStatus(result, trace);
+  const approvalDecision = workflowRunApprovalDecisionSummary(run);
+  const includeApprovalDecisionDetails = options?.includeApprovalDecisionDetails ?? true;
+  const approvalDecisionSuffix =
+    includeApprovalDecisionDetails
+      ? workflowApprovalDecisionFollowUpSummary({
+          optionLabel: approvalDecision.optionLabel,
+          consequenceSummary: approvalDecision.consequenceSummary,
+          note: approvalDecision.note,
+        })
+      : null;
 
   switch (status) {
     case "waiting_for_approval": {
+      const approvalReview = workflowRunApprovalReview(run);
       const approvalReason =
         explicitReason
+          ?? approvalReview?.reason
           ?? (typeof result.approval_reason === "string" && result.approval_reason.trim()
             ? result.approval_reason.trim()
             : null)
-          ?? `${label} is waiting for approval.`;
-      return { text: approvalReason, toneClass: "border-amber-200/70 bg-amber-50/80 text-amber-900" };
+          ?? workflowApprovalReasonSummary(label);
+      const trustSummary = workflowApprovalReviewCompactSummary(approvalReview);
+      const consequencePreview = approvalReview?.consequenceSummaryLines?.[0];
+      const draftPreview = workflowApprovalPreviewSummary(approvalReview);
+      const provenanceSummary = approvalReview?.provenanceSummary;
+      const narrative = consequencePreview
+        ? `${approvalReason}${trustSummary ? ` ${trustSummary}` : ""} Next consequence: ${consequencePreview}`
+        : draftPreview
+          ? `${approvalReason}${trustSummary ? ` ${trustSummary}` : ""} Preview: ${draftPreview}`
+        : provenanceSummary && provenanceSummary !== approvalReason
+          ? `${approvalReason}${trustSummary ? ` ${trustSummary}` : ""} ${provenanceSummary}`
+          : trustSummary
+            ? `${approvalReason} ${trustSummary}`
+            : approvalReason;
+      return { text: narrative, toneClass: "border-amber-200/70 bg-amber-50/80 text-amber-900" };
     }
     case "blocked": {
       const blockedReason =
         explicitReason
+          ?? skillCapsuleOutcomeMessage({
+            label,
+            outcomeKind: skillCapsuleOutcome,
+            receiptStatus: skillCapsuleReceipt,
+            status: "blocked",
+          })
           ?? (typeof result.blocked_reason === "string" && result.blocked_reason.trim()
             ? result.blocked_reason.trim()
             : null)
@@ -511,6 +891,12 @@ export function timelineStepNarrative(
     case "failed": {
       const failedReason =
         explicitReason
+          ?? skillCapsuleOutcomeMessage({
+            label,
+            outcomeKind: skillCapsuleOutcome,
+            receiptStatus: skillCapsuleReceipt,
+            status: "failed",
+          })
           ?? (typeof result.failed_reason === "string" && result.failed_reason.trim()
             ? result.failed_reason.trim()
             : null)
@@ -542,7 +928,7 @@ export function timelineStepNarrative(
       return { text: waitReason, toneClass: "border-sky-200/70 bg-sky-50/80 text-sky-900" };
     }
     case "resumed_pending_execution": {
-      const trace = step.trace && typeof step.trace === "object" ? step.trace as Record<string, unknown> : null;
+      const trace = isRecord(step.trace) ? step.trace : null;
       const resumeFamily =
         typeof trace?.resume_family === "string" ? trace.resume_family.replaceAll("_", " ") : null;
       const resumeKind =
@@ -552,8 +938,29 @@ export function timelineStepNarrative(
           ? `${resumeFamily} · ${resumeKind}`
           : resumeFamily ?? resumeKind ?? "wait";
       return {
-        text: explicitReason ?? `Workflow resumed after ${resumeLabel} and is ready for downstream execution.`,
+        text:
+          explicitReason
+          ?? [
+            `Workflow resumed after ${resumeLabel} and is ready for downstream execution.`,
+            approvalDecisionSuffix,
+          ]
+            .filter((value): value is string => Boolean(value))
+            .join(" "),
         toneClass: "border-sky-200/70 bg-sky-50/80 text-sky-900",
+      };
+    }
+    case "cancelled": {
+      const cancelReason =
+        explicitReason
+          ?? (typeof result.cancel_reason === "string" && result.cancel_reason.trim()
+            ? result.cancel_reason.replaceAll("_", " ").trim()
+            : null)
+          ?? "Workflow was cancelled.";
+      return {
+        text: [cancelReason, approvalDecisionSuffix]
+          .filter((value): value is string => Boolean(value))
+          .join(" "),
+        toneClass: "border-slate-200/70 bg-slate-50/90 text-slate-700",
       };
     }
     default:
@@ -585,6 +992,10 @@ export function branchExecutionLogEntries(
 
   if (edgeState) {
     const visual = edgeExecutionVisual(edgeState);
+    const approvalTrustSummary =
+      edgeState === "waiting_for_approval"
+        ? workflowApprovalReviewCompactSummary(workflowRunApprovalReview(run))
+        : null;
     const branchText =
       edgeState === "completed"
         ? `${routePrefix} was taken during the run.`
@@ -593,9 +1004,9 @@ export function branchExecutionLogEntries(
           : edgeState === "skipped"
             ? `${routePrefix} was available but not selected.`
             : edgeState === "queued"
-              ? `${routePrefix} is queued behind an upstream decision or gate.`
-              : edgeState === "waiting_for_approval"
-                ? `${routePrefix} is paused at an approval boundary.`
+            ? `${routePrefix} is queued behind an upstream decision or gate.`
+            : edgeState === "waiting_for_approval"
+                ? workflowApprovalBranchStatusSummary(routePrefix, approvalTrustSummary)
                 : edgeState === "blocked"
                   ? `${routePrefix} was blocked by policy before continuing.`
                   : `${routePrefix} failed before it could complete.`;
@@ -607,7 +1018,7 @@ export function branchExecutionLogEntries(
         : visual.legend === "Simulated branch" ? "border-cyan-200/70 bg-cyan-50/80 text-cyan-900"
         : visual.legend === "Skipped branch" ? "border-slate-200/70 bg-slate-50/90 text-slate-700"
         : visual.legend === "Queued branch" ? "border-slate-200/70 bg-slate-100/90 text-slate-800"
-        : visual.legend === "Approval gate" ? "border-amber-200/70 bg-amber-50/80 text-amber-900"
+        : visual.legend === workflowApprovalGateLabel(1, true) ? "border-amber-200/70 bg-amber-50/80 text-amber-900"
         : visual.legend === "Blocked branch" ? "border-orange-200/70 bg-orange-50/80 text-orange-900"
         : "border-rose-200/70 bg-rose-50/80 text-rose-900"
       }`,
@@ -645,4 +1056,177 @@ export function branchExecutionLogEntries(
   }
 
   return entries;
+}
+
+export function compactExecutionLogEntries(
+  run: WorkflowRun | null,
+): Array<{
+  detailLines: string[];
+  index: number;
+  phase: string;
+  title: string;
+  text: string;
+  toneClass: string;
+}> {
+  if (!run || !Array.isArray(run.timeline)) return [];
+  return run.timeline.map((step, i) => {
+    const nodeId = timelineStepNodeId(step) ?? `step-${i}`;
+    const status = typeof step["status"] === "string" ? step["status"] : "unknown";
+    const narrative = timelineStepNarrative(step, run, { includeApprovalDecisionDetails: false });
+    const rawLabel = step["label"] ?? step["node_type"];
+    const title = typeof rawLabel === "string" ? rawLabel : nodeId;
+    const approvalDecision = workflowRunApprovalDecisionSummary(run);
+    const detailLines =
+      status === "resumed_pending_execution" || status === "cancelled"
+        ? workflowApprovalDecisionFollowUpParts({
+            optionLabel: approvalDecision.optionLabel,
+            consequenceSummary: approvalDecision.consequenceSummary,
+            note: approvalDecision.note,
+          })
+        : [];
+    return {
+      detailLines,
+      index: i,
+      phase: status,
+      title,
+      text: narrative.text,
+      toneClass: narrative.toneClass,
+    };
+  });
+}
+
+export function workflowExecutionExplanationChip(
+  run: WorkflowRun | null,
+): WorkflowExecutionExplanationChip | null {
+  if (!run) return null;
+  if (run.status === "waiting_for_approval") return { label: "Approval", className: "text-amber-600" };
+  if (run.status === "waiting_for_resume") return { label: "Waiting", className: "text-sky-600" };
+  if (run.status === "resumed_pending_execution") return { label: "Resumed", className: "text-cyan-600" };
+  if (run.status === "blocked") return { label: "Blocked", className: "text-orange-600" };
+  if (run.status === "failed") return { label: "Failed", className: "text-red-500" };
+  if (run.status === "queued") return { label: "Queued", className: "text-slate-600" };
+  if (run.status === "cancelled") return { label: "Cancelled", className: "text-outline" };
+  if (run.status === "partial") return { label: "Partial", className: "text-amber-400" };
+  const hasSimulated =
+    Array.isArray(run.timeline) &&
+    run.timeline.some((s) => s["status"] === "simulated");
+  if (hasSimulated) return { label: "Simulated", className: "text-blue-400" };
+  if (run.replay_of_run_id) return { label: "Replay", className: "text-amber-500" };
+  return null;
+}
+
+export function workflowExecutionExplanationText(run: WorkflowRun | null): string | null {
+  if (!run) return null;
+  const result = asRecord(run.result);
+  const skillCapsuleOutcome = skillCapsuleOutcomeKind(result);
+  const skillCapsuleReceipt = skillCapsuleReceiptStatus(result);
+  if (run.replay_of_run_id) return `Replay of run ${run.replay_of_run_id.slice(0, 8)}...`;
+  if (run.status === "waiting_for_approval") {
+    const approvalReview = workflowRunApprovalReview(run);
+    const explicitApprovalReason =
+      typeof run.result?.approval_reason === "string" && run.result.approval_reason.trim()
+        ? run.result.approval_reason.trim()
+        : null;
+    if (!approvalReview && !explicitApprovalReason) {
+      return workflowApprovalPendingSummary();
+    }
+    return workflowApprovalRunStatusSummary({
+      runId: run.run_id,
+      subjectText: "This run",
+      reason:
+        approvalReview?.reason
+        ?? explicitApprovalReason
+        ?? workflowApprovalPendingSummary(),
+      trustSummary: workflowApprovalReviewCompactSummary(approvalReview),
+      consequenceSummary: approvalReview?.consequenceSummaryLines?.[0] ?? null,
+      provenanceSummary: approvalReview?.provenanceSummary ?? null,
+      previewSummary: workflowApprovalPreviewSummary(approvalReview),
+    });
+  }
+  if (run.status === "waiting_for_resume") {
+    return typeof run.result?.wait_reason === "string" && run.result.wait_reason.trim()
+      ? run.result.wait_reason.trim()
+      : "Waiting for a scheduled or event-driven resume.";
+  }
+  if (run.status === "blocked") {
+    return skillCapsuleOutcomeMessage({
+      label: "This run",
+      outcomeKind: skillCapsuleOutcome,
+      receiptStatus: skillCapsuleReceipt,
+      status: "blocked",
+    })
+      ?? (typeof run.result?.blocked_reason === "string" && run.result.blocked_reason.trim()
+        ? run.result.blocked_reason.trim()
+        : "Blocked by policy before completion.");
+  }
+  if (run.status === "failed") {
+    const reason =
+      skillCapsuleOutcomeMessage({
+        label: "This run",
+        outcomeKind: skillCapsuleOutcome,
+        receiptStatus: skillCapsuleReceipt,
+        status: "failed",
+      })
+      ?? (typeof run.result?.failure_reason === "string" && run.result.failure_reason.trim()
+        ? run.result.failure_reason.trim()
+        : typeof run.result?.failed_reason === "string" && run.result.failed_reason.trim()
+          ? run.result.failed_reason.trim()
+          : undefined);
+    return reason ? `Failed: ${reason}` : "This run encountered an error and stopped early.";
+  }
+  if (run.status === "queued") {
+    return typeof run.result?.queued_reason === "string" && run.result.queued_reason.trim()
+      ? run.result.queued_reason.trim()
+      : "Queued behind an upstream gate or unfinished branch outcome.";
+  }
+  if (run.status === "cancelled") {
+    const approvalDecision = workflowRunApprovalDecisionSummary(run);
+    const cancelReason =
+      typeof run.result?.cancel_reason === "string" && run.result.cancel_reason.trim()
+        ? run.result.cancel_reason.trim().replaceAll("_", " ")
+        : "Run was cancelled before completion.";
+    return [
+      cancelReason,
+      workflowApprovalDecisionFollowUpSummary({
+        optionLabel: approvalDecision.optionLabel,
+        consequenceSummary: approvalDecision.consequenceSummary,
+        note: approvalDecision.note,
+      }),
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(" ");
+  }
+  if (run.status === "resumed_pending_execution") {
+    const approvalDecision = workflowRunApprovalDecisionSummary(run);
+    const resumeSummary =
+      typeof run.result?.summary === "string" && run.result.summary.trim()
+        ? run.result.summary.trim()
+        : "Workflow resumed and is ready for downstream execution.";
+    return [
+      resumeSummary,
+      workflowApprovalDecisionFollowUpSummary({
+        optionLabel: approvalDecision.optionLabel,
+        consequenceSummary: approvalDecision.consequenceSummary,
+        note: approvalDecision.note,
+      }),
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(" ");
+  }
+  if (run.status === "partial") return "Some steps were skipped or did not complete.";
+  const hasSimulated =
+    Array.isArray(run.timeline) &&
+    run.timeline.some((s) => s["status"] === "simulated");
+  if (hasSimulated) return "One or more steps ran in simulation mode without real side-effects.";
+  return null;
+}
+
+export function workflowExecutionCurrentStateExplanationText(run: WorkflowRun | null): string | null {
+  if (!run) return null;
+  if (!run.replay_of_run_id) return workflowExecutionExplanationText(run);
+  const currentRun: WorkflowRun = {
+    ...run,
+    replay_of_run_id: null,
+  };
+  return workflowExecutionExplanationText(currentRun);
 }
