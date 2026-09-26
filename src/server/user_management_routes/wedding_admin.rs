@@ -1,0 +1,680 @@
+/*
+ * @module-id: rust.server.user-management-routes.wedding-admin
+ * @primary-capability: rust.source-module
+ * @locs-version: 2.0
+ * @stability: active
+ * @owner: omnyid
+ */
+
+use super::*;
+fn validate_optional_http_url(
+    value: Option<String>,
+    label: &str,
+) -> Result<Option<String>, (StatusCode, String)> {
+    let Some(url) = clean_optional_string(value) else {
+        return Ok(None);
+    };
+    let parsed = reqwest::Url::parse(&url).map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("{label} must be a full http or https URL"),
+        )
+    })?;
+    if matches!(parsed.scheme(), "http" | "https") {
+        Ok(Some(url))
+    } else {
+        Err((
+            StatusCode::BAD_REQUEST,
+            format!("{label} must be a full http or https URL"),
+        ))
+    }
+}
+
+fn validate_optional_date(
+    value: Option<String>,
+    label: &str,
+) -> Result<Option<String>, (StatusCode, String)> {
+    let Some(date) = clean_optional_string(value) else {
+        return Ok(None);
+    };
+    chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d").map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("{label} must use YYYY-MM-DD"),
+        )
+    })?;
+    Ok(Some(date))
+}
+
+pub(super) fn validate_optional_rfc3339(
+    value: Option<String>,
+    label: &str,
+) -> Result<Option<String>, (StatusCode, String)> {
+    let Some(timestamp) = clean_optional_string(value) else {
+        return Ok(None);
+    };
+    chrono::DateTime::parse_from_rfc3339(&timestamp).map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("{label} must be an RFC3339 timestamp"),
+        )
+    })?;
+    Ok(Some(timestamp))
+}
+
+fn validate_contact_method(value: String) -> Result<String, (StatusCode, String)> {
+    let method = clean_required_string(value, "contact_method")?;
+    if matches!(
+        method.as_str(),
+        "master_agent"
+            | "agent_email_draft"
+            | "personal_email"
+            | "phone"
+            | "website_form"
+            | "other"
+    ) {
+        Ok(method)
+    } else {
+        Err((
+            StatusCode::BAD_REQUEST,
+            "invalid contact_method".to_string(),
+        ))
+    }
+}
+
+fn validate_wedding_intake_source(
+    value: String,
+    label: &str,
+) -> Result<String, (StatusCode, String)> {
+    let source = clean_required_string(value, label)?;
+    if matches!(source.as_str(), "wedding_site" | "generic") {
+        Ok(source)
+    } else {
+        Err((StatusCode::BAD_REQUEST, format!("invalid {label}")))
+    }
+}
+
+pub(super) fn wedding_vendor_write_input(
+    body: WeddingVendorWriteRequest,
+) -> Result<WeddingVendorUpsertRecord, (StatusCode, String)> {
+    let photo_requests = body.photos.unwrap_or_default();
+    if photo_requests.len() > 3 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "vendors can have at most 3 photos".to_string(),
+        ));
+    }
+    let mut seen_photo_slots = std::collections::HashSet::new();
+    let photos = photo_requests
+        .into_iter()
+        .map(|photo| {
+            if !(1..=3).contains(&photo.slot) {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "photo slot must be 1, 2, or 3".to_string(),
+                ));
+            }
+            if !seen_photo_slots.insert(photo.slot) {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "photo slots must be unique".to_string(),
+                ));
+            }
+            let photo_url = validate_optional_http_url(Some(photo.photo_url), "photo_url")?
+                .ok_or_else(|| (StatusCode::BAD_REQUEST, "photo_url is required".to_string()))?;
+            Ok(WeddingVendorPhotoUpsertRecord {
+                slot: photo.slot,
+                photo_url,
+                alt_text: clean_optional_string(photo.alt_text),
+                source_label: clean_optional_string(photo.source_label),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(WeddingVendorUpsertRecord {
+        vendor_slug: validate_vendor_slug(body.vendor_slug)?,
+        vendor_name: clean_required_string(body.vendor_name, "vendor_name")?,
+        category: clean_required_string(body.category, "category")?,
+        service_area: clean_required_string(body.service_area, "service_area")?,
+        address: clean_optional_string(body.address),
+        website_url: validate_optional_http_url(body.website_url, "website_url")?,
+        contact_phone: clean_optional_string(body.contact_phone),
+        contact_email: clean_optional_string(body.contact_email),
+        source_url: validate_optional_http_url(body.source_url, "source_url")?,
+        source_label: clean_optional_string(body.source_label),
+        source_checked_at: validate_optional_date(body.source_checked_at, "source_checked_at")?,
+        status: validate_vendor_status(body.status)?,
+        notes: clean_optional_string(body.notes),
+        evidence: body.evidence.unwrap_or_else(|| serde_json::json!({})),
+        caveat_labels: body.caveat_labels.unwrap_or_default(),
+        photos,
+    })
+}
+
+pub(super) fn parse_meminfo_bytes(input: &str) -> Option<(u64, u64)> {
+    let mut total_kib: Option<u64> = None;
+    let mut available_kib: Option<u64> = None;
+    let mut free_kib: Option<u64> = None;
+    for line in input.lines() {
+        let mut parts = line.split_whitespace();
+        let Some(label) = parts.next() else {
+            continue;
+        };
+        let value = parts.next().and_then(|raw| raw.parse::<u64>().ok());
+        match (label.trim_end_matches(':'), value) {
+            ("MemTotal", Some(value)) => total_kib = Some(value),
+            ("MemAvailable", Some(value)) => available_kib = Some(value),
+            ("MemFree", Some(value)) => free_kib = Some(value),
+            _ => {}
+        }
+    }
+    let total = total_kib?;
+    let available = available_kib.or(free_kib)?;
+    let used = total.saturating_sub(available);
+    Some((used.saturating_mul(1024), total.saturating_mul(1024)))
+}
+
+pub(super) fn parse_df_bytes(input: &str) -> Option<(u64, u64)> {
+    input
+        .lines()
+        .skip(1)
+        .filter_map(|line| {
+            let parts = line.split_whitespace().collect::<Vec<_>>();
+            let total = parts.get(1)?.parse::<u64>().ok()?;
+            let used = parts.get(2)?.parse::<u64>().ok()?;
+            (used <= total).then_some((used, total))
+        })
+        .next()
+}
+
+fn read_oracle_memory_metrics() -> Option<(u64, u64)> {
+    std::fs::read_to_string("/proc/meminfo")
+        .ok()
+        .and_then(|content| parse_meminfo_bytes(&content))
+}
+
+fn read_oracle_disk_metrics() -> Option<(u64, u64)> {
+    let root = std::env::var("OMNYID_ADMIN_WEDDING_OPS_METRICS_ROOT")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "/".to_string());
+    let output = std::process::Command::new("df")
+        .args(["-B1", root.as_str()])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    parse_df_bytes(&stdout)
+}
+
+fn oracle_metrics_source_label() -> String {
+    std::env::var("OMNYID_ADMIN_WEDDING_OPS_METRICS_SOURCE")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            std::env::var("HOSTNAME")
+                .ok()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+        })
+        .or_else(|| {
+            std::fs::read_to_string("/etc/hostname")
+                .ok()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+        })
+        .unwrap_or_else(|| "oracle-host".to_string())
+}
+
+fn env_flag_enabled(key: &str) -> bool {
+    std::env::var(key)
+        .ok()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "yes" | "on"))
+}
+
+fn env_positive_number(key: &str) -> bool {
+    std::env::var(key)
+        .ok()
+        .and_then(|value| value.trim().parse::<f64>().ok())
+        .is_some_and(|value| value.is_finite() && value > 0.0)
+}
+
+pub(super) fn admin_wedding_ai_routing_policy_json() -> Value {
+    let routing_enabled = env_flag_enabled("OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED");
+    let audit_receipts_enabled = env_flag_enabled("OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED");
+    let budget_guardrails_ready = env_positive_number("OMNYID_WEDDING_ADMIN_AI_DAILY_USD_LIMIT")
+        || env_positive_number("OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT")
+        || env_positive_number("OMNYID_WEDDING_ADMIN_AI_DAILY_TOKEN_LIMIT");
+    serde_json::json!({
+        "backendPolicyEndpointMounted": true,
+        "auditReceiptProjectionReady": routing_enabled && audit_receipts_enabled,
+        "tenantBoundaryEnforced": true,
+        "budgetGuardrailsReady": routing_enabled && budget_guardrails_ready,
+        "weddingTemplateScopeOnly": true,
+        "masterAgentQueryExcluded": true,
+        "lastVerifiedAt": chrono::Utc::now().to_rfc3339(),
+        "policySourceLabel": "admin-wedding-ai-routing-policy",
+        "routingEnabled": routing_enabled,
+    })
+}
+
+fn env_optional_trimmed(key: &str) -> Option<String> {
+    std::env::var(key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+pub(super) fn admin_third_party_tool_policy_json() -> Value {
+    admin_third_party_tool_policy_json_with_file(admin_third_party_tool_policy_file_path())
+}
+
+fn admin_third_party_tool_policy_tools() -> [(&'static str, &'static str); 5] {
+    [
+        (
+            "google-maps-platform",
+            "OMNYID_ADMIN_TOOL_GOOGLE_MAPS_PLATFORM",
+        ),
+        ("weatherapi", "OMNYID_ADMIN_TOOL_WEATHERAPI"),
+        ("twilio-messaging", "OMNYID_ADMIN_TOOL_TWILIO_MESSAGING"),
+        ("stripe", "OMNYID_ADMIN_TOOL_STRIPE"),
+        ("cloudinary", "OMNYID_ADMIN_TOOL_CLOUDINARY"),
+    ]
+}
+
+fn admin_third_party_tool_policy_file_path() -> Option<String> {
+    env_optional_trimmed("OMNYID_ADMIN_THIRD_PARTY_TOOL_POLICY_FILE")
+}
+
+pub(super) fn admin_third_party_tool_policy_json_with_file(
+    policy_file_path: Option<String>,
+) -> Value {
+    let mut policies: Vec<Value> = admin_third_party_tool_policy_tools()
+        .iter()
+        .map(|(tool_id, prefix)| {
+            serde_json::json!({
+                "toolId": tool_id,
+                "enabledForAllUsers": env_flag_enabled(&format!("{prefix}_ALL_USERS_ENABLED")),
+                "enabledForWeddingTemplate": env_flag_enabled(&format!("{prefix}_WEDDING_TEMPLATE_ENABLED")),
+                "monthlyFreeQuotaLabel": env_optional_trimmed(&format!("{prefix}_MONTHLY_FREE_QUOTA_LABEL")),
+                "quotaUsedLabel": env_optional_trimmed(&format!("{prefix}_QUOTA_USED_LABEL")),
+            })
+        })
+        .collect();
+    if let Some(path) = policy_file_path {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            if let Ok(file_policy) = serde_json::from_str::<Value>(&content) {
+                merge_admin_third_party_tool_file_policy(&mut policies, &file_policy);
+            }
+        }
+    }
+    serde_json::json!({
+        "policies": policies,
+        "updatedAt": chrono::Utc::now().to_rfc3339(),
+        "sourceLabel": "admin-third-party-tool-policy-env",
+    })
+}
+
+fn merge_admin_third_party_tool_file_policy(policies: &mut [Value], file_policy: &Value) {
+    let Some(file_policies) = file_policy.get("policies").and_then(Value::as_array) else {
+        return;
+    };
+    for file_record in file_policies {
+        let Some(tool_id) = file_record.get("toolId").and_then(Value::as_str) else {
+            continue;
+        };
+        if let Some(existing) = policies.iter_mut().find(|entry| entry["toolId"] == tool_id) {
+            if let Some(value) = file_record
+                .get("enabledForAllUsers")
+                .and_then(Value::as_bool)
+            {
+                existing["enabledForAllUsers"] = Value::Bool(value);
+            }
+            if let Some(value) = file_record
+                .get("enabledForWeddingTemplate")
+                .and_then(Value::as_bool)
+            {
+                existing["enabledForWeddingTemplate"] = Value::Bool(value);
+            }
+            if let Some(value) = file_record
+                .get("monthlyFreeQuotaLabel")
+                .and_then(Value::as_str)
+            {
+                existing["monthlyFreeQuotaLabel"] = Value::String(value.trim().to_string());
+            }
+            if let Some(value) = file_record.get("quotaUsedLabel").and_then(Value::as_str) {
+                existing["quotaUsedLabel"] = Value::String(value.trim().to_string());
+            }
+        }
+    }
+}
+
+pub(super) fn sanitize_admin_third_party_tool_policy(
+    body: AdminThirdPartyToolPolicyWriteRequest,
+) -> Result<Value, (StatusCode, String)> {
+    let allowed_tools = admin_third_party_tool_policy_tools()
+        .iter()
+        .map(|(tool_id, _)| *tool_id)
+        .collect::<std::collections::HashSet<_>>();
+    let mut seen = std::collections::HashSet::new();
+    let mut policies = Vec::new();
+    for record in body.policies {
+        let tool_id = clean_required_string(record.tool_id, "toolId")?;
+        if !allowed_tools.contains(tool_id.as_str()) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("unsupported toolId: {tool_id}"),
+            ));
+        }
+        if !seen.insert(tool_id.clone()) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("duplicate toolId: {tool_id}"),
+            ));
+        }
+        policies.push(serde_json::json!({
+            "toolId": tool_id,
+            "enabledForAllUsers": record.enabled_for_all_users.unwrap_or(false),
+            "enabledForWeddingTemplate": record.enabled_for_wedding_template.unwrap_or(false),
+            "monthlyFreeQuotaLabel": clean_optional_string(record.monthly_free_quota_label),
+            "quotaUsedLabel": clean_optional_string(record.quota_used_label),
+        }));
+    }
+    Ok(serde_json::json!({
+        "policies": policies,
+        "updatedAt": chrono::Utc::now().to_rfc3339(),
+        "sourceLabel": "admin-third-party-tool-policy-file",
+    }))
+}
+
+pub(super) async fn admin_wedding_ai_routing_policy_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator_user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&operator_user.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    Ok(Json(admin_wedding_ai_routing_policy_json()))
+}
+
+pub(super) async fn admin_third_party_tool_policy_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator_user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&operator_user.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    Ok(Json(admin_third_party_tool_policy_json()))
+}
+
+pub(super) async fn admin_third_party_tool_policy_update_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<AdminThirdPartyToolPolicyWriteRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator_user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&operator_user.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    let Some(path) = admin_third_party_tool_policy_file_path() else {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Admin shared-tool policy saving is not configured on this server.".to_string(),
+        ));
+    };
+    let policy = sanitize_admin_third_party_tool_policy(body)?;
+    let serialized = serde_json::to_string_pretty(&policy).map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to serialize policy".to_string(),
+        )
+    })?;
+    if let Some(parent) = std::path::Path::new(&path)
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        std::fs::create_dir_all(parent).map_err(|err| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to prepare policy directory: {err}"),
+            )
+        })?;
+    }
+    std::fs::write(&path, serialized).map_err(|err| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("failed to save policy: {err}"),
+        )
+    })?;
+    Ok(Json(admin_third_party_tool_policy_json_with_file(Some(
+        path,
+    ))))
+}
+
+pub(super) async fn admin_wedding_ops_metrics_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator_user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&operator_user.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    let disk = read_oracle_disk_metrics();
+    let ram = read_oracle_memory_metrics();
+    Ok(Json(serde_json::json!({
+        "disk_used_bytes": disk.map(|value| value.0),
+        "disk_total_bytes": disk.map(|value| value.1),
+        "ram_used_bytes": ram.map(|value| value.0),
+        "ram_total_bytes": ram.map(|value| value.1),
+        "source_label": oracle_metrics_source_label(),
+        "generated_at": chrono::Utc::now().to_rfc3339(),
+    })))
+}
+
+pub(super) async fn admin_wedding_waitlist_list_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator_user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&operator_user.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    let signups = state
+        .db
+        .list_wedding_waitlist_signups(500)
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(Json(serde_json::json!({ "signups": signups })))
+}
+
+pub(super) async fn admin_wedding_vendors_list_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<AdminWeddingVendorListQuery>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator_user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&operator_user.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    let vendors = state
+        .db
+        .list_wedding_vendors(params.limit.unwrap_or(200), params.query.as_deref())
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(Json(serde_json::json!({ "vendors": vendors })))
+}
+
+pub(super) async fn admin_wedding_vendor_create_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<WeddingVendorWriteRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator_user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&operator_user.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    let input = wedding_vendor_write_input(body)?;
+    let vendor = state
+        .db
+        .upsert_wedding_vendor(None, &input, &operator_user.id)
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(Json(serde_json::json!({ "vendor": vendor })))
+}
+
+pub(super) async fn admin_wedding_vendor_update_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(vendor_id): Path<String>,
+    Json(body): Json<WeddingVendorWriteRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator_user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&operator_user.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    let input = wedding_vendor_write_input(body)?;
+    let vendor = state
+        .db
+        .upsert_wedding_vendor(Some(vendor_id.trim()), &input, &operator_user.id)
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(Json(serde_json::json!({ "vendor": vendor })))
+}
+
+pub(super) async fn admin_wedding_vendor_delete_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(vendor_id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator_user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&operator_user.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    let deleted = state
+        .db
+        .delete_wedding_vendor(vendor_id.trim())
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(Json(
+        serde_json::json!({ "ok": deleted, "vendor_id": vendor_id }),
+    ))
+}
+
+pub(super) async fn wedding_vendor_contact_record_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(vendor_id): Path<String>,
+    Json(body): Json<WeddingVendorContactRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let contact_method = validate_contact_method(body.contact_method)?;
+    let follow_up_due_at = validate_optional_rfc3339(body.follow_up_due_at, "follow_up_due_at")?;
+    let response_received_at =
+        validate_optional_rfc3339(body.response_received_at, "response_received_at")?;
+    let contact = state
+        .db
+        .record_wedding_vendor_contact(
+            &user.id,
+            vendor_id.trim(),
+            &contact_method,
+            follow_up_due_at.as_deref(),
+            response_received_at.as_deref(),
+            clean_optional_string(body.thread_id).as_deref(),
+            clean_optional_string(body.receipt_ref).as_deref(),
+            clean_optional_string(body.notes).as_deref(),
+        )
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(Json(serde_json::json!({ "contact": contact })))
+}
+
+pub(super) async fn wedding_vendors_list_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<AdminWeddingVendorListQuery>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let vendors = state
+        .db
+        .list_active_wedding_vendors_for_user(
+            &user.id,
+            params.limit.unwrap_or(200),
+            params.query.as_deref(),
+        )
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(Json(serde_json::json!({ "vendors": vendors })))
+}
+
+pub(super) async fn wedding_onboarding_state_get_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<WeddingOnboardingStateQuery>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let wedding_plan_id = clean_required_string(params.wedding_plan_id, "wedding_plan_id")?;
+    let onboarding_state = state
+        .db
+        .get_wedding_user_onboarding_state(&user.id, &wedding_plan_id)
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(Json(
+        serde_json::json!({ "onboarding_state": onboarding_state }),
+    ))
+}
+
+pub(super) async fn wedding_onboarding_state_upsert_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<WeddingOnboardingStateUpsertRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let wedding_plan_id = clean_required_string(body.wedding_plan_id, "wedding_plan_id")?;
+    let intake_variant = validate_wedding_intake_source(body.intake_variant, "intake_variant")?;
+    let entry_source = validate_wedding_intake_source(body.entry_source, "entry_source")?;
+    let onboarding_state = state
+        .db
+        .upsert_wedding_user_onboarding_state(
+            &user.id,
+            &wedding_plan_id,
+            &intake_variant,
+            &entry_source,
+        )
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(Json(
+        serde_json::json!({ "onboarding_state": onboarding_state }),
+    ))
+}

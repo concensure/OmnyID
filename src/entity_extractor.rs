@@ -188,7 +188,7 @@ fn extract_metrics(text: &str, out: &mut Vec<AfpEntityMention>) {
         }
 
         // If the signal is a currency/percent prefix attached to a number (e.g. "$5M").
-        let rest = lower_trim.trim_start_matches(['$', 'â‚¬', 'Â£', '%']);
+        let rest = lower_trim.trim_start_matches(['$', '\u{20AC}', '\u{00A3}', '%']);
         let has_number = rest
             .chars()
             .next()
