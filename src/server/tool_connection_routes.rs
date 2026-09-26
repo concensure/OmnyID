@@ -591,6 +591,16 @@ fn tool_descriptor_declares_no_auth(value: Option<&Value>) -> bool {
         .unwrap_or(false)
 }
 
+fn direct_tool_allows_empty_api_key(tool_slug: &str, descriptor: Option<&Value>) -> bool {
+    if !tool_descriptor_declares_no_auth(descriptor) {
+        return false;
+    }
+    matches!(
+        tool_slug,
+        "arxiv" | "wikipedia" | "mcp-fetch" | "apple-reminders"
+    )
+}
+
 fn tool_connection_change_requires_recent_session() -> bool {
     true
 }
@@ -1649,7 +1659,9 @@ async fn upsert_tool_connection_http(
             StatusCode::BAD_REQUEST,
             "Composio connections must be completed through the dedicated auth flow.".to_string(),
         ));
-    } else if api_key.is_none() && !tool_descriptor_declares_no_auth(tool_descriptor.as_ref()) {
+    } else if api_key.is_none()
+        && !direct_tool_allows_empty_api_key(&tool_slug, tool_descriptor.as_ref())
+    {
         return Err((
             StatusCode::BAD_REQUEST,
             "Direct MCP tool connections require a non-empty api_key.".to_string(),
@@ -2082,14 +2094,27 @@ mod tests {
             normalize_tool_descriptor(Some(json!({"name": "github"}))).unwrap(),
             Some(json!({"name": "github"}))
         );
-        assert!(tool_descriptor_declares_no_auth(Some(
-            &normalize_tool_descriptor(Some(json!({
-                "name": "arxiv",
-                "auth_type": "none"
-            })))
-            .unwrap()
-            .unwrap()
-        )));
+        let arxiv_no_auth_descriptor = normalize_tool_descriptor(Some(json!({
+            "name": "arxiv",
+            "auth_type": "none"
+        })))
+        .unwrap()
+        .unwrap();
+        let forged_github_no_auth_descriptor = normalize_tool_descriptor(Some(json!({
+            "name": "github",
+            "auth_type": "none"
+        })))
+        .unwrap()
+        .unwrap();
+        assert!(tool_descriptor_declares_no_auth(Some(&arxiv_no_auth_descriptor)));
+        assert!(direct_tool_allows_empty_api_key(
+            "arxiv",
+            Some(&arxiv_no_auth_descriptor)
+        ));
+        assert!(!direct_tool_allows_empty_api_key(
+            "github",
+            Some(&forged_github_no_auth_descriptor)
+        ));
         assert!(!tool_descriptor_declares_no_auth(Some(
             &normalize_tool_descriptor(Some(json!({
                 "name": "github",
