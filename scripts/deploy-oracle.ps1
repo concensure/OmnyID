@@ -438,12 +438,36 @@ domain=`$(grep '^OMNYID_DOMAIN=' .env.oracle | head -n 1 | cut -d= -f2- | tr -d 
   echo 'workspace smoke check failed: OMNYID_DOMAIN missing from .env.oracle' >&2
   exit 1
 }
-workspace_headers=`$(curl -sSI --resolve "`$domain:443:127.0.0.1" -k "https://`$domain/workspace/")
+grep -q 'handle /wedding/\*' Caddyfile || {
+  echo 'workspace smoke check failed: staged Caddyfile is missing the /wedding/* route' >&2
+  exit 1
+}
+grep -q './wedding:/srv/wedding:ro' $composeFile || {
+  echo 'workspace smoke check failed: compose file is missing the /srv/wedding mount' >&2
+  exit 1
+}
+[ -f wedding/index.html ] || {
+  echo 'workspace smoke check failed: staged wedding/index.html is missing' >&2
+  exit 1
+}
+docker exec omnyid-caddy-1 test -f /srv/wedding/index.html || {
+  echo 'workspace smoke check failed: running Caddy container cannot see /srv/wedding/index.html' >&2
+  exit 1
+}
+docker exec omnyid-caddy-1 caddy validate --config /etc/caddy/Caddyfile >/dev/null || {
+  echo 'workspace smoke check failed: running Caddy config does not validate' >&2
+  exit 1
+}
+docker exec omnyid-caddy-1 grep -q 'handle /wedding/\*' /etc/caddy/Caddyfile || {
+  echo 'workspace smoke check failed: running Caddyfile is missing the /wedding/* route' >&2
+  exit 1
+}
+workspace_headers=`$(curl --http1.1 -sSI --resolve "`$domain:443:127.0.0.1" -k "https://`$domain/workspace/" | tr -d '\r')
 printf '%s\n' "`$workspace_headers"
 printf '%s' "`$workspace_headers" | grep -qi '^www-authenticate: basic' && {
   preview_hash=`$(grep '^OMNYID_PREVIEW_PASSWORD_HASH=' .env.oracle | head -n 1 | cut -d= -f2- | tr -d '\r')
   if [ -n "`$preview_hash" ]; then
-    echo 'workspace smoke check skipped: /workspace/ is protected by configured preview Basic auth'
+    echo 'workspace header-only checks skipped: /workspace/ is protected by configured preview Basic auth'
     exit 0
   fi
   echo 'workspace smoke check failed: /workspace/ is still behind Basic auth and no preview auth hash is configured' >&2

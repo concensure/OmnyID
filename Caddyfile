@@ -5,42 +5,266 @@
 
 (omnyid_proxy) {
     reverse_proxy homeserver:8080 {
-        header_up X-Forwarded-Proto {scheme}
-        header_up X-Forwarded-Host {host}
-        header_up X-Forwarded-For {remote_host}
+        # GAP-089: use {client_ip} (the TLS peer address Caddy sees) rather than
+        # {remote_host} (same value) or the incoming X-Forwarded-For header (spoofable).
+        # This is the correct real-client IP when Caddy is the edge terminator.
+        header_up X-Forwarded-For {client_ip}
+    }
+}
+
+# File conversion endpoints accept up to 32 MB (HTML→PDF payload).
+# Other routes use the tighter 4 MB default.
+(conversion_proxy) {
+    request_body {
+        max_size 32MB
+    }
+    reverse_proxy homeserver:8080 {
+        header_up X-Forwarded-For {client_ip}
     }
 }
 
 {$OMNYID_DOMAIN} {
-    basic_auth {
-        {$OMNYID_PREVIEW_USERNAME} {$OMNYID_PREVIEW_PASSWORD_HASH}
+    # Default body size limit for all routes (GAP-145).
+    request_body {
+        max_size 4MB
     }
 
-    # OAuth callbacks and API routes on the main domain → homeserver
+    # File conversion routes need a larger body limit for HTML→PDF payloads.
+    handle /files/* {
+        import conversion_proxy
+    }
+
+    # All homeserver API routes on the main domain (GAP-088: previously only /gmail/* was proxied)
+    handle /auth/* {
+        import omnyid_proxy
+    }
+    handle /waitlist {
+        import omnyid_proxy
+    }
+    handle /api/* {
+        import omnyid_proxy
+    }
+    handle /agent/* {
+        import omnyid_proxy
+    }
+    handle /relay/* {
+        import omnyid_proxy
+    }
+    handle /billing/* {
+        import omnyid_proxy
+    }
+    handle /dashboard/* {
+        import omnyid_proxy
+    }
+    handle /integrations/* {
+        import omnyid_proxy
+    }
+    handle /send {
+        import omnyid_proxy
+    }
+    handle /messages {
+        import omnyid_proxy
+    }
+    handle /thread/* {
+        import omnyid_proxy
+    }
+    handle /threads/* {
+        import omnyid_proxy
+    }
+    handle /feed/* {
+        import omnyid_proxy
+    }
+    handle /daemons/* {
+        import omnyid_proxy
+    }
+    handle /mcp {
+        import omnyid_proxy
+    }
     handle /gmail/* {
         import omnyid_proxy
     }
+    handle /personalization/* {
+        import omnyid_proxy
+    }
+    handle /user/* {
+        import omnyid_proxy
+    }
+    handle /ingest/* {
+        import omnyid_proxy
+    }
+    handle /runtime/* {
+        import omnyid_proxy
+    }
+    handle /task/* {
+        import omnyid_proxy
+    }
+    handle /multi-edit/* {
+        import omnyid_proxy
+    }
+    handle /social/* {
+        import omnyid_proxy
+    }
+    handle /actions/* {
+        import omnyid_proxy
+    }
+    handle /tools/* {
+        import omnyid_proxy
+    }
+    handle /attachments/* {
+        import omnyid_proxy
+    }
+    handle /key-bundle/* {
+        import omnyid_proxy
+    }
+    handle /query {
+        import omnyid_proxy
+    }
+    handle /llm/* {
+        import omnyid_proxy
+    }
+    handle /skill-capsule/* {
+        import omnyid_proxy
+    }
+    handle /notes/* {
+        import omnyid_proxy
+    }
+    handle /calendar/* {
+        import omnyid_proxy
+    }
+    handle /spaces/* {
+        import omnyid_proxy
+    }
+    handle /workflows/* {
+        import omnyid_proxy
+    }
+    handle /metricsz {
+        import omnyid_proxy
+    }
+    handle /healthz {
+        import omnyid_proxy
+    }
+    handle /readyz {
+        import omnyid_proxy
+    }
+    handle /.well-known/* {
+        import omnyid_proxy
+    }
+    handle /federation/* {
+        import omnyid_proxy
+    }
+    handle /sync/* {
+        import omnyid_proxy
+    }
+    handle /ui/* {
+        import omnyid_proxy
+    }
 
-    handle_path /workspace* {
+    handle /workspace {
+        redir /workspace/ 308
+    }
+
+    handle_path /workspace/* {
         root * /srv/workspace
+        try_files {path} /index.html
+        file_server
+        header /index.html Cache-Control "no-cache, no-store, must-revalidate"
+        header /sw.js Cache-Control "no-cache, must-revalidate"
+        header /assets/* Cache-Control "public, max-age=31536000, immutable"
+        # GAP-116: prevent XSS via a strict CSP.
+        # unsafe-inline is needed for SolidJS's runtime style injection.
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://static.cloudflareinsights.com https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; connect-src 'self' wss: https:; font-src 'self' data:; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
+        header X-Content-Type-Options "nosniff"
+        header X-Frame-Options "DENY"
+        header Referrer-Policy "strict-origin-when-cross-origin"
+        # CGAP-013: allow the SW at /workspace/sw.js to control the /workspace/ scope.
+        # Safari and Firefox enforce that the SW script path must be within its claimed scope.
+        header /sw.js Service-Worker-Allowed "/workspace/"
+    }
+
+    # Wedding vertical marketing site — a separate static frontend that hands
+    # sign-in/sign-up off to this same domain's /docs/ login (source=wedding).
+    # Its waitlist form posts here, so this proxy route must be handled before
+    # the static /wedding/* file-server block below.
+    handle /wedding/waitlist {
+        import omnyid_proxy
+    }
+
+    handle /wedding/* {
+        uri strip_prefix /wedding
+        root * /srv/wedding
+        @weddingdirindex {
+            path /
+        }
+        rewrite @weddingdirindex /index.html
+        file_server
+    }
+
+    # Alias so the wedding site's relative "../docs/index.html" links resolve.
+    # The catch-all handle{} below already serves the same /srv/docs content at "/".
+    handle /docs/* {
+        uri strip_prefix /docs
+        root * /srv/docs
         try_files {path} /index.html
         file_server
     }
 
     handle {
         root * /srv/docs
+        try_files {path} {path}.html /index.html
         file_server
     }
 }
 
+(file_upload_proxy) {
+    request_body {
+        max_size 128MB
+    }
+    reverse_proxy homeserver:8080 {
+        header_up X-Forwarded-For {client_ip}
+    }
+}
+
 api.{$OMNYID_DOMAIN} {
-    import omnyid_proxy
+    request_body {
+        max_size 4MB
+    }
+    handle /files/* {
+        import conversion_proxy
+    }
+    handle /api/files/* {
+        import file_upload_proxy
+    }
+    handle {
+        import omnyid_proxy
+    }
 }
 
 cloud.{$OMNYID_DOMAIN} {
-    import omnyid_proxy
+    request_body {
+        max_size 4MB
+    }
+    handle /files/* {
+        import conversion_proxy
+    }
+    handle {
+        import omnyid_proxy
+    }
 }
 
 wt.{$OMNYID_DOMAIN} {
     import omnyid_proxy
+}
+
+# NOTE: this site block serves a different app (StrollerCheck) sharing this
+# same Oracle VM/Caddy instance. It is not part of the OmnyID codebase but is
+# kept here because it is already live on the deployed host — removing it
+# would take down api.strollercheck.com. Do not delete without checking with
+# the StrollerCheck deployment first.
+api.strollercheck.com {
+    handle /api/* {
+        reverse_proxy 127.0.0.1:3011
+    }
+    handle {
+        reverse_proxy 10.0.5.1:8100
+    }
 }

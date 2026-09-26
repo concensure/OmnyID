@@ -41,7 +41,13 @@ services:
     pids_limit: ${OMNYID_ELECTRIC_PIDS_LIMIT:-128}
     depends_on:
       - postgres
+    # Overriding entrypoint in Compose drops the image's own CMD unless it is
+    # also given explicitly here — this was previously missing, so the
+    # wrapper's `exec "$@"` ran with no arguments (a no-op) and the container
+    # exited 0 immediately in an endless restart loop without ever starting
+    # Electric.
     entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
+    command: ["/app/bin/entrypoint", "start"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-}
       DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
@@ -85,6 +91,7 @@ services:
       OMNYID_HOMESERVER_URL: ${OMNYID_HOMESERVER_URL}
       OMNYID_AFP_DELEGATION: ${OMNYID_AFP_DELEGATION}
       OMNYID_DOMAIN: ${OMNYID_DOMAIN}
+      OMNYID_BASE_URL: ${OMNYID_BASE_URL:-https://omnyid.com}
       LOG_FORMAT: ${LOG_FORMAT:-json}
       OMNYID_PUBLIC_KEY_HEX: ${OMNYID_PUBLIC_KEY_HEX}
       OMNYID_SIGNING_KEY_HEX: ${OMNYID_SIGNING_KEY_HEX}
@@ -122,8 +129,10 @@ services:
       SMTP_PASS_FILE: ${SMTP_PASS_FILE:-/run/secrets/omnyid_smtp_pass}
       SMTP_PORT: ${SMTP_PORT:-587}
       OMNYID_ANTHROPIC_KEY_FILE: ${OMNYID_ANTHROPIC_KEY_FILE:-/run/secrets/omnyid_anthropic_api_key}
+      OMNYID_NVIDIA_API_KEY_FILE: ${OMNYID_NVIDIA_API_KEY_FILE:-/run/secrets/omnyid_nvidia_api_key}
       OMNYID_RUNPOD_API_KEY_FILE: ${OMNYID_RUNPOD_API_KEY_FILE:-/run/secrets/omnyid_runpod_api_key}
       OMNYID_OPENAI_API_KEY_FILE: ${OMNYID_OPENAI_API_KEY_FILE:-/run/secrets/omnyid_openai_api_key}
+      COMPOSIO_API_KEY: ${COMPOSIO_API_KEY:-}
       SEAWEEDFS_URL: http://seaweedfs:9000
       SEAWEEDFS_USER: ${SEAWEEDFS_ROOT_USER:-${MINIO_ROOT_USER:-omnyid}}
       SEAWEEDFS_PASS: ${SEAWEEDFS_ROOT_PASSWORD:-${MINIO_ROOT_PASSWORD:-omnyid-dev-secret}}
@@ -161,6 +170,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - ./docs:/srv/docs:ro
+      - ./wedding:/srv/wedding:ro
       - workspace-assets:/srv/workspace:ro
       - caddy-data:/data
       - caddy-config:/config

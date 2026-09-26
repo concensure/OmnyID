@@ -1412,3 +1412,42 @@ wedding-test-output.txt
 
 _None._
 
+## UX / Backend Health Analysis - 2026-09-26
+
+This section classifies the untracked files above by whether they are likely to matter for live UX, backend health, or wedding planner functionality. It does not mark every untracked file as commit-ready; several are useful evidence or local operator state, not runtime source.
+
+### Highest priority to review before committing
+
+- `solid-ui/tests/` additions: likely important. There are hundreds of untracked frontend tests covering A2UI, agent settings, wedding-adjacent routing, response queue, templates, usage, workflows, and failure states. These do not affect production by themselves, but they should be reviewed in batches and committed with the matching source changes they protect. If committed all at once without checking the related modified source files, they may freeze unfinished behavior or create noisy maintenance burden.
+- `tests/` and `typescript-sdk/tests/`: likely important for backend / SDK health if they correspond to current API, workflow, or AFP changes. Review with the related `typescript-sdk/src/*`, `src/*`, and workflow changes before committing.
+- `docs/.well-known/`, `docs/*.html`, `docs/*.md`: potentially live-site important because `docs/` is served by Caddy as the main static site. These need a quick content and link audit before deployment; untracked HTML in `docs/` can change user-facing pages if staged by the Oracle runtime packager.
+- `scripts/*`: potentially backend / operationally important. Several untracked scripts are production hygiene and Oracle proof/pruning tools. Commit only scripts that are part of the supported operational path, and pair them with selftests where available.
+- `Documents/issues/gap-remediation-log.md`, `Documents/issues/production-readiness-gaps.md`, and related issue docs: important as audit trail, not runtime. They should be committed if they document decisions or live proof, but do not need code integration.
+
+### Wedding planner / UX reference material worth keeping, but not direct runtime
+
+- `Documents/UX/*`, `Documents/UI/*`, `Documents/design/*`, and `Documents/wedding research/*`: useful product and UX source material. These should be curated into a small number of canonical specs rather than all committed as raw scratch notes.
+- `Documents/marketing/*` and competitor / wedding planning research: useful for positioning and future UX, but not needed to restore live functionality.
+- `wedding-build-output*.txt` and `wedding-test-output*.txt`: useful temporary receipts, but better represented by committed tests or a concise proof document than raw output files.
+
+### Generally do not commit
+
+- `.claude/`, `.antigravitycli/`, `.contextCLI/`, `.playwright-mcp/`, `.smartlearn/`, `.tmp-debug-bash-selftest/`, local capsule/tooling folders: local agent/tool state.
+- `.mcp.json`, `Runpod api.txt`, and any file that may contain local service configuration or credentials: do not commit unless scrubbed and intentionally converted into an example.
+- `artifacts/*`, `backups/*`, `tmp_*`, `temp_*`: generated proof, backup, or scratch output. Keep outside git unless a specific proof artifact is intentionally promoted into `Documents/issues/`.
+
+### Needs integration before commit
+
+- Large untracked test sets should be matched to the source files they validate. If the source changes are still dirty, commit tests and implementation together by feature area.
+- Untracked docs under live-served `docs/` should be checked for broken links, old claims, and accidental exposure before deployment.
+- New operational scripts should be checked for idempotency, secret handling, and Windows/PowerShell compatibility before becoming part of the supported deploy path.
+
+### Deployment finding connected to this inventory
+
+The live missing wedding/template route was not caused by untracked files. The immediate deployment issue came from tracked but uncommitted deployment files:
+
+- `Caddyfile`
+- `docker-compose.oracle.minimal.yml`
+
+Oracle was running the older committed configuration: no `/wedding/*` handler and no `./wedding:/srv/wedding:ro` Caddy mount. The wedding files existed on the remote host, but the running Caddy container could not see or serve them.
+
