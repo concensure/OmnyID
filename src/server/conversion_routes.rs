@@ -106,11 +106,7 @@ async fn html_to_pdf(
 
     if let Err(e) = fs::write(&input_path, safe_html.as_bytes()).await {
         error!("html_to_pdf: failed to write temp html: {e}");
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "failed to write temp file",
-        )
-            .into_response();
+        return internal_http_error(e).into_response();
     }
 
     let scripts_dir = env::var("OMNYID_SCRIPTS_DIR").unwrap_or_else(|_| "./scripts".into());
@@ -150,11 +146,7 @@ async fn html_to_pdf(
         }
         Ok(Err(e)) => {
             error!("html_to_pdf: failed to spawn node: {e}");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "node process could not be spawned â€” is node in PATH?",
-            )
-                .into_response()
+            internal_http_error(e).into_response()
         }
         Ok(Ok(out)) if !out.status.success() => {
             let stderr = String::from_utf8_lossy(&out.stderr);
@@ -176,7 +168,7 @@ async fn html_to_pdf(
         Ok(Ok(_)) => match fs::read(&output_path).await {
             Err(e) => {
                 error!("html_to_pdf: failed to read output pdf: {e}");
-                (StatusCode::INTERNAL_SERVER_ERROR, "PDF output missing").into_response()
+                internal_http_error(e).into_response()
             }
             Ok(bytes) => {
                 if let Err(e) = fs::remove_file(&output_path).await {
@@ -199,5 +191,17 @@ mod tests {
         assert!(source.contains("fn build_pdf_download_response(bytes: Vec<u8>) -> Response"));
         assert!(source.contains("Err(err) => internal_http_error(err).into_response(),"));
         assert!(source.contains("build_pdf_download_response(bytes)"));
+    }
+
+    #[test]
+    fn conversion_route_sanitizes_infrastructure_failures() {
+        let source = include_str!("conversion_routes.rs");
+        let production_source = source.split("#[cfg(test)]").next().unwrap_or(source);
+
+        assert!(production_source.contains("return internal_http_error(e).into_response();"));
+        assert!(production_source.contains("internal_http_error(e).into_response()"));
+        assert!(!production_source.contains("\"failed to write temp file\""));
+        assert!(!production_source.contains("\"node process could not be spawned"));
+        assert!(!production_source.contains("\"PDF output missing\""));
     }
 }
