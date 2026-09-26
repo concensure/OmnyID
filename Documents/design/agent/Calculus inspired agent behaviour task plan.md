@@ -515,7 +515,7 @@ Release calibration / deployment validation update, 2026-09-26:
 - deployment rehearsal and deployment-ops selftests pass for Bash/PowerShell paths after aligning the Oracle runtime staging fixture with the required `wedding/` static root
 - deployed database validation was not executed in this environment because no deployed `DATABASE_URL` / deployed database env var is available
 - source-control reproducibility is currently blocked: a temporary clean worktree at `HEAD` cannot compile because tracked Rust roots reference local-only module files
-- `scripts/source-control-repro-check.ps1` now inventories this class of release blocker; current local result is `145` Rust module files referenced by tracked roots but missing from git, including oversized split route modules that must be reconciled without violating the 1000-line new-file guard
+- `scripts/source-control-repro-check.ps1` now inventories this class of release blocker; the first pass found `145` Rust module files referenced by tracked roots but missing from git, and a follow-up source-control slice staged the `119` under-1000-line modules, leaving `26` oversized split modules that must be decomposed or otherwise reconciled without violating the 1000-line new-file guard
 
 What remains incomplete or calibration-sensitive:
 
