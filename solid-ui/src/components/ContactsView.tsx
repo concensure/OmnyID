@@ -3,6 +3,7 @@ import { createSignal, For, Show } from "solid-js";
 import { postAgentMessage, readSession } from "@/lib/api";
 import type { ResponseQueueRelationship } from "@/lib/responseQueuePolicy";
 import { EmptyState } from "@/components/EmptyState";
+import { ContactEditControls } from "@/components/ContactEditControls";
 import { ContactRoleChips, ContactRoleInput } from "@/components/ContactRoleControls";
 import { loadContacts, saveContacts, type Contact } from "@/lib/contactsLocalState";
 import { removeContactRole } from "@/lib/contactRoleState";
@@ -51,6 +52,7 @@ export function ContactsView() {
   const [showImport, setShowImport] = createSignal(false);
   const [newName, setNewName] = createSignal("");
   const [newEmail, setNewEmail] = createSignal("");
+  const [newPhone, setNewPhone] = createSignal("");
   const [newRelationshipKind, setNewRelationshipKind] = createSignal<ResponseQueueRelationship>("other");
   const [newRoles, setNewRoles] = createSignal<string[]>([]);
   const [newResponseSlaHours, setNewResponseSlaHours] = createSignal("24");
@@ -74,6 +76,8 @@ export function ContactsView() {
   const [responseEditorContactId, setResponseEditorContactId] = createSignal<string | null>(null);
   const [responseDraft, setResponseDraft] = createSignal("");
   const [roleEditorContactId, setRoleEditorContactId] = createSignal<string | null>(null);
+  const [contactEditorContactId, setContactEditorContactId] = createSignal<string | null>(null);
+  const [contactNotice, setContactNotice] = createSignal<string | null>(null);
   const [responseSummariesEnabled, setResponseSummariesEnabled] = createSignal(
     contacts().some((contact) => contact.responseSummaryEnabled),
   );
@@ -126,12 +130,23 @@ export function ContactsView() {
 
   async function addContact() {
     if (!newName().trim()) return;
+    const duplicate = findDuplicateContact({
+      name: newName(),
+      email: newEmail(),
+      phone: newPhone(),
+    });
+    if (duplicate) {
+      setContactNotice(`${duplicate.name} already looks like this contact. Open the existing contact to update roles or details.`);
+      return;
+    }
     setBusy(true);
     setSyncFailure(null);
+    setContactNotice(null);
     const contact: Contact = {
       id: `contact-${Date.now()}`,
       name: newName().trim(),
       email: newEmail().trim() || undefined,
+      phone: newPhone().trim() || undefined,
       relationshipKind: newRelationshipKind(),
       ...(newRoles().length > 0 ? { roles: newRoles() } : {}),
       responseSlaHours: Number(newResponseSlaHours()) || undefined,
@@ -140,7 +155,7 @@ export function ContactsView() {
     try {
       await postAgentMessage({
         to: ["agent://master"],
-        content: { kind: "contact_add", name: contact.name, email: contact.email, roles: contact.roles ?? [] },
+        content: { kind: "contact_add", name: contact.name, email: contact.email, phone: contact.phone, roles: contact.roles ?? [] },
       });
     } catch (error: unknown) {
       setSyncFailure(
@@ -156,6 +171,7 @@ export function ContactsView() {
     setContacts(next);
     setNewName("");
     setNewEmail("");
+    setNewPhone("");
     setNewRelationshipKind("other");
     setNewRoles([]);
     setNewResponseSlaHours("24");
@@ -172,6 +188,33 @@ export function ContactsView() {
   function saveNextContacts(next: Contact[]) {
     saveContacts(next, sessionUserId);
     setContacts(next);
+  }
+
+  function normalizeLookup(value: string | undefined): string {
+    return (value ?? "").trim().toLowerCase();
+  }
+
+  function findDuplicateContact(input: { name: string; email?: string; phone?: string }, excludeId?: string): Contact | null {
+    const email = normalizeLookup(input.email);
+    const phone = normalizeLookup(input.phone);
+    const name = normalizeLookup(input.name);
+    return contacts().find((contact) => {
+      if (contact.id === excludeId) return false;
+      if (email && normalizeLookup(contact.email) === email) return true;
+      if (phone && normalizeLookup(contact.phone) === phone) return true;
+      return !email && !phone && name !== "" && normalizeLookup(contact.name) === name;
+    }) ?? null;
+  }
+
+  function updateContact(updated: Contact): boolean {
+    const duplicate = findDuplicateContact(updated, updated.id);
+    if (duplicate) {
+      setContactNotice(`${duplicate.name} already uses those contact details. Update that contact instead, or use a different email or phone number.`);
+      return false;
+    }
+    setContactNotice(null);
+    saveNextContacts(contacts().map((contact) => contact.id === updated.id ? updated : contact));
+    return true;
   }
 
   function removeRoleFromContact(contact: Contact, role: string) {
@@ -327,6 +370,7 @@ export function ContactsView() {
     return contacts().filter(
       (contact) => contact.name.toLowerCase().includes(q)
         || (contact.email ?? "").toLowerCase().includes(q)
+        || (contact.phone ?? "").toLowerCase().includes(q)
         || contact.relationshipKind.toLowerCase().includes(q)
         || (contact.roles ?? []).some((role) => role.toLowerCase().includes(q)),
     );
@@ -512,6 +556,13 @@ export function ContactsView() {
             onInput={(e) => setNewEmail(e.currentTarget.value)}
             class="w-full rounded-xl border border-white/40 bg-white/60 px-3 py-2 text-sm outline-none transition focus:border-primary/50"
           />
+          <input
+            type="tel"
+            placeholder="Phone (optional)"
+            value={newPhone()}
+            onInput={(e) => setNewPhone(e.currentTarget.value)}
+            class="w-full rounded-xl border border-white/40 bg-white/60 px-3 py-2 text-sm outline-none transition focus:border-primary/50"
+          />
           <div class="grid gap-2 sm:grid-cols-2">
             <label class="space-y-1">
               <span class="text-[11px] text-on-surface-variant/70">Follow-up type</span>
@@ -554,6 +605,7 @@ export function ContactsView() {
                 setShowAdd(false);
                 setNewName("");
                 setNewEmail("");
+                setNewPhone("");
                 setNewRelationshipKind("other");
                 setNewRoles([]);
                 setNewResponseSlaHours("24");
@@ -574,6 +626,14 @@ export function ContactsView() {
         </div>
       </Show>
 
+      <Show when={contactNotice()}>
+        {(notice) => (
+          <div class="rounded-xl border border-amber-200/60 bg-amber-50/80 px-4 py-3 text-xs text-amber-800 shadow-sm">
+            {notice()}
+          </div>
+        )}
+      </Show>
+
       <Show when={syncFailure()}>
         {(receipt) => (
           <div
@@ -590,15 +650,13 @@ export function ContactsView() {
         )}
       </Show>
 
-      <Show when={contacts().length > 4}>
-        <input
-          type="text"
-          placeholder="Filter contacts..."
-          value={filter()}
-          onInput={(e) => setFilter(e.currentTarget.value)}
-          class="w-full rounded-xl border border-white/35 bg-white/30 px-4 py-2 text-sm text-on-surface outline-none transition placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:bg-white/50"
-        />
-      </Show>
+      <input
+        type="text"
+        placeholder="Find contacts by name, email, phone, role, or follow-up type..."
+        value={filter()}
+        onInput={(e) => setFilter(e.currentTarget.value)}
+        class="w-full rounded-xl border border-white/35 bg-white/30 px-4 py-2 text-sm text-on-surface outline-none transition placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:bg-white/50"
+      />
 
       <div class="min-w-0 rounded-2xl border border-amber-200/70 bg-amber-50/80 p-4 shadow-sm">
         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -872,6 +930,13 @@ export function ContactsView() {
                       />
                     </div>
                   </Show>
+                  <Show when={contactEditorContactId() === contact.id}>
+                    <ContactEditControls
+                      contact={contact}
+                      onSave={updateContact}
+                      onCancel={() => setContactEditorContactId(null)}
+                    />
+                  </Show>
                   <div class="mt-2 flex flex-wrap gap-1.5">
                     <button
                       type="button"
@@ -902,6 +967,13 @@ export function ContactsView() {
                       class="rounded-full border border-primary/15 bg-primary/10 px-2.5 py-1.5 text-[10px] text-primary transition hover:bg-primary/15"
                     >
                       {roleEditorContactId() === contact.id ? "Close roles" : "Add role"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContactEditorContactId(contactEditorContactId() === contact.id ? null : contact.id)}
+                      class="rounded-full border border-slate-200 bg-white/70 px-2.5 py-1.5 text-[10px] text-slate-700 transition hover:bg-white"
+                    >
+                      {contactEditorContactId() === contact.id ? "Close edit" : "Edit contact"}
                     </button>
                   </div>
                 </div>
