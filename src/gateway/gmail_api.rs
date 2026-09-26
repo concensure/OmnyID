@@ -32,6 +32,10 @@ fn gmail_client() -> &'static Client {
     })
 }
 
+fn gmail_upstream_status_error(operation: &str, status: reqwest::StatusCode) -> String {
+    format!("{operation} failed with status {status}")
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GmailOAuthConfig {
     pub client_id: String,
@@ -84,11 +88,7 @@ pub async fn send_gmail_message(
 
     if !response.status().is_success() {
         let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!(
-            "Gmail API send failed with status {}: {}",
-            status, body
-        ));
+        return Err(gmail_upstream_status_error("Gmail API send", status));
     }
 
     Ok(())
@@ -112,10 +112,9 @@ async fn exchange_refresh_token(
 
     if !response.status().is_success() {
         let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!(
-            "Google OAuth token exchange failed with status {}: {}",
-            status, body
+        return Err(gmail_upstream_status_error(
+            "Google OAuth token exchange",
+            status,
         ));
     }
 
@@ -147,10 +146,9 @@ pub async fn list_gmail_message_ids(
 
     if !response.status().is_success() {
         let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!(
-            "Gmail API message list failed with status {}: {}",
-            status, body
+        return Err(gmail_upstream_status_error(
+            "Gmail API message list",
+            status,
         ));
     }
 
@@ -180,10 +178,9 @@ pub async fn fetch_gmail_raw_message(
 
     if !response.status().is_success() {
         let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!(
-            "Gmail API raw message fetch failed with status {}: {}",
-            status, body
+        return Err(gmail_upstream_status_error(
+            "Gmail API raw message fetch",
+            status,
         ));
     }
 
@@ -237,7 +234,9 @@ pub fn build_gmail_raw_message(request: &OutgoingEmailRequest, from_address: &st
 mod tests {
     use base64::Engine as _;
 
-    use super::{GmailMessageId, build_gmail_raw_message, gmail_client};
+    use super::{
+        GmailMessageId, build_gmail_raw_message, gmail_client, gmail_upstream_status_error,
+    };
     use crate::gateway::smtp_out::OutgoingEmailRequest;
 
     #[test]
@@ -287,5 +286,20 @@ mod tests {
     #[test]
     fn gmail_client_is_shared_singleton() {
         assert!(std::ptr::eq(gmail_client(), gmail_client()));
+    }
+
+    #[test]
+    fn gmail_upstream_status_error_omits_provider_body() {
+        let err = gmail_upstream_status_error(
+            "Google OAuth token exchange",
+            reqwest::StatusCode::UNAUTHORIZED,
+        );
+
+        assert_eq!(
+            err,
+            "Google OAuth token exchange failed with status 401 Unauthorized"
+        );
+        assert!(!err.contains("refresh_token"));
+        assert!(!err.contains("client_secret"));
     }
 }
