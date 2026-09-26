@@ -262,11 +262,12 @@ pub fn build_suggestion_afp(
     let mut suggestion = enrich_proactive_suggestion_content(result.suggestion.clone());
     suggestion.source_event_id = source_event_afp_id.map(str::to_string);
     if let Some(source_event_id) = source_event_afp_id {
-        if suggestion.source_refs.is_empty() {
-            suggestion.source_refs = vec![source_event_id.to_string()];
-        }
-        if suggestion.source_count.is_none() {
-            suggestion.source_count = Some(1);
+        if !suggestion
+            .source_refs
+            .iter()
+            .any(|source_ref| source_ref == source_event_id)
+        {
+            suggestion.source_refs.push(source_event_id.to_string());
         }
     }
     let selection_reason = proactive_suggestion_selection_reason(&suggestion);
@@ -274,7 +275,8 @@ pub fn build_suggestion_afp(
     let provenance_cue = proactive_suggestion_provenance_cue(&suggestion);
     let source_count = suggestion
         .source_count
-        .unwrap_or(suggestion.source_refs.len() as u32);
+        .unwrap_or(0)
+        .max(suggestion.source_refs.len() as u32);
     if suggestion.selection_reason.is_none() {
         suggestion.selection_reason = Some(selection_reason.clone());
     }
@@ -284,9 +286,7 @@ pub fn build_suggestion_afp(
     if suggestion.provenance_cue.is_none() {
         suggestion.provenance_cue = Some(provenance_cue.clone());
     }
-    if suggestion.source_count.is_none() {
-        suggestion.source_count = Some(source_count);
-    }
+    suggestion.source_count = Some(source_count);
     let strategic_policy = policy_for_proactive_suggestion(&suggestion);
     let strategic_policy_value = serde_json::to_value(&strategic_policy).unwrap_or_default();
     let mut content = serde_json::to_value(&suggestion).unwrap_or_default();
@@ -869,5 +869,45 @@ mod tests {
             Some("defer")
         );
         assert_eq!(afp["metadata"]["surface_policy"].as_str(), Some("defer"));
+    }
+
+    #[test]
+    fn suggestion_afp_keeps_trigger_event_in_source_refs_and_count() {
+        let result = EvaluationResult {
+            heuristic_id: "custom-sourced".to_string(),
+            suggestion: AfpProactiveSuggestionContent {
+                heuristic_id: "custom-sourced".to_string(),
+                confidence: 0.9,
+                urgency: "medium".to_string(),
+                action_label: "Review sourced context".to_string(),
+                description: "A sourced suggestion is available.".to_string(),
+                source_refs: vec!["existing_ref".to_string()],
+                source_count: Some(0),
+                ..Default::default()
+            },
+        };
+
+        let afp = build_suggestion_afp("user_1", "passive:user_1", &result, Some("event_ref"));
+        let content_refs = afp["content"]["source_refs"]
+            .as_array()
+            .expect("content source refs")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>();
+        let metadata_refs = afp["metadata"]["source_refs"]
+            .as_array()
+            .expect("metadata source refs")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>();
+
+        assert_eq!(content_refs, vec!["existing_ref", "event_ref"]);
+        assert_eq!(metadata_refs, content_refs);
+        assert_eq!(afp["content"]["source_count"].as_u64(), Some(2));
+        assert_eq!(afp["metadata"]["source_count"].as_u64(), Some(2));
+        assert_eq!(
+            afp["content"]["strategic_policy"]["action"].as_str(),
+            Some("surface_now")
+        );
     }
 }
