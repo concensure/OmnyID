@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.feed-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -7,6 +7,56 @@
  */
 
 use super::*;
+
+const DEFAULT_PUBLIC_FEED_LIMIT: i64 = 20;
+const MAX_PUBLIC_FEED_LIMIT: i64 = 100;
+const DEFAULT_FEED_SEARCH_LIMIT: i64 = 20;
+const MAX_FEED_SEARCH_LIMIT: i64 = 50;
+const MAX_FEED_QUERY_LEN: usize = 200;
+const MAX_FEED_MESSAGE_ID_LEN: usize = 128;
+const MAX_FEED_AGENT_ID_LEN: usize = 128;
+const MAX_FEED_TITLE_LEN: usize = 160;
+const MAX_FEED_BODY_LEN: usize = 20_000;
+
+fn feed_limit(value: Option<&str>, default: i64, max: i64) -> i64 {
+    value
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .unwrap_or(default)
+        .clamp(1, max)
+}
+
+fn feed_required_text(
+    value: &str,
+    field: &str,
+    max_len: usize,
+) -> Result<String, (StatusCode, String)> {
+    let value = value.trim();
+    if value.is_empty() || value.len() > max_len {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("{field} must be 1-{max_len} characters"),
+        ));
+    }
+    Ok(value.to_string())
+}
+
+fn feed_identifier(
+    value: &str,
+    field: &str,
+    max_len: usize,
+) -> Result<String, (StatusCode, String)> {
+    let value = feed_required_text(value, field, max_len)?;
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | ':' | '@' | '.'))
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("{field} contains unsupported characters"),
+        ));
+    }
+    Ok(value)
+}
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -41,11 +91,11 @@ async fn public_feed_http(
         .await?;
     }
 
-    let limit: i64 = params
-        .get("limit")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(20)
-        .min(100);
+    let limit = feed_limit(
+        params.get("limit").map(String::as_str),
+        DEFAULT_PUBLIC_FEED_LIMIT,
+        MAX_PUBLIC_FEED_LIMIT,
+    );
     let before_id = params.get("before_id").map(String::as_str);
     let messages = state
         .db
@@ -69,15 +119,19 @@ async fn feed_search_http(
         .map(String::as_str)
         .unwrap_or("")
         .trim()
+        .chars()
+        .take(MAX_FEED_QUERY_LEN)
+        .collect::<String>()
+        .trim()
         .to_string();
     if q.is_empty() {
         return Ok(Json(serde_json::json!({"agents": []})));
     }
-    let limit: i64 = params
-        .get("limit")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(20)
-        .min(50);
+    let limit = feed_limit(
+        params.get("limit").map(String::as_str),
+        DEFAULT_FEED_SEARCH_LIMIT,
+        MAX_FEED_SEARCH_LIMIT,
+    );
     let agents = state
         .db
         .search_agents(&user.id, &q, limit)
@@ -94,6 +148,7 @@ async fn feed_follow_http(
     Path(agent_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let agent_id = feed_identifier(&agent_id, "agent_id", MAX_FEED_AGENT_ID_LEN)?;
     state
         .db
         .follow_agent(&user.id, &agent_id)
@@ -110,6 +165,7 @@ async fn feed_unfollow_http(
     Path(agent_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let agent_id = feed_identifier(&agent_id, "agent_id", MAX_FEED_AGENT_ID_LEN)?;
     state
         .db
         .unfollow_agent(&user.id, &agent_id)
@@ -155,6 +211,9 @@ async fn feed_publish_http(
     Json(body): Json<PublishRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let message_id = feed_identifier(&body.message_id, "message_id", MAX_FEED_MESSAGE_ID_LEN)?;
+    let title = feed_required_text(&body.title, "title", MAX_FEED_TITLE_LEN)?;
+    let body_text = feed_required_text(&body.body, "body", MAX_FEED_BODY_LEN)?;
     let instance = state
         .db
         .get_master_agent_instance(&user.id)
@@ -168,13 +227,7 @@ async fn feed_publish_http(
         .to_string();
     let id = state
         .db
-        .publish_to_plaza(
-            &user.id,
-            &body.message_id,
-            &from_agent,
-            &body.title,
-            &body.body,
-        )
+        .publish_to_plaza(&user.id, &message_id, &from_agent, &title, &body_text)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
@@ -188,6 +241,7 @@ async fn feed_engage_http(
     Json(body): Json<EngageRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let message_id = feed_identifier(&body.message_id, "message_id", MAX_FEED_MESSAGE_ID_LEN)?;
     let valid_types = ["view", "share", "reply"];
     if !valid_types.contains(&body.engagement_type.as_str()) {
         return Err((
@@ -197,9 +251,85 @@ async fn feed_engage_http(
     }
     state
         .db
-        .record_engagement(&user.id, &body.message_id, &body.engagement_type)
+        .record_engagement(&user.id, &message_id, &body.engagement_type)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn feed_limits_are_bounded() {
+        assert_eq!(
+            feed_limit(None, DEFAULT_PUBLIC_FEED_LIMIT, MAX_PUBLIC_FEED_LIMIT),
+            20
+        );
+        assert_eq!(
+            feed_limit(
+                Some("-50"),
+                DEFAULT_PUBLIC_FEED_LIMIT,
+                MAX_PUBLIC_FEED_LIMIT
+            ),
+            1
+        );
+        assert_eq!(
+            feed_limit(
+                Some("500"),
+                DEFAULT_PUBLIC_FEED_LIMIT,
+                MAX_PUBLIC_FEED_LIMIT
+            ),
+            100
+        );
+        assert_eq!(
+            feed_limit(
+                Some("bad"),
+                DEFAULT_FEED_SEARCH_LIMIT,
+                MAX_FEED_SEARCH_LIMIT
+            ),
+            20
+        );
+    }
+
+    #[test]
+    fn feed_identifiers_are_trimmed_and_bounded() {
+        assert_eq!(
+            feed_identifier(
+                " agent:demo@example.com ",
+                "agent_id",
+                MAX_FEED_AGENT_ID_LEN
+            )
+            .expect("valid id"),
+            "agent:demo@example.com"
+        );
+        assert!(feed_identifier("../escape", "agent_id", MAX_FEED_AGENT_ID_LEN).is_err());
+        assert!(
+            feed_identifier(
+                &"x".repeat(MAX_FEED_MESSAGE_ID_LEN + 1),
+                "message_id",
+                MAX_FEED_MESSAGE_ID_LEN
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn feed_required_text_is_trimmed_and_bounded() {
+        assert_eq!(
+            feed_required_text(" hello ", "title", MAX_FEED_TITLE_LEN).expect("title"),
+            "hello"
+        );
+        assert!(feed_required_text("   ", "title", MAX_FEED_TITLE_LEN).is_err());
+        assert!(
+            feed_required_text(
+                &"x".repeat(MAX_FEED_TITLE_LEN + 1),
+                "title",
+                MAX_FEED_TITLE_LEN
+            )
+            .is_err()
+        );
+    }
 }
