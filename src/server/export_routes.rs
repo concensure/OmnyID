@@ -68,7 +68,7 @@ async fn export_mbox_http(
             "attachment; filename=\"omnyid-export.mbox\"",
         )
         .body(axum::body::Body::from(mbox_bytes))
-        .unwrap())
+        .map_err(internal_http_error)?)
 }
 
 /// GET /export/afp-archive
@@ -88,7 +88,7 @@ async fn export_afp_archive_http(
             "attachment; filename=\"omnyid-afp-archive.ndjson.gz\"",
         )
         .body(axum::body::Body::from(archive_bytes))
-        .unwrap())
+        .map_err(internal_http_error)?)
 }
 
 /// GET /export/json-ld
@@ -343,5 +343,21 @@ mod tests {
         let function_source = &source[start..end];
         assert!(function_source.contains(".recent_messages_for_user(user_id, &agent_ids, 5000)"));
         assert!(!function_source.contains(".recent_messages_for_agents(&agent_ids, 5000)"));
+    }
+
+    #[test]
+    fn binary_export_routes_do_not_unwrap_response_builders() {
+        let source = include_str!("export_routes.rs");
+        let mbox_start = source
+            .find("async fn export_mbox_http(")
+            .expect("export_mbox_http definition");
+        let json_ld_start = source[mbox_start..]
+            .find("/// GET /export/json-ld")
+            .map(|offset| mbox_start + offset)
+            .expect("json-ld marker");
+        let binary_export_source = &source[mbox_start..json_ld_start];
+
+        assert!(binary_export_source.contains(".map_err(internal_http_error)?"));
+        assert!(!binary_export_source.contains(".unwrap()"));
     }
 }
