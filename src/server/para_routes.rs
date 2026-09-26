@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.para-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -17,6 +17,11 @@
 use super::*;
 use axum::extract::Query;
 use serde::Deserialize;
+
+const MAX_PARA_TAGS: usize = 20;
+const MAX_PARA_TAG_LEN: usize = 128;
+const MAX_PARA_AUTO_ARCHIVE_TARGETS: usize = 100;
+const MAX_PARA_TARGET_ID_LEN: usize = 128;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -45,6 +50,53 @@ struct ParaItemsQuery {
 
 fn para_list_limit(limit: Option<i64>) -> i64 {
     limit.unwrap_or(50).clamp(1, 200)
+}
+
+fn normalize_para_tags(tags: Vec<String>) -> Result<Vec<String>, (StatusCode, String)> {
+    if tags.len() > MAX_PARA_TAGS {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("para_tags can include at most {MAX_PARA_TAGS} items"),
+        ));
+    }
+    tags.into_iter()
+        .map(|tag| {
+            let tag = tag.trim().to_string();
+            if tag.is_empty() || tag.len() > MAX_PARA_TAG_LEN {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    format!("para_tags must be 1-{MAX_PARA_TAG_LEN} characters"),
+                ));
+            }
+            Ok(tag)
+        })
+        .collect()
+}
+
+fn normalize_para_target_id(target_id: String) -> Result<String, (StatusCode, String)> {
+    let target_id = target_id.trim().to_string();
+    if target_id.is_empty() || target_id.len() > MAX_PARA_TARGET_ID_LEN {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("target_id must be 1-{MAX_PARA_TARGET_ID_LEN} characters"),
+        ));
+    }
+    Ok(target_id)
+}
+
+fn normalize_auto_archive_target_ids(
+    target_ids: Vec<String>,
+) -> Result<Vec<String>, (StatusCode, String)> {
+    if target_ids.is_empty() || target_ids.len() > MAX_PARA_AUTO_ARCHIVE_TARGETS {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("target_ids must include 1-{MAX_PARA_AUTO_ARCHIVE_TARGETS} items"),
+        ));
+    }
+    target_ids
+        .into_iter()
+        .map(normalize_para_target_id)
+        .collect()
 }
 
 async fn para_items_http(
@@ -105,13 +157,15 @@ async fn para_classify_http(
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     let id = ulid::Ulid::new().to_string();
+    let target_id = normalize_para_target_id(body.target_id)?;
+    let para_tags = normalize_para_tags(body.para_tags)?;
     state
         .db
         .upsert_para_classification(
             &user.id,
             &id,
-            &body.target_id,
-            body.para_tags.clone(),
+            &target_id,
+            para_tags,
             "active",
             None,
             body.context.as_deref(),
@@ -121,7 +175,7 @@ async fn para_classify_http(
         .map_err(status_to_http)?;
     Ok((
         StatusCode::OK,
-        Json(json!({ "id": id, "target_id": body.target_id })),
+        Json(json!({ "id": id, "target_id": target_id })),
     ))
 }
 
@@ -143,12 +197,13 @@ async fn para_archive_http(
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     let id = ulid::Ulid::new().to_string();
+    let target_id = normalize_para_target_id(body.target_id)?;
     state
         .db
         .upsert_para_classification(
             &user.id,
             &id,
-            &body.target_id,
+            &target_id,
             vec![],
             "archived",
             Some(&body.reason),
@@ -159,7 +214,7 @@ async fn para_archive_http(
         .map_err(status_to_http)?;
     Ok((
         StatusCode::OK,
-        Json(json!({ "archived": true, "target_id": body.target_id })),
+        Json(json!({ "archived": true, "target_id": target_id })),
     ))
 }
 
@@ -244,14 +299,14 @@ async fn para_auto_archive_approve_http(
     let user = authenticated_user(&state.db, &headers).await?;
     let reason = body.reason.as_deref().unwrap_or("inactive");
     let mut archived = 0usize;
-    for target_id in &body.target_ids {
+    for target_id in normalize_auto_archive_target_ids(body.target_ids)? {
         let id = ulid::Ulid::new().to_string();
         if state
             .db
             .upsert_para_classification(
                 &user.id,
                 &id,
-                target_id,
+                &target_id,
                 vec![],
                 "archived",
                 Some(reason),
@@ -275,5 +330,52 @@ mod tests {
         assert_eq!(super::para_list_limit(Some(-5)), 1);
         assert_eq!(super::para_list_limit(Some(80)), 80);
         assert_eq!(super::para_list_limit(Some(5_000)), 200);
+    }
+
+    #[test]
+    fn normalize_para_tags_trims_and_bounds_tags() {
+        assert_eq!(
+            super::normalize_para_tags(vec![" project:venue ".to_string()]).expect("tags"),
+            vec!["project:venue".to_string()]
+        );
+        assert!(super::normalize_para_tags(vec![" ".to_string()]).is_err());
+        assert!(
+            super::normalize_para_tags(
+                (0..=super::MAX_PARA_TAGS)
+                    .map(|i| format!("tag:{i}"))
+                    .collect()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn normalize_para_target_id_trims_and_bounds_id() {
+        assert_eq!(
+            super::normalize_para_target_id(" target_1 ".to_string()).expect("target id"),
+            "target_1"
+        );
+        assert!(super::normalize_para_target_id(" ".to_string()).is_err());
+        assert!(
+            super::normalize_para_target_id("x".repeat(super::MAX_PARA_TARGET_ID_LEN + 1)).is_err()
+        );
+    }
+
+    #[test]
+    fn normalize_auto_archive_target_ids_trims_and_bounds_batch() {
+        assert_eq!(
+            super::normalize_auto_archive_target_ids(vec![" target_1 ".to_string()])
+                .expect("target ids"),
+            vec!["target_1".to_string()]
+        );
+        assert!(super::normalize_auto_archive_target_ids(Vec::new()).is_err());
+        assert!(
+            super::normalize_auto_archive_target_ids(
+                (0..=super::MAX_PARA_AUTO_ARCHIVE_TARGETS)
+                    .map(|i| format!("target_{i}"))
+                    .collect()
+            )
+            .is_err()
+        );
     }
 }
