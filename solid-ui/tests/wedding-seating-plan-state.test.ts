@@ -41,6 +41,10 @@ test("buildWeddingSeatingPlanState summarizes assigned tables and constraints", 
   assert.ok(state.actionItems.some((item) => /Assign 1 attending guest/i.test(item.title)));
   assert.ok(state.actionItems.some((item) => /Confirm 1 sensitive seating constraint/i.test(item.title)));
   assert.ok(state.actionItems.some((item) => /Brief venue on 1 accessibility/i.test(item.title)));
+  assert.equal(state.optimizationPreview?.assignments.length, 3);
+  assert.ok(state.optimizationPreview?.hardViolations.length === 0);
+  assert.equal(state.optimizationPeople.length, 3);
+  assert.equal(state.optimizationTables.length, 2);
   assert.ok(state.warningLabels.some((label) => /not assigned/i.test(label)));
   assert.ok(state.warningLabels.some((label) => /sensitive seating/i.test(label)));
   assert.ok(state.warningLabels.some((label) => /accessibility/i.test(label)));
@@ -58,6 +62,7 @@ test("buildWeddingSeatingPlanState reports draft-ready when attending guests are
         "| Blair | Yes | Table 2 | Friends | Guest |",
       ].join("\n"),
     }],
+    seatsPerTable: 1,
   });
 
   assert.equal(state.statusLabel, "Draft seating-ready");
@@ -65,7 +70,30 @@ test("buildWeddingSeatingPlanState reports draft-ready when attending guests are
   assert.deepEqual(state.tableLabels, ["Table 1", "Table 2"]);
   assert.equal(state.tableBriefs.length, 2);
   assert.equal(state.actionItems.length, 0);
+  assert.equal(state.optimizationPreview?.assignments.length, 2);
   assert.ok(state.vendorBriefLines.some((line) => /2 named tables detected/i.test(line)));
+});
+
+test("buildWeddingSeatingPlanState feeds conflict notes into the optimizer preview", () => {
+  const state = buildWeddingSeatingPlanState({
+    artifacts: [{
+      title: "Guest list",
+      kind: "guest_list",
+      bodyText: [
+        "| Name | RSVP | Household | Seating note |",
+        "| --- | --- | --- | --- |",
+        "| Mum | Yes | Family |  |",
+        "| Uncle David | Yes | Family | Do not seat with Mum |",
+      ].join("\n"),
+    }],
+    seatsPerTable: 1,
+  });
+  const mum = state.optimizationPreview?.assignments.find((assignment) => assignment.personLabel === "Mum");
+  const david = state.optimizationPreview?.assignments.find((assignment) => assignment.personLabel === "Uncle David");
+
+  assert.ok(mum);
+  assert.ok(david);
+  assert.notEqual(mum.tableId, david.tableId);
 });
 
 test("buildWeddingSeatingPlanState asks for household grouping before optimization", () => {

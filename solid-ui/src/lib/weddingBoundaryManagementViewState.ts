@@ -47,6 +47,12 @@ export function weddingBoundaryDecisionNoticeFromError(error: unknown): string {
   return "Could not save that decision right now. Try again in a moment.";
 }
 
+export function weddingBoundaryDraftSaveUnavailableNotice(kind: "request" | "rule"): string {
+  return kind === "request"
+    ? "This family request is ready to review, but saving is not connected right now. Sign in or reconnect saving to keep it with this wedding."
+    : "This family rule is ready, but saving is not connected right now. Sign in or reconnect saving to keep it with this wedding.";
+}
+
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -131,7 +137,9 @@ export function buildWeddingBoundaryManagementViewState(input: {
     })),
     privateItemsLabel: input.state.privateObjectCount > 0
       ? `${input.state.privateObjectCount} private item${input.state.privateObjectCount === 1 ? "" : "s"} stay visible only to the couple.`
-      : null,
+      : hasPrivateSignals
+        ? "Private notes and reasons stay visible only to the couple."
+        : null,
     hasApprovalItems: input.state.approvalQueue.length > 0,
     hasRules: policyNodes.length > 0,
     hasVisibilityItems: roleNodes.length > 0 || guestNodes.length > 0,

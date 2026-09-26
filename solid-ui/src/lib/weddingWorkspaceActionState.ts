@@ -3,11 +3,13 @@ export type WeddingWorkspaceSidebarActionKind =
   | "continue_chat"
   | "open_graph"
   | "open_budget"
+  | "open_workspace_menu"
   | "open_calendar"
   | "open_tasks"
   | "open_connected_apps"
   | "export_bundle"
-  | "approve_action";
+  | "approve_action"
+  | "defer_decision";
 
 export type WeddingWorkspaceSidebarAction = {
   kind: WeddingWorkspaceSidebarActionKind;

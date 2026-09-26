@@ -41,6 +41,7 @@ import {
   type WeddingWorkspaceRefreshScaleProofPacketState,
 } from "@/lib/weddingWorkspaceRefreshScaleProofPacketState";
 import type { WeddingProviderExecutorSmokeProofState } from "@/lib/weddingProviderExecutorSmokeProofState";
+import type { WeddingApiStackState } from "@/lib/weddingApiStackState";
 
 export type WeddingProductionReadinessEvidenceInput = {
   strictOracleProofs?: boolean | null;
@@ -65,6 +66,7 @@ export type WeddingProductionReadinessEvidenceInput = {
   connectedAppIds?: readonly string[] | null;
   vendorSearchProviders?: WeddingVendorSearchProviderEnvState | null;
   vendorSearchExecutorAvailable?: boolean | null;
+  apiStack?: WeddingApiStackState | null;
   oracleReleaseGate?: WeddingOracleReleaseGateReadinessState | null;
 };
 
@@ -215,8 +217,10 @@ function oracleReleaseGateReady(
 function providerExecutorsReady(
   providerExecutorSuite: WeddingProviderExecutorSuiteReadinessState | null | undefined,
   providers: readonly WeddingProviderExecutorReadinessState[] | null | undefined,
+  apiStack: WeddingApiStackState | null | undefined,
   strictOracleProofs: boolean,
 ): boolean {
+  if (apiStack && apiStack.missingRequiredLabels.length > 0) return false;
   if (providerExecutorSuite) {
     if (providerExecutorSuite.productionEvidenceReady !== true) return false;
     return strictOracleProofs ? (providerExecutorSuite.proofReferenceLabels ?? []).length >= 4 : true;
@@ -280,7 +284,7 @@ export function buildWeddingProductionReadinessEvidenceState(
     ),
     adminAiRoutingPolicyReady: adminAiRoutingPolicyReady(input.adminWeddingAiRoutingPolicy, strictOracleProofs),
     adminOpsBackendMetricsReady: input.adminOpsBackendMetrics?.productionReady === true,
-    providerExecutorsReady: providerExecutorsReady(providerExecutorSuite, providerExecutors, strictOracleProofs),
+    providerExecutorsReady: providerExecutorsReady(providerExecutorSuite, providerExecutors, input.apiStack, strictOracleProofs),
     oracleReleaseGateReady: oracleReleaseGateReady(input.oracleReleaseGate, strictOracleProofs),
   };
   const summaryLabels = [
@@ -334,6 +338,8 @@ export function buildWeddingProductionReadinessEvidenceState(
     evidence.adminOpsBackendMetricsReady ? null : "Admin Oracle and user metrics proof is missing.",
     evidence.providerExecutorsReady
       ? null
+      : input.apiStack?.missingRequiredLabels.length
+        ? `Wedding API stack is missing required providers: ${input.apiStack.missingRequiredLabels.join(", ")}.`
       : strictOracleProofs && providerExecutorSuite.productionEvidenceReady === true
         ? "Provider executor proof references are incomplete."
         : input.providerExecutorSmokeProof?.blockerLabels.length

@@ -24,6 +24,10 @@ import {
   buildWeddingImportParserTaskItems,
   type WeddingImportParserReadinessState,
 } from "@/lib/weddingImportParserReadinessState";
+import {
+  buildWeddingInspirationTaskItems,
+  type WeddingInspirationState,
+} from "@/lib/weddingInspirationState";
 import { buildWeddingLegalAdministrationTaskItems } from "@/lib/weddingLegalAdministrationState";
 import {
   buildWeddingVendorContactOutreachTaskItems,
@@ -51,6 +55,7 @@ export type WeddingWorkspaceGeneratedTaskItemsInput = {
   budgetTracking?: WeddingBudgetTrackingState | null;
   guestTracking?: WeddingGuestTrackingState | null;
   seatingPlan?: WeddingSeatingPlanState | null;
+  inspiration?: WeddingInspirationState | null;
   importParserReadiness?: WeddingImportParserReadinessState | null;
   backgroundAutomationCoverage?: WeddingBackgroundAutomationCoverageState | null;
   delegation?: WeddingDelegationState | null;
@@ -88,6 +93,11 @@ export function buildWeddingWorkspaceGeneratedTaskItems(input: WeddingWorkspaceG
     }),
     ...buildWeddingSeatingActionTaskItems({
       seatingPlan: input.seatingPlan,
+      metadata: input.metadata,
+      existingTaskItems: baseTaskItems,
+    }),
+    ...buildWeddingInspirationTaskItems({
+      inspiration: input.inspiration,
       metadata: input.metadata,
       existingTaskItems: baseTaskItems,
     }),

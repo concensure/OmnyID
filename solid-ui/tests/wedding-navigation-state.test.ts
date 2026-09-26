@@ -42,6 +42,9 @@ test("buildWeddingNavigationIntentFromPresentationAction maps existing surfaces"
   assert.equal(buildWeddingNavigationIntentFromPresentationAction(presentationAction({ kind: "approve_draft" })).view, "decision_queue");
   assert.equal(buildWeddingNavigationIntentFromPresentationAction(presentationAction({ kind: "continue_chat" })).view, "threads");
   assert.equal(buildWeddingNavigationIntentFromPresentationAction(presentationAction({ kind: "open_map" })).view, "response_queue");
+  const exportIntent = buildWeddingNavigationIntentFromPresentationAction(presentationAction({ kind: "export_artifact" }));
+  assert.equal(exportIntent.view, "response_queue");
+  assert.equal(exportIntent.surface, "planning_files");
 });
 
 test("buildWeddingNavigationIntentFromSidebarAction carries workspace and active artifact context", () => {
@@ -145,6 +148,32 @@ test("buildWeddingNavigationIntentFromSidebarAction routes budget summaries to t
   assert.match(intent.notice, /wedding budget/i);
 });
 
+test("buildWeddingNavigationIntentFromSidebarAction keeps workspace-menu actions inside the planner", () => {
+  const action: WeddingWorkspaceSidebarAction = {
+    kind: "open_workspace_menu",
+    label: "Open Inspiration",
+    enabled: true,
+    reason: null,
+    metadata: {
+      wedding_workspace_menu: "inspiration",
+      source_task_id: "wedding_task:inspiration",
+      a2ui_primary_action: "open_wedding_inspiration",
+    },
+  };
+  const intent = buildWeddingNavigationIntentFromSidebarAction({
+    action,
+    weddingPlanId: "wedding_plan:inspiration",
+    responseWorkspaceId: "response_workspace:inspiration",
+  });
+
+  assert.equal(intent.view, "response_queue");
+  assert.equal(intent.surface, "workspace_menu");
+  assert.equal(intent.metadata.wedding_workspace_menu, "inspiration");
+  assert.equal(intent.metadata.source_task_id, "wedding_task:inspiration");
+  assert.equal(intent.metadata.a2ui_primary_action, "open_wedding_inspiration");
+  assert.match(intent.notice, /planner section/i);
+});
+
 test("buildWeddingNavigationIntentFromSidebarAction preserves decision-focus handoff packets", () => {
   const action: WeddingWorkspaceSidebarAction = {
     kind: "open_tasks",
@@ -177,6 +206,32 @@ test("buildWeddingNavigationIntentFromSidebarAction preserves decision-focus han
   assert.equal(intent.view, "tasks");
   assert.equal(intent.surface, "tasks");
   assert.deepEqual(intent.metadata.decision_focus, action.metadata?.decision_focus);
+});
+
+test("buildWeddingNavigationIntentFromSidebarAction routes deferred wedding decisions to tasks", () => {
+  const action: WeddingWorkspaceSidebarAction = {
+    kind: "defer_decision",
+    label: "Decide Later",
+    enabled: true,
+    reason: null,
+    metadata: {
+      decision_deferral: {
+        version: 1,
+        id: "task:photographer",
+        title: "Choose photographer",
+        requested_state: "deferred",
+      },
+    },
+  };
+  const intent = buildWeddingNavigationIntentFromSidebarAction({
+    action,
+    weddingPlanId: "wedding_plan:defer",
+    responseWorkspaceId: "response_workspace:defer",
+  });
+
+  assert.equal(intent.view, "tasks");
+  assert.equal(intent.surface, "tasks");
+  assert.deepEqual(intent.metadata.decision_deferral, action.metadata?.decision_deferral);
 });
 
 test("readWeddingNavigationIntentEventDetail preserves safe metadata while normalizing routing fields", () => {

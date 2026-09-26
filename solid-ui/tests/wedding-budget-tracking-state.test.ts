@@ -42,6 +42,7 @@ test("buildWeddingBudgetTrackingState totals selected vendor projected and quote
   });
 
   assert.equal(state.lineItems.length, 2);
+  assert.equal(state.lineItems[0]?.linkedArtifactId, "artifact:vendors");
   assert.equal(state.totalProjectedAmount, 4500);
   assert.equal(state.totalQuotedAmount, 12000);
   assert.equal(state.totalKnownAmount, 16500);
@@ -308,6 +309,31 @@ test("buildWeddingBudgetTrackingState still treats ordinary budget-sheet decisio
   assert.equal(state.budgetAllocation.length, 0, "ordinary budget-sheet rows must not become the user's allocation target");
 });
 
+test("buildWeddingBudgetTrackingState shows saved contribution rows without counting them as vendor spend", () => {
+  const state = buildWeddingBudgetTrackingState({
+    decisionRecords: [
+      decision({
+        id: "decision:contribution",
+        artifactId: "wedding-budget-contribution:workspace:alex-parents",
+        artifactTitle: "Wedding Budget Contribution",
+        artifactKind: "budget_sheet",
+        selectedOptionId: "budget-contribution",
+        selectedOptionLabel: "Alex parents",
+        selectedOptionDetail: "Alex parents may contribute A$5,000. Condition: Venue only",
+        selectedOptionCells: ["Contributor: Alex parents", "Amount: A$5,000", "Condition: Venue only"],
+      }),
+    ],
+  });
+
+  assert.equal(state.lineItems.length, 0);
+  assert.equal(state.totalKnownAmount, 0);
+  assert.deepEqual(state.insights.contributionRows, [{
+    personLabel: "Alex parents",
+    amountLabel: "A$5,000",
+    conditionLabel: "Venue only",
+  }]);
+});
+
 test("buildWeddingBudgetTrackingState normalizes quote fields and scenario budgets", () => {
   const state = buildWeddingBudgetTrackingState({
     budgetTargetText: "Total budget AUD 30000",
@@ -338,14 +364,41 @@ test("buildWeddingBudgetTrackingState normalizes quote fields and scenario budge
   assert.equal(state.insights.committedAmount, 0);
   assert.equal(state.insights.estimatedAmount, 4500);
   assert.equal(state.insights.paidAmount, 1000);
+  assert.ok(state.insights.uncertaintyAmount > 0);
+  assert.ok(state.insights.forecastAmount > state.totalKnownAmount);
+  assert.match(state.insights.forecastRangeLabel, /\$/);
+  assert.ok(state.insights.riskExplanationLabels.some((label) => /estimate/i.test(label)));
   assert.equal(state.insights.remainingAmount, 25500);
   assert.equal(state.insights.monthlyCashNeeds.length, 2);
+  assert.match(state.insights.monthlyCashNeedsSummaryLabel, /dated across 2 months/i);
   assert.equal(state.insights.scenarios.find((scenario) => scenario.id === "safe")?.targetAmount, 27000);
+  assert.match(state.insights.scenarios.find((scenario) => scenario.id === "safe")?.meaningLabel ?? "", /buffer/i);
+  assert.match(state.insights.scenarios.find((scenario) => scenario.id === "stretch")?.nextStepLabel ?? "", /taxes/i);
   assert.equal(state.insights.contributionRows[0]?.personLabel, "Alex parents");
+  assert.equal(state.insights.quoteNormalForms[0]?.linkedArtifactId, "artifact:vendors");
   assert.equal(state.insights.quoteNormalForms[0]?.hoursLabel, "8 hours");
   assert.match(state.insights.quoteNormalForms[0]?.taxLabel ?? "", /GST included/i);
   assert.match(state.insights.quoteNormalForms[0]?.cancellationLabel ?? "", /Cancellation/i);
   assert.deepEqual(state.insights.missingContextLabels, []);
+});
+
+test("buildWeddingBudgetTrackingState does not count unpaid due rows as paid", () => {
+  const state = buildWeddingBudgetTrackingState({
+    artifacts: [{
+      id: "artifact:budget",
+      title: "Payment tracker",
+      kind: "budget_sheet",
+      bodyText: [
+        "| Category | Vendor | Paid | Due |",
+        "| --- | --- | --- | --- |",
+        "| Flowers | Petal Studio | Not paid | $1200 |",
+        "| Music | DJ Light | Paid $500 | $1500 |",
+        "| Transport | Shuttle Co | Outstanding | $900 |",
+      ].join("\n"),
+    }],
+  });
+
+  assert.equal(state.insights.paidAmount, 500);
 });
 
 test("buildWeddingBudgetTrackingState asks for missing budget context and flags unaffordable category choices", () => {
@@ -415,4 +468,60 @@ test("buildWeddingBudgetTrackingState extracts payment dates from uploaded contr
     state.insights.monthlyCashNeeds.map((row) => row.monthLabel),
     ["Jan 2027", "Feb 2027", "May 2027"],
   );
+});
+
+test("buildWeddingBudgetTrackingState splits multiple payment dates from one contract sentence", () => {
+  const state = buildWeddingBudgetTrackingState({
+    budgetTargetText: "Total budget AUD 30000",
+    artifacts: [{
+      id: "artifact:catering-contract",
+      title: "Catering contract",
+      kind: "legal",
+      vendorLabels: ["Feast Co"],
+      bodyText: "Deposit $2000 due 2027-01-10 and final balance $8000 due 2027-04-20. Cancellation terms apply.",
+    }, {
+      id: "artifact:payments",
+      title: "Payment tracker",
+      kind: "budget_sheet",
+      bodyText: [
+        "| Category | Vendor | Paid | Due | Due date |",
+        "| --- | --- | --- | --- | --- |",
+        "| Flowers | Petal Studio | Not paid | $1200 | 2027-03-01 |",
+      ].join("\n"),
+    }],
+  });
+
+  assert.equal(state.paymentTaskCandidates.length, 3);
+  assert.deepEqual(
+    state.paymentTaskCandidates.map((candidate) => candidate.dueAt),
+    ["2027-01-10", "2027-04-20", "2027-03-01"],
+  );
+  assert.deepEqual(
+    state.insights.monthlyCashNeeds.map((row) => `${row.monthLabel}:${row.amount}`),
+    ["Jan 2027:2000", "Mar 2027:1200", "Apr 2027:8000"],
+  );
+});
+
+test("buildWeddingBudgetTrackingState keeps dated payment deadlines visible when amount is missing", () => {
+  const state = buildWeddingBudgetTrackingState({
+    artifacts: [{
+      id: "artifact:venue-contract",
+      title: "Garden Hall contract",
+      kind: "legal",
+      vendorLabels: ["Garden Hall"],
+      bodyText: "Final balance due 2027-05-15. Ask venue for final invoice amount.",
+    }],
+  });
+
+  assert.equal(state.paymentTaskCandidates.length, 1);
+  assert.equal(state.paymentTaskCandidates[0]?.dueAmountLabel, null);
+  assert.equal(state.paymentTaskCandidates[0]?.dueAt, "2027-05-15");
+  assert.deepEqual(state.insights.monthlyCashNeeds, [{
+    monthLabel: "May 2027",
+    amount: 0,
+    currency: "AUD",
+    itemCount: 1,
+    amountToConfirmCount: 1,
+  }]);
+  assert.match(state.insights.monthlyCashNeedsSummaryLabel, /1 payment amount still to confirm/i);
 });

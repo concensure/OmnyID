@@ -20,6 +20,7 @@ import {
   type WeddingBudgetAllocationDraft,
   type WeddingBudgetCategoryId,
 } from "@/lib/weddingBudgetAllocationState";
+import { buildWeddingBudgetContributionProjectionInput } from "@/lib/weddingBudgetContributionState";
 import { buildWeddingBudgetCategoryGuidanceLabel } from "@/lib/weddingBudgetGuidanceState";
 
 function moneyLabel(amount: number, currency: string): string {
@@ -50,6 +51,8 @@ export function WeddingBudgetTrackerCard(props: {
   locationLabel?: string | null;
   metadata?: unknown;
   onSaveAllocation?: (input: SendAfpMessageInput) => Promise<unknown>;
+  onSaveContribution?: (input: SendAfpMessageInput) => Promise<unknown>;
+  onOpenArtifact?: (artifactId: string) => void;
 }) {
   const currency = props.state.lineItems[0]?.currency ?? "AUD";
   const [draft, setDraft] = createSignal<WeddingBudgetAllocationDraft>(
@@ -59,7 +62,12 @@ export function WeddingBudgetTrackerCard(props: {
       : (props.weddingPlanId ? loadWeddingBudgetAllocationDraft(props.weddingPlanId) : null) ?? emptyWeddingBudgetAllocationDraft(currency),
   );
   const [saving, setSaving] = createSignal(false);
+  const [savingContribution, setSavingContribution] = createSignal(false);
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
+  const [contributionNotice, setContributionNotice] = createSignal<string | null>(null);
+  const [contributorLabel, setContributorLabel] = createSignal("");
+  const [contributionAmount, setContributionAmount] = createSignal("");
+  const [contributionCondition, setContributionCondition] = createSignal("");
   const [lastSyncedAllocationSignature, setLastSyncedAllocationSignature] = createSignal(budgetAllocationSignature(props.state));
   const allocated = createMemo(() => weddingBudgetAllocationAllocatedAmount(draft()));
   const remaining = createMemo(() => weddingBudgetAllocationRemaining(draft()));
@@ -116,6 +124,32 @@ export function WeddingBudgetTrackerCard(props: {
     }
   }
 
+  async function saveContribution() {
+    if (!props.onSaveContribution || savingContribution()) return;
+    const projection = buildWeddingBudgetContributionProjectionInput({
+      personLabel: contributorLabel(),
+      amount: Number(contributionAmount()),
+      conditionLabel: contributionCondition(),
+      currency,
+    }, props.metadata ?? {});
+    if (!projection) {
+      setContributionNotice("Add who is contributing and the amount before saving.");
+      return;
+    }
+    setSavingContribution(true);
+    try {
+      await props.onSaveContribution(weddingDecisionProjectionToAfpSendInput(projection));
+      setContributorLabel("");
+      setContributionAmount("");
+      setContributionCondition("");
+      setContributionNotice("Contribution saved. Conditions will stay visible in the budget.");
+    } catch {
+      setContributionNotice("Could not save the contribution right now. Try again in a moment.");
+    } finally {
+      setSavingContribution(false);
+    }
+  }
+
   return (
     <div class="min-w-0 rounded-[24px] border border-emerald-100/80 bg-emerald-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
       <div class="flex items-start justify-between gap-2">
@@ -164,7 +198,7 @@ export function WeddingBudgetTrackerCard(props: {
         </Show>
       </div>
 
-      <div class="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-5">
+      <div class="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-6">
         <div class="rounded-2xl border border-emerald-100 bg-white/75 px-2.5 py-2">
           <p class="text-xs font-semibold text-emerald-950/65">Committed</p>
           <p class="mt-1 break-words text-lg font-semibold text-emerald-950">{moneyLabel(props.state.insights.committedAmount, currency)}</p>
@@ -186,6 +220,10 @@ export function WeddingBudgetTrackerCard(props: {
         <div class="rounded-2xl border border-rose-100 bg-rose-50/75 px-2.5 py-2">
           <p class="text-xs font-semibold text-rose-950/65">At risk</p>
           <p class="mt-1 break-words text-lg font-semibold text-rose-950">{moneyLabel(props.state.insights.atRiskAmount, currency)}</p>
+        </div>
+        <div class="rounded-2xl border border-amber-100 bg-amber-50/75 px-2.5 py-2">
+          <p class="text-xs font-semibold text-amber-950/65">Forecast range</p>
+          <p class="mt-1 break-words text-sm font-semibold leading-5 text-amber-950">{props.state.insights.forecastRangeLabel}</p>
         </div>
       </div>
 
@@ -333,6 +371,8 @@ export function WeddingBudgetTrackerCard(props: {
                   {scenario.targetAmount === null ? "Set budget" : moneyLabel(scenario.targetAmount, currency)}
                 </p>
                 <p class="mt-1 text-xs leading-5 text-emerald-900/70">{scenario.summaryLabel}</p>
+                <p class="mt-2 text-xs leading-5 text-emerald-950/75">{scenario.meaningLabel}</p>
+                <p class="mt-1 text-xs font-semibold leading-5 text-emerald-950">{scenario.nextStepLabel}</p>
               </div>
             )}
           </For>
@@ -344,6 +384,16 @@ export function WeddingBudgetTrackerCard(props: {
           <ul class="mt-2 space-y-1">
             <For each={props.state.insights.unaffordableWarningLabels}>
               {(label) => <li class="text-xs leading-5 text-rose-950/75">{label}</li>}
+            </For>
+          </ul>
+        </div>
+      </Show>
+      <Show when={props.state.insights.riskExplanationLabels.length > 0}>
+        <div class="mt-3 rounded-2xl border border-amber-100 bg-amber-50/80 p-3">
+          <p class="text-sm font-semibold text-amber-950">What could still move</p>
+          <ul class="mt-2 space-y-1">
+            <For each={props.state.insights.riskExplanationLabels}>
+              {(label) => <li class="text-xs leading-5 text-amber-950/75">{label}</li>}
             </For>
           </ul>
         </div>
@@ -363,13 +413,52 @@ export function WeddingBudgetTrackerCard(props: {
       <Show when={props.state.insights.monthlyCashNeeds.length > 0}>
         <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
           <p class="text-sm font-semibold text-emerald-950">Cash needed by month</p>
+          <p class="mt-1 text-xs leading-5 text-emerald-900/70">{props.state.insights.monthlyCashNeedsSummaryLabel}</p>
           <div class="mt-2 space-y-1.5">
             <For each={props.state.insights.monthlyCashNeeds.slice(0, 6)}>
               {(row) => (
                 <div class="flex items-center justify-between gap-2 text-xs text-emerald-950/75">
                   <span class="font-semibold">{row.monthLabel}</span>
-                  <span>{moneyLabel(row.amount, row.currency)} - {row.itemCount} payment{row.itemCount === 1 ? "" : "s"}</span>
+                  <span>
+                    {row.amount > 0 ? moneyLabel(row.amount, row.currency) : "Amount to confirm"} - {row.itemCount} payment{row.itemCount === 1 ? "" : "s"}
+                    <Show when={row.amountToConfirmCount > 0}>
+                      {" "}({row.amountToConfirmCount} amount{row.amountToConfirmCount === 1 ? "" : "s"} to confirm)
+                    </Show>
+                  </span>
                 </div>
+              )}
+            </For>
+          </div>
+        </div>
+      </Show>
+      <Show when={props.state.paymentTaskCandidates.length > 0}>
+        <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
+          <p class="text-sm font-semibold text-emerald-950">Payments to check</p>
+          <p class="mt-1 text-xs leading-5 text-emerald-900/70">
+            Review deposits, balances, receipts, and due dates before anyone pays.
+          </p>
+          <div class="mt-2 space-y-2">
+            <For each={props.state.paymentTaskCandidates.slice(0, 4)}>
+              {(task) => (
+                <article class="rounded-2xl border border-emerald-100 bg-emerald-50/50 px-3 py-2">
+                  <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div class="min-w-0">
+                      <p class="break-words text-xs font-semibold text-emerald-950">{task.title}</p>
+                      <p class="mt-1 text-xs leading-5 text-emerald-950/70">
+                        {[task.dueAmountLabel, task.dueDateLabel].filter(Boolean).join(" - ") || task.priorityLabel}
+                      </p>
+                    </div>
+                    <Show when={task.linkedArtifactId && props.onOpenArtifact}>
+                      <button
+                        type="button"
+                        onClick={() => task.linkedArtifactId && props.onOpenArtifact?.(task.linkedArtifactId)}
+                        class="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-50"
+                      >
+                        View source
+                      </button>
+                    </Show>
+                  </div>
+                </article>
               )}
             </For>
           </div>
@@ -418,6 +507,15 @@ export function WeddingBudgetTrackerCard(props: {
                       Ask vendor about: {quote.missingLabels.slice(0, 5).join(", ")}
                     </p>
                   </Show>
+                  <Show when={quote.linkedArtifactId && props.onOpenArtifact}>
+                    <button
+                      type="button"
+                      onClick={() => quote.linkedArtifactId && props.onOpenArtifact?.(quote.linkedArtifactId)}
+                      class="mt-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-50"
+                    >
+                      View source
+                    </button>
+                  </Show>
                 </article>
               )}
             </For>
@@ -426,6 +524,52 @@ export function WeddingBudgetTrackerCard(props: {
       </Show>
       <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
         <p class="text-sm font-semibold text-emerald-950">Contributions</p>
+        <div class="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem]">
+          <input
+            type="text"
+            value={contributorLabel()}
+            placeholder="Who is contributing?"
+            class="rounded-2xl border border-emerald-100 bg-white px-3 py-2 text-sm text-emerald-950 outline-none focus:border-emerald-300"
+            onInput={(event) => {
+              setContributorLabel(event.currentTarget.value);
+              setContributionNotice(null);
+            }}
+          />
+          <input
+            type="number"
+            inputmode="numeric"
+            min="0"
+            step="100"
+            value={contributionAmount()}
+            placeholder="Amount"
+            class="rounded-2xl border border-emerald-100 bg-white px-3 py-2 text-sm text-emerald-950 outline-none focus:border-emerald-300"
+            onInput={(event) => {
+              setContributionAmount(event.currentTarget.value);
+              setContributionNotice(null);
+            }}
+          />
+        </div>
+        <input
+          type="text"
+          value={contributionCondition()}
+          placeholder="Condition, for example: venue only, no condition, paid after invoice"
+          class="mt-2 w-full rounded-2xl border border-emerald-100 bg-white px-3 py-2 text-sm text-emerald-950 outline-none focus:border-emerald-300"
+          onInput={(event) => {
+            setContributionCondition(event.currentTarget.value);
+            setContributionNotice(null);
+          }}
+        />
+        <button
+          type="button"
+          disabled={!props.onSaveContribution || savingContribution()}
+          onClick={() => void saveContribution()}
+          class="mt-2 rounded-full border border-emerald-200 bg-emerald-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300"
+        >
+          {savingContribution() ? "Saving..." : "Save contribution"}
+        </button>
+        <Show when={contributionNotice()}>
+          {(notice) => <p class="mt-2 text-xs leading-5 text-emerald-950/75">{notice()}</p>}
+        </Show>
         <Show when={props.state.insights.contributionRows.length > 0} fallback={
           <p class="mt-1 text-xs leading-5 text-emerald-900/70">
             Add who is contributing and any conditions in an uploaded budget, quote, or contract so spending stays clear.
@@ -469,6 +613,15 @@ export function WeddingBudgetTrackerCard(props: {
                       {(label) => <li class="text-xs leading-5 text-emerald-950/65">{label}</li>}
                     </For>
                   </ul>
+                </Show>
+                <Show when={item.linkedArtifactId && props.onOpenArtifact}>
+                  <button
+                    type="button"
+                    onClick={() => item.linkedArtifactId && props.onOpenArtifact?.(item.linkedArtifactId)}
+                    class="mt-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-50"
+                  >
+                    View source
+                  </button>
                 </Show>
               </article>
             )}

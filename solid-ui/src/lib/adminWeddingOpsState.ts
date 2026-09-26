@@ -10,6 +10,7 @@ import {
 } from "@/lib/adminWeddingOpsBackendMetricsReadinessState";
 import type { WeddingProviderExecutorProofPacketState } from "@/lib/weddingProviderExecutorProofPacketState";
 import type { WeddingVendorSearchProviderEnvState } from "@/lib/weddingVendorSearchProviderEnvState";
+import type { WeddingApiStackState } from "@/lib/weddingApiStackState";
 
 export type AdminWeddingOpsMetricCard = {
   title: string;
@@ -80,6 +81,7 @@ export function buildAdminWeddingOpsPanelState(args: {
   weddingAiRoutingPolicy?: AdminWeddingAiRoutingPolicyState | null;
   backendMetricsReadiness?: AdminWeddingOpsBackendMetricsReadinessState | null;
   providerExecutorProofPacket?: WeddingProviderExecutorProofPacketState | null;
+  apiStack?: WeddingApiStackState | null;
   routeWeddingAiThroughAdmin: boolean;
 }): AdminWeddingOpsPanelState {
   const signedUp = signedUpValue(args.operatorUsers);
@@ -164,6 +166,20 @@ export function buildAdminWeddingOpsPanelState(args: {
             ? "local_only"
             : "needs_backend",
       },
+      {
+        title: "Wedding API stack",
+        value: args.apiStack?.missingRequiredLabels.length
+          ? `${args.apiStack.missingRequiredLabels.length} missing`
+          : args.apiStack
+            ? "Required providers ready"
+            : "Stack proof needed",
+        detail: args.apiStack?.missingRequiredLabels.length
+          ? `Connect ${args.apiStack.missingRequiredLabels.join(", ")} before live discovery, maps, scheduling, weather, or payments are treated as production-ready.`
+          : args.apiStack
+            ? args.apiStack.summary
+            : "Supply the wedding API stack readiness state so admin ops can audit Places, Maps, Calendar, WeatherAPI, Stripe, SMS, and media processing.",
+        status: args.apiStack?.missingRequiredLabels.length ? "needs_backend" : args.apiStack ? "ready" : "needs_backend",
+      },
     ],
     toggle: {
       enabled: routeActive,
@@ -189,6 +205,9 @@ export function buildAdminWeddingOpsPanelState(args: {
       args.providerExecutorProofPacket?.canClearOracleProviderGate
         ? "Provider executor proof packet can clear the Oracle provider gate."
         : "Keep Oracle upload blocked until the provider executor proof packet is complete.",
+      args.apiStack?.missingRequiredLabels.length
+        ? `Connect required wedding APIs before production: ${args.apiStack.missingRequiredLabels.join(", ")}.`
+        : "Keep horizontal wedding APIs as evidence sources; OmnyID storage and AFP records remain the source of truth.",
     ],
   };
 }

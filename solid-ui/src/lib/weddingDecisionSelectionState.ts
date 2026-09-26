@@ -1,5 +1,9 @@
 // @locs-version: 2.0
 import type { WeddingArtifactTablePreview } from "@/lib/weddingArtifactPreviewState";
+import {
+  evaluateWeddingExperienceDecisionFit,
+  type WeddingExperienceModelState,
+} from "@/lib/weddingExperienceModelState";
 import type { WeddingArtifactKind } from "@/lib/weddingPlanningTemplateState";
 
 export const WEDDING_DECISION_SELECTION_KEY = "omnyid.wedding-decision-selections";
@@ -31,6 +35,20 @@ export type WeddingDecisionSelectionState = {
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function uniqueStrings(values: readonly unknown[], limit = 80): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const item = clean(value);
+    const key = item.toLowerCase();
+    if (!item || seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+    if (result.length >= limit) break;
+  }
+  return result;
 }
 
 function storageOrNull(storage?: Storage | null): Storage | null {
@@ -161,6 +179,7 @@ export function buildWeddingDecisionSelectionState(input: {
   table: WeddingArtifactTablePreview | null;
   selectedOptionId?: string | null;
   preferenceText?: string | null;
+  experienceModel?: Pick<WeddingExperienceModelState, "traits"> | null;
 }): WeddingDecisionSelectionState {
   const eligible = Boolean(clean(input.artifactId) && input.table?.kind === "table" && isEligibleKind(input.artifactKind));
   const profile = preferenceProfile(input.preferenceText);
@@ -169,7 +188,9 @@ export function buildWeddingDecisionSelectionState(input: {
       const label = clean(row[0]) || `Option ${rowIndex + 1}`;
       const detail = row.slice(1).map(clean).filter(Boolean).join(" - ") || "No structured detail captured yet.";
       const id = stableOptionId(rowIndex, row);
-      const preferenceFit = evaluatePreferenceFit(row.map(clean).join(" "), profile);
+      const rowText = row.map(clean).join(" ");
+      const preferenceFit = evaluatePreferenceFit(rowText, profile);
+      const experienceFit = evaluateWeddingExperienceDecisionFit(input.experienceModel, rowText);
       return {
         id,
         rowIndex,
@@ -177,10 +198,12 @@ export function buildWeddingDecisionSelectionState(input: {
         detail,
         cells: row.map(clean),
         selected: id === input.selectedOptionId,
-        preferenceFitLabels: preferenceFit.fit,
+        preferenceFitLabels: uniqueStrings([...preferenceFit.fit, ...experienceFit.fitLabels], 4),
         missingPreferenceLabels: preferenceFit.missing,
-        tradeoffLabels: preferenceFit.tradeoffs,
-        preferenceSummaryLabel: preferenceFit.summary,
+        tradeoffLabels: uniqueStrings([...preferenceFit.tradeoffs, ...experienceFit.tradeoffLabels], 4),
+        preferenceSummaryLabel: experienceFit.tradeoffLabels.length > 0 || experienceFit.fitLabels.length > 0
+          ? `${preferenceFit.summary}; ${experienceFit.summaryLabel}`
+          : preferenceFit.summary,
       };
     })
     : [];

@@ -73,7 +73,7 @@ function badgeFor(surface: WeddingNavigationSurface): string {
   if (surface === "budget") return "Budget";
   if (surface === "calendar") return "Calendar context";
   if (surface === "knowledge_graph") return "Related details";
-  if (surface === "tasks") return "Task context";
+  if (surface === "tasks") return "Wedding tasks";
   if (surface === "connected_apps") return "Provider setup";
   if (surface === "approval") return "Approval gate";
   return "Export context";
@@ -413,7 +413,7 @@ function buildCards(intent: WeddingNavigationIntent): WeddingNavigationArrivalCa
       ? {
         label: "Planning setup gaps",
         detail: expectedBehaviorSummary,
-        tone: intent.surface === "tasks" ? "amber" : "sky",
+        tone: "amber",
       }
       : null,
     decisionFocus

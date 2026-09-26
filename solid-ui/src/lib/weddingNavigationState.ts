@@ -14,6 +14,7 @@ export const OPEN_WEDDING_PLANNING_INTENT_EVENT = "omnyid:open-wedding-planning-
 
 export type WeddingNavigationSurface =
   | "planning_files"
+  | "workspace_menu"
   | "continue_chat"
   | "probe"
   | "map"
@@ -39,6 +40,7 @@ export type WeddingNavigationIntent = {
 
 const WEDDING_NAVIGATION_SURFACES = new Set<WeddingNavigationSurface>([
   "planning_files",
+  "workspace_menu",
   "continue_chat",
   "probe",
   "map",
@@ -72,6 +74,7 @@ function surfaceForPresentationAction(kind: WeddingPresentationActionKind): Wedd
   if (kind === "open_graph") return "knowledge_graph";
   if (kind === "open_task_list") return "tasks";
   if (kind === "approve_draft") return "approval";
+  if (kind === "export_artifact") return "planning_files";
   return "export";
 }
 
@@ -79,15 +82,18 @@ function surfaceForSidebarAction(kind: WeddingWorkspaceSidebarActionKind): Weddi
   if (kind === "continue_chat") return "continue_chat";
   if (kind === "open_graph") return "knowledge_graph";
   if (kind === "open_budget") return "budget";
+  if (kind === "open_workspace_menu") return "workspace_menu";
   if (kind === "open_calendar") return "calendar";
   if (kind === "open_tasks") return "tasks";
   if (kind === "open_connected_apps") return "connected_apps";
   if (kind === "approve_action") return "approval";
+  if (kind === "defer_decision") return "tasks";
   return "export";
 }
 
 function viewForSurface(surface: WeddingNavigationSurface): ViewName {
   if (surface === "calendar") return "calendar";
+  if (surface === "workspace_menu") return "response_queue";
   if (surface === "budget") return "response_queue";
   if (surface === "knowledge_graph") return "knowledge_graph";
   if (surface === "tasks") return "tasks";
@@ -101,6 +107,7 @@ function viewForSurface(surface: WeddingNavigationSurface): ViewName {
 
 function noticeFor(surface: WeddingNavigationSurface, responseWorkspaceId: string, artifactId: string | null): string {
   if (surface === "planning_files") return `Opening wedding documents for ${responseWorkspaceId}.`;
+  if (surface === "workspace_menu") return "Opening this wedding planner section.";
   if (surface === "continue_chat") return `Continuing chat with wedding workspace ${responseWorkspaceId}.`;
   if (surface === "probe") return "Continuing the wedding plan with the next need-to-know question.";
   if (surface === "map") return "Opening wedding map/search context from this response.";

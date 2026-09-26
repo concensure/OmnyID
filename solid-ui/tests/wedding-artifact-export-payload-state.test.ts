@@ -350,7 +350,7 @@ test("buildWeddingWorkspaceBundleExportPayload includes bounded decision focus s
     },
   });
 
-  assert.match(payload.content, /## What needs your yes\/no/);
+  assert.match(payload.content, /## Three things worth your attention/);
   assert.match(payload.content, /Focus on 2 wedding decisions now; 1 can wait/);
   assert.match(payload.content, /Verify venue balance before payment/);
   assert.match(payload.content, /Backlog context: 1 lower-priority decision can wait/);

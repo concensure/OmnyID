@@ -6,6 +6,11 @@ import {
   loadWeddingDecisionSelection,
   toggleWeddingDecisionSelection,
 } from "../src/lib/weddingDecisionSelectionState.ts";
+import { buildWeddingExperienceModelState } from "../src/lib/weddingExperienceModelState.ts";
+import {
+  buildWeddingInspirationItem,
+  buildWeddingInspirationState,
+} from "../src/lib/weddingInspirationState.ts";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -84,4 +89,31 @@ test("buildWeddingDecisionSelectionState adds conservative preference-fit labels
   assert.match(harbour?.preferenceSummaryLabel ?? "", /preference fit signal/i);
   assert.ok(garden?.tradeoffLabels.includes("wet-weather backup"));
   assert.ok(garden?.preferenceFitLabels.includes("budget control"));
+});
+
+test("buildWeddingDecisionSelectionState carries wedding experience fit into option tradeoffs", () => {
+  const experienceModel = buildWeddingExperienceModelState(buildWeddingInspirationState([
+    buildWeddingInspirationItem({ title: "Reception 1", note: "warm lighting and long table", createdAt: "2026-09-26T00:00:00.000Z" }),
+    buildWeddingInspirationItem({ title: "Reception 2", note: "warm candles and relaxed dinner", createdAt: "2026-09-26T00:01:00.000Z" }),
+    buildWeddingInspirationItem({ title: "Flowers", note: "low floral arrangements for conversation", createdAt: "2026-09-26T00:02:00.000Z" }),
+  ]));
+  const state = buildWeddingDecisionSelectionState({
+    artifactId: "artifact:venues",
+    artifactKind: "vendor_table",
+    table: {
+      ...table,
+      rows: [
+        ["Warm Loft", "Venue", "Warm candle lighting, long table, low florals"],
+        ["Grand Ballroom", "Venue", "Large bright white ballroom with tall floral centerpieces and loud music"],
+      ],
+    },
+    experienceModel,
+  });
+
+  const loft = state.options.find((option) => option.label === "Warm Loft");
+  const ballroom = state.options.find((option) => option.label === "Grand Ballroom");
+
+  assert.ok(loft?.preferenceFitLabels.some((label) => /warm/i.test(label)));
+  assert.ok(ballroom?.tradeoffLabels.some((label) => /conversation/i.test(label)));
+  assert.match(ballroom?.preferenceSummaryLabel ?? "", /style tradeoff/i);
 });

@@ -17,6 +17,7 @@ import { weddingNeedToKnowContextToAfpMessage } from "@/lib/weddingNeedToKnowAfp
 import { buildWeddingPersistedWorkspaceState } from "@/lib/weddingPersistedWorkspaceState";
 import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 import { weddingDecisionProjectionToAfpMessage } from "@/lib/weddingDecisionAfpProjectionState";
+import { weddingDecisionDeferralToAfpMessage } from "@/lib/weddingDecisionDeferralAfpState";
 import { buildWeddingImportSynthesisState } from "@/lib/weddingImportSynthesisState";
 import { buildWeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
 import {
@@ -24,6 +25,19 @@ import {
   type WeddingBoundaryChangeRequest,
   type WeddingBoundaryPolicy,
 } from "@/lib/weddingBoundaryLedgerState";
+import {
+  buildWeddingSeatingConstraintActionFromInstruction,
+  weddingSeatingConstraintActionToAfpMessage,
+} from "@/lib/weddingSeatingConstraintActionState";
+import {
+  buildWeddingSeatingOptimizationResult,
+  weddingSeatingOptimizationResultToAfpMessage,
+} from "@/lib/weddingSeatingOptimizationState";
+import { weddingSeatingDraftArchiveToAfpMessage } from "@/lib/weddingSeatingDraftArchiveState";
+import {
+  buildWeddingInspirationItem,
+  weddingInspirationItemsToAfpMessage,
+} from "@/lib/weddingInspirationState";
 
 const metadata = {
   weddingPlanId: "wedding_plan:persisted",
@@ -271,6 +285,144 @@ test("buildWeddingPersistedWorkspaceState preserves auto-blocked boundary gate h
   assert.equal(message.content.approval_gate_recorded, true);
   assert.equal(request?.requestStatus, "auto_blocked");
   assert.equal(request?.approvalRequired, true);
+});
+
+test("buildWeddingPersistedWorkspaceState reloads saved seating constraints from AFP messages", () => {
+  const action = buildWeddingSeatingConstraintActionFromInstruction({
+    instruction: "Move Uncle David away from Mum.",
+    people: [
+      { id: "mum", label: "Mum" },
+      { id: "uncle-david", label: "Uncle David" },
+    ],
+  });
+  assert.ok(action);
+  const state = buildWeddingPersistedWorkspaceState({
+    messages: [
+      weddingSeatingConstraintActionToAfpMessage({ action, metadata, createdAt: "2026-09-26T00:00:00.000Z" }),
+    ],
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+  });
+
+  assert.equal(state.hasPersistedData, true);
+  assert.equal(state.seatingConstraints.length, 1);
+  assert.equal(state.seatingConstraints[0]?.kind, "keep_apart");
+  assert.equal(state.seatingConstraints[0]?.primaryPersonId, "uncle-david");
+  assert.equal(state.seatingConstraints[0]?.relatedPersonId, "mum");
+});
+
+test("buildWeddingPersistedWorkspaceState reloads saved seating drafts from AFP messages", () => {
+  const result = buildWeddingSeatingOptimizationResult({
+    people: [
+      { id: "mum", label: "Mum" },
+      { id: "uncle-david", label: "Uncle David", conflictPersonIds: ["mum"] },
+    ],
+    tables: [
+      { id: "table-1", label: "Table 1", capacity: 10 },
+      { id: "table-2", label: "Table 2", capacity: 10 },
+    ],
+  });
+  const newerResult = {
+    ...result,
+    assignments: result.assignments.map((assignment) => assignment.personId === "mum"
+      ? { ...assignment, tableId: "table-2", tableLabel: "Table 2" }
+      : assignment),
+    explanationLabels: ["Newer saved seating draft."],
+  };
+  const state = buildWeddingPersistedWorkspaceState({
+    messages: [
+      weddingSeatingOptimizationResultToAfpMessage({ result: newerResult, metadata, createdAt: "2026-09-26T00:10:00.000Z" }),
+      weddingSeatingOptimizationResultToAfpMessage({ result, metadata, createdAt: "2026-09-26T00:05:00.000Z" }),
+    ],
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+  });
+
+  assert.equal(state.hasPersistedData, true);
+  assert.equal(state.seatingOptimizations.length, 2);
+  assert.equal(state.seatingOptimizations[0]?.explanationLabels[0], result.explanationLabels[0]);
+  assert.equal(state.seatingOptimizations.at(-1)?.explanationLabels[0], "Newer saved seating draft.");
+  assert.equal(state.seatingOptimizations.at(-1)?.assignments.find((assignment) => assignment.personId === "mum")?.tableLabel, "Table 2");
+});
+
+test("buildWeddingPersistedWorkspaceState reloads hidden seating draft records", () => {
+  const state = buildWeddingPersistedWorkspaceState({
+    messages: [
+      weddingSeatingDraftArchiveToAfpMessage({
+        fingerprint: "guest-1:table-1",
+        metadata,
+        createdAt: "2026-09-26T00:15:00.000Z",
+      }),
+    ],
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+  });
+
+  assert.equal(state.hasPersistedData, true);
+  assert.equal(state.seatingDraftArchives.length, 1);
+  assert.equal(state.seatingDraftArchives[0]?.fingerprint, "guest-1:table-1");
+});
+
+test("buildWeddingPersistedWorkspaceState reloads wedding inspiration knowledge", () => {
+  const state = buildWeddingPersistedWorkspaceState({
+    messages: [
+      weddingInspirationItemsToAfpMessage({
+        items: [buildWeddingInspirationItem({
+          title: "Reception inspiration",
+          note: "warm lighting and long table",
+          createdAt: "2026-09-26T00:00:00.000Z",
+        })],
+        metadata,
+        createdAt: "2026-09-26T00:20:00.000Z",
+      }),
+    ],
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+  });
+
+  assert.equal(state.hasPersistedData, true);
+  assert.equal(state.inspirationItems.length, 1);
+  assert.ok(state.inspirationItems[0]?.tags.includes("warm lighting"));
+});
+
+test("buildWeddingPersistedWorkspaceState coalesces duplicate inspiration saves newest-first", () => {
+  const original = buildWeddingInspirationItem({
+    title: "Reception inspiration",
+    note: "warm lighting",
+    createdAt: "2026-09-26T00:00:00.000Z",
+  });
+  const refined = {
+    ...original,
+    note: "warm lighting and long table",
+    tags: [...original.tags, "long table"],
+    preferenceSignals: [...original.preferenceSignals, "communal table style"],
+  };
+  const state = buildWeddingPersistedWorkspaceState({
+    messages: [
+      weddingInspirationItemsToAfpMessage({
+        items: [refined],
+        metadata,
+        createdAt: "2026-09-26T00:30:00.000Z",
+      }),
+      weddingInspirationItemsToAfpMessage({
+        items: [original],
+        metadata,
+        createdAt: "2026-09-26T00:20:00.000Z",
+      }),
+    ],
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+  });
+
+  assert.equal(state.hasPersistedData, true);
+  assert.equal(state.inspirationItems.length, 1);
+  assert.equal(state.inspirationItems[0]?.note, "warm lighting and long table");
+  assert.ok(state.inspirationItems[0]?.tags.includes("long table"));
 });
 
 test("buildWeddingPersistedWorkspaceState preserves wedding import original-upload receipts", () => {
@@ -548,6 +700,42 @@ test("buildWeddingPersistedWorkspaceState reloads approval receipt block kinds",
   assert.equal(state.approvalReceipts.length, 1);
   assert.equal(state.approvalReceipts[0]?.status, "blocked");
   assert.equal(state.approvalReceipts[0]?.blockKind, "needs_user_approval");
+});
+
+test("buildWeddingPersistedWorkspaceState reloads deferred wedding decision records", () => {
+  const message = weddingDecisionDeferralToAfpMessage({
+    metadata,
+    item: {
+      id: "task:weather-backup",
+      kind: "task",
+      title: "Confirm wet-weather backup",
+      pressureFamily: "attention",
+      rankWeight: 72,
+      dueLabel: "Before deposit",
+      dueAt: "2026-09-27T09:00:00.000Z",
+      explanation: "Weather backup is blocking venue confidence.",
+      evidenceLabels: ["selected venue", "no backup found"],
+      sourceSurface: "tasks",
+      simulatorSeedKind: "response",
+    },
+  }, "2026-09-25T09:00:00.000Z");
+  const state = buildWeddingPersistedWorkspaceState({
+    messages: [message],
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+  });
+
+  assert.equal(state.hasPersistedData, true);
+  assert.equal(state.decisionDeferrals.length, 1);
+  assert.equal(state.decisionDeferrals[0]?.focusItemId, "task:weather-backup");
+  assert.equal(state.decisionDeferrals[0]?.title, "Confirm wet-weather backup");
+  assert.deepEqual(state.decisionDeferrals[0]?.evidenceLabels, ["selected venue", "no backup found"]);
+  assert.equal(state.decisionDeferrals[0]?.deferredUntilAt, "2026-09-24T09:00:00.000Z");
+  assert.equal(state.decisionDeferrals[0]?.staleAfterAt, "2026-10-02T09:00:00.000Z");
+  assert.match(state.decisionDeferrals[0]?.dependencyFingerprint ?? "", /weather-backup/i);
+  assert.ok(state.decisionDeferrals[0]?.metadataLabels.includes("deferred decision"));
+  assert.ok(state.decisionDeferrals[0]?.metadataLabels.includes("bring back 2026-09-24"));
 });
 
 test("buildWeddingPersistedWorkspaceState reloads registry provider handoff metadata", () => {

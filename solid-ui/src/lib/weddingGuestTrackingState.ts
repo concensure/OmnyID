@@ -1,5 +1,6 @@
 // @locs-version: 2.0
 import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
+import type { WeddingBoundaryLedgerObject } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 
@@ -16,6 +17,8 @@ export type WeddingGuestTrackingState = {
   missingMealCount: number;
   finalCountOptions: WeddingGuestFinalCountOption[];
   followUpTaskCandidates: WeddingGuestFollowUpTaskCandidate[];
+  boundaryRuleLabels: string[];
+  invitationScopeLabels: string[];
   summaryLabel: string;
   warningLabels: string[];
   sourceLabels: string[];
@@ -89,7 +92,8 @@ function cell(row: readonly string[], index: number): string {
 }
 
 function hasUsefulValue(value: string): boolean {
-  return Boolean(value) && !/\b(n\/a|none|no|unknown|tbc|tbd|pending)\b/i.test(value);
+  const normalized = clean(value).toLowerCase();
+  return Boolean(normalized) && !/^(n\/a|none|no|unknown|tbc|tbd|pending)$/.test(normalized);
 }
 
 function metadataRecord(value: unknown): Record<string, unknown> {
@@ -229,6 +233,39 @@ function priorityForGuestTask(candidate: WeddingGuestFollowUpTaskCandidate): Wed
   return "normal";
 }
 
+function activeBoundaryRuleLabels(objects: readonly WeddingBoundaryLedgerObject[] | null | undefined): string[] {
+  return (objects ?? [])
+    .filter((object): object is Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_policy" }> => (
+      object.kind === "wedding_boundary_policy"
+      && (object.status ?? "active") === "active"
+      && ["plus_one", "children", "invitation_scope"].includes(object.ruleType)
+    ))
+    .map((policy) => clean(policy.plainLanguage) || clean(policy.title))
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
+function invitationScopeLabels(objects: readonly WeddingBoundaryLedgerObject[] | null | undefined): string[] {
+  const invitations = (objects ?? [])
+    .filter((object): object is Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_event_invitation" }> => (
+      object.kind === "wedding_boundary_event_invitation"
+      && object.invitationStatus !== "not_invited"
+      && object.invitationStatus !== "declined_by_couple"
+    ));
+  const plusOneAllowed = invitations.filter((invitation) => invitation.plusOneAllowed === true).length;
+  const plusOneBlocked = invitations.filter((invitation) => invitation.plusOneAllowed === false).length;
+  const childrenInvited = invitations.filter((invitation) => invitation.childrenInvited === true).length;
+  const childrenBlocked = invitations.filter((invitation) => invitation.childrenInvited === false).length;
+  return [
+    plusOneAllowed + plusOneBlocked > 0
+      ? `Plus-ones: ${plusOneAllowed} included, ${plusOneBlocked} not included`
+      : null,
+    childrenInvited + childrenBlocked > 0
+      ? `Children: ${childrenInvited} included, ${childrenBlocked} not included`
+      : null,
+  ].filter((label): label is string => Boolean(label));
+}
+
 export function buildWeddingGuestFollowUpTaskItems(input: WeddingGuestFollowUpTaskInput): WeddingPlanningTaskItem[] {
   const guests = input.guestTracking;
   if (!guests) return [];
@@ -322,6 +359,7 @@ export function buildWeddingGuestFinalCountDecisionTaskItems(input: WeddingGuest
 
 export function buildWeddingGuestTrackingState(input: {
   artifacts?: readonly WeddingArtifactInput[] | null;
+  boundaryObjects?: readonly WeddingBoundaryLedgerObject[] | null;
   estimatedCostPerGuest?: number | null;
 }): WeddingGuestTrackingState {
   const guestArtifacts = (input.artifacts ?? []).filter((artifact) => artifact.kind === "guest_list");
@@ -363,6 +401,27 @@ export function buildWeddingGuestTrackingState(input: {
     }
   }
 
+  const boundaryProfiles = new Map<string, Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_guest_profile" }>>();
+  const boundaryInvitations = new Map<string, Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_event_invitation" }>>();
+  for (const object of input.boundaryObjects ?? []) {
+    if (object.kind === "wedding_boundary_guest_profile") boundaryProfiles.set(object.personId, object);
+    if (object.kind === "wedding_boundary_event_invitation") boundaryInvitations.set(object.personId, object);
+  }
+  if (boundaryProfiles.size > 0) sourceLabels.push("Saved guest records");
+  for (const profile of boundaryProfiles.values()) {
+    const invitation = boundaryInvitations.get(profile.personId);
+    guestRowCount += 1;
+    householdKeys.add(uniqueHouseholdKey(profile.displayName, profile.householdId ?? ""));
+    const status = invitation?.invitationStatus;
+    if (status === "rsvp_yes") attendingCount += 1;
+    else if (status === "rsvp_no" || status === "declined_by_couple") declinedCount += 1;
+    else pendingCount += 1;
+    if (hasUsefulValue(profile.dietaryNote ?? "")) dietaryCount += 1;
+    if (hasUsefulValue(profile.accessibilityNote ?? "")) accessibilityCount += 1;
+    if (!hasUsefulValue(profile.contactLabel ?? "")) missingContactCount += 1;
+    if (status === "rsvp_yes" && !hasUsefulValue(profile.mealPreference ?? "")) missingMealCount += 1;
+  }
+
   const warningLabels = [
     pendingCount > 0 ? `${pendingCount} RSVP${pendingCount === 1 ? "" : "s"} still pending` : null,
     missingContactCount > 0 ? `${missingContactCount} guest contact${missingContactCount === 1 ? "" : "s"} missing` : null,
@@ -373,6 +432,8 @@ export function buildWeddingGuestTrackingState(input: {
     : null;
   const options = guestRowCount > 0 ? finalCountOptions({ attendingCount, pendingCount, estimatedCostPerGuest: cost }) : [];
   const tasks = followUpTaskCandidates({ pendingCount, missingContactCount, missingMealCount });
+  const ruleLabels = activeBoundaryRuleLabels(input.boundaryObjects);
+  const scopeLabels = invitationScopeLabels(input.boundaryObjects);
 
   return {
     guestFileCount: guestArtifacts.length,
@@ -387,6 +448,8 @@ export function buildWeddingGuestTrackingState(input: {
     missingMealCount,
     finalCountOptions: options,
     followUpTaskCandidates: tasks,
+    boundaryRuleLabels: ruleLabels,
+    invitationScopeLabels: scopeLabels,
     summaryLabel: guestRowCount === 0
       ? "No structured guest-list rows detected yet."
       : `${guestRowCount} guest row${guestRowCount === 1 ? "" : "s"} tracked across ${householdKeys.size} household${householdKeys.size === 1 ? "" : "s"}; ${attendingCount} attending, ${pendingCount} pending.`,

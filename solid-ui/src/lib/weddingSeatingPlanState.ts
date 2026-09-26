@@ -1,8 +1,20 @@
 // @locs-version: 2.0
 import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
+import type { WeddingBoundaryLedgerObject } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
+import {
+  buildWeddingSeatingOptimizationResult,
+  type WeddingSeatingOptimizationNeed,
+  type WeddingSeatingOptimizationResult,
+  type WeddingSeatingPersonNode,
+  type WeddingSeatingTableNode,
+} from "@/lib/weddingSeatingOptimizationState";
+import {
+  applyWeddingSeatingConstraintAction,
+  type WeddingSeatingConstraintAction,
+} from "@/lib/weddingSeatingConstraintActionState";
 
 export type WeddingSeatingPlanState = {
   guestRowsConsidered: number;
@@ -22,6 +34,9 @@ export type WeddingSeatingPlanState = {
   vendorBriefLines: string[];
   actionItems: WeddingSeatingActionItem[];
   dietaryAccessibilityBrief: WeddingDietaryAccessibilityBrief;
+  optimizationPreview: WeddingSeatingOptimizationResult | null;
+  optimizationPeople: WeddingSeatingPersonNode[];
+  optimizationTables: WeddingSeatingTableNode[];
 };
 
 export type WeddingSeatingTableBrief = {
@@ -99,7 +114,8 @@ function isAttending(value: string): boolean {
 }
 
 function hasUsefulValue(value: string): boolean {
-  return Boolean(value) && !/\b(n\/a|none|no|unknown|tbc|tbd|pending)\b/i.test(value);
+  const normalized = clean(value).toLowerCase();
+  return Boolean(normalized) && !/^(n\/a|none|no|unknown|tbc|tbd|pending)$/.test(normalized);
 }
 
 function hasSensitiveSeating(value: string): boolean {
@@ -135,6 +151,58 @@ function accessibilityCategories(value: string): string[] {
   if (/\bsensory|quiet|neurodivergent\b/.test(text)) categories.push("sensory support");
   if (categories.length === 0 && hasUsefulValue(value)) categories.push("other accessibility note");
   return categories;
+}
+
+function seatingId(value: string, fallback: string): string {
+  const normalized = clean(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return normalized || fallback;
+}
+
+function accessibilityNeeds(value: string): WeddingSeatingOptimizationNeed[] {
+  const text = value.toLowerCase();
+  const needs: WeddingSeatingOptimizationNeed[] = [];
+  if (/\bwheelchair\b/.test(text)) needs.push("wheelchair");
+  if (/\bmobility|walker|crutch|cane|step[-\s]?free|stairs?\b/.test(text)) needs.push("mobility");
+  if (/\bhearing|auslan|caption\b/.test(text)) needs.push("hearing");
+  if (/\bvision|visual|low[-\s]?vision\b/.test(text)) needs.push("vision");
+  if (/\bsensory|quiet|neurodivergent\b/.test(text)) needs.push("sensory");
+  return Array.from(new Set(needs));
+}
+
+function splitList(value: string): string[] {
+  return value.split(/[,;/]|\band\b/i).map((item) => item.trim()).filter(Boolean);
+}
+
+function conflictLabels(value: string): string[] {
+  const match = value.match(/\b(?:do not seat with|not together with|keep apart from|avoid|conflict with)\s+([^.;]+)/i);
+  return match ? splitList(match[1] ?? "") : [];
+}
+
+function tableNodes(labels: readonly string[], suggestedCount: number, seatsPerTable: number, needsAccessible: boolean): WeddingSeatingTableNode[] {
+  const sourceLabels = labels.slice();
+  for (let index = sourceLabels.length; index < Math.max(1, suggestedCount); index += 1) {
+    sourceLabels.push(`Table ${index + 1}`);
+  }
+  return sourceLabels.map((label, index) => ({
+    id: seatingId(label, `table-${index + 1}`),
+    label,
+    capacity: seatsPerTable,
+    accessible: needsAccessible ? index === 0 : true,
+    distanceToExitMeters: index === 0 ? 8 : 18,
+    distanceToSpeakerMeters: index === 0 ? 19 : 9,
+  }));
+}
+
+function applyConflictLabels(people: WeddingSeatingPersonNode[], pending: Map<string, string[]>): WeddingSeatingPersonNode[] {
+  const idByLabel = new Map(people.map((person) => [person.label.toLowerCase(), person.id]));
+  return people.map((person) => {
+    const conflicts = (pending.get(person.id) ?? [])
+      .map((label) => idByLabel.get(label.toLowerCase()) ?? "")
+      .filter(Boolean);
+    return conflicts.length > 0
+      ? { ...person, conflictPersonIds: Array.from(new Set([...(person.conflictPersonIds ?? []), ...conflicts])) }
+      : person;
+  });
 }
 
 function countLabels(map: Map<string, number>): string[] {
@@ -252,6 +320,9 @@ export function buildWeddingSeatingActionTaskItems(input: WeddingSeatingActionTa
 
 export function buildWeddingSeatingPlanState(input: {
   artifacts?: readonly WeddingArtifactInput[] | null;
+  boundaryObjects?: readonly WeddingBoundaryLedgerObject[] | null;
+  seatingConstraints?: readonly WeddingSeatingConstraintAction[] | null;
+  seatingOptimizations?: readonly WeddingSeatingOptimizationResult[] | null;
   guestTracking?: WeddingGuestTrackingState | null;
   seatsPerTable?: number | null;
 }): WeddingSeatingPlanState {
@@ -269,30 +340,52 @@ export function buildWeddingSeatingPlanState(input: {
   const tableBriefMap = new Map<string, Omit<WeddingSeatingTableBrief, "summaryLabel">>();
   const dietaryMap = new Map<string, number>();
   const accessibilityMap = new Map<string, number>();
+  const optimizerPeople: WeddingSeatingPersonNode[] = [];
+  const pendingConflictLabels = new Map<string, string[]>();
 
   for (const artifact of input.artifacts ?? []) {
     if (artifact.kind !== "guest_list") continue;
     const table = parseMarkdownTable(clean(artifact.bodyText));
     if (!table) continue;
     const rsvpIndex = headerIndex(table.headers, /\b(rsvp|attendance|attending|status)\b/i);
-    const tableIndex = headerIndex(table.headers, /\b(table|seat|seating)\b/i);
+    const tableIndex = headerIndex(table.headers, /^(table|table no\.?|table number|seat assignment|assigned table)$/i);
     const householdIndex = headerIndex(table.headers, /\b(household|family|group|party)\b/i);
     const roleIndex = headerIndex(table.headers, /\b(role|vip|wedding party|bridal party|family side)\b/i);
     const noteIndex = headerIndex(table.headers, /\b(note|seating note|sensitive|constraint|relationship)\b/i);
+    const nameIndex = headerIndex(table.headers, /\b(name|guest|person)\b/i);
+    const languageIndex = headerIndex(table.headers, /\b(language|languages)\b/i);
+    const socialIndex = headerIndex(table.headers, /\b(social|friend group|group)\b/i);
     const mealIndex = headerIndex(table.headers, /\b(meal|menu|food)\b/i);
     const dietaryIndex = headerIndex(table.headers, /\b(dietary|allerg|vegan|vegetarian|gluten|nut)\b/i);
     const accessibilityIndex = headerIndex(table.headers, /\b(accessibility|access|mobility|wheelchair|sensory)\b/i);
 
-    for (const row of table.rows) {
+    for (const [rowNumber, row] of table.rows.entries()) {
       const attending = rsvpIndex < 0 || isAttending(cell(row, rsvpIndex));
       if (!attending) continue;
       guestRowsConsidered += 1;
+      const nameLabel = cell(row, nameIndex) || `Guest ${guestRowsConsidered}`;
       const tableLabel = cell(row, tableIndex);
       const householdLabel = cell(row, householdIndex);
       const roleLabel = cell(row, roleIndex);
       const noteLabel = cell(row, noteIndex);
       const dietaryLabel = [cell(row, mealIndex), cell(row, dietaryIndex)].filter(Boolean).join(" ");
       const accessibilityLabel = cell(row, accessibilityIndex);
+      const personId = seatingId(nameLabel, `guest-row-${rowNumber + 1}`);
+      optimizerPeople.push({
+        id: personId,
+        label: nameLabel,
+        householdId: hasUsefulValue(householdLabel) ? seatingId(householdLabel, "household") : null,
+        familyId: hasUsefulValue(householdLabel) ? seatingId(householdLabel, "family") : null,
+        relationshipLabel: roleLabel || null,
+        languages: splitList(cell(row, languageIndex)),
+        accessibilityNeeds: accessibilityNeeds(accessibilityLabel),
+        dietaryRequirements: splitList(dietaryLabel),
+        weddingPartyRole: roleLabel || null,
+        socialGroups: splitList(cell(row, socialIndex)),
+        preferences: hasUsefulValue(noteLabel) ? [noteLabel] : [],
+      });
+      const conflicts = conflictLabels(noteLabel);
+      if (conflicts.length > 0) pendingConflictLabels.set(personId, conflicts);
       const isVip = /\b(vip|bride|groom|parent|family|bridal|wedding party|maid|best man|groomsman|bridesmaid)\b/i.test(roleLabel);
       const isSensitive = hasSensitiveSeating(`${noteLabel} ${roleLabel}`);
       const hasDietaryOrAccessibility = hasUsefulValue(dietaryLabel) || hasUsefulValue(accessibilityLabel);
@@ -328,6 +421,45 @@ export function buildWeddingSeatingPlanState(input: {
     }
   }
 
+  const boundaryProfiles = new Map<string, Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_guest_profile" }>>();
+  const boundaryInvitations = new Map<string, Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_event_invitation" }>>();
+  for (const object of input.boundaryObjects ?? []) {
+    if (object.kind === "wedding_boundary_guest_profile") boundaryProfiles.set(object.personId, object);
+    if (object.kind === "wedding_boundary_event_invitation") boundaryInvitations.set(object.personId, object);
+  }
+  for (const profile of boundaryProfiles.values()) {
+    const invitation = boundaryInvitations.get(profile.personId);
+    if (invitation?.invitationStatus !== "rsvp_yes") continue;
+    guestRowsConsidered += 1;
+    unassignedAttendingCount += 1;
+    const householdLabel = clean(profile.householdId);
+    const roleLabel = clean(profile.relationshipLabel);
+    const dietaryLabel = [profile.mealPreference, profile.dietaryNote].map(clean).filter(Boolean).join(" ");
+    const accessibilityLabel = clean(profile.accessibilityNote);
+    optimizerPeople.push({
+      id: profile.personId,
+      label: profile.displayName,
+      householdId: profile.householdId ?? null,
+      familyId: profile.householdId ?? null,
+      relationshipLabel: roleLabel || null,
+      ageBand: profile.ageBand === "child_under_12" ? "child" : profile.ageBand === "teen" ? "teen" : "adult",
+      accessibilityNeeds: accessibilityNeeds(accessibilityLabel),
+      dietaryRequirements: splitList(dietaryLabel),
+      weddingPartyRole: roleLabel || null,
+      socialGroups: profile.familySide ? [profile.familySide] : [],
+      preferences: [],
+    });
+    const isVip = /\b(vip|bride|groom|parent|family|bridal|wedding party|maid|best man|groomsman|bridesmaid)\b/i.test(roleLabel);
+    if (hasUsefulValue(householdLabel)) householdLabels.add(householdLabel.toLowerCase());
+    if (isVip) vipOrWeddingPartyCount += 1;
+    for (const category of dietaryCategories(dietaryLabel)) increment(dietaryMap, category);
+    for (const category of accessibilityCategories(accessibilityLabel)) increment(accessibilityMap, category);
+    if (/\b(severe|anaphylaxis|anaphylactic|epi[-\s]?pen|epipen|life[-\s]?threatening)\b/i.test(dietaryLabel)) {
+      severeAllergyCount += 1;
+    }
+    if (hasUsefulValue(accessibilityLabel)) accessibilityConstraintCount += 1;
+  }
+
   householdGroupCount = householdLabels.size;
   const attendingCount = Math.max(guestRowsConsidered, input.guestTracking?.attendingCount ?? 0);
   const suggestedTableCount = Math.max(0, Math.ceil(attendingCount / seatsPerTable));
@@ -356,6 +488,27 @@ export function buildWeddingSeatingPlanState(input: {
     householdGroupCount,
     attendingCount,
   });
+  const minimumOptimizerTables = (input.seatingConstraints ?? []).some((constraint) => constraint.kind === "keep_apart") && attendingCount > 1
+    ? 2
+    : 1;
+  const optimizerTables = tableNodes(
+    Array.from(tableLabels).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })),
+    Math.max(suggestedTableCount, minimumOptimizerTables),
+    seatsPerTable,
+    accessibilityConstraintCount > 0,
+  );
+  const optimizationPeople = (input.seatingConstraints ?? []).reduce(
+    (people, action) => applyWeddingSeatingConstraintAction(people, action),
+    applyConflictLabels(optimizerPeople, pendingConflictLabels),
+  );
+  const computedOptimizationPreview = optimizationPeople.length > 0
+    ? buildWeddingSeatingOptimizationResult({
+      people: optimizationPeople,
+      tables: optimizerTables,
+    })
+    : null;
+  const savedOptimizationPreview = (input.seatingOptimizations ?? []).at(-1) ?? null;
+  const optimizationPreview = savedOptimizationPreview ?? computedOptimizationPreview;
 
   const statusLabel = guestRowsConsidered === 0
     ? "Needs guest data"
@@ -393,5 +546,8 @@ export function buildWeddingSeatingPlanState(input: {
       ].filter((label): label is string => Boolean(label)),
       correctionLoopLabel: "After vendor acknowledgement, record corrections back into the guest list before final count and seating export.",
     },
+    optimizationPreview,
+    optimizationPeople,
+    optimizationTables: optimizerTables,
   };
 }

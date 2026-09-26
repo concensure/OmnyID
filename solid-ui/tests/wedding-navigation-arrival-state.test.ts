@@ -72,7 +72,7 @@ test("buildWeddingNavigationArrivalState gives task and graph guidance", () => {
     notice: "Opening wedding topology in Knowledge Graph.",
   });
 
-  assert.equal(taskState?.badge, "Task context");
+  assert.equal(taskState?.badge, "Wedding tasks");
   assert.match(taskState?.nextStep ?? "", /Confirm owner/);
   assert.equal(graphState?.badge, "Related details");
   assert.match(graphState?.nextStep ?? "", /connected details and missing proof/);

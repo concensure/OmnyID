@@ -33,6 +33,23 @@ import {
   type WeddingArtifactKind,
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
+import {
+  weddingSeatingOptimizationResultFromAfpMessage,
+  type WeddingSeatingOptimizationResult,
+} from "@/lib/weddingSeatingOptimizationState";
+import {
+  weddingSeatingDraftArchiveFromAfpMessage,
+  type WeddingSeatingDraftArchiveRecord,
+} from "@/lib/weddingSeatingDraftArchiveState";
+import {
+  buildWeddingInspirationState,
+  weddingInspirationItemsFromAfpMessage,
+  type WeddingInspirationItem,
+} from "@/lib/weddingInspirationState";
+import type {
+  WeddingSeatingConstraintAction,
+  WeddingSeatingConstraintKind,
+} from "@/lib/weddingSeatingConstraintActionState";
 
 export type WeddingPersistedApprovalReceipt = {
   id: string;
@@ -76,13 +93,36 @@ export type WeddingPersistedDecisionRecord = {
   metadataLabels: string[];
 };
 
+export type WeddingPersistedDecisionDeferral = {
+  id: string;
+  focusItemId: string;
+  focusItemKind: string;
+  title: string;
+  pressureFamily: string | null;
+  sourceSurface: string | null;
+  dueLabel: string | null;
+  dueAt: string | null;
+  explanation: string | null;
+  evidenceLabels: string[];
+  createdAt: string;
+  deferredUntilAt?: string | null;
+  staleAfterAt?: string | null;
+  dependencyFingerprint?: string | null;
+  metadataLabels: string[];
+};
+
 export type WeddingPersistedWorkspaceState = {
   metadata: WeddingPlanningMetadata;
   artifacts: WeddingArtifactInput[];
   contextItems: WeddingNeedToKnowProjectionContext[];
   approvalReceipts: WeddingPersistedApprovalReceipt[];
   decisionRecords: WeddingPersistedDecisionRecord[];
+  decisionDeferrals: WeddingPersistedDecisionDeferral[];
   boundaryObjects: WeddingBoundaryLedgerObject[];
+  seatingConstraints: WeddingSeatingConstraintAction[];
+  seatingOptimizations: WeddingSeatingOptimizationResult[];
+  seatingDraftArchives: WeddingSeatingDraftArchiveRecord[];
+  inspirationItems: WeddingInspirationItem[];
   scheduleItems: WeddingPlanningScheduleItem[];
   taskItems: WeddingPlanningTaskItem[];
   sourceMessageIds: string[];
@@ -204,6 +244,13 @@ const BOUNDARY_REQUEST_STATUSES = new Set<WeddingBoundaryRequestStatus>([
   "approved",
   "declined",
   "auto_blocked",
+]);
+
+const SEATING_CONSTRAINT_KINDS = new Set<WeddingSeatingConstraintKind>([
+  "keep_apart",
+  "prefer_together",
+  "prefer_quiet",
+  "social_group_together",
 ]);
 
 function clean(value: unknown): string | null {
@@ -472,6 +519,12 @@ function boundaryRequestStatusFrom(value: unknown): WeddingBoundaryRequestStatus
     : "pending";
 }
 
+function seatingConstraintKindFrom(value: unknown): WeddingSeatingConstraintKind | null {
+  return typeof value === "string" && SEATING_CONSTRAINT_KINDS.has(value as WeddingSeatingConstraintKind)
+    ? value as WeddingSeatingConstraintKind
+    : null;
+}
+
 function noimValue(value: unknown): WeddingPlanningContext["noimDownloaded"] {
   if (value === true || value === false) return value;
   const normalized = clean(value);
@@ -679,6 +732,70 @@ function messageToDecisionRecord(message: AfpMessage): WeddingPersistedDecisionR
   };
 }
 
+function messageToDecisionDeferral(message: AfpMessage): WeddingPersistedDecisionDeferral | null {
+  if (message.subtype !== "wedding_decision_deferral" || workspaceIdFrom(message) === null) return null;
+  const id = clean(contentValue(message, "deferral_id")) ?? clean(message.metadata?.deferral_id) ?? message.id;
+  const focusItemId = clean(contentValue(message, "focus_item_id") ?? message.metadata?.focus_item_id);
+  const title = clean(contentValue(message, "title") ?? message.metadata?.focus_item_title);
+  if (!id || !focusItemId || !title) return null;
+  const focusItemKind = clean(contentValue(message, "focus_item_kind") ?? message.metadata?.focus_item_kind) ?? "unknown";
+  const pressureFamily = clean(contentValue(message, "pressure_family"));
+  const sourceSurface = clean(contentValue(message, "source_surface"));
+  const dueLabel = clean(contentValue(message, "due_label"));
+  const dueAt = clean(contentValue(message, "due_at"));
+  const explanation = clean(contentValue(message, "explanation"));
+  const evidenceLabels = strings(contentValue(message, "evidence_labels")).slice(0, 8);
+  const deferredUntilAt = clean(contentValue(message, "deferred_until_at") ?? message.metadata?.deferred_until_at);
+  const staleAfterAt = clean(contentValue(message, "stale_after_at") ?? message.metadata?.stale_after_at);
+  const dependencyFingerprint = clean(contentValue(message, "dependency_fingerprint") ?? message.metadata?.dependency_fingerprint);
+  return {
+    id,
+    focusItemId,
+    focusItemKind,
+    title,
+    pressureFamily,
+    sourceSurface,
+    dueLabel,
+    dueAt,
+    explanation,
+    evidenceLabels,
+    createdAt: clean(contentValue(message, "created_at")) ?? message.timestamp,
+    deferredUntilAt,
+    staleAfterAt,
+    dependencyFingerprint,
+    metadataLabels: [
+      "deferred decision",
+      focusItemKind.replace(/_/g, " "),
+      pressureFamily?.replace(/_/g, " "),
+      sourceSurface?.replace(/_/g, " "),
+      dueLabel,
+      deferredUntilAt ? `bring back ${deferredUntilAt.slice(0, 10)}` : null,
+      clean(message.metadata?.projection),
+    ].filter((label): label is string => Boolean(label)),
+  };
+}
+
+function messageToSeatingConstraint(message: AfpMessage): WeddingSeatingConstraintAction | null {
+  if (message.subtype !== "wedding_seating_constraint" || workspaceIdFrom(message) === null) return null;
+  const kind = seatingConstraintKindFrom(contentValue(message, "constraint_kind") ?? message.metadata?.seating_constraint_kind);
+  const instruction = clean(contentValue(message, "instruction"));
+  if (!kind || !instruction) return null;
+  const confidenceValue = clean(contentValue(message, "confidence"));
+  const confidence = confidenceValue === "high" || confidenceValue === "medium" || confidenceValue === "low"
+    ? confidenceValue
+    : "medium";
+  return {
+    id: clean(contentValue(message, "constraint_id")) ?? message.id,
+    kind,
+    instruction,
+    primaryPersonId: clean(message.references?.find((reference) => reference.type === "seating_constraint_primary_person")?.target),
+    relatedPersonId: clean(message.references?.find((reference) => reference.type === "seating_constraint_related_person")?.target),
+    socialGroup: clean(message.references?.find((reference) => reference.type === "seating_constraint_social_group")?.target),
+    confidence,
+    statusLabel: clean(contentValue(message, "status_label")) ?? "Seating instruction saved.",
+  };
+}
+
 function boundaryBase(message: AfpMessage, fallback: WeddingPlanningMetadata): {
   id: string;
   title: string;
@@ -838,10 +955,39 @@ export function buildWeddingPersistedWorkspaceState(input: {
     const item = messageToDecisionRecord(message);
     return item ? [item] : [];
   });
+  const decisionDeferrals = scopedMessages.flatMap((message) => {
+    const item = messageToDecisionDeferral(message);
+    return item ? [item] : [];
+  });
   const boundaryObjects = coalesceWeddingBoundaryLedgerObjects(scopedMessages.flatMap((message) => {
     const item = messageToBoundaryObject(message, metadata);
     return item ? [item] : [];
   }));
+  const seatingConstraints = scopedMessages.flatMap((message) => {
+    const item = messageToSeatingConstraint(message);
+    return item ? [item] : [];
+  });
+  const seatingOptimizations = scopedMessages
+    .flatMap((message) => {
+      const item = weddingSeatingOptimizationResultFromAfpMessage(message);
+      return item ? [{ item, timestamp: Date.parse(message.timestamp) || 0 }] : [];
+    })
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .map((entry) => entry.item);
+  const seatingDraftArchives = scopedMessages
+    .flatMap((message) => {
+      const item = weddingSeatingDraftArchiveFromAfpMessage(message);
+      return item ? [{ item, timestamp: Date.parse(message.timestamp) || 0 }] : [];
+    })
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .map((entry) => entry.item);
+  const inspirationItems = buildWeddingInspirationState(scopedMessages
+    .flatMap((message) => weddingInspirationItemsFromAfpMessage(message).map((item) => ({
+      item,
+      timestamp: Date.parse(message.timestamp) || Date.parse(item.createdAt) || 0,
+    })))
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .map((entry) => entry.item)).items;
   const scheduleItems = scopedMessages.flatMap((message) => {
     const item = messageToScheduleItem(message, metadata);
     return item ? [item] : [];
@@ -857,7 +1003,12 @@ export function buildWeddingPersistedWorkspaceState(input: {
     contextItems,
     approvalReceipts,
     decisionRecords,
+    decisionDeferrals,
     boundaryObjects,
+    seatingConstraints,
+    seatingOptimizations,
+    seatingDraftArchives,
+    inspirationItems,
     scheduleItems,
     taskItems,
     sourceMessageIds: scopedMessages.map((message) => message.id),
@@ -865,7 +1016,12 @@ export function buildWeddingPersistedWorkspaceState(input: {
       || contextItems.length > 0
       || approvalReceipts.length > 0
       || decisionRecords.length > 0
+      || decisionDeferrals.length > 0
       || boundaryObjects.length > 0
+      || seatingConstraints.length > 0
+      || seatingOptimizations.length > 0
+      || seatingDraftArchives.length > 0
+      || inspirationItems.length > 0
       || scheduleItems.length > 0
       || taskItems.length > 0,
   };

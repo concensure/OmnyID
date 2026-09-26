@@ -3,13 +3,17 @@ import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWor
 
 export type WeddingWorkspaceMenuBadgeInput = Pick<
   WeddingResponseWorkspaceViewState,
-  "budgetTracking" | "guestTracking" | "seatingPlan" | "vendorContactCards" | "delegation" | "ganttTimeline"
+  "budgetTracking" | "guestTracking" | "seatingPlan" | "vendorContactCards" | "delegation" | "ganttTimeline" | "inspiration"
 >;
 
 export type WeddingWorkspaceMenuId =
   | "home"
+  | "people"
+  | "plan"
+  | "vision"
   | "budget"
   | "guests"
+  | "inspiration"
   | "seating"
   | "helpers"
   | "response_queue"
@@ -18,8 +22,12 @@ export type WeddingWorkspaceMenuId =
 
 const WEDDING_WORKSPACE_MENU_IDS: readonly WeddingWorkspaceMenuId[] = [
   "home",
+  "people",
+  "plan",
+  "vision",
   "budget",
   "guests",
+  "inspiration",
   "seating",
   "helpers",
   "response_queue",
@@ -91,11 +99,21 @@ export function weddingWorkspaceMenuBadge(
     const pending = state.guestTracking.pendingCount;
     return pending > 0 ? { label: String(pending), tone: "info" } : null;
   }
+  if (id === "people") {
+    const pending = state.guestTracking.pendingCount;
+    const unassigned = state.seatingPlan.unassignedAttendingCount;
+    const total = pending + unassigned;
+    return total > 0 ? { label: String(total), tone: "info" } : null;
+  }
   if (id === "seating") {
     const unassigned = state.seatingPlan.unassignedAttendingCount;
     return unassigned > 0 ? { label: String(unassigned), tone: "info" } : null;
   }
   if (id === "response_queue") {
+    const urgent = state.vendorContactCards.filter((card) => card.tone === "urgent").length;
+    return urgent > 0 ? { label: String(urgent), tone: "urgent" } : null;
+  }
+  if (id === "plan") {
     const urgent = state.vendorContactCards.filter((card) => card.tone === "urgent").length;
     return urgent > 0 ? { label: String(urgent), tone: "urgent" } : null;
   }
@@ -110,13 +128,19 @@ export function weddingWorkspaceMenuHint(
   if (!state) return null;
   if (id === "budget") return state.budgetTracking.budgetTargetAmount === null ? "Start" : null;
   if (id === "guests") return state.guestTracking.guestRowCount === 0 ? "Start" : null;
+  if (id === "people") return state.guestTracking.guestRowCount === 0 ? "Start" : null;
   if (id === "seating") {
     const hasGuestsToSeat = state.guestTracking.attendingCount > 0;
     return hasGuestsToSeat && state.seatingPlan.assignedSeatCount === 0 ? "Start" : null;
   }
   if (id === "helpers") return state.delegation.items.length === 0 ? "Start" : null;
+  if (id === "inspiration") return state.inspiration.items.length === 0 ? "Start" : null;
   if (id === "timeline") {
     return state.ganttTimeline.rows.length === 0 && state.ganttTimeline.undatedItems.length === 0 ? "Start" : null;
   }
+  if (id === "plan") {
+    return state.ganttTimeline.rows.length === 0 && state.vendorContactCards.length === 0 ? "Start" : null;
+  }
+  if (id === "vision") return state.inspiration.items.length === 0 ? "Start" : null;
   return null;
 }

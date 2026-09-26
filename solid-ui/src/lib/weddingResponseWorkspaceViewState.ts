@@ -33,8 +33,19 @@ import type {
 import type { WeddingNeedToKnowProjectionContext } from "@/lib/weddingNeedToKnowAfpProjectionState";
 import type {
   WeddingPersistedApprovalReceipt,
+  WeddingPersistedDecisionDeferral,
   WeddingPersistedDecisionRecord,
 } from "@/lib/weddingPersistedWorkspaceState";
+import type { WeddingSeatingDraftArchiveRecord } from "@/lib/weddingSeatingDraftArchiveState";
+import {
+  buildWeddingInspirationState,
+  type WeddingInspirationItem,
+  type WeddingInspirationState,
+} from "@/lib/weddingInspirationState";
+import {
+  buildWeddingExperienceModelState,
+  type WeddingExperienceModelState,
+} from "@/lib/weddingExperienceModelState";
 import type { WeddingProjectionQueueViewState } from "@/lib/weddingProjectionQueueViewState";
 import { buildWeddingResponseWorkspaceProjectionQueueState } from "@/lib/weddingResponseWorkspaceProjectionQueueState";
 import {
@@ -99,6 +110,7 @@ import {
   buildWeddingGuestTrackingState,
   type WeddingGuestTrackingState,
 } from "@/lib/weddingGuestTrackingState";
+import { weddingEstimatedCostPerGuest } from "@/lib/weddingGuestBudgetImpactState";
 import {
   buildWeddingSeatingPlanState,
   type WeddingSeatingPlanState,
@@ -135,6 +147,12 @@ import { buildWeddingBoundaryStarterObjects } from "@/lib/weddingBoundaryDefault
 import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
 import type { WeddingArtifactKind, WeddingApprovalState } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
+import type { WeddingSeatingConstraintAction } from "@/lib/weddingSeatingConstraintActionState";
+import type { WeddingSeatingOptimizationResult } from "@/lib/weddingSeatingOptimizationState";
+import {
+  buildWeddingSeatingDraftCards,
+  type WeddingSeatingDraftCard,
+} from "@/lib/weddingSeatingDraftCardState";
 
 export type WeddingWorkspaceFilterKind =
   | "artifact_kind"
@@ -200,6 +218,11 @@ export type WeddingVendorContactWorkspaceCard = {
   tone: "neutral" | "waiting" | "due" | "urgent" | "closed";
   detailLabel: string;
   nextActionLabel: string;
+  primaryActionLabel: string;
+  actionMode: "follow_up" | "waiting" | "reply_recorded";
+  lastContactLabel: string | null;
+  followUpDueLabel: string | null;
+  replyLabel: string | null;
   metadataLabels: string[];
 };
 export type WeddingExpectedBehaviorAuditCard = {
@@ -248,6 +271,9 @@ export type WeddingResponseWorkspaceViewState = {
   budgetTracking: WeddingBudgetTrackingState;
   guestTracking: WeddingGuestTrackingState;
   seatingPlan: WeddingSeatingPlanState;
+  seatingDraftCards: WeddingSeatingDraftCard[];
+  inspiration: WeddingInspirationState;
+  experienceModel: WeddingExperienceModelState;
   importParserReadiness: WeddingImportParserReadinessState;
   backgroundAutomationCoverage: WeddingBackgroundAutomationCoverageState;
   collaboration: WeddingCollaborationState;
@@ -426,6 +452,16 @@ function vendorContactTone(stage: WeddingOutreachEscalationStage): WeddingVendor
   return "neutral";
 }
 
+function vendorContactPrimaryActionLabel(stage: WeddingOutreachEscalationStage): string {
+  if (stage === "initial_outreach") return "Review and approve outreach";
+  if (stage === "follow_up_due") return "Review and approve follow-up";
+  if (stage === "escalate_to_user") return "Choose next step";
+  if (stage === "mark_unresponsive") return "Review alternatives";
+  if (stage === "waiting_for_reply") return "Open follow-up task";
+  if (stage === "closed") return "View response";
+  return "Review vendor";
+}
+
 function vendorContactCards(input: {
   metadata?: unknown;
   vendors?: readonly WeddingVendorContactOutreachVendor[] | null;
@@ -463,6 +499,15 @@ function vendorContactCards(input: {
         tone: vendorContactTone(state.stage),
         detailLabel: state.decisionPrompt,
         nextActionLabel: state.options[0]?.label ?? "Review vendor",
+        primaryActionLabel: vendorContactPrimaryActionLabel(state.stage),
+        actionMode: state.stage === "closed"
+          ? "reply_recorded"
+          : state.stage === "waiting_for_reply"
+            ? "waiting"
+            : "follow_up",
+        lastContactLabel,
+        followUpDueLabel: followUpLabel,
+        replyLabel,
         metadataLabels,
       };
     })
@@ -843,6 +888,7 @@ function recommendationCards(
 
 function decisionProjectionItems(
   artifacts: readonly WeddingArtifactInput[],
+  experienceModel?: Pick<WeddingExperienceModelState, "traits"> | null,
   storage?: Storage | null,
 ): WeddingDecisionProjectionInput[] {
   return artifacts.flatMap((artifact): WeddingDecisionProjectionInput[] => {
@@ -864,6 +910,7 @@ function decisionProjectionItems(
       table: preview,
       selectedOptionId,
       preferenceText: bodyText,
+      experienceModel,
     });
     if (!decision.selectedOption) return [];
     return [{
@@ -961,6 +1008,10 @@ export type WeddingResponseWorkspaceViewInput = WeddingWorkspaceProductionReadin
   adminDataConsentEnabled?: boolean | null;
   collaboratorInvites?: readonly WeddingCollaboratorInviteInput[] | null;
   boundaryObjects?: readonly WeddingBoundaryLedgerObject[] | null;
+  seatingConstraints?: readonly WeddingSeatingConstraintAction[] | null;
+  seatingOptimizations?: readonly WeddingSeatingOptimizationResult[] | null;
+  seatingDraftArchives?: readonly WeddingSeatingDraftArchiveRecord[] | null;
+  inspirationItems?: readonly WeddingInspirationItem[] | null;
   collaborationBackendReady?: boolean | null;
   collaborationEncryptionReady?: boolean | null;
   collaborationAuditReady?: boolean | null;
@@ -971,6 +1022,7 @@ export type WeddingResponseWorkspaceViewInput = WeddingWorkspaceProductionReadin
   contextItems?: readonly WeddingNeedToKnowProjectionContext[] | null;
   approvalReceipts?: readonly WeddingPersistedApprovalReceipt[] | null;
   decisionRecords?: readonly WeddingPersistedDecisionRecord[] | null;
+  decisionDeferrals?: readonly WeddingPersistedDecisionDeferral[] | null;
   generatedArtifacts?: readonly WeddingGeneratedArtifact[] | null;
   scheduleItems?: readonly WeddingPlanningScheduleItem[] | null;
   taskItems?: readonly WeddingPlanningTaskItem[] | null;
@@ -1028,14 +1080,34 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     title: "Wedding planning bundle",
   });
   const cards = recommendationCards(input.recommendations?.recommendations ?? []);
-  const decisions = decisionProjectionItems(artifacts, input.projectionStorage);
+  const inspiration = buildWeddingInspirationState(input.inspirationItems);
+  const experienceModel = buildWeddingExperienceModelState(inspiration);
+  const decisions = decisionProjectionItems(artifacts, experienceModel, input.projectionStorage);
   const budgetTracking = buildWeddingBudgetTrackingState({
     decisionRecords: input.decisionRecords,
     selectedDecisionItems: decisions,
     artifacts,
   });
-  const guestTracking = buildWeddingGuestTrackingState({ artifacts });
-  const seatingPlan = buildWeddingSeatingPlanState({ artifacts, guestTracking });
+  const persistedBoundaryObjects = input.boundaryObjects ?? null;
+  const guestTrackingWithoutBudget = buildWeddingGuestTrackingState({
+    artifacts,
+    boundaryObjects: persistedBoundaryObjects,
+  });
+  const guestTracking = buildWeddingGuestTrackingState({
+    artifacts,
+    boundaryObjects: persistedBoundaryObjects,
+    estimatedCostPerGuest: weddingEstimatedCostPerGuest({
+      budgetTracking,
+      guestTracking: guestTrackingWithoutBudget,
+    }),
+  });
+  const seatingPlan = buildWeddingSeatingPlanState({
+    artifacts,
+    boundaryObjects: persistedBoundaryObjects,
+    seatingConstraints: input.seatingConstraints,
+    seatingOptimizations: input.seatingOptimizations,
+    guestTracking,
+  });
   const importParserReadiness = buildWeddingImportParserReadinessState({
     artifacts,
     binarySpreadsheetParserReady: input.weddingImportBinaryParserReady,
@@ -1110,6 +1182,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     budgetTracking,
     guestTracking,
     seatingPlan,
+    inspiration,
     importParserReadiness,
     backgroundAutomationCoverage,
     delegation,
@@ -1127,6 +1200,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     scheduleItems: projectionScheduleItems,
     decisionItems: decisions,
     approvalReceipts: input.approvalReceipts,
+    decisionDeferrals: input.decisionDeferrals,
     now: input.nowIso ? new Date(input.nowIso) : null,
     limit: 40,
   });
@@ -1231,6 +1305,12 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     budgetTracking,
     guestTracking,
     seatingPlan,
+    seatingDraftCards: buildWeddingSeatingDraftCards(
+      input.seatingOptimizations,
+      input.seatingDraftArchives?.map((archive) => archive.fingerprint),
+    ),
+    inspiration,
+    experienceModel,
     importParserReadiness,
     backgroundAutomationCoverage,
     collaboration,

@@ -4,6 +4,7 @@ import test from "node:test";
 import { buildWeddingBoundaryState } from "@/lib/weddingBoundaryLedgerState";
 import {
   buildWeddingBoundaryManagementViewState,
+  weddingBoundaryDraftSaveUnavailableNotice,
   visibleWeddingBoundaryApprovalCount,
   visibleWeddingBoundaryApprovalItems,
   weddingBoundaryDecisionNoticeFromError,
@@ -90,7 +91,7 @@ test("buildWeddingBoundaryManagementViewState derives non-editable user guidance
   assert.doesNotMatch(view.approvalItems[0]?.detail ?? "", /sealed:/);
   assert.equal(view.ruleItems[0]?.detail, "We are not adding extra plus-ones unless both of us approve it.");
   assert.ok(view.visibilityItems.some((item) => item.label === "Janet family access" && item.detail === "parent family"));
-  assert.equal(view.privateItemsLabel, null);
+  assert.equal(view.privateItemsLabel, "Private notes and reasons stay visible only to the couple.");
 });
 
 test("buildWeddingBoundaryManagementViewState has calm empty-state labels", () => {
@@ -104,6 +105,28 @@ test("buildWeddingBoundaryManagementViewState has calm empty-state labels", () =
   assert.equal(view.hasRules, false);
   assert.equal(view.hasVisibilityItems, false);
   assert.equal(view.privateItemsLabel, null);
+});
+
+test("buildWeddingBoundaryManagementViewState counts couple-only private rationale records", () => {
+  const state = buildWeddingBoundaryState({
+    metadata,
+    objects: [{
+      id: "decision:guest-limit",
+      kind: "wedding_boundary_decision_rationale",
+      title: "Why we capped the guest list",
+      visibility: "couple_only",
+      decisionId: "decision:guest-limit",
+      summaryPublic: "We are keeping the guest list limited.",
+      rationaleCiphertext: "sealed:private-family-context",
+    }],
+  });
+  const topology = buildWeddingBoundaryTopologyState({
+    metadata,
+    objects: [],
+  });
+  const view = buildWeddingBoundaryManagementViewState({ state, topology });
+
+  assert.equal(view.privateItemsLabel, "1 private item stay visible only to the couple.");
 });
 
 test("visibleWeddingBoundaryApprovalItems hides requests already completed in the UI", () => {
@@ -141,5 +164,20 @@ test("weddingBoundaryDecisionNoticeFromError keeps approval failures user-facing
   assert.match(
     weddingBoundaryDecisionNoticeFromError("network failed"),
     /Could not save/i,
+  );
+});
+
+test("weddingBoundaryDraftSaveUnavailableNotice prevents silent draft actions", () => {
+  assert.match(
+    weddingBoundaryDraftSaveUnavailableNotice("request"),
+    /family request is ready to review/i,
+  );
+  assert.match(
+    weddingBoundaryDraftSaveUnavailableNotice("rule"),
+    /family rule is ready/i,
+  );
+  assert.match(
+    weddingBoundaryDraftSaveUnavailableNotice("request"),
+    /saving is not connected/i,
   );
 });

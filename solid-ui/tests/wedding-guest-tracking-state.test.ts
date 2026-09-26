@@ -109,6 +109,84 @@ test("buildWeddingGuestTrackingState groups households and estimates final-count
   assert.ok(state.finalCountOptions[1]?.riskLabel.includes("late-count fees"));
 });
 
+test("buildWeddingGuestTrackingState summarizes active boundary rules and invitation scope", () => {
+  const state = buildWeddingGuestTrackingState({
+    boundaryObjects: [{
+      id: "policy:no-extra-plus-ones",
+      kind: "wedding_boundary_policy",
+      title: "No extra plus-ones",
+      ruleType: "plus_one",
+      enforcement: "require_approval",
+      plainLanguage: "No extra plus-ones unless both of us approve.",
+      status: "active",
+    }, {
+      id: "policy:children",
+      kind: "wedding_boundary_policy",
+      title: "Children rule",
+      ruleType: "children",
+      enforcement: "require_approval",
+      plainLanguage: "Children are only included when named on the invite.",
+      status: "active",
+    }, {
+      id: "invite:alex",
+      kind: "wedding_boundary_event_invitation",
+      title: "Alex ceremony invitation",
+      invitationId: "invite:alex",
+      eventId: "ceremony",
+      personId: "person:alex",
+      invitationStatus: "rsvp_yes",
+      plusOneAllowed: true,
+      childrenInvited: false,
+    }, {
+      id: "invite:blair",
+      kind: "wedding_boundary_event_invitation",
+      title: "Blair ceremony invitation",
+      invitationId: "invite:blair",
+      eventId: "ceremony",
+      personId: "person:blair",
+      invitationStatus: "invited",
+      plusOneAllowed: false,
+      childrenInvited: false,
+    }],
+  });
+
+  assert.deepEqual(state.boundaryRuleLabels, [
+    "No extra plus-ones unless both of us approve.",
+    "Children are only included when named on the invite.",
+  ]);
+  assert.deepEqual(state.invitationScopeLabels, [
+    "Plus-ones: 1 included, 1 not included",
+    "Children: 0 included, 2 not included",
+  ]);
+});
+
+test("buildWeddingGuestTrackingState ignores inactive boundary rules and not-invited scope", () => {
+  const state = buildWeddingGuestTrackingState({
+    boundaryObjects: [{
+      id: "policy:old-plus-one",
+      kind: "wedding_boundary_policy",
+      title: "Old plus-one rule",
+      ruleType: "plus_one",
+      enforcement: "warn",
+      plainLanguage: "Old rule",
+      status: "archived",
+    }, {
+      id: "invite:not-invited",
+      kind: "wedding_boundary_event_invitation",
+      title: "Not invited",
+      invitationId: "invite:not-invited",
+      eventId: "ceremony",
+      personId: "person:not-invited",
+      invitationStatus: "not_invited",
+      plusOneAllowed: false,
+      childrenInvited: false,
+    }],
+  });
+
+  assert.deepEqual(state.boundaryRuleLabels, []);
+  assert.deepEqual(state.invitationScopeLabels, []);
+});
+
 test("buildWeddingGuestFinalCountDecisionTaskItems creates a searchable DecisionOS task", () => {
   const guestTracking = buildWeddingGuestTrackingState({
     estimatedCostPerGuest: 200,

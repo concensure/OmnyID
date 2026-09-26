@@ -12,6 +12,7 @@ import type {
   WeddingPlanningScheduleItem,
   WeddingPlanningTaskItem,
 } from "../src/lib/weddingCalendarProjectionState.ts";
+import { buildWeddingInspirationItem } from "../src/lib/weddingInspirationState.ts";
 
 const baseMetadata = {
   wedding_plan_id: "wedding_plan:harbour",
@@ -309,6 +310,167 @@ test("buildWeddingKnowledgeGraphState marks day-of execution gaps in topology", 
   assert.match(riskNode.label, /guest coordination/i);
   assert.ok(riskNode.supertags.includes("day_of_execution:day_of_guest_coordination"));
   assert.ok(state.edges.some((edge) => edge.kind === "next_action" && edge.target === taskNode.id));
+});
+
+test("buildWeddingKnowledgeGraphState makes seating constraints queryable in guest topology", () => {
+  const state = buildWeddingKnowledgeGraphState({
+    metadata: baseMetadata,
+    seatingConstraints: [{
+      id: "constraint:uncle-david-away",
+      kind: "keep_apart",
+      instruction: "Move Uncle David away from Mum.",
+      primaryPersonId: "uncle-david",
+      relatedPersonId: "mum",
+      confidence: "high",
+      statusLabel: "Uncle David and Mum will be kept apart in the next seating draft.",
+    }, {
+      id: "constraint:sophie-quiet",
+      kind: "prefer_quiet",
+      instruction: "Seat Sophie somewhere quiet.",
+      primaryPersonId: "sophie",
+      confidence: "medium",
+      statusLabel: "Sophie will be placed away from loud tables where possible.",
+    }, {
+      id: "constraint:uni-friends",
+      kind: "social_group_together",
+      instruction: "Try to keep university friends together.",
+      socialGroup: "university friends",
+      confidence: "medium",
+      statusLabel: "university friends guests will be kept together where table sizes allow.",
+    }],
+  });
+
+  const constraintNode = state.nodes.find((node) => node.kind === "seating_constraint" && /Uncle David and Mum/i.test(node.label));
+  const mumNode = state.nodes.find((node) => node.kind === "guest" && node.metadata.person_id === "mum");
+  const groupNode = state.nodes.find((node) => node.kind === "social_group" && node.label === "university friends");
+
+  assert.ok(constraintNode);
+  assert.ok(constraintNode.supertags.includes("wedding_seating:constraint"));
+  assert.equal(constraintNode.metadata.seating_constraint_kind, "keep_apart");
+  assert.ok(mumNode);
+  assert.ok(groupNode);
+  assert.ok(state.edges.some((edge) => edge.kind === "keeps_apart"));
+  assert.ok(state.edges.some((edge) => edge.kind === "prefers_quiet"));
+  assert.ok(state.edges.some((edge) => edge.kind === "keeps_together" && edge.target === groupNode.id));
+});
+
+test("buildWeddingKnowledgeGraphState makes seating drafts queryable by guest and table", () => {
+  const state = buildWeddingKnowledgeGraphState({
+    metadata: baseMetadata,
+    seatingOptimizations: [{
+      assignments: [{
+        personId: "grandma-chen",
+        personLabel: "Grandma Chen",
+        tableId: "table-3",
+        tableLabel: "Table 3",
+        score: 24,
+        reasonLabels: ["Accessible table and quieter seating"],
+      }, {
+        personId: "aunt-lin",
+        personLabel: "Aunt Lin",
+        tableId: "table-3",
+        tableLabel: "Table 3",
+        score: 10,
+        reasonLabels: ["Shared language"],
+      }],
+      totalScore: 34,
+      hardViolations: [],
+      softSignals: [],
+      explanationLabels: ["No hard seating rule is broken in this draft."],
+      proactiveIssueLabels: [],
+      applyLabel: "Apply seating plan",
+      alternativeLabel: "Show alternatives",
+      savedAt: "2026-09-26T00:00:00.000Z",
+    }, {
+      assignments: [{
+        personId: "grandma-chen",
+        personLabel: "Grandma Chen",
+        tableId: "table-3",
+        tableLabel: "Table 3",
+        score: 24,
+        reasonLabels: ["Accessible table and quieter seating"],
+      }, {
+        personId: "aunt-lin",
+        personLabel: "Aunt Lin",
+        tableId: "table-3",
+        tableLabel: "Table 3",
+        score: 10,
+        reasonLabels: ["Shared language"],
+      }],
+      totalScore: 34,
+      hardViolations: [],
+      softSignals: [],
+      explanationLabels: ["Duplicate saved later."],
+      proactiveIssueLabels: [],
+      applyLabel: "Apply seating plan",
+      alternativeLabel: "Show alternatives",
+      savedAt: "2026-09-27T00:00:00.000Z",
+    }],
+  });
+
+  const draftNode = state.nodes.find((node) => node.kind === "seating_draft");
+  const guestNode = state.nodes.find((node) => node.kind === "guest" && node.label === "Grandma Chen");
+  const tableNode = state.nodes.find((node) => node.kind === "seating_table" && node.label === "Table 3");
+
+  assert.ok(draftNode);
+  assert.ok(draftNode.supertags.includes("wedding_seating:current_draft"));
+  assert.equal(state.nodes.filter((node) => node.kind === "seating_draft").length, 1);
+  assert.equal(draftNode.metadata.assignment_count, 2);
+  assert.equal(draftNode.metadata.saved_at, "2026-09-27T00:00:00.000Z");
+  assert.ok(guestNode);
+  assert.ok(tableNode);
+  assert.ok(state.edges.some((edge) => edge.kind === "places_guest" && edge.source === draftNode.id && edge.target === guestNode.id));
+  assert.ok(state.edges.some((edge) => edge.kind === "seats_at" && edge.source === guestNode.id && edge.target === tableNode.id));
+  assert.ok(state.edges.some((edge) => edge.kind === "contains" && edge.source === draftNode.id && edge.target === tableNode.id));
+});
+
+test("buildWeddingKnowledgeGraphState excludes archived seating drafts from topology surfaces", () => {
+  const state = buildWeddingKnowledgeGraphState({
+    metadata: baseMetadata,
+    seatingOptimizations: [{
+      assignments: [{
+        personId: "grandma-chen",
+        personLabel: "Grandma Chen",
+        tableId: "table-3",
+        tableLabel: "Table 3",
+        score: 24,
+        reasonLabels: ["Accessible table and quieter seating"],
+      }],
+      totalScore: 24,
+      hardViolations: [],
+      softSignals: [],
+      explanationLabels: ["Archived seating draft."],
+      proactiveIssueLabels: [],
+      applyLabel: "Apply seating plan",
+      alternativeLabel: "Show alternatives",
+      savedAt: "2026-09-26T00:00:00.000Z",
+    }],
+    seatingDraftArchiveFingerprints: ["grandma-chen:table-3"],
+  });
+
+  assert.equal(state.nodes.some((node) => node.kind === "seating_draft"), false);
+  assert.equal(state.edges.some((edge) => edge.kind === "places_guest"), false);
+});
+
+test("buildWeddingKnowledgeGraphState links inspiration to preference topology", () => {
+  const state = buildWeddingKnowledgeGraphState({
+    metadata: baseMetadata,
+    inspirationItems: [
+      buildWeddingInspirationItem({
+        title: "Reception inspiration",
+        note: "warm lighting and long table",
+        createdAt: "2026-09-26T00:00:00.000Z",
+      }),
+    ],
+  });
+
+  const inspirationNode = state.nodes.find((node) => node.kind === "inspiration");
+  const preferenceNode = state.nodes.find((node) => node.kind === "preference" && /warm intimate lighting/i.test(node.label));
+
+  assert.ok(inspirationNode);
+  assert.ok(preferenceNode);
+  assert.ok(state.edges.some((edge) => edge.kind === "signals_preference" && edge.source === inspirationNode.id && edge.target === preferenceNode.id));
+  assert.ok(state.edges.some((edge) => edge.kind === "inspires"));
 });
 
 test("buildWeddingKnowledgeGraphState adds decision constraints and risk next-action edges", () => {

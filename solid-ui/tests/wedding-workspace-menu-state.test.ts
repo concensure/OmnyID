@@ -36,12 +36,17 @@ function fixture(overrides: Partial<WeddingWorkspaceMenuBadgeInput> = {}): Weddi
     vendorContactCards: [],
     delegation: { items: [{ id: "helper" }] } as WeddingWorkspaceMenuBadgeInput["delegation"],
     ganttTimeline: { rows: [{ id: "row" }], undatedItems: [] } as WeddingWorkspaceMenuBadgeInput["ganttTimeline"],
+    inspiration: { items: [{ id: "inspiration" }] } as WeddingWorkspaceMenuBadgeInput["inspiration"],
     ...overrides,
   };
 }
 
 test("isWeddingWorkspaceMenuId accepts only known menu ids", () => {
   assert.equal(isWeddingWorkspaceMenuId("budget"), true);
+  assert.equal(isWeddingWorkspaceMenuId("people"), true);
+  assert.equal(isWeddingWorkspaceMenuId("plan"), true);
+  assert.equal(isWeddingWorkspaceMenuId("vision"), true);
+  assert.equal(isWeddingWorkspaceMenuId("inspiration"), true);
   assert.equal(isWeddingWorkspaceMenuId("advanced"), true);
   assert.equal(isWeddingWorkspaceMenuId("not-a-menu"), false);
   assert.equal(isWeddingWorkspaceMenuId(null), false);
@@ -62,6 +67,9 @@ test("loadWeddingWorkspaceMenu falls back to home for a corrupted value", () => 
 
 test("loadWeddingWorkspaceMenuFromUrl accepts query or hash tabs", () => {
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=seating"), "seating");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=people"), "people");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=plan"), "plan");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=vision"), "vision");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("", "#weddingMenu=timeline"), "timeline");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=bad"), null);
 });
@@ -92,6 +100,12 @@ test("weddingWorkspaceMenuBadge surfaces pending RSVPs and unassigned seats as c
 
   const unassignedSeats = fixture({ seatingPlan: { unassignedAttendingCount: 2 } as WeddingWorkspaceMenuBadgeInput["seatingPlan"] });
   assert.deepEqual(weddingWorkspaceMenuBadge("seating", unassignedSeats), { label: "2", tone: "info" });
+
+  const peopleNeeds = fixture({
+    guestTracking: { pendingCount: 4 } as WeddingWorkspaceMenuBadgeInput["guestTracking"],
+    seatingPlan: { unassignedAttendingCount: 2 } as WeddingWorkspaceMenuBadgeInput["seatingPlan"],
+  });
+  assert.deepEqual(weddingWorkspaceMenuBadge("people", peopleNeeds), { label: "6", tone: "info" });
 });
 
 test("weddingWorkspaceMenuBadge counts only urgent vendor cards on the queue tab", () => {
@@ -103,6 +117,7 @@ test("weddingWorkspaceMenuBadge counts only urgent vendor cards on the queue tab
     ],
   });
   assert.deepEqual(weddingWorkspaceMenuBadge("response_queue", withVendors), { label: "2", tone: "urgent" });
+  assert.deepEqual(weddingWorkspaceMenuBadge("plan", withVendors), { label: "2", tone: "urgent" });
   assert.equal(weddingWorkspaceMenuBadge("response_queue", fixture()), null);
 });
 
@@ -119,11 +134,24 @@ test("weddingWorkspaceMenuHint marks empty first-run sections without replacing 
   assert.equal(weddingWorkspaceMenuHint("guests", fixture({
     guestTracking: { guestRowCount: 0, pendingCount: 0, attendingCount: 0 } as WeddingWorkspaceMenuBadgeInput["guestTracking"],
   })), "Start");
+  assert.equal(weddingWorkspaceMenuHint("people", fixture({
+    guestTracking: { guestRowCount: 0, pendingCount: 0, attendingCount: 0 } as WeddingWorkspaceMenuBadgeInput["guestTracking"],
+  })), "Start");
   assert.equal(weddingWorkspaceMenuHint("helpers", fixture({
     delegation: { items: [] } as WeddingWorkspaceMenuBadgeInput["delegation"],
   })), "Start");
+  assert.equal(weddingWorkspaceMenuHint("inspiration", fixture({
+    inspiration: { items: [] } as WeddingWorkspaceMenuBadgeInput["inspiration"],
+  })), "Start");
   assert.equal(weddingWorkspaceMenuHint("timeline", fixture({
     ganttTimeline: { rows: [], undatedItems: [] } as WeddingWorkspaceMenuBadgeInput["ganttTimeline"],
+  })), "Start");
+  assert.equal(weddingWorkspaceMenuHint("plan", fixture({
+    ganttTimeline: { rows: [], undatedItems: [] } as WeddingWorkspaceMenuBadgeInput["ganttTimeline"],
+    vendorContactCards: [],
+  })), "Start");
+  assert.equal(weddingWorkspaceMenuHint("vision", fixture({
+    inspiration: { items: [] } as WeddingWorkspaceMenuBadgeInput["inspiration"],
   })), "Start");
   assert.equal(weddingWorkspaceMenuHint("advanced", fixture()), null);
   assert.equal(weddingWorkspaceMenuHint("budget", null), null);

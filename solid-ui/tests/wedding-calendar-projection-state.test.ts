@@ -416,6 +416,48 @@ test("wedding task projection routes budget work to DecisionOS and knowledge gra
   assert.equal(message.views[0]?.content.budget_vendor_label, "Garden Hall");
 });
 
+test("wedding task projection routes inspiration reviews to style knowledge surfaces", () => {
+  const message = weddingTaskItemToAfpTaskMessage({
+    ...taskItem,
+    id: "wedding-inspiration-review",
+    title: "Turn saved inspiration into wedding style decisions",
+    kind: "decision",
+    metadata: {
+      ...(taskItem.metadata as Record<string, unknown>),
+      wedding_inspiration_task: true,
+      inspiration_task_key: "wedding_inspiration_review:warm-lighting",
+      inspiration_tags: ["warm lighting", "long table"],
+      inspiration_item_count: 4,
+      preferred_action_label: "Open Inspiration",
+      wedding_workspace_menu: "inspiration",
+      a2ui_primary_action: "open_wedding_inspiration",
+      decisionos_scope: "wedding_style",
+      topology_scope: "wedding_preference_graph",
+    },
+  }, "2026-09-11T00:00:00.000Z");
+
+  assert.ok(message);
+  assert.ok(message.to?.includes("agent://decision-queue"));
+  assert.ok(message.to?.includes("agent://knowledge-graph"));
+  assert.ok(message.to?.includes("agent://topology"));
+  assert.ok(message.supertags?.includes("wedding_inspiration"));
+  assert.ok(message.supertags?.includes("wedding_inspiration:preference_model"));
+  assert.ok(message.supertags?.includes("decisionos:wedding_style"));
+  assert.ok(message.supertags?.includes("topology:wedding_preference_graph"));
+  assert.equal(message.content.wedding_inspiration_task, true);
+  assert.deepEqual(message.content.inspiration_tags, ["warm lighting", "long table"]);
+  assert.equal(message.content.preferred_action_label, "Open Inspiration");
+  assert.equal(message.content.wedding_workspace_menu, "inspiration");
+  assert.equal(message.metadata?.wedding_inspiration_task, true);
+  assert.equal(message.metadata?.inspiration_task_key, "wedding_inspiration_review:warm-lighting");
+  assert.equal(message.metadata?.decisionos_scope, "wedding_style");
+  assert.equal(message.metadata?.topology_scope, "wedding_preference_graph");
+  assert.ok((message.metadata?.searchable_terms as string[]).includes("wedding inspiration"));
+  assert.ok((message.metadata?.searchable_terms as string[]).includes("warm lighting"));
+  assert.equal(message.views[0]?.content.preferred_action_label, "Open Inspiration");
+  assert.equal(message.views[0]?.content.a2ui_primary_action, "open_wedding_inspiration");
+});
+
 test("wedding task projection preserves seeded-vendor review metadata", () => {
   const message = weddingTaskItemToAfpTaskMessage({
     ...taskItem,

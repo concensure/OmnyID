@@ -1,5 +1,5 @@
 // @locs-version: 2.0
-import type { SendAfpMessageInput } from "@/lib/api";
+import type { AfpMessage, SendAfpMessageInput } from "@/lib/api";
 import type { WeddingProjectionDispatchReceiptState } from "@/lib/weddingProjectionDispatchState";
 
 export type WeddingVendorContactProjectionMethod =
@@ -22,12 +22,36 @@ export type WeddingVendorContactProjectionRequest = {
   };
 };
 
+export type WeddingVendorReplyProjectionInput = {
+  vendorId?: string | null;
+  vendorLabel?: string | null;
+  threadId?: string | null;
+  receiptRef?: string | null;
+  responseReceivedAt?: string | null;
+  messageSubject?: string | null;
+  messageSnippet?: string | null;
+  sourceLabel?: string | null;
+};
+
+export type WeddingVendorReplyKnownContact = {
+  vendorId?: string | null;
+  vendorName?: string | null;
+  threadId?: string | null;
+  receiptRef?: string | null;
+};
+
 function clean(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
 }
 
 function validMethod(value: unknown): WeddingVendorContactProjectionMethod {
@@ -66,6 +90,127 @@ function savedTaskItems(receipt: WeddingProjectionDispatchReceiptState): Map<str
   return saved;
 }
 
+function matchingVendorId(
+  reply: WeddingVendorReplyProjectionInput,
+  knownContacts: readonly WeddingVendorReplyKnownContact[],
+): string | null {
+  const direct = clean(reply.vendorId);
+  if (direct) return direct;
+  const threadId = clean(reply.threadId);
+  const receiptRef = clean(reply.receiptRef);
+  const vendorLabel = clean(reply.vendorLabel)?.toLowerCase() ?? null;
+  const match = knownContacts.find((contact) => {
+    const contactThread = clean(contact.threadId);
+    const contactReceipt = clean(contact.receiptRef);
+    const contactName = clean(contact.vendorName)?.toLowerCase() ?? null;
+    return Boolean(
+      (threadId && contactThread && threadId === contactThread)
+      || (receiptRef && contactReceipt && receiptRef === contactReceipt)
+      || (vendorLabel && contactName && vendorLabel === contactName),
+    );
+  });
+  return clean(match?.vendorId);
+}
+
+function replyNotes(input: WeddingVendorReplyProjectionInput): string | null {
+  const parts = [
+    clean(input.sourceLabel),
+    clean(input.messageSubject) ? `Subject: ${clean(input.messageSubject)}` : null,
+    clean(input.messageSnippet),
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(" | ").slice(0, 500) : null;
+}
+
+function knownContactMatchesMessage(
+  message: AfpMessage,
+  knownContacts: readonly WeddingVendorReplyKnownContact[],
+): WeddingVendorReplyKnownContact | null {
+  const metadata = record(message.metadata);
+  const content = record(message.content);
+  const threadCandidates = [
+    message.thread_id,
+    clean(metadata.thread_id),
+    clean(metadata.gmail_thread_id),
+    clean(metadata.email_thread_id),
+    clean(content.thread_id),
+    clean(content.gmail_thread_id),
+  ].filter((item): item is string => Boolean(item));
+  const receiptCandidates = [
+    message.id,
+    clean(metadata.receipt_ref),
+    clean(metadata.message_id),
+    clean(metadata.gmail_message_id),
+    clean(content.message_id),
+    clean(content.gmail_message_id),
+  ].filter((item): item is string => Boolean(item));
+  return knownContacts.find((contact) => {
+    const threadId = clean(contact.threadId);
+    const receiptRef = clean(contact.receiptRef);
+    return Boolean(
+      (threadId && threadCandidates.includes(threadId))
+      || (receiptRef && receiptCandidates.includes(receiptRef)),
+    );
+  }) ?? null;
+}
+
+function messageLooksLikeVendorReply(message: AfpMessage, knownMatch: WeddingVendorReplyKnownContact | null): boolean {
+  if (knownMatch) return true;
+  const metadata = record(message.metadata);
+  const content = record(message.content);
+  const tags = strings(message.supertags);
+  const text = [
+    message.type,
+    message.kind,
+    message.subtype,
+    ...tags,
+    clean(metadata.origin),
+    clean(metadata.provider),
+    clean(metadata.source),
+    clean(metadata.vendor_id),
+    clean(metadata.vendor_label),
+    clean(content.kind),
+    clean(content.subject),
+    clean(content.snippet),
+  ].filter(Boolean).join(" ").toLowerCase();
+  return /\b(vendor|wedding_vendor|vendor_reply|vendor response|supplier|quote reply|gmail|email)\b/.test(text)
+    && /\b(reply|response|re:|inbound|received|availability|quote|package)\b/.test(text);
+}
+
+function replyInputFromMessage(
+  message: AfpMessage,
+  knownContacts: readonly WeddingVendorReplyKnownContact[],
+): WeddingVendorReplyProjectionInput | null {
+  const metadata = record(message.metadata);
+  const content = record(message.content);
+  const knownMatch = knownContactMatchesMessage(message, knownContacts);
+  if (!messageLooksLikeVendorReply(message, knownMatch)) return null;
+  return {
+    vendorId: clean(metadata.vendor_id) ?? clean(content.vendor_id) ?? clean(knownMatch?.vendorId),
+    vendorLabel: clean(metadata.vendor_label) ?? clean(content.vendor_label) ?? clean(knownMatch?.vendorName),
+    threadId: clean(metadata.vendor_contact_thread_id)
+      ?? clean(metadata.thread_id)
+      ?? clean(metadata.gmail_thread_id)
+      ?? clean(content.thread_id)
+      ?? clean(content.gmail_thread_id)
+      ?? clean(knownMatch?.threadId)
+      ?? message.thread_id,
+    receiptRef: clean(metadata.vendor_contact_receipt_ref)
+      ?? clean(metadata.receipt_ref)
+      ?? clean(metadata.gmail_message_id)
+      ?? clean(content.message_id)
+      ?? clean(content.gmail_message_id)
+      ?? clean(knownMatch?.receiptRef)
+      ?? message.id,
+    responseReceivedAt: clean(metadata.response_received_at)
+      ?? clean(metadata.received_at)
+      ?? clean(content.received_at)
+      ?? message.timestamp,
+    messageSubject: clean(metadata.subject) ?? clean(content.subject) ?? clean(content.title),
+    messageSnippet: clean(metadata.snippet) ?? clean(content.snippet) ?? clean(content.body_preview) ?? clean(content.markdown),
+    sourceLabel: clean(metadata.provider) ?? clean(metadata.origin) ?? "AFP vendor reply",
+  };
+}
+
 export function weddingVendorContactProjectionRequests(input: {
   receipt: WeddingProjectionDispatchReceiptState;
   sendInputs?: readonly SendAfpMessageInput[] | null;
@@ -101,5 +246,59 @@ export function weddingVendorContactProjectionRequests(input: {
     });
   }
 
+  return requests;
+}
+
+export function weddingVendorReplyInputsFromAfpMessages(input: {
+  messages?: readonly AfpMessage[] | null;
+  knownContacts?: readonly WeddingVendorReplyKnownContact[] | null;
+}): WeddingVendorReplyProjectionInput[] {
+  const knownContacts = input.knownContacts ?? [];
+  const seen = new Set<string>();
+  const replies: WeddingVendorReplyProjectionInput[] = [];
+  for (const message of input.messages ?? []) {
+    const reply = replyInputFromMessage(message, knownContacts);
+    if (!reply) continue;
+    const key = [
+      clean(reply.vendorId) ?? clean(reply.vendorLabel) ?? "",
+      clean(reply.threadId) ?? "",
+      clean(reply.receiptRef) ?? "",
+      clean(reply.responseReceivedAt) ?? "",
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    replies.push(reply);
+  }
+  return replies;
+}
+
+export function weddingVendorReplyProjectionRequests(input: {
+  replies?: readonly WeddingVendorReplyProjectionInput[] | null;
+  knownContacts?: readonly WeddingVendorReplyKnownContact[] | null;
+  nowIso?: string | null;
+}): WeddingVendorContactProjectionRequest[] {
+  const nowIso = clean(input.nowIso) ?? new Date().toISOString();
+  const knownContacts = input.knownContacts ?? [];
+  const requests: WeddingVendorContactProjectionRequest[] = [];
+  const seen = new Set<string>();
+  for (const reply of input.replies ?? []) {
+    const vendorId = matchingVendorId(reply, knownContacts);
+    if (!vendorId) continue;
+    const responseReceivedAt = clean(reply.responseReceivedAt) ?? nowIso;
+    const key = `${vendorId}:${clean(reply.threadId) ?? ""}:${clean(reply.receiptRef) ?? ""}:${responseReceivedAt}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    requests.push({
+      vendorId,
+      body: {
+        contact_method: "other",
+        response_received_at: responseReceivedAt,
+        follow_up_due_at: null,
+        thread_id: clean(reply.threadId),
+        receipt_ref: clean(reply.receiptRef),
+        notes: replyNotes(reply) ?? "Vendor reply recorded; continue from the response instead of sending another follow-up.",
+      },
+    });
+  }
   return requests;
 }

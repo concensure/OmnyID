@@ -150,49 +150,42 @@ function riskLabelsFor(input: {
     risks.push({
       id: "vendor_before_venue",
       severity: "warning",
-      label: "Vendor work starts before venue timing is visible; confirm date/location constraints before outreach.",
+      label: "Confirm the wedding date and venue details before contacting vendors.",
     });
   }
   if (firstBudget && firstVenue && firstBudget.getTime() < firstVenue.getTime()) {
     risks.push({
       id: "budget_before_venue",
       severity: "info",
-      label: "Budget/payment work appears before venue selection; keep deposits uncommitted until venue terms are verified.",
+      label: "Wait to pay deposits until the venue terms are clear.",
     });
   }
   if (firstOutreach && daysUntil(firstOutreach, input.now) <= 14) {
     risks.push({
       id: "near_outreach_window",
       severity: "warning",
-      label: "Outreach is scheduled within two weeks; confirm shortlist, contact consent, and no-spam follow-up limits.",
+      label: "Vendor outreach is coming up soon. Check the shortlist and follow-up plan first.",
     });
   }
   if (firstGuest && firstRunSheet && firstGuest.getTime() > firstRunSheet.getTime()) {
     risks.push({
       id: "guest_after_run_sheet",
       severity: "blocked",
-      label: "Guest/RSVP work is after run-sheet work; final count, meals, and accessibility should feed the run sheet first.",
+      label: "Finish guest counts, meals, and accessibility notes before finalizing the run sheet.",
     });
   }
   if (firstWeather && firstRunSheet && firstWeather.getTime() > firstRunSheet.getTime()) {
     risks.push({
       id: "weather_after_run_sheet",
       severity: "warning",
-      label: "Weather backup is later than run-sheet work; backup location and rain plan should be settled before final timing.",
+      label: "Set the rain backup before finalizing the day-of timing.",
     });
   }
   if (finalLegal && daysUntil(finalLegal, input.now) <= 30) {
     risks.push({
       id: "legal_deadline_near",
       severity: "blocked",
-      label: "A legal/NOIM deadline is within 30 days; surface it in DecisionOS before lower-risk planning tasks.",
-    });
-  }
-  if (input.undatedItems.length > 0) {
-    risks.push({
-      id: "undated_items",
-      severity: "info",
-      label: `${input.undatedItems.length} anytime/no-date item${input.undatedItems.length === 1 ? "" : "s"} should stay at the top of task review until committed or dismissed.`,
+      label: "A legal deadline is within 30 days. Handle it before lower-risk planning tasks.",
     });
   }
   return risks;
@@ -258,6 +251,6 @@ export function buildWeddingGanttTimelineState(input: {
     categoryColors: colors,
     legend: usedCategories.map((category) => ({ category, label: labelFor(category), color: colors[category] ?? colors.general })),
     riskLabels,
-    blockerLabels: rows.length > 0 ? [] : ["No dated wedding timeline items are available for the Gantt chart."],
+    blockerLabels: rows.length > 0 ? [] : ["No dated wedding tasks yet. Add a date to a task to show it on the timeline."],
   };
 }

@@ -81,6 +81,10 @@ export type WeddingBoundaryGuestProfile = WeddingBoundaryLedgerObjectBase & {
   householdId?: string | null;
   ageBand?: "adult" | "child_under_12" | "teen" | "unknown" | null;
   relationshipLabel?: string | null;
+  contactLabel?: string | null;
+  mealPreference?: string | null;
+  dietaryNote?: string | null;
+  accessibilityNote?: string | null;
   familySide?: "bride" | "groom" | "shared" | "other" | null;
   privateNotesCiphertext?: string | null;
 };
@@ -275,6 +279,8 @@ function supertagsFor(object: WeddingBoundaryLedgerObject, metadata: WeddingPlan
     object.kind === "wedding_boundary_guest_profile" && object.ageBand ? `wedding_guest:${safeWeddingLabel(object.ageBand)}` : null,
     object.kind === "wedding_boundary_event_invitation" && object.plusOneAllowed === true ? "wedding_guest:plus_one_allowed" : null,
     object.kind === "wedding_boundary_event_invitation" && object.plusOneAllowed === false ? "wedding_guest:plus_one_blocked" : null,
+    object.kind === "wedding_boundary_event_invitation" && object.childrenInvited === true ? "wedding_guest:children_invited" : null,
+    object.kind === "wedding_boundary_event_invitation" && object.childrenInvited === false ? "wedding_guest:children_blocked" : null,
     object.visibility === "family_visible" || object.visibility === "approved_shared" ? "wedding_boundary:family_visible" : null,
   ]);
 }
@@ -364,6 +370,10 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
       household_id: object.householdId ?? null,
       age_band: object.ageBand ?? "unknown",
       relationship_label: object.relationshipLabel ?? null,
+      contact_label: object.contactLabel ?? null,
+      meal_preference: object.mealPreference ?? null,
+      dietary_note: object.dietaryNote ?? null,
+      accessibility_note: object.accessibilityNote ?? null,
       family_side: object.familySide ?? null,
       private_notes_encrypted: Boolean(object.privateNotesCiphertext),
     };

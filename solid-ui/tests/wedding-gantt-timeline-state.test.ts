@@ -57,8 +57,8 @@ test("buildWeddingGanttTimelineState blocks empty undated timelines", () => {
   assert.equal(state.rows.length, 0);
   assert.equal(state.undatedItems.length, 1);
   assert.equal(state.undatedItems[0]?.category, "ceremony");
-  assert.ok(state.riskLabels.some((risk) => /anytime\/no-date/i.test(risk.label)));
-  assert.ok(state.blockerLabels.some((label) => /No dated wedding timeline/i.test(label)));
+  assert.equal(state.riskLabels.some((risk) => risk.id === "undated_items"), false);
+  assert.ok(state.blockerLabels.some((label) => /No dated wedding tasks yet/i.test(label)));
 });
 
 test("buildWeddingGanttTimelineState flags sequencing risks across preparation categories", () => {
@@ -80,4 +80,6 @@ test("buildWeddingGanttTimelineState flags sequencing risks across preparation c
   assert.ok(state.riskLabels.some((risk) => risk.id === "guest_after_run_sheet" && risk.severity === "blocked"));
   assert.ok(state.riskLabels.some((risk) => risk.id === "weather_after_run_sheet"));
   assert.ok(state.riskLabels.some((risk) => risk.id === "legal_deadline_near" && risk.severity === "blocked"));
+  assert.ok(state.riskLabels.every((risk) => !/DecisionOS|anytime\/no-date|Gantt chart|surface it/i.test(risk.label)));
+  assert.match(state.riskLabels.find((risk) => risk.id === "vendor_before_venue")?.label ?? "", /Confirm the wedding date and venue details/i);
 });

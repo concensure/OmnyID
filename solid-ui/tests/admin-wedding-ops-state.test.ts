@@ -6,6 +6,7 @@ import { buildAdminWeddingOpsPanelState } from "../src/lib/adminWeddingOpsState.
 import { buildWeddingProviderExecutorProofPacketState } from "../src/lib/weddingProviderExecutorProofPacketState.ts";
 import { buildWeddingProviderExecutorSuiteReadinessState } from "../src/lib/weddingProviderExecutorSuiteReadinessState.ts";
 import { buildWeddingVendorSearchProviderEnvState } from "../src/lib/weddingVendorSearchProviderEnvState.ts";
+import { buildWeddingApiStackState } from "../src/lib/weddingApiStackState.ts";
 
 test("buildAdminWeddingOpsPanelState shows exact users live Oracle metrics and enforced wedding AI routing", () => {
   const state = buildAdminWeddingOpsPanelState({
@@ -139,4 +140,31 @@ test("buildAdminWeddingOpsPanelState surfaces provider executor proof packet sta
   assert.equal(readyState.metrics.find((metric) => metric.title === "Provider executor proof")?.value, "Proof complete");
   assert.equal(readyState.metrics.find((metric) => metric.title === "Provider executor proof")?.status, "ready");
   assert.ok(readyState.guardrails.some((guardrail) => /can clear the Oracle provider gate/i.test(guardrail)));
+});
+
+test("buildAdminWeddingOpsPanelState surfaces wedding API stack readiness", () => {
+  const blocked = buildAdminWeddingOpsPanelState({
+    operatorUsers: { users: [], limit: 25, total_users: 1 },
+    apiStack: buildWeddingApiStackState({ connectedAppIds: ["google-places-api"] }),
+    routeWeddingAiThroughAdmin: false,
+  });
+
+  const blockedMetric = blocked.metrics.find((metric) => metric.title === "Wedding API stack");
+  assert.equal(blockedMetric?.value, "4 missing");
+  assert.equal(blockedMetric?.status, "needs_backend");
+  assert.match(blockedMetric?.detail ?? "", /Google Maps Platform, Google Calendar API, WeatherAPI, Stripe/);
+  assert.ok(blocked.guardrails.some((guardrail) => /Connect required wedding APIs/i.test(guardrail)));
+
+  const ready = buildAdminWeddingOpsPanelState({
+    operatorUsers: { users: [], limit: 25, total_users: 1 },
+    apiStack: buildWeddingApiStackState({
+      connectedAppIds: ["google-places-api", "google-maps-platform", "gcal", "weatherapi", "stripe"],
+    }),
+    routeWeddingAiThroughAdmin: false,
+  });
+
+  const readyMetric = ready.metrics.find((metric) => metric.title === "Wedding API stack");
+  assert.equal(readyMetric?.value, "Required providers ready");
+  assert.equal(readyMetric?.status, "ready");
+  assert.match(readyMetric?.detail ?? "", /required production providers connected/i);
 });

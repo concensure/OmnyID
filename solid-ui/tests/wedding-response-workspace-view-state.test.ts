@@ -5,6 +5,8 @@ import { normalizeWeddingArtifactSummary } from "../src/lib/weddingArtifactState
 import { buildWeddingKnowledgeGraphState } from "../src/lib/weddingKnowledgeGraphState.ts";
 import { buildWeddingRecommendationExplanationState } from "../src/lib/weddingRecommendationExplanationState.ts";
 import { setWeddingDecisionSelection } from "../src/lib/weddingDecisionSelectionState.ts";
+import { buildWeddingGuestBoundaryDraftObjects } from "../src/lib/weddingGuestBoundaryDraftState.ts";
+import { buildWeddingInspirationItem } from "../src/lib/weddingInspirationState.ts";
 import { buildWeddingResponseWorkspaceViewState } from "../src/lib/weddingResponseWorkspaceViewState.ts";
 import { buildWeddingTemplateFollowUpState } from "../src/lib/weddingTemplateFollowUpState.ts";
 import {
@@ -96,9 +98,9 @@ test("buildWeddingResponseWorkspaceViewState creates category rail and active ar
   assert.ok(!state.personalOsProjection.rankedItems.some((item) => item.evidenceLabels.includes("live update check")));
   assert.ok(!state.personalOsProjection.rankedItems.some((item) => /Finish launch check/i.test(item.title)));
   assert.match(state.personalOsProjection.fieldEngineSummary ?? "", /Wedding .* pressure:/);
-  assert.match(state.personalOsProjection.decisionLoadRelief.summaryLabel, /wedding decision|No decision-heavy wedding items/);
-  assert.match(state.bundleExportPayload.content, /## What needs your yes\/no/);
-  assert.match(state.bundleExportPayload.content, /Decision-focus note:/);
+  assert.match(state.personalOsProjection.decisionLoadRelief.summaryLabel, /things need your attention|No decision-heavy wedding items/);
+  assert.match(state.bundleExportPayload.content, /## Three things worth your attention/);
+  assert.match(state.bundleExportPayload.content, /Attention note:/);
   assert.equal(state.bundleExportPayload.filename, "wedding-planning-bundle.md");
   assert.equal(state.htmlBundleExportPayload.filename, "wedding-planning-bundle.html");
   assert.equal(state.wordBundleExportPayload.filename, "wedding-planning-bundle.doc");
@@ -682,11 +684,20 @@ test("buildWeddingResponseWorkspaceViewState exposes editable-vendor contact car
   assert.equal(state.vendorContactCards[0]?.statusLabel, "Second attempt due");
   assert.equal(state.vendorContactCards[0]?.tone, "due");
   assert.equal(state.vendorContactCards[0]?.nextActionLabel, "Send one follow-up");
+  assert.equal(state.vendorContactCards[0]?.primaryActionLabel, "Review and approve follow-up");
+  assert.equal(state.vendorContactCards[0]?.lastContactLabel, "2026-09-09");
+  assert.equal(state.vendorContactCards[0]?.followUpDueLabel, "2026-09-14");
   assert.ok(state.vendorContactCards[0]?.metadataLabels.includes("personal email"));
   assert.equal(state.vendorContactCards[1]?.statusLabel, "Waiting for reply");
   assert.equal(state.vendorContactCards[1]?.tone, "waiting");
+  assert.equal(state.vendorContactCards[1]?.actionMode, "waiting");
+  assert.equal(state.vendorContactCards[1]?.primaryActionLabel, "Open follow-up task");
   assert.equal(state.vendorContactCards[2]?.statusLabel, "Reply received");
   assert.equal(state.vendorContactCards[2]?.tone, "closed");
+  assert.equal(state.vendorContactCards[2]?.actionMode, "reply_recorded");
+  assert.equal(state.vendorContactCards[2]?.primaryActionLabel, "View response");
+  assert.equal(state.vendorContactCards[2]?.replyLabel, "2026-09-10");
+  assert.match(state.vendorContactCards[2]?.detailLabel ?? "", /Continue from the response/i);
 });
 
 test("buildWeddingResponseWorkspaceViewState turns commitment timing gaps into task projections", () => {
@@ -1300,6 +1311,51 @@ test("buildWeddingResponseWorkspaceViewState exposes guest operations tracking",
   assert.ok(state.projectionQueue?.dispatchPayload?.sendInputs.some((input) => input.type === "ledger" && input.kind === "wedding_boundary_policy"));
 });
 
+test("buildWeddingResponseWorkspaceViewState counts saved boundary guests in guest tracking", () => {
+  const boundaryObjects = buildWeddingGuestBoundaryDraftObjects({
+    displayName: "Casey Morgan",
+    householdLabel: "Friends",
+    rsvpStatus: "Attending",
+    contactLabel: "casey@example.test",
+    mealPreference: "Vegetarian",
+    dietaryNote: "No shellfish",
+    accessibilityNote: "Step-free entry",
+  }, metadata, "2026-09-25T00:00:00.000Z");
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    boundaryObjects,
+  });
+
+  assert.equal(state.guestTracking.guestFileCount, 0);
+  assert.equal(state.guestTracking.guestRowCount, 1);
+  assert.equal(state.guestTracking.attendingCount, 1);
+  assert.equal(state.guestTracking.pendingCount, 0);
+  assert.equal(state.guestTracking.householdCount, 1);
+  assert.equal(state.guestTracking.dietaryCount, 1);
+  assert.equal(state.guestTracking.accessibilityCount, 1);
+  assert.equal(state.guestTracking.missingContactCount, 0);
+  assert.equal(state.guestTracking.missingMealCount, 0);
+  assert.ok(state.guestTracking.sourceLabels.includes("Saved guest records"));
+  assert.equal(state.seatingPlan.guestRowsConsidered, 1);
+  assert.equal(state.seatingPlan.unassignedAttendingCount, 1);
+  assert.equal(state.seatingPlan.suggestedTableCount, 1);
+  assert.equal(state.seatingPlan.accessibilityConstraintCount, 1);
+  assert.ok(state.seatingPlan.dietaryAccessibilityBrief.dietarySummaryLabels.some((label) => /shellfish/i.test(label)));
+  assert.ok(state.seatingPlan.actionItems.some((item) => /Assign 1 attending guest/i.test(item.title)));
+  assert.ok(state.planningTaskItems.some((item) => item.id === "wedding_seating_action:assign_tables"));
+  assert.ok(state.planningTaskItems.some((item) => item.id === "wedding_seating_action:brief_accessibility"));
+  assert.ok(state.projectionQueue?.dispatchPayload?.sendInputs.some((input) =>
+    input.type === "task"
+    && input.kind === "task"
+    && input.metadata?.seating_action_candidate_id === "wedding_seating_action:assign_tables",
+  ));
+  assert.ok(state.personalOsProjection.rankedItems.some((item) =>
+    item.id === "task:wedding_seating_action:assign_tables"
+    && item.sourceSurface === "tasks"
+    && item.evidenceLabels.includes("seating action"),
+  ));
+});
+
 test("buildWeddingResponseWorkspaceViewState exposes seating draft tracking", () => {
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,
@@ -1325,4 +1381,166 @@ test("buildWeddingResponseWorkspaceViewState exposes seating draft tracking", ()
   assert.equal(state.seatingPlan.sensitiveConstraintCount, 1);
   assert.equal(state.seatingPlan.accessibilityConstraintCount, 1);
   assert.ok(state.seatingPlan.warningLabels.some((label) => /not assigned/i.test(label)));
+});
+
+test("buildWeddingResponseWorkspaceViewState applies saved seating constraints to the draft", () => {
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    artifacts: [{
+      id: "artifact:guests",
+      title: "Guest list",
+      kind: "guest_list",
+      createdAt: 1,
+      metadata,
+      bodyText: [
+        "| Name | RSVP | Household |",
+        "| --- | --- | --- |",
+        "| Mum | Yes | Family |",
+        "| Uncle David | Yes | Family |",
+      ].join("\n"),
+    }],
+    seatingConstraints: [{
+      id: "constraint:keep-apart",
+      kind: "keep_apart",
+      instruction: "Move Uncle David away from Mum.",
+      primaryPersonId: "uncle-david",
+      relatedPersonId: "mum",
+      confidence: "high",
+      statusLabel: "Uncle David and Mum will be kept apart in the next seating draft.",
+    }],
+  });
+  const mum = state.seatingPlan.optimizationPreview?.assignments.find((assignment) => assignment.personId === "mum");
+  const david = state.seatingPlan.optimizationPreview?.assignments.find((assignment) => assignment.personId === "uncle-david");
+
+  assert.ok(mum);
+  assert.ok(david);
+  assert.notEqual(mum.tableId, david.tableId);
+});
+
+test("buildWeddingResponseWorkspaceViewState shows a saved seating draft after refresh", () => {
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    seatingOptimizations: [{
+      assignments: [{
+        personId: "grandma-chen",
+        personLabel: "Grandma Chen",
+        tableId: "table-3",
+        tableLabel: "Table 3",
+        score: 14,
+        reasonLabels: ["Accessible table and quieter seating"],
+      }],
+      totalScore: 14,
+      hardViolations: [],
+      softSignals: [],
+      explanationLabels: ["Saved seating draft is ready to review."],
+      proactiveIssueLabels: [],
+      applyLabel: "Apply seating plan",
+      alternativeLabel: "Show alternatives",
+      savedAt: "2026-09-25T00:00:00.000Z",
+    }, {
+      assignments: [{
+        personId: "grandma-chen",
+        personLabel: "Grandma Chen",
+        tableId: "table-4",
+        tableLabel: "Table 4",
+        score: 12,
+        reasonLabels: ["Kept near family"],
+      }],
+      totalScore: 12,
+      hardViolations: [],
+      softSignals: [],
+      explanationLabels: ["Newer seating draft is ready."],
+      proactiveIssueLabels: [],
+      applyLabel: "Apply seating plan",
+      alternativeLabel: "Show alternatives",
+      savedAt: "2026-09-26T00:00:00.000Z",
+    }],
+  });
+
+  assert.equal(state.seatingPlan.optimizationPreview?.assignments[0]?.personLabel, "Grandma Chen");
+  assert.equal(state.seatingPlan.optimizationPreview?.assignments[0]?.tableLabel, "Table 4");
+  assert.equal(state.seatingPlan.optimizationPreview?.explanationLabels[0], "Newer seating draft is ready.");
+  assert.equal(state.seatingDraftCards.length, 2);
+  assert.equal(state.seatingDraftCards[0]?.title, "Current seating draft");
+  assert.equal(state.seatingDraftCards[0]?.isCurrent, true);
+  assert.equal(state.seatingDraftCards[1]?.statusLabel, "Saved");
+  assert.match(state.seatingDraftCards[1]?.detailLabel ?? "", /25 Sept 2026/);
+});
+
+test("buildWeddingResponseWorkspaceViewState hides archived seating drafts", () => {
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    seatingOptimizations: [{
+      assignments: [{
+        personId: "grandma-chen",
+        personLabel: "Grandma Chen",
+        tableId: "table-3",
+        tableLabel: "Table 3",
+        score: 14,
+        reasonLabels: ["Accessible table and quieter seating"],
+      }],
+      totalScore: 14,
+      hardViolations: [],
+      softSignals: [],
+      explanationLabels: ["Saved seating draft is ready to review."],
+      proactiveIssueLabels: [],
+      applyLabel: "Apply seating plan",
+      alternativeLabel: "Show alternatives",
+      savedAt: "2026-09-25T00:00:00.000Z",
+    }, {
+      assignments: [{
+        personId: "grandma-chen",
+        personLabel: "Grandma Chen",
+        tableId: "table-4",
+        tableLabel: "Table 4",
+        score: 12,
+        reasonLabels: ["Kept near family"],
+      }],
+      totalScore: 12,
+      hardViolations: [],
+      softSignals: [],
+      explanationLabels: ["Newer seating draft is ready."],
+      proactiveIssueLabels: [],
+      applyLabel: "Apply seating plan",
+      alternativeLabel: "Show alternatives",
+      savedAt: "2026-09-26T00:00:00.000Z",
+    }],
+    seatingDraftArchives: [{
+      id: "archive:old",
+      fingerprint: "grandma-chen:table-3",
+      statusLabel: "Saved seating draft hidden.",
+      reasonLabel: null,
+      createdAt: "2026-09-26T00:10:00.000Z",
+    }],
+  });
+
+  assert.equal(state.seatingDraftCards.length, 1);
+  assert.equal(state.seatingDraftCards[0]?.result.assignments[0]?.tableLabel, "Table 4");
+});
+
+test("buildWeddingResponseWorkspaceViewState exposes inspiration preference state", () => {
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    inspirationItems: [
+      buildWeddingInspirationItem({
+        title: "Reception inspiration",
+        note: "warm lighting, candles, and long table",
+        createdAt: "2026-09-26T00:00:00.000Z",
+      }),
+      buildWeddingInspirationItem({
+        title: "Venue inspiration",
+        note: "warm garden venue",
+        createdAt: "2026-09-26T00:01:00.000Z",
+      }),
+    ],
+  });
+
+  assert.equal(state.inspiration.items.length, 2);
+  assert.ok(state.inspiration.tagCounts.some((entry) => entry.tag === "warm lighting"));
+  assert.match(state.inspiration.insight?.detail ?? "", /warm lighting/i);
+  assert.ok(state.experienceModel.traits.some((trait) => trait.label === "Warm and intimate"));
+  assert.match(state.experienceModel.summaryLabel, /warm/i);
+  assert.ok(state.planningTaskItems.some((task) => task.metadata
+    && typeof task.metadata === "object"
+    && (task.metadata as Record<string, unknown>).wedding_inspiration_task === true));
 });

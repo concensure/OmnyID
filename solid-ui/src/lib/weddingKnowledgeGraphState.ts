@@ -12,6 +12,13 @@ import {
   safeWeddingLabel,
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
+import type { WeddingSeatingConstraintAction } from "@/lib/weddingSeatingConstraintActionState";
+import {
+  compactWeddingSeatingOptimizationResults,
+  type WeddingSeatingOptimizationResult,
+  weddingSeatingOptimizationFingerprint,
+} from "@/lib/weddingSeatingOptimizationState";
+import type { WeddingInspirationItem } from "@/lib/weddingInspirationState";
 
 export type WeddingGraphNodeKind =
   | "wedding_plan"
@@ -22,6 +29,13 @@ export type WeddingGraphNodeKind =
   | "calendar_event"
   | "task"
   | "decision"
+  | "guest"
+  | "social_group"
+  | "seating_constraint"
+  | "seating_draft"
+  | "seating_table"
+  | "inspiration"
+  | "preference"
   | "risk";
 
 export type WeddingGraphEdgeKind =
@@ -32,6 +46,14 @@ export type WeddingGraphEdgeKind =
   | "creates_deadline"
   | "requires"
   | "constrains"
+  | "applies_to"
+  | "keeps_apart"
+  | "keeps_together"
+  | "prefers_quiet"
+  | "places_guest"
+  | "seats_at"
+  | "inspires"
+  | "signals_preference"
   | "requires_approval"
   | "has_risk"
   | "next_action";
@@ -81,6 +103,10 @@ export type WeddingKnowledgeGraphInput = {
   scheduleItems?: readonly WeddingPlanningScheduleItem[];
   taskItems?: readonly WeddingPlanningTaskItem[];
   decisions?: readonly WeddingDecisionInput[];
+  seatingConstraints?: readonly WeddingSeatingConstraintAction[];
+  seatingOptimizations?: readonly WeddingSeatingOptimizationResult[];
+  seatingDraftArchiveFingerprints?: readonly string[];
+  inspirationItems?: readonly WeddingInspirationItem[];
   risks?: readonly WeddingRiskInput[];
 };
 
@@ -176,6 +202,12 @@ function sanitizedSelectedDecisionScope(value: unknown): Record<string, unknown>
 
 function nodeId(kind: WeddingGraphNodeKind, value: unknown): string {
   return `wedding_graph:${kind}:${safeWeddingLabel(value)}`;
+}
+
+function graphPersonLabel(value: unknown): string {
+  const raw = clean(value);
+  if (!raw) return "Guest";
+  return raw.replace(/^person:/i, "").replace(/[-_:]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function edgeId(source: string, kind: WeddingGraphEdgeKind, target: string): string {
@@ -357,6 +389,11 @@ export function buildWeddingKnowledgeGraphState(input: WeddingKnowledgeGraphInpu
   const scheduleItems = input.scheduleItems ?? [];
   const taskItems = input.taskItems ?? [];
   const decisions = (input.decisions ?? []).map((decision) => normalizeDecision(decision, metadata));
+  const seatingConstraints = input.seatingConstraints ?? [];
+  const hiddenSeatingDrafts = new Set((input.seatingDraftArchiveFingerprints ?? []).map((fingerprint) => clean(fingerprint)).filter(Boolean));
+  const seatingOptimizations = compactWeddingSeatingOptimizationResults(input.seatingOptimizations)
+    .filter((result) => !hiddenSeatingDrafts.has(clean(result.fingerprint) || weddingSeatingOptimizationFingerprint(result)));
+  const inspirationItems = input.inspirationItems ?? [];
   const risks = (input.risks ?? []).map(normalizeRisk);
   const nodes = new Map<string, WeddingGraphNode>();
   const edges = new Map<string, WeddingGraphEdge>();
@@ -554,6 +591,150 @@ export function buildWeddingKnowledgeGraphState(input: WeddingKnowledgeGraphInpu
       const targetId = nodeId("decision", target);
       addNode(nodes, metadata, targetId, "decision", target, ["wedding_decision"]);
       addEdge(edges, decisionId, targetId, "constrains", "constrains");
+    }
+  }
+
+  for (const constraint of seatingConstraints) {
+    const constraintId = nodeId("seating_constraint", constraint.id);
+    addNode(nodes, metadata, constraintId, "seating_constraint", constraint.statusLabel, [
+      "wedding_seating",
+      "wedding_seating:constraint",
+      `wedding_seating_constraint:${constraint.kind}`,
+      "topology:wedding_guest_graph",
+      "decisionos:wedding_seating",
+    ], {
+      seating_constraint_id: constraint.id,
+      seating_constraint_kind: constraint.kind,
+      instruction: constraint.instruction,
+      confidence: constraint.confidence,
+      primary_person_id: clean(constraint.primaryPersonId) || null,
+      related_person_id: clean(constraint.relatedPersonId) || null,
+      social_group: clean(constraint.socialGroup) || null,
+    });
+    addEdge(edges, planId, constraintId, "requires", "requires seating rule");
+
+    if (clean(constraint.primaryPersonId)) {
+      const primaryId = nodeId("guest", constraint.primaryPersonId);
+      addNode(nodes, metadata, primaryId, "guest", graphPersonLabel(constraint.primaryPersonId), [
+        "wedding_guest",
+        "topology:wedding_guest_graph",
+      ], { person_id: constraint.primaryPersonId });
+      addEdge(edges, constraintId, primaryId, "applies_to", "applies to guest");
+      if (constraint.kind === "prefer_quiet") {
+        addEdge(edges, primaryId, constraintId, "prefers_quiet", "prefers quiet seating");
+      }
+    }
+    if (clean(constraint.relatedPersonId)) {
+      const relatedId = nodeId("guest", constraint.relatedPersonId);
+      addNode(nodes, metadata, relatedId, "guest", graphPersonLabel(constraint.relatedPersonId), [
+        "wedding_guest",
+        "topology:wedding_guest_graph",
+      ], { person_id: constraint.relatedPersonId });
+      addEdge(edges, constraintId, relatedId, "applies_to", "applies to guest");
+    }
+    if (constraint.kind === "keep_apart" && clean(constraint.primaryPersonId) && clean(constraint.relatedPersonId)) {
+      addEdge(edges, nodeId("guest", constraint.primaryPersonId), nodeId("guest", constraint.relatedPersonId), "keeps_apart", "keep apart");
+    }
+    if (constraint.kind === "prefer_together" && clean(constraint.primaryPersonId) && clean(constraint.relatedPersonId)) {
+      addEdge(edges, nodeId("guest", constraint.primaryPersonId), nodeId("guest", constraint.relatedPersonId), "keeps_together", "keep together where possible");
+    }
+    if (constraint.kind === "social_group_together" && clean(constraint.socialGroup)) {
+      const groupId = nodeId("social_group", constraint.socialGroup);
+      addNode(nodes, metadata, groupId, "social_group", clean(constraint.socialGroup), [
+        "wedding_social_group",
+        "topology:wedding_guest_graph",
+      ], { social_group: constraint.socialGroup });
+      addEdge(edges, constraintId, groupId, "keeps_together", "keep social group together");
+    }
+  }
+
+  for (const [index, draft] of seatingOptimizations.entries()) {
+    const draftNumber = index + 1;
+    const draftId = nodeId("seating_draft", `draft:${draftNumber}:${draft.savedAt ?? draft.assignments.length}`);
+    addNode(nodes, metadata, draftId, "seating_draft", index === seatingOptimizations.length - 1 ? "Current seating draft" : `Saved seating draft ${draftNumber}`, [
+      "wedding_seating",
+      "wedding_seating:draft",
+      index === seatingOptimizations.length - 1 ? "wedding_seating:current_draft" : "wedding_seating:saved_draft",
+      draft.hardViolations.length > 0 ? "wedding_seating:review_required" : "wedding_seating:ready_to_apply",
+      "topology:wedding_guest_graph",
+      "decisionos:wedding_seating",
+    ], {
+      seating_draft_index: draftNumber,
+      seating_draft_current: index === seatingOptimizations.length - 1,
+      saved_at: clean(draft.savedAt) || null,
+      assignment_count: draft.assignments.length,
+      hard_violation_count: draft.hardViolations.length,
+      total_score: draft.totalScore,
+      proactive_issue_labels: draft.proactiveIssueLabels,
+    });
+    addEdge(edges, planId, draftId, "requires", "requires seating review");
+    addEdge(edges, workspaceId, draftId, "created", "created seating draft");
+
+    for (const assignment of draft.assignments) {
+      const guestId = nodeId("guest", assignment.personId);
+      const tableId = nodeId("seating_table", assignment.tableId);
+      addNode(nodes, metadata, guestId, "guest", clean(assignment.personLabel) || graphPersonLabel(assignment.personId), [
+        "wedding_guest",
+        "topology:wedding_guest_graph",
+      ], {
+        person_id: assignment.personId,
+        person_label: assignment.personLabel,
+      });
+      addNode(nodes, metadata, tableId, "seating_table", clean(assignment.tableLabel) || graphPersonLabel(assignment.tableId), [
+        "wedding_seating",
+        "wedding_seating:table",
+        "topology:wedding_guest_graph",
+      ], {
+        table_id: assignment.tableId,
+        table_label: assignment.tableLabel,
+      });
+      addEdge(edges, draftId, guestId, "places_guest", "places guest", {
+        table_id: assignment.tableId,
+        score: assignment.score,
+      });
+      addEdge(edges, guestId, tableId, "seats_at", "seated at table", {
+        seating_draft_id: draftId,
+        table_label: assignment.tableLabel,
+        reason_labels: assignment.reasonLabels,
+      });
+      addEdge(edges, draftId, tableId, "contains", "uses table");
+    }
+  }
+
+  for (const item of inspirationItems) {
+    const inspirationId = nodeId("inspiration", item.id);
+    addNode(nodes, metadata, inspirationId, "inspiration", item.title, [
+      "wedding_inspiration",
+      `wedding_inspiration:${item.kind}`,
+      "topology:wedding_preference_graph",
+      "decisionos:wedding_style",
+    ], {
+      inspiration_item_id: item.id,
+      inspiration_kind: item.kind,
+      tags: item.tags,
+      uploaded_by: item.uploadedBy,
+      created_at: item.createdAt,
+    });
+    addEdge(edges, workspaceId, inspirationId, "created", "saved inspiration");
+    addEdge(edges, planId, inspirationId, "contains", "contains inspiration");
+
+    for (const signal of item.preferenceSignals.slice(0, 8)) {
+      const preferenceId = nodeId("preference", signal);
+      addNode(nodes, metadata, preferenceId, "preference", signal, [
+        "wedding_preference",
+        "wedding_inspiration:preference_signal",
+        "topology:wedding_preference_graph",
+      ], { preference_signal: signal });
+      addEdge(edges, inspirationId, preferenceId, "signals_preference", "signals preference");
+    }
+    for (const link of item.ontologyLinks.slice(0, 8)) {
+      const targetId = nodeId("preference", link.target);
+      addNode(nodes, metadata, targetId, "preference", link.target, [
+        "wedding_preference",
+        "wedding_inspiration:ontology_target",
+        "topology:wedding_preference_graph",
+      ], { ontology_target: link.target });
+      addEdge(edges, inspirationId, targetId, "inspires", link.label);
     }
   }
 

@@ -1,15 +1,15 @@
 // @locs-version: 2.0
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { WeddingArtifactDetailPanel, weddingApprovalStateLabel } from "@/components/WeddingArtifactDetailPanel";
 import { WeddingProjectionQueuePanel } from "@/components/WeddingProjectionQueuePanel";
-import {
-  WeddingDecisionFocusCard,
-  WeddingHomeOverviewGrid,
-  WeddingWorkspaceContextPanels,
-} from "@/components/WeddingWorkspaceContextPanels";
+import { WeddingWorkspaceContextPanels } from "@/components/WeddingWorkspaceContextPanels";
+import { WeddingDecisionFocusCard } from "@/components/WeddingDecisionFocusCard";
+import { WeddingHomeOverviewGrid } from "@/components/WeddingHomeOverviewGrid";
+import { WeddingNextStepCard } from "@/components/WeddingNextStepCard";
 import type { SendAfpMessageInput } from "@/lib/api";
 import { buildWeddingArtifactExportPayload } from "@/lib/weddingArtifactExportPayloadState";
+import { weddingDecisionDeferralActionToAfpSendInput } from "@/lib/weddingDecisionDeferralAfpState";
 import {
   approveWeddingApprovalRequestState,
   type WeddingApprovalRequestState,
@@ -64,6 +64,7 @@ export function WeddingResponseWorkspaceView(props: {
   importRunning?: boolean | null;
   activeMenu?: WeddingWorkspaceMenuId;
   sharePlanOpen?: boolean;
+  onToggleSharePlan?: () => void;
   compact?: boolean;
   onQueryChange?: (query: string) => void;
   onRefreshWorkspace?: () => void;
@@ -98,6 +99,10 @@ export function WeddingResponseWorkspaceView(props: {
   const cardClass = () => compactMode()
     ? "rounded-[20px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[24px]"
     : "rounded-[24px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[28px] sm:p-4";
+
+  createEffect(() => {
+    if (state().workspace.activeArtifact) setShowPlanningFiles(true);
+  });
 
   function approvedApprovalRequest(request: WeddingApprovalRequestState): WeddingApprovalRequestState {
     return approvedRequests()[request.id] ? approveWeddingApprovalRequestState(request) : request;
@@ -161,6 +166,14 @@ export function WeddingResponseWorkspaceView(props: {
   }
 
   function handleSidebarAction(action: WeddingWorkspaceSidebarAction) {
+    if (action.kind === "defer_decision" && props.saveProjection) {
+      const sendInput = weddingDecisionDeferralActionToAfpSendInput(action, state().workspace.metadata);
+      if (sendInput) {
+        void props.saveProjection(sendInput)
+          .then(() => props.onRefreshWorkspace?.())
+          .catch(() => undefined);
+      }
+    }
     if (action.kind === "export_bundle") runBundleExport();
     props.onSidebarAction?.(action);
   }
@@ -210,6 +223,10 @@ export function WeddingResponseWorkspaceView(props: {
     >
       <div class={primaryColumnClass()}>
         <Show when={activeMenu() === "home"}>
+          <WeddingNextStepCard
+            state={state()}
+            onSelectMenu={props.onSelectMenu}
+          />
           <WeddingHomeOverviewGrid
             state={state()}
             onSelectMenu={props.onSelectMenu}
@@ -436,6 +453,7 @@ export function WeddingResponseWorkspaceView(props: {
           showHomeOverview={false}
           activeMenu={activeMenu()}
           sharePlanOpen={Boolean(props.sharePlanOpen)}
+          onToggleSharePlan={props.onToggleSharePlan}
           saveProjection={props.saveProjection}
           onRefreshWorkspace={props.onRefreshWorkspace}
           onSelectMenu={props.onSelectMenu}

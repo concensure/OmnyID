@@ -208,7 +208,7 @@ function cardFromArtifact(
     primaryAction: sectionId === "drafts"
       ? action("approve_draft", "Review approval", workspace, sectionId, artifact.id)
       : action("open_planning_files", "Open wedding documents", workspace, sectionId, artifact.id),
-    secondaryAction: action("export_artifact", "Export", workspace, sectionId, artifact.id),
+    secondaryAction: action("export_artifact", "Export options", workspace, sectionId, artifact.id),
   };
 }
 

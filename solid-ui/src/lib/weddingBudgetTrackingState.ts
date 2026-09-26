@@ -13,11 +13,16 @@ import {
   buildWeddingBudgetInsightsState,
   type WeddingBudgetInsightsState,
 } from "@/lib/weddingBudgetInsightsState";
+import {
+  isWeddingBudgetContributionDecisionRecord,
+  weddingBudgetContributionsFromDecisionRecords,
+} from "@/lib/weddingBudgetContributionState";
 
 export type WeddingBudgetLinePriceStatus = "quoted" | "projected" | "unknown";
 
 export type WeddingBudgetLineItem = {
   id: string;
+  linkedArtifactId: string | null;
   vendorName: string;
   categoryLabel: string;
   amount: number | null;
@@ -222,6 +227,7 @@ function lineItemFor(record: WeddingPersistedDecisionRecord): WeddingBudgetLineI
   // its artifactKind ("budget_sheet") would otherwise match the "budget" keyword below and
   // get miscounted as a single vendor line. It's summarized separately (see budgetAllocation).
   if (isWeddingBudgetAllocationDecisionRecord(record)) return null;
+  if (isWeddingBudgetContributionDecisionRecord(record)) return null;
   if (!/vendor|venue|budget|quote|package|price|cost|photographer|florist|caterer|band|dj|celebrant|officiant/i.test(`${record.artifactKind} ${record.artifactTitle} ${record.selectedOptionDetail}`)) {
     return null;
   }
@@ -230,6 +236,7 @@ function lineItemFor(record: WeddingPersistedDecisionRecord): WeddingBudgetLineI
   const status = priceStatus(rowText);
   return {
     id: record.id,
+    linkedArtifactId: clean(record.artifactId) || null,
     vendorName: clean(record.selectedOptionLabel) || "Selected vendor",
     categoryLabel: categoryFor(record),
     amount,
@@ -349,7 +356,9 @@ function usableAmount(value: string): boolean {
 }
 
 function paidCellIsUnpaid(value: string): boolean {
-  return Boolean(value) && !/\b(paid|yes|settled|complete|completed)\b/i.test(value);
+  if (!value) return false;
+  if (/\b(unpaid|not\s+paid|no|outstanding|pending|due|owed)\b/i.test(value)) return true;
+  return !/\b(paid|yes|settled|complete|completed)\b/i.test(value);
 }
 
 function isoDateFromCell(value: string): string | null {
@@ -367,22 +376,46 @@ function artifactHasPaymentSignals(artifact: WeddingArtifactInput): boolean {
     .test(`${artifact.kind ?? ""} ${artifact.title ?? ""} ${artifact.bodyText ?? ""}`);
 }
 
+function paymentLineClauses(line: string): string[] {
+  const cleaned = clean(line);
+  const paymentStarts = Array.from(cleaned.matchAll(/\b(?:deposit|final\s+balance|balance|instalment|installment|payment)\b[^$€£\d]{0,36}(?:(?:\$|aud|usd|gbp|eur)\s*\d|\d[\d,]*(?:\.\d+)?\s*(?:aud|usd|gbp|eur)\b)/gi))
+    .map((match) => match.index ?? 0)
+    .filter((index, arrayIndex, indexes) => arrayIndex === 0 || index !== indexes[arrayIndex - 1]);
+  if (paymentStarts.length < 2) return [cleaned];
+  return paymentStarts.map((start, index) => {
+    const end = paymentStarts[index + 1] ?? cleaned.length;
+    return clean(cleaned.slice(start, end).replace(/\s+(?:and|then)\s*$/i, ""));
+  }).filter(Boolean);
+}
+
+function paymentAmountLabelFromText(text: string): string | null {
+  const withoutDates = text.replace(/\b20\d{2}-\d{2}-\d{2}\b/g, " ");
+  const labelled = withoutDates.match(/(?:\$|aud|usd|gbp|eur)\s*\d[\d,]*(?:\.\d+)?/i)
+    ?? withoutDates.match(/\b\d[\d,]*(?:\.\d+)?\s*(?:aud|usd|gbp|eur)\b/i);
+  if (labelled) return clean(labelled[0]);
+  if (!/\b(amount|price|cost|fee|deposit|balance|payment|invoice)\b/i.test(withoutDates)) return null;
+  const unlabelled = withoutDates.match(/\b\d[\d,]*(?:\.\d+)?\b/);
+  return unlabelled ? clean(unlabelled[0]) : null;
+}
+
 function paymentTaskCandidateFromTextLine(input: {
   artifact: WeddingArtifactInput;
   line: string;
   lineIndex: number;
+  clauseIndex?: number;
   fallbackVendor: string;
 }): WeddingBudgetPaymentTaskCandidate | null {
   const line = clean(input.line);
   if (!/\b(deposit|instalment|installment|payment|balance|invoice|receipt|due|refund|cancellation|non-refundable)\b/i.test(line)) {
     return null;
   }
-  const dueAmount = moneyValue(line) !== null ? line.match(/(?:\$|aud|usd|gbp|eur)?\s*\d[\d,]*(?:\.\d+)?/i)?.[0] ?? null : null;
+  const dueAmount = paymentAmountLabelFromText(line);
   const dueAt = isoDateFromCell(line);
   if (!dueAmount && !dueAt && !/\b(deposit|balance due|payment schedule|non-refundable)\b/i.test(line)) return null;
   const vendor = clean(input.artifact.vendorLabels?.[0]) || input.fallbackVendor;
+  const clauseSuffix = typeof input.clauseIndex === "number" ? `-${input.clauseIndex + 1}` : "";
   return {
-    id: `wedding_budget_payment_task:${safeWeddingLabel(clean(input.artifact.id) || clean(input.artifact.title) || "payment")}:line-${input.lineIndex + 1}`,
+    id: `wedding_budget_payment_task:${safeWeddingLabel(clean(input.artifact.id) || clean(input.artifact.title) || "payment")}:line-${input.lineIndex + 1}${clauseSuffix}`,
     title: `Review payment detail for ${vendor}`,
     categoryLabel: "Payment schedule",
     vendorName: vendor,
@@ -422,8 +455,10 @@ function paymentTaskCandidates(artifacts: readonly WeddingArtifactInput[]): Wedd
         return clean(artifact.bodyText)
           .split(/\r?\n/)
           .flatMap((line, lineIndex): WeddingBudgetPaymentTaskCandidate[] => {
-            const candidate = paymentTaskCandidateFromTextLine({ artifact, line, lineIndex, fallbackVendor });
-            return candidate ? [candidate] : [];
+            return paymentLineClauses(line).flatMap((clause, clauseIndex): WeddingBudgetPaymentTaskCandidate[] => {
+              const candidate = paymentTaskCandidateFromTextLine({ artifact, line: clause, lineIndex, clauseIndex, fallbackVendor });
+              return candidate ? [candidate] : [];
+            });
           });
       }
       const categoryIndex = headerIndex(table.headers, /\b(category|item|vendor|supplier|service)\b/i);
@@ -622,6 +657,7 @@ export function buildWeddingBudgetTrackingState(input: {
     return item ? [item] : [];
   });
   const budgetAllocationSummary = weddingBudgetAllocationFromDecisionRecords(mergedRecords);
+  const savedContributionRows = weddingBudgetContributionsFromDecisionRecords(mergedRecords);
   const totalProjectedAmount = lineItems
     .filter((item) => item.priceStatus === "projected" && item.amount !== null)
     .reduce((total, item) => total + (item.amount ?? 0), 0);
@@ -651,6 +687,7 @@ export function buildWeddingBudgetTrackingState(input: {
     lineItems,
     paymentTaskCandidates: paymentTasks,
     budgetAllocation: budgetAllocationSummary?.categories ?? [],
+    savedContributionRows,
     budgetTargetAmount: targetAmount,
     totalKnownAmount,
     totalProjectedAmount,

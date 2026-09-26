@@ -7,6 +7,7 @@ import {
 import {
   buildWeddingProductionReadinessEvidenceState,
 } from "../src/lib/weddingProductionReadinessEvidenceState.ts";
+import { buildWeddingApiStackState } from "../src/lib/weddingApiStackState.ts";
 
 test("wedding production readiness blocks Oracle upload while required gates remain blocked", () => {
   const state = buildWeddingProductionReadinessState();
@@ -334,4 +335,26 @@ test("production readiness accepts aggregated helper evidence", () => {
   assert.ok(!state.nextActions.includes("Admin-funded wedding AI routing policy"));
   assert.ok(!state.nextActions.includes("Admin Oracle and user metrics"));
   assert.ok(!state.nextActions.includes("Oracle release gate"));
+});
+
+test("aggregated readiness blocks provider gate when required wedding API stack providers are missing", () => {
+  const evidenceState = buildWeddingProductionReadinessEvidenceState({
+    providerExecutors: [
+      { capability: "email", requiredProvider: "Gmail or email provider", productionReady: true } as any,
+      { capability: "calendar", requiredProvider: "Google Calendar or calendar provider", productionReady: true } as any,
+      { capability: "registry", requiredProvider: "Registry provider", productionReady: true } as any,
+      { capability: "vendor_search", requiredProvider: "Brave Search, Google Places, or OSM/Overpass provider", productionReady: true } as any,
+    ],
+    apiStack: buildWeddingApiStackState({ connectedAppIds: ["google-places-api"] }),
+  });
+  const state = buildWeddingProductionReadinessState({}, evidenceState.evidence);
+
+  const providerCheck = state.checks.find((check) => check.id === "provider_executor_integrations");
+  assert.equal(providerCheck?.status, "blocked");
+  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(
+    evidenceState.missingRequiredEvidenceLabels.some((label) =>
+      /Google Maps Platform, Google Calendar API, WeatherAPI, Stripe/.test(label),
+    ),
+  );
 });
