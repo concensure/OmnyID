@@ -1,15 +1,15 @@
 ﻿# Dirty Workspace Inventory - 2026-09-26
 
-Generated after the wedding planner hardening commits. This inventory excludes this inventory file itself so the report does not self-reference while being updated.
+Generated after the wedding planner hardening commits and Oracle staging prerequisite commits. This inventory excludes this inventory file itself so the report does not self-reference while being updated.
 
-Total dirty entries excluding this file: 2137
+Total dirty entries excluding this file: 2130
 
 ## Summary
 
-- Modified/type-changed tracked: 206
+- Modified/type-changed tracked: 205
 - Deleted tracked: 9
 - Renamed/copied tracked: 0
-- Untracked: 1922
+- Untracked: 1916
 - Other: 0
 
 ## Modified / Type-Changed Tracked Files
@@ -120,6 +120,7 @@ Total dirty entries excluding this file: 2137
  M solid-ui/src/components/ThreadMiniMap.tsx
  M solid-ui/src/components/ThreadView.tsx
  M solid-ui/src/components/ThreadsListView.tsx
+ M solid-ui/src/components/ToolsView.tsx
  M solid-ui/src/components/UsageView.tsx
  M solid-ui/src/components/ViewDispatcher.tsx
  M solid-ui/src/components/WorkflowsView.tsx
@@ -160,7 +161,6 @@ Total dirty entries excluding this file: 2137
  M src/crypto.rs
  M src/curator_runtime.rs
  M src/daemon_registry.rs
- M src/db.rs
  M src/differential_privacy.rs
  M src/entity_extractor.rs
  M src/export.rs
@@ -196,7 +196,6 @@ Total dirty entries excluding this file: 2137
  M src/server/auth.rs
  M src/server/billing.rs
  M src/server/health.rs
- M src/server/mod.rs
  M src/server/protocol_routes.rs
  M src/server/relay.rs
  M src/server/workflow/mod.rs
@@ -257,7 +256,6 @@ _None._
 .tmp-debug-bash-selftest/
 "AI Co-Founder Launch Template.txt"
 "C\357\200\272UsersozansAppDataLocalTemprust-hygiene-regression-test/"
-Dockerfile.backup
 "Documents/Recommended Oracle Cloud Solutions.txt"
 "Documents/UI/100 More UI Improvement Suggestions.md"
 "Documents/UI/50 UI Improvement Suggestions.md"
@@ -511,7 +509,6 @@ artifacts/storage-hygiene-report-benchmark-final/
 artifacts/storage-hygiene-report-benchmark/
 artifacts/storage-hygiene-report-current/
 backups/
-benchmarks/
 dev.ps1
 doc_ignore/
 docs/.well-known/
@@ -688,7 +685,6 @@ solid-ui/public/logo-animation.html
 solid-ui/public/manifest.webmanifest
 solid-ui/public/pdf.worker.min.mjs
 solid-ui/public/sw.js
-solid-ui/render-genesis-mark.cjs
 solid-ui/src/appEvents.d.ts
 solid-ui/src/components/A2UICard.tsx
 solid-ui/src/components/AddCustomViewModal.tsx
@@ -2103,7 +2099,6 @@ solid-ui/tests/workspace-setup-banner-failure-state.test.ts
 solid-ui/tests/workspace-setup-banner-local-state.test.ts
 solid-ui/tests/workspace-setup-state.test.ts
 solid-ui/tests/workspace-update-state.test.ts
-solid-ui/vite.config.mjs
 src/background_watcher_heuristics.rs
 src/background_watcher_runtime.rs
 src/bin/omnyid_tui.rs
@@ -2149,13 +2144,11 @@ temp_release_snippet.txt
 tests/
 tmp_backup_raw.txt
 tmp_restore_raw.txt
-typescript-sdk/scripts/
 typescript-sdk/src/continuity.ts
 typescript-sdk/src/retrieval.ts
 typescript-sdk/src/semantic-router/
 typescript-sdk/src/workspace-assistance.ts
 typescript-sdk/tests/
-typescript-sdk/tsconfig.build.json
 ui/components/BentoCard.tsx
 ui/components/DecisionOutcomeDiary.tsx
 ui/components/GoalProgressRing.tsx
