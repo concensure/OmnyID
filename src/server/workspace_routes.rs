@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.workspace-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -261,6 +261,14 @@ pub(super) struct WorkspaceThreadGrepQuery {
     pub(super) limit: Option<usize>,
 }
 
+fn workspace_thread_window(window: Option<usize>) -> usize {
+    window.unwrap_or(8).clamp(1, 50)
+}
+
+fn workspace_thread_grep_limit(limit: Option<usize>) -> usize {
+    limit.unwrap_or(20).clamp(1, 100)
+}
+
 pub(super) async fn workspace_thread_read_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -272,8 +280,11 @@ pub(super) async fn workspace_thread_read_http(
     let mode = crate::workspace_filesystem::ThreadReadMode::parse(
         query.mode.as_deref().unwrap_or("latest"),
     );
-    let response =
-        crate::workspace_filesystem::read_thread(&app_messages, mode, query.window.unwrap_or(8));
+    let response = crate::workspace_filesystem::read_thread(
+        &app_messages,
+        mode,
+        workspace_thread_window(query.window),
+    );
     Ok(Json(serde_json::to_value(response).unwrap_or_else(
         |_| serde_json::json!({"thread_id": thread_id, "mode": mode.as_str(), "message_count": 0}),
     )))
@@ -315,11 +326,30 @@ pub(super) async fn workspace_thread_grep_http(
     let hits = crate::workspace_filesystem::grep_thread(
         &app_messages,
         &query.query,
-        query.limit.unwrap_or(20),
+        workspace_thread_grep_limit(query.limit),
     );
     Ok(Json(serde_json::json!({
         "thread_id": query.thread_id,
         "query": query.query,
         "hits": hits,
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn workspace_thread_window_is_bounded() {
+        assert_eq!(super::workspace_thread_window(None), 8);
+        assert_eq!(super::workspace_thread_window(Some(0)), 1);
+        assert_eq!(super::workspace_thread_window(Some(12)), 12);
+        assert_eq!(super::workspace_thread_window(Some(5_000)), 50);
+    }
+
+    #[test]
+    fn workspace_thread_grep_limit_is_bounded() {
+        assert_eq!(super::workspace_thread_grep_limit(None), 20);
+        assert_eq!(super::workspace_thread_grep_limit(Some(0)), 1);
+        assert_eq!(super::workspace_thread_grep_limit(Some(40)), 40);
+        assert_eq!(super::workspace_thread_grep_limit(Some(5_000)), 100);
+    }
 }

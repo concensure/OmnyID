@@ -230,6 +230,10 @@ fn truncate_pointer_text(text: &str, max_chars: usize) -> String {
         + "..."
 }
 
+fn agent_memory_item_limit(limit: Option<u32>) -> u32 {
+    limit.unwrap_or(24).clamp(1, 100)
+}
+
 fn build_ranked_pointer_bundle(
     items: &[AgentMemoryItem],
     harness: Option<&str>,
@@ -289,7 +293,7 @@ async fn agent_memory_http(
         tier: query.tier.clone(),
         memory_type: query.memory_type.clone(),
         include_stale: query.include_stale.unwrap_or(false),
-        limit: query.limit.unwrap_or(24),
+        limit: agent_memory_item_limit(query.limit),
         namespace: query.namespace.clone(),
         memory_space: query.memory_space.clone(),
         author_mask: query.author_mask.clone(),
@@ -449,5 +453,13 @@ mod tests {
             Some("mem_high")
         );
         assert!(bundle.pointers_text.contains("mem_high content"));
+    }
+
+    #[test]
+    fn agent_memory_item_limit_is_bounded() {
+        assert_eq!(agent_memory_item_limit(None), 24);
+        assert_eq!(agent_memory_item_limit(Some(0)), 1);
+        assert_eq!(agent_memory_item_limit(Some(32)), 32);
+        assert_eq!(agent_memory_item_limit(Some(10_000)), 100);
     }
 }
