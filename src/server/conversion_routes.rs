@@ -161,9 +161,12 @@ async fn html_to_pdf(
             let msg = if code == 2 {
                 "HTML payload too large for PDF conversion"
             } else {
-                "PDF generation failed â€” ensure playwright is installed (npx playwright install chromium)"
+                return internal_http_error(format!(
+                    "pdf conversion subprocess failed with exit code {code}"
+                ))
+                .into_response();
             };
-            (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response()
+            (StatusCode::PAYLOAD_TOO_LARGE, msg).into_response()
         }
         Ok(Ok(_)) => match fs::read(&output_path).await {
             Err(e) => {
@@ -200,8 +203,13 @@ mod tests {
 
         assert!(production_source.contains("return internal_http_error(e).into_response();"));
         assert!(production_source.contains("internal_http_error(e).into_response()"));
+        assert!(production_source.contains(
+            "return internal_http_error(format!(\n                    \"pdf conversion subprocess failed with exit code {code}\"\n                ))"
+        ));
+        assert!(production_source.contains("(StatusCode::PAYLOAD_TOO_LARGE, msg).into_response()"));
         assert!(!production_source.contains("\"failed to write temp file\""));
         assert!(!production_source.contains("\"node process could not be spawned"));
         assert!(!production_source.contains("\"PDF output missing\""));
+        assert!(!production_source.contains("ensure playwright is installed"));
     }
 }
