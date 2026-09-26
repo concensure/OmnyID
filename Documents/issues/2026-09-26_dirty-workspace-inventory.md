@@ -1,15 +1,15 @@
 ﻿# Dirty Workspace Inventory - 2026-09-26
 
-Generated after the wedding planner hardening commits and Oracle runtime-contract prerequisite commits. This inventory excludes this inventory file itself so the report does not self-reference while being updated.
+Generated after the wedding planner hardening commits, Oracle runtime-contract prerequisite commits, and clean-build dependency commits. This inventory excludes this inventory file itself so the report does not self-reference while being updated.
 
-Total dirty entries excluding this file: 2120
+Total dirty entries excluding this file: 2115
 
 ## Summary
 
-- Modified/type-changed tracked: 205
+- Modified/type-changed tracked: 203
 - Deleted tracked: 9
 - Renamed/copied tracked: 0
-- Untracked: 1906
+- Untracked: 1903
 - Other: 0
 
 ## Modified / Type-Changed Tracked Files
@@ -120,7 +120,6 @@ Total dirty entries excluding this file: 2120
  M solid-ui/src/components/ThreadMiniMap.tsx
  M solid-ui/src/components/ThreadView.tsx
  M solid-ui/src/components/ThreadsListView.tsx
- M solid-ui/src/components/ToolsView.tsx
  M solid-ui/src/components/UsageView.tsx
  M solid-ui/src/components/ViewDispatcher.tsx
  M solid-ui/src/components/WorkflowsView.tsx
@@ -142,7 +141,6 @@ Total dirty entries excluding this file: 2120
  M solid-ui/src/lib/costStrategy.ts
  M solid-ui/src/lib/decrypt.ts
  M solid-ui/src/lib/sync.ts
- M solid-ui/src/lib/toolCatalog.ts
  M solid-ui/src/lib/voiceInput.ts
  M solid-ui/src/lib/workflowDeploymentHelpers.ts
  M solid-ui/src/lib/workflowGraphTypes.ts
@@ -688,7 +686,6 @@ solid-ui/src/components/AutomationsView.tsx
 solid-ui/src/components/BentoQuickAdd.tsx
 solid-ui/src/components/ClaimNeighborhoodInspector.tsx
 solid-ui/src/components/CognitiveBentoRow.tsx
-solid-ui/src/components/ConnectedAppsView.tsx
 solid-ui/src/components/ContactsView.tsx
 solid-ui/src/components/ContextPackSurface.tsx
 solid-ui/src/components/ConversationAttentionSurface.tsx
@@ -723,7 +720,6 @@ solid-ui/src/components/PARAOverviewStrip.tsx
 solid-ui/src/components/PARAView.tsx
 solid-ui/src/components/PlanningView.tsx
 solid-ui/src/components/PreparedDraftSurface.tsx
-solid-ui/src/components/PrimaryUseCasePrompt.tsx
 solid-ui/src/components/ProactiveSuggestionStrip.tsx
 solid-ui/src/components/ProcessingGlyph.tsx
 solid-ui/src/components/ProfileLedgerView.tsx
@@ -1215,10 +1211,8 @@ solid-ui/src/lib/planningFailureState.ts
 solid-ui/src/lib/planningViewState.ts
 solid-ui/src/lib/popoverPosition.ts
 solid-ui/src/lib/pricing.ts
-solid-ui/src/lib/primaryUseCaseProfileState.ts
 solid-ui/src/lib/proactiveSuggestionContextArtifactPreviewState.ts
 solid-ui/src/lib/proactiveSuggestionSimulatorPreviewState.ts
-solid-ui/src/lib/profileLedger.ts
 solid-ui/src/lib/profileLedgerFailureState.ts
 solid-ui/src/lib/profileLedgerLocalState.ts
 solid-ui/src/lib/profileLocalState.ts
@@ -1434,6 +1428,9 @@ solid-ui/src/lib/workflowAsyncState.ts
 solid-ui/src/lib/workflowCanvasState.ts
 solid-ui/src/lib/workflowCollectionState.ts
 solid-ui/src/lib/workflowComposerState.ts
+solid-ui/src/lib/workflowDeploymentMetadataState.ts
+solid-ui/src/lib/workflowDeploymentOverrideState.ts
+solid-ui/src/lib/workflowDeploymentPolicyState.ts
 solid-ui/src/lib/workflowDescribeHistory.ts
 solid-ui/src/lib/workflowDescribeIntentAnalysis.ts
 solid-ui/src/lib/workflowDomState.ts
@@ -1840,7 +1837,6 @@ solid-ui/tests/planning-failure-state.test.ts
 solid-ui/tests/planning-view-state.test.ts
 solid-ui/tests/popover-position.test.ts
 solid-ui/tests/pricing.test.ts
-solid-ui/tests/primary-use-case-profile-state.test.ts
 solid-ui/tests/proactive-suggestion-approval-state.test.ts
 solid-ui/tests/proactive-suggestion-context-artifact-preview-state.test.ts
 solid-ui/tests/proactive-suggestion-simulator-preview-state.test.ts
@@ -2115,7 +2111,6 @@ src/server/proactive_routes.rs
 src/server/search_workflows.rs
 src/server/skill_capsule_routes.rs
 src/server/thread_discovery.rs
-src/server/tool_connection_routes.rs
 src/server/ui_command_response_enricher.rs
 src/server/ui_command_routes.rs
 src/server/user_integrations.rs
