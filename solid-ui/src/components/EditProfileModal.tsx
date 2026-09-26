@@ -1,0 +1,212 @@
+﻿// @locs-version: 1.0
+import { readSession } from "@/lib/api";
+import { For, createEffect, createSignal } from "solid-js";
+import { DialogShell } from "@/components/DialogShell";
+import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import { loadUserProfile, saveUserProfile } from "@/lib/profileLocalState";
+import { recordShortcutUse } from "@/lib/shortcutRecency";
+
+const PRESET_WEBSITES = [
+  { id: "linkedin", label: "LinkedIn", emoji: "in" },
+  { id: "twitter", label: "X / Twitter", emoji: "X" },
+  { id: "instagram", label: "Instagram", emoji: "IG" },
+  { id: "facebook", label: "Facebook", emoji: "f" },
+  { id: "github", label: "GitHub", emoji: "GH" },
+  { id: "notion", label: "Notion", emoji: "N" },
+  { id: "medium", label: "Medium", emoji: "M" },
+  { id: "substack", label: "Substack", emoji: "S" },
+  { id: "pinterest", label: "Pinterest", emoji: "P" },
+  { id: "tumblr", label: "Tumblr", emoji: "T" },
+  { id: "raindrop", label: "Raindrop", emoji: "R" },
+  { id: "reddit", label: "Reddit", emoji: "r" },
+];
+
+export function EditProfileModal(props: { onClose: () => void }) {
+  const sessionUserId = readSession()?.user?.id ?? null;
+  const initial = loadUserProfile(sessionUserId);
+  const [displayName, setDisplayName] = createSignal(initial.displayName);
+  const [bio, setBio] = createSignal(initial.bio);
+  const [avatar, setAvatar] = createSignal(initial.avatar || ":)");
+  const [websites, setWebsites] = createSignal<string[]>(initial.websites);
+  const [saving, setSaving] = createSignal(false);
+  let displayNameRef: HTMLInputElement | undefined;
+
+  function toggleWebsite(id: string) {
+    setWebsites((previous) =>
+      previous.includes(id)
+        ? previous.filter((entry) => entry !== id)
+        : [...previous, id],
+    );
+  }
+
+  async function save() {
+    if (saving()) return;
+    setSaving(true);
+    try {
+      saveUserProfile({
+        displayName: displayName(),
+        bio: bio(),
+        avatar: avatar(),
+        websites: websites(),
+      }, sessionUserId);
+      props.onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function requestClose() {
+    if (saving()) return;
+    props.onClose();
+  }
+
+  function handleFormShortcut(event: KeyboardEvent) {
+    if (event.key === "Escape" && !saving()) {
+      event.preventDefault();
+      recordShortcutUse("form_cancel");
+      requestClose();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      recordShortcutUse("form_submit");
+      void save();
+    }
+  }
+
+  createEffect(() => {
+    queueMicrotask(() => displayNameRef?.focus());
+  });
+
+  return (
+    <DialogShell
+      labelledBy="edit-profile-title"
+      focusableSelector={'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'}
+      overlayClass="fixed inset-0 z-[200] flex items-center justify-center bg-on-surface/30 p-4 backdrop-blur-sm"
+      dialogClass="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-white/45 bg-white/96 p-6 shadow-panel backdrop-blur-xl"
+      onClose={requestClose}
+    >
+      <>
+        <button
+          type="button"
+          onClick={() => {
+            recordShortcutUse("form_cancel");
+            requestClose();
+          }}
+          disabled={saving()}
+          class="absolute right-3 top-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-on-surface-variant/40 transition hover:bg-white/60 hover:text-on-surface"
+          aria-label="Close"
+        >
+          x
+        </button>
+
+        <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-outline">
+          Profile
+        </p>
+        <h2 id="edit-profile-title" class="mb-5 text-lg font-bold text-on-surface">
+          Edit Profile
+        </h2>
+
+        <div class="space-y-4" onKeyDown={handleFormShortcut}>
+          <label class="block">
+            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
+              Avatar
+            </span>
+            <input
+              value={avatar()}
+              disabled={saving()}
+              onInput={(event) => setAvatar(event.currentTarget.value)}
+              class="mt-2 w-full rounded-2xl border border-white/40 bg-white/65 px-4 py-3 text-sm text-on-surface outline-none"
+            />
+          </label>
+
+          <label class="block">
+            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
+              Display name
+            </span>
+            <input
+              ref={displayNameRef}
+              value={displayName()}
+              disabled={saving()}
+              onInput={(event) => setDisplayName(event.currentTarget.value)}
+              class="mt-2 w-full rounded-2xl border border-white/40 bg-white/65 px-4 py-3 text-sm text-on-surface outline-none"
+            />
+          </label>
+
+          <label class="block">
+            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
+              Bio
+            </span>
+            <div class="mt-2">
+              <TiptapEditor
+                mode="compact"
+                initialContent={bio()}
+                disabled={saving()}
+                placeholder="Tell OmnyID how to understand you."
+                submitLabel={saving() ? "Saving..." : "Save profile"}
+                clearOnSend={false}
+                onChange={(_text, markdown) => setBio(markdown)}
+                onSend={async (payload) => {
+                  setBio(payload.markdown || payload.text);
+                  await save();
+                }}
+              />
+            </div>
+          </label>
+
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
+              Linked identities
+            </p>
+            <div class="mt-3 grid grid-cols-3 gap-2">
+              <For each={PRESET_WEBSITES}>
+                {(site) => {
+                  const active = () => websites().includes(site.id);
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => toggleWebsite(site.id)}
+                      disabled={saving()}
+                      class={`flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-center text-[10px] font-medium transition ${
+                        active()
+                          ? "border-primary/40 bg-primary/10 text-primary"
+                          : "border-white/40 bg-white/50 text-on-surface-variant hover:bg-white/70"
+                      }`}
+                    >
+                      <span class="text-base leading-none" aria-hidden="true">
+                        {site.emoji}
+                      </span>
+                      <span>{site.label}</span>
+                    </button>
+                  );
+                }}
+              </For>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                recordShortcutUse("form_cancel");
+                requestClose();
+              }}
+              disabled={saving()}
+              class="rounded-full border border-white/30 bg-white/60 px-4 py-2 text-sm font-medium text-on-surface-variant transition hover:bg-white/80"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={saving()}
+              class="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-black transition hover:brightness-105"
+            >
+              {saving() ? "Saving..." : "Save profile"}
+            </button>
+          </div>
+        </div>
+      </>
+    </DialogShell>
+  );
+}

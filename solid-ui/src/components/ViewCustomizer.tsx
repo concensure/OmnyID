@@ -1,0 +1,301 @@
+﻿// @locs-version: 1.0
+// @module-id: ui.view-customizer
+// @primary-capability: per-view-image-background-and-overlay-cards
+//
+// Provides a floating + button for non-home views that lets users:
+//   1. Set an image background (URL or file upload) behind the current view
+//   2. Add freely-draggable A2UICard overlays to any view
+//
+// State is persisted per-viewId in localStorage.
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { Portal } from "solid-js/web";
+import type { ViewName } from "@/lib/viewNames";
+import { A2UICard } from "@/components/A2UICard";
+import {
+  loadViewCustomizerBg,
+  loadViewCustomizerCards,
+  saveViewCustomizerBg,
+  saveViewCustomizerCards,
+  type OverlayCard,
+} from "@/lib/viewCustomizerLocalState";
+import { recordShortcutUse } from "@/lib/shortcutRecency";
+
+// â”€â”€ Storage helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function ViewCustomizer(props: { viewId: ViewName }) {
+  const [bgImage, setBgImage]       = createSignal<string | null>(null);
+  const [bgUrl, setBgUrl]           = createSignal("");
+  const [cards, setCards]           = createSignal<OverlayCard[]>([]);
+  const [menuOpen, setMenuOpen]     = createSignal(false);
+  const [showBgPanel, setShowBgPanel] = createSignal(false);
+
+  let fileRef: HTMLInputElement | undefined;
+
+  // Reload state whenever the view changes
+  createEffect(() => {
+    const v = props.viewId;
+    const bg = loadViewCustomizerBg(v);
+    setBgImage(bg);
+    setBgUrl(bg?.startsWith("http") ? bg : "");
+    setCards(loadViewCustomizerCards(v));
+    setMenuOpen(false);
+    setShowBgPanel(false);
+  });
+
+  // â”€â”€ Background helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  function applyBg(url: string | null) {
+    setBgImage(url);
+    saveViewCustomizerBg(props.viewId, url);
+  }
+
+  function applyBgUrl() {
+    const url = bgUrl().trim();
+    if (url) applyBg(url);
+  }
+
+  function clearBgDraft() {
+    setBgUrl(bgImage()?.startsWith("http") ? bgImage() ?? "" : "");
+    setShowBgPanel(false);
+  }
+
+  function handleBgFile(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result;
+      if (typeof result === "string") applyBg(result);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // â”€â”€ Overlay card helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  function addCard() {
+    const card: OverlayCard = {
+      id: `card-${Date.now()}`,
+      // Position near the center-right of the visible area
+      x: Math.max(60, Math.min(window.innerWidth - 420, window.innerWidth * 0.35)),
+      y: Math.max(80, Math.min(window.innerHeight - 440, window.innerHeight * 0.2)),
+    };
+    const next = [...cards(), card];
+    setCards(next);
+    saveViewCustomizerCards(props.viewId, next);
+    setMenuOpen(false);
+  }
+
+  function removeCard(id: string) {
+    const next = cards().filter((c) => c.id !== id);
+    setCards(next);
+    saveViewCustomizerCards(props.viewId, next);
+  }
+
+  function startDragCard(cardId: string, pointerX: number, pointerY: number, originX: number, originY: number) {
+    let cx = originX, cy = originY;
+
+    function onMove(e: PointerEvent) {
+      cx = originX + (e.clientX - pointerX);
+      cy = originY + (e.clientY - pointerY);
+      // Update position reactively (batched in next animation frame for perf)
+      setCards((prev) => prev.map((c) => c.id === cardId ? { ...c, x: cx, y: cy } : c));
+    }
+
+    function onUp() {
+      // Persist final position
+      setCards((prev) => {
+        saveViewCustomizerCards(props.viewId, prev);
+        return prev;
+      });
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    onCleanup(() => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    });
+  }
+
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  return (
+    <>
+      {/* Subtle image background layer â€” sits behind view content */}
+      <Show when={bgImage()}>
+        <Portal>
+          <div
+            class="pointer-events-none fixed z-[1] transition-opacity duration-500"
+            aria-hidden="true"
+            style={{
+              top: "60px",
+              left: "248px",
+              right: "0",
+              bottom: "0",
+              "background-image": `url(${bgImage()})`,
+              "background-size": "cover",
+              "background-position": "center",
+              opacity: "0.13",
+            }}
+          />
+        </Portal>
+      </Show>
+
+      {/* Overlay A2UI cards â€” freely draggable */}
+      <For each={cards()}>
+        {(card) => (
+          <Portal>
+            <div
+              class="fixed z-[180] animate-fade-in"
+              style={{ left: `${card.x}px`, top: `${card.y}px` }}
+            >
+              <div class="rounded-2xl border border-white/50 bg-white/96 p-4 shadow-panel backdrop-blur-xl">
+                {/* Drag handle */}
+                <div
+                  class="mb-3 flex cursor-grab items-center justify-between select-none active:cursor-grabbing"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    startDragCard(card.id, e.clientX, e.clientY, card.x, card.y);
+                  }}
+                >
+                  <span class="font-mono text-[8px] uppercase tracking-[0.2em] text-on-surface-variant/35">
+                    Custom Card Â· drag to move
+                  </span>
+                  <button
+                    type="button"
+                    class="ml-3 flex h-5 w-5 items-center justify-center rounded-full bg-black/5 text-[10px] text-on-surface-variant transition hover:bg-red-100 hover:text-red-500"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => removeCard(card.id)}
+                    aria-label="Remove card"
+                  >âœ•</button>
+                </div>
+                <A2UICard personaTone={card.personaTone} onDismiss={() => removeCard(card.id)} />
+              </div>
+            </div>
+          </Portal>
+        )}
+      </For>
+
+      {/* Floating + button â€” above AgentPersonaFAB (bottom-24) */}
+      <Portal>
+        <div class="fixed z-[170]" style={{ bottom: "88px", right: "16px" }}>
+          <div class="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              class="glass-button flex h-10 w-10 items-center justify-center rounded-2xl border border-white/40 bg-white/90 text-lg font-light text-on-surface-variant shadow-panel backdrop-blur-md transition hover:bg-white hover:text-on-surface"
+              aria-label="Customize view"
+              title="Add to this view"
+            >
+              +
+            </button>
+
+            {/* Dropdown menu */}
+            <Show when={menuOpen()}>
+              <div class="absolute bottom-full right-0 mb-2 w-60 animate-fade-in rounded-2xl border border-white/50 bg-white/96 p-3 shadow-panel backdrop-blur-xl">
+
+                {/* â”€â”€ Image Background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+                <button
+                  type="button"
+                  onClick={() => setShowBgPanel((v) => !v)}
+                  class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-xs transition hover:bg-on-surface/6"
+                >
+                  <span class="text-base leading-none">ðŸ–¼</span>
+                  <div>
+                    <p class="font-medium text-on-surface">Image Background</p>
+                    <p class="text-[10px] text-on-surface-variant/60">Set a photo behind this view</p>
+                  </div>
+                  <span class="ml-auto text-[10px] text-on-surface-variant/40">{showBgPanel() ? "â–²" : "â–¼"}</span>
+                </button>
+
+                <Show when={showBgPanel()}>
+                  <div class="mt-1 flex flex-col gap-1.5 px-2 pb-2">
+                    <input
+                      type="text"
+                      class="w-full rounded-xl border border-black/10 bg-white/70 px-2.5 py-1.5 text-[11px] text-on-surface placeholder-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="Paste image URLâ€¦"
+                      value={bgUrl()}
+                      onInput={(e) => setBgUrl(e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          recordShortcutUse("form_submit");
+                          applyBgUrl();
+                          return;
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          recordShortcutUse("form_cancel");
+                          clearBgDraft();
+                        }
+                      }}
+                    />
+                    <div class="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={applyBgUrl}
+                        disabled={!bgUrl().trim()}
+                        class="flex-1 rounded-xl bg-primary py-1.5 text-[10px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+                      >
+                        Apply
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileRef?.click()}
+                        class="rounded-xl border border-black/10 bg-white/60 px-3 py-1.5 text-[10px] text-on-surface-variant transition hover:bg-white/90"
+                      >
+                        Upload
+                      </button>
+                      <Show when={bgImage()}>
+                        <button
+                          type="button"
+                          onClick={() => { applyBg(null); setBgUrl(""); }}
+                          class="rounded-xl border border-red-200/60 bg-red-50/60 px-2.5 py-1.5 text-[10px] text-red-500 transition hover:bg-red-100"
+                          title="Remove background"
+                        >âœ•</button>
+                      </Show>
+                    </div>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/*"
+                      class="hidden"
+                      onChange={handleBgFile}
+                    />
+                  </div>
+                </Show>
+
+                <div class="mx-1 my-1 h-px bg-outline/10" />
+
+                {/* â”€â”€ Add A2UI card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+                <button
+                  type="button"
+                  onClick={addCard}
+                  class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-xs transition hover:bg-on-surface/6"
+                >
+                  <span class="text-base leading-none">âœ¦</span>
+                  <div>
+                    <p class="font-medium text-on-surface">Add Custom Card</p>
+                    <p class="text-[10px] text-on-surface-variant/60">Agent-generated floating card</p>
+                  </div>
+                </button>
+              </div>
+            </Show>
+          </div>
+        </div>
+
+        {/* Click-away backdrop */}
+        <Show when={menuOpen()}>
+          <div
+            class="fixed inset-0 z-[169]"
+            onClick={() => { setMenuOpen(false); setShowBgPanel(false); }}
+          />
+        </Show>
+      </Portal>
+    </>
+  );
+}
