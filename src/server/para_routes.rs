@@ -43,6 +43,10 @@ struct ParaItemsQuery {
     limit: Option<i64>,
 }
 
+fn para_list_limit(limit: Option<i64>) -> i64 {
+    limit.unwrap_or(50).clamp(1, 200)
+}
+
 async fn para_items_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -50,7 +54,7 @@ async fn para_items_http(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     let prefix = q.prefix.as_deref().unwrap_or("project:");
-    let limit = q.limit.unwrap_or(50).min(200);
+    let limit = para_list_limit(q.limit);
     let items = state
         .db
         .get_para_by_tag_prefix(&user.id, prefix, limit)
@@ -73,7 +77,7 @@ async fn para_archived_http(
     Query(q): Query<ArchivedQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    let limit = q.limit.unwrap_or(50).min(200);
+    let limit = para_list_limit(q.limit);
     let rows = state
         .db
         .get_para_archived(&user.id, limit)
@@ -260,4 +264,16 @@ async fn para_auto_archive_approve_http(
         }
     }
     Ok(Json(json!({ "archived": archived })))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn para_list_limit_is_bounded() {
+        assert_eq!(super::para_list_limit(None), 50);
+        assert_eq!(super::para_list_limit(Some(0)), 1);
+        assert_eq!(super::para_list_limit(Some(-5)), 1);
+        assert_eq!(super::para_list_limit(Some(80)), 80);
+        assert_eq!(super::para_list_limit(Some(5_000)), 200);
+    }
 }
