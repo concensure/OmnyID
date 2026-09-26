@@ -846,4 +846,28 @@ mod tests {
             Some("workflows")
         );
     }
+
+    #[test]
+    fn high_confidence_unsourced_suggestion_is_deferred_in_afp_policy() {
+        let result = EvaluationResult {
+            heuristic_id: "generic-high-confidence".to_string(),
+            suggestion: AfpProactiveSuggestionContent {
+                heuristic_id: "generic-high-confidence".to_string(),
+                confidence: 0.95,
+                urgency: "medium".to_string(),
+                action_label: "Review possible next step".to_string(),
+                description: "A possible next step is available.".to_string(),
+                ..Default::default()
+            },
+        };
+
+        let afp = build_suggestion_afp("user_1", "passive:user_1", &result, None);
+
+        assert_eq!(afp["content"]["surface_policy"].as_str(), Some("defer"));
+        assert_eq!(
+            afp["content"]["strategic_policy"]["action"].as_str(),
+            Some("defer")
+        );
+        assert_eq!(afp["metadata"]["surface_policy"].as_str(), Some("defer"));
+    }
 }

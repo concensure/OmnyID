@@ -59,7 +59,7 @@ pub fn policy_for_proactive_suggestion(
         };
     }
 
-    if urgency == "high" || confidence >= 0.85 {
+    if urgency == "high" || (confidence >= 0.85 && has_evidence(suggestion)) {
         return ProactiveStrategicPolicy {
             action: ProactiveStrategicAction::SurfaceNow,
             surface_policy: "surface_now".to_string(),
@@ -76,6 +76,10 @@ pub fn policy_for_proactive_suggestion(
         approval_policy: "no_side_effect".to_string(),
         rationale: "Suggestion is useful but can wait for a calmer review moment.".to_string(),
     }
+}
+
+fn has_evidence(suggestion: &AfpProactiveSuggestionContent) -> bool {
+    suggestion.source_count.unwrap_or(0) > 0 || !suggestion.source_refs.is_empty()
 }
 
 #[cfg(test)]
@@ -130,5 +134,24 @@ mod tests {
 
         assert_eq!(policy.action, ProactiveStrategicAction::SurfaceNow);
         assert_eq!(policy.approval_policy, "no_side_effect");
+    }
+
+    #[test]
+    fn high_confidence_without_evidence_defers_for_calm_review() {
+        let policy = policy_for_proactive_suggestion(&suggestion(0.92, "medium"));
+
+        assert_eq!(policy.action, ProactiveStrategicAction::Defer);
+        assert_eq!(policy.surface_policy, "defer");
+    }
+
+    #[test]
+    fn high_confidence_with_evidence_surfaces_now() {
+        let mut suggestion = suggestion(0.92, "medium");
+        suggestion.source_refs = vec!["msg_1".to_string()];
+
+        let policy = policy_for_proactive_suggestion(&suggestion);
+
+        assert_eq!(policy.action, ProactiveStrategicAction::SurfaceNow);
+        assert_eq!(policy.surface_policy, "surface_now");
     }
 }
