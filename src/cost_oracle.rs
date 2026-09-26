@@ -58,10 +58,13 @@ impl Budget {
         self.max_cost_usd * self.soft_limit_ratio
     }
     pub fn soft_api_calls(&self) -> u32 {
-        (self.max_api_calls as f64 * self.soft_limit_ratio) as u32
+        // clamp ratio to [0,1] before cast so a misconfigured DB value can't produce > max
+        let ratio = self.soft_limit_ratio.clamp(0.0, 1.0);
+        (self.max_api_calls as f64 * ratio) as u32
     }
     pub fn soft_tokens(&self) -> u64 {
-        (self.max_llm_tokens as f64 * self.soft_limit_ratio) as u64
+        let ratio = self.soft_limit_ratio.clamp(0.0, 1.0);
+        (self.max_llm_tokens as f64 * ratio) as u64
     }
 }
 
@@ -129,15 +132,16 @@ impl ExecutionContext {
     pub fn can_afford(&self, estimated_usd: f64, estimated_tokens: u64) -> bool {
         self.cost_so_far + estimated_usd <= self.budget.max_cost_usd
             && self.tokens_so_far + estimated_tokens <= self.budget.max_llm_tokens
-            && self.api_calls_so_far + 1 <= self.budget.max_api_calls
+            // use < instead of saturating +1 to avoid u32 overflow at max_api_calls == u32::MAX
+            && self.api_calls_so_far < self.budget.max_api_calls
     }
 
     /// Apply a cost event and update status accordingly.
     pub fn apply_cost(&mut self, usd: f64, tokens: u64, is_api_call: bool) {
         self.cost_so_far += usd;
-        self.tokens_so_far += tokens;
+        self.tokens_so_far = self.tokens_so_far.saturating_add(tokens);
         if is_api_call {
-            self.api_calls_so_far += 1;
+            self.api_calls_so_far = self.api_calls_so_far.saturating_add(1);
         }
         self.status = match self.budget_status() {
             BudgetStatus::HardExceeded => ExecutionStatus::Halted,
@@ -349,15 +353,11 @@ pub struct PreflightResult {
     pub effective_tier: u8,
 }
 
-pub struct BudgetEnforcer {
-    selector: ApiTierSelector,
-}
+pub struct BudgetEnforcer {}
 
 impl BudgetEnforcer {
     pub fn new() -> Self {
-        Self {
-            selector: ApiTierSelector::new(),
-        }
+        Self {}
     }
 
     /// Pre-flight check before executing a node/task.
@@ -421,7 +421,6 @@ impl Default for BudgetEnforcer {
 struct CacheEntry {
     data: serde_json::Value,
     expires_at: i64, // Unix timestamp seconds
-    hits: u32,
 }
 
 /// Multi-layer cache.
@@ -467,14 +466,7 @@ impl CacheEngine {
         let k = format!("{run_id}:{key}");
         let expires_at = Utc::now().timestamp() + ttl_secs;
         let mut guard = self.session.write().await;
-        guard.insert(
-            k,
-            CacheEntry {
-                data,
-                expires_at,
-                hits: 0,
-            },
-        );
+        guard.insert(k, CacheEntry { data, expires_at });
     }
 
     pub async fn session_evict_run(&self, run_id: &str) {
@@ -486,19 +478,32 @@ impl CacheEngine {
     // ── Global cache (L1) — PostgreSQL ────────────────────────────────────────
 
     pub async fn global_get(&self, cache_key: &str) -> Option<serde_json::Value> {
+        // GAP-112: use a plain SELECT to avoid row-level write locks on reads.
+        // The hit_count increment runs fire-and-forget in the background.
+        use sqlx::Row;
         let row = sqlx::query(
-            r#"UPDATE cache_entries
-                  SET hit_count = hit_count + 1, last_hit_at = now()
-                WHERE cache_key = $1 AND expires_at > now()
-            RETURNING data"#,
+            r#"SELECT data FROM cache_entries
+                WHERE cache_key = $1 AND expires_at > now()"#,
         )
         .bind(cache_key)
         .fetch_optional(&self.db)
         .await
         .ok()??;
+        let data = row.try_get::<serde_json::Value, _>("data").ok()?;
 
-        use sqlx::Row;
-        row.try_get::<serde_json::Value, _>("data").ok()
+        let db = self.db.clone();
+        let key = cache_key.to_string();
+        tokio::spawn(async move {
+            let _ = sqlx::query(
+                "UPDATE cache_entries SET hit_count = hit_count + 1, last_hit_at = now() \
+                 WHERE cache_key = $1",
+            )
+            .bind(&key)
+            .execute(&db)
+            .await;
+        });
+
+        Some(data)
     }
 
     pub async fn global_set(
@@ -533,11 +538,10 @@ impl CacheEngine {
     // ── User cache (L2) — PostgreSQL ──────────────────────────────────────────
 
     pub async fn user_get(&self, user_id: &str, cache_key: &str) -> Option<serde_json::Value> {
+        // GAP-112: plain SELECT to avoid write-lock contention on hot cache rows.
         let row = sqlx::query(
-            r#"UPDATE user_cache_entries
-                  SET hit_count = hit_count + 1
-                WHERE user_id = $1 AND cache_key = $2 AND expires_at > now()
-            RETURNING data"#,
+            r#"SELECT data FROM user_cache_entries
+                WHERE user_id = $1 AND cache_key = $2 AND expires_at > now()"#,
         )
         .bind(user_id)
         .bind(cache_key)
@@ -546,7 +550,23 @@ impl CacheEngine {
         .ok()??;
 
         use sqlx::Row;
-        row.try_get::<serde_json::Value, _>("data").ok()
+        let data = row.try_get::<serde_json::Value, _>("data").ok()?;
+
+        let db = self.db.clone();
+        let uid = user_id.to_string();
+        let key = cache_key.to_string();
+        tokio::spawn(async move {
+            let _ = sqlx::query(
+                "UPDATE user_cache_entries SET hit_count = hit_count + 1 \
+                 WHERE user_id = $1 AND cache_key = $2",
+            )
+            .bind(&uid)
+            .bind(&key)
+            .execute(&db)
+            .await;
+        });
+
+        Some(data)
     }
 
     pub async fn user_set(
@@ -921,5 +941,83 @@ impl CostOracle {
         } else {
             0.0
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn default_budget() -> Budget {
+        Budget::default()
+    }
+
+    fn ctx_with_status(status: BudgetStatus) -> ExecutionContext {
+        let budget = default_budget();
+        let mut ctx = ExecutionContext::new(
+            "run-1".to_string(),
+            "user-1".to_string(),
+            None,
+            budget.clone(),
+        );
+
+        match status {
+            BudgetStatus::Ok => {
+                ctx.cost_so_far = 0.0;
+                ctx.api_calls_so_far = 0;
+                ctx.tokens_so_far = 0;
+            }
+            BudgetStatus::SoftExceeded => {
+                ctx.cost_so_far = budget.soft_usd();
+            }
+            BudgetStatus::HardExceeded => {
+                ctx.cost_so_far = budget.max_cost_usd;
+            }
+        }
+
+        ctx
+    }
+
+    #[test]
+    fn api_tier_selector_caps_expensive_tasks_when_budget_is_soft_exceeded() {
+        let selector = ApiTierSelector::new();
+        let ctx = ctx_with_status(BudgetStatus::SoftExceeded);
+
+        let selected = selector
+            .select("flights", &ctx)
+            .expect("soft-exceeded budget should still allow a moderate flight API");
+
+        assert_eq!(selected.name, "skyscanner_basic");
+        assert_eq!(selected.tier, ApiTier::Moderate);
+    }
+
+    #[test]
+    fn budget_enforcer_blocks_expensive_cards_when_budget_is_hard_exceeded() {
+        let enforcer = BudgetEnforcer::new();
+        let ctx = ctx_with_status(BudgetStatus::HardExceeded);
+
+        let result = enforcer.check(&ctx, "flights", Some("flights"), 0.01);
+
+        assert!(!result.allowed);
+        assert_eq!(result.effective_tier, 1);
+        assert!(matches!(
+            result.downgrade,
+            Some(DowngradeAction::SkipCard { ref card_type }) if card_type == "flights"
+        ));
+    }
+
+    #[test]
+    fn budget_enforcer_uses_estimate_for_expensive_cards_in_soft_mode() {
+        let enforcer = BudgetEnforcer::new();
+        let ctx = ctx_with_status(BudgetStatus::SoftExceeded);
+
+        let result = enforcer.check(&ctx, "flights", Some("flights"), 0.03);
+
+        assert!(result.allowed);
+        assert_eq!(result.effective_tier, 2);
+        assert!(matches!(
+            result.downgrade,
+            Some(DowngradeAction::UseEstimate { ref card_type }) if card_type == "flights"
+        ));
     }
 }

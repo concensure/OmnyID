@@ -13,6 +13,7 @@
 //! calls `get_secret("OMNYID_SIGNING_KEY_HEX")` regardless of where it lives.
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 
 // ── Trait ─────────────────────────────────────────────────────────────────────
@@ -75,7 +76,7 @@ impl SecretBackend for EnvSecretBackend {
         if let Some(v) = self.overrides.get(name) {
             return Ok(Some(v.clone()));
         }
-        Ok(std::env::var(name).ok())
+        Ok(read_process_secret(name))
     }
 
     async fn set(&self, _name: &str, _value: &str) -> Result<(), SecretError> {
@@ -83,6 +84,49 @@ impl SecretBackend for EnvSecretBackend {
             "EnvSecretBackend is read-only; set env vars before starting the process".to_string(),
         ))
     }
+}
+
+fn secret_file_env_name(name: &str) -> String {
+    format!("{name}_FILE")
+}
+
+fn read_secret_file(path: &Path) -> Option<String> {
+    let contents = std::fs::read_to_string(path).ok()?;
+    let trimmed = contents.trim_end_matches(['\r', '\n']);
+    if trimmed.trim().is_empty() {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
+pub fn read_process_secret(name: &str) -> Option<String> {
+    let file_env_name = secret_file_env_name(name);
+    if let Ok(path) = std::env::var(&file_env_name) {
+        let trimmed = path.trim();
+        if !trimmed.is_empty() {
+            if let Some(value) = read_secret_file(Path::new(trimmed)) {
+                return Some(value);
+            }
+        }
+    }
+    std::env::var(name).ok().and_then(|value| {
+        if value.trim().is_empty() {
+            None
+        } else {
+            Some(value)
+        }
+    })
+}
+
+pub fn read_process_secret_trimmed(name: &str) -> Option<String> {
+    read_process_secret(name).and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
 }
 
 // ── Vault backend ─────────────────────────────────────────────────────────────
@@ -280,6 +324,12 @@ pub fn build_backend() -> Arc<dyn SecretBackend> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[tokio::test]
     async fn env_backend_reads_overrides() {
@@ -321,6 +371,48 @@ mod tests {
     fn build_backend_defaults_to_env() {
         // Ensure default factory produces a working backend (no panic)
         let _backend = build_backend();
+    }
+
+    #[test]
+    fn read_process_secret_prefers_file_override() {
+        let _guard = env_lock().lock().unwrap();
+        let secret_name = "OMNYID_TEST_SECRET";
+        let file_name = secret_file_env_name(secret_name);
+        let temp_path =
+            std::env::temp_dir().join(format!("omnyid-secret-{}.txt", std::process::id()));
+        std::fs::write(&temp_path, "from-file\n").unwrap();
+
+        unsafe {
+            std::env::set_var(secret_name, "from-env");
+            std::env::set_var(&file_name, temp_path.display().to_string());
+        }
+
+        let value = read_process_secret(secret_name);
+        assert_eq!(value.as_deref(), Some("from-file"));
+
+        unsafe {
+            std::env::remove_var(secret_name);
+            std::env::remove_var(&file_name);
+        }
+        let _ = std::fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn read_process_secret_falls_back_to_env() {
+        let _guard = env_lock().lock().unwrap();
+        let secret_name = "OMNYID_TEST_SECRET_ENV_ONLY";
+
+        unsafe {
+            std::env::remove_var(secret_file_env_name(secret_name));
+            std::env::set_var(secret_name, "from-env");
+        }
+
+        let value = read_process_secret(secret_name);
+        assert_eq!(value.as_deref(), Some("from-env"));
+
+        unsafe {
+            std::env::remove_var(secret_name);
+        }
     }
 
     #[test]

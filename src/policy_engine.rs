@@ -43,6 +43,17 @@ const DATABASE_CAPS: &[&str] = &["read_database"];
 
 const APPROVAL_REQUIRED_TRANSITIONS: &[(&str, &str)] = &[("private", "public"), ("team", "public")];
 
+// ── Tier policy ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct TierPolicy {
+    pub plan: &'static str,
+    pub monthly_price_usd: f64,
+    pub est_monthly_revenue_usd: f64,
+    pub max_stage: u32,
+    pub max_cost_cents_per_run: u32,
+}
+
 // ── PolicyEngine ─────────────────────────────────────────────────────────────
 
 pub struct PolicyEngine;
@@ -84,6 +95,43 @@ impl PolicyEngine {
     /// Returns `true` if `task_type` is in the global allow-list.
     pub fn is_allowed_task_type(task_type: &str) -> bool {
         ALLOWED_TASK_TYPES.contains(&task_type)
+    }
+
+    /// Returns the billing / cost-guardrail policy for a subscription tier.
+    pub fn tier_policy(plan: &str) -> TierPolicy {
+        match plan {
+            "pro" => TierPolicy {
+                plan: "pro",
+                monthly_price_usd: 29.0,
+                est_monthly_revenue_usd: 29.0,
+                max_stage: 10,
+                max_cost_cents_per_run: 10,
+            },
+            "team" => TierPolicy {
+                plan: "team",
+                monthly_price_usd: 79.0,
+                est_monthly_revenue_usd: 79.0,
+                max_stage: 20,
+                max_cost_cents_per_run: 25,
+            },
+            _ => TierPolicy {
+                plan: "free",
+                monthly_price_usd: 0.0,
+                est_monthly_revenue_usd: 0.0,
+                max_stage: 5,
+                max_cost_cents_per_run: 2,
+            },
+        }
+    }
+
+    /// Returns the expensive node kinds allowed for a given template.
+    pub fn allowed_expensive_nodes_for_template(template_id: &str) -> Vec<&'static str> {
+        match template_id {
+            "travel_booker" => vec!["web_search", "form_fill", "booking_confirm"],
+            "finance_guardian" => vec!["web_search", "spreadsheet_write"],
+            "study_planner" => vec!["web_search"],
+            _ => vec![],
+        }
     }
 }
 

@@ -8,6 +8,11 @@ CREATE TABLE IF NOT EXISTS messages (
     to_agents JSONB NOT NULL,
     timestamp TIMESTAMPTZ NOT NULL,
     type TEXT NOT NULL,
+    kind TEXT,
+    supertags TEXT[] NOT NULL DEFAULT '{}',
+    reference_targets TEXT[] NOT NULL DEFAULT '{}',
+    reference_types TEXT[] NOT NULL DEFAULT '{}',
+    link_types TEXT[] NOT NULL DEFAULT '{}',
     content JSONB NOT NULL,
     views JSONB NOT NULL DEFAULT '[]'::jsonb,
     summary TEXT,
@@ -25,6 +30,10 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_thread ON messages(thread_id);
 CREATE INDEX IF NOT EXISTS idx_embedding ON messages USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS idx_references ON messages USING gin ("references");
+CREATE INDEX IF NOT EXISTS idx_supertags ON messages USING gin (supertags);
+CREATE INDEX IF NOT EXISTS idx_reference_targets ON messages USING gin (reference_targets);
+CREATE INDEX IF NOT EXISTS idx_reference_types ON messages USING gin (reference_types);
+CREATE INDEX IF NOT EXISTS idx_link_types ON messages USING gin (link_types);
 
 CREATE TABLE IF NOT EXISTS attachments (
     id TEXT PRIMARY KEY,

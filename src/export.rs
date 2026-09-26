@@ -26,6 +26,90 @@ pub struct ExportMessage {
     pub prev_hash: Option<String>,
 }
 
+// ── Tabular export format ─────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExportFormat {
+    Csv,
+    Xlsx,
+}
+
+impl ExportFormat {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "csv" => Some(Self::Csv),
+            "xlsx" => Some(Self::Xlsx),
+            _ => None,
+        }
+    }
+
+    pub fn extension(&self) -> &'static str {
+        match self {
+            Self::Csv => "csv",
+            Self::Xlsx => "xlsx",
+        }
+    }
+
+    pub fn mime_type(&self) -> &'static str {
+        match self {
+            Self::Csv => "text/csv",
+            Self::Xlsx => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }
+    }
+}
+
+/// Export tabular data (columns + rows) to the requested format.
+/// Returns serialized bytes or an error description.
+pub fn export_to_file(
+    fmt: &ExportFormat,
+    columns: &[String],
+    rows: &[Vec<serde_json::Value>],
+) -> Result<Vec<u8>, String> {
+    match fmt {
+        ExportFormat::Csv => {
+            let mut out = String::new();
+            out.push_str(&columns.join(","));
+            out.push('\n');
+            for row in rows {
+                let cells: Vec<String> = row
+                    .iter()
+                    .map(|v| match v {
+                        serde_json::Value::String(s) => {
+                            format!("\"{}\"", s.replace('"', "\"\""))
+                        }
+                        serde_json::Value::Null => String::new(),
+                        other => other.to_string(),
+                    })
+                    .collect();
+                out.push_str(&cells.join(","));
+                out.push('\n');
+            }
+            Ok(out.into_bytes())
+        }
+        ExportFormat::Xlsx => {
+            use rust_xlsxwriter::Workbook;
+            let mut wb = Workbook::new();
+            let ws = wb.add_worksheet();
+            for (col_idx, col_name) in columns.iter().enumerate() {
+                ws.write(0, col_idx as u16, col_name.as_str())
+                    .map_err(|e| e.to_string())?;
+            }
+            for (row_idx, row) in rows.iter().enumerate() {
+                for (col_idx, cell) in row.iter().enumerate() {
+                    let text = match cell {
+                        serde_json::Value::String(s) => s.clone(),
+                        serde_json::Value::Null => String::new(),
+                        other => other.to_string(),
+                    };
+                    ws.write(row_idx as u32 + 1, col_idx as u16, text.as_str())
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+            wb.save_to_buffer().map_err(|e| e.to_string())
+        }
+    }
+}
+
 // ── MBOX export (RFC 4155) ────────────────────────────────────────────────────
 
 /// Convert an email-type AFP message into an RFC 4155 MBOX record.

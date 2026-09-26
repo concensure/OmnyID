@@ -2106,7 +2106,9 @@ mod tests {
         })))
         .unwrap()
         .unwrap();
-        assert!(tool_descriptor_declares_no_auth(Some(&arxiv_no_auth_descriptor)));
+        assert!(tool_descriptor_declares_no_auth(Some(
+            &arxiv_no_auth_descriptor
+        )));
         assert!(direct_tool_allows_empty_api_key(
             "arxiv",
             Some(&arxiv_no_auth_descriptor)

@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::{
     message::AfpProvenanceHash,
@@ -198,9 +198,11 @@ mod tests {
             provenance["content"]["input_hashes"][0]["label"].as_str(),
             Some("proactive_suggestion")
         );
-        assert!(provenance["content"]["input_hashes"][0]["sha256"]
-            .as_str()
-            .is_some_and(|value| value.len() == 64));
+        assert!(
+            provenance["content"]["input_hashes"][0]["sha256"]
+                .as_str()
+                .is_some_and(|value| value.len() == 64)
+        );
     }
 
     #[test]

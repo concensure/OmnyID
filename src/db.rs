@@ -1297,7 +1297,10 @@ impl Db {
         &self,
         owner_user_id: &str,
         supertags: &[String],
-        kind_filter: Option<&str>, match_all: bool, limit: i64, offset: i64,
+        kind_filter: Option<&str>,
+        match_all: bool,
+        limit: i64,
+        offset: i64,
     ) -> Result<Vec<ProtoMessage>, sqlx::Error> {
         if supertags.is_empty() {
             return Ok(vec![]);
@@ -1336,7 +1339,8 @@ impl Db {
         ))
         .bind(supertags)
         .bind(kind_filter.map(|kind| kind.to_ascii_lowercase()))
-        .bind(limit.max(1)).bind(offset.max(0))
+        .bind(limit.max(1))
+        .bind(offset.max(0))
         .fetch_all(&self.pool)
         .await?;
 

@@ -24,9 +24,11 @@ async fn post_message_http(
     let proto = app_to_proto(message);
     let ack = store_proto_message(&state.db, &state.metrics, &state.relay_tx, proto)
         .await
-        .map_err(|s| (StatusCode::INTERNAL_SERVER_ERROR, s.message().to_string()))?
+        .map_err(status_to_http)?
         .into_inner();
-    Ok(Json(serde_json::json!({ "success": ack.success, "message_id": ack.message_id })))
+    Ok(Json(
+        serde_json::json!({ "success": ack.success, "message_id": ack.message_id }),
+    ))
 }
 
 async fn mcp_http(
@@ -34,12 +36,9 @@ async fn mcp_http(
     headers: HeaderMap,
     Json(req): Json<crate::mcp_server::McpRequest>,
 ) -> Result<Json<crate::mcp_server::McpResponse>, (StatusCode, String)> {
-    // MCP auth is optional — unauthenticated clients get tool list but not data
-    let user_id = authenticated_user(&state.db, &headers)
-        .await
-        .ok()
-        .map(|u| u.id);
-    let resp = crate::mcp_server::dispatch_mcp_request(req, &state.db, user_id.as_deref()).await;
+    // The public MCP HTTP route is user-scoped and requires an authenticated session.
+    let user = authenticated_user(&state.db, &headers).await?;
+    let resp = crate::mcp_server::dispatch_mcp_request(req, &state.db, Some(&user.id)).await;
     Ok(Json(resp))
 }
 
@@ -80,5 +79,44 @@ async fn verify_thread_chain_http(
             "chain_valid": false,
             "broken_at_index": broken_at,
         }))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn mcp_http_route_requires_authenticated_user() {
+        let source = include_str!("protocol_routes.rs");
+        let start = source.find("async fn mcp_http(").expect("mcp_http exists");
+        let end = source[start..]
+            .find("\nasync fn verify_thread_chain_http(")
+            .map(|offset| start + offset)
+            .expect("verify_thread_chain_http follows mcp_http");
+        let function_source = &source[start..end];
+
+        assert!(
+            function_source.contains("let user = authenticated_user(&state.db, &headers).await?;")
+        );
+        assert!(function_source.contains("Some(&user.id)"));
+        assert!(!function_source.contains(".ok()"));
+        assert!(!function_source.contains("user_id.as_deref()"));
+    }
+
+    #[test]
+    fn post_message_http_uses_status_to_http_for_store_failures() {
+        let source = include_str!("protocol_routes.rs");
+        let start = source
+            .find("async fn post_message_http(")
+            .expect("post_message_http exists");
+        let end = source[start..]
+            .find("\nasync fn mcp_http(")
+            .map(|offset| start + offset)
+            .expect("mcp_http follows post_message_http");
+        let function_source = &source[start..end];
+
+        assert!(function_source.contains(".map_err(status_to_http)?"));
+        assert!(!function_source.contains(
+            ".map_err(|s| (StatusCode::INTERNAL_SERVER_ERROR, s.message().to_string()))?"
+        ));
     }
 }

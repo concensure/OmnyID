@@ -2,29 +2,77 @@ use std::time::Duration;
 
 use std::sync::Arc;
 
+use serde_json::Value;
 use sqlx;
 use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
 use tonic::Response;
 use tracing::{info, warn};
 
 use crate::{
     afp::Ack,
-    db::Db,
+    daemon_runtime::ShutdownRx,
+    db::{Db, GmailTokenRecord, PersonalAutomationConversationRecord},
     gateway::{
         custom_imap::{CustomImapConfig, fetch_recent_messages as fetch_recent_imap_messages},
         gmail_api::{GmailOAuthConfig, fetch_gmail_raw_message, list_gmail_message_ids},
         graph_api::{
             GraphOAuthConfig, fetch_raw_message as fetch_graph_raw_message, list_inbox_messages,
         },
-        smtp_in::handle_incoming_email,
+        smtp_in::{handle_incoming_email, summarize_incoming_email},
     },
+    message::{AFP_TYPE_PASSIVE_EVENT, AFPMessage, AfpPassiveEventContent},
     metrics::Metrics,
-    server::{app_to_proto, store_proto_message},
+    personal_event_ingestion::{
+        enrich_mail_passive_event_with_recent_contact_context,
+        enrich_mail_passive_event_with_recent_conversation_context,
+        enrich_mail_passive_event_with_recent_thread_context,
+        enrich_mail_passive_event_with_reply_policy, plan_passive_event_background_artifact,
+    },
+    server::{
+        app_to_proto,
+        auth::{new_server_message, store_private_app_message},
+        store_proto_message,
+    },
 };
 
 use super::provider::{InboundAuthMode, MailGatewayConfig, MailProvider};
 
-pub async fn start_imap_sync(db: Db, metrics: Arc<Metrics>, relay_tx: broadcast::Sender<String>) {
+const CROCKFORD_BASE32_ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/// Derives a stable 26-character ULID-shaped id from an arbitrary label, for
+/// callers that need a fixed synthetic thread/message id that still passes
+/// `validate_proto_message`'s ULID format check.
+fn deterministic_pseudo_ulid(label: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(label.as_bytes());
+    digest
+        .iter()
+        .take(26)
+        .map(|byte| CROCKFORD_BASE32_ALPHABET[(*byte % 32) as usize] as char)
+        .collect()
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct GmailSyncTarget {
+    owner_user_id: Option<String>,
+    account: String,
+    config: GmailOAuthConfig,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct MailSyncErrorPolicy {
+    checkpoint_status: &'static str,
+    initial_backoff_seconds: u64,
+    is_permanent: bool,
+}
+
+pub fn start_imap_sync(
+    db: Db,
+    metrics: Arc<Metrics>,
+    relay_tx: broadcast::Sender<String>,
+    mut shutdown: ShutdownRx,
+) -> JoinHandle<()> {
     let config = MailGatewayConfig::from_env();
     tokio::spawn(async move {
         if matches!(config.provider, MailProvider::Disabled) {
@@ -39,7 +87,15 @@ pub async fn start_imap_sync(db: Db, metrics: Arc<Metrics>, relay_tx: broadcast:
             "Omnyid mail sync scheduler started"
         );
 
+        // GAP-085: track consecutive failures for exponential backoff.
+        // The loop never exits permanently on transient errors.
+        let mut consecutive_failures: u32 = 0;
+
         loop {
+            if *shutdown.borrow() {
+                info!("Omnyid mail sync scheduler: graceful shutdown");
+                break;
+            }
             let status_result = match config.inbound_auth_mode {
                 InboundAuthMode::OAuthGmailApi => {
                     gmail_sync_tick(&db, &metrics, &relay_tx, &config).await
@@ -52,7 +108,8 @@ pub async fn start_imap_sync(db: Db, metrics: Arc<Metrics>, relay_tx: broadcast:
                 }
                 InboundAuthMode::Disabled => {
                     warn!("Omnyid mail sync auth disabled");
-                    Err("disabled".to_string())
+                    // Disabled is permanent; exit the task.
+                    return;
                 }
             };
 
@@ -60,9 +117,14 @@ pub async fn start_imap_sync(db: Db, metrics: Arc<Metrics>, relay_tx: broadcast:
                 .email_address
                 .clone()
                 .unwrap_or_else(|| "unknown-account".to_string());
-            let checkpoint_status = match &status_result {
-                Ok((status, _)) => status.as_str(),
-                Err(_) => "disabled",
+            let error_policy = match &status_result {
+                Ok(_) => None,
+                Err(error) => Some(classify_mail_sync_error(error)),
+            };
+            let checkpoint_status = match (&status_result, error_policy) {
+                (Ok((status, _)), _) => status.as_str(),
+                (Err(_), Some(policy)) => policy.checkpoint_status,
+                (Err(_), None) => "error",
             };
             let checkpoint_error = match &status_result {
                 Ok((_, error)) => error.as_deref(),
@@ -86,13 +148,52 @@ pub async fn start_imap_sync(db: Db, metrics: Arc<Metrics>, relay_tx: broadcast:
                 warn!(%err, "Omnyid mail sync checkpoint update failed");
             }
 
-            if status_result.is_err() {
-                return;
-            }
+            let sleep_secs = if status_result.is_err() {
+                consecutive_failures += 1;
+                let policy = error_policy.unwrap_or(MailSyncErrorPolicy {
+                    checkpoint_status: "error",
+                    initial_backoff_seconds: 30,
+                    is_permanent: false,
+                });
+                let backoff = if policy.is_permanent {
+                    policy.initial_backoff_seconds
+                } else {
+                    // Exponential backoff: 30s, 60s, 120s … capped at 15 min.
+                    (policy.initial_backoff_seconds * (1u64 << consecutive_failures.min(5)))
+                        .min(900)
+                };
+                let error = status_result
+                    .as_ref()
+                    .err()
+                    .map(String::as_str)
+                    .unwrap_or("");
+                warn!(
+                    provider = config.provider_label(),
+                    account = %account,
+                    checkpoint_status = policy.checkpoint_status,
+                    is_permanent = policy.is_permanent,
+                    consecutive_failures,
+                    backoff_seconds = backoff,
+                    error = %error,
+                    "Omnyid mail sync tick failed — will retry"
+                );
+                backoff
+            } else {
+                consecutive_failures = 0;
+                config.poll_interval_seconds
+            };
 
-            tokio::time::sleep(Duration::from_secs(config.poll_interval_seconds)).await;
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_secs(sleep_secs)) => {}
+                _ = shutdown.changed() => {
+                    if *shutdown.borrow() {
+                        info!("Omnyid mail sync scheduler: graceful shutdown");
+                        break;
+                    }
+                }
+            }
         }
-    });
+    })
 }
 
 async fn gmail_sync_tick(
@@ -101,39 +202,73 @@ async fn gmail_sync_tick(
     relay_tx: &broadcast::Sender<String>,
     config: &MailGatewayConfig,
 ) -> Result<(String, Option<String>), String> {
-    let gmail_config = gmail_config_from_env(config)?;
-    let account = config
-        .email_address
-        .clone()
-        .unwrap_or_else(|| "unknown-account".to_string());
-    let messages = list_gmail_message_ids(&gmail_config, 10).await?;
+    // GAP-086 (pass 4): fetch up to OMNYID_GMAIL_SYNC_BATCH_SIZE messages per tick
+    // (default 50) so high-volume inboxes don't permanently miss emails.
+    let batch_size = mail_sync_batch_size("OMNYID_GMAIL_SYNC_BATCH_SIZE", 50);
+    let targets = gmail_sync_targets(db, config).await?;
+    let mut newest_processed_any: Option<String> = None;
 
-    let last_seen = db_checkpoint_last_message_id(db, config.provider_label(), &account).await;
-    let mut pending_ids = messages
-        .into_iter()
-        .map(|message| message.id)
-        .collect::<Vec<_>>();
-    if let Some(last_seen_id) = last_seen.as_deref() {
-        if let Some(index) = pending_ids
-            .iter()
-            .position(|message_id| message_id == last_seen_id)
+    for target in targets {
+        let messages = list_gmail_message_ids(&target.config, batch_size).await?;
+
+        let last_seen =
+            db_checkpoint_last_message_id(db, config.provider_label(), &target.account).await;
+        let mut pending_ids = messages
+            .into_iter()
+            .map(|message| message.id)
+            .collect::<Vec<_>>();
+        if let Some(last_seen_id) = last_seen.as_deref() {
+            if let Some(index) = pending_ids
+                .iter()
+                .position(|message_id| message_id == last_seen_id)
+            {
+                pending_ids.truncate(index);
+            }
+        }
+        pending_ids.reverse();
+
+        let mut newest_processed: Option<String> = None;
+        for message_id in pending_ids {
+            let raw_email = fetch_gmail_raw_message(&target.config, &message_id).await?;
+            let message = handle_incoming_email(&raw_email).await?;
+            persist_gateway_message(db, metrics, relay_tx, message)
+                .await
+                .map_err(|err| err.to_string())?;
+            if let Some(owner_user_id) = target.owner_user_id.as_deref() {
+                emit_gmail_personal_automation(
+                    db,
+                    metrics,
+                    relay_tx,
+                    owner_user_id,
+                    &target.account,
+                    &message_id,
+                    &raw_email,
+                )
+                .await?;
+            }
+            newest_processed = Some(message_id);
+        }
+
+        if let Err(err) = db
+            .upsert_mail_sync_checkpoint(
+                config.provider_label(),
+                &target.account,
+                None,
+                newest_processed.as_deref(),
+                "oauth_gmail_api",
+                None,
+            )
+            .await
         {
-            pending_ids.truncate(index);
+            warn!(%err, account = %target.account, "Omnyid Gmail sync checkpoint update failed");
+        }
+
+        if newest_processed.is_some() {
+            newest_processed_any = newest_processed;
         }
     }
-    pending_ids.reverse();
 
-    let mut newest_processed: Option<String> = None;
-    for message_id in pending_ids {
-        let raw_email = fetch_gmail_raw_message(&gmail_config, &message_id).await?;
-        let message = handle_incoming_email(&raw_email).await?;
-        persist_gateway_message(db, metrics, relay_tx, message)
-            .await
-            .map_err(|err| err.to_string())?;
-        newest_processed = Some(message_id);
-    }
-
-    Ok(("oauth_gmail_api".to_string(), newest_processed))
+    Ok(("oauth_gmail_api".to_string(), newest_processed_any))
 }
 
 async fn custom_imap_sync_tick(
@@ -142,6 +277,7 @@ async fn custom_imap_sync_tick(
     relay_tx: &broadcast::Sender<String>,
     config: &MailGatewayConfig,
 ) -> Result<(String, Option<String>), String> {
+    let batch_size = mail_sync_batch_size("OMNYID_IMAP_SYNC_BATCH_SIZE", 50);
     let imap_config = custom_imap_config_from_env(config)?;
     let account = config
         .email_address
@@ -151,7 +287,7 @@ async fn custom_imap_sync_tick(
     let last_seen_uid = db_checkpoint_last_message_id(db, config.provider_label(), &account)
         .await
         .and_then(|value| value.parse::<u32>().ok());
-    let messages = fetch_recent_imap_messages(imap_config, last_seen_uid, 10).await?;
+    let messages = fetch_recent_imap_messages(imap_config, last_seen_uid, batch_size).await?;
 
     let mut newest_processed: Option<String> = None;
     for fetched in messages {
@@ -197,6 +333,483 @@ fn gmail_config_from_env(config: &MailGatewayConfig) -> Result<GmailOAuthConfig,
             .clone()
             .ok_or_else(|| "FROM_ADDRESS or OMNYID_EMAIL_ADDRESS is not configured".to_string())?,
     })
+}
+
+async fn gmail_sync_targets(
+    db: &Db,
+    config: &MailGatewayConfig,
+) -> Result<Vec<GmailSyncTarget>, String> {
+    let client_id = config
+        .gmail_client_id
+        .clone()
+        .ok_or_else(|| "OMNYID_GMAIL_CLIENT_ID is not configured".to_string())?;
+    let client_secret = config
+        .gmail_client_secret
+        .clone()
+        .ok_or_else(|| "OMNYID_GMAIL_CLIENT_SECRET is not configured".to_string())?;
+    let user_scoped_tokens = db
+        .list_connected_gmail_tokens()
+        .await
+        .map_err(|err| format!("Failed to list connected Gmail accounts: {err}"))?;
+
+    if !user_scoped_tokens.is_empty() {
+        return Ok(user_scoped_tokens
+            .into_iter()
+            .map(|token| gmail_sync_target_from_record(&client_id, &client_secret, token))
+            .collect());
+    }
+
+    Ok(vec![GmailSyncTarget {
+        owner_user_id: None,
+        account: config
+            .email_address
+            .clone()
+            .unwrap_or_else(|| "unknown-account".to_string()),
+        config: gmail_config_from_env(config)?,
+    }])
+}
+
+fn gmail_sync_target_from_record(
+    client_id: &str,
+    client_secret: &str,
+    token: GmailTokenRecord,
+) -> GmailSyncTarget {
+    GmailSyncTarget {
+        owner_user_id: Some(token.user_id),
+        account: token.gmail_email.clone(),
+        config: GmailOAuthConfig {
+            client_id: client_id.to_string(),
+            client_secret: client_secret.to_string(),
+            refresh_token: token.refresh_token,
+            user_id: "me".to_string(),
+            from_address: token.gmail_email,
+        },
+    }
+}
+
+async fn emit_gmail_personal_automation(
+    db: &Db,
+    metrics: &Arc<Metrics>,
+    relay_tx: &broadcast::Sender<String>,
+    owner_user_id: &str,
+    gmail_email: &str,
+    external_message_id: &str,
+    raw_email: &[u8],
+) -> Result<(), String> {
+    let summary = summarize_incoming_email(raw_email);
+    let observed_at = chrono::Utc::now().to_rfc3339();
+    let event_content =
+        build_gmail_passive_event_content(gmail_email, external_message_id, &summary);
+    let reply_policy_metadata = db
+        .get_contact_reply_policy_metadata(owner_user_id, summary.smtp_from.trim())
+        .await
+        .map_err(|err| format!("failed to load contact reply policy: {err}"))?;
+    let recent_contact_context = db
+        .recent_private_incoming_email_context(
+            owner_user_id,
+            summary.smtp_from.trim(),
+            Some(&summary.smtp_message_id),
+            3,
+        )
+        .await
+        .map_err(|err| format!("failed to load recent contact email context: {err}"))?;
+    let recent_conversation_context = db
+        .recent_private_incoming_email_conversation_context(
+            owner_user_id,
+            &summary.external_conversation_key,
+            Some(&summary.smtp_message_id),
+            4,
+        )
+        .await
+        .map_err(|err| format!("failed to load recent conversation email context: {err}"))?;
+    let recent_thread_context = db
+        .recent_private_incoming_email_thread_context(
+            owner_user_id,
+            &thread_reference_targets(&summary),
+            Some(&summary.smtp_message_id),
+            3,
+        )
+        .await
+        .map_err(|err| format!("failed to load recent thread email context: {err}"))?;
+    let event_content =
+        enrich_mail_passive_event_with_reply_policy(&event_content, reply_policy_metadata.as_ref());
+    let event_content = enrich_mail_passive_event_with_recent_conversation_context(
+        &event_content,
+        &recent_conversation_context,
+    );
+    let event_content = enrich_mail_passive_event_with_recent_contact_context(
+        &event_content,
+        &recent_contact_context,
+    );
+    let event_content = enrich_mail_passive_event_with_recent_thread_context(
+        &event_content,
+        &recent_thread_context,
+    );
+    // validate_proto_message (GAP-098) requires thread_id to be a valid ULID,
+    // so the human-readable "passive:{user_id}" label can't be stored directly —
+    // derive a stable, ULID-shaped id from it instead so all passive events for
+    // a user keep landing in the same synthetic thread.
+    let thread_id = deterministic_pseudo_ulid(&format!("passive:{owner_user_id}"));
+    let event_message = new_server_message(
+        "background_watcher".to_string(),
+        vec![owner_user_id.to_string()],
+        thread_id.clone(),
+        AFP_TYPE_PASSIVE_EVENT,
+        serde_json::to_value(&event_content).unwrap_or_default(),
+        vec![],
+        vec![],
+        vec![],
+        false,
+    )
+    .map_err(|err| format!("failed to build passive Gmail event: {err}"))?;
+    let event_afp_id = event_message.id.clone();
+    store_private_app_message(db, metrics, relay_tx, owner_user_id, event_message)
+        .await
+        .map_err(|err| err.message().to_string())?;
+
+    let connected_capabilities = db
+        .list_user_connected_capabilities(owner_user_id)
+        .await
+        .map_err(|err| format!("failed to load connected capabilities: {err}"))?;
+    let priority_rules = db
+        .get_master_agent_instance(owner_user_id)
+        .await
+        .map_err(|err| format!("failed to load master agent instance: {err}"))?
+        .and_then(|instance| instance.get("priority_rules").cloned())
+        .unwrap_or_else(crate::agent_template::default_priority_rules);
+    let automation_artifact_json = plan_passive_event_background_artifact(
+        owner_user_id,
+        &thread_id,
+        &event_afp_id,
+        &event_content,
+        "email_incoming",
+        &connected_capabilities,
+        &priority_rules,
+    );
+    db.upsert_personal_automation_conversation(&gmail_conversation_record(
+        owner_user_id,
+        gmail_email,
+        external_message_id,
+        &summary,
+        &observed_at,
+        &thread_id,
+        &event_afp_id,
+        automation_artifact_json.as_ref(),
+    ))
+    .await
+    .map_err(|err| format!("failed to upsert gmail conversation registry entry: {err}"))?;
+
+    if let Some(automation_artifact_json) = automation_artifact_json {
+        let automation_message = serde_json::from_value::<AFPMessage>(automation_artifact_json)
+            .map_err(|err| format!("failed to decode automation artifact AFP: {err}"))?;
+        store_private_app_message(db, metrics, relay_tx, owner_user_id, automation_message)
+            .await
+            .map_err(|err| err.message().to_string())?;
+    }
+
+    Ok(())
+}
+
+fn build_gmail_passive_event_content(
+    gmail_email: &str,
+    external_message_id: &str,
+    summary: &crate::gateway::smtp_in::IncomingEmailSummary,
+) -> AfpPassiveEventContent {
+    let body_preview = summary.body_preview.trim().to_string();
+    let subject = summary.subject.trim().to_string();
+    AfpPassiveEventContent {
+        event_type: "email_incoming".to_string(),
+        confidence: 1.0,
+        metadata: serde_json::json!({
+            "provider": "gmail",
+            "gmail_email": gmail_email,
+            "account_ref": gmail_email,
+            "message_id": external_message_id,
+            "smtp_message_id": summary.smtp_message_id,
+            "subject": subject,
+            "snippet": body_preview,
+            "from_address": summary.smtp_from,
+            "to_address": summary.smtp_to,
+            "requires_action": contains_mail_action_keywords(&subject)
+                || contains_mail_action_keywords(&body_preview),
+            "in_reply_to": summary.in_reply_to,
+            "reference_targets": summary.reference_targets,
+            "external_conversation_key": summary.external_conversation_key,
+        }),
+        entity_id: Some(external_message_id.to_string()),
+        source: "gmail_watch".to_string(),
+        payload: Some(serde_json::json!({
+            "provider": "gmail",
+            "gmail_email": gmail_email,
+            "account_ref": gmail_email,
+            "message_id": external_message_id,
+            "subject": subject,
+            "snippet": body_preview,
+            "from_address": summary.smtp_from,
+            "to_address": summary.smtp_to,
+            "external_conversation_key": summary.external_conversation_key,
+        })),
+        context: None,
+        event_at: chrono::Utc::now().to_rfc3339(),
+    }
+}
+
+fn gmail_conversation_record(
+    owner_user_id: &str,
+    gmail_email: &str,
+    external_message_id: &str,
+    summary: &crate::gateway::smtp_in::IncomingEmailSummary,
+    observed_at: &str,
+    thread_id: &str,
+    source_event_id: &str,
+    automation_artifact_json: Option<&Value>,
+) -> PersonalAutomationConversationRecord {
+    let (
+        needs_attention,
+        latest_attention_kind,
+        latest_artifact_id,
+        latest_artifact_type,
+        latest_artifact_subtype,
+        latest_artifact_draft_class,
+        latest_artifact_destination_view,
+        latest_value_hint,
+        latest_artifact_summary,
+    ) = conversation_attention_metadata(automation_artifact_json);
+    let attention_rank = crate::conversation_attention::conversation_attention_rank(
+        "communications",
+        latest_attention_kind,
+        latest_value_hint.as_deref(),
+    );
+    PersonalAutomationConversationRecord {
+        id: String::new(),
+        user_id: owner_user_id.to_string(),
+        provider: "gmail".to_string(),
+        account_ref: gmail_email.to_string(),
+        conversation_key: summary.external_conversation_key.clone(),
+        conversation_family: "communications".to_string(),
+        display_label: if summary.subject.trim().is_empty() {
+            format!("Conversation with {}", summary.smtp_from.trim())
+        } else {
+            summary.subject.trim().to_string()
+        },
+        latest_message_ref: Some(external_message_id.to_string()),
+        latest_subject: Some(summary.subject.trim().to_string()),
+        latest_sender: Some(summary.smtp_from.trim().to_string()),
+        health_state: "active".to_string(),
+        first_observed_at: observed_at.to_string(),
+        last_observed_at: observed_at.to_string(),
+        metadata_json: serde_json::json!({
+            "provider_label": "Gmail",
+            "external_conversation_key": summary.external_conversation_key,
+            "smtp_message_id": summary.smtp_message_id,
+            "in_reply_to": summary.in_reply_to,
+            "reference_targets": summary.reference_targets,
+            "from_address": summary.smtp_from,
+            "to_address": summary.smtp_to,
+            "thread_id": thread_id,
+            "source_event_id": source_event_id,
+            "needs_attention": needs_attention,
+            "attention_rank": attention_rank,
+            "latest_attention_kind": latest_attention_kind,
+            "latest_artifact_id": latest_artifact_id,
+            "latest_artifact_type": latest_artifact_type,
+            "latest_artifact_subtype": latest_artifact_subtype,
+            "latest_artifact_draft_class": latest_artifact_draft_class,
+            "latest_artifact_destination_view": latest_artifact_destination_view,
+            "latest_value_hint": latest_value_hint,
+            "latest_artifact_summary": latest_artifact_summary,
+        }),
+    }
+}
+
+fn conversation_attention_metadata(
+    automation_artifact_json: Option<&Value>,
+) -> (
+    bool,
+    &'static str,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
+    let Some(artifact) = automation_artifact_json else {
+        return (false, "none", None, None, None, None, None, None, None);
+    };
+
+    let artifact_id = artifact
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let artifact_type = artifact
+        .get("type")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let artifact_subtype = artifact
+        .get("subtype")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let artifact_draft_class = artifact
+        .get("content")
+        .and_then(Value::as_object)
+        .and_then(|content| content.get("draft_class"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    let artifact_destination_view = artifact
+        .get("content")
+        .and_then(Value::as_object)
+        .and_then(|content| content.get("destination_view"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            artifact_draft_class
+                .as_deref()
+                .map(crate::prepared_draft_semantics::prepared_draft_destination_view)
+                .map(str::to_string)
+        });
+    let artifact_summary = artifact
+        .get("content")
+        .and_then(Value::as_object)
+        .and_then(|content| {
+            content
+                .get("summary")
+                .and_then(Value::as_str)
+                .or_else(|| content.get("message").and_then(Value::as_str))
+                .or_else(|| content.get("label").and_then(Value::as_str))
+        })
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    let value_hint = artifact_value_hint(artifact);
+    let attention_kind = match (artifact_type.as_deref(), artifact_subtype.as_deref()) {
+        (Some("watcher_alert"), _) => "approval_request",
+        (Some("ledger"), Some("prepared_draft")) => "prepared_draft",
+        _ => "background_follow_up",
+    };
+
+    (
+        true,
+        attention_kind,
+        artifact_id,
+        artifact_type,
+        artifact_subtype,
+        artifact_draft_class,
+        artifact_destination_view,
+        value_hint,
+        artifact_summary,
+    )
+}
+
+fn artifact_value_hint(artifact: &Value) -> Option<String> {
+    let searchable = artifact
+        .get("metadata")
+        .and_then(Value::as_object)
+        .and_then(|metadata| metadata.get("searchable_metadata"))
+        .and_then(Value::as_object)?;
+    let domain = searchable
+        .get("prepared_draft_domain")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or_default();
+    if domain != "renewal_review" {
+        return None;
+    }
+
+    let current_cost = searchable.get("current_cost_usd").and_then(Value::as_f64);
+    let alternative_cost = searchable
+        .get("alternative_cost_usd")
+        .and_then(Value::as_f64);
+    if let (Some(current), Some(alternative)) = (current_cost, alternative_cost) {
+        if alternative < current {
+            return Some(format!("Potential savings: ${:.2}", current - alternative));
+        }
+    }
+
+    searchable
+        .get("days_until_renewal")
+        .and_then(Value::as_i64)
+        .map(|days| {
+            if days <= 0 {
+                "Renewal is due now".to_string()
+            } else if days == 1 {
+                "Renewal due in 1 day".to_string()
+            } else {
+                format!("Renewal due in {days} days")
+            }
+        })
+}
+
+fn thread_reference_targets(
+    summary: &crate::gateway::smtp_in::IncomingEmailSummary,
+) -> Vec<String> {
+    let mut targets = Vec::new();
+    if let Some(in_reply_to) = summary
+        .in_reply_to
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        targets.push(in_reply_to.to_string());
+    }
+    for target in &summary.reference_targets {
+        let trimmed = target.trim();
+        if !trimmed.is_empty() {
+            targets.push(trimmed.to_string());
+        }
+    }
+    targets.sort();
+    targets.dedup();
+    targets
+}
+
+fn contains_mail_action_keywords(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    [
+        "please reply",
+        "can you",
+        "could you",
+        "action required",
+        "needs your response",
+        "approval needed",
+        "invoice",
+        "payment due",
+        "urgent",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+fn classify_mail_sync_error(error: &str) -> MailSyncErrorPolicy {
+    let normalized = error.to_ascii_lowercase();
+    if normalized.contains("invalid_grant")
+        || normalized.contains("invalid_client")
+        || normalized.contains("refresh token")
+        || normalized.contains("oauth token exchange failed with status 400")
+    {
+        MailSyncErrorPolicy {
+            checkpoint_status: "auth_invalid",
+            initial_backoff_seconds: 3600,
+            is_permanent: true,
+        }
+    } else if normalized.contains("not configured") {
+        MailSyncErrorPolicy {
+            checkpoint_status: "config_invalid",
+            initial_backoff_seconds: 3600,
+            is_permanent: true,
+        }
+    } else {
+        MailSyncErrorPolicy {
+            checkpoint_status: "error",
+            initial_backoff_seconds: 30,
+            is_permanent: false,
+        }
+    }
 }
 
 async fn graph_sync_tick(
@@ -254,6 +867,16 @@ fn custom_imap_config_from_env(config: &MailGatewayConfig) -> Result<CustomImapC
     })
 }
 
+fn mail_sync_batch_size(env_key: &str, default: usize) -> usize {
+    parse_mail_sync_batch_size(std::env::var(env_key).ok().as_deref(), default)
+}
+
+fn parse_mail_sync_batch_size(raw: Option<&str>, default: usize) -> usize {
+    raw.and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(default)
+}
+
 async fn db_checkpoint_last_message_id(db: &Db, provider: &str, account: &str) -> Option<String> {
     sqlx::query_scalar::<_, Option<String>>(
         r#"
@@ -273,7 +896,14 @@ async fn db_checkpoint_last_message_id(db: &Db, provider: &str, account: &str) -
 
 #[cfg(test)]
 mod tests {
-    use super::{InboundAuthMode, MailGatewayConfig, MailProvider};
+    use super::{
+        GmailSyncTarget, InboundAuthMode, MailGatewayConfig, MailProvider,
+        build_gmail_passive_event_content, classify_mail_sync_error, gmail_sync_target_from_record,
+        parse_mail_sync_batch_size, thread_reference_targets,
+    };
+    use crate::db::GmailTokenRecord;
+    use crate::gateway::gmail_api::GmailOAuthConfig;
+    use crate::gateway::smtp_in::IncomingEmailSummary;
 
     #[test]
     fn scheduler_uses_shared_gateway_config() {
@@ -304,5 +934,148 @@ mod tests {
             InboundAuthMode::DirectCredentialsFallback
         );
         assert!(config.inbound_enabled());
+    }
+
+    #[test]
+    fn classify_mail_sync_error_marks_invalid_grant_as_permanent_auth_failure() {
+        let policy = classify_mail_sync_error(
+            "Google OAuth token exchange failed with status 400: {\"error\":\"invalid_grant\"}",
+        );
+        assert_eq!(policy.checkpoint_status, "auth_invalid");
+        assert!(policy.is_permanent);
+        assert_eq!(policy.initial_backoff_seconds, 3600);
+    }
+
+    #[test]
+    fn classify_mail_sync_error_marks_missing_config_as_permanent_config_failure() {
+        let policy = classify_mail_sync_error("OMNYID_GMAIL_REFRESH_TOKEN is not configured");
+        assert_eq!(policy.checkpoint_status, "config_invalid");
+        assert!(policy.is_permanent);
+        assert_eq!(policy.initial_backoff_seconds, 3600);
+    }
+
+    #[test]
+    fn classify_mail_sync_error_keeps_transient_errors_retryable() {
+        let policy =
+            classify_mail_sync_error("Gmail API message list request failed: operation timed out");
+        assert_eq!(policy.checkpoint_status, "error");
+        assert!(!policy.is_permanent);
+        assert_eq!(policy.initial_backoff_seconds, 30);
+    }
+
+    #[test]
+    fn gmail_sync_target_from_record_uses_user_scoped_refresh_token_and_account() {
+        let target = gmail_sync_target_from_record(
+            "client-id",
+            "client-secret",
+            GmailTokenRecord {
+                user_id: "user_123".to_string(),
+                gmail_email: "person@example.com".to_string(),
+                refresh_token: "refresh-token".to_string(),
+            },
+        );
+
+        assert_eq!(
+            target,
+            GmailSyncTarget {
+                owner_user_id: Some("user_123".to_string()),
+                account: "person@example.com".to_string(),
+                config: GmailOAuthConfig {
+                    client_id: "client-id".to_string(),
+                    client_secret: "client-secret".to_string(),
+                    refresh_token: "refresh-token".to_string(),
+                    user_id: "me".to_string(),
+                    from_address: "person@example.com".to_string(),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn build_gmail_passive_event_content_shapes_mail_metadata_for_planner() {
+        let event = build_gmail_passive_event_content(
+            "person@example.com",
+            "gmail-msg-1",
+            &IncomingEmailSummary {
+                subject: "Please reply about the invoice".to_string(),
+                smtp_from: "billing@example.com".to_string(),
+                smtp_to: "person@example.com".to_string(),
+                body_preview: "Action required for invoice 4821".to_string(),
+                smtp_message_id: "<smtp-1@example.com>".to_string(),
+                in_reply_to: Some("<parent@example.com>".to_string()),
+                reference_targets: vec!["<ref-1@example.com>".to_string()],
+                external_conversation_key: crate::gateway::smtp_in::external_email_conversation_key(
+                    "<smtp-1@example.com>",
+                    Some("<parent@example.com>"),
+                    &["<ref-1@example.com>".to_string()],
+                ),
+            },
+        );
+
+        assert_eq!(event.event_type, "email_incoming");
+        assert_eq!(event.source, "gmail_watch");
+        assert_eq!(event.entity_id.as_deref(), Some("gmail-msg-1"));
+        assert_eq!(event.metadata["provider"].as_str(), Some("gmail"));
+        assert_eq!(
+            event.metadata["gmail_email"].as_str(),
+            Some("person@example.com")
+        );
+        assert_eq!(event.metadata["requires_action"].as_bool(), Some(true));
+        assert_eq!(
+            event
+                .payload
+                .as_ref()
+                .and_then(|value| value.get("subject"))
+                .and_then(serde_json::Value::as_str),
+            Some("Please reply about the invoice")
+        );
+        assert_eq!(
+            event.metadata["external_conversation_key"].as_str(),
+            Some("external_email_thread:<ref-1@example.com>")
+        );
+    }
+
+    #[test]
+    fn thread_reference_targets_prefers_in_reply_to_and_references_without_duplicates() {
+        let targets = thread_reference_targets(&IncomingEmailSummary {
+            subject: "Please reply about the invoice".to_string(),
+            smtp_from: "billing@example.com".to_string(),
+            smtp_to: "person@example.com".to_string(),
+            body_preview: "Action required for invoice 4821".to_string(),
+            smtp_message_id: "<smtp-1@example.com>".to_string(),
+            in_reply_to: Some("<parent@example.com>".to_string()),
+            reference_targets: vec![
+                "<parent@example.com>".to_string(),
+                "<ref-1@example.com>".to_string(),
+            ],
+            external_conversation_key: crate::gateway::smtp_in::external_email_conversation_key(
+                "<smtp-1@example.com>",
+                Some("<parent@example.com>"),
+                &[
+                    "<parent@example.com>".to_string(),
+                    "<ref-1@example.com>".to_string(),
+                ],
+            ),
+        });
+
+        assert_eq!(
+            targets,
+            vec![
+                "<parent@example.com>".to_string(),
+                "<ref-1@example.com>".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_mail_sync_batch_size_uses_positive_override() {
+        assert_eq!(parse_mail_sync_batch_size(Some("75"), 50), 75);
+    }
+
+    #[test]
+    fn parse_mail_sync_batch_size_rejects_zero_and_invalid_values() {
+        assert_eq!(parse_mail_sync_batch_size(Some("0"), 50), 50);
+        assert_eq!(parse_mail_sync_batch_size(Some("invalid"), 50), 50);
+        assert_eq!(parse_mail_sync_batch_size(None, 50), 50);
     }
 }

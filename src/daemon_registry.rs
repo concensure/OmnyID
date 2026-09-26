@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use sqlx::Row;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     db::Db,
@@ -27,16 +28,29 @@ pub struct StaleHeartbeatWarning {
     pub stale_minutes: i64,
 }
 
+// GAP-129: Batch the registration check into 2 queries instead of N+1.
+// Fetch all existing active daemon registrations and all user IDs in one round-trip each,
+// then compute missing (user, daemon_kind) pairs in Rust before spawning.
 pub async fn ensure_system_daemons_registered(db: &Db) -> Result<(), sqlx::Error> {
+    // Single query: all active system daemon registrations for all users.
+    let existing_rows = sqlx::query(
+        "SELECT user_id, daemon_kind FROM daemon_registrations WHERE status = 'active'",
+    )
+    .fetch_all(&db.pool)
+    .await?;
+
+    let mut registered: HashMap<String, HashSet<DaemonKind>> = HashMap::new();
+    for row in existing_rows {
+        let user_id: String = row.get("user_id");
+        let kind_str: String = row.get("daemon_kind");
+        let kind = daemon_kind_from_str(&kind_str);
+        registered.entry(user_id).or_default().insert(kind);
+    }
+
     let user_ids = db.list_user_ids().await?;
     for user_id in user_ids {
-        for daemon_kind in [
-            DaemonKind::KnowledgeCurator,
-            DaemonKind::EmailGateway,
-            DaemonKind::RelationalSync,
-            DaemonKind::ArchiveColdStorage,
-            DaemonKind::HealthMaintenance,
-        ] {
+        let existing_kinds = registered.get(&user_id).cloned().unwrap_or_default();
+        for daemon_kind in missing_system_daemon_kinds(&existing_kinds) {
             let slug = daemon_kind_slug(&daemon_kind);
             let _ = spawn_daemon(
                 db,
@@ -55,6 +69,97 @@ pub async fn ensure_system_daemons_registered(db: &Db) -> Result<(), sqlx::Error
         }
     }
     Ok(())
+}
+
+fn system_daemon_kinds() -> [DaemonKind; 6] {
+    [
+        DaemonKind::KnowledgeCurator,
+        DaemonKind::LedgerIngestion,
+        DaemonKind::EmailGateway,
+        DaemonKind::RelationalSync,
+        DaemonKind::ArchiveColdStorage,
+        DaemonKind::HealthMaintenance,
+    ]
+}
+
+fn missing_system_daemon_kinds(existing_kinds: &HashSet<DaemonKind>) -> Vec<DaemonKind> {
+    system_daemon_kinds()
+        .into_iter()
+        .filter(|daemon_kind| !existing_kinds.contains(daemon_kind))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{missing_system_daemon_kinds, system_daemon_kinds};
+    use crate::knowledge_curator::DaemonKind;
+    use std::collections::HashSet;
+
+    #[test]
+    fn missing_system_daemon_kinds_skips_already_registered_daemons() {
+        let existing = [DaemonKind::KnowledgeCurator, DaemonKind::EmailGateway]
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+        let missing = missing_system_daemon_kinds(&existing);
+        assert_eq!(
+            missing,
+            vec![
+                DaemonKind::LedgerIngestion,
+                DaemonKind::RelationalSync,
+                DaemonKind::ArchiveColdStorage,
+                DaemonKind::HealthMaintenance
+            ]
+        );
+    }
+
+    #[test]
+    fn missing_system_daemon_kinds_returns_empty_when_all_present() {
+        let existing = system_daemon_kinds().into_iter().collect::<HashSet<_>>();
+        let missing = missing_system_daemon_kinds(&existing);
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn missing_system_daemon_kinds_returns_full_system_set_when_none_registered() {
+        let existing = HashSet::new();
+        let missing = missing_system_daemon_kinds(&existing);
+        assert_eq!(missing, system_daemon_kinds().to_vec());
+    }
+
+    #[test]
+    fn ensure_system_daemons_registered_uses_batched_scan_instead_of_per_user_active_fetches() {
+        let source = include_str!("daemon_registry.rs");
+        let start = source
+            .find("pub async fn ensure_system_daemons_registered")
+            .expect("ensure_system_daemons_registered exists");
+        let end = source[start..]
+            .find("\nfn system_daemon_kinds()")
+            .map(|offset| start + offset)
+            .expect("system_daemon_kinds follows ensure_system_daemons_registered");
+        let function_source = &source[start..end];
+
+        assert!(function_source.contains(
+            "SELECT user_id, daemon_kind FROM daemon_registrations WHERE status = 'active'"
+        ));
+        assert!(
+            !function_source.contains("get_active_daemons("),
+            "ensure_system_daemons_registered should not re-fetch active daemons per user"
+        );
+    }
+
+    #[test]
+    fn daemon_health_check_supports_both_user_scoped_and_ops_wide_queries() {
+        let source = include_str!("daemon_registry.rs");
+        let start = source
+            .find("pub async fn daemon_health_check")
+            .expect("daemon_health_check exists");
+        let function_source = &source[start..];
+
+        assert!(function_source.contains("if let Some(uid) = user_id"));
+        assert!(function_source.contains("WHERE status = 'active' AND user_id = $1"));
+        assert!(function_source.contains("WHERE status = 'active'"));
+    }
 }
 
 pub async fn spawn_daemon(
@@ -205,20 +310,35 @@ pub async fn get_latest_heartbeat(db: &Db, daemon_id: &str) -> Result<Option<Val
     }))
 }
 
-pub async fn daemon_health_check(db: &Db) -> Result<Vec<StaleHeartbeatWarning>, sqlx::Error> {
-    let rows = sqlx::query(
-        r#"
-        SELECT
-            daemon_id,
-            user_id,
-            daemon_kind,
-            last_heartbeat_at::text AS last_heartbeat_at
-        FROM daemon_registrations
-        WHERE status = 'active'
-        "#,
-    )
-    .fetch_all(&db.pool)
-    .await?;
+/// Returns stale-heartbeat warnings for active daemons.
+/// Pass `Some(user_id)` to scope to one user (user-facing endpoint).
+/// Pass `None` to return all users' stale daemons (health/ops endpoint — GAP-130).
+pub async fn daemon_health_check(
+    db: &Db,
+    user_id: Option<&str>,
+) -> Result<Vec<StaleHeartbeatWarning>, sqlx::Error> {
+    let rows = if let Some(uid) = user_id {
+        sqlx::query(
+            r#"
+            SELECT daemon_id, user_id, daemon_kind, last_heartbeat_at::text AS last_heartbeat_at
+            FROM daemon_registrations
+            WHERE status = 'active' AND user_id = $1
+            "#,
+        )
+        .bind(uid)
+        .fetch_all(&db.pool)
+        .await?
+    } else {
+        sqlx::query(
+            r#"
+            SELECT daemon_id, user_id, daemon_kind, last_heartbeat_at::text AS last_heartbeat_at
+            FROM daemon_registrations
+            WHERE status = 'active'
+            "#,
+        )
+        .fetch_all(&db.pool)
+        .await?
+    };
 
     let now = Utc::now();
     let mut warnings = Vec::new();
@@ -275,6 +395,7 @@ fn daemon_status_from_str(value: &str) -> DaemonStatus {
 
 fn daemon_kind_from_str(value: &str) -> DaemonKind {
     match value {
+        "ledger_ingestion" => DaemonKind::LedgerIngestion,
         "email_gateway" => DaemonKind::EmailGateway,
         "relational_sync" => DaemonKind::RelationalSync,
         "archive_cold_storage" => DaemonKind::ArchiveColdStorage,
@@ -286,6 +407,7 @@ fn daemon_kind_from_str(value: &str) -> DaemonKind {
 fn daemon_kind_slug(kind: &DaemonKind) -> &'static str {
     match kind {
         DaemonKind::KnowledgeCurator => "knowledge_curator",
+        DaemonKind::LedgerIngestion => "ledger_ingestion",
         DaemonKind::EmailGateway => "email_gateway",
         DaemonKind::RelationalSync => "relational_sync",
         DaemonKind::ArchiveColdStorage => "archive_cold_storage",

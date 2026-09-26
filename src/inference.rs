@@ -240,6 +240,147 @@ pub async fn runpod_infer(
     })
 }
 
+// ── Unified backend ───────────────────────────────────────────────────────────
+
+/// Selectable inference backend carried by modules that need to call an LLM.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "backend", rename_all = "snake_case")]
+pub enum InferenceBackend {
+    Anthropic {
+        api_key: String,
+    },
+    Ollama {
+        url: String,
+    },
+    RunPod {
+        endpoint_id: String,
+        api_key: String,
+    },
+    OpenAICompat {
+        base_url: String,
+        api_key: String,
+        cost_per_1m_input: f64,
+        cost_per_1m_output: f64,
+    },
+}
+
+/// Dispatch an inference request to the appropriate backend.
+pub async fn dispatch_infer(
+    backend: &InferenceBackend,
+    model: &str,
+    req: &InferenceRequest,
+) -> Result<InferenceResponse, InferenceError> {
+    match backend {
+        InferenceBackend::Anthropic { api_key } => anthropic_infer(api_key, model, req).await,
+        InferenceBackend::Ollama { url } => ollama_infer(url, model, req).await,
+        InferenceBackend::RunPod {
+            endpoint_id,
+            api_key,
+        } => runpod_infer(endpoint_id, api_key, model, req).await,
+        InferenceBackend::OpenAICompat {
+            base_url,
+            api_key,
+            cost_per_1m_input,
+            cost_per_1m_output,
+        } => {
+            openai_compat_infer(
+                base_url,
+                api_key,
+                model,
+                *cost_per_1m_input,
+                *cost_per_1m_output,
+                req,
+            )
+            .await
+        }
+    }
+}
+
+/// OpenAI-compatible inference backend (NVIDIA NIM, Together AI, Anyscale, etc.)
+async fn openai_compat_infer(
+    base_url: &str,
+    api_key: &str,
+    model: &str,
+    cost_per_1m_input: f64,
+    cost_per_1m_output: f64,
+    req: &InferenceRequest,
+) -> Result<InferenceResponse, InferenceError> {
+    let client = reqwest::Client::new();
+    let messages: Vec<Value> = std::iter::once(serde_json::json!({
+        "role": "system",
+        "content": req.system,
+    }))
+    .chain(
+        req.messages
+            .iter()
+            .map(|m| serde_json::json!({ "role": m.role, "content": m.content })),
+    )
+    .collect();
+    let body = serde_json::json!({
+        "model": model,
+        "messages": messages,
+        "max_tokens": req.max_tokens,
+        "temperature": req.temperature,
+    });
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {api_key}"))
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| InferenceError::Http(e.to_string()))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err(InferenceError::Api(format!("{status}: {text}")));
+    }
+    let json: Value = resp
+        .json()
+        .await
+        .map_err(|e| InferenceError::Http(e.to_string()))?;
+    let content = json["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let tokens_input = json["usage"]["prompt_tokens"].as_i64().unwrap_or(0) as i32;
+    let tokens_output = json["usage"]["completion_tokens"].as_i64().unwrap_or(0) as i32;
+    let cost_cents = ((tokens_input as f64 / 1_000_000.0) * cost_per_1m_input
+        + (tokens_output as f64 / 1_000_000.0) * cost_per_1m_output) as i32;
+    Ok(InferenceResponse {
+        content,
+        model: model.to_string(),
+        tokens_input,
+        tokens_output,
+        cost_cents,
+    })
+}
+
+/// Construct an `InferenceBackend` from a backend name and API key string.
+/// Used by route handlers that read backend config from DB or env vars.
+pub fn build_inference_backend(backend: &str, api_key: &str) -> InferenceBackend {
+    match backend {
+        "ollama" => InferenceBackend::Ollama {
+            url: std::env::var("OLLAMA_URL")
+                .unwrap_or_else(|_| "http://localhost:11434".to_string()),
+        },
+        "runpod" => InferenceBackend::RunPod {
+            endpoint_id: std::env::var("OMNYID_RUNPOD_ENDPOINT_ID").unwrap_or_default(),
+            api_key: api_key.to_string(),
+        },
+        "nvidia" | "nvidia_nim" => InferenceBackend::OpenAICompat {
+            base_url: "https://integrate.api.nvidia.com/v1".to_string(),
+            api_key: api_key.to_string(),
+            cost_per_1m_input: 0.0,
+            cost_per_1m_output: 0.0,
+        },
+        _ => InferenceBackend::Anthropic {
+            api_key: api_key.to_string(),
+        },
+    }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -274,5 +415,18 @@ mod tests {
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("helpful assistant"));
         assert!(json.contains("max_tokens"));
+    }
+
+    #[test]
+    fn build_inference_backend_supports_nvidia_nim() {
+        match build_inference_backend("nvidia", "nvapi-test") {
+            InferenceBackend::OpenAICompat {
+                base_url, api_key, ..
+            } => {
+                assert_eq!(base_url, "https://integrate.api.nvidia.com/v1");
+                assert_eq!(api_key, "nvapi-test");
+            }
+            other => panic!("expected NVIDIA OpenAI-compatible backend, got {other:?}"),
+        }
     }
 }

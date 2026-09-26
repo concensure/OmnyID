@@ -1,11 +1,36 @@
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{
+    Engine as _, alphabet,
+    engine::{GeneralPurpose, GeneralPurposeConfig, general_purpose::URL_SAFE_NO_PAD},
+};
+
+/// Gmail's API is inconsistent about whether `raw` message payloads carry
+/// base64url padding, so decode leniently instead of assuming either way
+/// (encoding our own outgoing messages still uses strict URL_SAFE_NO_PAD below).
+const URL_SAFE_LENIENT: GeneralPurpose = GeneralPurpose::new(
+    &alphabet::URL_SAFE,
+    GeneralPurposeConfig::new()
+        .with_encode_padding(false)
+        .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
+);
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 
 use super::smtp_out::OutgoingEmailRequest;
 
 const GOOGLE_OAUTH_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const GMAIL_SEND_URL_BASE: &str = "https://gmail.googleapis.com/gmail/v1/users";
+
+// GAP-097: shared client for connection pooling across all Gmail API calls.
+static GMAIL_CLIENT: OnceLock<Client> = OnceLock::new();
+fn gmail_client() -> &'static Client {
+    GMAIL_CLIENT.get_or_init(|| {
+        Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default()
+    })
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GmailOAuthConfig {
@@ -42,7 +67,7 @@ pub async fn send_gmail_message(
     request: &OutgoingEmailRequest,
     config: &GmailOAuthConfig,
 ) -> Result<(), String> {
-    let client = Client::new();
+    let client = gmail_client();
     let token = exchange_refresh_token(&client, config).await?;
     let raw_message = build_gmail_raw_message(request, &config.from_address);
 
@@ -104,7 +129,7 @@ pub async fn list_gmail_message_ids(
     config: &GmailOAuthConfig,
     max_results: usize,
 ) -> Result<Vec<GmailMessageId>, String> {
-    let client = Client::new();
+    let client = gmail_client();
     let token = exchange_refresh_token(&client, config).await?;
     let response = client
         .get(format!(
@@ -140,7 +165,7 @@ pub async fn fetch_gmail_raw_message(
     config: &GmailOAuthConfig,
     message_id: &str,
 ) -> Result<Vec<u8>, String> {
-    let client = Client::new();
+    let client = gmail_client();
     let token = exchange_refresh_token(&client, config).await?;
     let response = client
         .get(format!(
@@ -167,23 +192,40 @@ pub async fn fetch_gmail_raw_message(
         .await
         .map_err(|err| format!("Gmail API raw message decode failed: {err}"))?;
 
-    URL_SAFE_NO_PAD
+    URL_SAFE_LENIENT
         .decode(payload.raw)
         .map_err(|err| format!("Gmail raw message base64url decode failed: {err}"))
 }
 
+/// Strip CR and LF from a header value to prevent CRLF injection (GAP-094).
+fn sanitize_header(value: &str) -> String {
+    value.replace(['\r', '\n'], "")
+}
+
 pub fn build_gmail_raw_message(request: &OutgoingEmailRequest, from_address: &str) -> String {
     let mut mime = String::new();
-    mime.push_str(&format!("From: {from_address}\r\n"));
-    mime.push_str(&format!("To: {}\r\n", request.to.join(", ")));
-    mime.push_str(&format!("Subject: {}\r\n", request.subject));
+    mime.push_str(&format!("From: {}\r\n", sanitize_header(from_address)));
+    let to_clean: Vec<String> = request.to.iter().map(|a| sanitize_header(a)).collect();
+    mime.push_str(&format!("To: {}\r\n", to_clean.join(", ")));
+    mime.push_str(&format!(
+        "Subject: {}\r\n",
+        sanitize_header(&request.subject)
+    ));
     mime.push_str("MIME-Version: 1.0\r\n");
     mime.push_str("Content-Type: text/plain; charset=UTF-8\r\n");
     if let Some(in_reply_to) = request.in_reply_to.as_ref() {
-        mime.push_str(&format!("In-Reply-To: {in_reply_to}\r\n"));
+        mime.push_str(&format!(
+            "In-Reply-To: {}\r\n",
+            sanitize_header(in_reply_to)
+        ));
     }
     if !request.references.is_empty() {
-        mime.push_str(&format!("References: {}\r\n", request.references.join(" ")));
+        let refs_clean: Vec<String> = request
+            .references
+            .iter()
+            .map(|r| sanitize_header(r))
+            .collect();
+        mime.push_str(&format!("References: {}\r\n", refs_clean.join(" ")));
     }
     mime.push_str("\r\n");
     mime.push_str(&request.body);
@@ -195,7 +237,7 @@ pub fn build_gmail_raw_message(request: &OutgoingEmailRequest, from_address: &st
 mod tests {
     use base64::Engine as _;
 
-    use super::{GmailMessageId, build_gmail_raw_message};
+    use super::{GmailMessageId, build_gmail_raw_message, gmail_client};
     use crate::gateway::smtp_out::OutgoingEmailRequest;
 
     #[test]
@@ -240,5 +282,10 @@ mod tests {
         .expect("gmail message id");
 
         assert_eq!(payload.id, "18c5d2f0b1");
+    }
+
+    #[test]
+    fn gmail_client_is_shared_singleton() {
+        assert!(std::ptr::eq(gmail_client(), gmail_client()));
     }
 }

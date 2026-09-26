@@ -12,7 +12,7 @@
 //!   - Counts are clamped to [0, ∞) after adding noise so they never go negative.
 //!
 //! Usage:
-//!   ```rust
+//!   ```text
 //!   let noisy = add_laplace_noise(exact_count, epsilon, sensitivity);
 //!   ```
 //!

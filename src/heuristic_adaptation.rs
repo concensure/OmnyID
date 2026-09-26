@@ -148,6 +148,30 @@ pub fn normalise_queue_pressure(combined_queue_depth: u32, max_expected: u32) ->
     (combined_queue_depth as f64 / max).clamp(0.0, 1.0)
 }
 
+/// Convert recent heuristic activity into a normalised 0-1 recurrence score.
+///
+/// `recent_fire_count` is the bounded number of recent fires or outcomes tied to
+/// the heuristic. `max_expected` is the saturation point.
+pub fn normalise_topic_recurrence(recent_fire_count: u32, max_expected: u32) -> f64 {
+    let max = max_expected.max(1) as f64;
+    (recent_fire_count as f64 / max).clamp(0.0, 1.0)
+}
+
+/// Convert recent revert behaviour into a normalised 0-1 regret score.
+///
+/// Returns 0.0 until at least `min_samples` reversible actions exist, so a
+/// single undo does not distort adaptation too early.
+pub fn normalise_undone_action_rate(
+    reverted_action_count: u32,
+    total_reversible_action_count: u32,
+    min_samples: u32,
+) -> f64 {
+    if total_reversible_action_count < min_samples.max(1) {
+        return 0.0;
+    }
+    (reverted_action_count as f64 / total_reversible_action_count as f64).clamp(0.0, 1.0)
+}
+
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 fn acceptance_rate_delta(ema: f64) -> (f64, &'static str) {
@@ -211,6 +235,12 @@ mod tests {
     }
 
     #[test]
+    fn normalise_undone_action_rate_requires_minimum_samples() {
+        assert_eq!(normalise_undone_action_rate(1, 2, 3), 0.0);
+        assert!((normalise_undone_action_rate(2, 4, 3) - 0.5).abs() < 0.001);
+    }
+
+    #[test]
     fn queue_pressure_softens_suppression() {
         let sig = HeuristicSignals {
             ema_acceptance_rate: 0.15,
@@ -267,7 +297,10 @@ mod tests {
         for _ in 0..30 {
             ema = update_acceptance_ema(ema, true);
         }
-        assert!(ema > 0.95, "EMA should converge toward 1.0 with all acceptances");
+        assert!(
+            ema > 0.95,
+            "EMA should converge toward 1.0 with all acceptances"
+        );
     }
 
     #[test]
@@ -277,5 +310,14 @@ mod tests {
         assert_eq!(normalise_queue_pressure(100, 20), 1.0);
         let mid = normalise_queue_pressure(10, 20);
         assert!((mid - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn normalise_topic_recurrence_clamps() {
+        assert_eq!(normalise_topic_recurrence(0, 5), 0.0);
+        assert_eq!(normalise_topic_recurrence(5, 5), 1.0);
+        assert_eq!(normalise_topic_recurrence(12, 5), 1.0);
+        let mid = normalise_topic_recurrence(2, 5);
+        assert!((mid - 0.4).abs() < 0.001);
     }
 }

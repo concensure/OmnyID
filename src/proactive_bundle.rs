@@ -3,7 +3,7 @@ use serde_json::Value;
 use crate::{
     autonomy_policy::AutonomyDecision,
     proactive_engine::{
-        apply_proactive_autonomy_to_suggestion_value, build_suggestion_afp, EvaluationResult,
+        EvaluationResult, apply_proactive_autonomy_to_suggestion_value, build_suggestion_afp,
     },
     proactive_provenance::build_proactive_suggestion_provenance_afp,
 };
@@ -61,9 +61,9 @@ pub fn build_suggestion_afp_bundle_with_autonomy(
 mod tests {
     use super::*;
     use crate::{
-        autonomy_policy::{autonomy_decision_for_proactive_enum, ProactiveAutonomyTier},
+        autonomy_policy::{ProactiveAutonomyTier, autonomy_decision_for_proactive_enum},
         message::{
-            AfpPassiveEventContent, AfpProactiveSuggestionContent, AFP_SUBTYPE_EMAIL_THREAD_IDLE,
+            AFP_SUBTYPE_EMAIL_THREAD_IDLE, AfpPassiveEventContent, AfpProactiveSuggestionContent,
         },
         proactive_engine::{builtin_heuristics, evaluate},
     };

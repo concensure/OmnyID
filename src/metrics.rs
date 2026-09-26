@@ -119,6 +119,81 @@ pub struct MetricsSnapshot {
     pub rate_limited_requests_total: u64,
 }
 
+impl MetricsSnapshot {
+    /// Render as Prometheus text exposition format (GAP-084).
+    pub fn to_prometheus(&self) -> String {
+        let mut out = String::with_capacity(1024);
+        let fields: &[(&str, &str, u64)] = &[
+            (
+                "omnyid_messages_stored_total",
+                "AFP messages persisted since startup",
+                self.messages_stored_total,
+            ),
+            (
+                "omnyid_messages_replayed_total",
+                "Duplicate AFP messages deduplicated",
+                self.messages_replayed_total,
+            ),
+            (
+                "omnyid_relay_connections_total",
+                "WebSocket+WebTransport relay connections accepted",
+                self.relay_connections_total,
+            ),
+            (
+                "omnyid_relay_webtransport_capability_checks_total",
+                "Requests to GET /transport/capabilities",
+                self.relay_webtransport_capability_checks_total,
+            ),
+            (
+                "omnyid_relay_webtransport_sessions_total",
+                "WebTransport sessions opened",
+                self.relay_webtransport_sessions_total,
+            ),
+            (
+                "omnyid_relay_send_requests_total",
+                "Relay send frames handled",
+                self.relay_send_requests_total,
+            ),
+            (
+                "omnyid_relay_thread_subscriptions_total",
+                "Thread subscribe frames handled",
+                self.relay_thread_subscriptions_total,
+            ),
+            (
+                "omnyid_relay_errors_total",
+                "Relay-level errors (invalid frames, stream errors)",
+                self.relay_errors_total,
+            ),
+            (
+                "omnyid_gateway_inbound_emails_total",
+                "Emails received via IMAP/SMTP gateway",
+                self.gateway_inbound_emails_total,
+            ),
+            (
+                "omnyid_gateway_outbound_attempts_total",
+                "Outbound email send attempts",
+                self.gateway_outbound_attempts_total,
+            ),
+            (
+                "omnyid_gateway_outbound_failures_total",
+                "Outbound email send failures",
+                self.gateway_outbound_failures_total,
+            ),
+            (
+                "omnyid_rate_limited_requests_total",
+                "Requests rejected by rate limiter",
+                self.rate_limited_requests_total,
+            ),
+        ];
+        for (name, help, value) in fields {
+            out.push_str(&format!(
+                "# HELP {name} {help}\n# TYPE {name} counter\n{name} {value}\n"
+            ));
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Metrics, MetricsSnapshot};

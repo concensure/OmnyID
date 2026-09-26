@@ -140,7 +140,9 @@ fn byok_backend_for_provider(provider: &str, api_key: &str) -> InferenceBackend 
         "cerebras" => openai_compat_backend("https://api.cerebras.ai/v1", api_key),
         "together_ai" => openai_compat_backend("https://api.together.xyz/v1", api_key),
         "mistral" => openai_compat_backend("https://api.mistral.ai/v1", api_key),
-        "huggingface" | "hugging_face" => openai_compat_backend("https://router.huggingface.co/v1", api_key),
+        "huggingface" | "hugging_face" => {
+            openai_compat_backend("https://router.huggingface.co/v1", api_key)
+        }
         "nvidia" | "nvidia_nim" => nvidia_nim_backend(api_key),
         _ => InferenceBackend::Anthropic {
             api_key: api_key.to_string(),
@@ -233,8 +235,7 @@ mod tests {
             "provider": "huggingface",
         });
         let resolved =
-            resolve_user_inference_backend_from_config(&cfg, Some("hf_test".to_string()))
-                .unwrap();
+            resolve_user_inference_backend_from_config(&cfg, Some("hf_test".to_string())).unwrap();
         assert_eq!(resolved.model, DEFAULT_HUGGINGFACE_MODEL);
         match resolved.backend {
             InferenceBackend::OpenAICompat { base_url, .. } => {

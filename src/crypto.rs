@@ -36,7 +36,6 @@ pub fn verify_signature(msg: &crate::message::AFPMessage) -> bool {
         Err(_) => return false,
     };
 
-    let signable = signable_payload(msg);
     let sig_bytes = match STANDARD.decode(signature_b64) {
         Ok(bytes) => bytes,
         Err(_) => return false,
@@ -47,9 +46,34 @@ pub fn verify_signature(msg: &crate::message::AFPMessage) -> bool {
     };
     let signature = Signature::from_bytes(&signature_array);
 
-    verifying_key
+    let signable = signable_payload(msg);
+    if verifying_key
         .verify(signable.as_bytes(), &signature)
         .is_ok()
+    {
+        return true;
+    }
+
+    // Backward compatibility: older AFP signatures incorrectly included the
+    // storage hint in the signed bytes. Accept that legacy form for existing
+    // messages, but do not generate new signatures with it.
+    let legacy_signable = legacy_signable_payload(msg);
+    verifying_key
+        .verify(legacy_signable.as_bytes(), &signature)
+        .is_ok()
+}
+
+pub fn signature_public_key_hex(signature: &str) -> Option<&str> {
+    let (public_key_hex, _) = parse_signature_parts(signature)?;
+    Some(public_key_hex)
+}
+
+pub fn signature_matches_public_key(signature: &str, expected_public_key_hex: &str) -> bool {
+    let expected = expected_public_key_hex.trim();
+    if expected.is_empty() {
+        return false;
+    }
+    signature_public_key_hex(signature).is_some_and(|actual| actual.eq_ignore_ascii_case(expected))
 }
 
 pub fn has_verifiable_signature(signature: &str) -> bool {
@@ -129,7 +153,7 @@ pub fn is_supported_encryption_envelope(encryption: &Value) -> bool {
 }
 
 pub fn signable_payload(msg: &crate::message::AFPMessage) -> String {
-    let mut parts = Vec::with_capacity(15);
+    let mut parts = Vec::with_capacity(16);
     parts.push(msg.protocol.clone());
     parts.push(msg.id.clone());
     parts.push(msg.thread_id.clone());
@@ -138,6 +162,7 @@ pub fn signable_payload(msg: &crate::message::AFPMessage) -> String {
     parts.push(canonical_json_string(&serde_json::json!(msg.to)));
     parts.push(msg.timestamp.clone());
     parts.push(msg.r#type.clone());
+    parts.push(msg.kind.clone().unwrap_or_default());
     parts.push(msg.subtype.clone().unwrap_or_default());
     parts.push(canonical_json_string(&msg.content));
     parts.push(
@@ -157,8 +182,64 @@ pub fn signable_payload(msg: &crate::message::AFPMessage) -> String {
     parts.push(canonical_json_string(&Value::Array(
         msg.attachments.clone(),
     )));
+    parts.join("\n")
+}
+
+fn legacy_signable_payload(msg: &crate::message::AFPMessage) -> String {
+    let mut parts = signable_payload(msg)
+        .split('\n')
+        .map(str::to_string)
+        .collect::<Vec<_>>();
     parts.push(msg.store_in_relational.to_string());
     parts.join("\n")
+}
+
+/// Derive the 32-byte key used to encrypt BYOK API keys at rest (GAP-049).
+/// Uses HKDF-SHA256 with a provider-specific info tag so each provider's
+/// key domain is independent.
+pub fn byok_api_key_kek(provider: &str) -> [u8; 32] {
+    let root_key_hex =
+        crate::secret_manager::read_process_secret_trimmed("OMNYID_ENCRYPTION_KEY_HEX")
+            .or_else(|| {
+                crate::secret_manager::read_process_secret_trimmed("OMNYID_SIGNING_KEY_HEX")
+            })
+            .unwrap_or_default();
+    let root_key = hex::decode(root_key_hex.trim()).unwrap_or_else(|_| vec![0u8; 32]);
+    let info = format!("omnyid-byok-api-key:{provider}");
+    let derived = crate::post_quantum::hkdf_sha256(&root_key, b"", info.as_bytes(), 32);
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&derived);
+    key
+}
+
+/// Encrypt an arbitrary plaintext string with XChaCha20-Poly1305 (GAP-062).
+/// Returns a base64(nonce || ciphertext) string suitable for DB storage.
+/// The caller supplies a 32-byte symmetric key (e.g. derived from OMNYID_ENCRYPTION_KEY_HEX).
+pub fn encrypt_secret(plaintext: &str, key: &[u8; 32]) -> String {
+    let cipher = XChaCha20Poly1305::new_from_slice(key).expect("32-byte key");
+    let mut nonce_bytes = [0u8; 24];
+    OsRng.fill_bytes(&mut nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(XNonce::from_slice(&nonce_bytes), plaintext.as_bytes())
+        .expect("encrypt_secret: encryption should succeed");
+    let mut combined = nonce_bytes.to_vec();
+    combined.extend_from_slice(&ciphertext);
+    STANDARD.encode(combined)
+}
+
+/// Decrypt a base64(nonce || ciphertext) string produced by `encrypt_secret`.
+/// Returns `None` if decryption fails (wrong key, tampered ciphertext).
+pub fn decrypt_secret(encoded: &str, key: &[u8; 32]) -> Option<String> {
+    let combined = STANDARD.decode(encoded).ok()?;
+    if combined.len() < 24 {
+        return None;
+    }
+    let (nonce_bytes, ciphertext) = combined.split_at(24);
+    let cipher = XChaCha20Poly1305::new_from_slice(key).expect("32-byte key");
+    let plaintext = cipher
+        .decrypt(XNonce::from_slice(nonce_bytes), ciphertext)
+        .ok()?;
+    String::from_utf8(plaintext).ok()
 }
 
 pub fn canonical_json_string(value: &Value) -> String {
@@ -198,10 +279,14 @@ fn parse_signature_parts(signature: &str) -> Option<(&str, &str)> {
 #[cfg(test)]
 mod tests {
     use super::{
-        canonical_json_string, decrypt_content, encrypt_content, has_verifiable_signature,
-        is_supported_encryption_envelope, sign_message, signable_payload, verify_signature,
+        STANDARD, SigningKey, canonical_json_string, decrypt_content, encrypt_content,
+        has_verifiable_signature, is_supported_encryption_envelope, legacy_signable_payload,
+        sign_message, signable_payload, signature_matches_public_key, signature_public_key_hex,
+        verify_signature,
     };
     use crate::message::AFPMessage;
+    use base64::Engine as _;
+    use ed25519_dalek::Signer;
 
     fn sample_message() -> AFPMessage {
         AFPMessage {
@@ -213,6 +298,8 @@ mod tests {
             to: vec!["agent:peer@omnyid.local".to_string()],
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: "task".to_string(),
+            kind: Some("task".to_string()),
+            supertags: vec![],
             subtype: Some("status".to_string()),
             content: serde_json::json!({"b": 2, "a": 1}),
             metadata: Some(serde_json::json!({"domain": "ops", "confidence": 0.97})),
@@ -220,6 +307,7 @@ mod tests {
             encryption: Some(serde_json::json!({"z": true, "a": "first"})),
             views: vec![serde_json::json!({"format": "system", "content": {"z": 1, "a": 2}})],
             references: vec![serde_json::json!({"target": "thread_other", "type": "thread"})],
+            typed_refs: vec![],
             attachments: vec![],
             store_in_relational: false,
             prev_hash: None,
@@ -254,6 +342,55 @@ mod tests {
         let after = signable_payload(&message);
         assert_ne!(before, after);
         assert!(!verify_signature(&message));
+    }
+
+    #[test]
+    fn signature_public_key_hex_extracts_embedded_key() {
+        let mut message = sample_message();
+        let key = [9u8; 32];
+        let signature = sign_message(&mut message, &key);
+        let signing_key = SigningKey::from_bytes(&key);
+        let expected = hex::encode(signing_key.verifying_key().to_bytes());
+
+        assert_eq!(
+            signature_public_key_hex(&signature),
+            Some(expected.as_str())
+        );
+    }
+
+    #[test]
+    fn signature_matches_public_key_requires_exact_trusted_key() {
+        let mut message = sample_message();
+        let key = [11u8; 32];
+        let signature = sign_message(&mut message, &key);
+        let signing_key = SigningKey::from_bytes(&key);
+        let expected = hex::encode(signing_key.verifying_key().to_bytes());
+
+        assert!(signature_matches_public_key(&signature, &expected));
+        assert!(!signature_matches_public_key(&signature, "deadbeef"));
+    }
+
+    #[test]
+    fn signable_payload_ignores_storage_hint() {
+        let mut message = sample_message();
+        let before = signable_payload(&message);
+        message.store_in_relational = true;
+        let after = signable_payload(&message);
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn verify_signature_accepts_legacy_storage_hint_payload() {
+        let mut message = sample_message();
+        let key = [11u8; 32];
+        let signing_key = SigningKey::from_bytes(&key);
+        let public_key_hex = hex::encode(signing_key.verifying_key().to_bytes());
+        let legacy_signature = signing_key.sign(legacy_signable_payload(&message).as_bytes());
+        message.signature = format!(
+            "ed25519:{public_key_hex}:{}",
+            STANDARD.encode(legacy_signature.to_bytes())
+        );
+        assert!(verify_signature(&message));
     }
 
     #[test]

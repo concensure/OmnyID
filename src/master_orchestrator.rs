@@ -23,11 +23,14 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 
 use crate::{
-    agent_template::{AgentTask, ContextSnapshot, TaskPriority, TaskStatus, generate_delegated_key},
+    agent_template::{
+        AgentTask, ContextSnapshot, TaskPriority, TaskStatus, generate_delegated_key,
+    },
     audit_chain::message_hash,
     db::Db,
     inference::{InferenceMessage, InferenceRequest, anthropic_infer, runpod_infer},
     policy_engine::PolicyEngine,
+    prompt_guidance::append_reasoning_guidance,
 };
 
 // ── Node manifest (compiled IR node slice) ────────────────────────────────────
@@ -56,6 +59,14 @@ pub struct WorkflowNodeManifest {
     pub system_prompt: Option<String>,
     /// Optional instruction prompt from the compiled manifest.
     pub instruction_prompt: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_family_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_role: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub family_workflow_id: Option<String>,
+    #[serde(default)]
+    pub instance_inputs: std::collections::HashMap<String, String>,
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -86,13 +97,21 @@ fn default_priority() -> String {
     "normal".to_string()
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct TaskResult {
     pub task_id: String,
     pub task_type: String,
     pub status: String, // "ok" | "failed" | "timeout" | "policy_blocked"
     pub result: Option<String>,
     pub error: Option<String>,
+    pub result_meta: Option<crate::message::AfpNormalizedToolResultData>,
+    pub cost_estimate_usd: Option<f64>,
+    pub actual_cost_usd: Option<f64>,
+    pub api_tier: Option<i32>,
+    pub token_estimate: Option<i32>,
+    pub tokens_used: Option<i32>,
+    pub downgrade_action: Option<String>,
+    pub execution_explanation: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -104,6 +123,19 @@ pub struct OrchestratorResult {
     pub results: Vec<TaskResult>,
     /// SHA-256 hash chain entry for the audit log
     pub audit_hash: String,
+}
+
+/// Build a human-readable explanation of why a task completed as it did.
+pub fn task_execution_explanation(result: &TaskResult) -> String {
+    if result.status == "ok" {
+        format!("Task {} completed successfully.", result.task_id)
+    } else {
+        format!(
+            "Task {} failed: {}",
+            result.task_id,
+            result.error.as_deref().unwrap_or("unknown error")
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -172,13 +204,20 @@ impl MasterOrchestrator {
         db: &Db,
         api_key: &str,
         model: &str,
-        soul_md: Option<&str>,
+        operational_soul_md: Option<&str>,
+        output_persona_md: Option<&str>,
         lora_active: bool,
         runpod_endpoint: Option<&str>,
         _cost_oracle: Option<&crate::cost_oracle::CostOracle>,
-        _trace_context: Option<&str>,
+        trace_context: Option<&str>,
     ) -> Result<OrchestratorResult, OrchestratorError> {
         let correlation_id = ulid::Ulid::new().to_string();
+        let trace_context_owned = trace_context.map(str::to_string);
+        let reasoning_guidance =
+            crate::server::skill_capsule_routes::selected_reasoning_skill_guidance_for_user(
+                &self.owner_user_id,
+            )
+            .unwrap_or_default();
 
         // Step 1: plan
         let tasks = self
@@ -186,9 +225,11 @@ impl MasterOrchestrator {
                 objective,
                 api_key,
                 model,
-                soul_md,
+                operational_soul_md,
                 lora_active,
                 runpod_endpoint,
+                trace_context_owned.as_deref(),
+                &reasoning_guidance,
             )
             .await?;
         let task_count = tasks.len();
@@ -210,11 +251,14 @@ impl MasterOrchestrator {
             let model = model.to_string();
             let agent_instance_id = self.agent_instance_id.clone();
             let owner_user_id = self.owner_user_id.clone();
-            let soul = soul_md.map(str::to_string);
+            let operational_soul = operational_soul_md.map(str::to_string);
+            let output_persona = output_persona_md.map(str::to_string);
             let lora = lora_active;
             let runpod_ep = runpod_endpoint.map(str::to_string);
             let manifests = node_manifests.clone();
             let prior = prior_results.clone();
+            let task_trace_context = trace_context_owned.clone();
+            let task_reasoning_guidance = reasoning_guidance.clone();
 
             let handle = tokio::spawn(async move {
                 let _permit = sem.acquire().await.ok();
@@ -230,6 +274,7 @@ impl MasterOrchestrator {
                             "task type '{}' is not allowed under mask '{}'",
                             task.task_type, task.mask
                         )),
+                        ..Default::default()
                     };
                 }
 
@@ -263,6 +308,7 @@ impl MasterOrchestrator {
                                     manifest.node_id,
                                     manifest.allowed_capabilities.join(", ")
                                 )),
+                                ..Default::default()
                             };
                         }
                         // Resolved capability slice: intersection of node list
@@ -306,6 +352,7 @@ impl MasterOrchestrator {
                     system_prompt: system_prompt.clone(),
                     instruction_prompt: instruction_prompt.clone(),
                     token_budget_remaining: Some(512),
+                    simulator_projection_summary: task_trace_context.clone(),
                 });
 
                 // Create DB task record
@@ -313,18 +360,35 @@ impl MasterOrchestrator {
                     owner_user_id.clone(),
                     agent_instance_id.clone(),
                     task.content.clone(),
-                    match task.priority.as_str() {
-                        "high" => TaskPriority::High,
-                        "low" => TaskPriority::Low,
-                        _ => TaskPriority::Normal,
-                    },
+                    TaskPriority::from_label(Some(task.priority.as_str())),
                 );
                 let _ = db.create_agent_task(&agent_task).await;
 
                 // Generate scoped delegation — item 25 caps + allowlist + item 27 snapshot
-                let placeholder_master_key = "0".repeat(64);
+                let master_key = match crate::agent_template::delegation_master_key_hex() {
+                    Ok(key) => key,
+                    Err(err) => {
+                        let _ = db
+                            .update_agent_task_status(
+                                &owner_user_id,
+                                &agent_task.id,
+                                TaskStatus::Failed.as_str(),
+                                None,
+                                Some(err.as_str()),
+                            )
+                            .await;
+                        return TaskResult {
+                            task_id: agent_task.id,
+                            task_type: task.task_type,
+                            status: "failed".to_string(),
+                            result: None,
+                            error: Some(err),
+                            ..Default::default()
+                        };
+                    }
+                };
                 let delegation = generate_delegated_key(
-                    &placeholder_master_key,
+                    &master_key,
                     &task.task_type,
                     &agent_task.id,
                     30,
@@ -338,18 +402,21 @@ impl MasterOrchestrator {
                 let _ = db.create_delegation(&delegation).await;
 
                 // Execute task with 30-second timeout
-                let soul_ref = soul.as_deref();
+                let operational_soul_ref = operational_soul.as_deref();
+                let output_persona_ref = output_persona.as_deref();
                 let result = tokio::time::timeout(
                     std::time::Duration::from_secs(30),
                     execute_task_llm(
                         &task,
                         &api_key,
                         &model,
-                        soul_ref,
+                        operational_soul_ref,
+                        output_persona_ref,
                         lora,
                         runpod_ep.as_deref(),
                         system_prompt.as_deref(),
                         instruction_prompt.as_deref(),
+                        &task_reasoning_guidance,
                     ),
                 )
                 .await;
@@ -369,7 +436,10 @@ impl MasterOrchestrator {
                                 None,
                             )
                             .await;
-                        prior.lock().await.insert(agent_task.id.clone(), text.clone());
+                        prior
+                            .lock()
+                            .await
+                            .insert(agent_task.id.clone(), text.clone());
                         ("ok".to_string(), Some(text), None)
                     }
                     Ok(Err(e)) => {
@@ -408,6 +478,7 @@ impl MasterOrchestrator {
                     status: status_str,
                     result: result_str,
                     error: error_str,
+                    ..Default::default()
                 }
             });
             handles.push(handle);
@@ -423,6 +494,7 @@ impl MasterOrchestrator {
                     status: "failed".into(),
                     result: None,
                     error: Some(e.to_string()),
+                    ..Default::default()
                 }),
             }
         }
@@ -458,12 +530,23 @@ impl MasterOrchestrator {
         soul_md: Option<&str>,
         lora_active: bool,
         runpod_endpoint: Option<&str>,
+        trace_context: Option<&str>,
+        reasoning_guidance: &[String],
     ) -> Result<Vec<PlannedTask>, OrchestratorError> {
         let system = if lora_active || soul_md.is_none() {
-            planning_system_prompt(None)
+            planning_system_prompt(None, reasoning_guidance)
         } else {
-            planning_system_prompt(soul_md)
+            planning_system_prompt(soul_md, reasoning_guidance)
         };
+
+        let trace_context_block = trace_context
+            .filter(|context| !context.trim().is_empty())
+            .map(|context| {
+                format!(
+                    "\nBounded planning context (advisory, not authoritative state):\n- {context}\n"
+                )
+            })
+            .unwrap_or_default();
 
         let user_prompt = format!(
             "Decompose this objective into a JSON task list.\n\
@@ -475,6 +558,7 @@ impl MasterOrchestrator {
             \n\
             Allowed task types: email_triage, calendar, study_planning, web_research, note, database.\n\
             Allowed masks: private, team, public.\n\
+            {trace_context_block}\
             \n\
             Objective: {objective}"
         );
@@ -515,17 +599,18 @@ impl MasterOrchestrator {
     }
 }
 
-fn planning_system_prompt(soul_md: Option<&str>) -> String {
+fn planning_system_prompt(soul_md: Option<&str>, reasoning_guidance: &[String]) -> String {
     let soul_section = soul_md
         .map(|s| format!("\n\nAgent soul context:\n{s}"))
         .unwrap_or_default();
-    format!(
+    let base = format!(
         "You are a master agent orchestrator.\n\
         Your job is to decompose user objectives into discrete, typed sub-tasks.\n\
         Each sub-task must map to an allowed task type.\n\
         Always choose the most restrictive mask that still allows the task to run.\n\
         Return ONLY valid JSON — no prose, no code fences.{soul_section}"
-    )
+    );
+    append_reasoning_guidance(&base, reasoning_guidance, "orchestration planning step")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -533,34 +618,47 @@ async fn execute_task_llm(
     task: &PlannedTask,
     api_key: &str,
     model: &str,
-    soul_md: Option<&str>,
+    operational_soul_md: Option<&str>,
+    output_persona_md: Option<&str>,
     lora_active: bool,
     runpod_endpoint: Option<&str>,
     system_prompt_override: Option<&str>,
     instruction_prompt: Option<&str>,
+    reasoning_guidance: &[String],
 ) -> Result<String, String> {
     let capabilities = PolicyEngine::capabilities_for_task(&task.task_type);
     let caps_str = capabilities.join(", ");
 
     let soul_context = if !lora_active {
-        soul_md
+        operational_soul_md
             .map(|s| format!("\n\nAgent soul:\n{s}"))
             .unwrap_or_default()
     } else {
         String::new()
     };
+    let persona_context = output_persona_md
+        .map(|s| format!("\n\nUser-facing output persona:\n{s}"))
+        .unwrap_or_default();
 
     // Use the node's system prompt from the compiled IR if available (item 27);
     // otherwise fall back to the generic sub-agent prompt.
     let system = if let Some(sp) = system_prompt_override {
-        format!("{sp}{soul_context}")
+        append_reasoning_guidance(
+            &format!("{sp}{soul_context}{persona_context}"),
+            reasoning_guidance,
+            "delegated task execution",
+        )
     } else {
-        format!(
-            "You are a sub-agent specialising in '{}'.\n\
+        append_reasoning_guidance(
+            &format!(
+                "You are a sub-agent specialising in '{}'.\n\
             Your granted capabilities for this task: [{caps_str}].\n\
             Mask: {}. Operate under the principle of data minimisation.\n\
-            Return a concise structured result.{soul_context}",
-            task.task_type, task.mask,
+            Return a concise structured result.{soul_context}{persona_context}",
+                task.task_type, task.mask,
+            ),
+            reasoning_guidance,
+            "delegated task execution",
         )
     };
 
@@ -627,15 +725,63 @@ mod tests {
 
     #[test]
     fn planning_system_prompt_includes_soul_when_provided() {
-        let prompt = planning_system_prompt(Some("## Personality\nCalm"));
+        let prompt = planning_system_prompt(Some("## Personality\nCalm"), &[]);
         assert!(prompt.contains("Agent soul context"));
         assert!(prompt.contains("Calm"));
     }
 
     #[test]
     fn planning_system_prompt_omits_soul_when_none() {
-        let prompt = planning_system_prompt(None);
+        let prompt = planning_system_prompt(None, &[]);
         assert!(!prompt.contains("Agent soul context"));
+    }
+
+    #[test]
+    fn planning_system_prompt_appends_reasoning_guidance() {
+        let prompt = planning_system_prompt(
+            None,
+            &[
+                "Use grounded reasoning.".to_string(),
+                "Run a brief reflection pass.".to_string(),
+            ],
+        );
+        assert!(prompt.contains("# Enabled workspace reasoning guidance"));
+        assert!(prompt.contains("- Use grounded reasoning."));
+        assert!(prompt.contains("- Run a brief reflection pass."));
+    }
+
+    #[test]
+    fn plan_objective_uses_live_inference_backends() {
+        let source = include_str!("master_orchestrator.rs");
+        let start = source
+            .find("async fn plan_objective(")
+            .expect("plan_objective exists");
+        let tail = &source[start..];
+        let end = tail
+            .find("fn planning_system_prompt(")
+            .expect("planning_system_prompt follows plan_objective");
+        let function_source = &tail[..end];
+
+        assert!(function_source.contains("runpod_infer(ep, api_key, model, &req)"));
+        assert!(function_source.contains("anthropic_infer(api_key, model, &req)"));
+        assert!(function_source.contains("serde_json::from_value(parsed[\"tasks\"].clone())"));
+    }
+
+    #[test]
+    fn execute_task_llm_uses_live_inference_backends() {
+        let source = include_str!("master_orchestrator.rs");
+        let start = source
+            .find("async fn execute_task_llm(")
+            .expect("execute_task_llm exists");
+        let tail = &source[start..];
+        let end = tail
+            .find("#[cfg(test)]")
+            .expect("tests follow execute_task_llm");
+        let function_source = &tail[..end];
+
+        assert!(function_source.contains("runpod_infer(ep, api_key, model, &req)"));
+        assert!(function_source.contains("anthropic_infer(api_key, model, &req)"));
+        assert!(function_source.contains(".map(|r| r.content)"));
     }
 
     // ── Item 25: per-node capability validation ───────────────────────────────
@@ -648,11 +794,19 @@ mod tests {
             kind: "agent".into(),
             allowed_capabilities: vec!["note".into()],
             outbound_allowlist: vec![],
+            workflow_family_id: None,
+            semantic_role: None,
             system_prompt: None,
             instruction_prompt: None,
+            family_workflow_id: None,
+            instance_inputs: std::collections::HashMap::new(),
         };
         // email_triage is NOT in allowed_capabilities
-        assert!(!manifest.allowed_capabilities.contains(&"email_triage".to_string()));
+        assert!(
+            !manifest
+                .allowed_capabilities
+                .contains(&"email_triage".to_string())
+        );
         // note IS in allowed_capabilities
         assert!(manifest.allowed_capabilities.contains(&"note".to_string()));
     }
@@ -664,8 +818,12 @@ mod tests {
             kind: "agent".into(),
             allowed_capabilities: vec![], // empty = no restriction
             outbound_allowlist: vec![],
+            workflow_family_id: None,
+            semantic_role: None,
             system_prompt: None,
             instruction_prompt: None,
+            family_workflow_id: None,
+            instance_inputs: std::collections::HashMap::new(),
         };
         assert!(manifest.allowed_capabilities.is_empty());
     }
@@ -698,11 +856,56 @@ mod tests {
             system_prompt: Some("You are helpful".into()),
             instruction_prompt: Some("Summarise emails".into()),
             token_budget_remaining: Some(256),
+            simulator_projection_summary: Some(
+                "Bounded simulation traced 2 step(s) across 1 rollout.".into(),
+            ),
         };
         let json = serde_json::to_string(&snap).unwrap();
         let back: ContextSnapshot = serde_json::from_str(&json).unwrap();
         assert_eq!(back.system_prompt.as_deref(), Some("You are helpful"));
         assert_eq!(back.token_budget_remaining, Some(256));
-        assert_eq!(back.prior_step_results.get("task-1").map(|s| s.as_str()), Some("result text"));
+        assert_eq!(
+            back.simulator_projection_summary.as_deref(),
+            Some("Bounded simulation traced 2 step(s) across 1 rollout.")
+        );
+        assert_eq!(
+            back.prior_step_results.get("task-1").map(|s| s.as_str()),
+            Some("result text")
+        );
+    }
+
+    #[test]
+    fn planning_prompt_can_include_trace_context() {
+        let orchestrator = MasterOrchestrator::new("agent_1".into(), "user_1".into());
+        let prompt = {
+            let trace_context_block = Some(
+                "Bounded simulation traced 2 step(s); prepared draft candidate surfaced."
+                    .to_string(),
+            )
+            .filter(|context| !context.trim().is_empty())
+            .map(|context| {
+                format!(
+                    "\nBounded planning context (advisory, not authoritative state):\n- {context}\n"
+                )
+            })
+            .unwrap_or_default();
+            format!(
+                "Decompose this objective into a JSON task list.\n\
+                \n\
+                Respond ONLY with valid JSON in this exact shape:\n\
+                {{\"tasks\": [\
+                  {{\"id\": \"t1\", \"type\": \"email_triage\", \"content\": \"...\", \"mask\": \"private\", \"priority\": \"normal\"}}\
+                ]}}\n\
+                \n\
+                Allowed task types: email_triage, calendar, study_planning, web_research, note, database.\n\
+                Allowed masks: private, team, public.\n\
+                {trace_context_block}\
+                \n\
+                Objective: plan the next step"
+            )
+        };
+        let _ = orchestrator;
+        assert!(prompt.contains("Bounded planning context"));
+        assert!(prompt.contains("prepared draft candidate surfaced"));
     }
 }

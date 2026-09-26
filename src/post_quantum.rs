@@ -21,7 +21,7 @@
 //!
 //! ## Key derivation
 //!
-//! ```
+//! ```text
 //! ss_x25519  = X25519(ephemeral_priv, recipient_x25519_pub)
 //! ss_mlkem   = ML-KEM.Decaps(recipient_mlkem_priv, mlkem_kem_ct)
 //! ikm        = ss_x25519 || ss_mlkem
@@ -104,30 +104,17 @@ pub fn generate_hybrid_keypair() -> (HybridPrivateKey, HybridPublicKey) {
 
 /// Multiply a scalar by the X25519 base point (returns 32-byte public key).
 fn x25519_mul_basepoint(scalar: &[u8; 32]) -> [u8; 32] {
-    // We use the `ed25519-dalek` crate's underlying field for a minimal dependency.
-    // In production this should use the `x25519-dalek` crate.
-    // Here we derive a deterministic 32-byte value from the scalar using HKDF
-    // as a stand-in for the actual scalar multiplication (adequate for testing
-    // the data model; replace with x25519_dalek::PublicKey::from for real crypto).
-    hkdf_sha256(scalar, b"omnyid-x25519-basepoint", b"pub", 32)
-        .try_into()
-        .expect("hkdf output is 32 bytes")
+    use x25519_dalek::{PublicKey, StaticSecret};
+    let secret = StaticSecret::from(*scalar);
+    *PublicKey::from(&secret).as_bytes()
 }
 
 /// Compute X25519 Diffie-Hellman shared secret.
-///
-/// Stub: derives shared secret from own_pub XOR peer_pub so that:
-///   x25519_dh(alice_scalar, bob_pub) == x25519_dh(bob_scalar, alice_pub)
-/// This preserves the commutative property of real X25519 DH.
 fn x25519_dh(scalar: &[u8; 32], peer_pub: &[u8; 32]) -> [u8; 32] {
-    let own_pub = x25519_mul_basepoint(scalar);
-    let mut xored = [0u8; 32];
-    for i in 0..32 {
-        xored[i] = own_pub[i] ^ peer_pub[i];
-    }
-    hkdf_sha256(&xored, b"omnyid-x25519-dh", b"ss", 32)
-        .try_into()
-        .expect("hkdf output is 32 bytes")
+    use x25519_dalek::{PublicKey, StaticSecret};
+    let secret = StaticSecret::from(*scalar);
+    let public = PublicKey::from(*peer_pub);
+    *secret.diffie_hellman(&public).as_bytes()
 }
 
 // ── KEM encapsulation (ML-KEM stub) ──────────────────────────────────────────

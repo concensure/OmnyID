@@ -5,6 +5,9 @@ use crate::message::AFPMessage;
 
 #[derive(Debug)]
 pub enum RelayRequest {
+    Authenticate {
+        bearer_token: String,
+    },
     Send {
         message: AFPMessage,
     },
@@ -40,6 +43,15 @@ pub fn parse_relay_request(payload: &str) -> Result<RelayRequest, String> {
         serde_json::from_str(payload).map_err(|_| "Relay frame must be valid JSON".to_string())?;
 
     match value.get("op").and_then(Value::as_str) {
+        Some("auth") => {
+            let bearer_token = value
+                .get("token")
+                .and_then(Value::as_str)
+                .filter(|t| !t.is_empty())
+                .ok_or_else(|| "auth frame must include a non-empty token".to_string())?
+                .to_string();
+            Ok(RelayRequest::Authenticate { bearer_token })
+        }
         Some("send") => {
             let message = serde_json::from_value::<AFPMessage>(
                 value

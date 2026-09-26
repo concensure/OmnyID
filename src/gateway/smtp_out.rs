@@ -1,10 +1,11 @@
 use serde_json::Value;
-use tracing::{info, instrument, warn};
+use tracing::{instrument, warn};
 
 use crate::message::AFPMessage;
 
 use super::{
     gmail_api::{GmailOAuthConfig, send_gmail_message},
+    graph_api::{GraphOAuthConfig, send_graph_message},
     provider::{MailGatewayConfig, OutboundAuthMode},
     smtp_fallback::{SmtpFallbackConfig, send_via_smtp_fallback},
 };
@@ -121,17 +122,14 @@ pub async fn send_outgoing_email(request: &OutgoingEmailRequest) -> Result<(), S
             send_gmail_message(request, &gmail_config).await
         }
         OutboundAuthMode::OAuthMicrosoftGraph => {
-            info!(
-                thread_id = %request.thread_id,
-                message_id = %request.message_id,
-                recipients = ?request.to,
-                subject = %request.subject,
-                in_reply_to = ?request.in_reply_to,
-                references = ?request.references,
-                provider = config.provider_label(),
-                "Omnyid outbound email placeholder via OAuth + Microsoft Graph path"
-            );
-            Ok(())
+            // GAP-084: wire the real Microsoft Graph send path instead of the no-op placeholder.
+            let graph_config = GraphOAuthConfig::from_env().ok_or_else(|| {
+                "Microsoft Graph outbound email requires OMNYID_MS_TENANT_ID, \
+                 OMNYID_MS_CLIENT_ID, OMNYID_MS_CLIENT_SECRET, OMNYID_MS_REFRESH_TOKEN, \
+                 and OMNYID_MS_FROM_ADDRESS to be set"
+                    .to_string()
+            })?;
+            send_graph_message(request, &graph_config).await
         }
         OutboundAuthMode::DirectSmtpFallback => {
             let smtp_config = smtp_fallback_config_from_env(&config)?;
@@ -146,6 +144,23 @@ pub async fn send_outgoing_email(request: &OutgoingEmailRequest) -> Result<(), S
             Err("Outbound email provider auth is not configured".to_string())
         }
     }
+}
+
+/// Send a transactional email (verification, password reset, etc.) without an AFP message context.
+/// Falls through to the same configured outbound provider. Returns Ok(()) if provider is
+/// unconfigured and logs a warning — callers should still proceed (token was created, link logged).
+pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Result<(), String> {
+    let request = OutgoingEmailRequest {
+        thread_id: format!("transactional-{}", ulid::Ulid::new()),
+        message_id: format!("txemail-{}", ulid::Ulid::new()),
+        parent_id: None,
+        to: vec![to.to_string()],
+        subject: subject.to_string(),
+        body: body.to_string(),
+        in_reply_to: None,
+        references: vec![],
+    };
+    send_outgoing_email(&request).await
 }
 
 fn gmail_config_from_env(config: &MailGatewayConfig) -> Result<GmailOAuthConfig, String> {
@@ -300,6 +315,8 @@ mod tests {
             to: vec!["friend@example.com".to_string()],
             timestamp: "2026-03-20T00:00:00Z".to_string(),
             r#type: message_type.to_string(),
+            kind: None,
+            supertags: vec![],
             subtype: subtype.map(str::to_string),
             content,
             metadata: None,
@@ -307,6 +324,7 @@ mod tests {
             encryption: None,
             views: vec![],
             references: vec![],
+            typed_refs: vec![],
             attachments: vec![],
             store_in_relational: false,
             prev_hash: None,

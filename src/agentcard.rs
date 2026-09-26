@@ -124,14 +124,25 @@ impl AgentCard {
     }
 
     pub fn verify(&self) -> bool {
-        if AgentId::parse(&self.agent_id).is_none() {
+        self.verify_with_trusted_public_key(None)
+    }
+
+    pub fn verify_with_trusted_public_key(&self, trusted_public_key_hex: Option<&str>) -> bool {
+        let Some(agent_id) = AgentId::parse(&self.agent_id) else {
             return false;
-        }
+        };
         if self.key_id.trim().is_empty() {
             return false;
         }
 
         if self.signature.trim().is_empty() {
+            return false;
+        }
+
+        let Some(homeserver_host) = homeserver_host(&self.homeserver_url) else {
+            return false;
+        };
+        if !host_matches_agent_domain(homeserver_host, &agent_id.domain) {
             return false;
         }
 
@@ -141,6 +152,12 @@ impl AgentCard {
 
         if public_key_hex != self.public_key_hex {
             return false;
+        }
+        if let Some(trusted_public_key_hex) = trusted_public_key_hex {
+            let trusted = trusted_public_key_hex.trim();
+            if trusted.is_empty() || !public_key_hex.eq_ignore_ascii_case(trusted) {
+                return false;
+            }
         }
 
         let public_key_bytes = match hex::decode(public_key_hex) {
@@ -220,6 +237,17 @@ fn parse_signature_parts(signature: &str) -> Option<(&str, &str)> {
     }
 }
 
+fn homeserver_host(homeserver_url: &str) -> Option<String> {
+    let url = reqwest::Url::parse(homeserver_url).ok()?;
+    let host = url.host_str()?.trim_end_matches('.').to_ascii_lowercase();
+    if host.is_empty() { None } else { Some(host) }
+}
+
+fn host_matches_agent_domain(host: String, agent_domain: &str) -> bool {
+    let agent_domain = agent_domain.trim_end_matches('.').to_ascii_lowercase();
+    host == agent_domain || host.ends_with(&format!(".{agent_domain}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{AgentCard, derive_public_key_hex, sign_agent_card};
@@ -291,5 +319,76 @@ mod tests {
         card.key_id = "rotated".to_string();
 
         assert!(!card.verify());
+    }
+
+    #[test]
+    fn subdomain_homeserver_host_is_allowed() {
+        let signing_seed_hex = "1010101010101010101010101010101010101010101010101010101010101010";
+        let public_key_hex = derive_public_key_hex(signing_seed_hex).expect("public key");
+        let mut card = AgentCard::new(
+            "agent:test@omnyid.local".to_string(),
+            "main".to_string(),
+            vec![],
+            public_key_hex,
+            "https://relay.omnyid.local".to_string(),
+        );
+
+        card.signature = sign_agent_card(&card, signing_seed_hex).expect("signature");
+
+        assert!(card.verify());
+    }
+
+    #[test]
+    fn unrelated_homeserver_host_fails_verification_even_when_self_signed() {
+        let signing_seed_hex = "1111111111111111111111111111111111111111111111111111111111111111";
+        let public_key_hex = derive_public_key_hex(signing_seed_hex).expect("public key");
+        let mut card = AgentCard::new(
+            "agent:ceo@omnyid.local".to_string(),
+            "main".to_string(),
+            vec![],
+            public_key_hex,
+            "https://attacker.local".to_string(),
+        );
+
+        card.signature = sign_agent_card(&card, signing_seed_hex).expect("signature");
+
+        assert!(!card.verify());
+    }
+
+    #[test]
+    fn trusted_public_key_verification_accepts_matching_key() {
+        let signing_seed_hex = "1212121212121212121212121212121212121212121212121212121212121212";
+        let public_key_hex = derive_public_key_hex(signing_seed_hex).expect("public key");
+        let mut card = AgentCard::new(
+            "agent:test@omnyid.local".to_string(),
+            "main".to_string(),
+            vec![],
+            public_key_hex.clone(),
+            "https://omnyid.local".to_string(),
+        );
+
+        card.signature = sign_agent_card(&card, signing_seed_hex).expect("signature");
+
+        assert!(card.verify_with_trusted_public_key(Some(&public_key_hex)));
+    }
+
+    #[test]
+    fn trusted_public_key_verification_rejects_mismatched_key_even_when_self_signed() {
+        let signing_seed_hex = "1313131313131313131313131313131313131313131313131313131313131313";
+        let public_key_hex = derive_public_key_hex(signing_seed_hex).expect("public key");
+        let mut card = AgentCard::new(
+            "agent:test@omnyid.local".to_string(),
+            "main".to_string(),
+            vec![],
+            public_key_hex,
+            "https://omnyid.local".to_string(),
+        );
+
+        card.signature = sign_agent_card(&card, signing_seed_hex).expect("signature");
+
+        assert!(card.verify());
+        assert!(!card.verify_with_trusted_public_key(Some(
+            "abababababababababababababababababababababababababababababababab"
+        )));
     }
 }

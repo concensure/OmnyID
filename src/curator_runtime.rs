@@ -2,35 +2,108 @@ use std::collections::{BTreeSet, HashSet};
 use std::time::Duration;
 
 use chrono::Utc;
+use futures_util::future::join_all;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use sqlx::Row;
+use tokio::task::JoinHandle;
 use tracing::{info, warn};
 use ulid::Ulid;
 
 use crate::{
     afp::Message as ProtoMessage,
+    coordination_bus::{CoordFamily, DaemonCursor, coordination_bus},
     daemon_registry,
     db::Db,
+    entity_extractor::extract_from_afp_content,
     knowledge_curator::{
         BacklinkKind, BacklinkRecord, CuratorPolicy, CuratorRunAudit, CuratorRunStatus,
         CuratorTriggerKind, DaemonKind, KnowledgeCard,
     },
-    message::{BacklinkOverrideContent, AFP_TYPE_BACKLINK_OVERRIDE, FolderRuleContent},
-    summarizer::{generate_summary_and_embedding, generate_embedding_with_ollama},
+    message::{
+        AFP_SUBTYPE_KNOWLEDGE_LINK_ENTITY, AFP_SUBTYPE_KNOWLEDGE_LINK_RELATIONSHIP,
+        AFP_TYPE_BACKLINK_OVERRIDE, AFP_TYPE_KNOWLEDGE_LINK, AFP_TYPE_PARSED_DOCUMENT,
+        AFP_TYPE_RELATION_LINK, AFP_TYPE_TRANSCRIPT, AfpEntityMention, AfpKnowledgeLinkContent,
+        AfpRelationship, BacklinkOverrideContent, FolderRuleContent,
+    },
+    summarizer::{generate_embedding_with_ollama, generate_summary_and_embedding},
 };
 
 const CURATOR_MODEL_VERSION: &str = "local-summary-v1";
 
-pub async fn start_knowledge_curator_daemon(db: Db) {
+/// Minimum seconds between passes when Bridge A wakeups are active.
+const CURATOR_MIN_IDLE_SECS: u64 = 2;
+const CURATOR_DEFAULT_IDLE_SECS: u64 = 20;
+const CURATOR_MAX_IDLE_SECS: u64 = 120;
+
+fn next_curator_idle_secs(current_idle_secs: u64, processed_count: Option<u32>) -> u64 {
+    match processed_count {
+        Some(total) if total > 0 => CURATOR_DEFAULT_IDLE_SECS,
+        Some(_) | None => (current_idle_secs * 2).min(CURATOR_MAX_IDLE_SECS),
+    }
+}
+
+pub fn start_knowledge_curator_daemon(
+    db: Db,
+    mut shutdown: crate::daemon_runtime::ShutdownRx,
+) -> JoinHandle<()> {
     tokio::spawn(async move {
         info!("Knowledge Curator daemon started");
+        // GAP-072: exponential idle backoff — ramp up to 120s when nothing is
+        // processed, snap back to 20s the moment a message is processed.
+        // GAP-083: exits cleanly when shutdown signal fires.
+        let mut idle_secs: u64 = CURATOR_DEFAULT_IDLE_SECS;
+        // Subscribe before the loop so we never miss a wakeup between passes.
+        let mut wake = coordination_bus().subscribe();
+        let mut cursor = DaemonCursor::new(&[
+            CoordFamily::Ingestion,
+            CoordFamily::Watcher,
+            CoordFamily::Other,
+        ]);
         loop {
-            if let Err(err) = run_curator_pass(&db).await {
-                warn!(%err, "Knowledge Curator pass failed");
+            let pass_result = if cursor.should_run() {
+                let r = run_curator_pass_with_count(&db).await;
+                cursor.commit();
+                r
+            } else {
+                Ok(0)
+            };
+            match pass_result {
+                Ok(total) if total > 0 => {
+                    idle_secs = next_curator_idle_secs(idle_secs, Some(total));
+                }
+                Ok(_) => {
+                    idle_secs = next_curator_idle_secs(idle_secs, Some(0));
+                }
+                Err(err) => {
+                    warn!(%err, "Knowledge Curator pass failed");
+                    idle_secs = next_curator_idle_secs(idle_secs, None);
+                }
             }
-            tokio::time::sleep(Duration::from_secs(20)).await;
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_secs(idle_secs)) => {}
+                // Bridge A: new ingestion or watcher AFP — wake immediately.
+                res = wake.recv() => {
+                    use tokio::sync::broadcast::error::RecvError;
+                    match res {
+                        Ok(w) => {
+                            if matches!(w.family, CoordFamily::Ingestion | CoordFamily::Watcher | CoordFamily::Other) {
+                                idle_secs = CURATOR_MIN_IDLE_SECS;
+                            }
+                        }
+                        Err(RecvError::Lagged(_)) => { idle_secs = CURATOR_MIN_IDLE_SECS; }
+                        Err(RecvError::Closed) => break,
+                    }
+                }
+                _ = shutdown.changed() => {
+                    if *shutdown.borrow() {
+                        info!("Knowledge Curator daemon: graceful shutdown");
+                        break;
+                    }
+                }
+            }
         }
-    });
+    })
 }
 
 pub async fn run_curator_backfill_pass(
@@ -59,35 +132,108 @@ pub async fn run_curator_backfill_pass(
     Ok(processed)
 }
 
+async fn run_curator_pass_with_count(db: &Db) -> Result<u32, sqlx::Error> {
+    let user_ids = db.list_user_ids().await?;
+    let handles: Vec<_> = user_ids
+        .into_iter()
+        .map(|user_id| {
+            let db = db.clone();
+            tokio::spawn(async move {
+                let registration = daemon_registry::get_active_daemon_for_kind(
+                    &db,
+                    &user_id,
+                    DaemonKind::KnowledgeCurator,
+                )
+                .await;
+                let Ok(Some(registration)) = registration else {
+                    return 0u32;
+                };
+                if let Err(err) = db.ensure_user_private_schema(&user_id).await {
+                    warn!(%err, %user_id, "Curator failed to ensure tenant schema");
+                    return 0u32;
+                }
+                let processed = process_user_queue(
+                    &db,
+                    &user_id,
+                    &registration.daemon_id,
+                    &registration.policy_config,
+                    12,
+                )
+                .await
+                .unwrap_or_else(|err| {
+                    warn!(%err, %user_id, "Curator pass failed for user");
+                    0
+                });
+                if processed > 0 {
+                    let _ = daemon_registry::record_heartbeat(
+                        &db,
+                        &registration.daemon_id,
+                        &user_id,
+                        0,
+                        processed,
+                        0,
+                        0,
+                    )
+                    .await;
+                }
+                processed
+            })
+        })
+        .collect();
+    let results = join_all(handles).await;
+    let total = results.into_iter().filter_map(|r| r.ok()).sum();
+    Ok(total)
+}
+
+#[allow(dead_code)]
 async fn run_curator_pass(db: &Db) -> Result<(), sqlx::Error> {
-    for user_id in db.list_user_ids().await? {
-        let Some(registration) =
-            daemon_registry::get_active_daemon_for_kind(db, &user_id, DaemonKind::KnowledgeCurator)
-                .await?
-        else {
-            continue;
-        };
-        let processed = process_user_queue(
-            db,
-            &user_id,
-            &registration.daemon_id,
-            &registration.policy_config,
-            12,
-        )
-        .await?;
-        if processed > 0 {
-            daemon_registry::record_heartbeat(
-                db,
-                &registration.daemon_id,
-                &user_id,
-                0,
-                processed,
-                0,
-                0,
-            )
-            .await?;
-        }
-    }
+    let user_ids = db.list_user_ids().await?;
+    let handles: Vec<_> = user_ids
+        .into_iter()
+        .map(|user_id| {
+            let db = db.clone();
+            tokio::spawn(async move {
+                let registration = daemon_registry::get_active_daemon_for_kind(
+                    &db,
+                    &user_id,
+                    DaemonKind::KnowledgeCurator,
+                )
+                .await;
+                let Ok(Some(registration)) = registration else {
+                    return;
+                };
+                if let Err(err) = db.ensure_user_private_schema(&user_id).await {
+                    warn!(%err, %user_id, "Curator failed to ensure tenant schema");
+                    return;
+                }
+                let processed = process_user_queue(
+                    &db,
+                    &user_id,
+                    &registration.daemon_id,
+                    &registration.policy_config,
+                    12,
+                )
+                .await
+                .unwrap_or_else(|err| {
+                    warn!(%err, %user_id, "Curator pass failed for user");
+                    0
+                });
+                if processed > 0 {
+                    let _ = daemon_registry::record_heartbeat(
+                        &db,
+                        &registration.daemon_id,
+                        &user_id,
+                        0,
+                        processed,
+                        0,
+                        0,
+                    )
+                    .await;
+                }
+            })
+        })
+        .collect();
+    join_all(handles).await;
     Ok(())
 }
 
@@ -106,6 +252,7 @@ async fn process_user_queue(
             m.type,
             m.summary,
             m.content,
+            m.supertags,
             m.metadata,
             m."references",
             m.timestamp::text AS timestamp
@@ -139,9 +286,46 @@ async fn process_user_queue(
 
     let mut processed = 0u32;
     for row in rows {
-        processed += process_source_message(db, user_id, daemon_id, policy, &row).await?;
+        let source_id: String = match row.try_get("id") {
+            Ok(id) => id,
+            Err(e) => {
+                warn!(%e, %user_id, "curator: skipping row with undecodable id");
+                continue;
+            }
+        };
+        match process_source_message(db, user_id, daemon_id, policy, &row).await {
+            Ok(n) => processed += n,
+            Err(err) => {
+                // Poison-message protection: record a skip card so this message is excluded
+                // from future queue queries (LEFT JOIN afp_knowledge_cards) rather than
+                // blocking the user's queue indefinitely on a bad message.
+                warn!(%err, %source_id, %user_id, "curator: message processing failed; inserting poison-skip card");
+                let skip_card = poison_skip_knowledge_card(user_id, &source_id);
+                if let Err(skip_err) = upsert_knowledge_card(db, &skip_card).await {
+                    warn!(%skip_err, %source_id, "curator: failed to insert poison-skip card; message will retry next pass");
+                }
+            }
+        }
     }
     Ok(processed)
+}
+
+fn poison_skip_knowledge_card(user_id: &str, source_id: &str) -> KnowledgeCard {
+    KnowledgeCard {
+        card_id: stable_knowledge_card_id(user_id, source_id),
+        user_id: user_id.to_string(),
+        source_id: source_id.to_string(),
+        summary: None,
+        supertags: vec![],
+        entities: vec![],
+        model_version: "poison-skip".to_string(),
+        created_at: Utc::now().to_rfc3339(),
+        curator_run_id: String::new(),
+        card_json: json!({
+            "skip": true,
+            "reason": "processing_error",
+        }),
+    }
 }
 
 async fn process_source_message(
@@ -164,9 +348,22 @@ async fn process_source_message(
     let existing_summary = row.try_get::<Option<String>, _>("summary").ok().flatten();
     let source_text = flatten_text(&content, existing_summary.as_deref());
     let run_id = Ulid::new().to_string();
+    let metadata_ephemeral = metadata
+        .as_ref()
+        .and_then(|value| value.get("ephemeral_output"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let top_level_supertags = row
+        .try_get::<Vec<String>, _>("supertags")
+        .unwrap_or_default();
+    let retention_ephemeral = top_level_supertags
+        .iter()
+        .any(|tag| tag.eq_ignore_ascii_case("retention:keep_nothing"));
 
     // Phase A fast-skip: too short or recognised noise pattern.
-    let skip = source_text.trim().len() < 24
+    let skip = metadata_ephemeral
+        || retention_ephemeral
+        || source_text.trim().len() < 24
         || is_noise_message(source_text.trim(), &message_type);
     if skip {
         record_curator_audit(
@@ -183,7 +380,11 @@ async fn process_source_message(
                 tokens_used: 0,
                 duration_ms: Some((Utc::now() - started_at).num_milliseconds().max(0) as u32),
                 status: CuratorRunStatus::Skipped,
-                error_message: None,
+                error_message: if metadata_ephemeral || retention_ephemeral {
+                    Some("ephemeral_ingest_output".to_string())
+                } else {
+                    None
+                },
                 created_at: Utc::now().to_rfc3339(),
             },
         )
@@ -193,10 +394,8 @@ async fn process_source_message(
 
     // Load folder scope first, then layer any per-message / per-thread override
     // on top (highest priority in the rules hierarchy).
-    let mut scope =
-        load_folder_scope(db, user_id, &thread_id, &content, metadata.as_ref()).await?;
-    if let Some(override_rules) =
-        load_backlink_override(db, user_id, &source_id, &thread_id).await
+    let mut scope = load_folder_scope(db, user_id, &thread_id, &content, metadata.as_ref()).await?;
+    if let Some(override_rules) = load_backlink_override(db, user_id, &source_id, &thread_id).await
     {
         // Per-message override wins: merge suppress flag and threshold/scope.
         if override_rules.suppress_backlinks {
@@ -215,12 +414,9 @@ async fn process_source_message(
     // kept for the non-async db.rs storage path.
     let ollama_url = std::env::var("OLLAMA_URL").ok();
     let embed_model = std::env::var("OLLAMA_EMBED_MODEL").ok();
-    let embedding = generate_embedding_with_ollama(
-        ollama_url.as_deref(),
-        embed_model.as_deref(),
-        &source_text,
-    )
-    .await;
+    let embedding =
+        generate_embedding_with_ollama(ollama_url.as_deref(), embed_model.as_deref(), &source_text)
+            .await;
     let (summary, _) = generate_summary_and_embedding(&json!({ "text": source_text }));
     let entities = extract_entities(&source_text);
     let source_refs = extract_reference_ids(&refs);
@@ -238,6 +434,26 @@ async fn process_source_message(
     let backlink_threshold = scope
         .backlink_threshold
         .unwrap_or(policy.backlink_similarity_threshold);
+    let semantic_links_created = if should_emit_semantic_topology_links(
+        &message_type,
+        metadata.as_ref(),
+        &top_level_supertags,
+        &supertags,
+    ) {
+        store_semantic_topology_links(
+            db,
+            user_id,
+            &thread_id,
+            &source_id,
+            &message_type,
+            &content,
+            &source_refs,
+            &supertags,
+        )
+        .await?
+    } else {
+        0
+    };
 
     let candidates = find_similarity_candidates(
         db,
@@ -254,22 +470,46 @@ async fn process_source_message(
     if !scope.suppress_backlinks {
         for candidate in candidates {
             let overlap = jaccard(&entities, &candidate.entities);
+            let supertag_overlap = if supertags.is_empty() || candidate.supertags.is_empty() {
+                0.0
+            } else {
+                let left = supertags
+                    .iter()
+                    .map(|tag| tag.to_ascii_lowercase())
+                    .collect::<BTreeSet<_>>();
+                let right = candidate
+                    .supertags
+                    .iter()
+                    .map(|tag| tag.to_ascii_lowercase())
+                    .collect::<BTreeSet<_>>();
+                jaccard(&left, &right)
+            };
             let thread_bonus =
                 if candidate.thread_id == thread_id || source_refs.contains(&candidate.id) {
                     1.0
                 } else {
                     0.0
                 };
-            let score = 0.6 * candidate.similarity + 0.25 * overlap + 0.15 * thread_bonus;
+            let score = 0.5 * candidate.similarity
+                + 0.2 * overlap
+                + 0.15 * supertag_overlap
+                + 0.15 * thread_bonus;
             if score < backlink_threshold {
                 continue;
             }
             let record = BacklinkRecord {
-                backlink_id: Ulid::new().to_string(),
+                backlink_id: stable_backlink_id(
+                    user_id,
+                    &source_id,
+                    &candidate.id,
+                    &BacklinkKind::SemanticSimilarity,
+                    "mentions",
+                ),
                 user_id: user_id.to_string(),
                 source_id: source_id.clone(),
                 target_id: candidate.id.clone(),
                 link_kind: BacklinkKind::SemanticSimilarity,
+                ref_type: "mentions".to_string(),
                 similarity: Some(score),
                 entities: entities
                     .iter()
@@ -323,7 +563,7 @@ async fn process_source_message(
     }
 
     let card = KnowledgeCard {
-        card_id: Ulid::new().to_string(),
+        card_id: stable_knowledge_card_id(user_id, &source_id),
         user_id: user_id.to_string(),
         source_id: source_id.clone(),
         summary: Some(summary.clone()),
@@ -337,6 +577,7 @@ async fn process_source_message(
             "summary": summary,
             "suggested_supertags": supertags,
             "related_matches": backlinks_created,
+            "semantic_links_created": semantic_links_created,
         }),
         model_version: CURATOR_MODEL_VERSION.to_string(),
         created_at: timestamp,
@@ -447,11 +688,14 @@ async fn find_similarity_candidates(
             thread_id,
             content,
             summary,
+            metadata,
+            supertags,
             1 - (embedding <=> $2) AS similarity
         FROM {}
         WHERE id <> $1
           AND embedding IS NOT NULL
           AND timestamp > NOW() - INTERVAL '60 days'
+          AND COALESCE((metadata->>'ephemeral_output')::boolean, FALSE) = FALSE
         "#,
         tenant_messages_table(user_id)
     );
@@ -500,6 +744,9 @@ async fn find_similarity_candidates(
                 .try_get::<Value, _>("content")
                 .unwrap_or_else(|_| json!({}));
             let summary = row.try_get::<Option<String>, _>("summary").ok().flatten();
+            let supertags = row
+                .try_get::<Vec<String>, _>("supertags")
+                .unwrap_or_default();
             CandidateMessage {
                 id: row.get("id"),
                 thread_id: row.get("thread_id"),
@@ -509,9 +756,389 @@ async fn find_similarity_candidates(
                     .flatten()
                     .unwrap_or(0.0) as f32,
                 entities: extract_entities(&flatten_text(&content, summary.as_deref())),
+                supertags,
             }
         })
         .collect())
+}
+
+fn stable_knowledge_card_id(user_id: &str, source_id: &str) -> String {
+    stable_curator_lineage_id("knowledge-card", &[user_id, source_id])
+}
+
+fn stable_backlink_id(
+    user_id: &str,
+    source_id: &str,
+    target_id: &str,
+    link_kind: &BacklinkKind,
+    ref_type: &str,
+) -> String {
+    stable_curator_lineage_id(
+        "backlink",
+        &[
+            user_id,
+            source_id,
+            target_id,
+            backlink_kind_slug(link_kind),
+            ref_type,
+        ],
+    )
+}
+
+fn stable_curator_lineage_id(prefix: &str, parts: &[&str]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(prefix.as_bytes());
+    for part in parts {
+        hasher.update([0x1f]);
+        hasher.update(part.as_bytes());
+    }
+    format!("{prefix}.{}", hex::encode(hasher.finalize()))
+}
+
+fn stable_semantic_link_id(
+    user_id: &str,
+    source_id: &str,
+    message_type: &str,
+    subtype: &str,
+    relationship_id: &str,
+) -> String {
+    stable_curator_lineage_id(
+        "semantic-link",
+        &[user_id, source_id, message_type, subtype, relationship_id],
+    )
+}
+
+fn backlink_kind_slug(kind: &BacklinkKind) -> &'static str {
+    match kind {
+        BacklinkKind::SemanticSimilarity => "semantic_similarity",
+        BacklinkKind::EntityOverlap => "entity_overlap",
+        BacklinkKind::ExplicitRef => "explicit_ref",
+        BacklinkKind::TemporalProximity => "temporal_proximity",
+    }
+}
+
+fn afp_message_reference(target: &str, link_type: &str, label: Option<&str>) -> Value {
+    let mut reference = serde_json::Map::new();
+    reference.insert("type".to_string(), Value::String("message".to_string()));
+    reference.insert("target".to_string(), Value::String(target.to_string()));
+    if let Some(label) = label.map(str::trim).filter(|value| !value.is_empty()) {
+        reference.insert("label".to_string(), Value::String(label.to_string()));
+    }
+    reference.insert(
+        "metadata".to_string(),
+        json!({
+            "link_type": link_type,
+        }),
+    );
+    Value::Object(reference)
+}
+
+fn should_emit_semantic_topology_links(
+    message_type: &str,
+    metadata: Option<&Value>,
+    source_supertags: &[String],
+    suggested_supertags: &[String],
+) -> bool {
+    if matches!(message_type, AFP_TYPE_PARSED_DOCUMENT | AFP_TYPE_TRANSCRIPT) {
+        return true;
+    }
+
+    let metadata_mode = metadata
+        .and_then(|value| value.get("knowledge_pipeline"))
+        .and_then(Value::as_str)
+        .map(str::trim);
+    if metadata_mode == Some("connected_notes_ingest") {
+        return true;
+    }
+
+    let knowledge_mode = metadata
+        .and_then(|value| value.get("knowledge_mode"))
+        .and_then(Value::as_str)
+        .map(str::trim);
+    if matches!(knowledge_mode, Some("connected_notes" | "zettelkasten")) {
+        return true;
+    }
+
+    source_supertags
+        .iter()
+        .chain(suggested_supertags.iter())
+        .any(|tag| {
+            tag.eq_ignore_ascii_case("knowledge:connected_notes")
+                || tag.eq_ignore_ascii_case("knowledge:zettelkasten")
+                || tag.eq_ignore_ascii_case("resource:zettelkasten")
+                || tag.eq_ignore_ascii_case("knowledge_mode:connected_notes")
+                || tag.eq_ignore_ascii_case("knowledge_mode:zettelkasten")
+        })
+}
+
+fn semantic_entity_relationship_id(entity: &AfpEntityMention) -> Option<String> {
+    let kind = entity.kind.trim().to_ascii_lowercase();
+    let canonical = entity.canonical.trim().to_ascii_lowercase();
+    if kind.is_empty() || canonical.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "entity:{}:{}",
+        slugify_semantic_token(&kind),
+        slugify_semantic_token(&canonical)
+    ))
+}
+
+fn semantic_relationship_id(relationship: &AfpRelationship) -> Option<String> {
+    let subject = relationship.subject.trim();
+    let predicate = relationship.predicate.trim();
+    let object = relationship.object.trim();
+    if subject.is_empty() || predicate.is_empty() || object.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "relationship:{}:{}:{}",
+        slugify_semantic_token(subject),
+        slugify_semantic_token(predicate),
+        slugify_semantic_token(object)
+    ))
+}
+
+fn slugify_semantic_token(value: &str) -> String {
+    let mut slug = String::with_capacity(value.len());
+    let mut last_was_sep = false;
+    for ch in value.chars() {
+        let normalized = if ch.is_ascii_alphanumeric() {
+            Some(ch.to_ascii_lowercase())
+        } else {
+            None
+        };
+        match normalized {
+            Some(ch) => {
+                slug.push(ch);
+                last_was_sep = false;
+            }
+            None if !last_was_sep && !slug.is_empty() => {
+                slug.push('_');
+                last_was_sep = true;
+            }
+            None => {}
+        }
+    }
+    slug.trim_matches('_').to_string()
+}
+
+fn dedupe_semantic_entities(entities: Vec<AfpEntityMention>) -> Vec<AfpEntityMention> {
+    let mut deduped: std::collections::BTreeMap<String, AfpEntityMention> =
+        std::collections::BTreeMap::new();
+    for entity in entities {
+        let Some(relationship_id) = semantic_entity_relationship_id(&entity) else {
+            continue;
+        };
+        match deduped.get(&relationship_id) {
+            Some(existing) if existing.confidence >= entity.confidence => {}
+            _ => {
+                deduped.insert(relationship_id, entity);
+            }
+        }
+    }
+    let mut deduped = deduped.into_values().collect::<Vec<_>>();
+    deduped.sort_by(|left, right| {
+        right
+            .confidence
+            .partial_cmp(&left.confidence)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| left.kind.cmp(&right.kind))
+            .then_with(|| left.canonical.cmp(&right.canonical))
+    });
+    deduped
+}
+
+fn dedupe_semantic_relationships(relationships: Vec<AfpRelationship>) -> Vec<AfpRelationship> {
+    let mut deduped: std::collections::BTreeMap<String, AfpRelationship> =
+        std::collections::BTreeMap::new();
+    for relationship in relationships {
+        let Some(relationship_id) = semantic_relationship_id(&relationship) else {
+            continue;
+        };
+        match deduped.get(&relationship_id) {
+            Some(existing) if existing.confidence >= relationship.confidence => {}
+            _ => {
+                deduped.insert(relationship_id, relationship);
+            }
+        }
+    }
+    let mut deduped = deduped.into_values().collect::<Vec<_>>();
+    deduped.sort_by(|left, right| {
+        right
+            .confidence
+            .partial_cmp(&left.confidence)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| left.predicate.cmp(&right.predicate))
+            .then_with(|| left.subject.cmp(&right.subject))
+            .then_with(|| left.object.cmp(&right.object))
+    });
+    deduped
+}
+
+fn build_semantic_topology_message(
+    user_id: &str,
+    thread_id: &str,
+    source_id: &str,
+    source_message_type: &str,
+    message_type: &str,
+    subtype: &str,
+    link_type: &str,
+    relationship_id: &str,
+    confidence: Option<f64>,
+    entities: Vec<AfpEntityMention>,
+    relationships: Vec<AfpRelationship>,
+    source_refs: &[String],
+    supertags: &[String],
+) -> (ProtoMessage, Value) {
+    let content = AfpKnowledgeLinkContent {
+        source_message_id: source_id.to_string(),
+        thread_id: thread_id.to_string(),
+        extracted_at: Utc::now().to_rfc3339(),
+        entities,
+        relationships,
+        extractor_version: Some("heuristic-v1".to_string()),
+        link_type: Some(link_type.to_string()),
+        relationship_id: Some(relationship_id.to_string()),
+        confidence,
+        source_refs: source_refs.iter().cloned().collect(),
+        ..Default::default()
+    };
+    let content_value = serde_json::to_value(&content).unwrap_or(Value::Null);
+    let message_id = format!(
+        "msg.{}",
+        stable_semantic_link_id(user_id, source_id, message_type, subtype, relationship_id)
+    );
+    let message = ProtoMessage {
+        protocol: "afp-v1".to_string(),
+        id: message_id,
+        thread_id: format!("thread.semantic.{}", source_id),
+        parent_id: String::new(),
+        from: "omnyid://daemon/knowledge-curator".to_string(),
+        to: vec!["omnyid://workspace/user".to_string()],
+        timestamp: Utc::now().to_rfc3339(),
+        r#type: message_type.to_string(),
+        kind: None,
+        supertags: supertags.to_vec(),
+        content: content_value.to_string(),
+        signature: String::new(),
+        encryption: "{}".to_string(),
+        views: "[]".to_string(),
+        references: json!([afp_message_reference(
+            source_id,
+            "derived_from",
+            Some("source material")
+        )])
+        .to_string(),
+        attachments: "[]".to_string(),
+        store_in_relational: false,
+        subtype: subtype.to_string(),
+        metadata: json!({
+            "user_id": user_id,
+            "source_message_id": source_id,
+            "source_message_type": source_message_type,
+            "relationship_id": relationship_id,
+            "link_type": link_type,
+            "extractor": "heuristic-v1",
+        })
+        .to_string(),
+    };
+    (message, content_value)
+}
+
+async fn store_semantic_topology_links(
+    db: &Db,
+    user_id: &str,
+    thread_id: &str,
+    source_id: &str,
+    source_message_type: &str,
+    content: &Value,
+    source_refs: &HashSet<String>,
+    supertags: &[String],
+) -> Result<u32, sqlx::Error> {
+    let extracted = extract_from_afp_content(content);
+    let mut entity_keep_ids = Vec::new();
+    let mut relationship_keep_ids = Vec::new();
+    let mut created = 0u32;
+    let source_refs_vec = source_refs.iter().cloned().collect::<Vec<_>>();
+
+    for entity in dedupe_semantic_entities(extracted.entities)
+        .into_iter()
+        .take(8)
+    {
+        let Some(relationship_id) = semantic_entity_relationship_id(&entity) else {
+            continue;
+        };
+        let (message, content_value) = build_semantic_topology_message(
+            user_id,
+            thread_id,
+            source_id,
+            source_message_type,
+            AFP_TYPE_KNOWLEDGE_LINK,
+            AFP_SUBTYPE_KNOWLEDGE_LINK_ENTITY,
+            "shared_entity",
+            &relationship_id,
+            Some(entity.confidence),
+            vec![entity],
+            vec![],
+            &source_refs_vec,
+            supertags,
+        );
+        entity_keep_ids.push(message.id.clone());
+        db.upsert_private_message(user_id, &message, content_value)
+            .await?;
+        created += 1;
+    }
+
+    for relationship in dedupe_semantic_relationships(extracted.relationships)
+        .into_iter()
+        .take(6)
+    {
+        let Some(relationship_id) = semantic_relationship_id(&relationship) else {
+            continue;
+        };
+        let (message, content_value) = build_semantic_topology_message(
+            user_id,
+            thread_id,
+            source_id,
+            source_message_type,
+            AFP_TYPE_RELATION_LINK,
+            AFP_SUBTYPE_KNOWLEDGE_LINK_RELATIONSHIP,
+            "shared_relationship",
+            &relationship_id,
+            Some(relationship.confidence),
+            vec![],
+            vec![relationship],
+            &source_refs_vec,
+            supertags,
+        );
+        relationship_keep_ids.push(message.id.clone());
+        db.upsert_private_message(user_id, &message, content_value)
+            .await?;
+        created += 1;
+    }
+
+    let reference_targets = vec![source_id.to_string()];
+    db.prune_private_messages_by_reference_targets(
+        user_id,
+        AFP_TYPE_KNOWLEDGE_LINK,
+        AFP_SUBTYPE_KNOWLEDGE_LINK_ENTITY,
+        "omnyid://daemon/knowledge-curator",
+        &reference_targets,
+        &entity_keep_ids,
+    )
+    .await?;
+    db.prune_private_messages_by_reference_targets(
+        user_id,
+        AFP_TYPE_RELATION_LINK,
+        AFP_SUBTYPE_KNOWLEDGE_LINK_RELATIONSHIP,
+        "omnyid://daemon/knowledge-curator",
+        &reference_targets,
+        &relationship_keep_ids,
+    )
+    .await?;
+
+    Ok(created)
 }
 
 async fn store_backlink_update_message(
@@ -525,20 +1152,29 @@ async fn store_backlink_update_message(
         "similarity": record.similarity,
         "entities": record.entities,
     });
+    let message_id = format!("msg.{}", record.backlink_id);
+    let keep_ids = vec![message_id.clone()];
+    let reference_targets = vec![record.source_id.clone(), record.target_id.clone()];
     let message = ProtoMessage {
         protocol: "afp-v1".to_string(),
-        id: format!("backlink.{}", Ulid::new()),
-        thread_id: format!("thread.backlink.{}", record.source_id),
+        id: message_id,
+        thread_id: format!("thread.{}", record.backlink_id),
         parent_id: String::new(),
         from: "omnyid://daemon/knowledge-curator".to_string(),
         to: vec!["omnyid://workspace/user".to_string()],
         timestamp: Utc::now().to_rfc3339(),
         r#type: "backlink_update".to_string(),
+        kind: None,
+        supertags: vec![],
         content: content.to_string(),
         signature: String::new(),
         encryption: "{}".to_string(),
         views: "[]".to_string(),
-        references: json!([record.source_id, record.target_id]).to_string(),
+        references: json!([
+            afp_message_reference(&record.source_id, "related_to", Some("similar source")),
+            afp_message_reference(&record.target_id, "related_to", Some("similar target"))
+        ])
+        .to_string(),
         attachments: "[]".to_string(),
         store_in_relational: false,
         subtype: "semantic_similarity".to_string(),
@@ -552,7 +1188,17 @@ async fn store_backlink_update_message(
         })
         .to_string(),
     };
-    let _ = db.store_private_message(user_id, &message, content).await?;
+    db.upsert_private_message(user_id, &message, content)
+        .await?;
+    db.prune_private_messages_by_reference_targets(
+        user_id,
+        "backlink_update",
+        "semantic_similarity",
+        "omnyid://daemon/knowledge-curator",
+        &reference_targets,
+        &keep_ids,
+    )
+    .await?;
     Ok(())
 }
 
@@ -570,20 +1216,30 @@ async fn store_knowledge_card_message(
         "card_json": card.card_json,
         "model_version": card.model_version,
     });
+    let message_id = format!("msg.{}", card.card_id);
+    let keep_ids = vec![message_id.clone()];
+    let reference_targets = vec![card.source_id.clone()];
     let message = ProtoMessage {
         protocol: "afp-v1".to_string(),
-        id: format!("knowledge-card.{}", Ulid::new()),
+        id: message_id,
         thread_id: format!("thread.knowledge.{}", card.source_id),
         parent_id: String::new(),
         from: "omnyid://daemon/knowledge-curator".to_string(),
         to: vec!["omnyid://workspace/user".to_string()],
         timestamp: Utc::now().to_rfc3339(),
         r#type: "knowledge_card".to_string(),
+        kind: None,
+        supertags: card.supertags.clone(),
         content: content.to_string(),
         signature: String::new(),
         encryption: "{}".to_string(),
         views: "[]".to_string(),
-        references: json!([card.source_id]).to_string(),
+        references: json!([afp_message_reference(
+            &card.source_id,
+            "derived_from",
+            Some("source material")
+        )])
+        .to_string(),
         attachments: "[]".to_string(),
         store_in_relational: false,
         subtype: "auto_summary".to_string(),
@@ -593,7 +1249,17 @@ async fn store_knowledge_card_message(
         })
         .to_string(),
     };
-    let _ = db.store_private_message(user_id, &message, content).await?;
+    db.upsert_private_message(user_id, &message, content)
+        .await?;
+    db.prune_private_messages_by_reference_targets(
+        user_id,
+        "knowledge_card",
+        "auto_summary",
+        "omnyid://daemon/knowledge-curator",
+        &reference_targets,
+        &keep_ids,
+    )
+    .await?;
     Ok(())
 }
 
@@ -777,19 +1443,7 @@ fn tenant_messages_table(user_id: &str) -> String {
     format!("\"{}\".messages", tenant_schema_name(user_id))
 }
 
-fn tenant_schema_name(user_id: &str) -> String {
-    let mut schema = String::from("user_");
-    for ch in user_id.chars().flat_map(|c| c.to_lowercase()) {
-        schema.push(if ch.is_ascii_alphanumeric() { ch } else { '_' });
-        if schema.len() >= 60 {
-            break;
-        }
-    }
-    if schema == "user_" {
-        schema.push_str("tenant");
-    }
-    schema
-}
+use crate::db::tenant_schema_name;
 
 struct FolderScope {
     folder_id: Option<String>,
@@ -804,6 +1458,7 @@ struct CandidateMessage {
     thread_id: String,
     similarity: f32,
     entities: BTreeSet<String>,
+    supertags: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -1073,17 +1728,39 @@ fn parse_backlink_rules(rules: &str) -> ParsedBacklinkRules {
 #[cfg(test)]
 mod tests {
     use super::{
-        BacklinkSearchScope, ParsedBacklinkRules, is_noise_message, parse_backlink_rules,
-        run_curator_backfill_pass,
+        BacklinkSearchScope, CURATOR_DEFAULT_IDLE_SECS, CURATOR_MAX_IDLE_SECS, ParsedBacklinkRules,
+        afp_message_reference, dedupe_semantic_entities, dedupe_semantic_relationships,
+        is_noise_message, next_curator_idle_secs, parse_backlink_rules, poison_skip_knowledge_card,
+        run_curator_backfill_pass, semantic_entity_relationship_id, semantic_relationship_id,
+        should_emit_semantic_topology_links, slugify_semantic_token,
     };
     use crate::{
         afp::Message,
         daemon_registry::{DaemonManifest, spawn_daemon},
         db::{Db, UserRecord},
         knowledge_curator::DaemonKind,
+        message::{AfpEntityMention, AfpRelationship},
     };
     use serde_json::json;
     use ulid::Ulid;
+
+    #[test]
+    fn curator_idle_backoff_resets_when_work_is_processed() {
+        assert_eq!(
+            next_curator_idle_secs(80, Some(3)),
+            CURATOR_DEFAULT_IDLE_SECS
+        );
+    }
+
+    #[test]
+    fn curator_idle_backoff_doubles_until_capped_when_idle_or_failed() {
+        assert_eq!(next_curator_idle_secs(20, Some(0)), 40);
+        assert_eq!(next_curator_idle_secs(80, Some(0)), CURATOR_MAX_IDLE_SECS);
+        assert_eq!(
+            next_curator_idle_secs(CURATOR_MAX_IDLE_SECS, None),
+            CURATOR_MAX_IDLE_SECS
+        );
+    }
 
     // ── Noise filter tests ────────────────────────────────────────────────────
 
@@ -1121,7 +1798,10 @@ mod tests {
 
     #[test]
     fn noise_filter_passes_note_type() {
-        assert!(!is_noise_message("Project kickoff notes for OmnyID.", "note"));
+        assert!(!is_noise_message(
+            "Project kickoff notes for OmnyID.",
+            "note"
+        ));
     }
 
     #[test]
@@ -1164,6 +1844,167 @@ mod tests {
         let parsed = parse_backlink_rules("scope: all; aggressive");
         assert_eq!(parsed.search_scope, BacklinkSearchScope::AllFolders);
         assert_eq!(parsed.threshold, Some(0.72));
+    }
+
+    #[test]
+    fn semantic_topology_link_gate_accepts_connected_notes_and_zettelkasten_inputs() {
+        assert!(should_emit_semantic_topology_links(
+            "note",
+            Some(&json!({
+                "knowledge_pipeline": "connected_notes_ingest"
+            })),
+            &[],
+            &[]
+        ));
+        assert!(should_emit_semantic_topology_links(
+            "note",
+            Some(&json!({
+                "knowledge_mode": "zettelkasten"
+            })),
+            &[],
+            &[]
+        ));
+        assert!(should_emit_semantic_topology_links(
+            "note",
+            None,
+            &["resource:zettelkasten".to_string()],
+            &[]
+        ));
+    }
+
+    #[test]
+    fn semantic_topology_link_gate_accepts_parsed_sources_and_rejects_unmarked_notes() {
+        assert!(should_emit_semantic_topology_links(
+            "parsed_document",
+            None,
+            &[],
+            &[]
+        ));
+        assert!(should_emit_semantic_topology_links(
+            "transcript",
+            None,
+            &[],
+            &[]
+        ));
+        assert!(!should_emit_semantic_topology_links(
+            "note",
+            Some(&json!({
+                "origin": "workspace"
+            })),
+            &[],
+            &[]
+        ));
+    }
+
+    #[test]
+    fn semantic_ids_are_slugged_and_stable() {
+        let entity = AfpEntityMention {
+            kind: "Metric".to_string(),
+            name: "Q1 2026".to_string(),
+            canonical: "Q1 2026".to_string(),
+            context_snippet: None,
+            confidence: 0.9,
+        };
+        let relationship = AfpRelationship {
+            subject: "Professor Smith".to_string(),
+            predicate: "teaches".to_string(),
+            object: "Market Failures".to_string(),
+            confidence: 0.7,
+        };
+
+        assert_eq!(slugify_semantic_token("Q1 2026"), "q1_2026");
+        assert_eq!(
+            semantic_entity_relationship_id(&entity).as_deref(),
+            Some("entity:metric:q1_2026")
+        );
+        assert_eq!(
+            semantic_relationship_id(&relationship).as_deref(),
+            Some("relationship:professor_smith:teaches:market_failures")
+        );
+    }
+
+    #[test]
+    fn semantic_dedupers_keep_single_best_membership_per_identity() {
+        let entities = dedupe_semantic_entities(vec![
+            AfpEntityMention {
+                kind: "metric".to_string(),
+                name: "Q1 2026".to_string(),
+                canonical: "q1_2026".to_string(),
+                context_snippet: None,
+                confidence: 0.6,
+            },
+            AfpEntityMention {
+                kind: "metric".to_string(),
+                name: "Q1 2026".to_string(),
+                canonical: "q1_2026".to_string(),
+                context_snippet: None,
+                confidence: 0.9,
+            },
+        ]);
+        let relationships = dedupe_semantic_relationships(vec![
+            AfpRelationship {
+                subject: "Professor Smith".to_string(),
+                predicate: "teaches".to_string(),
+                object: "Market Failures".to_string(),
+                confidence: 0.4,
+            },
+            AfpRelationship {
+                subject: "Professor Smith".to_string(),
+                predicate: "teaches".to_string(),
+                object: "Market Failures".to_string(),
+                confidence: 0.8,
+            },
+        ]);
+
+        assert_eq!(entities.len(), 1);
+        assert_eq!(entities[0].confidence, 0.9);
+        assert_eq!(relationships.len(), 1);
+        assert_eq!(relationships[0].confidence, 0.8);
+    }
+
+    #[test]
+    fn curator_reference_builder_emits_canonical_afp_message_references() {
+        assert_eq!(
+            afp_message_reference("msg_1", "derived_from", Some("source material")),
+            json!({
+                "type": "message",
+                "target": "msg_1",
+                "label": "source material",
+                "metadata": {
+                    "link_type": "derived_from"
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn curator_runtime_uses_shared_db_tenant_schema_helper() {
+        let source = include_str!("curator_runtime.rs");
+        let test_start = source.find("#[cfg(test)]").expect("test module marker");
+        let main_source = &source[..test_start];
+        assert!(main_source.contains("use crate::db::tenant_schema_name;"));
+        assert!(!main_source.contains("fn tenant_schema_name("));
+        assert!(source.contains("format!(\"\\\"{}\\\".messages\", tenant_schema_name(user_id))"));
+    }
+
+    #[test]
+    fn poison_skip_card_is_sanitized_and_excludes_raw_internal_errors() {
+        let card = poison_skip_knowledge_card("user_test", "msg_test");
+        assert_eq!(card.user_id, "user_test");
+        assert_eq!(card.source_id, "msg_test");
+        assert_eq!(card.model_version, "poison-skip");
+        assert_eq!(card.summary, None);
+        assert_eq!(
+            card.card_json.get("skip").and_then(|value| value.as_bool()),
+            Some(true)
+        );
+        assert_eq!(
+            card.card_json
+                .get("reason")
+                .and_then(|value| value.as_str()),
+            Some("processing_error")
+        );
+        assert!(card.card_json.get("error").is_none());
     }
 
     #[tokio::test]
@@ -1371,6 +2212,8 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "note".to_string(),
+            kind: None,
+            supertags: vec![],
             content: content.to_string(),
             signature: String::new(),
             encryption: "{}".to_string(),
@@ -1408,6 +2251,8 @@ mod tests {
             to: vec![],
             timestamp: chrono::Utc::now().to_rfc3339(),
             r#type: "folder_rule".to_string(),
+            kind: None,
+            supertags: vec![],
             content: content.to_string(),
             signature: String::new(),
             encryption: "{}".to_string(),

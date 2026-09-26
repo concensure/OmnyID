@@ -19,10 +19,11 @@ use serde::{Deserialize, Serialize};
 // ---------------------------------------------------------------------------
 
 /// Which background daemon kind a registration represents.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum DaemonKind {
     KnowledgeCurator,
+    LedgerIngestion,
     EmailGateway,
     RelationalSync,
     ArchiveColdStorage,
@@ -39,6 +40,12 @@ impl DaemonKind {
                 "knowledge_card",
                 "insight",
                 "merge_suggestion",
+                "daemon_heartbeat",
+            ],
+            DaemonKind::LedgerIngestion => &[
+                "knowledge_link",
+                "relation_link",
+                "thread_summary",
                 "daemon_heartbeat",
             ],
             DaemonKind::EmailGateway => &[
@@ -63,6 +70,7 @@ impl DaemonKind {
     pub fn display_name(&self) -> &'static str {
         match self {
             DaemonKind::KnowledgeCurator => "Knowledge Curator",
+            DaemonKind::LedgerIngestion => "Ledger Ingestion",
             DaemonKind::EmailGateway => "Email Gateway",
             DaemonKind::RelationalSync => "Relational Sync",
             DaemonKind::ArchiveColdStorage => "Archive & Cold Storage",
@@ -186,6 +194,10 @@ pub struct BacklinkRecord {
     pub source_id: String,
     pub target_id: String,
     pub link_kind: BacklinkKind,
+    /// GAP-124/GAP-135: semantic stance of the edge (e.g. "supports", "refutes", "mentions").
+    /// Defaults to "mentions" when absent. Stored in the `ref_type` column of `afp_backlinks`.
+    #[serde(default)]
+    pub ref_type: String,
     /// Cosine similarity score; None for non-vector link kinds.
     pub similarity: Option<f32>,
     /// Named entities shared between source and target (for EntityOverlap links).
@@ -276,6 +288,9 @@ pub struct BacklinkUpdateMetadata {
     pub curator_run_id: Option<String>,
     #[serde(default)]
     pub entities: Vec<String>,
+    /// Semantic stance of this edge ("supports", "refutes", "mentions", …).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ref_type: Option<String>,
 }
 
 impl BacklinkRecord {
@@ -320,6 +335,7 @@ impl BacklinkRecord {
             source_id: references[0].clone(),
             target_id: references[1].clone(),
             link_kind,
+            ref_type: metadata.ref_type.unwrap_or_else(|| "mentions".to_string()),
             similarity: metadata.similarity_score,
             entities: metadata.entities,
             created_at: if message.timestamp.trim().is_empty() {
@@ -642,6 +658,7 @@ mod tests {
             source_id: "msg_abc".to_string(),
             target_id: "msg_xyz".to_string(),
             link_kind: BacklinkKind::SemanticSimilarity,
+            ref_type: "mentions".to_string(),
             similarity: Some(0.91),
             entities: vec!["ACME Corp".to_string()],
             created_at: "2026-04-06T00:00:00Z".to_string(),
@@ -661,6 +678,7 @@ mod tests {
             thread_id: "thread_01".to_string(),
             timestamp: "2026-04-06T00:00:00Z".to_string(),
             r#type: "backlink_update".to_string(),
+            kind: None,
             subtype: Some("semantic_similarity".to_string()),
             metadata: Some(serde_json::json!({
                 "user_id": "user_01",
@@ -692,6 +710,7 @@ mod tests {
             source_id: "msg_a".to_string(),
             target_id: "msg_b".to_string(),
             link_kind: BacklinkKind::ExplicitRef,
+            ref_type: "mentions".to_string(),
             similarity: None,
             entities: Vec::new(),
             created_at: "2026-04-06T00:00:00Z".to_string(),
@@ -708,6 +727,7 @@ mod tests {
     fn daemon_kind_display_names_are_non_empty() {
         let kinds = [
             DaemonKind::KnowledgeCurator,
+            DaemonKind::LedgerIngestion,
             DaemonKind::EmailGateway,
             DaemonKind::RelationalSync,
             DaemonKind::ArchiveColdStorage,

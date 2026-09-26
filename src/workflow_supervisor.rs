@@ -27,6 +27,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 
@@ -40,6 +41,7 @@ use crate::{
     inference::{InferenceMessage, InferenceRequest, anthropic_infer, runpod_infer},
     master_orchestrator::WorkflowNodeManifest,
     policy_engine::PolicyEngine,
+    prompt_guidance::append_reasoning_guidance,
 };
 
 // ── Node kinds ────────────────────────────────────────────────────────────────
@@ -51,6 +53,17 @@ use crate::{
 /// - `Plan`             — decomposes a goal into a sub-task graph
 /// - `Executor`         — carries out a leaf task using the granted capabilities
 /// - `Reflection`       — reviews results, decides continue / replan / escalate
+/// Controls when the supervisor inserts a `Reflection` node during plan execution.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReflectionPolicy {
+    EveryStep,
+    EveryNSteps(u32),
+    OnDrift,
+    OnFailureOrDrift,
+    Off,
+}
+
 /// - `CapabilityRouter` — routes a task to the first matching registered capability
 /// - `CustomNodeBuilder`— builds a new capability node when no match is found (item 24)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -324,6 +337,7 @@ pub struct DefaultSpawner {
     pub soul_md: Option<String>,
     pub lora_active: bool,
     pub runpod_endpoint: Option<String>,
+    pub reasoning_guidance: Vec<String>,
 }
 
 #[async_trait::async_trait]
@@ -358,7 +372,11 @@ impl RuntimeNodeSpawner for DefaultSpawner {
 impl DefaultSpawner {
     async fn llm_call(&self, system: &str, user: &str, max_tokens: u32) -> Result<String, String> {
         let req = InferenceRequest {
-            system: system.to_string(),
+            system: append_reasoning_guidance(
+                system,
+                &self.reasoning_guidance,
+                "workflow supervisor runtime node",
+            ),
             messages: vec![InferenceMessage {
                 role: "user".to_string(),
                 content: user.to_string(),
@@ -706,6 +724,11 @@ impl WorkflowSupervisor {
         runpod_endpoint: Option<&str>,
     ) -> Result<SupervisorResult, SupervisorError> {
         let run_id = ulid::Ulid::new().to_string();
+        let reasoning_guidance =
+            crate::server::skill_capsule_routes::selected_reasoning_skill_guidance_for_user(
+                &self.owner_user_id,
+            )
+            .unwrap_or_default();
 
         // Step 1: build the task graph via LLM decomposition
         let graph = self
@@ -716,6 +739,7 @@ impl WorkflowSupervisor {
                 soul_md,
                 lora_active,
                 runpod_endpoint,
+                &reasoning_guidance,
             )
             .await?;
 
@@ -778,6 +802,7 @@ impl WorkflowSupervisor {
                 let inst = self.instance_id.clone();
                 let manifests = self.node_manifests.clone();
                 let prior = prior_results.clone();
+                let node_reasoning_guidance = reasoning_guidance.clone();
 
                 let handle = tokio::spawn(async move {
                     let _permit = sem.acquire().await.ok();
@@ -800,6 +825,7 @@ impl WorkflowSupervisor {
                         system_prompt: sys_prompt.clone(),
                         instruction_prompt: instr_prompt.clone(),
                         token_budget_remaining: Some(512),
+                        simulator_projection_summary: None,
                     });
 
                     // Issue scoped delegation key (items 25+27)
@@ -811,9 +837,10 @@ impl WorkflowSupervisor {
                     );
                     let _ = db_clone.create_agent_task(&task_record).await;
 
-                    let placeholder = "0".repeat(64);
+                    let mut mk = [0u8; 32];
+                    rand::rng().fill_bytes(&mut mk);
                     let delegation = generate_delegated_key(
-                        &placeholder,
+                        &hex::encode(mk),
                         &node.task_type,
                         &task_record.id,
                         60,
@@ -834,6 +861,7 @@ impl WorkflowSupervisor {
                             soul_s.as_deref(),
                             lora,
                             ep.as_deref(),
+                            &node_reasoning_guidance,
                             &node,
                             &delegation,
                             &prior_snap,
@@ -861,6 +889,7 @@ impl WorkflowSupervisor {
                                 soul_md: soul_s.clone(),
                                 lora_active: lora,
                                 runpod_endpoint: ep.clone(),
+                                reasoning_guidance: node_reasoning_guidance.clone(),
                             };
                             let builder_result = builder_spawner
                                 .spawn(&builder_node, &delegation, &prior_snap)
@@ -963,14 +992,17 @@ impl WorkflowSupervisor {
             // on the recursive async future.
             for node in child_supervisor_nodes {
                 let prior_snap = prior_results.lock().await.clone();
-                let placeholder = "0".repeat(64);
-
-                // Derive child delegation from parent key via HKDF
+                // Derive child delegation from parent key when available; otherwise
+                // generate a fresh random key so root-level keys are not predictable.
                 let child_key = self
                     .parent_delegation
                     .as_ref()
                     .map(|pd| pd.delegated_key_hex.clone())
-                    .unwrap_or_else(|| placeholder.clone());
+                    .unwrap_or_else(|| {
+                        let mut mk = [0u8; 32];
+                        rand::rng().fill_bytes(&mut mk);
+                        hex::encode(mk)
+                    });
 
                 let task_record = AgentTask::new(
                     self.owner_user_id.clone(),
@@ -1097,6 +1129,7 @@ impl WorkflowSupervisor {
         soul_md: Option<&str>,
         lora_active: bool,
         runpod_endpoint: Option<&str>,
+        reasoning_guidance: &[String],
     ) -> Result<TaskGraph, SupervisorError> {
         let soul_section = if !lora_active {
             soul_md
@@ -1106,8 +1139,9 @@ impl WorkflowSupervisor {
             String::new()
         };
 
-        let system = format!(
-            "You are a workflow supervisor. Decompose the objective into a structured task \
+        let system = append_reasoning_guidance(
+            &format!(
+                "You are a workflow supervisor. Decompose the objective into a structured task \
              graph where each node has: id, node_kind, task_type, capability, \
              estimated_cost_cents, content, and depends_on (list of prerequisite node IDs).\n\
              node_kind must be one of: goal_intake, plan, executor, reflection, \
@@ -1118,6 +1152,9 @@ impl WorkflowSupervisor {
              and a reflection node last.\n\
              Return ONLY valid JSON: {{\"nodes\": [...]}}.\
              {soul_section}"
+            ),
+            reasoning_guidance,
+            "workflow graph decomposition",
         );
 
         let req = InferenceRequest {
@@ -1199,6 +1236,11 @@ impl WorkflowSupervisor {
         runpod_endpoint: Option<&str>,
     ) -> Result<SupervisorResult, SupervisorError> {
         let run_id = ulid::Ulid::new().to_string();
+        let reasoning_guidance =
+            crate::server::skill_capsule_routes::selected_reasoning_skill_guidance_for_user(
+                &self.owner_user_id,
+            )
+            .unwrap_or_default();
 
         // Convert IR manifests + edges → TaskGraph.
         let graph = task_graph_from_ir(&ir).map_err(SupervisorError::PlanningFailed)?;
@@ -1265,6 +1307,7 @@ impl WorkflowSupervisor {
                 let manifests = self.node_manifests.clone();
                 let prior_snap = prior_results.lock().await.clone();
                 let prior_arc = prior_results.clone();
+                let parallel_reasoning_guidance = reasoning_guidance.clone();
 
                 let sched_result = scheduler
                     .run(move |mf_id, cost_cents| {
@@ -1279,6 +1322,7 @@ impl WorkflowSupervisor {
                         let manifests_c = manifests.clone();
                         let prior_snap_c = prior_snap.clone();
                         let prior_arc_c = prior_arc.clone();
+                        let reasoning_guidance_c = parallel_reasoning_guidance.clone();
 
                         async move {
                             // Build a synthetic TaskGraphNode for this manifest.
@@ -1300,9 +1344,10 @@ impl WorkflowSupervisor {
                             let (allowed_caps, outbound_list, sys_prompt, instr_prompt) =
                                 manifest_to_delegation_fields(&node.task_type, manifest);
 
-                            let placeholder = "0".repeat(64);
+                            let mut mk3 = [0u8; 32];
+                            rand::rng().fill_bytes(&mut mk3);
                             let delegation = generate_delegated_key(
-                                &placeholder,
+                                &hex::encode(mk3),
                                 &node.task_type,
                                 &mf_id,
                                 60,
@@ -1316,6 +1361,7 @@ impl WorkflowSupervisor {
                                     system_prompt: sys_prompt,
                                     instruction_prompt: instr_prompt,
                                     token_budget_remaining: Some(512),
+                                    simulator_projection_summary: None,
                                 }),
                             );
                             let delegation_id = delegation.id.clone();
@@ -1327,6 +1373,7 @@ impl WorkflowSupervisor {
                                 soul_c.as_deref(),
                                 false,
                                 ep_c.as_deref(),
+                                &reasoning_guidance_c,
                                 &node,
                                 &delegation,
                                 &prior_snap_c,
@@ -1417,6 +1464,7 @@ impl WorkflowSupervisor {
                 let inst = self.instance_id.clone();
                 let manifests = self.node_manifests.clone();
                 let prior = prior_results.clone();
+                let sequential_reasoning_guidance = reasoning_guidance.clone();
 
                 let handle = tokio::spawn(async move {
                     let _permit = sem.acquire().await.ok();
@@ -1435,6 +1483,7 @@ impl WorkflowSupervisor {
                         system_prompt: sys_prompt,
                         instruction_prompt: instr_prompt,
                         token_budget_remaining: Some(512),
+                        simulator_projection_summary: None,
                     });
 
                     let task_record = AgentTask::new(
@@ -1445,9 +1494,10 @@ impl WorkflowSupervisor {
                     );
                     let _ = db_clone.create_agent_task(&task_record).await;
 
-                    let placeholder = "0".repeat(64);
+                    let mut mk4 = [0u8; 32];
+                    rand::rng().fill_bytes(&mut mk4);
                     let delegation = generate_delegated_key(
-                        &placeholder,
+                        &hex::encode(mk4),
                         &node.task_type,
                         &task_record.id,
                         60,
@@ -1466,6 +1516,7 @@ impl WorkflowSupervisor {
                         soul_s.as_deref(),
                         lora,
                         ep.as_deref(),
+                        &sequential_reasoning_guidance,
                         &node,
                         &delegation,
                         &prior_snap,
@@ -2061,6 +2112,7 @@ async fn spawner_call_sync(
     soul_md: Option<&str>,
     lora_active: bool,
     runpod_endpoint: Option<&str>,
+    reasoning_guidance: &[String],
     node: &TaskGraphNode,
     delegation: &AgentDelegation,
     prior: &HashMap<String, String>,
@@ -2071,6 +2123,7 @@ async fn spawner_call_sync(
         soul_md: soul_md.map(str::to_string),
         lora_active,
         runpod_endpoint: runpod_endpoint.map(str::to_string),
+        reasoning_guidance: reasoning_guidance.to_vec(),
     };
     s.spawn(node, delegation, prior).await
 }
@@ -2080,6 +2133,22 @@ async fn spawner_call_sync(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reasoning_guidance_prompt_helper_appends_guidance() {
+        let prompt = append_reasoning_guidance(
+            "Base workflow prompt",
+            &[
+                "Use grounded reasoning.".to_string(),
+                "Run a brief reflection pass.".to_string(),
+            ],
+            "workflow graph decomposition",
+        );
+        assert!(prompt.contains("# Enabled workspace reasoning guidance"));
+        assert!(prompt.contains("- Use grounded reasoning."));
+        assert!(prompt.contains("- Run a brief reflection pass."));
+        assert!(prompt.contains("workflow graph decomposition"));
+    }
 
     // ── TaskGraph / item 21 ───────────────────────────────────────────────────
 

@@ -135,6 +135,29 @@ impl TaskPriority {
             TaskPriority::Low => "low",
         }
     }
+
+    pub fn from_label(value: Option<&str>) -> Self {
+        match value
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase())
+            .as_deref()
+        {
+            Some("critical" | "urgent" | "high") => TaskPriority::High,
+            Some("low") => TaskPriority::Low,
+            _ => TaskPriority::Normal,
+        }
+    }
+
+    pub fn rank_value(value: &str) -> u8 {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "critical" | "urgent" => 0,
+            "high" => 1,
+            "medium" | "normal" => 2,
+            "low" => 3,
+            _ => 4,
+        }
+    }
 }
 
 impl Default for TaskPriority {
@@ -417,6 +440,10 @@ pub struct ContextSnapshot {
     pub instruction_prompt: Option<String>,
     /// Advisory token budget remaining for this sub-agent turn.
     pub token_budget_remaining: Option<u32>,
+    /// Optional compact planning/simulator summary carried from the master
+    /// orchestration context. Advisory only; never authoritative state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simulator_projection_summary: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -446,7 +473,46 @@ pub struct AgentDelegation {
     pub context_snapshot: Option<ContextSnapshot>,
 }
 
-/// Derive a scoped short-lived delegation key from the master key using HKDF.
+/// Validate that the delegation master key is present, non-zero, and real
+/// 32-byte hex. Delegation issuance must fail closed instead of silently
+/// deriving predictable keys (GAP-010).
+pub fn validate_delegation_master_key_hex(raw: &str) -> Result<String, String> {
+    let key = raw.trim();
+    if key.is_empty() {
+        return Err(
+            "OMNYID_DELEGATION_MASTER_KEY_HEX is not set. Configure a real 32-byte hex key."
+                .to_string(),
+        );
+    }
+    if key == "0".repeat(64) {
+        return Err(
+            "OMNYID_DELEGATION_MASTER_KEY_HEX is set to the all-zeros placeholder. \
+             Configure a real 32-byte hex key."
+                .to_string(),
+        );
+    }
+    let decoded = hex::decode(key).map_err(|_| {
+        "OMNYID_DELEGATION_MASTER_KEY_HEX must be valid hex encoding for 32 bytes.".to_string()
+    })?;
+    if decoded.len() != 32 {
+        return Err(
+            "OMNYID_DELEGATION_MASTER_KEY_HEX must decode to exactly 32 bytes.".to_string(),
+        );
+    }
+    Ok(key.to_string())
+}
+
+/// Return the validated delegation master key hex string from the environment.
+pub fn delegation_master_key_hex() -> Result<String, String> {
+    match std::env::var("OMNYID_DELEGATION_MASTER_KEY_HEX") {
+        Ok(key) => validate_delegation_master_key_hex(&key),
+        Err(_) => Err(
+            "OMNYID_DELEGATION_MASTER_KEY_HEX is not set. Configure a real 32-byte hex key."
+                .to_string(),
+        ),
+    }
+}
+
 /// The derived key is safe to hand to a sub-agent: it can only be used for
 /// the given `scope` and is time-limited by `expires_at`.
 ///
@@ -625,6 +691,12 @@ pub const AGENT_SUBTYPE_TRIAGE: &str = "triage";
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn agent_instance_provision_derives_agent_id_from_display_name() {
@@ -654,6 +726,36 @@ mod tests {
         assert!(TaskStatus::Cancelled.is_terminal());
         assert!(!TaskStatus::Executing.is_terminal());
         assert!(!TaskStatus::AwaitingApproval.is_terminal());
+    }
+
+    #[test]
+    fn task_priority_from_label_normalizes_extended_priority_aliases() {
+        assert_eq!(
+            TaskPriority::from_label(Some("critical")),
+            TaskPriority::High
+        );
+        assert_eq!(
+            TaskPriority::from_label(Some(" urgent ")),
+            TaskPriority::High
+        );
+        assert_eq!(
+            TaskPriority::from_label(Some("medium")),
+            TaskPriority::Normal
+        );
+        assert_eq!(TaskPriority::from_label(Some("low")), TaskPriority::Low);
+        assert_eq!(
+            TaskPriority::from_label(Some("unknown")),
+            TaskPriority::Normal
+        );
+        assert_eq!(TaskPriority::from_label(None), TaskPriority::Normal);
+    }
+
+    #[test]
+    fn task_priority_rank_value_orders_stronger_priorities_first() {
+        assert!(TaskPriority::rank_value("critical") < TaskPriority::rank_value("high"));
+        assert!(TaskPriority::rank_value("high") < TaskPriority::rank_value("normal"));
+        assert!(TaskPriority::rank_value("normal") < TaskPriority::rank_value("low"));
+        assert!(TaskPriority::rank_value("low") < TaskPriority::rank_value("unknown"));
     }
 
     #[test]
@@ -765,6 +867,38 @@ mod tests {
             None,
         );
         assert_ne!(d.delegated_key_hex, d2.delegated_key_hex);
+    }
+
+    #[test]
+    fn validate_delegation_master_key_hex_rejects_missing_zero_and_bad_hex() {
+        assert!(validate_delegation_master_key_hex("").is_err());
+        assert!(validate_delegation_master_key_hex(&"0".repeat(64)).is_err());
+        assert!(validate_delegation_master_key_hex("xyz").is_err());
+        assert!(validate_delegation_master_key_hex(&"ab".repeat(31)).is_err());
+    }
+
+    #[test]
+    fn delegation_master_key_hex_requires_real_env_key() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+        }
+        assert!(delegation_master_key_hex().is_err());
+
+        unsafe {
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", "0".repeat(64));
+        }
+        assert!(delegation_master_key_hex().is_err());
+
+        let valid = "ab".repeat(32);
+        unsafe {
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", &valid);
+        }
+        assert_eq!(delegation_master_key_hex().expect("valid key"), valid);
+
+        unsafe {
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+        }
     }
 
     #[test]

@@ -7,6 +7,18 @@ use crate::{
     message::AFPMessage,
 };
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IncomingEmailSummary {
+    pub subject: String,
+    pub smtp_from: String,
+    pub smtp_to: String,
+    pub body_preview: String,
+    pub smtp_message_id: String,
+    pub in_reply_to: Option<String>,
+    pub reference_targets: Vec<String>,
+    pub external_conversation_key: String,
+}
+
 pub async fn handle_incoming_email(raw_email: &[u8]) -> Result<AFPMessage, String> {
     let parsed = parse_incoming_email(raw_email);
     let subject = parsed.subject;
@@ -16,10 +28,16 @@ pub async fn handle_incoming_email(raw_email: &[u8]) -> Result<AFPMessage, Strin
     let smtp_message_id = parsed.smtp_message_id;
     let in_reply_to = parsed.in_reply_to;
     let reference_targets = parsed.reference_targets;
+    let external_conversation_key = external_email_conversation_key(
+        &smtp_message_id,
+        in_reply_to.as_deref(),
+        &reference_targets,
+    );
     let gateway_references =
         build_gateway_references(&smtp_message_id, in_reply_to.as_deref(), &reference_targets);
 
-    let thread_id = format!("email_{}", Ulid::new());
+    // thread_id must be a bare ULID (GAP-098 / validate_proto_message) — no prefix.
+    let thread_id = Ulid::new().to_string();
     let mut afp_msg = AFPMessage {
         protocol: "afp-v1".to_string(),
         id: Ulid::new().to_string(),
@@ -29,6 +47,8 @@ pub async fn handle_incoming_email(raw_email: &[u8]) -> Result<AFPMessage, Strin
         to: vec![current_agent_id()],
         timestamp: chrono::Utc::now().to_rfc3339(),
         r#type: "email".to_string(),
+        kind: None,
+        supertags: vec![],
         subtype: Some("incoming".to_string()),
         content: json!({
             "subject": subject,
@@ -37,12 +57,20 @@ pub async fn handle_incoming_email(raw_email: &[u8]) -> Result<AFPMessage, Strin
             "body": body,
             "original_smtp_id": smtp_message_id,
             "in_reply_to": in_reply_to,
-            "smtp_references": reference_targets
+            "smtp_references": reference_targets,
+            "external_conversation_key": external_conversation_key
         }),
         metadata: Some(json!({
             "channel": "smtp",
             "kind": "gateway_ingest",
-            "transport": "smtp"
+            "transport": "smtp",
+            "email_from": smtp_from,
+            "email_to": smtp_to,
+            "email_subject": subject,
+            "original_smtp_id": smtp_message_id,
+            "in_reply_to": in_reply_to,
+            "smtp_references": reference_targets,
+            "external_conversation_key": external_conversation_key
         })),
         signature: String::new(),
         encryption: None,
@@ -51,6 +79,7 @@ pub async fn handle_incoming_email(raw_email: &[u8]) -> Result<AFPMessage, Strin
             json!({"format": "notion", "content": {"blocks": [{"type": "paragraph", "text": body}]}}),
         ],
         references: gateway_references,
+        typed_refs: vec![],
         attachments: vec![],
         store_in_relational: false,
         prev_hash: None,
@@ -60,6 +89,39 @@ pub async fn handle_incoming_email(raw_email: &[u8]) -> Result<AFPMessage, Strin
     maybe_sign_gateway_message(&mut afp_msg)?;
 
     Ok(afp_msg)
+}
+
+pub fn summarize_incoming_email(raw_email: &[u8]) -> IncomingEmailSummary {
+    let parsed = parse_incoming_email(raw_email);
+    let external_conversation_key = external_email_conversation_key(
+        &parsed.smtp_message_id,
+        parsed.in_reply_to.as_deref(),
+        &parsed.reference_targets,
+    );
+    IncomingEmailSummary {
+        subject: parsed.subject,
+        smtp_from: parsed.smtp_from,
+        smtp_to: parsed.smtp_to,
+        body_preview: preview_text(&parsed.body, 240),
+        smtp_message_id: parsed.smtp_message_id,
+        in_reply_to: parsed.in_reply_to,
+        reference_targets: parsed.reference_targets,
+        external_conversation_key,
+    }
+}
+
+pub fn external_email_conversation_key(
+    smtp_message_id: &str,
+    in_reply_to: Option<&str>,
+    reference_targets: &[String],
+) -> String {
+    let root = reference_targets
+        .first()
+        .map(String::as_str)
+        .or(in_reply_to)
+        .unwrap_or(smtp_message_id)
+        .trim();
+    format!("external_email_thread:{root}")
 }
 
 struct ParsedIncomingEmail {
@@ -121,13 +183,11 @@ fn gateway_encryption_key() -> Result<Option<[u8; 32]>, String> {
 }
 
 fn env_hex_32(name: &str) -> Result<Option<[u8; 32]>, String> {
-    let value = std::env::var(name).unwrap_or_default();
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
+    let Some(trimmed) = crate::secret_manager::read_process_secret_trimmed(name) else {
         return Ok(None);
-    }
+    };
 
-    let bytes = hex::decode(trimmed).map_err(|_| format!("{name} must be valid hex"))?;
+    let bytes = hex::decode(&trimmed).map_err(|_| format!("{name} must be valid hex"))?;
     let array: [u8; 32] = bytes
         .try_into()
         .map_err(|_| format!("{name} must decode to 32 bytes"))?;
@@ -307,6 +367,15 @@ fn normalize_message_id(value: &str) -> String {
     } else {
         format!("<{trimmed}>")
     }
+}
+
+fn preview_text(input: &str, max_chars: usize) -> String {
+    let normalized = input.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut preview = normalized.chars().take(max_chars).collect::<String>();
+    if normalized.chars().count() > max_chars {
+        preview.push_str("...");
+    }
+    preview
 }
 
 #[cfg(test)]

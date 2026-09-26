@@ -8,6 +8,18 @@
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
+
+// GAP-097: shared client for connection pooling across all Graph API calls.
+static GRAPH_CLIENT: OnceLock<Client> = OnceLock::new();
+fn graph_client() -> &'static Client {
+    GRAPH_CLIENT.get_or_init(|| {
+        Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default()
+    })
+}
 
 use super::smtp_out::OutgoingEmailRequest;
 
@@ -138,8 +150,8 @@ pub async fn send_graph_message(
     request: &OutgoingEmailRequest,
     config: &GraphOAuthConfig,
 ) -> Result<(), String> {
-    let client = Client::new();
-    let token = refresh_access_token(&client, config).await?;
+    let client = graph_client();
+    let token = refresh_access_token(client, config).await?;
 
     let body = SendMailBody {
         save_to_sent_items: true,
@@ -165,7 +177,7 @@ pub async fn send_graph_message(
     let url = format!("{}/users/{}/sendMail", GRAPH_API_BASE, config.user_id);
     let resp = client
         .post(&url)
-        .bearer_auth(&token)
+        .bearer_auth(token)
         .json(&body)
         .send()
         .await
@@ -185,8 +197,8 @@ pub async fn list_inbox_messages(
     config: &GraphOAuthConfig,
     delta_link: Option<&str>,
 ) -> Result<(Vec<GraphMessageMeta>, Option<String>), String> {
-    let client = Client::new();
-    let token = refresh_access_token(&client, config).await?;
+    let client = graph_client();
+    let token = refresh_access_token(client, config).await?;
 
     let url = if let Some(link) = delta_link {
         link.to_string()
@@ -199,7 +211,7 @@ pub async fn list_inbox_messages(
 
     let resp = client
         .get(&url)
-        .bearer_auth(&token)
+        .bearer_auth(token)
         .send()
         .await
         .map_err(|e| format!("Graph list messages failed: {e}"))?;
@@ -220,15 +232,15 @@ pub async fn fetch_raw_message(
     config: &GraphOAuthConfig,
     message_id: &str,
 ) -> Result<Vec<u8>, String> {
-    let client = Client::new();
-    let token = refresh_access_token(&client, config).await?;
+    let client = graph_client();
+    let token = refresh_access_token(client, config).await?;
     let url = format!(
         "{}/users/{}/messages/{}/$value",
         GRAPH_API_BASE, config.user_id, message_id
     );
     let resp = client
         .get(&url)
-        .bearer_auth(&token)
+        .bearer_auth(token)
         .send()
         .await
         .map_err(|e| format!("Graph fetch raw failed: {e}"))?;
@@ -246,4 +258,14 @@ pub async fn fetch_raw_message(
 /// Encode raw bytes as base64 for AFP attachment storage reference.
 pub fn raw_to_base64(bytes: &[u8]) -> String {
     STANDARD.encode(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::graph_client;
+
+    #[test]
+    fn graph_client_is_shared_singleton() {
+        assert!(std::ptr::eq(graph_client(), graph_client()));
+    }
 }

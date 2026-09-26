@@ -75,9 +75,7 @@ impl MailGatewayConfig {
         let imap_username = std::env::var("OMNYID_IMAP_USERNAME")
             .ok()
             .filter(|s| !s.trim().is_empty());
-        let imap_password = std::env::var("OMNYID_IMAP_PASSWORD")
-            .ok()
-            .filter(|s| !s.trim().is_empty());
+        let imap_password = read_process_secret_trimmed("OMNYID_IMAP_PASSWORD");
         let smtp_host = std::env::var("SMTP_HOST")
             .ok()
             .filter(|s| !s.trim().is_empty());
@@ -88,18 +86,12 @@ impl MailGatewayConfig {
         let smtp_username = std::env::var("SMTP_USER")
             .ok()
             .filter(|s| !s.trim().is_empty());
-        let smtp_password = std::env::var("SMTP_PASS")
-            .ok()
-            .filter(|s| !s.trim().is_empty());
+        let smtp_password = read_process_secret_trimmed("SMTP_PASS");
         let gmail_client_id = std::env::var("OMNYID_GMAIL_CLIENT_ID")
             .ok()
             .filter(|s| !s.trim().is_empty());
-        let gmail_client_secret = std::env::var("OMNYID_GMAIL_CLIENT_SECRET")
-            .ok()
-            .filter(|s| !s.trim().is_empty());
-        let gmail_refresh_token = std::env::var("OMNYID_GMAIL_REFRESH_TOKEN")
-            .ok()
-            .filter(|s| !s.trim().is_empty());
+        let gmail_client_secret = read_process_secret_trimmed("OMNYID_GMAIL_CLIENT_SECRET");
+        let gmail_refresh_token = read_process_secret_trimmed("OMNYID_GMAIL_REFRESH_TOKEN");
         let gmail_user_id = std::env::var("OMNYID_GMAIL_USER_ID")
             .ok()
             .filter(|s| !s.trim().is_empty())
@@ -111,10 +103,7 @@ impl MailGatewayConfig {
 
         let inbound_auth_mode = match provider {
             MailProvider::Gmail => {
-                if has_env("OMNYID_GMAIL_CLIENT_ID")
-                    && has_env("OMNYID_GMAIL_CLIENT_SECRET")
-                    && has_env("OMNYID_GMAIL_REFRESH_TOKEN")
-                {
+                if has_env("OMNYID_GMAIL_CLIENT_ID") && has_env("OMNYID_GMAIL_CLIENT_SECRET") {
                     InboundAuthMode::OAuthGmailApi
                 } else {
                     InboundAuthMode::Disabled
@@ -215,9 +204,7 @@ impl MailGatewayConfig {
 }
 
 fn has_env(name: &str) -> bool {
-    std::env::var(name)
-        .map(|value| !value.trim().is_empty())
-        .unwrap_or(false)
+    read_process_secret(name).is_some()
 }
 
 #[cfg(test)]
@@ -278,6 +265,24 @@ mod tests {
     }
 
     #[test]
+    fn gmail_inbound_allows_user_scoped_oauth_without_env_refresh_token() {
+        let _guard = env_lock().lock().expect("env lock");
+        clear_env();
+        unsafe {
+            std::env::set_var("OMNYID_MAIL_PROVIDER", "gmail");
+            std::env::set_var("OMNYID_GMAIL_CLIENT_ID", "client");
+            std::env::set_var("OMNYID_GMAIL_CLIENT_SECRET", "secret");
+        }
+
+        let config = MailGatewayConfig::from_env();
+        assert_eq!(config.provider, MailProvider::Gmail);
+        assert_eq!(config.inbound_auth_mode, InboundAuthMode::OAuthGmailApi);
+        assert_eq!(config.outbound_auth_mode, OutboundAuthMode::Disabled);
+        assert!(config.inbound_enabled());
+        assert!(!config.outbound_enabled());
+    }
+
+    #[test]
     fn custom_config_uses_direct_fallbacks() {
         let _guard = env_lock().lock().expect("env lock");
         clear_env();
@@ -324,3 +329,4 @@ mod tests {
         assert!(config.outbound_enabled());
     }
 }
+use crate::secret_manager::{read_process_secret, read_process_secret_trimmed};

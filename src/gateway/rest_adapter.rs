@@ -14,6 +14,8 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signer, SigningKey};
 use reqwest::{Client, Method};
 use serde_json::{Value, json};
+use std::net::{IpAddr, SocketAddr};
+use tokio::net::lookup_host;
 
 use crate::integration::{
     ActionIntent, ActionResult, ActionStatus, ApprovalMode, IntegrationCapability,
@@ -83,6 +85,7 @@ pub async fn execute_action(
     intent: &ActionIntent,
     params: RestCallParams,
     now_iso: &str,
+    client: &Client,
 ) -> Result<ActionResult, String> {
     match capability.approval_mode {
         ApprovalMode::HumanApprovalRequired => {
@@ -117,7 +120,11 @@ pub async fn execute_action(
     // valid request signatures. Check applies to both REST and GraphQL.
     if !params.outbound_allowlist.is_empty() {
         let host = extract_host(&params.url);
-        if !params.outbound_allowlist.iter().any(|allowed| host_matches(&host, allowed)) {
+        if !params
+            .outbound_allowlist
+            .iter()
+            .any(|allowed| host_matches(&host, allowed))
+        {
             return Err(format!(
                 "policy_block: outbound call to '{}' (host '{}') is not in the node's \
                  outbound_allowlist [{}]. Request denied before signing.",
@@ -129,8 +136,8 @@ pub async fn execute_action(
     }
 
     let result = match capability.transport {
-        IntegrationTransport::Rest => rest_call(&params).await,
-        IntegrationTransport::Graphql => graphql_call(&params).await,
+        IntegrationTransport::Rest => rest_call(&params, client).await,
+        IntegrationTransport::Graphql => graphql_call(&params, client).await,
         IntegrationTransport::BrowserAutomation => {
             Err("Browser automation is not yet supported in this adapter".to_string())
         }
@@ -156,8 +163,11 @@ pub async fn execute_action(
     }
 }
 
-async fn rest_call(params: &RestCallParams) -> Result<(Value, Option<String>), String> {
-    let client = Client::new();
+async fn rest_call(
+    params: &RestCallParams,
+    client: &Client,
+) -> Result<(Value, Option<String>), String> {
+    validate_public_http_url(&params.url).await?;
     let method = params
         .method
         .parse::<Method>()
@@ -195,8 +205,11 @@ async fn rest_call(params: &RestCallParams) -> Result<(Value, Option<String>), S
     Ok((body, None))
 }
 
-async fn graphql_call(params: &RestCallParams) -> Result<(Value, Option<String>), String> {
-    let client = Client::new();
+async fn graphql_call(
+    params: &RestCallParams,
+    client: &Client,
+) -> Result<(Value, Option<String>), String> {
+    validate_public_http_url(&params.url).await?;
     let mut builder = client.post(&params.url);
     if let Some(token) = &params.bearer_token {
         builder = builder.bearer_auth(token);
@@ -232,12 +245,135 @@ async fn graphql_call(params: &RestCallParams) -> Result<(Value, Option<String>)
     Ok((body, None))
 }
 
+// ── SSRF blocklist ────────────────────────────────────────────────────────────
+
+/// Reject URLs whose hostname resolves to link-local, loopback, or private
+/// address ranges — guards against SSRF to cloud metadata endpoints.
+///
+/// DNS is not resolved here; this is a best-effort string check on the literal
+/// hostname. Hosts that pass this check and then resolve to a blocked IP range
+/// are blocked by the OS/network layer (defence-in-depth).
+pub(crate) fn is_ssrf_blocked_host(host: &str) -> bool {
+    // Strip brackets from IPv6 literals: [::1] → ::1
+    let h = host.trim_matches(|c| c == '[' || c == ']');
+    let h_lower = h.to_lowercase();
+
+    // Exact loopback / link-local addresses
+    let blocked_exact = [
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "0.0.0.0",
+        // Oracle / AWS / GCP / Azure cloud metadata endpoints
+        "169.254.169.254",
+        "metadata.google.internal",
+        "169.254.170.2", // ECS task metadata
+    ];
+    if blocked_exact.iter().any(|b| h_lower == *b) {
+        return true;
+    }
+
+    // Prefix-based private / link-local ranges (IPv4 dotted notation)
+    let blocked_prefixes = [
+        "10.",     // RFC-1918 Class A
+        "172.16.", // RFC-1918 Class B (172.16–31.x.x)
+        "172.17.",
+        "172.18.",
+        "172.19.",
+        "172.20.",
+        "172.21.",
+        "172.22.",
+        "172.23.",
+        "172.24.",
+        "172.25.",
+        "172.26.",
+        "172.27.",
+        "172.28.",
+        "172.29.",
+        "172.30.",
+        "172.31.",
+        "192.168.",   // RFC-1918 Class C
+        "127.",       // Full loopback range
+        "169.254.",   // Link-local
+        "fd",         // IPv6 ULA (fd00::/8)
+        "fe80:",      // IPv6 link-local
+        "::ffff:127", // IPv4-mapped loopback
+        "::ffff:10.",
+        "::ffff:192.168.",
+    ];
+    if blocked_prefixes.iter().any(|p| h_lower.starts_with(p)) {
+        return true;
+    }
+
+    false
+}
+
+pub(crate) fn is_ssrf_blocked_ip(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ipv4) => {
+            ipv4.is_private()
+                || ipv4.is_loopback()
+                || ipv4.is_link_local()
+                || ipv4.is_broadcast()
+                || ipv4.is_unspecified()
+                || *ipv4 == std::net::Ipv4Addr::new(169, 254, 169, 254)
+                || *ipv4 == std::net::Ipv4Addr::new(169, 254, 170, 2)
+        }
+        IpAddr::V6(ipv6) => {
+            ipv6.is_loopback()
+                || ipv6.is_unspecified()
+                || ipv6.is_unique_local()
+                || ipv6.is_unicast_link_local()
+                || ipv6.is_multicast()
+        }
+    }
+}
+
+pub(crate) async fn validate_public_http_url(url: &str) -> Result<(), String> {
+    let parsed = reqwest::Url::parse(url).map_err(|err| format!("invalid URL '{}': {err}", url))?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| format!("invalid URL '{}': missing host", url))?;
+
+    if is_ssrf_blocked_host(host) {
+        return Err(format!(
+            "ssrf_block: outbound call to '{}' (host '{}') targets a private or link-local address range and is not permitted.",
+            url, host
+        ));
+    }
+
+    let port = parsed.port_or_known_default().unwrap_or(443);
+    let resolved: Vec<SocketAddr> = if let Ok(ip) = host.parse::<IpAddr>() {
+        vec![SocketAddr::new(ip, port)]
+    } else {
+        lookup_host((host, port))
+            .await
+            .map_err(|err| format!("could not resolve host '{}': {err}", host))?
+            .collect()
+    };
+
+    if resolved.is_empty() {
+        return Err(format!("could not resolve host '{}'", host));
+    }
+
+    if let Some(blocked) = resolved.iter().find(|addr| is_ssrf_blocked_ip(&addr.ip())) {
+        return Err(format!(
+            "ssrf_block: outbound call to '{}' resolved host '{}' to blocked address '{}'",
+            url,
+            host,
+            blocked.ip()
+        ));
+    }
+
+    Ok(())
+}
+
 // ── Allowlist helpers ─────────────────────────────────────────────────────────
 
 /// Extract the hostname (and optional port) from a URL string.
 /// Returns the raw string on parse failure so the caller can include it in
 /// the deny message.
-fn extract_host(url: &str) -> String {
+pub(crate) fn extract_host(url: &str) -> String {
     // Minimal host extraction: find "://" then take up to the next "/" or end.
     if let Some(after_scheme) = url.split_once("://").map(|(_, rest)| rest) {
         let host_part = after_scheme.split('/').next().unwrap_or(after_scheme);
@@ -301,6 +437,7 @@ mod tests {
             IntegrationTransport::Rest,
         );
         let intent = make_intent();
+        let client = Client::new();
         let params = RestCallParams {
             url: "https://example.com/api".to_string(),
             method: "POST".to_string(),
@@ -309,7 +446,7 @@ mod tests {
             signing_context: None,
             outbound_allowlist: vec![],
         };
-        let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z").await;
+        let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z", &client).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("requires human approval"));
     }
@@ -339,6 +476,7 @@ mod tests {
     async fn suggest_only_returns_pending_preview() {
         let cap = make_capability(ApprovalMode::SuggestOnly, IntegrationTransport::Rest);
         let intent = make_intent();
+        let client = Client::new();
         let params = RestCallParams {
             url: "https://api.stripe.com/v1/charges".to_string(),
             method: "POST".to_string(),
@@ -347,7 +485,7 @@ mod tests {
             signing_context: None,
             outbound_allowlist: vec![],
         };
-        let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z")
+        let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z", &client)
             .await
             .unwrap();
         assert_eq!(result.status, ActionStatus::Pending);
@@ -358,7 +496,10 @@ mod tests {
 
     #[test]
     fn extract_host_strips_scheme_path_and_port() {
-        assert_eq!(extract_host("https://api.stripe.com/v1/charges"), "api.stripe.com");
+        assert_eq!(
+            extract_host("https://api.stripe.com/v1/charges"),
+            "api.stripe.com"
+        );
         assert_eq!(extract_host("http://localhost:8080/foo"), "localhost");
         assert_eq!(extract_host("https://example.com"), "example.com");
     }
@@ -373,10 +514,34 @@ mod tests {
         assert!(!host_matches("stripe.com", "*.stripe.com"));
     }
 
+    #[test]
+    fn ssrf_ip_blocklist_rejects_metadata_and_private_addresses() {
+        assert!(is_ssrf_blocked_ip(&"169.254.169.254".parse().expect("ip")));
+        assert!(is_ssrf_blocked_ip(&"10.0.0.1".parse().expect("ip")));
+        assert!(is_ssrf_blocked_ip(&"127.0.0.1".parse().expect("ip")));
+    }
+
+    #[tokio::test]
+    async fn validate_public_http_url_rejects_localhost_without_dns_lookup() {
+        let err = validate_public_http_url("https://localhost/secrets")
+            .await
+            .expect_err("localhost should be blocked");
+        assert!(err.contains("ssrf_block"));
+        assert!(err.contains("localhost"));
+    }
+
+    #[tokio::test]
+    async fn validate_public_http_url_accepts_public_literal_ip() {
+        validate_public_http_url("https://8.8.8.8/health")
+            .await
+            .expect("public literal IP should pass SSRF guard");
+    }
+
     #[tokio::test]
     async fn allowlist_blocks_unauthorized_host() {
         let cap = make_capability(ApprovalMode::Autonomous, IntegrationTransport::Rest);
         let intent = make_intent();
+        let client = Client::new();
         let params = RestCallParams {
             url: "https://evil.example.com/exfiltrate".to_string(),
             method: "POST".to_string(),
@@ -385,7 +550,7 @@ mod tests {
             signing_context: None,
             outbound_allowlist: vec!["api.stripe.com".to_string()],
         };
-        let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z").await;
+        let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z", &client).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.contains("policy_block"));
@@ -398,6 +563,7 @@ mod tests {
         // level (no real server) but must NOT fail with a policy_block error.
         let cap = make_capability(ApprovalMode::Autonomous, IntegrationTransport::Rest);
         let intent = make_intent();
+        let client = Client::new();
         let params = RestCallParams {
             url: "https://api.example.com/test".to_string(),
             method: "GET".to_string(),
@@ -406,10 +572,13 @@ mod tests {
             signing_context: None,
             outbound_allowlist: vec![],
         };
-        let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z").await;
+        let result = execute_action(&cap, &intent, params, "2026-01-01T00:00:00Z", &client).await;
         // Should not be a policy_block — may succeed or fail with a network error
         if let Err(e) = &result {
-            assert!(!e.contains("policy_block"), "empty allowlist triggered policy_block: {e}");
+            assert!(
+                !e.contains("policy_block"),
+                "empty allowlist triggered policy_block: {e}"
+            );
         }
     }
 }

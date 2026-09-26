@@ -663,9 +663,15 @@ impl TrialRunnerManager {
 
         // Runs the live NVIDIA NIM call outside the session lock so a slow or
         // failing upstream request can't stall other trial sessions.
-        let reply =
-            trial_generate_reply(content, &active_template, &traces, &reviews, intent, &history)
-                .await;
+        let reply = trial_generate_reply(
+            content,
+            &active_template,
+            &traces,
+            &reviews,
+            intent,
+            &history,
+        )
+        .await;
 
         let mut sessions = self.sessions.lock().await;
         let session = sessions
