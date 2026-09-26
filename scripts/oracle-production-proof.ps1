@@ -867,7 +867,7 @@ $reportText =
         # regardless of PowerShell encoding settings — verified even when bypassing
         # PowerShell's pipeline via a raw StreamWriter. Strip both on the remote side instead
         # of fighting the client-side cause.
-        Invoke-RemoteSshCommand -RemoteCommand "LC_ALL=C sed '1s/^\xEF\xBB\xBF//; s/\r$//' | bash -s" -InputText $remoteAuditScript
+        Invoke-RemoteSshCommand -RemoteCommand "bash -s" -InputText $remoteAuditScript
     }
 $reportText = $reportText.Trim()
 
