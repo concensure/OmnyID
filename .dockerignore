@@ -1,0 +1,8 @@
+solid-ui/node_modules
+solid-ui/dist
+typescript-sdk/node_modules
+typescript-sdk/dist
+target
+.git
+.secrets
+.env.oracle
