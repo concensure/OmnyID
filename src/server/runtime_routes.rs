@@ -304,12 +304,10 @@ async fn runtime_runner_config_action_http(
             "runtime runner config action must be save_policies".to_string(),
         ));
     }
-    let config = deployment.config_json.as_object_mut().ok_or_else(|| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "runtime config is malformed".to_string(),
-        )
-    })?;
+    let config = deployment
+        .config_json
+        .as_object_mut()
+        .ok_or_else(|| internal_http_error("runtime deployment config_json was not an object"))?;
     if let Some(model_policy) = request.model_policy {
         config.insert("model_policy".to_string(), model_policy);
     }
@@ -422,4 +420,26 @@ async fn runtime_runner_config_action_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
     Ok(Json(runtime_deployment_response_live(deployment).await))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn runtime_runner_config_malformed_config_error_is_sanitized() {
+        let source = include_str!("runtime_routes.rs");
+        let start = source
+            .find("async fn runtime_runner_config_action_http(")
+            .expect("runtime runner config action route exists");
+        let end = source[start..]
+            .find("\n#[cfg(test)]")
+            .map(|offset| start + offset)
+            .expect("test module follows runtime route handlers");
+        let body = &source[start..end];
+
+        assert!(body.contains(
+            ".ok_or_else(|| internal_http_error(\"runtime deployment config_json was not an object\"))?;"
+        ));
+        assert!(!body.contains("\"runtime config is malformed\""));
+        assert!(!body.contains("(StatusCode::INTERNAL_SERVER_ERROR,"));
+    }
 }
