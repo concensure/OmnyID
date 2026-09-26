@@ -31,7 +31,7 @@ test("loadContacts keeps only valid trimmed contacts and optional fields", () =>
         email: " alice@example.com ",
         agentId: " agent://alice ",
         relationshipKind: "client",
-        roles: [" Guest ", "Guest", "Planner"],
+        roles: [" guest ", "Guest", "wedding PLANNER"],
         responseSlaHours: 24,
       },
       {
@@ -61,7 +61,7 @@ test("loadContacts keeps only valid trimmed contacts and optional fields", () =>
       email: "alice@example.com",
       agentId: "agent://alice",
       relationshipKind: "client",
-      roles: ["Guest", "Planner"],
+      roles: ["Guest", "Wedding planner"],
       responseSlaHours: 24,
     },
     {
@@ -77,7 +77,7 @@ test("loadContacts keeps only valid trimmed contacts and optional fields", () =>
       email: "alice@example.com",
       agentId: "agent://alice",
       relationshipKind: "client",
-      roles: ["Guest", "Planner"],
+      roles: ["Guest", "Wedding planner"],
       responseSlaHours: 24,
     },
     {

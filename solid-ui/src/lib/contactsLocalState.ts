@@ -3,6 +3,7 @@ import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
 import type { ResponseQueueRelationship } from "@/lib/responseQueuePolicy";
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
+import { normalizeContactRoleLabel } from "@/lib/contactRoleState";
 
 export type Contact = {
   id: string;
@@ -45,9 +46,9 @@ function normalizeRoles(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const roles = value
     .filter((role): role is string => typeof role === "string")
-    .map((role) => role.trim().replace(/\s+/g, " "))
-    .filter(Boolean);
-  const unique = Array.from(new Set(roles));
+    .map((role) => normalizeContactRoleLabel(role))
+    .filter((role): role is string => role !== null);
+  const unique = Array.from(new Map(roles.map((role) => [role.toLowerCase(), role])).values());
   return unique.length > 0 ? unique : undefined;
 }
 
