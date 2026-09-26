@@ -512,6 +512,7 @@ Release calibration / deployment validation update, 2026-09-26:
 - focused continuity calibration/projection tests pass (`13 passed`)
 - `npm run typecheck` passes
 - `npm run test:wedding` passes (`1057 passed`)
+- deployment rehearsal and deployment-ops selftests pass for Bash/PowerShell paths after aligning the Oracle runtime staging fixture with the required `wedding/` static root
 - deployed database validation was not executed in this environment because no deployed `DATABASE_URL` / deployed database env var is available
 - source-control reconciliation is still required for the env-race fix if `src/server/user_management_routes.rs` remains an untracked split route file in the release worktree
 
@@ -521,4 +522,5 @@ What remains incomplete or calibration-sensitive:
 - A2UI now has compact proactive provenance/policy summaries, watcher-signal chips, and continuity trend bars
 - escalation uses bounded thresholds, but those thresholds are still static and not yet personalized by user profile or longer-horizon behavioral calibration
 - opt-in live database smoke coverage passed against local compose Postgres; rerun against the deployed Postgres path before final release sign-off if that differs from local compose
+- live deployment endpoint validation still needs a real `OMNYID_BASE_URL` / workspace URL and production ops token; local mocked deployment-ops gates now pass
 - deployed telemetry/replay calibration is still needed to compare production workspace distributions against the conservative local fixtures before raising surface intensity or enabling personalization
