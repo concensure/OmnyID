@@ -1,5 +1,11 @@
 // @locs-version: 2.0
-import type { SendAfpMessageInput } from "@/lib/api";
+import {
+  buildContinuityProjectionQueueSelectionState,
+  buildContinuityProjectionQueueState,
+  type ContinuityProjectionQueueItem,
+  type ContinuityProjectionQueueState,
+  type ContinuityProjectionQueueSelectionState,
+} from "@/lib/continuityProjectionState";
 import type { WeddingGeneratedArtifact } from "@/lib/weddingArtifactGenerationState";
 import {
   hasSentWeddingArtifactAfpProjection,
@@ -41,37 +47,10 @@ import {
 export const WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY = "omnyid.wedding.boundary_afp_projections.v1";
 
 export type WeddingProjectionQueueItemKind = "context" | "artifact" | "calendar_event" | "task" | "decision" | "access_control" | "boundary";
-export type WeddingProjectionQueueItemStatus = "pending" | "sent" | "blocked";
-
-export type WeddingProjectionQueueItem = {
-  id: string;
-  sourceId: string;
-  kind: WeddingProjectionQueueItemKind;
-  title: string;
-  status: WeddingProjectionQueueItemStatus;
-  statusLabel: string;
-  blockedReason: string | null;
-  sendInput: SendAfpMessageInput | null;
-};
-
-export type WeddingProjectionQueueState = {
-  items: WeddingProjectionQueueItem[];
-  pendingItems: WeddingProjectionQueueItem[];
-  sentItems: WeddingProjectionQueueItem[];
-  blockedItems: WeddingProjectionQueueItem[];
-  pendingSendInputs: SendAfpMessageInput[];
-  summaryLabel: string;
-  nextActionLabel: string;
-  canDispatch: boolean;
-};
-
-export type WeddingProjectionQueueSelectionState = {
-  queue: WeddingProjectionQueueState;
-  selectedPendingItems: WeddingProjectionQueueItem[];
-  selectedPendingCount: number;
-  totalPendingCount: number;
-  selectionSummaryLabel: string | null;
-};
+export type WeddingProjectionQueueItemStatus = ContinuityProjectionQueueItem<WeddingProjectionQueueItemKind>["status"];
+export type WeddingProjectionQueueItem = ContinuityProjectionQueueItem<WeddingProjectionQueueItemKind>;
+export type WeddingProjectionQueueState = ContinuityProjectionQueueState<WeddingProjectionQueueItemKind>;
+export type WeddingProjectionQueueSelectionState = ContinuityProjectionQueueSelectionState<WeddingProjectionQueueItemKind>;
 
 function clean(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -265,16 +244,6 @@ function boundaryItem(
   };
 }
 
-function summaryLabel(pendingCount: number, sentCount: number, blockedCount: number): string {
-  if (pendingCount === 0 && sentCount === 0 && blockedCount === 0) return "No wedding items to save";
-  const parts = [
-    pendingCount > 0 ? `${pendingCount} ready` : null,
-    sentCount > 0 ? `${sentCount} already saved` : null,
-    blockedCount > 0 ? `${blockedCount} need review` : null,
-  ].filter(Boolean);
-  return parts.join(", ");
-}
-
 export function buildWeddingProjectionQueueState(input: {
   contextItems?: readonly WeddingNeedToKnowProjectionContext[] | null;
   decisionItems?: readonly WeddingDecisionProjectionInput[] | null;
@@ -299,61 +268,23 @@ export function buildWeddingProjectionQueueState(input: {
     ...(input.collaborationInvites ?? []).map((invite) => collaborationItem(invite, input.collaborationMetadata, nowIso, storage)),
     ...(input.boundaryObjects ?? []).map((object) => boundaryItem(object, input.boundaryMetadata ?? input.collaborationMetadata, nowIso, storage)),
   ];
-  const pendingItems = items.filter((item) => item.status === "pending");
-  const sentItems = items.filter((item) => item.status === "sent");
-  const blockedItems = items.filter((item) => item.status === "blocked");
-  const pendingSendInputs = pendingItems.flatMap((item) => item.sendInput ? [item.sendInput] : []);
-
-  return {
+  return buildContinuityProjectionQueueState({
     items,
-    pendingItems,
-    sentItems,
-    blockedItems,
-    pendingSendInputs,
-    summaryLabel: summaryLabel(pendingItems.length, sentItems.length, blockedItems.length),
-    nextActionLabel: pendingItems.length > 0
-      ? `Save ${pendingItems.length} planning item${pendingItems.length === 1 ? "" : "s"}`
-      : blockedItems.length > 0
-        ? "Review items that need attention"
-        : sentItems.length > 0 ? "Planning items saved" : "Create planning items",
-    canDispatch: pendingSendInputs.length > 0,
-  };
+    copy: {
+      emptyLabel: "No wedding items to save",
+      itemNoun: "planning item",
+      nextActionSavedLabel: "Planning items saved",
+      nextActionEmptyLabel: "Create planning items",
+    },
+  });
 }
 
 export function buildWeddingProjectionQueueSelectionState(input: {
   queue: WeddingProjectionQueueState;
   deselectedItemIds?: Readonly<Record<string, boolean>> | null;
 }): WeddingProjectionQueueSelectionState {
-  const deselectedItemIds = input.deselectedItemIds ?? {};
-  const selectedPendingItems = input.queue.pendingItems.filter((item) => !deselectedItemIds[item.id]);
-  const selectedIds = new Set(selectedPendingItems.map((item) => item.id));
-  const items = input.queue.items.filter((item) => item.status !== "pending" || selectedIds.has(item.id));
-  const pendingItems = items.filter((item) => item.status === "pending");
-  const sentItems = items.filter((item) => item.status === "sent");
-  const blockedItems = items.filter((item) => item.status === "blocked");
-  const pendingSendInputs = pendingItems.flatMap((item) => item.sendInput ? [item.sendInput] : []);
-
-  return {
-    queue: {
-      ...input.queue,
-      items,
-      pendingItems,
-      sentItems,
-      blockedItems,
-      pendingSendInputs,
-      canDispatch: pendingSendInputs.length > 0,
-      summaryLabel: pendingItems.length > 0
-        ? `${pendingItems.length} selected item${pendingItems.length === 1 ? "" : "s"} ready`
-        : "No selected items to save",
-      nextActionLabel: pendingItems.length > 0
-        ? `Save ${pendingItems.length} selected item${pendingItems.length === 1 ? "" : "s"}`
-        : "Select items to save",
-    },
-    selectedPendingItems,
-    selectedPendingCount: selectedPendingItems.length,
-    totalPendingCount: input.queue.pendingItems.length,
-    selectionSummaryLabel: input.queue.pendingItems.length > 0
-      ? `${selectedPendingItems.length}/${input.queue.pendingItems.length} ready items selected`
-      : null,
-  };
+  return buildContinuityProjectionQueueSelectionState({
+    queue: input.queue,
+    deselectedItemIds: input.deselectedItemIds,
+  });
 }

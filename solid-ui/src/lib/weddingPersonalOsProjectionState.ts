@@ -3,18 +3,24 @@ import type {
   WeddingPlanningScheduleItem,
   WeddingPlanningTaskItem,
 } from "@/lib/weddingCalendarProjectionState";
+import {
+  buildContinuityPersonalOsProjectionState,
+  type ContinuityDecisionLoadReliefState,
+  type ContinuityPersonalOsProjectionState,
+  type ContinuityPressureFamily,
+  type ContinuityRankedItem,
+} from "@/lib/continuityProjectionState";
 import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 import {
   weddingDecisionSourceLabelsForProjection,
   weddingDecisionSourceUrlsForProjection,
 } from "@/lib/weddingDecisionAfpProjectionState";
-import type { WeddingPersistedApprovalReceipt } from "@/lib/weddingPersistedWorkspaceState";
+import type {
+  WeddingPersistedApprovalReceipt,
+  WeddingPersistedDecisionDeferral,
+} from "@/lib/weddingPersistedWorkspaceState";
 
-export type WeddingPersonalOsPressureFamily =
-  | "obligation"
-  | "attention"
-  | "knowledge"
-  | "opportunity";
+export type WeddingPersonalOsPressureFamily = ContinuityPressureFamily;
 
 export type WeddingPersonalOsRankedItemKind =
   | "task"
@@ -22,37 +28,14 @@ export type WeddingPersonalOsRankedItemKind =
   | "decision"
   | "approval";
 
-export type WeddingPersonalOsRankedItem = {
-  id: string;
-  kind: WeddingPersonalOsRankedItemKind;
-  title: string;
-  pressureFamily: WeddingPersonalOsPressureFamily;
-  rankWeight: number;
-  dueLabel: string | null;
-  dueAt: string | null;
-  explanation: string;
-  evidenceLabels: string[];
+export type WeddingPersonalOsRankedItem = ContinuityRankedItem<WeddingPersonalOsRankedItemKind> & {
   sourceSurface: "tasks" | "calendar" | "decision_queue" | "approval_queue";
-  simulatorSeedKind: "commitment" | "response" | "decision" | "context";
 };
 
-export type WeddingDecisionLoadReliefState = {
-  summaryLabel: string;
-  focusLimit: number;
-  focusItems: WeddingPersonalOsRankedItem[];
-  backlogCount: number;
-  reliefLabels: string[];
-};
+export type WeddingDecisionLoadReliefState = ContinuityDecisionLoadReliefState<WeddingPersonalOsRankedItem>;
 
-export type WeddingPersonalOsProjectionState = {
+export type WeddingPersonalOsProjectionState = Omit<ContinuityPersonalOsProjectionState<WeddingPersonalOsRankedItem>, "hasSignal"> & {
   hasWeddingPersonalOsSignal: boolean;
-  summaryLabel: string;
-  fieldEnginePrimaryType: WeddingPersonalOsPressureFamily | null;
-  fieldEngineSummary: string | null;
-  simulatorSeedSummary: string | null;
-  decisionLoadRelief: WeddingDecisionLoadReliefState;
-  rankedItems: WeddingPersonalOsRankedItem[];
-  guardrailLabels: string[];
 };
 
 function clean(value: unknown): string {
@@ -67,6 +50,20 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
     : [];
+}
+
+function uniqueStrings(values: readonly unknown[], limit = 24): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const item = clean(value);
+    const key = item.toLowerCase();
+    if (!item || seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+    if (result.length >= limit) break;
+  }
+  return result;
 }
 
 function usableSourceUrlCount(value: unknown): number {
@@ -420,10 +417,28 @@ function approvalItem(receipt: WeddingPersistedApprovalReceipt): WeddingPersonal
   };
 }
 
-function primaryFamily(items: readonly WeddingPersonalOsRankedItem[]): WeddingPersonalOsPressureFamily | null {
-  const totals = new Map<WeddingPersonalOsPressureFamily, number>();
-  for (const item of items) totals.set(item.pressureFamily, (totals.get(item.pressureFamily) ?? 0) + item.rankWeight);
-  return Array.from(totals.entries()).sort((left, right) => right[1] - left[1])[0]?.[0] ?? null;
+function suppressDeferredItem(deferral: WeddingPersistedDecisionDeferral, now: Date): boolean {
+  const deferredUntil = deferral.deferredUntilAt ? Date.parse(deferral.deferredUntilAt) : Number.NaN;
+  if (Number.isFinite(deferredUntil)) return now.getTime() < deferredUntil;
+  const staleAfter = deferral.staleAfterAt ? Date.parse(deferral.staleAfterAt) : Number.NaN;
+  if (Number.isFinite(staleAfter) && now.getTime() >= staleAfter) return false;
+  const dueDays = daysUntil(deferral.dueAt, now);
+  if (dueDays !== null && dueDays <= 3) return false;
+  const createdDays = daysUntil(deferral.createdAt, now);
+  if (createdDays !== null && createdDays <= -7) return false;
+  return true;
+}
+
+function rankedItemDependencyFingerprint(item: WeddingPersonalOsRankedItem): string {
+  return uniqueStrings([
+    item.id,
+    item.kind,
+    item.pressureFamily,
+    item.sourceSurface,
+    item.dueAt ?? "",
+    item.dueLabel ?? "",
+    ...item.evidenceLabels,
+  ]).join("|").toLowerCase();
 }
 
 function familySummary(family: WeddingPersonalOsPressureFamily | null, top: WeddingPersonalOsRankedItem | null): string | null {
@@ -442,13 +457,10 @@ function decisionLoadCandidate(item: WeddingPersonalOsRankedItem): boolean {
   );
 }
 
-function buildDecisionLoadReliefState(
-  rankedItems: readonly WeddingPersonalOsRankedItem[],
-  focusLimit: number,
-): WeddingDecisionLoadReliefState {
-  const candidates = rankedItems.filter(decisionLoadCandidate);
-  const focusItems = candidates.slice(0, focusLimit);
-  const backlogCount = Math.max(0, candidates.length - focusItems.length);
+function decisionLoadReliefLabels(
+  focusItems: readonly WeddingPersonalOsRankedItem[],
+  backlogCount: number,
+): string[] {
   const familyLabels = Array.from(new Set(focusItems.map((item) => item.pressureFamily)))
     .map((family) => family === "knowledge"
       ? "evidence gaps"
@@ -458,20 +470,12 @@ function buildDecisionLoadReliefState(
           ? "follow-up decisions"
           : "commitment decisions");
 
-  return {
-    summaryLabel: focusItems.length > 0
-      ? `Focus on ${focusItems.length} wedding decision${focusItems.length === 1 ? "" : "s"} now; ${backlogCount} can wait.`
-      : "No decision-heavy wedding items need focus right now.",
-    focusLimit,
-    focusItems,
-    backlogCount,
-    reliefLabels: [
-      focusItems.length > 0 ? `Limits active wedding choices to the top ${focusItems.length}.` : "No immediate decision pile-up.",
-      backlogCount > 0 ? `${backlogCount} lower-priority decision${backlogCount === 1 ? "" : "s"} stay in the backlog.` : null,
-      familyLabels.length > 0 ? `Decision load drivers: ${familyLabels.join(", ")}.` : null,
-      "Keeps vendor search, budget, guest, and logistics work as ranked next actions instead of an unbounded checklist.",
-    ].filter((label): label is string => Boolean(label)),
-  };
+  return [
+    focusItems.length > 0 ? `Limits active wedding choices to the top ${focusItems.length}.` : "No immediate decision pile-up.",
+    backlogCount > 0 ? `${backlogCount} lower-priority decision${backlogCount === 1 ? "" : "s"} stay in the backlog.` : null,
+    familyLabels.length > 0 ? `Decision load drivers: ${familyLabels.join(", ")}.` : null,
+    "Keeps vendor search, budget, guest, and logistics work as ranked next actions instead of an unbounded checklist.",
+  ].filter((label): label is string => Boolean(label));
 }
 
 export function buildWeddingPersonalOsProjectionState(input: {
@@ -479,6 +483,7 @@ export function buildWeddingPersonalOsProjectionState(input: {
   scheduleItems?: readonly WeddingPlanningScheduleItem[] | null;
   decisionItems?: readonly WeddingDecisionProjectionInput[] | null;
   approvalReceipts?: readonly WeddingPersistedApprovalReceipt[] | null;
+  decisionDeferrals?: readonly WeddingPersistedDecisionDeferral[] | null;
   now?: Date | null;
   limit?: number | null;
   decisionFocusLimit?: number | null;
@@ -486,39 +491,44 @@ export function buildWeddingPersonalOsProjectionState(input: {
   const now = input.now ?? new Date();
   const limit = input.limit ?? 12;
   const decisionFocusLimit = Math.max(1, Math.min(5, Math.trunc(input.decisionFocusLimit ?? 3)));
-  const rankedItems = [
+  const candidateItems = [
     ...(input.taskItems ?? []).map((item) => taskItem(item, now)),
     ...(input.scheduleItems ?? []).map((item) => scheduleItem(item, now)),
     ...(input.decisionItems ?? []).map(decisionItem),
     ...(input.approvalReceipts ?? []).map(approvalItem),
   ]
-    .filter((item): item is WeddingPersonalOsRankedItem => Boolean(item))
-    .filter((item) => item.rankWeight > 0)
-    .sort((left, right) => right.rankWeight - left.rankWeight || left.title.localeCompare(right.title))
-    .slice(0, limit);
-
-  const top = rankedItems[0] ?? null;
-  const fieldEnginePrimaryType = primaryFamily(rankedItems);
-  const fieldEngineSummary = familySummary(fieldEnginePrimaryType, top);
-  const decisionLoadRelief = buildDecisionLoadReliefState(rankedItems, decisionFocusLimit);
-
-  return {
-    hasWeddingPersonalOsSignal: rankedItems.length > 0,
-    summaryLabel: rankedItems.length > 0
-      ? `${rankedItems.length} wedding item${rankedItems.length === 1 ? "" : "s"} ready for PersonalOS ranking`
-      : "No wedding items ready for PersonalOS ranking",
-    fieldEnginePrimaryType,
-    fieldEngineSummary,
-    simulatorSeedSummary: top
-      ? `Use existing simulator as a bounded ${top.simulatorSeedKind} preview seed for ${top.title}.`
-      : null,
-    decisionLoadRelief,
-    rankedItems,
+    .filter((item): item is WeddingPersonalOsRankedItem => Boolean(item));
+  const candidateById = new Map(candidateItems.map((item) => [item.id, item]));
+  const deferredIds = new Set((input.decisionDeferrals ?? [])
+    .filter((deferral) => {
+      if (!suppressDeferredItem(deferral, now)) return false;
+      const currentItem = candidateById.get(deferral.focusItemId);
+      if (!currentItem || !deferral.dependencyFingerprint) return true;
+      return rankedItemDependencyFingerprint(currentItem) === deferral.dependencyFingerprint;
+    })
+    .map((item) => item.focusItemId));
+  const activeItems = candidateItems
+    .filter((item) => !deferredIds.has(item.id))
+    .filter((item) => item.rankWeight > 0);
+  const genericProjection = buildContinuityPersonalOsProjectionState({
+    items: activeItems,
+    limit,
+    decisionFocusLimit,
+    summarySubject: "wedding",
+    familySummary,
+    decisionLoadCandidate,
+    decisionLoadReliefLabels,
     guardrailLabels: [
       "Uses existing PersonalOS field engine and simulator only.",
       "Does not create a wedding-specific field engine or simulator.",
       "Does not infer booking, payment, lodgement, availability, or legal compliance.",
       "Demo, ignored, archived, and unsourced speculative items should not outrank actionable wedding evidence.",
     ],
+  });
+
+  const { hasSignal, ...projection } = genericProjection;
+  return {
+    ...projection,
+    hasWeddingPersonalOsSignal: hasSignal,
   };
 }

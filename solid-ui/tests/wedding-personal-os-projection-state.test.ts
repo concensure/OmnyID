@@ -4,7 +4,10 @@ import test from "node:test";
 import { buildWeddingOutreachEscalationState } from "../src/lib/weddingOutreachEscalationState.ts";
 import { buildWeddingPersonalOsProjectionState } from "../src/lib/weddingPersonalOsProjectionState.ts";
 import type { WeddingDecisionProjectionInput } from "../src/lib/weddingDecisionAfpProjectionState.ts";
-import type { WeddingPersistedApprovalReceipt } from "../src/lib/weddingPersistedWorkspaceState.ts";
+import type {
+  WeddingPersistedApprovalReceipt,
+  WeddingPersistedDecisionDeferral,
+} from "../src/lib/weddingPersistedWorkspaceState.ts";
 
 const now = new Date("2026-09-13T10:00:00.000Z");
 
@@ -119,6 +122,169 @@ test("wedding PersonalOS projection counts only usable selected-decision source 
 
   assert.equal(state.rankedItems[0]?.kind, "decision");
   assert.ok(!state.rankedItems[0]?.evidenceLabels.some((label) => /source url/i.test(label)));
+});
+
+test("wedding PersonalOS projection keeps deferred focus items out of the immediate list", () => {
+  const deferrals: WeddingPersistedDecisionDeferral[] = [{
+    id: "wedding_decision_deferral:workspace:task-weather-backup",
+    focusItemId: "task:weather-backup",
+    focusItemKind: "task",
+    title: "Confirm wet-weather backup for Harbour House",
+    pressureFamily: "attention",
+    sourceSurface: "tasks",
+    dueLabel: "Before deposit",
+    dueAt: "2026-09-25T09:00:00.000Z",
+    explanation: "The couple chose to decide this later.",
+    evidenceLabels: ["Smart Action"],
+    createdAt: "2026-09-13T10:00:00.000Z",
+    metadataLabels: ["deferred decision"],
+  }];
+  const state = buildWeddingPersonalOsProjectionState({
+    now,
+    decisionDeferrals: deferrals,
+    taskItems: [{
+      id: "weather-backup",
+      title: "Confirm wet-weather backup for Harbour House",
+      kind: "vendor_follow_up",
+      dueAt: "2026-09-14T09:00:00.000Z",
+      dueLabel: "Before deposit",
+      priority: "high",
+      reviewStatus: "accepted",
+      approvalState: "draft",
+      metadata: {
+        second_order_task: true,
+        second_order_loop: "weather_backup",
+        second_order_evidence_labels: ["selected venue"],
+      },
+    }, {
+      id: "catering-count",
+      title: "Confirm final catering count",
+      kind: "vendor_follow_up",
+      dueAt: "2026-09-14T09:00:00.000Z",
+      dueLabel: "Tomorrow",
+      priority: "high",
+      reviewStatus: "accepted",
+      approvalState: "draft",
+    }],
+  });
+
+  assert.equal(state.rankedItems.some((item) => item.id === "task:weather-backup"), false);
+  assert.equal(state.rankedItems.some((item) => item.id === "task:catering-count"), true);
+  assert.equal(state.decisionLoadRelief.focusItems.some((item) => item.id === "task:weather-backup"), false);
+});
+
+test("wedding PersonalOS projection resurfaces deferred items when due soon", () => {
+  const state = buildWeddingPersonalOsProjectionState({
+    now,
+    decisionDeferrals: [{
+      id: "wedding_decision_deferral:workspace:task-weather-backup",
+      focusItemId: "task:weather-backup",
+      focusItemKind: "task",
+      title: "Confirm wet-weather backup for Harbour House",
+      pressureFamily: "attention",
+      sourceSurface: "tasks",
+      dueLabel: "Tomorrow",
+      dueAt: "2026-09-14T09:00:00.000Z",
+      explanation: "The couple chose to decide this later.",
+      evidenceLabels: ["Smart Action"],
+      createdAt: "2026-09-13T08:00:00.000Z",
+      metadataLabels: ["deferred decision"],
+    }],
+    taskItems: [{
+      id: "weather-backup",
+      title: "Confirm wet-weather backup for Harbour House",
+      kind: "vendor_follow_up",
+      dueAt: "2026-09-14T09:00:00.000Z",
+      dueLabel: "Tomorrow",
+      priority: "high",
+      reviewStatus: "accepted",
+      approvalState: "draft",
+      metadata: {
+        second_order_task: true,
+        second_order_loop: "weather_backup",
+        second_order_evidence_labels: ["selected venue"],
+      },
+    }],
+  });
+
+  assert.equal(state.rankedItems.some((item) => item.id === "task:weather-backup"), true);
+  assert.equal(state.decisionLoadRelief.focusItems.some((item) => item.id === "task:weather-backup"), true);
+});
+
+test("wedding PersonalOS projection resurfaces deferred items when evidence changes", () => {
+  const state = buildWeddingPersonalOsProjectionState({
+    now,
+    decisionDeferrals: [{
+      id: "wedding_decision_deferral:workspace:task-weather-backup",
+      focusItemId: "task:weather-backup",
+      focusItemKind: "task",
+      title: "Confirm wet-weather backup for Harbour House",
+      pressureFamily: "attention",
+      sourceSurface: "tasks",
+      dueLabel: "Before deposit",
+      dueAt: "2026-09-25T09:00:00.000Z",
+      explanation: "The couple chose to decide this later.",
+      evidenceLabels: ["Smart Action"],
+      createdAt: "2026-09-13T08:00:00.000Z",
+      deferredUntilAt: "2026-09-22T09:00:00.000Z",
+      staleAfterAt: "2026-09-20T08:00:00.000Z",
+      dependencyFingerprint: "older-evidence-fingerprint",
+      metadataLabels: ["deferred decision"],
+    }],
+    taskItems: [{
+      id: "weather-backup",
+      title: "Confirm wet-weather backup for Harbour House",
+      kind: "vendor_follow_up",
+      dueAt: "2026-09-25T09:00:00.000Z",
+      dueLabel: "Before deposit",
+      priority: "high",
+      reviewStatus: "accepted",
+      approvalState: "draft",
+      metadata: {
+        second_order_task: true,
+        second_order_loop: "weather_backup",
+        second_order_evidence_labels: ["new venue note added"],
+      },
+    }],
+  });
+
+  assert.equal(state.rankedItems.some((item) => item.id === "task:weather-backup"), true);
+  assert.equal(state.decisionLoadRelief.focusItems.some((item) => item.id === "task:weather-backup"), true);
+});
+
+test("wedding PersonalOS projection resurfaces stale deferrals without due dates", () => {
+  const state = buildWeddingPersonalOsProjectionState({
+    now,
+    decisionDeferrals: [{
+      id: "wedding_decision_deferral:workspace:task-photographer",
+      focusItemId: "task:photographer",
+      focusItemKind: "task",
+      title: "Choose photographer",
+      pressureFamily: "opportunity",
+      sourceSurface: "tasks",
+      dueLabel: null,
+      dueAt: null,
+      explanation: "The couple chose to decide this later.",
+      evidenceLabels: ["vendor search freshness"],
+      createdAt: "2026-09-05T08:00:00.000Z",
+      metadataLabels: ["deferred decision"],
+    }],
+    taskItems: [{
+      id: "photographer",
+      title: "Choose photographer",
+      kind: "vendor_follow_up",
+      priority: "high",
+      reviewStatus: "accepted",
+      approvalState: "draft",
+      metadata: {
+        second_order_task: true,
+        second_order_loop: "vendor_search",
+        second_order_evidence_labels: ["vendor search freshness"],
+      },
+    }],
+  });
+
+  assert.equal(state.rankedItems.some((item) => item.id === "task:photographer"), true);
 });
 
 test("wedding PersonalOS projection redacts imported selected-decision private source evidence", () => {
@@ -472,7 +638,7 @@ test("wedding PersonalOS projection narrows decision-heavy work into a bounded f
   assert.equal(state.decisionLoadRelief.focusLimit, 2);
   assert.equal(state.decisionLoadRelief.focusItems.length, 2);
   assert.equal(state.decisionLoadRelief.backlogCount, 1);
-  assert.match(state.decisionLoadRelief.summaryLabel, /Focus on 2 wedding decisions now; 1 can wait/);
+  assert.match(state.decisionLoadRelief.summaryLabel, /2 things need your attention; 1 can wait/);
   assert.ok(state.decisionLoadRelief.focusItems.some((item) => /Decide final caterer headcount|Verify venue balance/i.test(item.title)));
   assert.equal(state.decisionLoadRelief.focusItems.some((item) => /Pack emergency kit/i.test(item.title)), false);
   assert.ok(state.decisionLoadRelief.reliefLabels.some((label) => /unbounded checklist/i.test(label)));
