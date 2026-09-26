@@ -490,6 +490,7 @@ Current status: production-ready locally, with larger-workspace calibration stil
 - Phase 4 now has mixed `knowledge_link` / `relation_link` topology retrieval, follow-up-chain grouping, PARA grouping, object/entity grouping, source-message and source-attachment grouping, open-question grouping, file-ledger/file-path participation, and decay/resurfacing ranking.
 - Phase 5 now has snapshot-first projection objectives, topology-neighborhood projection context, proactive strategic policy, approval/surface policy metadata, suggestion bundles, parented `provenance_record` companions, and runtime storage for action-driving proactive provenance.
 - Wedding planner projection queue and PersonalOS projection adapters now reuse the generic continuity projection state instead of carrying separate queue/ranking logic.
+- Production hardening now dedupes shared continuity projection queues, dedupes shared PersonalOS ranked items before pressure/backlog calculations, normalizes proactive suggestion source refs/counts, defers evidence-free proactive surfacing, guards stale topology fan-out, and keeps sparse calibration histories conservative.
 - verification status: focused Rust provenance/bundle/storage tests, broader Rust tests, typecheck, focused continuity trend tests with larger-history calibration coverage, wedding UI tests, and local opt-in Postgres smoke are green after these passes.
 
 Release validation commands already exercised locally:
@@ -505,7 +506,8 @@ Release validation commands already exercised locally:
 
 What remains incomplete or calibration-sensitive:
 
-- thresholds and resurfacing weights now have conservative UI calibration visibility plus sample-volatility, sparse-coverage, bounded topology fan-out, active-anchor prioritization, and evidence-aware proactive surfacing review, but still need tuning against larger real-world workspaces
+- thresholds and resurfacing weights now have conservative UI calibration visibility plus sample-volatility, sparse-coverage gating, bounded topology fan-out, stale-fanout ranking guards, active-anchor prioritization, and evidence-aware proactive surfacing review, but still need tuning against larger real-world workspaces
 - A2UI now has compact proactive provenance/policy summaries, watcher-signal chips, and continuity trend bars
 - escalation uses bounded thresholds, but those thresholds are still static and not yet personalized by user profile or longer-horizon behavioral calibration
 - opt-in live database smoke coverage passed against local compose Postgres; rerun against the deployed Postgres path before final release sign-off if that differs from local compose
+- deployed telemetry/replay calibration is still needed to compare production workspace distributions against the conservative local fixtures before raising surface intensity or enabling personalization
