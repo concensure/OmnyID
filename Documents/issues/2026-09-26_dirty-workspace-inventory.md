@@ -1,15 +1,15 @@
 ﻿# Dirty Workspace Inventory - 2026-09-26
 
-Generated after the wedding planner hardening commits and Oracle staging prerequisite commits. This inventory excludes this inventory file itself so the report does not self-reference while being updated.
+Generated after the wedding planner hardening commits and Oracle runtime-contract prerequisite commits. This inventory excludes this inventory file itself so the report does not self-reference while being updated.
 
-Total dirty entries excluding this file: 2130
+Total dirty entries excluding this file: 2120
 
 ## Summary
 
 - Modified/type-changed tracked: 205
 - Deleted tracked: 9
 - Renamed/copied tracked: 0
-- Untracked: 1916
+- Untracked: 1906
 - Other: 0
 
 ## Modified / Type-Changed Tracked Files
@@ -604,18 +604,13 @@ scripts/frontend-correctness.sh
 scripts/migrate-env-secrets-to-files.ps1
 scripts/nemotron-lora-train.sh
 scripts/omnyid-backup-verify-selftest.sh
-scripts/omnyid-backup-verify.sh
-scripts/omnyid-migrations-plan.sh
 scripts/omnyid-prune-daemon-heartbeats-selftest.sh
-scripts/omnyid-prune-daemon-heartbeats.sh
 scripts/omnyid-prune-operational-history.sh
 scripts/omnyid-prune-synthetic-message-spam-selftest.sh
 scripts/omnyid-prune-synthetic-message-spam.sh
 scripts/omnyid-restore-drill-selftest.sh
-scripts/omnyid-restore-drill.sh
 scripts/omnyid-restore-selftest.sh
 scripts/oracle-production-proof-pwsh-selftest.ps1
-scripts/oracle-production-proof.ps1
 scripts/oracle-prune-daemon-heartbeats-pwsh-selftest.ps1
 scripts/oracle-prune-daemon-heartbeats.ps1
 scripts/oracle-prune-operational-history-pwsh-selftest.ps1
@@ -623,7 +618,6 @@ scripts/oracle-prune-operational-history.ps1
 scripts/oracle-prune-synthetic-message-spam-pwsh-selftest.ps1
 scripts/oracle-prune-synthetic-message-spam.ps1
 scripts/oracle-remediate-electric-slot-pwsh-selftest.ps1
-scripts/oracle-remediate-electric-slot.ps1
 scripts/oracle-remediation-sequence-pwsh-selftest.ps1
 scripts/oracle-remediation-sequence.ps1
 scripts/oracle-runtime-cleanup-execute-pwsh-selftest.ps1
@@ -659,7 +653,6 @@ scripts/release-readiness-selftest.sh
 scripts/release-readiness.ps1
 scripts/release-readiness.sh
 scripts/runpod-autopilot.sh
-scripts/runtime-env-entrypoint.sh
 scripts/rust-correctness.ps1
 scripts/rust-correctness.sh
 scripts/rust-hygiene-baseline.env
@@ -671,12 +664,9 @@ scripts/rust-hygiene.ps1
 scripts/rust-hygiene.sh
 scripts/start-semantic-omnyid.ps1
 scripts/start-training.sh
-scripts/startup-policy-check.ps1
-scripts/startup-policy-check.sh
 scripts/storage-hygiene-report-pwsh-selftest.ps1
 scripts/storage-hygiene-report.ps1
 scripts/test_backends.py
-scripts/verify-deployment.sh
 skills/
 solid-ui/_tmp_shoot.mjs
 solid-ui/public/favicon.svg
