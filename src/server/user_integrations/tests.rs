@@ -320,10 +320,7 @@ fn alias_routes_sanitize_unexpected_database_errors() {
     let change_start = source
         .find("async fn alias_change_http(")
         .expect("alias_change_http exists");
-    let change_end = source[change_start..]
-        .find("\n#[cfg(test)]")
-        .map(|offset| change_start + offset)
-        .expect("test module follows alias_change_http");
+    let change_end = source.len();
     let change_source = &source[change_start..change_end];
     assert!(change_source.contains("internal_http_error(e)"));
     assert!(!change_source.contains("(StatusCode::INTERNAL_SERVER_ERROR, msg)"));
