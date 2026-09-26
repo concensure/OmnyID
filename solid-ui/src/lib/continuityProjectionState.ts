@@ -214,6 +214,17 @@ function defaultDecisionLoadCandidate(item: ContinuityRankedItem): boolean {
   return item.evidenceLabels.some((label) => /decision|shortlist|quote|payment|review|verification/i.test(label));
 }
 
+function dedupeRankedItems<TItem extends ContinuityRankedItem>(
+  items: readonly TItem[],
+): TItem[] {
+  const byId = new Map<string, TItem>();
+  for (const item of items) {
+    const existing = byId.get(item.id);
+    if (!existing || item.rankWeight > existing.rankWeight) byId.set(item.id, item);
+  }
+  return [...byId.values()];
+}
+
 export function buildContinuityPersonalOsProjectionState<TItem extends ContinuityRankedItem>(input: {
   items: readonly TItem[];
   limit?: number | null;
@@ -227,8 +238,7 @@ export function buildContinuityPersonalOsProjectionState<TItem extends Continuit
   const limit = input.limit ?? 12;
   const subject = input.summarySubject?.trim() || "continuity";
   const decisionFocusLimit = Math.max(1, Math.min(5, Math.trunc(input.decisionFocusLimit ?? 3)));
-  const rankedItems = [...input.items]
-    .filter((item) => item.rankWeight > 0)
+  const rankedItems = dedupeRankedItems(input.items.filter((item) => item.rankWeight > 0))
     .sort((left, right) => right.rankWeight - left.rankWeight || left.title.localeCompare(right.title))
     .slice(0, limit);
   const top = rankedItems[0] ?? null;

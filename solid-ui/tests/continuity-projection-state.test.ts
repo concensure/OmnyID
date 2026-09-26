@@ -183,3 +183,61 @@ test("buildContinuityPersonalOsProjectionState ranks pressure and limits decisio
   assert.equal(projection.decisionLoadRelief.focusItems.length, 1);
   assert.match(projection.simulatorSeedSummary ?? "", /bounded context preview seed/);
 });
+
+test("buildContinuityPersonalOsProjectionState dedupes ranked items before focus counts", () => {
+  const items: ContinuityRankedItem[] = [
+    {
+      id: "decision:venue",
+      kind: "decision",
+      title: "Review old venue shortlist",
+      pressureFamily: "knowledge",
+      rankWeight: 20,
+      dueLabel: null,
+      dueAt: null,
+      explanation: "Older duplicate.",
+      evidenceLabels: ["decision"],
+      sourceSurface: "decision_queue",
+      simulatorSeedKind: "context",
+    },
+    {
+      id: "decision:venue",
+      kind: "decision",
+      title: "Review current venue shortlist",
+      pressureFamily: "knowledge",
+      rankWeight: 45,
+      dueLabel: null,
+      dueAt: null,
+      explanation: "Current duplicate.",
+      evidenceLabels: ["decision"],
+      sourceSurface: "decision_queue",
+      simulatorSeedKind: "context",
+    },
+    {
+      id: "decision:catering",
+      kind: "decision",
+      title: "Verify catering quote",
+      pressureFamily: "knowledge",
+      rankWeight: 30,
+      dueLabel: null,
+      dueAt: null,
+      explanation: "Needs review.",
+      evidenceLabels: ["quote"],
+      sourceSurface: "decision_queue",
+      simulatorSeedKind: "context",
+    },
+  ];
+
+  const projection = buildContinuityPersonalOsProjectionState({
+    items,
+    summarySubject: "wedding",
+    decisionFocusLimit: 1,
+  });
+
+  assert.deepEqual(projection.rankedItems.map((item) => item.title), [
+    "Review current venue shortlist",
+    "Verify catering quote",
+  ]);
+  assert.equal(projection.decisionLoadRelief.focusItems.length, 1);
+  assert.equal(projection.decisionLoadRelief.backlogCount, 1);
+  assert.equal(projection.summaryLabel, "2 wedding items ready for PersonalOS ranking");
+});
