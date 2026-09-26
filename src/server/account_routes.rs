@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.account-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -8,6 +8,8 @@
 
 use super::*;
 
+const MAX_SUPPORT_ACCESS_REASON_LEN: usize = 500;
+
 fn account_user_facing_text(
     text: &str,
     active_persona: Option<&crate::agent_personas::AgentPersona>,
@@ -15,6 +17,28 @@ fn account_user_facing_text(
     active_persona
         .map(|persona| crate::agent_personas::restyle_user_facing_text(text, persona))
         .unwrap_or_else(|| text.to_string())
+}
+
+fn clean_support_access_reason(
+    value: Option<&str>,
+    required: bool,
+) -> Result<Option<String>, (StatusCode, String)> {
+    let reason = value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            value
+                .chars()
+                .take(MAX_SUPPORT_ACCESS_REASON_LEN)
+                .collect::<String>()
+        });
+    if required && reason.is_none() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "support access reason is required".to_string(),
+        ));
+    }
+    Ok(reason)
 }
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
@@ -187,17 +211,8 @@ async fn update_support_access_http(
                     "support access duration must be 1, 4, or 24 hours".to_string(),
                 ));
             }
-            let reason = request
-                .reason
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .ok_or_else(|| {
-                    (
-                        StatusCode::BAD_REQUEST,
-                        "support access reason is required".to_string(),
-                    )
-                })?;
+            let reason = clean_support_access_reason(request.reason.as_deref(), true)?
+                .expect("required support reason");
             let access_scope = request
                 .access_scope
                 .as_deref()
@@ -216,7 +231,7 @@ async fn update_support_access_http(
                 .create_support_access_grant(
                     &user.id,
                     access_scope,
-                    Some(reason),
+                    Some(&reason),
                     &expires_at,
                     notes,
                 )
@@ -230,11 +245,7 @@ async fn update_support_access_http(
                 .db
                 .revoke_active_support_access(
                     &user.id,
-                    request
-                        .reason
-                        .as_deref()
-                        .map(str::trim)
-                        .filter(|value| !value.is_empty()),
+                    clean_support_access_reason(request.reason.as_deref(), false)?.as_deref(),
                 )
                 .await
                 .map_err(internal_error)
@@ -320,4 +331,34 @@ async fn account_delete_http(
             active_persona.as_ref(),
         )
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MAX_SUPPORT_ACCESS_REASON_LEN, clean_support_access_reason};
+
+    #[test]
+    fn support_access_reason_is_required_for_grants() {
+        assert!(clean_support_access_reason(None, true).is_err());
+        assert!(clean_support_access_reason(Some("   "), true).is_err());
+    }
+
+    #[test]
+    fn support_access_reason_is_trimmed_and_bounded() {
+        assert_eq!(
+            clean_support_access_reason(Some(" debug runtime "), true).expect("reason"),
+            Some("debug runtime".to_string())
+        );
+        let reason = clean_support_access_reason(
+            Some(&"x".repeat(MAX_SUPPORT_ACCESS_REASON_LEN + 50)),
+            true,
+        )
+        .expect("bounded")
+        .expect("reason");
+        assert_eq!(reason.len(), MAX_SUPPORT_ACCESS_REASON_LEN);
+        assert_eq!(
+            clean_support_access_reason(Some(" "), false).expect("optional"),
+            None
+        );
+    }
 }
