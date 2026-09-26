@@ -931,11 +931,13 @@ async fn alias_change_http(
 
     // Pre-flight cooldown check so we can return a helpful next_change_at date
     let last_changed =
-        chrono::DateTime::parse_from_rfc3339(&existing.last_changed_at).map_err(|_| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Invalid timestamp in alias record.".into(),
-            )
+        chrono::DateTime::parse_from_rfc3339(&existing.last_changed_at).map_err(|err| {
+            tracing::error!(
+                error = %err,
+                user_id = %user.id,
+                "alias record has invalid last_changed_at timestamp"
+            );
+            internal_http_error(err)
         })?;
     let next_allowed = last_changed + chrono::Duration::days(30);
     if chrono::Utc::now() < next_allowed {

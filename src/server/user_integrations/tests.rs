@@ -323,5 +323,8 @@ fn alias_routes_sanitize_unexpected_database_errors() {
     let change_end = source.len();
     let change_source = &source[change_start..change_end];
     assert!(change_source.contains("internal_http_error(e)"));
+    assert!(change_source.contains("alias record has invalid last_changed_at timestamp"));
+    assert!(change_source.contains("internal_http_error(err)"));
+    assert!(!change_source.contains("\"Invalid timestamp in alias record.\""));
     assert!(!change_source.contains("(StatusCode::INTERNAL_SERVER_ERROR, msg)"));
 }
