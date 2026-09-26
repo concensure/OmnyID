@@ -1,6 +1,6 @@
 ﻿# Dirty Workspace Inventory - 2026-09-26
 
-Generated after the wedding planner hardening, clean frontend/backend build dependency commits, and Oracle deployment preparation. This inventory excludes this inventory file itself so the report does not self-reference while being updated.
+Generated after wedding planner hardening, Oracle deployment/build commits, and proof collection. This inventory excludes this inventory file itself so the report does not self-reference while being updated.
 
 Total dirty entries excluding this file: 1377
 
@@ -141,7 +141,7 @@ Total dirty entries excluding this file: 1377
  M solid-ui/src/main.tsx
  M solid-ui/tsconfig.json
  M solid-ui/vite.config.ts
- M src/server/user_integrations/tests.rs
+ M src/server/health.rs
  M "to do.txt"
  M typescript-sdk/package.json
  M typescript-sdk/src/index.ts
