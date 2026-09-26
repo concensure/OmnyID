@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.news-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -7,6 +7,103 @@
  */
 
 use super::*;
+
+const MAX_NEWS_LABEL_LEN: usize = 200;
+const MAX_NEWS_LOCALITY_LEN: usize = 160;
+const MAX_NEWS_GOAL_ID_LEN: usize = 128;
+const MAX_NEWS_ROUTE_ID_LEN: usize = 128;
+const MAX_NEWS_CATEGORIES: usize = 20;
+const MAX_NEWS_SOURCES: usize = 20;
+const MAX_NEWS_FEED_LIMIT: i64 = 100;
+const DEFAULT_NEWS_FEED_LIMIT: i64 = 30;
+
+fn news_feed_limit(value: Option<&str>) -> i64 {
+    value
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .unwrap_or(DEFAULT_NEWS_FEED_LIMIT)
+        .clamp(1, MAX_NEWS_FEED_LIMIT)
+}
+
+fn news_required_text(
+    value: Option<&str>,
+    field: &str,
+    max_len: usize,
+) -> Result<String, (StatusCode, String)> {
+    let value = value.unwrap_or("").trim();
+    if value.is_empty() || value.len() > max_len {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("{field} must be 1-{max_len} characters"),
+        ));
+    }
+    Ok(value.to_string())
+}
+
+fn news_optional_text(
+    value: Option<&str>,
+    max_len: usize,
+) -> Result<Option<String>, (StatusCode, String)> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            if value.len() > max_len {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    format!("value must be 1-{max_len} characters"),
+                ));
+            }
+            Ok(value.to_string())
+        })
+        .transpose()
+}
+
+fn news_route_id(value: &str, field: &str) -> Result<String, (StatusCode, String)> {
+    let value = news_required_text(Some(value), field, MAX_NEWS_ROUTE_ID_LEN)?;
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | ':' | '.'))
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("{field} contains unsupported characters"),
+        ));
+    }
+    Ok(value)
+}
+
+fn bounded_json_array(
+    body: &Value,
+    field: &str,
+    max_len: usize,
+) -> Result<Value, (StatusCode, String)> {
+    let Some(value) = body.get(field) else {
+        return Ok(json!([]));
+    };
+    let Some(items) = value.as_array() else {
+        return Err((StatusCode::BAD_REQUEST, format!("{field} must be an array")));
+    };
+    if items.len() > max_len {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("{field} can include at most {max_len} items"),
+        ));
+    }
+    Ok(Value::Array(items.clone()))
+}
+
+fn serialize_bounded_json_array(
+    body: &Value,
+    field: &str,
+    max_len: usize,
+) -> Result<String, (StatusCode, String)> {
+    serde_json::to_string(&bounded_json_array(body, field, max_len)?).map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to encode news array".to_string(),
+        )
+    })
+}
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -77,13 +174,7 @@ async fn create_channel_http(
     let user = authenticated_user(&state.db, &headers).await?;
     let channel_id = Ulid::new().to_string();
 
-    let label = body["label"].as_str().unwrap_or("").trim().to_string();
-    if label.is_empty() || label.len() > 200 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "label must be 1â€“200 characters".to_string(),
-        ));
-    }
+    let label = news_required_text(body["label"].as_str(), "label", MAX_NEWS_LABEL_LEN)?;
     let granularity = body["granularity"]
         .as_str()
         .unwrap_or("summaries")
@@ -101,26 +192,12 @@ async fn create_channel_http(
             "frequency must be realtime, daily, or weekly".to_string(),
         ));
     }
-    if body
-        .get("sources")
-        .and_then(|v| v.as_array())
-        .map_or(false, |a| a.len() > 20)
-    {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "at most 20 RSS sources allowed".to_string(),
-        ));
-    }
-
-    let categories = serde_json::to_string(body.get("categories").unwrap_or(&json!([])))
-        .unwrap_or_else(|_| "[]".to_string());
-    let locality = body["locality"]
-        .as_str()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
-    let sources = serde_json::to_string(body.get("sources").unwrap_or(&json!([])))
-        .unwrap_or_else(|_| "[]".to_string());
-    let goal_id = body["goal_id"].as_str().map(|s| s.to_string());
+    let categories_value = bounded_json_array(&body, "categories", MAX_NEWS_CATEGORIES)?;
+    let sources_value = bounded_json_array(&body, "sources", MAX_NEWS_SOURCES)?;
+    let categories = serialize_bounded_json_array(&body, "categories", MAX_NEWS_CATEGORIES)?;
+    let locality = news_optional_text(body["locality"].as_str(), MAX_NEWS_LOCALITY_LEN)?;
+    let sources = serialize_bounded_json_array(&body, "sources", MAX_NEWS_SOURCES)?;
+    let goal_id = news_optional_text(body["goal_id"].as_str(), MAX_NEWS_GOAL_ID_LEN)?;
 
     if let Some(ref gid) = goal_id {
         let exists_row = sqlx::query(
@@ -160,11 +237,11 @@ async fn create_channel_http(
     Ok(Json(json!({
         "channel_id": channel_id,
         "label": label,
-        "categories": body.get("categories").cloned().unwrap_or(json!([])),
+        "categories": categories_value,
         "locality": locality,
         "granularity": granularity,
         "frequency": frequency,
-        "sources": body.get("sources").cloned().unwrap_or(json!([])),
+        "sources": sources_value,
         "goal_id": goal_id,
         "enabled": true,
         "created_at": now.to_rfc3339(),
@@ -178,13 +255,14 @@ async fn update_channel_http(
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let channel_id = news_route_id(&channel_id, "channel_id")?;
 
     if let Some(lbl) = body["label"].as_str() {
         let trimmed = lbl.trim();
-        if trimmed.is_empty() || trimmed.len() > 200 {
+        if trimmed.is_empty() || trimmed.len() > MAX_NEWS_LABEL_LEN {
             return Err((
                 StatusCode::BAD_REQUEST,
-                "label must be 1â€“200 characters".to_string(),
+                format!("label must be 1-{MAX_NEWS_LABEL_LEN} characters"),
             ));
         }
     }
@@ -204,32 +282,20 @@ async fn update_channel_http(
             ));
         }
     }
-    if body
-        .get("sources")
-        .and_then(|v| v.as_array())
-        .map_or(false, |a| a.len() > 20)
-    {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "at most 20 RSS sources allowed".to_string(),
-        ));
-    }
-
     let label = body["label"].as_str().map(|s| s.trim().to_string());
     let granularity = body["granularity"].as_str().map(|s| s.to_string());
     let frequency = body["frequency"].as_str().map(|s| s.to_string());
-    let locality = body["locality"]
-        .as_str()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
+    let locality = news_optional_text(body["locality"].as_str(), MAX_NEWS_LOCALITY_LEN)?;
     let enabled = body["enabled"].as_bool();
     let categories_json = body
         .get("categories")
-        .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
+        .map(|_| serialize_bounded_json_array(&body, "categories", MAX_NEWS_CATEGORIES))
+        .transpose()?;
     let sources_json = body
         .get("sources")
-        .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
-    let goal_id = body["goal_id"].as_str().map(|s| s.to_string());
+        .map(|_| serialize_bounded_json_array(&body, "sources", MAX_NEWS_SOURCES))
+        .transpose()?;
+    let goal_id = news_optional_text(body["goal_id"].as_str(), MAX_NEWS_GOAL_ID_LEN)?;
 
     if let Some(ref gid) = goal_id {
         let exists_row = sqlx::query(
@@ -282,6 +348,7 @@ async fn delete_channel_http(
     Path(channel_id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let channel_id = news_route_id(&channel_id, "channel_id")?;
     sqlx::query("DELETE FROM news_subscriptions WHERE channel_id = $1 AND user_id = $2")
         .bind(&channel_id)
         .bind(&user.id)
@@ -299,6 +366,7 @@ async fn get_channel_feed_http(
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let channel_id = news_route_id(&channel_id, "channel_id")?;
     let exists_row = sqlx::query(
         "SELECT EXISTS(SELECT 1 FROM news_subscriptions WHERE channel_id = $1 AND user_id = $2) as e"
     )
@@ -314,11 +382,7 @@ async fn get_channel_feed_http(
         return Err((StatusCode::NOT_FOUND, "channel not found".to_string()));
     }
 
-    let limit: i64 = params
-        .get("limit")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(30)
-        .min(100);
+    let limit = news_feed_limit(params.get("limit").map(String::as_str));
     let rows = sqlx::query(
         "SELECT id, url, headline, summary, source_name,
                 published_at::text as published_at, reading_time_min,
@@ -368,6 +432,7 @@ async fn dismiss_item_http(
     Path(item_id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let item_id = news_route_id(&item_id, "item_id")?;
     sqlx::query(
         "UPDATE news_items ni SET dismissed = true
          FROM news_subscriptions ns
@@ -391,6 +456,7 @@ async fn save_item_to_knowledge_http(
     Path(item_id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let item_id = news_route_id(&item_id, "item_id")?;
 
     let updated_row = sqlx::query(
         "UPDATE news_items ni SET saved_to_knowledge = true
@@ -410,4 +476,64 @@ async fn save_item_to_knowledge_http(
     }
 
     Ok(Json(json!({ "ok": true })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn news_feed_limit_is_bounded() {
+        assert_eq!(news_feed_limit(None), DEFAULT_NEWS_FEED_LIMIT);
+        assert_eq!(news_feed_limit(Some("-20")), 1);
+        assert_eq!(news_feed_limit(Some("500")), MAX_NEWS_FEED_LIMIT);
+        assert_eq!(news_feed_limit(Some("bad")), DEFAULT_NEWS_FEED_LIMIT);
+    }
+
+    #[test]
+    fn news_route_ids_are_trimmed_and_bounded() {
+        assert_eq!(
+            news_route_id(" 01JNEWSCHANNEL ", "channel_id").expect("valid channel id"),
+            "01JNEWSCHANNEL"
+        );
+        assert!(news_route_id("../escape", "channel_id").is_err());
+        assert!(news_route_id(&"x".repeat(MAX_NEWS_ROUTE_ID_LEN + 1), "item_id").is_err());
+    }
+
+    #[test]
+    fn news_text_fields_are_trimmed_and_bounded() {
+        assert_eq!(
+            news_required_text(Some(" Local brief "), "label", MAX_NEWS_LABEL_LEN)
+                .expect("valid label"),
+            "Local brief"
+        );
+        assert!(news_required_text(Some(" "), "label", MAX_NEWS_LABEL_LEN).is_err());
+        assert!(
+            news_optional_text(
+                Some(&"x".repeat(MAX_NEWS_LOCALITY_LEN + 1)),
+                MAX_NEWS_LOCALITY_LEN
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn news_json_arrays_are_type_checked_and_bounded() {
+        let body = json!({ "categories": ["ai"], "sources": ["https://example.com/feed"] });
+        assert_eq!(
+            bounded_json_array(&body, "categories", MAX_NEWS_CATEGORIES).expect("array"),
+            json!(["ai"])
+        );
+        assert!(
+            bounded_json_array(&json!({ "sources": "rss" }), "sources", MAX_NEWS_SOURCES).is_err()
+        );
+        assert!(
+            bounded_json_array(
+                &json!({ "sources": vec!["x"; MAX_NEWS_SOURCES + 1] }),
+                "sources",
+                MAX_NEWS_SOURCES
+            )
+            .is_err()
+        );
+    }
 }
