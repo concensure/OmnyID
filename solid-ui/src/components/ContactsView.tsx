@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ContactEditControls } from "@/components/ContactEditControls";
 import { ContactRoleChips, ContactRoleInput } from "@/components/ContactRoleControls";
 import { loadContacts, saveContacts, type Contact } from "@/lib/contactsLocalState";
+import { findDuplicateContact, replaceContact } from "@/lib/contactManagementState";
 import { removeContactRole } from "@/lib/contactRoleState";
 import {
   buildContactsFailureReceipt,
@@ -130,13 +131,13 @@ export function ContactsView() {
 
   async function addContact() {
     if (!newName().trim()) return;
-    const duplicate = findDuplicateContact({
+    const duplicate = findDuplicateContact(contacts(), {
       name: newName(),
       email: newEmail(),
       phone: newPhone(),
     });
     if (duplicate) {
-      setContactNotice(`${duplicate.name} already looks like this contact. Open the existing contact to update roles or details.`);
+      setContactNotice(`${duplicate.contact.name} already looks like this contact. Open the existing contact to update roles or details.`);
       return;
     }
     setBusy(true);
@@ -190,30 +191,14 @@ export function ContactsView() {
     setContacts(next);
   }
 
-  function normalizeLookup(value: string | undefined): string {
-    return (value ?? "").trim().toLowerCase();
-  }
-
-  function findDuplicateContact(input: { name: string; email?: string; phone?: string }, excludeId?: string): Contact | null {
-    const email = normalizeLookup(input.email);
-    const phone = normalizeLookup(input.phone);
-    const name = normalizeLookup(input.name);
-    return contacts().find((contact) => {
-      if (contact.id === excludeId) return false;
-      if (email && normalizeLookup(contact.email) === email) return true;
-      if (phone && normalizeLookup(contact.phone) === phone) return true;
-      return !email && !phone && name !== "" && normalizeLookup(contact.name) === name;
-    }) ?? null;
-  }
-
   function updateContact(updated: Contact): boolean {
-    const duplicate = findDuplicateContact(updated, updated.id);
+    const duplicate = findDuplicateContact(contacts(), updated, updated.id);
     if (duplicate) {
-      setContactNotice(`${duplicate.name} already uses those contact details. Update that contact instead, or use a different email or phone number.`);
+      setContactNotice(`${duplicate.contact.name} already uses those contact details. Update that contact instead, or use a different email or phone number.`);
       return false;
     }
     setContactNotice(null);
-    saveNextContacts(contacts().map((contact) => contact.id === updated.id ? updated : contact));
+    saveNextContacts(replaceContact(contacts(), updated));
     return true;
   }
 
