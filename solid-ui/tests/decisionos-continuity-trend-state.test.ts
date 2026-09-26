@@ -63,6 +63,7 @@ test("decisionOsContinuityTrendState builds bounded bars from smoothed metrics",
   assert.equal(state.calibrationText, "1 snapshot sample available; keep thresholds conservative.");
   assert.deepEqual(state.calibrationReview, {
     sampleCount: 1,
+    coveragePercent: 100,
     volatility: "insufficient",
     volatileKeys: [],
     peakPercent: 80,
@@ -115,6 +116,7 @@ test("decisionOsContinuityTrendState marks calibration review ready with enough 
       stateSnapshot({
         urgency_acceleration: 0.2 + index * 0.05,
         unresolved_queue_pressure: 0.4,
+        follow_up_drift_score: 0.12,
         recent_signal_count: 2,
       }),
     ),
@@ -124,6 +126,7 @@ test("decisionOsContinuityTrendState marks calibration review ready with enough 
   assert.equal(state.calibrationStatus, "ready");
   assert.equal(state.calibrationText, "5 snapshot samples available for calibration review.");
   assert.equal(state.calibrationReview.volatility, "stable");
+  assert.equal(state.calibrationReview.coveragePercent, 100);
   assert.deepEqual(state.calibrationReview.volatileKeys, []);
   assert.equal(state.calibrationReview.peakPercent, 40);
   assert.equal(state.calibrationReview.note, "Snapshot history is stable enough for calibration review.");
@@ -132,17 +135,18 @@ test("decisionOsContinuityTrendState marks calibration review ready with enough 
 test("decisionOsContinuityTrendState flags volatile calibration history", () => {
   const state = decisionOsContinuityTrendState({
     messages: [
-      stateSnapshot({ urgency_acceleration: 0.05, unresolved_queue_pressure: 0.2, recent_signal_count: 1 }),
-      stateSnapshot({ urgency_acceleration: 0.9, unresolved_queue_pressure: 0.22, recent_signal_count: 4 }),
-      stateSnapshot({ urgency_acceleration: 0.15, unresolved_queue_pressure: 0.25, recent_signal_count: 1 }),
-      stateSnapshot({ urgency_acceleration: 0.84, unresolved_queue_pressure: 0.24, recent_signal_count: 4 }),
-      stateSnapshot({ urgency_acceleration: 0.18, unresolved_queue_pressure: 0.23, recent_signal_count: 2 }),
+      stateSnapshot({ urgency_acceleration: 0.05, unresolved_queue_pressure: 0.2, follow_up_drift_score: 0.1, recent_signal_count: 1 }),
+      stateSnapshot({ urgency_acceleration: 0.9, unresolved_queue_pressure: 0.22, follow_up_drift_score: 0.1, recent_signal_count: 4 }),
+      stateSnapshot({ urgency_acceleration: 0.15, unresolved_queue_pressure: 0.25, follow_up_drift_score: 0.1, recent_signal_count: 1 }),
+      stateSnapshot({ urgency_acceleration: 0.84, unresolved_queue_pressure: 0.24, follow_up_drift_score: 0.1, recent_signal_count: 4 }),
+      stateSnapshot({ urgency_acceleration: 0.18, unresolved_queue_pressure: 0.23, follow_up_drift_score: 0.1, recent_signal_count: 2 }),
     ],
   });
 
   assert.equal(state.calibrationStatus, "ready");
   assert.equal(state.calibrationReview.sampleCount, 5);
   assert.equal(state.calibrationReview.volatility, "spiky");
+  assert.equal(state.calibrationReview.coveragePercent, 100);
   assert.deepEqual(state.calibrationReview.volatileKeys, ["urgency_acceleration"]);
   assert.equal(state.calibrationReview.peakPercent, 90);
   assert.equal(
@@ -166,7 +170,36 @@ test("decisionOsContinuityTrendState handles larger workspace calibration histor
   assert.equal(state.calibrationStatus, "ready");
   assert.equal(state.calibrationReview.sampleCount, 36);
   assert.equal(state.calibrationReview.volatility, "stable");
+  assert.equal(state.calibrationReview.coveragePercent, 100);
   assert.deepEqual(state.calibrationReview.volatileKeys, []);
   assert.equal(state.calibrationReview.peakPercent, 72);
   assert.equal(state.calibrationReview.note, "Snapshot history is stable enough for calibration review.");
+});
+
+test("decisionOsContinuityTrendState keeps larger sparse workspace history conservative", () => {
+  const messages = Array.from({ length: 24 }, (_, index) =>
+    stateSnapshot(index < 16
+      ? {
+        urgency_acceleration: 0.26,
+        recent_signal_count: 8,
+      }
+      : {
+        urgency_acceleration: 0.3,
+        unresolved_queue_pressure: 0.42,
+        follow_up_drift_score: 0.18,
+        recent_signal_count: 11,
+      }),
+  );
+
+  const state = decisionOsContinuityTrendState({ messages });
+
+  assert.equal(state.calibrationStatus, "ready");
+  assert.equal(state.calibrationReview.sampleCount, 24);
+  assert.equal(state.calibrationReview.coveragePercent, 33);
+  assert.equal(state.calibrationReview.volatility, "insufficient");
+  assert.deepEqual(state.calibrationReview.volatileKeys, []);
+  assert.equal(
+    state.calibrationReview.note,
+    "Snapshot history has sparse continuity metric coverage; keep thresholds conservative until newer snapshots dominate.",
+  );
 });

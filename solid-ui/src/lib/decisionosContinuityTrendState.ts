@@ -26,6 +26,7 @@ export type DecisionOsContinuityTrendBar = {
 
 export type DecisionOsContinuityCalibrationReview = {
   sampleCount: number;
+  coveragePercent: number;
   volatility: "insufficient" | "stable" | "variable" | "spiky";
   volatileKeys: DecisionOsContinuityMetricKey[];
   peakPercent: number;
@@ -137,6 +138,7 @@ function calibrationReview(args: {
   if (args.source === "watcher_signals") {
     return {
       sampleCount: 0,
+      coveragePercent: 0,
       volatility: "insufficient",
       volatileKeys: [],
       peakPercent: 0,
@@ -150,22 +152,36 @@ function calibrationReview(args: {
       .map((sample) => finiteNumber(sample[key]))
       .filter((value): value is number => value !== null)
       .map(bounded);
-    if (values.length === 0) return { key, range: 0, peak: 0 };
+    if (values.length === 0) return { key, range: 0, peak: 0, coverage: 0 };
     return {
       key,
       range: Math.max(...values) - Math.min(...values),
       peak: Math.max(...values),
+      coverage: values.length / Math.max(1, args.samples.length),
     };
   });
   const peakPercent = Math.round(Math.max(0, ...ranges.map((entry) => entry.peak)) * 100);
+  const coveragePercent = Math.round(Math.min(...ranges.map((entry) => entry.coverage)) * 100);
 
   if (args.samples.length < 5) {
     return {
       sampleCount: args.samples.length,
+      coveragePercent,
       volatility: "insufficient",
       volatileKeys: [],
       peakPercent,
       note: null,
+    };
+  }
+
+  if (coveragePercent < 60) {
+    return {
+      sampleCount: args.samples.length,
+      coveragePercent,
+      volatility: "insufficient",
+      volatileKeys: [],
+      peakPercent,
+      note: "Snapshot history has sparse continuity metric coverage; keep thresholds conservative until newer snapshots dominate.",
     };
   }
 
@@ -181,6 +197,7 @@ function calibrationReview(args: {
 
   return {
     sampleCount: args.samples.length,
+    coveragePercent,
     volatility,
     volatileKeys,
     peakPercent,
