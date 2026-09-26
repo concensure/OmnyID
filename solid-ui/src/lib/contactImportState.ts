@@ -1,6 +1,7 @@
 ﻿// @locs-version: 1.0
 import type { Contact } from "@/lib/contactsLocalState";
 import { buildContactIdentityKeys, findDuplicateContact } from "@/lib/contactManagementState";
+import { addContactRole } from "@/lib/contactRoleState";
 import type { ResponseQueueRelationship } from "@/lib/responseQueuePolicy";
 
 export type ContactImportSource = "gmail" | "contact_file" | "ai_file";
@@ -9,6 +10,7 @@ export type ContactImportInput = {
   source: ContactImportSource;
   text?: string | null;
   defaultRelationshipKind?: ResponseQueueRelationship | null;
+  defaultRoles?: readonly string[] | null;
   existingContacts?: readonly Contact[] | null;
 };
 
@@ -78,6 +80,7 @@ export function buildContactImportState(input: ContactImportInput): ContactImpor
   const source = input.source;
   const text = clean(input.text) ?? "";
   const defaultRelationshipKind = relationship(input.defaultRelationshipKind);
+  const defaultRoles = (input.defaultRoles ?? []).reduce<string[]>((roles, role) => addContactRole(roles, role), []);
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const sourceBlocks = source === "ai_file" && !/[,@]|\bTEL\b|\bEMAIL\b/i.test(text)
     ? []
@@ -111,6 +114,7 @@ export function buildContactImportState(input: ContactImportInput): ContactImpor
           relationshipKind: defaultRelationshipKind,
           ...(email ? { email } : {}),
           ...(phone ? { phone } : {}),
+          ...(defaultRoles.length > 0 ? { roles: defaultRoles } : {}),
           notes: `Imported from ${labelForSource(source)}.`,
         };
       return {

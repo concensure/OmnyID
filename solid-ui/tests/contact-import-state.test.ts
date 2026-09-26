@@ -7,6 +7,7 @@ test("buildContactImportState imports Gmail or CSV-style contact rows", () => {
   const state = buildContactImportState({
     source: "gmail",
     defaultRelationshipKind: "supplier",
+    defaultRoles: [" vendor ", "wedding VENDOR"],
     text: [
       "Harbour Venue, events@harbour.example, +61 2 9000 0000",
       "Florist Studio <hello@florist.example>",
@@ -18,6 +19,7 @@ test("buildContactImportState imports Gmail or CSV-style contact rows", () => {
   assert.equal(state.importableContacts[0]?.relationshipKind, "supplier");
   assert.equal(state.importableContacts[0]?.email, "events@harbour.example");
   assert.equal(state.importableContacts[0]?.phone, "+61 2 9000 0000");
+  assert.deepEqual(state.importableContacts[0]?.roles, ["Vendor", "Wedding vendor"]);
   assert.match(state.importableContacts[0]?.notes ?? "", /Gmail contact import/i);
 });
 

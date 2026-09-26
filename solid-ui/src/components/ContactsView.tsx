@@ -61,6 +61,7 @@ export function ContactsView() {
   const [syncFailure, setSyncFailure] = createSignal<ContactsFailureReceipt | null>(null);
   const [importSource, setImportSource] = createSignal<ContactImportSource>("gmail");
   const [importText, setImportText] = createSignal("");
+  const [importRoles, setImportRoles] = createSignal<string[]>([]);
   const [importNotice, setImportNotice] = createSignal<string | null>(null);
   const [savingFollowUpTasks, setSavingFollowUpTasks] = createSignal(false);
   const [followUpTaskReceipt, setFollowUpTaskReceipt] = createSignal<ContactFollowUpTaskDispatchReceipt | null>(null);
@@ -86,6 +87,7 @@ export function ContactsView() {
     source: importSource(),
     text: importText(),
     defaultRelationshipKind: "supplier",
+    defaultRoles: importRoles(),
     existingContacts: contacts(),
   });
   const followUpQueue = () => buildContactFollowUpQueueState({ contacts: contacts() });
@@ -475,6 +477,15 @@ export function ContactsView() {
               />
             </label>
           </div>
+          <ContactRoleInput
+            id="contact-role-options-import"
+            compact
+            contacts={contacts()}
+            roles={importRoles()}
+            onChange={setImportRoles}
+            placeholder="Apply a role to this import, e.g. Guest, Vendor..."
+            description="Every imported contact gets these labels. You can still edit each person later."
+          />
           <textarea
             value={importText()}
             onInput={(event) => setImportText(event.currentTarget.value)}
