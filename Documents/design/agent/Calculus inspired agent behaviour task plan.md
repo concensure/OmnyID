@@ -514,7 +514,8 @@ Release calibration / deployment validation update, 2026-09-26:
 - `npm run test:wedding` passes (`1057 passed`)
 - deployment rehearsal and deployment-ops selftests pass for Bash/PowerShell paths after aligning the Oracle runtime staging fixture with the required `wedding/` static root
 - deployed database validation was not executed in this environment because no deployed `DATABASE_URL` / deployed database env var is available
-- source-control reconciliation is still required for the env-race fix if `src/server/user_management_routes.rs` remains an untracked split route file in the release worktree
+- source-control reproducibility is currently blocked: a temporary clean worktree at `HEAD` cannot compile because tracked Rust roots reference local-only module files
+- `scripts/source-control-repro-check.ps1` now inventories this class of release blocker; current local result is `145` Rust module files referenced by tracked roots but missing from git, including oversized split route modules that must be reconciled without violating the 1000-line new-file guard
 
 What remains incomplete or calibration-sensitive:
 
@@ -523,4 +524,5 @@ What remains incomplete or calibration-sensitive:
 - escalation uses bounded thresholds, but those thresholds are still static and not yet personalized by user profile or longer-horizon behavioral calibration
 - opt-in live database smoke coverage passed against local compose Postgres; rerun against the deployed Postgres path before final release sign-off if that differs from local compose
 - live deployment endpoint validation still needs a real `OMNYID_BASE_URL` / workspace URL and production ops token; local mocked deployment-ops gates now pass
+- clean-checkout Rust build reproducibility must be restored before production release; do not rely on the dirty workspace's untracked Rust modules as release evidence
 - deployed telemetry/replay calibration is still needed to compare production workspace distributions against the conservative local fixtures before raising surface intensity or enabling personalization
