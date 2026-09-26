@@ -108,6 +108,15 @@ fn clean_optional_text(value: Option<String>, max_len: usize) -> Option<String> 
     }
 }
 
+fn clean_optional_rfc3339(value: Option<String>, label: &str) -> Result<Option<String>, String> {
+    let Some(text) = clean_optional_text(value, 64) else {
+        return Ok(None);
+    };
+    chrono::DateTime::parse_from_rfc3339(&text)
+        .map_err(|_| format!("{label} must be an RFC3339 timestamp"))?;
+    Ok(Some(text))
+}
+
 fn valid_usage_number(value: f64) -> bool {
     value.is_finite() && (0.0..=1_000_000.0).contains(&value)
 }
@@ -164,7 +173,7 @@ pub fn wedding_shared_tool_usage_event(
         estimated_cost_usd: input.estimated_cost_usd,
         currency: Some("USD".to_string()),
         source: Some("wedding_planner_shared_tool".to_string()),
-        occurred_at: input.occurred_at,
+        occurred_at: clean_optional_rfc3339(input.occurred_at, "occurred_at")?,
         metadata_json: Some(Value::Object(metadata)),
     })
 }
@@ -290,6 +299,39 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    #[test]
+    fn wedding_shared_tool_usage_event_requires_rfc3339_occurred_at() {
+        let valid = wedding_shared_tool_usage_event(WeddingSharedToolUsageInput {
+            user_id: "user-4".to_string(),
+            provider: WeddingSharedToolProvider::WeatherApi,
+            feature: WeddingSharedToolFeature::WeatherContingency,
+            quantity: 1.0,
+            estimated_cost_usd: 0.01,
+            usage_unit: None,
+            wedding_plan_id: None,
+            operation: None,
+            provider_request_id: None,
+            occurred_at: Some("2026-09-26T10:00:00Z".to_string()),
+        })
+        .expect("valid timestamp");
+        assert_eq!(valid.occurred_at.as_deref(), Some("2026-09-26T10:00:00Z"));
+
+        let invalid = wedding_shared_tool_usage_event(WeddingSharedToolUsageInput {
+            user_id: "user-4".to_string(),
+            provider: WeddingSharedToolProvider::WeatherApi,
+            feature: WeddingSharedToolFeature::WeatherContingency,
+            quantity: 1.0,
+            estimated_cost_usd: 0.01,
+            usage_unit: None,
+            wedding_plan_id: None,
+            operation: None,
+            provider_request_id: None,
+            occurred_at: Some("2026-09-26".to_string()),
+        })
+        .expect_err("date-only timestamp should fail");
+        assert!(invalid.contains("occurred_at must be an RFC3339 timestamp"));
     }
 
     #[test]
