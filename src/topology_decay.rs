@@ -177,4 +177,42 @@ mod tests {
         assert_eq!(items[0].message_id, "fresh");
         assert_eq!(items[1].message_id, "follow_up");
     }
+
+    #[test]
+    fn large_stale_neighborhood_does_not_displace_active_risks() {
+        let mut items = (0..80)
+            .map(|index| {
+                item(
+                    &format!("stale_{index}"),
+                    "Old related planning note",
+                    "stale",
+                    "high",
+                    &["same_project", "same_thread"],
+                )
+            })
+            .collect::<Vec<_>>();
+        items.push(item(
+            "critical_payment",
+            "Critical payment decision",
+            "fresh",
+            "medium",
+            &["same_project"],
+        ));
+        items.push(item(
+            "approval_follow_up",
+            "Open approval follow-up",
+            "reactivated",
+            "high",
+            &["same_follow_up_chain"],
+        ));
+
+        rank_neighborhood_items(&mut items);
+
+        let top_ids = items
+            .iter()
+            .take(2)
+            .map(|item| item.message_id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(top_ids, vec!["critical_payment", "approval_follow_up"]);
+    }
 }
