@@ -174,4 +174,27 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn high_confidence_unsourced_bundle_defers_without_provenance() {
+        let result = EvaluationResult {
+            heuristic_id: "unsourced-high-confidence".to_string(),
+            suggestion: AfpProactiveSuggestionContent {
+                heuristic_id: "unsourced-high-confidence".to_string(),
+                confidence: 0.93,
+                urgency: "medium".to_string(),
+                action_label: "Review later".to_string(),
+                description: "Useful but not grounded in a source event.".to_string(),
+                ..Default::default()
+            },
+        };
+
+        let bundle = build_suggestion_afp_bundle("user_1", "passive:user_1", &result, None);
+
+        assert_eq!(
+            bundle.suggestion_afp["content"]["strategic_policy"]["action"].as_str(),
+            Some("defer")
+        );
+        assert!(bundle.companion_afps.is_empty());
+    }
 }

@@ -154,4 +154,15 @@ mod tests {
         assert_eq!(policy.action, ProactiveStrategicAction::SurfaceNow);
         assert_eq!(policy.surface_policy, "surface_now");
     }
+
+    #[test]
+    fn high_confidence_with_source_count_evidence_surfaces_now() {
+        let mut suggestion = suggestion(0.92, "medium");
+        suggestion.source_count = Some(2);
+
+        let policy = policy_for_proactive_suggestion(&suggestion);
+
+        assert_eq!(policy.action, ProactiveStrategicAction::SurfaceNow);
+        assert_eq!(policy.surface_policy, "surface_now");
+    }
 }
