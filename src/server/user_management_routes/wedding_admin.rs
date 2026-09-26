@@ -94,6 +94,10 @@ fn validate_wedding_intake_source(
     }
 }
 
+pub(super) fn wedding_vendor_list_limit(limit: Option<i64>) -> i64 {
+    limit.unwrap_or(200).clamp(1, 200)
+}
+
 pub(super) fn wedding_vendor_write_input(
     body: WeddingVendorWriteRequest,
 ) -> Result<WeddingVendorUpsertRecord, (StatusCode, String)> {
@@ -512,7 +516,10 @@ pub(super) async fn admin_wedding_vendors_list_http(
     }
     let vendors = state
         .db
-        .list_wedding_vendors(params.limit.unwrap_or(200), params.query.as_deref())
+        .list_wedding_vendors(
+            wedding_vendor_list_limit(params.limit),
+            params.query.as_deref(),
+        )
         .await
         .map_err(readiness_error_to_http)?;
     Ok(Json(serde_json::json!({ "vendors": vendors })))
@@ -621,7 +628,7 @@ pub(super) async fn wedding_vendors_list_http(
         .db
         .list_active_wedding_vendors_for_user(
             &user.id,
-            params.limit.unwrap_or(200),
+            wedding_vendor_list_limit(params.limit),
             params.query.as_deref(),
         )
         .await

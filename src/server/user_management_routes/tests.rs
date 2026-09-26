@@ -360,6 +360,15 @@ fn wedding_vendor_write_input_validates_urls_dates_and_photo_slots() {
 }
 
 #[test]
+fn wedding_vendor_list_limit_is_bounded_for_public_and_admin_routes() {
+    assert_eq!(super::wedding_vendor_list_limit(None), 200);
+    assert_eq!(super::wedding_vendor_list_limit(Some(0)), 1);
+    assert_eq!(super::wedding_vendor_list_limit(Some(-50)), 1);
+    assert_eq!(super::wedding_vendor_list_limit(Some(20)), 20);
+    assert_eq!(super::wedding_vendor_list_limit(Some(50_000)), 200);
+}
+
+#[test]
 fn wedding_vendor_write_input_accepts_clean_vendor_payload() {
     let input = super::wedding_vendor_write_input(super::WeddingVendorWriteRequest {
         vendor_slug: "harbour-house".to_string(),
