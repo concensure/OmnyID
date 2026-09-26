@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.social-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -7,6 +7,9 @@
  */
 
 use super::*;
+
+const MAX_SOCIAL_CONTENT_LEN: usize = 10_000;
+const MAX_SOCIAL_TITLE_LEN: usize = 160;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -30,6 +33,54 @@ struct SocialPublishRequest {
     platform: Option<String>,
     content: String,
     title: Option<String>,
+}
+
+fn normalize_social_platform(value: Option<String>) -> String {
+    match value
+        .as_deref()
+        .unwrap_or("linkedin")
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "x" | "twitter" => "x".to_string(),
+        "bluesky" | "bsky" => "bluesky".to_string(),
+        _ => "linkedin".to_string(),
+    }
+}
+
+fn clean_social_content(value: String) -> Result<String, (StatusCode, String)> {
+    let value = value.trim().to_string();
+    if value.is_empty() || value.len() > MAX_SOCIAL_CONTENT_LEN {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("content must be 1-{MAX_SOCIAL_CONTENT_LEN} characters"),
+        ));
+    }
+    Ok(value)
+}
+
+fn clean_social_optional_content(value: Option<String>) -> String {
+    value
+        .map(|value| value.trim().chars().take(MAX_SOCIAL_CONTENT_LEN).collect())
+        .unwrap_or_default()
+}
+
+fn clean_social_title(value: Option<String>, content: &str) -> String {
+    value
+        .map(|title| title.trim().to_string())
+        .filter(|title| !title.is_empty())
+        .unwrap_or_else(|| {
+            content
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("Social post")
+                .trim()
+                .to_string()
+        })
+        .chars()
+        .take(MAX_SOCIAL_TITLE_LEN)
+        .collect()
 }
 
 fn social_suggestion_items(platform: &str, content: &str) -> Vec<Value> {
@@ -166,11 +217,8 @@ async fn social_suggestions_http(
     Json(body): Json<SocialSuggestionsRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let _user = authenticated_user(&state.db, &headers).await?;
-    let platform = body
-        .platform
-        .unwrap_or_else(|| "linkedin".to_string())
-        .to_lowercase();
-    let content = body.content.unwrap_or_default();
+    let platform = normalize_social_platform(body.platform);
+    let content = clean_social_optional_content(body.content);
     let suggestions = social_suggestion_items(&platform, &content);
     Ok(Json(serde_json::json!({ "suggestions": suggestions })))
 }
@@ -192,12 +240,8 @@ async fn social_composer_message_http(
         .and_then(|row| row["id"].as_str())
         .unwrap_or(&user.id)
         .to_string();
-    let platform = params
-        .get("platform")
-        .cloned()
-        .unwrap_or_else(|| "linkedin".to_string())
-        .to_lowercase();
-    let content = params.get("content").cloned().unwrap_or_default();
+    let platform = normalize_social_platform(params.get("platform").cloned());
+    let content = clean_social_optional_content(params.get("content").cloned());
     let suggestions = social_suggestion_items(&platform, &content);
     let public_messages = state
         .db
@@ -206,10 +250,7 @@ async fn social_composer_message_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
     let posts = social_post_rows_for_user(&user.id, &master_agent_id, public_messages);
-    let title = params
-        .get("title")
-        .cloned()
-        .unwrap_or_else(|| "Social post draft".to_string());
+    let title = clean_social_title(params.get("title").cloned(), "Social post draft");
     let platforms = vec![
         "LinkedIn".to_string(),
         "X".to_string(),
@@ -246,9 +287,7 @@ async fn social_publish_http(
     Json(body): Json<SocialPublishRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    if body.content.trim().is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "content is required".to_string()));
-    }
+    let content = clean_social_content(body.content)?;
 
     let instance = state
         .db
@@ -262,25 +301,12 @@ async fn social_publish_http(
         .unwrap_or(&user.id)
         .to_string();
 
-    let platform = body.platform.unwrap_or_else(|| "linkedin".to_string());
-    let title = body.title.unwrap_or_else(|| {
-        let first_line = body
-            .content
-            .lines()
-            .find(|line| !line.trim().is_empty())
-            .unwrap_or("Social post");
-        first_line.chars().take(72).collect()
-    });
+    let platform = normalize_social_platform(body.platform);
+    let title = clean_social_title(body.title, &content);
     let source_message_id = format!("social:{}", Ulid::new());
     let id = state
         .db
-        .publish_to_plaza(
-            &user.id,
-            &source_message_id,
-            &from_agent,
-            &title,
-            &body.content,
-        )
+        .publish_to_plaza(&user.id, &source_message_id, &from_agent, &title, &content)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
@@ -291,7 +317,7 @@ async fn social_publish_http(
         "post": {
             "id": id,
             "platform": platform,
-            "content": body.content,
+            "content": content,
             "publishedAt": chrono::Utc::now().to_rfc3339(),
             "likes": 0,
             "reposts": 0,
@@ -302,7 +328,11 @@ async fn social_publish_http(
 
 #[cfg(test)]
 mod tests {
-    use super::{social_post_rows_for_user, social_suggestion_items};
+    use super::{
+        MAX_SOCIAL_CONTENT_LEN, MAX_SOCIAL_TITLE_LEN, clean_social_content,
+        clean_social_optional_content, clean_social_title, normalize_social_platform,
+        social_post_rows_for_user, social_suggestion_items,
+    };
 
     #[test]
     fn suggestions_include_timing_guidance() {
@@ -352,5 +382,39 @@ mod tests {
             ],
         );
         assert_eq!(rows.len(), 2);
+    }
+
+    #[test]
+    fn social_inputs_are_normalized_and_bounded() {
+        assert_eq!(
+            normalize_social_platform(Some(" Twitter ".to_string())),
+            "x"
+        );
+        assert_eq!(
+            normalize_social_platform(Some("BSKY".to_string())),
+            "bluesky"
+        );
+        assert_eq!(
+            normalize_social_platform(Some("unknown".to_string())),
+            "linkedin"
+        );
+        assert_eq!(
+            clean_social_content(" hello ".to_string()).expect("content"),
+            "hello"
+        );
+        assert!(clean_social_content(" ".to_string()).is_err());
+        assert!(clean_social_content("x".repeat(MAX_SOCIAL_CONTENT_LEN + 1)).is_err());
+        assert_eq!(
+            clean_social_optional_content(Some(" x ".to_string())),
+            "x".to_string()
+        );
+        assert_eq!(
+            clean_social_title(Some(" title ".to_string()), "fallback"),
+            "title".to_string()
+        );
+        assert_eq!(
+            clean_social_title(None, &"x".repeat(MAX_SOCIAL_TITLE_LEN + 50)).len(),
+            MAX_SOCIAL_TITLE_LEN
+        );
     }
 }
