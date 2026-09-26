@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.space-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -8,6 +8,13 @@
 
 use super::*;
 use crate::spaces::SpaceManager;
+
+const MAX_SPACE_NAME_LEN: usize = 120;
+const MAX_SPACE_DESCRIPTION_LEN: usize = 1000;
+const MAX_SPACE_MESSAGE_ID_LEN: usize = 128;
+const MAX_SPACE_AGENT_ID_LEN: usize = 128;
+const MAX_SPACE_MESSAGE_TYPE_LEN: usize = 64;
+const MAX_SPACE_SUBTYPE_LEN: usize = 64;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -26,6 +33,46 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
 
 fn space_manager(state: &Arc<AppState>) -> SpaceManager {
     SpaceManager::new(state.db.pool.clone())
+}
+
+fn space_messages_limit(raw: Option<&str>) -> i64 {
+    raw.and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(50)
+        .clamp(1, 200)
+}
+
+fn clean_space_required(
+    value: String,
+    label: &str,
+    max_len: usize,
+) -> Result<String, (StatusCode, String)> {
+    let value = value.trim().to_string();
+    if value.is_empty() || value.len() > max_len {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("{label} must be 1-{max_len} characters"),
+        ));
+    }
+    Ok(value)
+}
+
+fn clean_space_optional(
+    value: Option<String>,
+    max_len: usize,
+) -> Result<Option<String>, (StatusCode, String)> {
+    let Some(value) = value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(None);
+    };
+    if value.len() > max_len {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("optional field must be 1-{max_len} characters"),
+        ));
+    }
+    Ok(Some(value))
 }
 
 fn space_feed_member_rows(members: &[crate::spaces::SpaceMember]) -> Vec<Value> {
@@ -93,16 +140,10 @@ async fn create_space_http(
     Json(body): Json<CreateSpaceRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    if body.name.trim().is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "name is required".to_string()));
-    }
+    let name = clean_space_required(body.name, "name", MAX_SPACE_NAME_LEN)?;
+    let description = clean_space_optional(body.description, MAX_SPACE_DESCRIPTION_LEN)?;
     let space = space_manager(&state)
-        .create_space(
-            &user.id,
-            body.name.trim(),
-            body.description.as_deref(),
-            body.is_public,
-        )
+        .create_space(&user.id, &name, description.as_deref(), body.is_public)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
@@ -187,11 +228,7 @@ async fn list_space_messages_http(
                 "space not found or access denied".to_string(),
             )
         })?;
-    let limit: i64 = params
-        .get("limit")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(50)
-        .min(200);
+    let limit = space_messages_limit(params.get("limit").map(String::as_str));
     let before_id = params.get("before_id").map(String::as_str);
     let messages = manager
         .list_messages(&id, &user.id, limit, before_id)
@@ -250,14 +287,22 @@ async fn post_space_message_http(
             ));
         }
     }
+    let afp_message_id = clean_space_required(
+        body.afp_message_id,
+        "afp_message_id",
+        MAX_SPACE_MESSAGE_ID_LEN,
+    )?;
+    let from_agent = clean_space_required(body.from_agent, "from_agent", MAX_SPACE_AGENT_ID_LEN)?;
+    let msg_type = clean_space_required(body.msg_type, "type", MAX_SPACE_MESSAGE_TYPE_LEN)?;
+    let subtype = clean_space_optional(body.subtype, MAX_SPACE_SUBTYPE_LEN)?;
     let msg = manager
         .post_message(
             &id,
-            &body.afp_message_id,
-            &body.from_agent,
+            &afp_message_id,
+            &from_agent,
             &user.id,
-            &body.msg_type,
-            body.subtype.as_deref(),
+            &msg_type,
+            subtype.as_deref(),
             body.content,
         )
         .await
@@ -391,7 +436,10 @@ async fn space_feed_message_http(
 
 #[cfg(test)]
 mod tests {
-    use super::{space_feed_member_rows, space_feed_message_rows};
+    use super::{
+        MAX_SPACE_AGENT_ID_LEN, clean_space_optional, clean_space_required, space_feed_member_rows,
+        space_feed_message_rows, space_messages_limit,
+    };
 
     #[test]
     fn feed_member_rows_preserve_roles() {
@@ -422,5 +470,46 @@ mod tests {
         }]);
         assert_eq!(rows[0]["author"].as_str(), Some("master-agent"));
         assert_eq!(rows[0]["body"].as_str(), Some("Kickoff"));
+    }
+
+    #[test]
+    fn space_messages_limit_is_bounded() {
+        assert_eq!(space_messages_limit(None), 50);
+        assert_eq!(space_messages_limit(Some("0")), 1);
+        assert_eq!(space_messages_limit(Some("-2")), 1);
+        assert_eq!(space_messages_limit(Some("80")), 80);
+        assert_eq!(space_messages_limit(Some("5000")), 200);
+    }
+
+    #[test]
+    fn space_string_inputs_are_trimmed_and_bounded() {
+        assert_eq!(
+            clean_space_required(
+                " agent-1 ".to_string(),
+                "from_agent",
+                MAX_SPACE_AGENT_ID_LEN
+            )
+            .expect("agent id"),
+            "agent-1"
+        );
+        assert!(
+            clean_space_required(" ".to_string(), "from_agent", MAX_SPACE_AGENT_ID_LEN).is_err()
+        );
+        assert!(
+            clean_space_required(
+                "x".repeat(MAX_SPACE_AGENT_ID_LEN + 1),
+                "from_agent",
+                MAX_SPACE_AGENT_ID_LEN
+            )
+            .is_err()
+        );
+        assert_eq!(
+            clean_space_optional(Some(" desc ".to_string()), 20).expect("description"),
+            Some("desc".to_string())
+        );
+        assert_eq!(
+            clean_space_optional(Some(" ".to_string()), 20).expect("blank"),
+            None
+        );
     }
 }
