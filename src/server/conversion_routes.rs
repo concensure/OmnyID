@@ -9,7 +9,7 @@
 use super::auth::{authenticated_user, enforce_rate_limit};
 use super::*;
 use axum::{body::Bytes, http::header, response::Response};
-use std::env;
+use std::{env, io::ErrorKind};
 use tokio::fs;
 use tokio::time::timeout;
 use ulid::Ulid;
@@ -42,6 +42,15 @@ fn build_pdf_download_response(bytes: Vec<u8>) -> Response {
         Ok(response) => response,
         Err(err) => internal_http_error(err).into_response(),
     }
+}
+
+fn pdf_conversion_unavailable_response(reason: impl std::fmt::Display) -> Response {
+    error!(reason = %reason, "html_to_pdf: runtime dependency unavailable");
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "PDF conversion is unavailable",
+    )
+        .into_response()
 }
 
 /// Convert an HTML document to PDF via Playwright headless Chromium.
@@ -111,6 +120,14 @@ async fn html_to_pdf(
 
     let scripts_dir = env::var("OMNYID_SCRIPTS_DIR").unwrap_or_else(|_| "./scripts".into());
     let script = format!("{scripts_dir}/pdf-from-html.mjs");
+    if let Err(e) = fs::metadata(&script).await {
+        if e.kind() == ErrorKind::NotFound {
+            return pdf_conversion_unavailable_response(format!(
+                "missing pdf helper script at {script}"
+            ));
+        }
+        return internal_http_error(e).into_response();
+    }
 
     // GAP-096: hard timeout so a hung node process cannot block this thread indefinitely.
     let spawn_result = timeout(
@@ -145,6 +162,9 @@ async fn html_to_pdf(
             (StatusCode::GATEWAY_TIMEOUT, "PDF generation timed out").into_response()
         }
         Ok(Err(e)) => {
+            if e.kind() == ErrorKind::NotFound {
+                return pdf_conversion_unavailable_response("node executable not found");
+            }
             error!("html_to_pdf: failed to spawn node: {e}");
             internal_http_error(e).into_response()
         }
@@ -203,6 +223,9 @@ mod tests {
 
         assert!(production_source.contains("return internal_http_error(e).into_response();"));
         assert!(production_source.contains("internal_http_error(e).into_response()"));
+        assert!(production_source.contains("pdf_conversion_unavailable_response("));
+        assert!(production_source.contains("StatusCode::SERVICE_UNAVAILABLE"));
+        assert!(production_source.contains("ErrorKind::NotFound"));
         assert!(production_source.contains(
             "return internal_http_error(format!(\n                    \"pdf conversion subprocess failed with exit code {code}\"\n                ))"
         ));
