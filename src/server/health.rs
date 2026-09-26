@@ -15,7 +15,7 @@ use super::health_deps::{
 };
 use super::{
     AppState, authenticated_user, bearer_token_from_headers, enable_internal_grpc,
-    readiness_error_to_http, webtransport_bind_addr, webtransport_enabled,
+    internal_http_error, readiness_error_to_http, webtransport_bind_addr, webtransport_enabled,
 };
 use crate::secret_manager::read_process_secret_trimmed;
 
@@ -233,7 +233,7 @@ pub(super) async fn metrics_http(
             .status(StatusCode::OK)
             .header("content-type", "text/plain; version=0.0.4; charset=utf-8")
             .body(axum::body::Body::from(body))
-            .unwrap());
+            .map_err(internal_http_error)?);
     }
     let json = Json(serde_json::json!({
         "status": "ok",
@@ -328,6 +328,22 @@ mod tests {
             public_operational_request_token(&headers).as_deref(),
             Some("bearer-token")
         );
+    }
+
+    #[test]
+    fn metrics_prometheus_response_builder_is_fallible() {
+        let source = include_str!("health.rs");
+        let start = source
+            .find("pub(super) async fn metrics_http(")
+            .expect("metrics_http exists");
+        let end = source[start..]
+            .find("pub(super) async fn transport_capabilities_http(")
+            .map(|offset| start + offset)
+            .expect("transport capabilities follows metrics");
+        let metrics_source = &source[start..end];
+
+        assert!(metrics_source.contains(".map_err(internal_http_error)?"));
+        assert!(!metrics_source.contains(".unwrap()"));
     }
 
     #[test]
