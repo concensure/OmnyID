@@ -16,8 +16,8 @@ use wtransport::{
 
 use super::auth::{bearer_token_from_headers, merge_thread_messages, session_is_expired};
 use super::{
-    AppState, app_to_proto, load_webtransport_identity, proto_to_app, store_proto_message,
-    webtransport_bind_addr,
+    AppState, app_to_proto, internal_http_error, load_webtransport_identity, proto_to_app,
+    store_proto_message, webtransport_bind_addr,
 };
 use crate::db::Db;
 use crate::metrics::Metrics;
@@ -389,6 +389,18 @@ mod tests {
         );
         let token = require_relay_bearer_token(&headers).expect("bearer token");
         assert_eq!(token, "test-session-token");
+    }
+
+    #[test]
+    fn relay_snapshot_load_failures_use_sanitized_internal_error() {
+        let source = include_str!("relay.rs");
+        let start = source
+            .rfind("async fn load_relay_thread_snapshot_for_owner(")
+            .expect("relay snapshot loader exists");
+        let body = &source[start..];
+
+        assert!(body.contains("internal_http_error(relay_snapshot_load_error(err))"));
+        assert!(!body.contains("(StatusCode::INTERNAL_SERVER_ERROR,"));
     }
 
     #[test]
@@ -804,20 +816,13 @@ async fn load_relay_thread_snapshot_for_owner(
     let private_messages = db
         .get_private_thread(owner_user_id, thread_id)
         .await
-        .map_err(|err| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                relay_snapshot_load_error(err),
-            )
-        })?;
+        .map_err(|err| internal_http_error(relay_snapshot_load_error(err)))?;
     if private_messages.is_empty() {
         return Err((StatusCode::NOT_FOUND, relay_thread_access_error()));
     }
-    let public_messages = db.get_thread(thread_id).await.map_err(|err| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            relay_snapshot_load_error(err),
-        )
-    })?;
+    let public_messages = db
+        .get_thread(thread_id)
+        .await
+        .map_err(|err| internal_http_error(relay_snapshot_load_error(err)))?;
     Ok(merge_thread_messages(private_messages, public_messages))
 }
