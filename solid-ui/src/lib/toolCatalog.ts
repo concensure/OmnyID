@@ -16,6 +16,7 @@ export type CatalogTool = {
   auth_type: "api_key" | "oauth2" | "none";
   mcpDocsUrl?: string;
   apiKeyUrl?: string;
+  connectedAppId?: string;
   billing?: {
     provider_key: string;
     provider_category: string;
@@ -61,14 +62,14 @@ export const TOOL_CATEGORIES = [
 
 export const CATALOG: CatalogTool[] = [
   // ── Communication ──────────────────────────────────────────────────────────
-  { slug: "slack", name: "Slack", domain: "slack.com", category: "Communication", description: "Send messages, search channels, and manage workspaces.", capabilities: ["send_message", "list_channels", "search_messages", "create_channel", "invite_user"], auth_type: "api_key", apiKeyUrl: "https://api.slack.com/apps" },
+  { slug: "slack", name: "Slack", domain: "slack.com", category: "Communication", description: "Send messages, search channels, and manage workspaces.", capabilities: ["send_message", "list_channels", "search_messages", "create_channel", "invite_user"], auth_type: "api_key", apiKeyUrl: "https://api.slack.com/apps", connectedAppId: "slack" },
   { slug: "zoom", name: "Zoom", domain: "zoom.us", category: "Communication", description: "Schedule and manage Zoom meetings.", capabilities: ["create_meeting", "list_meetings", "get_recording", "delete_meeting"], auth_type: "oauth2" },
   { slug: "teams", name: "Microsoft Teams", domain: "teams.microsoft.com", category: "Communication", description: "Create meetings and post messages to Teams channels.", capabilities: ["send_message", "create_meeting", "list_channels", "create_team"], auth_type: "oauth2" },
-  { slug: "discord", name: "Discord", domain: "discord.com", category: "Communication", description: "Send messages and manage Discord servers and channels.", capabilities: ["send_message", "list_channels", "create_thread", "pin_message"], auth_type: "api_key" },
+  { slug: "discord", name: "Discord", domain: "discord.com", category: "Communication", description: "Send messages and manage Discord servers and channels.", capabilities: ["send_message", "list_channels", "create_thread", "pin_message"], auth_type: "api_key", connectedAppId: "discord" },
   { slug: "telegram", name: "Telegram", domain: "telegram.org", category: "Communication", description: "Send messages and manage Telegram bots and groups.", capabilities: ["send_message", "send_photo", "get_updates", "create_poll"], auth_type: "api_key" },
   { slug: "whatsapp-messenger", name: "WhatsApp", domain: "whatsapp.com", category: "Communication", description: "Connect personal WhatsApp messaging workflows where supported by your bridge.", capabilities: ["send_message", "get_contacts", "list_chats"], auth_type: "api_key" },
   { slug: "whatsapp", name: "WhatsApp Business", domain: "business.whatsapp.com", category: "Communication", description: "Send messages via WhatsApp Business API.", capabilities: ["send_message", "send_template", "get_contacts"], auth_type: "api_key" },
-  { slug: "twilio-sms", name: "Twilio", domain: "twilio.com", category: "Communication", description: "Send SMS, voice, verification, and messaging events through Twilio.", capabilities: ["send_sms", "create_call", "verify_user", "list_messages", "lookup_number"], auth_type: "api_key", apiKeyUrl: "https://console.twilio.com/" },
+  { slug: "twilio-sms", name: "Twilio", domain: "twilio.com", category: "Communication", description: "Send SMS, voice, verification, and messaging events through Twilio.", capabilities: ["send_sms", "create_call", "verify_user", "list_messages", "lookup_number"], auth_type: "api_key", apiKeyUrl: "https://console.twilio.com/", connectedAppId: "twilio-messaging" },
   { slug: "sendgrid", name: "SendGrid", domain: "sendgrid.com", category: "Communication", description: "Send transactional email and manage email templates through SendGrid.", capabilities: ["send_email", "list_templates", "get_stats", "manage_senders"], auth_type: "api_key", apiKeyUrl: "https://app.sendgrid.com/settings/api_keys" },
   { slug: "messagebird", name: "MessageBird", domain: "messagebird.com", category: "Communication", description: "Send SMS, voice, and omnichannel messages through MessageBird.", capabilities: ["send_sms", "send_whatsapp", "list_messages", "lookup_number"], auth_type: "api_key", apiKeyUrl: "https://dashboard.messagebird.com/developers/access" },
   { slug: "plivo", name: "Plivo", domain: "plivo.com", category: "Communication", description: "Send SMS and voice calls through Plivo.", capabilities: ["send_sms", "create_call", "list_messages", "lookup_number"], auth_type: "api_key", apiKeyUrl: "https://console.plivo.com/dashboard/" },
@@ -77,9 +78,9 @@ export const CATALOG: CatalogTool[] = [
   { slug: "outlook", name: "Outlook", domain: "outlook.com", category: "Communication", description: "Read, send, and manage Outlook emails and calendar.", capabilities: ["send_email", "list_emails", "create_event", "search_emails"], auth_type: "oauth2" },
 
   // ── Project Management ─────────────────────────────────────────────────────
-  { slug: "linear", name: "Linear", domain: "linear.app", category: "Project Management", description: "Create and track issues, projects, and cycles.", capabilities: ["create_issue", "update_issue", "list_issues", "search_issues", "create_project"], auth_type: "api_key" },
-  { slug: "jira", name: "Jira", domain: "atlassian.com", category: "Project Management", description: "Manage Jira tickets, sprints, and boards.", capabilities: ["create_issue", "update_issue", "list_issues", "search_issues", "create_sprint"], auth_type: "oauth2" },
-  { slug: "trello", name: "Trello", domain: "trello.com", category: "Project Management", description: "Create cards, move through lists, and manage boards.", capabilities: ["create_card", "move_card", "list_boards", "add_comment", "create_checklist"], auth_type: "api_key" },
+  { slug: "linear", name: "Linear", domain: "linear.app", category: "Project Management", description: "Create and track issues, projects, and cycles.", capabilities: ["create_issue", "update_issue", "list_issues", "search_issues", "create_project"], auth_type: "api_key", connectedAppId: "linear" },
+  { slug: "jira", name: "Jira", domain: "atlassian.com", category: "Project Management", description: "Manage Jira tickets, sprints, and boards.", capabilities: ["create_issue", "update_issue", "list_issues", "search_issues", "create_sprint"], auth_type: "oauth2", connectedAppId: "jira" },
+  { slug: "trello", name: "Trello", domain: "trello.com", category: "Project Management", description: "Create cards, move through lists, and manage boards.", capabilities: ["create_card", "move_card", "list_boards", "add_comment", "create_checklist"], auth_type: "api_key", connectedAppId: "trello" },
   { slug: "asana", name: "Asana", domain: "asana.com", category: "Project Management", description: "Manage tasks, projects, and team workloads.", capabilities: ["create_task", "update_task", "list_projects", "assign_task", "add_comment"], auth_type: "oauth2" },
   { slug: "clickup", name: "ClickUp", domain: "clickup.com", category: "Project Management", description: "All-in-one project management and productivity platform.", capabilities: ["create_task", "update_task", "list_spaces", "create_doc", "track_time"], auth_type: "api_key" },
   { slug: "monday", name: "Monday.com", domain: "monday.com", category: "Project Management", description: "Manage boards, items, and workflows in Monday.com.", capabilities: ["create_item", "update_item", "list_boards", "create_column", "add_update"], auth_type: "api_key" },
@@ -87,9 +88,9 @@ export const CATALOG: CatalogTool[] = [
   { slug: "height", name: "Height", domain: "height.app", category: "Project Management", description: "Create and manage tasks in Height workspaces.", capabilities: ["create_task", "update_task", "list_lists", "add_comment"], auth_type: "api_key" },
 
   // ── Productivity ───────────────────────────────────────────────────────────
-  { slug: "notion", name: "Notion", domain: "notion.so", category: "Productivity", description: "Create pages, databases, and manage your knowledge base.", capabilities: ["create_page", "update_page", "search_pages", "list_databases", "query_database"], auth_type: "api_key" },
+  { slug: "notion", name: "Notion", domain: "notion.so", category: "Productivity", description: "Create pages, databases, and manage your knowledge base.", capabilities: ["create_page", "update_page", "search_pages", "list_databases", "query_database"], auth_type: "api_key", connectedAppId: "notion" },
   { slug: "todoist", name: "Todoist", domain: "todoist.com", category: "Productivity", description: "Add and manage tasks with priorities and due dates.", capabilities: ["create_task", "complete_task", "list_tasks", "create_project", "add_comment"], auth_type: "oauth2" },
-  { slug: "google-calendar", name: "Google Calendar", domain: "calendar.google.com", category: "Productivity", description: "Create events, check availability, and manage schedules.", capabilities: ["create_event", "list_events", "check_availability", "delete_event", "invite_attendee"], auth_type: "oauth2" },
+  { slug: "google-calendar", name: "Google Calendar", domain: "calendar.google.com", category: "Productivity", description: "Create events, check availability, and manage schedules.", capabilities: ["create_event", "list_events", "check_availability", "delete_event", "invite_attendee"], auth_type: "oauth2", connectedAppId: "gcal" },
   { slug: "microsoft-graph", name: "Microsoft Graph", domain: "developer.microsoft.com", category: "Productivity", description: "Access Microsoft 365 mail, calendar, files, users, and collaboration data through Microsoft Graph.", capabilities: ["send_email", "create_event", "list_files", "list_users", "read_directory"], auth_type: "oauth2", apiKeyUrl: "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" },
   { slug: "google-workspace-api", name: "Google Workspace API", domain: "developers.google.com", category: "Productivity", description: "Connect Gmail, Calendar, Drive, Docs, Sheets, and Admin APIs through Google Workspace.", capabilities: ["send_email", "create_event", "list_files", "update_sheet", "manage_users"], auth_type: "oauth2", apiKeyUrl: "https://console.cloud.google.com/apis/credentials" },
   { slug: "microsoft-todo", name: "Microsoft To Do", domain: "todo.microsoft.com", category: "Productivity", description: "Manage tasks and to-do lists across Microsoft 365.", capabilities: ["create_task", "complete_task", "list_lists", "create_list"], auth_type: "oauth2" },
@@ -100,7 +101,7 @@ export const CATALOG: CatalogTool[] = [
   { slug: "apple-reminders", name: "Apple Reminders", domain: "apple.com", category: "Productivity", description: "Add reminders to Apple Reminders lists.", capabilities: ["create_reminder", "list_reminders", "complete_reminder"], auth_type: "none" },
 
   // ── Storage ────────────────────────────────────────────────────────────────
-  { slug: "google-drive", name: "Google Drive", domain: "drive.google.com", category: "Storage", description: "Search, read, and manage files in Google Drive.", capabilities: ["list_files", "read_file", "create_file", "share_file", "move_file"], auth_type: "oauth2" },
+  { slug: "google-drive", name: "Google Drive", domain: "drive.google.com", category: "Storage", description: "Search, read, and manage files in Google Drive.", capabilities: ["list_files", "read_file", "create_file", "share_file", "move_file"], auth_type: "oauth2", connectedAppId: "gdrive" },
   { slug: "dropbox", name: "Dropbox", domain: "dropbox.com", category: "Storage", description: "Access and manage files in your Dropbox account.", capabilities: ["list_files", "upload_file", "download_file", "share_file", "delete_file"], auth_type: "oauth2" },
   { slug: "onedrive", name: "OneDrive", domain: "onedrive.live.com", category: "Storage", description: "Browse and manage Microsoft OneDrive files.", capabilities: ["list_files", "upload_file", "download_file", "share_file"], auth_type: "oauth2" },
   { slug: "box", name: "Box", domain: "box.com", category: "Storage", description: "Manage files and folders in Box cloud storage.", capabilities: ["list_files", "upload_file", "share_file", "create_folder"], auth_type: "oauth2" },
@@ -114,7 +115,7 @@ export const CATALOG: CatalogTool[] = [
   { slug: "sketch", name: "Sketch", domain: "sketch.com", category: "Design", description: "Access Sketch documents and artboards.", capabilities: ["list_documents", "get_artboard", "export_asset"], auth_type: "api_key" },
 
   // ── Dev & Data ─────────────────────────────────────────────────────────────
-  { slug: "github", name: "GitHub", domain: "github.com", category: "Dev & Data", description: "Create issues, review PRs, query repos, and automate blog posts, READMEs, and PR descriptions directly in your repo.", capabilities: ["create_issue", "list_prs", "get_repo", "create_pr", "merge_pr", "add_comment", "create_file", "update_file", "search_code"], auth_type: "api_key", mcpDocsUrl: "https://github.com/modelcontextprotocol/servers/tree/main/src/github" },
+  { slug: "github", name: "GitHub", domain: "github.com", category: "Dev & Data", description: "Create issues, review PRs, query repos, and automate blog posts, READMEs, and PR descriptions directly in your repo.", capabilities: ["create_issue", "list_prs", "get_repo", "create_pr", "merge_pr", "add_comment", "create_file", "update_file", "search_code"], auth_type: "api_key", mcpDocsUrl: "https://github.com/modelcontextprotocol/servers/tree/main/src/github", connectedAppId: "github" },
   { slug: "gitlab", name: "GitLab", domain: "gitlab.com", category: "Dev & Data", description: "Manage GitLab projects, issues, and merge requests.", capabilities: ["create_issue", "list_mrs", "get_project", "create_mr", "run_pipeline"], auth_type: "api_key" },
   { slug: "supabase", name: "Supabase", domain: "supabase.com", category: "Dev & Data", description: "Query your Supabase database and manage projects.", capabilities: ["run_query", "list_tables", "insert_row", "update_row", "delete_row"], auth_type: "api_key" },
   { slug: "snowflake", name: "Snowflake", domain: "snowflake.com", category: "Dev & Data", description: "Run SQL queries against your Snowflake data warehouse.", capabilities: ["run_query", "list_tables", "list_schemas", "create_table"], auth_type: "api_key" },
@@ -135,7 +136,7 @@ export const CATALOG: CatalogTool[] = [
   { slug: "pipedream", name: "Pipedream", domain: "pipedream.com", category: "Automation", description: "Trigger Pipedream workflows and manage connected apps.", capabilities: ["trigger_workflow", "list_workflows", "get_execution"], auth_type: "api_key", apiKeyUrl: "https://pipedream.com/settings/account" },
 
   // ── CRM & Finance ──────────────────────────────────────────────────────────
-  { slug: "hubspot", name: "HubSpot", domain: "hubspot.com", category: "CRM & Finance", description: "Manage contacts, deals, and marketing campaigns.", capabilities: ["create_contact", "update_contact", "list_deals", "create_deal", "send_email", "log_activity"], auth_type: "api_key" },
+  { slug: "hubspot", name: "HubSpot", domain: "hubspot.com", category: "CRM & Finance", description: "Manage contacts, deals, and marketing campaigns.", capabilities: ["create_contact", "update_contact", "list_deals", "create_deal", "send_email", "log_activity"], auth_type: "api_key", connectedAppId: "hubspot" },
   { slug: "salesforce", name: "Salesforce", domain: "salesforce.com", category: "CRM & Finance", description: "Manage Salesforce leads, opportunities, and accounts.", capabilities: ["create_lead", "update_opportunity", "list_accounts", "run_soql", "create_task"], auth_type: "oauth2" },
   { slug: "pipedrive", name: "Pipedrive", domain: "pipedrive.com", category: "CRM & Finance", description: "Manage deals, contacts, and pipeline stages in Pipedrive.", capabilities: ["create_deal", "update_deal", "list_persons", "create_activity"], auth_type: "api_key" },
   { slug: "attio", name: "Attio", domain: "attio.com", category: "CRM & Finance", description: "Manage contacts, companies, and records in Attio CRM.", capabilities: ["list_records", "create_record", "update_record", "search_records"], auth_type: "api_key" },
@@ -172,13 +173,13 @@ export const CATALOG: CatalogTool[] = [
   { slug: "segment", name: "Twilio Segment", domain: "segment.com", category: "Analytics", description: "Query events and manage customer data pipelines in Twilio Segment.", capabilities: ["list_sources", "get_events", "manage_destinations"], auth_type: "api_key", apiKeyUrl: "https://app.segment.com/" },
 
   // Payments
-  { slug: "stripe", name: "Stripe", domain: "stripe.com", category: "Payments", description: "Query payments, subscriptions, invoices, and customer data.", capabilities: ["list_payments", "get_customer", "create_subscription", "list_invoices", "refund_payment"], auth_type: "api_key", apiKeyUrl: "https://dashboard.stripe.com/apikeys" },
+  { slug: "stripe", name: "Stripe", domain: "stripe.com", category: "Payments", description: "Query payments, subscriptions, invoices, and customer data.", capabilities: ["list_payments", "get_customer", "create_subscription", "list_invoices", "refund_payment"], auth_type: "api_key", apiKeyUrl: "https://dashboard.stripe.com/apikeys", connectedAppId: "stripe" },
   { slug: "paypal", name: "PayPal", domain: "paypal.com", category: "Payments", description: "Create and reconcile PayPal orders, payments, and subscriptions.", capabilities: ["create_order", "capture_payment", "list_transactions", "refund_payment"], auth_type: "oauth2", apiKeyUrl: "https://developer.paypal.com/dashboard/applications/live" },
   { slug: "square", name: "Square", domain: "squareup.com", category: "Payments", description: "Manage Square payments, customers, catalog items, and orders.", capabilities: ["create_payment", "list_orders", "get_customer", "manage_catalog"], auth_type: "oauth2", apiKeyUrl: "https://developer.squareup.com/apps" },
   { slug: "razorpay", name: "Razorpay", domain: "razorpay.com", category: "Payments", description: "Create and reconcile Razorpay payments, orders, refunds, and subscriptions.", capabilities: ["create_order", "capture_payment", "list_payments", "refund_payment"], auth_type: "api_key", apiKeyUrl: "https://dashboard.razorpay.com/app/keys" },
 
   // Maps & Weather
-  { slug: "google-maps", name: "Google Maps", domain: "mapsplatform.google.com", category: "Maps & Weather", description: "Geocode addresses, plan routes, and search places through Google Maps Platform.", capabilities: ["geocode_address", "search_places", "get_directions", "distance_matrix"], auth_type: "api_key", apiKeyUrl: "https://console.cloud.google.com/google/maps-apis/credentials" },
+  { slug: "google-maps", name: "Google Maps", domain: "mapsplatform.google.com", category: "Maps & Weather", description: "Geocode addresses, plan routes, and search places through Google Maps Platform.", capabilities: ["geocode_address", "search_places", "get_directions", "distance_matrix"], auth_type: "api_key", apiKeyUrl: "https://console.cloud.google.com/google/maps-apis/credentials", connectedAppId: "google-maps-platform" },
   { slug: "openweathermap", name: "OpenWeatherMap", domain: "openweathermap.org", category: "Maps & Weather", description: "Fetch current weather, forecasts, and historical weather data.", capabilities: ["current_weather", "weather_forecast", "historical_weather", "air_pollution"], auth_type: "api_key", apiKeyUrl: "https://home.openweathermap.org/api_keys" },
 
   // Travel
@@ -327,6 +328,7 @@ export const CATALOG: CatalogTool[] = [
     description: "Independent web search API for live search, grounding, and retrieval without relying on a single LLM vendor.",
     capabilities: ["search_web", "search_news", "search_images"],
     auth_type: "api_key",
+    connectedAppId: "brave-search-api",
     billing: {
       provider_key: "brave-search-api",
       provider_category: "search_api",
@@ -355,9 +357,9 @@ export const CATALOG: CatalogTool[] = [
   { slug: "printful", name: "Printful", domain: "printful.com", category: "E-commerce", description: "Manage Printful print-on-demand products and orders.", capabilities: ["list_products", "create_product", "list_orders", "get_shipping_rates"], auth_type: "api_key" },
 
   // ── Education ──────────────────────────────────────────────────────────────
-  { slug: "google-classroom", name: "Google Classroom", domain: "classroom.google.com", category: "Education", description: "Manage courses, assignments, and students in Google Classroom.", capabilities: ["list_courses", "create_assignment", "list_students", "get_submissions"], auth_type: "oauth2" },
-  { slug: "canvas-lms", name: "Canvas LMS", domain: "instructure.com", category: "Education", description: "Manage Canvas courses, assignments, and grades.", capabilities: ["list_courses", "create_assignment", "get_grades", "list_students"], auth_type: "api_key" },
-  { slug: "blackboard-lms", name: "Blackboard", domain: "blackboard.com", category: "Education", description: "Import Blackboard courses, content, assessments, and due dates.", capabilities: ["list_courses", "list_content", "list_assignments", "list_tests"], auth_type: "oauth2" },
+  { slug: "google-classroom", name: "Google Classroom", domain: "classroom.google.com", category: "Education", description: "Manage courses, assignments, and students in Google Classroom.", capabilities: ["list_courses", "create_assignment", "list_students", "get_submissions"], auth_type: "oauth2", connectedAppId: "google-classroom" },
+  { slug: "canvas-lms", name: "Canvas LMS", domain: "instructure.com", category: "Education", description: "Manage Canvas courses, assignments, and grades.", capabilities: ["list_courses", "create_assignment", "get_grades", "list_students"], auth_type: "api_key", connectedAppId: "canvas-lms" },
+  { slug: "blackboard-lms", name: "Blackboard", domain: "blackboard.com", category: "Education", description: "Import Blackboard courses, content, assessments, and due dates.", capabilities: ["list_courses", "list_content", "list_assignments", "list_tests"], auth_type: "oauth2", connectedAppId: "blackboard-lms" },
   { slug: "duolingo", name: "Duolingo", domain: "duolingo.com", category: "Education", description: "Retrieve Duolingo progress and streak data.", capabilities: ["get_profile", "get_courses", "get_streak"], auth_type: "api_key" },
   { slug: "khan-academy", name: "Khan Academy", domain: "khanacademy.org", category: "Education", description: "Access Khan Academy exercises and progress data.", capabilities: ["get_progress", "list_exercises", "get_video"], auth_type: "oauth2" },
 ];

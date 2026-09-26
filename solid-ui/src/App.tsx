@@ -1126,6 +1126,7 @@ function App() {
   // Agent settings focus: scroll to AI Model Config when opening from pill link
   const [agentSettingsFocusLlm, setAgentSettingsFocusLlm] = createSignal(false);
   const [agentSettingsFocusTab, setAgentSettingsFocusTab] = createSignal<"llm" | "mcp" | "skills" | "runtime" | null>(null);
+  const [connectedAppsInitialFilter, setConnectedAppsInitialFilter] = createSignal<string | undefined>(undefined);
 
   // UI state
   const [advanced, setAdvanced] = createSignal(loadAdvancedNavEnabled(initUserId));
@@ -3781,7 +3782,15 @@ function App() {
             {/* Tools view — MCP tools and skill capsules */}
             <Show when={activeView() === "tools"}>
               <Suspense fallback={<LazyViewFallback label="Tools" />}>
-                <div class="view-enter"><LazyToolsView signedIn={Boolean(session()?.token)} /></div>
+                <div class="view-enter">
+                  <LazyToolsView
+                    signedIn={Boolean(session()?.token)}
+                    onOpenConnectedApp={(_appId, label) => {
+                      setConnectedAppsInitialFilter(label);
+                      selectView("connected_apps");
+                    }}
+                  />
+                </div>
               </Suspense>
             </Show>
 
@@ -3912,7 +3921,7 @@ function App() {
               <Suspense fallback={<LazyViewFallback label="Connected Apps" />}>
                 <div class="view-enter">
                   <WeddingReturnBanner onReturn={() => selectView("response_queue")} />
-                  <LazyConnectedAppsView />
+                  <LazyConnectedAppsView initialFilter={connectedAppsInitialFilter()} />
                 </div>
               </Suspense>
             </Show>

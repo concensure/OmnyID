@@ -21,6 +21,7 @@ import {
   type SkillCapsuleCatalogEntry,
 } from "@/lib/api";
 import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { AVAILABLE_CONNECTED_APPS } from "@/lib/connectedAppsCatalog";
 import { CATALOG, type CatalogTool } from "@/lib/toolCatalog";
 import {
   buildToolsFailureReceipt,
@@ -41,6 +42,39 @@ import {
   signedInLocalRegistryNotice,
 } from "@/lib/toolConnectionRegistry";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
+
+const connectedAppNameById = new Map(AVAILABLE_CONNECTED_APPS.map((app) => [app.id, app.name]));
+
+function credentialLabel(tool: CatalogTool): string {
+  if (tool.auth_type === "oauth2") return "OAuth credential";
+  if (tool.auth_type === "none") return "access token";
+  return "API key";
+}
+
+function credentialPluralLabel(tool: CatalogTool): string {
+  if (tool.auth_type === "oauth2") return "OAuth credentials";
+  if (tool.auth_type === "none") return "access token";
+  return "API key";
+}
+
+function directCredentialRequired(tool: CatalogTool): boolean {
+  return tool.auth_type !== "none";
+}
+
+function toolSetupSummary(tool: CatalogTool, connectedAppName?: string): string {
+  if (connectedAppName) {
+    return `${tool.name} can be enabled through the Connected Apps flow for ${connectedAppName}, or connected as a direct MCP server when you run your own endpoint.`;
+  }
+  if (tool.mcpDocsUrl) {
+    return `${tool.name} has MCP documentation linked from this card. Use that server URL with a scoped credential from the provider.`;
+  }
+  return `Use a provider-issued credential and the MCP-compatible endpoint that exposes ${tool.name} actions to OmnyID.`;
+}
+
+function toolSecuritySummary(tool: CatalogTool): string {
+  const credential = credentialLabel(tool).toLowerCase();
+  return `Connections are saved per signed-in user. Use a least-privilege ${credential}, rotate it from the provider console when needed, and disconnect here to remove OmnyID runtime access.`;
+}
 
 // ── Tool logo with clearbit CDN + letter fallback ────────────────────────────
 
@@ -90,6 +124,153 @@ function ToolLogo(props: { tool: CatalogTool; size?: "sm" | "lg" }) {
 
 // ── Connect / disconnect modal ────────────────────────────────────────────────
 
+function ToolInfoModal(props: {
+  tool: CatalogTool;
+  signedIn: boolean;
+  connected: boolean;
+  connectedAppName?: string;
+  onClose: () => void;
+  onConnectDirect: () => void;
+  onOpenConnectedApp?: () => void;
+}) {
+  const credential = () => credentialLabel(props.tool);
+  const credentialPlural = () => credentialPluralLabel(props.tool);
+
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        class="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        role="button"
+        tabindex={-1}
+        onClick={props.onClose}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") props.onClose();
+        }}
+      />
+      <div class="relative z-10 w-full max-w-2xl rounded-3xl border border-white/50 bg-white/95 p-6 shadow-xl backdrop-blur-md">
+        <div class="flex items-start gap-3">
+          <ToolLogo tool={props.tool} size="lg" />
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="text-base font-semibold text-on-surface">{props.tool.name}</h2>
+              <span class="rounded-full border border-white/50 bg-white/60 px-2 py-0.5 text-[10px] font-medium text-on-surface-variant">
+                {props.tool.category}
+              </span>
+              <span class="rounded-full border border-white/50 bg-white/60 px-2 py-0.5 text-[10px] font-medium text-on-surface-variant">
+                {props.tool.auth_type.replaceAll("_", " ")}
+              </span>
+            </div>
+            <p class="mt-1 text-xs leading-5 text-on-surface-variant">{props.tool.description}</p>
+          </div>
+          <button
+            type="button"
+            class="rounded-full border border-white/50 bg-white/60 px-2.5 py-1 text-xs text-on-surface-variant transition hover:bg-white"
+            onClick={props.onClose}
+          >
+            Close
+          </button>
+        </div>
+
+        <div class="mt-5 grid gap-3 md:grid-cols-2">
+          <div class="rounded-2xl border border-white/55 bg-white/55 px-4 py-3">
+            <p class="text-xs font-semibold text-on-surface">Setup path</p>
+            <p class="mt-1 text-xs leading-5 text-on-surface-variant">
+              {toolSetupSummary(props.tool, props.connectedAppName)}
+            </p>
+            <Show when={props.connectedAppName}>
+              {(name) => (
+                <p class="mt-2 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-[11px] leading-5 text-primary">
+                  Use Connected Apps to enable the managed {name()} flow without manually entering an MCP URL.
+                </p>
+              )}
+            </Show>
+          </div>
+
+          <div class="rounded-2xl border border-white/55 bg-white/55 px-4 py-3">
+            <p class="text-xs font-semibold text-on-surface">Security</p>
+            <p class="mt-1 text-xs leading-5 text-on-surface-variant">{toolSecuritySummary(props.tool)}</p>
+          </div>
+
+          <div class="rounded-2xl border border-white/55 bg-white/55 px-4 py-3">
+            <p class="text-xs font-semibold text-on-surface">What agents can request</p>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              <For each={props.tool.capabilities.slice(0, 8)}>
+                {(capability) => (
+                  <span class="rounded-full border border-white/45 bg-white/70 px-2 py-0.5 text-[10px] text-on-surface-variant">
+                    {capability.replaceAll("_", " ")}
+                  </span>
+                )}
+              </For>
+            </div>
+          </div>
+
+          <div class="rounded-2xl border border-white/55 bg-white/55 px-4 py-3">
+            <p class="text-xs font-semibold text-on-surface">Credential guidance</p>
+            <p class="mt-1 text-xs leading-5 text-on-surface-variant">
+              {directCredentialRequired(props.tool)
+                ? `Direct MCP setup requires a non-empty ${credential().toLowerCase()}. Create a scoped credential in ${props.tool.name}, then paste it only into this user-scoped connection form.`
+                : `This provider normally does not need a provider API key, but your MCP server may still require an access token depending on how it is deployed.`}
+            </p>
+          </div>
+        </div>
+
+        <Show when={props.tool.billing}>
+          {(billing) => (
+            <div class="mt-3 rounded-2xl border border-sky-200/60 bg-sky-50/80 px-4 py-3 text-xs text-sky-900">
+              <p class="font-semibold">Billing model: {billing().billing_model.replaceAll("_", " ")}</p>
+              <p class="mt-1 leading-5">{billing().pricing_summary}</p>
+            </div>
+          )}
+        </Show>
+
+        <div class="mt-5 flex flex-wrap justify-end gap-2">
+          <Show when={props.tool.apiKeyUrl}>
+            {(url) => (
+              <a
+                href={url()}
+                target="_blank"
+                rel="noreferrer"
+                class="rounded-xl border border-white/50 bg-white/60 px-3 py-2 text-xs font-medium text-on-surface-variant transition hover:bg-white"
+              >
+                Open {credentialPlural()} page
+              </a>
+            )}
+          </Show>
+          <Show when={props.tool.mcpDocsUrl}>
+            {(url) => (
+              <a
+                href={url()}
+                target="_blank"
+                rel="noreferrer"
+                class="rounded-xl border border-white/50 bg-white/60 px-3 py-2 text-xs font-medium text-on-surface-variant transition hover:bg-white"
+              >
+                MCP docs
+              </a>
+            )}
+          </Show>
+          <Show when={props.connectedAppName && props.onOpenConnectedApp}>
+            <button
+              type="button"
+              class="rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/18"
+              onClick={props.onOpenConnectedApp}
+            >
+              Use Connected Apps
+            </button>
+          </Show>
+          <button
+            type="button"
+            disabled={props.connected}
+            class="rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 disabled:bg-emerald-100 disabled:text-emerald-700"
+            onClick={props.onConnectDirect}
+          >
+            {props.connected ? "Connected" : props.signedIn ? "Connect direct MCP" : "Sign in to connect"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ConnectModal(props: {
   tool: CatalogTool;
   onClose: () => void;
@@ -100,8 +281,8 @@ function ConnectModal(props: {
   const [busy, setBusy] = createSignal(false);
   const [validationError, setValidationError] = createSignal<string | null>(null);
   const [submitError, setSubmitError] = createSignal<ToolsFailureReceipt | null>(null);
-  const credentialNoun = () => props.tool.auth_type === "oauth2" ? "credential" : "API key";
-  const credentialNounPlural = () => props.tool.auth_type === "oauth2" ? "credentials" : "API key";
+  const credentialNoun = () => credentialLabel(props.tool);
+  const credentialNounPlural = () => credentialPluralLabel(props.tool);
 
   const requestClose = () => {
     if (busy()) return;
@@ -113,6 +294,10 @@ function ConnectModal(props: {
     const url = serverUrl().trim();
     if (!url) {
       setValidationError("MCP server URL is required.");
+      return;
+    }
+    if (directCredentialRequired(props.tool) && !apiKey().trim()) {
+      setValidationError(`${credentialNoun()} is required for direct ${props.tool.name} connections.`);
       return;
     }
     setBusy(true);
@@ -246,7 +431,9 @@ function ConnectModal(props: {
 
           <div>
             <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
-              <label class="block text-xs font-medium text-on-surface-variant">API Key (optional)</label>
+              <label class="block text-xs font-medium text-on-surface-variant">
+                {credentialNoun()} {directCredentialRequired(props.tool) ? "" : "(optional)"}
+              </label>
               <Show when={props.tool.apiKeyUrl}>
                 {(url) => (
                   <a
@@ -262,13 +449,15 @@ function ConnectModal(props: {
             </div>
             <input
               type="password"
-              placeholder="sk-..."
+              placeholder={props.tool.auth_type === "oauth2" ? "OAuth access token..." : props.tool.auth_type === "none" ? "Optional server token..." : "API key..."}
               class="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm text-on-surface placeholder-on-surface-variant/40 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
               value={apiKey()}
               onInput={(e) => {
                 setApiKey(e.currentTarget.value);
+                if (validationError()) setValidationError(null);
                 if (submitError()) setSubmitError(null);
               }}
+              required={directCredentialRequired(props.tool)}
             />
           </div>
 
@@ -393,12 +582,22 @@ function ToolCard(props: {
   connected: boolean;
   signedIn: boolean;
   onConnect: () => void;
+  onOpenConnectedApp?: () => void;
+  onInfo: () => void;
   selectMode?: boolean;
   selected?: boolean;
   connectBlockedReason?: string | null;
 }) {
   const connectBlocked = () => !props.selectMode && Boolean(props.connectBlockedReason);
   const credentialPageLabel = () => props.tool.auth_type === "oauth2" ? "Credential page" : "API key page";
+  const connectedAppName = () => props.tool.connectedAppId ? connectedAppNameById.get(props.tool.connectedAppId) : undefined;
+  const primaryAction = () => {
+    if (props.tool.connectedAppId && props.onOpenConnectedApp) {
+      props.onOpenConnectedApp();
+      return;
+    }
+    props.onConnect();
+  };
 
   return (
     <div
@@ -421,7 +620,17 @@ function ToolCard(props: {
         </span>
       </Show>
 
-      <ToolLogo tool={props.tool} />
+      <button
+        type="button"
+        class="rounded-xl outline-none focus:ring-2 focus:ring-primary/25"
+        onClick={(event) => {
+          event.stopPropagation();
+          props.onInfo();
+        }}
+        title={`More about ${props.tool.name}`}
+      >
+        <ToolLogo tool={props.tool} />
+      </button>
 
       <div class="flex-1 min-w-0">
         <p class="text-sm font-semibold text-on-surface">{props.tool.name}</p>
@@ -437,6 +646,20 @@ function ToolCard(props: {
             >
               {credentialPageLabel()}
             </a>
+          )}
+        </Show>
+        <Show when={connectedAppName()}>
+          {(name) => (
+            <button
+              type="button"
+              class="mt-1 inline-flex text-[11px] font-medium text-primary/80 underline underline-offset-2 hover:text-primary"
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onOpenConnectedApp?.();
+              }}
+            >
+              Enable via {name()}
+            </button>
           )}
         </Show>
         <Show when={props.tool.billing}>
@@ -456,6 +679,17 @@ function ToolCard(props: {
       </div>
 
       <Show when={!props.selectMode}>
+        <button
+          type="button"
+          class="flex-shrink-0 rounded-full border border-white/50 bg-white/45 px-2 py-1 text-[11px] font-semibold text-on-surface-variant transition hover:bg-white hover:text-on-surface"
+          onClick={(event) => {
+            event.stopPropagation();
+            props.onInfo();
+          }}
+          title={`More setup information for ${props.tool.name}`}
+        >
+          Info
+        </button>
         <Show
           when={!props.connected}
           fallback={
@@ -475,9 +709,18 @@ function ToolCard(props: {
                 ? "border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
                 : "border border-amber-300/50 bg-amber-50/80 text-amber-700 hover:bg-amber-100/80"
             }`}
-            onClick={props.onConnect}
+            onClick={(event) => {
+              event.stopPropagation();
+              primaryAction();
+            }}
           >
-            {connectBlocked() ? "Registry unavailable" : props.signedIn ? "Connect" : "Sign in"}
+            {connectBlocked()
+              ? "Registry unavailable"
+              : props.signedIn
+                ? props.tool.connectedAppId && props.onOpenConnectedApp
+                  ? "Enable app"
+                  : "Connect"
+                : "Sign in"}
           </button>
         </Show>
       </Show>
@@ -556,11 +799,16 @@ function recordToolUsed(slug: string) {
 
 // ── ToolsView ─────────────────────────────────────────────────────────────────
 
-export function ToolsView(props: { signedIn: boolean }) {
+export function ToolsView(props: {
+  signedIn: boolean;
+  onOpenConnectedApp?: (appId: string, label: string) => void;
+}) {
   const sessionUserId = () => readSession()?.user?.id ?? null;
   const [activeTab, setActiveTab] = createSignal<"connections" | "skills">("connections");
   const [connections, setConnections] = createSignal<McpToolConnection[]>([]);
   const [connectingTool, setConnectingTool] = createSignal<CatalogTool | null>(null);
+  const [infoTool, setInfoTool] = createSignal<CatalogTool | null>(null);
+  const [connectQueue, setConnectQueue] = createSignal<CatalogTool[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [loadError, setLoadError] = createSignal<ToolsFailureReceipt | null>(null);
   const [actionError, setActionError] = createSignal<ToolsFailureReceipt | null>(null);
@@ -673,6 +921,9 @@ export function ToolsView(props: { signedIn: boolean }) {
     if (localConnectionMode()) saveLocalToolConnections(sessionUserId(), next);
     setActionError(null);
     setConnectingTool(null);
+    const [queuedTool, ...remainingQueue] = connectQueue();
+    setConnectQueue(remainingQueue);
+    if (queuedTool) setTimeout(() => openConnect(queuedTool), 80);
   };
 
   const openConnect = (tool: CatalogTool) => {
@@ -695,6 +946,30 @@ export function ToolsView(props: { signedIn: boolean }) {
       return;
     }
     setConnectingTool(tool);
+  };
+
+  const openConnectedApp = (tool: CatalogTool) => {
+    if (!props.signedIn) {
+      setConnectNotice(`Sign in to enable ${tool.name}. App connections are only available for logged-in users.`);
+      return;
+    }
+    const appId = tool.connectedAppId;
+    if (!appId) {
+      openConnect(tool);
+      return;
+    }
+    const label = connectedAppNameById.get(appId) ?? tool.name;
+    if (!props.onOpenConnectedApp) {
+      setConnectNotice(`Open Connected Apps and filter for ${label} to enable this provider.`);
+      return;
+    }
+    props.onOpenConnectedApp(appId, label);
+  };
+
+  const startQueuedDirectConnect = (tools: CatalogTool[]) => {
+    const [nextTool, ...remainingTools] = tools;
+    setConnectQueue(remainingTools);
+    if (nextTool) openConnect(nextTool);
   };
 
   const toggleWorkspaceSkill = async (skillId: string) => {
@@ -722,11 +997,20 @@ export function ToolsView(props: { signedIn: boolean }) {
   };
 
   const bulkConnect = async () => {
-    for (const slug of selected()) {
-      const tool = CATALOG.find(t => t.slug === slug);
-      if (!tool || connectedSlugs().has(slug)) continue;
-      recordToolUsed(slug);
-      setConnectingTool(tool);
+    const targets = [...selected()]
+      .map((slug) => CATALOG.find((tool) => tool.slug === slug))
+      .filter((tool): tool is CatalogTool => tool !== undefined && !connectedSlugs().has(tool.slug));
+    const managedTargets = targets.filter((tool) => Boolean(tool.connectedAppId));
+    const directTargets = targets.filter((tool) => !tool.connectedAppId);
+    if (managedTargets.length === 1 && directTargets.length === 0) {
+      openConnectedApp(managedTargets[0]!);
+    } else if (managedTargets.length > 0) {
+      setConnectNotice(
+        `Selected ${managedTargets.length} managed app ${managedTargets.length === 1 ? "connection" : "connections"}. Open each managed app from its card so OmnyID can send you to the correct provider auth flow.`,
+      );
+    }
+    if (directTargets.length > 0) {
+      startQueuedDirectConnect(directTargets);
     }
     setSelectMode(false);
     setSelected(new Set<string>());
@@ -1045,6 +1329,8 @@ export function ToolsView(props: { signedIn: boolean }) {
                     connected={connectedSlugs().has(tool.slug)}
                     signedIn={props.signedIn}
                     onConnect={() => openConnect(tool)}
+                    onOpenConnectedApp={tool.connectedAppId ? () => openConnectedApp(tool) : undefined}
+                    onInfo={() => setInfoTool(tool)}
                     selectMode={selectMode()}
                     selected={selected().has(tool.slug)}
                     connectBlockedReason={
@@ -1154,12 +1440,36 @@ export function ToolsView(props: { signedIn: boolean }) {
         </div>
       </Show>
 
+      {/* Tool info modal */}
+      <Show when={infoTool()}>
+        {(tool) => (
+          <ToolInfoModal
+            tool={tool()}
+            signedIn={props.signedIn}
+            connected={connectedSlugs().has(tool().slug)}
+            connectedAppName={tool().connectedAppId ? connectedAppNameById.get(tool().connectedAppId!) : undefined}
+            onClose={() => setInfoTool(null)}
+            onOpenConnectedApp={tool().connectedAppId ? () => {
+              setInfoTool(null);
+              openConnectedApp(tool());
+            } : undefined}
+            onConnectDirect={() => {
+              setInfoTool(null);
+              openConnect(tool());
+            }}
+          />
+        )}
+      </Show>
+
       {/* Connect modal */}
       <Show when={connectingTool()}>
         {(tool) => (
           <ConnectModal
             tool={tool()}
-            onClose={() => setConnectingTool(null)}
+            onClose={() => {
+              setConnectQueue([]);
+              setConnectingTool(null);
+            }}
             onConnected={handleConnected}
           />
         )}
