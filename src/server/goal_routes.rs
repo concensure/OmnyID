@@ -8,6 +8,10 @@
 
 use super::*;
 
+const MAX_GOAL_NOTE_LEN: usize = 2000;
+const MAX_GOAL_PROGRESS_SIGNAL_LEN: usize = 64;
+const MAX_GOAL_AFP_MESSAGE_ID_LEN: usize = 128;
+
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/api/goals", get(list_goals_http).post(create_goal_http))
@@ -27,6 +31,30 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/api/goals/reorder", post(reorder_goals_http))
 }
 
+fn goal_list_limit(raw: Option<&str>) -> i64 {
+    raw.and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(50)
+        .clamp(1, 100)
+}
+
+fn clean_goal_optional_string(value: Option<&str>, max_len: usize) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.chars().take(max_len).collect::<String>())
+}
+
+fn clean_goal_signal_type(value: Option<&str>) -> Result<String, (StatusCode, String)> {
+    let signal = value.unwrap_or("manual").trim();
+    if signal.is_empty() || signal.len() > MAX_GOAL_PROGRESS_SIGNAL_LEN {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("signal_type must be 1-{MAX_GOAL_PROGRESS_SIGNAL_LEN} characters"),
+        ));
+    }
+    Ok(signal.to_string())
+}
+
 async fn list_goals_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -34,11 +62,7 @@ async fn list_goals_http(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     let status_filter = params.get("status").cloned().unwrap_or_default();
-    let limit: i64 = params
-        .get("limit")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(50)
-        .min(100);
+    let limit = goal_list_limit(params.get("limit").map(String::as_str));
 
     let rows = sqlx::query(
         "SELECT goal_id, domain, title, description, target_date::text as target_date, status,
@@ -361,11 +385,10 @@ async fn add_goal_progress_http(
     }
 
     let progress_id = Ulid::new().to_string();
-    let signal_type = body["signal_type"].as_str().unwrap_or("manual").to_string();
-    let note = body["note"]
-        .as_str()
-        .map(|s| s.chars().take(2000).collect::<String>());
-    let afp_message_id = body["afp_message_id"].as_str().map(|s| s.to_string());
+    let signal_type = clean_goal_signal_type(body["signal_type"].as_str())?;
+    let note = clean_goal_optional_string(body["note"].as_str(), MAX_GOAL_NOTE_LEN);
+    let afp_message_id =
+        clean_goal_optional_string(body["afp_message_id"].as_str(), MAX_GOAL_AFP_MESSAGE_ID_LEN);
 
     sqlx::query(
         "INSERT INTO user_goal_progress (progress_id, goal_id, signal_type, note, afp_message_id) \
@@ -416,4 +439,36 @@ async fn reorder_goals_http(
         .await;
     }
     Ok(Json(json!({ "ok": true })))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn goal_list_limit_is_bounded() {
+        assert_eq!(super::goal_list_limit(None), 50);
+        assert_eq!(super::goal_list_limit(Some("0")), 1);
+        assert_eq!(super::goal_list_limit(Some("-20")), 1);
+        assert_eq!(super::goal_list_limit(Some("75")), 75);
+        assert_eq!(super::goal_list_limit(Some("5000")), 100);
+    }
+
+    #[test]
+    fn goal_progress_inputs_are_trimmed_and_bounded() {
+        assert_eq!(
+            super::clean_goal_signal_type(Some(" manual ")).expect("signal"),
+            "manual"
+        );
+        assert!(super::clean_goal_signal_type(Some(" ")).is_err());
+        assert!(super::clean_goal_signal_type(Some(&"x".repeat(65))).is_err());
+        assert_eq!(
+            super::clean_goal_optional_string(Some(" note "), super::MAX_GOAL_NOTE_LEN),
+            Some("note".to_string())
+        );
+        assert_eq!(
+            super::clean_goal_optional_string(Some("x".repeat(3000).as_str()), 12)
+                .expect("trimmed")
+                .len(),
+            12
+        );
+    }
 }
