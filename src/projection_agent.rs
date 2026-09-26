@@ -209,7 +209,6 @@ fn projection_snapshot_summary(snapshot: &StateSnapshotContent) -> String {
 
 fn projection_anchor_refs_from_snapshot(snapshot: &StateSnapshotContent) -> Vec<String> {
     let mut refs = Vec::new();
-    refs.extend(snapshot.sources.iter().cloned());
     refs.extend(
         snapshot
             .decision_queue
@@ -258,6 +257,7 @@ fn projection_anchor_refs_from_snapshot(snapshot: &StateSnapshotContent) -> Vec<
                 .flat_map(|draft| draft.source_refs.iter().cloned()),
         );
     }
+    refs.extend(snapshot.sources.iter().cloned());
 
     dedupe_nonempty(refs, 12)
 }
@@ -442,5 +442,30 @@ mod tests {
             Some("surface_now")
         );
         assert!(afp["content"]["source_refs"].as_array().is_some());
+    }
+
+    #[test]
+    fn projection_anchor_refs_prioritize_active_items_before_broad_sources() {
+        let snapshot = StateSnapshotContent {
+            sources: (0..20).map(|index| format!("generic_{index}")).collect(),
+            decision_queue: vec![StateSnapshotDecisionItem {
+                id: "decision_1".to_string(),
+                label: "Approve venue payment".to_string(),
+                category: "payment".to_string(),
+                urgency: "high".to_string(),
+                confidence: "high".to_string(),
+                source_refs: vec!["urgent_decision_source".to_string()],
+                suggested_next_action: "Review payment evidence".to_string(),
+                approval_required: true,
+            }],
+            ..Default::default()
+        };
+
+        let anchors = projection_anchor_refs_from_snapshot(&snapshot);
+
+        assert_eq!(anchors.len(), 12);
+        assert_eq!(anchors[0], "urgent_decision_source");
+        assert!(anchors.contains(&"generic_0".to_string()));
+        assert!(!anchors.contains(&"generic_19".to_string()));
     }
 }

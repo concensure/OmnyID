@@ -470,6 +470,7 @@ Now that Phases 3-5 are functionally wired, the most sensible concrete next pass
 2. Calibration and scale validation
    - compact trend state now exposes calibration readiness from snapshot sample history, watcher fallback, stable/variable/spiky sample volatility review, and sparse mixed-history metric coverage
    - topology retrieval now bounds large shared-neighborhood fan-out while preserving fresh project context under result limits
+   - projection anchor selection now prioritizes active queue/watch context before broad snapshot sources in large workspaces
    - test derivative thresholds, topology resurfacing, and proactive policies against larger real workspaces before personalizing thresholds
    - keep reader compatibility and metadata-first behavior
 
@@ -503,7 +504,7 @@ Release validation commands already exercised locally:
 
 What remains incomplete or calibration-sensitive:
 
-- thresholds and resurfacing weights now have conservative UI calibration visibility plus sample-volatility, sparse-coverage, and bounded topology fan-out review, but still need tuning against larger real-world workspaces
+- thresholds and resurfacing weights now have conservative UI calibration visibility plus sample-volatility, sparse-coverage, bounded topology fan-out, and active-anchor prioritization review, but still need tuning against larger real-world workspaces
 - A2UI now has compact proactive provenance/policy summaries, watcher-signal chips, and continuity trend bars
 - escalation uses bounded thresholds, but those thresholds are still static and not yet personalized by user profile or longer-horizon behavioral calibration
 - opt-in live database smoke coverage passed against local compose Postgres; rerun against the deployed Postgres path before final release sign-off if that differs from local compose
