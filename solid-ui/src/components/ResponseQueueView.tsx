@@ -10,19 +10,31 @@ import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationAr
 import { WeddingPlannerWalkthrough } from "@/components/WeddingPlannerWalkthrough";
 import { WeddingResponseWorkspaceView } from "@/components/WeddingResponseWorkspaceView";
 import { WeddingRichResponseView } from "@/components/WeddingRichResponseView";
+import { WorkspaceSetupBanner } from "@/components/WorkspaceSetupBanner";
+import { WeddingSiteIntakeWizard } from "@/components/WeddingSiteIntakeWizard";
 import { RailIcon, type IconId } from "@/components/RailIcons";
 import {
   loadWeddingWorkspaceMenu,
   loadWeddingWorkspaceMenuFromUrl,
+  isWeddingWorkspaceMenuId,
   replaceWeddingWorkspaceMenuInUrl,
   saveWeddingWorkspaceMenu,
   weddingWorkspaceMenuBadge,
   weddingWorkspaceMenuHint,
   type WeddingWorkspaceMenuId,
 } from "@/lib/weddingWorkspaceMenuState";
+import { saveWeddingReturnIntent } from "@/lib/weddingReturnIntentState";
 import {
+  loadWeddingEntrySource,
+  loadWeddingIntakeVariantShown,
+  saveWeddingIntakeVariantShown,
+  type WeddingEntrySource,
+} from "@/lib/weddingEntrySourceState";
+import {
+  fetchWeddingOnboardingState,
   fetchWeddingVendors,
   recordWeddingVendorContact,
+  saveWeddingOnboardingState,
   sendAfpMessage,
   uploadFilePayload,
   type WeddingVendor,
@@ -81,7 +93,12 @@ import {
 import { buildWeddingNeedToKnowExtractionState } from "@/lib/weddingNeedToKnowExtractionState";
 import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
 import { buildWeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchState";
-import { weddingVendorContactProjectionRequests } from "@/lib/weddingVendorContactProjectionState";
+import {
+  weddingVendorContactProjectionRequests,
+  weddingVendorReplyInputsFromAfpMessages,
+  weddingVendorReplyProjectionRequests,
+  type WeddingVendorReplyKnownContact,
+} from "@/lib/weddingVendorContactProjectionState";
 import { loadWeddingWorkspaceRefreshState, type WeddingWorkspaceRefreshState } from "@/lib/weddingWorkspaceRefreshState";
 import {
   buildWeddingImportSynthesisState,
@@ -132,6 +149,14 @@ const WEDDING_WORKSPACE_MENU_ITEMS: Array<{
     activeClassName: "border-amber-300 bg-amber-100 text-amber-950",
   },
   {
+    id: "inspiration",
+    icon: "discover",
+    label: "Inspiration",
+    title: "Add photos, screenshots, links, and thoughts so OmnyID can learn the wedding style.",
+    className: "border-rose-100 bg-rose-50/80 text-rose-950 hover:border-rose-200",
+    activeClassName: "border-rose-300 bg-rose-100 text-rose-950",
+  },
+  {
     id: "seating",
     icon: "seating",
     label: "Seating",
@@ -166,8 +191,8 @@ const WEDDING_WORKSPACE_MENU_ITEMS: Array<{
   {
     id: "advanced",
     icon: "tools",
-    label: "Advanced setup",
-    title: "Connection, approval, and launch checks. Most couples can leave this closed.",
+    label: "Setup checks",
+    title: "Connection and safety checks. Most couples can leave this closed.",
     className: "border-stone-200 bg-stone-50/80 text-stone-800 hover:border-stone-300",
     activeClassName: "border-stone-400 bg-stone-100 text-stone-950",
   },
@@ -274,7 +299,7 @@ function normalizedVowPreferenceAnswer(value: string): "" | "standard" | "create
 
 export function ResponseQueueView(props: {
   bootstrap: DashboardBootstrap | null;
-  onNavigate?: (view: ViewName) => void;
+  onNavigate?: (view: ViewName, hint?: string) => void;
 }) {
   const bootstrap = createMemo(() => props.bootstrap);
   const queueCompanion = createMemo(() => decisionOsQueueCompanionState(bootstrap()));
@@ -284,6 +309,9 @@ export function ResponseQueueView(props: {
     setWeddingWorkspaceMenuSignal(id);
     saveWeddingWorkspaceMenu(id);
     if (typeof window !== "undefined") replaceWeddingWorkspaceMenuInUrl(id);
+    if (typeof document !== "undefined") {
+      document.getElementById("wedding-tabpanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
   function handleWeddingMenuTabKeyDown(event: KeyboardEvent, currentIndex: number) {
     const nextIndex = weddingMenuKeyDownStep(event.key, currentIndex, WEDDING_WORKSPACE_MENU_ITEMS.length);
@@ -306,6 +334,7 @@ export function ResponseQueueView(props: {
   const [weddingRefreshState, setWeddingRefreshState] = createSignal<WeddingWorkspaceRefreshState | null>(null);
   const [weddingVendorDirectory, setWeddingVendorDirectory] = createSignal<WeddingVendor[]>([]);
   const [weddingVendorDirectoryRequestKey, setWeddingVendorDirectoryRequestKey] = createSignal("");
+  const syncedWeddingVendorReplyContactKeys = new Set<string>();
   const [weddingFollowUpDate, setWeddingFollowUpDate] = createSignal("");
   const [weddingFollowUpLocation, setWeddingFollowUpLocation] = createSignal("");
   const [weddingFollowUpGuests, setWeddingFollowUpGuests] = createSignal("");
@@ -342,6 +371,17 @@ export function ResponseQueueView(props: {
     setWeddingVendorDirectoryRequestKey(requestKey);
     void refreshWeddingVendorDirectory(requestKey);
   });
+  createEffect(() => {
+    const intent = weddingNavigationIntent();
+    if (intent?.surface === "budget" && weddingWorkspaceMenu() !== "budget") {
+      setWeddingWorkspaceMenu("budget");
+    }
+  });
+  createEffect(() => {
+    const refresh = weddingRefreshState();
+    if (!refresh || refresh.status === "skipped") return;
+    void recordWeddingVendorRepliesFromMessages(refresh.messages, weddingVendorDirectory());
+  });
   const weddingApprovalHandlers = createMemo(() => buildWeddingDefaultApprovalExecutionHandlers());
   const weddingTemplateLaunch = createMemo(() => {
     const intent = weddingNavigationIntent();
@@ -352,6 +392,68 @@ export function ResponseQueueView(props: {
       sourceResponseId: intent.sourceResponseId,
     });
   });
+  // Single arbiter for the wedding intake: once a real, persisted workspace exists for this
+  // plan, neither intake variant shows again, no matter how the user re-arrives (wedding-site
+  // relaunch or the in-app Templates gallery both dispatch a fresh, sourceResponseId-less
+  // intent that would otherwise re-trigger the form on top of an already-populated workspace).
+  const weddingIntakeActive = createMemo(() => Boolean(weddingTemplateLaunch()) && !weddingWorkspace());
+  // Which intake variant a signed-in user has already been shown is the account's, not the
+  // browser's, so it can't flip on a second device. Checked once per plan; a local lock (or
+  // the current entry source) is used optimistically while the account check is in flight, so
+  // a repeat visit on the SAME browser never has to wait on the network to show something.
+  const [weddingAccountOnboardingRequestedPlanId, setWeddingAccountOnboardingRequestedPlanId] = createSignal<string | null>(null);
+  // Set only once the fetch actually completes (success or failure) — distinct from the
+  // "requested" signal above, which fires immediately and only guards against re-fetching.
+  const [weddingAccountOnboardingResolvedPlanId, setWeddingAccountOnboardingResolvedPlanId] = createSignal<string | null>(null);
+  const [weddingAccountOnboardingVariant, setWeddingAccountOnboardingVariant] = createSignal<WeddingEntrySource | null>(null);
+  createEffect(() => {
+    const launch = weddingTemplateLaunch();
+    if (!launch || !weddingIntakeActive() || !weddingSignedIn()) return;
+    const planId = launch.metadata.weddingPlanId;
+    if (weddingAccountOnboardingRequestedPlanId() === planId) return;
+    setWeddingAccountOnboardingRequestedPlanId(planId);
+    void fetchWeddingOnboardingState(planId)
+      .then((response) => setWeddingAccountOnboardingVariant(response.onboardingState?.intakeVariant ?? null))
+      .catch(() => setWeddingAccountOnboardingVariant(null))
+      .finally(() => setWeddingAccountOnboardingResolvedPlanId(planId));
+  });
+  // Which intake variant to show is locked in per wedding plan the first time it's decided,
+  // so a mid-flow entry-source change (e.g. the same browser later visiting the Templates
+  // gallery) can't flip the form out from under a user partway through answering it. For a
+  // signed-in user whose account has no confirmed variant yet AND no local trace on this
+  // browser either (a genuinely first-ever visit, on any device), nothing shows until the
+  // account check resolves, rather than briefly showing one variant and swapping to the other.
+  const weddingIntakeVariant = createMemo<WeddingEntrySource | null>(() => {
+    const launch = weddingTemplateLaunch();
+    if (!launch || !weddingIntakeActive()) return null;
+    const planId = launch.metadata.weddingPlanId;
+    const accountVariant = weddingAccountOnboardingVariant();
+    if (accountVariant) return accountVariant;
+    const localVariant = loadWeddingIntakeVariantShown(planId);
+    if (localVariant) return localVariant;
+    if (weddingSignedIn() && weddingAccountOnboardingResolvedPlanId() !== planId) return null;
+    return loadWeddingEntrySource() === "wedding_site" ? "wedding_site" : "generic";
+  });
+  createEffect(() => {
+    const launch = weddingTemplateLaunch();
+    const variant = weddingIntakeVariant();
+    if (!launch || !variant) return;
+    saveWeddingIntakeVariantShown(launch.metadata.weddingPlanId, variant);
+    if (weddingSignedIn()) {
+      const entrySource = loadWeddingEntrySource() ?? "generic";
+      void saveWeddingOnboardingState(launch.metadata.weddingPlanId, variant, entrySource)
+        .then((response) => {
+          if (response.onboardingState) setWeddingAccountOnboardingVariant(response.onboardingState.intakeVariant);
+        })
+        .catch(() => {});
+    }
+  });
+  const activeGenericWeddingLaunch = createMemo(() => (
+    weddingIntakeVariant() === "generic" ? weddingTemplateLaunch() : null
+  ));
+  const activeWeddingSiteLaunch = createMemo(() => (
+    weddingIntakeVariant() === "wedding_site" ? weddingTemplateLaunch() : null
+  ));
   const weddingTemplateFollowUp = createMemo(() => {
     const intent = weddingNavigationIntent();
     if (!intent || intent.surface !== "planning_files" || intent.sourceResponseId || !weddingFollowUpRequested()) {
@@ -402,7 +504,19 @@ export function ResponseQueueView(props: {
       responseWorkspaceId: intent.responseWorkspaceId,
       sourceResponseId: intent.sourceResponseId,
     });
-    if (persisted.hasPersistedData) {
+    const persistedHasWorkspaceContent = persisted.artifacts.length > 0
+      || persisted.contextItems.length > 0
+      || persisted.approvalReceipts.length > 0
+      || persisted.decisionRecords.length > 0
+      || persisted.decisionDeferrals.length > 0
+      || persisted.boundaryObjects.length > 0
+      || persisted.seatingConstraints.length > 0
+      || persisted.seatingOptimizations.length > 0
+      || persisted.seatingDraftArchives.length > 0
+      || persisted.inspirationItems.length > 0
+      || persisted.scheduleItems.length > 0
+      || persisted.taskItems.length > 0;
+    if (persistedHasWorkspaceContent) {
       const persistedSummaries = normalizeWeddingArtifactSummaries(persisted.artifacts);
       const graph = buildWeddingRecommendationExplanationState(buildWeddingKnowledgeGraphState({
         metadata: persisted.metadata,
@@ -410,6 +524,10 @@ export function ResponseQueueView(props: {
         scheduleItems: persisted.scheduleItems,
         taskItems: persisted.taskItems,
         decisions: weddingPersistedDecisionRecordsToGraphDecisions(persisted.decisionRecords),
+        seatingConstraints: persisted.seatingConstraints,
+        seatingOptimizations: persisted.seatingOptimizations,
+        seatingDraftArchiveFingerprints: persisted.seatingDraftArchives.map((archive) => archive.fingerprint),
+        inspirationItems: persisted.inspirationItems,
       }));
       return buildWeddingResponseWorkspaceViewState({
         metadata: persisted.metadata,
@@ -418,7 +536,12 @@ export function ResponseQueueView(props: {
         contextItems: persisted.contextItems,
         approvalReceipts: persisted.approvalReceipts,
         decisionRecords: persisted.decisionRecords,
+        decisionDeferrals: persisted.decisionDeferrals,
         boundaryObjects: persisted.boundaryObjects,
+        seatingConstraints: persisted.seatingConstraints,
+        seatingOptimizations: persisted.seatingOptimizations,
+        seatingDraftArchives: persisted.seatingDraftArchives,
+        inspirationItems: persisted.inspirationItems,
         query: weddingWorkspaceQuery(),
         activeArtifactId: activeWeddingArtifactId() ?? intent.artifactId,
         recommendations: graph,
@@ -439,6 +562,11 @@ export function ResponseQueueView(props: {
         artifacts: [...followUp.artifacts, ...importedArtifactInputs],
         generatedArtifacts: [...followUp.generatedArtifacts, ...importedArtifacts],
         contextItems: [followUp.contextProjection],
+        decisionDeferrals: persisted.decisionDeferrals,
+        seatingConstraints: persisted.seatingConstraints,
+        seatingOptimizations: persisted.seatingOptimizations,
+        seatingDraftArchives: persisted.seatingDraftArchives,
+        inspirationItems: persisted.inspirationItems,
         query: weddingWorkspaceQuery(),
         activeArtifactId: activeWeddingArtifactId() ?? intent.artifactId,
         scheduleItems: followUp.scheduleItems,
@@ -453,6 +581,11 @@ export function ResponseQueueView(props: {
         metadata: launch.metadata,
         artifacts: [...launch.artifactGeneration.artifactInputs, ...importedArtifactInputs],
         generatedArtifacts: [...launch.artifactGeneration.artifacts, ...importedArtifacts],
+        decisionDeferrals: persisted.decisionDeferrals,
+        seatingConstraints: persisted.seatingConstraints,
+        seatingOptimizations: persisted.seatingOptimizations,
+        seatingDraftArchives: persisted.seatingDraftArchives,
+        inspirationItems: persisted.inspirationItems,
         query: weddingWorkspaceQuery(),
         activeArtifactId: activeWeddingArtifactId() ?? intent.artifactId,
         weddingVendors: weddingVendorDirectory(),
@@ -497,6 +630,11 @@ export function ResponseQueueView(props: {
       query: weddingWorkspaceQuery(),
       activeArtifactId: activeWeddingArtifactId() ?? intent.artifactId,
       recommendations: graph,
+      decisionDeferrals: persisted.decisionDeferrals,
+      seatingConstraints: persisted.seatingConstraints,
+      seatingOptimizations: persisted.seatingOptimizations,
+      seatingDraftArchives: persisted.seatingDraftArchives,
+      inspirationItems: persisted.inspirationItems,
       generatedArtifacts: [...generatedArtifacts, ...importedArtifacts],
       scheduleItems,
       taskItems,
@@ -571,6 +709,48 @@ export function ResponseQueueView(props: {
     void refreshWeddingVendorDirectory();
   }
 
+  function vendorReplyKnownContactsFromDirectory(vendors: readonly WeddingVendor[]): WeddingVendorReplyKnownContact[] {
+    return vendors.map((vendor) => ({
+      vendorId: vendor.vendorId,
+      vendorName: vendor.vendorName,
+      threadId: vendor.userContact?.threadId,
+      receiptRef: vendor.userContact?.receiptRef,
+    }));
+  }
+
+  function vendorReplyContactSyncKey(request: ReturnType<typeof weddingVendorReplyProjectionRequests>[number]): string {
+    return [
+      request.vendorId,
+      request.body.thread_id ?? "",
+      request.body.receipt_ref ?? "",
+      request.body.response_received_at ?? "",
+    ].join("|");
+  }
+
+  async function recordWeddingVendorRepliesFromMessages(
+    messages: WeddingWorkspaceRefreshState["messages"],
+    vendors: readonly WeddingVendor[],
+  ) {
+    if (!weddingSignedIn()) return;
+    const knownContacts = vendorReplyKnownContactsFromDirectory(vendors);
+    const replies = weddingVendorReplyInputsFromAfpMessages({ messages, knownContacts });
+    const requests = weddingVendorReplyProjectionRequests({
+      replies,
+      knownContacts,
+      nowIso: new Date().toISOString(),
+    }).filter((request) => {
+      const key = vendorReplyContactSyncKey(request);
+      if (syncedWeddingVendorReplyContactKeys.has(key)) return false;
+      syncedWeddingVendorReplyContactKeys.add(key);
+      return true;
+    });
+    if (requests.length === 0) return;
+    await Promise.allSettled(requests.map((request) =>
+      recordWeddingVendorContact(request.vendorId, request.body),
+    ));
+    void refreshWeddingVendorDirectory();
+  }
+
   async function refreshWeddingWorkspaceMessages(
     intent = weddingNavigationIntent(),
   ) {
@@ -631,6 +811,14 @@ export function ResponseQueueView(props: {
   function runWeddingWorkspaceAction(action: WeddingWorkspaceSidebarAction) {
     const intent = weddingNavigationIntent();
     if (!intent || !action.enabled) return;
+    if (action.kind === "open_workspace_menu") {
+      const menuId = action.metadata?.wedding_workspace_menu;
+      if (typeof menuId === "string" && isWeddingWorkspaceMenuId(menuId)) {
+        setWeddingWorkspaceMenu(menuId);
+      }
+      return;
+    }
+    if (action.kind === "open_budget") setWeddingWorkspaceMenu("budget");
     const workspace = weddingWorkspace();
     const handoffMetadata = workspace
       ? {
@@ -651,11 +839,28 @@ export function ResponseQueueView(props: {
         ...(action.metadata ?? {}),
       },
     });
+    if (nextIntent.view === "response_queue") {
+      setWeddingNavigationIntent({ ...nextIntent, savedAt: new Date().toISOString() });
+      if (nextIntent.surface === "planning_files") setWeddingWorkspaceMenu("home");
+      if (nextIntent.surface === "map") setWeddingWorkspaceMenu("home");
+      if (nextIntent.artifactId) {
+        setActiveWeddingArtifactId(nextIntent.artifactId);
+      }
+    }
     dispatchWeddingNavigationIntent(nextIntent);
   }
 
   function runWeddingRichResponseAction(action: WeddingRichResponseAction) {
-    dispatchWeddingNavigationIntent(buildWeddingNavigationIntentFromPresentationAction(action));
+    const nextIntent = buildWeddingNavigationIntentFromPresentationAction(action);
+    if (nextIntent.view === "response_queue") {
+      setWeddingNavigationIntent({ ...nextIntent, savedAt: new Date().toISOString() });
+      if (nextIntent.surface === "planning_files") setWeddingWorkspaceMenu("home");
+      if (nextIntent.surface === "map") setWeddingWorkspaceMenu("home");
+      if (nextIntent.artifactId) {
+        setActiveWeddingArtifactId(nextIntent.artifactId);
+      }
+    }
+    dispatchWeddingNavigationIntent(nextIntent);
   }
 
   function toggleWeddingVendorSelection(vendorId: string, selected: boolean) {
@@ -882,19 +1087,19 @@ export function ResponseQueueView(props: {
               ? "cursor-wait border-teal-100 bg-white/50 text-teal-900/50"
               : "border-teal-200 bg-white/85 text-teal-950 hover:border-teal-300 hover:bg-white"
           }`}>
-            {weddingImportRunning() ? "Importing..." : "Upload lists"}
+            {weddingImportRunning() ? "Importing..." : "Upload files"}
             <input
               type="file"
               class="sr-only"
               multiple
-              accept=".csv,.tsv,.txt,.xls,.xlsx,text/csv,text/tab-separated-values,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              accept=".csv,.tsv,.txt,.xls,.xlsx,.pdf,.doc,.docx,text/csv,text/tab-separated-values,text/plain,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               disabled={weddingImportRunning()}
               onChange={importWeddingFilesFromHeader}
             />
             <span class="pointer-events-none absolute right-0 top-[calc(100%+0.5rem)] z-30 w-72 rounded-2xl border border-teal-100 bg-white px-3 py-2 text-left text-xs font-normal leading-5 text-teal-950 opacity-0 shadow-xl transition group-hover:opacity-100 group-focus-within:opacity-100">
               <span class="block font-semibold">Bring in your existing lists</span>
               <span class="mt-1 block">
-                Upload guest lists, budgets, spreadsheets, Google Sheets exports, or The Knot exports. OmnyID will organize what it can and keep the original files for later.
+                Upload guest lists, budgets, spreadsheets, vendor quotes, contracts, Google Sheets exports, or The Knot exports. OmnyID will organize what it can and keep the original files for later.
               </span>
             </span>
           </label>
@@ -926,11 +1131,21 @@ export function ResponseQueueView(props: {
         )}
       </Show>
 
+      <Show when={weddingWorkspace() && weddingWorkspaceMenu() === "home"}>
+        <WorkspaceSetupBanner
+          signedIn={weddingSignedIn()}
+          onNavigate={(view, hint) => {
+            saveWeddingReturnIntent();
+            props.onNavigate?.(view as ViewName, hint);
+          }}
+        />
+      </Show>
+
       <Show when={weddingWorkspace() && weddingWorkspaceMenu() === "home" && incompleteWeddingSetupChecklist().length > 0}>
         <section class="rounded-[24px] border border-rose-100/80 bg-white/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
           <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p class="text-sm font-semibold text-rose-950">Start here</p>
+              <p class="text-sm font-semibold text-rose-950">Then add your wedding details</p>
               <p class="mt-1 text-sm leading-6 text-rose-900/70">
                 Add the basics once, then OmnyID can keep the rest of the planner connected.
               </p>
@@ -962,7 +1177,9 @@ export function ResponseQueueView(props: {
         </section>
       </Show>
 
-      <Show when={!weddingWorkspace()}>
+      {/* Suppressed while an intake form is the active next step — its "Open wedding
+          documents" copy assumes a response already exists, which isn't true yet here. */}
+      <Show when={!weddingWorkspace() && !weddingIntakeActive()}>
         <WeddingNavigationArrivalBanner
           state={weddingArrivalBanner()}
           onAction={runWeddingArrivalAction}
@@ -977,11 +1194,11 @@ export function ResponseQueueView(props: {
         />
       </Show>
 
-      <Show when={weddingTemplateLaunch()}>
+      <Show when={activeGenericWeddingLaunch()}>
         {(launch) => (
           <section class="min-w-0 rounded-[24px] border border-rose-100/80 bg-[linear-gradient(135deg,rgba(255,241,242,0.96),rgba(255,251,235,0.94))] p-3 shadow-card sm:rounded-[28px] sm:p-4">
             <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-rose-700/70">
-              Wedding template launch
+              Let's set up your wedding
             </p>
             <h2 class="mt-1 break-words text-lg font-semibold text-on-surface">{launch().presentation.title}</h2>
             <p class="mt-1 break-words text-sm leading-6 text-on-surface-variant">{launch().nextQuestionLabel}</p>
@@ -990,7 +1207,7 @@ export function ResponseQueueView(props: {
             </p>
             <div class="mt-4 grid min-w-0 gap-3 rounded-[24px] border border-white/70 bg-white/65 p-3 md:grid-cols-3">
               <label class="space-y-1 text-xs font-semibold text-on-surface md:col-span-3">
-                Paste a planning message
+                Paste a planning message for the fastest start — or skip to the fields below. Everything here can be changed later.
                 <textarea
                   class="min-h-28 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
                   value={weddingExtractionText()}
@@ -1103,7 +1320,11 @@ export function ResponseQueueView(props: {
                   </p>
                 </Show>
               </div>
-              <div class="min-w-0 space-y-3 rounded-[24px] border border-rose-100 bg-white/70 p-3 md:col-span-3">
+              <details class="md:col-span-3 rounded-[24px] border border-rose-100 bg-white/70 p-3">
+                <summary class="cursor-pointer text-sm font-semibold text-on-surface">
+                  Legal &amp; vows (optional — can add later)
+                </summary>
+              <div class="mt-3 min-w-0 space-y-3">
                 <div>
                   <p class="text-xs font-semibold text-on-surface">Vow preparation</p>
                   <p class="mt-0.5 break-words text-[11px] leading-5 text-on-surface-variant">
@@ -1197,6 +1418,7 @@ export function ResponseQueueView(props: {
                   </select>
                 </label>
               </div>
+              </details>
               <div class="md:col-span-3">
                 <button
                   class="w-full rounded-full bg-rose-900 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-rose-800 sm:w-auto sm:py-2"
@@ -1240,6 +1462,45 @@ export function ResponseQueueView(props: {
         )}
       </Show>
 
+      <Show when={activeWeddingSiteLaunch()}>
+        {(launch) => (
+          <WeddingSiteIntakeWizard
+            launch={launch()}
+            weddingExtractionText={weddingExtractionText}
+            onWeddingExtractionTextInput={setWeddingExtractionText}
+            onExtractFromMessage={extractWeddingFollowUpFromMessage}
+            weddingExtractionNotice={weddingExtractionNotice}
+            weddingFollowUpDate={weddingFollowUpDate}
+            onWeddingFollowUpDateInput={setWeddingFollowUpDate}
+            weddingFollowUpLocation={weddingFollowUpLocation}
+            onWeddingFollowUpLocationInput={setWeddingFollowUpLocation}
+            weddingFollowUpGuests={weddingFollowUpGuests}
+            onWeddingFollowUpGuestsInput={setWeddingFollowUpGuests}
+            weddingFollowUpBudget={weddingFollowUpBudget}
+            onWeddingFollowUpBudgetInput={setWeddingFollowUpBudget}
+            weddingFollowUpPriorities={weddingFollowUpPriorities}
+            onWeddingFollowUpPrioritiesInput={setWeddingFollowUpPriorities}
+            weddingFollowUpVendorIds={weddingFollowUpVendorIds}
+            onClearVendors={() => setWeddingFollowUpVendorIds([])}
+            onToggleVendor={toggleWeddingVendorSelection}
+            weddingFollowUpVowPreference={weddingFollowUpVowPreference}
+            onWeddingFollowUpVowPreferenceChange={setWeddingFollowUpVowPreference}
+            weddingFollowUpVowStyle={weddingFollowUpVowStyle}
+            onWeddingFollowUpVowStyleChange={setWeddingFollowUpVowStyle}
+            weddingFollowUpRelationshipFacts={weddingFollowUpRelationshipFacts}
+            onWeddingFollowUpRelationshipFactsInput={setWeddingFollowUpRelationshipFacts}
+            weddingFollowUpVowChecklist={weddingFollowUpVowChecklist}
+            onWeddingFollowUpVowChecklistInput={setWeddingFollowUpVowChecklist}
+            weddingFollowUpNoim={weddingFollowUpNoim}
+            onWeddingFollowUpNoimChange={setWeddingFollowUpNoim}
+            weddingFollowUpCelebrant={weddingFollowUpCelebrant}
+            onWeddingFollowUpCelebrantChange={setWeddingFollowUpCelebrant}
+            onGenerateFollowUp={generateWeddingFollowUp}
+            weddingTemplateFollowUp={weddingTemplateFollowUp}
+          />
+        )}
+      </Show>
+
       <Show when={weddingRichResponse()}>
         {(richResponse) => (
           <WeddingRichResponseView
@@ -1275,7 +1536,11 @@ export function ResponseQueueView(props: {
             }}
             onReviewBlockedOutputs={() => props.onNavigate?.("decision_queue")}
             onOpenSavedOutputs={() => props.onNavigate?.("files")}
-            onProviderSetup={(view) => props.onNavigate?.(view)}
+            onProviderSetup={(view) => {
+              saveWeddingReturnIntent();
+              props.onNavigate?.(view);
+            }}
+            onSelectMenu={setWeddingWorkspaceMenu}
             compact={viewState().responseSurfaceCompactMode}
           />
         )}

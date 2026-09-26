@@ -1402,7 +1402,10 @@ function App() {
     const next = paraViewEnabled()
       ? [...entries]
       : entries.filter((entry) => entry !== "para");
-    return next.length > 0 ? next : ["home"];
+    const withoutAdjacentDuplicates = next.filter((entry, index) => index === 0 || entry !== next[index - 1]);
+    if (withoutAdjacentDuplicates.length === 0) return ["home"];
+    if (withoutAdjacentDuplicates[0] !== "home") return (["home", ...withoutAdjacentDuplicates] as ViewName[]).slice(-5);
+    return withoutAdjacentDuplicates;
   }
 
   function persistThreadSessionHistory(next: ReturnType<typeof threadSessionHistory>) {
@@ -1439,8 +1442,8 @@ function App() {
       const total = new Set(dashboardBootstrapMessages(workspaceBootstrap()).map((m) => m.thread_id)).size;
       seenThreadCount = saveThreadSeenCount(userId(), total);
     }
-    // Reset breadcrumb to a single entry when returning to top-level views
-    if (nextView === "home" || nextView === "search") {
+    // Reset only at Home; other views keep a clickable return trail.
+    if (nextView === "home") {
       setNavTrail(normalizedNavTrailEntries([nextView]));
     } else {
       addToNavTrail(nextView);
@@ -3319,13 +3322,13 @@ function App() {
                   <span class="text-[11px] text-green-700 flex items-center gap-1">
                     <span>✓</span> Signed in
                   </span>
-                  <a
-                    role="button"
+                  <button
+                    type="button"
                     class="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                    onClick={() => { selectView("agent_settings"); setAgentSettingsFocusLlm(true); }}
+                    onClick={() => { setAgentSettingsFocusLlm(true); setAgentSettingsFocusTab("llm"); selectView("agent_settings"); }}
                   >
                     <span class="text-amber-500">○</span> Connect AI model →
-                  </a>
+                  </button>
                 </div>
               </div>
               <span class="text-[10px] text-amber-600/70 flex-shrink-0">Step 1 of 2</span>
@@ -3525,7 +3528,13 @@ function App() {
                     commandSummary={commandResult() ? undefined : undefined}
                     advanced={advanced()}
                     onOpenThread={openThread}
-                    onNavigate={(view, _hint) => selectKnownView(view)}
+                    onNavigate={(view, hint) => {
+                      if (view === "agent_settings" && hint === "llm") {
+                        setAgentSettingsFocusLlm(true);
+                        setAgentSettingsFocusTab("llm");
+                      }
+                      selectKnownView(view);
+                    }}
                   />
                 </Suspense>
               </div>
@@ -3743,7 +3752,16 @@ function App() {
             <Show when={activeView() === "response_queue" && (Boolean(session()?.token) || guestUsesSampleWorkspace())}>
               <Suspense fallback={<LazyViewFallback label="Response Queue" />}>
                 <div class="view-enter">
-                  <LazyResponseQueueView bootstrap={workspaceBootstrap()} onNavigate={selectView} />
+                  <LazyResponseQueueView
+                    bootstrap={workspaceBootstrap()}
+                    onNavigate={(view, hint) => {
+                      if (view === "agent_settings" && hint === "llm") {
+                        setAgentSettingsFocusLlm(true);
+                        setAgentSettingsFocusTab("llm");
+                      }
+                      selectView(view);
+                    }}
+                  />
                 </div>
               </Suspense>
             </Show>

@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { approvalModeLabel } from "afp-ts/continuity";
-import { apiFetch, applyRuntimeUpdate, checkRuntimeUpdates, createRuntimeBackupSnapshot, createRuntimeRestoreDrill, deleteCapability, fetchLlmConfig, fetchRuntimeBackupManifest, fetchRuntimeRecoveryPacket, listCapabilities, patchCapability, pingLlmConfig, registerCapability, saveLlmConfig, setRuntimeBackupRetention, setRuntimeUpdatePolicy, updateDeviceSyncPolicyProfile, type CapabilityDescriptor, type DeviceSyncPolicyEntry, type LlmConfig, type RuntimeBackupManifestResponse, type RuntimeBackupsResponse, type RuntimeRestoreDrillsResponse, type RuntimeUpdatesResponse } from "@/lib/api";
+import { applyRuntimeUpdate, checkRuntimeUpdates, createRuntimeBackupSnapshot, createRuntimeRestoreDrill, deleteCapability, fetchLlmConfig, fetchRuntimeBackupManifest, fetchRuntimeRecoveryPacket, getFleetMasterInstance, listCapabilities, patchCapability, pingLlmConfig, readSession, registerCapability, saveLlmConfig, setRuntimeBackupRetention, setRuntimeUpdatePolicy, updateAgentSoulMd, updateDeviceSyncPolicyProfile, type CapabilityDescriptor, type DashboardBootstrap, type DeviceSyncPolicyEntry, type LlmConfig, type RuntimeBackupManifestResponse, type RuntimeBackupsResponse, type RuntimeRecoveryPacketResponse, type RuntimeRestoreDrillsResponse, type RuntimeUpdatesResponse } from "@/lib/api";
 import { AddCapabilityModal } from "./AddCapabilityModal";
 import { OnboardingWizard } from "./OnboardingWizard";
 import { SoulEditorModal } from "./SoulEditorModal";
@@ -14,39 +14,152 @@ import {
   byteCountLabel,
   dateTimeLabel,
   durationLabel,
-  earliestTimestampValue,
-  expiredTimestampCount,
-  futureTimestampCount,
   latestTimestampValue,
-  nextFutureTimestampValue,
   relativeTimeLabel,
-  totalNumber,
 } from "@/lib/agentSettingsRuntimeFormat";
 import { exportAgentIdentityCard } from "@/lib/exportAgentIdentityCard";
 import { exportSovereignDataBundle as exportSovereignDataBundleFile } from "@/lib/exportSovereignDataBundle";
 import { dispatchDashboardRefreshEvent } from "@/lib/dashboardRefreshEvent";
-import { supportAccessHistoryLines as formatSupportAccessHistoryLines } from "@/lib/supportAccessHistoryFormat";
+import { buildBillingUpgradeMailtoHref } from "@/lib/billingUpgradeState";
+import { supportAccessHistoryCards } from "@/lib/supportAccessHistoryFormat";
 import {
   compactSummaryLines,
-  compactSummaryLinesExcluding,
-  deviceSyncSliceSummaryLines,
 } from "@/lib/agentSettingsSummaryFormat";
 import {
-  runtimeManifestSummaryLines,
-  runtimeStatusPanelLines,
-} from "@/lib/agentSettingsRuntimeSummaryFormat";
-
-type AgentInstance = {
-  soul_md?: string;
-  lora_confidence_score?: number;
-  lora_genome_active?: boolean;
-  is_master?: boolean;
-};
-
-type SummaryItem = {
-  label: string;
-  value: string | number;
-};
+  runtimeBackupSummaryRows,
+  runtimeRestoreDrillSummaryRows,
+  supportAccessSummaryRows,
+  type AgentSettingsSummaryRow,
+} from "@/lib/agentSettingsSummaryRowsState";
+import {
+  deviceSyncPolicyCardStates,
+  deviceSyncLocalKeysLabel,
+  deviceSyncProvisionedLabel,
+  deviceSyncRuntimeHasSummary,
+  deviceSyncRuntimeSummaryCardState,
+  deviceSyncUsedLabel,
+} from "@/lib/deviceSyncRuntimeState";
+import {
+  runtimeOperationsOverviewRows,
+  runtimeUpdateEventCards,
+} from "@/lib/runtimeOperationsState";
+import {
+  runtimeBackupManifestReviewState as buildRuntimeBackupManifestReviewState,
+} from "@/lib/runtimeBackupManifestState";
+import {
+  runtimeDeploymentHostedCard,
+} from "@/lib/runtimeDeploymentState";
+import {
+  simulatorRuntimeHasSummary,
+  simulatorRuntimeSummaryCardState,
+} from "@/lib/simulatorRuntimeState";
+import {
+  runtimeBackupsEntries,
+  runtimeBackupsHasEntries,
+  runtimeBackupsLatestEntryId,
+  runtimeBackupsPreviewCards,
+  runtimeBackupsRetentionDays,
+} from "@/lib/runtimeBackupsState";
+import { runtimeRecoveryMetrics } from "@/lib/runtimeRecoveryMetricsState";
+import {
+  runtimeRestoreDrillHasEntries,
+  runtimeRestoreDrillEntries as selectRuntimeRestoreDrillEntries,
+  runtimeRestoreDrillPreviewCards,
+} from "@/lib/runtimeRestoreDrillsState";
+import {
+  supportAccessReason,
+  supportAccessBoundaryCardState,
+} from "@/lib/supportAccessState";
+import {
+  runtimeUpdatesActionState,
+  runtimeUpdatesEntries,
+  runtimeUpdatesHasAvailableUpdate,
+  runtimeUpdatesPolicy,
+  runtimeUpdatesPolicyAutoApply,
+  runtimeUpdatesPolicySupportPostureLabel,
+  runtimeUpdatesPolicyUpdateChannel,
+  runtimeUpdatesPolicyViewState,
+} from "@/lib/runtimeUpdatesState";
+import { type AgentSettingsRuntimeFailureReceipt } from "@/lib/agentSettingsRuntimeFailureState";
+import {
+  runtimeRecoveryPacketPreviewState as buildRuntimeRecoveryPacketPreviewState,
+} from "@/lib/runtimeRecoveryPacketState";
+import {
+  capabilityUsageCardState,
+  type CapabilityUsageCardState,
+} from "@/lib/agentSettingsCapabilityUsageState";
+import {
+  clearLoraHistory as clearSavedLoraHistory,
+  loadLastLlmPingAt,
+  loadSoulSavedAt,
+  loadCapabilityDowUsage,
+  loadCapabilityLastUsed,
+  loadCapabilityUsageCount,
+  loadLatencyHistory,
+  loadLoraHistory,
+  loadTestHistory,
+  saveCapabilityDowUsage,
+  saveCapabilityLastUsed,
+  saveCapabilityUsageCount,
+  saveLoraHistory,
+  type LatencySnapshot,
+  type LoraSnapshot,
+  type TestHistoryEntry,
+} from "@/lib/agentSettingsLocalState";
+import { type AgentSettingsCapabilityFailureReceipt } from "@/lib/agentSettingsCapabilityFailureState";
+import { type AgentSettingsDevicePolicyFailureReceipt } from "@/lib/agentSettingsDevicePolicyFailureState";
+import {
+  buildAgentSettingsIdentityFailureReceipt,
+  type AgentSettingsIdentityFailureReceipt,
+} from "@/lib/agentSettingsIdentityFailureState";
+import {
+  type AgentSettingsIdentityUtilityFailureReceipt,
+} from "@/lib/agentSettingsIdentityUtilityFailureState";
+import {
+  type AgentSettingsLlmFailureReceipt,
+} from "@/lib/agentSettingsLlmFailureState";
+import {
+  type AgentSettingsSoulFailureReceipt,
+} from "@/lib/agentSettingsSoulFailureState";
+import {
+  runtimeBackupControlsState,
+  runtimeRecoveryPacketControlsState,
+} from "@/lib/runtimeControlsState";
+import { type AgentFleetInstance as AgentInstance } from "@/lib/agentFleetResponseState";
+import {
+  agentSettingsHasSupportAccessHistory,
+  agentSettingsIdentityCardExportState,
+  agentSettingsRuntimeRecoveryPacketExportState,
+  agentSettingsTestHistoryRowState,
+} from "@/lib/agentSettingsViewState";
+import {
+  addAgentSettingsCapabilityAndReload,
+  applyAgentSettingsRuntimeUpdate,
+  checkAgentSettingsRuntimeUpdates,
+  copyAgentSettingsKeyPrefix,
+  copyAgentSettingsSoulText,
+  createAgentSettingsRuntimeRestoreDrill,
+  createAgentSettingsRuntimeSnapshot,
+  downloadAgentSettingsRuntimeRecoveryPacketState,
+  cycleAgentSettingsCapabilityApprovalModeAndReload,
+  deleteAgentSettingsCapabilityAndReload,
+  exportAgentSettingsIdentityCardState,
+  exportAgentSettingsSovereignDataBundleState,
+  importAgentSettingsCapabilitiesAndReload,
+  loadAgentSettingsBootstrapState,
+  loadAgentSettingsCapabilitiesState,
+  loadAgentSettingsIdentityState,
+  loadAgentSettingsLlmState,
+  loadAgentSettingsRuntimeBackupManifest,
+  loadAgentSettingsRuntimeRecoveryPacket,
+  preloadAgentSettingsRuntimeRecoveryPacket,
+  saveAgentSettingsSoulStateAndReload,
+  saveAgentSettingsLlmStateAndReload,
+  testAgentSettingsLlmConnectionState,
+  updateAgentSettingsDevicePolicyAndReload,
+  updateAgentSettingsRuntimeBackupRetention,
+  updateAgentSettingsRuntimeUpdatePolicy,
+} from "@/lib/agentSettingsAsyncState";
 
 type SummaryChipListProps = {
   items: string[];
@@ -54,7 +167,7 @@ type SummaryChipListProps = {
   itemClass?: string;
 };
 
-function SummaryRows(props: { items: SummaryItem[]; class?: string }) {
+function SummaryRows(props: { items: AgentSettingsSummaryRow[]; class?: string }) {
   return (
     <div role="list" class={props.class ?? "space-y-2 text-xs text-on-surface-variant"}>
       <For each={props.items}>
@@ -193,6 +306,12 @@ function DetailCard(props: { title: string; class?: string; children: any }) {
   );
 }
 
+const EMPTY_CAPABILITY_USAGE_CARD_STATE: CapabilityUsageCardState = {
+  usageSummary: null,
+  dowBars: [],
+  staleSummary: null,
+};
+
 export function AgentSettingsView(props: {
   browserAiLabel?: string | null;
   focusLlm?: boolean;
@@ -214,22 +333,9 @@ export function AgentSettingsView(props: {
     latest_last_used_at?: string | null;
     latest_policy_note?: string | null;
   } | null;
+  simulatorRuntimeSummary?: DashboardBootstrap["simulator_runtime_summary"] | null;
   runtimeUpdates?: RuntimeUpdatesResponse | null;
-  runtimeDeployment?: {
-    id: string;
-    framework: string;
-    status: string;
-    workspace_path: string;
-    gui?: string | null;
-    runtime_monitor?: {
-      status: string;
-      source: string;
-      lines: string[];
-      updated_at: string;
-    } | null;
-    runtime_status_panel?: Record<string, unknown> | null;
-    runtime_status_views?: Array<{ id?: string; format?: string; title?: string | null }> | null;
-  } | null;
+  runtimeDeployment?: DashboardBootstrap["runtime_deployment"] | null;
   runtimeBackups?: RuntimeBackupsResponse | null;
   runtimeRestoreDrills?: RuntimeRestoreDrillsResponse | null;
   supportAccess?: {
@@ -251,12 +357,13 @@ export function AgentSettingsView(props: {
     revoked_at?: string | null;
   }>;
 }) {
+  const sessionUserId = () => readSession()?.user?.id ?? null;
   let llmSectionRef: HTMLDivElement | undefined;
 
   const [instance, setInstance] = createSignal<AgentInstance | null>(null);
-  const [instanceLoadError, setInstanceLoadError] = createSignal<string | null>(null);
+  const [instanceLoadError, setInstanceLoadError] = createSignal<AgentSettingsIdentityFailureReceipt | null>(null);
   const [showWizard, setShowWizard] = createSignal(false);
-  const [wizardRefreshError, setWizardRefreshError] = createSignal<string | null>(null);
+  const [wizardRefreshError, setWizardRefreshError] = createSignal<AgentSettingsIdentityFailureReceipt | null>(null);
   const [confirmReconfigure, setConfirmReconfigure] = createSignal(false);
   let onboardingWizardTriggerRef: HTMLButtonElement | undefined;
   const [loading, setLoading] = createSignal(true);
@@ -293,14 +400,18 @@ export function AgentSettingsView(props: {
     openrouter:  ["openai/gpt-4o-mini", "anthropic/claude-sonnet-4-6", "meta-llama/llama-3.1-8b-instruct"],
     cerebras:    ["llama3.1-70b", "llama3.1-8b"],
     together_ai: ["meta-llama/Llama-3-8b-hf", "meta-llama/Llama-3-70b-hf"],
+    mistral:     ["mistral-small-latest", "mistral-large-latest", "open-mixtral-8x22b"],
+    huggingface: ["meta-llama/Llama-3.1-8B-Instruct", "mistralai/Mistral-7B-Instruct-v0.3", "Qwen/Qwen2.5-7B-Instruct"],
   };
 
-  const providerDefaults: Record<string, { model: string; keyPlaceholder: string }> = {
-    anthropic:   { model: "claude-haiku-4-5-20251001", keyPlaceholder: "sk-ant-..." },
-    openai:      { model: "gpt-4o-mini",               keyPlaceholder: "sk-..." },
-    openrouter:  { model: "openai/gpt-4o-mini",        keyPlaceholder: "sk-or-..." },
-    cerebras:    { model: "llama3.1-70b",              keyPlaceholder: "csk-..." },
-    together_ai: { model: "meta-llama/Llama-3-8b-hf",  keyPlaceholder: "...together key..." },
+  const providerDefaults: Record<string, { model: string; keyPlaceholder: string; keyPrefix?: string }> = {
+    anthropic:   { model: "claude-haiku-4-5-20251001", keyPlaceholder: "sk-ant-...", keyPrefix: "sk-ant-" },
+    openai:      { model: "gpt-4o-mini",               keyPlaceholder: "sk-...", keyPrefix: "sk-" },
+    openrouter:  { model: "openai/gpt-4o-mini",        keyPlaceholder: "sk-or-...", keyPrefix: "sk-or-" },
+    cerebras:    { model: "llama3.1-70b",              keyPlaceholder: "csk-...", keyPrefix: "csk-" },
+    together_ai: { model: "meta-llama/Llama-3-8b-hf",  keyPlaceholder: "Together AI API key" },
+    mistral:     { model: "mistral-small-latest",      keyPlaceholder: "Mistral API key" },
+    huggingface: { model: "meta-llama/Llama-3.1-8B-Instruct", keyPlaceholder: "hf_...", keyPrefix: "hf_" },
   };
   function llmProviderLabel(provider?: string | null, backend?: string | null): string {
     switch (provider) {
@@ -309,6 +420,8 @@ export function AgentSettingsView(props: {
       case "openrouter": return "OpenRouter";
       case "cerebras": return "Cerebras";
       case "together_ai": return "Together AI";
+      case "mistral": return "Mistral";
+      case "huggingface": return "Hugging Face";
       default:
         switch (backend) {
           case "ollama": return "Ollama";
@@ -319,8 +432,7 @@ export function AgentSettingsView(props: {
     }
   }
   const keyPrefix = () => {
-    const placeholder = providerDefaults[llmProvider()]?.keyPlaceholder ?? "";
-    return placeholder.split("…")[0];
+    return providerDefaults[llmProvider()]?.keyPrefix ?? "";
   };
   const keyFormatValid = () => {
     const key = llmApiKey();
@@ -330,7 +442,7 @@ export function AgentSettingsView(props: {
     return key.startsWith(prefix);
   };
   const [keyPrefixCopied, setKeyPrefixCopied] = createSignal(false);
-  const [keyPrefixCopyError, setKeyPrefixCopyError] = createSignal<string | null>(null);
+  const [keyPrefixCopyError, setKeyPrefixCopyError] = createSignal<AgentSettingsIdentityUtilityFailureReceipt | null>(null);
   const [runtimeBackupsState, setRuntimeBackupsState] = createSignal<RuntimeBackupsResponse | null>(props.runtimeBackups ?? null);
   const [runtimeRestoreDrillsState, setRuntimeRestoreDrillsState] = createSignal<RuntimeRestoreDrillsResponse | null>(props.runtimeRestoreDrills ?? null);
   const [runtimeUpdatesState, setRuntimeUpdatesState] = createSignal<RuntimeUpdatesResponse | null>(props.runtimeUpdates ?? null);
@@ -340,219 +452,82 @@ export function AgentSettingsView(props: {
   const [runtimeDrillBusyBackupId, setRuntimeDrillBusyBackupId] = createSignal<string | null>(null);
   const [runtimeUpdatesBusy, setRuntimeUpdatesBusy] = createSignal<"policy" | "check" | "apply" | null>(null);
   const [runtimeRecoveryBusy, setRuntimeRecoveryBusy] = createSignal(false);
-  const [runtimeRecoveryPacket, setRuntimeRecoveryPacket] = createSignal<Awaited<ReturnType<typeof fetchRuntimeRecoveryPacket>> | null>(null);
+  const [runtimeRecoveryPacket, setRuntimeRecoveryPacket] = createSignal<RuntimeRecoveryPacketResponse | null>(null);
+  const [runtimeRecoveryPreviewOpen, setRuntimeRecoveryPreviewOpen] = createSignal(false);
+  const [runtimeRecoveryPacketHydrated, setRuntimeRecoveryPacketHydrated] = createSignal(false);
   const [runtimeRecoveryPreviewOrigin, setRuntimeRecoveryPreviewOrigin] = createSignal<"preview" | "download" | null>(null);
   const [runtimeFeedback, setRuntimeFeedback] = createSignal<string>("");
+  const [runtimeActionError, setRuntimeActionError] = createSignal<AgentSettingsRuntimeFailureReceipt | null>(null);
   let runtimeBackupManifestTriggerRef: HTMLButtonElement | undefined;
   let runtimeRecoveryPreviewTriggerRef: HTMLButtonElement | undefined;
   let runtimeRecoveryDownloadTriggerRef: HTMLButtonElement | undefined;
-  const runtimeBackupEntries = createMemo(() => runtimeBackupsState()?.entries ?? []);
-  const runtimeRestoreDrillEntries = createMemo(() => runtimeRestoreDrillsState()?.entries ?? []);
-  const retainedBackupIds = createMemo(() => new Set(runtimeBackupEntries().map((entry) => entry.id)));
-  const activeRuntimeBackupEntries = createMemo(() =>
-    runtimeBackupEntries().filter((entry) => {
-      const expiresAt = Date.parse(entry.expires_at);
-      return !Number.isNaN(expiresAt) && expiresAt >= Date.now();
+  const runtimeBackupEntries = createMemo(() => runtimeBackupsEntries(runtimeBackupsState()));
+  const runtimeRestoreDrillEntries = createMemo(() => selectRuntimeRestoreDrillEntries(runtimeRestoreDrillsState()));
+  const runtimeUpdateEntriesState = createMemo(() => runtimeUpdatesEntries(runtimeUpdatesState()));
+  const runtimeUpdatePolicyState = createMemo(() => runtimeUpdatesPolicy(runtimeUpdatesState()));
+  const runtimeDeploymentState = createMemo(() => props.runtimeDeployment ?? null);
+  const runtimeDeploymentHostedCardState = createMemo(() => runtimeDeploymentHostedCard(runtimeDeploymentState()));
+  const deviceSyncRuntimeSummaryCard = createMemo(() => deviceSyncRuntimeSummaryCardState(props.deviceSyncRuntimeSummary));
+  const simulatorRuntimeSummaryCard = createMemo(() => simulatorRuntimeSummaryCardState(props.simulatorRuntimeSummary));
+  const latestRuntimeBackupId = createMemo(() => runtimeBackupsLatestEntryId(runtimeBackupsState()));
+  const hasRuntimeBackupEntries = createMemo(() => runtimeBackupsHasEntries(runtimeBackupsState()));
+  const runtimeRecoveryMetricsState = createMemo(() =>
+    runtimeRecoveryMetrics(runtimeBackupsState(), runtimeRestoreDrillsState())
+  );
+  const runtimeBackupPreviewCardList = createMemo(() =>
+    runtimeBackupsPreviewCards(
+      runtimeBackupsState(),
+      runtimeRecoveryMetricsState().latestCompletedRestoreDrillByBackupId,
+    )
+  );
+  const runtimeBackupManifestReviewCard = createMemo(() =>
+    buildRuntimeBackupManifestReviewState(runtimeBackupManifest())
+  );
+  const hasRuntimeRestoreDrillEntries = createMemo(() => runtimeRestoreDrillHasEntries(runtimeRestoreDrillsState()));
+  const runtimeRestoreDrillPreviewCardList = createMemo(() => runtimeRestoreDrillPreviewCards(runtimeRestoreDrillsState()));
+  const runtimeRecoveryPacketState = createMemo(() => runtimeRecoveryPacket());
+  const runtimeRecoveryPacketPreviewState = createMemo(() =>
+    buildRuntimeRecoveryPacketPreviewState(runtimeRecoveryPacketState())
+  );
+  const devicePolicyCardStatesState = createMemo(() => deviceSyncPolicyCardStates(devicePolicies()));
+  const supportAccessHistoryCardList = createMemo(() => supportAccessHistoryCards(props.supportAccessHistory));
+  const supportAccessBoundaryCard = createMemo(() => supportAccessBoundaryCardState(props.supportAccess));
+  const runtimeUpdatesPolicyView = createMemo(() => runtimeUpdatesPolicyViewState(runtimeUpdatesState()));
+  const runtimeUpdatesActionView = createMemo(() => runtimeUpdatesActionState(runtimeUpdatesBusy(), runtimeUpdatesState()));
+  const runtimeBackupControlsView = createMemo(() =>
+    runtimeBackupControlsState({
+      busy: runtimeBackupBusy(),
+      manifestBusyId: runtimeBackupManifestBusyId(),
+      latestBackupId: latestRuntimeBackupId(),
+      hasBackupEntries: hasRuntimeBackupEntries(),
+      drillBusyBackupId: runtimeDrillBusyBackupId(),
     })
   );
-  const latestRestoreDrill = createMemo(() => runtimeRestoreDrillEntries()[0] ?? null);
-  const latestCompletedRestoreDrill = createMemo(() => {
-    let latest: RuntimeRestoreDrillsResponse["entries"][number] | null = null;
-    let latestMs = -Infinity;
-    for (const entry of runtimeRestoreDrillEntries()) {
-      if (!entry.completed_at) continue;
-      const parsed = Date.parse(entry.completed_at);
-      if (Number.isNaN(parsed) || parsed <= latestMs) continue;
-      latestMs = parsed;
-      latest = entry;
-    }
-    return latest;
-  });
-  const latestCompletedRestoreDrillByBackupId = createMemo(() => {
-    const latestByBackupId = new Map<string, RuntimeRestoreDrillsResponse["entries"][number]>();
-    for (const entry of runtimeRestoreDrillEntries()) {
-      if (!entry.completed_at) continue;
-      const parsed = Date.parse(entry.completed_at);
-      if (Number.isNaN(parsed)) continue;
-      const current = latestByBackupId.get(entry.backup_id);
-      const currentParsed = current?.completed_at ? Date.parse(current.completed_at) : -Infinity;
-      if (!current || Number.isNaN(currentParsed) || parsed > currentParsed) {
-        latestByBackupId.set(entry.backup_id, entry);
-      }
-    }
-    return latestByBackupId;
-  });
-  const latestRetainedCompletedRestoreDrill = createMemo(() => {
-    let latest: RuntimeRestoreDrillsResponse["entries"][number] | null = null;
-    let latestMs = -Infinity;
-    for (const entry of runtimeRestoreDrillEntries()) {
-      if (!entry.completed_at || !retainedBackupIds().has(entry.backup_id)) continue;
-      const parsed = Date.parse(entry.completed_at);
-      if (Number.isNaN(parsed) || parsed <= latestMs) continue;
-      latestMs = parsed;
-      latest = entry;
-    }
-    return latest;
-  });
-  const rehearsedRuntimeBackupCount = createMemo(
-    () => runtimeBackupEntries().filter((entry) => latestCompletedRestoreDrillByBackupId().has(entry.id)).length
+  const runtimeRecoveryPacketControlsView = createMemo(() =>
+    runtimeRecoveryPacketControlsState(runtimeRecoveryBusy())
   );
-  const unrehearsedRuntimeBackupCount = createMemo(
-    () => runtimeBackupEntries().length - rehearsedRuntimeBackupCount()
+  const runtimeBackupSummaryItems = createMemo(() =>
+    runtimeBackupSummaryRows(runtimeBackupsState(), runtimeRestoreDrillsState())
   );
-  const activeRehearsedRuntimeBackupCount = createMemo(
-    () => activeRuntimeBackupEntries().filter((entry) => latestCompletedRestoreDrillByBackupId().has(entry.id)).length
+  const restoreDrillSummaryItems = createMemo(() =>
+    runtimeRestoreDrillSummaryRows(runtimeBackupsState(), runtimeRestoreDrillsState())
   );
-  const activeUnrehearsedRuntimeBackupCount = createMemo(
-    () => activeRuntimeBackupEntries().length - activeRehearsedRuntimeBackupCount()
+  const supportBoundarySummaryItems = createMemo(() =>
+    supportAccessSummaryRows(props.supportAccess)
   );
-  const retainedRehearsalCoverageLabel = createMemo(() => {
-    if (runtimeBackupEntries().length === 0) return "no retained snapshots";
-    return `${rehearsedRuntimeBackupCount()} / ${runtimeBackupEntries().length}`;
-  });
-  const activeRehearsalCoverageLabel = createMemo(() => {
-    if (activeRuntimeBackupEntries().length === 0) return "no active snapshots";
-    return `${activeRehearsedRuntimeBackupCount()} / ${activeRuntimeBackupEntries().length}`;
-  });
-  const nextRuntimeBackupExpiry = createMemo(() =>
-    nextFutureTimestampValue(runtimeBackupEntries().map((entry) => entry.expires_at))
-  );
-  const expiredRuntimeBackupCount = createMemo(() =>
-    expiredTimestampCount(runtimeBackupEntries().map((entry) => entry.expires_at))
-  );
-  const restoreDrillRecordedCount = createMemo(() => runtimeRestoreDrillEntries().length);
-  const restoreDrillInProgressCount = createMemo(
-    () => runtimeRestoreDrillEntries().filter((entry) => !entry.completed_at).length
-  );
-  const restoreDrillCompletedCount = createMemo(
-    () => runtimeRestoreDrillEntries().filter((entry) => Boolean(entry.completed_at)).length
-  );
-  const restoreDrillRehearsedBackupCount = createMemo(
-    () => new Set(runtimeRestoreDrillEntries().map((entry) => entry.backup_id)).size
-  );
-  const restoreDrillRetainedCoverageLabel = createMemo(() => {
-    if (runtimeBackupEntries().length === 0) return "no retained backups";
-    return `${restoreDrillRehearsedBackupCount()} / ${runtimeBackupEntries().length} retained backups`;
-  });
-  const runtimeBackupSummaryItems = createMemo<SummaryItem[]>(() => [
-    { label: "Retention", value: `${runtimeBackupsState()?.policy.retention_days ?? 0} days` },
-    { label: "Storage", value: runtimeBackupsState()?.policy.storage_mode ?? "unknown" },
-    {
-      label: "Last snapshot",
-      value: `${dateTimeLabel(runtimeBackupsState()?.policy.last_snapshot_at)} | ${relativeTimeLabel(runtimeBackupsState()?.policy.last_snapshot_at)}`,
-    },
-    { label: "Recorded snapshots", value: runtimeBackupEntries().length },
-    { label: "Rehearsed snapshots", value: rehearsedRuntimeBackupCount() },
-    { label: "Retained rehearsal coverage", value: retainedRehearsalCoverageLabel() },
-    {
-      label: "Latest retained rehearsal",
-      value: latestRetainedCompletedRestoreDrill()?.completed_at
-        ? `${dateTimeLabel(latestRetainedCompletedRestoreDrill()?.completed_at)} | ${relativeTimeLabel(latestRetainedCompletedRestoreDrill()?.completed_at)}`
-        : "none",
-    },
-    { label: "Unrehearsed snapshots", value: unrehearsedRuntimeBackupCount() },
-    { label: "Active unrehearsed", value: activeUnrehearsedRuntimeBackupCount() },
-    { label: "Active rehearsed", value: activeRehearsedRuntimeBackupCount() },
-    { label: "Active rehearsal coverage", value: activeRehearsalCoverageLabel() },
-    { label: "Active snapshots", value: activeRuntimeBackupEntries().length },
-    {
-      label: "Workspace footprint",
-      value: byteCountLabel(totalNumber(runtimeBackupEntries().map((entry) => entry.total_workspace_bytes))),
-    },
-    {
-      label: "Artifact footprint",
-      value: byteCountLabel(totalNumber(runtimeBackupEntries().map((entry) => entry.artifact_size_bytes))),
-    },
-    {
-      label: "Next expiry",
-      value: nextRuntimeBackupExpiry()
-        ? `${dateTimeLabel(nextRuntimeBackupExpiry())} | ${relativeTimeLabel(nextRuntimeBackupExpiry())}`
-        : "no upcoming expiry",
-    },
-    { label: "Expired snapshots", value: expiredRuntimeBackupCount() },
-    {
-      label: "Support posture",
-      value: runtimeBackupsState()?.policy.support_disabled_by_default === false ? "customized" : "disabled by default",
-    },
-  ]);
-  const restoreDrillSummaryItems = createMemo<SummaryItem[]>(() => [
-    { label: "Recorded drills", value: restoreDrillRecordedCount() },
-    { label: "In progress", value: restoreDrillInProgressCount() },
-    { label: "Completed drills", value: restoreDrillCompletedCount() },
-    { label: "Rehearsed backups", value: restoreDrillRehearsedBackupCount() },
-    { label: "Coverage", value: restoreDrillRetainedCoverageLabel() },
-    {
-      label: "Latest completed",
-      value: latestCompletedRestoreDrill()?.completed_at
-        ? `${dateTimeLabel(latestCompletedRestoreDrill()?.completed_at)} | ${relativeTimeLabel(latestCompletedRestoreDrill()?.completed_at)}`
-        : "none",
-    },
-    {
-      label: "Latest completed outcome",
-      value: latestCompletedRestoreDrill()
-        ? `${latestCompletedRestoreDrill()?.status ?? "unknown"} | backup ${latestCompletedRestoreDrill()?.backup_id ?? "unknown"}`
-        : "none",
-    },
-    {
-      label: "Latest completed duration",
-      value: latestCompletedRestoreDrill()
-        ? (durationLabel(latestCompletedRestoreDrill()?.started_at, latestCompletedRestoreDrill()?.completed_at) ?? "unknown")
-        : "none",
-    },
-    {
-      label: "Latest drill",
-      value: `${latestRestoreDrill()?.status ?? "unknown"} | ${relativeTimeLabel(latestRestoreDrill()?.completed_at ?? latestRestoreDrill()?.started_at)}`,
-    },
-  ]);
-  const supportBoundarySummaryItems = createMemo<SummaryItem[]>(() => [
-    { label: "Access status", value: props.supportAccess?.status ?? "disabled" },
-    { label: "Scope", value: props.supportAccess?.access_scope ?? "none" },
-    {
-      label: "Consent posture",
-      value: props.supportAccess?.support_disabled_by_default === false ? "customized" : "disabled by default",
-    },
-    {
-      label: "Granted at",
-      value: `${dateTimeLabel(props.supportAccess?.granted_at)} | ${relativeTimeLabel(props.supportAccess?.granted_at)}`,
-    },
-    {
-      label: "Expires at",
-      value: `${dateTimeLabel(props.supportAccess?.expires_at)} | ${relativeTimeLabel(props.supportAccess?.expires_at)}`,
-    },
-    {
-      label: "Consent window",
-      value: durationLabel(
-        props.supportAccess?.granted_at,
-        props.supportAccess?.revoked_at ?? props.supportAccess?.expires_at
-      ) ?? "unknown",
-    },
-    {
-      label: "Boundary timing",
-      value: props.supportAccess?.revoked_at
-        ? `ended ${relativeTimeLabel(props.supportAccess?.revoked_at)}`
-        : props.supportAccess?.expires_at
-          ? `ends ${relativeTimeLabel(props.supportAccess?.expires_at)}`
-          : "unknown",
-    },
-    ...(props.supportAccess?.revoked_at
-      ? [
-          {
-            label: "Revoked at",
-            value: `${dateTimeLabel(props.supportAccess?.revoked_at)} | ${relativeTimeLabel(props.supportAccess?.revoked_at)}`,
-          },
-        ]
-      : []),
-  ]);
-  function copyKeyPrefix() {
+  async function copyKeyPrefix() {
     const prefix = keyPrefix();
     if (!prefix) return;
     setKeyPrefixCopyError(null);
-    navigator.clipboard.writeText(prefix).then(() => {
+    const result = await copyAgentSettingsKeyPrefix(prefix, (text) => navigator.clipboard.writeText(text));
+    if (result.error) {
+      setKeyPrefixCopyError(result.error);
+      return;
+    }
+    if (result.copied) {
       setKeyPrefixCopied(true);
       setTimeout(() => setKeyPrefixCopied(false), 1500);
-    }).catch((error) => {
-      setKeyPrefixCopyError(error instanceof Error ? error.message : "Could not copy the expected key prefix.");
-    });
+    }
   }
 
   // Saved-to-server snapshots — used for per-field dirty highlighting
@@ -562,12 +537,13 @@ export function AgentSettingsView(props: {
 
   const [llmSaving, setLlmSaving] = createSignal(false);
   const [llmSaved, setLlmSaved] = createSignal(false);
-  const [llmError, setLlmError] = createSignal("");
+  const [llmError, setLlmError] = createSignal<AgentSettingsLlmFailureReceipt | null>(null);
+  const [llmLoadError, setLlmLoadError] = createSignal<AgentSettingsLlmFailureReceipt | null>(null);
   const [llmDirty, setLlmDirty] = createSignal(false);
   const [llmPinging, setLlmPinging] = createSignal(false);
   const [llmPingResult, setLlmPingResult] = createSignal<{
     ok: boolean;
-    reason?: string;
+    receipt?: AgentSettingsLlmFailureReceipt;
     backend?: string;
     provider?: string;
     httpStatus?: number;
@@ -579,33 +555,14 @@ export function AgentSettingsView(props: {
     setModelResetTo(model);
     modelResetTimer = setTimeout(() => setModelResetTo(null), 3000);
   }
-  const LLM_PING_KEY = "omnyid.llm.last_ping";
-  const LLM_PING_OK_KEY = "omnyid.llm.last_ping_ok";
-  const LLM_LATENCY_KEY = "omnyid.llm.latency_history";
-  const LLM_TEST_HISTORY_KEY = "omnyid.llm.test_history";
-  type LatencySnapshot = { ts: number; ms: number };
-  type TestHistoryEntry = { ts: number; model: string; ms: number | null; ok: boolean; reason?: string };
-  function loadLatencyHistory(): LatencySnapshot[] {
-    try { return JSON.parse(localStorage.getItem(LLM_LATENCY_KEY) ?? "[]"); } catch { return []; }
-  }
-  function loadTestHistory(): TestHistoryEntry[] {
-    try { return JSON.parse(localStorage.getItem(LLM_TEST_HISTORY_KEY) ?? "[]"); } catch { return []; }
-  }
-  const [latencyHistory, setLatencyHistory] = createSignal<LatencySnapshot[]>(loadLatencyHistory());
-  const [testHistory, setTestHistory] = createSignal<TestHistoryEntry[]>(loadTestHistory());
-  const [lastPingAt, setLastPingAt] = createSignal<number | null>(
-    (() => { const v = localStorage.getItem(LLM_PING_KEY); return v ? parseInt(v) : null; })()
-  );
+  const [latencyHistory, setLatencyHistory] = createSignal<LatencySnapshot[]>(loadLatencyHistory(sessionUserId()));
+  const [testHistory, setTestHistory] = createSignal<TestHistoryEntry[]>(loadTestHistory(sessionUserId()));
+  const [lastPingAt, setLastPingAt] = createSignal<number | null>(loadLastLlmPingAt(sessionUserId()));
 
   // LoRA history sparkline
-  const LORA_HISTORY_KEY = "omnyid.lora.history";
-  type LoraSnapshot = { date: string; score: number };
-  function loadLoraHistory(): LoraSnapshot[] {
-    try { return JSON.parse(localStorage.getItem(LORA_HISTORY_KEY) ?? "[]"); } catch { return []; }
-  }
-  const [loraHistory, setLoraHistory] = createSignal<LoraSnapshot[]>(loadLoraHistory());
+  const [loraHistory, setLoraHistory] = createSignal<LoraSnapshot[]>(loadLoraHistory(sessionUserId()));
   function clearLoraHistory() {
-    localStorage.removeItem(LORA_HISTORY_KEY);
+    clearSavedLoraHistory(sessionUserId());
     setLoraHistory([]);
   }
   createEffect(() => {
@@ -617,64 +574,74 @@ export function AgentSettingsView(props: {
   createEffect(() => {
     setRuntimeUpdatesState(props.runtimeUpdates ?? null);
   });
+  createEffect(() => {
+    if (settingsTab() !== "runtime") return;
+    if (runtimeRecoveryPacketHydrated() || runtimeRecoveryBusy()) return;
+    setRuntimeRecoveryPacketHydrated(true);
+    queueMicrotask(() => {
+      void (async () => {
+        setRuntimeRecoveryPacket(await preloadAgentSettingsRuntimeRecoveryPacket(fetchRuntimeRecoveryPacket));
+      })();
+    });
+  });
   function signalDashboardRefresh() {
     dispatchDashboardRefreshEvent({ reason: "runtime-management-updated" });
   }
   async function handleRuntimeBackupRetentionChange(retentionDays: 7 | 14 | 30 | 90) {
     setRuntimeBackupBusy("retention");
     setRuntimeFeedback("");
-    try {
-      const response = await setRuntimeBackupRetention(retentionDays);
-      setRuntimeBackupsState(response);
-      setRuntimeFeedback(`Backup retention updated to ${response.policy.retention_days} days.`);
+    setRuntimeActionError(null);
+    const result = await updateAgentSettingsRuntimeBackupRetention(retentionDays, setRuntimeBackupRetention);
+    if (result.error) {
+      setRuntimeActionError(result.error);
+    } else if (result.backups) {
+      setRuntimeBackupsState(result.backups);
+      setRuntimeFeedback(result.feedback ?? "");
       signalDashboardRefresh();
-    } catch (error) {
-      setRuntimeFeedback(error instanceof Error ? error.message : "Failed to update backup retention.");
-    } finally {
-      setRuntimeBackupBusy(null);
     }
+    setRuntimeBackupBusy(null);
   }
   async function handleCreateRuntimeSnapshot() {
     setRuntimeBackupBusy("snapshot");
     setRuntimeFeedback("");
-    try {
-      const response = await createRuntimeBackupSnapshot();
-      setRuntimeBackupsState(response);
-      setRuntimeFeedback("Runtime snapshot created.");
+    setRuntimeActionError(null);
+    const result = await createAgentSettingsRuntimeSnapshot(createRuntimeBackupSnapshot);
+    if (result.error) {
+      setRuntimeActionError(result.error);
+    } else if (result.backups) {
+      setRuntimeBackupsState(result.backups);
+      setRuntimeFeedback(result.feedback ?? "");
       setRuntimeBackupManifest(null);
       signalDashboardRefresh();
-    } catch (error) {
-      setRuntimeFeedback(error instanceof Error ? error.message : "Failed to create runtime snapshot.");
-    } finally {
-      setRuntimeBackupBusy(null);
     }
+    setRuntimeBackupBusy(null);
   }
   async function handleCreateRestoreDrill(backupId: string) {
     setRuntimeDrillBusyBackupId(backupId);
     setRuntimeFeedback("");
-    try {
-      const response = await createRuntimeRestoreDrill(backupId);
-      setRuntimeRestoreDrillsState(response);
-      setRuntimeFeedback(`Restore drill recorded for backup ${backupId}.`);
+    setRuntimeActionError(null);
+    const result = await createAgentSettingsRuntimeRestoreDrill(backupId, createRuntimeRestoreDrill);
+    if (result.error) {
+      setRuntimeActionError(result.error);
+    } else if (result.drills) {
+      setRuntimeRestoreDrillsState(result.drills);
+      setRuntimeFeedback(result.feedback ?? "");
       signalDashboardRefresh();
-    } catch (error) {
-      setRuntimeFeedback(error instanceof Error ? error.message : "Failed to create restore drill.");
-    } finally {
-      setRuntimeDrillBusyBackupId(null);
     }
+    setRuntimeDrillBusyBackupId(null);
   }
   async function handleReviewRuntimeBackupManifest(backupId: string) {
     setRuntimeBackupManifestBusyId(backupId);
     setRuntimeFeedback("");
-    try {
-      const response = await fetchRuntimeBackupManifest(backupId);
-      setRuntimeBackupManifest(response);
-      setRuntimeFeedback(`Loaded manifest for backup ${backupId}.`);
-    } catch (error) {
-      setRuntimeFeedback(error instanceof Error ? error.message : "Failed to load runtime backup manifest.");
-    } finally {
-      setRuntimeBackupManifestBusyId(null);
+    setRuntimeActionError(null);
+    const result = await loadAgentSettingsRuntimeBackupManifest(backupId, fetchRuntimeBackupManifest);
+    if (result.error) {
+      setRuntimeActionError(result.error);
+    } else if (result.manifest) {
+      setRuntimeBackupManifest(result.manifest);
+      setRuntimeFeedback(result.feedback ?? "");
     }
+    setRuntimeBackupManifestBusyId(null);
   }
 
   function closeRuntimeBackupManifestReview(options?: { restoreFocus?: boolean }) {
@@ -682,89 +649,104 @@ export function AgentSettingsView(props: {
     if (options?.restoreFocus === false) return;
     queueMicrotask(() => runtimeBackupManifestTriggerRef?.focus());
   }
+
+  function saveRuntimeRecoveryPacket(packet: RuntimeRecoveryPacketResponse) {
+    const exportState = agentSettingsRuntimeRecoveryPacketExportState(packet);
+    const blob = new Blob([exportState.payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = exportState.filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleRuntimeUpdatePolicyChange(input: {
     update_channel: "stable" | "manual_only";
     auto_apply: "manual_only" | "scaffold_refresh_only";
   }) {
     setRuntimeUpdatesBusy("policy");
     setRuntimeFeedback("");
-    try {
-      const response = await setRuntimeUpdatePolicy(input);
-      setRuntimeUpdatesState(response);
-      setRuntimeFeedback("Runtime update policy saved.");
+    setRuntimeActionError(null);
+    const result = await updateAgentSettingsRuntimeUpdatePolicy(input, setRuntimeUpdatePolicy);
+    if (result.error) {
+      setRuntimeActionError(result.error);
+    } else if (result.updates) {
+      setRuntimeUpdatesState(result.updates);
+      setRuntimeFeedback(result.feedback ?? "");
       signalDashboardRefresh();
-    } catch (error) {
-      setRuntimeFeedback(error instanceof Error ? error.message : "Failed to save runtime update policy.");
-    } finally {
-      setRuntimeUpdatesBusy(null);
     }
+    setRuntimeUpdatesBusy(null);
   }
   async function handleCheckRuntimeUpdates() {
     setRuntimeUpdatesBusy("check");
     setRuntimeFeedback("");
-    try {
-      const response = await checkRuntimeUpdates();
-      setRuntimeUpdatesState(response);
-      setRuntimeFeedback(response.update_available ? "Runtime updates checked. Update available." : "Runtime updates checked. No update available.");
+    setRuntimeActionError(null);
+    const result = await checkAgentSettingsRuntimeUpdates(checkRuntimeUpdates);
+    if (result.error) {
+      setRuntimeActionError(result.error);
+    } else if (result.updates) {
+      setRuntimeUpdatesState(result.updates);
+      setRuntimeFeedback(result.feedback ?? "");
       signalDashboardRefresh();
-    } catch (error) {
-      setRuntimeFeedback(error instanceof Error ? error.message : "Failed to check runtime updates.");
-    } finally {
-      setRuntimeUpdatesBusy(null);
     }
+    setRuntimeUpdatesBusy(null);
   }
   async function handleApplyRuntimeUpdate() {
     setRuntimeUpdatesBusy("apply");
     setRuntimeFeedback("");
-    try {
-      const response = await applyRuntimeUpdate();
-      setRuntimeUpdatesState(response);
-      setRuntimeFeedback("Runtime update action recorded.");
+    setRuntimeActionError(null);
+    const result = await applyAgentSettingsRuntimeUpdate(applyRuntimeUpdate);
+    if (result.error) {
+      setRuntimeActionError(result.error);
+    } else if (result.updates) {
+      setRuntimeUpdatesState(result.updates);
+      setRuntimeFeedback(result.feedback ?? "");
       signalDashboardRefresh();
-    } catch (error) {
-      setRuntimeFeedback(error instanceof Error ? error.message : "Failed to apply runtime update.");
-    } finally {
-      setRuntimeUpdatesBusy(null);
     }
+    setRuntimeUpdatesBusy(null);
   }
   async function handleDownloadRecoveryPacket() {
     setRuntimeRecoveryBusy(true);
     setRuntimeFeedback("");
+    setRuntimeActionError(null);
     setRuntimeRecoveryPreviewOrigin("download");
-    try {
-      const response = await fetchRuntimeRecoveryPacket();
-      setRuntimeRecoveryPacket(response);
-      const blob = new Blob([JSON.stringify(response, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = response.packet_name || "omnyid-runtime-recovery-packet.json";
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setRuntimeFeedback("Runtime recovery packet downloaded.");
-    } catch (error) {
-      setRuntimeFeedback(error instanceof Error ? error.message : "Failed to download runtime recovery packet.");
-    } finally {
+    setRuntimeRecoveryPreviewOpen(false);
+    const result = await downloadAgentSettingsRuntimeRecoveryPacketState({
+      loadPacket: fetchRuntimeRecoveryPacket,
+      savePacket: saveRuntimeRecoveryPacket,
+    });
+    if (result.error) {
+      setRuntimeActionError(result.error);
       setRuntimeRecoveryBusy(false);
+      return;
     }
+    if (result.packet) {
+      setRuntimeRecoveryPacket(result.packet);
+      setRuntimeRecoveryPacketHydrated(true);
+      setRuntimeFeedback(result.feedback ?? "");
+    }
+    setRuntimeRecoveryBusy(false);
   }
   async function handlePreviewRecoveryPacket() {
     setRuntimeRecoveryBusy(true);
     setRuntimeFeedback("");
+    setRuntimeActionError(null);
     setRuntimeRecoveryPreviewOrigin("preview");
-    try {
-      const response = await fetchRuntimeRecoveryPacket();
-      setRuntimeRecoveryPacket(response);
-      setRuntimeFeedback("Runtime recovery packet loaded for review.");
-    } catch (error) {
-      setRuntimeFeedback(error instanceof Error ? error.message : "Failed to load runtime recovery packet.");
-    } finally {
-      setRuntimeRecoveryBusy(false);
+    const result = await loadAgentSettingsRuntimeRecoveryPacket("preview", fetchRuntimeRecoveryPacket);
+    if (result.error) {
+      setRuntimeActionError(result.error);
+    } else if (result.packet) {
+      setRuntimeRecoveryPacket(result.packet);
+      setRuntimeRecoveryPacketHydrated(true);
+      setRuntimeRecoveryPreviewOpen(true);
+      setRuntimeFeedback(result.feedback ?? "");
     }
+    setRuntimeRecoveryBusy(false);
   }
 
   function closeRuntimeRecoveryPacketPreview(options?: { restoreFocus?: boolean }) {
-    setRuntimeRecoveryPacket(null);
+    setRuntimeRecoveryPreviewOpen(false);
     if (options?.restoreFocus === false) return;
     queueMicrotask(() => {
       if (runtimeRecoveryPreviewOrigin() === "download") {
@@ -778,15 +760,15 @@ export function AgentSettingsView(props: {
     const score = instance()?.lora_confidence_score;
     if (score == null) return;
     const today = new Date().toISOString().slice(0, 10);
-    const history = loadLoraHistory();
+    const history = loadLoraHistory(sessionUserId());
     const existing = history.find((h) => h.date === today);
     if (!existing) {
       const next = [...history, { date: today, score }].slice(-7);
-      localStorage.setItem(LORA_HISTORY_KEY, JSON.stringify(next));
+      saveLoraHistory(next, sessionUserId());
       setLoraHistory(next);
     } else if (existing.score !== score) {
       const next = history.map((h) => h.date === today ? { ...h, score } : h);
-      localStorage.setItem(LORA_HISTORY_KEY, JSON.stringify(next));
+      saveLoraHistory(next, sessionUserId());
       setLoraHistory(next);
     }
   });
@@ -800,6 +782,7 @@ export function AgentSettingsView(props: {
   );
   const [devicePolicyUpdatingId, setDevicePolicyUpdatingId] = createSignal<string | null>(null);
   const [devicePolicyFeedback, setDevicePolicyFeedback] = createSignal<string | null>(null);
+  const [devicePolicyActionError, setDevicePolicyActionError] = createSignal<AgentSettingsDevicePolicyFailureReceipt | null>(null);
 
   createEffect(() => {
     setDevicePolicies(props.deviceSyncPolicies ?? []);
@@ -859,25 +842,28 @@ export function AgentSettingsView(props: {
     const target = options?.target ?? "bootstrap";
     if (target === "bootstrap") setInstanceLoadError(null);
     if (target === "wizard") setWizardRefreshError(null);
-    try {
-      const fleet = await apiFetch<{ master_instance?: AgentInstance }>("/agent/fleet");
-      setInstance(fleet.master_instance ?? null);
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not load agent identity.";
-      if (target === "bootstrap") {
-        setInstanceLoadError(message);
-      } else {
-        setWizardRefreshError(message);
-      }
+    const result = await loadAgentSettingsIdentityState(
+      target === "bootstrap" ? "Load agent identity" : "Refresh agent personality",
+      getFleetMasterInstance,
+    );
+    if (result.error) {
+      if (target === "bootstrap") setInstanceLoadError(result.error);
+      else setWizardRefreshError(result.error);
       return false;
     }
+    setInstance(result.instance);
+    return true;
   }
 
   async function refreshInstanceAfterWizard() {
     const ok = await refreshInstance({ target: "wizard" });
     if (!ok && !wizardRefreshError()) {
-      setWizardRefreshError("Could not refresh the updated agent personality.");
+      setWizardRefreshError(
+        buildAgentSettingsIdentityFailureReceipt(
+          "Refresh agent personality",
+          "Could not refresh the updated agent personality.",
+        ),
+      );
     }
   }
 
@@ -938,21 +924,19 @@ export function AgentSettingsView(props: {
   ) {
     setDevicePolicyUpdatingId(deviceId);
     setDevicePolicyFeedback(null);
-    try {
-      const response = await updateDeviceSyncPolicyProfile({
-        device_id: deviceId,
-        policy_profile: profile,
-      });
-      setDevicePolicies(response.entries ?? []);
-      setDevicePolicyFeedback(`Updated ${deviceId} to ${profile}.`);
+    setDevicePolicyActionError(null);
+    const result = await updateAgentSettingsDevicePolicyAndReload(
+      { deviceId, profile },
+      updateDeviceSyncPolicyProfile,
+    );
+    if (result.error) {
+      setDevicePolicyActionError(result.error);
+    } else {
+      setDevicePolicies(result.entries);
+      setDevicePolicyFeedback(result.feedback);
       dispatchDashboardRefreshEvent({ reason: "device-sync-policy-update" });
-    } catch (error) {
-      setDevicePolicyFeedback(
-        error instanceof Error ? error.message : "Failed to update sync policy.",
-      );
-    } finally {
-      setDevicePolicyUpdatingId(null);
     }
+    setDevicePolicyUpdatingId(null);
   }
 
   // Capability registry state
@@ -960,36 +944,40 @@ export function AgentSettingsView(props: {
   const [showAddCapability, setShowAddCapability] = createSignal(false);
   const [capDeleting, setCapDeleting] = createSignal<string | null>(null);
   const [capAdding, setCapAdding] = createSignal<string | null>(null);
-  const [capLoadError, setCapLoadError] = createSignal<string | null>(null);
-  const [capActionError, setCapActionError] = createSignal<string | null>(null);
+  const [capLoadError, setCapLoadError] = createSignal<AgentSettingsCapabilityFailureReceipt | null>(null);
+  const [capActionError, setCapActionError] = createSignal<AgentSettingsCapabilityFailureReceipt | null>(null);
   let addCapabilityTriggerRef: HTMLButtonElement | undefined;
   const [newCapId, setNewCapId] = createSignal<string | null>(null);
-  const SOUL_SAVED_KEY = "omnyid.soul.saved_at";
-  const [soulSavedAt, setSoulSavedAt] = createSignal<number | null>(
-    (() => { const v = localStorage.getItem("omnyid.soul.saved_at"); return v ? parseInt(v) : null; })()
-  );
+  const [soulSavedAt, setSoulSavedAt] = createSignal<number | null>(loadSoulSavedAt(sessionUserId()));
   const [soulCopied, setSoulCopied] = createSignal(false);
-  const [soulCopyError, setSoulCopyError] = createSignal<string | null>(null);
-  const [identityCardExportError, setIdentityCardExportError] = createSignal<string | null>(null);
+  const [soulCopyError, setSoulCopyError] = createSignal<AgentSettingsSoulFailureReceipt | null>(null);
+  const [identityCardExportError, setIdentityCardExportError] = createSignal<AgentSettingsIdentityUtilityFailureReceipt | null>(null);
+  const [sovereignDataExportError, setSovereignDataExportError] = createSignal<AgentSettingsIdentityUtilityFailureReceipt | null>(null);
   const [showSoulEditor, setShowSoulEditor] = createSignal(false);
   const [soulEditText, setSoulEditText] = createSignal("");
   const [soulSaving, setSoulSaving] = createSignal(false);
-  const [soulSaveError, setSoulSaveError] = createSignal("");
+  const [soulSaveError, setSoulSaveError] = createSignal<AgentSettingsSoulFailureReceipt | null>(null);
   let soulEditorTriggerRef: HTMLButtonElement | undefined;
 
-  function copySoulMd() {
+  async function copySoulMd() {
     setSoulCopyError(null);
-    navigator.clipboard.writeText(instance()?.soul_md ?? "").then(() => {
+    const result = await copyAgentSettingsSoulText(
+      instance()?.soul_md ?? "",
+      (text) => navigator.clipboard.writeText(text),
+    );
+    if (result.error) {
+      setSoulCopyError(result.error);
+      return;
+    }
+    if (result.copied) {
       setSoulCopied(true);
       setTimeout(() => setSoulCopied(false), 1500);
-    }).catch((error) => {
-      setSoulCopyError(error instanceof Error ? error.message : "Could not copy soul.md.");
-    });
+    }
   }
 
   function openSoulEditor() {
     setSoulEditText(instance()?.soul_md ?? "");
-    setSoulSaveError("");
+    setSoulSaveError(null);
     setShowSoulEditor(true);
   }
 
@@ -1007,43 +995,57 @@ export function AgentSettingsView(props: {
   async function saveSoulMd() {
     if (soulSaving()) return;
     setSoulSaving(true);
-    setSoulSaveError("");
-    try {
-      await apiFetch("/agent/soul_md", { method: "PUT", bodyJson: { soul_md: soulEditText() } });
-      const fleet = await apiFetch<{ master_instance?: AgentInstance }>("/agent/fleet");
-      setInstance(fleet.master_instance ?? null);
-      const savedNow = Date.now();
+    setSoulSaveError(null);
+    const result = await saveAgentSettingsSoulStateAndReload(soulEditText(), {
+      saveSoul: updateAgentSoulMd,
+      loadInstance: getFleetMasterInstance,
+      userId: sessionUserId(),
+    });
+    if (result.error) {
+      setSoulSaveError(result.error);
+    } else {
+      setInstance(result.instance);
+      const savedNow = result.savedAt;
       setSoulSavedAt(savedNow);
-      localStorage.setItem(SOUL_SAVED_KEY, String(savedNow));
       closeSoulEditor({ restoreFocus: true });
-    } catch (e: unknown) {
-      setSoulSaveError(e instanceof Error ? e.message : "Save failed");
     }
     setSoulSaving(false);
   }
 
-  const CAP_LAST_USED_KEY = "omnyid.cap.last_used";
   const [capLastUsed, setCapLastUsed] = createSignal<Record<string, number>>(
-    (() => { try { const v = localStorage.getItem(CAP_LAST_USED_KEY); return v ? JSON.parse(v) as Record<string, number> : {}; } catch { return {}; } })()
+    loadCapabilityLastUsed(sessionUserId())
   );
-  const CAP_USAGE_COUNT_KEY = "omnyid.cap.usage_count";
   const [capUsageCount, setCapUsageCount] = createSignal<Record<string, number>>(
-    (() => { try { const v = localStorage.getItem(CAP_USAGE_COUNT_KEY); return v ? JSON.parse(v) as Record<string, number> : {}; } catch { return {}; } })()
+    loadCapabilityUsageCount(sessionUserId())
   );
-  const CAP_DOW_KEY = "omnyid.cap.dow_usage";
   const [capDowUsage, setCapDowUsage] = createSignal<Record<string, number[]>>(
-    (() => { try { const v = localStorage.getItem(CAP_DOW_KEY); return v ? JSON.parse(v) as Record<string, number[]> : {}; } catch { return {}; } })()
+    loadCapabilityDowUsage(sessionUserId())
   );
+  const capabilityUsageViewById = createMemo<Record<string, CapabilityUsageCardState>>(() => {
+    const usageCountById = capUsageCount();
+    const lastUsedById = capLastUsed();
+    const dowUsageById = capDowUsage();
+    return Object.fromEntries(
+      capabilities().map((cap) => [
+        cap.id,
+        capabilityUsageCardState({
+          usageCount: usageCountById[cap.id],
+          lastUsedAt: lastUsedById[cap.id],
+          dowUsage: dowUsageById[cap.id],
+        }),
+      ]),
+    );
+  });
   function touchCapLastUsed(id: string) {
     const now = Date.now();
     setCapLastUsed((prev) => {
       const next = { ...prev, [id]: now };
-      localStorage.setItem(CAP_LAST_USED_KEY, JSON.stringify(next));
+      saveCapabilityLastUsed(next, sessionUserId());
       return next;
     });
     setCapUsageCount((prev) => {
       const next = { ...prev, [id]: (prev[id] ?? 0) + 1 };
-      localStorage.setItem(CAP_USAGE_COUNT_KEY, JSON.stringify(next));
+      saveCapabilityUsageCount(next, sessionUserId());
       return next;
     });
     const dow = new Date().getDay();
@@ -1052,7 +1054,7 @@ export function AgentSettingsView(props: {
       const next = [...existing] as number[];
       next[dow] = (next[dow] ?? 0) + 1;
       const updated = { ...prev, [id]: next };
-      localStorage.setItem(CAP_DOW_KEY, JSON.stringify(updated));
+      saveCapabilityDowUsage(updated, sessionUserId());
       return updated;
     });
   }
@@ -1065,25 +1067,31 @@ export function AgentSettingsView(props: {
   const [capModePatching, setCapModePatching] = createSignal<string | null>(null);
   const [capModeSaved, setCapModeSaved] = createSignal<string | null>(null);
   async function cycleApprovalMode(cap: CapabilityDescriptor) {
-    const next = APPROVAL_CYCLE[(APPROVAL_CYCLE.indexOf(cap.approval_mode) + 1) % APPROVAL_CYCLE.length];
     setCapModePatching(cap.id);
     setCapActionError(null);
-    try {
-      await patchCapability(cap.id, { approval_mode: next });
-      await refreshCapabilities();
+    const result = await cycleAgentSettingsCapabilityApprovalModeAndReload(cap, {
+      patchCapability,
+      loadCapabilities: listCapabilities,
+      approvalCycle: APPROVAL_CYCLE,
+    });
+    if (result.error) {
+      setCapActionError(result.error);
+    } else {
+      setCapabilities(result.capabilities);
       touchCapLastUsed(cap.id);
       setCapModeSaved(cap.id);
       setTimeout(() => setCapModeSaved((prev) => (prev === cap.id ? null : prev)), 1500);
-    } catch (error) {
-      setCapActionError(error instanceof Error ? error.message : "Could not update capability approval mode.");
     }
     setCapModePatching(null);
   }
 
   const [capFilter, setCapFilter] = createSignal("");
   const [capImporting, setCapImporting] = createSignal(false);
-  const [capImportResult, setCapImportResult] = createSignal<string | null>(null);
+  const [capImportSuccess, setCapImportSuccess] = createSignal<string | null>(null);
+  const [capImportError, setCapImportError] = createSignal<AgentSettingsCapabilityFailureReceipt | null>(null);
   let capImportInputRef: HTMLInputElement | undefined;
+
+  const hostedUpgradeHref = createMemo(() => buildBillingUpgradeMailtoHref(null, null));
 
   function exportCapabilities() {
     const json = JSON.stringify(capabilities(), null, 2);
@@ -1101,150 +1109,46 @@ export function AgentSettingsView(props: {
     const inst = instance();
     const cfg = llmConfig();
     const caps = capabilities();
-    const card = null as Window | null;
-
-    {
-      const agentId = `omnyid-${Date.now().toString(36).toUpperCase()}`;
-      const model = cfg?.model ?? llmModel();
-      const provider = cfg?.provider ?? llmProvider();
-      const loraScore = inst?.lora_confidence_score != null
-        ? `${Math.round(inst.lora_confidence_score * 100)}%`
-        : "-";
-      const issuedAt = new Date().toLocaleDateString("en-AU", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-
-      const opened = exportAgentIdentityCard({
-        agentId,
-        model,
-        provider,
-        loraScore,
-        issuedAt,
+    const result = exportAgentSettingsIdentityCardState(() =>
+      exportAgentIdentityCard(agentSettingsIdentityCardExportState({
+        llmConfig: cfg,
+        llmModel: llmModel(),
+        llmProvider: llmProvider(),
+        loraConfidenceScore: inst?.lora_confidence_score ?? null,
         capabilities: caps,
-      });
-      if (!opened) {
-        setIdentityCardExportError("Could not open the print preview. Allow pop-ups for OmnyID and try again.");
-      }
-      return;
-    }
-
-    // Escape HTML entities before injecting server-derived values into document.write.
-    const esc = (s: unknown) => String(s ?? "")
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    const agentId = `omnyid-${Date.now().toString(36).toUpperCase()}`;
-    const model = cfg?.model ?? llmModel();
-    const provider = cfg?.provider ?? llmProvider();
-    const loraScore = inst?.lora_confidence_score != null
-      ? `${Math.round(inst!.lora_confidence_score! * 100)}%`
-      : "-";
-    const capList = caps.length > 0
-      ? caps.map((c) => `<li>${esc(c.id)}: ${esc(c.description)}</li>`).join("")
-      : "<li style='color:#888'>No capabilities registered</li>";
-
-    card!.document.write(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<title>OmnyID Agent Identity Card</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Inter,system-ui,sans-serif;background:#f0f3f9;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
-  .card{width:680px;min-height:360px;background:linear-gradient(135deg,#fff 60%,#e8eef8);border-radius:20px;box-shadow:0 20px 60px rgba(49,86,142,0.18);overflow:hidden;position:relative;display:flex;flex-direction:column}
-  .header{background:linear-gradient(135deg,#31568e,#3d6aaa);color:#fff;padding:28px 32px 24px;display:flex;align-items:center;gap:24px}
-  .avatar{width:72px;height:72px;border-radius:16px;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.35);display:flex;align-items:center;justify-content:center;font-size:2em;flex-shrink:0}
-  .header-text h1{font-size:22px;font-weight:700;letter-spacing:-0.02em}
-  .header-text p{font-size:11px;opacity:0.7;margin-top:2px;font-family:monospace}
-  .badge{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:999px;padding:3px 10px;font-size:10px;margin-top:8px;font-family:monospace;letter-spacing:0.05em}
-  .body{display:grid;grid-template-columns:1fr 1fr;gap:0;flex:1}
-  .col{padding:24px 28px;border-right:1px solid rgba(49,86,142,0.08)}
-  .col:last-child{border-right:none}
-  .section-label{font-size:9px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:#737781;margin-bottom:10px}
-  .field{margin-bottom:14px}
-  .field-name{font-size:10px;color:#737781;margin-bottom:2px}
-  .field-val{font-size:13px;font-weight:600;color:#1a1c1b}
-  .field-val.mono{font-family:monospace;font-size:11px;font-weight:400;color:#31568e;word-break:break-all}
-  .cap-list{list-style:none;display:flex;flex-direction:column;gap:4px}
-  .cap-list li{font-size:11px;color:#434750;padding:4px 8px;background:rgba(49,86,142,0.05);border-radius:6px}
-  .footer{background:#f8f9fc;border-top:1px solid rgba(49,86,142,0.08);padding:12px 28px;display:flex;align-items:center;justify-content:space-between}
-  .footer p{font-size:9px;color:#737781;font-family:monospace}
-  .qr-stub{width:48px;height:48px;background:#31568e;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px;font-family:monospace;text-align:center;line-height:1.3}
-  @media print{body{background:#fff;padding:0}@page{margin:0;size:A5 landscape}}
-</style>
-</head>
-<body>
-<div class="card">
-  <div class="header">
-    <div class="avatar">AI</div>
-    <div class="header-text">
-      <h1>OmnyID Master Agent</h1>
-      <p>Agent Identity Card | v1 | AFP-compliant</p>
-      <span class="badge">E2EE-Verified | Local-First | Agent-First</span>
-    </div>
-  </div>
-  <div class="body">
-    <div class="col">
-      <p class="section-label">Identity</p>
-      <div class="field"><div class="field-name">Agent ID</div><div class="field-val mono">${esc(agentId)}</div></div>
-      <div class="field"><div class="field-name">LLM Model</div><div class="field-val">${esc(model)}</div></div>
-      <div class="field"><div class="field-name">Provider</div><div class="field-val">${esc(provider)}</div></div>
-      <div class="field"><div class="field-name">LoRA Confidence</div><div class="field-val">${esc(loraScore)}</div></div>
-      <div class="field"><div class="field-name">Issued</div><div class="field-val">${new Date().toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" })}</div></div>
-    </div>
-    <div class="col">
-      <p class="section-label">Capabilities (${caps.length})</p>
-      <ul class="cap-list">${capList}</ul>
-    </div>
-  </div>
-  <div class="footer">
-    <div>
-      <p>OmnyID | omnyid.com | AFP v1</p>
-      <p>This card is a non-binding identity record for the registered agent instance.</p>
-    </div>
-    <div class="qr-stub">ID<br/>${esc(agentId.slice(-6))}</div>
-  </div>
-</div>
-<script>window.onload=()=>window.print();<\/script>
-</body>
-</html>`);
-    card!.document.close();
+      })),
+    );
+    setIdentityCardExportError(result.error);
   }
 
   function exportSovereignDataBundle() {
-    exportSovereignDataBundleFile();
+    setSovereignDataExportError(null);
+    const result = exportAgentSettingsSovereignDataBundleState(exportSovereignDataBundleFile);
+    setSovereignDataExportError(result.error);
   }
 
   async function handleImportFile(e: Event) {
     const file = (e.currentTarget as HTMLInputElement).files?.[0];
     if (!file) return;
     setCapImporting(true);
-    setCapImportResult(null);
-    try {
-      const text = await file.text();
-      const parsed = JSON.parse(text) as CapabilityDescriptor[];
-      if (!Array.isArray(parsed)) throw new Error("Expected a JSON array");
-      const existing = new Set(capabilities().map((c) => c.name));
-      const toAdd = parsed.filter((c) => !existing.has(c.name));
-      for (const cap of toAdd) {
-        await registerCapability({
-          name: cap.name,
-          description: cap.description,
-          input_schema: cap.input_schema,
-          output_schema: cap.output_schema ?? null,
-          version: cap.version ?? "1.0.0",
-          tags: cap.tags ?? [],
-          approval_mode: cap.approval_mode ?? "suggest_only",
-        });
-      }
-      await refreshCapabilities();
-      setCapImportResult(`Imported ${toAdd.length} capability${toAdd.length === 1 ? "" : "ies"}`);
-      setTimeout(() => setCapImportResult(null), 4000);
-    } catch (err) {
-      setCapImportResult(`Import failed: ${err instanceof Error ? err.message : "unknown error"}`);
-      setTimeout(() => setCapImportResult(null), 6000);
+    setCapImportSuccess(null);
+    setCapImportError(null);
+    const text = await file.text();
+    const result = await importAgentSettingsCapabilitiesAndReload(
+      text,
+      capabilities().map((capability) => capability.name),
+      {
+        registerCapability,
+        loadCapabilities: listCapabilities,
+      },
+    );
+    if (result.error) {
+      setCapImportError(result.error);
+      setTimeout(() => setCapImportError(null), 6000);
+    } else {
+      setCapabilities(result.capabilities);
+      setCapImportSuccess(`Imported ${result.importedCount} capability${result.importedCount === 1 ? "" : "ies"}.`);
+      setTimeout(() => setCapImportSuccess(null), 4000);
     }
     setCapImporting(false);
     (e.currentTarget as HTMLInputElement).value = "";
@@ -1323,8 +1227,8 @@ export function AgentSettingsView(props: {
     if (capAdding()) return;
     setCapAdding(tpl.id);
     setCapActionError(null);
-    try {
-      await registerCapability({
+    const result = await addAgentSettingsCapabilityAndReload(
+      {
         name: tpl.name,
         description: tpl.description,
         input_schema: tpl.input_schema,
@@ -1332,15 +1236,21 @@ export function AgentSettingsView(props: {
         version: "1.0.0",
         tags: tpl.tags,
         approval_mode: tpl.approval_mode,
-      });
-      await refreshCapabilities();
-      const added = capabilities().find((c) => c.name === tpl.name);
+      },
+      {
+        registerCapability,
+        loadCapabilities: listCapabilities,
+      },
+    );
+    if (result.error) {
+      setCapActionError(result.error);
+    } else {
+      setCapabilities(result.capabilities);
+      const added = result.capabilities.find((c) => c.name === tpl.name);
       if (added) {
         setNewCapId(added.id);
         setTimeout(() => setNewCapId((prev) => (prev === added.id ? null : prev)), 3000);
       }
-    } catch (error) {
-      setCapActionError(error instanceof Error ? error.message : `Could not add ${tpl.name}.`);
     }
     setCapAdding(null);
   }
@@ -1353,23 +1263,20 @@ export function AgentSettingsView(props: {
 
   async function refreshCapabilities() {
     setCapLoadError(null);
-    try {
-      const caps = await listCapabilities();
-      setCapabilities(caps);
-    } catch (error) {
-      setCapLoadError(error instanceof Error ? error.message : "Could not load capabilities.");
-    }
+    const result = await loadAgentSettingsCapabilitiesState(listCapabilities);
+    setCapabilities(result.capabilities);
+    setCapLoadError(result.error);
   }
 
   async function handleDeleteCapability(id: string) {
     setCapDeleting(id);
     setCapActionError(null);
-    try {
-      await deleteCapability(id);
-      await refreshCapabilities();
-    } catch (error) {
-      setCapActionError(error instanceof Error ? error.message : "Could not remove this capability.");
-    }
+    const result = await deleteAgentSettingsCapabilityAndReload(id, {
+      deleteCapability,
+      loadCapabilities: listCapabilities,
+    });
+    if (result.error) setCapActionError(result.error);
+    else setCapabilities(result.capabilities);
     setCapDeleting(null);
   }
 
@@ -1380,113 +1287,98 @@ export function AgentSettingsView(props: {
     }
     props.onFocusDone?.();
 
-    await refreshInstance({ target: "bootstrap" });
-    await refreshCapabilities();
-    try {
-      const cfg = await fetchLlmConfig();
-      setLlmConfig(cfg);
-      if (cfg.backend === "ollama" || cfg.backend === "byok" || cfg.backend === "runpod") {
-        setLlmBackend(cfg.backend as "byok" | "ollama" | "runpod");
-        setSavedLlmBackend(cfg.backend);
-      }
-      if (cfg.provider) {
-        setLlmProvider(cfg.provider);
-      }
-      setLlmModel(cfg.model);
-      setSavedLlmModel(cfg.model);
-      if (cfg.ollama_url) { setLlmOllamaUrl(cfg.ollama_url); setSavedOllamaUrl(cfg.ollama_url); }
-    } catch { /* not configured yet */ }
+    const bootstrap = await loadAgentSettingsBootstrapState({
+      loadInstance: getFleetMasterInstance,
+      loadCapabilities: listCapabilities,
+      loadConfig: fetchLlmConfig,
+    });
+    setInstanceLoadError(bootstrap.instanceError);
+    setInstance(bootstrap.instance);
+    setCapabilities(bootstrap.capabilities);
+    setCapLoadError(bootstrap.capabilitiesError);
+    setLlmLoadError(bootstrap.llmError);
+    if (bootstrap.llmState) {
+      setLlmConfig(bootstrap.llmState.config);
+      setLlmBackend(bootstrap.llmState.backend);
+      setSavedLlmBackend(bootstrap.llmState.backend);
+      if (bootstrap.llmState.provider) setLlmProvider(bootstrap.llmState.provider);
+      setLlmModel(bootstrap.llmState.model);
+      setSavedLlmModel(bootstrap.llmState.model);
+      setLlmOllamaUrl(bootstrap.llmState.ollamaUrl);
+      setSavedOllamaUrl(bootstrap.llmState.ollamaUrl);
+    }
     setLoading(false);
   });
 
   async function saveLlm() {
     setLlmSaving(true);
-    setLlmError("");
+    setLlmError(null);
+    setLlmLoadError(null);
     setLlmPingResult(null);
-    try {
-      const normalizedBackend = llmBackend();
-      const normalizedProvider = llmProvider().trim();
-      const normalizedModel = llmModel().trim();
-      const normalizedApiKey = llmApiKey().trim();
-      const normalizedOllamaUrl = llmOllamaUrl().trim();
-      await saveLlmConfig({
+    const normalizedBackend = llmBackend();
+    const normalizedProvider = llmProvider().trim();
+    const normalizedModel = llmModel().trim();
+    const normalizedApiKey = llmApiKey().trim();
+    const normalizedOllamaUrl = llmOllamaUrl().trim();
+    const result = await saveAgentSettingsLlmStateAndReload(
+      {
         backend: normalizedBackend,
-        provider: normalizedBackend === "byok" ? normalizedProvider || undefined : undefined,
-        model: normalizedModel || undefined,
-        api_key: normalizedBackend === "byok" ? normalizedApiKey || undefined : undefined,
-        ollama_url: normalizedBackend === "ollama" ? normalizedOllamaUrl || undefined : undefined,
-      });
-      setLlmProvider(normalizedProvider || llmProvider());
-      setLlmModel(normalizedModel);
+        provider: normalizedProvider,
+        model: normalizedModel,
+        apiKey: normalizedApiKey,
+        ollamaUrl: normalizedOllamaUrl,
+      },
+      {
+        saveConfig: saveLlmConfig,
+        loadConfig: fetchLlmConfig,
+      },
+    );
+    if (result.error) {
+      setLlmError(result.error);
+    } else if (result.state) {
+      setLlmConfig(result.state.config);
+      setLlmBackend(result.state.backend);
+      setSavedLlmBackend(result.state.backend);
+      setLlmProvider(result.state.provider || llmProvider());
+      setLlmModel(result.state.model);
+      setSavedLlmModel(result.state.model);
+      setLlmOllamaUrl(result.state.ollamaUrl);
+      setSavedOllamaUrl(result.state.ollamaUrl);
       setLlmApiKey(normalizedApiKey);
-      setLlmOllamaUrl(normalizedOllamaUrl);
       setLlmSaved(true);
       setLlmDirty(false);
-      setSavedLlmBackend(normalizedBackend);
-      setSavedLlmModel(normalizedModel);
-      setSavedOllamaUrl(normalizedOllamaUrl);
       setTimeout(() => setLlmSaved(false), 3000);
-      const cfg = await fetchLlmConfig();
-      setLlmConfig(cfg);
-    } catch (e: unknown) {
-      setLlmError(e instanceof Error ? e.message : "Save failed");
     }
     setLlmSaving(false);
   }
 
-  function pushTestHistory(entry: TestHistoryEntry) {
-    const next = [entry, ...loadTestHistory()].slice(0, 10);
-    localStorage.setItem(LLM_TEST_HISTORY_KEY, JSON.stringify(next));
-    setTestHistory(next);
-  }
-
   async function testLlmConnection() {
     // Auto-save unsaved changes before pinging so the test reflects what the user typed.
-    if (llmDirty() && !llmSaving()) await saveLlm();
+    if (llmDirty() && !llmSaving()) {
+      await saveLlm();
+      if (llmDirty() || llmError()) return;
+    }
     setLlmPinging(true);
     setLlmPingResult(null);
-    let timedOut = false;
-    const timeoutId = setTimeout(() => {
-      timedOut = true;
-      setLlmPingResult({ ok: false, reason: "Request timed out after 10s", backend: llmBackend(), provider: llmProvider() });
-      localStorage.setItem(LLM_PING_OK_KEY, "0");
-      pushTestHistory({ ts: Date.now(), model: llmModel(), ms: null, ok: false, reason: "timeout" });
-      setLlmPinging(false);
-    }, 10_000);
-    try {
-      const t0 = performance.now();
-      const result = await pingLlmConfig();
-      const latencyMs = Math.round(performance.now() - t0);
-      clearTimeout(timeoutId);
-      if (!timedOut) {
-        setLlmPingResult({
-          ok: result.ok,
-          reason: result.reason,
-          backend: result.backend,
-          provider: result.provider,
-          httpStatus: result.http_status,
-        });
-        localStorage.setItem(LLM_PING_OK_KEY, result.ok ? "1" : "0");
-        if (result.ok) {
-          const now = Date.now();
-          localStorage.setItem(LLM_PING_KEY, String(now));
-          setLastPingAt(now);
-          const next = [...loadLatencyHistory(), { ts: now, ms: latencyMs }].slice(-7);
-          localStorage.setItem(LLM_LATENCY_KEY, JSON.stringify(next));
-          setLatencyHistory(next);
-          setTimeout(() => setLlmPingResult(null), 8000);
-        }
-        pushTestHistory({ ts: Date.now(), model: llmModel(), ms: result.ok ? latencyMs : null, ok: result.ok, reason: result.reason });
-      }
-    } catch (e: unknown) {
-      clearTimeout(timeoutId);
-      if (!timedOut) {
-        const reason = e instanceof Error ? e.message : "Connection failed";
-        setLlmPingResult({ ok: false, reason, backend: llmBackend(), provider: llmProvider() });
-        pushTestHistory({ ts: Date.now(), model: llmModel(), ms: null, ok: false, reason });
-      }
+    const result = await testAgentSettingsLlmConnectionState(
+      {
+        backend: llmBackend(),
+        provider: llmProvider(),
+        model: llmModel(),
+        userId: sessionUserId(),
+      },
+      {
+        pingConfig: pingLlmConfig,
+      },
+    );
+    setLlmPingResult(result.pingResult);
+    setLatencyHistory(result.latencyHistory);
+    setTestHistory(result.testHistory);
+    setLastPingAt(result.lastPingAt);
+    if (result.clearResultAfterMs) {
+      setTimeout(() => setLlmPingResult(null), result.clearResultAfterMs);
     }
-    if (!timedOut) setLlmPinging(false);
+    setLlmPinging(false);
   }
 
   return (
@@ -1513,14 +1405,27 @@ export function AgentSettingsView(props: {
           }
         >
           <Show when={instanceLoadError()}>
-            {(message) => (
-              <NoticeBox role="alert" ariaLive="assertive" ariaAtomic={true} class="mt-4 text-sm text-red-500">
+            {(receipt) => (
+              <NoticeBox
+                role="alert"
+                ariaLive="assertive"
+                ariaAtomic={true}
+                class={`mt-4 border px-3 py-2 text-sm ${
+                  receipt().tone === "danger"
+                    ? "border-red-300/60 bg-red-50/70 text-red-900"
+                    : "border-amber-300/60 bg-amber-50/70 text-amber-900"
+                }`}
+              >
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                  <span>Could not load master agent identity: {message()}</span>
+                  <div class="min-w-0">
+                    <p class="font-semibold">{receipt().title}</p>
+                    <p class="mt-1">{receipt().summary}</p>
+                    <p class="mt-1">{receipt().nextStep}</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => void refreshInstance({ target: "bootstrap" })}
-                    class="font-medium text-red-500 underline underline-offset-2"
+                    class="font-medium underline underline-offset-2"
                   >
                     Retry identity
                   </button>
@@ -1575,13 +1480,23 @@ export function AgentSettingsView(props: {
               }
             >
               <Show when={wizardRefreshError()}>
-                {(message) => (
-                  <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300/50 bg-amber-50/90 px-3 py-2 text-xs text-amber-900 shadow-sm">
-                    <span>Personality refresh failed: {message()}</span>
+                {(receipt) => (
+                  <div
+                    class={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs shadow-sm ${
+                      receipt().tone === "danger"
+                        ? "border-red-300/60 bg-red-50/90 text-red-900"
+                        : "border-amber-300/50 bg-amber-50/90 text-amber-900"
+                    }`}
+                  >
+                    <div class="min-w-0">
+                      <p class="font-semibold">{receipt().title}</p>
+                      <p class="mt-1">{receipt().summary}</p>
+                      <p class="mt-1">{receipt().nextStep}</p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => void refreshInstanceAfterWizard()}
-                      class="font-medium text-amber-900 underline underline-offset-2"
+                      class="font-medium underline underline-offset-2"
                     >
                       Retry refresh
                     </button>
@@ -1620,14 +1535,27 @@ export function AgentSettingsView(props: {
                   </div>
                 </div>
                 <Show when={soulCopyError()}>
-                  {(message) => (
-                    <NoticeBox role="alert" ariaLive="assertive" ariaAtomic={true} class="mt-2 text-xs text-red-500">
+                  {(receipt) => (
+                    <NoticeBox
+                      role="alert"
+                      ariaLive="assertive"
+                      ariaAtomic={true}
+                      class={`mt-2 border px-3 py-2 text-xs ${
+                        receipt().tone === "danger"
+                          ? "border-red-300/60 bg-red-50/70 text-red-900"
+                          : "border-amber-300/60 bg-amber-50/70 text-amber-900"
+                      }`}
+                    >
                       <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span>Could not copy soul.md: {message()}</span>
+                        <div class="min-w-0">
+                          <p class="font-semibold">{receipt().title}</p>
+                          <p class="mt-1">{receipt().summary}</p>
+                          <p class="mt-1">{receipt().nextStep}</p>
+                        </div>
                         <button
                           type="button"
                           onClick={() => setSoulCopyError(null)}
-                          class="font-medium text-red-500 underline underline-offset-2"
+                          class="font-medium underline underline-offset-2"
                         >
                           Dismiss
                         </button>
@@ -1769,6 +1697,31 @@ export function AgentSettingsView(props: {
               </Show>
 
               {/* Browser AI status — shown when browser supports it */}
+              <div class="mt-3 rounded-lg border border-amber-300/40 bg-amber-50/60 px-3 py-3">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-amber-900">Hosted AI</p>
+                    <p class="mt-1 text-sm font-medium text-amber-900">
+                      Managed hosted AI requires a Pro workspace.
+                    </p>
+                    <p class="mt-1 text-xs leading-6 text-amber-800/90">
+                      Free workspaces should use Bring Your Own Key, Local Ollama, or RunPod. Hosted AI is only enabled when the server accepts a Pro hosted configuration and assigns a positive monthly budget.
+                    </p>
+                    <Show when={llmConfig()?.backend === "hosted" && (llmConfig()?.monthly_budget_cents ?? 0) <= 0}>
+                      <p class="mt-2 text-xs leading-6 text-amber-900">
+                        This workspace is still on a hosted-zero-budget config, so the agent will not use hosted AI until you upgrade or switch backends here.
+                      </p>
+                    </Show>
+                  </div>
+                  <a
+                    href={hostedUpgradeHref()}
+                    class="shrink-0 rounded-lg border border-amber-400/50 bg-white/80 px-3 py-2 text-xs font-semibold text-amber-900 transition hover:bg-white"
+                  >
+                    Request Pro hosted access
+                  </a>
+                </div>
+              </div>
+
               <Show when={props.browserAiLabel}>
                 <div class={`mt-3 rounded-lg border px-3 py-2 flex items-start gap-2 ${llmConfig() ? "border-white/15 bg-white/5" : "border-primary/30 bg-primary/10"}`}>
                   <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/80">AI</span>
@@ -1886,6 +1839,8 @@ export function AgentSettingsView(props: {
                       <option value="openrouter">Open Router</option>
                       <option value="cerebras">Cerebras</option>
                       <option value="together_ai">Together AI</option>
+                      <option value="mistral">Mistral</option>
+                      <option value="huggingface">Hugging Face</option>
                     </select>
                     <p class="mt-0.5 text-[10px] text-on-surface-variant">
                       Your key must match the selected provider. Changing provider updates the default model.
@@ -1950,14 +1905,25 @@ export function AgentSettingsView(props: {
                       </Show>
                     </label>
                     <Show when={keyPrefixCopyError()}>
-                      {(message) => (
-                        <NoticeBox role="alert" ariaLive="assertive" ariaAtomic={true} class="mb-2 text-xs text-red-500">
+                      {(receipt) => (
+                        <NoticeBox
+                          role="alert"
+                          ariaLive="assertive"
+                          ariaAtomic={true}
+                          class={`mb-2 text-xs ${receipt().tone === "danger" ? "text-red-600" : "text-amber-700"}`}
+                        >
                           <div class="flex flex-wrap items-center justify-between gap-3">
-                            <span>Could not copy expected key prefix: {message()}</span>
+                            <div class="min-w-0">
+                              <p class="font-semibold">{receipt().title}</p>
+                              <p class="mt-1">{receipt().summary}</p>
+                              <p class="mt-1 text-[11px] opacity-80">Next step: {receipt().nextStep}</p>
+                            </div>
                             <button
                               type="button"
                               onClick={() => setKeyPrefixCopyError(null)}
-                              class="font-medium text-red-500 underline underline-offset-2"
+                              class={`font-medium underline underline-offset-2 ${
+                                receipt().tone === "danger" ? "text-red-600" : "text-amber-700"
+                              }`}
                             >
                               Dismiss
                             </button>
@@ -2085,20 +2051,25 @@ export function AgentSettingsView(props: {
                           <tbody>
                             <For each={testHistory()}>
                               {(entry) => (
-                                <tr class="border-t border-white/10">
-                                  <td class="py-[2px] pr-1.5 text-on-surface-variant/35">
-                                    {new Date(entry.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                  </td>
-                                  <td class="max-w-[72px] truncate py-[2px] pr-1.5 text-on-surface-variant/50">
-                                    {entry.model}
-                                  </td>
-                                  <td class="py-[2px] pr-1.5 text-right text-on-surface-variant/50">
-                                    {entry.ms !== null ? `${entry.ms}ms` : "-"}
-                                  </td>
-                                  <td class={`py-[2px] text-right font-semibold ${entry.ok ? "text-green-600" : "text-red-400"}`}>
-                                    {entry.ok ? "OK" : "NO"}
-                                  </td>
-                                </tr>
+                                (() => {
+                                  const row = agentSettingsTestHistoryRowState(entry);
+                                  return (
+                                    <tr class="border-t border-white/10">
+                                      <td class="py-[2px] pr-1.5 text-on-surface-variant/35">
+                                        {row.timeLabel}
+                                      </td>
+                                      <td class="max-w-[72px] truncate py-[2px] pr-1.5 text-on-surface-variant/50">
+                                        {row.modelLabel}
+                                      </td>
+                                      <td class="py-[2px] pr-1.5 text-right text-on-surface-variant/50">
+                                        {row.durationLabel}
+                                      </td>
+                                      <td class={`py-[2px] text-right font-semibold ${row.statusClass}`}>
+                                        {row.statusLabel}
+                                      </td>
+                                    </tr>
+                                  );
+                                })()
                               )}
                             </For>
                           </tbody>
@@ -2128,14 +2099,40 @@ export function AgentSettingsView(props: {
                     </div>
                   </Show>
                   <Show when={llmError()}>
-                    <NoticeBox
-                      role="alert"
-                      ariaLive="assertive"
-                      ariaAtomic={true}
-                      class="text-xs text-red-500"
-                    >
-                      {llmError()}
-                    </NoticeBox>
+                    {(receipt) => (
+                      <NoticeBox
+                        role="alert"
+                        ariaLive="assertive"
+                        ariaAtomic={true}
+                        class={`border px-3 py-2 text-xs ${
+                          receipt().tone === "danger"
+                            ? "border-red-300/60 bg-red-50/70 text-red-900"
+                            : "border-amber-300/60 bg-amber-50/70 text-amber-900"
+                        }`}
+                      >
+                        <p class="font-semibold">{receipt().title}</p>
+                        <p class="mt-1">{receipt().summary}</p>
+                        <p class="mt-1">{receipt().nextStep}</p>
+                      </NoticeBox>
+                    )}
+                  </Show>
+                  <Show when={!llmError() && llmLoadError()}>
+                    {(receipt) => (
+                      <NoticeBox
+                        role="alert"
+                        ariaLive="assertive"
+                        ariaAtomic={true}
+                        class={`border px-3 py-2 text-xs ${
+                          receipt().tone === "danger"
+                            ? "border-red-300/60 bg-red-50/70 text-red-900"
+                            : "border-amber-300/60 bg-amber-50/70 text-amber-900"
+                        }`}
+                      >
+                        <p class="font-semibold">{receipt().title}</p>
+                        <p class="mt-1">{receipt().summary}</p>
+                        <p class="mt-1">{receipt().nextStep}</p>
+                      </NoticeBox>
+                    )}
                   </Show>
                   <Show when={llmPingResult()}>
                     {(() => {
@@ -2146,15 +2143,22 @@ export function AgentSettingsView(props: {
                           role={result.ok ? "status" : "alert"}
                           ariaLive={result.ok ? "polite" : "assertive"}
                           ariaAtomic={true}
-                          class={`text-xs ${result.ok ? "text-green-600" : "text-red-500"}`}
+                          class={`text-xs ${
+                            result.ok
+                              ? "text-green-600"
+                              : result.receipt?.tone === "danger"
+                                ? "text-red-600"
+                                : "text-amber-700"
+                          }`}
                         >
                           <span class="block font-medium">
-                            {result.ok ? `Connected to ${targetLabel}` : "Connection failed"}
+                            {result.ok ? `Connected to ${targetLabel}` : result.receipt?.title ?? "Connection failed"}
                           </span>
-                          <Show when={!result.ok && result.reason}>
-                            <span class="mt-1 block font-normal leading-5">
-                              {result.reason}
-                            </span>
+                          <Show when={!result.ok && result.receipt}>
+                            <div class="mt-1">
+                              <p class="font-normal leading-5">{result.receipt!.summary}</p>
+                              <p class="mt-1 text-[11px] opacity-80">{result.receipt!.nextStep}</p>
+                            </div>
                           </Show>
                           <Show when={!result.ok && result.httpStatus !== undefined}>
                             <span class="mt-1 block font-mono text-[10px] opacity-70">
@@ -2226,14 +2230,27 @@ export function AgentSettingsView(props: {
               }
             >
               <Show when={capActionError()}>
-                {(message) => (
-                  <NoticeBox role="alert" ariaLive="assertive" ariaAtomic={true} class="mb-3 text-xs text-red-500">
+                {(receipt) => (
+                  <NoticeBox
+                    role="alert"
+                    ariaLive="assertive"
+                    ariaAtomic={true}
+                    class={`mb-3 border px-3 py-2 text-xs ${
+                      receipt().tone === "danger"
+                        ? "border-red-300/60 bg-red-50/70 text-red-900"
+                        : "border-amber-300/60 bg-amber-50/70 text-amber-900"
+                    }`}
+                  >
                     <div class="flex items-start justify-between gap-3">
-                      <span>{message()}</span>
+                      <div class="min-w-0">
+                        <p class="font-semibold">{receipt().title}</p>
+                        <p class="mt-1">{receipt().summary}</p>
+                        <p class="mt-1">{receipt().nextStep}</p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => setCapActionError(null)}
-                        class="font-medium text-red-500 underline underline-offset-2"
+                        class="font-medium underline underline-offset-2"
                       >
                         Dismiss
                       </button>
@@ -2242,14 +2259,27 @@ export function AgentSettingsView(props: {
                 )}
               </Show>
               <Show when={capLoadError()}>
-                {(message) => (
-                  <NoticeBox role="alert" ariaLive="assertive" ariaAtomic={true} class="mb-3 text-xs text-red-500">
+                {(receipt) => (
+                  <NoticeBox
+                    role="alert"
+                    ariaLive="assertive"
+                    ariaAtomic={true}
+                    class={`mb-3 border px-3 py-2 text-xs ${
+                      receipt().tone === "danger"
+                        ? "border-red-300/60 bg-red-50/70 text-red-900"
+                        : "border-amber-300/60 bg-amber-50/70 text-amber-900"
+                    }`}
+                  >
                     <div class="flex items-start justify-between gap-3">
-                      <span>Could not load capabilities: {message()}</span>
+                      <div class="min-w-0">
+                        <p class="font-semibold">{receipt().title}</p>
+                        <p class="mt-1">{receipt().summary}</p>
+                        <p class="mt-1">{receipt().nextStep}</p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => void refreshCapabilities()}
-                        class="font-medium text-red-500 underline underline-offset-2"
+                        class="font-medium underline underline-offset-2"
                       >
                         Retry capabilities
                       </button>
@@ -2291,15 +2321,39 @@ export function AgentSettingsView(props: {
                 </div>
               </div>
 
-              <Show when={capImportResult()}>
-                <NoticeBox
-                  role={capImportResult()?.startsWith("Import failed") ? "alert" : "status"}
-                  ariaLive={capImportResult()?.startsWith("Import failed") ? "assertive" : "polite"}
-                  ariaAtomic={true}
-                  class={`mt-2 text-xs ${capImportResult()?.startsWith("Import failed") ? "text-red-500" : "text-green-600 font-medium"}`}
-                >
-                  {capImportResult()}
-                </NoticeBox>
+              <Show when={capImportError()}>
+                {(receipt) => (
+                  <NoticeBox
+                    role="alert"
+                    ariaLive="assertive"
+                    ariaAtomic={true}
+                    class={`mt-2 text-xs ${receipt().tone === "danger" ? "text-red-600" : "text-amber-700"}`}
+                  >
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <div class="min-w-0">
+                        <p class="font-semibold">{receipt().title}</p>
+                        <p class="mt-1">{receipt().summary}</p>
+                        <p class="mt-1 text-[11px] opacity-80">Next step: {receipt().nextStep}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCapImportError(null)}
+                        class={`font-medium underline underline-offset-2 ${
+                          receipt().tone === "danger" ? "text-red-600" : "text-amber-700"
+                        }`}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </NoticeBox>
+                )}
+              </Show>
+              <Show when={capImportSuccess()}>
+                {(message) => (
+                  <NoticeBox role="status" ariaLive="polite" ariaAtomic={true} class="mt-2 text-xs font-medium text-green-600">
+                    {message()}
+                  </NoticeBox>
+                )}
               </Show>
               <p class="mt-4 text-[10px] font-mono uppercase tracking-[0.18em] text-outline mb-2">Registered</p>
               <Show when={capabilities().length > 3}>
@@ -2346,7 +2400,9 @@ export function AgentSettingsView(props: {
                 >
                 <div class="space-y-2">
                   <For each={filteredCapabilities()}>
-                    {(cap) => (
+                    {(cap) => {
+                      const usageState = () => capabilityUsageViewById()[cap.id] ?? EMPTY_CAPABILITY_USAGE_CARD_STATE;
+                      return (
                       <div class={`flex items-start justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 transition-all ${newCapId() === cap.id ? "ring-2 ring-green-400/50 animate-fade-in" : ""}`}>
                         <div class="min-w-0">
                           <p class="font-mono text-xs font-semibold text-on-surface truncate">{cap.name}</p>
@@ -2390,57 +2446,34 @@ export function AgentSettingsView(props: {
                               </For>
                             </div>
                           </Show>
-                          <Show when={capLastUsed()[cap.id] || capUsageCount()[cap.id]}>
+                          <Show when={usageState().usageSummary}>
                             <p class="mt-0.5 font-mono text-[0.55em] text-on-surface-variant/30">
-                              {(() => {
-                                const count = capUsageCount()[cap.id] ?? 0;
-                                const lastTs = capLastUsed()[cap.id];
-                                const countLabel = count > 0 ? `used ${count}x` : null;
-                                const lastLabel = (() => {
-                                  if (!lastTs) return null;
-                                  const secs = Math.floor((Date.now() - lastTs) / 1000);
-                                  if (secs < 60) return "just now";
-                                  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
-                                  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
-                                  return `${Math.floor(secs / 86400)}d ago`;
-                                })();
-                                return [countLabel, lastLabel ? `last ${lastLabel}` : null].filter(Boolean).join(" | ");
-                              })()}
+                              {usageState().usageSummary}
                             </p>
                           </Show>
-                          {(() => {
-                            const dow = capDowUsage()[cap.id];
-                            if (!dow || dow.every((n) => n === 0)) return null;
-                            const maxCount = Math.max(1, ...dow);
-                            const DOW_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
-                            return (
-                              <div class="mt-0.5 flex items-end gap-[2px]" title="Usage by day of week (Sun-Sat)">
-                                <For each={dow}>
-                                  {(count, i) => (
-                                    <div class="flex flex-col items-center gap-[1px]">
-                                      <div
-                                        class="w-[5px] rounded-sm transition-all"
-                                        style={`height: ${count > 0 ? Math.max(3, Math.round((count / maxCount) * 12)) : 2}px; background: ${count > 0 ? "rgba(49,86,142,0.4)" : "rgba(0,0,0,0.06)"}`}
-                                        title={`${DOW_LABELS[i()]}: ${count}`}
-                                      />
-                                      <span class="font-mono text-[0.4em] text-on-surface-variant/20">{DOW_LABELS[i()]}</span>
-                                    </div>
-                                  )}
-                                </For>
-                              </div>
-                            );
-                          })()}
-                          {(() => {
-                            const lastTs = capLastUsed()[cap.id];
-                            if (!lastTs) return null;
-                            const staleDays = Math.floor((Date.now() - lastTs) / 86400000);
-                            if (staleDays < 14) return null;
-                            return (
+                          <Show when={usageState().dowBars.length > 0}>
+                            <div class="mt-0.5 flex items-end gap-[2px]" title="Usage by day of week (Sun-Sat)">
+                              <For each={usageState().dowBars}>
+                                {(bar) => (
+                                  <div class="flex flex-col items-center gap-[1px]">
+                                    <div
+                                      class="w-[5px] rounded-sm transition-all"
+                                      style={`height: ${bar.height}px; background: ${bar.active ? "rgba(49,86,142,0.4)" : "rgba(0,0,0,0.06)"}`}
+                                      title={`${bar.label}: ${bar.count}`}
+                                    />
+                                    <span class="font-mono text-[0.4em] text-on-surface-variant/20">{bar.label}</span>
+                                  </div>
+                                )}
+                              </For>
+                            </div>
+                          </Show>
+                          <Show when={usageState().staleSummary}>
+                            {(summary) => (
                               <p class="mt-0.5 font-mono text-[0.52em] text-amber-500/50">
-                                not used in {staleDays}d - may be redundant
+                                {summary()}
                               </p>
-                            );
-                          })()}
+                            )}
+                          </Show>
                         </div>
                         <button
                           type="button"
@@ -2451,7 +2484,7 @@ export function AgentSettingsView(props: {
                           {capDeleting() === cap.id ? "..." : "Remove"}
                         </button>
                       </div>
-                    )}
+                    )}}
                   </For>
                 </div>
                 </Show>
@@ -2489,69 +2522,48 @@ export function AgentSettingsView(props: {
                     <p class="mt-1 text-xs leading-5 text-on-surface-variant">
                       Keep the runtime scaffold, deployment state, and update pressure visible in the same place as device bootstrap policy.
                     </p>
-                    <div class="mt-3 space-y-2 text-xs text-on-surface-variant">
-                      <div class="flex items-center justify-between gap-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2">
-                        <span>Status</span>
-                        <span class="font-semibold text-on-surface">
-                          {props.runtimeDeployment?.status ?? runtimeUpdatesState()?.runtime_status ?? "unknown"}
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between gap-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2">
-                        <span>Framework</span>
-                        <span class="font-semibold text-on-surface">
-                          {props.runtimeDeployment?.framework ?? runtimeUpdatesState()?.framework ?? "none"}
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between gap-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2">
-                        <span>Latest version</span>
-                        <span class="font-semibold text-on-surface">
-                          {runtimeUpdatesState()?.latest_version ?? "unknown"}
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between gap-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2">
-                        <span>Current version</span>
-                        <span class="font-semibold text-on-surface">
-                          {runtimeUpdatesState()?.current_version ?? "unknown"}
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between gap-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2">
-                        <span>Update pressure</span>
-                        <span class="font-semibold text-on-surface">
-                          {runtimeUpdatesState()?.update_available
-                            ? `${runtimeUpdatesState()?.current_version ?? "current"} -> ${runtimeUpdatesState()?.latest_version ?? "latest"}`
-                            : "up to date"}
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between gap-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2">
-                        <span>Last checked</span>
-                        <span class="font-semibold text-on-surface">
-                          {dateTimeLabel(runtimeUpdatesState()?.last_checked_at)} | {relativeTimeLabel(runtimeUpdatesState()?.last_checked_at)}
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between gap-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2">
-                        <span>Last applied</span>
-                        <span class="font-semibold text-on-surface">
-                          {dateTimeLabel(runtimeUpdatesState()?.last_applied_at)} | {relativeTimeLabel(runtimeUpdatesState()?.last_applied_at)}
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between gap-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2">
-                        <span>Last update event</span>
-                        <span class="font-semibold text-on-surface">
-                          {dateTimeLabel(latestTimestampValue((runtimeUpdatesState()?.entries ?? []).map((entry) => entry.created_at)))} | {relativeTimeLabel(latestTimestampValue((runtimeUpdatesState()?.entries ?? []).map((entry) => entry.created_at)))}
-                        </span>
-                      </div>
-                    </div>
-                    <Show when={props.runtimeDeployment?.workspace_path}>
+                    <Show when={runtimeRecoveryPacketPreviewState().operationalGuidanceCard}>
+                      {(card) => (
+                        <div class="mt-3 rounded-lg border border-amber-300/70 bg-amber-50/85 px-3 py-3">
+                          <div class="flex items-center gap-2">
+                            <EyebrowLabel class="text-amber-900/75">{card().title}</EyebrowLabel>
+                            <InfoHint text="This operator gate comes from the latest production go/no-go artifact. It only appears here when operational-history cleanup is the active blocker." />
+                          </div>
+                          <TextLineList
+                            lines={card().lines}
+                            class="mt-2 space-y-1"
+                            lineClass="text-[11px] text-amber-950/85"
+                          />
+                          <Show when={runtimeRecoveryPacketPreviewState().operationalGuidanceCommand}>
+                            {(command) => (
+                              <code class="mt-2 block whitespace-pre-wrap break-all rounded border border-amber-200/80 bg-white/70 px-2 py-2 text-[11px] text-amber-950">
+                                {command()}
+                              </code>
+                            )}
+                          </Show>
+                        </div>
+                      )}
+                    </Show>
+                    <SummaryRows
+                      items={runtimeOperationsOverviewRows(
+                        runtimeDeploymentState(),
+                        runtimeUpdatesState(),
+                        props.simulatorRuntimeSummary,
+                      )}
+                      class="mt-3 space-y-2 text-xs text-on-surface-variant"
+                    />
+                    <Show when={runtimeDeploymentHostedCardState().workspacePath}>
                       <p class="mt-3 break-all rounded-lg border border-violet-200/60 bg-white/60 px-3 py-2 font-mono text-[11px] text-on-surface-variant">
-                        {props.runtimeDeployment?.workspace_path}
+                        {runtimeDeploymentHostedCardState().workspacePath}
                       </p>
                     </Show>
-                    <Show when={props.runtimeDeployment?.gui}>
+                    <Show when={runtimeDeploymentHostedCardState().gui}>
                       <div class="mt-3 rounded-lg border border-violet-200/60 bg-white/60 px-3 py-2 text-[11px] text-on-surface-variant">
-                        <span class="font-medium text-on-surface">GUI:</span> {props.runtimeDeployment?.gui}
+                        <span class="font-medium text-on-surface">GUI:</span> {runtimeDeploymentHostedCardState().gui}
                       </div>
                     </Show>
-                    <Show when={props.runtimeDeployment?.runtime_monitor}>
+                    <Show when={runtimeDeploymentHostedCardState().monitorCard}>
+                      {(monitorCard) => (
                       <div class="mt-3 rounded-lg border border-violet-200/60 bg-white/60 px-3 py-3">
                         <div class="flex items-center gap-2">
                           <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-on-surface-variant/60">
@@ -2560,16 +2572,16 @@ export function AgentSettingsView(props: {
                           <InfoHint text="Recent heartbeat/status lines from the deployed runtime monitor. This is hosted runtime telemetry, not browser-side application logging." />
                         </div>
                         <p class="mt-2 text-[11px] font-semibold text-on-surface">
-                          {props.runtimeDeployment?.runtime_monitor?.status} | {props.runtimeDeployment?.runtime_monitor?.source}
+                          {monitorCard().statusLine}
                         </p>
                         <p class="mt-1 text-[11px] text-on-surface-variant">
-                          updated {dateTimeLabel(props.runtimeDeployment?.runtime_monitor?.updated_at)}
+                          {monitorCard().updatedLine}
                         </p>
                         <p class="mt-1 text-[11px] text-on-surface-variant">
-                          {relativeTimeLabel(props.runtimeDeployment?.runtime_monitor?.updated_at)} | {(props.runtimeDeployment?.runtime_monitor?.lines ?? []).length} monitor line{((props.runtimeDeployment?.runtime_monitor?.lines ?? []).length === 1) ? "" : "s"}
+                          {monitorCard().relativeLine}
                         </p>
                         <div class="mt-2 space-y-1">
-                          <For each={(props.runtimeDeployment?.runtime_monitor?.lines ?? []).slice(0, 4)}>
+                          <For each={monitorCard().lines}>
                             {(line) => (
                               <p class="rounded border border-white/30 bg-white/60 px-2 py-1 font-mono text-[10px] text-on-surface-variant">
                                 {line}
@@ -2578,8 +2590,9 @@ export function AgentSettingsView(props: {
                           </For>
                         </div>
                       </div>
+                      )}
                     </Show>
-                    <Show when={runtimeStatusPanelLines(props.runtimeDeployment?.runtime_status_panel).length > 0}>
+                    <Show when={runtimeDeploymentHostedCardState().statusPanelLines.length > 0}>
                       <div class="mt-3 rounded-lg border border-violet-200/60 bg-white/60 px-3 py-3">
                         <div class="flex items-center gap-2">
                           <EyebrowLabel>Runtime status panel</EyebrowLabel>
@@ -2588,11 +2601,11 @@ export function AgentSettingsView(props: {
                         <TextLineList
                           class="mt-2 space-y-1"
                           lineClass="rounded border border-white/30 bg-white/60 px-2 py-1 font-mono text-[10px] text-on-surface-variant"
-                          lines={runtimeStatusPanelLines(props.runtimeDeployment?.runtime_status_panel)}
+                          lines={runtimeDeploymentHostedCardState().statusPanelLines}
                         />
                       </div>
                     </Show>
-                    <Show when={(props.runtimeDeployment?.runtime_status_views?.length ?? 0) > 0}>
+                    <Show when={runtimeDeploymentHostedCardState().statusViewLabels.length > 0}>
                       <div class="mt-3 rounded-lg border border-violet-200/60 bg-white/60 px-3 py-3">
                         <div class="flex items-center gap-2">
                           <EyebrowLabel>Status view formats</EyebrowLabel>
@@ -2600,9 +2613,7 @@ export function AgentSettingsView(props: {
                         </div>
                         <SummaryChipList
                           class="mt-2 flex flex-wrap gap-2"
-                          items={(props.runtimeDeployment?.runtime_status_views ?? [])
-                            .slice(0, 4)
-                            .map((view) => view.title ?? view.format ?? view.id ?? "runtime-view")}
+                          items={runtimeDeploymentHostedCardState().statusViewLabels}
                         />
                       </div>
                     </Show>
@@ -2610,47 +2621,47 @@ export function AgentSettingsView(props: {
                       <button
                         type="button"
                         onClick={() => void handleCheckRuntimeUpdates()}
-                        disabled={runtimeUpdatesBusy() !== null}
-                        aria-busy={runtimeUpdatesBusy() === "check"}
-                        aria-disabled={runtimeUpdatesBusy() !== null}
+                        disabled={!runtimeUpdatesActionView().canCheck}
+                        aria-busy={runtimeUpdatesActionView().checkBusy}
+                        aria-disabled={!runtimeUpdatesActionView().canCheck}
                         class="rounded-lg border border-violet-300/60 bg-white/70 px-3 py-2 text-xs font-medium text-on-surface transition hover:bg-white disabled:opacity-50"
                       >
-                        {runtimeUpdatesBusy() === "check" ? "Checking updates..." : "Check updates"}
+                        {runtimeUpdatesActionView().checkLabel}
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleApplyRuntimeUpdate()}
-                        disabled={runtimeUpdatesBusy() !== null || !runtimeUpdatesState()?.update_available}
-                        aria-busy={runtimeUpdatesBusy() === "apply"}
-                        aria-disabled={runtimeUpdatesBusy() !== null || !runtimeUpdatesState()?.update_available}
+                        disabled={!runtimeUpdatesActionView().canApply}
+                        aria-busy={runtimeUpdatesActionView().applyBusy}
+                        aria-disabled={!runtimeUpdatesActionView().canApply}
                         class="rounded-lg border border-violet-300/60 bg-violet-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-violet-700 disabled:opacity-50"
                       >
-                        {runtimeUpdatesBusy() === "apply" ? "Applying..." : "Apply update"}
+                        {runtimeUpdatesActionView().applyLabel}
                       </button>
                     </ActionRow>
-                    <Show when={(runtimeUpdatesState()?.entries?.length ?? 0) > 0}>
+                    <Show when={runtimeUpdateEntriesState().length > 0}>
                       <div class="mt-3">
                         <div class="flex items-center gap-2">
                           <EyebrowLabel>Recent update events</EyebrowLabel>
                           <InfoHint text="Recent check/apply events for the hosted runtime, including the version movement and any notes attached to the update attempt." />
                         </div>
                         <div class="mt-2 space-y-2">
-                          <For each={(runtimeUpdatesState()?.entries ?? []).slice(0, 3)}>
+                          <For each={runtimeUpdateEventCards(runtimeUpdatesState())}>
                             {(entry) => (
                               <div class="rounded-lg border border-violet-200/60 bg-white/60 px-3 py-2">
                                 <p class="text-[11px] font-semibold text-on-surface">
-                                  {entry.action} | {entry.status}
+                                  {entry.title}
                                 </p>
                                 <p class="mt-1 text-[11px] text-on-surface-variant">
-                                  {entry.from_version ?? "unknown"}{" -> "}{entry.to_version ?? "pending"}{" | "}{dateTimeLabel(entry.created_at)}
+                                  {entry.versionSummary}
                                 </p>
                                 <p class="mt-1 text-[11px] text-on-surface-variant">
-                                  {relativeTimeLabel(entry.created_at)}
+                                  {entry.relativeCreatedAt}
                                 </p>
-                                <Show when={compactSummaryLines(entry.notes_summary).length > 0}>
+                                <Show when={entry.noteChips.length > 0}>
                                   <SummaryChipList
                                     class="mt-2 flex flex-wrap gap-2"
-                                    items={compactSummaryLines(entry.notes_summary)}
+                                    items={entry.noteChips}
                                   />
                                 </Show>
                               </div>
@@ -2670,9 +2681,9 @@ export function AgentSettingsView(props: {
                       items={supportBoundarySummaryItems()}
                       class="mt-3 space-y-2 text-xs text-on-surface-variant"
                     />
-                    <Show when={props.supportAccess?.reason}>
+                    <Show when={supportAccessBoundaryCard().reason}>
                       <NoticeBox class="mt-3 rounded-lg border border-rose-200/60 bg-white/60 px-3 py-2 text-[11px] leading-5 text-on-surface-variant">
-                        {props.supportAccess?.reason}
+                        {supportAccessBoundaryCard().reason}
                       </NoticeBox>
                     </Show>
                   </SectionCard>
@@ -2692,10 +2703,10 @@ export function AgentSettingsView(props: {
                           <InfoHint text="How long runtime backup snapshots remain eligible for recovery and restore-drill review before they expire." />
                         </span>
                         <select
-                          value={String(runtimeBackupsState()?.policy.retention_days ?? 14)}
-                          disabled={runtimeBackupBusy() !== null}
-                          aria-busy={runtimeBackupBusy() !== null}
-                          aria-disabled={runtimeBackupBusy() !== null}
+                          value={String(runtimeBackupsRetentionDays(runtimeBackupsState(), 14))}
+                          disabled={runtimeBackupControlsView().controlsDisabled}
+                          aria-busy={runtimeBackupControlsView().retentionBusy}
+                          aria-disabled={runtimeBackupControlsView().controlsDisabled}
                           onChange={(event) =>
                             void handleRuntimeBackupRetentionChange(
                               Number(event.currentTarget.value) as 7 | 14 | 30 | 90
@@ -2717,47 +2728,42 @@ export function AgentSettingsView(props: {
                         <button
                           type="button"
                           onClick={() => void handleCreateRuntimeSnapshot()}
-                          disabled={runtimeBackupBusy() !== null}
-                          aria-busy={runtimeBackupBusy() === "snapshot"}
-                          aria-disabled={runtimeBackupBusy() !== null}
+                          disabled={runtimeBackupControlsView().controlsDisabled}
+                          aria-busy={runtimeBackupControlsView().snapshotBusy}
+                          aria-disabled={runtimeBackupControlsView().controlsDisabled}
                           class="rounded-lg border border-amber-300/60 bg-amber-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-amber-600 disabled:opacity-50"
                         >
-                          {runtimeBackupBusy() === "snapshot" ? "Creating snapshot..." : "Create snapshot"}
+                          {runtimeBackupControlsView().snapshotLabel}
                         </button>
                       </div>
                     </div>
-                    <Show when={(runtimeBackupsState()?.entries?.length ?? 0) > 0}>
+                    <Show when={hasRuntimeBackupEntries()}>
                       <div class="mt-3 space-y-2">
-                        <For each={(runtimeBackupsState()?.entries ?? []).slice(0, 2)}>
-                          {(entry) => (
+                        <For each={runtimeBackupPreviewCardList()}>
+                          {(card) => (
                             <div class="rounded-lg border border-amber-200/60 bg-white/60 px-3 py-2">
                               <p id="runtime-backup-manifest-review-title" class="text-[11px] font-semibold text-on-surface">
-                                {entry.snapshot_type} | {entry.status}
+                                {card.title}
                               </p>
                               <p class="mt-1 text-[11px] text-on-surface-variant">
-                                {(() => {
-                                  const latestDrill = latestCompletedRestoreDrillByBackupId().get(entry.id);
-                                  return latestDrill?.completed_at
-                                    ? `rehearsed ${relativeTimeLabel(latestDrill.completed_at)} | ${latestDrill.status}`
-                                    : "not yet rehearsed";
-                                })()}
+                                {card.rehearsalLine}
                               </p>
                               <p class="mt-1 text-[11px] text-on-surface-variant">
-                                created {dateTimeLabel(entry.created_at)} | expires {dateTimeLabel(entry.expires_at)}
+                                {card.createdExpiresLine}
                               </p>
                               <p class="mt-1 text-[11px] text-on-surface-variant">
-                                {relativeTimeLabel(entry.created_at)} | expires {relativeTimeLabel(entry.expires_at)}
+                                {card.relativeExpiryLine}
                               </p>
                               <p class="mt-1 text-[11px] text-on-surface-variant">
-                                {entry.file_count} files
+                                {card.fileCountLine}
                               </p>
                               <p class="mt-1 text-[11px] text-on-surface-variant">
-                                workspace {byteCountLabel(entry.total_workspace_bytes)} | artifact {byteCountLabel(entry.artifact_size_bytes)}
+                                {card.footprintLine}
                               </p>
-                              <Show when={compactSummaryLines(entry.manifest_summary).length > 0}>
+                              <Show when={card.manifestChips.length > 0}>
                                 <SummaryChipList
                                   class="mt-2 flex flex-wrap gap-2"
-                                  items={compactSummaryLines(entry.manifest_summary)}
+                                  items={card.manifestChips}
                                 />
                               </Show>
                             </div>
@@ -2770,16 +2776,16 @@ export function AgentSettingsView(props: {
                         ref={runtimeBackupManifestTriggerRef}
                         type="button"
                         onClick={() => {
-                          const latestBackupId = runtimeBackupsState()?.entries?.[0]?.id;
+                          const latestBackupId = latestRuntimeBackupId();
                           if (!latestBackupId) return;
                           void handleReviewRuntimeBackupManifest(latestBackupId);
                         }}
-                        disabled={runtimeBackupManifestBusyId() !== null || !(runtimeBackupsState()?.entries?.length)}
+                        disabled={runtimeBackupControlsView().manifestReviewDisabled}
                         aria-expanded={runtimeBackupManifest() !== null}
                         aria-controls="runtime-backup-manifest-review"
                         class="rounded-lg border border-amber-200/70 bg-white/80 px-3 py-1.5 text-[11px] font-medium text-on-surface transition hover:bg-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       >
-                        {runtimeBackupManifestBusyId() ? "Loading manifest..." : "Review latest manifest"}
+                        {runtimeBackupControlsView().manifestReviewLabel}
                       </button>
                     </ActionRow>
                     <Show when={runtimeBackupManifest()}>
@@ -2793,13 +2799,13 @@ export function AgentSettingsView(props: {
                           <div class="flex items-start justify-between gap-3">
                             <div>
                               <p class="text-[11px] font-semibold text-on-surface">
-                                Manifest review | {manifest().id}
+                                {runtimeBackupManifestReviewCard().title}
                               </p>
                               <p class="mt-1 text-[11px] text-on-surface-variant">
-                                {manifest().storage_mode} | created {dateTimeLabel(manifest().created_at)} | expires {dateTimeLabel(manifest().expires_at)}
+                                {runtimeBackupManifestReviewCard().lifecycleLine}
                               </p>
                               <p class="mt-1 text-[11px] text-on-surface-variant">
-                                {relativeTimeLabel(manifest().created_at)} | expires {relativeTimeLabel(manifest().expires_at)}
+                                {runtimeBackupManifestReviewCard().relativeLifecycleLine}
                               </p>
                             </div>
                               <button
@@ -2814,7 +2820,7 @@ export function AgentSettingsView(props: {
                           <TextLineList
                             class="mt-3 space-y-1"
                             lineClass="rounded border border-white/30 bg-white/60 px-2 py-1 font-mono text-[10px] text-on-surface-variant"
-                            lines={runtimeManifestSummaryLines(manifest())}
+                            lines={runtimeBackupManifestReviewCard().manifestLines}
                           />
                         </div>
                       )}
@@ -2826,7 +2832,7 @@ export function AgentSettingsView(props: {
                     title="Restore Drills"
                     description="Recovery rehearsal should be visible next to backup posture, not buried in a separate operator-only flow."
                   >
-                    <Show when={(runtimeRestoreDrillsState()?.entries?.length ?? 0) > 0}>
+                    <Show when={hasRuntimeRestoreDrillEntries()}>
                       <SummaryRows items={restoreDrillSummaryItems()} class="mt-3 space-y-2 text-xs text-on-surface-variant" />
                     </Show>
                     <ActionRow class="mt-3">
@@ -2838,21 +2844,21 @@ export function AgentSettingsView(props: {
                         <button
                           type="button"
                           onClick={() => {
-                            const latestBackupId = runtimeBackupsState()?.entries?.[0]?.id;
+                            const latestBackupId = latestRuntimeBackupId();
                             if (!latestBackupId) return;
                             void handleCreateRestoreDrill(latestBackupId);
                           }}
-                          disabled={runtimeDrillBusyBackupId() !== null || !(runtimeBackupsState()?.entries?.length)}
-                          aria-busy={runtimeDrillBusyBackupId() !== null}
-                          aria-disabled={runtimeDrillBusyBackupId() !== null || !(runtimeBackupsState()?.entries?.length)}
+                          disabled={runtimeBackupControlsView().drillDisabled}
+                          aria-busy={runtimeBackupControlsView().drillBusy}
+                          aria-disabled={runtimeBackupControlsView().drillDisabled}
                           class="rounded-lg border border-emerald-300/60 bg-white/70 px-3 py-2 text-xs font-medium text-on-surface transition hover:bg-white disabled:opacity-50"
                         >
-                          {runtimeDrillBusyBackupId() ? "Running drill..." : "Run drill from latest snapshot"}
+                          {runtimeBackupControlsView().drillLabel}
                         </button>
                       </div>
                     </ActionRow>
                     <Show
-                      when={(runtimeRestoreDrillsState()?.entries?.length ?? 0) > 0}
+                      when={hasRuntimeRestoreDrillEntries()}
                       fallback={
                         <NoticeBox class="mt-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2 text-xs text-on-surface-variant">
                           No restore drills have been recorded yet.
@@ -2860,28 +2866,23 @@ export function AgentSettingsView(props: {
                       }
                     >
                       <div class="mt-3 space-y-2">
-                        <For each={(runtimeRestoreDrillsState()?.entries ?? []).slice(0, 2)}>
-                          {(entry) => (
+                        <For each={runtimeRestoreDrillPreviewCardList()}>
+                          {(card) => (
                             <div class="rounded-lg border border-emerald-200/60 bg-white/60 px-3 py-2">
                               <p class="text-[11px] font-semibold text-on-surface">
-                                {entry.status} | backup {entry.backup_id}
+                                {card.statusLabel}
                               </p>
                               <p class="mt-1 text-[11px] text-on-surface-variant">
-                                started {dateTimeLabel(entry.started_at)}
-                                {entry.completed_at ? ` | completed ${dateTimeLabel(entry.completed_at)}` : ""}
-                                {durationLabel(entry.started_at, entry.completed_at)
-                                  ? ` | ${entry.completed_at ? "duration" : "running"} ${durationLabel(entry.started_at, entry.completed_at)}`
-                                  : ""}
+                                {card.timingLine}
                               </p>
                               <p class="mt-1 text-[11px] text-on-surface-variant">
-                                {relativeTimeLabel(entry.started_at)}
-                                {entry.completed_at ? ` | completed ${relativeTimeLabel(entry.completed_at)}` : ""}
+                                {card.relativeTimingLine}
                               </p>
-                              <Show when={compactSummaryLines(entry.notes_summary).length > 0}>
+                              <Show when={card.noteChips.length > 0}>
                                 <SummaryChipList
                                   class="mt-2 flex flex-wrap gap-1"
                                   itemClass="rounded-full border border-emerald-200/60 bg-emerald-100/70 px-2 py-0.5 font-mono text-[10px] text-emerald-900/80"
-                                  items={compactSummaryLines(entry.notes_summary)}
+                                  items={card.noteChips}
                                 />
                               </Show>
                             </div>
@@ -2904,48 +2905,48 @@ export function AgentSettingsView(props: {
                   <div class="mt-3 grid gap-2 md:grid-cols-3">
                     <MetricCard
                       label="Provisioned"
-                      value={`${props.deviceSyncRuntimeSummary?.device_policy_count ?? devicePolicies().length} device policies`}
+                      value={deviceSyncProvisionedLabel(props.deviceSyncRuntimeSummary, devicePolicies())}
                     />
                     <MetricCard
                       label="Used"
-                      value={`${props.deviceSyncRuntimeSummary?.used_device_count ?? devicePolicies().filter((entry) => Boolean(entry.last_used_at)).length} active bootstrap records`}
+                      value={deviceSyncUsedLabel(props.deviceSyncRuntimeSummary, devicePolicies())}
                     />
                     <MetricCard
                       label="Local keys"
-                      value={`${props.deviceSyncRuntimeSummary?.local_key_device_count ?? devicePolicies().filter((entry) => entry.requires_local_key_material).length} device${(props.deviceSyncRuntimeSummary?.local_key_device_count ?? devicePolicies().filter((entry) => entry.requires_local_key_material).length) === 1 ? "" : "s"} need local key material`}
+                      value={deviceSyncLocalKeysLabel(props.deviceSyncRuntimeSummary, devicePolicies())}
                     />
                   </div>
-                  <Show when={props.deviceSyncRuntimeSummary}>
+                  <Show when={deviceSyncRuntimeHasSummary(props.deviceSyncRuntimeSummary)}>
                     <div class="mt-3 grid gap-2 lg:grid-cols-2">
                       <div class="rounded-lg border border-white/40 bg-white/50 px-3 py-2">
                         <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-on-surface-variant/60">By device class</p>
                         <p class="mt-1 text-sm font-semibold text-on-surface">
-                          {props.deviceSyncRuntimeSummary?.desktop_device_count ?? 0} desktop | {props.deviceSyncRuntimeSummary?.mobile_device_count ?? 0} mobile | {props.deviceSyncRuntimeSummary?.watch_device_count ?? 0} watch
+                          {deviceSyncRuntimeSummaryCard().classBreakdownLabel}
                         </p>
                       </div>
                       <div class="rounded-lg border border-white/40 bg-white/50 px-3 py-2">
                         <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-on-surface-variant/60">Latest policy activity</p>
                         <p class="mt-1 text-sm font-semibold text-on-surface">
-                          {props.deviceSyncRuntimeSummary?.latest_device_class ?? "unknown"} | {props.deviceSyncRuntimeSummary?.latest_policy_profile ?? "unknown"}
+                          {deviceSyncRuntimeSummaryCard().latestActivityLabel}
                         </p>
                         <p class="mt-1 text-[11px] text-on-surface-variant">
-                          device {props.deviceSyncRuntimeSummary?.latest_device_id ?? "unknown"}
+                          {deviceSyncRuntimeSummaryCard().latestDeviceLabel}
                         </p>
                         <p class="mt-1 text-[11px] text-on-surface-variant">
-                          last used {dateTimeLabel(props.deviceSyncRuntimeSummary?.latest_last_used_at)}
+                          {deviceSyncRuntimeSummaryCard().latestLastUsedLine}
                         </p>
                         <p class="mt-1 text-[11px] text-on-surface-variant">
-                          {relativeTimeLabel(props.deviceSyncRuntimeSummary?.latest_last_used_at)}
+                          {deviceSyncRuntimeSummaryCard().latestLastUsedRelativeLine}
                         </p>
                       </div>
                     </div>
                   </Show>
-                  <Show when={props.deviceSyncRuntimeSummary?.latest_policy_note}>
+                  <Show when={deviceSyncRuntimeSummaryCard().latestPolicyNote}>
                     <NoticeBox class="mt-3 rounded-lg border border-indigo-200/60 bg-white/60 px-3 py-2 text-[11px] leading-5 text-on-surface-variant">
-                      {props.deviceSyncRuntimeSummary?.latest_policy_note}
+                      {deviceSyncRuntimeSummaryCard().latestPolicyNote}
                     </NoticeBox>
                   </Show>
-                  <Show when={runtimeUpdatesState()?.policy}>
+                  <Show when={runtimeUpdatePolicyState()}>
                     <div class="mt-3 grid gap-2 lg:grid-cols-2">
                       <label class="block text-[11px] font-medium text-on-surface-variant">
                         <span class="flex items-center gap-1.5">
@@ -2953,14 +2954,14 @@ export function AgentSettingsView(props: {
                           <InfoHint text="Controls whether this runtime follows the normal stable release track or waits for explicitly manual updates only." />
                         </span>
                         <select
-                          value={runtimeUpdatesState()?.policy.update_channel ?? "stable"}
+                          value={runtimeUpdatesPolicyView().updateChannel}
                           disabled={runtimeUpdatesBusy() !== null}
                           aria-busy={runtimeUpdatesBusy() !== null}
                           aria-disabled={runtimeUpdatesBusy() !== null}
                           onChange={(event) =>
                             void handleRuntimeUpdatePolicyChange({
                               update_channel: event.currentTarget.value as "stable" | "manual_only",
-                              auto_apply: (runtimeUpdatesState()?.policy.auto_apply ?? "manual_only") as "manual_only" | "scaffold_refresh_only",
+                              auto_apply: runtimeUpdatesPolicyView().autoApply as "manual_only" | "scaffold_refresh_only",
                             })
                           }
                           class="mt-1 w-full rounded-lg border border-white/20 bg-white/50 px-3 py-2 text-xs text-on-surface outline-none transition focus:border-primary disabled:opacity-50"
@@ -2975,13 +2976,13 @@ export function AgentSettingsView(props: {
                           <InfoHint text="Defines whether the runtime can self-apply low-risk scaffold refreshes or whether every update must stay manual." />
                         </span>
                         <select
-                          value={runtimeUpdatesState()?.policy.auto_apply ?? "manual_only"}
+                          value={runtimeUpdatesPolicyView().autoApply}
                           disabled={runtimeUpdatesBusy() !== null}
                           aria-busy={runtimeUpdatesBusy() !== null}
                           aria-disabled={runtimeUpdatesBusy() !== null}
                           onChange={(event) =>
                             void handleRuntimeUpdatePolicyChange({
-                              update_channel: (runtimeUpdatesState()?.policy.update_channel ?? "stable") as "stable" | "manual_only",
+                              update_channel: runtimeUpdatesPolicyView().updateChannel as "stable" | "manual_only",
                               auto_apply: event.currentTarget.value as "manual_only" | "scaffold_refresh_only",
                             })
                           }
@@ -2993,7 +2994,7 @@ export function AgentSettingsView(props: {
                       </label>
                     </div>
                     <NoticeBox class="mt-2 rounded-lg border border-white/40 bg-white/50 px-3 py-2 text-[11px] text-on-surface-variant">
-                      Support posture: {runtimeUpdatesState()?.policy.support_disabled_by_default === false ? "customized" : "disabled by default"}
+                      {runtimeUpdatesPolicyView().supportPostureLine}
                     </NoticeBox>
                   </Show>
                   <div class="mt-3 flex items-center gap-2">
@@ -3005,29 +3006,28 @@ export function AgentSettingsView(props: {
                       ref={runtimeRecoveryPreviewTriggerRef}
                       type="button"
                       onClick={() => void handlePreviewRecoveryPacket()}
-                      disabled={runtimeRecoveryBusy()}
-                      aria-busy={runtimeRecoveryBusy()}
-                      aria-disabled={runtimeRecoveryBusy()}
-                      aria-expanded={runtimeRecoveryPacket() !== null}
+                      disabled={runtimeRecoveryPacketControlsView().disabled}
+                      aria-busy={runtimeRecoveryPacketControlsView().busy}
+                      aria-disabled={runtimeRecoveryPacketControlsView().disabled}
+                      aria-expanded={runtimeRecoveryPreviewOpen()}
                       aria-controls="runtime-recovery-packet-preview"
                       class="rounded-lg border border-indigo-300/60 bg-white/70 px-3 py-2 text-xs font-medium text-on-surface transition hover:bg-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
-                      {runtimeRecoveryBusy() ? "Preparing packet..." : "Preview recovery packet"}
+                      {runtimeRecoveryPacketControlsView().previewLabel}
                     </button>
                     <button
                       ref={runtimeRecoveryDownloadTriggerRef}
                       type="button"
                       onClick={() => void handleDownloadRecoveryPacket()}
-                      disabled={runtimeRecoveryBusy()}
-                      aria-busy={runtimeRecoveryBusy()}
-                      aria-disabled={runtimeRecoveryBusy()}
+                      disabled={runtimeRecoveryPacketControlsView().disabled}
+                      aria-busy={runtimeRecoveryPacketControlsView().busy}
+                      aria-disabled={runtimeRecoveryPacketControlsView().disabled}
                       class="rounded-lg border border-indigo-300/60 bg-white/70 px-3 py-2 text-xs font-medium text-on-surface transition hover:bg-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
-                      {runtimeRecoveryBusy() ? "Preparing packet..." : "Download recovery packet"}
+                      {runtimeRecoveryPacketControlsView().downloadLabel}
                     </button>
                   </ActionRow>
-                  <Show when={runtimeRecoveryPacket()}>
-                    {(packet) => (
+                  <Show when={runtimeRecoveryPreviewOpen() && runtimeRecoveryPacket()}>
                       <div
                         id="runtime-recovery-packet-preview"
                         role="region"
@@ -3036,12 +3036,14 @@ export function AgentSettingsView(props: {
                       >
                         <div class="flex items-start justify-between gap-3">
                           <div>
-                            <p id="runtime-recovery-packet-preview-title" class="text-sm font-semibold text-on-surface">Recovery Packet Preview</p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              {packet().packet_name}{" | "}generated {dateTimeLabel(packet().generated_at)}{" | "}version {packet().packet_version}
+                            <p id="runtime-recovery-packet-preview-title" class="text-sm font-semibold text-on-surface">
+                              {runtimeRecoveryPacketPreviewState().title}
                             </p>
                             <p class="mt-1 text-[11px] text-on-surface-variant">
-                              {relativeTimeLabel(packet().generated_at)}
+                              {runtimeRecoveryPacketPreviewState().subtitle}
+                            </p>
+                            <p class="mt-1 text-[11px] text-on-surface-variant">
+                              {runtimeRecoveryPacketPreviewState().relativeGeneratedAt}
                             </p>
                           </div>
                           <button
@@ -3056,110 +3058,76 @@ export function AgentSettingsView(props: {
                         <div class="mt-3 grid gap-2 md:grid-cols-3">
                           <MetricCard
                             class="rounded-lg border border-white/30 bg-white/60 px-3 py-2"
-                            label="Account"
-                            value={packet().user.display_name}
-                            lines={[packet().user.email]}
+                            label={runtimeRecoveryPacketPreviewState().accountCard.label}
+                            value={runtimeRecoveryPacketPreviewState().accountCard.value}
+                            lines={runtimeRecoveryPacketPreviewState().accountCard.lines}
                           />
-                          <div class="rounded-lg border border-white/30 bg-white/60 px-3 py-2">
-                            <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-on-surface-variant/60">Backups</p>
-                            <p class="mt-1 text-sm font-semibold text-on-surface">
-                              {packet().runtime_backups.entries.length} snapshots
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              latest {dateTimeLabel(latestTimestampValue(packet().runtime_backups.entries.map((entry) => entry.created_at)))}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              {relativeTimeLabel(latestTimestampValue(packet().runtime_backups.entries.map((entry) => entry.created_at)))}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              workspace {byteCountLabel(totalNumber(packet().runtime_backups.entries.map((entry) => entry.total_workspace_bytes)))}{" | "}artifact {byteCountLabel(totalNumber(packet().runtime_backups.entries.map((entry) => entry.artifact_size_bytes)))}
-                            </p>
-                          </div>
-                          <div class="rounded-lg border border-white/30 bg-white/60 px-3 py-2">
-                            <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-on-surface-variant/60">Restore drills</p>
-                            <p class="mt-1 text-sm font-semibold text-on-surface">
-                              {packet().runtime_restore_drills.entries.length} drills
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              latest {dateTimeLabel(latestTimestampValue(packet().runtime_restore_drills.entries.map((entry) => entry.completed_at ?? entry.started_at)))}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              {relativeTimeLabel(latestTimestampValue(packet().runtime_restore_drills.entries.map((entry) => entry.completed_at ?? entry.started_at)))}
-                            </p>
-                          </div>
-                          <div class="rounded-lg border border-white/30 bg-white/60 px-3 py-2">
-                            <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-on-surface-variant/60">Update events</p>
-                            <p class="mt-1 text-sm font-semibold text-on-surface">
-                              {packet().runtime_updates.entries.length} events
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              latest {dateTimeLabel(latestTimestampValue(packet().runtime_updates.entries.map((entry) => entry.created_at)))}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              {relativeTimeLabel(latestTimestampValue(packet().runtime_updates.entries.map((entry) => entry.created_at)))}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              current {packet().runtime_updates.current_version}{" | "}latest {packet().runtime_updates.latest_version}
-                            </p>
-                          </div>
+                          <For each={runtimeRecoveryPacketPreviewState().metricCards}>
+                            {(card) => (
+                              <MetricCard
+                                class="rounded-lg border border-white/30 bg-white/60 px-3 py-2"
+                                label={card.label}
+                                value={card.value}
+                                lines={card.lines}
+                              />
+                            )}
+                          </For>
                         </div>
-                        <Show when={packet().runtime_deployment}>
-                          <DetailCard class="mt-3" title="Runtime deployment context">
-                            <div class="mt-2 grid gap-2 md:grid-cols-2">
-                              <div class="rounded-lg border border-white/30 bg-white/60 px-3 py-2">
-                                <p class="text-[11px] font-semibold text-on-surface">
-                                  {packet().runtime_deployment?.framework ?? "unknown"}{" | "}{packet().runtime_deployment?.status ?? "unknown"}
-                                </p>
-                                <p class="mt-1 text-[11px] text-on-surface-variant">
-                                  deployment {packet().runtime_deployment?.id ?? "unknown"}
-                                </p>
-                              </div>
-                              <NoticeBox class="rounded-lg border border-white/30 bg-white/60 px-3 py-2 font-mono break-all text-[10px] text-on-surface-variant">
-                                {packet().runtime_deployment?.workspace_path ?? "unknown"}
-                              </NoticeBox>
-                            </div>
-                          </DetailCard>
+                        <Show when={runtimeRecoveryPacketPreviewState().deploymentCard}>
+                          {(card) => (
+                            <MetricCard
+                              class="mt-3 rounded-lg border border-white/30 bg-white/60 px-3 py-2"
+                              label={card().label}
+                              value={card().value}
+                              lines={card().lines}
+                            />
+                          )}
                         </Show>
                         <div class="mt-3 grid gap-2 md:grid-cols-2">
-                          <DetailCard title="Backup policy snapshot">
-                            <p class="mt-2 text-[11px] font-semibold text-on-surface">
-                              {packet().runtime_backups.policy.retention_days} day retention{" | "}{packet().runtime_backups.policy.storage_mode}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              support posture {packet().runtime_backups.policy.support_disabled_by_default === false ? "customized" : "disabled by default"}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              last snapshot {relativeTimeLabel(packet().runtime_backups.policy.last_snapshot_at)}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              snapshot at {dateTimeLabel(packet().runtime_backups.policy.last_snapshot_at)}
-                            </p>
-                          </DetailCard>
-                          <DetailCard title="Update policy snapshot">
-                            <p class="mt-2 text-[11px] font-semibold text-on-surface">
-                              {packet().runtime_updates.policy.update_channel}{" | "}{packet().runtime_updates.policy.auto_apply}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              support posture {packet().runtime_updates.policy.support_disabled_by_default === false ? "customized" : "disabled by default"}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              last checked {relativeTimeLabel(packet().runtime_updates.last_checked_at)}
-                            </p>
-                            <p class="mt-1 text-[11px] text-on-surface-variant">
-                              checked at {dateTimeLabel(packet().runtime_updates.last_checked_at)}
-                            </p>
-                          </DetailCard>
+                          <For each={runtimeRecoveryPacketPreviewState().policyCards}>
+                            {(card) => (
+                              <DetailCard title={card.title}>
+                                <TextLineList
+                                  lines={card.lines}
+                                  class="mt-2 space-y-1"
+                                  lineClass="text-[11px] text-on-surface-variant"
+                                />
+                              </DetailCard>
+                            )}
+                          </For>
                         </div>
+                        <Show when={runtimeRecoveryPacketPreviewState().operationalGuidanceCard}>
+                          {(card) => (
+                            <DetailCard class="mt-3" title={card().title}>
+                              <TextLineList
+                                lines={card().lines}
+                                class="mt-2 space-y-1"
+                                lineClass="text-[11px] text-on-surface-variant"
+                              />
+                            </DetailCard>
+                          )}
+                        </Show>
+                        <Show when={runtimeRecoveryPacketPreviewState().operationalGuidanceCommand}>
+                          {(command) => (
+                            <div class="mt-3 rounded-lg border border-amber-200/70 bg-amber-50/80 px-3 py-3">
+                              <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900/80">
+                                Recorded operator command
+                              </p>
+                              <code class="mt-2 block whitespace-pre-wrap break-all text-[11px] text-amber-950">
+                                {command()}
+                              </code>
+                            </div>
+                          )}
+                        </Show>
                         <div class="mt-3 grid gap-4 lg:grid-cols-2">
                           <DetailCard title="Recovery checklist">
-                            <TextLineList lines={packet().recovery_checklist} />
+                            <TextLineList lines={runtimeRecoveryPacketPreviewState().recoveryChecklist} />
                           </DetailCard>
                           <DetailCard title="Privacy notes">
-                            <TextLineList lines={packet().privacy_notes} />
+                            <TextLineList lines={runtimeRecoveryPacketPreviewState().privacyNotes} />
                           </DetailCard>
                         </div>
                       </div>
-                    )}
                   </Show>
                 </SectionCard>
 
@@ -3178,68 +3146,50 @@ export function AgentSettingsView(props: {
                 >
                   <div class="space-y-3">
                     <For each={devicePolicies()}>
-                      {(entry) => {
+                      {(entry, index) => {
+                        const card = () => devicePolicyCardStatesState()[index()]!;
                         const updating = () => devicePolicyUpdatingId() === entry.device_id;
-                        const notes = entry.notes_summary ?? {};
-                        const policyNote = typeof notes.policy_note === "string" ? notes.policy_note : null;
-                        const policySource = typeof notes.source === "string" ? notes.source : null;
-                        const defaultProfile = typeof notes.default_profile === "string" ? notes.default_profile : null;
-                        const extraPolicyDetail = compactSummaryLinesExcluding(entry.notes_summary, [
-                          "policy_note",
-                          "source",
-                          "default_profile",
-                        ]);
                         return (
                           <div class="rounded-xl border border-white/20 bg-white/10 p-4">
                             <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                               <div class="min-w-0">
-                                <p class="text-sm font-semibold text-on-surface">{entry.device_id}</p>
+                                <p class="text-sm font-semibold text-on-surface">{card().deviceId}</p>
                                 <p class="mt-1 text-xs text-on-surface-variant">
-                                  {entry.device_class} device
-                                  {" | "}
-                                  {relativeTimeLabel(entry.last_used_at)}
-                                  {" | "}
-                                  bundled {dateTimeLabel(entry.last_bundle_at)}
+                                  {card().deviceClassLine}
                                 </p>
                                 <p class="mt-1 text-[11px] text-on-surface-variant">
-                                  last used {dateTimeLabel(entry.last_used_at)}
+                                  {card().lastUsedLine}
                                 </p>
                                 <p class="mt-1 text-[11px] text-on-surface-variant">
-                                  policy updated {dateTimeLabel(entry.updated_at)}
+                                  {card().policyUpdatedLine}
                                 </p>
                                 <p class="mt-1 text-[11px] text-on-surface-variant">
-                                  bundled {relativeTimeLabel(entry.last_bundle_at)}{" | "}updated {relativeTimeLabel(entry.updated_at)}
+                                  {card().bundledUpdatedLine}
                                 </p>
-                                <Show when={policyNote}>
-                                  <NoticeBox class="mt-2 text-[11px] leading-5 text-on-surface-variant">{policyNote}</NoticeBox>
+                                <Show when={card().policyNote}>
+                                  <NoticeBox class="mt-2 text-[11px] leading-5 text-on-surface-variant">{card().policyNote}</NoticeBox>
                                 </Show>
                                 <SummaryChipList
                                   class="mt-2 flex flex-wrap gap-2"
                                   itemClass="rounded-full border border-white/30 bg-white/50 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-on-surface-variant"
-                                  items={[
-                                    entry.policy_profile,
-                                    entry.requires_local_key_material ? "local-key" : "metadata-only",
-                                  ]}
+                                  items={card().profileChips}
                                 />
-                                <Show when={policySource || defaultProfile}>
+                                <Show when={card().sourceChips.length > 0}>
                                   <SummaryChipList
                                     class="mt-2 flex flex-wrap gap-2"
-                                    items={[
-                                      ...(policySource ? [`source: ${policySource}`] : []),
-                                      ...(defaultProfile ? [`default: ${defaultProfile}`] : []),
-                                    ]}
+                                    items={card().sourceChips}
                                   />
                                 </Show>
-                                <Show when={extraPolicyDetail.length > 0}>
+                                <Show when={card().policyDetailChips.length > 0}>
                                   <div class="mt-2 space-y-1">
                                     <EyebrowLabel>Policy detail</EyebrowLabel>
-                                    <SummaryChipList items={extraPolicyDetail} />
+                                    <SummaryChipList items={card().policyDetailChips} />
                                   </div>
                                 </Show>
-                                <Show when={deviceSyncSliceSummaryLines(entry.sync_slices).length > 0}>
+                                <Show when={card().syncScopeChips.length > 0}>
                                   <div class="mt-2 space-y-1">
                                     <EyebrowLabel>Sync scope</EyebrowLabel>
-                                    <SummaryChipList items={deviceSyncSliceSummaryLines(entry.sync_slices)} />
+                                    <SummaryChipList items={card().syncScopeChips} />
                                   </div>
                                 </Show>
                               </div>
@@ -3273,6 +3223,35 @@ export function AgentSettingsView(props: {
                         );
                       }}
                     </For>
+                    <Show when={devicePolicyActionError()}>
+                      {(receipt) => (
+                        <NoticeBox
+                          role="alert"
+                          ariaLive="assertive"
+                          ariaAtomic={true}
+                          class={`rounded-lg border px-3 py-2 text-xs ${
+                            receipt().tone === "danger"
+                              ? "border-red-300/60 bg-red-50/70 text-red-900"
+                              : "border-amber-300/60 bg-amber-50/70 text-amber-900"
+                          }`}
+                        >
+                          <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                              <p class="font-semibold">{receipt().title}</p>
+                              <p class="mt-1">{receipt().summary}</p>
+                              <p class="mt-1">{receipt().nextStep}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setDevicePolicyActionError(null)}
+                              class="font-medium underline underline-offset-2"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </NoticeBox>
+                      )}
+                    </Show>
                     <Show when={devicePolicyFeedback()}>
                       {(message) => (
                         <NoticeBox
@@ -3289,6 +3268,113 @@ export function AgentSettingsView(props: {
                 </Show>
 
                 <SectionCard
+                  class="rounded-xl border border-fuchsia-200/40 bg-fuchsia-50/40 p-4"
+                  title="Simulator Rollout"
+                  description="Inspect the bounded simulator rollout posture that shapes preparation and calibration before workflow, watcher, and synthesizer changes are promoted into broader runtime behavior."
+                >
+                  <div class="mt-3 flex items-center gap-2">
+                    <EyebrowLabel class="text-[11px]">Bounded rollout state</EyebrowLabel>
+                    <InfoHint text="These values summarize which internal surfaces currently run with simulator support, which ones are still sampled or review-gated, and how calibration is configured per surface." />
+                  </div>
+                  <div class="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricCard
+                      label="Highest stage"
+                      value={simulatorRuntimeSummaryCard().highestRolloutStageLabel}
+                    />
+                    <MetricCard
+                      label="Enabled"
+                      value={simulatorRuntimeSummaryCard().enabledSurfacesLabel}
+                    />
+                    <MetricCard
+                      label="Promotion"
+                      value={simulatorRuntimeSummaryCard().promotionSurfacesLabel}
+                    />
+                    <MetricCard
+                      label="Review / sampled"
+                      value={simulatorRuntimeSummaryCard().reviewSurfacesLabel}
+                      lines={[simulatorRuntimeSummaryCard().sampledSurfacesLabel]}
+                    />
+                  </div>
+                  <Show
+                    when={simulatorRuntimeHasSummary(props.simulatorRuntimeSummary)}
+                    fallback={
+                      <NoticeBox class="mt-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2 text-xs text-on-surface-variant">
+                        No simulator rollout summary is available in the current bootstrap payload.
+                      </NoticeBox>
+                    }
+                  >
+                    <div class="mt-3 grid gap-3 lg:grid-cols-2">
+                      <div class="rounded-lg border border-white/40 bg-white/50 px-3 py-3">
+                        <EyebrowLabel>Surface rollout stages</EyebrowLabel>
+                        <Show
+                          when={simulatorRuntimeSummaryCard().surfaceStageChips.length > 0}
+                          fallback={
+                            <p class="mt-2 text-[11px] text-on-surface-variant">
+                              No rollout stages were reported for simulator-backed surfaces.
+                            </p>
+                          }
+                        >
+                          <SummaryChipList class="mt-2 flex flex-wrap gap-2" items={simulatorRuntimeSummaryCard().surfaceStageChips} />
+                        </Show>
+                      </div>
+                      <div class="rounded-lg border border-white/40 bg-white/50 px-3 py-3">
+                        <EyebrowLabel>Calibration modes</EyebrowLabel>
+                        <Show
+                          when={simulatorRuntimeSummaryCard().calibrationModeChips.length > 0}
+                          fallback={
+                            <p class="mt-2 text-[11px] text-on-surface-variant">
+                              No calibration modes were reported for simulator-backed surfaces.
+                            </p>
+                          }
+                        >
+                          <SummaryChipList class="mt-2 flex flex-wrap gap-2" items={simulatorRuntimeSummaryCard().calibrationModeChips} />
+                        </Show>
+                      </div>
+                    </div>
+                    <Show when={simulatorRuntimeSummaryCard().rolloutTrustLines.length > 0}>
+                      <div class="mt-3 rounded-lg border border-white/40 bg-white/50 px-3 py-3">
+                        <EyebrowLabel>Rollout trust</EyebrowLabel>
+                        <TextLineList
+                          lines={simulatorRuntimeSummaryCard().rolloutTrustLines}
+                          class="mt-2 space-y-1"
+                          lineClass="rounded border border-white/30 bg-white/60 px-2 py-1 text-[11px] text-on-surface-variant break-words"
+                        />
+                      </div>
+                    </Show>
+                    <Show when={simulatorRuntimeSummaryCard().observedSummaryLines.length > 0}>
+                      <div class="mt-3 rounded-lg border border-white/40 bg-white/50 px-3 py-3">
+                        <EyebrowLabel>Latest observed simulation</EyebrowLabel>
+                        <TextLineList
+                          lines={simulatorRuntimeSummaryCard().observedSummaryLines}
+                          class="mt-2 space-y-1"
+                          lineClass="rounded border border-white/30 bg-white/60 px-2 py-1 text-[11px] text-on-surface-variant break-words"
+                        />
+                      </div>
+                    </Show>
+                    <Show when={simulatorRuntimeSummaryCard().policySummaryLines.length > 0}>
+                      <div class="mt-3 rounded-lg border border-white/40 bg-white/50 px-3 py-3">
+                        <EyebrowLabel>Policy posture</EyebrowLabel>
+                        <TextLineList
+                          lines={simulatorRuntimeSummaryCard().policySummaryLines}
+                          class="mt-2 space-y-1"
+                          lineClass="rounded border border-white/30 bg-white/60 px-2 py-1 text-[11px] text-on-surface-variant break-words"
+                        />
+                      </div>
+                    </Show>
+                    <Show when={simulatorRuntimeSummaryCard().calibrationNoteLines.length > 0}>
+                      <div class="mt-3 rounded-lg border border-white/40 bg-white/50 px-3 py-3">
+                        <EyebrowLabel>Calibration notes</EyebrowLabel>
+                        <TextLineList
+                          lines={simulatorRuntimeSummaryCard().calibrationNoteLines}
+                          class="mt-2 space-y-1"
+                          lineClass="rounded border border-white/30 bg-white/60 px-2 py-1 text-[11px] text-on-surface-variant break-words"
+                        />
+                      </div>
+                    </Show>
+                  </Show>
+                </SectionCard>
+
+                <SectionCard
                   class="rounded-xl border border-slate-200/40 bg-slate-50/40 p-4"
                   title="Support Access History"
                   description="Recent support consent windows remain visible here so the support boundary is inspectable as time-bounded lineage, not just a current flag."
@@ -3298,7 +3384,7 @@ export function AgentSettingsView(props: {
                     <InfoHint text="Each entry records when support access was granted, scoped, and later expired or revoked so the support boundary remains auditable over time." />
                   </div>
                   <Show
-                    when={(props.supportAccessHistory?.length ?? 0) > 0}
+                    when={agentSettingsHasSupportAccessHistory(supportAccessHistoryCardList())}
                     fallback={
                       <NoticeBox class="mt-3 rounded-lg border border-white/40 bg-white/50 px-3 py-2 text-xs text-on-surface-variant">
                         No support access history has been recorded yet.
@@ -3306,14 +3392,14 @@ export function AgentSettingsView(props: {
                     }
                   >
                     <div class="mt-3 space-y-2">
-                      <For each={(props.supportAccessHistory ?? []).slice(0, 3)}>
-                        {(entry) => (
+                      <For each={supportAccessHistoryCardList()}>
+                        {(card) => (
                           <div class="rounded-lg border border-slate-200/60 bg-white/60 px-3 py-2">
                             <p class="text-[11px] font-semibold text-on-surface">
-                              {entry.status} | {entry.access_scope}
+                              {card.title}
                             </p>
                             <TextLineList
-                              lines={formatSupportAccessHistoryLines(entry)}
+                              lines={card.lines}
                               class="mt-1"
                               lineClass="text-[11px] text-on-surface-variant"
                             />
@@ -3323,6 +3409,35 @@ export function AgentSettingsView(props: {
                     </div>
                   </Show>
                 </SectionCard>
+                <Show when={runtimeActionError()}>
+                  {(receipt) => (
+                    <NoticeBox
+                      role="alert"
+                      ariaLive="assertive"
+                      ariaAtomic={true}
+                      class={`rounded-lg border px-3 py-2 text-xs ${
+                        receipt().tone === "danger"
+                          ? "border-red-300/60 bg-red-50/70 text-red-900"
+                          : "border-amber-300/60 bg-amber-50/70 text-amber-900"
+                      }`}
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <p class="font-semibold">{receipt().title}</p>
+                          <p class="mt-1">{receipt().summary}</p>
+                          <p class="mt-1">{receipt().nextStep}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setRuntimeActionError(null)}
+                          class="font-medium underline underline-offset-2"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </NoticeBox>
+                  )}
+                </Show>
                 <Show when={runtimeFeedback()}>
                   {(message) => (
                     <NoticeBox
@@ -3375,6 +3490,33 @@ export function AgentSettingsView(props: {
                 Export all local AFP state (preferences, reactions, bookmarks, LLM config, LoRA history) as a
                 portable JSON bundle. Nothing is held back - you own your data completely.
               </p>
+              <Show when={sovereignDataExportError()}>
+                {(receipt) => (
+                  <NoticeBox
+                    role="alert"
+                    ariaLive="assertive"
+                    ariaAtomic={true}
+                    class={`mt-3 text-xs ${receipt().tone === "danger" ? "text-red-600" : "text-amber-700"}`}
+                  >
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <div class="min-w-0">
+                        <p class="font-semibold">{receipt().title}</p>
+                        <p class="mt-1">{receipt().summary}</p>
+                        <p class="mt-1 text-[11px] opacity-80">Next step: {receipt().nextStep}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSovereignDataExportError(null)}
+                        class={`font-medium underline underline-offset-2 ${
+                          receipt().tone === "danger" ? "text-red-600" : "text-amber-700"
+                        }`}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </NoticeBox>
+                )}
+              </Show>
               <button
                 type="button"
                 onClick={exportSovereignDataBundle}
@@ -3397,14 +3539,25 @@ export function AgentSettingsView(props: {
           Export your agent's identity and capabilities as a high-DPI printable card - suitable for physical archives or enterprise ID badges.
         </p>
         <Show when={identityCardExportError()}>
-          {(message) => (
-            <NoticeBox role="alert" ariaLive="assertive" ariaAtomic={true} class="mb-3 text-xs text-red-500">
+          {(receipt) => (
+            <NoticeBox
+              role="alert"
+              ariaLive="assertive"
+              ariaAtomic={true}
+              class={`mb-3 text-xs ${receipt().tone === "danger" ? "text-red-600" : "text-amber-700"}`}
+            >
               <div class="flex flex-wrap items-center justify-between gap-3">
-                <span>{message()}</span>
+                <div class="min-w-0">
+                  <p class="font-semibold">{receipt().title}</p>
+                  <p class="mt-1">{receipt().summary}</p>
+                  <p class="mt-1 text-[11px] opacity-80">Next step: {receipt().nextStep}</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setIdentityCardExportError(null)}
-                  class="font-medium text-red-500 underline underline-offset-2"
+                  class={`font-medium underline underline-offset-2 ${
+                    receipt().tone === "danger" ? "text-red-600" : "text-amber-700"
+                  }`}
                 >
                   Dismiss
                 </button>
@@ -3414,101 +3567,7 @@ export function AgentSettingsView(props: {
         </Show>
         <button
           type="button"
-          onClick={() => {
-            exportIdentityCard();
-            return;
-            const inst = instance();
-            const cfg = llmConfig();
-            const caps = capabilities();
-            const card = window.open("", "_blank", "width=900,height=640,noopener,noreferrer");
-            if (!card) return;
-            const popup = card!;
-            try {
-              popup.opener = null;
-            } catch {
-              // Ignore browsers that expose opener as read-only for noopener windows.
-            }
-            // Escape HTML entities before injecting server-derived values into document.write.
-            const esc = (s: unknown) => String(s ?? "")
-              .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-            const agentId = `omnyid-${Date.now().toString(36).toUpperCase()}`;
-            const model = cfg?.model ?? llmModel();
-            const provider = cfg?.provider ?? llmProvider();
-            const loraScore = inst?.lora_confidence_score != null
-              ? `${Math.round(inst!.lora_confidence_score! * 100)}%`
-              : "-";
-            const capList = caps.length > 0
-              ? caps.map((c) => `<li>${esc(c.id)}: ${esc(c.description)}</li>`).join("")
-              : "<li style='color:#888'>No capabilities registered</li>";
-            popup.document.write(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<title>OmnyID Agent Identity Card</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Inter,system-ui,sans-serif;background:#f0f3f9;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
-  .card{width:680px;min-height:360px;background:linear-gradient(135deg,#fff 60%,#e8eef8);border-radius:20px;box-shadow:0 20px 60px rgba(49,86,142,0.18);overflow:hidden;position:relative;display:flex;flex-direction:column}
-  .header{background:linear-gradient(135deg,#31568e,#3d6aaa);color:#fff;padding:28px 32px 24px;display:flex;align-items:center;gap:24px}
-  .avatar{width:72px;height:72px;border-radius:16px;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.35);display:flex;align-items:center;justify-content:center;font-size:2em;flex-shrink:0}
-  .header-text h1{font-size:22px;font-weight:700;letter-spacing:-0.02em}
-  .header-text p{font-size:11px;opacity:0.7;margin-top:2px;font-family:monospace}
-  .badge{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:999px;padding:3px 10px;font-size:10px;margin-top:8px;font-family:monospace;letter-spacing:0.05em}
-  .body{display:grid;grid-template-columns:1fr 1fr;gap:0;flex:1}
-  .col{padding:24px 28px;border-right:1px solid rgba(49,86,142,0.08)}
-  .col:last-child{border-right:none}
-  .section-label{font-size:9px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:#737781;margin-bottom:10px}
-  .field{margin-bottom:14px}
-  .field-name{font-size:10px;color:#737781;margin-bottom:2px}
-  .field-val{font-size:13px;font-weight:600;color:#1a1c1b}
-  .field-val.mono{font-family:monospace;font-size:11px;font-weight:400;color:#31568e;word-break:break-all}
-  .cap-list{list-style:none;display:flex;flex-direction:column;gap:4px}
-  .cap-list li{font-size:11px;color:#434750;padding:4px 8px;background:rgba(49,86,142,0.05);border-radius:6px}
-  .footer{background:#f8f9fc;border-top:1px solid rgba(49,86,142,0.08);padding:12px 28px;display:flex;align-items:center;justify-content:space-between}
-  .footer p{font-size:9px;color:#737781;font-family:monospace}
-  .qr-stub{width:48px;height:48px;background:#31568e;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px;font-family:monospace;text-align:center;line-height:1.3}
-  @media print{body{background:#fff;padding:0}@page{margin:0;size:A5 landscape}}
-</style>
-</head>
-<body>
-<div class="card">
-  <div class="header">
-    <div class="avatar">AI</div>
-    <div class="header-text">
-      <h1>OmnyID Master Agent</h1>
-      <p>Agent Identity Card | v1 | AFP-compliant</p>
-      <span class="badge">E2EE-Verified | Local-First | Agent-First</span>
-    </div>
-  </div>
-  <div class="body">
-    <div class="col">
-      <p class="section-label">Identity</p>
-      <div class="field"><div class="field-name">Agent ID</div><div class="field-val mono">${esc(agentId)}</div></div>
-      <div class="field"><div class="field-name">LLM Model</div><div class="field-val">${esc(model)}</div></div>
-      <div class="field"><div class="field-name">Provider</div><div class="field-val">${esc(provider)}</div></div>
-      <div class="field"><div class="field-name">LoRA Confidence</div><div class="field-val">${esc(loraScore)}</div></div>
-      <div class="field"><div class="field-name">Issued</div><div class="field-val">${new Date().toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" })}</div></div>
-    </div>
-    <div class="col">
-      <p class="section-label">Capabilities (${caps.length})</p>
-      <ul class="cap-list">${capList}</ul>
-    </div>
-  </div>
-  <div class="footer">
-    <div>
-      <p>OmnyID | omnyid.com | AFP v1</p>
-      <p>This card is a non-binding identity record for the registered agent instance.</p>
-    </div>
-    <div class="qr-stub">ID<br/>${esc(agentId.slice(-6))}</div>
-  </div>
-</div>
-<script>window.onload=()=>window.print();<\/script>
-</body>
-</html>`);
-            popup.document.close();
-          }}
+          onClick={exportIdentityCard}
           class="rounded-lg border border-primary/20 bg-primary/8 px-4 py-2 text-xs font-medium text-primary transition hover:bg-primary/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           Export Identity Card (Print / PDF)
@@ -3543,7 +3602,7 @@ export function AgentSettingsView(props: {
         onChange={(value) => {
           setSoulEditText(value);
           if (soulSaveError() && !soulSaving()) {
-            setSoulSaveError("");
+            setSoulSaveError(null);
           }
         }}
         onClose={() => requestCloseSoulEditor()}
