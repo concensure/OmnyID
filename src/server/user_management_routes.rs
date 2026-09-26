@@ -204,6 +204,10 @@ fn validate_vendor_status(value: Option<String>) -> Result<String, (StatusCode, 
     }
 }
 
+fn admin_users_list_limit(limit: Option<i64>) -> i64 {
+    limit.unwrap_or(50).clamp(1, 200)
+}
+
 async fn admin_users_list_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -218,14 +222,17 @@ async fn admin_users_list_http(
     }
     let users = state
         .db
-        .list_operator_user_summaries(params.limit.unwrap_or(50), params.query.as_deref())
+        .list_operator_user_summaries(
+            admin_users_list_limit(params.limit),
+            params.query.as_deref(),
+        )
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
     let total_users = count_admin_user_summaries(&state, params.query.as_deref()).await?;
     Ok(Json(serde_json::json!({
         "users": users.into_iter().map(admin_user_summary_json).collect::<Vec<_>>(),
-        "limit": params.limit.unwrap_or(50).clamp(1, 200),
+        "limit": admin_users_list_limit(params.limit),
         "query": params.query.map(|value| value.trim().to_string()).filter(|value| !value.is_empty()),
         "total_users": total_users,
     })))

@@ -43,6 +43,15 @@ fn normalize_admin_user_action_rejects_unknown_actions() {
 }
 
 #[test]
+fn admin_users_list_limit_is_bounded_before_querying() {
+    assert_eq!(super::admin_users_list_limit(None), 50);
+    assert_eq!(super::admin_users_list_limit(Some(0)), 1);
+    assert_eq!(super::admin_users_list_limit(Some(-10)), 1);
+    assert_eq!(super::admin_users_list_limit(Some(75)), 75);
+    assert_eq!(super::admin_users_list_limit(Some(10_000)), 200);
+}
+
+#[test]
 fn normalize_runtime_remediation_action_accepts_supported_action() {
     assert_eq!(
         super::normalize_runtime_remediation_action(" issue_cleanup_receipt "),
