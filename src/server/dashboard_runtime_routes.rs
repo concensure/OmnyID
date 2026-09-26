@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.dashboard-runtime-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -7,6 +7,73 @@
  */
 
 use super::*;
+
+const MAX_RUNTIME_BACKUP_ID_LEN: usize = 64;
+const MAX_RUNTIME_DEVICE_ID_LEN: usize = 128;
+
+fn normalize_runtime_route_id(
+    value: &str,
+    field: &str,
+    max_len: usize,
+) -> Result<String, (StatusCode, String)> {
+    let value = value.trim();
+    if value.is_empty() || value.len() > max_len {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("{field} must be 1-{max_len} characters"),
+        ));
+    }
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("{field} may only include letters, numbers, hyphen, or underscore"),
+        ));
+    }
+    Ok(value.to_string())
+}
+
+fn normalize_runtime_backup_id(value: &str) -> Result<String, (StatusCode, String)> {
+    normalize_runtime_route_id(value, "backup_id", MAX_RUNTIME_BACKUP_ID_LEN)
+}
+
+fn normalize_runtime_device_id(value: &str) -> Result<String, (StatusCode, String)> {
+    normalize_runtime_route_id(value, "device_id", MAX_RUNTIME_DEVICE_ID_LEN)
+}
+
+fn normalize_optional_runtime_device_id(
+    value: Option<&str>,
+) -> Result<Option<String>, (StatusCode, String)> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(normalize_runtime_device_id)
+        .transpose()
+}
+
+fn runtime_update_channel(value: Option<&str>) -> Result<&'static str, (StatusCode, String)> {
+    match value.map(str::trim).filter(|value| !value.is_empty()) {
+        None | Some("stable") => Ok("stable"),
+        Some("manual_only") => Ok("manual_only"),
+        Some(_) => Err((
+            StatusCode::BAD_REQUEST,
+            "update_channel must be stable or manual_only".to_string(),
+        )),
+    }
+}
+
+fn runtime_auto_apply(value: Option<&str>) -> Result<&'static str, (StatusCode, String)> {
+    match value.map(str::trim).filter(|value| !value.is_empty()) {
+        None | Some("manual_only") => Ok("manual_only"),
+        Some("scaffold_refresh_only") => Ok("scaffold_refresh_only"),
+        Some(_) => Err((
+            StatusCode::BAD_REQUEST,
+            "auto_apply must be manual_only or scaffold_refresh_only".to_string(),
+        )),
+    }
+}
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -112,17 +179,16 @@ async fn runtime_backups_action_http(
             let backup_id = request
                 .backup_id
                 .as_deref()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
                 .ok_or_else(|| {
                     (
                         StatusCode::BAD_REQUEST,
                         "backup_id is required when deleting a snapshot".to_string(),
                     )
-                })?;
+                })
+                .and_then(normalize_runtime_backup_id)?;
             let deleted = state
                 .db
-                .delete_runtime_backup_by_id(&user.id, backup_id)
+                .delete_runtime_backup_by_id(&user.id, &backup_id)
                 .await
                 .map_err(internal_error)
                 .map_err(status_to_http)?
@@ -159,6 +225,7 @@ async fn runtime_backup_manifest_http(
     Path(backup_id): Path<String>,
 ) -> Result<Json<RuntimeBackupManifestResponse>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let backup_id = normalize_runtime_backup_id(&backup_id)?;
     let _ = prune_expired_runtime_backups(&state.db, &user.id).await;
     let record = state
         .db
@@ -208,14 +275,11 @@ async fn runtime_restore_drill_create_http(
     )
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
-    let backup_id = request.backup_id.trim();
-    if backup_id.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "backup_id is required".to_string()));
-    }
+    let backup_id = normalize_runtime_backup_id(&request.backup_id)?;
     let _ = prune_expired_runtime_backups(&state.db, &user.id).await;
     let backup = state
         .db
-        .find_runtime_backup_by_id(&user.id, backup_id)
+        .find_runtime_backup_by_id(&user.id, &backup_id)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?
@@ -270,18 +334,8 @@ async fn runtime_updates_action_http(
 
     match action.as_str() {
         "set_policy" => {
-            let update_channel = request
-                .update_channel
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| matches!(*value, "stable" | "manual_only"))
-                .unwrap_or("stable");
-            let auto_apply = request
-                .auto_apply
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| matches!(*value, "manual_only" | "scaffold_refresh_only"))
-                .unwrap_or("manual_only");
+            let update_channel = runtime_update_channel(request.update_channel.as_deref())?;
+            let auto_apply = runtime_auto_apply(request.auto_apply.as_deref())?;
             state
                 .db
                 .upsert_runtime_update_policy(&user.id, update_channel, auto_apply, None, None)
@@ -373,6 +427,7 @@ async fn device_bootstrap_bundle_http(
     )
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
+    let device_id = normalize_optional_runtime_device_id(request.device_id.as_deref())?;
     let agents = state
         .db
         .list_managed_agents_by_user(&user.id)
@@ -383,7 +438,7 @@ async fn device_bootstrap_bundle_http(
         &user,
         &agents,
         request.device_class.trim(),
-        request.device_id.as_deref(),
+        device_id.as_deref(),
         request.policy_profile.as_deref(),
     )?;
     let sync_slices = sync_slices_for_bundle(&bundle.device_class, &bundle.policy_profile)?;
@@ -447,9 +502,8 @@ async fn device_sync_policies_action_http(
             let device_id = request
                 .device_id
                 .as_deref()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
                 .ok_or_else(|| (StatusCode::BAD_REQUEST, "device_id is required".to_string()))?;
+            let device_id = normalize_runtime_device_id(device_id)?;
             let profile = request
                 .policy_profile
                 .as_deref()
@@ -463,7 +517,7 @@ async fn device_sync_policies_action_http(
                 })?;
             let existing = state
                 .db
-                .find_sync_device_policy_by_user(&user.id, device_id)
+                .find_sync_device_policy_by_user(&user.id, &device_id)
                 .await
                 .map_err(internal_error)
                 .map_err(status_to_http)?
@@ -478,7 +532,7 @@ async fn device_sync_policies_action_http(
                 .db
                 .update_sync_device_policy(
                     &user.id,
-                    device_id,
+                    &device_id,
                     profile,
                     &sync_slices,
                     requires_local_key_material(&sync_slices),
@@ -509,4 +563,44 @@ async fn device_sync_policies_action_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
     Ok(Json(response))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runtime_backup_ids_are_trimmed_and_bounded() {
+        assert_eq!(
+            normalize_runtime_backup_id(" 01JABCDEF0123456789ABCDEFG ").expect("valid backup id"),
+            "01JABCDEF0123456789ABCDEFG"
+        );
+        assert!(normalize_runtime_backup_id("../escape").is_err());
+        assert!(normalize_runtime_backup_id(&"x".repeat(MAX_RUNTIME_BACKUP_ID_LEN + 1)).is_err());
+    }
+
+    #[test]
+    fn runtime_device_ids_reject_path_like_values() {
+        assert_eq!(
+            normalize_optional_runtime_device_id(Some(" mobile-main_01 "))
+                .expect("valid device id"),
+            Some("mobile-main_01".to_string())
+        );
+        assert!(normalize_optional_runtime_device_id(Some("mobile/../escape")).is_err());
+        assert!(
+            normalize_optional_runtime_device_id(Some(&"x".repeat(MAX_RUNTIME_DEVICE_ID_LEN + 1)))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn runtime_update_policy_values_are_explicit() {
+        assert_eq!(runtime_update_channel(None).expect("default"), "stable");
+        assert_eq!(
+            runtime_auto_apply(Some(" scaffold_refresh_only ")).expect("valid"),
+            "scaffold_refresh_only"
+        );
+        assert!(runtime_update_channel(Some("nightly")).is_err());
+        assert!(runtime_auto_apply(Some("always")).is_err());
+    }
 }
