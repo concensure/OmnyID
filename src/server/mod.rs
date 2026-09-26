@@ -25341,9 +25341,8 @@ fn llm_ping_reason_from_body(body: &str) -> String {
     }
 }
 
-fn llm_ping_failure_reason(provider: &str, status: StatusCode, body: &str) -> String {
-    let summary = llm_ping_reason_from_body(body);
-    format!("{provider} returned HTTP {}: {summary}", status.as_u16())
+fn llm_ping_failure_reason(provider: &str, status: StatusCode) -> String {
+    format!("{provider} returned HTTP {}. Check logs.", status.as_u16())
 }
 
 // -- LLM ping — verify connection without triggering inference -----------------
@@ -25403,12 +25402,11 @@ async fn llm_config_ping_http(
                     serde_json::json!({ "ok": true, "backend": "runpod", "http_status": status.as_u16() }),
                 ))
             } else {
-                let body = resp.text().await.unwrap_or_default();
                 Ok(Json(serde_json::json!({
                     "ok": false,
                     "backend": "runpod",
                     "http_status": status.as_u16(),
-                    "reason": llm_ping_failure_reason("runpod", status, &body)
+                    "reason": llm_ping_failure_reason("runpod", status)
                 })))
             }
         }
@@ -25488,13 +25486,12 @@ async fn llm_config_ping_http(
                     serde_json::json!({ "ok": true, "backend": "byok", "provider": provider, "http_status": status.as_u16() }),
                 ))
             } else {
-                let body = resp.text().await.unwrap_or_default();
                 Ok(Json(serde_json::json!({
                     "ok": false,
                     "backend": "byok",
                     "provider": provider,
                     "http_status": status.as_u16(),
-                    "reason": llm_ping_failure_reason(provider, status, &body)
+                    "reason": llm_ping_failure_reason(provider, status)
                 })))
             }
         }
@@ -29403,8 +29400,9 @@ mod tests {
     fn llm_ping_reports_missing_saved_key_and_provider_specific_failure_reason() {
         let source = std::fs::read_to_string("src/server/mod.rs").expect("read mod.rs");
         assert!(source.contains("No API key is currently saved for this provider"));
-        assert!(source.contains("llm_ping_failure_reason(provider, status, &body)"));
-        assert!(source.contains("llm_ping_failure_reason(\"runpod\", status, &body)"));
+        assert!(source.contains("llm_ping_failure_reason(provider, status)"));
+        assert!(source.contains("llm_ping_failure_reason(\"runpod\", status)"));
+        assert!(!source.contains(concat!("resp.text().await", ".unwrap_or_default()")));
         assert!(source.contains("\"RunPod is unreachable right now.\""));
         assert!(source.contains("\"Ollama is unreachable right now.\""));
         assert!(source.contains("\"The configured AI provider is unreachable right now.\""));
