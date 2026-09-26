@@ -15,6 +15,11 @@
 use super::*;
 use axum::routing::delete;
 
+const MIN_DAILY_TOKEN_LIMIT: i32 = 1_000;
+const MAX_DAILY_TOKEN_LIMIT: i32 = 10_000_000;
+const MIN_ALERT_THRESHOLD_PCT: i32 = 1;
+const MAX_ALERT_THRESHOLD_PCT: i32 = 100;
+
 fn privacy_user_facing_text(
     text: &str,
     active_persona: Option<&crate::agent_personas::AgentPersona>,
@@ -86,6 +91,35 @@ struct TokenBudgetUpdateRequest {
     escalation_enabled: Option<bool>,
 }
 
+fn token_budget_daily_limit(value: Option<i32>, current: i64) -> Result<i64, (StatusCode, String)> {
+    let value = value.unwrap_or(current as i32);
+    if !(MIN_DAILY_TOKEN_LIMIT..=MAX_DAILY_TOKEN_LIMIT).contains(&value) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "daily_limit_tokens must be between {MIN_DAILY_TOKEN_LIMIT} and {MAX_DAILY_TOKEN_LIMIT}"
+            ),
+        ));
+    }
+    Ok(value as i64)
+}
+
+fn token_budget_alert_threshold(
+    value: Option<i32>,
+    current: f64,
+) -> Result<f64, (StatusCode, String)> {
+    let value = value.map(|v| v as f64).unwrap_or(current);
+    if !(MIN_ALERT_THRESHOLD_PCT as f64..=MAX_ALERT_THRESHOLD_PCT as f64).contains(&value) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "alert_threshold_pct must be between {MIN_ALERT_THRESHOLD_PCT} and {MAX_ALERT_THRESHOLD_PCT}"
+            ),
+        ));
+    }
+    Ok(value)
+}
+
 async fn token_budget_put_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -106,11 +140,8 @@ async fn token_budget_put_http(
         .await
         .unwrap_or((50_000, 80.0, true));
 
-    let new_limit = body.daily_limit_tokens.unwrap_or(cur_limit as i32);
-    let new_alert = body
-        .alert_threshold_pct
-        .map(|v| v as f64)
-        .unwrap_or(cur_alert);
+    let new_limit = token_budget_daily_limit(body.daily_limit_tokens, cur_limit)?;
+    let new_alert = token_budget_alert_threshold(body.alert_threshold_pct, cur_alert)?;
     let new_esc = body.escalation_enabled.unwrap_or(cur_esc);
 
     if new_limit < 1000 {
@@ -123,7 +154,7 @@ async fn token_budget_put_http(
     let escalation_threshold = if new_esc { 0.95 } else { 1.0 };
     state
         .db
-        .upsert_user_token_budget(&user.id, new_limit as i64, new_alert, escalation_threshold)
+        .upsert_user_token_budget(&user.id, new_limit, new_alert, escalation_threshold)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
@@ -306,5 +337,30 @@ mod tests {
                 consent: true,
             }
         ));
+    }
+
+    #[test]
+    fn token_budget_update_values_are_bounded() {
+        assert_eq!(
+            token_budget_daily_limit(None, 50_000).expect("existing limit"),
+            50_000
+        );
+        assert_eq!(
+            token_budget_daily_limit(Some(10_000_000), 50_000).expect("max limit"),
+            10_000_000
+        );
+        assert!(token_budget_daily_limit(Some(999), 50_000).is_err());
+        assert!(token_budget_daily_limit(Some(10_000_001), 50_000).is_err());
+
+        assert_eq!(
+            token_budget_alert_threshold(None, 80.0).expect("existing threshold"),
+            80.0
+        );
+        assert_eq!(
+            token_budget_alert_threshold(Some(100), 80.0).expect("max threshold"),
+            100.0
+        );
+        assert!(token_budget_alert_threshold(Some(0), 80.0).is_err());
+        assert!(token_budget_alert_threshold(Some(101), 80.0).is_err());
     }
 }
