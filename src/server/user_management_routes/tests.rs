@@ -278,6 +278,25 @@ fn admin_third_party_tool_policy_rejects_unknown_tools() {
 }
 
 #[test]
+fn admin_third_party_tool_policy_save_path_sanitizes_internal_errors() {
+    let source = include_str!("wedding_admin.rs");
+    let start = source
+        .find("pub(super) async fn admin_third_party_tool_policy_update_http(")
+        .expect("policy update handler exists");
+    let end = source[start..]
+        .find("\npub(super) async fn admin_wedding_ops_metrics_http(")
+        .map(|offset| start + offset)
+        .expect("ops metrics handler follows policy update");
+    let handler_source = &source[start..end];
+
+    assert!(handler_source.contains("map_err(internal_http_error)"));
+    assert!(handler_source.contains("failed to prepare admin third-party tool policy directory"));
+    assert!(handler_source.contains("failed to save admin third-party tool policy"));
+    assert!(!handler_source.contains("format!(\"failed to prepare policy directory: {err}\")"));
+    assert!(!handler_source.contains("format!(\"failed to save policy: {err}\")"));
+}
+
+#[test]
 fn wedding_vendor_write_input_validates_urls_dates_and_photo_slots() {
     let invalid = super::wedding_vendor_write_input(super::WeddingVendorWriteRequest {
         vendor_slug: "harbour-house".to_string(),

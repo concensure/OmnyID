@@ -437,28 +437,19 @@ pub(super) async fn admin_third_party_tool_policy_update_http(
         ));
     };
     let policy = sanitize_admin_third_party_tool_policy(body)?;
-    let serialized = serde_json::to_string_pretty(&policy).map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "failed to serialize policy".to_string(),
-        )
-    })?;
+    let serialized = serde_json::to_string_pretty(&policy).map_err(internal_http_error)?;
     if let Some(parent) = std::path::Path::new(&path)
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
     {
         std::fs::create_dir_all(parent).map_err(|err| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("failed to prepare policy directory: {err}"),
-            )
+            tracing::error!(error = %err, path = %parent.display(), "failed to prepare admin third-party tool policy directory");
+            internal_http_error(err)
         })?;
     }
     std::fs::write(&path, serialized).map_err(|err| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("failed to save policy: {err}"),
-        )
+        tracing::error!(error = %err, path = %path, "failed to save admin third-party tool policy");
+        internal_http_error(err)
     })?;
     Ok(Json(admin_third_party_tool_policy_json_with_file(Some(
         path,
