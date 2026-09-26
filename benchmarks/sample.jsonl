@@ -1,0 +1,24 @@
+{"id":"bit_01","prompt":"What is 15 XOR 9?","expected_answer":"6","difficulty":0.3,"category":"bit_manipulation"}
+{"id":"bit_02","prompt":"What is the result of 0b1010 AND 0b1100?","expected_answer":"8","difficulty":0.4,"category":"bit_manipulation"}
+{"id":"bit_03","prompt":"What is 7 left-shifted by 2 bits?","expected_answer":"28","difficulty":0.4,"category":"bit_manipulation"}
+{"id":"bit_04","prompt":"What is 255 AND 170? (170 = 0b10101010)","expected_answer":"170","difficulty":0.5,"category":"bit_manipulation"}
+{"id":"bit_05","prompt":"If x = 0b11001100 and y = 0b10101010, what is x XOR y in decimal?","expected_answer":"102","difficulty":0.6,"category":"bit_manipulation"}
+{"id":"bit_06","prompt":"What is 1 left-shifted by 8 bits minus 1?","expected_answer":"255","difficulty":0.5,"category":"bit_manipulation"}
+{"id":"bit_07","prompt":"What is the result of NOT 0b00001111 (8-bit representation)?","expected_answer":"240","difficulty":0.6,"category":"bit_manipulation"}
+{"id":"alg_01","prompt":"Solve for x: 3x + 7 = 22","expected_answer":"5","difficulty":0.3,"category":"algebra"}
+{"id":"alg_02","prompt":"Solve for x: 2x - 4 = 10","expected_answer":"7","difficulty":0.3,"category":"algebra"}
+{"id":"alg_03","prompt":"Solve for x: 5x + 3 = 3x + 11","expected_answer":"4","difficulty":0.5,"category":"algebra"}
+{"id":"alg_04","prompt":"Solve for x: x^2 - 5x + 6 = 0. Give the larger root.","expected_answer":"3","difficulty":0.6,"category":"algebra"}
+{"id":"alg_05","prompt":"Solve for x: (x + 2)(x - 3) = 0. Give the positive root.","expected_answer":"3","difficulty":0.5,"category":"algebra"}
+{"id":"alg_06","prompt":"Solve for x: 4x^2 = 100","expected_answer":"5","difficulty":0.6,"category":"algebra"}
+{"id":"alg_07","prompt":"Solve for x: 2x^2 - 8x + 6 = 0. Give the smaller root.","expected_answer":"1","difficulty":0.7,"category":"algebra"}
+{"id":"logic_01","prompt":"A number is divisible by 3 and by 5. What is the smallest positive such number?","expected_answer":"15","difficulty":0.3,"category":"logic"}
+{"id":"logic_02","prompt":"If all A are B, and all B are C, are all A also C?","expected_answer":"yes","difficulty":0.3,"category":"logic"}
+{"id":"logic_03","prompt":"How many bits are needed to represent the number 200?","expected_answer":"8","difficulty":0.4,"category":"logic"}
+{"id":"logic_04","prompt":"What is the sum of the first 10 positive integers?","expected_answer":"55","difficulty":0.4,"category":"logic"}
+{"id":"logic_05","prompt":"A sequence starts: 1, 1, 2, 3, 5, 8, 13. What is the next number?","expected_answer":"21","difficulty":0.5,"category":"logic"}
+{"id":"mixed_01","prompt":"What is 2^10?","expected_answer":"1024","difficulty":0.4,"category":"bit_manipulation"}
+{"id":"mixed_02","prompt":"Solve: x = (0b1111 + 0b0001) in decimal.","expected_answer":"16","difficulty":0.5,"category":"bit_manipulation"}
+{"id":"mixed_03","prompt":"How many unique values can a 3-bit number represent?","expected_answer":"8","difficulty":0.4,"category":"bit_manipulation"}
+{"id":"mixed_04","prompt":"If x = 42, what is x AND 0b11110000 (assuming 8-bit x)?","expected_answer":"32","difficulty":0.7,"category":"bit_manipulation"}
+{"id":"mixed_05","prompt":"Solve for x: log2(x) = 4","expected_answer":"16","difficulty":0.6,"category":"algebra"}

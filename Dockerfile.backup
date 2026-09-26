@@ -1,0 +1,23 @@
+# dl.min.io no longer serves the standalone mc binary at the legacy per-arch
+# release URL (returns HTTP 410), and the `minio/mc` Docker Hub image now
+# requires authorization too. Build mc from source via the Go module proxy
+# instead, which is unaffected by MinIO's distribution changes.
+FROM golang:alpine AS mc-builder
+RUN go install github.com/minio/mc@latest
+
+FROM postgres:18
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
+    coreutils \
+    curl \
+    findutils \
+    gzip \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=mc-builder /go/bin/mc /usr/local/bin/mc
+RUN chmod +x /usr/local/bin/mc && mc --version
+
+WORKDIR /backup
