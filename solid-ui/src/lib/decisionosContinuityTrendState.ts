@@ -254,6 +254,15 @@ export function decisionOsContinuityTrendState(input: {
     ? snapshotSamples
     : input.metrics ? [input.metrics] : [];
   const review = calibrationReview({ source, samples: reviewSamples });
+  const effectiveCalibration = source === "state_snapshot"
+    && review.sampleCount >= 5
+    && review.volatility === "insufficient"
+    && review.note
+    ? {
+      calibrationStatus: "insufficient_history" as const,
+      calibrationText: review.note,
+    }
+    : calibration;
   const bars = metrics
     ? (["urgency_acceleration", "unresolved_queue_pressure", "follow_up_drift_score"] as const)
       .map((key) => trendBar(key, metrics[key]))
@@ -265,7 +274,7 @@ export function decisionOsContinuityTrendState(input: {
     summaryText: bars.length > 0
       ? `${recentCount} continuity signal${recentCount === 1 ? "" : "s"} shaping this queue.`
       : null,
-    ...calibration,
+    ...effectiveCalibration,
     calibrationReview: review,
     source,
     hasTrend: bars.length > 0,

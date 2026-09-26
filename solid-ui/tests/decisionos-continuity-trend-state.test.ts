@@ -193,7 +193,11 @@ test("decisionOsContinuityTrendState keeps larger sparse workspace history conse
 
   const state = decisionOsContinuityTrendState({ messages });
 
-  assert.equal(state.calibrationStatus, "ready");
+  assert.equal(state.calibrationStatus, "insufficient_history");
+  assert.equal(
+    state.calibrationText,
+    "Snapshot history has sparse continuity metric coverage; keep thresholds conservative until newer snapshots dominate.",
+  );
   assert.equal(state.calibrationReview.sampleCount, 24);
   assert.equal(state.calibrationReview.coveragePercent, 33);
   assert.equal(state.calibrationReview.volatility, "insufficient");
