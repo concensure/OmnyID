@@ -1,15 +1,15 @@
 ﻿# Dirty Workspace Inventory - 2026-09-26
 
-Generated after the wedding planner hardening, clean frontend build dependency commits, and Oracle deployment preparation. This inventory excludes this inventory file itself so the report does not self-reference while being updated.
+Generated after the wedding planner hardening, clean frontend/backend build dependency commits, and Oracle deployment preparation. This inventory excludes this inventory file itself so the report does not self-reference while being updated.
 
-Total dirty entries excluding this file: 1515
+Total dirty entries excluding this file: 1377
 
 ## Summary
 
-- Modified/type-changed tracked: 187
+- Modified/type-changed tracked: 132
 - Deleted tracked: 9
 - Renamed/copied tracked: 0
-- Untracked: 1319
+- Untracked: 1236
 - Other: 0
 
 ## Modified / Type-Changed Tracked Files
@@ -20,8 +20,6 @@ Total dirty entries excluding this file: 1515
  M .gitignore
  M CLAUDE.md
  M Caddyfile
- M Cargo.lock
- M Cargo.toml
  M Dockerfile
  M Documents/README.md
  M Documents/deployment/OMNYID_CLOUD_SETUP_NOTES.md
@@ -74,8 +72,6 @@ Total dirty entries excluding this file: 1515
  M docs/landing.md
  M oracle-cloud.env.example
  M oracle-cloud.quic.env.example
- M postgres/migrations/0001_init.sql
- M proto/afp.proto
  M runtime-templates/python-runner-chat/starter_templates.json.tpl
  M scripts/get-gmail-token.py
  M scripts/install-omnyid-private.ps1
@@ -145,58 +141,7 @@ Total dirty entries excluding this file: 1515
  M solid-ui/src/main.tsx
  M solid-ui/tsconfig.json
  M solid-ui/vite.config.ts
- M src/agent_id.rs
- M src/agent_template.rs
- M src/agentcard.rs
- M src/audit_chain.rs
- M src/bin/omnyid_keys.rs
- M src/bin/omnyid_wt_cert.rs
- M src/cli_executor.rs
- M src/cost_oracle.rs
- M src/crypto.rs
- M src/curator_runtime.rs
- M src/daemon_registry.rs
- M src/differential_privacy.rs
- M src/export.rs
- M src/federation.rs
- M src/gateway/custom_imap.rs
- M src/gateway/gmail_api.rs
- M src/gateway/graph_api.rs
- M src/gateway/imap_sync.rs
- M src/gateway/provider.rs
- M src/gateway/rest_adapter.rs
- M src/gateway/smtp_fallback.rs
- M src/gateway/smtp_in.rs
- M src/gateway/smtp_out.rs
- M src/heuristic_adaptation.rs
- M src/inference.rs
- M src/integration.rs
- M src/knowledge_curator.rs
- M src/lib.rs
- M src/local_sync.rs
- M src/main.rs
- M src/master_orchestrator.rs
- M src/mcp_server.rs
- M src/message.rs
- M src/metrics.rs
- M src/personalization.rs
- M src/policy_engine.rs
- M src/post_quantum.rs
- M src/proactive_outcome_memory.rs
- M src/query.rs
- M src/relay.rs
- M src/runtime_risk.rs
- M src/secret_manager.rs
- M src/server/auth.rs
- M src/server/billing.rs
- M src/server/health.rs
- M src/server/protocol_routes.rs
- M src/server/relay.rs
- M src/server/workflow/mod.rs
- M src/server/workflow/scheduler.rs
- M src/sync_worker.rs
- M src/webauthn.rs
- M src/workflow_supervisor.rs
+ M src/server/user_integrations/tests.rs
  M "to do.txt"
  M typescript-sdk/package.json
  M typescript-sdk/src/index.ts
@@ -514,53 +459,6 @@ infra/
 logo/
 mcp-servers/
 package-lock.json
-postgres/migrations/0038_openai_compat_backend.sql
-postgres/migrations/0039_training_mode.sql
-postgres/migrations/0040_profit_guardrails.sql
-postgres/migrations/0041_capability_enabled_flag.sql
-postgres/migrations/0042_spaces.sql
-postgres/migrations/0043_mcp_tool_connections.sql
-postgres/migrations/0044_tool_descriptor.sql
-postgres/migrations/0045_proactive.sql
-postgres/migrations/0046_temporal_summary.sql
-postgres/migrations/0047_heuristic_packs.sql
-postgres/migrations/0048_proactivity_level.sql
-postgres/migrations/0049_notification_source_filters.sql
-postgres/migrations/0050_map_provider.sql
-postgres/migrations/0052_content_preview.sql
-postgres/migrations/0053_typed_refs_backlinks.sql
-postgres/migrations/0054_knowledge_triple_index.sql
-postgres/migrations/0055_email_contact_groups.sql
-postgres/migrations/0056_proactive_privacy.sql
-postgres/migrations/0057_fix_archive_projection_keys.sql
-postgres/migrations/0058_agent_personas.sql
-postgres/migrations/0059_auth_tokens_email_verify.sql
-postgres/migrations/0060_archive_index_composite_key.sql
-postgres/migrations/0061_rate_limit_log.sql
-postgres/migrations/0062_anon_dashboard_sessions.sql
-postgres/migrations/0063_outbound_email_receipts_unique.sql
-postgres/migrations/0064_afp_kind_and_seaweedfs.sql
-postgres/migrations/0065_user_goals.sql
-postgres/migrations/0066_news_subscriptions.sql
-postgres/migrations/0067_finance_guardian.sql
-postgres/migrations/0068_para_archive.sql
-postgres/migrations/0070_router_metadata_facets.sql
-postgres/migrations/0071_afp_top_level_supertags.sql
-postgres/migrations/0072_reference_facets.sql
-postgres/migrations/0072_router_reference_facets.sql
-postgres/migrations/0073_supertag_hierarchy.sql
-postgres/migrations/0074_router_metadata_terms.sql
-postgres/migrations/0075_afp_coordination_notify.sql
-postgres/migrations/0076_billing_archive_only_mode.sql
-postgres/migrations/0077_user_connected_capabilities.sql
-postgres/migrations/0078_personal_automation_conversations.sql
-postgres/migrations/0079_composio_tool_connection_identity.sql
-postgres/migrations/0080_user_account_status.sql
-postgres/migrations/0081_daemon_heartbeat_retention.sql
-postgres/migrations/0082_external_tool_usage.sql
-postgres/migrations/0083_operator_runtime_remediation_receipts.sql
-postgres/migrations/0084_operator_runtime_remediation_receipt_completion.sql
-postgres/migrations/0087_google_calendar_tokens.sql
 prompts/
 python-sdk/afp/capabilities/
 python-sdk/afp/executors/image_generate.py
@@ -1496,42 +1394,6 @@ solid-ui/tests/workspace-setup-banner-failure-state.test.ts
 solid-ui/tests/workspace-setup-banner-local-state.test.ts
 solid-ui/tests/workspace-setup-state.test.ts
 solid-ui/tests/workspace-update-state.test.ts
-src/background_watcher_heuristics.rs
-src/background_watcher_runtime.rs
-src/bin/omnyid_tui.rs
-src/db/models.rs
-src/db/tenant_roundtrip.rs
-src/field_engine.rs
-src/gateway/clamav.rs
-src/gateway/notion_gateway.rs
-src/gateway/slack_gateway.rs
-src/gateway/spam_filter.rs
-src/personal_event_ingestion.rs
-src/planning_tools.md
-src/prepared_context_packet.rs
-src/prepared_draft_packet.rs
-src/server/agent_routes.rs
-src/server/approval_surfaces.rs
-src/server/background_workers.rs
-src/server/continuity_routes.rs
-src/server/dashboard_routes.rs
-src/server/ingest_routes.rs
-src/server/knowledge_routes.rs
-src/server/proactive_routes.rs
-src/server/search_workflows.rs
-src/server/skill_capsule_routes.rs
-src/server/thread_discovery.rs
-src/server/ui_command_response_enricher.rs
-src/server/user_integrations.rs
-src/server/workflow_instance_inputs.rs
-src/server/workflow_lineage_filters.rs
-src/server/workflow_semantic_templates.rs
-src/simulator_loop.rs
-src/simulator_promotion.rs
-src/state_fields.rs
-src/state_synthesizer.rs
-src/state_synthesizer_contract.rs
-src/tool_dispatch.rs
 temp_release_snippet.txt
 tests/
 tmp_backup_raw.txt
