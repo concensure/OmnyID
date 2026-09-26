@@ -504,6 +504,17 @@ Release validation commands already exercised locally:
 - `npm run typecheck`
 - `npm run test:wedding`
 
+Release calibration / deployment validation update, 2026-09-26:
+
+- local compose Postgres is running as `omnyid-postgres-1` on `127.0.0.1:5432`
+- `cargo test --lib` now passes locally (`2137 passed`) after serializing process-env-mutating admin routing policy tests in the current split route worktree
+- opt-in local DB smoke passes against `postgres://afp:afp@127.0.0.1:5432/afp`
+- focused continuity calibration/projection tests pass (`13 passed`)
+- `npm run typecheck` passes
+- `npm run test:wedding` passes (`1057 passed`)
+- deployed database validation was not executed in this environment because no deployed `DATABASE_URL` / deployed database env var is available
+- source-control reconciliation is still required for the env-race fix if `src/server/user_management_routes.rs` remains an untracked split route file in the release worktree
+
 What remains incomplete or calibration-sensitive:
 
 - thresholds and resurfacing weights now have conservative UI calibration visibility plus sample-volatility, sparse-coverage gating, bounded topology fan-out, stale-fanout ranking guards, active-anchor prioritization, and evidence-aware proactive surfacing review, but still need tuning against larger real-world workspaces
