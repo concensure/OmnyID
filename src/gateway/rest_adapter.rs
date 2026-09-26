@@ -76,6 +76,15 @@ pub struct AdapterResult {
     pub external_reference: Option<String>,
 }
 
+fn upstream_http_status_error(transport: &str, status: reqwest::StatusCode) -> String {
+    format!("{transport} call returned {status}")
+}
+
+fn graphql_errors_error(errors: &Value) -> String {
+    let count = errors.as_array().map_or(1, Vec::len);
+    format!("GraphQL response contained {count} error item(s)")
+}
+
 /// Execute or preview an integration action.
 ///
 /// Returns `Err` if approval is required but not yet granted, or if the HTTP
@@ -199,7 +208,7 @@ async fn rest_call(
         .unwrap_or_else(|_| json!({ "raw": "<non-JSON response>" }));
 
     if !status.is_success() {
-        return Err(format!("REST call returned {status}: {body}"));
+        return Err(upstream_http_status_error("REST", status));
     }
 
     Ok((body, None))
@@ -233,12 +242,12 @@ async fn graphql_call(
         .unwrap_or_else(|_| json!({ "raw": "<non-JSON response>" }));
 
     if !status.is_success() {
-        return Err(format!("GraphQL call returned {status}: {body}"));
+        return Err(upstream_http_status_error("GraphQL", status));
     }
 
     if let Some(errors) = body.get("errors") {
         if !errors.is_null() && errors.as_array().map_or(false, |arr| !arr.is_empty()) {
-            return Err(format!("GraphQL errors: {errors}"));
+            return Err(graphql_errors_error(errors));
         }
     }
 
@@ -470,6 +479,28 @@ mod tests {
         // Different URL = different signature
         let headers3 = ctx.sign_request("https://api.example.com/v1/other", "2026-01-01T00:00:00Z");
         assert_ne!(headers[2].1, headers3[2].1);
+    }
+
+    #[test]
+    fn upstream_status_errors_omit_response_bodies() {
+        let err = upstream_http_status_error("REST", reqwest::StatusCode::UNAUTHORIZED);
+
+        assert_eq!(err, "REST call returned 401 Unauthorized");
+        assert!(!err.contains("access_token"));
+        assert!(!err.contains("client_secret"));
+    }
+
+    #[test]
+    fn graphql_errors_are_counted_not_echoed() {
+        let errors = serde_json::json!([
+            {"message": "token expired: sk_live_secret"},
+            {"message": "customer email private@example.com"}
+        ]);
+        let err = graphql_errors_error(&errors);
+
+        assert_eq!(err, "GraphQL response contained 2 error item(s)");
+        assert!(!err.contains("sk_live_secret"));
+        assert!(!err.contains("private@example.com"));
     }
 
     #[tokio::test]
