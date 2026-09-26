@@ -12,6 +12,7 @@ export type Contact = {
   notes?: string;
   agentId?: string;
   relationshipKind: ResponseQueueRelationship;
+  roles?: string[];
   responseSlaHours?: number;
   lastContactedAt?: string;
   lastContactedBy?: "user" | "agent";
@@ -40,6 +41,16 @@ function normalizeRelationship(value: unknown): ResponseQueueRelationship | null
     : null;
 }
 
+function normalizeRoles(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const roles = value
+    .filter((role): role is string => typeof role === "string")
+    .map((role) => role.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+  const unique = Array.from(new Set(roles));
+  return unique.length > 0 ? unique : undefined;
+}
+
 function normalizeResponseSlaHours(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
 }
@@ -54,6 +65,7 @@ function normalizeContact(value: unknown): Contact | null {
   const phone = normalizeText(value.phone) ?? undefined;
   const notes = normalizeText(value.notes) ?? undefined;
   const agentId = normalizeText(value.agentId) ?? undefined;
+  const roles = normalizeRoles(value.roles);
   const responseSlaHours = normalizeResponseSlaHours(value.responseSlaHours);
   const lastContactedAt = normalizeText(value.lastContactedAt) ?? undefined;
   const lastContactedBy = value.lastContactedBy === "user" || value.lastContactedBy === "agent"
@@ -84,6 +96,7 @@ function normalizeContact(value: unknown): Contact | null {
     ...(phone ? { phone } : {}),
     ...(notes ? { notes } : {}),
     ...(agentId ? { agentId } : {}),
+    ...(roles ? { roles } : {}),
     ...(responseSlaHours !== undefined ? { responseSlaHours } : {}),
     ...(lastContactedAt ? { lastContactedAt } : {}),
     ...(lastContactedBy ? { lastContactedBy } : {}),

@@ -3,7 +3,9 @@ import { createSignal, For, Show } from "solid-js";
 import { postAgentMessage, readSession } from "@/lib/api";
 import type { ResponseQueueRelationship } from "@/lib/responseQueuePolicy";
 import { EmptyState } from "@/components/EmptyState";
+import { ContactRoleChips, ContactRoleInput } from "@/components/ContactRoleControls";
 import { loadContacts, saveContacts, type Contact } from "@/lib/contactsLocalState";
+import { removeContactRole } from "@/lib/contactRoleState";
 import {
   buildContactsFailureReceipt,
   type ContactsFailureReceipt,
@@ -50,6 +52,7 @@ export function ContactsView() {
   const [newName, setNewName] = createSignal("");
   const [newEmail, setNewEmail] = createSignal("");
   const [newRelationshipKind, setNewRelationshipKind] = createSignal<ResponseQueueRelationship>("other");
+  const [newRoles, setNewRoles] = createSignal<string[]>([]);
   const [newResponseSlaHours, setNewResponseSlaHours] = createSignal("24");
   const [busy, setBusy] = createSignal(false);
   const [syncFailure, setSyncFailure] = createSignal<ContactsFailureReceipt | null>(null);
@@ -70,6 +73,7 @@ export function ContactsView() {
   const [outreachHealthRevision, setOutreachHealthRevision] = createSignal(0);
   const [responseEditorContactId, setResponseEditorContactId] = createSignal<string | null>(null);
   const [responseDraft, setResponseDraft] = createSignal("");
+  const [roleEditorContactId, setRoleEditorContactId] = createSignal<string | null>(null);
   const [responseSummariesEnabled, setResponseSummariesEnabled] = createSignal(
     contacts().some((contact) => contact.responseSummaryEnabled),
   );
@@ -129,13 +133,14 @@ export function ContactsView() {
       name: newName().trim(),
       email: newEmail().trim() || undefined,
       relationshipKind: newRelationshipKind(),
+      ...(newRoles().length > 0 ? { roles: newRoles() } : {}),
       responseSlaHours: Number(newResponseSlaHours()) || undefined,
     };
 
     try {
       await postAgentMessage({
         to: ["agent://master"],
-        content: { kind: "contact_add", name: contact.name, email: contact.email },
+        content: { kind: "contact_add", name: contact.name, email: contact.email, roles: contact.roles ?? [] },
       });
     } catch (error: unknown) {
       setSyncFailure(
@@ -152,6 +157,7 @@ export function ContactsView() {
     setNewName("");
     setNewEmail("");
     setNewRelationshipKind("other");
+    setNewRoles([]);
     setNewResponseSlaHours("24");
     setShowAdd(false);
     setBusy(false);
@@ -166,6 +172,14 @@ export function ContactsView() {
   function saveNextContacts(next: Contact[]) {
     saveContacts(next, sessionUserId);
     setContacts(next);
+  }
+
+  function removeRoleFromContact(contact: Contact, role: string) {
+    const nextRoles = removeContactRole(contact.roles, role);
+    saveNextContacts(contacts().map((item) => item.id === contact.id ? {
+      ...item,
+      ...(nextRoles.length > 0 ? { roles: nextRoles } : { roles: undefined }),
+    } : item));
   }
 
   function importContacts() {
@@ -311,7 +325,10 @@ export function ContactsView() {
     const q = filter().toLowerCase();
     if (!q) return contacts();
     return contacts().filter(
-      (contact) => contact.name.toLowerCase().includes(q) || (contact.email ?? "").toLowerCase().includes(q),
+      (contact) => contact.name.toLowerCase().includes(q)
+        || (contact.email ?? "").toLowerCase().includes(q)
+        || contact.relationshipKind.toLowerCase().includes(q)
+        || (contact.roles ?? []).some((role) => role.toLowerCase().includes(q)),
     );
   };
 
@@ -497,7 +514,7 @@ export function ContactsView() {
           />
           <div class="grid gap-2 sm:grid-cols-2">
             <label class="space-y-1">
-              <span class="text-[11px] text-on-surface-variant/70">Relationship</span>
+              <span class="text-[11px] text-on-surface-variant/70">Follow-up type</span>
               <select
                 value={newRelationshipKind()}
                 onInput={(e) => setNewRelationshipKind(e.currentTarget.value as ResponseQueueRelationship)}
@@ -522,6 +539,14 @@ export function ContactsView() {
               />
             </label>
           </div>
+          <ContactRoleInput
+            id="contact-role-options-new"
+            contacts={contacts()}
+            roles={newRoles()}
+            onChange={setNewRoles}
+            placeholder="Guest, parent, vendor, helper, custom role..."
+            description="Use roles to mark wedding guests, family helpers, vendors, or any custom label. The contact can still be reused outside the wedding planner."
+          />
           <div class="flex flex-col gap-2 pt-1 sm:flex-row">
             <button
               type="button"
@@ -530,6 +555,7 @@ export function ContactsView() {
                 setNewName("");
                 setNewEmail("");
                 setNewRelationshipKind("other");
+                setNewRoles([]);
                 setNewResponseSlaHours("24");
               }}
               class="flex-1 rounded-xl border border-outline/20 py-2.5 text-xs text-on-surface-variant transition hover:bg-on-surface/5 sm:py-2"
@@ -772,6 +798,7 @@ export function ContactsView() {
                     <span class="max-w-full rounded-full border border-slate-200/70 bg-slate-50/80 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-600 break-words">
                       {contact.relationshipKind}
                     </span>
+                    <ContactRoleChips roles={contact.roles ?? []} onRemove={(role) => removeRoleFromContact(contact, role)} />
                     <Show when={contact.responseSlaHours}>
                       <span class="max-w-full rounded-full border border-sky-200/70 bg-sky-50/80 px-2 py-1 text-[10px] text-sky-700 break-words">
                         Reply in {contact.responseSlaHours}h
@@ -832,6 +859,19 @@ export function ContactsView() {
                       </p>
                     </div>
                   </Show>
+                  <Show when={roleEditorContactId() === contact.id}>
+                    <div class="mt-2">
+                      <ContactRoleInput
+                        id={`contact-role-options-${contact.id}`}
+                        compact
+                        contacts={contacts()}
+                        roles={contact.roles ?? []}
+                        onChange={(roles) => saveNextContacts(contacts().map((item) => item.id === contact.id ? { ...item, roles } : item))}
+                        placeholder="Add a role, e.g. Guest, celebrant, cousin..."
+                        description="Suggestions include roles already used here plus wedding roles. Custom roles are accepted."
+                      />
+                    </div>
+                  </Show>
                   <div class="mt-2 flex flex-wrap gap-1.5">
                     <button
                       type="button"
@@ -853,6 +893,15 @@ export function ContactsView() {
                       class="rounded-full border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[10px] text-emerald-700 transition hover:bg-emerald-100"
                     >
                       Record response
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRoleEditorContactId(roleEditorContactId() === contact.id ? null : contact.id);
+                      }}
+                      class="rounded-full border border-primary/15 bg-primary/10 px-2.5 py-1.5 text-[10px] text-primary transition hover:bg-primary/15"
+                    >
+                      {roleEditorContactId() === contact.id ? "Close roles" : "Add role"}
                     </button>
                   </div>
                 </div>
