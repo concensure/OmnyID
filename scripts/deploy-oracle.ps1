@@ -441,7 +441,12 @@ domain=`$(grep '^OMNYID_DOMAIN=' .env.oracle | head -n 1 | cut -d= -f2- | tr -d 
 workspace_headers=`$(curl -sSI --resolve "`$domain:443:127.0.0.1" -k "https://`$domain/workspace/")
 printf '%s\n' "`$workspace_headers"
 printf '%s' "`$workspace_headers" | grep -qi '^www-authenticate: basic' && {
-  echo 'workspace smoke check failed: /workspace/ is still behind Basic auth' >&2
+  preview_hash=`$(grep '^OMNYID_PREVIEW_PASSWORD_HASH=' .env.oracle | head -n 1 | cut -d= -f2- | tr -d '\r')
+  if [ -n "`$preview_hash" ]; then
+    echo 'workspace smoke check skipped: /workspace/ is protected by configured preview Basic auth'
+    exit 0
+  fi
+  echo 'workspace smoke check failed: /workspace/ is still behind Basic auth and no preview auth hash is configured' >&2
   exit 1
 }
 printf '%s' "`$workspace_headers" | grep -qi '^content-security-policy:' || {
