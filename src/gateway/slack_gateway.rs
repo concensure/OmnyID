@@ -75,8 +75,7 @@ pub async fn post_message(
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(format!("Slack webhook error {status}: {body}"));
+        return Err(format!("Slack webhook error {status}"));
     }
 
     Ok(())
@@ -103,6 +102,15 @@ mod tests {
     #[test]
     fn slack_client_is_shared_singleton() {
         assert!(std::ptr::eq(slack_client(), slack_client()));
+    }
+
+    #[test]
+    fn slack_error_message_does_not_depend_on_upstream_body() {
+        let status = reqwest::StatusCode::BAD_REQUEST;
+        let message = format!("Slack webhook error {status}");
+
+        assert_eq!(message, "Slack webhook error 400 Bad Request");
+        assert!(!message.contains("invalid_auth"));
     }
 }
 

@@ -100,8 +100,7 @@ pub async fn post_page(
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("Notion API error {status}: {text}"));
+        return Err(format!("Notion API error {status}"));
     }
 
     let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
@@ -134,8 +133,7 @@ pub async fn append_block(cfg: &NotionConfig, page_id: &str, markdown: &str) -> 
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("Notion append error {status}: {text}"));
+        return Err(format!("Notion append error {status}"));
     }
 
     Ok(())
@@ -192,6 +190,18 @@ mod tests {
     #[test]
     fn notion_client_is_shared_singleton() {
         assert!(std::ptr::eq(notion_client(), notion_client()));
+    }
+
+    #[test]
+    fn notion_error_messages_do_not_depend_on_upstream_body() {
+        let status = reqwest::StatusCode::UNAUTHORIZED;
+        let create_message = format!("Notion API error {status}");
+        let append_message = format!("Notion append error {status}");
+
+        assert_eq!(create_message, "Notion API error 401 Unauthorized");
+        assert_eq!(append_message, "Notion append error 401 Unauthorized");
+        assert!(!create_message.contains("secret"));
+        assert!(!append_message.contains("secret"));
     }
 }
 
