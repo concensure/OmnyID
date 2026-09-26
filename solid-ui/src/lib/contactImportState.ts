@@ -1,5 +1,6 @@
 ﻿// @locs-version: 1.0
 import type { Contact } from "@/lib/contactsLocalState";
+import { buildContactIdentityKeys, findDuplicateContact } from "@/lib/contactManagementState";
 import type { ResponseQueueRelationship } from "@/lib/responseQueuePolicy";
 
 export type ContactImportSource = "gmail" | "contact_file" | "ai_file";
@@ -73,18 +74,10 @@ function inferName(line: string, email: string | null, phone: string | null): st
   return null;
 }
 
-function existingKey(contact: Contact): string[] {
-  return [contact.email, contact.phone, contact.name].filter((value): value is string => Boolean(clean(value))).map((value) => value.toLowerCase());
-}
-
 export function buildContactImportState(input: ContactImportInput): ContactImportState {
   const source = input.source;
   const text = clean(input.text) ?? "";
   const defaultRelationshipKind = relationship(input.defaultRelationshipKind);
-  const existing = new Map<string, string>();
-  for (const contact of input.existingContacts ?? []) {
-    for (const key of existingKey(contact)) existing.set(key, contact.id);
-  }
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const sourceBlocks = source === "ai_file" && !/[,@]|\bTEL\b|\bEMAIL\b/i.test(text)
     ? []
@@ -99,10 +92,15 @@ export function buildContactImportState(input: ContactImportInput): ContactImpor
       const phone = normalizePhone(phones[pairIndex] ?? phones[0] ?? null);
       const name = inferName(line, email, phone);
       if (!name || (!email && !phone)) return null;
-      const dedupeKey = (email ?? phone ?? name).toLowerCase();
-      if (seen.has(dedupeKey)) return null;
-      seen.add(dedupeKey);
-      const duplicateOfContactId = existing.get(dedupeKey) ?? existing.get(name.toLowerCase()) ?? null;
+      const dedupeKeys = buildContactIdentityKeys({ name, email: email ?? undefined, phone: phone ?? undefined });
+      if (dedupeKeys.some((key) => seen.has(key))) return null;
+      dedupeKeys.forEach((key) => seen.add(key));
+      const duplicate = findDuplicateContact([...(input.existingContacts ?? [])], {
+        name,
+        email: email ?? undefined,
+        phone: phone ?? undefined,
+      });
+      const duplicateOfContactId = duplicate?.contact.id ?? null;
       const id = `import:${source}:${safeId(email ?? phone ?? name)}:${index}`;
       const confidence: ContactImportCandidate["confidence"] = email ? "high" : source === "ai_file" ? "needs_ai" : "medium";
       const contact: Contact | null = duplicateOfContactId

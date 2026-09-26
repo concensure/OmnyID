@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { findDuplicateContact, replaceContact } from "../src/lib/contactManagementState.ts";
+import { buildContactIdentityKeys, findDuplicateContact, replaceContact } from "../src/lib/contactManagementState.ts";
 import type { Contact } from "../src/lib/contactsLocalState.ts";
 
 const contacts: Contact[] = [
@@ -18,6 +18,13 @@ test("findDuplicateContact matches email and phone before name", () => {
   assert.deepEqual(findDuplicateContact(contacts, {
     name: "Someone",
     phone: "+61 400 111 222",
+  }), { contact: contacts[0], reason: "phone" });
+});
+
+test("findDuplicateContact matches phone numbers despite punctuation", () => {
+  assert.deepEqual(findDuplicateContact(contacts, {
+    name: "Ava mobile",
+    phone: "+61 (400) 111-222",
   }), { contact: contacts[0], reason: "phone" });
 });
 
@@ -41,4 +48,13 @@ test("replaceContact updates one contact without changing order", () => {
     contacts[0],
     { ...contacts[1], phone: "+61 2 9999 0000" },
   ]);
+});
+
+test("buildContactIdentityKeys prefers email and phone over name fallback", () => {
+  assert.deepEqual(buildContactIdentityKeys({
+    name: "Ava Smith",
+    email: "AVA@example.com",
+    phone: "+61 (400) 111-222",
+  }), ["email:ava@example.com", "phone:61400111222"]);
+  assert.deepEqual(buildContactIdentityKeys({ name: " Ava Smith " }), ["name:ava smith"]);
 });

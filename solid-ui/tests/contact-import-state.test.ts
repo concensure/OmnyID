@@ -39,6 +39,23 @@ test("buildContactImportState skips duplicates from existing contacts", () => {
   assert.ok(state.blockerLabels.some((label) => /Duplicate contacts/i.test(label)));
 });
 
+test("buildContactImportState skips phone duplicates with different formatting", () => {
+  const state = buildContactImportState({
+    source: "contact_file",
+    existingContacts: [{
+      id: "contact:ava",
+      name: "Ava Smith",
+      phone: "+61 400 111 222",
+      relationshipKind: "friend",
+    }],
+    text: "Ava S, +61 (400) 111-222",
+  });
+
+  assert.equal(state.candidates.length, 1);
+  assert.equal(state.candidates[0]?.duplicateOfContactId, "contact:ava");
+  assert.equal(state.importableContacts.length, 0);
+});
+
 test("buildContactImportState marks arbitrary files for AI extraction when no contact structure is visible", () => {
   const state = buildContactImportState({
     source: "ai_file",

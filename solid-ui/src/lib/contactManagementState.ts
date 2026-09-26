@@ -16,19 +16,39 @@ function normalizeLookup(value: string | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
 
+export function normalizeContactNameForMatch(value: string | undefined): string {
+  return normalizeLookup(value);
+}
+
+export function normalizeContactPhoneForMatch(value: string | undefined): string {
+  return (value ?? "").replace(/\D+/g, "");
+}
+
+export function buildContactIdentityKeys(input: ContactIdentityInput): string[] {
+  const email = normalizeLookup(input.email);
+  const phone = normalizeContactPhoneForMatch(input.phone);
+  const name = normalizeLookup(input.name);
+  return [
+    email ? `email:${email}` : null,
+    phone ? `phone:${phone}` : null,
+    !email && !phone && name ? `name:${name}` : null,
+  ].filter((key): key is string => key !== null);
+}
+
 export function findDuplicateContact(
   contacts: Contact[],
   input: ContactIdentityInput,
   excludeId?: string,
 ): ContactDuplicateResult | null {
-  const email = normalizeLookup(input.email);
-  const phone = normalizeLookup(input.phone);
-  const name = normalizeLookup(input.name);
+  const emailKey = buildContactIdentityKeys({ name: "", email: input.email })[0] ?? "";
+  const phoneKey = buildContactIdentityKeys({ name: "", phone: input.phone })[0] ?? "";
+  const nameKey = buildContactIdentityKeys(input).find((key) => key.startsWith("name:")) ?? "";
   for (const contact of contacts) {
     if (contact.id === excludeId) continue;
-    if (email && normalizeLookup(contact.email) === email) return { contact, reason: "email" };
-    if (phone && normalizeLookup(contact.phone) === phone) return { contact, reason: "phone" };
-    if (!email && !phone && name !== "" && normalizeLookup(contact.name) === name) {
+    const contactKeys = new Set(buildContactIdentityKeys(contact));
+    if (emailKey && contactKeys.has(emailKey)) return { contact, reason: "email" };
+    if (phoneKey && contactKeys.has(phoneKey)) return { contact, reason: "phone" };
+    if (nameKey && normalizeContactNameForMatch(contact.name) === nameKey.replace(/^name:/, "")) {
       return { contact, reason: "name" };
     }
   }
