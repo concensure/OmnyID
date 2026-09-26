@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.runtime-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -7,6 +7,31 @@
  */
 
 use super::*;
+
+const MAX_RUNTIME_STARTER_TEMPLATE_ID_LEN: usize = 96;
+
+fn normalize_runtime_starter_template_id(value: String) -> Result<String, (StatusCode, String)> {
+    let value = value.trim();
+    if value.is_empty() || value.len() > MAX_RUNTIME_STARTER_TEMPLATE_ID_LEN {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "starter_template_id must be 1-{MAX_RUNTIME_STARTER_TEMPLATE_ID_LEN} characters"
+            ),
+        ));
+    }
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "starter_template_id may only include letters, numbers, hyphen, or underscore"
+                .to_string(),
+        ));
+    }
+    Ok(value.to_string())
+}
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -318,6 +343,7 @@ async fn runtime_runner_config_action_http(
         config.insert("channel_policy".to_string(), channel_policy);
     }
     if let Some(starter_template_id) = request.starter_template_id {
+        let starter_template_id = normalize_runtime_starter_template_id(starter_template_id)?;
         let starter_profile = config
             .entry("starter_profile".to_string())
             .or_insert_with(|| serde_json::json!({}));
@@ -424,6 +450,25 @@ async fn runtime_runner_config_action_http(
 
 #[cfg(test)]
 mod tests {
+    use super::{MAX_RUNTIME_STARTER_TEMPLATE_ID_LEN, normalize_runtime_starter_template_id};
+
+    #[test]
+    fn runtime_starter_template_id_is_trimmed_and_bounded() {
+        assert_eq!(
+            normalize_runtime_starter_template_id(" travel_planner ".to_string())
+                .expect("valid template"),
+            "travel_planner"
+        );
+        assert!(normalize_runtime_starter_template_id(" ".to_string()).is_err());
+        assert!(
+            normalize_runtime_starter_template_id(
+                "x".repeat(MAX_RUNTIME_STARTER_TEMPLATE_ID_LEN + 1)
+            )
+            .is_err()
+        );
+        assert!(normalize_runtime_starter_template_id("../escape".to_string()).is_err());
+    }
+
     #[test]
     fn runtime_runner_config_malformed_config_error_is_sanitized() {
         let source = include_str!("runtime_routes.rs");
