@@ -1,4 +1,4 @@
-﻿use std::{
+use std::{
     path::{Component, Path, PathBuf},
     sync::{Arc, OnceLock},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -308,10 +308,7 @@ async fn upload_file_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
     if !stored {
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "upload message was not persisted".to_string(),
-        ));
+        return Err(internal_http_error("upload message was not persisted"));
     }
 
     Ok(Json(json!({
@@ -846,12 +843,8 @@ fn verify_download_token(
 
 fn sign_download_token(token_b64: &str) -> Result<String, (StatusCode, String)> {
     let secret = attachment_signing_secret();
-    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "invalid attachment signing secret".to_string(),
-        )
-    })?;
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+        .map_err(|_| internal_http_error("invalid attachment signing secret"))?;
     mac.update(token_b64.as_bytes());
     Ok(hex::encode(mac.finalize().into_bytes()))
 }
@@ -867,12 +860,8 @@ fn verify_download_signature(
         ));
     }
     let secret = attachment_signing_secret();
-    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "invalid attachment signing secret".to_string(),
-        )
-    })?;
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+        .map_err(|_| internal_http_error("invalid attachment signing secret"))?;
     mac.update(token_b64.as_bytes());
     let sig_bytes = hex::decode(provided_sig).map_err(|_| {
         (

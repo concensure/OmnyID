@@ -43,12 +43,16 @@ fn file_upload_routes_sanitize_unexpected_storage_and_encoding_errors() {
     assert!(source.contains("\"failed to prepare upload directory\".to_string()"));
     assert!(source.contains("\"failed to persist upload bytes\".to_string()"));
     assert!(source.contains("internal_http_error(err)"));
+    assert!(source.contains("internal_http_error(\"upload message was not persisted\")"));
+    assert!(source.contains("internal_http_error(\"invalid attachment signing secret\")"));
     assert!(!source.contains("format!(\"invalid multipart form: {err}\")"));
     assert!(!source.contains("format!(\"could not read upload body: {err}\")"));
     assert!(!source.contains("format!(\"attachment file is unavailable: {err}\")"));
     assert!(!source.contains("format!(\"failed to prepare upload directory: {err}\")"));
     assert!(!source.contains("format!(\"failed to persist upload bytes: {err}\")"));
     assert!(!source.contains("format!(\"failed to encode download token: {err}\")"));
+    assert!(!source.contains("\"upload message was not persisted\".to_string()"));
+    assert!(!source.contains("\"invalid attachment signing secret\".to_string()"));
 }
 
 #[test]
