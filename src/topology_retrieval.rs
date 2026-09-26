@@ -25,6 +25,7 @@ const LINK_TYPE_SAME_OPEN_QUESTION: &str = "same_open_question";
 const LINK_TYPE_SHARED_OBJECT: &str = "shared_object";
 const LINK_TYPE_SAME_SOURCE_MESSAGE: &str = "same_source_message";
 const LINK_TYPE_SAME_SOURCE_ATTACHMENT: &str = "same_source_attachment";
+const MAX_GROUP_NEIGHBORS_PER_NODE: usize = 32;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TopologyNeighborhoodItem {
@@ -587,17 +588,16 @@ fn group_edges(
 ) -> Vec<TopologyEdge> {
     let mut edges = Vec::new();
     for nodes in groups.into_values() {
-        for (idx, left) in nodes.iter().enumerate() {
-            for right in nodes.iter().skip(idx + 1) {
+        let nodes = ranked_group_members(nodes);
+        for left in &nodes {
+            for right in nodes
+                .iter()
+                .filter(|right| right.id != left.id)
+                .take(MAX_GROUP_NEIGHBORS_PER_NODE)
+            {
                 edges.push(TopologyEdge {
                     from: left.id.clone(),
                     to: right.id.clone(),
-                    link_type: link_type.to_string(),
-                    confidence_score,
-                });
-                edges.push(TopologyEdge {
-                    from: right.id.clone(),
-                    to: left.id.clone(),
                     link_type: link_type.to_string(),
                     confidence_score,
                 });
@@ -607,13 +607,29 @@ fn group_edges(
     edges
 }
 
+fn ranked_group_members(mut nodes: Vec<&TopologyNode>) -> Vec<&TopologyNode> {
+    nodes.sort_by(|left, right| {
+        right
+            .observed_at
+            .cmp(&left.observed_at)
+            .then(left.label.cmp(&right.label))
+            .then(left.id.cmp(&right.id))
+    });
+    nodes
+}
+
 fn group_message_membership_edges(
     groups: HashMap<(String, String), Vec<(String, u8)>>,
 ) -> Vec<TopologyEdge> {
     let mut edges = Vec::new();
     for ((_, link_type), members) in groups {
-        for (idx, (left_id, left_confidence)) in members.iter().enumerate() {
-            for (right_id, right_confidence) in members.iter().skip(idx + 1) {
+        let members = ranked_membership_group(members);
+        for (left_id, left_confidence) in &members {
+            for (right_id, right_confidence) in members
+                .iter()
+                .filter(|(right_id, _)| right_id != left_id)
+                .take(MAX_GROUP_NEIGHBORS_PER_NODE)
+            {
                 let confidence_score = (*left_confidence).max(*right_confidence);
                 edges.push(TopologyEdge {
                     from: left_id.clone(),
@@ -621,16 +637,15 @@ fn group_message_membership_edges(
                     link_type: link_type.clone(),
                     confidence_score,
                 });
-                edges.push(TopologyEdge {
-                    from: right_id.clone(),
-                    to: left_id.clone(),
-                    link_type: link_type.clone(),
-                    confidence_score,
-                });
             }
         }
     }
     edges
+}
+
+fn ranked_membership_group(mut members: Vec<(String, u8)>) -> Vec<(String, u8)> {
+    members.sort_by(|left, right| right.1.cmp(&left.1).then(left.0.cmp(&right.0)));
+    members
 }
 
 fn build_adjacency(edges: &[TopologyEdge]) -> HashMap<String, Vec<TopologyEdge>> {

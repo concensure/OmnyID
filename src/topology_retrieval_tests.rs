@@ -203,6 +203,53 @@
     }
 
     #[test]
+    fn build_neighborhood_bundle_bounds_large_membership_group_fanout() {
+        let mut messages = vec![json!({
+            "id": "anchor_1",
+            "thread_id": "thread_alpha",
+            "type": "note",
+            "content": { "title": "Anchor metric note" },
+            "metadata": {}
+        }), json!({
+            "id": "anchor_link",
+            "type": "knowledge_link",
+            "content": {
+                "source_message_id": "anchor_1",
+                "relationship_id": "entity:metric:large",
+                "link_type": "shared_entity",
+                "confidence": 0.95
+            }
+        })];
+        for index in 0..72 {
+            messages.push(json!({
+                "id": format!("member_{index:02}"),
+                "thread_id": format!("thread_member_{index:02}"),
+                "type": "decision_request",
+                "content": { "title": format!("Member decision {index:02}") },
+                "metadata": {}
+            }));
+            messages.push(json!({
+                "id": format!("member_link_{index:02}"),
+                "type": "knowledge_link",
+                "content": {
+                    "source_message_id": format!("member_{index:02}"),
+                    "relationship_id": "entity:metric:large",
+                    "link_type": "shared_entity",
+                    "confidence": 0.8
+                }
+            }));
+        }
+
+        let bundle = build_neighborhood_bundle(&["anchor_1".to_string()], &messages, 1, 10);
+
+        assert_eq!(bundle.result_budget_used, 10);
+        assert!(bundle
+            .items
+            .iter()
+            .all(|item| item.relation_path == vec!["shared_entity"]));
+    }
+
+    #[test]
     fn build_neighborhood_bundle_groups_messages_by_shared_object_refs() {
         let messages = vec![
             json!({
@@ -468,6 +515,41 @@
         assert_eq!(bundle.result_budget_used, 1);
         assert_eq!(bundle.items[0].message_id, "msg_2");
         assert_eq!(bundle.items[0].relation_path, vec![LINK_TYPE_SAME_PROJECT]);
+    }
+
+    #[test]
+    fn build_neighborhood_bundle_bounds_large_workspace_group_fanout() {
+        let mut messages = vec![json!({
+            "id": "anchor_1",
+            "thread_id": "thread_alpha",
+            "type": "task",
+            "timestamp": "2026-06-01T09:00:00Z",
+            "supertags": ["project:large_workspace"],
+            "content": { "title": "Anchor task" },
+            "metadata": {}
+        })];
+        for index in 0..80 {
+            messages.push(json!({
+                "id": format!("note_{index:02}"),
+                "thread_id": format!("thread_{index:02}"),
+                "type": "note",
+                "timestamp": format!("2099-06-{:02}T09:00:00Z", 1 + (index % 20)),
+                "supertags": ["project:large_workspace"],
+                "content": { "title": format!("Large workspace note {index:02}") },
+                "metadata": {}
+            }));
+        }
+
+        let bundle = build_neighborhood_bundle(&["anchor_1".to_string()], &messages, 1, 12);
+
+        assert_eq!(bundle.result_budget_used, 12);
+        assert_eq!(bundle.items.len(), 12);
+        assert!(bundle
+            .items
+            .iter()
+            .all(|item| item.relation_path == vec![LINK_TYPE_SAME_PROJECT]));
+        assert!(bundle.items.iter().all(|item| item.freshness == "fresh"));
+        assert!(bundle.coverage_summary.contains("Surfaced 12 related context items"));
     }
 
     #[test]
