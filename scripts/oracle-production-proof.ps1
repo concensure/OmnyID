@@ -54,6 +54,12 @@ function Invoke-RemoteSshCommand {
         [string]$InputText = ""
     )
 
+    if (-not [string]::IsNullOrEmpty($InputText)) {
+        # PowerShell 5.1 can turn LF-only here-strings back into CRLF when piping
+        # text into ssh.exe. Strip carriage returns on the remote side before the
+        # shell sees generated audit scripts.
+        $RemoteCommand = "tr -d '\r' | $RemoteCommand"
+    }
     $sshArgs = New-SshArgumentList -RemoteCommand $RemoteCommand
     # $? goes false whenever the remote command prints anything to stderr, even on a
     # genuine success (e.g. PowerShell 5.1 wraps stderr lines from a native call into
