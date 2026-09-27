@@ -16,6 +16,7 @@
   const platformEstimate = document.getElementById("platform-estimate");
   const privacyPathSummary = document.getElementById("privacy-path-summary");
   const authFeedback = document.getElementById("auth-feedback");
+  const loginFeedback = document.getElementById("login-feedback");
   const waitlistFeedback = document.getElementById("waitlist-feedback");
   const trialUsageSummary = document.getElementById("trial-usage-summary");
   const trialFeedback = document.getElementById("trial-feedback");
@@ -157,12 +158,16 @@
   let currentRuntimeRestoreDrills = null;
   let authModeContext = "private-assistant";
   let selectedPrivacyMode = "managed_private";
-  let selectedDeploymentTarget = "local_machine";
+  // Kept in sync with selectedPrivacyMode's default (managed_private -> OmnyID Cloud,
+  // hosted on Oracle Cloud today) now that the privacy-mode picker is hidden and users
+  // can no longer pick a deployment target by hand before their first sign-in.
+  let selectedDeploymentTarget = "managed_omnyid";
   let currentTrialSession = null;
+  let pendingResetToken = null;
 
   function readSession() {
     try {
-      const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+      const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -171,11 +176,16 @@
 
   function writeSession(nextSession) {
     session = nextSession;
+    // Written to sessionStorage (not localStorage) so it matches how the
+    // /workspace/ SolidJS app (solid-ui/src/lib/api.ts) reads the session
+    // after this page redirects there post sign-in.
     if (!nextSession) {
+      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
       window.localStorage.removeItem(SESSION_STORAGE_KEY);
       return;
     }
-    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+    window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
   }
 
   function readTrialFingerprint() {
@@ -262,16 +272,19 @@
       : tone === "success"
         ? "rounded-xl bg-secondary-container/50 px-4 py-3 text-sm text-secondary"
         : "rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant";
+    if (tone === "error") {
+      trialFeedback.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }
 
-  function openAuthModal(event) {
+  function openAuthModal(event, modeOverride) {
     if (!authModal) {
       return;
     }
     const trigger = event && event.currentTarget ? event.currentTarget : null;
-    authModeContext = trigger && trigger.dataset && trigger.dataset.authMode
+    authModeContext = modeOverride || (trigger && trigger.dataset && trigger.dataset.authMode
       ? trigger.dataset.authMode
-      : "private-assistant";
+      : "private-assistant");
     renderAuthMode();
     authModal.classList.remove("hidden");
     authModal.classList.add("flex");
@@ -287,6 +300,64 @@
     authModal.classList.remove("flex");
     authModal.classList.remove("items-start", "justify-center");
     document.body.classList.remove("overflow-hidden");
+  }
+
+  function authModeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const requestedMode = params.get("auth");
+    if (requestedMode === "agent-id" || requestedMode === "advanced-agent-id") {
+      return "advanced-agent-id";
+    }
+    if (requestedMode === "signin" || requestedMode === "register") {
+      return "private-assistant";
+    }
+    return null;
+  }
+
+  function focusAuthTargetFromUrl() {
+    const requestedMode = new URLSearchParams(window.location.search).get("auth");
+    const target = requestedMode === "register"
+      ? document.getElementById("register-display-name")
+      : document.getElementById("login-email");
+    if (target) {
+      setTimeout(() => target.focus(), 0);
+    }
+  }
+
+  function openAuthModalFromUrl() {
+    if (window.location.hash !== "#login" && window.location.hash !== "#auth") {
+      return;
+    }
+    openAuthModal(null, authModeFromUrl() || "private-assistant");
+    focusAuthTargetFromUrl();
+  }
+
+  // Run this as early as possible (right after its dependencies are defined),
+  // not after the rest of this file's init code, so an unrelated error later
+  // in the script can never silently prevent external links like
+  // ".../index.html?auth=register#login" (used by the wedding site's sign-up
+  // buttons) from opening the auth modal.
+  try {
+    openAuthModalFromUrl();
+  } catch (err) {
+    console.error("openAuthModalFromUrl failed", err);
+  }
+
+  function openResetPasswordFromUrl() {
+    if (window.location.pathname !== "/reset-password") {
+      return;
+    }
+    const token = new URLSearchParams(window.location.search).get("token");
+    openAuthModal(null, "private-assistant");
+    if (loginForm) loginForm.classList.add("hidden");
+    if (forgotPasswordForm) forgotPasswordForm.classList.add("hidden");
+    if (resetPasswordForm) resetPasswordForm.classList.remove("hidden");
+    if (!token) {
+      pendingResetToken = null;
+      setFeedback(authFeedback, "Password reset link is incomplete. Request a fresh reset link and try again.", "error");
+      return;
+    }
+    pendingResetToken = token;
   }
 
   function detectPlatformLabel() {
@@ -372,9 +443,6 @@
     authKicker.textContent = "Start your private assistant";
     authTitle.textContent = "Sign in to the private preview.";
     authDescription.textContent = "Use a custom email and password or continue with Google. After signup, OmnyID will seed a private agent workspace. OmnyID Cloud is the fastest path to your first running agent.";
-    if (privacyModePanel) {
-      privacyModePanel.classList.remove("hidden");
-    }
     renderSelectedPrivacyMode();
   }
 
@@ -692,8 +760,8 @@
     ].join("");
   }
 
-  async function ensureTrialSession() {
-    if (currentTrialSession && currentTrialSession.session_id && !currentTrialSession.requires_signup) {
+  async function ensureTrialSession(forceNew) {
+    if (!forceNew && currentTrialSession && currentTrialSession.session_id && !currentTrialSession.requires_signup) {
       return currentTrialSession;
     }
     const payload = await apiFetch("/trial/python-runner/session", {
@@ -706,6 +774,27 @@
     return payload;
   }
 
+  function isTrialSessionNotFoundError(error) {
+    return String((error && error.message) || "").toLowerCase().includes("trial session not found");
+  }
+
+  // A backend redeploy wipes in-memory trial sessions mid-use. Rather than
+  // dead-ending on a raw "trial session not found" error, transparently
+  // start a fresh session and retry the action once.
+  async function withTrialSessionRetry(action) {
+    try {
+      const sessionPayload = await ensureTrialSession();
+      return await action(sessionPayload);
+    } catch (error) {
+      if (!isTrialSessionNotFoundError(error)) {
+        throw error;
+      }
+      currentTrialSession = null;
+      const freshSession = await ensureTrialSession(true);
+      return action(freshSession);
+    }
+  }
+
   async function handleTrialTemplateSelect(templateId) {
     // Highlight selected template button with thicker border
     trialTemplateButtons.forEach(function(btn) {
@@ -715,14 +804,14 @@
         btn.classList.remove("ring-2", "ring-primary", "!border-primary/60");
       }
     });
-    const sessionPayload = await ensureTrialSession();
-    const payload = await apiFetch("/trial/python-runner/run", {
+    const payload = await withTrialSessionRetry((sessionPayload) => apiFetch("/trial/python-runner/run", {
       method: "POST",
       body: {
         session_id: sessionPayload.session_id,
-        template_id: templateId
+        template_id: templateId,
+        fingerprint: readTrialFingerprint()
       }
-    });
+    }));
     renderTrialSession(payload);
   }
 
@@ -738,6 +827,18 @@
         await handleTrialTemplateSelect("student_day_planner");
       } else {
         renderTrialStudentValuePanel(currentTrialSession);
+      }
+      // A quota-exhausted session resolves without throwing (requires_signup
+      // is just a flag on the payload), so requestSubmit() below would silently
+      // fail server-side instead of visibly explaining why nothing ran.
+      if (!currentTrialSession || currentTrialSession.active_template_id !== "student_day_planner" || currentTrialSession.requires_signup) {
+        setTrialFeedback(
+          currentTrialSession && currentTrialSession.requires_signup
+            ? "Anonymous trial limit reached. Sign in or create an Agent ID to keep going."
+            : "Could not start the Connected Study Workspace preview. Try again in a moment.",
+          "error"
+        );
+        return;
       }
       if (trialChatForm) {
         if (typeof trialChatForm.requestSubmit === "function") {
@@ -762,14 +863,14 @@
       return;
     }
     try {
-      const sessionPayload = await ensureTrialSession();
-      const payload = await apiFetch("/trial/python-runner/chat", {
+      const payload = await withTrialSessionRetry((sessionPayload) => apiFetch("/trial/python-runner/chat", {
         method: "POST",
         body: {
           session_id: sessionPayload.session_id,
-          content: content
+          content: content,
+          fingerprint: readTrialFingerprint()
         }
-      });
+      }));
       trialChatInput.value = "";
       renderTrialSession(payload);
     } catch (error) {
@@ -789,7 +890,8 @@
       await apiFetch("/trial/python-runner/convert", {
         method: "POST",
         body: {
-          session_id: currentTrialSession.session_id
+          session_id: currentTrialSession.session_id,
+          fingerprint: readTrialFingerprint()
         }
       });
     } catch {
@@ -1932,6 +2034,7 @@
   }
 
   function handleGuestAccess() {
+    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     window.location.href = "/workspace/";
   }
@@ -1975,7 +2078,7 @@
 
   async function handleLogin(event) {
     event.preventDefault();
-    setFeedback(authFeedback, "Signing you in...", "neutral");
+    setFeedback(loginFeedback, "Signing you in...", "neutral");
     try {
       const payload = await apiFetch("/auth/login", {
         method: "POST",
@@ -1984,13 +2087,79 @@
           password: document.getElementById("login-password").value
         }
       });
+      setFeedback(loginFeedback, "", "neutral");
       await completeAuth(payload, "Sign-in complete. Loading your console.");
     } catch (error) {
       setFeedback(
-        authFeedback,
+        loginFeedback,
         error.message + " If you just signed up, verify your email first — check your inbox for the link.",
         "error"
       );
+    }
+  }
+
+  function showForgotPasswordForm() {
+    if (loginForm) loginForm.classList.add("hidden");
+    if (forgotPasswordForm) forgotPasswordForm.classList.remove("hidden");
+    setFeedback(authFeedback, "", "neutral");
+    setFeedback(loginFeedback, "", "neutral");
+    const loginEmail = document.getElementById("login-email");
+    const forgotEmail = document.getElementById("forgot-password-email");
+    if (loginEmail && forgotEmail && loginEmail.value) {
+      forgotEmail.value = loginEmail.value;
+    }
+  }
+
+  function showLoginForm() {
+    if (forgotPasswordForm) forgotPasswordForm.classList.add("hidden");
+    if (resetPasswordForm) resetPasswordForm.classList.add("hidden");
+    if (loginForm) loginForm.classList.remove("hidden");
+    setFeedback(authFeedback, "", "neutral");
+    setFeedback(loginFeedback, "", "neutral");
+  }
+
+  async function handleForgotPassword(event) {
+    event.preventDefault();
+    const email = document.getElementById("forgot-password-email").value;
+    setFeedback(authFeedback, "Sending reset link...", "neutral");
+    try {
+      const payload = await apiFetch("/auth/forgot-password", {
+        method: "POST",
+        body: { email }
+      });
+      setFeedback(
+        authFeedback,
+        payload.message || "If that email is registered, a reset link has been sent.",
+        "success"
+      );
+    } catch (error) {
+      setFeedback(authFeedback, error.message, "error");
+    }
+  }
+
+  async function handleResetPassword(event) {
+    event.preventDefault();
+    if (!pendingResetToken) {
+      setFeedback(authFeedback, "Password reset link is incomplete. Request a fresh reset link and try again.", "error");
+      return;
+    }
+    const newPassword = document.getElementById("reset-password-new").value;
+    setFeedback(authFeedback, "Resetting your password...", "neutral");
+    try {
+      await apiFetch("/auth/reset-password", {
+        method: "POST",
+        body: { token: pendingResetToken, new_password: newPassword }
+      });
+      pendingResetToken = null;
+      window.history.replaceState({}, "", window.location.pathname === "/reset-password" ? "/#login" : window.location.pathname);
+      setFeedback(
+        authFeedback,
+        "Your password has been reset. All existing sessions were signed out for safety — sign in below with your new password.",
+        "success"
+      );
+      showLoginForm();
+    } catch (error) {
+      setFeedback(authFeedback, error.message, "error");
     }
   }
 
@@ -2681,8 +2850,20 @@
     }
   }
 
+  // The preview sign-in/register popup that used to live in #auth-modal on this
+  // page is commented out — "Offload my stress" and every other data-open-auth
+  // trigger now go straight to the real sign-in form in the /workspace/ app,
+  // the same way the wedding site's CTAs already link to
+  // "../workspace/?auth=signin&source=wedding" instead of this page's modal.
+  function redirectToActualSignIn(event) {
+    const trigger = event && event.currentTarget ? event.currentTarget : null;
+    const mode = trigger && trigger.dataset && trigger.dataset.authMode === "advanced-agent-id"
+      ? "agent-id"
+      : "signin";
+    window.location.href = "/workspace/?auth=" + mode + "&source=marketing";
+  }
   document.querySelectorAll("[data-open-auth]").forEach((button) => {
-    button.addEventListener("click", openAuthModal);
+    button.addEventListener("click", redirectToActualSignIn);
   });
   document.querySelectorAll("[data-select-privacy-mode]").forEach((button) => {
     button.addEventListener("click", function () {
@@ -2697,6 +2878,10 @@
 
   const registerForm = document.getElementById("register-form");
   const loginForm = document.getElementById("login-form");
+  const forgotPasswordForm = document.getElementById("forgot-password-form");
+  const forgotPasswordLink = document.getElementById("forgot-password-link");
+  const backToSignInLink = document.getElementById("back-to-sign-in-link");
+  const resetPasswordForm = document.getElementById("reset-password-form");
   const demoSendForm = document.getElementById("demo-send-form");
   const waitlistForm = document.getElementById("waitlist-form");
   const signOutButton = document.getElementById("sign-out-button");
@@ -2708,6 +2893,19 @@
   if (loginForm) {
     loginForm.addEventListener("submit", handleLogin);
   }
+  if (forgotPasswordLink) {
+    forgotPasswordLink.addEventListener("click", showForgotPasswordForm);
+  }
+  if (backToSignInLink) {
+    backToSignInLink.addEventListener("click", showLoginForm);
+  }
+  if (forgotPasswordForm) {
+    forgotPasswordForm.addEventListener("submit", handleForgotPassword);
+  }
+  if (resetPasswordForm) {
+    resetPasswordForm.addEventListener("submit", handleResetPassword);
+  }
+  openResetPasswordFromUrl();
   if (setupForm) {
     setupForm.addEventListener("submit", handleSetup);
   }

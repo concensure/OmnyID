@@ -181,11 +181,34 @@
         header /sw.js Service-Worker-Allowed "/workspace/"
     }
 
+    # Password-reset emails (src/server/auth.rs) link to "{base_url}/reset-password?token=...".
+    # The real reset form now lives only in the /workspace/ SolidJS app (its AuthModal
+    # checks window.location.pathname === "/reset-password" exactly), so this serves that
+    # same app's index.html at the root path the email already points to, instead of
+    # rewriting the link itself. /workspace/* below covers its /workspace/assets/* requests.
+    handle /reset-password {
+        root * /srv/workspace
+        try_files {path} /index.html
+        file_server
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://static.cloudflareinsights.com https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; connect-src 'self' wss: https:; font-src 'self' data:; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
+        header X-Content-Type-Options "nosniff"
+        header X-Frame-Options "DENY"
+        header Referrer-Policy "strict-origin-when-cross-origin"
+        header Cache-Control "no-cache, no-store, must-revalidate"
+    }
+
     # Wedding vertical marketing site — a separate static frontend that hands
     # sign-in/sign-up off to this same domain's /docs/ login (source=wedding).
     # Its waitlist form posts here, so this proxy route must be handled before
     # the static /wedding/* file-server block below.
     handle /wedding/waitlist {
+        import omnyid_proxy
+    }
+
+    # Free "Wedding Understanding" lead-magnet tool (analyses text/photos via
+    # a vision model). Same reasoning as the waitlist route above: must be
+    # handled before the static /wedding/* file-server block below.
+    handle /wedding/understanding {
         import omnyid_proxy
     }
 
