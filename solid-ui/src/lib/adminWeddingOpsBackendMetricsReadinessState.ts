@@ -1,6 +1,7 @@
 // @locs-version: 2.0
 import type { OperatorUsersResponse } from "@/lib/api";
 import type { AdminWeddingOpsOracleMetrics } from "@/lib/adminWeddingOpsState";
+import { durableWeddingProductionProofLabels } from "@/lib/weddingProductionLabelState";
 
 export type AdminWeddingOpsBackendMetricsReadinessState = {
   status: "ready" | "partial" | "blocked";
@@ -22,10 +23,36 @@ function clean(value: unknown): string {
 function durableProofRef(value: unknown): string {
   const ref = clean(value);
   if (!ref) return "";
-  if (/^(receipt|local|draft|display):/i.test(ref)) return "";
-  if (/^(file|blob|data):/i.test(ref)) return "";
-  if (/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|::1)(?::|\/|$)/i.test(ref)) return "";
+  if (placeholderProofRef(ref)) return "";
+  if (durableWeddingProductionProofLabels([ref]).length === 0) return "";
+  if (!remoteProofUrlAllowed(ref)) return "";
   return ref;
+}
+
+function placeholderProofRef(ref: string): boolean {
+  return ref === "..."
+    || /^(?:test|example|placeholder|fake|stub|mock):/i.test(ref)
+    || /(?:^|:)(?:test|example|placeholder|fake|stub|mock)(?::|$)/i.test(ref);
+}
+
+function localProofRef(ref: string): boolean {
+  return durableWeddingProductionProofLabels([ref]).length === 0
+    || !remoteProofUrlAllowed(ref);
+}
+
+function remoteProofUrlAllowed(ref: string): boolean {
+  if (!/^https?:\/\//i.test(ref)) return true;
+  try {
+    const url = new URL(ref);
+    const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+    return url.protocol === "https:"
+      && hostname !== "localhost"
+      && hostname !== "127.0.0.1"
+      && hostname !== "0.0.0.0"
+      && hostname !== "::1";
+  } catch {
+    return false;
+  }
 }
 
 function normalizedAge(value: unknown): number | null {
@@ -38,7 +65,8 @@ export function buildAdminWeddingOpsBackendMetricsReadinessState(args: {
   freshnessPolicy?: "optional" | "required" | null;
 } = {}): AdminWeddingOpsBackendMetricsReadinessState {
   const exactUserCountReady = typeof args.operatorUsers?.total_users === "number"
-    && Number.isFinite(args.operatorUsers.total_users);
+    && Number.isFinite(args.operatorUsers.total_users)
+    && args.operatorUsers.total_users >= 0;
   const diskReady = hasText(args.oracleMetrics?.diskUsedLabel) && hasText(args.oracleMetrics?.diskTotalLabel);
   const ramReady = hasText(args.oracleMetrics?.ramUsedLabel) && hasText(args.oracleMetrics?.ramTotalLabel);
   const sourceReady = hasText(args.oracleMetrics?.sourceLabel);
@@ -63,8 +91,10 @@ export function buildAdminWeddingOpsBackendMetricsReadinessState(args: {
       {
         ready: proofReady,
         evidence: `Oracle metrics proof reference mounted: ${proofRef}`,
-        blocker: rawProofRef
-          ? "Oracle metrics proof reference must be a durable audit ID or remote proof link, not a local receipt, localhost URL, or browser-only file reference."
+        blocker: rawProofRef && placeholderProofRef(rawProofRef)
+          ? "Oracle metrics proof reference must be real production evidence, not a placeholder, test, fake, stub, or mock value."
+          : rawProofRef && localProofRef(rawProofRef)
+            ? "Oracle metrics proof reference must be a durable audit ID or remote HTTPS proof link, not a local receipt, localhost URL, or browser-only file reference."
           : "Oracle metrics proof reference is not mounted.",
       },
       {

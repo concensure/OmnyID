@@ -1,4 +1,6 @@
 // @locs-version: 2.0
+import { durableWeddingProductionProofLabels } from "@/lib/weddingProductionLabelState";
+
 export type AdminWeddingAiRoutingPolicyInput = {
   backendPolicyEndpointMounted?: boolean | null;
   auditReceiptProjectionReady?: boolean | null;
@@ -31,9 +33,25 @@ function clean(value: unknown): string | null {
 function durableProofRef(value: unknown): string | null {
   const ref = clean(value);
   if (!ref) return null;
-  if (/^(receipt|local|draft|display):/i.test(ref)) return null;
-  if (/^(file|blob|data):/i.test(ref)) return null;
-  if (/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|::1)(?::|\/|$)/i.test(ref)) return null;
+  if (ref === "...") return null;
+  if (durableWeddingProductionProofLabels([ref]).length === 0) return null;
+  if (/^https?:\/\//i.test(ref)) {
+    try {
+      const url = new URL(ref);
+      const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+      if (url.protocol !== "https:") return null;
+      if (
+        hostname === "localhost"
+        || hostname === "127.0.0.1"
+        || hostname === "0.0.0.0"
+        || hostname === "::1"
+      ) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
   return ref;
 }
 
@@ -80,7 +98,7 @@ export function buildAdminWeddingAiRoutingPolicyState(
         ready: Boolean(policyProofRef),
         evidence: `Admin routing policy proof reference mounted: ${policyProofRef}`,
         blocker: rawPolicyProofRef
-          ? "Admin routing policy proof reference must be a durable audit ID or remote proof link, not a local receipt, localhost URL, or browser-only file reference."
+          ? "Admin routing policy proof reference must be a durable audit ID or remote HTTPS proof link, not a local, dry-run, placeholder, localhost, or browser-only reference."
           : "Admin routing policy proof reference is not mounted.",
       }]
       : []),
@@ -114,7 +132,7 @@ export function buildAdminWeddingAiRoutingPolicyState(
     evidenceLabels,
     proofReferenceLabels,
     nextActionLabels: blockerLabels.map((label) => {
-      if (/proof reference|local receipt|localhost URL|browser-only file reference/i.test(label)) return "Attach a durable admin routing policy proof reference.";
+      if (/proof reference|local|dry-run|placeholder|localhost|browser-only/i.test(label)) return "Attach a durable admin routing policy proof reference.";
       if (/endpoint/i.test(label)) return "Mount the backend wedding AI routing policy endpoint.";
       if (/audit/i.test(label)) return "Project admin routing decisions into durable AFP/audit receipts.";
       if (/Tenant/i.test(label)) return "Enforce tenant boundaries before enabling admin-funded routing.";

@@ -43,12 +43,126 @@ test("buildWeddingExpectedBehaviorAuditState marks all expected behaviours ready
     hasPostWeddingWrapUp: true,
     hasPostWeddingFeedbackCollection: true,
     hasPostWeddingKeepsakeExport: true,
+    proofReferenceLabels: ["expected-behavior-audit:oracle-prod-1:2026-09-28"],
   });
 
   assert.equal(state.readyCount, state.items.length);
   assert.equal(state.blockedCount, 0);
+  assert.deepEqual(state.proofReferenceLabels, ["expected-behavior-audit:oracle-prod-1:2026-09-28"]);
   assert.deepEqual(state.productionBlockerLabels, []);
   assert.ok(state.summaryLabels[0].startsWith(`${state.items.length}/${state.items.length}`));
+  assert.ok(state.summaryLabels.some((label) => /Expected behaviour audit proof/i.test(label)));
+});
+
+test("buildWeddingExpectedBehaviorAuditState rejects placeholder proof references", () => {
+  const state = buildWeddingExpectedBehaviorAuditState({
+    hasPlanningContext: true,
+    hasDecisionProjection: true,
+    hasNeedToKnowProbing: true,
+    hasVendorChecklist: true,
+    hasVendorSearchPlanning: true,
+    vendorSearchProviderReady: true,
+    approvalUiReady: true,
+    providerExecutorsReady: true,
+    hasLegalAdministration: true,
+    hasAustralianLegalSetup: true,
+    hasFinalPhaseCoordination: true,
+    hasLifecycleManagement: true,
+    weatherProviderReady: true,
+    rsvpProviderReady: true,
+    seatingCanvasReady: true,
+    liveRunSheetExecutionReady: true,
+    guestMessagingProviderReady: true,
+    paymentVerificationProviderReady: true,
+    hasPostWeddingWrapUp: true,
+    hasPostWeddingFeedbackCollection: true,
+    hasPostWeddingKeepsakeExport: true,
+    proofReferenceLabels: ["expected-behavior-audit:fake:test"],
+  });
+
+  assert.equal(state.readyCount, state.items.length);
+  assert.deepEqual(state.proofReferenceLabels, []);
+  assert.deepEqual(state.productionBlockerLabels, []);
+});
+
+test("buildWeddingExpectedBehaviorAuditState rejects bare test proof references while accepting prod-smoke", () => {
+  const baseInput = {
+    hasPlanningContext: true,
+    hasDecisionProjection: true,
+    hasNeedToKnowProbing: true,
+    hasVendorChecklist: true,
+    hasVendorSearchPlanning: true,
+    vendorSearchProviderReady: true,
+    approvalUiReady: true,
+    providerExecutorsReady: true,
+    hasLegalAdministration: true,
+    hasAustralianLegalSetup: true,
+    hasFinalPhaseCoordination: true,
+    hasLifecycleManagement: true,
+    weatherProviderReady: true,
+    rsvpProviderReady: true,
+    seatingCanvasReady: true,
+    liveRunSheetExecutionReady: true,
+    guestMessagingProviderReady: true,
+    paymentVerificationProviderReady: true,
+    hasPostWeddingWrapUp: true,
+    hasPostWeddingFeedbackCollection: true,
+    hasPostWeddingKeepsakeExport: true,
+  };
+
+  const testProof = buildWeddingExpectedBehaviorAuditState({
+    ...baseInput,
+    proofReferenceLabels: ["expected-behavior-audit:test:latest"],
+  });
+  const prodSmokeProof = buildWeddingExpectedBehaviorAuditState({
+    ...baseInput,
+    proofReferenceLabels: ["expected-behavior-audit:prod-smoke:2026-09-28"],
+  });
+
+  assert.deepEqual(testProof.proofReferenceLabels, []);
+  assert.deepEqual(prodSmokeProof.proofReferenceLabels, ["expected-behavior-audit:prod-smoke:2026-09-28"]);
+  assert.ok(prodSmokeProof.summaryLabels.some((label) => /prod-smoke/i.test(label)));
+});
+
+test("buildWeddingExpectedBehaviorAuditState rejects local browser-only proof references", () => {
+  const state = buildWeddingExpectedBehaviorAuditState({
+    hasPlanningContext: true,
+    hasDecisionProjection: true,
+    hasNeedToKnowProbing: true,
+    hasVendorChecklist: true,
+    hasVendorSearchPlanning: true,
+    vendorSearchProviderReady: true,
+    approvalUiReady: true,
+    providerExecutorsReady: true,
+    hasLegalAdministration: true,
+    hasAustralianLegalSetup: true,
+    hasFinalPhaseCoordination: true,
+    hasLifecycleManagement: true,
+    weatherProviderReady: true,
+    rsvpProviderReady: true,
+    seatingCanvasReady: true,
+    liveRunSheetExecutionReady: true,
+    guestMessagingProviderReady: true,
+    paymentVerificationProviderReady: true,
+    hasPostWeddingWrapUp: true,
+    hasPostWeddingFeedbackCollection: true,
+    hasPostWeddingKeepsakeExport: true,
+    proofReferenceLabels: [
+      "expected-behavior-audit:local-only",
+      "http://localhost:5173/proof",
+      "file:///tmp/wedding-proof.json",
+      "blob:https://omnyid.example/proof",
+      "data:application/json,{}",
+      "expected-behavior-audit:oracle-prod-1:2026-09-28",
+    ],
+  });
+
+  assert.equal(state.readyCount, state.items.length);
+  assert.deepEqual(state.proofReferenceLabels, ["expected-behavior-audit:oracle-prod-1:2026-09-28"]);
+  assert.deepEqual(
+    state.summaryLabels.filter((label) => /Expected behaviour audit proof/i.test(label)),
+    ["Expected behaviour audit proof: expected-behavior-audit:oracle-prod-1:2026-09-28"],
+  );
 });
 
 test("buildWeddingExpectedBehaviorAuditState blocks vendor and weather claims without live providers", () => {

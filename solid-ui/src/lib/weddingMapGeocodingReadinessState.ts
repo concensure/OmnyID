@@ -1,4 +1,9 @@
 // @locs-version: 2.0
+import {
+  cleanWeddingProductionLabels,
+  durableWeddingProductionProofLabels,
+} from "@/lib/weddingProductionLabelState";
+
 export type WeddingMapGeocodingProvider = "google_maps" | "mapbox" | "other";
 
 export type WeddingMapGeocodingReadinessInput = {
@@ -12,6 +17,7 @@ export type WeddingMapGeocodingReadinessInput = {
   maxRouteAgeMinutes?: number | null;
   hasTravelTimeCaveat?: boolean | null;
   hasFallbackMapUrl?: boolean | null;
+  proofReferenceLabels?: readonly string[] | null;
   errorCount?: number | null;
 };
 
@@ -20,6 +26,7 @@ export type WeddingMapGeocodingReadinessState = {
   productionEvidenceReady: boolean;
   summary: string;
   evidenceLabels: string[];
+  proofReferenceLabels: string[];
   blockerLabels: string[];
 };
 
@@ -39,15 +46,17 @@ export function buildWeddingMapGeocodingReadinessState(
   const routesVerified = count(input.routesVerified);
   const maxRouteAgeMinutes = count(input.maxRouteAgeMinutes);
   const errorCount = count(input.errorCount);
+  const proofReferenceLabels = durableWeddingProductionProofLabels(input.proofReferenceLabels);
   const hasGeocodeWork = locationsRequested > 0;
   const hasRouteWork = routesRequested > 0;
-  const evidenceLabels = [
+  const evidenceLabels = cleanWeddingProductionLabels([
     `${provider.replace(/_/g, " ")} provider selected`,
     hasGeocodeWork ? `${locationsVerified}/${locationsRequested} locations geocoded` : "No geocoding requested",
     hasRouteWork ? `${routesVerified}/${routesRequested} routes verified` : "No route verification requested",
     input.hasFallbackMapUrl ? "fallback map handoff URL available" : null,
     input.hasTravelTimeCaveat ? "travel-time caveat visible" : null,
-  ].filter((value): value is string => Boolean(value));
+    proofReferenceLabels.length > 0 ? `${proofReferenceLabels.length} durable map proof reference${proofReferenceLabels.length === 1 ? "" : "s"}` : null,
+  ]);
   const blockerLabels: string[] = [];
 
   if (!input.geocodingConnected) blockerLabels.push("Live geocoding provider is not connected.");
@@ -67,6 +76,9 @@ export function buildWeddingMapGeocodingReadinessState(
   if (!input.hasFallbackMapUrl) {
     blockerLabels.push("Fallback external map URL is missing.");
   }
+  if (proofReferenceLabels.length === 0) {
+    blockerLabels.push("Durable map/geocoding proof reference is not mounted.");
+  }
   if (errorCount > 0) {
     blockerLabels.push(`${errorCount} map/geocoding error${errorCount === 1 ? "" : "s"} occurred.`);
   }
@@ -77,6 +89,7 @@ export function buildWeddingMapGeocodingReadinessState(
       productionEvidenceReady: true,
       summary: "Live wedding map/geocoding evidence is verified for the requested locations and routes.",
       evidenceLabels,
+      proofReferenceLabels,
       blockerLabels,
     };
   }
@@ -89,6 +102,7 @@ export function buildWeddingMapGeocodingReadinessState(
       ? "Wedding map output is safe as an external map handoff, but not as verified live travel data."
       : "Wedding map/geocoding verification is not production-ready yet.",
     evidenceLabels,
+    proofReferenceLabels,
     blockerLabels,
   };
 }

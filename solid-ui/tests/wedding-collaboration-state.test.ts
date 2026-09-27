@@ -90,10 +90,65 @@ test("buildWeddingCollaborationState only becomes production-ready when required
     encryptionReady: true,
     auditReady: true,
     conflictPolicyReady: true,
+    proofReferenceLabels: ["collaboration-access:oracle-prod-1:2026-09-28"],
   });
 
   assert.equal(state.productionReady, true);
   assert.equal(state.statusLabel, "Collaboration ready");
   assert.equal(state.blockerLabels.length, 0);
   assert.equal(state.permissionProofCards.every((card) => card.allowed), true);
+  assert.deepEqual(state.proofReferenceLabels, ["collaboration-access:oracle-prod-1:2026-09-28"]);
+});
+
+test("buildWeddingCollaborationState rejects placeholder access-control proof references", () => {
+  const state = buildWeddingCollaborationState({
+    backendReady: true,
+    encryptionReady: true,
+    auditReady: true,
+    conflictPolicyReady: true,
+    proofReferenceLabels: ["collaboration-access:fake:test"],
+  });
+
+  assert.equal(state.productionReady, true);
+  assert.deepEqual(state.proofReferenceLabels, []);
+});
+
+test("buildWeddingCollaborationState rejects bare test proof references while accepting prod-smoke", () => {
+  const baseInput = {
+    backendReady: true,
+    encryptionReady: true,
+    auditReady: true,
+    conflictPolicyReady: true,
+  };
+
+  const testProof = buildWeddingCollaborationState({
+    ...baseInput,
+    proofReferenceLabels: ["collaboration-access:test:latest"],
+  });
+  const prodSmokeProof = buildWeddingCollaborationState({
+    ...baseInput,
+    proofReferenceLabels: ["collaboration-access:prod-smoke:2026-09-28"],
+  });
+
+  assert.equal(testProof.productionReady, true);
+  assert.deepEqual(testProof.proofReferenceLabels, []);
+  assert.equal(prodSmokeProof.productionReady, true);
+  assert.deepEqual(prodSmokeProof.proofReferenceLabels, ["collaboration-access:prod-smoke:2026-09-28"]);
+});
+
+test("buildWeddingCollaborationState rejects local-only proof references", () => {
+  const state = buildWeddingCollaborationState({
+    backendReady: true,
+    encryptionReady: true,
+    auditReady: true,
+    conflictPolicyReady: true,
+    proofReferenceLabels: [
+      "collaboration-access:local-only:2026-09-28",
+      "collaboration-access:http://localhost:5173/proof",
+      "file:///tmp/collaboration-proof.json",
+    ],
+  });
+
+  assert.equal(state.productionReady, true);
+  assert.deepEqual(state.proofReferenceLabels, []);
 });

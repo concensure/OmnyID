@@ -1,4 +1,10 @@
 // @locs-version: 2.0
+import {
+  cleanWeddingProductionLabel,
+  cleanWeddingProductionLabels,
+  durableWeddingProductionProofLabels,
+} from "@/lib/weddingProductionLabelState";
+
 export type WeddingCollaborationLifecycleProjectionKind =
   | "invite"
   | "expire"
@@ -40,9 +46,24 @@ function clean(value: unknown): string {
 function durableProofRef(value: unknown): string | null {
   const ref = clean(value);
   if (!ref) return null;
-  if (/^(receipt|local|draft|display):/i.test(ref)) return null;
-  if (/^(file|blob|data):/i.test(ref)) return null;
-  if (/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|::1)(?::|\/|$)/i.test(ref)) return null;
+  if (durableWeddingProductionProofLabels([ref]).length === 0) return null;
+  if (/^https?:\/\//i.test(ref)) {
+    try {
+      const url = new URL(ref);
+      const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+      if (url.protocol !== "https:") return null;
+      if (
+        hostname === "localhost"
+        || hostname === "127.0.0.1"
+        || hostname === "0.0.0.0"
+        || hostname === "::1"
+      ) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
   return ref;
 }
 
@@ -71,7 +92,7 @@ export function buildWeddingCollaborationLifecycleProjectionProofState(
     ...(!input.searchableAfpRecords ? ["Searchable collaborator lifecycle AFP record proof is missing."] : []),
     ...(proofReferenceRequired && !rawProofRef ? ["Collaboration lifecycle proof reference is not mounted."] : []),
     ...(proofReferenceRequired && rawProofRef && !proofRef
-      ? ["Collaboration lifecycle proof reference must be a durable audit ID or remote proof link, not a local receipt, localhost URL, or browser-only file reference."]
+      ? ["Collaboration lifecycle proof reference must be a durable audit ID or remote HTTPS proof link, not a local, dry-run, placeholder, localhost, or browser-only reference."]
       : []),
   ];
   const evidenceLabels = [
@@ -83,15 +104,18 @@ export function buildWeddingCollaborationLifecycleProjectionProofState(
     proofRef ? `collaboration lifecycle proof: ${proofRef}` : null,
   ].filter((value): value is string => Boolean(value));
   const productionEvidenceReady = blockerLabels.length === 0;
+  const proofReferenceLabel = proofRef
+    ? cleanWeddingProductionLabel(`collaboration lifecycle proof: ${proofRef}`)
+    : null;
 
   return {
     status: productionEvidenceReady ? "ready" : "blocked",
     productionEvidenceReady,
     projectedKinds,
-    evidenceLabels,
-    blockerLabels,
+    evidenceLabels: cleanWeddingProductionLabels(evidenceLabels),
+    blockerLabels: cleanWeddingProductionLabels(blockerLabels),
     missingKindLabels: missingKinds.map(kindLabel),
-    proofReferenceLabel: proofRef ? `collaboration lifecycle proof: ${proofRef}` : null,
+    proofReferenceLabel,
     summary: productionEvidenceReady
       ? "Collaborator invite, expiry, revocation, and stale-access review projection proof is complete."
       : "Collaborator lifecycle projection proof is incomplete; keep shared wedding access fail-closed.",

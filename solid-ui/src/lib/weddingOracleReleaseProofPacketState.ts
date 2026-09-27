@@ -1,5 +1,10 @@
 // @locs-version: 2.0
 import type { WeddingOracleReleaseGateReadinessState } from "@/lib/weddingOracleReleaseGateReadinessState";
+import {
+  cleanWeddingProductionLabel,
+  cleanWeddingProductionLabels,
+  durableWeddingProductionProofLabels,
+} from "@/lib/weddingProductionLabelState";
 
 export type WeddingOracleReleaseProofRequirementKind =
   | "release_readiness"
@@ -81,25 +86,55 @@ const REQUIREMENTS: readonly {
 ] as const;
 
 function firstMatching(values: readonly string[], pattern: RegExp): string | null {
-  return values.find((value) => pattern.test(value)) ?? null;
+  return cleanWeddingProductionLabels(values).find((value) => pattern.test(value)) ?? null;
 }
 
 function stripProofPrefix(label: string | null): string | null {
   if (!label) return null;
   const [, ref] = label.split(/:\s(.+)/, 2);
-  return ref?.trim() || label;
+  return cleanWeddingProductionLabel(ref?.trim() || label);
+}
+
+function durableProofRef(value: string | null): string | null {
+  const ref = cleanWeddingProductionLabel(value);
+  if (!ref) return null;
+  if (durableWeddingProductionProofLabels([ref]).length === 0) return null;
+  if (/^https?:\/\//i.test(ref)) {
+    try {
+      const url = new URL(ref);
+      const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+      if (url.protocol !== "https:") return null;
+      if (
+        hostname === "localhost"
+        || hostname === "127.0.0.1"
+        || hostname === "0.0.0.0"
+        || hostname === "::1"
+      ) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return ref;
+}
+
+function invalidProofRefBlocker(title: string, proofLabel: string | null, proofRef: string | null): string | null {
+  if (!proofLabel || proofRef) return null;
+  return `${title} proof reference must be a durable audit ID or remote HTTPS proof link, not a local, dry-run, placeholder, localhost, or browser-only reference.`;
 }
 
 export function buildWeddingOracleReleaseProofPacketState(
   gate: WeddingOracleReleaseGateReadinessState,
 ): WeddingOracleReleaseProofPacketState {
-  const proofReferenceLabels = gate.proofReferenceLabels ?? [];
-  const blockerLabels = gate.blockerLabels ?? [];
-  const nextActionLabels = gate.nextActionLabels ?? [];
+  const proofReferenceLabels = cleanWeddingProductionLabels(gate.proofReferenceLabels ?? []);
+  const blockerLabels = cleanWeddingProductionLabels(gate.blockerLabels ?? []);
+  const nextActionLabels = cleanWeddingProductionLabels(gate.nextActionLabels ?? []);
   const requirements = REQUIREMENTS.map((requirement): WeddingOracleReleaseProofRequirement => {
     const proofLabel = firstMatching(proofReferenceLabels, requirement.proofPattern);
-    const proofRef = stripProofPrefix(proofLabel);
-    const blockerLabel = firstMatching(blockerLabels, requirement.blockerPattern);
+    const proofRef = durableProofRef(stripProofPrefix(proofLabel));
+    const blockerLabel = firstMatching(blockerLabels, requirement.blockerPattern)
+      ?? invalidProofRefBlocker(requirement.title, proofLabel, proofRef);
     const nextActionLabel = firstMatching(nextActionLabels, requirement.nextActionPattern);
     return {
       kind: requirement.kind,
@@ -110,9 +145,9 @@ export function buildWeddingOracleReleaseProofPacketState(
       nextActionLabel,
     };
   });
-  const missingProofLabels = requirements
+  const missingProofLabels = cleanWeddingProductionLabels(requirements
     .filter((requirement) => requirement.status !== "ready" || !requirement.proofRef)
-    .map((requirement) => `${requirement.title}: proof receipt required`);
+    .map((requirement) => `${requirement.title}: proof receipt required`));
   const canClearOracleReleaseGate = gate.productionEvidenceReady && missingProofLabels.length === 0;
 
   return {
@@ -125,6 +160,6 @@ export function buildWeddingOracleReleaseProofPacketState(
     requirements,
     missingProofLabels,
     nextActionLabels,
-    runbookLabels: gate.runbookLabels ?? [],
+    runbookLabels: cleanWeddingProductionLabels(gate.runbookLabels ?? []),
   };
 }

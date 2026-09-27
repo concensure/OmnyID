@@ -1,4 +1,9 @@
 // @locs-version: 2.0
+import {
+  cleanWeddingProductionLabels,
+  durableWeddingProductionProofLabels,
+} from "@/lib/weddingProductionLabelState";
+
 export type WeddingGraphCanvasReadinessInput = {
   focusNodeIds?: readonly string[] | null;
   focusEdgeIds?: readonly string[] | null;
@@ -8,6 +13,7 @@ export type WeddingGraphCanvasReadinessInput = {
   arrivalIntentConsumed?: boolean | null;
   hasClearFocusControl?: boolean | null;
   hasPathEmphasisLegend?: boolean | null;
+  proofReferenceLabels?: readonly string[] | null;
   errorCount?: number | null;
 };
 
@@ -16,19 +22,12 @@ export type WeddingGraphCanvasReadinessState = {
   productionEvidenceReady: boolean;
   summary: string;
   evidenceLabels: string[];
+  proofReferenceLabels: string[];
   blockerLabels: string[];
 };
 
 function cleanIds(values: readonly string[] | null | undefined): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values ?? []) {
-    const id = value.trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    result.push(id);
-  }
-  return result;
+  return cleanWeddingProductionLabels(values ?? []);
 }
 
 function missingIds(expected: readonly string[], actual: readonly string[]): string[] {
@@ -47,7 +46,8 @@ export function buildWeddingGraphCanvasReadinessState(
   const missingEdges = missingIds(focusEdgeIds, highlightedEdgeIds);
   const errorCount = Math.max(0, Math.trunc(input.errorCount ?? 0));
   const hasFocus = focusNodeIds.length > 0 || focusEdgeIds.length > 0;
-  const evidenceLabels = [
+  const proofReferenceLabels = durableWeddingProductionProofLabels(input.proofReferenceLabels);
+  const evidenceLabels = cleanWeddingProductionLabels([
     `${focusNodeIds.length} focus node${focusNodeIds.length === 1 ? "" : "s"} carried`,
     `${focusEdgeIds.length} focus edge${focusEdgeIds.length === 1 ? "" : "s"} carried`,
     `${highlightedNodeIds.length} node highlight${highlightedNodeIds.length === 1 ? "" : "s"} rendered`,
@@ -56,7 +56,8 @@ export function buildWeddingGraphCanvasReadinessState(
     input.arrivalIntentConsumed ? "arrival intent consumed by Knowledge Graph" : null,
     input.hasClearFocusControl ? "clear-focus control available" : null,
     input.hasPathEmphasisLegend ? "path-emphasis legend visible" : null,
-  ].filter((value): value is string => Boolean(value));
+    proofReferenceLabels.length > 0 ? `${proofReferenceLabels.length} durable graph proof reference${proofReferenceLabels.length === 1 ? "" : "s"}` : null,
+  ]);
   const blockerLabels: string[] = [];
 
   if (!hasFocus) blockerLabels.push("No wedding graph focus nodes or edges were supplied.");
@@ -66,6 +67,7 @@ export function buildWeddingGraphCanvasReadinessState(
   if (!input.arrivalIntentConsumed) blockerLabels.push("Knowledge Graph did not consume the wedding arrival/focus intent.");
   if (!input.hasClearFocusControl) blockerLabels.push("Clear-focus control is missing.");
   if (!input.hasPathEmphasisLegend) blockerLabels.push("Path-emphasis legend is missing.");
+  if (proofReferenceLabels.length === 0) blockerLabels.push("Durable graph canvas proof reference is not mounted.");
   if (errorCount > 0) blockerLabels.push(`${errorCount} graph highlighting error${errorCount === 1 ? "" : "s"} occurred.`);
 
   if (blockerLabels.length === 0) {
@@ -74,7 +76,8 @@ export function buildWeddingGraphCanvasReadinessState(
       productionEvidenceReady: true,
       summary: "Wedding Knowledge Graph focus highlighting is ready with node, edge, path, and clear/reset evidence.",
       evidenceLabels,
-      blockerLabels,
+      proofReferenceLabels,
+      blockerLabels: cleanWeddingProductionLabels(blockerLabels),
     };
   }
 
@@ -86,6 +89,7 @@ export function buildWeddingGraphCanvasReadinessState(
       ? "Wedding graph focus is carried to Knowledge Graph, but canvas highlighting is not proven yet."
       : "Wedding graph canvas highlighting is not production-ready yet.",
     evidenceLabels,
-    blockerLabels,
+    proofReferenceLabels,
+    blockerLabels: cleanWeddingProductionLabels(blockerLabels),
   };
 }

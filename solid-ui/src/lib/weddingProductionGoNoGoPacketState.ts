@@ -1,9 +1,15 @@
 // @locs-version: 2.0
 import type { WeddingProductionReadinessEvidenceState } from "@/lib/weddingProductionReadinessEvidenceState";
+import {
+  cleanWeddingProductionLabels,
+  isWeakWeddingProductionProofReference,
+} from "@/lib/weddingProductionLabelState";
 
 export type WeddingProductionGoNoGoGateKind =
   | "backend_scale"
+  | "template_launch"
   | "approval_ui"
+  | "vendor_quote_reply"
   | "provider_executors"
   | "expected_behavior"
   | "import_parser"
@@ -56,6 +62,64 @@ export type WeddingProductionGoNoGoPacketState = {
   guardrailLabels: string[];
 };
 
+const ORACLE_REQUIRED_PROOF_MANIFEST_KINDS: readonly WeddingProductionGoNoGoGateKind[] = [
+  "backend_scale",
+  "provider_executors",
+  "template_launch",
+  "vendor_quote_reply",
+  "collaboration_lifecycle",
+  "admin_routing_policy",
+  "admin_ops_metrics",
+  "oracle_release",
+];
+
+const ORACLE_REQUIRED_READY_GATE_KINDS: readonly WeddingProductionGoNoGoGateKind[] = [
+  "backend_scale",
+  "template_launch",
+  "approval_ui",
+  "vendor_quote_reply",
+  "provider_executors",
+  "expected_behavior",
+  "import_parser",
+  "collaboration_access",
+  "collaboration_lifecycle",
+  "admin_routing_policy",
+  "admin_ops_metrics",
+  "oracle_release",
+];
+
+export function weddingProductionGoNoGoPacketHasCompleteReadyGates(
+  packet: WeddingProductionGoNoGoPacketState | null | undefined,
+): boolean {
+  if (!packet) return false;
+  if (packet.gateCounts.total !== ORACLE_REQUIRED_READY_GATE_KINDS.length) return false;
+  if (packet.gateCounts.blocked !== 0 || packet.gateCounts.missing !== 0) return false;
+  if (packet.gateCounts.ready !== packet.gateCounts.total) return false;
+  if (packet.gates.length !== packet.gateCounts.total) return false;
+
+  const gatesByKind = new Map(packet.gates.map((gate) => [gate.kind, gate]));
+  return ORACLE_REQUIRED_READY_GATE_KINDS.every((kind) => gatesByKind.get(kind)?.status === "ready");
+}
+
+export function weddingProductionGoNoGoPacketHasCompleteProofManifest(
+  packet: WeddingProductionGoNoGoPacketState | null | undefined,
+): boolean {
+  if (!packet) return false;
+  if (packet.proofManifestCounts.total !== ORACLE_REQUIRED_PROOF_MANIFEST_KINDS.length) return false;
+  if (packet.proofManifestCounts.blocked !== 0 || packet.proofManifestCounts.missing !== 0) return false;
+  if (packet.proofManifestCounts.attached !== packet.proofManifestCounts.total) return false;
+  if (packet.proofManifest.length !== packet.proofManifestCounts.total) return false;
+
+  const manifestByKind = new Map(packet.proofManifest.map((item) => [item.kind, item]));
+  return ORACLE_REQUIRED_PROOF_MANIFEST_KINDS.every((kind) => {
+    const item = manifestByKind.get(kind);
+    const proofReferenceLabels = cleanWeddingProductionLabels(item?.proofReferenceLabels ?? []);
+    return item?.status === "attached"
+      && proofReferenceLabels.length > 0
+      && proofReferenceLabels.every((label) => !isWeakWeddingProductionProofReference(label));
+  });
+}
+
 function gateStatus(ready: boolean | null | undefined, present: boolean): "ready" | "blocked" | "missing" {
   if (!present) return "missing";
   return ready ? "ready" : "blocked";
@@ -87,8 +151,12 @@ function booleanGate(input: {
   };
 }
 
-function unique(values: readonly string[]): string[] {
-  return Array.from(new Set(values.filter(Boolean)));
+function normalizeGate(gate: WeddingProductionGoNoGoGate): WeddingProductionGoNoGoGate {
+  return {
+    ...gate,
+    blockerLabels: cleanWeddingProductionLabels(gate.blockerLabels),
+    nextActionLabels: cleanWeddingProductionLabels(gate.nextActionLabels),
+  };
 }
 
 function gateCounts(gates: readonly WeddingProductionGoNoGoGate[]): WeddingProductionGoNoGoGateCounts {
@@ -107,8 +175,14 @@ function manifestItem(input: {
   missingProofLabels: readonly string[];
   gateStatus?: WeddingProductionGoNoGoGate["status"];
 }): WeddingProductionGoNoGoProofManifestItem {
-  const proofReferenceLabels = unique(input.proofReferenceLabels.filter((label): label is string => Boolean(label)));
-  const missingProofLabels = unique(input.missingProofLabels);
+  const proofReferenceLabels = cleanWeddingProductionLabels(input.proofReferenceLabels);
+  const weakProofReferenceLabels = proofReferenceLabels.filter(isWeakWeddingProductionProofReference);
+  const missingProofLabels = cleanWeddingProductionLabels([
+    ...input.missingProofLabels,
+    weakProofReferenceLabels.length
+      ? "One or more proof references are placeholders, dry-run receipts, or non-production examples."
+      : null,
+  ]);
   return {
     kind: input.kind,
     title: input.title,
@@ -131,11 +205,86 @@ function proofManifestCounts(items: readonly WeddingProductionGoNoGoProofManifes
   };
 }
 
+function vendorQuoteReplyGate(
+  evidence: WeddingProductionReadinessEvidenceState,
+): WeddingProductionGoNoGoGate {
+  const ui = evidence.vendorQuoteReplyUi;
+  const production = evidence.vendorQuoteReplyProduction;
+  const ready = evidence.evidence.vendorQuoteReplyUiReady
+    && evidence.evidence.vendorQuoteReplyProductionReady;
+  const status = gateStatus(ready, true);
+  const blockerLabels = cleanWeddingProductionLabels([
+    ...(ui && !ui.productionReady ? ui.blockerLabels : []),
+    ...(production?.blockerLabels.length ? production.blockerLabels : []),
+    ...(!ui ? ["Vendor quote reply UI proof is missing."] : []),
+    ...(production && !production.productionReady && !production.blockerLabels.length
+      ? ["Vendor quote reply live production proof is missing or blocked."]
+      : []),
+    ...(!production ? ["Vendor quote reply live production proof is missing or blocked."] : []),
+  ]);
+  const nextActionLabels = cleanWeddingProductionLabels([
+    ...(ui && !ui.productionReady ? ui.nextActionLabels : []),
+    ...(production?.nextActionLabels.length ? production.nextActionLabels : []),
+    ...(!ui ? ["Prove inline quote summary, Tiptap editor, separate approvals, undo-send, sent proof, live regions, and telemetry."] : []),
+    ...(production && !production.productionReady && !production.nextActionLabels.length
+      ? ["Prove the vendor quote reply flow with live provider send, undo, durable receipt, and proof drawer reconstruction."]
+      : []),
+    ...(!production ? ["Prove the vendor quote reply flow with live provider send, undo, durable receipt, and proof drawer reconstruction."] : []),
+  ]);
+  const blockedDetail = !ui
+    ? "Vendor quote reply UI proof is missing: quote summary, Tiptap editor, approval controls, undo-send, sent proof, live regions, and telemetry must be verified."
+    : ui.productionReady
+      ? production?.summary ?? "Vendor quote reply proof is missing provider-send, thread round-trip, regression, or live proof evidence."
+      : ui.summary;
+
+  return {
+    kind: "vendor_quote_reply",
+    title: "Vendor quote reply live-send proof",
+    status,
+    detail: gateDetail(
+      status,
+      "Vendor quote reply live provider proof is complete.",
+      blockedDetail,
+    ),
+    blockerLabels: status === "ready" ? [] : blockerLabels,
+    nextActionLabels: status === "ready" ? [] : nextActionLabels,
+  };
+}
+
+function templateLaunchGate(
+  evidence: WeddingProductionReadinessEvidenceState,
+): WeddingProductionGoNoGoGate {
+  const readiness = evidence.templateLaunchReadiness;
+  const status = gateStatus(evidence.evidence.templateLaunchIntakeReady, true);
+  return {
+    kind: "template_launch",
+    title: "Wedding template launch and intake proof",
+    status,
+    detail: gateDetail(
+      status,
+      "Wedding template launch and first-run intake proof is complete.",
+      readiness?.summary ?? "Wedding template launch proof is missing or incomplete.",
+    ),
+    blockerLabels: status === "ready"
+      ? []
+      : readiness?.blockerLabels.length
+        ? readiness.blockerLabels
+        : ["Wedding template launch proof is missing."],
+    nextActionLabels: status === "ready"
+      ? []
+      : readiness?.nextActionLabels.length
+        ? readiness.nextActionLabels
+        : ["Prove wedding template deep link, first-run intake, real workspace creation, and launch guardrails."],
+  };
+}
+
 export function buildWeddingProductionGoNoGoPacketState(
   evidence: WeddingProductionReadinessEvidenceState,
 ): WeddingProductionGoNoGoPacketState {
-  const backendScaleStatus = gateStatus(
-    evidence.backendScaleProofPacket?.canClearBackendScaleGate,
+  const backendReady = evidence.evidence.backendPaginationReady
+    && evidence.backendScaleProofPacket?.canClearBackendScaleGate === true;
+  const backendStatus = gateStatus(
+    backendReady,
     Boolean(evidence.backendScaleProofPacket),
   );
   const providerStatus = gateStatus(
@@ -149,16 +298,20 @@ export function buildWeddingProductionGoNoGoPacketState(
   const gates: WeddingProductionGoNoGoGate[] = [
     {
       kind: "backend_scale",
-      title: "Saved workspace backend scale proof",
-      status: backendScaleStatus,
+      title: "Saved workspace backend pagination and scale proof",
+      status: backendStatus,
       detail: gateDetail(
-        backendScaleStatus,
-        "Bounded saved-workspace refresh proof is complete.",
+        backendStatus,
+        "Bounded saved-workspace pagination and refresh proof is complete.",
         evidence.backendScaleProofPacket?.summary ?? "Backend scale proof is blocked.",
       ),
-      blockerLabels: evidence.backendScaleProofPacket?.missingEvidenceLabels ?? ["Backend saved-workspace scale proof packet is missing."],
+      blockerLabels: cleanWeddingProductionLabels([
+        ...evidence.missingRequiredEvidenceLabels.filter((label) => /Backend pagination contract/i.test(label)),
+        ...(evidence.backendScaleProofPacket?.missingEvidenceLabels ?? ["Backend saved-workspace scale proof packet is missing."]),
+      ]),
       nextActionLabels: evidence.backendScaleProofPacket?.nextActionLabels ?? ["Run saved-workspace backend scale proof."],
     },
+    templateLaunchGate(evidence),
     booleanGate({
       kind: "approval_ui",
       title: "Approval execution UI proof",
@@ -168,6 +321,7 @@ export function buildWeddingProductionGoNoGoPacketState(
       blockerLabel: "Approval UI proof is missing.",
       nextActionLabel: "Prove approval execution UI and receipt handling.",
     }),
+    vendorQuoteReplyGate(evidence),
     {
       kind: "provider_executors",
       title: "External provider executor proof",
@@ -247,23 +401,38 @@ export function buildWeddingProductionGoNoGoPacketState(
       nextActionLabels: evidence.oracleReleaseProofPacket?.nextActionLabels ?? ["Run Oracle release proof."],
     },
   ];
-  const counts = gateCounts(gates);
+  const normalizedGates = gates.map(normalizeGate);
+  const counts = gateCounts(normalizedGates);
+  const backendPaginationProofRefs = evidence.durableProofReferenceLabels
+    .filter((label) => /Backend pagination contract proof/i.test(label));
   const collaborationLifecycleProofRefs = evidence.durableProofReferenceLabels
     .filter((label) => /collaboration-lifecycle|Collaborator lifecycle/i.test(label));
   const adminRoutingProofRefs = evidence.durableProofReferenceLabels
     .filter((label) => /admin routing|routing policy/i.test(label));
   const adminOpsMetricsProofRefs = evidence.durableProofReferenceLabels
     .filter((label) => /oracle metrics|ops backend metrics|user metrics/i.test(label));
+  const templateLaunchProofRefs = evidence.durableProofReferenceLabels
+    .filter((label) => /Wedding template launch proof/i.test(label));
+  const vendorQuoteReplyProofRefs = evidence.durableProofReferenceLabels
+    .filter((label) => /Actual connected provider send verified/i.test(label));
+  const vendorQuoteReplyGateItem = normalizedGates.find((gate) => gate.kind === "vendor_quote_reply");
+  const vendorQuoteReplyGateStatus = vendorQuoteReplyGateItem?.status;
   const proofManifest = [
     manifestItem({
       kind: "backend_scale",
-      title: "Saved workspace backend scale receipt",
-      gateStatus: backendScaleStatus,
-      proofReferenceLabels: evidence.backendScaleProofPacket?.requirements
+      title: "Saved workspace backend pagination and scale receipts",
+      gateStatus: backendStatus,
+      proofReferenceLabels: [
+        ...backendPaginationProofRefs,
+        ...(evidence.backendScaleProofPacket?.requirements
         .filter((requirement) => requirement.kind === "proof_ref")
-        .map((requirement) => requirement.evidenceLabel) ?? [],
-      missingProofLabels: evidence.backendScaleProofPacket?.missingEvidenceLabels
-        .filter((label) => /receipt|proof/i.test(label)) ?? ["Backend saved-workspace scale proof packet is missing."],
+        .map((requirement) => requirement.evidenceLabel) ?? []),
+      ],
+      missingProofLabels: cleanWeddingProductionLabels([
+        ...(backendPaginationProofRefs.length ? [] : evidence.missingRequiredEvidenceLabels.filter((label) => /Backend pagination contract/i.test(label))),
+        ...(evidence.backendScaleProofPacket?.missingEvidenceLabels
+          .filter((label) => /receipt|proof/i.test(label)) ?? ["Backend saved-workspace scale proof packet is missing."]),
+      ]),
     }),
     manifestItem({
       kind: "provider_executors",
@@ -274,23 +443,43 @@ export function buildWeddingProductionGoNoGoPacketState(
       missingProofLabels: evidence.providerExecutorProofPacket.missingProofRefs,
     }),
     manifestItem({
+      kind: "template_launch",
+      title: "Wedding template launch receipt",
+      gateStatus: normalizedGates.find((gate) => gate.kind === "template_launch")?.status,
+      proofReferenceLabels: templateLaunchProofRefs,
+      missingProofLabels: templateLaunchProofRefs.length ? [] : ["Wedding template launch proof reference is missing."],
+    }),
+    manifestItem({
+      kind: "vendor_quote_reply",
+      title: "Vendor quote reply live-send receipt",
+      gateStatus: vendorQuoteReplyGateStatus,
+      proofReferenceLabels: vendorQuoteReplyProofRefs,
+      missingProofLabels: vendorQuoteReplyGateStatus === "ready"
+        ? []
+        : vendorQuoteReplyGateItem?.blockerLabels.length
+          ? vendorQuoteReplyGateItem.blockerLabels
+          : vendorQuoteReplyProofRefs.length
+            ? []
+            : ["Vendor quote reply live provider proof reference is missing."],
+    }),
+    manifestItem({
       kind: "collaboration_lifecycle",
       title: "Collaborator lifecycle receipt",
-      gateStatus: gates.find((gate) => gate.kind === "collaboration_lifecycle")?.status,
+      gateStatus: normalizedGates.find((gate) => gate.kind === "collaboration_lifecycle")?.status,
       proofReferenceLabels: collaborationLifecycleProofRefs,
       missingProofLabels: collaborationLifecycleProofRefs.length ? [] : ["Collaborator lifecycle audit projection proof reference is missing."],
     }),
     manifestItem({
       kind: "admin_routing_policy",
       title: "Admin-funded AI routing policy receipt",
-      gateStatus: gates.find((gate) => gate.kind === "admin_routing_policy")?.status,
+      gateStatus: normalizedGates.find((gate) => gate.kind === "admin_routing_policy")?.status,
       proofReferenceLabels: adminRoutingProofRefs,
       missingProofLabels: adminRoutingProofRefs.length ? [] : ["Admin-funded wedding AI routing policy proof reference is missing."],
     }),
     manifestItem({
       kind: "admin_ops_metrics",
       title: "Admin Oracle metrics receipt",
-      gateStatus: gates.find((gate) => gate.kind === "admin_ops_metrics")?.status,
+      gateStatus: normalizedGates.find((gate) => gate.kind === "admin_ops_metrics")?.status,
       proofReferenceLabels: adminOpsMetricsProofRefs,
       missingProofLabels: adminOpsMetricsProofRefs.length ? [] : ["Admin Oracle and user metrics proof reference is missing."],
     }),
@@ -305,12 +494,12 @@ export function buildWeddingProductionGoNoGoPacketState(
     }),
   ];
   const manifestCounts = proofManifestCounts(proofManifest);
-  const blockerLabels = unique([
+  const blockerLabels = cleanWeddingProductionLabels([
     ...evidence.missingRequiredEvidenceLabels,
-    ...gates.flatMap((gate) => gate.status === "ready" ? [] : gate.blockerLabels),
+    ...normalizedGates.flatMap((gate) => gate.status === "ready" ? [] : gate.blockerLabels),
     ...proofManifest.flatMap((item) => item.status === "attached" ? [] : item.missingProofLabels),
   ]);
-  const canUploadToOracle = gates.every((gate) => gate.status === "ready")
+  const canUploadToOracle = normalizedGates.every((gate) => gate.status === "ready")
     && evidence.missingRequiredEvidenceLabels.length === 0
     && manifestCounts.blocked === 0
     && manifestCounts.missing === 0;
@@ -322,17 +511,17 @@ export function buildWeddingProductionGoNoGoPacketState(
     summary: canUploadToOracle
       ? "All wedding-specific backend, provider, and Oracle release proof gates are ready for upload."
       : "Do not upload the wedding template to Oracle until every required proof gate is ready.",
-    gates,
+    gates: normalizedGates,
     gateCounts: counts,
     proofManifest,
     proofManifestCounts: manifestCounts,
     blockerLabels,
-    nextActionLabels: unique(gates.flatMap((gate) => gate.status === "ready" ? [] : gate.nextActionLabels)),
-    guardrailLabels: [
+    nextActionLabels: cleanWeddingProductionLabels(normalizedGates.flatMap((gate) => gate.status === "ready" ? [] : gate.nextActionLabels)),
+    guardrailLabels: cleanWeddingProductionLabels([
       "Do not deploy while any gate is missing or blocked.",
       "Do not treat dry-run provider receipts as live production execution proof.",
       "Keep secrets file-backed and out of AFP/search/UI logs.",
       "Record durable proof references before changing Oracle production.",
-    ],
+    ]),
   };
 }

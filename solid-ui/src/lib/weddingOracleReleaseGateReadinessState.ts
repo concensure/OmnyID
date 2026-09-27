@@ -1,4 +1,10 @@
 // @locs-version: 2.0
+import {
+  cleanWeddingProductionLabel,
+  cleanWeddingProductionLabels,
+  durableWeddingProductionProofLabels,
+} from "@/lib/weddingProductionLabelState";
+
 export type WeddingOracleReleaseGateReadinessInput = {
   releaseReadinessPassed?: boolean | null;
   releaseReadinessRef?: string | null;
@@ -38,9 +44,24 @@ function clean(value: unknown): string {
 function durableProofRef(value: unknown): string | null {
   const ref = clean(value);
   if (!ref) return null;
-  if (/^(receipt|local|draft|display):/i.test(ref)) return null;
-  if (/^(file|blob|data):/i.test(ref)) return null;
-  if (/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|::1)(?::|\/|$)/i.test(ref)) return null;
+  if (durableWeddingProductionProofLabels([ref]).length === 0) return null;
+  if (/^https?:\/\//i.test(ref)) {
+    try {
+      const url = new URL(ref);
+      const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+      if (url.protocol !== "https:") return null;
+      if (
+        hostname === "localhost"
+        || hostname === "127.0.0.1"
+        || hostname === "0.0.0.0"
+        || hostname === "::1"
+      ) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
   return ref;
 }
 
@@ -50,7 +71,7 @@ function age(value: number | null | undefined): number {
 
 function proofLabel(label: string, ref: unknown): string | null {
   const cleaned = durableProofRef(ref);
-  return cleaned ? `${label}: ${cleaned}` : null;
+  return cleaned ? cleanWeddingProductionLabel(`${label}: ${cleaned}`) : null;
 }
 
 function missingProofRefBlocker(label: string, passed: boolean | null | undefined, ref: unknown): string | null {
@@ -59,13 +80,13 @@ function missingProofRefBlocker(label: string, passed: boolean | null | undefine
   if (!raw) return `${label} passed but has no durable proof reference.`;
   return durableProofRef(raw)
     ? null
-    : `${label} proof reference must be a durable audit ID or remote proof link, not a local receipt, localhost URL, or browser-only file reference.`;
+    : `${label} proof reference must be a durable audit ID or remote HTTPS proof link, not a local, dry-run, placeholder, localhost, or browser-only reference.`;
 }
 
 export function buildWeddingOracleReleaseGateReadinessState(
   input: WeddingOracleReleaseGateReadinessInput = {},
 ): WeddingOracleReleaseGateReadinessState {
-  const targetLabel = clean(input.targetLabel) || "Oracle target";
+  const targetLabel = cleanWeddingProductionLabel(input.targetLabel, { maxLength: 120, wordAware: true }) ?? "Oracle target";
   const proofAgeHours = age(input.proofAgeHours);
   const maxProofAgeHours = Math.max(1, age(input.maxProofAgeHours) || DEFAULT_MAX_PROOF_AGE_HOURS);
   const proofReferencesRequired = input.proofReferencePolicy === "required";
@@ -125,7 +146,7 @@ export function buildWeddingOracleReleaseGateReadinessState(
     input.secretsSynced ? null : "Sync secrets to file-backed Oracle runtime policy.",
     input.remoteProofPassed ? null : "Run fresh Oracle remote proof on the intended target.",
     input.remoteProofPassed && proofAgeHours > maxProofAgeHours ? "Refresh stale Oracle remote proof." : null,
-    proofReferencesRequired && blockerLabels.some((label) => /durable proof reference/i.test(label))
+    proofReferencesRequired && blockerLabels.some((label) => /proof reference/i.test(label))
       ? "Attach durable proof references before marking Oracle upload ready."
       : null,
   ].filter((value): value is string => Boolean(value));
@@ -136,14 +157,14 @@ export function buildWeddingOracleReleaseGateReadinessState(
     summary: status === "ready"
       ? `${targetLabel} is ready for wedding planner Oracle upload.`
       : `${targetLabel} is still blocked from wedding planner Oracle upload.`,
-    evidenceLabels,
-    blockerLabels,
-    proofReferenceLabels,
-    nextActionLabels,
-    runbookLabels: [
+    evidenceLabels: cleanWeddingProductionLabels(evidenceLabels),
+    blockerLabels: cleanWeddingProductionLabels(blockerLabels),
+    proofReferenceLabels: cleanWeddingProductionLabels(proofReferenceLabels),
+    nextActionLabels: cleanWeddingProductionLabels(nextActionLabels),
+    runbookLabels: cleanWeddingProductionLabels([
       "Keep production upload blocked until release-readiness, production go/no-go, backup, restore, secret-sync, and remote target proof all pass.",
       "Prefer file-backed secrets for Oracle runtime keys; do not paste API secrets into UI logs or AFP messages.",
       "Keep remote proof fresh for the intended target and store only receipt IDs, paths, or audit links in readiness state.",
-    ],
+    ]),
   };
 }

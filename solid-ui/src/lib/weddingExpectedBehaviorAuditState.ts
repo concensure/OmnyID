@@ -14,6 +14,10 @@ import type { WeddingRunSheetAdjustmentReadinessState } from "@/lib/weddingRunSh
 import type { WeddingSeatingChartReadinessState } from "@/lib/weddingSeatingChartReadinessState";
 import type { WeddingVendorScopedSharingReadinessState } from "@/lib/weddingVendorScopedSharingReadinessState";
 import type { WeddingWeatherProviderReadinessState } from "@/lib/weddingWeatherProviderReadinessState";
+import {
+  cleanWeddingProductionLabels,
+  durableWeddingProductionProofLabels,
+} from "@/lib/weddingProductionLabelState";
 
 export type WeddingExpectedBehaviorStatus =
   | "in_place"
@@ -94,6 +98,7 @@ export type WeddingExpectedBehaviorAuditInput = {
   hasPostWeddingWrapUp?: boolean | null;
   hasPostWeddingFeedbackCollection?: boolean | null;
   hasPostWeddingKeepsakeExport?: boolean | null;
+  proofReferenceLabels?: readonly string[] | null;
 };
 
 export type WeddingExpectedBehaviorAuditState = {
@@ -101,6 +106,7 @@ export type WeddingExpectedBehaviorAuditState = {
   readyCount: number;
   blockedCount: number;
   summaryLabels: string[];
+  proofReferenceLabels: string[];
   productionBlockerLabels: string[];
 };
 
@@ -149,6 +155,7 @@ export function buildWeddingExpectedBehaviorAuditState(
   const hasPostWeddingWrapUp = ready(input.hasPostWeddingWrapUp);
   const hasPostWeddingFeedbackCollection = ready(input.hasPostWeddingFeedbackCollection);
   const hasPostWeddingKeepsakeExport = ready(input.hasPostWeddingKeepsakeExport);
+  const proofReferenceLabels = durableWeddingProductionProofLabels(input.proofReferenceLabels);
   const controlledOutreachReady = input.controlledOutreachReadiness
     ? input.controlledOutreachReadiness.productionEvidenceReady
     : approvalUiReady && providerExecutorsReady;
@@ -456,7 +463,9 @@ export function buildWeddingExpectedBehaviorAuditState(
     summaryLabels: [
       `${readyCount}/${items.length} expected wedding behaviours production-ready`,
       `${blockedCount} expected behaviours need provider or focused UI proof`,
+      ...proofReferenceLabels.map((label) => `Expected behaviour audit proof: ${label}`),
     ],
+    proofReferenceLabels,
     productionBlockerLabels,
   };
 }

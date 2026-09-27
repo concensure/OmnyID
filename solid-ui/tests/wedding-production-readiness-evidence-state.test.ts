@@ -11,6 +11,7 @@ import { buildWeddingVendorSeedState } from "@/lib/weddingVendorSeedState";
 import { buildWeddingWorkspaceRefreshScaleProofState } from "@/lib/weddingWorkspaceRefreshScaleProofState";
 import { buildWeddingProviderExecutorSmokeProofState } from "@/lib/weddingProviderExecutorSmokeProofState";
 import { buildWeddingCollaborationLifecycleProjectionProofState } from "@/lib/weddingCollaborationLifecycleProjectionProofState";
+import { buildWeddingVendorQuoteReplyUiReadinessState } from "@/lib/weddingVendorQuoteReplyUiReadinessState";
 
 const readyProof = { productionEvidenceReady: true };
 const blockedProof = { productionEvidenceReady: false };
@@ -29,9 +30,65 @@ const readyScaleProofWithReceipt = buildWeddingWorkspaceRefreshScaleProofState({
 });
 const blockedScaleProof = { status: "blocked" };
 
-function seededVendorCorpus() {
+const readyEmailProvider = {
+  capability: "email",
+  requiredProvider: "Gmail or email provider",
+  credentialStatus: "connected",
+  executorStatus: "available",
+  productionReady: true,
+  setupView: "email",
+  summary: "Gmail or email provider ready",
+  detail: "The connected app is ready.",
+} as const;
+
+function readyVendorQuoteReplyUi() {
+  return buildWeddingVendorQuoteReplyUiReadinessState({
+    quoteSummaryMounted: true,
+    originalQuoteActionMounted: true,
+    inlineEmailEditorMounted: true,
+    wordingApprovalControlMounted: true,
+    budgetAcknowledgementControlMounted: true,
+    sendActionMounted: true,
+    undoWindowMounted: true,
+    persistentSentConfirmationMounted: true,
+    proofDrawerActionMounted: true,
+    proofDrawerStatusMounted: true,
+    liveRegionsMounted: true,
+    failureTelemetryMounted: true,
+    providerReadiness: readyEmailProvider,
+  });
+}
+
+function readyVendorQuoteReplyProduction() {
+  return {
+    status: "ready",
+    productionReady: true,
+    summary: "Vendor quote inline reply v1 is production-ready with live provider proof.",
+    detail: "Ready.",
+    evidenceLabels: ["Actual connected provider send verified: gmail:prod-smoke:2026-09-27:gmail-message-123"],
+    blockerLabels: [],
+    nextActionLabels: [],
+    telemetryEvent: null,
+  } as const;
+}
+
+function readyTemplateLaunchReadiness() {
+  return {
+    status: "ready",
+    productionEvidenceReady: true,
+    summary: "Wedding template launch and first-run intake proof is complete.",
+    detail: "Ready.",
+    evidenceLabels: ["Wedding template launch proof: wedding-template:prod-smoke:2026-09-28"],
+    blockerLabels: [],
+    nextActionLabels: [],
+    proofReferenceLabel: "Wedding template launch proof: wedding-template:prod-smoke:2026-09-28",
+  } as const;
+}
+
+function seededVendorCorpus(proofReferenceLabels?: readonly string[]) {
   return buildWeddingVendorSeedState({
     now: new Date("2026-09-14T12:00:00Z"),
+    proofReferenceLabels,
     seeds: Array.from({ length: 10 }, (_, index) => ({
       vendorSlug: `vendor-${index + 1}`,
       vendorName: `Vendor ${index + 1}`,
@@ -55,9 +112,12 @@ test("buildWeddingProductionReadinessEvidenceState maps complete helper proofs",
   const state = buildWeddingProductionReadinessEvidenceState({
     backendPaginationContractReady: true,
     backendScaleProof: readyScaleProof as any,
+    templateLaunchReadiness: readyTemplateLaunchReadiness(),
     liveMapGeocoding: readyProof as any,
     graphCanvasHighlighting: readyProof as any,
     approvalUi: readyProof as any,
+    vendorQuoteReplyUi: readyVendorQuoteReplyUi(),
+    vendorQuoteReplyProduction: readyVendorQuoteReplyProduction(),
     nativeExportWorkers: readyProof as any,
     llmNeedToKnowExtraction: readyProof as any,
     seededVendorCorpus: seededVendorCorpus(),
@@ -78,9 +138,14 @@ test("buildWeddingProductionReadinessEvidenceState maps complete helper proofs",
 
   assert.equal(state.evidence.backendPaginationReady, true);
   assert.equal(state.evidence.backendScaleProofReady, true);
+  assert.equal(state.evidence.templateLaunchIntakeReady, true);
   assert.equal(state.evidence.liveMapGeocodingReady, true);
   assert.equal(state.evidence.graphCanvasHighlightingReady, true);
   assert.equal(state.evidence.approvalExecutionUiReady, true);
+  assert.equal(state.evidence.vendorQuoteReplyUiReady, true);
+  assert.equal(state.evidence.vendorQuoteReplyProductionReady, true);
+  assert.equal(state.vendorQuoteReplyUi?.productionReady, true);
+  assert.equal(state.vendorQuoteReplyProduction?.productionReady, true);
   assert.equal(state.evidence.nativeExportWorkersReady, true);
   assert.equal(state.evidence.llmNeedToKnowExtractionReady, true);
   assert.equal(state.evidence.seededVendorCorpusReady, true);
@@ -93,6 +158,146 @@ test("buildWeddingProductionReadinessEvidenceState maps complete helper proofs",
   assert.equal(state.evidence.providerExecutorsReady, true);
   assert.equal(state.evidence.oracleReleaseGateReady, true);
   assert.deepEqual(state.missingRequiredEvidenceLabels, []);
+  assert.ok(state.durableProofReferenceLabels.includes(
+    "Wedding template launch proof: wedding-template:prod-smoke:2026-09-28",
+  ));
+  assert.ok(state.durableProofReferenceLabels.includes(
+    "Actual connected provider send verified: gmail:prod-smoke:2026-09-27:gmail-message-123",
+  ));
+});
+
+test("buildWeddingProductionReadinessEvidenceState requires approval UI proof reference in strict mode", () => {
+  const readyApprovalUi = {
+    productionEvidenceReady: true,
+    proofReferenceLabels: ["approval-ui:playwright:oracle-prod-1"],
+  };
+  const missingRef = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    approvalUi: { productionEvidenceReady: true, proofReferenceLabels: [] } as any,
+  });
+  const ready = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    approvalUi: readyApprovalUi as any,
+  });
+
+  assert.equal(missingRef.evidence.approvalExecutionUiReady, false);
+  assert.ok(missingRef.missingRequiredEvidenceLabels.some((label) =>
+    /Approval UI proof reference is missing/i.test(label),
+  ));
+  assert.equal(ready.evidence.approvalExecutionUiReady, true);
+  assert.ok(ready.durableProofReferenceLabels.includes("approval-ui:playwright:oracle-prod-1"));
+});
+
+test("buildWeddingProductionReadinessEvidenceState requires template launch proof reference in strict mode", () => {
+  const missingRef = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    templateLaunchReadiness: {
+      ...readyTemplateLaunchReadiness(),
+      proofReferenceLabel: null,
+    } as any,
+  });
+  const ready = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    templateLaunchReadiness: readyTemplateLaunchReadiness(),
+  });
+
+  assert.equal(missingRef.evidence.templateLaunchIntakeReady, false);
+  assert.ok(missingRef.missingRequiredEvidenceLabels.some((label) =>
+    /Wedding template launch proof reference is missing/i.test(label),
+  ));
+  assert.equal(ready.evidence.templateLaunchIntakeReady, true);
+  assert.ok(ready.durableProofReferenceLabels.includes(
+    "Wedding template launch proof: wedding-template:prod-smoke:2026-09-28",
+  ));
+});
+
+test("buildWeddingProductionReadinessEvidenceState surfaces vendor quote reply UI blockers", () => {
+  const state = buildWeddingProductionReadinessEvidenceState({
+    vendorQuoteReplyUi: buildWeddingVendorQuoteReplyUiReadinessState({
+      quoteSummaryMounted: true,
+      originalQuoteActionMounted: true,
+      inlineEmailEditorMounted: false,
+      wordingApprovalControlMounted: true,
+      budgetAcknowledgementControlMounted: false,
+      sendActionMounted: true,
+      undoWindowMounted: true,
+      persistentSentConfirmationMounted: true,
+      proofDrawerActionMounted: true,
+      proofDrawerStatusMounted: true,
+      liveRegionsMounted: true,
+      failureTelemetryMounted: true,
+      providerReadiness: readyEmailProvider,
+    }),
+  });
+
+  assert.equal(state.evidence.vendorQuoteReplyUiReady, false);
+  assert.ok(!state.summaryLabels.includes("vendor quote reply UI proof ready"));
+  assert.ok(state.missingRequiredEvidenceLabels.some((label) =>
+    /Inline email editor is not mounted/.test(label) &&
+    /Separate budget acknowledgement control is not mounted/.test(label)
+  ));
+});
+
+test("buildWeddingProductionReadinessEvidenceState surfaces vendor quote live proof blockers", () => {
+  const state = buildWeddingProductionReadinessEvidenceState({
+    vendorQuoteReplyUi: readyVendorQuoteReplyUi(),
+    vendorQuoteReplyProduction: {
+      ...readyVendorQuoteReplyProduction(),
+      status: "partial",
+      productionReady: false,
+      blockerLabels: ["Actual connected Gmail/provider send proof is not attached."],
+      telemetryEvent: "wedding_vendor_quote_reply_production_readiness_blocked",
+    },
+  });
+
+  assert.equal(state.evidence.vendorQuoteReplyUiReady, true);
+  assert.equal(state.evidence.vendorQuoteReplyProductionReady, false);
+  assert.ok(state.summaryLabels.includes("vendor quote reply UI proof ready"));
+  assert.ok(!state.summaryLabels.includes("vendor quote reply live proof ready"));
+  assert.ok(state.missingRequiredEvidenceLabels.includes(
+    "Vendor quote reply live production proof is blocked: Actual connected Gmail/provider send proof is not attached.",
+  ));
+});
+
+test("buildWeddingProductionReadinessEvidenceState normalizes noisy vendor quote production evidence labels", () => {
+  const longBlockerLabel = `Actual connected Gmail/provider send proof is not attached because ${"receipt ".repeat(40)}`;
+  const state = buildWeddingProductionReadinessEvidenceState({
+    vendorQuoteReplyUi: readyVendorQuoteReplyUi(),
+    vendorQuoteReplyProduction: {
+      ...readyVendorQuoteReplyProduction(),
+      status: "partial",
+      productionReady: false,
+      evidenceLabels: [
+        "  Actual connected provider send verified: gmail:prod-smoke:2026-09-27:gmail-message-123  ",
+        "Actual   connected provider send verified: gmail:prod-smoke:2026-09-27:gmail-message-123",
+        "",
+      ],
+      blockerLabels: [
+        "  Actual connected Gmail/provider send proof is not attached.  ",
+        "Actual   connected Gmail/provider send proof is not attached.",
+        longBlockerLabel,
+      ],
+    },
+  });
+
+  assert.deepEqual(state.durableProofReferenceLabels, [
+    "Actual connected provider send verified: gmail:prod-smoke:2026-09-27:gmail-message-123",
+  ]);
+  assert.deepEqual(state.missingRequiredEvidenceLabels, [
+    "Backend pagination contract is missing.",
+    "Backend saved-workspace scale proof is missing.",
+    "Wedding template launch proof is missing.",
+    "Approval UI proof is missing.",
+    `Vendor quote reply live production proof is blocked: Actual connected Gmail/provider send proof is not attached. ${longBlockerLabel}`.slice(0, 237) + "...",
+    "Wedding dependency-plan expected behavior audit is missing.",
+    "Wedding import parser readiness is missing.",
+    "Shared wedding workspace access-control proof is missing.",
+    "Collaborator lifecycle audit projection proof is missing.",
+    "Admin-funded wedding AI routing policy proof is missing.",
+    "Admin Oracle and user metrics proof is missing.",
+    "Provider executor proof is missing.",
+    "Oracle release proof is missing.",
+  ]);
 });
 
 test("buildWeddingProductionReadinessEvidenceState blocks missing import parser readiness", () => {
@@ -115,6 +320,32 @@ test("buildWeddingProductionReadinessEvidenceState reports blocked import parser
   assert.ok(state.missingRequiredEvidenceLabels.some((label) => /Unreadable XLS import/.test(label)));
 });
 
+test("buildWeddingProductionReadinessEvidenceState requires import parser proof reference in strict mode", () => {
+  const missingRef = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    importParserReadiness: {
+      productionReady: true,
+      blockerLabels: [],
+      proofReferenceLabels: [],
+    } as any,
+  });
+  const ready = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    importParserReadiness: {
+      productionReady: true,
+      blockerLabels: [],
+      proofReferenceLabels: ["Wedding import parser proof: no-current-imports"],
+    } as any,
+  });
+
+  assert.equal(missingRef.evidence.importParserReady, false);
+  assert.ok(missingRef.missingRequiredEvidenceLabels.some((label) =>
+    /Wedding import parser readiness proof reference is missing/i.test(label),
+  ));
+  assert.equal(ready.evidence.importParserReady, true);
+  assert.ok(ready.durableProofReferenceLabels.includes("Wedding import parser proof: no-current-imports"));
+});
+
 test("buildWeddingProductionReadinessEvidenceState keeps collaboration lifecycle proof separate", () => {
   const blockedState = buildWeddingProductionReadinessEvidenceState({
     collaboration: { productionReady: true } as any,
@@ -129,6 +360,27 @@ test("buildWeddingProductionReadinessEvidenceState keeps collaboration lifecycle
   assert.ok(blockedState.missingRequiredEvidenceLabels.includes("Collaborator lifecycle audit projection proof is missing."));
   assert.equal(readyState.evidence.collaborationLifecycleAuditReady, true);
   assert.ok(readyState.summaryLabels.includes("collaboration lifecycle audit ready"));
+});
+
+test("buildWeddingProductionReadinessEvidenceState requires collaboration access-control proof refs in strict mode", () => {
+  const missingRef = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    collaboration: { productionReady: true, proofReferenceLabels: [] } as any,
+  });
+  const ready = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    collaboration: {
+      productionReady: true,
+      proofReferenceLabels: ["collaboration-access:oracle-prod-1:2026-09-28"],
+    } as any,
+  });
+
+  assert.equal(missingRef.evidence.collaborationAccessControlsReady, false);
+  assert.ok(missingRef.missingRequiredEvidenceLabels.some((label) =>
+    /Shared wedding workspace access-control proof reference is missing/i.test(label),
+  ));
+  assert.equal(ready.evidence.collaborationAccessControlsReady, true);
+  assert.ok(ready.durableProofReferenceLabels.includes("collaboration-access:oracle-prod-1:2026-09-28"));
 });
 
 test("buildWeddingProductionReadinessEvidenceState accepts structured collaboration lifecycle projection proof", () => {
@@ -225,6 +477,16 @@ test("buildWeddingProductionReadinessEvidenceState derives seeded vendor corpus 
   assert.ok(!tooSmallState.missingRequiredEvidenceLabels.some((label) => /vendor corpus/i.test(label)));
 });
 
+test("buildWeddingProductionReadinessEvidenceState requires seeded vendor corpus proof in strict mode", () => {
+  const proofRef = "seeded-vendor-corpus:prod-smoke:2026-09-28";
+  const missingRefState = buildWeddingProductionReadinessEvidenceState({ strictOracleProofs: true, seededVendorCorpus: seededVendorCorpus() });
+  const readyState = buildWeddingProductionReadinessEvidenceState({ strictOracleProofs: true, seededVendorCorpus: seededVendorCorpus([proofRef]) });
+  assert.equal(missingRefState.evidence.seededVendorCorpusReady, false);
+  assert.ok(missingRefState.missingRequiredEvidenceLabels.some((label) => /seeded vendor corpus/i.test(label)));
+  assert.equal(readyState.evidence.seededVendorCorpusReady, true);
+  assert.ok(readyState.durableProofReferenceLabels.includes(proofRef));
+});
+
 test("buildWeddingProductionReadinessEvidenceState keeps pagination contract separate from scale proof", () => {
   const state = buildWeddingProductionReadinessEvidenceState({
     backendPaginationContractReady: true,
@@ -241,11 +503,13 @@ test("buildWeddingProductionReadinessEvidenceState can require durable scale-pro
   const blockedState = buildWeddingProductionReadinessEvidenceState({
     strictOracleProofs: true,
     backendPaginationContractReady: true,
+    backendPaginationProofRef: "backend-pagination:oracle-prod-1:2026-09-14",
     backendScaleProof: readyScaleProof as any,
   });
   const readyState = buildWeddingProductionReadinessEvidenceState({
     strictOracleProofs: true,
     backendPaginationContractReady: true,
+    backendPaginationProofRef: "backend-pagination:oracle-prod-1:2026-09-14",
     backendScaleProof: readyScaleProofWithReceipt as any,
   });
 
@@ -257,6 +521,31 @@ test("buildWeddingProductionReadinessEvidenceState can require durable scale-pro
   assert.equal(readyState.backendScaleProofPacket?.status, "ready");
   assert.equal(readyState.backendScaleProofPacket?.canClearBackendScaleGate, true);
   assert.ok(readyState.summaryLabels.includes("backend scale proof ready"));
+});
+
+test("buildWeddingProductionReadinessEvidenceState follows scale proof packet completeness in strict mode", () => {
+  const incompleteScaleProof = buildWeddingWorkspaceRefreshScaleProofState({
+    requestedPageSize: 96,
+    pageCount: 2,
+    totalLoaded: 160,
+    maxPageMs: 700,
+    duplicateMessageIds: [],
+    errorCount: 0,
+    hasMoreAfterFinalPage: false,
+    proofReferencePolicy: "required",
+    proofRef: "refresh-scale:oracle-prod-1:missing-offsets",
+  });
+  const state = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    backendPaginationContractReady: true,
+    backendPaginationProofRef: "backend-pagination:oracle-prod-1:2026-09-14",
+    backendScaleProof: incompleteScaleProof,
+  });
+
+  assert.equal(incompleteScaleProof.status, "pass");
+  assert.equal(state.evidence.backendScaleProofReady, false);
+  assert.equal(state.backendScaleProofPacket?.canClearBackendScaleGate, false);
+  assert.ok(state.backendScaleProofPacket?.missingEvidenceLabels.includes("Sequential page offsets: evidence required"));
 });
 
 test("buildWeddingProductionReadinessEvidenceState can require complete Oracle release proof references", () => {
@@ -315,7 +604,15 @@ test("buildWeddingProductionReadinessEvidenceState accepts explicit provider sui
     providerExecutors: [
       { capability: "email", requiredProvider: "Gmail or email provider", productionReady: true } as any,
     ],
-    providerExecutorSuite: { productionEvidenceReady: true } as any,
+    providerExecutorSuite: {
+      productionEvidenceReady: true,
+      proofReferenceLabels: [
+        "Gmail or email provider executor proof: email-smoke:ok",
+        "Google Calendar or calendar provider executor proof: calendar-smoke:ok",
+        "Registry provider executor proof: registry-smoke:ok",
+        "Brave Search, Google Places, or OSM/Overpass provider executor proof: vendor-search-smoke:ok",
+      ],
+    } as any,
   });
 
   assert.equal(state.evidence.providerExecutorsReady, true);
@@ -349,6 +646,28 @@ test("buildWeddingProductionReadinessEvidenceState can require provider executor
   assert.ok(blockedState.missingRequiredEvidenceLabels.includes("Provider executor proof references are incomplete."));
   assert.equal(readyState.evidence.providerExecutorsReady, true);
   assert.ok(readyState.summaryLabels.includes("provider executors ready"));
+});
+
+test("buildWeddingProductionReadinessEvidenceState follows provider proof packet for weak aggregate refs", () => {
+  const state = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    providerExecutorSuite: {
+      productionEvidenceReady: true,
+      proofReferenceLabels: [
+        "Gmail or email provider executor proof: https://audit.omnyid.example/email",
+        "Google Calendar or calendar provider executor proof: data:application/json,{}",
+        "Registry provider executor proof: registry-smoke:fake:latest",
+        "Brave Search, Google Places, or OSM/Overpass provider executor proof: vendor-search-smoke:ok",
+      ],
+    } as any,
+  });
+
+  assert.equal(state.providerExecutorProofPacket.canClearOracleProviderGate, false);
+  assert.equal(state.evidence.providerExecutorsReady, false);
+  assert.ok(state.missingRequiredEvidenceLabels.includes("Provider executor proof references are incomplete."));
+  assert.ok(state.providerExecutorProofPacket.missingProofRefs.includes("Gmail or email provider: proof receipt required"));
+  assert.ok(state.providerExecutorProofPacket.missingProofRefs.includes("Google Calendar or calendar provider: proof receipt required"));
+  assert.ok(state.providerExecutorProofPacket.missingProofRefs.includes("Registry provider: proof receipt required"));
 });
 
 test("buildWeddingProductionReadinessEvidenceState derives provider gate from live smoke receipts", () => {
@@ -632,4 +951,49 @@ test("buildWeddingProductionReadinessEvidenceState derives admin ops backend met
   assert.ok(blockedState.missingRequiredEvidenceLabels.includes("Admin Oracle and user metrics proof is missing."));
   assert.equal(readyState.evidence.adminOpsBackendMetricsReady, true);
   assert.ok(readyState.summaryLabels.includes("admin ops backend metrics ready"));
+});
+
+test("buildWeddingProductionReadinessEvidenceState requires admin ops proof reference in strict mode", () => {
+  const baseMetrics = {
+    operatorUsers: { users: [], limit: 25, total_users: 12 },
+    oracleMetrics: {
+      diskUsedLabel: "31 GB",
+      diskTotalLabel: "100 GB",
+      ramUsedLabel: "3.2 GB",
+      ramTotalLabel: "8 GB",
+      sourceLabel: "oracle-prod-1",
+      collectedAtLabel: "2026-09-28T10:00:00Z",
+      metricAgeMinutes: 4,
+      maxMetricAgeMinutes: 15,
+    },
+  } as const;
+  const missingRef = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    adminOpsBackendMetrics: buildAdminWeddingOpsBackendMetricsReadinessState({
+      operatorUsers: baseMetrics.operatorUsers,
+      oracleMetrics: {
+        diskUsedLabel: baseMetrics.oracleMetrics.diskUsedLabel,
+        diskTotalLabel: baseMetrics.oracleMetrics.diskTotalLabel,
+        ramUsedLabel: baseMetrics.oracleMetrics.ramUsedLabel,
+        ramTotalLabel: baseMetrics.oracleMetrics.ramTotalLabel,
+        sourceLabel: baseMetrics.oracleMetrics.sourceLabel,
+      },
+    }),
+  });
+  const ready = buildWeddingProductionReadinessEvidenceState({
+    strictOracleProofs: true,
+    adminOpsBackendMetrics: buildAdminWeddingOpsBackendMetricsReadinessState({
+      ...baseMetrics,
+      freshnessPolicy: "required",
+      oracleMetrics: {
+        ...baseMetrics.oracleMetrics,
+        proofRef: "oracle-metrics:prod-1:2026-09-28T10",
+      },
+    }),
+  });
+
+  assert.equal(missingRef.evidence.adminOpsBackendMetricsReady, false);
+  assert.ok(missingRef.missingRequiredEvidenceLabels.includes("Admin Oracle and user metrics proof reference is missing."));
+  assert.equal(ready.evidence.adminOpsBackendMetricsReady, true);
+  assert.ok(ready.durableProofReferenceLabels.some((label) => /oracle-metrics:prod-1:2026-09-28T10/i.test(label)));
 });

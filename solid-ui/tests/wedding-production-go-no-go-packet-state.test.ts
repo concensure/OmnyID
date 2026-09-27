@@ -3,17 +3,94 @@ import test from "node:test";
 
 import { buildWeddingCollaborationLifecycleProjectionProofState } from "@/lib/weddingCollaborationLifecycleProjectionProofState";
 import { buildWeddingOracleReleaseGateReadinessState } from "@/lib/weddingOracleReleaseGateReadinessState";
-import { buildWeddingProductionGoNoGoPacketState } from "@/lib/weddingProductionGoNoGoPacketState";
+import {
+  buildWeddingProductionGoNoGoPacketState,
+  weddingProductionGoNoGoPacketHasCompleteProofManifest,
+  weddingProductionGoNoGoPacketHasCompleteReadyGates,
+} from "@/lib/weddingProductionGoNoGoPacketState";
 import { buildWeddingProductionReadinessEvidenceState } from "@/lib/weddingProductionReadinessEvidenceState";
 import { buildWeddingProviderExecutorSmokeProofState } from "@/lib/weddingProviderExecutorSmokeProofState";
+import { buildWeddingVendorQuoteReplyUiReadinessState } from "@/lib/weddingVendorQuoteReplyUiReadinessState";
 import { buildWeddingWorkspaceRefreshScaleProofState } from "@/lib/weddingWorkspaceRefreshScaleProofState";
+
+const readyEmailProvider = {
+  capability: "email",
+  requiredProvider: "Gmail or email provider",
+  credentialStatus: "connected",
+  executorStatus: "available",
+  productionReady: true,
+  setupView: "email",
+  summary: "Gmail or email provider ready",
+  detail: "The connected app is ready.",
+} as const;
+
+function readyVendorQuoteReplyUi() {
+  return buildWeddingVendorQuoteReplyUiReadinessState({
+    quoteSummaryMounted: true,
+    originalQuoteActionMounted: true,
+    inlineEmailEditorMounted: true,
+    wordingApprovalControlMounted: true,
+    budgetAcknowledgementControlMounted: true,
+    sendActionMounted: true,
+    undoWindowMounted: true,
+    persistentSentConfirmationMounted: true,
+    proofDrawerActionMounted: true,
+    proofDrawerStatusMounted: true,
+    liveRegionsMounted: true,
+    failureTelemetryMounted: true,
+    providerReadiness: readyEmailProvider,
+  });
+}
+
+function readyVendorQuoteReplyProduction() {
+  return {
+    status: "ready",
+    productionReady: true,
+    summary: "Vendor quote inline reply v1 is production-ready with live provider proof.",
+    detail: "Ready.",
+    evidenceLabels: ["Actual connected provider send verified: gmail:prod-smoke:2026-09-27:gmail-message-123"],
+    blockerLabels: [],
+    nextActionLabels: [],
+    telemetryEvent: null,
+  } as const;
+}
+
+function readyTemplateLaunchReadiness() {
+  return {
+    status: "ready",
+    productionEvidenceReady: true,
+    summary: "Wedding template launch and first-run intake proof is complete.",
+    detail: "Ready.",
+    evidenceLabels: ["Wedding template launch proof: wedding-template:prod-smoke:2026-09-28"],
+    blockerLabels: [],
+    nextActionLabels: [],
+    proofReferenceLabel: "Wedding template launch proof: wedding-template:prod-smoke:2026-09-28",
+  } as const;
+}
 
 const baseReadyEvidence = {
   backendPaginationContractReady: true,
-  approvalUi: { productionEvidenceReady: true } as any,
-  expectedBehaviorAudit: { productionBlockerLabels: [] } as any,
-  importParserReadiness: { productionReady: true, blockerLabels: [] } as any,
-  collaboration: { productionReady: true } as any,
+  backendPaginationProofRef: "backend-pagination:oracle-prod-1:2026-09-28",
+  approvalUi: {
+    productionEvidenceReady: true,
+    proofReferenceLabels: ["approval-ui:playwright:oracle-prod-1"],
+  } as any,
+  templateLaunchReadiness: readyTemplateLaunchReadiness(),
+  vendorQuoteReplyUi: readyVendorQuoteReplyUi(),
+  vendorQuoteReplyProduction: readyVendorQuoteReplyProduction(),
+  expectedBehaviorAudit: {
+    productionBlockerLabels: [],
+    proofReferenceLabels: ["expected-behavior-audit:oracle-prod-1:2026-09-28"],
+  } as any,
+  importParserReadiness: {
+    productionReady: true,
+    blockerLabels: [],
+    proofReferenceLabels: ["Wedding import parser proof: no-current-imports"],
+  } as any,
+  collaboration: {
+    productionReady: true,
+    proofReferenceLabels: ["collaboration-access:oracle-prod-1:2026-09-28"],
+  } as any,
   collaborationLifecycleProjectionProof: readyCollaborationLifecycleProof(),
   adminWeddingAiRoutingPolicy: {
     productionReady: true,
@@ -126,17 +203,28 @@ test("production go/no-go packet blocks missing proof packets", () => {
   assert.equal(packet.status, "blocked");
   assert.equal(packet.canUploadToOracle, false);
   assert.ok(packet.gates.some((gate) => gate.kind === "backend_scale" && gate.status === "missing"));
+  assert.ok(packet.gates.some((gate) => gate.kind === "template_launch" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "approval_ui" && gate.status === "blocked"));
+  assert.ok(packet.gates.some((gate) => gate.kind === "vendor_quote_reply" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "expected_behavior" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "import_parser" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "collaboration_access" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "admin_routing_policy" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "oracle_release" && gate.status === "missing"));
-  assert.deepEqual(packet.gateCounts, { ready: 0, blocked: 8, missing: 2, total: 10 });
+  assert.deepEqual(packet.gateCounts, { ready: 0, blocked: 10, missing: 2, total: 12 });
   assert.ok(packet.blockerLabels.includes("Backend pagination contract is missing."));
+  assert.ok(packet.blockerLabels.includes("Wedding template launch proof is missing."));
   assert.ok(packet.blockerLabels.includes("Approval UI proof is missing."));
+  assert.ok(packet.blockerLabels.includes("Vendor quote reply UI proof is missing."));
+  assert.ok(packet.blockerLabels.includes("Vendor quote reply live production proof is missing or blocked."));
   assert.ok(packet.blockerLabels.includes("Wedding import parser readiness is missing."));
   assert.ok(packet.nextActionLabels.includes("Prove approval execution UI and receipt handling."));
+  assert.ok(packet.nextActionLabels.includes(
+    "Prove inline quote summary, Tiptap editor, separate approvals, undo-send, sent proof, live regions, and telemetry.",
+  ));
+  assert.ok(packet.nextActionLabels.includes(
+    "Prove the vendor quote reply flow with live provider send, undo, durable receipt, and proof drawer reconstruction.",
+  ));
   assert.ok(packet.guardrailLabels.some((label) => /Do not deploy/i.test(label)));
 });
 
@@ -171,7 +259,7 @@ test("production go/no-go packet blocks dry-run provider proof", () => {
   assert.equal(packet.status, "blocked");
   assert.equal(packet.gates.find((gate) => gate.kind === "provider_executors")?.status, "blocked");
   assert.equal(packet.gates.find((gate) => gate.kind === "approval_ui")?.status, "ready");
-  assert.deepEqual(packet.gateCounts, { ready: 9, blocked: 1, missing: 0, total: 10 });
+  assert.deepEqual(packet.gateCounts, { ready: 11, blocked: 1, missing: 0, total: 12 });
   assert.ok(packet.gates.find((gate) => gate.kind === "provider_executors")?.nextActionLabels.length);
   assert.ok(packet.guardrailLabels.some((label) => /dry-run provider receipts/i.test(label)));
 });
@@ -188,8 +276,10 @@ test("production go/no-go packet allows upload only when all proof gates are rea
 
   assert.equal(packet.status, "ready");
   assert.equal(packet.canUploadToOracle, true);
-  assert.deepEqual(packet.gateCounts, { ready: 10, blocked: 0, missing: 0, total: 10 });
+  assert.deepEqual(packet.gateCounts, { ready: 12, blocked: 0, missing: 0, total: 12 });
   assert.deepEqual(packet.gates.map((gate) => gate.status), [
+    "ready",
+    "ready",
     "ready",
     "ready",
     "ready",
@@ -202,13 +292,78 @@ test("production go/no-go packet allows upload only when all proof gates are rea
     "ready",
   ]);
   assert.equal(packet.blockerLabels.length, 0);
-  assert.deepEqual(packet.proofManifestCounts, { attached: 6, missing: 0, blocked: 0, total: 6 });
+  assert.deepEqual(packet.proofManifestCounts, { attached: 8, missing: 0, blocked: 0, total: 8 });
   assert.ok(packet.proofManifest.some((item) =>
     item.kind === "provider_executors" && item.proofReferenceLabels.length === 4
   ));
   assert.ok(packet.proofManifest.some((item) =>
+    item.kind === "backend_scale"
+      && item.proofReferenceLabels.some((label) => /backend-pagination:oracle-prod-1/i.test(label))
+      && item.proofReferenceLabels.some((label) => /refresh-scale:oracle-prod-1/i.test(label))
+  ));
+  assert.ok(packet.proofManifest.some((item) =>
     item.kind === "admin_ops_metrics" && item.proofReferenceLabels.some((label) => /oracle-metrics:ok/i.test(label))
   ));
+  assert.ok(packet.proofManifest.some((item) =>
+    item.kind === "vendor_quote_reply" && item.proofReferenceLabels.some((label) => /gmail-message-123/i.test(label))
+  ));
+  assert.ok(packet.proofManifest.some((item) =>
+    item.kind === "template_launch" && item.proofReferenceLabels.some((label) => /wedding-template:prod-smoke/i.test(label))
+  ));
+});
+
+test("production go/no-go ready gate validator rejects forged ready counts", () => {
+  const evidence = buildWeddingProductionReadinessEvidenceState({
+    ...baseReadyEvidence,
+    strictOracleProofs: true,
+    backendScaleProof: readyScaleProof(),
+    providerExecutorSmokeProof: readySmokeProof(),
+    oracleReleaseGate: readyReleaseGate(),
+  });
+  const packet = buildWeddingProductionGoNoGoPacketState(evidence);
+
+  assert.equal(weddingProductionGoNoGoPacketHasCompleteReadyGates(packet), true);
+  assert.equal(weddingProductionGoNoGoPacketHasCompleteReadyGates({
+    ...packet,
+    gates: packet.gates.filter((gate) => gate.kind !== "vendor_quote_reply"),
+    gateCounts: { ready: 12, blocked: 0, missing: 0, total: 12 },
+  }), false);
+  assert.equal(weddingProductionGoNoGoPacketHasCompleteReadyGates({
+    ...packet,
+    gates: packet.gates.map((gate) => gate.kind === "template_launch" ? { ...gate, status: "blocked" } : gate),
+    gateCounts: { ready: 12, blocked: 0, missing: 0, total: 12 },
+  }), false);
+});
+
+test("production go/no-go proof manifest validator rejects forged local proof references", () => {
+  const evidence = buildWeddingProductionReadinessEvidenceState({
+    ...baseReadyEvidence,
+    strictOracleProofs: true,
+    backendScaleProof: readyScaleProof(),
+    providerExecutorSmokeProof: readySmokeProof(),
+    oracleReleaseGate: readyReleaseGate(),
+  });
+  const packet = buildWeddingProductionGoNoGoPacketState(evidence);
+
+  assert.equal(weddingProductionGoNoGoPacketHasCompleteProofManifest(packet), true);
+  assert.equal(weddingProductionGoNoGoPacketHasCompleteProofManifest({
+    ...packet,
+    proofManifest: packet.proofManifest.map((item) => item.kind === "template_launch"
+      ? {
+        ...item,
+        proofReferenceLabels: ["http://localhost:5173/proof"],
+      }
+      : item),
+  }), false);
+  assert.equal(weddingProductionGoNoGoPacketHasCompleteProofManifest({
+    ...packet,
+    proofManifest: packet.proofManifest.map((item) => item.kind === "vendor_quote_reply"
+      ? {
+        ...item,
+        proofReferenceLabels: ["vendor-quote:local-only"],
+      }
+      : item),
+  }), false);
 });
 
 test("production go/no-go packet blocks ready gates without admin metrics receipt manifest", () => {
@@ -224,9 +379,80 @@ test("production go/no-go packet blocks ready gates without admin metrics receip
 
   assert.equal(packet.status, "blocked");
   assert.equal(packet.canUploadToOracle, false);
-  assert.deepEqual(packet.gateCounts, { ready: 10, blocked: 0, missing: 0, total: 10 });
-  assert.deepEqual(packet.proofManifestCounts, { attached: 5, missing: 1, blocked: 0, total: 6 });
+  assert.deepEqual(packet.gateCounts, { ready: 11, blocked: 1, missing: 0, total: 12 });
+  assert.deepEqual(packet.proofManifestCounts, { attached: 7, missing: 0, blocked: 1, total: 8 });
   assert.ok(packet.blockerLabels.includes("Admin Oracle and user metrics proof reference is missing."));
+});
+
+test("production go/no-go packet blocks backend gate when scale proof is ready but pagination proof is missing", () => {
+  const evidence = buildWeddingProductionReadinessEvidenceState({
+    ...baseReadyEvidence,
+    strictOracleProofs: true,
+    backendPaginationProofRef: null,
+    backendScaleProof: readyScaleProof(),
+    providerExecutorSmokeProof: readySmokeProof(),
+    oracleReleaseGate: readyReleaseGate(),
+  });
+  const packet = buildWeddingProductionGoNoGoPacketState(evidence);
+  const gate = packet.gates.find((item) => item.kind === "backend_scale");
+  const manifestItem = packet.proofManifest.find((item) => item.kind === "backend_scale");
+
+  assert.equal(evidence.evidence.backendScaleProofReady, true);
+  assert.equal(evidence.evidence.backendPaginationReady, false);
+  assert.equal(gate?.status, "blocked");
+  assert.ok(gate?.blockerLabels.includes("Backend pagination contract proof reference is missing."));
+  assert.equal(manifestItem?.status, "blocked");
+  assert.ok(manifestItem?.missingProofLabels.includes("Backend pagination contract proof reference is missing."));
+  assert.ok(packet.blockerLabels.includes("Backend pagination contract proof reference is missing."));
+  assert.equal(packet.canUploadToOracle, false);
+});
+
+test("production go/no-go packet keeps vendor quote blocked when live proof is ready but UI proof is missing", () => {
+  const evidence = buildWeddingProductionReadinessEvidenceState({
+    ...baseReadyEvidence,
+    strictOracleProofs: true,
+    vendorQuoteReplyUi: null,
+    backendScaleProof: readyScaleProof(),
+    providerExecutorSmokeProof: readySmokeProof(),
+    oracleReleaseGate: readyReleaseGate(),
+  });
+  const packet = buildWeddingProductionGoNoGoPacketState(evidence);
+  const gate = packet.gates.find((item) => item.kind === "vendor_quote_reply");
+  const manifestItem = packet.proofManifest.find((item) => item.kind === "vendor_quote_reply");
+
+  assert.equal(gate?.status, "blocked");
+  assert.ok(gate?.blockerLabels.includes("Vendor quote reply UI proof is missing."));
+  assert.match(gate?.detail ?? "", /quote summary, Tiptap editor, approval controls/i);
+  assert.equal(manifestItem?.status, "blocked");
+  assert.ok(manifestItem?.missingProofLabels.includes("Vendor quote reply UI proof is missing."));
+  assert.equal(packet.canUploadToOracle, false);
+  assert.ok(packet.blockerLabels.includes("Vendor quote reply UI proof is missing."));
+});
+
+test("production go/no-go packet does not attach weak vendor quote proof refs", () => {
+  const evidence = buildWeddingProductionReadinessEvidenceState({
+    ...baseReadyEvidence,
+    strictOracleProofs: true,
+    vendorQuoteReplyProduction: {
+      ...readyVendorQuoteReplyProduction(),
+      evidenceLabels: ["Actual connected provider send verified: placeholder-gmail-message"],
+    },
+    backendScaleProof: readyScaleProof(),
+    providerExecutorSmokeProof: readySmokeProof(),
+    oracleReleaseGate: readyReleaseGate(),
+  });
+  const packet = buildWeddingProductionGoNoGoPacketState(evidence);
+  const manifestItem = packet.proofManifest.find((item) => item.kind === "vendor_quote_reply");
+
+  assert.equal(evidence.evidence.vendorQuoteReplyProductionReady, false);
+  assert.equal(manifestItem?.status, "blocked");
+  assert.ok(manifestItem?.missingProofLabels.includes(
+    "Vendor quote reply live provider proof reference is missing.",
+  ));
+  assert.ok(packet.blockerLabels.includes(
+    "Vendor quote reply live provider proof reference is missing.",
+  ));
+  assert.equal(packet.canUploadToOracle, false);
 });
 
 test("production go/no-go packet blocks each individual required gate independently", () => {
@@ -238,7 +464,25 @@ test("production go/no-go packet blocks each individual required gate independen
     oracleReleaseGate: readyReleaseGate(),
   };
   const cases = [
+    ["template_launch", {
+      ...readyInput,
+      templateLaunchReadiness: {
+        ...readyTemplateLaunchReadiness(),
+        productionEvidenceReady: false,
+        status: "blocked",
+        blockerLabels: ["Wedding template first-run intake gate is not proven before generated planning work."],
+      },
+    }],
     ["approval_ui", { ...readyInput, approvalUi: { productionEvidenceReady: false } as any }],
+    ["vendor_quote_reply", {
+      ...readyInput,
+      vendorQuoteReplyProduction: {
+        ...readyVendorQuoteReplyProduction(),
+        productionReady: false,
+        status: "partial",
+        blockerLabels: ["Actual connected Gmail/provider send proof is not attached."],
+      },
+    }],
     ["expected_behavior", { ...readyInput, expectedBehaviorAudit: { productionBlockerLabels: ["Guest messaging: needs delivery receipts."] } as any }],
     ["import_parser", { ...readyInput, importParserReadiness: { productionReady: false, blockerLabels: ["Spreadsheet parser missing."] } as any }],
     ["collaboration_access", { ...readyInput, collaboration: { productionReady: false } as any }],
@@ -261,7 +505,118 @@ test("production go/no-go packet blocks each individual required gate independen
     assert.equal(packet.canUploadToOracle, false, kind);
     assert.equal(packet.gates.find((gate) => gate.kind === kind)?.status, "blocked", kind);
     assert.equal(packet.gateCounts.blocked, 1, kind);
-    assert.equal(packet.gateCounts.ready, 9, kind);
+    assert.equal(packet.gateCounts.ready, 11, kind);
     assert.ok(packet.nextActionLabels.length > 0, kind);
   }
+});
+
+test("production go/no-go packet surfaces granular vendor quote reply production blockers", () => {
+  const evidence = buildWeddingProductionReadinessEvidenceState({
+    ...baseReadyEvidence,
+    strictOracleProofs: true,
+    vendorQuoteReplyProduction: {
+      ...readyVendorQuoteReplyProduction(),
+      productionReady: false,
+      status: "partial",
+      blockerLabels: [
+        "Server thread proof round-trip has not been verified.",
+        "Actual connected Gmail/provider send proof is not attached.",
+      ],
+      nextActionLabels: [
+        "Reload the vendor quote thread and confirm the proof drawer reconstructs quote, draft, and durable provider receipt.",
+        "Run a real connected-provider send verification and attach the durable provider proof reference.",
+      ],
+    },
+    backendScaleProof: readyScaleProof(),
+    providerExecutorSmokeProof: readySmokeProof(),
+    oracleReleaseGate: readyReleaseGate(),
+  });
+  const packet = buildWeddingProductionGoNoGoPacketState(evidence);
+  const gate = packet.gates.find((item) => item.kind === "vendor_quote_reply");
+  const manifestItem = packet.proofManifest.find((item) => item.kind === "vendor_quote_reply");
+
+  assert.equal(gate?.status, "blocked");
+  assert.deepEqual(gate?.blockerLabels, [
+    "Server thread proof round-trip has not been verified.",
+    "Actual connected Gmail/provider send proof is not attached.",
+  ]);
+  assert.ok(gate?.nextActionLabels.some((label) => /real connected-provider send verification/i.test(label)));
+  assert.equal(manifestItem?.status, "blocked");
+  assert.ok(manifestItem?.missingProofLabels.some((label) => /server thread proof round-trip/i.test(label)));
+  assert.ok(packet.blockerLabels.includes("Actual connected Gmail/provider send proof is not attached."));
+});
+
+test("production go/no-go packet normalizes noisy vendor quote blocker labels once upstream", () => {
+  const longBlockerLabel = `Actual connected Gmail/provider send proof is not attached because ${"receipt ".repeat(40)}`;
+  const evidence = buildWeddingProductionReadinessEvidenceState({
+    ...baseReadyEvidence,
+    strictOracleProofs: true,
+    vendorQuoteReplyProduction: {
+      ...readyVendorQuoteReplyProduction(),
+      productionReady: false,
+      status: "partial",
+      blockerLabels: [
+        "  Server thread proof round-trip has not been verified.  ",
+        "Server   thread proof round-trip has not been verified.",
+        longBlockerLabel,
+        "",
+      ],
+      nextActionLabels: [
+        "  Run a real connected-provider send verification and attach the durable provider proof reference.  ",
+        "Run a real connected-provider send verification and attach the durable provider proof reference.",
+      ],
+    },
+    backendScaleProof: readyScaleProof(),
+    providerExecutorSmokeProof: readySmokeProof(),
+    oracleReleaseGate: readyReleaseGate(),
+  });
+  const packet = buildWeddingProductionGoNoGoPacketState(evidence);
+  const gate = packet.gates.find((item) => item.kind === "vendor_quote_reply");
+  const manifestItem = packet.proofManifest.find((item) => item.kind === "vendor_quote_reply");
+
+  assert.deepEqual(gate?.blockerLabels, [
+    "Server thread proof round-trip has not been verified.",
+    `${longBlockerLabel.slice(0, 237)}...`,
+  ]);
+  assert.deepEqual(gate?.nextActionLabels, [
+    "Run a real connected-provider send verification and attach the durable provider proof reference.",
+  ]);
+  assert.deepEqual(manifestItem?.missingProofLabels, gate?.blockerLabels);
+  assert.equal(
+    packet.blockerLabels.filter((label) => label === "Server thread proof round-trip has not been verified.").length,
+    1,
+  );
+  assert.ok(packet.blockerLabels.every((label) => label.length <= 240));
+});
+
+test("production go/no-go packet carries granular vendor quote UI blockers into the live-send gate", () => {
+  const evidence = buildWeddingProductionReadinessEvidenceState({
+    ...baseReadyEvidence,
+    strictOracleProofs: true,
+    vendorQuoteReplyUi: buildWeddingVendorQuoteReplyUiReadinessState({
+      quoteSummaryMounted: true,
+      originalQuoteActionMounted: true,
+      inlineEmailEditorMounted: false,
+      wordingApprovalControlMounted: true,
+      budgetAcknowledgementControlMounted: false,
+      sendActionMounted: true,
+      undoWindowMounted: true,
+      persistentSentConfirmationMounted: true,
+      proofDrawerActionMounted: true,
+      proofDrawerStatusMounted: true,
+      liveRegionsMounted: true,
+      failureTelemetryMounted: true,
+      providerReadiness: readyEmailProvider,
+    }),
+    backendScaleProof: readyScaleProof(),
+    providerExecutorSmokeProof: readySmokeProof(),
+    oracleReleaseGate: readyReleaseGate(),
+  });
+  const packet = buildWeddingProductionGoNoGoPacketState(evidence);
+  const gate = packet.gates.find((item) => item.kind === "vendor_quote_reply");
+
+  assert.equal(gate?.status, "blocked");
+  assert.ok(gate?.blockerLabels.includes("Inline email editor is not mounted."));
+  assert.ok(gate?.blockerLabels.includes("Separate budget acknowledgement control is not mounted."));
+  assert.ok(gate?.nextActionLabels.some((label) => /Mount the Tiptap email editor/i.test(label)));
 });

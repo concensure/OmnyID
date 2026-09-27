@@ -79,21 +79,63 @@ test("buildAdminWeddingAiRoutingPolicyState can require durable policy proof ref
 });
 
 test("buildAdminWeddingAiRoutingPolicyState rejects local policy proof references", () => {
-  const state = buildAdminWeddingAiRoutingPolicyState({
-    backendPolicyEndpointMounted: true,
-    auditReceiptProjectionReady: true,
-    tenantBoundaryEnforced: true,
-    budgetGuardrailsReady: true,
-    weddingTemplateScopeOnly: true,
-    masterAgentQueryExcluded: true,
-    lastVerifiedAt: "2026-09-14T09:00:00.000Z",
-    policyProofRef: "http://localhost:8787/admin-policy-proof",
-    proofReferencePolicy: "required",
-  });
+  for (const policyProofRef of [
+    "http://localhost:8787/admin-policy-proof",
+    "http://audit.omnyid.com/admin-policy-proof",
+    "https://127.0.0.1/admin-policy-proof",
+    "https://0.0.0.0/admin-policy-proof",
+    "https://[::1]/admin-policy-proof",
+    "file:///tmp/admin-policy-proof.json",
+    "blob:https://app.example/admin-policy-proof",
+    "data:application/json,{}",
+  ]) {
+    const state = buildAdminWeddingAiRoutingPolicyState({
+      backendPolicyEndpointMounted: true,
+      auditReceiptProjectionReady: true,
+      tenantBoundaryEnforced: true,
+      budgetGuardrailsReady: true,
+      weddingTemplateScopeOnly: true,
+      masterAgentQueryExcluded: true,
+      lastVerifiedAt: "2026-09-14T09:00:00.000Z",
+      policyProofRef,
+      proofReferencePolicy: "required",
+    });
 
-  assert.equal(state.productionReady, false);
-  assert.equal(state.status, "local_only");
-  assert.deepEqual(state.proofReferenceLabels, []);
-  assert.ok(state.blockerLabels.some((label) => /not a local receipt/i.test(label)));
-  assert.ok(state.nextActionLabels.some((label) => /durable admin routing policy proof/i.test(label)));
+    assert.equal(state.productionReady, false, policyProofRef);
+    assert.equal(state.status, "local_only", policyProofRef);
+    assert.deepEqual(state.proofReferenceLabels, [], policyProofRef);
+    assert.ok(state.blockerLabels.some((label) => /remote HTTPS proof link/i.test(label)), policyProofRef);
+    assert.ok(state.nextActionLabels.some((label) => /durable admin routing policy proof/i.test(label)), policyProofRef);
+  }
+});
+
+test("buildAdminWeddingAiRoutingPolicyState rejects placeholder policy proof references", () => {
+  for (const policyProofRef of [
+    "...",
+    "test:admin-routing",
+    "dry-run:admin-routing",
+    "placeholder:latest",
+    "admin-routing-policy:fake:latest",
+    "admin-routing-policy:mock:latest",
+  ]) {
+    const state = buildAdminWeddingAiRoutingPolicyState({
+      backendPolicyEndpointMounted: true,
+      auditReceiptProjectionReady: true,
+      tenantBoundaryEnforced: true,
+      budgetGuardrailsReady: true,
+      weddingTemplateScopeOnly: true,
+      masterAgentQueryExcluded: true,
+      lastVerifiedAt: "2026-09-14T09:00:00.000Z",
+      policyProofRef,
+      proofReferencePolicy: "required",
+    });
+
+    assert.equal(state.productionReady, false, policyProofRef);
+    assert.equal(state.status, "local_only", policyProofRef);
+    assert.deepEqual(state.proofReferenceLabels, [], policyProofRef);
+    assert.ok(
+      state.blockerLabels.some((label) => /local, dry-run, placeholder, localhost, or browser-only/i.test(label)),
+      policyProofRef,
+    );
+  }
 });

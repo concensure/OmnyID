@@ -6,6 +6,10 @@ import {
   type WeddingCollaborationSurfaceId,
 } from "./weddingCollaborationPermissionState";
 import { buildWeddingCollaboratorInviteLifecycleState } from "./weddingCollaborationInviteLifecycleState";
+import {
+  cleanWeddingProductionLabels,
+  durableWeddingProductionProofLabels,
+} from "./weddingProductionLabelState";
 
 export type WeddingCollaboratorRole = "co_owner" | "planner" | "contributor" | "viewer";
 
@@ -82,6 +86,7 @@ export type WeddingCollaborationState = {
   readyInviteCount: number;
   blockerLabels: string[];
   warningLabels: string[];
+  proofReferenceLabels: string[];
 };
 
 const roleCards: WeddingRoleCapabilityCard[] = [
@@ -287,9 +292,11 @@ export function buildWeddingCollaborationState(input: {
   encryptionReady?: boolean | null;
   auditReady?: boolean | null;
   conflictPolicyReady?: boolean | null;
+  proofReferenceLabels?: readonly string[] | null;
   nowIso?: string | null;
 } = {}): WeddingCollaborationState {
   const invites = (input.invites ?? []).map((invite, index) => inviteCard(invite, index, input.nowIso));
+  const proofReferenceLabels = durableWeddingProductionProofLabels(input.proofReferenceLabels);
   const blockerLabels = [
     ...(!input.backendReady ? ["Workspace ACL backend not connected"] : []),
     ...(!input.encryptionReady ? ["Shared E2EE key distribution not proven"] : []),
@@ -322,5 +329,6 @@ export function buildWeddingCollaborationState(input: {
     readyInviteCount,
     blockerLabels,
     warningLabels: inviteWarnings,
+    proofReferenceLabels,
   };
 }

@@ -111,3 +111,103 @@ test("buildWeddingOracleReleaseGateReadinessState can require durable proof refe
   assert.equal(ready.productionEvidenceReady, true);
   assert.ok(ready.proofReferenceLabels.some((label) => /production go\/no-go proof: go-no-go:ok/i.test(label)));
 });
+
+test("buildWeddingOracleReleaseGateReadinessState rejects placeholder proof references", () => {
+  const state = buildWeddingOracleReleaseGateReadinessState({
+    releaseReadinessPassed: true,
+    releaseReadinessRef: "http://audit.omnyid.com/release",
+    productionGoNoGoPassed: true,
+    productionGoNoGoRef: "http://127.0.0.1:8787/go-no-go",
+    backupVerified: true,
+    backupVerificationRef: "https://0.0.0.0/backup",
+    restoreDrillPassed: true,
+    restoreDrillRef: "https://[::1]/restore",
+    secretsSynced: true,
+    secretsSyncRef: "...",
+    remoteProofPassed: true,
+    remoteProofRef: "oracle-remote:mock:latest",
+    proofAgeHours: 1,
+    proofReferencePolicy: "required",
+  });
+
+  assert.equal(state.status, "blocked");
+  assert.equal(state.productionEvidenceReady, false);
+  assert.deepEqual(state.proofReferenceLabels, []);
+  assert.equal(
+    state.blockerLabels.filter((label) => /remote HTTPS proof link/i.test(label)).length,
+    6,
+  );
+  assert.ok(state.nextActionLabels.some((label) => /Attach durable proof references/i.test(label)));
+});
+
+test("buildWeddingOracleReleaseGateReadinessState rejects test proof tokens but allows smoke receipts", () => {
+  const blocked = buildWeddingOracleReleaseGateReadinessState({
+    releaseReadinessPassed: true,
+    releaseReadinessRef: "release:prod-smoke:2026-09-28",
+    productionGoNoGoPassed: true,
+    productionGoNoGoRef: "go-no-go:test:latest",
+    backupVerified: true,
+    backupVerificationRef: "backup:prod-smoke:2026-09-28",
+    restoreDrillPassed: true,
+    restoreDrillRef: "restore:prod-smoke:2026-09-28",
+    secretsSynced: true,
+    secretsSyncRef: "secret-sync:prod-smoke:2026-09-28",
+    remoteProofPassed: true,
+    remoteProofRef: "oracle-remote:prod-smoke:2026-09-28",
+    proofAgeHours: 1,
+    proofReferencePolicy: "required",
+  });
+
+  assert.equal(blocked.status, "blocked");
+  assert.ok(blocked.blockerLabels.some((label) => /Production go\/no-go gate proof reference/i.test(label)));
+  assert.ok(blocked.proofReferenceLabels.every((label) => !/go-no-go:test/i.test(label)));
+  assert.ok(blocked.proofReferenceLabels.some((label) => /release:prod-smoke/i.test(label)));
+
+  const ready = buildWeddingOracleReleaseGateReadinessState({
+    releaseReadinessPassed: true,
+    releaseReadinessRef: "release:prod-smoke:2026-09-28",
+    productionGoNoGoPassed: true,
+    productionGoNoGoRef: "go-no-go:prod-smoke:2026-09-28",
+    backupVerified: true,
+    backupVerificationRef: "backup:prod-smoke:2026-09-28",
+    restoreDrillPassed: true,
+    restoreDrillRef: "restore:prod-smoke:2026-09-28",
+    secretsSynced: true,
+    secretsSyncRef: "secret-sync:prod-smoke:2026-09-28",
+    remoteProofPassed: true,
+    remoteProofRef: "oracle-remote:prod-smoke:2026-09-28",
+    proofAgeHours: 1,
+    proofReferencePolicy: "required",
+  });
+
+  assert.equal(ready.status, "ready");
+  assert.ok(ready.proofReferenceLabels.some((label) => /go-no-go:prod-smoke/i.test(label)));
+});
+
+test("buildWeddingOracleReleaseGateReadinessState bounds noisy target and proof labels", () => {
+  const longRemoteProof = `oracle-remote:prod-1:${"proof-".repeat(60)}`;
+  const state = buildWeddingOracleReleaseGateReadinessState({
+    releaseReadinessPassed: true,
+    releaseReadinessRef: `release:${"receipt-".repeat(60)}`,
+    productionGoNoGoPassed: true,
+    productionGoNoGoRef: `go-no-go:${"approval-".repeat(60)}`,
+    backupVerified: true,
+    backupVerificationRef: `backup:${"snapshot-".repeat(60)}`,
+    restoreDrillPassed: true,
+    restoreDrillRef: "restore:ok",
+    secretsSynced: true,
+    secretsSyncRef: "secret-sync:ok",
+    remoteProofPassed: true,
+    remoteProofRef: longRemoteProof,
+    targetLabel: `  Oracle   ${"production ".repeat(40)} `,
+    proofAgeHours: 1,
+    proofReferencePolicy: "required",
+  });
+
+  assert.equal(state.status, "ready");
+  assert.ok(state.summary.startsWith("Oracle production"));
+  assert.ok(state.evidenceLabels.every((label) => label.length <= 240));
+  assert.ok(state.proofReferenceLabels.every((label) => label.length <= 240));
+  assert.ok(state.proofReferenceLabels.some((label) => label.startsWith("Oracle remote proof: oracle-remote:prod-1")));
+  assert.ok(state.proofReferenceLabels.some((label) => label.endsWith("...")));
+});
