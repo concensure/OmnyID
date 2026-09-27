@@ -15,7 +15,7 @@ export type UserProfile = {
 const DEFAULT_USER_PROFILE: UserProfile = {
   displayName: "",
   bio: "",
-  avatar: "ðŸ§‘",
+  avatar: "🧑",
   websites: [],
 };
 

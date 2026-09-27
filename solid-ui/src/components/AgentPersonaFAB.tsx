@@ -3,19 +3,28 @@
 // @primary-capability: floating-agent-persona-switcher
 // @stability: beta
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import {
-  activatePersona,
-  createPersona,
-  listPersonas,
-  type AgentPersona,
-} from "@/lib/api";
+import { EmptyState } from "@/components/EmptyState";
+import { listPersonas, type AgentPersona } from "@/lib/api";
 import {
   PERSONA_TEMPLATES,
   type PersonaTemplate,
 } from "@/lib/personaTemplates";
+import {
+  buildPersonaSwitcherFailureReceipt,
+  type PersonaSwitcherFailureReceipt,
+} from "@/lib/personaSwitcherFailureState";
+import {
+  activatePersonaAndList,
+  filterPersonas,
+  filterPersonaTemplates,
+  installedPersonaIdsByTemplate,
+  installPersonaTemplateAndList,
+  personaSwitcherPreferredTab,
+  type PersonaSwitcherTab as SwitcherTab,
+} from "@/lib/personaSwitcherState";
+import { personaReloadBlocked, personaSwitcherBusy } from "@/lib/personaSwitcherViewState";
 
 type AnimState = "idle" | "busy" | "error" | "success";
-type SwitcherTab = "mine" | "templates";
 // Visual mood derived from queue pressure and LoRA genome state.
 type AvatarMood = "overwhelmed" | "focused" | "sharp" | "learning" | "idle";
 
@@ -50,6 +59,7 @@ function computeGenomeBadges(score: number, active: boolean): GenomeBadge[] {
 }
 
 export function AgentPersonaFAB(props: {
+  signedIn?: boolean;
   activeCount: number;
   hasError?: boolean;
   justCompleted?: boolean;
@@ -66,8 +76,15 @@ export function AgentPersonaFAB(props: {
   const [installingTemplateId, setInstallingTemplateId] = createSignal<string | null>(null);
   const [tab, setTab] = createSignal<SwitcherTab>("mine");
   const [search, setSearch] = createSignal("");
+  const [loadError, setLoadError] = createSignal<PersonaSwitcherFailureReceipt | null>(null);
+  const [actionError, setActionError] = createSignal<PersonaSwitcherFailureReceipt | null>(null);
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let didLongPress = false;
+  const switcherBusy = createMemo(() => personaSwitcherBusy({
+    loading: loading(),
+    switchingId: switchingId(),
+    installingTemplateId: installingTemplateId(),
+  }));
 
   const animState = createMemo<AnimState>(() => {
     if (props.hasError) return "error";
@@ -117,9 +134,9 @@ export function AgentPersonaFAB(props: {
     switch (avatarMood()) {
       case "overwhelmed": return `Overwhelmed — ${urgent} urgent decisions need attention`;
       case "focused":     return "Focused — active tasks in queue";
-      case "sharp":       return "Sharp and ready — switch persona";
-      case "learning":    return "Learning your style — switch persona";
-      default:            return "Switch agent persona";
+      case "sharp":       return "Sharp and ready — switch response persona";
+      case "learning":    return "Learning your style — switch response persona";
+      default:            return "Switch response persona";
     }
   };
 
@@ -136,39 +153,37 @@ export function AgentPersonaFAB(props: {
 
   // ── Existing persona management ───────────────────────────────────────────────
   const active = () => personas().find((p) => p.is_active) ?? null;
-  const installedTemplateNames = createMemo(
-    () => new Set(personas().map((persona) => persona.name.trim().toLowerCase())),
+  const installedPersonaIdsByTemplateState = createMemo(() =>
+    installedPersonaIdsByTemplate(PERSONA_TEMPLATES, personas()),
   );
-  const filteredPersonas = createMemo(() => {
-    const q = search().trim().toLowerCase();
-    return personas().filter((persona) => {
-      if (!q) return true;
-      return (
-        persona.name.toLowerCase().includes(q) ||
-        persona.writing_style.toLowerCase().includes(q)
-      );
-    });
-  });
-  const filteredTemplates = createMemo(() => {
-    const q = search().trim().toLowerCase();
-    return PERSONA_TEMPLATES.filter((template) => {
-      if (!q) return true;
-      return (
-        template.name.toLowerCase().includes(q) ||
-        template.description.toLowerCase().includes(q) ||
-        template.writing_style.toLowerCase().includes(q) ||
-        template.source.toLowerCase().includes(q)
-      );
-    });
-  });
+  const filteredPersonas = createMemo(() => filterPersonas(personas(), search()));
+  const filteredTemplates = createMemo(() => filterPersonaTemplates(PERSONA_TEMPLATES, search()));
 
   async function reloadPersonas() {
+    if (personaReloadBlocked({ loading: loading(), signedIn: props.signedIn })) return;
+    if (!props.signedIn) {
+      setPersonas([]);
+      setLoadError(null);
+      setLoading(false);
+      return;
+    }
+    setLoadError(null);
     try {
       const res = await listPersonas();
       setPersonas(res.personas);
-      if (res.personas.length === 0) setTab("templates");
-    } catch {
+      setTab((currentTab) =>
+        currentTab === "templates" || res.personas.length === 0
+          ? personaSwitcherPreferredTab(res.personas)
+          : currentTab,
+      );
+    } catch (error: unknown) {
       setPersonas([]);
+      setLoadError(
+        buildPersonaSwitcherFailureReceipt(
+          "Load personas",
+          error instanceof Error ? error.message : "Could not load personas.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -181,12 +196,14 @@ export function AgentPersonaFAB(props: {
   });
 
   function openSwitcher(preferredTab?: SwitcherTab) {
+    if (switcherBusy()) return;
     if (preferredTab) setTab(preferredTab);
-    else if (personas().length === 0) setTab("templates");
+    else setTab(personaSwitcherPreferredTab(personas()));
     setShowSwitcher(true);
   }
 
   function closeSwitcher() {
+    if (switcherBusy()) return;
     setShowSwitcher(false);
     setSearch("");
   }
@@ -213,46 +230,44 @@ export function AgentPersonaFAB(props: {
   }
 
   async function switchPersona(persona: AgentPersona) {
+    if (switcherBusy()) return;
     if (persona.is_active) {
       closeSwitcher();
       return;
     }
     setSwitchingId(persona.id);
+    setActionError(null);
     try {
-      await activatePersona(persona.id);
-      setPersonas((prev) =>
-        prev.map((p) =>
-          p.id === persona.id ? { ...p, is_active: true } : { ...p, is_active: false },
+      const result = await activatePersonaAndList(persona.id);
+      setPersonas(result.personas);
+      closeSwitcher();
+    } catch (error: unknown) {
+      setActionError(
+        buildPersonaSwitcherFailureReceipt(
+          "Switch persona",
+          error instanceof Error ? error.message : "Could not switch persona.",
         ),
       );
-      closeSwitcher();
-    } catch {
-      // Ignore transient switch failures in the FAB path.
     } finally {
       setSwitchingId(null);
     }
   }
 
   async function installTemplate(template: PersonaTemplate) {
+    if (switcherBusy()) return;
     setInstallingTemplateId(template.id);
+    setActionError(null);
     try {
-      const created = await createPersona({
-        name: template.name,
-        soul_md: template.soul_md,
-        writing_style: template.writing_style,
-        skills: template.skills,
-      });
-      const persona = created.persona;
-      await activatePersona(persona.id);
-      await reloadPersonas();
-      setPersonas((prev) =>
-        prev.map((p) =>
-          p.id === persona.id ? { ...p, is_active: true } : { ...p, is_active: false },
+      const result = await installPersonaTemplateAndList(template);
+      setPersonas(result.personas);
+      closeSwitcher();
+    } catch (error: unknown) {
+      setActionError(
+        buildPersonaSwitcherFailureReceipt(
+          "Install template",
+          error instanceof Error ? error.message : "Could not install persona template.",
         ),
       );
-      closeSwitcher();
-    } catch {
-      // Ignore transient install failures in the FAB path.
     } finally {
       setInstallingTemplateId(null);
     }
@@ -304,6 +319,7 @@ export function AgentPersonaFAB(props: {
               </div>
               <button
                 type="button"
+                disabled={switcherBusy()}
                 onClick={() => {
                   closeSwitcher();
                   props.onOpenSettings();
@@ -315,10 +331,14 @@ export function AgentPersonaFAB(props: {
             </div>
 
             {/* ── Genome state strip ─────────────────────────────────────── */}
-            {/* Shows avatar mood + earned LoRA capability badges. */}
+            {/* Shows avatar mood + earned LoRA capability badges. Clicking opens
+                Agent Settings, where LoRA weights are trained and reviewed. */}
             <Show when={avatarMood() !== "idle" || genomeBadges().length > 0}>
-              <div
-                class={`mt-2 flex items-center gap-2 rounded-xl px-2.5 py-1.5 ${
+              <button
+                type="button"
+                onClick={() => { closeSwitcher(); props.onOpenSettings(); }}
+                title="Open Agent Settings to review LoRA training progress"
+                class={`mt-2 flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:brightness-95 ${
                   avatarMood() === "overwhelmed"
                     ? "bg-red-400/10"
                     : avatarMood() === "sharp"
@@ -344,23 +364,25 @@ export function AgentPersonaFAB(props: {
                     )}
                   </For>
                 </div>
-              </div>
+              </button>
             </Show>
 
             <input
               type="text"
               value={search()}
+              disabled={switcherBusy()}
               onInput={(event) => setSearch(event.currentTarget.value)}
               placeholder="Search personas"
               class="mt-3 w-full rounded-2xl border border-outline/15 bg-white/75 px-3 py-2 text-xs text-on-surface outline-none transition focus:border-primary/35"
             />
             <div class="mt-3 flex gap-1">
-              <button type="button" class={tabClass("mine")} onClick={() => setTab("mine")}>
+              <button type="button" class={tabClass("mine")} disabled={switcherBusy()} onClick={() => setTab("mine")}>
                 My personas
               </button>
               <button
                 type="button"
                 class={tabClass("templates")}
+                disabled={switcherBusy()}
                 onClick={() => setTab("templates")}
               >
                 Templates
@@ -369,19 +391,56 @@ export function AgentPersonaFAB(props: {
           </div>
 
           <div class="max-h-[19rem] overflow-auto px-2 py-2">
+            <Show when={actionError()}>
+              {(receipt) => (
+                <div
+                  class={`mb-2 rounded-2xl border px-3 py-2 text-[0.6875em] leading-5 ${
+                    receipt().tone === "danger"
+                      ? "border-red-200/50 bg-red-50/70 text-red-700"
+                      : "border-amber-300/40 bg-amber-50/70 text-amber-800"
+                  }`}
+                >
+                  <p class="font-semibold">{receipt().title}</p>
+                  <p>{receipt().summary}</p>
+                  <p class="opacity-80">Next step: {receipt().nextStep}</p>
+                </div>
+              )}
+            </Show>
             <Show when={tab() === "mine"}>
               <Show when={loading()}>
                 <p class="px-3 py-8 text-center text-xs text-on-surface-variant/60">
                   Loading personas…
                 </p>
               </Show>
-              <Show when={!loading() && filteredPersonas().length === 0}>
+              <Show when={!loading() && loadError()}>
+                {(receipt) => (
+                  <div class="px-1 py-2">
+                    <EmptyState
+                      icon="AI"
+                      title={receipt().title}
+                      body={`${receipt().summary} Next step: ${receipt().nextStep}`}
+                      action={
+                        <button
+                          type="button"
+                          class="rounded-full border border-white/25 bg-white/70 px-3 py-1 text-[0.6875em] font-medium text-on-surface transition hover:bg-white"
+                          disabled={loading()}
+                          onClick={() => void reloadPersonas()}
+                        >
+                          Retry personas
+                        </button>
+                      }
+                    />
+                  </div>
+                )}
+              </Show>
+              <Show when={!loading() && !loadError() && filteredPersonas().length === 0}>
                 <div class="px-3 py-8 text-center">
                   <p class="text-xs text-on-surface-variant/60">
                     No saved personas yet.
                   </p>
                   <button
                     type="button"
+                    disabled={switcherBusy()}
                     onClick={() => setTab("templates")}
                     class="mt-3 rounded-xl bg-primary/10 px-3 py-1.5 text-[0.6875em] font-medium text-primary transition hover:bg-primary/15"
                   >
@@ -394,7 +453,7 @@ export function AgentPersonaFAB(props: {
                   <button
                     type="button"
                     onClick={() => switchPersona(persona)}
-                    disabled={switchingId() === persona.id}
+                    disabled={switcherBusy()}
                     class={`mb-1 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-on-surface/6 ${
                       persona.is_active ? "bg-primary/8 text-primary" : "text-on-surface"
                     }`}
@@ -425,8 +484,11 @@ export function AgentPersonaFAB(props: {
               </Show>
               <For each={filteredTemplates()}>
                 {(template) => {
-                  const installed = () =>
-                    installedTemplateNames().has(template.name.trim().toLowerCase());
+                  const installedPersona = () => {
+                    const personaId = installedPersonaIdsByTemplateState().get(template.id);
+                    return personaId ? personas().find((persona) => persona.id === personaId) ?? null : null;
+                  };
+                  const installed = () => Boolean(installedPersona());
                   return (
                     <button
                       type="button"
@@ -434,7 +496,7 @@ export function AgentPersonaFAB(props: {
                         if (installed()) return;
                         void installTemplate(template);
                       }}
-                      disabled={installed() || installingTemplateId() === template.id}
+                      disabled={installed() || switcherBusy()}
                       class="mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-on-surface/6 disabled:cursor-default disabled:hover:bg-transparent"
                     >
                       <span class="pt-0.5 text-lg leading-none">
@@ -455,7 +517,9 @@ export function AgentPersonaFAB(props: {
                       </div>
                       <span class="pt-0.5 text-[0.625em] font-medium text-primary">
                         {installed()
-                          ? "Installed"
+                          ? installedPersona()?.is_active
+                            ? "Active"
+                            : "Installed"
                           : installingTemplateId() === template.id
                             ? "Installing…"
                             : "Install"}

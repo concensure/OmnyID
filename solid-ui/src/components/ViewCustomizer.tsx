@@ -20,10 +20,10 @@ import {
 } from "@/lib/viewCustomizerLocalState";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
 
-// â”€â”€ Storage helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Storage helpers ──────────────────────────────────────────────────────────
 
 
-// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Component ─────────────────────────────────────────────────────────────
 
 export function ViewCustomizer(props: { viewId: ViewName }) {
   const [bgImage, setBgImage]       = createSignal<string | null>(null);
@@ -45,7 +45,7 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
     setShowBgPanel(false);
   });
 
-  // â”€â”€ Background helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Background helpers ─────────────────────────────────────────────────
 
   function applyBg(url: string | null) {
     setBgImage(url);
@@ -73,7 +73,7 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
     reader.readAsDataURL(file);
   }
 
-  // â”€â”€ Overlay card helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Overlay card helpers ───────────────────────────────────────────────
 
   function addCard() {
     const card: OverlayCard = {
@@ -122,11 +122,11 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
     });
   }
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Render ────────────────────────────────────────────────────────────
 
   return (
     <>
-      {/* Subtle image background layer â€” sits behind view content */}
+      {/* Subtle image background layer — sits behind view content */}
       <Show when={bgImage()}>
         <Portal>
           <div
@@ -146,7 +146,7 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
         </Portal>
       </Show>
 
-      {/* Overlay A2UI cards â€” freely draggable */}
+      {/* Overlay A2UI cards — freely draggable */}
       <For each={cards()}>
         {(card) => (
           <Portal>
@@ -164,7 +164,7 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
                   }}
                 >
                   <span class="font-mono text-[8px] uppercase tracking-[0.2em] text-on-surface-variant/35">
-                    Custom Card Â· drag to move
+                    Custom Card · drag to move
                   </span>
                   <button
                     type="button"
@@ -172,7 +172,7 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => removeCard(card.id)}
                     aria-label="Remove card"
-                  >âœ•</button>
+                  >✕</button>
                 </div>
                 <A2UICard personaTone={card.personaTone} onDismiss={() => removeCard(card.id)} />
               </div>
@@ -181,7 +181,7 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
         )}
       </For>
 
-      {/* Floating + button â€” above AgentPersonaFAB (bottom-24) */}
+      {/* Floating + button — above AgentPersonaFAB (bottom-24) */}
       <Portal>
         <div class="fixed z-[170]" style={{ bottom: "88px", right: "16px" }}>
           <div class="relative">
@@ -199,18 +199,18 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
             <Show when={menuOpen()}>
               <div class="absolute bottom-full right-0 mb-2 w-60 animate-fade-in rounded-2xl border border-white/50 bg-white/96 p-3 shadow-panel backdrop-blur-xl">
 
-                {/* â”€â”€ Image Background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+                {/* ── Image Background ────────────────────────────────── */}
                 <button
                   type="button"
                   onClick={() => setShowBgPanel((v) => !v)}
                   class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-xs transition hover:bg-on-surface/6"
                 >
-                  <span class="text-base leading-none">ðŸ–¼</span>
+                  <span class="text-base leading-none">🖼</span>
                   <div>
                     <p class="font-medium text-on-surface">Image Background</p>
                     <p class="text-[10px] text-on-surface-variant/60">Set a photo behind this view</p>
                   </div>
-                  <span class="ml-auto text-[10px] text-on-surface-variant/40">{showBgPanel() ? "â–²" : "â–¼"}</span>
+                  <span class="ml-auto text-[10px] text-on-surface-variant/40">{showBgPanel() ? "▲" : "▼"}</span>
                 </button>
 
                 <Show when={showBgPanel()}>
@@ -218,7 +218,7 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
                     <input
                       type="text"
                       class="w-full rounded-xl border border-black/10 bg-white/70 px-2.5 py-1.5 text-[11px] text-on-surface placeholder-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      placeholder="Paste image URLâ€¦"
+                      placeholder="Paste image URL…"
                       value={bgUrl()}
                       onInput={(e) => setBgUrl(e.currentTarget.value)}
                       onKeyDown={(e) => {
@@ -256,7 +256,7 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
                           onClick={() => { applyBg(null); setBgUrl(""); }}
                           class="rounded-xl border border-red-200/60 bg-red-50/60 px-2.5 py-1.5 text-[10px] text-red-500 transition hover:bg-red-100"
                           title="Remove background"
-                        >âœ•</button>
+                        >✕</button>
                       </Show>
                     </div>
                     <input
@@ -271,13 +271,13 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
 
                 <div class="mx-1 my-1 h-px bg-outline/10" />
 
-                {/* â”€â”€ Add A2UI card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+                {/* ── Add A2UI card ───────────────────────────────────── */}
                 <button
                   type="button"
                   onClick={addCard}
                   class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-xs transition hover:bg-on-surface/6"
                 >
-                  <span class="text-base leading-none">âœ¦</span>
+                  <span class="text-base leading-none">✦</span>
                   <div>
                     <p class="font-medium text-on-surface">Add Custom Card</p>
                     <p class="text-[10px] text-on-surface-variant/60">Agent-generated floating card</p>

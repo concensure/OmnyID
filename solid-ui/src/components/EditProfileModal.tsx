@@ -155,8 +155,17 @@ export function EditProfileModal(props: { onClose: () => void }) {
           </label>
 
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
+            <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
               Linked identities
+              <span
+                tabIndex={0}
+                role="note"
+                title="Optional social profiles to show on your OmnyID profile card, such as LinkedIn or X. This is just for display — it doesn't sign you in and isn't required."
+                aria-label="What are linked identities? Optional social profiles to show on your OmnyID profile card, such as LinkedIn or X. This is just for display — it doesn't sign you in and isn't required."
+                class="inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full text-[10px] font-bold normal-case tracking-normal text-on-surface-variant/50 outline-none hover:text-on-surface-variant focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                ⓘ
+              </span>
             </p>
             <div class="mt-3 grid grid-cols-3 gap-2">
               <For each={PRESET_WEBSITES}>
