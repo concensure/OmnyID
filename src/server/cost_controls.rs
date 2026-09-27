@@ -616,7 +616,13 @@ async fn get_run_context_http(
         Some(oid) if oid == user.id => {
             let ctx = state.cost_oracle.get_context(&run_id).await;
             match ctx {
-                Some(c) => Json(serde_json::to_value(&c).unwrap_or_default()).into_response(),
+                Some(c) => match serde_json::to_value(&c) {
+                    Ok(payload) => Json(payload).into_response(),
+                    Err(err) => {
+                        let (status, payload) = internal_json_http_error(err);
+                        (status, Json(payload)).into_response()
+                    }
+                },
                 None => (
                     StatusCode::NOT_FOUND,
                     Json(serde_json::json!({ "error": "run not active" })),
@@ -708,6 +714,23 @@ mod tests {
         let function_source = &source[start..end];
         assert!(function_source.contains("let (status, payload) = internal_json_http_error(e);"));
         assert!(!function_source.contains("Json(serde_json::json!({ \"error\": e.to_string() }))"));
+    }
+
+    #[test]
+    fn get_run_context_route_does_not_silently_drop_serialization_failures() {
+        let source = include_str!("cost_controls.rs");
+        let start = source
+            .find("async fn get_run_context_http(")
+            .expect("get_run_context_http exists");
+        let end = source[start..]
+            .find("\n#[cfg(test)]")
+            .map(|offset| start + offset)
+            .expect("test module follows get_run_context_http");
+        let function_source = &source[start..end];
+        assert!(function_source.contains("Some(c) => match serde_json::to_value(&c) {"));
+        assert!(function_source.contains("Ok(payload) => Json(payload).into_response(),"));
+        assert!(function_source.contains("let (status, payload) = internal_json_http_error(err);"));
+        assert!(!function_source.contains("unwrap_or_default()"));
     }
 
     #[test]
