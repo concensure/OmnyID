@@ -10,7 +10,13 @@ import {
 } from "./agentFleetResponseState";
 import { normalizeAgentTriggersResponse, type AgentTriggerRecord } from "./agentTriggerResponseState";
 import { parseAuthApiResponse, parseAuthMessageResponse, type AuthApiResponse } from "./authResponseState";
-import { normalizeGmailConnectionStatus, oauthUrlFromResponse, type GmailConnectionStatus } from "./gmailConnectionState";
+import {
+  normalizeGmailConnectionStatus,
+  normalizeGmailOAuthConfig,
+  oauthUrlFromResponse,
+  type GmailConnectionStatus,
+  type GmailOAuthConfig,
+} from "./gmailConnectionState";
 import { normalizeGoogleCalendarConnectionStatus, type GoogleCalendarConnectionStatus } from "./googleCalendarConnectionState";
 import { normalizeGoogleAuthConfig } from "./googleIdentity";
 import {
@@ -4121,6 +4127,9 @@ export const fetchGmailStatus = (scope: "workspace" | "integration" = "workspace
 export const fetchGmailOAuthUrl = (scope: "workspace" | "integration" = "workspace"): Promise<string> =>
   apiFetch<unknown>(scope === "integration" ? "/integrations/gmail/oauth-url" : "/gmail/connect-url")
     .then(oauthUrlFromResponse);
+export const fetchGmailOAuthConfig = (scope: "workspace" | "integration" = "workspace"): Promise<GmailOAuthConfig> =>
+  apiFetch<unknown>(scope === "integration" ? "/integrations/gmail/config" : "/gmail/config")
+    .then(normalizeGmailOAuthConfig);
 export const fetchGoogleCalendarStatus = (): Promise<GoogleCalendarConnectionStatus> =>
   apiFetch<unknown>("/calendar/google/status").then(normalizeGoogleCalendarConnectionStatus);
 export const fetchGoogleCalendarOAuthUrl = (): Promise<string> =>

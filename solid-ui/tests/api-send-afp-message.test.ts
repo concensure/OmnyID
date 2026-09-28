@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  fetchGmailOAuthConfig,
   fetchGmailOAuthUrl,
   fetchGmailStatus,
   retryFederatedAgentMessage,
@@ -260,19 +261,33 @@ test("Gmail integration API helpers use integration-scoped setup routes", async 
     if (String(input) === "/integrations/gmail/oauth-url") {
       return jsonResponse({ url: "https://accounts.google.com/o/oauth2/v2/auth" });
     }
+    if (String(input) === "/integrations/gmail/config") {
+      return jsonResponse({
+        configured: true,
+        client_id_configured: true,
+        client_secret_configured: true,
+        csrf_secret_configured: true,
+        homeserver_url_configured: true,
+        required_authorized_redirect_uri: "https://api.omnyid.com/gmail/callback",
+        required_scopes: ["https://www.googleapis.com/auth/gmail.modify"],
+      });
+    }
     return jsonResponse({ error: "unexpected" });
   };
 
   try {
     const status = await fetchGmailStatus("integration");
     const oauthUrl = await fetchGmailOAuthUrl("integration");
+    const config = await fetchGmailOAuthConfig("integration");
 
     assert.equal(status.connected, true);
     assert.equal(status.gmail_email, "admin@omnyid.com");
     assert.equal(oauthUrl, "https://accounts.google.com/o/oauth2/v2/auth");
+    assert.equal(config.requiredAuthorizedRedirectUri, "https://api.omnyid.com/gmail/callback");
     assert.deepEqual(seenPaths, [
       "/integrations/gmail/status",
       "/integrations/gmail/oauth-url",
+      "/integrations/gmail/config",
     ]);
   } finally {
     globalThis.fetch = originalFetch;

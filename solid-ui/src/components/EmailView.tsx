@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, onMount, Show } from "soli
 import type { DashboardBootstrap } from "@/lib/api";
 import {
   disconnectGmail,
+  fetchGmailOAuthConfig,
   fetchGmailOAuthUrl,
   fetchGmailInboxSummary,
   fetchGmailStatus,
@@ -20,6 +21,7 @@ import {
 import {
   gmailActionAvailabilityState,
   gmailConnectionWarningState,
+  gmailOAuthConfigFailureMessage,
   type GmailConnectionStatus,
 } from "@/lib/gmailConnectionState";
 import { buildEmailActionFailureReceipt, type EmailActionFailureReceipt } from "@/lib/emailActionFailureState";
@@ -309,7 +311,12 @@ export function EmailView(props: {
       const url = await fetchGmailOAuthUrl();
       window.location.href = url;
     } catch {
-      setConnectError("Gmail connection failed. Check your server OAuth configuration.");
+      try {
+        const config = await fetchGmailOAuthConfig();
+        setConnectError(gmailOAuthConfigFailureMessage(config));
+      } catch {
+        setConnectError(gmailOAuthConfigFailureMessage(null));
+      }
       setConnecting(false);
     }
   }

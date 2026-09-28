@@ -11,6 +11,17 @@ export type GmailConnectionStatus = {
   expires_within_24h?: boolean;
 };
 
+export type GmailOAuthConfig = {
+  configured: boolean;
+  clientIdConfigured: boolean;
+  clientSecretConfigured: boolean;
+  csrfSecretConfigured: boolean;
+  homeserverUrlConfigured: boolean;
+  redirectUri: string | null;
+  requiredAuthorizedRedirectUri: string | null;
+  requiredScopes: string[];
+};
+
 function optionalGmailString(value: unknown): string | null | undefined {
   return typeof value === "string" || value === null ? value : undefined;
 }
@@ -55,6 +66,55 @@ export function oauthUrlFromResponse(payload: unknown): string {
     throw new Error("Invalid OAuth redirect URL received from server.");
   }
   return payload.url;
+}
+
+function booleanAlias(payload: Record<string, unknown>, snakeKey: string, camelKey: string): boolean {
+  const snake = payload[snakeKey];
+  if (typeof snake === "boolean") return snake;
+  const camel = payload[camelKey];
+  return typeof camel === "boolean" ? camel : false;
+}
+
+function stringListAlias(payload: Record<string, unknown>, snakeKey: string, camelKey: string): string[] {
+  const value = Array.isArray(payload[snakeKey]) ? payload[snakeKey] : payload[camelKey];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+}
+
+export function normalizeGmailOAuthConfig(payload: unknown): GmailOAuthConfig {
+  const record = isRecord(payload) ? payload : {};
+  return {
+    configured: booleanAlias(record, "configured", "configured"),
+    clientIdConfigured: booleanAlias(record, "client_id_configured", "clientIdConfigured"),
+    clientSecretConfigured: booleanAlias(record, "client_secret_configured", "clientSecretConfigured"),
+    csrfSecretConfigured: booleanAlias(record, "csrf_secret_configured", "csrfSecretConfigured"),
+    homeserverUrlConfigured: booleanAlias(record, "homeserver_url_configured", "homeserverUrlConfigured"),
+    redirectUri: optionalStringAlias(record, "redirect_uri", "redirectUri") ?? null,
+    requiredAuthorizedRedirectUri: optionalStringAlias(
+      record,
+      "required_authorized_redirect_uri",
+      "requiredAuthorizedRedirectUri",
+    ) ?? null,
+    requiredScopes: stringListAlias(record, "required_scopes", "requiredScopes"),
+  };
+}
+
+export function gmailOAuthConfigFailureMessage(config: GmailOAuthConfig | null | undefined): string {
+  if (!config) return "Gmail connection failed. Check the server OAuth configuration.";
+  const missing = [
+    !config.clientIdConfigured ? "client ID" : null,
+    !config.clientSecretConfigured ? "client secret" : null,
+    !config.csrfSecretConfigured ? "session secret" : null,
+    !config.homeserverUrlConfigured ? "homeserver URL" : null,
+  ].filter((item): item is string => Boolean(item));
+  if (missing.length > 0) {
+    return `Gmail OAuth is missing ${missing.join(", ")}.`;
+  }
+  if (config.requiredAuthorizedRedirectUri) {
+    return `Gmail connection failed. In Google Cloud Console, confirm this authorized redirect URI is registered: ${config.requiredAuthorizedRedirectUri}`;
+  }
+  return "Gmail connection failed. Check the OAuth client type, consent screen, redirect URI, and Gmail scopes.";
 }
 
 export type GmailConnectionWarningState = {

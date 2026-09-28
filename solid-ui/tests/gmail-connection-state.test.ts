@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import {
   gmailActionAvailabilityState,
   gmailConnectionWarningState,
+  gmailOAuthConfigFailureMessage,
   normalizeGmailConnectionStatus,
+  normalizeGmailOAuthConfig,
   oauthUrlFromResponse,
 } from "../src/lib/gmailConnectionState.ts";
 
@@ -60,6 +62,46 @@ test("oauthUrlFromResponse only accepts https redirect urls", () => {
   assert.throws(() => oauthUrlFromResponse({ url: "javascript:alert(1)" }), /Invalid OAuth redirect URL/);
   assert.throws(() => oauthUrlFromResponse({ url: "/local/callback" }), /Invalid OAuth redirect URL/);
   assert.throws(() => oauthUrlFromResponse({}), /Invalid OAuth redirect URL/);
+});
+
+test("normalizeGmailOAuthConfig accepts redacted OAuth diagnostics", () => {
+  const config = normalizeGmailOAuthConfig({
+    configured: true,
+    client_id_configured: true,
+    client_secret_configured: true,
+    csrf_secret_configured: true,
+    homeserver_url_configured: true,
+    redirect_uri: "https://api.omnyid.com/gmail/callback",
+    required_authorized_redirect_uri: "https://api.omnyid.com/gmail/callback",
+    required_scopes: ["https://www.googleapis.com/auth/gmail.modify"],
+  });
+
+  assert.equal(config.configured, true);
+  assert.equal(config.requiredAuthorizedRedirectUri, "https://api.omnyid.com/gmail/callback");
+  assert.deepEqual(config.requiredScopes, ["https://www.googleapis.com/auth/gmail.modify"]);
+});
+
+test("gmailOAuthConfigFailureMessage names missing config or required redirect URI", () => {
+  assert.match(
+    gmailOAuthConfigFailureMessage(normalizeGmailOAuthConfig({
+      client_id_configured: false,
+      client_secret_configured: true,
+      csrf_secret_configured: false,
+      homeserver_url_configured: true,
+    })),
+    /client ID, session secret/i,
+  );
+  assert.match(
+    gmailOAuthConfigFailureMessage(normalizeGmailOAuthConfig({
+      configured: true,
+      client_id_configured: true,
+      client_secret_configured: true,
+      csrf_secret_configured: true,
+      homeserver_url_configured: true,
+      required_authorized_redirect_uri: "https://api.omnyid.com/gmail/callback",
+    })),
+    /https:\/\/api\.omnyid\.com\/gmail\/callback/,
+  );
 });
 
 test("gmailConnectionWarningState returns danger state for expired tokens", () => {

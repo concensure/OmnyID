@@ -6,9 +6,9 @@
 use super::{
     gmail_access_token_from_token_response, gmail_connection_change_requires_recent_session,
     gmail_oauth_client_id_configured, gmail_oauth_client_secret_configured,
-    gmail_oauth_is_fully_configured, gmail_oauth_redirect_target, gmail_oauth_redirect_uri,
-    gmail_oauth_state_sign_at, gmail_oauth_state_verify_at, oauth_csrf_secret,
-    validate_alias_agent_id,
+    gmail_oauth_config_payload, gmail_oauth_is_fully_configured, gmail_oauth_redirect_target,
+    gmail_oauth_redirect_uri, gmail_oauth_state_sign_at, gmail_oauth_state_verify_at,
+    oauth_csrf_secret, validate_alias_agent_id,
 };
 use axum::http::StatusCode;
 use std::sync::{Mutex, OnceLock};
@@ -25,9 +25,11 @@ fn gmail_routes_include_workspace_and_integration_status_aliases() {
     assert!(source.contains(".route(\"/gmail/status\", get(gmail_status_http))"));
     assert!(source.contains(".route(\"/integrations/gmail/status\", get(gmail_status_http))"));
     assert!(source.contains(".route(\"/gmail/connect-url\", get(gmail_connect_url_http))"));
+    assert!(source.contains(".route(\"/gmail/config\", get(gmail_config_http))"));
     assert!(
         source.contains(".route(\"/integrations/gmail/oauth-url\", get(gmail_connect_url_http))")
     );
+    assert!(source.contains(".route(\"/integrations/gmail/config\", get(gmail_config_http))"));
 }
 
 #[test]
@@ -185,6 +187,40 @@ fn gmail_oauth_full_config_requires_all_runtime_inputs() {
         std::env::remove_var("OMNYID_SESSION_SECRET");
     }
     assert!(!gmail_oauth_is_fully_configured());
+
+    unsafe {
+        std::env::remove_var("OMNYID_GMAIL_CLIENT_ID");
+        std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET");
+        std::env::remove_var("OMNYID_HOMESERVER_URL");
+        std::env::remove_var("OMNYID_SESSION_SECRET");
+    }
+}
+
+#[test]
+fn gmail_oauth_config_payload_returns_redacted_diagnostics() {
+    let _guard = env_lock().lock().expect("env lock");
+    unsafe {
+        std::env::set_var("OMNYID_GMAIL_CLIENT_ID", "gmail-client-id");
+        std::env::set_var("OMNYID_GMAIL_CLIENT_SECRET", "gmail-client-secret");
+        std::env::set_var("OMNYID_HOMESERVER_URL", "https://api.omnyid.com");
+        std::env::set_var("OMNYID_SESSION_SECRET", "session-secret");
+    }
+
+    let payload = gmail_oauth_config_payload();
+    assert_eq!(payload["configured"].as_bool(), Some(true));
+    assert_eq!(
+        payload["required_authorized_redirect_uri"].as_str(),
+        Some("https://api.omnyid.com/gmail/callback")
+    );
+    assert!(
+        payload["required_scopes"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|item| item
+                .as_str()
+                .is_some_and(|scope| scope.contains("gmail.modify"))))
+    );
+    assert!(!payload.to_string().contains("gmail-client-secret"));
+    assert!(!payload.to_string().contains("session-secret"));
 
     unsafe {
         std::env::remove_var("OMNYID_GMAIL_CLIENT_ID");

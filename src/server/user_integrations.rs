@@ -12,13 +12,14 @@ mod tests;
 
 use calendar::{
     calendar_create_http, calendar_delete_http, calendar_google_callback_http,
-    calendar_google_config_http, calendar_google_connect_url_http,
-    calendar_google_disconnect_http, calendar_google_status_http, calendar_google_sync_http,
-    calendar_list_http,
+    calendar_google_config_http, calendar_google_connect_url_http, calendar_google_disconnect_http,
+    calendar_google_status_http, calendar_google_sync_http, calendar_list_http,
 };
 
 const GMAIL_OAUTH_STATE_TTL_SECS: i64 = 600;
 const GMAIL_TOKEN_EXPIRY_WARNING_WINDOW_HOURS: i64 = 24;
+const GMAIL_OAUTH_SCOPES: &str =
+    "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email";
 const LOCAL_CACHE_KEY_CONNECTED_APPS: &str = "connected_apps_storage";
 
 fn integration_user_facing_text(
@@ -220,6 +221,20 @@ fn gmail_oauth_is_fully_configured() -> bool {
         && oauth_csrf_secret().is_ok()
 }
 
+fn gmail_oauth_config_payload() -> Value {
+    let redirect_uri = gmail_oauth_redirect_uri().ok();
+    serde_json::json!({
+        "configured": gmail_oauth_is_fully_configured(),
+        "client_id_configured": gmail_oauth_client_id_configured().is_ok(),
+        "client_secret_configured": gmail_oauth_client_secret_configured().is_ok(),
+        "csrf_secret_configured": oauth_csrf_secret().is_ok(),
+        "homeserver_url_configured": redirect_uri.is_some(),
+        "redirect_uri": redirect_uri,
+        "required_authorized_redirect_uri": redirect_uri,
+        "required_scopes": GMAIL_OAUTH_SCOPES.split_whitespace().collect::<Vec<_>>(),
+    })
+}
+
 fn gmail_access_token_from_token_response(token_data: &Value) -> Option<String> {
     let access_token = token_data["access_token"].as_str()?.trim();
     if access_token.is_empty() {
@@ -303,8 +318,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         )
         .route("/gmail/connect-url", get(gmail_connect_url_http))
         .route("/gmail/callback", get(gmail_callback_http))
+        .route("/gmail/config", get(gmail_config_http))
         .route("/gmail/status", get(gmail_status_http))
         .route("/integrations/gmail/oauth-url", get(gmail_connect_url_http))
+        .route("/integrations/gmail/config", get(gmail_config_http))
         .route("/integrations/gmail/status", get(gmail_status_http))
         .route("/gmail/disconnect", post(gmail_disconnect_http))
         .route(
@@ -501,6 +518,15 @@ async fn gmail_disconnect_http(
     })))
 }
 
+/// GET /gmail/config - safe OAuth diagnostics for Gmail connection setup.
+async fn gmail_config_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let _ = authenticated_user_and_session(&state.db, &headers).await?;
+    Ok(Json(gmail_oauth_config_payload()))
+}
+
 /// GET /gmail/connect-url — returns the Google OAuth authorization URL for Gmail scopes
 async fn gmail_connect_url_http(
     State(state): State<Arc<AppState>>,
@@ -513,10 +539,14 @@ async fn gmail_connect_url_http(
     let _ = user.id; // ensure user is authenticated
     let client_id = gmail_oauth_client_id_configured()?;
     let redirect_uri = gmail_oauth_redirect_uri()?;
-    let scopes = "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email";
     // Sign the state so the callback can verify it wasn't forged.
     let signed_state = gmail_oauth_state_sign(&user.id)?;
-    let url = google_oauth_authorization_url(&client_id, &redirect_uri, scopes, &signed_state);
+    let url = google_oauth_authorization_url(
+        &client_id,
+        &redirect_uri,
+        GMAIL_OAUTH_SCOPES,
+        &signed_state,
+    );
     Ok(Json(serde_json::json!({"url": url})))
 }
 
