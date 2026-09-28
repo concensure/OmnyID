@@ -163,6 +163,14 @@
         redir /workspace/ 308
     }
 
+    handle /workspace/sw.js {
+        root * /srv/workspace
+        file_server
+        header Cache-Control "no-cache, no-store, must-revalidate"
+        header Service-Worker-Allowed "/workspace/"
+        header X-Content-Type-Options "nosniff"
+    }
+
     handle_path /workspace/* {
         root * /srv/workspace
         try_files {path} /index.html
