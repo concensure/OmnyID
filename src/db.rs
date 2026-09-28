@@ -10177,15 +10177,23 @@ impl Db {
         let afp_subtype = afp["subtype"].as_str().unwrap_or("");
         let thread_id = afp["thread_id"].as_str().unwrap_or("").to_string();
         let metadata_str = afp["metadata"].as_str().unwrap_or("{}");
+        let from_agent = afp["from_agent"].as_str().unwrap_or("").to_string();
+        let metadata = afp.get("metadata").cloned().unwrap_or(Value::Null);
+        let store_in_relational = afp["store_in_relational"].as_bool().unwrap_or(false);
         let result = sqlx::query(
-            r#"INSERT INTO afp_messages (id, owner_user_id, type, thread_id, payload, created_at)
-               VALUES ($1, $2, $3, $4, $5, NOW())
+            r#"INSERT INTO afp_messages
+               (id, owner_user_id, type, subtype, thread_id, from_agent, store_in_relational, metadata, payload, created_at)
+               VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), $7, $8, $9, NOW())
                ON CONFLICT (id) DO NOTHING"#,
         )
         .bind(&id)
         .bind(&owner_user_id)
         .bind(&afp_type)
+        .bind(afp_subtype)
         .bind(&thread_id)
+        .bind(&from_agent)
+        .bind(store_in_relational)
+        .bind(&metadata)
         .bind(afp)
         .execute(&self.pool)
         .await?;
@@ -11153,8 +11161,8 @@ impl Db {
     ) -> Result<Vec<String>, sqlx::Error> {
         use sqlx::Row;
         let rows = sqlx::query(
-            r#"SELECT group_id FROM contact_group_memberships
-               WHERE owner_user_id = $1 AND email = $2"#,
+            r#"SELECT group_id FROM email_contact_group_memberships
+               WHERE owner_user_id = $1 AND email_address = $2"#,
         )
         .bind(owner_user_id)
         .bind(email)
@@ -11236,7 +11244,7 @@ impl Db {
         group_ids: &[String],
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"DELETE FROM contact_group_memberships WHERE owner_user_id = $1 AND email = $2"#,
+            r#"DELETE FROM email_contact_group_memberships WHERE owner_user_id = $1 AND email_address = $2"#,
         )
         .bind(owner_user_id)
         .bind(email)
@@ -11244,7 +11252,7 @@ impl Db {
         .await?;
         for gid in group_ids {
             sqlx::query(
-                r#"INSERT INTO contact_group_memberships (owner_user_id, email, group_id)
+                r#"INSERT INTO email_contact_group_memberships (owner_user_id, email_address, group_id)
                    VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"#,
             )
             .bind(owner_user_id)

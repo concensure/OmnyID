@@ -467,4 +467,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Per-account record of which wedding intake variant a user has already seen, so it stays consistent across devices",
         include_str!("../../postgres/migrations/0090_wedding_user_onboarding_state.sql"),
     ),
+    (
+        "0091_afp_daemon_messages",
+        "Public daemon AFP message store used by authenticated workspace summaries",
+        include_str!("../../postgres/migrations/0091_afp_daemon_messages.sql"),
+    ),
 ];
