@@ -96,13 +96,27 @@ if command -v pg_restore >/dev/null 2>&1; then
   trap 'rm -f "${TMP_LOG:-}"' EXIT
   # Stream directly into pg_restore so verification does not require
   # scratch space proportional to the decompressed archive size.
-  if ! gzip -dc "${PG_DUMP}" | pg_restore --list >"${TMP_LOG}" 2>&1; then
+  set +e
+  gzip -dc "${PG_DUMP}" | pg_restore --list >"${TMP_LOG}" 2>&1
+  PIPE_STATUSES=("${PIPESTATUS[@]}")
+  set -e
+  GZIP_STATUS="${PIPE_STATUSES[0]:-1}"
+  PG_RESTORE_STATUS="${PIPE_STATUSES[1]:-1}"
+  if [[ "${PG_RESTORE_STATUS}" -ne 0 ]]; then
     detail="$(tr '\r\n' ' ' < "${TMP_LOG}" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
     if [[ -n "${detail}" ]]; then
       echo "[omnyid-backup-verify] ERROR: pg_restore could not read the decompressed Postgres archive: ${detail}" >&2
     else
       echo "[omnyid-backup-verify] ERROR: pg_restore could not read the decompressed Postgres archive." >&2
     fi
+    exit 1
+  fi
+  if [[ "${GZIP_STATUS}" -ne 0 && "${GZIP_STATUS}" -ne 141 ]]; then
+    echo "[omnyid-backup-verify] ERROR: gzip could not decompress the Postgres archive for pg_restore listing." >&2
+    exit 1
+  fi
+  if [[ ! -s "${TMP_LOG}" ]]; then
+    echo "[omnyid-backup-verify] ERROR: pg_restore produced no table-of-contents entries for the decompressed Postgres archive." >&2
     exit 1
   fi
   rm -f "${TMP_LOG}"
@@ -127,8 +141,22 @@ if ! command -v pg_restore >/dev/null 2>&1; then
   echo "pg_restore unavailable inside backup container" >&2
   exit 127
 fi
-if ! gzip -dc "$dump_path" | pg_restore --list >"$tmp_log" 2>&1; then
+set +e
+gzip -dc "$dump_path" | pg_restore --list >"$tmp_log" 2>&1
+pipe_statuses=("${PIPESTATUS[@]}")
+set -e
+gzip_status="${pipe_statuses[0]:-1}"
+pg_restore_status="${pipe_statuses[1]:-1}"
+if [ "$pg_restore_status" -ne 0 ]; then
   cat "$tmp_log" >&2
+  exit 1
+fi
+if [ "$gzip_status" -ne 0 ] && [ "$gzip_status" -ne 141 ]; then
+  echo "gzip could not decompress the Postgres archive for pg_restore listing" >&2
+  exit 1
+fi
+if [ ! -s "$tmp_log" ]; then
+  echo "pg_restore produced no table-of-contents entries for the decompressed Postgres archive" >&2
   exit 1
 fi
 EOF
