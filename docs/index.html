@@ -124,16 +124,17 @@
       </div>
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-3">
-          <button data-open-auth class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white transition hover:opacity-90">
+          <a href="/workspace/?auth=signin&amp;source=marketing" data-open-auth class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white transition hover:opacity-90">
             Offload my stress
-          </button>
-          <button
+          </a>
+          <a
+            href="/workspace/?auth=agent-id&amp;source=marketing"
             data-open-auth
             data-auth-mode="advanced-agent-id"
             class="hidden rounded-lg border border-outline-variant bg-surface-container-low px-4 py-2 text-xs font-medium text-on-surface transition hover:bg-surface md:inline-flex"
           >
             Agent ID only
-          </button>
+          </a>
         </div>
       </div>
     </div>
@@ -162,9 +163,9 @@
           </p>
 
           <div class="flex flex-wrap gap-4 pt-2">
-            <button data-open-auth class="rounded-lg bg-primary px-8 py-4 text-base font-medium text-white shadow-lg shadow-primary/10 transition hover:opacity-95">
+            <a href="/workspace/?auth=signin&amp;source=marketing" data-open-auth class="rounded-lg bg-primary px-8 py-4 text-base font-medium text-white shadow-lg shadow-primary/10 transition hover:opacity-95">
               Offload my stress
-            </button>
+            </a>
             <a href="#promises" class="flex items-center gap-2 rounded-lg px-8 py-4 font-medium text-on-surface transition hover:bg-surface-container-low">
               How it works
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -175,13 +176,14 @@
 
           <div class="space-y-3">
             <p class="text-sm text-on-surface-variant">Open source. Self-hostable. Your data, always yours.</p>
-            <button
+            <a
+              href="/workspace/?auth=agent-id&amp;source=marketing"
               data-open-auth
               data-auth-mode="advanced-agent-id"
               class="font-mono text-xs uppercase tracking-[0.18em] text-primary transition hover:opacity-80"
             >
               Already have an agent? Create only an Agent ID.
-            </button>
+            </a>
           </div>
         </div>
 
@@ -635,12 +637,12 @@
             Choose a starter to begin. OmnyID will keep this trial ephemeral and ask you to sign in before anything becomes persistent.
           </div>
           <div class="mt-4 flex flex-wrap gap-3">
-            <button data-open-auth type="button" class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+            <a href="/workspace/?auth=signin&amp;source=marketing" data-open-auth class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90">
               Continue with account
-            </button>
-            <button data-open-auth data-auth-mode="advanced-agent-id" type="button" class="rounded-xl border border-outline-variant bg-surface px-5 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low">
+            </a>
+            <a href="/workspace/?auth=agent-id&amp;source=marketing" data-open-auth data-auth-mode="advanced-agent-id" class="rounded-xl border border-outline-variant bg-surface px-5 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low">
               Agent ID only
-            </button>
+            </a>
           </div>
         </div>
       </div>
