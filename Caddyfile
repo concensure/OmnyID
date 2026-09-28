@@ -164,6 +164,7 @@
     }
 
     handle /workspace/sw.js {
+        uri strip_prefix /workspace
         root * /srv/workspace
         file_server
         header Cache-Control "no-cache, no-store, must-revalidate"
