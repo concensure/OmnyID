@@ -10,6 +10,15 @@ import "./index.css";
 // ── Service Worker registration (U-01: update-ready notification) ─────────────
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    const hadServiceWorkerController = Boolean(navigator.serviceWorker.controller);
+    let refreshingForUpdatedWorker = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadServiceWorkerController) return;
+      if (refreshingForUpdatedWorker) return;
+      refreshingForUpdatedWorker = true;
+      window.location.reload();
+    });
+
     navigator.serviceWorker
       .register("/workspace/sw.js", { scope: "/workspace/" })
       .then((reg) => {
@@ -18,6 +27,7 @@ if ("serviceWorker" in navigator) {
         // A new SW version found and installed — notify the app.
         const notifyUpdate = (sw: ServiceWorker) => {
           if (sw.state === "installed") {
+            sw.postMessage({ type: "SKIP_WAITING" });
             dispatchSwUpdateReadyEvent({ sw });
           }
         };
