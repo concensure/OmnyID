@@ -17,6 +17,11 @@ import {
   type WeddingNeedToKnowProjectionContext,
 } from "@/lib/weddingNeedToKnowAfpProjectionState";
 import {
+  hasSentWeddingIntakeProfileAfpProjection,
+  weddingIntakeProfileProjectionId,
+  weddingIntakeProfileToAfpSendInput,
+} from "@/lib/weddingIntakeProfileAfpProjectionState";
+import {
   hasSentWeddingDecisionAfpProjection,
   weddingDecisionProjectionToAfpSendInput,
   type WeddingDecisionProjectionInput,
@@ -54,7 +59,7 @@ import {
 
 export const WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY = "omnyid.wedding.boundary_afp_projections.v1";
 
-export type WeddingProjectionQueueItemKind = "context" | "artifact" | "calendar_event" | "task" | "decision" | "access_control" | "boundary";
+export type WeddingProjectionQueueItemKind = "context" | "intake_profile" | "artifact" | "calendar_event" | "task" | "decision" | "access_control" | "boundary";
 export type WeddingProjectionQueueItemStatus = ContinuityProjectionQueueItem<WeddingProjectionQueueItemKind>["status"];
 export type WeddingProjectionQueueItem = ContinuityProjectionQueueItem<WeddingProjectionQueueItemKind> & {
   semanticKind: WeddingSemanticUiKind | null;
@@ -182,6 +187,49 @@ function contextItem(
     statusLabel: sent ? "Already saved as context" : "Ready to save as context",
     blockedReason: null,
     sendInput: sent ? null : weddingNeedToKnowContextToAfpSendInput(context, nowIso),
+  });
+}
+
+function hasIntakeProfilePlanningValue(context: WeddingNeedToKnowProjectionContext): boolean {
+  const planning = record(context.planningContext);
+  return [
+    planning.dateOrSeason,
+    planning.date_or_season,
+    planning.location,
+    planning.guestCount,
+    planning.guest_count,
+    planning.budgetComfort,
+    planning.budget_comfort,
+    planning.atmosphereDescription,
+    planning.atmosphere_description,
+    planning.noimDownloaded,
+    planning.noim_downloaded,
+    planning.celebrantPath,
+    planning.celebrant_path,
+    planning.vowPreference,
+    planning.vow_preference,
+  ].some((value) => typeof value === "number" || typeof value === "boolean" || Boolean(clean(value)))
+    || stringArray(planning.topPriorities ?? planning.top_priorities).length > 0
+    || stringArray(planning.inspirationImageUrls ?? planning.inspiration_image_urls).length > 0
+    || stringArray(context.answeredLabels).length > 0;
+}
+
+function intakeProfileItem(
+  context: WeddingNeedToKnowProjectionContext,
+  nowIso: string,
+  storage: Storage,
+): WeddingProjectionQueueItem {
+  const sourceId = weddingIntakeProfileProjectionId(context);
+  const sent = hasSentWeddingIntakeProfileAfpProjection(sourceId, storage);
+  return queueItem({
+    id: `intake_profile:${sourceId}`,
+    sourceId,
+    kind: "intake_profile",
+    title: "Wedding intake profile",
+    status: sent ? "sent" : "pending",
+    statusLabel: sent ? "Already saved as structured profile" : "Ready to save as structured profile",
+    blockedReason: null,
+    sendInput: sent ? null : weddingIntakeProfileToAfpSendInput(context, nowIso),
   });
 }
 
@@ -328,7 +376,10 @@ export function buildWeddingProjectionQueueState(input: {
   const nowIso = clean(input.nowIso) ?? new Date().toISOString();
   const storage = projectionStorage(input.storage);
   const items = [
-    ...(input.contextItems ?? []).map((context) => contextItem(context, nowIso, storage)),
+    ...(input.contextItems ?? []).flatMap((context) => [
+      contextItem(context, nowIso, storage),
+      ...(hasIntakeProfilePlanningValue(context) ? [intakeProfileItem(context, nowIso, storage)] : []),
+    ]),
     ...(input.decisionItems ?? []).map((decision) => decisionItem(decision, nowIso, storage)),
     ...(input.artifacts ?? []).map((artifact) => artifactItem(artifact, nowIso, storage)),
     ...(input.scheduleItems ?? []).map((item) => calendarItem(item, nowIso, storage)),

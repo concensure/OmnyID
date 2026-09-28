@@ -14,7 +14,7 @@ import {
   weddingBudgetSidebarAction,
   weddingDayCountdownDetail,
   weddingDayCountdownLabel,
-  weddingTimelineSidebarAction,
+  weddingTimelinePrimarySidebarAction,
 } from "@/lib/weddingWorkspaceSidebarActionState";
 
 function pressureLabel(label: string): string {
@@ -48,7 +48,7 @@ export function WeddingDecisionFocusCard(props: {
     props.onSidebarAction(weddingBudgetSidebarAction(props.state));
   }
   function openCalendar() {
-    props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state));
+    props.onSidebarAction(weddingTimelinePrimarySidebarAction(props.state));
   }
   function deferItem(item: (typeof props.state.personalOsProjection.decisionLoadRelief.focusItems)[number]) {
     setLocallyDeferredIds((current) => new Set([...current, item.id]));

@@ -36,6 +36,8 @@ export type WeddingPlanningContext = {
   guestCount?: number | string | null;
   budgetComfort?: string | null;
   topPriorities?: readonly string[] | null;
+  atmosphereDescription?: string | null;
+  inspirationImageUrls?: readonly string[] | null;
   countryCode?: string | null;
   legalJurisdiction?: string | null;
   noimDownloaded?: boolean | "yes" | "no" | "unknown" | null;

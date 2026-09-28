@@ -241,6 +241,10 @@ export function WeddingSeatingPanel(props: {
           <button
             type="button"
             class="rounded-full bg-sky-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-950"
+            data-magic-action="assign-seat"
+            data-magic-icon="seating"
+            data-magic-label={props.state.seatingPlan.guestRowsConsidered > 0 ? "Draft seating plan" : "Add attending guests"}
+            data-magic-id="wedding:seating:draft"
             onClick={() => props.onSidebarAction(buildWeddingSeatingDraftSidebarAction(props.state.seatingPlan))}
           >
             {props.state.seatingPlan.guestRowsConsidered > 0 ? "Draft seating plan" : "Add attending guests"}
@@ -248,6 +252,10 @@ export function WeddingSeatingPanel(props: {
           <button
             type="button"
             class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-950 transition hover:bg-white"
+            data-magic-action="open"
+            data-magic-icon="guests"
+            data-magic-label="Open guest list"
+            data-magic-id="wedding:seating:open-guests"
             onClick={() => props.onSelectMenu?.("guests")}
           >
             Open guest list
@@ -299,6 +307,10 @@ export function WeddingSeatingPanel(props: {
                     <button
                       type="button"
                       class="rounded-full border border-sky-100 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-sky-950 transition hover:bg-white"
+                      data-magic-action="open"
+                      data-magic-icon="task"
+                      data-magic-label={`Open task: ${item.title}`}
+                      data-magic-id={`wedding:seating:task:${item.id}`}
                       onClick={() => props.onSidebarAction(seatingTaskSidebarAction(item.title, props.state))}
                     >
                       Open task
@@ -341,6 +353,10 @@ export function WeddingSeatingPanel(props: {
                 type="button"
                 disabled={saving()}
                 class="rounded-full bg-sky-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-950 disabled:cursor-not-allowed disabled:opacity-50"
+                data-magic-action="approve"
+                data-magic-icon="save"
+                data-magic-label={saving() ? "Saving..." : preview().applyLabel}
+                data-magic-id="wedding:seating:apply-draft"
                 onClick={() => void applySeatingDraft()}
               >
                 {saving() ? "Saving..." : preview().applyLabel}
@@ -348,6 +364,10 @@ export function WeddingSeatingPanel(props: {
               <button
                 type="button"
                 class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-950 transition hover:bg-white"
+                data-magic-action="swap-table"
+                data-magic-icon="swap"
+                data-magic-label={preview().alternativeLabel}
+                data-magic-id="wedding:seating:show-alternatives"
                 onClick={showSeatingAlternatives}
               >
                 {preview().alternativeLabel}
@@ -383,6 +403,10 @@ export function WeddingSeatingPanel(props: {
                         type="button"
                         disabled={saving()}
                         class="mt-2 rounded-full bg-sky-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-950 disabled:cursor-not-allowed disabled:opacity-50"
+                        data-magic-action="approve"
+                        data-magic-icon="save"
+                        data-magic-label={`Save seating option ${index() + 1}`}
+                        data-magic-id={`wedding:seating:alternative:${index() + 1}:save`}
                         onClick={() => void saveAlternativeDraft(option)}
                       >
                         Save this option
@@ -423,6 +447,10 @@ export function WeddingSeatingPanel(props: {
                               type="button"
                               disabled={saving()}
                               class="rounded-full border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-950 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              data-magic-action="approve"
+                              data-magic-icon="save"
+                              data-magic-label={`Make current: ${draft.title}`}
+                              data-magic-id={`wedding:seating:saved-draft:${draft.id}:make-current`}
                               onClick={() => void saveAlternativeDraft(draft.result)}
                             >
                               Make current
@@ -431,6 +459,10 @@ export function WeddingSeatingPanel(props: {
                               type="button"
                               disabled={saving()}
                               class="rounded-full border border-sky-100 bg-white/70 px-3 py-1.5 text-xs font-semibold text-sky-950/70 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                              data-magic-action="dismiss"
+                              data-magic-icon="hide"
+                              data-magic-label={`Hide old draft: ${draft.title}`}
+                              data-magic-id={`wedding:seating:saved-draft:${draft.id}:hide`}
                               onClick={() => void hideSavedDraft(draft.result)}
                             >
                               Hide old draft
@@ -460,6 +492,10 @@ export function WeddingSeatingPanel(props: {
                   type="button"
                   disabled={!seatingInstruction().trim() || saving()}
                   class="rounded-full border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-950 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  data-magic-action="open"
+                  data-magic-icon="preview"
+                  data-magic-label="Preview change"
+                  data-magic-id="wedding:seating:instruction:preview"
                   onClick={previewSeatingInstruction}
                 >
                   Preview change
@@ -468,6 +504,10 @@ export function WeddingSeatingPanel(props: {
                   type="button"
                   disabled={!seatingInstruction().trim() || saving()}
                   class="rounded-full bg-sky-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-950 disabled:cursor-not-allowed disabled:opacity-50"
+                  data-magic-action="approve"
+                  data-magic-icon="save"
+                  data-magic-label={saving() ? "Saving..." : "Save change"}
+                  data-magic-id="wedding:seating:instruction:save"
                   onClick={() => void saveSeatingInstruction()}
                 >
                   {saving() ? "Saving..." : "Save change"}

@@ -451,6 +451,10 @@ export function WeddingBudgetTrackerCard(props: {
                     <Show when={task.linkedArtifactId && props.onOpenArtifact}>
                       <button
                         type="button"
+                        data-magic-action="open"
+                        data-magic-icon="source"
+                        data-magic-label={`View source for ${task.title}`}
+                        data-magic-id={`wedding:budget:payment:${task.id}:source`}
                         onClick={() => task.linkedArtifactId && props.onOpenArtifact?.(task.linkedArtifactId)}
                         class="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-50"
                       >
@@ -510,6 +514,10 @@ export function WeddingBudgetTrackerCard(props: {
                   <Show when={quote.linkedArtifactId && props.onOpenArtifact}>
                     <button
                       type="button"
+                      data-magic-action="open"
+                      data-magic-icon="source"
+                      data-magic-label={`View source for ${quote.vendorName}`}
+                      data-magic-id={`wedding:budget:quote:${quote.vendorName}:source`}
                       onClick={() => quote.linkedArtifactId && props.onOpenArtifact?.(quote.linkedArtifactId)}
                       class="mt-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-50"
                     >
@@ -617,6 +625,10 @@ export function WeddingBudgetTrackerCard(props: {
                 <Show when={item.linkedArtifactId && props.onOpenArtifact}>
                   <button
                     type="button"
+                    data-magic-action="open"
+                    data-magic-icon="source"
+                    data-magic-label={`View source for ${item.vendorName}`}
+                    data-magic-id={`wedding:budget:line-item:${item.id}:source`}
                     onClick={() => item.linkedArtifactId && props.onOpenArtifact?.(item.linkedArtifactId)}
                     class="mt-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-50"
                   >

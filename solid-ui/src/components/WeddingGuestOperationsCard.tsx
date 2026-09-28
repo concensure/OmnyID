@@ -1,12 +1,29 @@
-// @locs-version: 2.0
-import { For, Show, createSignal } from "solid-js";
+// @locs-version: 2.3
+import { For, Show, createMemo, createSignal } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
+import {
+  loadWeddingGuestOperationsLocalState,
+  saveWeddingGuestOperationsLocalState,
+  weddingGuestOperationsScopeFromMetadata,
+  type WeddingGuestOperationsLocalDraftGuest,
+} from "@/lib/weddingGuestOperationsLocalState";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
+
+type GuestRsvpStatus = "Attending" | "Not attending" | "Pending";
+
+const rsvpOptions: GuestRsvpStatus[] = ["Attending", "Not attending", "Pending"];
+
+function rsvpToneClass(status: string): string {
+  if (status === "Attending") return "border-emerald-100 bg-emerald-50 text-emerald-900";
+  if (status === "Not attending") return "border-slate-200 bg-slate-50 text-slate-700";
+  return "border-amber-100 bg-amber-50 text-amber-900";
+}
 
 export function WeddingGuestOperationsCard(props: {
   state: WeddingGuestTrackingState;
+  metadata?: unknown;
   onSaveGuestDraft?: (input: {
     displayName: string;
     householdLabel: string;
@@ -32,11 +49,39 @@ export function WeddingGuestOperationsCard(props: {
   const [guestAccessibility, setGuestAccessibility] = createSignal("");
   const [plusOneRule, setPlusOneRule] = createSignal("No extra plus-ones unless the couple approves them.");
   const [childrenRule, setChildrenRule] = createSignal("Children under 12 are not included unless named on the invite.");
-  const [draftGuests, setDraftGuests] = createSignal<Array<{ name: string; group: string; rsvp: string }>>([]);
-  const [savedRules, setSavedRules] = createSignal<string[]>([]);
+  const localScope = weddingGuestOperationsScopeFromMetadata(props.metadata);
+  const localState = loadWeddingGuestOperationsLocalState(localScope);
+  const [draftGuests, setDraftGuests] = createSignal<WeddingGuestOperationsLocalDraftGuest[]>(localState.guests);
+  const [savedRules, setSavedRules] = createSignal<string[]>(localState.rules);
+  const [rsvpOverrides, setRsvpOverrides] = createSignal<Record<string, string>>(localState.rsvpOverrides);
   const [savingGuest, setSavingGuest] = createSignal(false);
   const [savingRules, setSavingRules] = createSignal(false);
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
+  const guestRows = createMemo(() => (props.state.guestRows ?? []).slice(0, 8).map((row) => ({
+    ...row,
+    rsvpStatus: rsvpOverrides()[row.id] ?? row.rsvpStatus,
+    locallyChanged: Boolean(rsvpOverrides()[row.id]),
+  })));
+  const saveLocalState = (next: {
+    guests?: WeddingGuestOperationsLocalDraftGuest[];
+    rules?: string[];
+    rsvpOverrides?: Record<string, string>;
+  }) => {
+    saveWeddingGuestOperationsLocalState(localScope, {
+      guests: next.guests ?? draftGuests(),
+      rules: next.rules ?? savedRules(),
+      rsvpOverrides: next.rsvpOverrides ?? rsvpOverrides(),
+    });
+  };
+  const setGuestRsvpOverride = (guestId: string, status: GuestRsvpStatus) => {
+    const original = (props.state.guestRows ?? []).find((row) => row.id === guestId)?.rsvpStatus;
+    const nextOverrides = { ...rsvpOverrides() };
+    if (original === status) delete nextOverrides[guestId];
+    else nextOverrides[guestId] = status;
+    setRsvpOverrides(nextOverrides);
+    saveLocalState({ rsvpOverrides: nextOverrides });
+    setSaveNotice(`RSVP marked ${status.toLowerCase()} on this device. Save or re-import the guest list later to make it account data.`);
+  };
   const saveGuestDraft = async () => {
     const name = guestName().trim();
     const group = guestGroup().trim() || "Ungrouped";
@@ -57,10 +102,12 @@ export function WeddingGuestOperationsCard(props: {
           accessibilityNote: guestAccessibility(),
         })
         : "Guest draft saved on this device. Account saving is not connected yet.";
-      setDraftGuests((current) => [
-        ...current,
+      const nextGuests = [
+        ...draftGuests(),
         { name, group, rsvp: guestRsvp() },
-      ]);
+      ].slice(-80);
+      setDraftGuests(nextGuests);
+      saveLocalState({ guests: nextGuests });
       setGuestName("");
       setGuestGroup("");
       setGuestRsvp("Pending");
@@ -87,6 +134,7 @@ export function WeddingGuestOperationsCard(props: {
         ? await props.onSaveGuestRules({ plusOneRule: plusOneRule().trim(), childrenRule: childrenRule().trim() })
         : "Guest rules saved on this device. Account saving is not connected yet.";
       setSavedRules(labels);
+      saveLocalState({ rules: labels });
       setSaveNotice(notice);
     } catch (error) {
       setSaveNotice(error instanceof Error ? error.message : "Guest rules could not be saved. Try again.");
@@ -123,6 +171,10 @@ export function WeddingGuestOperationsCard(props: {
         <button
           type="button"
           class="rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-950"
+          data-magic-action="open"
+          data-magic-icon="guest"
+          data-magic-label="Add guest"
+          data-magic-id="wedding:guests:add-panel"
           onClick={() => setActivePanel(activePanel() === "guest" ? null : "guest")}
         >
           Add guest
@@ -130,6 +182,10 @@ export function WeddingGuestOperationsCard(props: {
         <button
           type="button"
           class="rounded-full border border-sky-200 bg-white/80 px-3 py-2 text-xs font-semibold text-sky-950 transition hover:bg-white"
+          data-magic-action="open"
+          data-magic-icon="rules"
+          data-magic-label="Set guest rules"
+          data-magic-id="wedding:guests:rules-panel"
           onClick={() => setActivePanel(activePanel() === "rules" ? null : "rules")}
         >
           Set guest rules
@@ -241,6 +297,10 @@ export function WeddingGuestOperationsCard(props: {
             type="button"
             class="mt-3 rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-950 disabled:cursor-not-allowed disabled:bg-sky-300"
             disabled={!guestName().trim() || savingGuest()}
+            data-magic-action="approve"
+            data-magic-icon="save"
+            data-magic-label={savingGuest() ? "Saving..." : "Add to guest list"}
+            data-magic-id="wedding:guests:add-draft"
             onClick={() => void saveGuestDraft()}
           >
             {savingGuest() ? "Saving..." : "Add to guest list"}
@@ -283,6 +343,10 @@ export function WeddingGuestOperationsCard(props: {
             type="button"
             class="mt-3 rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-950"
             disabled={savingRules()}
+            data-magic-action="approve"
+            data-magic-icon="save"
+            data-magic-label={savingRules() ? "Saving..." : "Save guest rules"}
+            data-magic-id="wedding:guests:save-rules"
             onClick={() => void saveRuleDraft()}
           >
             {savingRules() ? "Saving..." : "Save guest rules"}
@@ -298,6 +362,64 @@ export function WeddingGuestOperationsCard(props: {
               </For>
             </div>
           </Show>
+        </div>
+      </Show>
+      <Show when={guestRows().length > 0}>
+        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p class="text-xs font-semibold text-sky-950/70">Guest RSVP quick actions</p>
+              <p class="mt-1 text-xs leading-5 text-sky-950/60">
+                Quick changes are local until you save or re-import the guest list.
+              </p>
+            </div>
+            <Show when={(props.state.guestRows?.length ?? 0) > guestRows().length}>
+              <span class="max-w-full break-words rounded-full bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-900">
+                Showing {guestRows().length} of {props.state.guestRows?.length}
+              </span>
+            </Show>
+          </div>
+          <div class="mt-2 space-y-2">
+            <For each={guestRows()}>
+              {(guest) => (
+                <article class="rounded-xl border border-sky-100 bg-sky-50/60 px-2.5 py-2">
+                  <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div class="min-w-0">
+                      <p class="break-words text-xs font-semibold text-sky-950">{guest.displayName}</p>
+                      <p class="mt-0.5 break-words text-[11px] leading-4 text-sky-950/60">
+                        {guest.householdLabel} - {guest.sourceLabel}
+                      </p>
+                    </div>
+                    <span class={`max-w-full break-words rounded-full border px-2 py-1 text-[11px] font-semibold ${rsvpToneClass(guest.rsvpStatus)}`}>
+                      {guest.rsvpStatus}{guest.locallyChanged ? " (local)" : ""}
+                    </span>
+                  </div>
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    <For each={rsvpOptions}>
+                      {(status) => (
+                        <button
+                          type="button"
+                          class={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${guest.rsvpStatus === status ? "border-sky-300 bg-white text-sky-950" : "border-sky-100 bg-white/70 text-sky-950/70 hover:bg-white"}`}
+                          data-magic-action={status === "Attending" ? "rsvp-yes" : status === "Not attending" ? "rsvp-no" : "open"}
+                          data-magic-icon={status === "Attending" ? "check" : status === "Not attending" ? "dismiss" : "clock"}
+                          data-magic-label={`${guest.displayName}: ${status}`}
+                          data-magic-id={`wedding:guest:${guest.id}:rsvp:${status.toLowerCase().replace(/\W+/g, "-")}`}
+                          onClick={() => setGuestRsvpOverride(guest.id, status)}
+                        >
+                          {status}
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                  <Show when={[guest.mealPreference, guest.dietaryNote, guest.accessibilityNote].some(Boolean)}>
+                    <p class="mt-2 break-words text-[11px] leading-4 text-sky-950/60">
+                      {[guest.mealPreference, guest.dietaryNote, guest.accessibilityNote].filter(Boolean).join(" - ")}
+                    </p>
+                  </Show>
+                </article>
+              )}
+            </For>
+          </div>
         </div>
       </Show>
       <div class="mt-3 grid grid-cols-3 gap-2">

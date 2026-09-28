@@ -6,6 +6,9 @@ import {
   markWeddingNeedToKnowAfpProjectionSent,
 } from "@/lib/weddingNeedToKnowAfpProjectionState";
 import {
+  markWeddingIntakeProfileAfpProjectionSent,
+} from "@/lib/weddingIntakeProfileAfpProjectionState";
+import {
   markWeddingDecisionAfpProjectionSent,
 } from "@/lib/weddingDecisionAfpProjectionState";
 import {
@@ -162,6 +165,8 @@ export function markWeddingProjectionDispatchReceiptSent(
   for (const item of receipt.savedItems) {
     if (item.kind === "context") {
       markWeddingNeedToKnowAfpProjectionSent(item.sourceId, storage);
+    } else if (item.kind === "intake_profile") {
+      markWeddingIntakeProfileAfpProjectionSent(item.sourceId, storage);
     } else if (item.kind === "decision") {
       markWeddingDecisionAfpProjectionSent(item.sourceId, storage);
     } else if (item.kind === "artifact") {

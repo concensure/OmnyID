@@ -1,5 +1,5 @@
 // @locs-version: 2.1
-import { For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
@@ -11,8 +11,39 @@ export function WeddingAdvancedAuditPanels(props: {
   onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
 }) {
+  const [expanded, setExpanded] = createSignal(false);
+  const summary = createMemo(() => {
+    const blockedCount = props.state.expectedBehaviorAuditCard.blockedItems.length
+      + props.state.importParserReadiness.blockerLabels.length
+      + props.state.productionRemainingWork.totalBlockedItems;
+    const visibleRecordCount = props.state.approvalReceiptCards.length
+      + props.state.decisionRecordCards.length
+      + props.state.secondOrderLoopCards.length
+      + props.state.recommendationCards.length;
+    if (blockedCount > 0) return `${blockedCount} setup item${blockedCount === 1 ? "" : "s"} need review`;
+    if (visibleRecordCount > 0) return `${visibleRecordCount} audit record${visibleRecordCount === 1 ? "" : "s"} available`;
+    return "Setup checks available";
+  });
   return (
-    <>
+    <section class="rounded-[24px] border border-slate-200/80 bg-slate-50/75 p-3 shadow-card sm:rounded-[28px] sm:p-4">
+      <button
+        type="button"
+        aria-expanded={expanded()}
+        class="flex w-full flex-col gap-2 text-left sm:flex-row sm:items-center sm:justify-between"
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <span>
+          <span class="block text-sm font-semibold text-slate-950">Setup checks</span>
+          <span class="mt-1 block text-xs leading-5 text-slate-700/75">
+            Connection, approval, and launch checks. Most couples can leave this closed.
+          </span>
+        </span>
+        <span class="inline-flex max-w-full items-center justify-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-semibold text-slate-800">
+          {expanded() ? "Hide details" : summary()}
+        </span>
+      </button>
+      <Show when={expanded()}>
+        <div class="mt-3 space-y-3">
       <div class="min-w-0 rounded-[24px] border border-teal-100/80 bg-teal-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
         <div class="flex items-start justify-between gap-2">
           <p class="text-base font-semibold text-teal-950">Import check</p>
@@ -335,6 +366,8 @@ export function WeddingAdvancedAuditPanels(props: {
           </div>
         </div>
       </Show>
-    </>
+        </div>
+      </Show>
+    </section>
   );
 }

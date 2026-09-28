@@ -42,7 +42,7 @@ function contextId(metadata: WeddingPlanningMetadata): string {
 }
 
 function markdownFor(context: WeddingNeedToKnowProjectionContext): string {
-  const planning = context.planningContext;
+  const planning = context.planningContext ?? {};
   return [
     "# Wedding Need-To-Know answers",
     "",
@@ -66,6 +66,8 @@ function markdownFor(context: WeddingNeedToKnowProjectionContext): string {
     `- Budget comfort: ${clean(planning.budgetComfort) ?? "Unknown"}`,
     `- Couple: ${clean(planning.familyOrStakeholderRoles) ?? "Unknown"}`,
     `- Top priorities: ${planning.topPriorities?.length ? planning.topPriorities.join(", ") : "Unknown"}`,
+    `- Atmosphere: ${clean(planning.atmosphereDescription) ?? "Unknown"}`,
+    `- Inspiration image links: ${planning.inspirationImageUrls?.length ? planning.inspirationImageUrls.join(", ") : "Unknown"}`,
     `- NOIM status: ${clean(planning.noimDownloaded) ?? "Unknown"}`,
     `- Celebrant path: ${clean(planning.celebrantPath) ?? "Unknown"}`,
     "",
@@ -77,7 +79,7 @@ function markdownFor(context: WeddingNeedToKnowProjectionContext): string {
 }
 
 function projectionTags(context: WeddingNeedToKnowProjectionContext): string[] {
-  const planning = context.planningContext;
+  const planning = context.planningContext ?? {};
   return uniqueStrings([
     ...context.metadata.supertags,
     "wedding",
@@ -113,14 +115,16 @@ export function weddingNeedToKnowContextToAfpMessage(
     metadata.sourceResponseId,
     ...context.answeredLabels,
     context.nextQuestionLabel,
-    clean(context.planningContext.dateOrSeason),
-    clean(context.planningContext.location),
-    clean(context.planningContext.guestCount),
-    clean(context.planningContext.budgetComfort),
-    clean(context.planningContext.familyOrStakeholderRoles),
-    ...(context.planningContext.topPriorities ?? []),
-    clean(context.planningContext.noimDownloaded),
-    clean(context.planningContext.celebrantPath),
+    clean(context.planningContext?.dateOrSeason),
+    clean(context.planningContext?.location),
+    clean(context.planningContext?.guestCount),
+    clean(context.planningContext?.budgetComfort),
+    clean(context.planningContext?.familyOrStakeholderRoles),
+    clean(context.planningContext?.atmosphereDescription),
+    ...(context.planningContext?.inspirationImageUrls ?? []),
+    ...(context.planningContext?.topPriorities ?? []),
+    clean(context.planningContext?.noimDownloaded),
+    clean(context.planningContext?.celebrantPath),
   ], 80);
 
   return {
@@ -141,7 +145,7 @@ export function weddingNeedToKnowContextToAfpMessage(
       next_question_label: context.nextQuestionLabel,
       ready_for_first_recommendations: context.readyForFirstRecommendations,
       semantic_object: semanticObject,
-      planning_context: context.planningContext as Record<string, unknown>,
+      planning_context: (context.planningContext ?? {}) as Record<string, unknown>,
       wedding_plan_id: metadata.weddingPlanId,
       response_workspace_id: metadata.responseWorkspaceId,
       source_response_id: metadata.sourceResponseId,

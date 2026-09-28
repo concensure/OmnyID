@@ -25,6 +25,7 @@ import { WeddingImportantDetailsPanel } from "@/components/WeddingImportantDetai
 import { WeddingInspirationPanel } from "@/components/WeddingInspirationPanel";
 import { WeddingNextStepCard } from "@/components/WeddingNextStepCard";
 import { WeddingProductionGateCard } from "@/components/WeddingProductionGateCard";
+import { WeddingProductionRemainingWorkCard } from "@/components/WeddingProductionRemainingWorkCard";
 import { WeddingSeatingPanel } from "@/components/WeddingSeatingPanel";
 import { WeddingTimelinePanel } from "@/components/WeddingTimelinePanel";
 import { WeddingVendorFollowUpPanel } from "@/components/WeddingVendorFollowUpPanel";
@@ -86,6 +87,7 @@ export function WeddingWorkspaceContextPanels(props: {
   onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
   onOpenArtifact?: (artifactId: string) => void;
   onOpenSavedOutputs?: () => void;
+  onSaveWeddingDate?: (date: string) => Promise<void> | void;
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
 }) {
   const activeMenu = () => props.activeMenu ?? "home";
@@ -205,6 +207,9 @@ export function WeddingWorkspaceContextPanels(props: {
           tone="advanced"
         />
         <WeddingProductionGateCard packet={props.state.productionGoNoGoPacket} />
+        <div class="mt-3">
+          <WeddingProductionRemainingWorkCard state={props.state.productionRemainingWork} />
+        </div>
 
         <WeddingBackgroundAutomationCard state={props.state.backgroundAutomationCoverage} />
       </Show>
@@ -230,10 +235,15 @@ export function WeddingWorkspaceContextPanels(props: {
             state={props.state}
             onSelectMenu={props.onSelectMenu}
             onSidebarAction={props.onSidebarAction}
+            onSaveWeddingDate={props.onSaveWeddingDate}
           />
         </div>
         <div class="mt-3">
-          <WeddingNextStepCard state={props.state} onSelectMenu={props.onSelectMenu} />
+          <WeddingNextStepCard
+            state={props.state}
+            onSelectMenu={props.onSelectMenu}
+            onSaveWeddingDate={props.onSaveWeddingDate}
+          />
         </div>
       </Show>
 
@@ -259,10 +269,6 @@ export function WeddingWorkspaceContextPanels(props: {
           onSaveContribution={saveBudgetAllocation}
           onOpenArtifact={props.onOpenArtifact}
         />
-      </div>
-
-      <div hidden={activeMenu() !== "vision"}>
-        <WeddingVisionPanel state={props.state} onSelectMenu={props.onSelectMenu} />
       </div>
 
       <div hidden={activeMenu() !== "people"}>
@@ -301,6 +307,15 @@ export function WeddingWorkspaceContextPanels(props: {
             </For>
           </div>
         </section>
+        <div class="mt-3">
+          <WeddingHelpersPanel
+            state={props.state}
+            onSidebarAction={props.onSidebarAction}
+            saveProjection={props.saveProjection}
+            onRefreshWorkspace={props.onRefreshWorkspace}
+            metadata={props.state.workspace.metadata}
+          />
+        </div>
       </div>
 
       <div hidden={activeMenu() !== "plan"}>
@@ -344,6 +359,7 @@ export function WeddingWorkspaceContextPanels(props: {
       <div hidden={activeMenu() !== "guests"}>
         <WeddingGuestOperationsCard
           state={props.state.guestTracking}
+          metadata={props.state.workspace.metadata}
           onSaveGuestDraft={saveGuestDraft}
           onSaveGuestRules={saveGuestRules}
         />
@@ -364,6 +380,14 @@ export function WeddingWorkspaceContextPanels(props: {
           saveProjection={props.saveProjection}
           onRefreshWorkspace={props.onRefreshWorkspace}
         />
+        <div class="mt-3">
+          <WeddingVisionPanel
+            state={props.state}
+            onSelectMenu={props.onSelectMenu}
+            saveProjection={props.saveProjection}
+            onRefreshWorkspace={props.onRefreshWorkspace}
+          />
+        </div>
       </div>
 
       <div hidden={activeMenu() !== "seating"}>
@@ -373,16 +397,6 @@ export function WeddingWorkspaceContextPanels(props: {
           onRefreshWorkspace={props.onRefreshWorkspace}
           onSelectMenu={props.onSelectMenu}
           onSidebarAction={props.onSidebarAction}
-        />
-      </div>
-
-      <div hidden={activeMenu() !== "helpers"}>
-        <WeddingHelpersPanel
-          state={props.state}
-          onSidebarAction={props.onSidebarAction}
-          saveProjection={props.saveProjection}
-          onRefreshWorkspace={props.onRefreshWorkspace}
-          metadata={props.state.workspace.metadata}
         />
       </div>
 
@@ -396,10 +410,16 @@ export function WeddingWorkspaceContextPanels(props: {
       </div>
 
       <div hidden={activeMenu() !== "home" || props.state.contextCards.length === 0}>
-        <WeddingImportantDetailsPanel cards={props.state.contextCards} onGenerateRecommendations={generateRecommendationSet} />
+        <WeddingImportantDetailsPanel
+          cards={props.state.contextCards}
+          metadata={props.state.workspace.metadata}
+          saveProjection={props.saveProjection}
+          onRefreshWorkspace={props.onRefreshWorkspace}
+          onGenerateRecommendations={generateRecommendationSet}
+        />
       </div>
 
-      <div hidden={activeMenu() !== "response_queue" || props.state.vendorContactCards.length === 0}>
+      <div hidden={activeMenu() !== "response_queue" || (props.state.vendorContactCards.length === 0 && props.state.vendorPursuitLogCards.length === 0)}>
         <WeddingVendorFollowUpPanel state={props.state} onSidebarAction={props.onSidebarAction} />
       </div>
     </>

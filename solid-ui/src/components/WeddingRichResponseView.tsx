@@ -124,7 +124,9 @@ export function WeddingRichResponseView(props: {
           </p>
           <h2 class="mt-1 break-words text-xl font-semibold text-on-surface sm:text-2xl">{props.state.title}</h2>
           <p class="mt-2 max-w-3xl break-words text-sm leading-6 text-on-surface-variant">{props.state.subtitle}</p>
-          <p class="mt-2 text-xs leading-5 text-rose-950/70">{props.state.accessibilityFallbackLabel}</p>
+          <Show when={props.state.accessibilityFallbackLabel}>
+            {(label) => <p class="mt-2 text-xs leading-5 text-rose-950/70">{label()}</p>}
+          </Show>
         </div>
         <div class="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
           <RichActionButton action={props.state.primaryAction} primary onAction={props.onAction} />

@@ -78,6 +78,9 @@ test("buildWeddingProjectionQueueViewState exposes semantic objects for meaning-
     storage: memoryStorage(),
   });
 
+  assert.equal(state.dispatchPayload?.count, 2);
+  assert.equal(state.dispatchPayload?.sendInputs.some((input) => input.subtype === "wedding_intake_profile"), true);
+  assert.deepEqual(state.groups.map((group) => group.label), ["Context", "Profile"]);
   assert.equal(state.semanticObjects.length, 1);
   assert.equal(state.semanticObjects[0]?.kind, "wedding_active_loop");
   assert.ok(state.semanticObjects[0]?.semanticTags.includes("wedding_context"));

@@ -120,7 +120,6 @@ import { buildWeddingVendorEndToEndValidationState } from "@/lib/weddingVendorEn
 import { buildWeddingVendorSearchProviderPlanState } from "@/lib/weddingVendorSearchProviderPlanState";
 import { buildWeddingVendorSearchReadinessState } from "@/lib/weddingVendorSearchReadinessState";
 import type { WeddingVendorSearchProviderKind } from "@/lib/weddingVendorSearchProviderEnvState";
-import { WEDDING_VOW_STYLE_OPTIONS } from "@/lib/weddingVowPlanningState";
 import {
   loadWeddingTemplateFollowUpDraft,
   saveWeddingTemplateFollowUpDraft,
@@ -221,14 +220,6 @@ const WEDDING_WORKSPACE_MENU_ITEMS: Array<{
     title: "Add photos, screenshots, links, and thoughts so OmnyID can learn the wedding style.",
     className: "border-rose-100 bg-rose-50/80 text-rose-950 hover:border-rose-200",
     activeClassName: "border-rose-300 bg-rose-100 text-rose-950",
-  },
-  {
-    id: "helpers",
-    icon: "tasks",
-    label: "Who helps",
-    title: "See who is helping with each wedding task and what details are still needed.",
-    className: "border-fuchsia-100 bg-fuchsia-50/80 text-fuchsia-950 hover:border-fuchsia-200",
-    activeClassName: "border-fuchsia-300 bg-fuchsia-100 text-fuchsia-950",
   },
   {
     id: "advanced",
@@ -355,6 +346,10 @@ function normalizedVowPreferenceAnswer(value: string): "" | "standard" | "create
   return value === "standard" || value === "create" || value === "undecided" ? value : "";
 }
 
+function linesFromText(value: string): string[] {
+  return value.split(/\n|,/).map((item) => item.trim()).filter(Boolean);
+}
+
 export function ResponseQueueView(props: {
   bootstrap: DashboardBootstrap | null;
   onNavigate?: (view: ViewName, hint?: string) => void;
@@ -394,6 +389,7 @@ export function ResponseQueueView(props: {
   const [weddingRefreshState, setWeddingRefreshState] = createSignal<WeddingWorkspaceRefreshState | null>(null);
   const [weddingVendorSearchRunning, setWeddingVendorSearchRunning] = createSignal(false);
   const [weddingVendorSearchNotice, setWeddingVendorSearchNotice] = createSignal<string | null>(null);
+  const [weddingVendorSearchCategoryScope, setWeddingVendorSearchCategoryScope] = createSignal<string[] | null>(null);
   const [weddingLiveEvidenceRunning, setWeddingLiveEvidenceRunning] = createSignal(false);
   const [weddingLiveEvidenceNotice, setWeddingLiveEvidenceNotice] = createSignal<string | null>(null);
   const [weddingProviderCapabilities, setWeddingProviderCapabilities] = createSignal<WeddingProviderCapabilitiesResponse | null>(null);
@@ -408,6 +404,8 @@ export function ResponseQueueView(props: {
   const [weddingFollowUpGuests, setWeddingFollowUpGuests] = createSignal("");
   const [weddingFollowUpBudget, setWeddingFollowUpBudget] = createSignal("");
   const [weddingFollowUpPriorities, setWeddingFollowUpPriorities] = createSignal("");
+  const [weddingFollowUpAtmosphere, setWeddingFollowUpAtmosphere] = createSignal("");
+  const [weddingFollowUpImageLinks, setWeddingFollowUpImageLinks] = createSignal("");
   const [weddingFollowUpCoupleNames, setWeddingFollowUpCoupleNames] = createSignal("");
   const [weddingFollowUpVendorIds, setWeddingFollowUpVendorIds] = createSignal<string[]>([]);
   const [weddingFollowUpVowPreference, setWeddingFollowUpVowPreference] = createSignal("");
@@ -588,11 +586,8 @@ export function ResponseQueueView(props: {
         .catch(() => {});
     }
   });
-  const activeGenericWeddingLaunch = createMemo(() => (
-    weddingIntakeVariant() === "generic" ? weddingTemplateLaunch() : null
-  ));
-  const activeWeddingSiteLaunch = createMemo(() => (
-    weddingIntakeVariant() === "wedding_site" ? weddingTemplateLaunch() : null
+  const activeWeddingLaunch = createMemo(() => (
+    weddingIntakeActive() ? weddingTemplateLaunch() : null
   ));
   const weddingTemplateFollowUp = createMemo(() => {
     const intent = weddingNavigationIntent();
@@ -608,11 +603,15 @@ export function ResponseQueueView(props: {
       guestCount: weddingFollowUpGuests(),
       budgetComfort: weddingFollowUpBudget(),
       topPriorities: weddingFollowUpPriorities().split(",").map((priority) => priority.trim()).filter(Boolean),
+      atmosphereDescription: weddingFollowUpAtmosphere(),
+      inspirationImageUrls: linesFromText(weddingFollowUpImageLinks()),
       familyOrStakeholderRoles: weddingFollowUpCoupleNames(),
       vendorCategories: weddingFollowUpVendorIds(),
       vendorPreferences: [
         weddingFollowUpBudget() ? `Budget comfort: ${weddingFollowUpBudget()}` : null,
         weddingFollowUpPriorities() ? `Priorities: ${weddingFollowUpPriorities()}` : null,
+        weddingFollowUpAtmosphere() ? `Atmosphere: ${weddingFollowUpAtmosphere()}` : null,
+        weddingFollowUpImageLinks() ? `Inspiration links: ${linesFromText(weddingFollowUpImageLinks()).join(", ")}` : null,
       ].filter(Boolean).join("; "),
       vowPreference: weddingFollowUpVowPreference() || "undecided",
       vowStyle: weddingFollowUpVowStyle(),
@@ -994,6 +993,8 @@ export function ResponseQueueView(props: {
         setWeddingFollowUpGuests(draft.guestCount);
         setWeddingFollowUpBudget(draft.budgetComfort);
         setWeddingFollowUpPriorities(draft.prioritiesCsv);
+        setWeddingFollowUpAtmosphere(draft.atmosphereDescription);
+        setWeddingFollowUpImageLinks(draft.inspirationImageUrlsText);
         setWeddingFollowUpCoupleNames(draft.coupleNames);
         setWeddingFollowUpVendorIds(draft.vendorCategoryIds);
         setWeddingFollowUpVowPreference(draft.vowPreference);
@@ -1143,6 +1144,16 @@ export function ResponseQueueView(props: {
   function runWeddingWorkspaceAction(action: WeddingWorkspaceSidebarAction) {
     const intent = weddingNavigationIntent();
     if (!intent || !action.enabled) return;
+    const scopedVendorCategoryId = typeof action.metadata?.vendor_lead_time_category_id === "string"
+      ? action.metadata.vendor_lead_time_category_id.trim()
+      : "";
+    if (action.metadata?.vendor_lead_time_research_task === true && scopedVendorCategoryId) {
+      setWeddingVendorSearchCategoryScope([scopedVendorCategoryId]);
+      const label = weddingVendorSelectionLabels([scopedVendorCategoryId])[0] ?? scopedVendorCategoryId;
+      setWeddingVendorSearchNotice(`Ready to research ${label}. Search will use admin-configured providers and this user's wedding context.`);
+    } else if (action.metadata?.vendor_search_scope !== "lead_time_category") {
+      setWeddingVendorSearchCategoryScope(null);
+    }
     if (
       action.kind === "continue_chat"
       && weddingRecommendationRequestedOutput(action) === "first_recommendation_set"
@@ -1238,6 +1249,8 @@ export function ResponseQueueView(props: {
         guestCount: weddingFollowUpGuests(),
         budgetComfort: weddingFollowUpBudget(),
         prioritiesCsv: weddingFollowUpPriorities(),
+        atmosphereDescription: weddingFollowUpAtmosphere(),
+        inspirationImageUrlsText: weddingFollowUpImageLinks(),
         coupleNames: weddingFollowUpCoupleNames(),
         vendorCategoryIds: weddingFollowUpVendorIds(),
         vowPreference: normalizedVowPreferenceAnswer(weddingFollowUpVowPreference()),
@@ -1286,6 +1299,8 @@ export function ResponseQueueView(props: {
         guestCount: weddingFollowUpGuests(),
         budgetComfort: weddingFollowUpBudget(),
         prioritiesCsv: weddingFollowUpPriorities(),
+        atmosphereDescription: weddingFollowUpAtmosphere(),
+        inspirationImageUrlsText: weddingFollowUpImageLinks(),
         coupleNames: weddingFollowUpCoupleNames(),
         vowPreference: normalizedVowPreferenceAnswer(weddingFollowUpVowPreference()),
         vowStyle: weddingFollowUpVowStyle(),
@@ -1301,6 +1316,8 @@ export function ResponseQueueView(props: {
     setWeddingFollowUpGuests(state.draft.guestCount ?? "");
     setWeddingFollowUpBudget(state.draft.budgetComfort ?? "");
     setWeddingFollowUpPriorities(state.draft.prioritiesCsv ?? "");
+    setWeddingFollowUpAtmosphere(state.draft.atmosphereDescription ?? "");
+    setWeddingFollowUpImageLinks(state.draft.inspirationImageUrlsText ?? "");
     setWeddingFollowUpCoupleNames(state.draft.coupleNames ?? "");
     setWeddingFollowUpVowPreference(state.draft.vowPreference ?? "");
     setWeddingFollowUpVowStyle(state.draft.vowStyle ?? "");
@@ -1394,7 +1411,10 @@ export function ResponseQueueView(props: {
         setWeddingVendorSearchNotice(`${smokeCleanupGate.blockerLabel} Use Remove fixture, then run live search again.`);
         return;
       }
-      const categoryLabels = weddingVendorSelectionLabels(weddingFollowUpVendorIds());
+      const scopedCategoryIds = weddingVendorSearchCategoryScope();
+      const categoryLabels = weddingVendorSelectionLabels(
+        scopedCategoryIds && scopedCategoryIds.length > 0 ? scopedCategoryIds : weddingFollowUpVendorIds(),
+      );
       const liveWorkflowReadiness = buildWeddingLiveWorkflowReadinessState({
         workflow: "vendor_search",
         dateOrSeason: weddingFollowUpDate(),
@@ -1418,8 +1438,8 @@ export function ResponseQueueView(props: {
       const readiness = buildWeddingVendorSearchReadinessState({
         location: weddingFollowUpLocation(),
         vendorCategories: categoryLabels,
-        vendorPreferences: weddingFollowUpPriorities(),
-        photographyScope: weddingFollowUpPriorities(),
+        vendorPreferences: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
+        photographyScope: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
         musicOrBandNeeded: null,
         liveSearchProviderReady: configuredProviderKinds.length > 0,
       });
@@ -1483,11 +1503,14 @@ export function ResponseQueueView(props: {
       const comparisonArtifact = buildWeddingVendorComparisonArtifactState({
         metadata,
         execution,
-        preferences: weddingFollowUpPriorities(),
+        preferences: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
         location: weddingFollowUpLocation(),
         dateOrSeason: weddingFollowUpDate(),
         guestCount: weddingFollowUpGuests(),
         budgetComfort: weddingFollowUpBudget(),
+        atmosphereDescription: weddingFollowUpAtmosphere(),
+        inspirationImageUrls: linesFromText(weddingFollowUpImageLinks()),
+        topPriorities: linesFromText(weddingFollowUpPriorities()),
         vendorCategories: categoryLabels,
       });
       const generatedArtifacts: WeddingGeneratedArtifact[] = [
@@ -1513,6 +1536,7 @@ export function ResponseQueueView(props: {
       setWeddingImportRefreshKey((value) => value + 1);
       setActiveWeddingArtifactId(comparisonArtifact.summary?.id ?? generatedArtifact.summary.id);
       setWeddingWorkspaceMenu("documents");
+      setWeddingVendorSearchCategoryScope(null);
       setWeddingVendorSearchNotice(comparisonArtifact.status === "created"
         ? `${execution.message} Saved source-backed vendor notes and a top-${comparisonArtifact.topChoiceCount} comparison.`
         : `${execution.message} Saved source-backed vendor notes. ${comparisonArtifact.reason ?? ""}`.trim()
@@ -1794,284 +1818,9 @@ export function ResponseQueueView(props: {
         />
       </Show>
 
-      <Show when={activeGenericWeddingLaunch()}>
-        {(launch) => (
-          <section class="min-w-0 rounded-[24px] border border-rose-100/80 bg-[linear-gradient(135deg,rgba(255,241,242,0.96),rgba(255,251,235,0.94))] p-3 shadow-card sm:rounded-[28px] sm:p-4">
-            <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-rose-700/70">
-              Let's set up your wedding
-            </p>
-            <h2 class="mt-1 break-words text-lg font-semibold text-on-surface">{launch().presentation.title}</h2>
-            <p class="mt-1 break-words text-sm leading-6 text-on-surface-variant">{launch().nextQuestionLabel}</p>
-            <p class="mt-2 text-xs leading-5 text-on-surface-variant">
-              A starter brief has been created as the first planning file. Approve planning outputs to keep it in Files before adding private details.
-            </p>
-            <div class="mt-4 grid min-w-0 gap-3 rounded-[24px] border border-white/70 bg-white/65 p-3 md:grid-cols-3">
-              <label class="space-y-1 text-xs font-semibold text-on-surface md:col-span-3">
-                Paste a planning message for the fastest start — or skip to the fields below. Everything here can be changed later.
-                <textarea
-                  class="min-h-28 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
-                  value={weddingExtractionText()}
-                  onInput={(event) => setWeddingExtractionText(event.currentTarget.value)}
-                  placeholder="Example: We are planning for October 2027 in Sydney NSW, about 90 guests, mid-range budget, priorities are food and photos, NOIM not downloaded, need celebrant options."
-                />
-              </label>
-              <div class="grid gap-2 sm:flex sm:flex-wrap sm:items-center md:col-span-3">
-                <button
-                  class="rounded-full border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-950 transition hover:border-rose-300 hover:bg-rose-50 sm:py-2"
-                  type="button"
-                  onClick={extractWeddingFollowUpFromMessage}
-                >
-                  Use message details
-                </button>
-                <Show when={weddingExtractionNotice()}>
-                  {(notice) => (
-                    <p class="break-words text-xs leading-5 text-rose-950">{notice()}</p>
-                  )}
-                </Show>
-              </div>
-              <label class="space-y-1 text-xs font-semibold text-on-surface">
-                Date or season
-                <input
-                  class="w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2"
-                  value={weddingFollowUpDate()}
-                  onInput={(event) => setWeddingFollowUpDate(event.currentTarget.value)}
-                  placeholder="October 2027"
-                />
-              </label>
-              <label class="space-y-1 text-xs font-semibold text-on-surface">
-                Location
-                <input
-                  class="w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2"
-                  value={weddingFollowUpLocation()}
-                  onInput={(event) => setWeddingFollowUpLocation(event.currentTarget.value)}
-                  placeholder="Sydney NSW"
-                />
-              </label>
-              <label class="space-y-1 text-xs font-semibold text-on-surface">
-                Guest count
-                <input
-                  class="w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2"
-                  value={weddingFollowUpGuests()}
-                  onInput={(event) => setWeddingFollowUpGuests(event.currentTarget.value)}
-                  placeholder="80"
-                />
-              </label>
-              <label class="space-y-1 text-xs font-semibold text-on-surface">
-                Budget comfort
-                <input
-                  class="w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2"
-                  value={weddingFollowUpBudget()}
-                  onInput={(event) => setWeddingFollowUpBudget(event.currentTarget.value)}
-                  placeholder="Keep it lean"
-                />
-              </label>
-              <label class="space-y-1 text-xs font-semibold text-on-surface">
-                Priorities
-                <input
-                  class="w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2"
-                  value={weddingFollowUpPriorities()}
-                  onInput={(event) => setWeddingFollowUpPriorities(event.currentTarget.value)}
-                  placeholder="food, photos, low stress"
-                />
-              </label>
-              <label class="space-y-1 text-xs font-semibold text-on-surface md:col-span-3">
-                Your names
-                <input
-                  class="w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2"
-                  value={weddingFollowUpCoupleNames()}
-                  onInput={(event) => setWeddingFollowUpCoupleNames(event.currentTarget.value)}
-                  placeholder="Alex and Sam"
-                />
-              </label>
-              <div class="space-y-2 md:col-span-3">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <div class="min-w-0">
-                    <p class="text-xs font-semibold text-on-surface">Vendor checklist</p>
-                    <p class="mt-0.5 break-words text-[11px] leading-5 text-on-surface-variant">
-                      Select the vendor types you need. The agent uses these selections to decide what to research and you can edit them later.
-                    </p>
-                  </div>
-                  <Show when={weddingFollowUpVendorIds().length > 0}>
-                    <button
-                      type="button"
-                      class="w-full rounded-full border border-rose-100 bg-white px-3 py-2 text-[11px] font-semibold text-rose-950 hover:bg-rose-50 sm:w-auto sm:py-1"
-                      onClick={() => setWeddingFollowUpVendorIds([])}
-                    >
-                      Clear vendors
-                    </button>
-                  </Show>
-                </div>
-                <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  <For each={WEDDING_VENDOR_CHECKLIST}>
-                    {(vendor) => {
-                      const checked = () => weddingFollowUpVendorIds().includes(vendor.id);
-                      return (
-                        <label class={`flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2.5 text-xs font-semibold transition sm:py-2 ${
-                          checked()
-                            ? "border-rose-300 bg-rose-50 text-rose-950"
-                            : "border-rose-100 bg-white/80 text-on-surface-variant hover:border-rose-200"
-                        }`}>
-                          <input
-                            type="checkbox"
-                            class="h-4 w-4 accent-rose-700"
-                            checked={checked()}
-                            onChange={(event) => toggleWeddingVendorSelection(vendor.id, event.currentTarget.checked)}
-                          />
-                          <span class="min-w-0 break-words">{vendor.label}</span>
-                        </label>
-                      );
-                    }}
-                  </For>
-                </div>
-                <Show when={weddingFollowUpVendorIds().length > 0}>
-                  <p class="break-words text-[11px] leading-5 text-rose-950">
-                    Selected: {weddingVendorSelectionLabels(weddingFollowUpVendorIds()).join(", ")}
-                  </p>
-                </Show>
-              </div>
-              <details class="md:col-span-3 rounded-[24px] border border-rose-100 bg-white/70 p-3">
-                <summary class="cursor-pointer text-sm font-semibold text-on-surface">
-                  Legal &amp; vows (optional — can add later)
-                </summary>
-              <div class="mt-3 min-w-0 space-y-3">
-                <div>
-                  <p class="text-xs font-semibold text-on-surface">Vow preparation</p>
-                  <p class="mt-0.5 break-words text-[11px] leading-5 text-on-surface-variant">
-                    Decide early whether to create personal vows or use a standard vow. If you create one, OmnyID will use the selected style and only known relationship facts from saved memory/context.
-                  </p>
-                </div>
-                <div class="grid gap-2 sm:grid-cols-2">
-                  <label class="space-y-1 text-xs font-semibold text-on-surface">
-                    Vow choice
-                    <select
-                      class="w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2"
-                      value={weddingFollowUpVowPreference()}
-                      onChange={(event) => setWeddingFollowUpVowPreference(event.currentTarget.value)}
-                    >
-                      <option value="">Decide later</option>
-                      <option value="create">Create personal vows</option>
-                      <option value="standard">Use a standard vow</option>
-                    </select>
-                  </label>
-                  <label class="space-y-1 text-xs font-semibold text-on-surface">
-                    Personal vow style
-                    <select
-                      class="w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 disabled:opacity-60 sm:py-2"
-                      value={weddingFollowUpVowStyle()}
-                      disabled={weddingFollowUpVowPreference() !== "create"}
-                      onChange={(event) => setWeddingFollowUpVowStyle(event.currentTarget.value)}
-                    >
-                      <option value="">Use warm personal default</option>
-                      <For each={WEDDING_VOW_STYLE_OPTIONS}>
-                        {(style) => <option value={style.id}>{style.label}</option>}
-                      </For>
-                    </select>
-                  </label>
-                </div>
-                <Show when={weddingFollowUpVowPreference() === "create"}>
-                  <div class="rounded-2xl border border-rose-100 bg-rose-50/70 p-3">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700/80">
-                      Style inspiration
-                    </p>
-                    <p class="mt-1 break-words text-sm leading-6 text-rose-950">
-                      {(WEDDING_VOW_STYLE_OPTIONS.find((style) => style.id === weddingFollowUpVowStyle()) ?? WEDDING_VOW_STYLE_OPTIONS[0]).sample}
-                    </p>
-                  </div>
-                </Show>
-                <div class="grid gap-2 lg:grid-cols-2">
-                  <label class="space-y-1 text-xs font-semibold text-on-surface">
-                    Known relationship facts from OmnyID memory or graph
-                    <textarea
-                      class="min-h-28 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
-                      value={weddingFollowUpRelationshipFacts()}
-                      onInput={(event) => setWeddingFollowUpRelationshipFacts(event.currentTarget.value)}
-                      placeholder="One known fact per line. Leave blank if not already known; the agent must not invent relationship history."
-                    />
-                  </label>
-                  <label class="space-y-1 text-xs font-semibold text-on-surface">
-                    Add to vow checklist
-                    <textarea
-                      class="min-h-28 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
-                      value={weddingFollowUpVowChecklist()}
-                      onInput={(event) => setWeddingFollowUpVowChecklist(event.currentTarget.value)}
-                      placeholder="One checklist item per line, e.g. agree target length; decide private vs ceremony-facing; confirm celebrant constraints."
-                    />
-                  </label>
-                </div>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-2 md:col-span-3">
-                <label class="space-y-1 text-xs font-semibold text-on-surface">
-                  NOIM status for Australian couples
-                  <select
-                    class="w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2"
-                    value={weddingFollowUpNoim()}
-                    onChange={(event) => setWeddingFollowUpNoim(event.currentTarget.value)}
-                  >
-                    <option value="">Not applicable or ask later</option>
-                    <option value="yes">Downloaded</option>
-                    <option value="no">Not downloaded</option>
-                    <option value="unknown">Not sure</option>
-                  </select>
-                </label>
-                <label class="space-y-1 text-xs font-semibold text-on-surface">
-                  Celebrant path
-                  <select
-                    class="w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2"
-                    value={weddingFollowUpCelebrant()}
-                    onChange={(event) => setWeddingFollowUpCelebrant(event.currentTarget.value)}
-                  >
-                    <option value="">Ask later</option>
-                    <option value="own_celebrant">Own authorised celebrant</option>
-                    <option value="public_or_registry_celebrant">Public/registry-style options</option>
-                    <option value="need_options">Compare both</option>
-                  </select>
-                </label>
-              </div>
-              </details>
-              <div class="md:col-span-3">
-                <button
-                  class="w-full rounded-full bg-rose-900 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-rose-800 sm:w-auto sm:py-2"
-                  type="button"
-                  onClick={generateWeddingFollowUp}
-                >
-                  Make follow-up documents
-                </button>
-                <Show when={weddingTemplateFollowUp()}>
-                  {(followUp) => (
-                    <p class="mt-2 break-words text-xs leading-5 text-rose-950">
-                      Follow-up files are ready from {followUp().answeredLabels.length} captured answer{followUp().answeredLabels.length === 1 ? "" : "s"}.
-                      Approve planning outputs to keep them in your wedding documents.
-                    </p>
-                  )}
-                </Show>
-              </div>
-            </div>
-            <div class="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-              <For each={launch().launchLabels.slice(0, 5)}>
-                {(label) => (
-                  <span class="shrink-0 rounded-full border border-rose-100 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-rose-950">
-                    {label}
-                  </span>
-                )}
-              </For>
-            </div>
-            <div class="mt-3 grid gap-2 md:grid-cols-3">
-              <For each={launch().starterCards.slice(0, 6)}>
-                {(starter) => (
-                  <article class={`min-w-0 rounded-2xl border p-3 ${
-                    starter.recommended ? "border-rose-200 bg-white/85" : "border-white/70 bg-white/55"
-                  }`}>
-                    <p class="break-words text-xs font-semibold text-on-surface">{starter.label}</p>
-                    <p class="mt-1 break-words text-[11px] leading-5 text-on-surface-variant">{starter.prompt}</p>
-                  </article>
-                )}
-              </For>
-            </div>
-          </section>
-        )}
-      </Show>
+      {/* Retired inline wedding intake removed; all first-run wedding launches use WeddingSiteIntakeWizard. */}
 
-      <Show when={activeWeddingSiteLaunch()}>
+      <Show when={activeWeddingLaunch()}>
         {(launch) => (
           <WeddingSiteIntakeWizard
             launch={launch()}
@@ -2089,6 +1838,10 @@ export function ResponseQueueView(props: {
             onWeddingFollowUpBudgetInput={setWeddingFollowUpBudget}
             weddingFollowUpPriorities={weddingFollowUpPriorities}
             onWeddingFollowUpPrioritiesInput={setWeddingFollowUpPriorities}
+            weddingFollowUpAtmosphere={weddingFollowUpAtmosphere}
+            onWeddingFollowUpAtmosphereInput={setWeddingFollowUpAtmosphere}
+            weddingFollowUpImageLinks={weddingFollowUpImageLinks}
+            onWeddingFollowUpImageLinksInput={setWeddingFollowUpImageLinks}
             weddingFollowUpCoupleNames={weddingFollowUpCoupleNames}
             onWeddingFollowUpCoupleNamesInput={setWeddingFollowUpCoupleNames}
             weddingFollowUpVendorIds={weddingFollowUpVendorIds}

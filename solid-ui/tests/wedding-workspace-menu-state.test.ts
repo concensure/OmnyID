@@ -85,7 +85,7 @@ test("loadWeddingWorkspaceMenuFromUrl accepts query or hash tabs", () => {
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=people"), "people");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=plan"), "plan");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=documents"), "documents");
-  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=helpers"), "helpers");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=helpers"), "people");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=inspiration"), "inspiration");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("", "#weddingMenu=timeline"), "timeline");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=bad"), null);
@@ -160,7 +160,8 @@ test("weddingWorkspaceMenuHint marks empty first-run sections without replacing 
   assert.equal(weddingWorkspaceMenuHint("people", fixture({
     guestTracking: { guestRowCount: 0, pendingCount: 0, attendingCount: 0 } as WeddingWorkspaceMenuBadgeInput["guestTracking"],
   })), "Start");
-  assert.equal(weddingWorkspaceMenuHint("helpers", fixture({
+  assert.equal(weddingWorkspaceMenuHint("people", fixture({
+    guestTracking: { guestRowCount: 2, pendingCount: 0, attendingCount: 2 } as WeddingWorkspaceMenuBadgeInput["guestTracking"],
     delegation: { items: [] } as WeddingWorkspaceMenuBadgeInput["delegation"],
   })), "Start");
   assert.equal(weddingWorkspaceMenuHint("inspiration", fixture({

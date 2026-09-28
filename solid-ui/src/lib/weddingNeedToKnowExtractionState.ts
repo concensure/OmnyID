@@ -7,6 +7,8 @@ export type WeddingNeedToKnowExtractedSlot =
   | "guest_count"
   | "budget_comfort"
   | "priorities"
+  | "atmosphere"
+  | "image_links"
   | "couple_names"
   | "noim_status"
   | "celebrant_path";
@@ -55,6 +57,8 @@ function baseDraft(input: WeddingNeedToKnowExtractionInput): WeddingTemplateFoll
     guestCount: clean(existing.guestCount),
     budgetComfort: clean(existing.budgetComfort),
     prioritiesCsv: clean(existing.prioritiesCsv),
+    atmosphereDescription: clean(existing.atmosphereDescription),
+    inspirationImageUrlsText: clean(existing.inspirationImageUrlsText),
     coupleNames: clean(existing.coupleNames),
     vendorCategoryIds: existing.vendorCategoryIds ?? [],
     vowPreference: existing.vowPreference === "standard" || existing.vowPreference === "create" || existing.vowPreference === "undecided"
@@ -136,6 +140,19 @@ function extractPriorities(text: string): string | null {
   return values.length ? values.join(", ") : null;
 }
 
+function extractAtmosphere(text: string): string | null {
+  const labelled = text.match(/\b(?:feels like|feel like|vibe is|atmosphere is|style is|vision is|we want|we would like)\s+([^.\n;]+)/i);
+  if (labelled?.[1]) return clean(labelled[1]).slice(0, 280);
+  if (!/\b(?:wedding|ceremony|reception|day|celebration|dinner)\b/i.test(text)) return null;
+  const sentence = text.match(/\b(?:romantic|intimate|relaxed|modern|classic|garden|coastal|formal|casual|joyful|elegant|minimal|colourful|colorful|bohemian|rustic)[^.\n;]{0,220}/i);
+  return sentence?.[0] ? clean(sentence[0]) : null;
+}
+
+function extractImageLinks(text: string): string[] {
+  const links = text.match(/https?:\/\/[^\s<>"')]+/gi) ?? [];
+  return unique(links.map((link) => clean(link.replace(/[.,;]+$/g, ""))).filter(Boolean)).slice(0, 10);
+}
+
 function extractCoupleNames(text: string): string | null {
   const labelled = text.match(/\b(?:couple|partners?|bride and groom|bride\/groom)\s*(?:are|:|-)\s*([A-Z][a-z]{1,30}(?:\s+[A-Z][a-z]{1,30})?)\s+(?:and|&)\s+([A-Z][a-z]{1,30}(?:\s+[A-Z][a-z]{1,30})?)\b/i);
   if (labelled?.[1] && labelled[2]) return `${clean(labelled[1])} and ${clean(labelled[2])}`;
@@ -205,6 +222,19 @@ export function buildWeddingNeedToKnowExtractionState(
   if (priorities) {
     draft.prioritiesCsv = priorities;
     capturedSlots.push("priorities");
+  }
+
+  const atmosphere = extractAtmosphere(text);
+  if (atmosphere) {
+    draft.atmosphereDescription = atmosphere;
+    capturedSlots.push("atmosphere");
+  }
+
+  const imageLinks = extractImageLinks(text);
+  if (imageLinks.length > 0) {
+    draft.inspirationImageUrlsText = imageLinks.join("\n");
+    capturedSlots.push("image_links");
+    needsReviewLabels.push("Inspiration links are saved as user-provided references; an approved agent should fetch or inspect them before using visual details.");
   }
 
   const coupleNames = extractCoupleNames(text);

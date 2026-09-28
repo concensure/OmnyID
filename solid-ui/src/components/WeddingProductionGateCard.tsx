@@ -31,6 +31,13 @@ export function WeddingProductionGateCard(props: {
               </p>
             )}
           </Show>
+          <Show when={presentation().proofManifestCountLabel}>
+            {(proofManifestCountLabel) => (
+              <p class="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                {proofManifestCountLabel()}
+              </p>
+            )}
+          </Show>
           <div class="mt-3 grid gap-2 sm:grid-cols-3">
             <For each={presentation().gates}>
               {(gate) => (
@@ -41,12 +48,42 @@ export function WeddingProductionGateCard(props: {
               )}
             </For>
           </div>
+          <Show when={presentation().proofManifestLabels.length > 0}>
+            <div class="mt-3 rounded-2xl border border-white/70 bg-white/75 px-2.5 py-2">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Receipt Groups</p>
+              <ul class="mt-1 space-y-1">
+                <For each={presentation().proofManifestLabels}>
+                  {(label) => <li class="text-[10px] leading-4 text-slate-700">{label}</li>}
+                </For>
+              </ul>
+            </div>
+          </Show>
           <Show when={presentation().blockerLabels.length > 0}>
             <ul class="mt-3 space-y-1">
               <For each={presentation().blockerLabels}>
                 {(label) => <li class="text-[10px] leading-4 text-red-950/70">{label}</li>}
               </For>
             </ul>
+          </Show>
+          <Show when={presentation().missingProofLabels.length > 0}>
+            <div class="mt-3 rounded-2xl border border-white/70 bg-white/75 px-2.5 py-2">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Missing Receipts</p>
+              <ul class="mt-1 space-y-1">
+                <For each={presentation().missingProofLabels}>
+                  {(label) => <li class="text-[10px] leading-4 text-red-950/70">{label}</li>}
+                </For>
+              </ul>
+            </div>
+          </Show>
+          <Show when={presentation().proofReferenceLabels.length > 0}>
+            <div class="mt-3 rounded-2xl border border-white/70 bg-white/75 px-2.5 py-2">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Attached Receipts</p>
+              <ul class="mt-1 space-y-1">
+                <For each={presentation().proofReferenceLabels}>
+                  {(label) => <li class="break-words text-[10px] leading-4 text-slate-700">{label}</li>}
+                </For>
+              </ul>
+            </div>
           </Show>
           <Show when={presentation().nextActionLabels.length > 0}>
             <div class="mt-3 rounded-2xl border border-white/70 bg-white/75 px-2.5 py-2">

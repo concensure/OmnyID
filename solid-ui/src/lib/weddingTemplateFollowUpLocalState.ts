@@ -10,6 +10,8 @@ export type WeddingTemplateFollowUpDraft = {
   guestCount: string;
   budgetComfort: string;
   prioritiesCsv: string;
+  atmosphereDescription: string;
+  inspirationImageUrlsText: string;
   coupleNames: string;
   vendorCategoryIds: string[];
   vowPreference: "" | "standard" | "create" | "undecided";
@@ -61,6 +63,8 @@ function normalizeDraft(value: unknown): WeddingTemplateFollowUpDraft | null {
     guestCount: clean(record.guestCount),
     budgetComfort: clean(record.budgetComfort),
     prioritiesCsv: clean(record.prioritiesCsv),
+    atmosphereDescription: clean(record.atmosphereDescription),
+    inspirationImageUrlsText: clean(record.inspirationImageUrlsText),
     coupleNames: clean(record.coupleNames),
     vendorCategoryIds: normalizeWeddingVendorSelections(Array.isArray(record.vendorCategoryIds) ? record.vendorCategoryIds : []),
     vowPreference: normalizedVowPreference(record.vowPreference),
@@ -88,6 +92,8 @@ export function saveWeddingTemplateFollowUpDraft(
     guestCount: clean(input.guestCount),
     budgetComfort: clean(input.budgetComfort),
     prioritiesCsv: clean(input.prioritiesCsv),
+    atmosphereDescription: clean(input.atmosphereDescription),
+    inspirationImageUrlsText: clean(input.inspirationImageUrlsText),
     coupleNames: clean(input.coupleNames),
     vendorCategoryIds: normalizeWeddingVendorSelections(input.vendorCategoryIds ?? []),
     vowPreference: normalizedVowPreference(input.vowPreference),

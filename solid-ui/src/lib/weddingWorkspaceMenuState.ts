@@ -42,7 +42,9 @@ export function isWeddingWorkspaceMenuId(value: unknown): value is WeddingWorksp
 }
 
 export function canonicalWeddingWorkspaceMenuId(value: WeddingWorkspaceMenuId): WeddingWorkspaceMenuId {
-  return value === "vision" ? "inspiration" : value;
+  if (value === "vision") return "inspiration";
+  if (value === "helpers") return "people";
+  return value;
 }
 
 const WEDDING_WORKSPACE_MENU_STORAGE_KEY = "omnyid.wedding.workspace-menu";
@@ -154,12 +156,13 @@ export function weddingWorkspaceMenuHint(
   if (!state) return null;
   if (id === "budget") return state.budgetTracking.budgetTargetAmount === null ? "Start" : null;
   if (id === "guests") return state.guestTracking.guestRowCount === 0 ? "Start" : null;
-  if (id === "people") return state.guestTracking.guestRowCount === 0 ? "Start" : null;
+  if (id === "people") {
+    return state.guestTracking.guestRowCount === 0 || state.delegation.items.length === 0 ? "Start" : null;
+  }
   if (id === "seating") {
     const hasGuestsToSeat = state.guestTracking.attendingCount > 0;
     return hasGuestsToSeat && state.seatingPlan.assignedSeatCount === 0 ? "Start" : null;
   }
-  if (id === "helpers") return state.delegation.items.length === 0 ? "Start" : null;
   if (id === "inspiration") return state.inspiration.items.length === 0 ? "Start" : null;
   if (id === "timeline") {
     return state.ganttTimeline.rows.length === 0 && state.ganttTimeline.undatedItems.length === 0 ? "Start" : null;

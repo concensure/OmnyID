@@ -343,6 +343,10 @@ export function WeddingInspirationPanel(props: {
                   <button
                     type="button"
                     class="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-950 transition hover:bg-rose-50"
+                    data-magic-action={option === "Not really" ? "dismiss" : "star"}
+                    data-magic-icon={option === "Not really" ? "discard" : "star"}
+                    data-magic-label={option}
+                    data-magic-id={`wedding:inspiration:validate:${option.toLowerCase().replace(/\W+/g, "-")}`}
                     onClick={() => setNotice(option === "Not really" ? "Got it. Add a note about what feels off, and OmnyID will use that correction." : "Thanks. OmnyID will treat this as a planning clue.")}
                   >
                     {option}

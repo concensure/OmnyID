@@ -1,5 +1,6 @@
 // @locs-version: 1.0
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
+import { WeddingDateEntryControl } from "@/components/WeddingDateEntryControl";
 import {
   buildWeddingHomeOverviewActionTiles,
   buildWeddingHomeTimelineOverview,
@@ -12,13 +13,14 @@ import {
   weddingBudgetSidebarAction,
   weddingDayCountdownDetail,
   weddingDayCountdownLabel,
-  weddingTimelineSidebarAction,
+  weddingTimelinePrimarySidebarAction,
 } from "@/lib/weddingWorkspaceSidebarActionState";
 
 export function WeddingHomeOverviewGrid(props: {
   state: WeddingResponseWorkspaceViewState;
   onSidebarAction?: (action: WeddingWorkspaceSidebarAction) => void;
   onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
+  onSaveWeddingDate?: (date: string) => Promise<void> | void;
 }) {
   const countdown = () => weddingDayCountdownLabel(props.state);
   const countdownDetail = () => weddingDayCountdownDetail(props.state);
@@ -34,12 +36,12 @@ export function WeddingHomeOverviewGrid(props: {
   }
   function openCalendar() {
     props.onSelectMenu?.("timeline");
-    props.onSidebarAction?.(weddingTimelineSidebarAction("open_calendar", props.state));
+    props.onSidebarAction?.(weddingTimelinePrimarySidebarAction(props.state));
   }
   function openTimelineOverview() {
     const overview = timelineOverview();
     props.onSelectMenu?.(overview.menuId);
-    props.onSidebarAction?.(weddingTimelineSidebarAction("open_calendar", props.state, overview.selectedRowId ?? undefined));
+    props.onSidebarAction?.(weddingTimelinePrimarySidebarAction(props.state, overview.selectedRowId));
   }
   function openMenu(menuId: WeddingWorkspaceMenuId | undefined) {
     if (menuId) props.onSelectMenu?.(menuId);
@@ -56,14 +58,22 @@ export function WeddingHomeOverviewGrid(props: {
         </div>
         <p class="mt-3 text-3xl font-bold tracking-tight text-indigo-950">{countdown()}</p>
         <p class="text-xs text-indigo-900/70">days to the wedding</p>
-        <button
-          type="button"
-          class="mt-2 break-words text-left text-xs font-semibold leading-5 text-indigo-950/75 underline decoration-indigo-300 underline-offset-2"
-          title={calendarActionLabel(props.state)}
-          onClick={openCalendar}
-        >
-          {countdownDetail()}
-        </button>
+        {countdown() === "Add date" && props.onSaveWeddingDate
+          ? (
+            <div class="mt-2">
+              <WeddingDateEntryControl onSave={props.onSaveWeddingDate} locale="en-AU" compact />
+            </div>
+          )
+          : (
+            <button
+              type="button"
+              class="mt-2 break-words text-left text-xs font-semibold leading-5 text-indigo-950/75 underline decoration-indigo-300 underline-offset-2"
+              title={calendarActionLabel(props.state)}
+              onClick={openCalendar}
+            >
+              {countdownDetail()}
+            </button>
+          )}
         <button
           type="button"
           class="mt-1 block break-words text-left text-xs font-semibold leading-5 text-indigo-950/70 underline decoration-indigo-200 underline-offset-2 transition hover:text-indigo-950"

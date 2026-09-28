@@ -1,5 +1,5 @@
-// @locs-version: 2.1
-import { For, Show } from "solid-js";
+// @locs-version: 2.2
+import { For, Show, createMemo, createSignal } from "solid-js";
 
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
@@ -20,6 +20,9 @@ export function WeddingTimelinePanel(props: {
   onOpenArtifact?: (artifactId: string) => void;
   onOpenSavedOutputs?: () => void;
 }) {
+  const [showAllRows, setShowAllRows] = createSignal(false);
+  const visibleRows = createMemo(() => showAllRows() ? props.state.ganttTimeline.rows : props.state.ganttTimeline.rows.slice(0, 6));
+  const hiddenRowCount = createMemo(() => Math.max(0, props.state.ganttTimeline.rows.length - visibleRows().length));
   const taskActionFor = (itemId: string) => {
     const task = props.state.planningTaskItems.find((item) => item.id === itemId);
     return task ? weddingTaskSidebarAction(task, props.state) : weddingTimelineSidebarAction("open_tasks", props.state, itemId);
@@ -45,6 +48,11 @@ export function WeddingTimelinePanel(props: {
     }
     props.onSidebarAction(taskActionFor(itemId));
   }
+  function openCalendarOrTaskDates(): void {
+    props.onSidebarAction(props.state.ganttTimeline.rows.length > 0
+      ? weddingTimelineSidebarAction("open_calendar", props.state)
+      : weddingTimelineSidebarAction("open_tasks", props.state));
+  }
 
   return (
     <div class="min-w-0 rounded-[24px] border border-indigo-100/80 bg-indigo-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
@@ -67,15 +75,22 @@ export function WeddingTimelinePanel(props: {
       <div class="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={props.state.ganttTimeline.rows.length === 0}
-          class="rounded-full border border-indigo-200 bg-white/85 px-3 py-2 text-xs font-semibold text-indigo-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45 sm:py-1.5"
-          onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state))}
+          class="rounded-full border border-indigo-200 bg-white/85 px-3 py-2 text-xs font-semibold text-indigo-950 transition hover:bg-white sm:py-1.5"
+          data-magic-action="open"
+          data-magic-icon="calendar"
+          data-magic-label={props.state.ganttTimeline.rows.length > 0 ? "Open wedding calendar" : "Add task dates"}
+          data-magic-id="wedding:timeline:calendar-or-dates"
+          onClick={openCalendarOrTaskDates}
         >
-          Open wedding calendar
+          {props.state.ganttTimeline.rows.length > 0 ? "Open wedding calendar" : "Add task dates"}
         </button>
         <button
           type="button"
           class="rounded-full border border-indigo-200 bg-indigo-100/80 px-3 py-2 text-xs font-semibold text-indigo-950 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45 sm:py-1.5"
+          data-magic-action="open"
+          data-magic-icon="tasks"
+          data-magic-label="Open wedding tasks"
+          data-magic-id="wedding:timeline:tasks"
           onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_tasks", props.state))}
         >
           Open wedding tasks
@@ -83,7 +98,7 @@ export function WeddingTimelinePanel(props: {
       </div>
       <Show when={props.state.ganttTimeline.rows.length === 0}>
         <p class="mt-2 text-xs leading-5 text-indigo-950/65">
-          Add a task with a date before opening the calendar view.
+          Add dates to tasks first. Once at least one task has a date, this opens the wedding calendar.
         </p>
       </Show>
       <Show when={props.state.ganttTimeline.undatedItems.length > 0}>
@@ -108,6 +123,10 @@ export function WeddingTimelinePanel(props: {
                     <button
                       type="button"
                       class="text-left font-semibold underline decoration-indigo-300 underline-offset-2"
+                      data-magic-action="open"
+                      data-magic-icon={item.linkedArtifactId ? "source" : "task"}
+                      data-magic-label={`Open ${item.title}`}
+                      data-magic-id={`wedding:timeline:item:${item.id}:open`}
                       onClick={() => item.linkedArtifactId
                         ? openFileAction(item.linkedArtifactId, item.id)
                         : props.onSidebarAction(taskActionFor(item.id))}
@@ -118,6 +137,10 @@ export function WeddingTimelinePanel(props: {
                     <button
                       type="button"
                       class="font-semibold underline decoration-indigo-300 underline-offset-2"
+                      data-magic-action="open"
+                      data-magic-icon="task"
+                      data-magic-label={taskActionLabelFor(item.id, weddingTimelineStatusLabel(item.statusLabel))}
+                      data-magic-id={`wedding:timeline:item:${item.id}:task`}
                       onClick={() => props.onSidebarAction(taskActionFor(item.id))}
                     >
                       {taskActionLabelFor(item.id, weddingTimelineStatusLabel(item.statusLabel))}
@@ -128,6 +151,10 @@ export function WeddingTimelinePanel(props: {
                         disabled={!fileAction.enabled}
                         title={fileAction.title}
                         class="ml-2 rounded-full border border-indigo-100 bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-indigo-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+                        data-magic-action="open"
+                        data-magic-icon="source"
+                        data-magic-label={fileAction.label}
+                        data-magic-id={`wedding:timeline:item:${item.id}:source`}
                         onClick={() => openFileAction(item.linkedArtifactId, item.id)}
                       >
                         {fileAction.label}
@@ -146,17 +173,43 @@ export function WeddingTimelinePanel(props: {
           <p class="mt-1 text-sm leading-6 text-indigo-950/70">
             {props.state.ganttTimeline.blockerLabels[0] ?? "Add wedding tasks with dates, then they will appear here and in Calendar."}
           </p>
-          <button
-            type="button"
-            class="mt-3 rounded-full border border-indigo-200 bg-indigo-100/80 px-3 py-2 text-xs font-semibold text-indigo-950 transition hover:bg-indigo-50 sm:py-1.5"
-            onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_tasks", props.state))}
-          >
+            <button
+              type="button"
+              class="mt-3 rounded-full border border-indigo-200 bg-indigo-100/80 px-3 py-2 text-xs font-semibold text-indigo-950 transition hover:bg-indigo-50 sm:py-1.5"
+              data-magic-action="open"
+              data-magic-icon="tasks"
+              data-magic-label="Open Tasks"
+              data-magic-id="wedding:timeline:empty:tasks"
+              onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_tasks", props.state))}
+            >
             Open Tasks
           </button>
         </div>
       }>
-        <div class="mt-3 space-y-2">
-          <For each={props.state.ganttTimeline.rows.slice(0, 6)}>
+        <div class="mt-3 rounded-2xl border border-indigo-100 bg-white/70 p-3">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-indigo-950">Schedule chart</p>
+              <p class="text-xs leading-5 text-indigo-950/65">
+                Each bar shows when the task starts and how long it lasts.
+              </p>
+            </div>
+            <Show when={props.state.ganttTimeline.rows.length > 6}>
+              <button
+                type="button"
+                class="rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-950 transition hover:bg-white"
+                data-magic-action="open"
+                data-magic-icon="expand"
+                data-magic-label={showAllRows() ? "Show less" : `Show all ${props.state.ganttTimeline.rows.length}`}
+                data-magic-id="wedding:timeline:toggle-rows"
+                onClick={() => setShowAllRows((value) => !value)}
+              >
+                {showAllRows() ? "Show less" : `Show all ${props.state.ganttTimeline.rows.length}`}
+              </button>
+            </Show>
+          </div>
+          <div class="space-y-2">
+          <For each={visibleRows()}>
             {(row) => {
               const fileAction = fileActionFor(row.linkedArtifactId);
               return (
@@ -167,6 +220,10 @@ export function WeddingTimelinePanel(props: {
                       type="button"
                       class="shrink-0 text-left text-xs font-semibold text-indigo-900/75 underline decoration-indigo-300 underline-offset-2"
                       title="Open this date in the wedding calendar"
+                      data-magic-action="open"
+                      data-magic-icon="calendar"
+                      data-magic-label={`View date for ${row.title}`}
+                      data-magic-id={`wedding:timeline:row:${row.id}:date-label`}
                       onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state, row.id))}
                     >
                       {row.startLabel}
@@ -193,6 +250,10 @@ export function WeddingTimelinePanel(props: {
                     <button
                       type="button"
                       class="rounded-full border border-indigo-100 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-950 transition hover:bg-white"
+                      data-magic-action="open"
+                      data-magic-icon="calendar"
+                      data-magic-label={`View date for ${row.title}`}
+                      data-magic-id={`wedding:timeline:row:${row.id}:date`}
                       onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state, row.id))}
                     >
                       View date
@@ -200,6 +261,10 @@ export function WeddingTimelinePanel(props: {
                     <button
                       type="button"
                       class="rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-950 transition hover:bg-white"
+                      data-magic-action="open"
+                      data-magic-icon="task"
+                      data-magic-label={taskActionLabelFor(row.id, "View task")}
+                      data-magic-id={`wedding:timeline:row:${row.id}:task`}
                       onClick={() => props.onSidebarAction(taskActionFor(row.id))}
                     >
                       {taskActionLabelFor(row.id, "View task")}
@@ -210,6 +275,10 @@ export function WeddingTimelinePanel(props: {
                         disabled={!fileAction.enabled}
                         title={fileAction.title}
                         class="rounded-full border border-indigo-100 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+                        data-magic-action="open"
+                        data-magic-icon="source"
+                        data-magic-label={fileAction.label}
+                        data-magic-id={`wedding:timeline:row:${row.id}:source`}
                         onClick={() => openFileAction(row.linkedArtifactId, row.id)}
                       >
                         {fileAction.label}
@@ -220,6 +289,12 @@ export function WeddingTimelinePanel(props: {
               );
             }}
           </For>
+          </div>
+          <Show when={hiddenRowCount() > 0}>
+            <p class="mt-2 text-xs leading-5 text-indigo-950/60">
+              {hiddenRowCount()} more timeline item{hiddenRowCount() === 1 ? "" : "s"} hidden to keep this view calm.
+            </p>
+          </Show>
         </div>
         <div class="mt-3 flex flex-wrap gap-1.5">
           <For each={props.state.ganttTimeline.legend}>

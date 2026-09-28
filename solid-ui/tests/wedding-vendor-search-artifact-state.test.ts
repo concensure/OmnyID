@@ -212,6 +212,7 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
     "4 source-backed choices ranked from live search results",
     "2 choices matched stated preferences",
     "2 choices surfaced package/pricing language",
+    "Intake signals used: Preferences: documentary style and transparent...; Budget comfort: balanced budget",
     "Location context: Sydney",
     "Provider evidence: Brave Search",
   ]);
@@ -235,6 +236,65 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).sourceCountsByProvider, { "Brave Search": 4 });
   assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).sourceUrlCount, 4);
   assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).parentSourceUrlCount, 4);
+});
+
+test("buildWeddingVendorComparisonArtifactState uses structured intake atmosphere and inspiration signals", async () => {
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        {
+          title: "Formal Ballroom Collective",
+          url: "https://formal-ballroom.example",
+          snippet: "Classic wedding photography packages and polished ballroom portraits.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Garden Candle Studio",
+          url: "https://garden-candle.example",
+          snippet: "Relaxed candlelit garden wedding photographer with warm documentary galleries.",
+          provider: "Brave Search",
+        },
+      ],
+    }),
+  });
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "transparent pricing",
+    atmosphereDescription: "Relaxed candlelit garden dinner",
+    inspirationImageUrls: ["https://example.com/garden-table.jpg"],
+    topPriorities: ["family", "budget"],
+    location: "Sydney",
+    budgetComfort: "Keep total spend low",
+    vendorCategories: ["photographer"],
+  });
+  const comparisonMetadata = comparison.artifactInput?.metadata as Record<string, unknown>;
+
+  assert.equal(comparison.status, "created");
+  assert.equal(comparison.summary?.vendorLabels[0], "Garden Candle Studio");
+  assert.match(comparison.markdown ?? "", /Desired atmosphere: Relaxed candlelit garden dinner/i);
+  assert.match(comparison.markdown ?? "", /Top priorities: family, budget/i);
+  assert.match(comparison.markdown ?? "", /Inspiration links: https:\/\/example\.com\/garden-table\.jpg/i);
+  assert.deepEqual(comparisonMetadata.vendorComparisonPreferenceSignals, [
+    "Preferences: transparent pricing",
+    "Atmosphere: Relaxed candlelit garden dinner",
+    "Budget comfort: Keep total spend low",
+    "Priority: family",
+    "Priority: budget",
+    "Inspiration link: https://example.com/garden-table.jpg",
+  ]);
+  const recommendationHandoff = comparisonMetadata.vendorComparisonHandoff as Record<string, unknown>;
+  assert.ok((recommendationHandoff.whyLabels as string[]).some((label) =>
+    /Intake signals used: Preferences: transparent pricing; Atmosphere: Relaxed candlelit garden dinner/i.test(label)
+  ));
+  assert.ok((comparisonMetadata.vendorComparisonRankingSignals as string[]).includes("atmosphere_description"));
+  assert.ok((comparisonMetadata.vendorComparisonRankingSignals as string[]).includes("inspiration_links"));
 });
 
 test("buildWeddingVendorSearchArtifactState does not create artifacts from dry-run or failed search", async () => {

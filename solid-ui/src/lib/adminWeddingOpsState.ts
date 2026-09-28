@@ -149,7 +149,7 @@ export function buildAdminWeddingOpsPanelState(args: {
         status: backendMetrics.productionReady ? "ready" : backendMetrics.status === "partial" ? "local_only" : "needs_backend",
       },
       {
-        title: "Provider executor proof",
+        title: "Connected app proof",
         value: args.providerExecutorProofPacket?.canClearOracleProviderGate
           ? "Proof complete"
           : args.providerExecutorProofPacket?.status === "ready"
@@ -159,7 +159,7 @@ export function buildAdminWeddingOpsPanelState(args: {
           ? args.providerExecutorProofPacket.summary
           : args.providerExecutorProofPacket?.missingProofRefs[0]
             ?? args.providerExecutorProofPacket?.capabilityPackets.find((packet) => packet.blockers.length)?.blockers[0]
-            ?? "Connect provider credentials, executors, smoke receipts, and durable proof refs before Oracle upload.",
+            ?? "Connect app sign-ins, callable actions, smoke receipts, and durable proof refs before Oracle upload.",
         status: args.providerExecutorProofPacket?.canClearOracleProviderGate
           ? "ready"
           : args.providerExecutorProofPacket
@@ -203,8 +203,8 @@ export function buildAdminWeddingOpsPanelState(args: {
         ? "Keep the backend policy evidence fresh before Oracle production upload."
         : "Treat the toggle as disabled in production until the backend routing policy is ready.",
       args.providerExecutorProofPacket?.canClearOracleProviderGate
-        ? "Provider executor proof packet can clear the Oracle provider gate."
-        : "Keep Oracle upload blocked until the provider executor proof packet is complete.",
+        ? "Connected app proof packet can clear the Oracle connected-app gate."
+        : "Keep Oracle upload blocked until the connected app proof packet is complete.",
       args.apiStack?.missingRequiredLabels.length
         ? `Connect required wedding APIs before production: ${args.apiStack.missingRequiredLabels.join(", ")}.`
         : "Keep horizontal wedding APIs as evidence sources; OmnyID storage and AFP records remain the source of truth.",

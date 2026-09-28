@@ -85,6 +85,7 @@ export type WeddingProjectionQueueViewState = {
 
 const GROUP_LABELS: Record<WeddingProjectionQueueItemKind, string> = {
   context: "Context",
+  intake_profile: "Profile",
   decision: "Decisions",
   access_control: "Access",
   boundary: "Guest boundaries",

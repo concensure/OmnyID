@@ -44,6 +44,8 @@ test("wedding follow-up local state saves normalized draft answers per workspace
     guestCount: " 80 ",
     budgetComfort: " Keep it lean ",
     prioritiesCsv: " food, photos ",
+    atmosphereDescription: " Relaxed garden dinner ",
+    inspirationImageUrlsText: " https://example.com/wedding.jpg\nhttps://example.com/table.jpg ",
     coupleNames: " Alex and Sam ",
     vendorCategoryIds: [" Venue ", "photographer", "bad"],
     vowPreference: "create",
@@ -61,6 +63,8 @@ test("wedding follow-up local state saves normalized draft answers per workspace
   assert.equal(loaded?.dateOrSeason, "October 2027");
   assert.equal(loaded?.noimDownloaded, "no");
   assert.equal(loaded?.coupleNames, "Alex and Sam");
+  assert.equal(loaded?.atmosphereDescription, "Relaxed garden dinner");
+  assert.equal(loaded?.inspirationImageUrlsText, "https://example.com/wedding.jpg\nhttps://example.com/table.jpg");
   assert.deepEqual(loaded?.vendorCategoryIds, ["venue", "photographer"]);
   assert.equal(loaded?.vowPreference, "create");
   assert.equal(loaded?.vowStyle, "warm_personal");

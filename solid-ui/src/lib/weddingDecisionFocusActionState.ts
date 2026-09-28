@@ -12,6 +12,7 @@ function actionKindForItem(item: WeddingPersonalOsRankedItem | null): WeddingWor
   if (item?.sourceSurface === "calendar") return "open_calendar";
   if (item?.sourceSurface === "decision_queue" || item?.sourceSurface === "approval_queue") return "approve_action";
   if (item?.sourceSurface === "tasks" && item.linkedArtifactId && isWeddingWorkspaceMenuId(item.workspaceMenu)) return "open_workspace_menu";
+  if (item?.sourceSurface === "tasks" && isWeddingWorkspaceMenuId(item.workspaceMenu) && item.actionMetadata?.vendor_lead_time_research_task === true) return "open_workspace_menu";
   return "open_tasks";
 }
 
@@ -19,6 +20,7 @@ function actionLabelForItem(item: WeddingPersonalOsRankedItem | null): string {
   if (item?.sourceSurface === "calendar") return "Open date";
   if (item?.sourceSurface === "approval_queue") return "Review approval";
   if (item?.sourceSurface === "decision_queue") return "Choose option";
+  if (item?.sourceSurface === "tasks" && isWeddingWorkspaceMenuId(item.workspaceMenu) && item.actionMetadata?.vendor_lead_time_research_task === true) return "Research this";
   if (item?.sourceSurface === "tasks" && item.linkedArtifactId && isWeddingWorkspaceMenuId(item.workspaceMenu)) {
     return item.evidenceLabels.some((label) => /top-three vendor comparison/i.test(label)) ? "Open comparison" : "Open file";
   }
@@ -40,6 +42,7 @@ export function buildWeddingDecisionFocusSidebarAction(
     metadata: {
       ...(top?.linkedArtifactId ? { linked_artifact_id: top.linkedArtifactId } : {}),
       ...(isWeddingWorkspaceMenuId(top?.workspaceMenu) ? { wedding_workspace_menu: top?.workspaceMenu } : {}),
+      ...(top?.actionMetadata ?? {}),
       decision_focus: {
         version: 1,
         intent,
@@ -56,6 +59,7 @@ export function buildWeddingDecisionFocusSidebarAction(
           due_label: item.dueLabel,
           linked_artifact_id: item.linkedArtifactId ?? null,
           wedding_workspace_menu: isWeddingWorkspaceMenuId(item.workspaceMenu) ? item.workspaceMenu : null,
+          action_metadata: item.actionMetadata ?? null,
           evidence_labels: item.evidenceLabels,
         })),
       },

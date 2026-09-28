@@ -21,6 +21,7 @@ export type WeddingVendorComparisonFooterActionState = {
   summaryLabel: string;
   consequenceLabel: string;
   actionLabel: string;
+  confirmationLabel: string;
   enabled: boolean;
   targetMenu: WeddingWorkspaceMenuId;
   actionKind: "review_follow_up_queue";
@@ -127,7 +128,10 @@ export function buildWeddingVendorComparisonUiState(input: {
       consequenceLabel: selectedCount > 0
         ? `${unselectedCount} unselected vendor${unselectedCount === 1 ? "" : "s"} will leave active queues; selected vendors continue to follow-up.`
         : "No vendor follow-up will be prepared until at least one row is selected.",
-      actionLabel: selectedCount > 0 ? "Review follow-up in queue" : "Choose vendors first",
+      actionLabel: selectedCount > 0 ? "Confirm choices and review follow-up" : "Choose vendors first",
+      confirmationLabel: selectedCount > 0
+        ? "Your selected vendors become the active follow-up set after this decision is projected; unselected vendors remain in the log only."
+        : "Choose at least one vendor before OmnyID prepares outreach or follow-up work.",
       enabled: selectedCount > 0,
       targetMenu: "response_queue",
       actionKind: "review_follow_up_queue",

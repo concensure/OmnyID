@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { AttachmentsRenderer } from "@/components/renderers/AttachmentsRenderer";
@@ -19,6 +19,7 @@ import {
   type WeddingVendorQuoteReplyFlowState,
 } from "@/lib/weddingVendorQuoteReplyFlowState";
 import { buildWeddingVendorQuoteReplyUiCopyState } from "@/lib/weddingVendorQuoteReplyUiState";
+import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
 import type { ViewName } from "@/lib/viewNames";
 
 export function WeddingVendorQuoteReplyCard(props: {
@@ -143,6 +144,14 @@ export function WeddingVendorQuoteReplyCard(props: {
     }
     if (action === "edit_reply") setForceReplyEditorOpen(true);
   };
+  onMount(() => {
+    const unsubscribe = subscribeMagicActionEvent((detail) => {
+      if (detail.msgId !== `wedding:quote-reply:${props.flow.id}:primary`) return;
+      if (detail.action !== "quote-secondary") return;
+      handleSecondaryAction();
+    });
+    onCleanup(unsubscribe);
+  });
   const uiCopy = () => buildWeddingVendorQuoteReplyUiCopyState({
     flow: props.flow,
     sendGate: sendGate(),
@@ -199,6 +208,10 @@ export function WeddingVendorQuoteReplyCard(props: {
             type="button"
             onClick={handlePrimaryAction}
             aria-label="View saved sent proof for this vendor reply"
+            data-magic-action="open"
+            data-magic-icon="proof"
+            data-magic-label={proofPersistence()?.actionLabel ?? presentation().primaryActionLabel}
+            data-magic-id={`wedding:quote-reply:${props.flow.id}:sent-proof`}
             class="mt-3 rounded-full border border-emerald-200 bg-emerald-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2"
           >
             {proofPersistence()?.actionLabel ?? presentation().primaryActionLabel}
@@ -216,6 +229,10 @@ export function WeddingVendorQuoteReplyCard(props: {
             type="button"
             onClick={handlePrimaryAction}
             aria-label="Undo scheduled vendor email send"
+            data-magic-action="dismiss"
+            data-magic-icon="undo"
+            data-magic-label={presentation().primaryActionLabel}
+            data-magic-id={`wedding:quote-reply:${props.flow.id}:undo-send`}
             class="mt-3 rounded-full border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
           >
             {presentation().primaryActionLabel}
@@ -251,6 +268,10 @@ export function WeddingVendorQuoteReplyCard(props: {
               onClick={() => setQuoteDetailsOpen((open) => !open)}
               aria-expanded={quoteDetailsOpen()}
               aria-controls={quoteDetailsId()}
+              data-magic-action="open"
+              data-magic-icon="quote"
+              data-magic-label={quoteDetailsOpen() ? "Hide quote details" : "See the quote"}
+              data-magic-id={`wedding:quote-reply:${props.flow.id}:quote-details`}
               class="mt-3 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2"
             >
               {quoteDetailsOpen() ? "Hide quote details" : "See the quote"}
@@ -320,6 +341,10 @@ export function WeddingVendorQuoteReplyCard(props: {
                       type="button"
                       disabled={props.busy}
                       onClick={() => setForceReplyEditorOpen(true)}
+                      data-magic-action="open"
+                      data-magic-icon="edit"
+                      data-magic-label="Edit reply"
+                      data-magic-id={`wedding:quote-reply:${props.flow.id}:edit-reply`}
                       class="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Edit reply
@@ -432,6 +457,10 @@ export function WeddingVendorQuoteReplyCard(props: {
                         type="button"
                         onClick={() => props.onProviderSetup?.(view())}
                         aria-label={`Open setup for ${readiness().requiredProvider ?? "connected app"}`}
+                        data-magic-action="open"
+                        data-magic-icon="setup"
+                        data-magic-label={providerSetup()?.buttonLabel ?? "Open setup"}
+                        data-magic-id={`wedding:quote-reply:${props.flow.id}:provider-setup`}
                         class="mt-3 rounded-full border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
                       >
                         {providerSetup()?.buttonLabel ?? "Open setup"}
@@ -451,6 +480,13 @@ export function WeddingVendorQuoteReplyCard(props: {
                 disabled={primaryActionDisabled()}
                 onClick={handlePrimaryAction}
                 aria-label={presentation().primaryActionLabel}
+                data-magic-action={presentation().primaryActionKind === "send" ? "approve" : presentation().primaryActionKind === "undo_send" ? "dismiss" : "open"}
+                data-magic-icon={presentation().primaryActionKind === "send" ? "send" : presentation().primaryActionKind === "approve_wording" ? "approve" : "action"}
+                data-magic-label={props.busy ? props.busyLabel ?? "Working..." : presentation().primaryActionLabel}
+                data-magic-alt-action={presentation().secondaryActionLabel ? "quote-secondary" : undefined}
+                data-magic-alt-icon={presentation().secondaryActionKind === "edit_reply" ? "edit" : "quote"}
+                data-magic-alt-label={presentation().secondaryActionLabel ?? undefined}
+                data-magic-id={`wedding:quote-reply:${props.flow.id}:primary`}
                 class="rounded-full bg-emerald-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-300"
               >
                 {props.busy ? props.busyLabel ?? "Working..." : presentation().primaryActionLabel}
@@ -462,6 +498,10 @@ export function WeddingVendorQuoteReplyCard(props: {
                     disabled={props.busy}
                     onClick={handleSecondaryAction}
                     aria-controls={presentation().secondaryActionKind === "view_quote" ? quoteDetailsId() : undefined}
+                    data-magic-action="open"
+                    data-magic-icon={presentation().secondaryActionKind === "edit_reply" ? "edit" : "quote"}
+                    data-magic-label={label()}
+                    data-magic-id={`wedding:quote-reply:${props.flow.id}:secondary`}
                     class="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {label()}

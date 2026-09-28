@@ -8,6 +8,7 @@ import {
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingGeneratedArtifact } from "@/lib/weddingArtifactGenerationState";
+import { WEDDING_VENDOR_LEAD_TIME_CATEGORIES } from "@/lib/weddingVendorLeadTimeState";
 
 export type WeddingLifecycleCoverageStatus = "in_place" | "partial" | "missing";
 
@@ -87,6 +88,11 @@ function titleFromContext(context: WeddingPlanningContext): string {
     : "Wedding lifecycle brief";
 }
 
+function leadTimeRangeLabel(categoryId: string, fallback: string): string {
+  const category = WEDDING_VENDOR_LEAD_TIME_CATEGORIES.find((item) => item.categoryId === categoryId);
+  return category ? `${category.idealLeadMonths[0]}-${category.idealLeadMonths[1]} months` : fallback;
+}
+
 function constraintsFor(context: WeddingPlanningContext): WeddingLifecycleConstraint[] {
   const constraints: WeddingLifecycleConstraint[] = [];
   const location = clean(context.location);
@@ -98,7 +104,7 @@ function constraintsFor(context: WeddingPlanningContext): WeddingLifecycleConstr
     id: "venue_lead_time",
     label: "Venue lead-time pressure",
     detail: /sydney|nsw/i.test(location)
-      ? "Planning heuristic: Sydney venues can require 12-18 months of lead time for preferred dates. Start venue outreach within 2 weeks unless the couple has already selected or booked a venue."
+      ? `Planning heuristic: Sydney venues can require ${leadTimeRangeLabel("venue", "12-18 months")} of lead time for preferred dates. Start venue outreach within 2 weeks unless the couple has already selected or booked a venue.`
       : "Planning heuristic: popular venues often need early outreach. Treat venue research as time-sensitive until a selected venue, quote, or booking artifact exists.",
     evidenceLabel: location ? `Location context: ${location}` : "Location not captured yet",
     severity: "warning",

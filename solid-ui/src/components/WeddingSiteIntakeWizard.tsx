@@ -7,7 +7,8 @@ import { createSignal, For, Show } from "solid-js";
 
 import type { WeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchState";
 import type { WeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
-import { WEDDING_VENDOR_CHECKLIST, weddingVendorSelectionLabels } from "@/lib/weddingVendorChecklistState";
+import { weddingVendorSelectionLabels } from "@/lib/weddingVendorChecklistState";
+import { weddingVendorMustDecideFirstCategories } from "@/lib/weddingVendorLeadTimeState";
 import { WEDDING_VOW_STYLE_OPTIONS } from "@/lib/weddingVowPlanningState";
 
 const STEP_LABELS = ["The basics", "Vendors", "Legal & vows", "Review"] as const;
@@ -29,6 +30,12 @@ export function WeddingSiteIntakeWizard(props: {
   onWeddingFollowUpBudgetInput: (value: string) => void;
   weddingFollowUpPriorities: () => string;
   onWeddingFollowUpPrioritiesInput: (value: string) => void;
+  weddingFollowUpAtmosphere: () => string;
+  onWeddingFollowUpAtmosphereInput: (value: string) => void;
+  weddingFollowUpImageLinks: () => string;
+  onWeddingFollowUpImageLinksInput: (value: string) => void;
+  weddingFollowUpCoupleNames: () => string;
+  onWeddingFollowUpCoupleNamesInput: (value: string) => void;
   weddingFollowUpVendorIds: () => string[];
   onClearVendors: () => void;
   onToggleVendor: (vendorId: string, selected: boolean) => void;
@@ -52,6 +59,7 @@ export function WeddingSiteIntakeWizard(props: {
   const atFirstStep = () => step() === 0;
   const goNext = () => setStep((current) => Math.min(LAST_STEP, current + 1));
   const goBack = () => setStep((current) => Math.max(0, current - 1));
+  const firstVendorCategories = weddingVendorMustDecideFirstCategories();
 
   const inputClass = "w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2";
   const labelClass = "space-y-1 text-xs font-semibold text-on-surface";
@@ -63,6 +71,9 @@ export function WeddingSiteIntakeWizard(props: {
       </p>
       <h2 class="mt-1 break-words text-lg font-semibold text-on-surface">{props.launch.presentation.title}</h2>
       <p class="mt-1 break-words text-sm leading-6 text-on-surface-variant">{props.launch.nextQuestionLabel}</p>
+      <div class="mt-3 inline-flex max-w-full items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-950">
+        Draft - not saved to your account yet
+      </div>
 
       {/* Step progress */}
       <div class="mt-4 flex items-center gap-2">
@@ -156,12 +167,39 @@ export function WeddingSiteIntakeWizard(props: {
             />
           </label>
           <label class={`${labelClass} md:col-span-2`}>
+            Your names
+            <input
+              class={inputClass}
+              value={props.weddingFollowUpCoupleNames()}
+              onInput={(event) => props.onWeddingFollowUpCoupleNamesInput(event.currentTarget.value)}
+              placeholder="Alex and Sam"
+            />
+          </label>
+          <label class={`${labelClass} md:col-span-2`}>
             Priorities
             <input
               class={inputClass}
               value={props.weddingFollowUpPriorities()}
               onInput={(event) => props.onWeddingFollowUpPrioritiesInput(event.currentTarget.value)}
               placeholder="food, photos, low stress"
+            />
+          </label>
+          <label class={`${labelClass} md:col-span-2`}>
+            What should the day feel like?
+            <textarea
+              class="min-h-24 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
+              value={props.weddingFollowUpAtmosphere()}
+              onInput={(event) => props.onWeddingFollowUpAtmosphereInput(event.currentTarget.value)}
+              placeholder="Relaxed garden dinner, candlelit, joyful, not too formal."
+            />
+          </label>
+          <label class={`${labelClass} md:col-span-2`}>
+            Inspiration picture links
+            <textarea
+              class="min-h-24 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
+              value={props.weddingFollowUpImageLinks()}
+              onInput={(event) => props.onWeddingFollowUpImageLinksInput(event.currentTarget.value)}
+              placeholder="Paste direct image or inspiration links, one per line."
             />
           </label>
         </div>
@@ -172,9 +210,9 @@ export function WeddingSiteIntakeWizard(props: {
         <div class="mt-4 space-y-2 rounded-[24px] border border-white/70 bg-white/65 p-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="min-w-0">
-              <p class="text-xs font-semibold text-on-surface">Vendor checklist (optional)</p>
+              <p class="text-xs font-semibold text-on-surface">First vendor choices (optional)</p>
               <p class="mt-0.5 break-words text-[11px] leading-5 text-on-surface-variant">
-                Select the vendor types you need. The agent uses these selections to decide what to research and you can edit them later.
+                Start with the longest-lead-time choices. Other vendor categories will surface later when their research window opens.
               </p>
             </div>
             <Show when={props.weddingFollowUpVendorIds().length > 0}>
@@ -188,9 +226,9 @@ export function WeddingSiteIntakeWizard(props: {
             </Show>
           </div>
           <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <For each={WEDDING_VENDOR_CHECKLIST}>
+            <For each={firstVendorCategories}>
               {(vendor) => {
-                const checked = () => props.weddingFollowUpVendorIds().includes(vendor.id);
+                const checked = () => props.weddingFollowUpVendorIds().includes(vendor.categoryId);
                 return (
                   <label class={`flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2.5 text-xs font-semibold transition sm:py-2 ${
                     checked()
@@ -201,9 +239,12 @@ export function WeddingSiteIntakeWizard(props: {
                       type="checkbox"
                       class="h-4 w-4 accent-rose-700"
                       checked={checked()}
-                      onChange={(event) => props.onToggleVendor(vendor.id, event.currentTarget.checked)}
+                      onChange={(event) => props.onToggleVendor(vendor.categoryId, event.currentTarget.checked)}
                     />
                     <span class="min-w-0 break-words">{vendor.label}</span>
+                    <span class="ml-auto shrink-0 rounded-full bg-white/75 px-2 py-0.5 text-[10px] text-rose-900/70">
+                      {vendor.idealLeadMonths[0]}-{vendor.idealLeadMonths[1]} mo
+                    </span>
                   </label>
                 );
               }}
@@ -318,6 +359,12 @@ export function WeddingSiteIntakeWizard(props: {
       {/* Step 3 — review & generate */}
       <Show when={step() === 3}>
         <div class="mt-4 space-y-3 rounded-[24px] border border-white/70 bg-white/65 p-3">
+          <div class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2">
+            <p class="text-xs font-semibold text-amber-950">Draft - not saved to your account yet</p>
+            <p class="mt-0.5 text-[11px] leading-5 text-amber-900">
+              Generate the starter files, then approve the planning outputs to save them and the structured intake profile.
+            </p>
+          </div>
           <p class="text-xs leading-5 text-on-surface-variant">
             A starter brief has been created as the first planning file. Approve planning outputs to keep it in Files before adding private details.
           </p>

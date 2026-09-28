@@ -44,9 +44,10 @@ test("buildWeddingVendorComparisonUiState exposes row actions and enabled follow
 
   assert.equal(state.dynamic, true);
   assert.equal(state.footer.enabled, true);
-  assert.equal(state.footer.actionLabel, "Review follow-up in queue");
+  assert.equal(state.footer.actionLabel, "Confirm choices and review follow-up");
   assert.equal(state.footer.summaryLabel, "2 vendors selected for approval-gated follow-up");
   assert.equal(state.footer.consequenceLabel, "1 unselected vendor will leave active queues; selected vendors continue to follow-up.");
+  assert.equal(state.footer.confirmationLabel, "Your selected vendors become the active follow-up set after this decision is projected; unselected vendors remain in the log only.");
   assert.equal(state.footer.unselectedCount, 1);
   assert.equal(state.footer.targetMenu, "response_queue");
   assert.deepEqual(state.rowActions.map((action) => action.selectLabel), [
@@ -74,6 +75,7 @@ test("buildWeddingVendorComparisonUiState keeps footer disabled before selection
   assert.equal(state.footer.actionLabel, "Choose vendors first");
   assert.equal(state.footer.summaryLabel, "Select one or more vendors to prepare follow-up");
   assert.equal(state.footer.consequenceLabel, "No vendor follow-up will be prepared until at least one row is selected.");
+  assert.equal(state.footer.confirmationLabel, "Choose at least one vendor before OmnyID prepares outreach or follow-up work.");
   assert.equal(state.footer.unselectedCount, 3);
 });
 

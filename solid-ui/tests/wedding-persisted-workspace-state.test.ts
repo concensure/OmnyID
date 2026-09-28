@@ -128,6 +128,8 @@ function persistedMessages() {
         guestCount: 90,
         budgetComfort: "Mid-range",
         topPriorities: ["food", "photos"],
+        atmosphereDescription: "Relaxed garden dinner, candlelit",
+        inspirationImageUrls: ["https://example.com/wedding.jpg"],
         countryCode: "AU",
         noimDownloaded: "no",
         celebrantPath: "need_options",
@@ -222,6 +224,8 @@ test("buildWeddingPersistedWorkspaceState recovers persisted artifacts dates and
   assert.equal(state.taskItems[0]?.semanticKind, "wedding_external_wait");
   assert.equal(state.taskItems[0]?.semanticObject?.id, "semantic:task:confirm-package");
   assert.equal(state.contextItems[0]?.planningContext.location, "Sydney NSW");
+  assert.equal(state.contextItems[0]?.planningContext.atmosphereDescription, "Relaxed garden dinner, candlelit");
+  assert.deepEqual(state.contextItems[0]?.planningContext.inspirationImageUrls, ["https://example.com/wedding.jpg"]);
   assert.equal(state.contextItems[0]?.projectionSaved, true);
   assert.equal(state.approvalReceipts[0]?.actionKind, "contact_vendor");
   assert.equal(state.approvalReceipts[0]?.status, "executed");

@@ -74,6 +74,40 @@ test("buildWeddingDecisionFocusSidebarAction opens linked vendor comparison arti
   assert.equal(focusItems[0]?.wedding_workspace_menu, "documents");
 });
 
+test("buildWeddingDecisionFocusSidebarAction routes lead-time vendor research to the response queue", () => {
+  const action = buildWeddingDecisionFocusSidebarAction({
+    summaryLabel: "Focus on 1 wedding decision now; 0 can wait.",
+    backlogCount: 0,
+    focusItems: [
+      item({
+        title: "Vendor research, right now: Venue",
+        sourceSurface: "tasks",
+        workspaceMenu: "response_queue",
+        evidenceLabels: ["vendor research timing"],
+        actionMetadata: {
+          vendor_lead_time_research_task: true,
+          vendor_lead_time_category_id: "venue",
+          vendor_search_review_task: true,
+          vendor_search_action_id: "lead-time-venue",
+          vendor_search_categories: ["Venue"],
+          vendor_search_scope: "lead_time_category",
+        },
+      }),
+    ],
+  });
+  const packet = action.metadata?.decision_focus as Record<string, unknown>;
+  const focusItems = packet.focus_items as Array<Record<string, unknown>>;
+  const itemMetadata = focusItems[0]?.action_metadata as Record<string, unknown>;
+
+  assert.equal(action.kind, "open_workspace_menu");
+  assert.equal(action.label, "Research this");
+  assert.equal(action.metadata?.wedding_workspace_menu, "response_queue");
+  assert.equal(action.metadata?.vendor_lead_time_category_id, "venue");
+  assert.equal(action.metadata?.vendor_search_scope, "lead_time_category");
+  assert.deepEqual(action.metadata?.vendor_search_categories, ["Venue"]);
+  assert.equal(itemMetadata.vendor_search_action_id, "lead-time-venue");
+});
+
 test("buildWeddingDecisionFocusSidebarAction can request explanation instead of opening", () => {
   const action = buildWeddingDecisionFocusSidebarAction({
     summaryLabel: "Focus on 1 wedding decision now; 0 can wait.",

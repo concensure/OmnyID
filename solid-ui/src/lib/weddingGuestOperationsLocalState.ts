@@ -9,6 +9,7 @@ export type WeddingGuestOperationsLocalDraftGuest = {
 export type WeddingGuestOperationsLocalState = {
   guests: WeddingGuestOperationsLocalDraftGuest[];
   rules: string[];
+  rsvpOverrides: Record<string, string>;
 };
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
@@ -22,6 +23,15 @@ function record(value: unknown): Record<string, unknown> | null {
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanOverrideRecord(value: unknown): Record<string, string> {
+  const source = record(value);
+  if (!source) return {};
+  const entries = Object.entries(source)
+    .map(([key, status]) => [clean(key), clean(status)] as const)
+    .filter(([key, status]) => Boolean(key) && Boolean(status));
+  return Object.fromEntries(entries);
 }
 
 function defaultStorage(): StorageLike | null {
@@ -47,7 +57,7 @@ export function loadWeddingGuestOperationsLocalState(
   scope: string,
   storage: StorageLike | null | undefined = defaultStorage(),
 ): WeddingGuestOperationsLocalState {
-  if (!storage) return { guests: [], rules: [] };
+  if (!storage) return { guests: [], rules: [], rsvpOverrides: {} };
   try {
     const parsed = JSON.parse(storage.getItem(weddingGuestOperationsStorageKey(scope)) ?? "{}");
     const source = record(parsed);
@@ -64,9 +74,9 @@ export function loadWeddingGuestOperationsLocalState(
     const rules = Array.isArray(source?.rules)
       ? source.rules.map(clean).filter(Boolean).slice(0, MAX_LOCAL_GUEST_RULES)
       : [];
-    return { guests, rules };
+    return { guests, rules, rsvpOverrides: cleanOverrideRecord(source?.rsvpOverrides ?? source?.rsvp_overrides) };
   } catch {
-    return { guests: [], rules: [] };
+    return { guests: [], rules: [], rsvpOverrides: {} };
   }
 }
 
@@ -80,6 +90,7 @@ export function saveWeddingGuestOperationsLocalState(
     storage.setItem(weddingGuestOperationsStorageKey(scope), JSON.stringify({
       guests: state.guests.slice(-MAX_LOCAL_GUEST_DRAFTS),
       rules: state.rules.slice(0, MAX_LOCAL_GUEST_RULES),
+      rsvpOverrides: cleanOverrideRecord(state.rsvpOverrides),
     }));
     return true;
   } catch {

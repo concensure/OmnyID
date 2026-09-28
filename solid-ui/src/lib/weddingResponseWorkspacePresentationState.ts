@@ -139,6 +139,7 @@ export function contextCards(contextItems: readonly WeddingNeedToKnowProjectionC
     statusLabel: item.projectionSaved
       ? "Saved context"
       : item.readyForFirstRecommendations ? "Ready for recommendations" : "Needs more context",
+    planningContext: item.planningContext,
     answeredLabels: item.answeredLabels.slice(0, 8),
     nextQuestionLabel: item.nextQuestionLabel,
     metadataLabels: [

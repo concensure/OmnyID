@@ -110,6 +110,8 @@ function answeredLabels(context: WeddingPlanningContext): string[] {
     hasAnswer(context.guestCount) ? `Guest count: ${context.guestCount}` : null,
     hasAnswer(context.budgetComfort) ? `Budget comfort: ${context.budgetComfort}` : null,
     hasAnswer(context.familyOrStakeholderRoles) ? `Couple: ${context.familyOrStakeholderRoles}` : null,
+    hasAnswer(context.atmosphereDescription) ? `Atmosphere: ${context.atmosphereDescription}` : null,
+    context.inspirationImageUrls?.length ? `Inspiration links: ${context.inspirationImageUrls.length}` : null,
     ...(context.topPriorities ?? []).map((priority) => `Priority: ${priority}`),
     ...weddingVendorSelectionLabels(context.vendorCategories).map((vendor) => `Vendor needed: ${vendor}`),
     hasAnswer(context.vowPreference) && clean(context.vowPreference).toLowerCase() !== "undecided"
@@ -128,6 +130,8 @@ function normalizeContext(input: WeddingTemplateFollowUpInput): WeddingPlanningC
     guestCount: typeof input.guestCount === "number" ? input.guestCount : clean(input.guestCount) || null,
     budgetComfort: clean(input.budgetComfort) || null,
     topPriorities: uniqueStrings(input.topPriorities ?? [], 6),
+    atmosphereDescription: clean(input.atmosphereDescription) || null,
+    inspirationImageUrls: uniqueStrings(input.inspirationImageUrls ?? [], 10),
     vendorCategories: weddingVendorSelectionLabels(input.vendorCategories),
     vendorPreferences: clean(input.vendorPreferences) || null,
     photographyScope: clean(input.photographyScope) || null,
@@ -193,6 +197,10 @@ function researchNotes(context: WeddingPlanningContext, labels: readonly string[
     context.location ? "Use the location to scope maps, guest logistics, and later verified vendor research." : null,
     context.guestCount ? "Use guest count as a hard capacity and catering constraint before ranking venues." : null,
     context.topPriorities?.length ? "Use top priorities to explain tradeoffs instead of optimizing for a generic wedding." : null,
+    context.atmosphereDescription ? "Use the described atmosphere to tune vendor ranking, decor assumptions, tone, and tradeoff warnings." : null,
+    context.inspirationImageUrls?.length
+      ? `User-provided inspiration links for style inference: ${context.inspirationImageUrls.join(" | ")}. Treat as unverified references until fetched by an approved agent.`
+      : null,
     context.vowPreference
       ? "Raise vow preparation early: the couple should choose between a standard vow and personal vows before ceremony scripting."
       : null,

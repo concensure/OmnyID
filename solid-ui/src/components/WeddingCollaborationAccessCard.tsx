@@ -103,6 +103,10 @@ export function WeddingCollaborationAccessCard(props: {
             type="button"
             class="rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!personName().trim() && !personEmail().trim()}
+            data-magic-action="invite"
+            data-magic-icon="person-add"
+            data-magic-label="Add person"
+            data-magic-id="wedding:collaboration:add-person"
             onClick={addDraftAssignment}
           >
             Add person
@@ -125,6 +129,10 @@ export function WeddingCollaborationAccessCard(props: {
                   <button
                     type="button"
                     class="rounded-full border border-sky-100 bg-white px-2 py-1 text-[11px] font-semibold text-sky-950"
+                    data-magic-action="revoke"
+                    data-magic-icon="remove"
+                    data-magic-label={`Remove ${assignment.name}`}
+                    data-magic-id={`wedding:collaboration:draft:${assignment.id}:remove`}
                     onClick={() => setDraftAssignments((current) => current.filter((item) => item.id !== assignment.id))}
                   >
                     Remove
@@ -160,6 +168,10 @@ export function WeddingCollaborationAccessCard(props: {
                   <button
                     type="button"
                     class="rounded-full border border-sky-100 bg-white/85 px-2 py-1 text-[10px] font-semibold text-sky-950 transition hover:border-sky-200 hover:bg-white"
+                    data-magic-action="open"
+                    data-magic-icon="access"
+                    data-magic-label={openRole() === role.role ? "Hide details" : "Show details"}
+                    data-magic-id={`wedding:collaboration:role:${role.role}:details`}
                     onClick={() => setOpenRole(openRole() === role.role ? null : role.role)}
                   >
                     {openRole() === role.role ? "Hide details" : "Show details"}
@@ -170,6 +182,10 @@ export function WeddingCollaborationAccessCard(props: {
                 <button
                   type="button"
                   class="mt-1 text-left text-xs font-semibold leading-5 text-sky-900 underline decoration-sky-300 underline-offset-2"
+                  data-magic-action="open"
+                  data-magic-icon="access"
+                  data-magic-label={role.mobileDisclosureLabel}
+                  data-magic-id={`wedding:collaboration:role:${role.role}:mobile-details`}
                   onClick={() => setOpenRole(openRole() === role.role ? null : role.role)}
                 >
                   {role.mobileDisclosureLabel}

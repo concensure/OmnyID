@@ -10,6 +10,7 @@ import {
   type WeddingPlanningTaskItem,
 } from "@/lib/weddingCalendarProjectionState";
 import { markWeddingNeedToKnowAfpProjectionSent } from "@/lib/weddingNeedToKnowAfpProjectionState";
+import { markWeddingIntakeProfileAfpProjectionSent } from "@/lib/weddingIntakeProfileAfpProjectionState";
 import { buildWeddingCollaborationState } from "@/lib/weddingCollaborationState";
 import {
   buildWeddingProjectionQueueSelectionState,
@@ -137,18 +138,25 @@ test("buildWeddingProjectionQueueState aggregates pending artifact calendar and 
     storage: memoryStorage(),
   });
 
-  assert.equal(state.items.length, 4);
-  assert.equal(state.pendingItems.length, 4);
+  assert.equal(state.items.length, 5);
+  assert.equal(state.pendingItems.length, 5);
   assert.equal(state.blockedItems.length, 0);
   assert.equal(state.sentItems.length, 0);
-  assert.equal(state.pendingSendInputs.length, 4);
-  assert.equal(state.summaryLabel, "4 ready");
-  assert.equal(state.nextActionLabel, "Save 4 planning items");
+  assert.equal(state.pendingSendInputs.length, 5);
+  assert.equal(state.summaryLabel, "5 ready");
+  assert.equal(state.nextActionLabel, "Save 5 planning items");
   assert.equal(state.canDispatch, true);
-  assert.deepEqual(state.pendingSendInputs.map((input) => input.type), ["context", "artifact", "calendar_event", "task"]);
+  assert.deepEqual(state.pendingSendInputs.map((input) => input.subtype ?? input.type), [
+    "wedding_need_to_know",
+    "wedding_intake_profile",
+    "wedding_artifact",
+    "wedding_event",
+    "wedding_task",
+  ]);
   assert.ok(state.pendingSendInputs.some((input) => input.supertags?.includes("wedding_task:budget_review")));
   assert.equal(state.pendingItems.find((item) => item.kind === "context")?.semanticKind, "wedding_active_loop");
   assert.ok(state.pendingItems.find((item) => item.kind === "context")?.semanticTags.includes("wedding_context"));
+  assert.equal(state.pendingItems.find((item) => item.kind === "intake_profile")?.title, "Wedding intake profile");
 });
 
 test("buildWeddingProjectionQueueState preserves semantic decision objects for meaning-first rendering", () => {
@@ -348,6 +356,7 @@ test("buildWeddingProjectionQueueState excludes already sent projections from di
   assert.ok(artifact);
   markWeddingArtifactAfpProjectionSent(artifact.summary.id, storage);
   markWeddingNeedToKnowAfpProjectionSent("response_workspace:workspace-1", storage);
+  markWeddingIntakeProfileAfpProjectionSent("wedding_intake_profile:response_workspace:workspace-1", storage);
   markWeddingProjectionSent(scheduleItem.id, WEDDING_CALENDAR_AFP_PROJECTIONS_KEY, storage);
   markWeddingProjectionSent(taskItem.id, WEDDING_TASK_AFP_PROJECTIONS_KEY, storage);
 
@@ -360,11 +369,42 @@ test("buildWeddingProjectionQueueState excludes already sent projections from di
   });
 
   assert.equal(state.pendingItems.length, 0);
-  assert.equal(state.sentItems.length, 4);
+  assert.equal(state.sentItems.length, 5);
   assert.equal(state.pendingSendInputs.length, 0);
-  assert.equal(state.summaryLabel, "4 already saved");
+  assert.equal(state.summaryLabel, "5 already saved");
   assert.equal(state.nextActionLabel, "Planning items saved");
   assert.equal(state.canDispatch, false);
+});
+
+test("buildWeddingProjectionQueueState can backfill intake profile after context was already saved", () => {
+  const storage = memoryStorage();
+  markWeddingNeedToKnowAfpProjectionSent("response_workspace:workspace-1", storage);
+
+  const state = buildWeddingProjectionQueueState({
+    contextItems: [contextItem(storage)],
+    storage,
+  });
+
+  assert.equal(state.sentItems.find((item) => item.kind === "context")?.statusLabel, "Already saved as context");
+  assert.equal(state.pendingItems.length, 1);
+  assert.equal(state.pendingItems[0]?.kind, "intake_profile");
+  assert.equal(state.pendingSendInputs[0]?.subtype, "wedding_intake_profile");
+});
+
+test("buildWeddingProjectionQueueState skips empty structured profile projections for partial context", () => {
+  const state = buildWeddingProjectionQueueState({
+    contextItems: [{
+      metadata,
+      answeredLabels: [],
+      nextQuestionLabel: "Continue wedding planning.",
+      readyForFirstRecommendations: false,
+    } as any],
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.items.some((item) => item.kind === "context"), true);
+  assert.equal(state.items.some((item) => item.kind === "intake_profile"), false);
+  assert.equal(state.pendingSendInputs.some((input) => input.subtype === "wedding_intake_profile"), false);
 });
 
 test("buildWeddingProjectionQueueState reports an empty queue", () => {

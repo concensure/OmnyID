@@ -102,3 +102,30 @@ test("buildWeddingVisionState reads inspiration supertags as preference evidence
   assert.ok(vision.feelTags.includes("Warm"));
   assert.ok(vision.priorityRows.some((row) => row.label === "Decor" && row.reason.includes("inspiration")));
 });
+
+test("buildWeddingVisionState uses structured intake atmosphere and inspiration links", () => {
+  const vision = buildWeddingVisionState(state({
+    contextCards: [{
+      title: "Wedding basics",
+      statusLabel: "Saved context",
+      planningContext: {
+        atmosphereDescription: "Relaxed candlelit garden dinner with personal vows",
+        inspirationImageUrls: ["https://example.com/garden-dinner.jpg", "https://example.com/table.jpg"],
+        topPriorities: ["budget", "food", "family"],
+        budgetComfort: "Keep total spend low",
+      },
+      answeredLabels: ["Budget comfort: Keep total spend low"],
+      nextQuestionLabel: "Ready for vendor recommendations.",
+      metadataLabels: ["response_workspace:vision"],
+    }],
+    inspiration: { items: [] } as WeddingResponseWorkspaceViewState["inspiration"],
+  }));
+
+  assert.ok(vision.feelTags.includes("Warm"));
+  assert.ok(vision.feelTags.includes("Relaxed"));
+  assert.ok(vision.feelTags.includes("Personal"));
+  assert.ok(vision.evidenceLabels.some((label) => /Atmosphere: Relaxed candlelit garden dinner/i.test(label)));
+  assert.ok(vision.evidenceLabels.some((label) => /2 inspiration links/i.test(label)));
+  assert.ok(vision.sourceMixLabels.some((label) => /2 inspiration links/i.test(label)));
+  assert.ok(!vision.actionLabels.some((action) => action.label === "Add inspiration"));
+});

@@ -353,6 +353,10 @@ export function WeddingTaskStageView(props: {
         <button
           type="button"
           class={`rounded-full px-3 py-2 text-xs font-semibold transition ${activeTab() === "open" ? "bg-rose-800 text-white shadow-sm" : "border border-rose-200 bg-white/70 text-rose-950 hover:bg-white"}`}
+          data-magic-action="reopen"
+          data-magic-icon="todo"
+          data-magic-label={`To do (${openTaskCount()})`}
+          data-magic-id="wedding:tasks:show-open"
           onClick={() => setActiveTab("open")}
         >
           To do ({openTaskCount()})
@@ -360,6 +364,10 @@ export function WeddingTaskStageView(props: {
         <button
           type="button"
           class={`rounded-full px-3 py-2 text-xs font-semibold transition ${activeTab() === "done" ? "bg-rose-800 text-white shadow-sm" : "border border-rose-200 bg-white/70 text-rose-950 hover:bg-white"}`}
+          data-magic-action="done"
+          data-magic-icon="check"
+          data-magic-label={`Done (${doneTaskCount()})`}
+          data-magic-id="wedding:tasks:show-done"
           onClick={() => setActiveTab("done")}
         >
           Done ({doneTaskCount()})
@@ -410,12 +418,20 @@ export function WeddingTaskStageView(props: {
                             class="mt-1 h-4 w-4 rounded border-white/70 accent-rose-700"
                             checked={completed()}
                             aria-label={item.checkboxLabel}
+                            data-magic-action={completed() ? "reopen" : "done"}
+                            data-magic-icon={completed() ? "undo" : "check"}
+                            data-magic-label={item.checkboxLabel}
+                            data-magic-id={`wedding:task:${item.task.task_id}:${completed() ? "reopen" : "done"}`}
                             onChange={() => toggleTask(item.task, item.completed)}
                           />
                           <button
                             type="button"
                             class="min-w-0 flex-1 text-left"
                             aria-expanded={expanded()}
+                            data-magic-action="open"
+                            data-magic-icon="expand"
+                            data-magic-label={`Open ${item.title}`}
+                            data-magic-id={`wedding:task:${item.task.task_id}:expand`}
                             onClick={() => toggleExpanded(item.task.task_id)}
                           >
                             <span class={`block break-words text-xs font-semibold leading-5 ${completed() ? "line-through text-slate-500" : item.titleClass}`}>

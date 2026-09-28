@@ -36,6 +36,31 @@ test("buildWeddingGuestTrackingState counts RSVP dietary accessibility and follo
   assert.equal(state.accessibilityCount, 1);
   assert.equal(state.missingContactCount, 1);
   assert.equal(state.missingMealCount, 1);
+  assert.deepEqual(state.guestRows?.slice(0, 2).map((row) => ({
+    name: row.displayName,
+    household: row.householdLabel,
+    rsvp: row.rsvpStatus,
+    meal: row.mealPreference,
+    dietary: row.dietaryNote,
+    access: row.accessibilityNote,
+    source: row.sourceLabel,
+  })), [{
+    name: "Alex",
+    household: "Ungrouped",
+    rsvp: "Attending",
+    meal: "Fish",
+    dietary: "Nut allergy",
+    access: "Wheelchair access",
+    source: "Guest list",
+  }, {
+    name: "Blair",
+    household: "Ungrouped",
+    rsvp: "Pending",
+    meal: null,
+    dietary: "Vegan",
+    access: null,
+    source: "Guest list",
+  }]);
   assert.ok(state.warningLabels.some((label) => /RSVPs? still pending/i.test(label)));
   assert.ok(state.warningLabels.some((label) => /contact/i.test(label)));
   assert.ok(state.warningLabels.some((label) => /meal/i.test(label)));

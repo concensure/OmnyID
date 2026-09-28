@@ -51,6 +51,7 @@ import {
   type WeddingSeatingPlanState,
 } from "@/lib/weddingSeatingPlanState";
 import { buildWeddingVendorSearchTaskItems } from "@/lib/weddingVendorSearchArtifactState";
+import { buildWeddingVendorLeadTimeTaskItems } from "@/lib/weddingVendorLeadTimeState";
 import { buildWeddingVendorSeedTaskItems } from "@/lib/weddingVendorSeedState";
 import { buildWeddingVowPlanningTaskItems } from "@/lib/weddingVowPlanningState";
 
@@ -72,6 +73,9 @@ export type WeddingWorkspaceGeneratedTaskItemsInput = {
   productionRemainingWork?: WeddingProductionRemainingWorkState | null;
   approvalReceipts?: readonly WeddingPersistedApprovalReceipt[] | null;
   weddingVendors?: readonly WeddingVendorContactOutreachVendor[] | null;
+  weddingDateOrSeason?: string | null;
+  vendorCategoryIds?: readonly unknown[] | null;
+  skippedVendorCategoryIds?: readonly unknown[] | null;
   now?: string | null;
   metadata?: unknown;
 };
@@ -143,6 +147,16 @@ export function buildWeddingWorkspaceGeneratedTaskItems(input: WeddingWorkspaceG
       artifacts: input.artifacts,
       selectedDecisionItems: input.selectedDecisionItems,
       metadata: input.metadata,
+      existingTaskItems: baseTaskItems,
+    }),
+    ...buildWeddingVendorLeadTimeTaskItems({
+      weddingDateOrSeason: input.weddingDateOrSeason,
+      selectedCategoryIds: input.vendorCategoryIds,
+      skippedCategoryIds: input.skippedVendorCategoryIds,
+      artifacts: input.artifacts,
+      selectedDecisionItems: input.selectedDecisionItems,
+      metadata: input.metadata,
+      now: input.now,
       existingTaskItems: baseTaskItems,
     }),
     ...buildWeddingVendorSeedTaskItems({

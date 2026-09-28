@@ -44,6 +44,30 @@ function objectStringArray(value: unknown, key: string): string[] {
   return Array.isArray(raw) ? raw.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
 }
 
+function contextPlanningText(state: WeddingResponseWorkspaceViewState): string[] {
+  return state.contextCards.flatMap((card) => {
+    const planning = (card as { planningContext?: Record<string, unknown> | null }).planningContext;
+    if (!planning) return [];
+    return [
+      optionalString(planning.atmosphereDescription),
+      ...objectStringArray(planning, "inspirationImageUrls"),
+      ...objectStringArray(planning, "topPriorities"),
+      optionalString(planning.budgetComfort),
+      optionalString(planning.guestCount),
+      optionalString(planning.location),
+      optionalString(planning.vowPreference),
+      optionalString(planning.vowStyle),
+    ].filter((value): value is string => Boolean(value));
+  });
+}
+
+function inspirationLinkCount(state: WeddingResponseWorkspaceViewState): number {
+  return state.contextCards.reduce((count, card) => {
+    const planning = (card as { planningContext?: Record<string, unknown> | null }).planningContext;
+    return count + objectStringArray(planning, "inspirationImageUrls").length;
+  }, 0);
+}
+
 function includesAny(text: string, patterns: readonly RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
@@ -51,6 +75,7 @@ function includesAny(text: string, patterns: readonly RegExp[]): boolean {
 function contextText(state: WeddingResponseWorkspaceViewState): string {
   return [
     ...state.contextCards.flatMap((card) => [...card.answeredLabels, ...card.metadataLabels, card.nextQuestionLabel]),
+    ...contextPlanningText(state),
     ...state.inspiration.items.flatMap((item) => [
       item.title,
       item.note,
@@ -125,7 +150,7 @@ function importantPeople(state: WeddingResponseWorkspaceViewState): string[] {
 
 function actionLabels(state: WeddingResponseWorkspaceViewState): WeddingVisionAction[] {
   const actions: WeddingVisionAction[] = [];
-  if (state.inspiration.items.length === 0) {
+  if (state.inspiration.items.length === 0 && inspirationLinkCount(state) === 0) {
     actions.push({
       label: "Add inspiration",
       detail: "Upload images, screenshots, notes, or links so OmnyID can learn the look and feeling.",
@@ -157,7 +182,7 @@ function actionLabels(state: WeddingResponseWorkspaceViewState): WeddingVisionAc
 }
 
 function confidenceLabel(state: WeddingResponseWorkspaceViewState, evidenceCount: number): string {
-  const hasInspiration = state.inspiration.items.length > 0;
+  const hasInspiration = state.inspiration.items.length > 0 || inspirationLinkCount(state) > 0;
   const hasPeople = state.guestTracking.guestRowCount > 0 || state.boundaryState.familyVisibleObjects.length > 0;
   const hasBudget = state.budgetTracking.budgetTargetAmount !== null;
   if (evidenceCount >= 4 && hasInspiration && hasPeople && hasBudget) return "Confidence: strong, based on several parts of the plan.";
@@ -166,9 +191,11 @@ function confidenceLabel(state: WeddingResponseWorkspaceViewState, evidenceCount
 }
 
 function sourceMixLabels(state: WeddingResponseWorkspaceViewState): string[] {
+  const linkCount = inspirationLinkCount(state);
   return unique([
     state.contextCards.length > 0 ? `${state.contextCards.length} planning answer set${state.contextCards.length === 1 ? "" : "s"}` : "",
     state.inspiration.items.length > 0 ? `${state.inspiration.items.length} inspiration item${state.inspiration.items.length === 1 ? "" : "s"}` : "",
+    linkCount > 0 ? `${linkCount} inspiration link${linkCount === 1 ? "" : "s"}` : "",
     state.guestTracking.guestRowCount > 0 ? `${state.guestTracking.guestRowCount} guests or people constraints` : "",
     state.budgetTracking.budgetTargetAmount !== null ? "Budget ceiling" : "",
     state.boundaryState.familyVisibleObjects.length > 0 ? "Family or access notes" : "",
@@ -176,8 +203,9 @@ function sourceMixLabels(state: WeddingResponseWorkspaceViewState): string[] {
 }
 
 function learningLabels(state: WeddingResponseWorkspaceViewState): string[] {
+  const hasVisualEvidence = state.inspiration.items.length > 0 || inspirationLinkCount(state) > 0;
   const labels = [
-    state.inspiration.items.length === 0 ? "Add inspiration images, screenshots, links, or notes to teach the look and feeling." : "",
+    hasVisualEvidence ? "" : "Add inspiration images, screenshots, links, or notes to teach the look and feeling.",
     state.guestTracking.guestRowCount === 0 ? "Add guests or important people so access needs and family context can shape the plan." : "",
     state.budgetTracking.budgetTargetAmount === null ? "Set a budget ceiling so recommendations can respect money tradeoffs." : "",
     state.delegation.items.length === 0 ? "Add who is helping so responsibilities and decision ownership are clearer." : "",
@@ -188,9 +216,16 @@ function learningLabels(state: WeddingResponseWorkspaceViewState): string[] {
 export function buildWeddingVisionState(state: WeddingResponseWorkspaceViewState): WeddingVisionState {
   const text = contextText(state);
   const people = importantPeople(state);
+  const linkCount = inspirationLinkCount(state);
+  const atmosphereLabels = unique(state.contextCards
+    .map((card) => optionalString((card as { planningContext?: Record<string, unknown> | null }).planningContext?.atmosphereDescription))
+    .filter((value): value is string => Boolean(value))
+    .map((value) => `Atmosphere: ${value}`), 2);
   const evidenceLabels = unique([
     ...state.contextCards.flatMap((card) => card.answeredLabels),
+    ...atmosphereLabels,
     state.inspiration.items.length > 0 ? `${state.inspiration.items.length} inspiration item${state.inspiration.items.length === 1 ? "" : "s"}` : "",
+    linkCount > 0 ? `${linkCount} inspiration link${linkCount === 1 ? "" : "s"}` : "",
     state.budgetTracking.budgetTargetAmount !== null ? "Budget target has been set." : "",
     state.guestTracking.guestRowCount > 0 ? `${state.guestTracking.guestRowCount} guests in the guest list.` : "",
   ], 8);

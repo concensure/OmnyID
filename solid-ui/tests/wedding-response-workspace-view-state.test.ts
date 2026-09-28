@@ -6,6 +6,13 @@ import { buildWeddingKnowledgeGraphState } from "../src/lib/weddingKnowledgeGrap
 import { buildWeddingRecommendationExplanationState } from "../src/lib/weddingRecommendationExplanationState.ts";
 import { buildWeddingVendorPursuitClosureTaskItem } from "../src/lib/weddingBudgetTrackingState.ts";
 import {
+  WEDDING_TASK_AFP_PROJECTIONS_KEY,
+  markWeddingProjectionSent,
+} from "../src/lib/weddingCalendarProjectionState.ts";
+import {
+  markWeddingDecisionAfpProjectionSent,
+} from "../src/lib/weddingDecisionAfpProjectionState.ts";
+import {
   setWeddingDecisionSelection,
   setWeddingDecisionSelections,
 } from "../src/lib/weddingDecisionSelectionState.ts";
@@ -994,6 +1001,186 @@ test("buildWeddingResponseWorkspaceViewState projects selected top-three vendor 
     /Confirm selected wedding option: Harbour Studio/i.test(item.title)
   ));
   assert.equal(state.personalOsProjection.rankedItems.some((item) => /Portrait Hall/i.test(item.title)), false);
+});
+
+test("buildWeddingResponseWorkspaceViewState stops resaving selected vendor decisions after projection", async () => {
+  const readiness = buildWeddingVendorSearchReadinessState({
+    location: "Sydney",
+    vendorCategories: ["photographer"],
+    vendorPreferences: "documentary style and transparent pricing",
+    photographyScope: "day-of coverage and portraits",
+    liveSearchProviderReady: true,
+  });
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        {
+          title: "Harbour Studio",
+          url: "https://harbour-studio.example",
+          snippet: "Sydney documentary wedding photographer with transparent packages, portfolio, and date availability.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Budget Lens",
+          url: "https://budget-lens.example",
+          snippet: "Wedding photography rates and simple packages for Sydney couples.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Portrait Hall",
+          url: "https://portrait-hall.example",
+          snippet: "Editorial portraits and gallery reviews.",
+          provider: "Brave Search",
+        },
+      ],
+    }),
+  });
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "documentary style and transparent pricing",
+    location: "Sydney",
+    budgetComfort: "balanced budget",
+    vendorCategories: ["photographer"],
+  });
+  const comparisonArtifact = comparison.artifactInput;
+  assert.ok(comparisonArtifact);
+
+  const storage = memoryStorage();
+  setWeddingDecisionSelections(comparisonArtifact.id, [
+    "vendor_choice:harbour_studio:1",
+    "vendor_choice:budget_lens:2",
+  ], storage);
+  const openState = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    activeArtifactId: comparisonArtifact.id,
+    artifacts: [comparisonArtifact],
+    projectionStorage: storage,
+  });
+  const harbourDecision = openState.projectionQueue?.groups
+    .find((group) => group.kind === "decision")
+    ?.items.find((item) => /Harbour Studio/i.test(item.title));
+  assert.ok(harbourDecision);
+  markWeddingDecisionAfpProjectionSent(harbourDecision.sourceId, storage);
+
+  const savedState = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    activeArtifactId: comparisonArtifact.id,
+    artifacts: [comparisonArtifact],
+    projectionStorage: storage,
+  });
+  const decisionGroup = savedState.projectionQueue?.groups.find((group) => group.kind === "decision");
+  const taskGroup = savedState.projectionQueue?.groups.find((group) => group.kind === "task");
+  const decisionInputs = savedState.projectionQueue?.dispatchPayload?.sendInputs.filter((input) => input.type === "decision") ?? [];
+
+  assert.equal(decisionGroup?.pendingCount, 1);
+  assert.equal(decisionGroup?.sentCount, 1);
+  assert.deepEqual(decisionInputs.map((input) => input.metadata?.selected_option_label), ["Budget Lens"]);
+  assert.ok(taskGroup?.items.some((item) => /approval-gated quote request for Harbour Studio/i.test(item.title)));
+  assert.ok(taskGroup?.items.some((item) => /approval-gated quote request for Budget Lens/i.test(item.title)));
+});
+
+test("buildWeddingResponseWorkspaceViewState stops resaving selected vendor outreach tasks after projection", async () => {
+  const readiness = buildWeddingVendorSearchReadinessState({
+    location: "Sydney",
+    vendorCategories: ["photographer"],
+    vendorPreferences: "documentary style and transparent pricing",
+    photographyScope: "day-of coverage and portraits",
+    liveSearchProviderReady: true,
+  });
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        {
+          title: "Harbour Studio",
+          url: "https://harbour-studio.example",
+          snippet: "Sydney documentary wedding photographer with transparent packages, portfolio, and date availability.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Budget Lens",
+          url: "https://budget-lens.example",
+          snippet: "Wedding photography rates and simple packages for Sydney couples.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Portrait Hall",
+          url: "https://portrait-hall.example",
+          snippet: "Editorial portraits and gallery reviews.",
+          provider: "Brave Search",
+        },
+      ],
+    }),
+  });
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "documentary style and transparent pricing",
+    location: "Sydney",
+    budgetComfort: "balanced budget",
+    vendorCategories: ["photographer"],
+  });
+  const comparisonArtifact = comparison.artifactInput;
+  assert.ok(comparisonArtifact);
+
+  const storage = memoryStorage();
+  setWeddingDecisionSelections(comparisonArtifact.id, [
+    "vendor_choice:harbour_studio:1",
+    "vendor_choice:budget_lens:2",
+  ], storage);
+  const openState = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    activeArtifactId: comparisonArtifact.id,
+    artifacts: [comparisonArtifact],
+    projectionStorage: storage,
+  });
+  const harbourTask = openState.projectionQueue?.groups
+    .find((group) => group.kind === "task")
+    ?.items.find((item) => /approval-gated quote request for Harbour Studio/i.test(item.title));
+  assert.ok(harbourTask);
+  markWeddingProjectionSent(harbourTask.sourceId, WEDDING_TASK_AFP_PROJECTIONS_KEY, storage);
+
+  const savedState = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    activeArtifactId: comparisonArtifact.id,
+    artifacts: [comparisonArtifact],
+    projectionStorage: storage,
+  });
+  const taskGroup = savedState.projectionQueue?.groups.find((group) => group.kind === "task");
+  const vendorOutreachItems = taskGroup?.items.filter((item) =>
+    item.sendInput?.metadata?.vendor_outreach_from_selected_decision === true
+    || /approval-gated quote request for (Harbour Studio|Budget Lens)/i.test(item.title)
+  ) ?? [];
+  const taskInputs = savedState.projectionQueue?.dispatchPayload?.sendInputs.filter((input) =>
+    input.type === "task"
+    && input.metadata?.vendor_outreach_from_selected_decision === true
+  ) ?? [];
+
+  assert.equal(vendorOutreachItems.filter((item) => item.status === "pending").length, 1);
+  assert.equal(vendorOutreachItems.filter((item) => item.status === "sent").length, 1);
+  assert.ok(vendorOutreachItems.some((item) =>
+    /approval-gated quote request for Harbour Studio/i.test(item.title)
+    && item.status === "sent"
+    && item.sendInput === null
+  ));
+  assert.ok(vendorOutreachItems.some((item) =>
+    /approval-gated quote request for Budget Lens/i.test(item.title)
+    && item.status === "pending"
+    && item.sendInput?.metadata?.vendor_outreach_from_selected_decision === true
+  ));
+  assert.deepEqual(taskInputs.map((input) => input.metadata?.vendor_outreach_vendor_label), ["Budget Lens"]);
 });
 
 test("buildWeddingResponseWorkspaceViewState drops closed selected vendors from active follow-up queue", async () => {

@@ -48,6 +48,9 @@ export type WeddingVendorComparisonInput = {
   dateOrSeason?: string | null;
   guestCount?: string | null;
   budgetComfort?: string | null;
+  atmosphereDescription?: string | null;
+  inspirationImageUrls?: readonly string[] | null;
+  topPriorities?: readonly string[] | null;
   vendorCategories?: readonly string[] | null;
 };
 
@@ -126,6 +129,43 @@ function tokenize(value: unknown): string[] {
     .toLowerCase()
     .split(/[^a-z0-9]+/i)
     .filter((token) => token.length >= 4 && !/^(wedding|vendor|vendors|with|from|that|this|have|need|needs|style)$/i.test(token)), 32);
+}
+
+function comparisonPreferenceText(input: WeddingVendorComparisonInput): string {
+  return [
+    input.preferences,
+    input.atmosphereDescription,
+    input.budgetComfort,
+    input.guestCount,
+    input.dateOrSeason,
+    ...(input.topPriorities ?? []),
+    ...(input.vendorCategories ?? []),
+    ...(input.inspirationImageUrls ?? []),
+  ].filter(Boolean).join(" ");
+}
+
+function comparisonPreferenceSignals(input: WeddingVendorComparisonInput): string[] {
+  return uniqueStrings([
+    clean(input.preferences) ? `Preferences: ${clean(input.preferences)}` : null,
+    clean(input.atmosphereDescription) ? `Atmosphere: ${clean(input.atmosphereDescription)}` : null,
+    clean(input.budgetComfort) ? `Budget comfort: ${clean(input.budgetComfort)}` : null,
+    ...(input.topPriorities ?? []).map((priority) => `Priority: ${priority}`),
+    ...(input.inspirationImageUrls ?? []).map((url) => `Inspiration link: ${url}`),
+  ], 12);
+}
+
+function compactPreferenceSignalLabel(signals: readonly string[]): string | null {
+  const labels = signals
+    .map((signal) => {
+      const [label, ...rest] = clean(signal).split(":");
+      const detail = clean(rest.join(":"));
+      if (!label || !detail) return clean(signal);
+      const boundedDetail = detail.length > 36 ? `${detail.slice(0, 33).trim()}...` : detail;
+      return `${label}: ${boundedDetail}`;
+    })
+    .filter(Boolean)
+    .slice(0, 3);
+  return labels.length > 0 ? `Intake signals used: ${labels.join("; ")}` : null;
 }
 
 function artifactId(metadata: WeddingPlanningMetadata, execution: WeddingVendorSearchExecutionState): string {
@@ -323,13 +363,7 @@ function sourceHostname(url: string): string {
 
 function rankedVendorSources(input: WeddingVendorComparisonInput): RankedVendorSource[] {
   const execution = input.execution;
-  const preferenceTokens = tokenize([
-    input.preferences,
-    input.budgetComfort,
-    input.guestCount,
-    input.dateOrSeason,
-    ...(input.vendorCategories ?? []),
-  ].filter(Boolean).join(" "));
+  const preferenceTokens = tokenize(comparisonPreferenceText(input));
   const locationTokens = tokenize(input.location);
   const categoryTokens = tokenize((input.vendorCategories ?? []).join(" "));
   const seen = new Set<string>();
@@ -466,6 +500,7 @@ function a2uiForComparison(choices: readonly RankedVendorSource[], summary: stri
 function comparisonRecommendationHandoff(input: {
   choices: readonly RankedVendorSource[];
   execution: WeddingVendorSearchExecutionState;
+  preferenceSignals?: readonly string[] | null;
   preferences?: string | null;
   location?: string | null;
 }): Record<string, unknown> {
@@ -492,6 +527,7 @@ function comparisonRecommendationHandoff(input: {
       pricingSignalCount > 0
         ? `${pricingSignalCount} choice${pricingSignalCount === 1 ? "" : "s"} surfaced package/pricing language`
         : "Pricing/package evidence is not clear yet",
+      compactPreferenceSignalLabel(input.preferenceSignals ?? []),
       clean(input.location) ? `Location context: ${clean(input.location)}` : null,
       `Provider evidence: ${clean(input.execution.providerLabel) || "live search"}`,
     ].filter(Boolean),
@@ -508,8 +544,11 @@ function comparisonMarkdown(input: WeddingVendorComparisonInput, choices: readon
     summary,
     "",
     clean(input.preferences) ? `User preferences: ${clean(input.preferences)}` : null,
+    clean(input.atmosphereDescription) ? `Desired atmosphere: ${clean(input.atmosphereDescription)}` : null,
     clean(input.location) ? `Planning location: ${clean(input.location)}` : null,
     clean(input.budgetComfort) ? `Budget comfort: ${clean(input.budgetComfort)}` : null,
+    (input.topPriorities ?? []).length > 0 ? `Top priorities: ${(input.topPriorities ?? []).join(", ")}` : null,
+    (input.inspirationImageUrls ?? []).length > 0 ? `Inspiration links: ${(input.inspirationImageUrls ?? []).join(", ")}` : null,
     (input.vendorCategories ?? []).length > 0 ? `Vendor categories: ${(input.vendorCategories ?? []).join(", ")}` : null,
     "",
     choices.length > 3 ? "## Top five candidates" : "## Top three",
@@ -704,9 +743,11 @@ export function buildWeddingVendorComparisonArtifactState(
     url: choice.url,
   }));
   const topChoiceActionRows = vendorChoiceActionRows(choices);
+  const preferenceSignals = comparisonPreferenceSignals(input);
   const recommendationHandoff = comparisonRecommendationHandoff({
     choices,
     execution,
+    preferenceSignals,
     preferences: input.preferences,
     location: input.location,
   });
@@ -733,6 +774,7 @@ export function buildWeddingVendorComparisonArtifactState(
       topChoiceCount: choices.length,
       topChoiceLabels: choices.map((choice) => choice.title),
       topChoiceActionRows,
+      vendorComparisonPreferenceSignals: preferenceSignals,
       vendorComparisonHandoff: recommendationHandoff,
       vendorComparisonSelection: {
         mode: "multi",
@@ -750,6 +792,9 @@ export function buildWeddingVendorComparisonArtifactState(
         "user_preferences",
         "location",
         "vendor_category",
+        "atmosphere_description",
+        "top_priorities",
+        "inspiration_links",
         "package_pricing_language",
         "portfolio_review_language",
         "availability_language",
@@ -818,6 +863,7 @@ export function buildWeddingVendorComparisonArtifactState(
       "top vendor choices",
       "vendor shortlist",
       ...choices.flatMap((choice) => [choice.title, choice.preferenceMatchLabel, choice.situationFitLabel]),
+      ...preferenceSignals,
     ]),
     vendorLabels: choices.map((choice) => choice.title),
     bodyText: markdown,

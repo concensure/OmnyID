@@ -7,6 +7,7 @@ import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateS
 export type WeddingGuestTrackingState = {
   guestFileCount: number;
   guestRowCount: number;
+  guestRows?: WeddingGuestTrackingRow[];
   attendingCount: number;
   declinedCount: number;
   pendingCount: number;
@@ -22,6 +23,18 @@ export type WeddingGuestTrackingState = {
   summaryLabel: string;
   warningLabels: string[];
   sourceLabels: string[];
+};
+
+export type WeddingGuestTrackingRow = {
+  id: string;
+  displayName: string;
+  householdLabel: string;
+  rsvpStatus: "Attending" | "Not attending" | "Pending";
+  contactLabel: string | null;
+  mealPreference: string | null;
+  dietaryNote: string | null;
+  accessibilityNote: string | null;
+  sourceLabel: string;
 };
 
 export type WeddingGuestFollowUpTaskInput = {
@@ -130,6 +143,13 @@ function rsvpStatus(value: string): "attending" | "declined" | "pending" {
   if (/\b(yes|attending|accepted|confirmed|coming)\b/i.test(value)) return "attending";
   if (/\b(no|declined|not attending|unable)\b/i.test(value)) return "declined";
   return "pending";
+}
+
+function rsvpStatusLabel(value: string): WeddingGuestTrackingRow["rsvpStatus"] {
+  const status = rsvpStatus(value);
+  if (status === "attending") return "Attending";
+  if (status === "declined") return "Not attending";
+  return "Pending";
 }
 
 function uniqueHouseholdKey(name: string, household: string): string {
@@ -373,6 +393,7 @@ export function buildWeddingGuestTrackingState(input: {
   let missingMealCount = 0;
   const householdKeys = new Set<string>();
   const sourceLabels: string[] = [];
+  const guestRows: WeddingGuestTrackingRow[] = [];
 
   for (const artifact of guestArtifacts) {
     const body = clean(artifact.bodyText);
@@ -386,18 +407,37 @@ export function buildWeddingGuestTrackingState(input: {
     const mealIndex = headerIndex(table.headers, /\b(meal|menu|food)\b/i);
     const dietaryIndex = headerIndex(table.headers, /\b(dietary|allerg|vegan|vegetarian|gluten|nut)\b/i);
     const accessibilityIndex = headerIndex(table.headers, /\b(accessibility|access|mobility|wheelchair|sensory)\b/i);
+    const sourceLabel = guestSourceLabel(artifact);
 
-    for (const row of table.rows) {
+    for (const [rowIndex, row] of table.rows.entries()) {
+      const displayName = cell(row, nameIndex) || `Guest ${guestRowCount + 1}`;
+      const rawHouseholdLabel = cell(row, householdIndex);
+      const householdLabel = rawHouseholdLabel || "Ungrouped";
+      const contactLabel = cell(row, contactIndex);
+      const mealPreference = cell(row, mealIndex);
+      const dietaryNote = cell(row, dietaryIndex);
+      const accessibilityNote = cell(row, accessibilityIndex);
       guestRowCount += 1;
-      householdKeys.add(uniqueHouseholdKey(cell(row, nameIndex), cell(row, householdIndex)));
+      householdKeys.add(uniqueHouseholdKey(displayName, rawHouseholdLabel));
       const status = rsvpStatus(cell(row, rsvpIndex));
       if (status === "attending") attendingCount += 1;
       else if (status === "declined") declinedCount += 1;
       else pendingCount += 1;
-      if (hasUsefulValue(cell(row, dietaryIndex))) dietaryCount += 1;
-      if (hasUsefulValue(cell(row, accessibilityIndex))) accessibilityCount += 1;
-      if (contactIndex >= 0 && !hasUsefulValue(cell(row, contactIndex))) missingContactCount += 1;
-      if (status === "attending" && mealIndex >= 0 && !hasUsefulValue(cell(row, mealIndex))) missingMealCount += 1;
+      if (hasUsefulValue(dietaryNote)) dietaryCount += 1;
+      if (hasUsefulValue(accessibilityNote)) accessibilityCount += 1;
+      if (contactIndex >= 0 && !hasUsefulValue(contactLabel)) missingContactCount += 1;
+      if (status === "attending" && mealIndex >= 0 && !hasUsefulValue(mealPreference)) missingMealCount += 1;
+      guestRows.push({
+        id: `${clean(artifact.id) || clean(artifact.title) || "guest_list"}:guest:${rowIndex}`,
+        displayName,
+        householdLabel,
+        rsvpStatus: rsvpStatusLabel(cell(row, rsvpIndex)),
+        contactLabel: hasUsefulValue(contactLabel) ? contactLabel : null,
+        mealPreference: hasUsefulValue(mealPreference) ? mealPreference : null,
+        dietaryNote: hasUsefulValue(dietaryNote) ? dietaryNote : null,
+        accessibilityNote: hasUsefulValue(accessibilityNote) ? accessibilityNote : null,
+        sourceLabel,
+      });
     }
   }
 
@@ -420,6 +460,17 @@ export function buildWeddingGuestTrackingState(input: {
     if (hasUsefulValue(profile.accessibilityNote ?? "")) accessibilityCount += 1;
     if (!hasUsefulValue(profile.contactLabel ?? "")) missingContactCount += 1;
     if (status === "rsvp_yes" && !hasUsefulValue(profile.mealPreference ?? "")) missingMealCount += 1;
+    guestRows.push({
+      id: `boundary:${profile.personId}`,
+      displayName: profile.displayName,
+      householdLabel: clean(profile.householdId) || "Ungrouped",
+      rsvpStatus: status === "rsvp_yes" ? "Attending" : status === "rsvp_no" || status === "declined_by_couple" ? "Not attending" : "Pending",
+      contactLabel: hasUsefulValue(profile.contactLabel ?? "") ? profile.contactLabel ?? null : null,
+      mealPreference: hasUsefulValue(profile.mealPreference ?? "") ? profile.mealPreference ?? null : null,
+      dietaryNote: hasUsefulValue(profile.dietaryNote ?? "") ? profile.dietaryNote ?? null : null,
+      accessibilityNote: hasUsefulValue(profile.accessibilityNote ?? "") ? profile.accessibilityNote ?? null : null,
+      sourceLabel: "Saved guest records",
+    });
   }
 
   const warningLabels = [
@@ -438,6 +489,7 @@ export function buildWeddingGuestTrackingState(input: {
   return {
     guestFileCount: guestArtifacts.length,
     guestRowCount,
+    guestRows: guestRows.slice(0, 80),
     attendingCount,
     declinedCount,
     pendingCount,

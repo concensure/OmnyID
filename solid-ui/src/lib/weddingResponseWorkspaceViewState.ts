@@ -217,6 +217,7 @@ export type WeddingNeedToKnowContextCard = {
   id: string;
   title: string;
   statusLabel: string;
+  planningContext: WeddingNeedToKnowProjectionContext["planningContext"];
   answeredLabels: string[];
   nextQuestionLabel: string;
   metadataLabels: string[];
@@ -416,6 +417,18 @@ function privateImportSourceUrl(value: string): boolean {
   return /\b(?:upload|uploads|attachment|attachments|storage|parser|source-file|source_file)\b/i.test(value)
     || /\b[^/?#]+\.(?:csv|tsv|xlsx?|ods)(?:$|[?#/])/i.test(value);
 }
+
+function firstWeddingPlanningContextValue(
+  contexts: readonly WeddingNeedToKnowProjectionContext[] | null | undefined,
+  key: "dateOrSeason" | "vendorCategories",
+): unknown {
+  for (const context of contexts ?? []) {
+    const value = context.planningContext?.[key];
+    if (Array.isArray(value) ? value.length > 0 : clean(value)) return value;
+  }
+  return null;
+}
+
 function decisionProjectionItems(
   artifacts: readonly WeddingArtifactInput[],
   experienceModel?: Pick<WeddingExperienceModelState, "traits"> | null,
@@ -701,6 +714,10 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     productionRemainingWork,
     approvalReceipts: input.approvalReceipts,
     weddingVendors: input.weddingVendors,
+    weddingDateOrSeason: clean(firstWeddingPlanningContextValue(input.contextItems, "dateOrSeason")),
+    vendorCategoryIds: Array.isArray(firstWeddingPlanningContextValue(input.contextItems, "vendorCategories"))
+      ? firstWeddingPlanningContextValue(input.contextItems, "vendorCategories") as readonly unknown[]
+      : [],
     now: input.nowIso,
     metadata: input.metadata ?? artifacts[0]?.metadata,
   });

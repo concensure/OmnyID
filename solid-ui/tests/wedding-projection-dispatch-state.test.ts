@@ -14,6 +14,7 @@ import {
 import { buildWeddingCollaborationState } from "@/lib/weddingCollaborationState";
 import { hasSentWeddingCollaborationAfpProjection } from "@/lib/weddingCollaborationAfpProjectionState";
 import { hasSentWeddingNeedToKnowAfpProjection } from "@/lib/weddingNeedToKnowAfpProjectionState";
+import { hasSentWeddingIntakeProfileAfpProjection } from "@/lib/weddingIntakeProfileAfpProjectionState";
 import { buildWeddingProjectionQueueState } from "@/lib/weddingProjectionQueueState";
 import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
 import {
@@ -88,10 +89,10 @@ test("buildWeddingProjectionDispatchReceiptState records successful save outcome
     })),
   });
 
-  assert.equal(receipt.savedCount, 4);
+  assert.equal(receipt.savedCount, 5);
   assert.equal(receipt.failedCount, 0);
   assert.equal(receipt.skippedCount, 0);
-  assert.equal(receipt.summaryLabel, "4 saved");
+  assert.equal(receipt.summaryLabel, "5 saved");
   assert.equal(receipt.canRetry, false);
   assert.ok(receipt.savedItems.every((item) => item.messageId?.startsWith("message-")));
   assert.equal(receipt.savedItems.find((item) => item.kind === "context")?.semanticKind, "wedding_active_loop");
@@ -162,6 +163,7 @@ test("markWeddingProjectionDispatchReceiptSent commits sent markers by projectio
   markWeddingProjectionDispatchReceiptSent(receipt, storage);
 
   assert.equal(hasSentWeddingNeedToKnowAfpProjection("response_workspace:workspace-dispatch", storage), true);
+  assert.equal(hasSentWeddingIntakeProfileAfpProjection("wedding_intake_profile:response_workspace:workspace-dispatch", storage), true);
   assert.equal(hasSentWeddingArtifactAfpProjection(generatedArtifact.summary.id, storage), true);
   assert.equal(hasSentWeddingProjection(scheduleItem.id, WEDDING_CALENDAR_AFP_PROJECTIONS_KEY, storage), true);
   assert.equal(hasSentWeddingProjection(taskItem.id, WEDDING_TASK_AFP_PROJECTIONS_KEY, storage), true);

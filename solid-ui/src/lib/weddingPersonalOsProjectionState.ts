@@ -32,6 +32,7 @@ export type WeddingPersonalOsRankedItem = ContinuityRankedItem<WeddingPersonalOs
   sourceSurface: "tasks" | "calendar" | "decision_queue" | "approval_queue";
   linkedArtifactId?: string | null;
   workspaceMenu?: string | null;
+  actionMetadata?: Record<string, unknown>;
 };
 
 export type WeddingDecisionLoadReliefState = ContinuityDecisionLoadReliefState<WeddingPersonalOsRankedItem>;
@@ -163,6 +164,10 @@ function hasVendorSearchReviewTask(metadata: unknown): boolean {
   return record(metadata).vendor_search_review_task === true;
 }
 
+function hasVendorLeadTimeResearchTask(metadata: unknown): boolean {
+  return record(metadata).vendor_lead_time_research_task === true;
+}
+
 function hasVendorComparisonDecisionTask(metadata: unknown): boolean {
   return record(metadata).vendor_comparison_decision_task === true;
 }
@@ -263,6 +268,9 @@ function taskWeight(task: WeddingPlanningTaskItem, now: Date): number {
   const finalPhase = hasFinalPhaseTask(task.metadata) ? 20 : 0;
   const legalAdmin = hasLegalAdministrationTask(task.metadata) ? 24 : 0;
   const vendorSearch = hasVendorSearchReviewTask(task.metadata) ? 21 : 0;
+  const vendorLeadTime = hasVendorLeadTimeResearchTask(task.metadata)
+    ? Math.min(40, Math.max(10, Number(record(task.metadata).vendor_lead_time_urgency_score) || 18))
+    : 0;
   const vendorComparison = hasVendorComparisonDecisionTask(task.metadata) ? 18 : 0;
   const vendorSeed = hasVendorSeedReviewTask(task.metadata) ? 5 : 0;
   const expectedBehaviorGap = hasExpectedBehaviorGap(task.metadata) ? 19 : 0;
@@ -274,7 +282,7 @@ function taskWeight(task: WeddingPlanningTaskItem, now: Date): number {
   const providerHandoff = hasProviderHandoffTask(task.metadata) ? 23 : 0;
   return 20 + priority + duePressure(task.dueAt, now) + approval + loop + review
     + quote + payment + guest + finalCount + postWedding + vow + seating + delegation + finalPhase + legalAdmin
-    + vendorSearch + vendorComparison + vendorSeed + expectedBehaviorGap + oracleUpdatePlan + productionRemainingWork
+    + vendorSearch + vendorLeadTime + vendorComparison + vendorSeed + expectedBehaviorGap + oracleUpdatePlan + productionRemainingWork
     + backgroundAutomation + providerHandoff
     + outreachEscalationWeight(outreachEscalationStage(task.metadata));
 }
@@ -285,6 +293,21 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
   const family = familyForTask(task);
   const timing = dueExplanation(task.dueAt, clean(task.dueLabel) || null, now);
   const escalationStage = outreachEscalationStage(task.metadata);
+  const metadata = record(task.metadata);
+  const actionMetadata = {
+    vendor_lead_time_research_task: metadata.vendor_lead_time_research_task === true ? true : undefined,
+    vendor_lead_time_category_id: clean(metadata.vendor_lead_time_category_id) || undefined,
+    vendor_lead_time_label: clean(metadata.vendor_lead_time_label) || undefined,
+    vendor_search_review_task: metadata.vendor_search_review_task === true ? true : undefined,
+    vendor_search_action_id: clean(metadata.vendor_search_action_id) || undefined,
+    vendor_search_categories: stringArray(metadata.vendor_search_categories).slice(0, 6),
+    vendor_search_scope: clean(metadata.vendor_search_scope) || undefined,
+  };
+  const compactActionMetadata = Object.fromEntries(
+    Object.entries(actionMetadata).filter(([, value]) =>
+      Array.isArray(value) ? value.length > 0 : value !== undefined
+    ),
+  );
   const evidenceLabels = [
     clean(task.kind).replace(/_/g, " "),
     task.priority ? `priority: ${task.priority}` : "",
@@ -300,6 +323,7 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
     hasFinalPhaseTask(task.metadata) ? "final-phase coordination" : "",
     hasLegalAdministrationTask(task.metadata) ? "legal administration" : "",
     hasVendorSearchReviewTask(task.metadata) ? "vendor search freshness" : "",
+    hasVendorLeadTimeResearchTask(task.metadata) ? "vendor research timing" : "",
     hasVendorComparisonDecisionTask(task.metadata) ? "top-three vendor comparison" : "",
     hasVendorSeedReviewTask(task.metadata) ? "seeded vendor data" : "",
     hasExpectedBehaviorGap(task.metadata) ? "launch check" : "",
@@ -336,6 +360,7 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
       hasFinalPhaseTask(task.metadata) ? "Final-phase wedding work affects run sheet, confirmations, day-of fallback, guests, vendors, or final payments." : null,
       hasLegalAdministrationTask(task.metadata) ? "Legal document and NOIM preparation should stay visible before celebrant review; no form is lodged automatically." : null,
       hasVendorSearchReviewTask(task.metadata) ? "Vendor search results need source freshness, price/availability verification, and user selection before reports narrow or outreach is sent." : null,
+      hasVendorLeadTimeResearchTask(task.metadata) ? "This vendor category is surfacing because its planning lead-time window is open or close to opening." : null,
       hasVendorComparisonDecisionTask(task.metadata) ? "The top-three vendor comparison is ready for the user to choose preferred vendors before outreach or report narrowing." : null,
       hasVendorSeedReviewTask(task.metadata) ? "Seeded vendor rows are planning hints only; refresh source pages and verify fit before using them for recommendations or outreach." : null,
       hasExpectedBehaviorGap(task.metadata) ? "This wedding feature still needs proof before users can rely on it end-to-end." : null,
@@ -357,7 +382,8 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
     evidenceLabels,
     sourceSurface: "tasks",
     linkedArtifactId: clean(task.linkedArtifactId) || null,
-    workspaceMenu: clean(record(task.metadata).wedding_workspace_menu) || null,
+    workspaceMenu: clean(metadata.wedding_workspace_menu) || null,
+    actionMetadata: Object.keys(compactActionMetadata).length > 0 ? compactActionMetadata : undefined,
     simulatorSeedKind: simulatorKindForFamily(family),
   };
 }
@@ -486,6 +512,8 @@ function decisionLoadCandidate(item: WeddingPersonalOsRankedItem): boolean {
   if (/^(Confirm|Decide|Choose|Verify|Review)\b/i.test(item.title)) return true;
   return item.evidenceLabels.some((label) =>
     /decision|shortlist|quote check|payment review|guest count|seating action|vendor search freshness|cached workbook values/i.test(label),
+  ) || item.evidenceLabels.some((label) =>
+    /vendor research timing/i.test(label),
   );
 }
 

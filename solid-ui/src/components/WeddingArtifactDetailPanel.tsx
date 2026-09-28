@@ -396,6 +396,9 @@ function ArtifactPreviewCard(props: {
               <p class="mt-1 text-xs leading-5 text-teal-900/70">
                 {comparisonUi().footer.consequenceLabel}
               </p>
+              <p class="mt-1 text-xs leading-5 text-teal-900/70">
+                {comparisonUi().footer.confirmationLabel}
+              </p>
             </div>
             <button
               type="button"

@@ -1,5 +1,5 @@
 // @locs-version: 2.1
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
@@ -22,6 +22,11 @@ import {
   weddingTaskSidebarAction,
   weddingTimelineSidebarAction,
 } from "@/lib/weddingWorkspaceSidebarActionState";
+import {
+  WEDDING_HELPER_TASK_TAB_EVENT,
+  weddingHelperTaskTabFromEvent,
+  type WeddingHelperTaskTab,
+} from "@/lib/weddingHelpersNavigationState";
 
 type WeddingPlanningTask = WeddingResponseWorkspaceViewState["planningTaskItems"][number];
 
@@ -38,10 +43,12 @@ export function WeddingHelpersPanel(props: {
   const [taskAssignees, setTaskAssignees] = createSignal<Record<string, string>>(initialState.taskAssignees);
   const [taskConsultedPeople, setTaskConsultedPeople] = createSignal<Record<string, string>>(initialState.taskConsultedPeople);
   const [taskLastContactDates, setTaskLastContactDates] = createSignal<Record<string, string>>(initialState.taskLastContactDates);
+  const [taskTab, setTaskTab] = createSignal<WeddingHelperTaskTab>("open");
   const [customHelperName, setCustomHelperName] = createSignal("");
   const [customHelpers, setCustomHelpers] = createSignal<string[]>(initialState.customHelpers);
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
-  const helperPeople = createMemo(() => buildWeddingHelperPeople(props.state.helperContactNames, customHelpers()));
+  const inferredPartnerNames = createMemo(() => inferWeddingPartnerNames(props.state));
+  const helperPeople = createMemo(() => buildWeddingHelperPeople(props.state.helperContactNames, customHelpers(), inferredPartnerNames()));
   const helperTasks = createMemo(() => props.state.planningTaskItems.slice(0, 30));
   const taskAssignee = (task: WeddingPlanningTask) =>
     taskAssignees()[task.id] ?? task.assignee ?? "Unassigned";
@@ -61,6 +68,15 @@ export function WeddingHelpersPanel(props: {
     taskAssignees: taskAssignees(),
     taskConsultedPeople: taskConsultedPeople(),
   }));
+
+  onMount(() => {
+    const handler = (event: Event) => {
+      const nextTab = weddingHelperTaskTabFromEvent(event);
+      if (nextTab) setTaskTab(nextTab);
+    };
+    window.addEventListener(WEDDING_HELPER_TASK_TAB_EVENT, handler);
+    onCleanup(() => window.removeEventListener(WEDDING_HELPER_TASK_TAB_EVENT, handler));
+  });
 
   createEffect(() => {
     saveWeddingHelperLocalState(workspaceId(), {
@@ -113,6 +129,20 @@ export function WeddingHelpersPanel(props: {
     setCustomHelperName("");
   }
 
+  function inferWeddingPartnerNames(state: WeddingResponseWorkspaceViewState): string[] {
+    const text = [
+      ...state.contextCards.flatMap((card) => [...card.answeredLabels, ...card.metadataLabels]),
+      ...state.helperContactNames,
+    ].join("\n");
+    const names: string[] = [];
+    const pair = text.match(/\b([A-Z][a-z]{1,30})\s+(?:and|&)\s+([A-Z][a-z]{1,30})\b/);
+    if (pair) names.push(pair[1], pair[2]);
+    for (const match of text.matchAll(/\b(?:bride|groom|partner|fiance|fiancee)\s*[:=-]\s*([A-Z][a-z]{1,30}(?:\s+[A-Z][a-z]{1,30})?)\b/gi)) {
+      names.push(match[1]);
+    }
+    return [...new Set(names.map((name) => name.trim()).filter(Boolean))].slice(0, 2);
+  }
+
   return (
     <div class="min-w-0 rounded-[24px] border border-fuchsia-100/80 bg-fuchsia-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
       <div class="flex items-start justify-between gap-2">
@@ -160,11 +190,17 @@ export function WeddingHelpersPanel(props: {
         <label class="min-w-0 flex-1 text-xs font-semibold text-fuchsia-950">
           Add a helper
           <input
+            list="wedding-helper-suggestions"
             value={customHelperName()}
             onInput={(event) => setCustomHelperName(event.currentTarget.value)}
             placeholder="Name from contacts, guest list, family, or coordinator"
             class="mt-1 w-full rounded-full border border-fuchsia-100 bg-white px-3 py-2 text-sm font-normal text-fuchsia-950 outline-none focus:border-fuchsia-300"
           />
+          <datalist id="wedding-helper-suggestions">
+            <For each={helperPeople()}>
+              {(name) => <option value={name} />}
+            </For>
+          </datalist>
         </label>
         <button
           type="button"
@@ -218,6 +254,25 @@ export function WeddingHelpersPanel(props: {
           </button>
         </div>
       }>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            aria-pressed={taskTab() === "open"}
+            class={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${taskTab() === "open" ? "border-fuchsia-300 bg-fuchsia-100 text-fuchsia-950" : "border-fuchsia-100 bg-white/75 text-fuchsia-900 hover:bg-fuchsia-50"}`}
+            onClick={() => setTaskTab("open")}
+          >
+            To do ({openHelperTasks().length})
+          </button>
+          <button
+            type="button"
+            aria-pressed={taskTab() === "done"}
+            class={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${taskTab() === "done" ? "border-fuchsia-300 bg-fuchsia-100 text-fuchsia-950" : "border-fuchsia-100 bg-white/75 text-fuchsia-900 hover:bg-fuchsia-50"}`}
+            onClick={() => setTaskTab("done")}
+          >
+            Done ({doneHelperTasks().length})
+          </button>
+        </div>
+        <Show when={taskTab() === "open"}>
         <div class="mt-3 space-y-2">
           <For each={openHelperTasks()}>
             {(task) => {
@@ -320,29 +375,36 @@ export function WeddingHelpersPanel(props: {
             }}
           </For>
         </div>
+        </Show>
       </Show>
-      <Show when={doneHelperTasks().length > 0}>
+      <Show when={helperTasks().length > 0 && taskTab() === "done"}>
         <div class="mt-3 rounded-2xl border border-fuchsia-100 bg-white/70 p-3">
           <p class="text-sm font-semibold text-fuchsia-950">Done</p>
-          <div class="mt-2 space-y-1">
-            <For each={doneHelperTasks()}>
-              {(task) => (
-                <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-fuchsia-100 bg-white/75 px-3 py-2">
-                  <p class="break-words text-xs font-semibold text-fuchsia-950">{task.title}</p>
-                  <button
-                    type="button"
-                    class="rounded-full border border-fuchsia-100 bg-fuchsia-50 px-2 py-1 text-[11px] font-semibold text-fuchsia-950"
-                    onClick={() => {
-                      setTaskDone(task.id, false);
-                      void saveTaskResponsibility(task, { status: "open" });
-                    }}
-                  >
-                    Move to to-do
-                  </button>
-                </div>
-              )}
-            </For>
-          </div>
+          <Show when={doneHelperTasks().length > 0} fallback={
+            <p class="mt-2 rounded-xl border border-fuchsia-100 bg-white/75 px-3 py-2 text-xs leading-5 text-fuchsia-950/70">
+              No completed tasks yet. Mark a task done and it will appear here.
+            </p>
+          }>
+            <div class="mt-2 space-y-1">
+              <For each={doneHelperTasks()}>
+                {(task) => (
+                  <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-fuchsia-100 bg-white/75 px-3 py-2">
+                    <p class="break-words text-xs font-semibold text-fuchsia-950">{task.title}</p>
+                    <button
+                      type="button"
+                      class="rounded-full border border-fuchsia-100 bg-fuchsia-50 px-2 py-1 text-[11px] font-semibold text-fuchsia-950"
+                      onClick={() => {
+                        setTaskDone(task.id, false);
+                        void saveTaskResponsibility(task, { status: "open" });
+                      }}
+                    >
+                      Move to to-do
+                    </button>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
         </div>
       </Show>
     </div>

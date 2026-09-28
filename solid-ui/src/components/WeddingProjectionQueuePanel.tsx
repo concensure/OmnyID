@@ -1,6 +1,7 @@
 // @locs-version: 2.0
 import { createMemo, createSignal, For, Show } from "solid-js";
 
+import { WeddingSemanticSurfaceStrip } from "@/components/WeddingSemanticSurfaceStrip";
 import type { SendAfpMessageInput } from "@/lib/api";
 import type { WeddingProjectionDispatchReceiptState } from "@/lib/weddingProjectionDispatchState";
 import { runWeddingProjectionDispatchQueue } from "@/lib/weddingProjectionDispatchRunnerState";
@@ -109,7 +110,7 @@ export function WeddingProjectionQueuePanel(props: {
           <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div class="min-w-0">
               <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-current/65">
-                Advanced save queue
+                Save queue
               </p>
               <h3 class="mt-1 break-words text-base font-semibold text-current">{state().title}</h3>
               <p class="mt-1 break-words text-xs leading-5 text-current/75">{state().subtitle}</p>
@@ -157,6 +158,12 @@ export function WeddingProjectionQueuePanel(props: {
               </For>
             </div>
           </div>
+
+          <WeddingSemanticSurfaceStrip
+            state={state().semanticSurface}
+            limit={6}
+            label="Planning meaning"
+          />
 
           <div class="mt-4 grid gap-2 md:grid-cols-3">
             <For each={state().groups}>

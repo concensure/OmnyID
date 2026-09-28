@@ -76,10 +76,10 @@ test("buildAdminWeddingOpsPanelState does not invent unavailable backend metrics
   assert.equal(state.metrics.find((metric) => metric.title === "Wedding vendor search")?.status, "needs_backend");
   assert.equal(state.metrics.find((metric) => metric.title === "Wedding AI routing policy")?.status, "needs_backend");
   assert.equal(state.metrics.find((metric) => metric.title === "Ops backend metrics")?.status, "needs_backend");
-  assert.equal(state.metrics.find((metric) => metric.title === "Provider executor proof")?.status, "needs_backend");
+  assert.equal(state.metrics.find((metric) => metric.title === "Connected app proof")?.status, "needs_backend");
   assert.equal(state.toggle.statusLabel, "User-scoped by default");
   assert.ok(state.guardrails.some((guardrail) => /user-owned wedding memory/i.test(guardrail)));
-  assert.ok(state.guardrails.some((guardrail) => /provider executor proof packet/i.test(guardrail)));
+  assert.ok(state.guardrails.some((guardrail) => /connected app proof packet/i.test(guardrail)));
 });
 
 test("buildAdminWeddingOpsPanelState keeps local admin toggle disabled until policy is enforced", () => {
@@ -98,7 +98,7 @@ test("buildAdminWeddingOpsPanelState keeps local admin toggle disabled until pol
   assert.ok(state.guardrails.some((guardrail) => /toggle as disabled in production/i.test(guardrail)));
 });
 
-test("buildAdminWeddingOpsPanelState surfaces provider executor proof packet status", () => {
+test("buildAdminWeddingOpsPanelState surfaces connected app proof packet status", () => {
   const blockedPacket = buildWeddingProviderExecutorProofPacketState(
     buildWeddingProviderExecutorSuiteReadinessState({
       requiredCapabilities: ["vendor_search"],
@@ -111,9 +111,9 @@ test("buildAdminWeddingOpsPanelState surfaces provider executor proof packet sta
     routeWeddingAiThroughAdmin: false,
   });
 
-  assert.equal(blockedState.metrics.find((metric) => metric.title === "Provider executor proof")?.value, "Proof blocked");
-  assert.equal(blockedState.metrics.find((metric) => metric.title === "Provider executor proof")?.status, "local_only");
-  assert.match(blockedState.metrics.find((metric) => metric.title === "Provider executor proof")?.detail ?? "", /proof receipt required|readiness proof is missing/i);
+  assert.equal(blockedState.metrics.find((metric) => metric.title === "Connected app proof")?.value, "Proof blocked");
+  assert.equal(blockedState.metrics.find((metric) => metric.title === "Connected app proof")?.status, "local_only");
+  assert.match(blockedState.metrics.find((metric) => metric.title === "Connected app proof")?.detail ?? "", /proof receipt required|readiness proof is missing/i);
 
   const readyPacket = buildWeddingProviderExecutorProofPacketState(
     buildWeddingProviderExecutorSuiteReadinessState({
@@ -137,9 +137,9 @@ test("buildAdminWeddingOpsPanelState surfaces provider executor proof packet sta
     routeWeddingAiThroughAdmin: false,
   });
 
-  assert.equal(readyState.metrics.find((metric) => metric.title === "Provider executor proof")?.value, "Proof complete");
-  assert.equal(readyState.metrics.find((metric) => metric.title === "Provider executor proof")?.status, "ready");
-  assert.ok(readyState.guardrails.some((guardrail) => /can clear the Oracle provider gate/i.test(guardrail)));
+  assert.equal(readyState.metrics.find((metric) => metric.title === "Connected app proof")?.value, "Proof complete");
+  assert.equal(readyState.metrics.find((metric) => metric.title === "Connected app proof")?.status, "ready");
+  assert.ok(readyState.guardrails.some((guardrail) => /can clear the Oracle connected-app gate/i.test(guardrail)));
 });
 
 test("buildAdminWeddingOpsPanelState surfaces wedding API stack readiness", () => {

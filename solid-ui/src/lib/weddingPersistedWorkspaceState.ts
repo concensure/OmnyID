@@ -554,6 +554,8 @@ function messageToNeedToKnowContext(
       : clean(context?.guestCount ?? context?.guest_count),
     budgetComfort: clean(context?.budgetComfort ?? context?.budget_comfort),
     topPriorities,
+    atmosphereDescription: clean(context?.atmosphereDescription ?? context?.atmosphere_description),
+    inspirationImageUrls: strings(context?.inspirationImageUrls ?? context?.inspiration_image_urls),
     countryCode: clean(context?.countryCode ?? context?.country_code),
     legalJurisdiction: clean(context?.legalJurisdiction ?? context?.legal_jurisdiction),
     noimDownloaded: noimValue(context?.noimDownloaded ?? context?.noim_downloaded),
