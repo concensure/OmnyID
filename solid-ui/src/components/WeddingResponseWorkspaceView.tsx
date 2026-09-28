@@ -1,5 +1,5 @@
 // @locs-version: 2.1
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 
 import { WeddingProjectionQueuePanel } from "@/components/WeddingProjectionQueuePanel";
 import { WeddingWorkspaceContextPanels } from "@/components/WeddingWorkspaceContextPanels";
@@ -69,6 +69,74 @@ import {
 import { weddingVendorQuoteReceiptPersistenceNotice } from "@/lib/weddingVendorQuoteReceiptPersistenceState";
 import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
 
+const WEDDING_HOME_SECTION_IDS = [
+  "next_step",
+  "planning_basics",
+  "vendor_search",
+  "live_evidence",
+  "vendor_smoke",
+  "vendor_validation",
+  "notice",
+  "overview",
+  "status",
+  "threads",
+  "quote_replies",
+  "decision_focus",
+  "resilience",
+  "approval",
+  "rich_response",
+] as const;
+
+type WeddingHomeSectionId = typeof WEDDING_HOME_SECTION_IDS[number];
+
+type WeddingHomeSection = {
+  id: WeddingHomeSectionId;
+  title: string;
+  visible: boolean;
+  render: () => JSX.Element;
+};
+
+const WEDDING_HOME_SECTION_SET = new Set<string>(WEDDING_HOME_SECTION_IDS);
+
+function weddingHomeLayoutStorageKey(scope: string): string {
+  return `omnyid:wedding_home_card_order:${scope}`;
+}
+
+function normalizeWeddingHomeSectionOrder(value: unknown): WeddingHomeSectionId[] {
+  const raw = Array.isArray(value) ? value : [];
+  const seen = new Set<WeddingHomeSectionId>();
+  const order: WeddingHomeSectionId[] = [];
+  for (const candidate of raw) {
+    if (typeof candidate !== "string" || !WEDDING_HOME_SECTION_SET.has(candidate)) continue;
+    const id = candidate as WeddingHomeSectionId;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    order.push(id);
+  }
+  for (const id of WEDDING_HOME_SECTION_IDS) {
+    if (!seen.has(id)) order.push(id);
+  }
+  return order;
+}
+
+function loadWeddingHomeSectionOrder(scope: string): WeddingHomeSectionId[] {
+  if (typeof localStorage === "undefined") return [...WEDDING_HOME_SECTION_IDS];
+  try {
+    return normalizeWeddingHomeSectionOrder(JSON.parse(localStorage.getItem(weddingHomeLayoutStorageKey(scope)) ?? "[]"));
+  } catch {
+    return [...WEDDING_HOME_SECTION_IDS];
+  }
+}
+
+function saveWeddingHomeSectionOrder(scope: string, order: readonly WeddingHomeSectionId[]): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(weddingHomeLayoutStorageKey(scope), JSON.stringify(normalizeWeddingHomeSectionOrder(order)));
+  } catch {
+    // Layout remains usable for the current page even when storage is unavailable.
+  }
+}
+
 export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceViewProps) {
   const state = () => props.state;
   const activePreview = () => state().activePreview;
@@ -104,6 +172,9 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const [quoteReplyProofMessages, setQuoteReplyProofMessages] = createSignal<AfpMessage[]>([]);
   const [quoteReplyProofLoading, setQuoteReplyProofLoading] = createSignal(false);
   const [quoteReplyProofError, setQuoteReplyProofError] = createSignal<string | null>(null);
+  const [homeLayoutScope, setHomeLayoutScope] = createSignal("");
+  const [homeSectionOrder, setHomeSectionOrder] = createSignal<WeddingHomeSectionId[]>([...WEDDING_HOME_SECTION_IDS]);
+  const [draggingHomeSectionId, setDraggingHomeSectionId] = createSignal<WeddingHomeSectionId | null>(null);
   const localQuoteReplyReceiptProofMessage = (): AfpMessage | null => {
     const thread = quoteReplyProofThread();
     const execution = thread
@@ -148,8 +219,25 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const cardClass = () => compactMode()
     ? "rounded-[20px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[24px]"
     : "rounded-[24px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[28px] sm:p-4";
+  const homeLayoutStorageScope = () =>
+    state().workspace.metadata.weddingPlanId
+    || state().workspace.metadata.responseWorkspaceId
+    || "default";
   createEffect(() => {
     if (state().workspace.activeArtifact) setShowPlanningFiles(true);
+  });
+
+  createEffect(() => {
+    const scope = homeLayoutStorageScope();
+    if (homeLayoutScope() === scope) return;
+    setHomeLayoutScope(scope);
+    setHomeSectionOrder(loadWeddingHomeSectionOrder(scope));
+  });
+
+  createEffect(() => {
+    const scope = homeLayoutScope();
+    if (!scope) return;
+    saveWeddingHomeSectionOrder(scope, homeSectionOrder());
   });
 
   onMount(() => {
@@ -231,6 +319,36 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     }
     if (action.kind === "export_bundle") runBundleExport();
     props.onSidebarAction?.(action);
+  }
+
+  function moveHomeSectionToIndex(id: WeddingHomeSectionId, targetVisibleIndex: number) {
+    const visibleSections = orderedHomeSections();
+    const currentVisibleIndex = visibleSections.findIndex((section) => section.id === id);
+    if (currentVisibleIndex < 0 || targetVisibleIndex < 0 || targetVisibleIndex >= visibleSections.length || currentVisibleIndex === targetVisibleIndex) return;
+    setHomeSectionOrder((currentOrder) => {
+      const current = normalizeWeddingHomeSectionOrder(currentOrder);
+      const visibleIds = visibleSections.map((section) => section.id);
+      const reorderedVisibleIds = [...visibleIds];
+      const [moving] = reorderedVisibleIds.splice(currentVisibleIndex, 1);
+      reorderedVisibleIds.splice(targetVisibleIndex, 0, moving!);
+      const visibleOrder = new Map(reorderedVisibleIds.map((sectionId, order) => [sectionId, order]));
+      return current.slice().sort((left, right) => {
+        const leftVisibleOrder = visibleOrder.get(left);
+        const rightVisibleOrder = visibleOrder.get(right);
+        if (leftVisibleOrder !== undefined && rightVisibleOrder !== undefined) return leftVisibleOrder - rightVisibleOrder;
+        if (leftVisibleOrder !== undefined) return -1;
+        if (rightVisibleOrder !== undefined) return 1;
+        return current.indexOf(left) - current.indexOf(right);
+      });
+    });
+  }
+
+  function dropHomeSection(targetId: WeddingHomeSectionId) {
+    const sourceId = draggingHomeSectionId();
+    setDraggingHomeSectionId(null);
+    if (!sourceId || sourceId === targetId) return;
+    const targetIndex = orderedHomeSections().findIndex((section) => section.id === targetId);
+    moveHomeSectionToIndex(sourceId, targetIndex);
   }
 
   function researchPromptAction(): WeddingWorkspaceSidebarAction {
@@ -566,6 +684,394 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     });
   }
 
+  const homeSections = createMemo<WeddingHomeSection[]>(() => [
+    {
+      id: "next_step",
+      title: "Next step",
+      visible: true,
+      render: () => (
+        <WeddingNextStepCard
+          state={state()}
+          onSelectMenu={props.onSelectMenu}
+          onSaveWeddingDate={props.onSaveWeddingDate}
+        />
+      ),
+    },
+    {
+      id: "planning_basics",
+      title: "Planning basics needed",
+      visible: props.vendorSearchReadiness?.status === "blocked" || props.liveEvidenceReadiness?.status === "blocked",
+      render: () => (
+        <div class="rounded-2xl border border-amber-200 bg-amber-50/90 p-3 shadow-sm">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-amber-950">Planning basics needed</p>
+              <p class="mt-1 break-words text-xs leading-5 text-amber-900/75">
+                Live wedding workflows stay blocked until the required planning context is captured.
+              </p>
+            </div>
+            <span class="rounded-full border border-amber-200 bg-white/75 px-2 py-1 text-xs font-semibold text-amber-950">
+              Intake checkpoint
+            </span>
+          </div>
+          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            <Show when={props.vendorSearchReadiness?.status === "blocked"}>
+              <div class="rounded-xl border border-amber-100 bg-white/75 p-3">
+                <p class="text-xs font-semibold uppercase text-amber-800/70">Vendor search</p>
+                <p class="mt-1 break-words text-sm leading-6 text-amber-950">
+                  Needs {props.vendorSearchReadiness?.missing.join(", ")}.
+                </p>
+              </div>
+            </Show>
+            <Show when={props.liveEvidenceReadiness?.status === "blocked"}>
+              <div class="rounded-xl border border-amber-100 bg-white/75 p-3">
+                <p class="text-xs font-semibold uppercase text-amber-800/70">Map and weather</p>
+                <p class="mt-1 break-words text-sm leading-6 text-amber-950">
+                  Needs {props.liveEvidenceReadiness?.missing.join(", ")}.
+                </p>
+              </div>
+            </Show>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "vendor_search",
+      title: "Live vendor search",
+      visible: true,
+      render: () => (
+        <div class="rounded-2xl border border-rose-100 bg-white/85 p-3 shadow-sm">
+          <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-rose-950">Live vendor search</p>
+              <p class="mt-1 break-words text-xs leading-5 text-rose-950/65">
+                Uses connected online search providers and saves cited vendor notes into documents.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="shrink-0 rounded-full bg-rose-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-rose-300"
+              title={props.vendorSearchBlockedReason ?? undefined}
+              disabled={props.vendorSearchRunning || !props.onRunLiveVendorSearch || props.vendorSearchReadiness?.status === "blocked" || Boolean(props.vendorSearchBlockedReason)}
+              onClick={() => props.onRunLiveVendorSearch?.()}
+              data-magic-action="open"
+              data-magic-icon="search"
+              data-magic-label={props.vendorSearchRunning ? "Vendor search running" : "Search wedding vendors"}
+              data-magic-id="wedding:vendor-search:run"
+            >
+              {props.vendorSearchRunning ? "Searching..." : "Search vendors"}
+            </button>
+          </div>
+          <Show when={props.vendorSearchNotice}>
+            {(notice) => (
+              <p class="mt-2 break-words text-xs leading-5 text-rose-950/70">
+                {notice()}
+              </p>
+            )}
+          </Show>
+          <Show when={props.vendorSearchBlockedReason}>
+            {(reason) => (
+              <p class="mt-2 break-words text-xs leading-5 text-rose-950/70">
+                {reason()}
+              </p>
+            )}
+          </Show>
+        </div>
+      ),
+    },
+    {
+      id: "live_evidence",
+      title: "Live map and weather evidence",
+      visible: true,
+      render: () => (
+        <div class="rounded-2xl border border-sky-100 bg-white/85 p-3 shadow-sm">
+          <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-sky-950">Live map and weather evidence</p>
+              <p class="mt-1 break-words text-xs leading-5 text-sky-950/65">
+                Verifies the planning location with server-side map and weather providers and saves the evidence into documents.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="shrink-0 rounded-full bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-sky-300"
+              disabled={props.liveEvidenceRunning || !props.onRunLiveEvidenceCheck || props.liveEvidenceReadiness?.status === "blocked"}
+              onClick={() => props.onRunLiveEvidenceCheck?.()}
+              data-magic-action="open"
+              data-magic-icon="map"
+              data-magic-label={props.liveEvidenceRunning ? "Location check running" : "Verify wedding location"}
+              data-magic-id="wedding:live-evidence:run"
+            >
+              {props.liveEvidenceRunning ? "Verifying..." : "Verify location"}
+            </button>
+          </div>
+          <Show when={props.liveEvidenceNotice}>
+            {(notice) => (
+              <p class="mt-2 break-words text-xs leading-5 text-sky-950/70">
+                {notice()}
+              </p>
+            )}
+          </Show>
+        </div>
+      ),
+    },
+    {
+      id: "vendor_smoke",
+      title: "Disposable vendor smoke test",
+      visible: Boolean(props.vendorSmokeTestAvailable),
+      render: () => (
+        <div class="rounded-2xl border border-slate-200 bg-white/85 p-3 shadow-sm">
+          <div class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-slate-950">Disposable vendor smoke test</p>
+              <p class="mt-1 break-words text-xs leading-5 text-slate-700">
+                Creates a temporary quote and reply draft for {props.vendorSmokeTestVendorEmail}. Remove it after validation before running real vendor search.
+              </p>
+            </div>
+            <div class="flex shrink-0 flex-wrap gap-2">
+              <button
+                type="button"
+                class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                onClick={() => props.onInstallVendorSmokeFixture?.()}
+                data-magic-action="open"
+                data-magic-icon="test"
+                data-magic-label="Install vendor smoke fixture"
+                data-magic-id="wedding:vendor-smoke:install"
+              >
+                Install fixture
+              </button>
+              <button
+                type="button"
+                class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                onClick={() => props.onRemoveVendorSmokeFixture?.()}
+                data-magic-action="dismiss"
+                data-magic-icon="clear"
+                data-magic-label="Remove vendor smoke fixture"
+                data-magic-id="wedding:vendor-smoke:remove"
+              >
+                Remove fixture
+              </button>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "vendor_validation",
+      title: "Vendor workflow validation",
+      visible: Boolean(props.vendorEndToEndValidation),
+      render: () => {
+        const validation = props.vendorEndToEndValidation;
+        if (!validation) return <></>;
+        return (
+          <div class={`rounded-2xl border p-3 shadow-sm ${
+            validation.status === "ready_for_usage_validation"
+              ? "border-emerald-200 bg-emerald-50/80"
+              : "border-amber-200 bg-amber-50/80"
+          }`}>
+            <div class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div class="min-w-0">
+                <p class={`text-sm font-semibold ${
+                  validation.status === "ready_for_usage_validation" ? "text-emerald-950" : "text-amber-950"
+                }`}>
+                  Vendor workflow validation
+                </p>
+                <p class={`mt-1 break-words text-xs leading-5 ${
+                  validation.status === "ready_for_usage_validation" ? "text-emerald-900/75" : "text-amber-900/75"
+                }`}>
+                  {validation.passedCount}/{validation.steps.length} checks passed.
+                  {validation.blockedCount > 0
+                    ? ` Estimated ${validation.estimatedPassesToUsage} pass${validation.estimatedPassesToUsage === 1 ? "" : "es"} to usage validation.`
+                    : " Ready for a usage-validation run with correct user data."}
+                </p>
+              </div>
+              <div class="flex shrink-0 flex-wrap gap-2">
+                <span class="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-800">
+                  {validation.passedCount} passed
+                </span>
+                <span class={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  validation.blockedCount > 0 ? "bg-amber-100 text-amber-950" : "bg-emerald-100 text-emerald-950"
+                }`}>
+                  {validation.blockedCount} blocked
+                </span>
+              </div>
+            </div>
+            <Show when={validation.nextActionLabels.length > 0}>
+              <div class="mt-3 rounded-xl border border-white/70 bg-white/70 p-3">
+                <p class="text-xs font-semibold text-slate-950">Next actions</p>
+                <ul class="mt-2 space-y-1 text-xs leading-5 text-slate-700">
+                  <For each={validation.nextActionLabels.slice(0, 3)}>
+                    {(action) => <li class="break-words">{action}</li>}
+                  </For>
+                </ul>
+              </div>
+            </Show>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <For each={validation.steps}>
+                {(step) => (
+                  <div class="min-w-0 rounded-xl border border-white/75 bg-white/75 px-3 py-2">
+                    <div class="flex min-w-0 items-center justify-between gap-2">
+                      <p class="min-w-0 truncate text-xs font-semibold text-slate-950">{step.label}</p>
+                      <span class={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                        step.status === "passed"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-amber-100 text-amber-800"
+                      }`}>
+                        {step.status === "passed" ? "Pass" : "Block"}
+                      </span>
+                    </div>
+                    <p class="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-600">{step.detail}</p>
+                  </div>
+                )}
+              </For>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: "notice",
+      title: "Planner notice",
+      visible: Boolean(exportNotice()),
+      render: () => (
+        <p class="rounded-2xl border border-sky-100 bg-sky-50/80 px-3 py-2 text-sm leading-6 text-sky-950/75">
+          {exportNotice()}
+        </p>
+      ),
+    },
+    {
+      id: "overview",
+      title: "Wedding overview",
+      visible: true,
+      render: () => (
+        <WeddingHomeOverviewGrid
+          state={state()}
+          onSelectMenu={props.onSelectMenu}
+          onSidebarAction={handleSidebarAction}
+          onSaveWeddingDate={props.onSaveWeddingDate}
+        />
+      ),
+    },
+    {
+      id: "status",
+      title: "Wedding status",
+      visible: true,
+      render: () => <WeddingHomeStatusStrip state={state()} onSelectMenu={props.onSelectMenu} />,
+    },
+    {
+      id: "threads",
+      title: "Planning threads",
+      visible: true,
+      render: () => (
+        <WeddingPlanningThreadsCard
+          state={state()}
+          onSelectMenu={props.onSelectMenu}
+          onSelectArtifact={props.onSelectArtifact}
+        />
+      ),
+    },
+    {
+      id: "quote_replies",
+      title: "Vendor quote replies",
+      visible: state().activeVendorQuoteReplyFlows.length > 0,
+      render: () => (
+        <div class="space-y-3">
+          <For each={state().activeVendorQuoteReplyFlows}>
+            {(baseFlow) => {
+              const flow = () => quoteReplyFlow(baseFlow);
+              return (
+                <WeddingVendorQuoteReplyCard
+                  flow={flow()}
+                  recipient={flow().recipient}
+                  subject={flow().subject}
+                  draftBody={flow().draftBody}
+                  busy={approvalRunning()}
+                  busyLabel={quoteReplyBusyLabel(flow().approvalRequest.id)}
+                  draftPersistenceStatus={quoteReplyDraftPersistence()[baseFlow.id] ?? null}
+                  proofSaveNotice={
+                    quoteReplyProofSaveNotice(flow().approvalRequest.id)
+                  }
+                  providerReadiness={quoteReplyProviderReadiness(flow())}
+                  onSaveDraft={(payload) => saveQuoteReplyDraft(baseFlow, payload)}
+                  onApproveWording={() => approveQuoteReplyWording(baseFlow)}
+                  onAcknowledgeBudgetImpact={() => acknowledgeQuoteReplyBudgetImpact(baseFlow)}
+                  onSend={() => startQuoteReplySend(baseFlow)}
+                  onUndo={() => undoQuoteReplySend(baseFlow)}
+                  onViewSentThread={() => void viewQuoteReplyThread(baseFlow)}
+                  onProviderSetup={props.onProviderSetup}
+                />
+              );
+            }}
+          </For>
+          <Show when={quoteReplyProofThread()}>
+            {(thread) => (
+              <WeddingVendorQuoteProofDrawer
+                vendorName={thread().vendorName}
+                messages={quoteReplyProofRows()}
+                loading={quoteReplyProofLoading()}
+                error={quoteReplyProofError()}
+                onClose={() => {
+                  setQuoteReplyProofThread(null);
+                  setQuoteReplyProofMessages([]);
+                  setQuoteReplyProofError(null);
+                }}
+              />
+            )}
+          </Show>
+        </div>
+      ),
+    },
+    {
+      id: "decision_focus",
+      title: "Decision focus",
+      visible: true,
+      render: () => <WeddingDecisionFocusCard state={state()} onSidebarAction={handleSidebarAction} />,
+    },
+    {
+      id: "resilience",
+      title: "Plan resilience",
+      visible: true,
+      render: () => <WeddingResilienceCardList state={state().resilience} onSidebarAction={handleSidebarAction} />,
+    },
+    {
+      id: "approval",
+      title: "Approval queue",
+      visible: Boolean(state().projectionQueue),
+      render: () => (
+        <WeddingProjectionApprovalCard
+          state={state().projectionQueue}
+          save={props.saveProjection}
+          storage={props.projectionStorage}
+          onDispatched={props.onProjectionDispatched}
+          onReviewBlocked={props.onReviewBlockedOutputs}
+        />
+      ),
+    },
+    {
+      id: "rich_response",
+      title: "Planner response",
+      visible: Boolean(props.richResponse),
+      render: () => props.richResponse
+        ? (
+          <WeddingRichResponseView
+            state={props.richResponse}
+            onAction={props.onRichResponseAction}
+          />
+        )
+        : <></>,
+    },
+  ]);
+
+  const orderedHomeSections = createMemo(() => {
+    const sections = homeSections().filter((section) => section.visible);
+    const order = normalizeWeddingHomeSectionOrder(homeSectionOrder());
+    const orderById = new Map(order.map((id, index) => [id, index]));
+    return sections.slice().sort((left, right) =>
+      (orderById.get(left.id) ?? WEDDING_HOME_SECTION_IDS.length)
+      - (orderById.get(right.id) ?? WEDDING_HOME_SECTION_IDS.length)
+    );
+  });
+
   async function executeRequest(request: WeddingApprovalRequestState) {
     if (approvalRunning()) return;
     setApprovalRunning(true);
@@ -638,294 +1144,54 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     >
       <div class={primaryColumnClass()}>
         <Show when={activeMenu() === "home"}>
-          <WeddingNextStepCard
-            state={state()}
-            onSelectMenu={props.onSelectMenu}
-            onSaveWeddingDate={props.onSaveWeddingDate}
-          />
-          <Show when={props.vendorSearchReadiness?.status === "blocked" || props.liveEvidenceReadiness?.status === "blocked"}>
-            <div class="rounded-2xl border border-amber-200 bg-amber-50/90 p-3 shadow-sm">
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-amber-950">Planning basics needed</p>
-                  <p class="mt-1 break-words text-xs leading-5 text-amber-900/75">
-                    Live wedding workflows stay blocked until the required planning context is captured.
-                  </p>
-                </div>
-                <span class="rounded-full border border-amber-200 bg-white/75 px-2 py-1 text-xs font-semibold text-amber-950">
-                  Intake checkpoint
-                </span>
-              </div>
-              <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                <Show when={props.vendorSearchReadiness?.status === "blocked"}>
-                  <div class="rounded-xl border border-amber-100 bg-white/75 p-3">
-                    <p class="text-xs font-semibold uppercase text-amber-800/70">Vendor search</p>
-                    <p class="mt-1 break-words text-sm leading-6 text-amber-950">
-                      Needs {props.vendorSearchReadiness?.missing.join(", ")}.
-                    </p>
-                  </div>
-                </Show>
-                <Show when={props.liveEvidenceReadiness?.status === "blocked"}>
-                  <div class="rounded-xl border border-amber-100 bg-white/75 p-3">
-                    <p class="text-xs font-semibold uppercase text-amber-800/70">Map and weather</p>
-                    <p class="mt-1 break-words text-sm leading-6 text-amber-950">
-                      Needs {props.liveEvidenceReadiness?.missing.join(", ")}.
-                    </p>
-                  </div>
-                </Show>
-              </div>
-            </div>
-          </Show>
-          <div class="rounded-2xl border border-rose-100 bg-white/85 p-3 shadow-sm">
-            <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div class="min-w-0">
-                <p class="text-sm font-semibold text-rose-950">Live vendor search</p>
-                <p class="mt-1 break-words text-xs leading-5 text-rose-950/65">
-                  Uses connected online search providers and saves cited vendor notes into documents.
-                </p>
-              </div>
-              <button
-                type="button"
-                class="shrink-0 rounded-full bg-rose-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-rose-300"
-                title={props.vendorSearchBlockedReason ?? undefined}
-                disabled={props.vendorSearchRunning || !props.onRunLiveVendorSearch || props.vendorSearchReadiness?.status === "blocked" || Boolean(props.vendorSearchBlockedReason)}
-                onClick={() => props.onRunLiveVendorSearch?.()}
-                data-magic-action="open"
-                data-magic-icon="search"
-                data-magic-label={props.vendorSearchRunning ? "Vendor search running" : "Search wedding vendors"}
-                data-magic-id="wedding:vendor-search:run"
+          <For each={orderedHomeSections()}>
+            {(section, index) => (
+              <div
+                class="rounded-[24px] border border-white/55 bg-white/45 p-2 shadow-sm backdrop-blur"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => dropHomeSection(section.id)}
               >
-                {props.vendorSearchRunning ? "Searching..." : "Search vendors"}
-              </button>
-            </div>
-            <Show when={props.vendorSearchNotice}>
-              {(notice) => (
-                <p class="mt-2 break-words text-xs leading-5 text-rose-950/70">
-                  {notice()}
-                </p>
-              )}
-            </Show>
-            <Show when={props.vendorSearchBlockedReason}>
-              {(reason) => (
-                <p class="mt-2 break-words text-xs leading-5 text-rose-950/70">
-                  {reason()}
-                </p>
-              )}
-            </Show>
-          </div>
-          <div class="rounded-2xl border border-sky-100 bg-white/85 p-3 shadow-sm">
-            <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div class="min-w-0">
-                <p class="text-sm font-semibold text-sky-950">Live map and weather evidence</p>
-                <p class="mt-1 break-words text-xs leading-5 text-sky-950/65">
-                  Verifies the planning location with server-side map and weather providers and saves the evidence into documents.
-                </p>
-              </div>
-              <button
-                type="button"
-                class="shrink-0 rounded-full bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-sky-300"
-                disabled={props.liveEvidenceRunning || !props.onRunLiveEvidenceCheck || props.liveEvidenceReadiness?.status === "blocked"}
-                onClick={() => props.onRunLiveEvidenceCheck?.()}
-                data-magic-action="open"
-                data-magic-icon="map"
-                data-magic-label={props.liveEvidenceRunning ? "Location check running" : "Verify wedding location"}
-                data-magic-id="wedding:live-evidence:run"
-              >
-                {props.liveEvidenceRunning ? "Verifying..." : "Verify location"}
-              </button>
-            </div>
-            <Show when={props.liveEvidenceNotice}>
-              {(notice) => (
-                <p class="mt-2 break-words text-xs leading-5 text-sky-950/70">
-                  {notice()}
-                </p>
-              )}
-            </Show>
-          </div>
-          <Show when={props.vendorSmokeTestAvailable}>
-            <div class="rounded-2xl border border-slate-200 bg-white/85 p-3 shadow-sm">
-              <div class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-slate-950">Disposable vendor smoke test</p>
-                  <p class="mt-1 break-words text-xs leading-5 text-slate-700">
-                    Creates a temporary quote and reply draft for {props.vendorSmokeTestVendorEmail}. Remove it after validation before running real vendor search.
-                  </p>
-                </div>
-                <div class="flex shrink-0 flex-wrap gap-2">
+                <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <button
                     type="button"
-                    class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-                    onClick={() => props.onInstallVendorSmokeFixture?.()}
-                    data-magic-action="open"
-                    data-magic-icon="test"
-                    data-magic-label="Install vendor smoke fixture"
-                    data-magic-id="wedding:vendor-smoke:install"
-                  >
-                    Install fixture
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-                    onClick={() => props.onRemoveVendorSmokeFixture?.()}
-                    data-magic-action="dismiss"
-                    data-magic-icon="clear"
-                    data-magic-label="Remove vendor smoke fixture"
-                    data-magic-id="wedding:vendor-smoke:remove"
-                  >
-                    Remove fixture
-                  </button>
-                </div>
-              </div>
-            </div>
-          </Show>
-          <Show when={props.vendorEndToEndValidation}>
-            {(validation) => (
-              <div class={`rounded-2xl border p-3 shadow-sm ${
-                validation().status === "ready_for_usage_validation"
-                  ? "border-emerald-200 bg-emerald-50/80"
-                  : "border-amber-200 bg-amber-50/80"
-              }`}>
-                <div class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div class="min-w-0">
-                    <p class={`text-sm font-semibold ${
-                      validation().status === "ready_for_usage_validation" ? "text-emerald-950" : "text-amber-950"
-                    }`}>
-                      Vendor workflow validation
-                    </p>
-                    <p class={`mt-1 break-words text-xs leading-5 ${
-                      validation().status === "ready_for_usage_validation" ? "text-emerald-900/75" : "text-amber-900/75"
-                    }`}>
-                      {validation().passedCount}/{validation().steps.length} checks passed.
-                      {validation().blockedCount > 0
-                        ? ` Estimated ${validation().estimatedPassesToUsage} pass${validation().estimatedPassesToUsage === 1 ? "" : "es"} to usage validation.`
-                        : " Ready for a usage-validation run with correct user data."}
-                    </p>
-                  </div>
-                  <div class="flex shrink-0 flex-wrap gap-2">
-                    <span class="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-800">
-                      {validation().passedCount} passed
-                    </span>
-                    <span class={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      validation().blockedCount > 0 ? "bg-amber-100 text-amber-950" : "bg-emerald-100 text-emerald-950"
-                    }`}>
-                      {validation().blockedCount} blocked
-                    </span>
-                  </div>
-                </div>
-                <Show when={validation().nextActionLabels.length > 0}>
-                  <div class="mt-3 rounded-xl border border-white/70 bg-white/70 p-3">
-                    <p class="text-xs font-semibold text-slate-950">Next actions</p>
-                    <ul class="mt-2 space-y-1 text-xs leading-5 text-slate-700">
-                      <For each={validation().nextActionLabels.slice(0, 3)}>
-                        {(action) => <li class="break-words">{action}</li>}
-                      </For>
-                    </ul>
-                  </div>
-                </Show>
-                <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  <For each={validation().steps}>
-                    {(step) => (
-                      <div class="min-w-0 rounded-xl border border-white/75 bg-white/75 px-3 py-2">
-                        <div class="flex min-w-0 items-center justify-between gap-2">
-                          <p class="min-w-0 truncate text-xs font-semibold text-slate-950">{step.label}</p>
-                          <span class={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                            step.status === "passed"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}>
-                            {step.status === "passed" ? "Pass" : "Block"}
-                          </span>
-                        </div>
-                        <p class="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-600">{step.detail}</p>
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </div>
-            )}
-          </Show>
-          <Show when={exportNotice()}>
-            {(notice) => (
-              <p class="rounded-2xl border border-sky-100 bg-sky-50/80 px-3 py-2 text-sm leading-6 text-sky-950/75">
-                {notice()}
-              </p>
-            )}
-          </Show>
-          <WeddingHomeOverviewGrid
-            state={state()}
-            onSelectMenu={props.onSelectMenu}
-            onSidebarAction={handleSidebarAction}
-            onSaveWeddingDate={props.onSaveWeddingDate}
-          />
-          <WeddingHomeStatusStrip state={state()} onSelectMenu={props.onSelectMenu} />
-          <WeddingPlanningThreadsCard
-            state={state()}
-            onSelectMenu={props.onSelectMenu}
-            onSelectArtifact={props.onSelectArtifact}
-          />
-          <Show when={state().activeVendorQuoteReplyFlows.length > 0}>
-            <div class="space-y-3">
-              <For each={state().activeVendorQuoteReplyFlows}>
-                {(baseFlow) => {
-                  const flow = () => quoteReplyFlow(baseFlow);
-                  return (
-                    <WeddingVendorQuoteReplyCard
-                      flow={flow()}
-                      recipient={flow().recipient}
-                      subject={flow().subject}
-                      draftBody={flow().draftBody}
-                      busy={approvalRunning()}
-                      busyLabel={quoteReplyBusyLabel(flow().approvalRequest.id)}
-                      draftPersistenceStatus={quoteReplyDraftPersistence()[baseFlow.id] ?? null}
-                      proofSaveNotice={
-                        quoteReplyProofSaveNotice(flow().approvalRequest.id)
-                      }
-                      providerReadiness={quoteReplyProviderReadiness(flow())}
-                      onSaveDraft={(payload) => saveQuoteReplyDraft(baseFlow, payload)}
-                      onApproveWording={() => approveQuoteReplyWording(baseFlow)}
-                      onAcknowledgeBudgetImpact={() => acknowledgeQuoteReplyBudgetImpact(baseFlow)}
-                      onSend={() => startQuoteReplySend(baseFlow)}
-                      onUndo={() => undoQuoteReplySend(baseFlow)}
-                      onViewSentThread={() => void viewQuoteReplyThread(baseFlow)}
-                      onProviderSetup={props.onProviderSetup}
-                    />
-                  );
-                }}
-              </For>
-              <Show when={quoteReplyProofThread()}>
-                {(thread) => (
-                  <WeddingVendorQuoteProofDrawer
-                    vendorName={thread().vendorName}
-                    messages={quoteReplyProofRows()}
-                    loading={quoteReplyProofLoading()}
-                    error={quoteReplyProofError()}
-                    onClose={() => {
-                      setQuoteReplyProofThread(null);
-                      setQuoteReplyProofMessages([]);
-                      setQuoteReplyProofError(null);
+                    class="inline-flex cursor-grab items-center gap-2 rounded-full border border-stone-200 bg-white/85 px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-sm active:cursor-grabbing"
+                    title={`Drag to move ${section.title}`}
+                    aria-label={`Move ${section.title}`}
+                    draggable={orderedHomeSections().length > 1}
+                    onDragStart={(event) => {
+                      setDraggingHomeSectionId(section.id);
+                      event.dataTransfer?.setData("text/plain", section.id);
                     }}
-                  />
-                )}
-              </Show>
-            </div>
-          </Show>
-          <WeddingDecisionFocusCard state={state()} onSidebarAction={handleSidebarAction} />
-          <WeddingResilienceCardList state={state().resilience} onSidebarAction={handleSidebarAction} />
-          <WeddingProjectionApprovalCard
-            state={state().projectionQueue}
-            save={props.saveProjection}
-            storage={props.projectionStorage}
-            onDispatched={props.onProjectionDispatched}
-            onReviewBlocked={props.onReviewBlockedOutputs}
-          />
-          <Show when={props.richResponse}>
-            {(richResponse) => (
-              <WeddingRichResponseView
-                state={richResponse()}
-                onAction={props.onRichResponseAction}
-              />
+                    onDragEnd={() => setDraggingHomeSectionId(null)}
+                  >
+                    ::
+                    <span>{section.title}</span>
+                  </button>
+                  <div class="flex flex-wrap gap-1">
+                    <button
+                      type="button"
+                      class="rounded-full border border-stone-200 bg-white/85 px-2.5 py-1 text-xs font-semibold text-stone-700 disabled:opacity-40"
+                      disabled={index() === 0}
+                      title="Move this card up"
+                      onClick={() => moveHomeSectionToIndex(section.id, index() - 1)}
+                    >
+                      Up
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full border border-stone-200 bg-white/85 px-2.5 py-1 text-xs font-semibold text-stone-700 disabled:opacity-40"
+                      disabled={index() === orderedHomeSections().length - 1}
+                      title="Move this card down"
+                      onClick={() => moveHomeSectionToIndex(section.id, index() + 1)}
+                    >
+                      Down
+                    </button>
+                  </div>
+                </div>
+                {section.render()}
+              </div>
             )}
-          </Show>
+          </For>
         </Show>
 
         <WeddingWorkspaceDocumentsPanel
