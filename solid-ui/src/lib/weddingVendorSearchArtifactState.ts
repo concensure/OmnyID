@@ -630,7 +630,7 @@ export function buildWeddingVendorSearchArtifactState(input: {
   if (execution.status !== "executed" || !execution.externalSearchPerformed) {
     return {
       status: "not_created",
-      reason: "Vendor search did not run live, so no source-backed vendor notes were created.",
+      reason: "No live vendor sources were returned yet. Check that admin search/place provider keys are configured, then run the search again.",
       metadata,
       artifactInput: null,
       summary: null,
@@ -642,7 +642,7 @@ export function buildWeddingVendorSearchArtifactState(input: {
   if (usableSources.length === 0) {
     return {
       status: "not_created",
-      reason: "Live vendor search returned no usable HTTP(S) source URLs.",
+      reason: "Live vendor search ran, but returned no usable vendor source URLs. Try a more specific category, location, or date window.",
       metadata,
       artifactInput: null,
       summary: null,

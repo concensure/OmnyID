@@ -271,7 +271,7 @@ export function WeddingWorkspaceContextPanels(props: {
         />
       </div>
 
-      <div hidden={activeMenu() !== "people"}>
+      <div hidden={activeMenu() !== "people"} class="grid gap-3 xl:grid-cols-2">
         <section class="rounded-[24px] border border-amber-100/80 bg-amber-50/75 p-4 shadow-card sm:rounded-[28px]">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -307,7 +307,7 @@ export function WeddingWorkspaceContextPanels(props: {
             </For>
           </div>
         </section>
-        <div class="mt-3">
+        <div class="xl:col-span-2">
           <WeddingHelpersPanel
             state={props.state}
             onSidebarAction={props.onSidebarAction}

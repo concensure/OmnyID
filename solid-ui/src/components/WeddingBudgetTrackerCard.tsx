@@ -118,7 +118,8 @@ export function WeddingBudgetTrackerCard(props: {
       await props.onSaveAllocation(weddingDecisionProjectionToAfpSendInput(projection));
       setSaveNotice("Budget saved. Your planner will use it when checking costs and next steps.");
     } catch {
-      setSaveNotice("Could not save the budget right now. Try again in a moment.");
+      if (props.weddingPlanId) saveWeddingBudgetAllocationDraft(props.weddingPlanId, draft());
+      setSaveNotice("Budget saved on this device. Account memory will sync when saving is available.");
     } finally {
       setSaving(false);
     }

@@ -1279,11 +1279,15 @@ export function ResponseQueueView(props: {
     });
     saveLocalWeddingDate(responseWorkspaceId, date, localStorage);
     setWeddingLocalDateRefreshKey((value) => value + 1);
-    setWeddingWorkspaceMenu("timeline");
     const sendInputs = weddingDateToAfpSendInputs({ date, metadata });
-    await Promise.all(sendInputs.map((input) => sendAfpMessage(input)));
-    setWeddingProjectionRefreshKey((value) => value + 1);
-    void refreshWeddingWorkspaceMessages();
+    try {
+      await Promise.all(sendInputs.map((input) => sendAfpMessage(input)));
+      setWeddingProjectionRefreshKey((value) => value + 1);
+      void refreshWeddingWorkspaceMessages();
+    } catch {
+      // The local date is already saved and immediately reflected in the planner.
+      // AFP projection can retry from the refreshed local state later.
+    }
   }
 
   function extractWeddingFollowUpFromMessage() {

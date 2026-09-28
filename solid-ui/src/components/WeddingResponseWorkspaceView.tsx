@@ -131,14 +131,20 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const activeMenu = () => props.activeMenu ?? "home";
   const showTechnicalDetails = () => activeMenu() === "advanced";
   const compactMode = () => Boolean(props.compact);
-  const rootClass = () => compactMode() ? "grid min-w-0 gap-3 xl:grid-cols-2" : "grid min-w-0 gap-4 xl:grid-cols-2";
+  const contextOnlyMenu = () => !["home", "documents", "advanced"].includes(activeMenu());
+  const rootClass = () => {
+    const spacing = compactMode() ? "gap-3" : "gap-4";
+    return contextOnlyMenu() ? `grid min-w-0 ${spacing}` : `grid min-w-0 ${spacing} xl:grid-cols-2`;
+  };
   const primaryColumnClass = () => {
     const spacing = compactMode() ? "space-y-3" : "space-y-4";
+    if (contextOnlyMenu()) return "hidden";
     return activeMenu() === "home" ? `min-w-0 ${spacing} xl:col-span-2` : `min-w-0 ${spacing}`;
   };
-  const sidebarClass = () => compactMode()
-    ? "min-w-0 space-y-3 xl:sticky xl:top-4 xl:self-start"
-    : "min-w-0 space-y-4 xl:sticky xl:top-4 xl:self-start";
+  const sidebarClass = () => {
+    const spacing = compactMode() ? "space-y-3" : "space-y-4";
+    return contextOnlyMenu() ? `min-w-0 ${spacing}` : `min-w-0 ${spacing} xl:sticky xl:top-4 xl:self-start`;
+  };
   const cardClass = () => compactMode()
     ? "rounded-[20px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[24px]"
     : "rounded-[24px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[28px] sm:p-4";
