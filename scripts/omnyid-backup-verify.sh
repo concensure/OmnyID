@@ -163,7 +163,7 @@ EOF
 )
     CONTAINER_ERR_LOG="$(mktemp "${TMPDIR:-/tmp}/omnyid-backup-verify-XXXXXX.log")"
     trap 'rm -f "${CONTAINER_ERR_LOG:-}"' EXIT
-    if ! docker exec omnyid-backup-1 sh -lc "${CONTAINER_CMD}" sh "${CONTAINER_DUMP_PATH}" > /dev/null 2>"${CONTAINER_ERR_LOG}"; then
+    if ! docker exec omnyid-backup-1 bash -lc "${CONTAINER_CMD}" bash "${CONTAINER_DUMP_PATH}" > /dev/null 2>"${CONTAINER_ERR_LOG}"; then
       detail="$(tr '\r\n' ' ' < "${CONTAINER_ERR_LOG}" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
       if [[ -n "${detail}" ]]; then
         echo "[omnyid-backup-verify] ERROR: pg_restore inside omnyid-backup-1 could not read the decompressed Postgres archive: ${detail}" >&2
