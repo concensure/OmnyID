@@ -165,6 +165,27 @@ const WEDDING_LIVE_VENDOR_SEARCH_PROVIDER_KINDS = new Set<WeddingVendorSearchPro
   "brave_search",
   "overpass",
 ]);
+function weddingConfiguredVendorSearchProviderKinds(
+  capabilities: WeddingProviderCapabilitiesResponse | null | undefined,
+): WeddingVendorSearchProviderKind[] {
+  return (capabilities?.providers ?? [])
+    .filter((provider) => provider.configured)
+    .map((provider) => provider.kind)
+    .filter((kind): kind is WeddingVendorSearchProviderKind =>
+      WEDDING_LIVE_VENDOR_SEARCH_PROVIDER_KINDS.has(kind as WeddingVendorSearchProviderKind),
+    );
+}
+
+function weddingConfiguredVendorSearchProviderLabel(
+  capabilities: WeddingProviderCapabilitiesResponse | null | undefined,
+  kinds: readonly WeddingVendorSearchProviderKind[],
+): string {
+  const labels = (capabilities?.providers ?? [])
+    .filter((provider) => provider.configured && kinds.includes(provider.kind as WeddingVendorSearchProviderKind))
+    .map((provider) => provider.label.trim())
+    .filter(Boolean);
+  return labels.length > 0 ? labels.join(", ") : "connected providers";
+}
 const WEDDING_WORKSPACE_MENU_ITEMS: Array<{
   id: WeddingWorkspaceMenuId;
   icon: IconId;
@@ -406,6 +427,16 @@ export function ResponseQueueView(props: {
   const [weddingFollowUpPriorities, setWeddingFollowUpPriorities] = createSignal("");
   const [weddingFollowUpAtmosphere, setWeddingFollowUpAtmosphere] = createSignal("");
   const [weddingFollowUpImageLinks, setWeddingFollowUpImageLinks] = createSignal("");
+
+  async function refreshWeddingProviderCapabilitiesNow(): Promise<WeddingProviderCapabilitiesResponse | null> {
+    try {
+      const capabilities = await fetchWeddingProviderCapabilities();
+      setWeddingProviderCapabilities(capabilities);
+      return capabilities;
+    } catch {
+      return weddingProviderCapabilities();
+    }
+  }
   const [weddingFollowUpCoupleNames, setWeddingFollowUpCoupleNames] = createSignal("");
   const [weddingFollowUpVendorIds, setWeddingFollowUpVendorIds] = createSignal<string[]>([]);
   const [weddingFollowUpVowPreference, setWeddingFollowUpVowPreference] = createSignal("");
@@ -821,12 +852,7 @@ export function ResponseQueueView(props: {
     const smokeFixturePresent = importedArtifacts.some((artifact) => isWeddingVendorSmokeFixtureArtifact(artifact))
       || Boolean(smokeQuoteFlow);
     const quoteFlow = smokeQuoteFlow ?? quoteFlows[0] ?? null;
-    const configuredProviderKinds = (weddingProviderCapabilities()?.providers ?? [])
-      .filter((provider) => provider.configured)
-      .map((provider) => provider.kind)
-      .filter((kind): kind is WeddingVendorSearchProviderKind =>
-        WEDDING_LIVE_VENDOR_SEARCH_PROVIDER_KINDS.has(kind as WeddingVendorSearchProviderKind),
-      );
+    const configuredProviderKinds = weddingConfiguredVendorSearchProviderKinds(weddingProviderCapabilities());
     const liveVendorArtifactSaved = state.workspace.results.some((artifact) => {
       const searchText = [
         artifact.id,
@@ -1433,12 +1459,8 @@ export function ResponseQueueView(props: {
         setWeddingVendorSearchNotice(`Live vendor search needs ${liveWorkflowReadiness.missing.join(", ")}.`);
         return;
       }
-      const configuredProviderKinds = (weddingProviderCapabilities()?.providers ?? [])
-        .filter((provider) => provider.configured)
-        .map((provider) => provider.kind)
-        .filter((kind): kind is WeddingVendorSearchProviderKind =>
-          kind === "google_places" || kind === "brave_search" || kind === "overpass",
-        );
+      const latestProviderCapabilities = await refreshWeddingProviderCapabilitiesNow();
+      const configuredProviderKinds = weddingConfiguredVendorSearchProviderKinds(latestProviderCapabilities);
       const readiness = buildWeddingVendorSearchReadinessState({
         location: weddingFollowUpLocation(),
         vendorCategories: categoryLabels,
@@ -1455,6 +1477,7 @@ export function ResponseQueueView(props: {
         setWeddingVendorSearchNotice("Vendor search needs an admin-configured server-side search provider. No API key is required from this user.");
         return;
       }
+      setWeddingVendorSearchNotice(`Running live vendor search with ${weddingConfiguredVendorSearchProviderLabel(latestProviderCapabilities, configuredProviderKinds)}...`);
       const plan = buildWeddingVendorSearchProviderPlanState({
         readiness,
         providerKinds: configuredProviderKinds,

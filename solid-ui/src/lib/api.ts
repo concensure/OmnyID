@@ -204,6 +204,8 @@ export type WeddingProviderCapabilityStatus = {
   connectedAppId: string;
   label: string;
   credentialRequired: boolean;
+  credentialConfigured: boolean;
+  sharedCreditEnabled: boolean;
   configured: boolean;
   sourceLabel: string | null;
 };
@@ -4477,8 +4479,14 @@ function normalizeWeddingProviderCapabilitiesResponse(value: unknown): WeddingPr
         connectedAppId,
         label,
         credentialRequired: provider.credentialRequired === true,
+        credentialConfigured: provider.credentialConfigured === true,
+        sharedCreditEnabled: provider.sharedCreditEnabled === true,
         configured: provider.configured === true,
-        sourceLabel: typeof provider.sourceLabel === "string" ? provider.sourceLabel : null,
+        sourceLabel: typeof provider.sourceLabel === "string"
+          ? provider.sourceLabel
+          : typeof provider.source_label === "string"
+            ? provider.source_label
+            : null,
       }];
     })
     : [];
