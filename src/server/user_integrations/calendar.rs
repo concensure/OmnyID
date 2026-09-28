@@ -58,35 +58,33 @@ pub(super) async fn calendar_google_connect_url_http(
     }
     let client_id = gmail_oauth_client_id_configured()?;
     let redirect_uri = calendar_google_oauth_redirect_uri()?;
-    let redirect_enc: String = redirect_uri
-        .chars()
-        .map(|c| match c {
-            ':' => "%3A".to_string(),
-            '/' => "%2F".to_string(),
-            _ => c.to_string(),
-        })
-        .collect();
-    let scope_enc: String = GOOGLE_CALENDAR_SCOPES
-        .chars()
-        .map(|c| match c {
-            ' ' => "%20".to_string(),
-            ':' => "%3A".to_string(),
-            '/' => "%2F".to_string(),
-            _ => c.to_string(),
-        })
-        .collect();
     let signed_state = gmail_oauth_state_sign(&user.id)?;
-    let state_enc: String = signed_state
-        .chars()
-        .map(|c| match c {
-            ':' => "%3A".to_string(),
-            _ => c.to_string(),
-        })
-        .collect();
-    let url = format!(
-        "https://accounts.google.com/o/oauth2/v2/auth?client_id={client_id}&redirect_uri={redirect_enc}&response_type=code&scope={scope_enc}&access_type=offline&prompt=consent&state={state_enc}"
+    let url = google_oauth_authorization_url(
+        &client_id,
+        &redirect_uri,
+        GOOGLE_CALENDAR_SCOPES,
+        &signed_state,
     );
     Ok(Json(serde_json::json!({"url": url})))
+}
+
+/// GET /calendar/google/config — safe OAuth diagnostics for admins and support UI.
+pub(super) async fn calendar_google_config_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let _ = authenticated_user_and_session(&state.db, &headers).await?;
+    let redirect_uri = calendar_google_oauth_redirect_uri().ok();
+    Ok(Json(serde_json::json!({
+        "configured": calendar_google_oauth_is_fully_configured(),
+        "client_id_configured": gmail_oauth_client_id_configured().is_ok(),
+        "client_secret_configured": gmail_oauth_client_secret_configured().is_ok(),
+        "csrf_secret_configured": oauth_csrf_secret().is_ok(),
+        "homeserver_url_configured": redirect_uri.is_some(),
+        "redirect_uri": redirect_uri,
+        "required_authorized_redirect_uri": redirect_uri,
+        "required_scopes": GOOGLE_CALENDAR_SCOPES.split_whitespace().collect::<Vec<_>>(),
+    })))
 }
 
 /// GET /calendar/google/callback?code=... — exchanges the OAuth code and stores the token

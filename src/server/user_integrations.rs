@@ -12,8 +12,9 @@ mod tests;
 
 use calendar::{
     calendar_create_http, calendar_delete_http, calendar_google_callback_http,
-    calendar_google_connect_url_http, calendar_google_disconnect_http, calendar_google_status_http,
-    calendar_google_sync_http, calendar_list_http,
+    calendar_google_config_http, calendar_google_connect_url_http,
+    calendar_google_disconnect_http, calendar_google_status_http, calendar_google_sync_http,
+    calendar_list_http,
 };
 
 const GMAIL_OAUTH_STATE_TTL_SECS: i64 = 600;
@@ -170,6 +171,21 @@ fn gmail_oauth_redirect_uri() -> Result<String, (StatusCode, String)> {
     Ok(format!("{trimmed}/gmail/callback"))
 }
 
+fn google_oauth_authorization_url(
+    client_id: &str,
+    redirect_uri: &str,
+    scopes: &str,
+    state: &str,
+) -> String {
+    format!(
+        "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope={}&access_type=offline&prompt=consent&state={}",
+        urlencoding::encode(client_id),
+        urlencoding::encode(redirect_uri),
+        urlencoding::encode(scopes),
+        urlencoding::encode(state),
+    )
+}
+
 fn gmail_oauth_client_id_configured() -> Result<String, (StatusCode, String)> {
     let client_id = std::env::var("OMNYID_GMAIL_CLIENT_ID").map_err(|_| {
         (
@@ -295,6 +311,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/calendar/google/connect-url",
             get(calendar_google_connect_url_http),
         )
+        .route("/calendar/google/config", get(calendar_google_config_http))
         .route(
             "/calendar/google/callback",
             get(calendar_google_callback_http),
@@ -497,36 +514,9 @@ async fn gmail_connect_url_http(
     let client_id = gmail_oauth_client_id_configured()?;
     let redirect_uri = gmail_oauth_redirect_uri()?;
     let scopes = "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email";
-    // Percent-encode manually for the URL query string
-    let redirect_enc: String = redirect_uri
-        .chars()
-        .map(|c| match c {
-            ':' => "%3A".to_string(),
-            '/' => "%2F".to_string(),
-            _ => c.to_string(),
-        })
-        .collect();
-    let scope_enc: String = scopes
-        .chars()
-        .map(|c| match c {
-            ' ' => "%20".to_string(),
-            ':' => "%3A".to_string(),
-            '/' => "%2F".to_string(),
-            _ => c.to_string(),
-        })
-        .collect();
     // Sign the state so the callback can verify it wasn't forged.
     let signed_state = gmail_oauth_state_sign(&user.id)?;
-    let state_enc: String = signed_state
-        .chars()
-        .map(|c| match c {
-            ':' => "%3A".to_string(),
-            _ => c.to_string(),
-        })
-        .collect();
-    let url = format!(
-        "https://accounts.google.com/o/oauth2/v2/auth?client_id={client_id}&redirect_uri={redirect_enc}&response_type=code&scope={scope_enc}&access_type=offline&prompt=consent&state={state_enc}"
-    );
+    let url = google_oauth_authorization_url(&client_id, &redirect_uri, scopes, &signed_state);
     Ok(Json(serde_json::json!({"url": url})))
 }
 

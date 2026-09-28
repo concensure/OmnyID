@@ -5,6 +5,7 @@ import {
   deleteCalendarEvent,
   disconnectGoogleCalendar,
   fetchBacklinksForMessage,
+  fetchGoogleCalendarOAuthConfig,
   fetchGoogleCalendarOAuthUrl,
   fetchGoogleCalendarStatus,
   installDefaultSupertags,
@@ -521,7 +522,16 @@ export function MonthlyCalendarView(props: {
       const url = await fetchGoogleCalendarOAuthUrl();
       window.location.assign(url);
     } catch (err) {
-      setGoogleCalendarNotice(err instanceof Error ? err.message : "Could not start Google Calendar connection.");
+      try {
+        const config = await fetchGoogleCalendarOAuthConfig();
+        const redirect = config.requiredAuthorizedRedirectUri ?? config.redirectUri;
+        const setupHint = redirect
+          ? ` Google Cloud must authorize this redirect URI: ${redirect}.`
+          : "";
+        setGoogleCalendarNotice(`${err instanceof Error ? err.message : "Could not start Google Calendar connection."}${setupHint}`);
+      } catch {
+        setGoogleCalendarNotice(err instanceof Error ? err.message : "Could not start Google Calendar connection.");
+      }
       setGoogleCalendarBusy(false);
     }
   }

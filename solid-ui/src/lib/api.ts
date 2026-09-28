@@ -4123,6 +4123,31 @@ export const fetchGoogleCalendarStatus = (): Promise<GoogleCalendarConnectionSta
   apiFetch<unknown>("/calendar/google/status").then(normalizeGoogleCalendarConnectionStatus);
 export const fetchGoogleCalendarOAuthUrl = (): Promise<string> =>
   apiFetch<unknown>("/calendar/google/connect-url").then(oauthUrlFromResponse);
+export type GoogleCalendarOAuthConfig = {
+  configured: boolean;
+  clientIdConfigured: boolean;
+  clientSecretConfigured: boolean;
+  csrfSecretConfigured: boolean;
+  homeserverUrlConfigured: boolean;
+  redirectUri: string | null;
+  requiredAuthorizedRedirectUri: string | null;
+  requiredScopes: string[];
+};
+function normalizeGoogleCalendarOAuthConfig(value: unknown): GoogleCalendarOAuthConfig {
+  const record = isRecord(value) ? value : {};
+  return {
+    configured: apiBoolean(record.configured),
+    clientIdConfigured: apiBoolean(record.client_id_configured),
+    clientSecretConfigured: apiBoolean(record.client_secret_configured),
+    csrfSecretConfigured: apiBoolean(record.csrf_secret_configured),
+    homeserverUrlConfigured: apiBoolean(record.homeserver_url_configured),
+    redirectUri: typeof record.redirect_uri === "string" ? record.redirect_uri : null,
+    requiredAuthorizedRedirectUri: typeof record.required_authorized_redirect_uri === "string" ? record.required_authorized_redirect_uri : null,
+    requiredScopes: apiStringList(record.required_scopes),
+  };
+}
+export const fetchGoogleCalendarOAuthConfig = (): Promise<GoogleCalendarOAuthConfig> =>
+  apiFetch<unknown>("/calendar/google/config").then(normalizeGoogleCalendarOAuthConfig);
 export const disconnectGoogleCalendar = () =>
   apiFetch<unknown>("/calendar/google/disconnect", { method: "POST" }).then(normalizeOkResponse);
 export const syncGoogleCalendar = (): Promise<{ ok: boolean; synced_count: number }> =>
