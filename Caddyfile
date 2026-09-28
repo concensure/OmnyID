@@ -225,6 +225,10 @@
         import omnyid_proxy
     }
 
+    handle /wedding {
+        redir * /wedding/ 308
+    }
+
     handle /wedding/* {
         uri strip_prefix /wedding
         root * /srv/wedding
