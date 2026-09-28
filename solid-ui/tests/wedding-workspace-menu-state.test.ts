@@ -7,6 +7,7 @@ import {
   loadWeddingWorkspaceMenuFromUrl,
   replaceWeddingWorkspaceMenuInUrl,
   saveWeddingWorkspaceMenu,
+  weddingWorkspaceMenuIdFromEvent,
   weddingWorkspaceMenuBadge,
   weddingWorkspaceMenuHint,
   type WeddingWorkspaceMenuBadgeInput,
@@ -46,7 +47,9 @@ test("isWeddingWorkspaceMenuId accepts only known menu ids", () => {
   assert.equal(isWeddingWorkspaceMenuId("people"), true);
   assert.equal(isWeddingWorkspaceMenuId("plan"), true);
   assert.equal(isWeddingWorkspaceMenuId("vision"), true);
+  assert.equal(isWeddingWorkspaceMenuId("documents"), true);
   assert.equal(isWeddingWorkspaceMenuId("inspiration"), true);
+  assert.equal(isWeddingWorkspaceMenuId("helpers"), true);
   assert.equal(isWeddingWorkspaceMenuId("advanced"), true);
   assert.equal(isWeddingWorkspaceMenuId("not-a-menu"), false);
   assert.equal(isWeddingWorkspaceMenuId(null), false);
@@ -59,6 +62,18 @@ test("loadWeddingWorkspaceMenu defaults to home and round-trips a saved tab", ()
   assert.equal(loadWeddingWorkspaceMenu(storage), "timeline");
 });
 
+test("legacy Vision menu values open Inspiration where the Vision summary lives", () => {
+  const storage = fakeStorage();
+  saveWeddingWorkspaceMenu("vision", storage);
+
+  assert.equal(loadWeddingWorkspaceMenu(storage), "inspiration");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=vision"), "inspiration");
+  assert.equal(
+    weddingWorkspaceMenuIdFromEvent(new CustomEvent("x", { detail: { menu: "vision" } })),
+    "inspiration",
+  );
+});
+
 test("loadWeddingWorkspaceMenu falls back to home for a corrupted value", () => {
   const storage = fakeStorage();
   storage.setItem("omnyid.wedding.workspace-menu", "not-a-real-tab");
@@ -69,7 +84,9 @@ test("loadWeddingWorkspaceMenuFromUrl accepts query or hash tabs", () => {
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=seating"), "seating");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=people"), "people");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=plan"), "plan");
-  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=vision"), "vision");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=documents"), "documents");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=helpers"), "helpers");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=inspiration"), "inspiration");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("", "#weddingMenu=timeline"), "timeline");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=bad"), null);
 });
@@ -85,6 +102,12 @@ test("replaceWeddingWorkspaceMenuInUrl keeps the current path and writes the sel
   } as Pick<Window, "location" | "history">;
   replaceWeddingWorkspaceMenuInUrl("guests", windowLike);
   assert.deepEqual(calls, ["/workspace/?x=1&weddingMenu=guests#keep"]);
+});
+
+test("weddingWorkspaceMenuIdFromEvent accepts only known wedding menu shortcuts", () => {
+  assert.equal(weddingWorkspaceMenuIdFromEvent(new CustomEvent("x", { detail: { menu: "timeline" } })), "timeline");
+  assert.equal(weddingWorkspaceMenuIdFromEvent(new CustomEvent("x", { detail: { menu: "not-real" } })), null);
+  assert.equal(weddingWorkspaceMenuIdFromEvent(new Event("x")), null);
 });
 
 test("weddingWorkspaceMenuBadge flags an over-budget total on the budget tab", () => {
@@ -149,9 +172,6 @@ test("weddingWorkspaceMenuHint marks empty first-run sections without replacing 
   assert.equal(weddingWorkspaceMenuHint("plan", fixture({
     ganttTimeline: { rows: [], undatedItems: [] } as WeddingWorkspaceMenuBadgeInput["ganttTimeline"],
     vendorContactCards: [],
-  })), "Start");
-  assert.equal(weddingWorkspaceMenuHint("vision", fixture({
-    inspiration: { items: [] } as WeddingWorkspaceMenuBadgeInput["inspiration"],
   })), "Start");
   assert.equal(weddingWorkspaceMenuHint("advanced", fixture()), null);
   assert.equal(weddingWorkspaceMenuHint("budget", null), null);

@@ -4043,11 +4043,7 @@ function TasksView(props: {
   onNavigate: (view: ViewName) => void;
 }) {
   const now = new Date();
-  const [weddingNavigationIntent, setWeddingNavigationIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
   const draftSummary = createMemo(() => props.bootstrap?.task_runtime_summary ?? null);
-  const weddingArrivalBanner = createMemo(() =>
-    buildWeddingNavigationArrivalBannerState(weddingNavigationIntent()),
-  );
   const pending = createMemo(() =>
     dashboardBootstrapMessages(props.bootstrap)
       .filter((m) => taskMessagePresentation(m, now).isPending)
@@ -4060,16 +4056,6 @@ function TasksView(props: {
   const overdue = createMemo(() =>
     dashboardBootstrapMessages(props.bootstrap).filter((m) => taskMessagePresentation(m, now).isOverdue)
   );
-  onMount(() => {
-    const intent = consumeWeddingNavigationIntent();
-    if (intent?.view === "tasks") setWeddingNavigationIntent(intent);
-  });
-
-  function runWeddingArrivalAction(action: WeddingArrivalAction) {
-    const destination = weddingArrivalActionDestinationView(action);
-    if (destination) props.onNavigate(destination);
-  }
-
   return (
     <div class="animate-fade-in space-y-5">
       <div class="flex items-start justify-between gap-4">
@@ -4083,12 +4069,6 @@ function TasksView(props: {
           + Add Task
         </button>
       </div>
-
-      <WeddingNavigationArrivalBanner
-        state={weddingArrivalBanner()}
-        onAction={runWeddingArrivalAction}
-        onDismiss={() => setWeddingNavigationIntent(null)}
-      />
 
       <Show when={overdue().length > 0}>
         <div class="rounded-2xl border border-red-200/60 bg-red-50/60 p-4 space-y-2">

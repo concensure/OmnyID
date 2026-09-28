@@ -7,18 +7,29 @@ import {
   type WeddingTaskCompletionRecord,
 } from "@/lib/weddingTaskCompletionLocalState";
 import { weddingTaskCompletionToAfpSendInput } from "@/lib/weddingTaskCompletionProjectionState";
+import { weddingTaskDateToAfpSendInput } from "@/lib/weddingTaskDateProjectionState";
 import { buildWeddingTaskCompletionSyncState } from "@/lib/weddingTaskCompletionSyncState";
 import {
   dispatchWeddingTaskCompletionSync,
   type WeddingTaskCompletionSaveFn,
   type WeddingTaskCompletionSyncDispatchReceipt,
 } from "@/lib/weddingTaskCompletionSyncDispatchState";
+import {
+  dispatchWeddingWorkspaceMenuSelection,
+  replaceWeddingWorkspaceMenuInUrl,
+  saveWeddingWorkspaceMenu,
+  type WeddingWorkspaceMenuId,
+} from "@/lib/weddingWorkspaceMenuState";
 
 export type WeddingTaskStageViewTask = {
   task_id: string;
   title: string;
   status: string;
   milestone?: string;
+  priority?: string;
+  due_date?: string;
+  due_label?: string;
+  assignee?: string;
   wedding_plan_id?: string;
   response_workspace_id?: string;
   second_order_loop?: string;
@@ -33,9 +44,12 @@ export function WeddingTaskStageView(props: {
   stages: WeddingTaskHierarchyStage<WeddingTaskStageViewTask>[];
   saveTaskStatus?: WeddingTaskCompletionSaveFn;
 }) {
+  const DATE_STORAGE_PREFIX = "omnyid:wedding_task_due_date:";
   const taskSyncKey = (input: { taskId: string; completed: boolean; savedAt: string }) =>
     `${input.taskId}:${input.completed ? "done" : "pending"}:${input.savedAt}`;
   const [completedOverrides, setCompletedOverrides] = createSignal<Record<string, boolean>>({});
+  const [dateOverrides, setDateOverrides] = createSignal<Record<string, string>>({});
+  const [expandedTaskIds, setExpandedTaskIds] = createSignal<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = createSignal<"open" | "done">("open");
   const [syncRefreshKey, setSyncRefreshKey] = createSignal(0);
   const [syncing, setSyncing] = createSignal(false);
@@ -63,6 +77,88 @@ export function WeddingTaskStageView(props: {
       weddingPlanId: task.wedding_plan_id,
     }, localStorage)?.completed
     ?? fallback;
+  const dateStorageKey = (task: WeddingTaskStageViewTask) =>
+    `${DATE_STORAGE_PREFIX}${task.response_workspace_id ?? "wedding"}:${task.task_id}`;
+  const validDate = (value: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const parsed = new Date(`${value}T09:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  };
+  const savedTaskDate = (task: WeddingTaskStageViewTask) => {
+    const override = dateOverrides()[task.task_id];
+    if (override) return override;
+    try {
+      const value = localStorage.getItem(dateStorageKey(task));
+      return value && validDate(value) ? value : "";
+    } catch {
+      return "";
+    }
+  };
+  const taskDate = (task: WeddingTaskStageViewTask) => savedTaskDate(task) || (typeof task.due_date === "string" ? task.due_date.slice(0, 10) : "");
+  const taskOwner = (task: WeddingTaskStageViewTask) => {
+    const owner = typeof task.assignee === "string" ? task.assignee.trim() : "";
+    return owner || "You";
+  };
+  const displayDueText = (item: WeddingTaskHierarchyStage<WeddingTaskStageViewTask>["items"][number]) =>
+    taskDate(item.task) || item.dueText || "Add date";
+  const toggleExpanded = (taskId: string) => {
+    setExpandedTaskIds((current) => ({ ...current, [taskId]: current[taskId] !== true }));
+  };
+  const saveTaskDate = (task: WeddingTaskStageViewTask, date: string) => {
+    const cleanDate = date.trim();
+    if (cleanDate && !validDate(cleanDate)) {
+      setTaskNotice("Use a full date like 2027-09-18.");
+      return;
+    }
+    setDateOverrides((current) => ({ ...current, [task.task_id]: cleanDate }));
+    try {
+      if (cleanDate) localStorage.setItem(dateStorageKey(task), cleanDate);
+      else localStorage.removeItem(dateStorageKey(task));
+    } catch {
+      setTaskNotice("Date changed here, but this browser could not save it locally.");
+      return;
+    }
+    const sendInput = weddingTaskDateToAfpSendInput({
+      taskId: task.task_id,
+      title: task.title,
+      dueDate: cleanDate || null,
+      weddingPlanId: task.wedding_plan_id,
+      responseWorkspaceId: task.response_workspace_id,
+      sourceMessageId: task.task_id,
+    });
+    if (!sendInput || !props.saveTaskStatus) {
+      setTaskNotice(cleanDate
+        ? "Task date saved here. Connect account saving to update the planner timeline everywhere."
+        : "Task date removed here.");
+      return;
+    }
+    setSyncingTaskIds((current) => ({ ...current, [task.task_id]: true }));
+    void Promise.resolve(props.saveTaskStatus(sendInput))
+      .then(() => {
+        setTaskNotice(cleanDate
+          ? "Task date saved. The planner can update the timeline and reminders."
+          : "Task date removed. The planner can update the timeline and reminders.");
+      })
+      .catch(() => {
+        setTaskNotice("Task date changed here, but the planner could not save the update yet.");
+      })
+      .finally(() => {
+        setSyncingTaskIds((current) => {
+          const next = { ...current };
+          delete next[task.task_id];
+          return next;
+        });
+      });
+  };
+  const openWeddingMenu = (menu: WeddingWorkspaceMenuId) => {
+    try {
+      saveWeddingWorkspaceMenu(menu);
+      replaceWeddingWorkspaceMenuInUrl(menu);
+      dispatchWeddingWorkspaceMenuSelection(menu);
+    } catch {
+      // Shortcut navigation is a convenience when the wedding workspace is mounted.
+    }
+  };
   const saveSingleTaskStatus = async (task: WeddingTaskStageViewTask, record: WeddingTaskCompletionRecord) => {
     const sendInput = weddingTaskCompletionToAfpSendInput({
       record,
@@ -222,6 +318,40 @@ export function WeddingTaskStageView(props: {
       <div class="mb-3 flex flex-wrap gap-2">
         <button
           type="button"
+          class="rounded-full border border-rose-200 bg-white/70 px-3 py-2 text-xs font-semibold text-rose-950 transition hover:bg-white"
+          onClick={() => openWeddingMenu("home")}
+          title="Return to the wedding planner home page"
+        >
+          Home
+        </button>
+        <button
+          type="button"
+          class="rounded-full border border-rose-200 bg-white/70 px-3 py-2 text-xs font-semibold text-rose-950 transition hover:bg-white"
+          onClick={() => openWeddingMenu("budget")}
+          title="Open the wedding budget"
+        >
+          Budget
+        </button>
+        <button
+          type="button"
+          class="rounded-full border border-rose-200 bg-white/70 px-3 py-2 text-xs font-semibold text-rose-950 transition hover:bg-white"
+          onClick={() => openWeddingMenu("timeline")}
+          title="Open the wedding timeline and Gantt chart"
+        >
+          Timeline
+        </button>
+        <button
+          type="button"
+          class="rounded-full border border-rose-200 bg-white/70 px-3 py-2 text-xs font-semibold text-rose-950 transition hover:bg-white"
+          onClick={() => openWeddingMenu("documents")}
+          title="Open wedding documents"
+        >
+          Documents
+        </button>
+      </div>
+      <div class="mb-3 flex flex-wrap gap-2">
+        <button
+          type="button"
           class={`rounded-full px-3 py-2 text-xs font-semibold transition ${activeTab() === "open" ? "bg-rose-800 text-white shadow-sm" : "border border-rose-200 bg-white/70 text-rose-950 hover:bg-white"}`}
           onClick={() => setActiveTab("open")}
         >
@@ -271,25 +401,67 @@ export function WeddingTaskStageView(props: {
                 <For each={stage.items}>
                   {(item) => {
                     const completed = () => itemCompleted(item.task, item.completed);
+                    const expanded = () => expandedTaskIds()[item.task.task_id] === true;
                     return (
-                      <label class={`flex min-w-0 items-start gap-2 rounded-xl border border-white/60 bg-white/65 px-3 py-2.5 transition ${completed() ? "opacity-55" : "shadow-sm"}`}>
-                        <input
-                          type="checkbox"
-                          class="mt-1 h-4 w-4 rounded border-white/70 accent-rose-700"
-                          checked={completed()}
-                          aria-label={item.checkboxLabel}
-                          onChange={() => toggleTask(item.task, item.completed)}
-                        />
-                        <span class="min-w-0 flex-1">
-                          <span class={`block break-words text-xs font-semibold leading-5 ${completed() ? "line-through text-slate-500" : item.titleClass}`}>
-                            {item.title}
-                          </span>
-                          <span class="mt-0.5 flex flex-wrap items-center gap-2 break-words text-xs opacity-75">
-                            <span>{item.dueText}</span>
-                            <Show when={item.task.milestone}>
-                              <span>Stage: {item.task.milestone}</span>
-                            </Show>
-                          </span>
+                      <article class={`min-w-0 rounded-xl border border-white/60 bg-white/65 px-3 py-2.5 transition ${completed() ? "opacity-60" : "shadow-sm"}`}>
+                        <div class="flex min-w-0 items-start gap-2">
+                          <input
+                            type="checkbox"
+                            class="mt-1 h-4 w-4 rounded border-white/70 accent-rose-700"
+                            checked={completed()}
+                            aria-label={item.checkboxLabel}
+                            onChange={() => toggleTask(item.task, item.completed)}
+                          />
+                          <button
+                            type="button"
+                            class="min-w-0 flex-1 text-left"
+                            aria-expanded={expanded()}
+                            onClick={() => toggleExpanded(item.task.task_id)}
+                          >
+                            <span class={`block break-words text-xs font-semibold leading-5 ${completed() ? "line-through text-slate-500" : item.titleClass}`}>
+                              {item.title}
+                            </span>
+                            <span class="mt-0.5 flex flex-wrap items-center gap-2 break-words text-xs opacity-75">
+                              <span>Owner: {taskOwner(item.task)}</span>
+                              <span>Date: {displayDueText(item)}</span>
+                              <Show when={item.task.milestone}>
+                                <span>Stage: {item.task.milestone}</span>
+                              </Show>
+                            </span>
+                          </button>
+                          <span class={`mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full ${completed() ? "bg-emerald-400" : item.statusClass}`} />
+                        </div>
+                        <Show when={expanded()}>
+                          <div class="mt-2 rounded-xl border border-rose-100/80 bg-white/70 p-2">
+                            <div class="grid gap-2 sm:grid-cols-3">
+                              <label class="min-w-0 text-xs font-semibold text-rose-950/75">
+                                Owner
+                                <span class="mt-1 block rounded-full border border-rose-100 bg-white px-3 py-2 text-rose-950">
+                                  {taskOwner(item.task)}
+                                </span>
+                              </label>
+                              <label class="min-w-0 text-xs font-semibold text-rose-950/75">
+                                Due date
+                                <input
+                                  type="date"
+                                  class="mt-1 w-full rounded-full border border-rose-100 bg-white px-3 py-2 text-xs text-rose-950 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                                  value={taskDate(item.task)}
+                                  onChange={(event) => saveTaskDate(item.task, event.currentTarget.value)}
+                                />
+                              </label>
+                              <label class="min-w-0 text-xs font-semibold text-rose-950/75">
+                                Status
+                                <span class="mt-1 block rounded-full border border-rose-100 bg-white px-3 py-2 text-rose-950">
+                                  {completed() ? "Done" : "To do"}
+                                </span>
+                              </label>
+                            </div>
+                            <p class="mt-2 text-xs leading-5 text-rose-950/65">
+                              Click the checkbox when this is finished. Changing the date here keeps the task usable while account-level task editing is connected.
+                            </p>
+                          </div>
+                        </Show>
+                        <div class="min-w-0 pl-6">
                           <Show when={item.loopLabel || item.evidenceLabels.length > 0 || item.preparationLabels.length > 0}>
                             <span class="mt-1 flex flex-wrap items-center gap-1.5">
                               <For each={item.preparationLabels}>
@@ -320,9 +492,8 @@ export function WeddingTaskStageView(props: {
                               Sending update to the planner...
                             </span>
                           </Show>
-                        </span>
-                        <span class={`mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full ${completed() ? "bg-emerald-400" : item.statusClass}`} />
-                      </label>
+                        </div>
+                      </article>
                     );
                   }}
                 </For>
