@@ -13,6 +13,7 @@ param(
     [switch]$SkipRemotePreflight,
     [switch]$SkipPostDeployProof,
     [switch]$UseDetachedOracleProof = $true,
+    [switch]$UseExistingRemoteEnv,
     [switch]$SkipComposeBuild,
     [switch]$SkipCaddyReload,
     [switch]$SkipWorkspaceSmoke,
@@ -409,7 +410,8 @@ $composeFile = if ($IncludeQuicProfile) {
 }
 $remoteDirLiteral = Convert-ToShellSingleQuotedLiteral $RemoteDir
 $serviceArgumentString = Join-ShellArguments -Values @($ComposeServices | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
-$composeCommand = if ($EnvFile) {
+$usesRemoteEnv = $EnvFile -or $UseExistingRemoteEnv
+$composeCommand = if ($usesRemoteEnv) {
     $buildArgument = if ($SkipComposeBuild) { "" } else { " --build" }
     $serviceArguments = if ([string]::IsNullOrWhiteSpace($serviceArgumentString)) { "" } else { " $serviceArgumentString" }
     "cd $remoteDirLiteral && docker compose --env-file .env.oracle -f $composeFile up -d$buildArgument$serviceArguments"
@@ -422,12 +424,12 @@ Invoke-CheckedRemoteCommand `
     -Command $composeCommand `
     -ScanDockerBuildOutput
 
-if ($EnvFile -and -not $SkipCaddyReload) {
+if ($usesRemoteEnv -and -not $SkipCaddyReload) {
     $reloadCommand = "cd $remoteDirLiteral && docker compose --env-file .env.oracle -f $composeFile up -d --force-recreate caddy"
     Invoke-CheckedRemoteCommand -Context "reloading caddy" -Command $reloadCommand
 }
 
-if ($EnvFile -and -not $SkipWorkspaceSmoke) {
+if ($usesRemoteEnv -and -not $SkipWorkspaceSmoke) {
     $workspaceSmokeScript = @"
 set -eu
 cd $remoteDirLiteral
@@ -436,8 +438,16 @@ domain=`$(grep '^OMNYID_DOMAIN=' .env.oracle | head -n 1 | cut -d= -f2- | tr -d 
   echo 'workspace smoke check failed: OMNYID_DOMAIN missing from .env.oracle' >&2
   exit 1
 }
-grep -q 'handle /wedding/\*' Caddyfile || {
-  echo 'workspace smoke check failed: staged Caddyfile is missing the /wedding/* route' >&2
+grep -q 'handle /wedding/provider-capabilities' Caddyfile || {
+  echo 'workspace smoke check failed: staged Caddyfile is missing the wedding provider-capabilities proxy route' >&2
+  exit 1
+}
+grep -q 'handle /wedding/vendor-search' Caddyfile || {
+  echo 'workspace smoke check failed: staged Caddyfile is missing the wedding vendor-search proxy route' >&2
+  exit 1
+}
+grep -q 'handle /wedding/live-evidence' Caddyfile || {
+  echo 'workspace smoke check failed: staged Caddyfile is missing the wedding live-evidence proxy route' >&2
   exit 1
 }
 grep -q './wedding:/srv/wedding:ro' $composeFile || {
@@ -456,8 +466,16 @@ docker exec omnyid-caddy-1 caddy validate --config /etc/caddy/Caddyfile >/dev/nu
   echo 'workspace smoke check failed: running Caddy config does not validate' >&2
   exit 1
 }
-docker exec omnyid-caddy-1 grep -q 'handle /wedding/\*' /etc/caddy/Caddyfile || {
-  echo 'workspace smoke check failed: running Caddyfile is missing the /wedding/* route' >&2
+docker exec omnyid-caddy-1 grep -q 'handle /wedding/provider-capabilities' /etc/caddy/Caddyfile || {
+  echo 'workspace smoke check failed: running Caddyfile is missing the wedding provider-capabilities proxy route' >&2
+  exit 1
+}
+docker exec omnyid-caddy-1 grep -q 'handle /wedding/vendor-search' /etc/caddy/Caddyfile || {
+  echo 'workspace smoke check failed: running Caddyfile is missing the wedding vendor-search proxy route' >&2
+  exit 1
+}
+docker exec omnyid-caddy-1 grep -q 'handle /wedding/live-evidence' /etc/caddy/Caddyfile || {
+  echo 'workspace smoke check failed: running Caddyfile is missing the wedding live-evidence proxy route' >&2
   exit 1
 }
 workspace_headers_file=`$(mktemp)
@@ -490,7 +508,7 @@ rm -f "`$workspace_headers_file"
     Invoke-CheckedRemoteCommand -Context "running workspace smoke check" -Command $workspaceSmokeScript
 }
 
-if (-not $EnvFile -and -not $SkipWorkspaceSmoke) {
+if (-not $usesRemoteEnv -and -not $SkipWorkspaceSmoke) {
     $publicRouteSmokeScript = @"
 set -eu
 domain=`$(docker exec omnyid-caddy-1 printenv OMNYID_DOMAIN 2>/dev/null || true)
@@ -514,7 +532,7 @@ fi
     Invoke-CheckedRemoteCommand -Context "running sync-only public route smoke check" -Command $publicRouteSmokeScript
 }
 
-if ($EnvFile -and -not $SkipPostDeployProof) {
+if ($usesRemoteEnv -and -not $SkipPostDeployProof) {
     $postDeployOutDir = Join-Path $ProofOutDir "postdeploy"
     $postDeployReport = Invoke-OracleProductionProofSummary -Destination $postDeployOutDir
     if ($postDeployReport.status -ne "pass") {
@@ -525,6 +543,8 @@ if ($EnvFile -and -not $SkipPostDeployProof) {
 }
 
 Write-Host "Oracle deployment sync complete."
-if (-not $EnvFile) {
-    Write-Host "No env file was uploaded, so only a compose config check was run remotely."
+if (-not $usesRemoteEnv) {
+    Write-Host "No env file was uploaded or selected, so only a compose config check was run remotely."
+} elseif ($UseExistingRemoteEnv -and -not $EnvFile) {
+    Write-Host "Used existing remote .env.oracle; no local env file was uploaded."
 }

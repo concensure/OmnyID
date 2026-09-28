@@ -238,7 +238,7 @@ function Invoke-FakeScp {
         throw "[deploy-oracle-pwsh-selftest] expected mocked deploy-oracle run without EnvFile to succeed`n$deployOutput"
     }
     $deployOutputText = $deployOutput | Out-String
-    Assert-True ($deployOutputText.Contains("No env file was uploaded, so only a compose config check was run remotely.")) "expected sync-only deploy note"
+    Assert-True ($deployOutputText.Contains("No env file was uploaded or selected, so only a compose config check was run remotely.")) "expected sync-only deploy note"
     $sshLogPath = Join-Path $tmpRoot "ssh.log"
     Assert-True (Test-Path $sshLogPath) "expected ssh log to be created"
     $sshLog = Get-Content $sshLogPath -Raw
@@ -281,6 +281,30 @@ OMNYID_DOMAIN=omnyid.example
     Assert-True (-not $sshLog.Contains("workspace smoke check failed")) "expected skip-workspace-smoke to avoid smoke script"
     $scpLog = Get-Content $scpLogPath -Raw
     Assert-True ($scpLog.Contains(".env.oracle")) "expected env deploy path to upload rewritten env file"
+
+    Remove-Item $sshLogPath -Force
+    Remove-Item $scpLogPath -Force
+    $deployOutputWithRemoteEnv = & $deployScriptPath `
+        -RemoteHost "oracle.example" `
+        -User "ubuntu" `
+        -KeyPath "C:\fake\id_rsa" `
+        -RemoteDir "/srv/omnyid" `
+        -ProjectRoot $tmpRoot `
+        -UseExistingRemoteEnv `
+        -ComposeServices @("homeserver") `
+        -SkipRemotePreflight `
+        -SkipPostDeployProof `
+        -SkipComposeBuild `
+        -SkipCaddyReload `
+        -SkipWorkspaceSmoke 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "[deploy-oracle-pwsh-selftest] expected mocked deploy-oracle run with existing remote EnvFile to succeed`n$deployOutputWithRemoteEnv"
+    }
+    $sshLog = Get-Content $sshLogPath -Raw
+    Assert-True ($sshLog.Contains("docker compose --env-file .env.oracle -f docker-compose.oracle.minimal.yml up -d")) "expected existing remote env deploy to run compose up"
+    Assert-True ($sshLog.Contains("homeserver")) "expected existing remote env service-scoped deploy command to mention homeserver"
+    $scpLog = if (Test-Path $scpLogPath) { Get-Content $scpLogPath -Raw } else { "" }
+    Assert-True (-not $scpLog.Contains(".env.oracle")) "expected existing remote env deploy path to avoid env upload"
 
     Write-Output "[deploy-oracle-pwsh-selftest] passed"
 }
