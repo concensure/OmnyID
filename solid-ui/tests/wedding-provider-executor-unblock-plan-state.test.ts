@@ -9,7 +9,7 @@ test("provider executor unblock plan turns missing proof into concrete setup ste
   const plan = buildWeddingProviderExecutorUnblockPlanState(suite);
 
   assert.equal(plan.status, "blocked");
-  assert.match(plan.summary, /credentials, executor handlers, smoke tests/i);
+  assert.match(plan.summary, /sign-ins, connected app actions, smoke tests/i);
   assert.equal(plan.nextStep?.kind, "connect_credentials");
   assert.equal(plan.nextStep?.capability, "email");
   assert.equal(plan.nextStep?.setupSurface, "email");

@@ -109,6 +109,7 @@ function answeredLabels(context: WeddingPlanningContext): string[] {
     hasAnswer(context.location) ? `Location: ${context.location}` : null,
     hasAnswer(context.guestCount) ? `Guest count: ${context.guestCount}` : null,
     hasAnswer(context.budgetComfort) ? `Budget comfort: ${context.budgetComfort}` : null,
+    hasAnswer(context.familyOrStakeholderRoles) ? `Couple: ${context.familyOrStakeholderRoles}` : null,
     ...(context.topPriorities ?? []).map((priority) => `Priority: ${priority}`),
     ...weddingVendorSelectionLabels(context.vendorCategories).map((vendor) => `Vendor needed: ${vendor}`),
     hasAnswer(context.vowPreference) && clean(context.vowPreference).toLowerCase() !== "undecided"
@@ -175,6 +176,9 @@ function researchNotes(context: WeddingPlanningContext, labels: readonly string[
   });
   return [
     "This follow-up brief was generated from answered Need-To-Know prompts.",
+    isAustralianContext(context)
+      ? "Australian legal planning should ask about NOIM and authorised celebrant path before creating legal reminders."
+      : null,
     ...labels,
     vendorSearch.searchBrief.length > 0 ? `Vendor search brief: ${vendorSearch.searchBrief.join("; ")}.` : null,
     weddingVendorSearchTerms(context.vendorCategories).length > 0
@@ -189,9 +193,6 @@ function researchNotes(context: WeddingPlanningContext, labels: readonly string[
     context.location ? "Use the location to scope maps, guest logistics, and later verified vendor research." : null,
     context.guestCount ? "Use guest count as a hard capacity and catering constraint before ranking venues." : null,
     context.topPriorities?.length ? "Use top priorities to explain tradeoffs instead of optimizing for a generic wedding." : null,
-    isAustralianContext(context)
-      ? "Australian legal planning should ask about NOIM and authorised celebrant path before creating legal reminders."
-      : null,
     context.vowPreference
       ? "Raise vow preparation early: the couple should choose between a standard vow and personal vows before ceremony scripting."
       : null,

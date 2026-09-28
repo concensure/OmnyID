@@ -64,7 +64,23 @@ function clean(value: unknown): string {
 
 function usableSourceUrl(value: unknown): string {
   const url = clean(value);
-  return /^https?:\/\//i.test(url) ? url : "";
+  if (!/^https?:\/\//i.test(url)) return "";
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === "localhost"
+      || hostname === "127.0.0.1"
+      || hostname === "0.0.0.0"
+      || hostname === "::1"
+      || hostname === "[::1]"
+    ) {
+      return "";
+    }
+    return url;
+  } catch {
+    return "";
+  }
 }
 
 function escapeHtml(value: string): string {
@@ -113,15 +129,15 @@ function bodyTextByArtifactId(artifacts: readonly WeddingArtifactInput[]): Map<s
 }
 
 function evidenceStatusLabel(status: WeddingArtifactEvidenceStatus): string {
-  if (status === "source_linked") return "source-linked";
-  if (status === "source_labelled") return "source-labelled";
-  return "source-unverified";
+  if (status === "source_linked") return "web links included";
+  if (status === "source_labelled") return "sources named";
+  return "needs a fact check";
 }
 
 function evidenceCaveat(status: WeddingArtifactEvidenceStatus): string {
-  if (status === "source_linked") return "source URL attached";
-  if (status === "source_labelled") return "source label exists, but no source URL is attached";
-  return "no source label or source URL is attached";
+  if (status === "source_linked") return "source web link included";
+  if (status === "source_labelled") return "source is named, but no web link is included";
+  return "no source name or web link is included";
 }
 
 function isImportedPrivateSourceLabel(label: string): boolean {
@@ -185,7 +201,7 @@ function markdownBundleContent(input: {
   return [
     `# ${input.title}`,
     "",
-    "Generated as a wedding planning bundle. Verify live availability, prices, legal details, and vendor terms before acting.",
+    "Generated as a wedding planning download. Check live availability, prices, legal details, and vendor terms before acting.",
     "",
     "## Included files",
     "",
@@ -205,7 +221,7 @@ function markdownBundleContent(input: {
       const evidenceSuffix = [
         sourceProviders.length > 0 ? `providers: ${sourceProviders.join(", ")}` : null,
         sourceLabels.length > 0 ? `sources: ${sourceLabels.join(", ")}` : null,
-        sourceUrls.length > 0 ? `${sourceUrls.length} source URL${sourceUrls.length === 1 ? "" : "s"}` : null,
+        sourceUrls.length > 0 ? `${sourceUrls.length} source web link${sourceUrls.length === 1 ? "" : "s"}` : null,
       ].filter(Boolean).join("; ");
       return `- ${scope.title}${source}: ${scope.detail}${labelSuffix}${evidenceSuffix ? ` [${evidenceSuffix}]` : ""}`;
     }),
@@ -238,16 +254,16 @@ function markdownBundleContent(input: {
     "",
     "## Where this came from",
     "",
-    `- Source-linked files: ${sourceLinkedCount}`,
-    `- Source-labelled files: ${sourceLabelledCount}`,
-    `- Source-unverified files: ${sourceUnverifiedCount}`,
+    `- Files with web links: ${sourceLinkedCount}`,
+    `- Files with named sources: ${sourceLabelledCount}`,
+    `- Files that need a fact check: ${sourceUnverifiedCount}`,
     "",
     ...input.included.map((artifact) => (
       `- ${artifact.title}: ${evidenceStatusLabel(artifact.evidenceStatus)}; ${artifact.sourceMarkerCount} source${artifact.sourceMarkerCount === 1 ? "" : "s"} listed; ${evidenceCaveat(artifact.evidenceStatus)}.`
     )),
     input.included.length === 0 ? "- No included files to summarize." : null,
     "",
-    "Evidence note: source status is a planning aid, not a guarantee. Verify live availability, prices, legal details, map routes, registry details, and vendor terms before acting.",
+    "Source note: these labels help you review the plan. Check live availability, prices, legal details, map routes, registry details, and vendor terms before acting.",
     "",
     "## Excluded or sensitive files",
     "",
@@ -340,7 +356,7 @@ export function buildWeddingWorkspaceBundleExportPayload(input: {
   const mimeType = targetId === "html"
     ? "text/html;charset=utf-8"
     : targetId === "word_doc" ? "application/msword;charset=utf-8" : "text/markdown;charset=utf-8";
-  const filename = `${safeWeddingLabel(bundle.title, "wedding-planning-packet")}${extension}`;
+  const filename = `${safeWeddingLabel(bundle.title, "wedding-planning-documents")}${extension}`;
   const bodies = bodyTextByArtifactId(input.artifacts);
   const included = bundle.includedArtifacts.map((artifact) => ({
     id: artifact.id,

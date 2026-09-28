@@ -31,6 +31,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             get(admin_wedding_ai_routing_policy_http),
         )
         .route(
+            "/admin/wedding/api-stack",
+            get(admin_wedding_api_stack_http),
+        )
+        .route(
             "/admin/third-party-tool-policy",
             get(admin_third_party_tool_policy_http).post(admin_third_party_tool_policy_update_http),
         )

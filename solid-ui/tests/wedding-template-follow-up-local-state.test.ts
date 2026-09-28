@@ -44,6 +44,7 @@ test("wedding follow-up local state saves normalized draft answers per workspace
     guestCount: " 80 ",
     budgetComfort: " Keep it lean ",
     prioritiesCsv: " food, photos ",
+    coupleNames: " Alex and Sam ",
     vendorCategoryIds: [" Venue ", "photographer", "bad"],
     vowPreference: "create",
     vowStyle: "warm_personal",
@@ -59,6 +60,7 @@ test("wedding follow-up local state saves normalized draft answers per workspace
   assert.equal(saved?.location, "Sydney NSW");
   assert.equal(loaded?.dateOrSeason, "October 2027");
   assert.equal(loaded?.noimDownloaded, "no");
+  assert.equal(loaded?.coupleNames, "Alex and Sam");
   assert.deepEqual(loaded?.vendorCategoryIds, ["venue", "photographer"]);
   assert.equal(loaded?.vowPreference, "create");
   assert.equal(loaded?.vowStyle, "warm_personal");

@@ -75,7 +75,7 @@ function badgeFor(surface: WeddingNavigationSurface): string {
   if (surface === "knowledge_graph") return "Related details";
   if (surface === "tasks") return "Wedding tasks";
   if (surface === "connected_apps") return "Provider setup";
-  if (surface === "approval") return "Approval gate";
+  if (surface === "approval") return "Review before sending";
   return "Export context";
 }
 
@@ -159,6 +159,51 @@ function expectedBehaviorNextStep(intent: WeddingNavigationIntent): string | nul
   return "Review the suggested wedding gap tasks, then commit only the follow-ups that have a clear owner, due date, and evidence source.";
 }
 
+function timelineContextSummary(intent: WeddingNavigationIntent): string | null {
+  const packet = intent.metadata?.wedding_timeline;
+  if (!packet || typeof packet !== "object" || Array.isArray(packet)) return null;
+  const record = packet as Record<string, unknown>;
+  const title = clean(record.selected_title);
+  const start = clean(record.selected_start);
+  const end = clean(record.selected_end);
+  const status = clean(record.selected_status);
+  const bucket = clean(record.selected_bucket)?.replace(/_/g, " ");
+  const linkedFile = clean(record.linked_artifact_id);
+  const datedCount = numberFrom(record.dated_count);
+  const undatedCount = numberFrom(record.undated_count);
+  const dateRange = start && end && start !== end ? `${start} to ${end}` : start;
+  const parts = [
+    title ? `item: ${title}` : null,
+    dateRange ? `date: ${dateRange}` : null,
+    status ? `status: ${status}` : null,
+    bucket ? `section: ${bucket}` : null,
+    linkedFile ? "linked file available" : null,
+    datedCount > 0 ? `${datedCount} dated item${datedCount === 1 ? "" : "s"}` : null,
+    undatedCount > 0 ? `${undatedCount} done or no-date item${undatedCount === 1 ? "" : "s"}` : null,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join("; ") + "." : null;
+}
+
+function timelineNextStep(intent: WeddingNavigationIntent): string | null {
+  const packet = intent.metadata?.wedding_timeline;
+  if (!packet || typeof packet !== "object" || Array.isArray(packet)) return null;
+  const record = packet as Record<string, unknown>;
+  const title = clean(record.selected_title);
+  const linkedFile = clean(record.linked_artifact_id);
+  if (intent.surface === "calendar") {
+    return title
+      ? `Open the calendar around "${title}", then confirm the date or move it if the timing is wrong.`
+      : "Open the wedding calendar, then review the dated tasks that need confirmation.";
+  }
+  if (intent.surface === "tasks") {
+    if (linkedFile) return "Open the completed task or linked file, then confirm whether anything still needs follow-up.";
+    return title
+      ? `Open "${title}", then add or adjust the owner, due date, and status.`
+      : "Open wedding tasks, then add dates to anything that should appear on the timeline.";
+  }
+  return null;
+}
+
 function continueContextSummary(intent: WeddingNavigationIntent): string | null {
   const packet = intent.metadata?.continue_context;
   if (!packet || typeof packet !== "object" || Array.isArray(packet)) return null;
@@ -177,6 +222,32 @@ function continueContextSummary(intent: WeddingNavigationIntent): string | null 
     importedReviewCount > 0 ? `${importedReviewCount} import${importedReviewCount === 1 ? " needs" : "s need"} review before reuse` : null,
   ].filter((part): part is string => Boolean(part));
   return parts.length > 0 ? `${parts.join("; ")}.` : null;
+}
+
+function researchPromptSummary(intent: WeddingNavigationIntent): string | null {
+  const packet = intent.metadata?.wedding_research_prompt;
+  if (!packet || typeof packet !== "object" || Array.isArray(packet)) return null;
+  const record = packet as Record<string, unknown>;
+  const title = clean(record.title);
+  const query = clean(record.query);
+  const kind = clean(record.artifact_kind)?.replace(/_/g, " ");
+  const location = clean(record.location);
+  const requestedOutput = clean(record.requested_output)?.replace(/_/g, " ");
+  const parts = [
+    title ? `research topic: ${title}` : null,
+    query ? `question: ${query}` : null,
+    kind ? `source: ${kind}` : null,
+    location ? `location: ${location}` : null,
+    requestedOutput ? `output: ${requestedOutput}` : null,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join("; ") + "." : null;
+}
+
+function researchPromptNextStep(intent: WeddingNavigationIntent): string | null {
+  if (intent.surface !== "continue_chat") return null;
+  return researchPromptSummary(intent)
+    ? "Ask OmnyID for the specific research brief, then save useful findings back into wedding documents before relying on them."
+    : null;
 }
 
 function numberFrom(value: unknown): number {
@@ -262,13 +333,13 @@ function handoffContextSummary(intent: WeddingNavigationIntent): string | null {
     dateCount > 0 ? `${dateCount} linked date${dateCount === 1 ? "" : "s"}` : null,
     taskCount > 0 ? `${taskCount} linked task${taskCount === 1 ? "" : "s"}` : null,
     decisionScopeCount > 0 ? `${decisionScopeCount} selected decision scope${decisionScopeCount === 1 ? "" : "s"}` : null,
-    sourceLinkedCount > 0 ? `${sourceLinkedCount} source-linked file${sourceLinkedCount === 1 ? "" : "s"}` : null,
-    sourceLabelledCount > 0 ? `${sourceLabelledCount} source-labelled file${sourceLabelledCount === 1 ? "" : "s"}` : null,
+    sourceLinkedCount > 0 ? `${sourceLinkedCount} file${sourceLinkedCount === 1 ? "" : "s"} with web links` : null,
+    sourceLabelledCount > 0 ? `${sourceLabelledCount} file${sourceLabelledCount === 1 ? "" : "s"} with named sources` : null,
     sourceUnverifiedCount > 0 ? `${sourceUnverifiedCount} file${sourceUnverifiedCount === 1 ? " needs" : "s need"} a fact check` : null,
     approvalCount > 0 ? `${approvalCount} approval prompt${approvalCount === 1 ? "" : "s"}` : null,
     excludedSensitive > 0 ? `${excludedSensitive} sensitive export${excludedSensitive === 1 ? "" : "s"} excluded by default` : null,
     importedCount > 0 ? `${importedCount} imported private planning file${importedCount === 1 ? "" : "s"} in workspace` : null,
-    importedReviewCount > 0 ? `${importedReviewCount} imported file${importedReviewCount === 1 ? " requires" : "s require"} handoff review` : null,
+    importedReviewCount > 0 ? `${importedReviewCount} imported file${importedReviewCount === 1 ? " needs" : "s need"} review before sharing` : null,
     pendingCount > 0 ? `${pendingCount} planning output${pendingCount === 1 ? "" : "s"} waiting to be approved` : null,
   ].filter((part): part is string => Boolean(part));
   return parts.length > 0 ? parts.join("; ") + "." : null;
@@ -338,6 +409,28 @@ function decisionFocusSummary(intent: WeddingNavigationIntent): string | null {
   return parts.length > 0 ? parts.join("; ") + "." : null;
 }
 
+function decisionFocusIntent(intent: WeddingNavigationIntent): string | null {
+  const packet = intent.metadata?.decision_focus;
+  if (!packet || typeof packet !== "object" || Array.isArray(packet)) return null;
+  const raw = clean((packet as Record<string, unknown>).intent);
+  return raw === "open_item" || raw === "explain_item" || raw === "review_all" ? raw : null;
+}
+
+function decisionFocusNextStep(intent: WeddingNavigationIntent): string | null {
+  if (intent.surface !== "tasks") return null;
+  const focusIntent = decisionFocusIntent(intent);
+  if (focusIntent === "explain_item") {
+    return "Show why this decision matters now, then open the linked task only if the couple wants to act on it.";
+  }
+  if (focusIntent === "open_item") {
+    return "Open the specific decision task, then approve, assign, or defer it instead of browsing the whole task list.";
+  }
+  if (focusIntent === "review_all") {
+    return "Review the top wedding decisions first, then defer anything that can safely wait.";
+  }
+  return null;
+}
+
 function graphContextSummary(intent: WeddingNavigationIntent): string | null {
   const packet = intent.metadata?.graph_context;
   if (!packet || typeof packet !== "object" || Array.isArray(packet)) return null;
@@ -359,6 +452,8 @@ function graphContextSummary(intent: WeddingNavigationIntent): string | null {
 
 function buildCards(intent: WeddingNavigationIntent): WeddingNavigationArrivalCard[] {
   const chatSummary = continueContextSummary(intent);
+  const researchSummary = researchPromptSummary(intent);
+  const timelineSummary = timelineContextSummary(intent);
   const handoffSummary = handoffContextSummary(intent);
   const graphSummary = graphContextSummary(intent);
   const providerSummary = providerHandoffAuditSummary(intent);
@@ -374,9 +469,23 @@ function buildCards(intent: WeddingNavigationIntent): WeddingNavigationArrivalCa
         tone: "emerald",
       }
       : null,
+    researchSummary
+      ? {
+        label: "Research request",
+        detail: researchSummary,
+        tone: "violet",
+      }
+      : null,
+    timelineSummary
+      ? {
+        label: "Timeline item",
+        detail: timelineSummary,
+        tone: intent.surface === "calendar" ? "sky" : "emerald",
+      }
+      : null,
     handoffSummary
       ? {
-        label: "Planning handoff",
+        label: "Planning context",
         detail: handoffSummary,
         tone: intent.surface === "export" ? "amber" : "sky",
       }
@@ -460,7 +569,10 @@ export function buildWeddingNavigationArrivalState(
     sectionId: normalized.sectionId,
     savedAt: savedAtFrom(intent),
     cards: buildCards(normalized),
-    nextStep: expectedBehaviorNextStep(normalized)
+    nextStep: researchPromptNextStep(normalized)
+      ?? expectedBehaviorNextStep(normalized)
+      ?? timelineNextStep(normalized)
+      ?? decisionFocusNextStep(normalized)
       ?? nextStepFor(normalized.surface, normalized.artifactId, decisionScopeLabels(normalized).length > 0),
   };
 }

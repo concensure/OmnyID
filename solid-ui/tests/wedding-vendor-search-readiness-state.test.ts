@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { WEDDING_PRODUCTION_LABEL_MAX_LENGTH } from "@/lib/weddingProductionLabelState";
 import { buildWeddingVendorSearchReadinessState } from "../src/lib/weddingVendorSearchReadinessState.ts";
 
 test("buildWeddingVendorSearchReadinessState blocks generic vendor searches without intake", () => {
@@ -53,4 +54,25 @@ test("buildWeddingVendorSearchReadinessState marks ready only with provider proo
 
   assert.equal(state.status, "ready");
   assert.equal(state.missing.length, 0);
+});
+
+test("buildWeddingVendorSearchReadinessState bounds noisy brief and query text", () => {
+  const state = buildWeddingVendorSearchReadinessState({
+    location: `  Sydney ${"inner west ".repeat(60)}  `,
+    vendorCategories: [
+      `  photographer ${"documentary ".repeat(60)}  `,
+      `photographer ${"documentary ".repeat(60)}`,
+      "band",
+    ],
+    vendorPreferences: `  transparent pricing ${"calm communication ".repeat(60)}  `,
+    photographyScope: `day-of coverage ${"plus rehearsal dinner ".repeat(50)}`,
+    musicOrBandNeeded: "yes",
+    liveSearchProviderReady: true,
+  });
+
+  assert.equal(state.status, "ready");
+  assert.ok(state.searchBrief.every((label) => label.length <= WEDDING_PRODUCTION_LABEL_MAX_LENGTH));
+  assert.ok(state.searchQueries.every((query) => query.length <= 180));
+  assert.equal(state.searchQueries.length, 6);
+  assert.ok(state.searchBrief.some((label) => label.endsWith("...")));
 });

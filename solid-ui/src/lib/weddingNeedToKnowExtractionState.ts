@@ -7,6 +7,7 @@ export type WeddingNeedToKnowExtractedSlot =
   | "guest_count"
   | "budget_comfort"
   | "priorities"
+  | "couple_names"
   | "noim_status"
   | "celebrant_path";
 
@@ -54,6 +55,7 @@ function baseDraft(input: WeddingNeedToKnowExtractionInput): WeddingTemplateFoll
     guestCount: clean(existing.guestCount),
     budgetComfort: clean(existing.budgetComfort),
     prioritiesCsv: clean(existing.prioritiesCsv),
+    coupleNames: clean(existing.coupleNames),
     vendorCategoryIds: existing.vendorCategoryIds ?? [],
     vowPreference: existing.vowPreference === "standard" || existing.vowPreference === "create" || existing.vowPreference === "undecided"
       ? existing.vowPreference
@@ -134,6 +136,14 @@ function extractPriorities(text: string): string | null {
   return values.length ? values.join(", ") : null;
 }
 
+function extractCoupleNames(text: string): string | null {
+  const labelled = text.match(/\b(?:couple|partners?|bride and groom|bride\/groom)\s*(?:are|:|-)\s*([A-Z][a-z]{1,30}(?:\s+[A-Z][a-z]{1,30})?)\s+(?:and|&)\s+([A-Z][a-z]{1,30}(?:\s+[A-Z][a-z]{1,30})?)\b/i);
+  if (labelled?.[1] && labelled[2]) return `${clean(labelled[1])} and ${clean(labelled[2])}`;
+  const firstPerson = text.match(/\b(?:we are|we're|for)\s+([A-Z][a-z]{1,30})\s+(?:and|&)\s+([A-Z][a-z]{1,30})\b/i);
+  if (firstPerson?.[1] && firstPerson[2]) return `${clean(firstPerson[1])} and ${clean(firstPerson[2])}`;
+  return null;
+}
+
 function extractNoim(text: string): "" | "yes" | "no" | "unknown" {
   if (!/\bNOIM\b|Notice of Intended Marriage/i.test(text)) return "";
   if (/\b(?:not sure|unsure|don't know|do not know|unknown)\b/i.test(text)) return "unknown";
@@ -195,6 +205,12 @@ export function buildWeddingNeedToKnowExtractionState(
   if (priorities) {
     draft.prioritiesCsv = priorities;
     capturedSlots.push("priorities");
+  }
+
+  const coupleNames = extractCoupleNames(text);
+  if (coupleNames) {
+    draft.coupleNames = coupleNames;
+    capturedSlots.push("couple_names");
   }
 
   const noim = extractNoim(text);

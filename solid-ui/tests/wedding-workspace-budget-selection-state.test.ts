@@ -130,6 +130,60 @@ test("buildWeddingResponseWorkspaceViewState projects selected vendor quote chec
   assert.ok(state.personalOsProjection.rankedItems.some((item) => /Verify Harbour Photos pricing/i.test(item.title)));
 });
 
+test("buildWeddingResponseWorkspaceViewState projects selected vendors into approval-gated outreach tasks", () => {
+  const storage = memoryStorage();
+  setWeddingDecisionSelection("artifact:photographer-shortlist", "0:harbour-photos", storage);
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    artifacts: [
+      artifact({
+        id: "artifact:photographer-shortlist",
+        title: "Photographer shortlist",
+        kind: "vendor_table",
+        createdAt: 1,
+        bodyText: [
+          "# Photographer shortlist",
+          "",
+          "| Name | Category | Price | Notes |",
+          "| --- | --- | --- | --- |",
+          "| Harbour Photos | Photographer | AUD 4,000-5,000 | Projected package, request current quote |",
+        ].join("\n"),
+      }),
+    ],
+    projectionStorage: storage,
+  });
+
+  const taskItems = state.projectionQueue?.groups.find((group) => group.kind === "task")?.items ?? [];
+  const outreachTask = taskItems.find((item) =>
+    /approval-gated quote request for Harbour Photos/i.test(item.title)
+  );
+
+  assert.ok(outreachTask);
+  assert.equal(outreachTask.kind, "task");
+  assert.equal(outreachTask.sendInput?.metadata?.vendor_outreach_from_selected_decision, true);
+  assert.equal(outreachTask.sendInput?.metadata?.approval_required_before_outreach, true);
+  assert.equal(outreachTask.sendInput?.metadata?.no_external_send_without_approval, true);
+  assert.equal(outreachTask.sendInput?.metadata?.vendor_outreach_draft_requires_approval, true);
+  assert.equal(outreachTask.sendInput?.metadata?.vendor_outreach_provider_receipt_required, true);
+  assert.match(String(outreachTask.sendInput?.metadata?.vendor_outreach_draft_subject ?? ""), /Wedding quote request - Photographer/i);
+  assert.match(String(outreachTask.sendInput?.metadata?.vendor_outreach_draft_body ?? ""), /availability, package inclusions, and a current quote/i);
+  assert.deepEqual(outreachTask.sendInput?.metadata?.vendor_outreach_request_checklist, [
+    "availability",
+    "package inclusions",
+    "current quote",
+    "deposit",
+    "payment schedule",
+    "overtime fees",
+    "travel fees",
+    "exclusions",
+    "cancellation terms",
+  ]);
+  assert.ok(state.personalOsProjection.rankedItems.some((item) =>
+    /approval-gated quote request for Harbour Photos/i.test(item.title)
+    && item.evidenceLabels.includes("vendor follow up")
+  ));
+});
+
 test("buildWeddingResponseWorkspaceViewState suppresses duplicate budget quote task projections", () => {
   const storage = memoryStorage();
   setWeddingDecisionSelection("artifact:photographer-shortlist", "0:harbour-photos", storage);
@@ -168,6 +222,47 @@ test("buildWeddingResponseWorkspaceViewState suppresses duplicate budget quote t
   assert.equal(taskItems.some((item) =>
     /Verify Harbour Photos pricing/i.test(item.title)
     && item.sourceId.startsWith("wedding_budget_quote_task:")
+  ), false);
+});
+
+test("buildWeddingResponseWorkspaceViewState suppresses duplicate selected-vendor outreach projections", () => {
+  const storage = memoryStorage();
+  setWeddingDecisionSelection("artifact:photographer-shortlist", "0:harbour-photos", storage);
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    artifacts: [
+      artifact({
+        id: "artifact:photographer-shortlist",
+        title: "Photographer shortlist",
+        kind: "vendor_table",
+        createdAt: 1,
+        bodyText: [
+          "# Photographer shortlist",
+          "",
+          "| Name | Category | Price | Notes |",
+          "| --- | --- | --- | --- |",
+          "| Harbour Photos | Photographer | AUD 4,000-5,000 | Projected package, request current quote |",
+        ].join("\n"),
+      }),
+    ],
+    taskItems: [{
+      id: "task:existing-vendor-outreach",
+      title: "Draft Harbour Photos outreach",
+      kind: "vendor_follow_up",
+      source: "agent",
+      metadata: {
+        ...metadata,
+        vendor_outreach_from_selected_decision: true,
+        vendor_outreach_line_item_id: "wedding_decision:artifact:photographer-shortlist:0:harbour-photos",
+      },
+    }],
+    projectionStorage: storage,
+  });
+
+  const taskItems = state.projectionQueue?.groups.find((group) => group.kind === "task")?.items ?? [];
+  assert.equal(taskItems.some((item) =>
+    /approval-gated quote request for Harbour Photos/i.test(item.title)
+    && item.sourceId.startsWith("wedding_vendor_outreach_task:")
   ), false);
 });
 

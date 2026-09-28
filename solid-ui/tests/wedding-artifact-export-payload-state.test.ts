@@ -124,9 +124,9 @@ test("buildWeddingWorkspaceBundleExportPayload exports safe artifacts and exclud
   assert.deepEqual(payload.excludedArtifactIds, ["artifact:guests"]);
   assert.match(payload.content, /Venue research/);
   assert.match(payload.content, /## Where this came from/);
-  assert.match(payload.content, /Source-linked files: 1/);
-  assert.match(payload.content, /Source-unverified files: 0/);
-  assert.match(payload.content, /Venue research: source-linked; 1 source listed/);
+  assert.match(payload.content, /Files with web links: 1/);
+  assert.match(payload.content, /Files that need a fact check: 0/);
+  assert.match(payload.content, /Venue research: web links included; 1 source listed/);
   assert.doesNotMatch(payload.content, /Private RSVP notes/);
   assert.ok(payload.warningLabels.some((warning) => /Guest list exports/i.test(warning)));
 });
@@ -162,7 +162,7 @@ test("buildWeddingWorkspaceBundleExportPayload excludes imported research by def
   assert.ok(payload.warningLabels.some((warning) => /Imported wedding files are private source evidence/i.test(warning)));
 });
 
-test("buildWeddingWorkspaceBundleExportPayload includes source caveats for weakly sourced packets", () => {
+test("buildWeddingWorkspaceBundleExportPayload includes source caveats for weakly sourced downloads", () => {
   const payload = buildWeddingWorkspaceBundleExportPayload({
     title: "Trust packet",
     includeSensitive: true,
@@ -185,11 +185,11 @@ test("buildWeddingWorkspaceBundleExportPayload includes source caveats for weakl
     ],
   });
 
-  assert.match(payload.content, /Source-labelled files: 1/);
-  assert.match(payload.content, /Source-unverified files: 1/);
-  assert.match(payload.content, /Budget assumptions: source-labelled; 1 source listed; source label exists, but no source URL is attached/);
-  assert.match(payload.content, /Registry ideas: source-unverified; 0 sources listed; no source label or source URL is attached/);
-  assert.match(payload.content, /Verify live availability, prices, legal details, map routes, registry details, and vendor terms/i);
+  assert.match(payload.content, /Files with named sources: 1/);
+  assert.match(payload.content, /Files that need a fact check: 1/);
+  assert.match(payload.content, /Budget assumptions: sources named; 1 source listed; source is named, but no web link is included/);
+  assert.match(payload.content, /Registry ideas: needs a fact check; 0 sources listed; no source name or web link is included/);
+  assert.match(payload.content, /Check live availability, prices, legal details, map routes, registry details, and vendor terms/i);
 });
 
 test("buildWeddingWorkspaceBundleExportPayload can emit printable html packets", () => {
@@ -263,7 +263,7 @@ test("buildWeddingWorkspaceBundleExportPayload includes selected decision scope 
   assert.match(payload.content, /Harbour Hall from Venue shortlist: Selected waterfront venue/);
   assert.match(payload.content, /providers: google_places/);
   assert.match(payload.content, /sources: Google Places API/);
-  assert.match(payload.content, /1 source URL/);
+  assert.match(payload.content, /1 source web link/);
   assert.match(payload.content, /unticked alternatives available in the source files/i);
 });
 
@@ -287,8 +287,37 @@ test("buildWeddingWorkspaceBundleExportPayload ignores malformed decision scope 
     }],
   });
 
-  assert.match(payload.content, /1 source URL/);
+  assert.match(payload.content, /1 source web link/);
   assert.doesNotMatch(payload.content, /javascript:alert/);
+});
+
+test("buildWeddingWorkspaceBundleExportPayload ignores local decision scope source URLs", () => {
+  const payload = buildWeddingWorkspaceBundleExportPayload({
+    title: "Selected vendor packet",
+    artifacts: [{
+      id: "artifact:vendors",
+      title: "Vendor shortlist",
+      kind: "vendor_table",
+      metadata,
+      bodyText: "# Vendor shortlist\n\nSafe vendor and local source rows.",
+    }],
+    decisionScopes: [{
+      title: "Safe Vendor",
+      detail: "Selected after source review.",
+      artifactTitle: "Vendor shortlist",
+      sourceLabels: ["Mixed source packet"],
+      sourceUrls: [
+        "http://localhost:8787/vendor/source",
+        "https://127.0.0.1/vendor/source",
+        "https://example.com/safe-vendor",
+      ],
+      sourceProviderLabels: ["manual_review"],
+    }],
+  });
+
+  assert.match(payload.content, /1 source web link/);
+  assert.doesNotMatch(payload.content, /localhost/);
+  assert.doesNotMatch(payload.content, /127\.0\.0\.1/);
 });
 
 test("buildWeddingWorkspaceBundleExportPayload redacts imported decision scope source filenames", () => {
@@ -317,7 +346,7 @@ test("buildWeddingWorkspaceBundleExportPayload redacts imported decision scope s
 
   assert.match(payload.content, /Family budget row from Imported private planning file/);
   assert.match(payload.content, /sources: Imported private planning file/);
-  assert.match(payload.content, /1 source URL/);
+  assert.match(payload.content, /1 source web link/);
   assert.doesNotMatch(payload.content, /family-budget\.csv/);
   assert.doesNotMatch(payload.content, /guest-budget\.xlsx/);
   assert.doesNotMatch(payload.content, /storage\.example\.test/);

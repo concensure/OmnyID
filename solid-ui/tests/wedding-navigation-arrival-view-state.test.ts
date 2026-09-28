@@ -83,6 +83,36 @@ test("buildWeddingNavigationArrivalBannerState maps destination-specific primary
   assert.equal(buildWeddingNavigationArrivalBannerState({ ...baseIntent, view: "files", surface: "export" })?.primaryAction.kind, "review_export");
 });
 
+test("buildWeddingNavigationArrivalBannerState makes research prompts obvious", () => {
+  const state = buildWeddingNavigationArrivalBannerState({
+    ...baseIntent,
+    view: "threads",
+    surface: "continue_chat",
+    metadata: {
+      template: "wedding_planning",
+      wedding_research_prompt: {
+        version: 1,
+        source: "documents",
+        title: "Wedding research",
+        requested_output: "research_brief",
+        query: "venues with wet-weather backup",
+        location: "Sydney",
+      },
+    },
+  });
+
+  assert.equal(state?.primaryAction.kind, "continue_chat");
+  assert.equal(state?.primaryAction.label, "Start research brief");
+  assert.match(state?.primaryAction.description ?? "", /save useful findings/);
+  assert.match(state?.primaryAction.draftPrompt ?? "", /Wedding research/);
+  assert.match(state?.primaryAction.draftPrompt ?? "", /venues with wet-weather backup/);
+  assert.match(state?.primaryAction.draftPrompt ?? "", /Sydney/);
+  assert.match(state?.primaryAction.draftPrompt ?? "", /source-backed findings/);
+  assert.match(state?.primaryAction.draftPrompt ?? "", /wedding documents/);
+  assert.equal(state?.chips.find((chip) => chip.label === "Request")?.value, "Research brief");
+  assert.ok(state?.bodyItems.some((item) => item.label === "Research request" && /wet-weather backup/.test(item.detail)));
+});
+
 test("buildWeddingNavigationArrivalBannerState renders connected app provider handoff setup", () => {
   const state = buildWeddingNavigationArrivalBannerState({
     ...baseIntent,
@@ -155,6 +185,54 @@ test("buildWeddingNavigationArrivalBannerState exposes direct decision focus chi
   });
 
   assert.equal(state?.chips.find((chip) => chip.label === "Focus")?.value, "2 decisions");
+});
+
+test("buildWeddingNavigationArrivalBannerState labels decision focus actions by intent", () => {
+  const explainState = buildWeddingNavigationArrivalBannerState({
+    ...baseIntent,
+    view: "tasks",
+    surface: "tasks",
+    metadata: {
+      template: "wedding_planning",
+      decision_focus: {
+        version: 1,
+        intent: "explain_item",
+        focus_items: [{ title: "Choose photographer" }],
+      },
+    },
+  });
+  const openState = buildWeddingNavigationArrivalBannerState({
+    ...baseIntent,
+    view: "tasks",
+    surface: "tasks",
+    metadata: {
+      template: "wedding_planning",
+      decision_focus: {
+        version: 1,
+        intent: "open_item",
+        focus_items: [{ title: "Choose photographer" }],
+      },
+    },
+  });
+  const reviewState = buildWeddingNavigationArrivalBannerState({
+    ...baseIntent,
+    view: "tasks",
+    surface: "tasks",
+    metadata: {
+      template: "wedding_planning",
+      decision_focus: {
+        version: 1,
+        intent: "review_all",
+        focus_items: [{ title: "Choose photographer" }],
+      },
+    },
+  });
+
+  assert.equal(explainState?.primaryAction.label, "Show why it matters");
+  assert.match(explainState?.primaryAction.description ?? "", /top three/i);
+  assert.equal(openState?.primaryAction.label, "Open this decision");
+  assert.match(openState?.primaryAction.description ?? "", /approved, assigned, or deferred/i);
+  assert.equal(reviewState?.primaryAction.label, "Review top decisions");
 });
 
 test("buildWeddingNavigationArrivalBannerState foregrounds expected behaviour gap reviews", () => {

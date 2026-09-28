@@ -156,6 +156,7 @@ mod ui_decision_routes;
 mod user_integrations;
 mod user_management_routes;
 mod value_signal_helpers;
+mod wedding_vendor_search_routes;
 mod wedding_understanding_routes;
 mod workflow_connector_bindings;
 mod workflow_skill_capsule_runtime;
@@ -1285,6 +1286,7 @@ pub async fn run() {
         .merge(ui_decision_routes::routes())
         .merge(user_integrations::routes())
         .merge(user_management_routes::routes())
+        .merge(wedding_vendor_search_routes::routes())
         .merge(wedding_understanding_routes::routes())
         .merge(workspace_routes::routes())
         .layer(cors_layer())

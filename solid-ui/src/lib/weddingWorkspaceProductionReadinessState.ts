@@ -14,12 +14,17 @@ import {
   type WeddingProductionReadinessEvidenceInput,
   type WeddingProductionReadinessEvidenceState,
 } from "@/lib/weddingProductionReadinessEvidenceState";
+import {
+  buildWeddingProductionRemainingWorkState,
+  type WeddingProductionRemainingWorkState,
+} from "@/lib/weddingProductionRemainingWorkState";
 
 export type {
   WeddingOracleUpdatePlanState,
   WeddingProductionGoNoGoPacketState,
   WeddingProductionReadinessEvidenceInput,
   WeddingProductionReadinessEvidenceState,
+  WeddingProductionRemainingWorkState,
   WeddingProductionReadinessState,
 };
 
@@ -35,6 +40,7 @@ export type WeddingWorkspaceProductionReadinessState = {
   productionReadinessEvidence: WeddingProductionReadinessEvidenceState | null;
   productionGoNoGoPacket: WeddingProductionGoNoGoPacketState | null;
   productionReadiness: WeddingProductionReadinessState;
+  productionRemainingWork: WeddingProductionRemainingWorkState;
   oracleUpdatePlan: WeddingOracleUpdatePlanState;
 };
 
@@ -59,10 +65,16 @@ export function buildWeddingWorkspaceProductionReadinessState(
     ?? (productionReadinessEvidence ? buildWeddingProductionGoNoGoPacketState(productionReadinessEvidence) : null);
   const productionReadiness = input.productionReadiness
     ?? buildWeddingProductionReadinessState({}, productionReadinessEvidence?.evidence);
+  const productionRemainingWork = buildWeddingProductionRemainingWorkState(
+    productionReadiness,
+    productionGoNoGoPacket,
+    productionReadinessEvidence,
+  );
   return {
     productionReadinessEvidence,
     productionGoNoGoPacket,
     productionReadiness,
+    productionRemainingWork,
     oracleUpdatePlan: input.oracleUpdatePlan ?? buildWeddingOracleUpdatePlanState({
       productionReadiness,
       productionGoNoGoPacket,

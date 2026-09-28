@@ -1,6 +1,27 @@
 // @locs-version: 1.0
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
+import { weddingDayCountdownLabel } from "@/lib/weddingWorkspaceSidebarActionState";
+
+export type WeddingHomeStatusTone = "good" | "attention" | "risk";
+
+export type WeddingHomeStatusMetric = {
+  id: string;
+  label: string;
+  value: string;
+  tone: WeddingHomeStatusTone;
+  menuId: WeddingWorkspaceMenuId;
+};
+
+export type WeddingHomeStatusState = {
+  title: string;
+  detail: string;
+  tone: WeddingHomeStatusTone;
+  actionLabel: string;
+  menuId: WeddingWorkspaceMenuId;
+  metrics: WeddingHomeStatusMetric[];
+  a2ui: Record<string, unknown>;
+};
 
 export type WeddingHomeOverviewActionTile = {
   id: "budget" | "guests" | "seating" | "vendors";
@@ -33,6 +54,35 @@ function currencyLabel(amount: number | null | undefined): string {
 
 function finiteAmount(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function optionalArray<T>(value: readonly T[] | null | undefined): readonly T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function homeStatusA2ui(state: Omit<WeddingHomeStatusState, "a2ui">): Record<string, unknown> {
+  return {
+    schema_version: "a2ui.v1",
+    kind: "wedding_home_status",
+    title: state.title,
+    description: state.detail,
+    tone: state.tone,
+    metrics: state.metrics.map((metric) => ({
+      id: metric.id,
+      label: metric.label,
+      value: metric.value,
+      tone: metric.tone,
+      action: {
+        kind: "open_wedding_menu",
+        target_menu: metric.menuId,
+      },
+    })),
+    primary_action: {
+      label: state.actionLabel,
+      kind: "open_wedding_menu",
+      target_menu: state.menuId,
+    },
+  };
 }
 
 function rowStatusText(row: unknown): string {
@@ -106,6 +156,87 @@ export function buildWeddingHomeTimelineOverview(state: WeddingResponseWorkspace
     selectedRowId: upcoming?.id ?? null,
   };
   return { ...timeline, a2ui: timelineA2ui(timeline) };
+}
+
+export function buildWeddingHomeStatusState(state: WeddingResponseWorkspaceViewState): WeddingHomeStatusState {
+  const tiles = buildWeddingHomeOverviewActionTiles(state);
+  const budget = tiles.find((tile) => tile.id === "budget") ?? null;
+  const guests = tiles.find((tile) => tile.id === "guests") ?? null;
+  const vendors = tiles.find((tile) => tile.id === "vendors") ?? null;
+  const openTasks = optionalArray(state.planningTaskItems).filter((task) => !isDoneTimelineRow(task)).length;
+  const urgentChanges = state.resilience?.hasUrgentItem === true;
+  const urgentVendorCount = optionalArray(state.vendorContactCards).filter((card) => card.tone === "urgent").length;
+  const budgetRisk = budget?.tone === "risk";
+  const needsInput = tiles.some((tile) => tile.tone === "needs_input");
+  const attentionCount = tiles.filter((tile) => tile.tone === "attention" || tile.tone === "risk").length
+    + (state.resilience?.cards?.length ?? 0)
+    + urgentVendorCount;
+  const tone: WeddingHomeStatusTone = urgentChanges || budgetRisk || urgentVendorCount > 0
+    ? "risk"
+    : needsInput || attentionCount > 0
+      ? "attention"
+      : "good";
+  const title = tone === "risk"
+    ? "One thing needs attention before the plan narrows"
+    : tone === "attention"
+      ? "Your wedding plan has a clear next step"
+      : "Your wedding plan is moving cleanly";
+  const detailParts = [
+    budget ? `Budget: ${budget.valueLabel}` : null,
+    guests ? `Guests: ${guests.valueLabel}` : null,
+    `Date: ${weddingDayCountdownLabel(state)}`,
+    openTasks > 0 ? `${openTasks} open task${openTasks === 1 ? "" : "s"}` : null,
+  ].filter((part): part is string => Boolean(part));
+  const actionTile = urgentChanges
+    ? vendors ?? budget ?? guests
+    : budget?.tone === "needs_input" || budget?.tone === "risk"
+      ? budget
+      : guests?.tone === "needs_input" || guests?.tone === "attention"
+        ? guests
+        : vendors?.tone === "risk" || vendors?.tone === "attention"
+          ? vendors
+          : null;
+  const actionLabel = actionTile?.actionLabel ?? (tone === "good" ? "Open plan" : "Review next step");
+  const menuId = actionTile?.menuId ?? "plan";
+  const metrics: WeddingHomeStatusMetric[] = [
+    {
+      id: "date",
+      label: "Wedding date",
+      value: weddingDayCountdownLabel(state),
+      tone: weddingDayCountdownLabel(state) === "Add date" ? "attention" : "good",
+      menuId: "timeline",
+    },
+    budget ? {
+      id: "budget",
+      label: "Budget",
+      value: budget.valueLabel,
+      tone: budget.tone === "risk" ? "risk" : budget.tone === "ready" ? "good" : "attention",
+      menuId: budget.menuId,
+    } : null,
+    guests ? {
+      id: "guests",
+      label: "Guests",
+      value: guests.valueLabel,
+      tone: guests.tone === "risk" ? "risk" : guests.tone === "ready" ? "good" : "attention",
+      menuId: guests.menuId,
+    } : null,
+    {
+      id: "tasks",
+      label: "Open tasks",
+      value: String(openTasks),
+      tone: openTasks > 0 ? "attention" : "good",
+      menuId: "helpers",
+    },
+  ].filter((metric): metric is WeddingHomeStatusMetric => metric !== null);
+  const result = {
+    title,
+    detail: detailParts.join(" - "),
+    tone,
+    actionLabel,
+    menuId,
+    metrics,
+  };
+  return { ...result, a2ui: homeStatusA2ui(result) };
 }
 
 export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorkspaceViewState): WeddingHomeOverviewActionTile[] {

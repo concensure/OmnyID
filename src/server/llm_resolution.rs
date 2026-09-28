@@ -2,6 +2,9 @@
 // @module-id: server.llm-resolution
 // @primary-capability: user-scoped-llm-provider-resolution
 // @stability: beta
+use crate::admin_tool_secrets::{
+    resolve_admin_tool_secret, ANTHROPIC_LLM_SPEC, NVIDIA_LLM_SPEC, RUNPOD_LLM_SPEC,
+};
 use crate::inference::InferenceBackend;
 use crate::secret_manager::read_process_secret_trimmed;
 
@@ -92,7 +95,7 @@ fn resolve_user_inference_backend_from_config(
                 .to_string(),
         ),
         "runpod" => {
-            let api_key = read_process_secret_trimmed("OMNYID_RUNPOD_API_KEY").unwrap_or_default();
+            let api_key = read_runpod_api_key().unwrap_or_default();
             if api_key.trim().is_empty() {
                 return None;
             }
@@ -115,13 +118,23 @@ fn resolve_user_inference_backend_from_config(
 }
 
 pub(super) fn read_hosted_anthropic_api_key() -> Option<String> {
-    read_process_secret_trimmed("OMNYID_ANTHROPIC_KEY")
+    resolve_admin_tool_secret(ANTHROPIC_LLM_SPEC)
+        .map(|secret| secret.secret)
+        .or_else(|| read_process_secret_trimmed("OMNYID_ANTHROPIC_KEY"))
         .or_else(|| read_process_secret_trimmed("ANTHROPIC_API_KEY"))
 }
 
 fn read_hosted_nvidia_api_key() -> Option<String> {
-    read_process_secret_trimmed("OMNYID_NVIDIA_API_KEY")
+    resolve_admin_tool_secret(NVIDIA_LLM_SPEC)
+        .map(|secret| secret.secret)
+        .or_else(|| read_process_secret_trimmed("OMNYID_NVIDIA_API_KEY"))
         .or_else(|| read_process_secret_trimmed("NVIDIA_API_KEY"))
+}
+
+fn read_runpod_api_key() -> Option<String> {
+    resolve_admin_tool_secret(RUNPOD_LLM_SPEC)
+        .map(|secret| secret.secret)
+        .or_else(|| read_process_secret_trimmed("OMNYID_RUNPOD_API_KEY"))
 }
 
 fn default_model_for_provider(provider: &str) -> &'static str {

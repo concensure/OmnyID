@@ -45,7 +45,7 @@ test("wedding next step starts with the date when no dated timeline exists", () 
 
   assert.equal(next.priority, "wedding_date");
   assert.equal(next.menuId, "plan");
-  assert.equal(next.actionLabel, "Open plan");
+  assert.equal(next.actionLabel, "Add wedding date");
   assert.equal(next.a2ui.schema_version, "a2ui.v1");
   assert.equal(next.a2ui.kind, "wedding_next_step");
   const action = ((next.a2ui.nodes as Array<Record<string, unknown>>)[2]?.props as Record<string, unknown>).actions as Array<Record<string, unknown>>;
@@ -177,7 +177,7 @@ test("wedding next step surfaces vendor follow-ups once basics exist", () => {
 
   assert.equal(next.priority, "vendor_follow_up");
   assert.equal(next.menuId, "plan");
-  assert.equal(next.actionLabel, "Open plan");
+  assert.equal(next.actionLabel, "Open follow-ups");
   assert.match(next.secondaryLabels[0] ?? "", /1 vendor/);
 });
 
@@ -269,5 +269,5 @@ test("wedding next step opens plan when the wedding is on track", () => {
 
   assert.equal(next.priority, "on_track");
   assert.equal(next.menuId, "plan");
-  assert.equal(next.actionLabel, "Open plan");
+  assert.equal(next.actionLabel, "Open planning hub");
 });

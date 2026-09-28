@@ -10,6 +10,7 @@ import {
 } from "@/lib/weddingProductionGoNoGoPacketState";
 import { buildWeddingProductionReadinessEvidenceState } from "@/lib/weddingProductionReadinessEvidenceState";
 import { buildWeddingProviderExecutorSmokeProofState } from "@/lib/weddingProviderExecutorSmokeProofState";
+import { buildWeddingVendorComparisonUiReadinessState } from "@/lib/weddingVendorComparisonUiReadinessState";
 import { buildWeddingVendorQuoteReplyUiReadinessState } from "@/lib/weddingVendorQuoteReplyUiReadinessState";
 import { buildWeddingWorkspaceRefreshScaleProofState } from "@/lib/weddingWorkspaceRefreshScaleProofState";
 
@@ -32,6 +33,10 @@ function readyVendorQuoteReplyUi() {
     wordingApprovalControlMounted: true,
     budgetAcknowledgementControlMounted: true,
     sendActionMounted: true,
+    primaryDecisionActionMounted: true,
+    secondaryDecisionActionMounted: true,
+    conditionalReplyEditorMounted: true,
+    sentReplyHistoryMounted: true,
     undoWindowMounted: true,
     persistentSentConfirmationMounted: true,
     proofDrawerActionMounted: true,
@@ -55,6 +60,23 @@ function readyVendorQuoteReplyProduction() {
   } as const;
 }
 
+function readyVendorComparisonUi() {
+  return buildWeddingVendorComparisonUiReadinessState({
+    comparisonTableMounted: true,
+    expandableTopFiveControlMounted: true,
+    multiSelectControlsMounted: true,
+    sourceLinkActionsMounted: true,
+    confirmSelectedActionMounted: true,
+    followUpQueueActionMounted: true,
+    approvalGatingCopyMounted: true,
+    selectedVendorProjectionMounted: true,
+    unselectedVendorQueueSuppressionMounted: true,
+    closedVendorHistoryMounted: true,
+    malformedSourceUrlGuardMounted: true,
+    localSourceUrlGuardMounted: true,
+  });
+}
+
 function readyTemplateLaunchReadiness() {
   return {
     status: "ready",
@@ -76,6 +98,7 @@ const baseReadyEvidence = {
     proofReferenceLabels: ["approval-ui:playwright:oracle-prod-1"],
   } as any,
   templateLaunchReadiness: readyTemplateLaunchReadiness(),
+  vendorComparisonUi: readyVendorComparisonUi(),
   vendorQuoteReplyUi: readyVendorQuoteReplyUi(),
   vendorQuoteReplyProduction: readyVendorQuoteReplyProduction(),
   expectedBehaviorAudit: {
@@ -102,6 +125,15 @@ const baseReadyEvidence = {
     evidenceLabels: ["Oracle metrics proof reference mounted: oracle-metrics:ok"],
   } as any,
 };
+
+function emailDelivery(to = "vendor@example.com") {
+  return {
+    channel: "email",
+    to: [to],
+    subject: "Wedding planning follow-up",
+    text: "Hi, we are following up on our wedding planning request.",
+  };
+}
 
 function readyCollaborationLifecycleProof() {
   return buildWeddingCollaborationLifecycleProjectionProofState({
@@ -142,7 +174,12 @@ function readySmokeProof() {
         createdAt: "2026-09-15T00:00:00.000Z",
         disclosureLines: [],
         riskLabels: [],
-        metadata: { provider_executor_mode: "live", external_delivery_performed: true, external_id: "gmail:message-1" },
+        metadata: {
+          provider_executor_mode: "live",
+          external_delivery_performed: true,
+          external_id: "gmail:message-1",
+          delivery: emailDelivery("events@venue.example"),
+        },
       },
       {
         id: "receipt:calendar",
@@ -205,22 +242,24 @@ test("production go/no-go packet blocks missing proof packets", () => {
   assert.ok(packet.gates.some((gate) => gate.kind === "backend_scale" && gate.status === "missing"));
   assert.ok(packet.gates.some((gate) => gate.kind === "template_launch" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "approval_ui" && gate.status === "blocked"));
+  assert.ok(packet.gates.some((gate) => gate.kind === "vendor_comparison_ui" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "vendor_quote_reply" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "expected_behavior" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "import_parser" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "collaboration_access" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "admin_routing_policy" && gate.status === "blocked"));
   assert.ok(packet.gates.some((gate) => gate.kind === "oracle_release" && gate.status === "missing"));
-  assert.deepEqual(packet.gateCounts, { ready: 0, blocked: 10, missing: 2, total: 12 });
+  assert.deepEqual(packet.gateCounts, { ready: 0, blocked: 11, missing: 2, total: 13 });
   assert.ok(packet.blockerLabels.includes("Backend pagination contract is missing."));
   assert.ok(packet.blockerLabels.includes("Wedding template launch proof is missing."));
   assert.ok(packet.blockerLabels.includes("Approval UI proof is missing."));
+  assert.ok(packet.blockerLabels.includes("Vendor comparison UI proof is missing."));
   assert.ok(packet.blockerLabels.includes("Vendor quote reply UI proof is missing."));
   assert.ok(packet.blockerLabels.includes("Vendor quote reply live production proof is missing or blocked."));
   assert.ok(packet.blockerLabels.includes("Wedding import parser readiness is missing."));
   assert.ok(packet.nextActionLabels.includes("Prove approval execution UI and receipt handling."));
   assert.ok(packet.nextActionLabels.includes(
-    "Prove inline quote summary, Tiptap editor, separate approvals, undo-send, sent proof, live regions, and telemetry.",
+    "Prove inline quote summary, state-derived decision CTAs, conditional Tiptap editor, undo-send, sent-history proof, live regions, and telemetry.",
   ));
   assert.ok(packet.nextActionLabels.includes(
     "Prove the vendor quote reply flow with live provider send, undo, durable receipt, and proof drawer reconstruction.",
@@ -259,7 +298,7 @@ test("production go/no-go packet blocks dry-run provider proof", () => {
   assert.equal(packet.status, "blocked");
   assert.equal(packet.gates.find((gate) => gate.kind === "provider_executors")?.status, "blocked");
   assert.equal(packet.gates.find((gate) => gate.kind === "approval_ui")?.status, "ready");
-  assert.deepEqual(packet.gateCounts, { ready: 11, blocked: 1, missing: 0, total: 12 });
+  assert.deepEqual(packet.gateCounts, { ready: 12, blocked: 1, missing: 0, total: 13 });
   assert.ok(packet.gates.find((gate) => gate.kind === "provider_executors")?.nextActionLabels.length);
   assert.ok(packet.guardrailLabels.some((label) => /dry-run provider receipts/i.test(label)));
 });
@@ -276,8 +315,9 @@ test("production go/no-go packet allows upload only when all proof gates are rea
 
   assert.equal(packet.status, "ready");
   assert.equal(packet.canUploadToOracle, true);
-  assert.deepEqual(packet.gateCounts, { ready: 12, blocked: 0, missing: 0, total: 12 });
+  assert.deepEqual(packet.gateCounts, { ready: 13, blocked: 0, missing: 0, total: 13 });
   assert.deepEqual(packet.gates.map((gate) => gate.status), [
+    "ready",
     "ready",
     "ready",
     "ready",
@@ -379,7 +419,7 @@ test("production go/no-go packet blocks ready gates without admin metrics receip
 
   assert.equal(packet.status, "blocked");
   assert.equal(packet.canUploadToOracle, false);
-  assert.deepEqual(packet.gateCounts, { ready: 11, blocked: 1, missing: 0, total: 12 });
+  assert.deepEqual(packet.gateCounts, { ready: 12, blocked: 1, missing: 0, total: 13 });
   assert.deepEqual(packet.proofManifestCounts, { attached: 7, missing: 0, blocked: 1, total: 8 });
   assert.ok(packet.blockerLabels.includes("Admin Oracle and user metrics proof reference is missing."));
 });
@@ -422,11 +462,47 @@ test("production go/no-go packet keeps vendor quote blocked when live proof is r
 
   assert.equal(gate?.status, "blocked");
   assert.ok(gate?.blockerLabels.includes("Vendor quote reply UI proof is missing."));
-  assert.match(gate?.detail ?? "", /quote summary, Tiptap editor, approval controls/i);
+  assert.match(gate?.detail ?? "", /quote summary, state-derived primary and secondary actions, conditional Tiptap editor/i);
   assert.equal(manifestItem?.status, "blocked");
   assert.ok(manifestItem?.missingProofLabels.includes("Vendor quote reply UI proof is missing."));
   assert.equal(packet.canUploadToOracle, false);
   assert.ok(packet.blockerLabels.includes("Vendor quote reply UI proof is missing."));
+});
+
+test("production go/no-go packet blocks missing dynamic vendor comparison UI", () => {
+  const evidence = buildWeddingProductionReadinessEvidenceState({
+    ...baseReadyEvidence,
+    strictOracleProofs: true,
+    vendorComparisonUi: buildWeddingVendorComparisonUiReadinessState({
+      comparisonTableMounted: true,
+      expandableTopFiveControlMounted: true,
+      multiSelectControlsMounted: false,
+      sourceLinkActionsMounted: true,
+      confirmSelectedActionMounted: true,
+      followUpQueueActionMounted: false,
+      approvalGatingCopyMounted: true,
+      selectedVendorProjectionMounted: true,
+      unselectedVendorQueueSuppressionMounted: true,
+      closedVendorHistoryMounted: true,
+      malformedSourceUrlGuardMounted: true,
+      localSourceUrlGuardMounted: true,
+    }),
+    backendScaleProof: readyScaleProof(),
+    providerExecutorSmokeProof: readySmokeProof(),
+    oracleReleaseGate: readyReleaseGate(),
+  });
+  const packet = buildWeddingProductionGoNoGoPacketState(evidence);
+  const gate = packet.gates.find((item) => item.kind === "vendor_comparison_ui");
+
+  assert.equal(evidence.evidence.vendorComparisonUiReady, false);
+  assert.equal(gate?.status, "blocked");
+  assert.ok(gate?.blockerLabels.includes("Vendor comparison UI proof is missing."));
+  assert.ok(packet.blockerLabels.some((label) =>
+    /Vendor comparison UI proof is blocked/.test(label)
+    && /Multi-select vendor controls are not mounted/.test(label)
+    && /Follow-up queue action is not mounted/.test(label)
+  ));
+  assert.equal(packet.canUploadToOracle, false);
 });
 
 test("production go/no-go packet does not attach weak vendor quote proof refs", () => {
@@ -474,6 +550,7 @@ test("production go/no-go packet blocks each individual required gate independen
       },
     }],
     ["approval_ui", { ...readyInput, approvalUi: { productionEvidenceReady: false } as any }],
+    ["vendor_comparison_ui", { ...readyInput, vendorComparisonUi: null }],
     ["vendor_quote_reply", {
       ...readyInput,
       vendorQuoteReplyProduction: {
@@ -505,7 +582,7 @@ test("production go/no-go packet blocks each individual required gate independen
     assert.equal(packet.canUploadToOracle, false, kind);
     assert.equal(packet.gates.find((gate) => gate.kind === kind)?.status, "blocked", kind);
     assert.equal(packet.gateCounts.blocked, 1, kind);
-    assert.equal(packet.gateCounts.ready, 11, kind);
+    assert.equal(packet.gateCounts.ready, 12, kind);
     assert.ok(packet.nextActionLabels.length > 0, kind);
   }
 });
@@ -600,6 +677,10 @@ test("production go/no-go packet carries granular vendor quote UI blockers into 
       wordingApprovalControlMounted: true,
       budgetAcknowledgementControlMounted: false,
       sendActionMounted: true,
+      primaryDecisionActionMounted: true,
+      secondaryDecisionActionMounted: true,
+      conditionalReplyEditorMounted: true,
+      sentReplyHistoryMounted: true,
       undoWindowMounted: true,
       persistentSentConfirmationMounted: true,
       proofDrawerActionMounted: true,

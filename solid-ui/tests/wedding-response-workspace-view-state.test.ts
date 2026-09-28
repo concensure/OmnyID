@@ -4,16 +4,25 @@ import test from "node:test";
 import { normalizeWeddingArtifactSummary } from "../src/lib/weddingArtifactState.ts";
 import { buildWeddingKnowledgeGraphState } from "../src/lib/weddingKnowledgeGraphState.ts";
 import { buildWeddingRecommendationExplanationState } from "../src/lib/weddingRecommendationExplanationState.ts";
-import { setWeddingDecisionSelection } from "../src/lib/weddingDecisionSelectionState.ts";
-import { buildWeddingGuestBoundaryDraftObjects } from "../src/lib/weddingGuestBoundaryDraftState.ts";
-import { buildWeddingInspirationItem } from "../src/lib/weddingInspirationState.ts";
+import { buildWeddingVendorPursuitClosureTaskItem } from "../src/lib/weddingBudgetTrackingState.ts";
+import {
+  setWeddingDecisionSelection,
+  setWeddingDecisionSelections,
+} from "../src/lib/weddingDecisionSelectionState.ts";
 import { buildWeddingResponseWorkspaceViewState } from "../src/lib/weddingResponseWorkspaceViewState.ts";
 import { buildWeddingTemplateFollowUpState } from "../src/lib/weddingTemplateFollowUpState.ts";
+import { buildWeddingVendorComparisonArtifactState } from "../src/lib/weddingVendorSearchArtifactState.ts";
+import { runWeddingVendorSearchExecution } from "../src/lib/weddingVendorSearchExecutorState.ts";
+import { buildWeddingVendorSearchReadinessState } from "../src/lib/weddingVendorSearchReadinessState.ts";
 import {
   weddingArtifact as artifact,
   weddingMemoryStorage as memoryStorage,
   weddingResponseWorkspaceMetadata as metadata,
 } from "./wedding-response-workspace-fixtures.ts";
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
 
 test("buildWeddingResponseWorkspaceViewState creates category rail and active artifact preview", () => {
   const state = buildWeddingResponseWorkspaceViewState({
@@ -294,666 +303,398 @@ test("buildWeddingResponseWorkspaceViewState carries graph-backed recommendation
   assert.ok(state.recommendationCards[0]?.graphContextLabels.some((label) => /related detail/i.test(label)));
 });
 
-test("buildWeddingResponseWorkspaceViewState exposes weather backup second-order loops", () => {
+test("buildWeddingResponseWorkspaceViewState exposes vendor quote reply flows from quote artifacts", () => {
+  const quoteArtifacts = [
+    artifact({
+      title: "Chloe florals quote",
+      kind: "vendor_table",
+      createdAt: 2,
+      bodyText: [
+        "# Chloe's Florals quote",
+        "",
+        "Vendor: Chloe's Florals",
+        "Quote amount: AUD $799",
+        "Budget delta: $200 over budget",
+        "Valid until: 2026-10-15",
+        "Original PDF: https://example.com/chloe-quote.pdf",
+        "",
+        "## Inclusions",
+        "",
+        "- Bridal bouquet",
+        "- Ceremony arrangements",
+      ].join("\n"),
+    }),
+    artifact({
+      title: "Older reply to Chloe's Florals",
+      kind: "email_draft",
+      createdAt: 1,
+      bodyText: [
+        "Recipient: hello@chloes.example",
+        "Subject: Floral quote",
+        "",
+        "## Draft",
+        "",
+        "Thanks Chloe, this was the older wording.",
+      ].join("\n"),
+    }),
+    artifact({
+      title: "Internal florist planning note",
+      kind: "email_draft",
+      createdAt: 4,
+      bodyText: [
+        "Recipient: planner@example.test",
+        "Subject: Internal planning note",
+        "",
+        "## Draft",
+        "",
+        "Ask Chloe's Florals about the quote after we compare backups.",
+      ].join("\n"),
+    }),
+    artifact({
+      title: "Latest reply to Chloe's Florals",
+      kind: "email_draft",
+      createdAt: 3,
+      bodyText: [
+        "Recipient: hello@chloes.example",
+        "Subject: Floral quote",
+        "",
+        "## Draft",
+        "",
+        "Thanks Chloe, latest wording says we would like to proceed.",
+      ].join("\n"),
+    }),
+  ];
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,
-    artifacts: [
-      artifact({
-        title: "Outdoor venue research",
-        kind: "research",
-        createdAt: 1,
-        bodyText: "Outdoor garden ceremony with harbour photos. Venue details are still missing a clear wet-weather fallback.",
-      }),
-    ],
-    taskItems: [{
-      id: "task:confirm-backup",
-      title: "Confirm wet-weather backup with venue",
-      kind: "vendor_follow_up",
-      dueLabel: "Before deposit",
-      priority: "high",
-    }],
-    decisionRecords: [{
-      id: "wedding_decision:venue:harbour-hall",
-      artifactId: "artifact:venue-shortlist",
-      artifactTitle: "Venue shortlist",
-      artifactKind: "vendor_table",
-      selectedOptionId: "row-1",
-      selectedOptionLabel: "Harbour Hall",
-      selectedOptionDetail: "Selected waterfront venue.",
-      selectedOptionCells: ["Harbour Hall", "Sydney"],
-      createdAt: "2026-09-12T00:00:00.000Z",
-      source: "local_selection",
-      metadataLabels: [],
-    }],
-    projectionStorage: memoryStorage(),
+    artifacts: quoteArtifacts,
   });
 
-  const weatherLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:weather_backup");
-  assert.ok(weatherLoop);
-  assert.match(weatherLoop.statusLabel, /backup/i);
-  assert.ok(weatherLoop.evidenceLabels.some((label) => /weather-exposed/i.test(label)));
-  assert.ok(weatherLoop.evidenceLabels.some((label) => /Harbour Hall/i.test(label)));
-  assert.match(weatherLoop.detailLabel, /selected planning path/i);
-  assert.equal(weatherLoop.action.kind, "open_tasks");
-  assert.equal(weatherLoop.action.metadata?.second_order_loop, "weather_backup");
-  assert.equal(weatherLoop.suggestedTask, null);
-});
+  assert.equal(state.vendorQuoteReplyFlows.length, 1);
+  const flow = state.vendorQuoteReplyFlows[0];
+  assert.equal(flow?.quote.vendorName, "Chloe's Florals");
+  assert.equal(flow?.recipient, "hello@chloes.example");
+  assert.equal(flow?.subject, "Floral quote");
+  assert.equal(flow?.stage, "draft_ready");
+  assert.equal(flow?.semanticObject.kind, "wedding_approval_required");
+  assert.match(flow?.draftBody ?? "", /latest wording/);
+  assert.equal(flow?.draftMessageId, "artifact:latest-reply-to-chloe-s-florals");
 
-test("buildWeddingResponseWorkspaceViewState turns missing weather backup loop into a task projection", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
+  const localReceiptOnly = buildWeddingResponseWorkspaceViewState({
     metadata,
-    artifacts: [
-      artifact({
-        title: "Outdoor venue research",
-        kind: "research",
-        createdAt: 1,
-        bodyText: "Outdoor garden ceremony beside the harbour. The current plan does not name an indoor option.",
-      }),
-    ],
-    decisionRecords: [{
-      id: "wedding_decision:venue:harbour-hall",
-      artifactId: "artifact:venue-shortlist",
-      artifactTitle: "Venue shortlist",
-      artifactKind: "vendor_table",
-      selectedOptionId: "row-1",
-      selectedOptionLabel: "Harbour Hall",
-      selectedOptionDetail: "Selected waterfront venue.",
-      selectedOptionCells: ["Harbour Hall", "Sydney"],
-      createdAt: "2026-09-12T00:00:00.000Z",
-      source: "local_selection",
-      metadataLabels: [],
+    artifacts: quoteArtifacts,
+    approvalReceipts: [{
+      id: "receipt:local-only",
+      requestId: flow?.approvalRequest.id ?? "",
+      actionKind: "send_email",
+      title: "Send reply to Chloe's Florals",
+      status: "executed",
+      createdAt: "2026-09-27T01:00:07.000Z",
+      disclosureLines: [],
+      riskLabels: [],
+      blockedReason: null,
+      blockKind: null,
+      externalId: null,
+      executionMode: "provider_executor",
+      providerCapability: "email",
+      requiredProvider: "Gmail or email provider",
+      providerCredentialStatus: "connected",
+      providerExecutorStatus: "available",
+      providerExecutorConnected: true,
+      providerSetupView: "email",
+      externalProviderRequired: true,
+      artifactIds: [],
+      scheduleItemIds: [],
+      taskItemIds: [],
     }],
-    projectionStorage: memoryStorage(),
   });
 
-  const weatherLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:weather_backup");
-  assert.ok(weatherLoop?.suggestedTask);
-  assert.equal(weatherLoop.suggestedTask.kind, "vendor_follow_up");
-  assert.match(weatherLoop.suggestedTask.title, /Harbour Hall/);
-  assert.match(weatherLoop.suggestedTask.notes ?? "", /selected planning path/i);
-  const taskMetadata = weatherLoop.suggestedTask.metadata as Record<string, unknown>;
-  assert.equal(taskMetadata.second_order_task, true);
-  assert.equal(taskMetadata.second_order_loop, "weather_backup");
-  assert.ok(Array.isArray(taskMetadata.second_order_evidence_labels));
-  assert.equal((taskMetadata.selected_decision_scope as Record<string, unknown>).selected_option_label, "Harbour Hall");
-  const taskGroup = state.projectionQueue?.groups.find((group) => group.kind === "task");
-  assert.equal(
-    taskGroup?.items.some((item) =>
-      item.status === "pending"
-      && item.title === weatherLoop.suggestedTask?.title
-      && item.sourceId === weatherLoop.suggestedTask?.id),
-    true,
-  );
-  assert.equal(state.projectionQueue?.dispatchPayload?.sendInputs.some((input) => input.type === "task"), true);
-});
+  assert.equal(localReceiptOnly.vendorQuoteReplyFlows[0]?.stage, "blocked");
+  assert.match(localReceiptOnly.vendorQuoteReplyFlows[0]?.failureMessage ?? "", /missing a provider receipt/i);
 
-test("buildWeddingResponseWorkspaceViewState redacts imported artifact titles in second-order task metadata", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
+  const providerReceipt = buildWeddingResponseWorkspaceViewState({
     metadata,
-    artifacts: [
-      artifact({
-        title: "Outdoor venue research",
-        kind: "research",
-        createdAt: 1,
-        bodyText: "Outdoor garden ceremony beside the harbour. The current plan does not name an indoor option.",
-      }),
-    ],
-    decisionRecords: [{
-      id: "wedding_decision:imported:harbour-hall",
-      artifactId: "wedding_import:vendor_table:workspace:venues-xlsx",
-      artifactTitle: "Imported XLSX: venues.xlsx",
-      artifactKind: "vendor_table",
-      selectedOptionId: "row-1",
-      selectedOptionLabel: "Harbour Hall",
-      selectedOptionDetail: "Selected waterfront venue.",
-      selectedOptionCells: ["Harbour Hall", "Sydney"],
-      sourceLabels: ["source: venues.xlsx"],
-      createdAt: "2026-09-12T00:00:00.000Z",
-      source: "local_selection",
-      metadataLabels: [],
+    artifacts: quoteArtifacts,
+    approvalReceipts: [{
+      id: "receipt:gmail",
+      requestId: flow?.approvalRequest.id ?? "",
+      actionKind: "send_email",
+      title: "Send reply to Chloe's Florals",
+      status: "executed",
+      createdAt: "2026-09-27T01:00:07.000Z",
+      disclosureLines: [],
+      riskLabels: [],
+      blockedReason: null,
+      blockKind: null,
+      externalId: "gmail-message-123",
+      externalDeliveryPerformed: true,
+      executionMode: "provider_executor",
+      providerCapability: "email",
+      requiredProvider: "Gmail or email provider",
+      providerCredentialStatus: "connected",
+      providerExecutorStatus: "available",
+      providerExecutorConnected: true,
+      providerSetupView: "email",
+      externalProviderRequired: true,
+      artifactIds: [],
+      scheduleItemIds: [],
+      taskItemIds: [],
     }],
-    projectionStorage: memoryStorage(),
   });
 
-  const weatherLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:weather_backup");
-  const taskMetadata = weatherLoop?.suggestedTask?.metadata as Record<string, unknown>;
-  const decisionScope = taskMetadata.selected_decision_scope as Record<string, unknown>;
+  assert.equal(providerReceipt.vendorQuoteReplyFlows[0]?.stage, "sent");
+  assert.equal(providerReceipt.vendorQuoteReplyFlows[0]?.sentReceiptId, "gmail-message-123");
+  assert.equal(providerReceipt.activeVendorQuoteReplyFlows.length, 0);
+  assert.equal(providerReceipt.vendorQuoteReplyLogFlows.length, 1);
+  assert.equal(providerReceipt.vendorQuoteReplyLogFlows[0]?.sentReceiptId, "gmail-message-123");
 
-  assert.equal(decisionScope.artifact_title, "Imported private planning file");
-  assert.equal(decisionScope.selected_option_label, "Harbour Hall");
-  assert.equal(JSON.stringify(decisionScope).includes("venues.xlsx"), false);
+  const providerMessageOnlyReceipt = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    artifacts: quoteArtifacts,
+    approvalReceipts: [{
+      id: "receipt:gmail-provider-message",
+      requestId: flow?.approvalRequest.id ?? "",
+      actionKind: "send_email",
+      title: "Send reply to Chloe's Florals",
+      status: "executed",
+      createdAt: "2026-09-27T01:00:07.000Z",
+      disclosureLines: [],
+      riskLabels: [],
+      blockedReason: null,
+      blockKind: null,
+      externalId: null,
+      providerMessageId: "gmail-message-from-provider",
+      clientMessageId: "local-message-from-provider",
+      externalDeliveryPerformed: true,
+      deliverySubject: "Floral quote",
+      deliveryThreadId: flow?.threadId ?? null,
+      deliveryInReplyTo: "<quote-message@example.com>",
+      deliveryReferences: ["<quote-message@example.com>", "afp-quote-message-1"],
+      deliveryRecipients: ["hello@chloes.example"],
+      executionMode: "provider_executor",
+      providerCapability: "email",
+      requiredProvider: "Gmail or email provider",
+      providerCredentialStatus: "connected",
+      providerExecutorStatus: "available",
+      providerExecutorConnected: true,
+      providerSetupView: "email",
+      externalProviderRequired: true,
+      artifactIds: [],
+      scheduleItemIds: [],
+      taskItemIds: [],
+    }],
+  });
+
+  const restoredFlow = providerMessageOnlyReceipt.vendorQuoteReplyFlows[0];
+  assert.equal(restoredFlow?.stage, "sent");
+  assert.equal(restoredFlow?.sentReceiptId, "gmail-message-from-provider");
+  assert.equal(restoredFlow?.approvalRequest.delivery?.references.includes(restoredFlow.quoteMessageId ?? ""), true);
+
+  const unprovenProviderReceipt = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    artifacts: quoteArtifacts,
+    approvalReceipts: [{
+      id: "receipt:gmail-unproven-provider-message",
+      requestId: flow?.approvalRequest.id ?? "",
+      actionKind: "send_email",
+      title: "Send reply to Chloe's Florals",
+      status: "executed",
+      createdAt: "2026-09-27T01:00:07.000Z",
+      disclosureLines: [],
+      riskLabels: [],
+      blockedReason: null,
+      blockKind: null,
+      externalId: "gmail-unproven-message",
+      providerMessageId: "gmail-unproven-message",
+      deliverySubject: "Floral quote",
+      deliveryThreadId: flow?.threadId ?? null,
+      deliveryRecipients: ["hello@chloes.example"],
+      executionMode: "provider_executor",
+      providerCapability: "email",
+      providerResultOk: true,
+      externalDeliveryPerformed: false,
+      missingDurableProviderReceipt: false,
+      requiredProvider: "Gmail or email provider",
+      providerCredentialStatus: "connected",
+      providerExecutorStatus: "available",
+      providerExecutorConnected: true,
+      providerSetupView: "email",
+      externalProviderRequired: true,
+      artifactIds: [],
+      scheduleItemIds: [],
+      taskItemIds: [],
+    }],
+  });
+
+  const unprovenFlow = unprovenProviderReceipt.vendorQuoteReplyFlows[0];
+  assert.equal(unprovenFlow?.stage, "blocked");
+  assert.equal(unprovenFlow?.sentReceiptId, null);
+  assert.equal(unprovenFlow?.execution?.status, "blocked");
+  assert.equal(unprovenFlow?.execution?.canRetry, true);
+  assert.equal(unprovenFlow?.execution?.receipt.metadata.external_delivery_performed, false);
+  assert.match(unprovenFlow?.failureMessage ?? "", /delivery did not complete/i);
+
+  const threadMatchedReceipt = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    artifacts: quoteArtifacts,
+    approvalReceipts: [{
+      id: "receipt:gmail-thread-fallback",
+      requestId: "legacy-request-id-before-thread-stabilized",
+      actionKind: "send_email",
+      title: "Send reply to Chloe's Florals",
+      status: "executed",
+      createdAt: "2026-09-27T01:00:07.000Z",
+      disclosureLines: [],
+      riskLabels: [],
+      blockedReason: null,
+      blockKind: null,
+      externalId: null,
+      providerMessageId: "gmail-thread-fallback-message",
+      externalDeliveryPerformed: true,
+      deliveryThreadId: flow?.threadId ?? null,
+      deliverySubject: "Floral quote",
+      executionMode: "provider_executor",
+      providerCapability: "email",
+      requiredProvider: "Gmail or email provider",
+      providerCredentialStatus: "connected",
+      providerExecutorStatus: "available",
+      providerExecutorConnected: true,
+      providerSetupView: "email",
+      externalProviderRequired: true,
+      artifactIds: [],
+      scheduleItemIds: [],
+      taskItemIds: [],
+    }],
+  });
+
+  assert.equal(threadMatchedReceipt.vendorQuoteReplyFlows[0]?.stage, "sent");
+  assert.equal(threadMatchedReceipt.vendorQuoteReplyFlows[0]?.sentReceiptId, "gmail-thread-fallback-message");
+
+  const unrelatedThreadReceipt = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    artifacts: quoteArtifacts,
+    approvalReceipts: [{
+      id: "receipt:wrong-thread",
+      requestId: "legacy-request-id-before-thread-stabilized",
+      actionKind: "send_email",
+      title: "Send reply to another vendor",
+      status: "executed",
+      createdAt: "2026-09-27T01:00:07.000Z",
+      disclosureLines: [],
+      riskLabels: [],
+      blockedReason: null,
+      blockKind: null,
+      externalId: "gmail-wrong-thread",
+      deliveryThreadId: "wedding_vendor_quote:workspace-1:other-vendor:floral-quote",
+      executionMode: "provider_executor",
+      providerCapability: "email",
+      requiredProvider: "Gmail or email provider",
+      providerCredentialStatus: "connected",
+      providerExecutorStatus: "available",
+      providerExecutorConnected: true,
+      providerSetupView: "email",
+      externalProviderRequired: true,
+      artifactIds: [],
+      scheduleItemIds: [],
+      taskItemIds: [],
+    }, {
+      id: "receipt:wrong-action",
+      requestId: "legacy-request-id-before-thread-stabilized",
+      actionKind: "publish_registry",
+      title: "Publish registry",
+      status: "executed",
+      createdAt: "2026-09-27T01:00:07.000Z",
+      disclosureLines: [],
+      riskLabels: [],
+      blockedReason: null,
+      blockKind: null,
+      externalId: "registry-published",
+      deliveryThreadId: flow?.threadId ?? null,
+      executionMode: "provider_executor",
+      providerCapability: "registry",
+      requiredProvider: "Registry provider",
+      providerCredentialStatus: "connected",
+      providerExecutorStatus: "available",
+      providerExecutorConnected: true,
+      providerSetupView: "connected_apps",
+      externalProviderRequired: true,
+      artifactIds: [],
+      scheduleItemIds: [],
+      taskItemIds: [],
+    }],
+  });
+
+  assert.equal(unrelatedThreadReceipt.vendorQuoteReplyFlows[0]?.stage, "draft_ready");
+  assert.equal(unrelatedThreadReceipt.vendorQuoteReplyFlows[0]?.sentReceiptId, null);
 });
 
-test("buildWeddingResponseWorkspaceViewState redacts imported decision scopes across reusable surfaces", () => {
-  const importedArtifactId = "wedding_import:vendor_table:workspace:venues-xlsx";
+test("buildWeddingResponseWorkspaceViewState creates contextual vendor quote reply drafts", () => {
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,
-    activeArtifactId: importedArtifactId,
     artifacts: [
       artifact({
-        id: importedArtifactId,
-        title: "Imported private planning file",
+        title: "Harbour blooms quote",
         kind: "vendor_table",
-        createdAt: 1,
-        metadata: {
-          ...metadata,
-          approval_state: "pending_user_approval",
-          supertags: ["wedding_import", "wedding_import:spreadsheet"],
-        },
-        sourceLabels: ["source: venues.xlsx", "original upload saved"],
+        createdAt: 2,
         bodyText: [
-          "# Imported private planning file",
+          "# Harbour Blooms quote",
           "",
-          "| Name | Location |",
-          "| --- | --- |",
-          "| Harbour Hall | Sydney |",
+          "Vendor: Harbour Blooms",
+          "Quote amount: AUD $1,450",
+          "Budget delta: $150 under budget",
+          "Valid until: 2026-11-01",
+          "",
+          "## Inclusions",
+          "",
+          "- Ceremony florals",
+          "- Reception table bud vases",
         ].join("\n"),
       }),
     ],
-    decisionRecords: [{
-      id: "wedding_decision:imported:harbour-hall",
-      artifactId: importedArtifactId,
-      artifactTitle: "Imported XLSX: venues.xlsx",
-      artifactKind: "vendor_table",
-      selectedOptionId: "row-1",
-      selectedOptionLabel: "Harbour Hall",
-      selectedOptionDetail: "Selected waterfront venue.",
-      selectedOptionCells: ["Harbour Hall", "Sydney"],
-      sourceLabels: ["source: venues.xlsx", "original upload saved"],
-      sourceUrls: [
-        "https://storage.example.test/uploads/venues.xlsx?token=private",
-        "https://example.com/venue",
-      ],
-      sourceProviderLabels: ["manual_review"],
-      createdAt: "2026-09-12T00:00:00.000Z",
-      source: "local_selection",
-      metadataLabels: ["source: venues.xlsx", "needs follow-up"],
-    }],
   });
 
-  const cardText = JSON.stringify(state.decisionRecordCards);
-  assert.match(cardText, /Imported private planning file/);
-  assert.match(cardText, /needs follow-up/);
-  assert.equal(cardText.includes("venues.xlsx"), false);
-  assert.equal(cardText.includes("original upload saved"), false);
-
-  const continueAction = state.sidebarActions.find((action) => action.kind === "continue_chat");
-  const scopes = continueAction?.metadata?.decision_scopes as Array<Record<string, unknown>> | undefined;
-  assert.equal(scopes?.[0]?.artifact_title, "Imported private planning file");
-  assert.deepEqual(scopes?.[0]?.source_labels, ["Imported private planning file"]);
-  assert.deepEqual(scopes?.[0]?.source_urls, ["https://example.com/venue"]);
-  assert.equal(JSON.stringify(scopes).includes("venues.xlsx"), false);
-  assert.equal(JSON.stringify(scopes).includes("storage.example.test"), false);
-  assert.equal(JSON.stringify(scopes).includes("token=private"), false);
-
-  const approvalLines = state.activePreview?.approvalRequest?.disclosureLines ?? [];
-  assert.ok(approvalLines.some((line) => /Selected choice: Harbour Hall from Imported private planning file/i.test(line)));
-  assert.equal(JSON.stringify(approvalLines).includes("venues.xlsx"), false);
-
-  assert.match(state.bundleExportPayload.content, /Harbour Hall from Imported private planning file/);
-  assert.match(state.bundleExportPayload.content, /sources: Imported private planning file/);
-  assert.doesNotMatch(state.bundleExportPayload.content, /venues\.xlsx/);
-  assert.doesNotMatch(state.bundleExportPayload.content, /storage\.example\.test/);
-  assert.doesNotMatch(state.bundleExportPayload.content, /token=private/);
-  assert.doesNotMatch(state.bundleExportPayload.content, /original upload saved/);
+  const flow = state.vendorQuoteReplyFlows[0];
+  assert.ok(flow);
+  assert.match(flow.draftBody, /AUD \$1,450/);
+  assert.match(flow.draftBody, /Ceremony florals/);
+  assert.match(flow.draftBody, /\$150 under budget/);
+  assert.match(flow.draftBody, /hold the date provisionally/i);
+  assert.match(flow.draftBody, /deposit amount, payment milestones, cancellation terms/i);
+  assert.match(flow.draftBody, /2026-11-01/);
+  assert.match(flow.recommendationRationale, /Harbour Blooms/);
+  assert.match(flow.recommendationRationale, /provisional hold/i);
 });
 
-test("buildWeddingResponseWorkspaceViewState suppresses weather backup suggestions from loop metadata", () => {
+test("buildWeddingResponseWorkspaceViewState asks over-budget quote vendors for trade-offs", () => {
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,
     artifacts: [
       artifact({
-        title: "Outdoor venue research",
-        kind: "research",
-        createdAt: 1,
-        bodyText: "Outdoor garden ceremony beside the harbour with no clear indoor fallback named.",
-      }),
-    ],
-    taskItems: [{
-      id: "task:persisted-second-order-weather",
-      title: "Loop closure task",
-      kind: "other",
-      dueLabel: "Before deposit",
-      priority: "high",
-      metadata: {
-        ...metadata,
-        second_order_loop: "weather_backup",
-      },
-    }],
-    projectionStorage: memoryStorage(),
-  });
-
-  const weatherLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:weather_backup");
-  assert.ok(weatherLoop);
-  assert.equal(weatherLoop.suggestedTask, null);
-  assert.ok(weatherLoop.evidenceLabels.includes("1 backup task"));
-});
-
-test("buildWeddingResponseWorkspaceViewState exposes email contact closure loops", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [
-      artifact({
-        title: "Venue follow-up email",
-        kind: "email_draft",
-        createdAt: 1,
-        metadata: { ...metadata, approval_state: "pending_user_approval" },
-        bodyText: "To: venue@example.com\nSubject: Availability\n\nPlease confirm availability and backup options.",
-      }),
-    ],
-    decisionRecords: [{
-      id: "wedding_decision:venue:harbour-hall",
-      artifactId: "artifact:venue-shortlist",
-      artifactTitle: "Venue shortlist",
-      artifactKind: "vendor_table",
-      selectedOptionId: "row-1",
-      selectedOptionLabel: "Harbour Hall",
-      selectedOptionDetail: "Selected waterfront venue.",
-      selectedOptionCells: ["Harbour Hall", "Sydney"],
-      createdAt: "2026-09-12T00:00:00.000Z",
-      source: "local_selection",
-      metadataLabels: [],
-    }],
-  });
-
-  const contactLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:contact_follow_up");
-  assert.ok(contactLoop);
-  assert.equal(contactLoop.statusLabel, "Drafts not closed");
-  assert.ok(contactLoop.evidenceLabels.includes("1 email draft"));
-  assert.ok(contactLoop.evidenceLabels.some((label) => /Harbour Hall/i.test(label)));
-  assert.match(contactLoop.nextActionLabel, /selected option/i);
-  assert.equal(contactLoop.action.kind, "open_tasks");
-  assert.equal(contactLoop.action.enabled, false);
-  assert.match(contactLoop.action.reason ?? "", /Create a follow-up task/i);
-  assert.ok(contactLoop.suggestedTask);
-  assert.match(contactLoop.suggestedTask.title, /Harbour Hall/);
-  assert.match(contactLoop.suggestedTask.notes ?? "", /response deadline/i);
-  const taskGroup = state.projectionQueue?.groups.find((group) => group.kind === "task");
-  assert.ok((taskGroup?.pendingCount ?? 0) >= 1);
-  assert.ok(taskGroup?.items.some((item) => /Track response follow-up for Harbour Hall/.test(item.title)));
-  assert.equal(state.projectionQueue?.dispatchPayload?.sendInputs.some((input) => input.type === "task"), true);
-});
-
-test("buildWeddingResponseWorkspaceViewState surfaces outreach escalation stage in contact loop", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [
-      artifact({
-        title: "Venue outreach escalation",
-        kind: "email_draft",
-        createdAt: 1,
-        bodyText: "No reply from Venue X after 7 days. Options: follow up again, move on, or call.",
-      }),
-    ],
-    taskItems: [{
-      id: "task:venue-x-escalation",
-      title: "Decide next outreach step for Venue X",
-      kind: "vendor_follow_up",
-      priority: "high",
-      metadata: {
-        ...metadata,
-        second_order_loop: "contact_follow_up",
-        outreach_escalation_stage: "escalate_to_user",
-        vendor_label: "Venue X",
-      },
-    }],
-    projectionStorage: memoryStorage(),
-  });
-
-  const contactLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:contact_follow_up");
-  assert.ok(contactLoop);
-  assert.equal(contactLoop.statusLabel, "Escalation needs user choice");
-  assert.ok(contactLoop.evidenceLabels.includes("day 7 escalation"));
-  assert.match(contactLoop.detailLabel, /No reply after 7 days/i);
-  assert.match(contactLoop.nextActionLabel, /final follow-up, move on/i);
-  assert.equal(contactLoop.suggestedTask, null);
-});
-
-test("buildWeddingResponseWorkspaceViewState projects editable-vendor contact follow-ups into workspace tasks", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    nowIso: "2026-09-14T00:00:00.000Z",
-    weddingVendors: [{
-      vendorId: "vendor:photo-team",
-      vendorName: "Photo Team",
-      category: "Photographer",
-      sourceLabel: "Editable wedding vendor directory",
-      userContact: {
-        contactMethod: "email",
-        lastContactAt: "2026-09-09T00:00:00.000Z",
-        followUpDueAt: "2026-09-14T00:00:00.000Z",
-        receiptRef: "email:photo-team-1",
-        threadId: "thread:photo-team",
-      },
-    }],
-  });
-
-  const taskGroup = state.projectionQueue?.groups.find((group) => group.kind === "task");
-  const task = taskGroup?.items.find((item) => /Photo Team/i.test(item.title));
-  const sendInput = state.projectionQueue?.dispatchPayload?.sendInputs.find((input) =>
-    input.type === "task" && /Photo Team/i.test(String(input.content.title ?? "")),
-  );
-
-  assert.ok(task);
-  assert.equal(sendInput?.metadata.vendor_id, "vendor:photo-team");
-  assert.equal(sendInput?.metadata.vendor_contact_receipt_ref, "email:photo-team-1");
-  assert.equal((sendInput?.content as Record<string, unknown> | undefined)?.vendor_contact_thread_id, "thread:photo-team");
-});
-
-test("buildWeddingResponseWorkspaceViewState exposes editable-vendor contact cards", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    nowIso: "2026-09-14T00:00:00.000Z",
-    weddingVendors: [
-      {
-        vendorId: "vendor:waiting-venue",
-        vendorName: "Waiting Venue",
-        category: "Venue",
-        userContact: {
-          contactMethod: "agent_email_draft",
-          lastContactAt: "2026-09-13T00:00:00.000Z",
-          followUpDueAt: "2026-09-18T00:00:00.000Z",
-          threadId: "thread:waiting",
-        },
-      },
-      {
-        vendorId: "vendor:due-caterer",
-        vendorName: "Due Caterer",
-        category: "Caterer",
-        userContact: {
-          contactMethod: "personal_email",
-          lastContactAt: "2026-09-09T00:00:00.000Z",
-          followUpDueAt: "2026-09-14T00:00:00.000Z",
-          receiptRef: "mail:due-caterer",
-        },
-      },
-      {
-        vendorId: "vendor:closed-band",
-        vendorName: "Closed Band",
-        category: "Band",
-        userContact: {
-          contactMethod: "email",
-          lastContactAt: "2026-09-08T00:00:00.000Z",
-          responseReceivedAt: "2026-09-10T00:00:00.000Z",
-        },
-      },
-    ],
-  });
-
-  assert.deepEqual(state.vendorContactCards.map((card) => card.vendorName), ["Due Caterer", "Waiting Venue", "Closed Band"]);
-  assert.equal(state.vendorContactCards[0]?.statusLabel, "Second attempt due");
-  assert.equal(state.vendorContactCards[0]?.tone, "due");
-  assert.equal(state.vendorContactCards[0]?.nextActionLabel, "Send one follow-up");
-  assert.equal(state.vendorContactCards[0]?.primaryActionLabel, "Review and approve follow-up");
-  assert.equal(state.vendorContactCards[0]?.lastContactLabel, "2026-09-09");
-  assert.equal(state.vendorContactCards[0]?.followUpDueLabel, "2026-09-14");
-  assert.ok(state.vendorContactCards[0]?.metadataLabels.includes("personal email"));
-  assert.equal(state.vendorContactCards[1]?.statusLabel, "Waiting for reply");
-  assert.equal(state.vendorContactCards[1]?.tone, "waiting");
-  assert.equal(state.vendorContactCards[1]?.actionMode, "waiting");
-  assert.equal(state.vendorContactCards[1]?.primaryActionLabel, "Open follow-up task");
-  assert.equal(state.vendorContactCards[2]?.statusLabel, "Reply received");
-  assert.equal(state.vendorContactCards[2]?.tone, "closed");
-  assert.equal(state.vendorContactCards[2]?.actionMode, "reply_recorded");
-  assert.equal(state.vendorContactCards[2]?.primaryActionLabel, "View response");
-  assert.equal(state.vendorContactCards[2]?.replyLabel, "2026-09-10");
-  assert.match(state.vendorContactCards[2]?.detailLabel ?? "", /Continue from the response/i);
-});
-
-test("buildWeddingResponseWorkspaceViewState turns commitment timing gaps into task projections", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [
-      artifact({
-        title: "Venue contract notes",
-        kind: "research",
-        createdAt: 1,
-        bodyText: "Harbour Hall requires a deposit before contract signing. Confirm cancellation terms and celebrant/NOIM timing before paying.",
-      }),
-    ],
-    decisionRecords: [{
-      id: "wedding_decision:venue:harbour-hall",
-      artifactId: "artifact:venue-shortlist",
-      artifactTitle: "Venue shortlist",
-      artifactKind: "vendor_table",
-      selectedOptionId: "row-1",
-      selectedOptionLabel: "Harbour Hall",
-      selectedOptionDetail: "Selected waterfront venue.",
-      selectedOptionCells: ["Harbour Hall", "Sydney"],
-      createdAt: "2026-09-12T00:00:00.000Z",
-      source: "local_selection",
-      metadataLabels: [],
-    }],
-    projectionStorage: memoryStorage(),
-  });
-
-  const commitmentLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:commitment_timing");
-  assert.ok(commitmentLoop?.suggestedTask);
-  assert.equal(commitmentLoop.statusLabel, "Commitment timing needs review");
-  assert.match(commitmentLoop.suggestedTask.title, /Harbour Hall/);
-  assert.equal(commitmentLoop.suggestedTask.kind, "legal");
-  assert.match(commitmentLoop.suggestedTask.notes ?? "", /NOIM\/celebrant requirements/i);
-  assert.ok(commitmentLoop.evidenceLabels.some((label) => /selected scope/i.test(label)));
-  const taskGroup = state.projectionQueue?.groups.find((group) => group.kind === "task");
-  assert.ok(taskGroup?.items.some((item) => /Verify legal, deposit, and contract timing/.test(item.title)));
-});
-
-test("buildWeddingResponseWorkspaceViewState suppresses commitment timing suggestions when task exists", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [
-      artifact({
-        title: "Payment and contract notes",
-        kind: "research",
-        createdAt: 1,
-        bodyText: "Deposit and cancellation terms need review before signing the venue contract.",
-      }),
-    ],
-    taskItems: [{
-      id: "task:contract-review",
-      title: "Review venue contract and deposit terms",
-      kind: "budget_review",
-      dueLabel: "Before signing",
-      priority: "high",
-    }],
-    projectionStorage: memoryStorage(),
-  });
-
-  const commitmentLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:commitment_timing");
-  assert.ok(commitmentLoop);
-  assert.equal(commitmentLoop.suggestedTask, null);
-  assert.equal(commitmentLoop.action.kind, "open_tasks");
-  assert.ok(commitmentLoop.evidenceLabels.includes("1 commitment task"));
-});
-
-test("buildWeddingResponseWorkspaceViewState turns guest logistics gaps into task projections", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [
-      artifact({
-        title: "Venue access notes",
-        kind: "map_collection",
-        createdAt: 1,
-        locationLabels: ["Sydney CBD"],
-        bodyText: "Guest transport, accommodation, parking, stairs, and wheelchair access still need checking before final venue decision.",
-      }),
-    ],
-    decisionRecords: [{
-      id: "wedding_decision:venue:harbour-hall",
-      artifactId: "artifact:venue-shortlist",
-      artifactTitle: "Venue shortlist",
-      artifactKind: "vendor_table",
-      selectedOptionId: "row-1",
-      selectedOptionLabel: "Harbour Hall",
-      selectedOptionDetail: "Selected waterfront venue.",
-      selectedOptionCells: ["Harbour Hall", "Sydney"],
-      createdAt: "2026-09-12T00:00:00.000Z",
-      source: "local_selection",
-      metadataLabels: [],
-    }],
-    projectionStorage: memoryStorage(),
-  });
-
-  const logisticsLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:guest_logistics");
-  assert.ok(logisticsLoop?.suggestedTask);
-  assert.equal(logisticsLoop.statusLabel, "Guest logistics needs check");
-  assert.match(logisticsLoop.suggestedTask.title, /Harbour Hall/);
-  assert.match(logisticsLoop.suggestedTask.notes ?? "", /transport, parking, accommodation, accessibility/i);
-  assert.ok(logisticsLoop.evidenceLabels.some((label) => /map\/location evidence/i.test(label)));
-  const taskGroup = state.projectionQueue?.groups.find((group) => group.kind === "task");
-  assert.ok(taskGroup?.items.some((item) => /Verify transport, access, and guest logistics/.test(item.title)));
-});
-
-test("buildWeddingResponseWorkspaceViewState suppresses guest logistics suggestions when task exists", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [
-      artifact({
-        title: "Venue logistics notes",
-        kind: "research",
-        createdAt: 1,
-        bodyText: "Guest transport and parking should be checked for the reception venue.",
-      }),
-    ],
-    taskItems: [{
-      id: "task:guest-logistics",
-      title: "Verify guest transport and accessibility",
-      kind: "research",
-      dueLabel: "Before final venue choice",
-      priority: "normal",
-    }],
-    projectionStorage: memoryStorage(),
-  });
-
-  const logisticsLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:guest_logistics");
-  assert.ok(logisticsLoop);
-  assert.equal(logisticsLoop.suggestedTask, null);
-  assert.equal(logisticsLoop.action.kind, "open_tasks");
-  assert.ok(logisticsLoop.evidenceLabels.includes("1 logistics task"));
-});
-
-test("buildWeddingResponseWorkspaceViewState turns budget drift gaps into task projections", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [
-      artifact({
-        title: "Venue budget sheet",
-        kind: "budget_sheet",
-        createdAt: 1,
-        bodyText: "Venue estimate is TBC. Minimum spend, overtime, GST, service fees, travel fee, and cancellation exclusions need confirmation.",
-      }),
-    ],
-    decisionRecords: [{
-      id: "wedding_decision:venue:harbour-hall",
-      artifactId: "artifact:venue-shortlist",
-      artifactTitle: "Venue shortlist",
-      artifactKind: "vendor_table",
-      selectedOptionId: "row-1",
-      selectedOptionLabel: "Harbour Hall",
-      selectedOptionDetail: "Selected waterfront venue.",
-      selectedOptionCells: ["Harbour Hall", "Sydney"],
-      createdAt: "2026-09-12T00:00:00.000Z",
-      source: "local_selection",
-      metadataLabels: [],
-    }],
-    projectionStorage: memoryStorage(),
-  });
-
-  const budgetLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:budget_drift");
-  assert.ok(budgetLoop?.suggestedTask);
-  assert.equal(budgetLoop.statusLabel, "Budget needs verification");
-  assert.match(budgetLoop.suggestedTask.title, /Harbour Hall/);
-  assert.equal(budgetLoop.suggestedTask.kind, "budget_review");
-  assert.match(budgetLoop.suggestedTask.notes ?? "", /minimum spend, overtime, tax\/GST, service fees/i);
-  assert.ok(budgetLoop.evidenceLabels.some((label) => /unknown or hidden-cost cue/i.test(label)));
-  const taskGroup = state.projectionQueue?.groups.find((group) => group.kind === "task");
-  assert.ok(taskGroup?.items.some((item) => /Verify unknown costs/.test(item.title)));
-});
-
-test("buildWeddingResponseWorkspaceViewState suppresses budget drift suggestions when task exists", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [
-      artifact({
-        title: "Vendor quote notes",
-        kind: "budget_sheet",
-        createdAt: 1,
-        bodyText: "Estimate excludes overtime, GST, travel fees, and cancellation terms.",
-      }),
-    ],
-    taskItems: [{
-      id: "task:budget-review",
-      title: "Review quote hidden costs and GST",
-      kind: "budget_review",
-      dueLabel: "Before vendor decision",
-      priority: "high",
-    }],
-    projectionStorage: memoryStorage(),
-  });
-
-  const budgetLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:budget_drift");
-  assert.ok(budgetLoop);
-  assert.equal(budgetLoop.suggestedTask, null);
-  assert.equal(budgetLoop.action.kind, "open_tasks");
-  assert.ok(budgetLoop.evidenceLabels.includes("1 budget task"));
-});
-
-test("buildWeddingResponseWorkspaceViewState suppresses loop suggestions from structured task metadata", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [
-      artifact({
-        title: "Venue planning notes",
-        kind: "budget_sheet",
-        createdAt: 1,
-        bodyText: "Deposit, cancellation terms, transport, parking, accessibility, TBC estimates, overtime, GST, and service fees still need review.",
-      }),
-      artifact({
-        title: "Venue follow-up draft",
-        kind: "email_draft",
+        title: "Harbour blooms premium quote",
+        kind: "vendor_table",
         createdAt: 2,
-        bodyText: "Please confirm details.",
+        bodyText: [
+          "# Harbour Blooms quote",
+          "",
+          "Vendor: Harbour Blooms",
+          "Quote amount: AUD $2,450",
+          "Budget delta: $450 over budget",
+          "Valid until: 2026-11-01",
+          "",
+          "## Inclusions",
+          "",
+          "- Ceremony florals",
+          "- Reception table bud vases",
+        ].join("\n"),
       }),
     ],
-    taskItems: [
-      {
-        id: "task:commitment-loop",
-        title: "Loop closure task",
-        kind: "other",
-        metadata: { ...metadata, second_order_loop: "commitment_timing" },
-      },
-      {
-        id: "task:logistics-loop",
-        title: "Loop closure task",
-        kind: "other",
-        metadata: { ...metadata, second_order_loop: "guest_logistics" },
-      },
-      {
-        id: "task:budget-loop",
-        title: "Loop closure task",
-        kind: "other",
-        metadata: { ...metadata, second_order_loop: "budget_drift" },
-      },
-      {
-        id: "task:contact-loop",
-        title: "Loop closure task",
-        kind: "other",
-        metadata: { ...metadata, second_order_loop: "contact_follow_up" },
-      },
-    ],
-    projectionStorage: memoryStorage(),
   });
 
-  for (const loopId of [
-    "second_order:commitment_timing",
-    "second_order:guest_logistics",
-    "second_order:budget_drift",
-    "second_order:contact_follow_up",
-  ]) {
-    const loop = state.secondOrderLoopCards.find((card) => card.id === loopId);
-    assert.ok(loop, loopId);
-    assert.equal(loop.suggestedTask, null, loopId);
-  }
+  const flow = state.vendorQuoteReplyFlows[0];
+  assert.ok(flow);
+  assert.match(flow.draftBody, /package adjustments/i);
+  assert.match(flow.draftBody, /reduce the total/i);
+  assert.match(flow.draftBody, /anything that is excluded/i);
+  assert.match(flow.recommendationRationale, /package adjustments before approval/i);
 });
 
 test("buildWeddingResponseWorkspaceViewState exposes Need-To-Know context cards", () => {
@@ -1021,14 +762,14 @@ test("buildWeddingResponseWorkspaceViewState exposes persisted approval receipt 
   assert.equal(state.providerHandoffAuditCard?.action.enabled, true);
   assert.equal(state.providerHandoffAuditCard?.action.label, "Open Connected Apps");
   assert.equal(state.approvalReceiptCards[0]?.statusLabel, "Blocked");
-  assert.equal(state.approvalReceiptCards[0]?.blockLabel, "provider missing");
-  assert.match(state.approvalReceiptCards[0]?.detailLabel ?? "", /No executor/i);
-  assert.ok(state.approvalReceiptCards[0]?.metadataLabels.includes("provider: email"));
+  assert.equal(state.approvalReceiptCards[0]?.blockLabel, "connected app missing");
+  assert.match(state.approvalReceiptCards[0]?.detailLabel ?? "", /No connected app/i);
+  assert.ok(state.approvalReceiptCards[0]?.metadataLabels.includes("app type: email"));
   assert.ok(state.approvalReceiptCards[0]?.metadataLabels.includes("Gmail or email provider"));
-  assert.ok(state.approvalReceiptCards[0]?.metadataLabels.includes("executor: missing"));
-  assert.ok(state.approvalReceiptCards[0]?.metadataLabels.includes("external handoff pending"));
+  assert.ok(state.approvalReceiptCards[0]?.metadataLabels.includes("app action: missing"));
+  assert.ok(state.approvalReceiptCards[0]?.metadataLabels.includes("connected app needed"));
   assert.ok(state.approvalReceiptCards[0]?.metadataLabels.includes("1 artifact link"));
-  assert.deepEqual(state.approvalReceiptCards[0]?.riskLabels, ["No executor is connected."]);
+  assert.deepEqual(state.approvalReceiptCards[0]?.riskLabels, ["No connected app is ready."]);
 });
 
 test("buildWeddingResponseWorkspaceViewState summarizes connected provider handoffs", () => {
@@ -1163,6 +904,192 @@ test("buildWeddingResponseWorkspaceViewState includes selected shortlist decisio
   assert.equal(state.projectionQueue?.dispatchPayload?.sendInputs.some((input) => input.type === "decision"), true);
 });
 
+test("buildWeddingResponseWorkspaceViewState projects selected top-three vendor comparison choices", async () => {
+  const readiness = buildWeddingVendorSearchReadinessState({
+    location: "Sydney",
+    vendorCategories: ["photographer"],
+    vendorPreferences: "documentary style and transparent pricing",
+    photographyScope: "day-of coverage and portraits",
+    liveSearchProviderReady: true,
+  });
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        {
+          title: "Harbour Studio",
+          url: "https://harbour-studio.example",
+          snippet: "Sydney documentary wedding photographer with transparent packages, portfolio, and date availability.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Budget Lens",
+          url: "https://budget-lens.example",
+          snippet: "Wedding photography rates and simple packages for Sydney couples.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Portrait Hall",
+          url: "https://portrait-hall.example",
+          snippet: "Editorial portraits and gallery reviews.",
+          provider: "Brave Search",
+        },
+      ],
+    }),
+  });
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "documentary style and transparent pricing",
+    location: "Sydney",
+    budgetComfort: "balanced budget",
+    vendorCategories: ["photographer"],
+  });
+  const comparisonArtifact = comparison.artifactInput;
+  assert.ok(comparisonArtifact);
+
+  const storage = memoryStorage();
+  setWeddingDecisionSelections(comparisonArtifact.id, [
+    "vendor_choice:harbour_studio:1",
+    "vendor_choice:budget_lens:2",
+  ], storage);
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    activeArtifactId: comparisonArtifact.id,
+    artifacts: [comparisonArtifact],
+    projectionStorage: storage,
+  });
+
+  const decisionGroup = state.projectionQueue?.groups.find((group) => group.kind === "decision");
+  const taskGroup = state.projectionQueue?.groups.find((group) => group.kind === "task");
+  const decisionInputs = state.projectionQueue?.dispatchPayload?.sendInputs.filter((input) => input.type === "decision") ?? [];
+
+  assert.equal(state.activePreview?.preview?.kind, "table");
+  assert.match(state.activePreview?.vendorComparisonHandoff?.recommendationLabel ?? "", /Harbour Studio/i);
+  assert.equal(state.activePreview?.vendorComparisonHandoff?.confidenceLabel, "Confidence: strong");
+  assert.ok(state.activePreview?.vendorComparisonHandoff?.whyLabels.some((label) => /source-backed choices/i.test(label)));
+  assert.equal(decisionGroup?.pendingCount, 2);
+  assert.deepEqual(decisionInputs.map((input) => input.metadata?.selected_option_label), ["Harbour Studio", "Budget Lens"]);
+  assert.deepEqual(decisionInputs[0]?.metadata?.source_provider_labels, ["Brave Search"]);
+  assert.deepEqual(decisionInputs[0]?.metadata?.source_counts_by_provider, { "Brave Search": 3 });
+  assert.ok(taskGroup?.items.some((item) =>
+    /approval-gated quote request for Harbour Studio/i.test(item.title)
+    && item.sendInput?.metadata?.approval_required_before_outreach === true
+    && item.sendInput?.metadata?.no_external_send_without_approval === true
+  ));
+  assert.ok(taskGroup?.items.some((item) =>
+    /approval-gated quote request for Budget Lens/i.test(item.title)
+    && item.sendInput?.metadata?.approval_required_before_outreach === true
+    && item.sendInput?.metadata?.no_external_send_without_approval === true
+  ));
+  assert.equal(taskGroup?.items.some((item) => /Portrait Hall/i.test(item.title)), false);
+  assert.equal(taskGroup?.items.some((item) => /Choose preferred vendors from the top-three comparison/i.test(item.title)), false);
+  assert.equal(taskGroup?.items.some((item) => /Prepare approval-gated vendor outreach and follow-up/i.test(item.title)), false);
+  assert.ok(state.personalOsProjection.rankedItems.some((item) =>
+    /Confirm selected wedding option: Harbour Studio/i.test(item.title)
+  ));
+  assert.equal(state.personalOsProjection.rankedItems.some((item) => /Portrait Hall/i.test(item.title)), false);
+});
+
+test("buildWeddingResponseWorkspaceViewState drops closed selected vendors from active follow-up queue", async () => {
+  const readiness = buildWeddingVendorSearchReadinessState({
+    location: "Sydney",
+    vendorCategories: ["photographer"],
+    vendorPreferences: "documentary style and transparent pricing",
+    photographyScope: "day-of coverage and portraits",
+    liveSearchProviderReady: true,
+  });
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        {
+          title: "Harbour Studio",
+          url: "https://harbour-studio.example",
+          snippet: "Sydney documentary wedding photographer with transparent packages.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Budget Lens",
+          url: "https://budget-lens.example",
+          snippet: "Wedding photography rates and simple packages for Sydney couples.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Portrait Hall",
+          url: "https://portrait-hall.example",
+          snippet: "Editorial portraits and gallery reviews.",
+          provider: "Brave Search",
+        },
+      ],
+    }),
+  });
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "documentary style and transparent pricing",
+    location: "Sydney",
+    budgetComfort: "balanced budget",
+    vendorCategories: ["photographer"],
+  });
+  const comparisonArtifact = comparison.artifactInput;
+  assert.ok(comparisonArtifact);
+
+  const storage = memoryStorage();
+  setWeddingDecisionSelections(comparisonArtifact.id, [
+    "vendor_choice:harbour_studio:1",
+    "vendor_choice:budget_lens:2",
+  ], storage);
+  const openState = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    activeArtifactId: comparisonArtifact.id,
+    artifacts: [comparisonArtifact],
+    projectionStorage: storage,
+  });
+  const budgetLens = openState.budgetTracking.lineItems.find((item) => item.vendorName === "Budget Lens");
+  assert.ok(budgetLens);
+  const closure = buildWeddingVendorPursuitClosureTaskItem({
+    lineItem: budgetLens,
+    metadata,
+    reason: "not_suitable",
+    note: "The style is less aligned than Harbour Studio.",
+    closedAt: "2026-09-28T00:00:00.000Z",
+  });
+
+  const closedState = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    activeArtifactId: comparisonArtifact.id,
+    artifacts: [comparisonArtifact],
+    projectionStorage: storage,
+    taskItems: [closure],
+  });
+  const taskGroup = closedState.projectionQueue?.groups.find((group) => group.kind === "task");
+
+  assert.ok(taskGroup?.items.some((item) => /approval-gated quote request for Harbour Studio/i.test(item.title)));
+  assert.equal(taskGroup?.items.some((item) => /Budget Lens/i.test(item.title)), false);
+  assert.equal(taskGroup?.items.some((item) => /Stopped pursuing Budget Lens/i.test(item.title)), false);
+  assert.equal(closedState.personalOsProjection.rankedItems.some((item) => /Budget Lens/i.test(item.title)), false);
+  assert.ok(closedState.vendorPursuitLogTaskItems.some((item) =>
+    /Stopped pursuing Budget Lens/i.test(item.title)
+    && record(item.metadata).vendor_outreach_pursuit_status === "not_pursuing"
+  ));
+  assert.equal(closedState.vendorPursuitLogCards.length, 1);
+  assert.equal(closedState.vendorPursuitLogCards[0]?.vendorLabel, "Budget Lens");
+  assert.equal(closedState.vendorPursuitLogCards[0]?.reasonLabel, "Not suitable");
+  assert.equal(closedState.vendorPursuitLogCards[0]?.closedAtLabel, "Closed 2026-09-28");
+  assert.equal(closedState.planningTaskItems.some((item) => /Stopped pursuing Budget Lens/i.test(item.title)), false);
+});
+
 test("buildWeddingResponseWorkspaceViewState projects committed preparation task alerts as calendar reminders", () => {
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,
@@ -1262,7 +1189,13 @@ test("buildWeddingResponseWorkspaceViewState sanitizes selected decision source 
       selectedOptionDetail: "Selected waterfront venue.",
       selectedOptionCells: ["Harbour Hall", "Venue", "Sydney"],
       sourceLabels: ["Mixed source packet"],
-      sourceUrls: ["javascript:alert(1)", "not-a-url", "https://example.com/venue"],
+      sourceUrls: [
+        "javascript:alert(1)",
+        "not-a-url",
+        "http://localhost:8787/venue",
+        "https://127.0.0.1/venue",
+        "https://example.com/venue",
+      ],
       sourceProviderLabels: ["manual_review"],
       createdAt: "2026-09-14T00:00:00.000Z",
       source: "local_selection",
@@ -1273,274 +1206,9 @@ test("buildWeddingResponseWorkspaceViewState sanitizes selected decision source 
   const scopes = continueAction?.metadata?.decision_scopes as Array<Record<string, unknown>> | undefined;
 
   assert.deepEqual(scopes?.[0]?.source_urls, ["https://example.com/venue"]);
-  assert.match(state.bundleExportPayload.content, /1 source URL/);
+  assert.match(state.bundleExportPayload.content, /1 source web link/);
   assert.doesNotMatch(state.bundleExportPayload.content, /javascript:alert/);
   assert.doesNotMatch(state.bundleExportPayload.content, /not-a-url/);
-});
-
-test("buildWeddingResponseWorkspaceViewState exposes guest operations tracking", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [{
-      id: "artifact:guests",
-      title: "Guest list",
-      kind: "guest_list",
-      createdAt: 1,
-      metadata,
-      bodyText: [
-        "| Name | RSVP | Email | Meal | Dietary | Accessibility |",
-        "| --- | --- | --- | --- | --- | --- |",
-        "| Alex | Yes | alex@example.test | Fish | Nut allergy | Wheelchair access |",
-        "| Blair | Pending |  |  | Vegan |  |",
-      ].join("\n"),
-    }],
-  });
-
-  assert.equal(state.guestTracking.guestFileCount, 1);
-  assert.equal(state.guestTracking.guestRowCount, 2);
-  assert.equal(state.guestTracking.attendingCount, 1);
-  assert.equal(state.guestTracking.pendingCount, 1);
-  assert.equal(state.guestTracking.dietaryCount, 2);
-  assert.equal(state.guestTracking.accessibilityCount, 1);
-  assert.ok(state.guestTracking.warningLabels.some((label) => /RSVP/i.test(label)));
-  assert.equal(state.boundaryState.activePolicyCount, 2);
-  assert.equal(state.boundaryState.guestCount, 2);
-  assert.ok(state.boundaryTopology.nodes.some((node) => node.kind === "boundary_policy"));
-  assert.ok(state.boundaryTopology.nodes.some((node) => node.kind === "guest" && node.label === "Alex"));
-  assert.ok(state.projectionQueue?.queue.pendingItems.some((item) => item.kind === "boundary" && /Guest changes/i.test(item.title)));
-  assert.ok(state.projectionQueue?.dispatchPayload?.sendInputs.some((input) => input.type === "ledger" && input.kind === "wedding_boundary_policy"));
-});
-
-test("buildWeddingResponseWorkspaceViewState counts saved boundary guests in guest tracking", () => {
-  const boundaryObjects = buildWeddingGuestBoundaryDraftObjects({
-    displayName: "Casey Morgan",
-    householdLabel: "Friends",
-    rsvpStatus: "Attending",
-    contactLabel: "casey@example.test",
-    mealPreference: "Vegetarian",
-    dietaryNote: "No shellfish",
-    accessibilityNote: "Step-free entry",
-  }, metadata, "2026-09-25T00:00:00.000Z");
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    boundaryObjects,
-  });
-
-  assert.equal(state.guestTracking.guestFileCount, 0);
-  assert.equal(state.guestTracking.guestRowCount, 1);
-  assert.equal(state.guestTracking.attendingCount, 1);
-  assert.equal(state.guestTracking.pendingCount, 0);
-  assert.equal(state.guestTracking.householdCount, 1);
-  assert.equal(state.guestTracking.dietaryCount, 1);
-  assert.equal(state.guestTracking.accessibilityCount, 1);
-  assert.equal(state.guestTracking.missingContactCount, 0);
-  assert.equal(state.guestTracking.missingMealCount, 0);
-  assert.ok(state.guestTracking.sourceLabels.includes("Saved guest records"));
-  assert.equal(state.seatingPlan.guestRowsConsidered, 1);
-  assert.equal(state.seatingPlan.unassignedAttendingCount, 1);
-  assert.equal(state.seatingPlan.suggestedTableCount, 1);
-  assert.equal(state.seatingPlan.accessibilityConstraintCount, 1);
-  assert.ok(state.seatingPlan.dietaryAccessibilityBrief.dietarySummaryLabels.some((label) => /shellfish/i.test(label)));
-  assert.ok(state.seatingPlan.actionItems.some((item) => /Assign 1 attending guest/i.test(item.title)));
-  assert.ok(state.planningTaskItems.some((item) => item.id === "wedding_seating_action:assign_tables"));
-  assert.ok(state.planningTaskItems.some((item) => item.id === "wedding_seating_action:brief_accessibility"));
-  assert.ok(state.projectionQueue?.dispatchPayload?.sendInputs.some((input) =>
-    input.type === "task"
-    && input.kind === "task"
-    && input.metadata?.seating_action_candidate_id === "wedding_seating_action:assign_tables",
-  ));
-  assert.ok(state.personalOsProjection.rankedItems.some((item) =>
-    item.id === "task:wedding_seating_action:assign_tables"
-    && item.sourceSurface === "tasks"
-    && item.evidenceLabels.includes("seating action"),
-  ));
-});
-
-test("buildWeddingResponseWorkspaceViewState exposes seating draft tracking", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [{
-      id: "artifact:guests",
-      title: "Guest list",
-      kind: "guest_list",
-      createdAt: 1,
-      metadata,
-      bodyText: [
-        "| Name | RSVP | Table | Household | Role | Seating note | Accessibility |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
-        "| Alex | Yes | Table 1 | Bride family | Parent | VIP table | Wheelchair access |",
-        "| Blair | Attending |  | Friends | Guest | Divorced - keep apart |  |",
-      ].join("\n"),
-    }],
-  });
-
-  assert.equal(state.seatingPlan.guestRowsConsidered, 2);
-  assert.equal(state.seatingPlan.assignedSeatCount, 1);
-  assert.equal(state.seatingPlan.unassignedAttendingCount, 1);
-  assert.equal(state.seatingPlan.householdGroupCount, 2);
-  assert.equal(state.seatingPlan.sensitiveConstraintCount, 1);
-  assert.equal(state.seatingPlan.accessibilityConstraintCount, 1);
-  assert.ok(state.seatingPlan.warningLabels.some((label) => /not assigned/i.test(label)));
-});
-
-test("buildWeddingResponseWorkspaceViewState applies saved seating constraints to the draft", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    artifacts: [{
-      id: "artifact:guests",
-      title: "Guest list",
-      kind: "guest_list",
-      createdAt: 1,
-      metadata,
-      bodyText: [
-        "| Name | RSVP | Household |",
-        "| --- | --- | --- |",
-        "| Mum | Yes | Family |",
-        "| Uncle David | Yes | Family |",
-      ].join("\n"),
-    }],
-    seatingConstraints: [{
-      id: "constraint:keep-apart",
-      kind: "keep_apart",
-      instruction: "Move Uncle David away from Mum.",
-      primaryPersonId: "uncle-david",
-      relatedPersonId: "mum",
-      confidence: "high",
-      statusLabel: "Uncle David and Mum will be kept apart in the next seating draft.",
-    }],
-  });
-  const mum = state.seatingPlan.optimizationPreview?.assignments.find((assignment) => assignment.personId === "mum");
-  const david = state.seatingPlan.optimizationPreview?.assignments.find((assignment) => assignment.personId === "uncle-david");
-
-  assert.ok(mum);
-  assert.ok(david);
-  assert.notEqual(mum.tableId, david.tableId);
-});
-
-test("buildWeddingResponseWorkspaceViewState shows a saved seating draft after refresh", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    seatingOptimizations: [{
-      assignments: [{
-        personId: "grandma-chen",
-        personLabel: "Grandma Chen",
-        tableId: "table-3",
-        tableLabel: "Table 3",
-        score: 14,
-        reasonLabels: ["Accessible table and quieter seating"],
-      }],
-      totalScore: 14,
-      hardViolations: [],
-      softSignals: [],
-      explanationLabels: ["Saved seating draft is ready to review."],
-      proactiveIssueLabels: [],
-      applyLabel: "Apply seating plan",
-      alternativeLabel: "Show alternatives",
-      savedAt: "2026-09-25T00:00:00.000Z",
-    }, {
-      assignments: [{
-        personId: "grandma-chen",
-        personLabel: "Grandma Chen",
-        tableId: "table-4",
-        tableLabel: "Table 4",
-        score: 12,
-        reasonLabels: ["Kept near family"],
-      }],
-      totalScore: 12,
-      hardViolations: [],
-      softSignals: [],
-      explanationLabels: ["Newer seating draft is ready."],
-      proactiveIssueLabels: [],
-      applyLabel: "Apply seating plan",
-      alternativeLabel: "Show alternatives",
-      savedAt: "2026-09-26T00:00:00.000Z",
-    }],
-  });
-
-  assert.equal(state.seatingPlan.optimizationPreview?.assignments[0]?.personLabel, "Grandma Chen");
-  assert.equal(state.seatingPlan.optimizationPreview?.assignments[0]?.tableLabel, "Table 4");
-  assert.equal(state.seatingPlan.optimizationPreview?.explanationLabels[0], "Newer seating draft is ready.");
-  assert.equal(state.seatingDraftCards.length, 2);
-  assert.equal(state.seatingDraftCards[0]?.title, "Current seating draft");
-  assert.equal(state.seatingDraftCards[0]?.isCurrent, true);
-  assert.equal(state.seatingDraftCards[1]?.statusLabel, "Saved");
-  assert.match(state.seatingDraftCards[1]?.detailLabel ?? "", /25 Sept 2026/);
-});
-
-test("buildWeddingResponseWorkspaceViewState hides archived seating drafts", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    seatingOptimizations: [{
-      assignments: [{
-        personId: "grandma-chen",
-        personLabel: "Grandma Chen",
-        tableId: "table-3",
-        tableLabel: "Table 3",
-        score: 14,
-        reasonLabels: ["Accessible table and quieter seating"],
-      }],
-      totalScore: 14,
-      hardViolations: [],
-      softSignals: [],
-      explanationLabels: ["Saved seating draft is ready to review."],
-      proactiveIssueLabels: [],
-      applyLabel: "Apply seating plan",
-      alternativeLabel: "Show alternatives",
-      savedAt: "2026-09-25T00:00:00.000Z",
-    }, {
-      assignments: [{
-        personId: "grandma-chen",
-        personLabel: "Grandma Chen",
-        tableId: "table-4",
-        tableLabel: "Table 4",
-        score: 12,
-        reasonLabels: ["Kept near family"],
-      }],
-      totalScore: 12,
-      hardViolations: [],
-      softSignals: [],
-      explanationLabels: ["Newer seating draft is ready."],
-      proactiveIssueLabels: [],
-      applyLabel: "Apply seating plan",
-      alternativeLabel: "Show alternatives",
-      savedAt: "2026-09-26T00:00:00.000Z",
-    }],
-    seatingDraftArchives: [{
-      id: "archive:old",
-      fingerprint: "grandma-chen:table-3",
-      statusLabel: "Saved seating draft hidden.",
-      reasonLabel: null,
-      createdAt: "2026-09-26T00:10:00.000Z",
-    }],
-  });
-
-  assert.equal(state.seatingDraftCards.length, 1);
-  assert.equal(state.seatingDraftCards[0]?.result.assignments[0]?.tableLabel, "Table 4");
-});
-
-test("buildWeddingResponseWorkspaceViewState exposes inspiration preference state", () => {
-  const state = buildWeddingResponseWorkspaceViewState({
-    metadata,
-    inspirationItems: [
-      buildWeddingInspirationItem({
-        title: "Reception inspiration",
-        note: "warm lighting, candles, and long table",
-        createdAt: "2026-09-26T00:00:00.000Z",
-      }),
-      buildWeddingInspirationItem({
-        title: "Venue inspiration",
-        note: "warm garden venue",
-        createdAt: "2026-09-26T00:01:00.000Z",
-      }),
-    ],
-  });
-
-  assert.equal(state.inspiration.items.length, 2);
-  assert.ok(state.inspiration.tagCounts.some((entry) => entry.tag === "warm lighting"));
-  assert.match(state.inspiration.insight?.detail ?? "", /warm lighting/i);
-  assert.ok(state.experienceModel.traits.some((trait) => trait.label === "Warm and intimate"));
-  assert.match(state.experienceModel.summaryLabel, /warm/i);
-  assert.ok(state.planningTaskItems.some((task) => task.metadata
-    && typeof task.metadata === "object"
-    && (task.metadata as Record<string, unknown>).wedding_inspiration_task === true));
+  assert.doesNotMatch(state.bundleExportPayload.content, /localhost/);
+  assert.doesNotMatch(state.bundleExportPayload.content, /127\.0\.0\.1/);
 });

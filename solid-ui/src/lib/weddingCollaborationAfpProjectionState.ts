@@ -9,6 +9,7 @@ import {
   safeWeddingLabel,
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
+import type { WeddingSemanticUiObject } from "@/lib/weddingSemanticUiState";
 
 export const WEDDING_COLLABORATION_AFP_PROJECTIONS_KEY = "omnyid.wedding-collaboration-afp-projections";
 
@@ -94,6 +95,65 @@ function actionLabel(action: WeddingCollaborationAccessAction): string {
   if (action === "expire") return "expiry";
   if (action === "review") return "stale-access review";
   return "invite";
+}
+
+function uniqueStrings(values: readonly unknown[], limit = 16): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const item = clean(value);
+    const key = item.toLowerCase();
+    if (!item || seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+function collaborationSemanticObject(input: {
+  id: string;
+  invite: WeddingCollaboratorInviteCard;
+  action: WeddingCollaborationAccessAction;
+  lifecycleLabel: string;
+  riskLabels: readonly string[];
+  missingLabels: readonly string[];
+}): WeddingSemanticUiObject {
+  const blocked = input.missingLabels.length > 0 || input.riskLabels.length > 0 || input.action !== "invite";
+  const kind = input.action === "review" || input.action === "revoke" || input.action === "expire"
+    ? "wedding_approval_required"
+    : blocked ? "wedding_approval_required" : "wedding_active_loop";
+  return {
+    id: `semantic:${input.id}`,
+    kind,
+    title: input.invite.displayName,
+    stateLabel: input.action === "invite"
+      ? input.invite.readyForInvite ? "Ready to invite" : "Needs details"
+      : input.action === "review" ? "Review access"
+        : input.action === "revoke" ? "Access revoked"
+          : "Invite expired",
+    tone: kind === "wedding_approval_required" ? "action" : "status",
+    summary: input.action === "invite"
+      ? `${input.invite.roleLabel} access is prepared, but backend ACL and shared encryption proof are still required before live editing.`
+      : input.invite.nextActionLabel || "Review collaborator access before enabling shared editing.",
+    comparison: null,
+    actions: [{
+      label: input.action === "invite" && input.invite.readyForInvite ? "Review invite" : "Review access",
+      kind: input.action === "invite" ? "review_wedding_invite" : "review_wedding_access",
+      enabled: true,
+      targetMenu: "plan",
+    }],
+    semanticTags: uniqueStrings([
+      kind,
+      "wedding_collaboration",
+      "wedding_access_control",
+      `wedding_access_action:${input.action}`,
+      `wedding_collaborator_role:${safeWeddingLabel(input.invite.role)}`,
+      input.invite.readyForInvite ? "wedding_invite_ready" : "wedding_invite_incomplete",
+      ...input.riskLabels,
+      ...input.missingLabels,
+    ]),
+  };
 }
 
 function markdownFor(metadata: WeddingPlanningMetadata, invite: WeddingCollaboratorInviteCard): string {
@@ -184,6 +244,14 @@ export function weddingCollaborationAccessToAfpMessage(
   const riskLabels = invite.riskLabels ?? [];
   const missingLabels = invite.missingLabels ?? [];
   const metadataLabels = invite.metadataLabels ?? [];
+  const semanticObject = collaborationSemanticObject({
+    id,
+    invite,
+    action,
+    lifecycleLabel,
+    riskLabels,
+    missingLabels,
+  });
   return {
     id: `afp-${id}`,
     thread_id: `wedding_collaboration:${safeWeddingLabel(metadata.responseWorkspaceId)}`,
@@ -226,6 +294,10 @@ export function weddingCollaborationAccessToAfpMessage(
       privacy_scope: metadata.privacyScope,
       shared_editing_enabled: false,
       execution_guardrail: "Do not grant account access from this AFP alone; require backend ACL, shared E2EE, audit, conflict, and user-approval proof.",
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticObject.semanticTags,
+      semantic_object: semanticObject,
+      semantic_objects: [semanticObject],
     },
     metadata: {
       origin: "wedding_planning",
@@ -238,6 +310,10 @@ export function weddingCollaborationAccessToAfpMessage(
       collaborator_lifecycle: lifecycleLabel,
       ready_for_invite: invite.readyForInvite,
       local_only_until_backend_acl: true,
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticObject.semanticTags,
+      semantic_object: semanticObject,
+      semantic_objects: [semanticObject],
       searchable_terms: [
         "wedding collaboration",
         `wedding collaborator ${actionLabel(action)}`,
@@ -260,6 +336,8 @@ export function weddingCollaborationAccessToAfpMessage(
           ready_for_invite: invite.readyForInvite,
           blocker_labels: [...missingLabels, ...riskLabels],
           shared_editing_enabled: false,
+          semantic_object: semanticObject,
+          semantic_objects: [semanticObject],
         },
       },
     ],

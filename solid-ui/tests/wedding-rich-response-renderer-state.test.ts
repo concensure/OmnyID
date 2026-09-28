@@ -47,7 +47,7 @@ test("buildWeddingRichResponseRendererState maps wedding presentation into trave
   assert.equal(state.renderer, "wedding_travel_style_response");
   assert.equal(state.workspaceId, "response_workspace:rich");
   assert.equal(state.primaryAction.kind, "open_planning_files");
-  assert.ok(state.accessibilityFallbackLabel.includes("visible button"));
+  assert.equal(state.accessibilityFallbackLabel, "");
   assert.deepEqual(
     state.sections.map((section) => [section.id, section.layoutHint]),
     [

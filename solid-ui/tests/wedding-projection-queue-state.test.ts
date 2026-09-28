@@ -82,6 +82,51 @@ const boundaryPolicy: WeddingBoundaryPolicy = {
   plainLanguage: "Extra plus-ones stay as suggestions until both people in the couple approve them.",
 };
 
+const decisionItem = {
+  id: "wedding_decision:workspace:venue:harbour-house",
+  metadata: {
+    wedding_plan_id: "wedding_plan:harbour",
+    response_workspace_id: "response_workspace:planning-pass",
+    source_response_id: "afp:response-1",
+  },
+  artifactId: "artifact:venue-shortlist",
+  artifactTitle: "Venue shortlist",
+  artifactKind: "vendor_table",
+  sourceLabels: ["Source linked"],
+  sourceUrls: ["https://example.com/harbour-house"],
+  sourceProviderLabels: ["google_places"],
+  sourceCountsByProvider: { google_places: 1 },
+  selectedOption: {
+    id: "0:harbour-house",
+    rowIndex: 0,
+    label: "Harbour House",
+    detail: "Sydney - water view and indoor backup",
+    cells: ["Harbour House", "Sydney", "Available"],
+    columnCells: [
+      { header: "Supplier", label: "Option", kind: "option", value: "Harbour House" },
+      { header: "Location", label: "Location", kind: "location", value: "Sydney" },
+      { header: "Availability", label: "Availability", kind: "availability", value: "Available" },
+    ],
+    selected: true,
+    preferenceFitLabels: ["wet-weather backup"],
+    missingPreferenceLabels: [],
+    tradeoffLabels: [],
+    preferenceSummaryLabel: "1 preference fit signal",
+  },
+  reportScope: {
+    status: "scoped_ready" as const,
+    selectedOptionId: "0:harbour-house",
+    selectedOptionLabel: "Harbour House",
+    collapseAlternatives: true,
+    includeAlternativesAsAudit: true,
+    reportInstructionLabel: "Use Harbour House as the primary scope.",
+    blockerLabels: [],
+    auditContextLabels: [],
+    nextActionLabels: ["Draft venue follow-up."],
+  },
+  source: "local_selection" as const,
+};
+
 test("buildWeddingProjectionQueueState aggregates pending artifact calendar and task send inputs", () => {
   const state = buildWeddingProjectionQueueState({
     contextItems: [contextItem()],
@@ -102,6 +147,55 @@ test("buildWeddingProjectionQueueState aggregates pending artifact calendar and 
   assert.equal(state.canDispatch, true);
   assert.deepEqual(state.pendingSendInputs.map((input) => input.type), ["context", "artifact", "calendar_event", "task"]);
   assert.ok(state.pendingSendInputs.some((input) => input.supertags?.includes("wedding_task:budget_review")));
+  assert.equal(state.pendingItems.find((item) => item.kind === "context")?.semanticKind, "wedding_active_loop");
+  assert.ok(state.pendingItems.find((item) => item.kind === "context")?.semanticTags.includes("wedding_context"));
+});
+
+test("buildWeddingProjectionQueueState preserves semantic decision objects for meaning-first rendering", () => {
+  const state = buildWeddingProjectionQueueState({
+    decisionItems: [decisionItem],
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+  const item = state.pendingItems[0];
+
+  assert.equal(state.pendingItems.length, 1);
+  assert.equal(item?.kind, "decision");
+  assert.equal(item?.semanticKind, "wedding_decision");
+  assert.equal(item?.semanticObject?.title, "Decision: Harbour House");
+  assert.ok(item?.semanticTags.includes("wedding_comparison"));
+  assert.equal(item?.semanticObject?.comparison?.columns.map((column) => column.kind).join(","), "option,location,availability");
+});
+
+test("buildWeddingProjectionQueueState extracts semantic objects from view payloads", () => {
+  const state = buildWeddingProjectionQueueState({
+    taskItems: [{
+      id: "task:view-semantic",
+      title: "Confirm caterer reply",
+      description: "Check whether the caterer has replied.",
+      status: "pending",
+      views: [{
+        format: "a2ui",
+        content: {
+          semantic_object: {
+            id: "semantic:task-view",
+            kind: "wedding_external_wait",
+            title: "Waiting for caterer reply",
+            stateLabel: "No response yet",
+            tone: "risk",
+            summary: "The caterer has not replied.",
+          },
+        },
+      }],
+    } as any],
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+  const item = state.pendingItems.find((entry) => entry.sourceId === "task:view-semantic");
+
+  assert.equal(item?.semanticKind, "wedding_external_wait");
+  assert.equal(item?.semanticObject?.id, "semantic:task-view");
+  assert.ok(item?.semanticTags.includes("wedding_external_wait"));
 });
 
 test("buildWeddingProjectionQueueState includes collaborator invite access-control records", () => {

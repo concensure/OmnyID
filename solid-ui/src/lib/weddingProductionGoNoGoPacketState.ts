@@ -9,6 +9,7 @@ export type WeddingProductionGoNoGoGateKind =
   | "backend_scale"
   | "template_launch"
   | "approval_ui"
+  | "vendor_comparison_ui"
   | "vendor_quote_reply"
   | "provider_executors"
   | "expected_behavior"
@@ -77,6 +78,7 @@ const ORACLE_REQUIRED_READY_GATE_KINDS: readonly WeddingProductionGoNoGoGateKind
   "backend_scale",
   "template_launch",
   "approval_ui",
+  "vendor_comparison_ui",
   "vendor_quote_reply",
   "provider_executors",
   "expected_behavior",
@@ -225,14 +227,14 @@ function vendorQuoteReplyGate(
   const nextActionLabels = cleanWeddingProductionLabels([
     ...(ui && !ui.productionReady ? ui.nextActionLabels : []),
     ...(production?.nextActionLabels.length ? production.nextActionLabels : []),
-    ...(!ui ? ["Prove inline quote summary, Tiptap editor, separate approvals, undo-send, sent proof, live regions, and telemetry."] : []),
+    ...(!ui ? ["Prove inline quote summary, state-derived decision CTAs, conditional Tiptap editor, undo-send, sent-history proof, live regions, and telemetry."] : []),
     ...(production && !production.productionReady && !production.nextActionLabels.length
       ? ["Prove the vendor quote reply flow with live provider send, undo, durable receipt, and proof drawer reconstruction."]
       : []),
     ...(!production ? ["Prove the vendor quote reply flow with live provider send, undo, durable receipt, and proof drawer reconstruction."] : []),
   ]);
   const blockedDetail = !ui
-    ? "Vendor quote reply UI proof is missing: quote summary, Tiptap editor, approval controls, undo-send, sent proof, live regions, and telemetry must be verified."
+    ? "Vendor quote reply UI proof is missing: quote summary, state-derived primary and secondary actions, conditional Tiptap editor, approval controls, undo-send, sent-history proof, live regions, and telemetry must be verified."
     : ui.productionReady
       ? production?.summary ?? "Vendor quote reply proof is missing provider-send, thread round-trip, regression, or live proof evidence."
       : ui.summary;
@@ -320,6 +322,15 @@ export function buildWeddingProductionGoNoGoPacketState(
       blockedDetail: "Approval execution UI proof is missing or incomplete.",
       blockerLabel: "Approval UI proof is missing.",
       nextActionLabel: "Prove approval execution UI and receipt handling.",
+    }),
+    booleanGate({
+      kind: "vendor_comparison_ui",
+      title: "Dynamic vendor comparison UI proof",
+      ready: evidence.evidence.vendorComparisonUiReady,
+      readyDetail: "Dynamic vendor comparison UI proof is complete.",
+      blockedDetail: "Dynamic vendor comparison UI proof is missing or incomplete.",
+      blockerLabel: "Vendor comparison UI proof is missing.",
+      nextActionLabel: "Prove multi-select vendor comparison, source actions, follow-up routing, unselected-vendor queue suppression, closed-vendor history, and URL guards.",
     }),
     vendorQuoteReplyGate(evidence),
     {

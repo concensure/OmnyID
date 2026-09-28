@@ -30,6 +30,8 @@ export type WeddingPersonalOsRankedItemKind =
 
 export type WeddingPersonalOsRankedItem = ContinuityRankedItem<WeddingPersonalOsRankedItemKind> & {
   sourceSurface: "tasks" | "calendar" | "decision_queue" | "approval_queue";
+  linkedArtifactId?: string | null;
+  workspaceMenu?: string | null;
 };
 
 export type WeddingDecisionLoadReliefState = ContinuityDecisionLoadReliefState<WeddingPersonalOsRankedItem>;
@@ -161,6 +163,10 @@ function hasVendorSearchReviewTask(metadata: unknown): boolean {
   return record(metadata).vendor_search_review_task === true;
 }
 
+function hasVendorComparisonDecisionTask(metadata: unknown): boolean {
+  return record(metadata).vendor_comparison_decision_task === true;
+}
+
 function hasVendorSeedReviewTask(metadata: unknown): boolean {
   return record(metadata).vendor_seed_review_task === true;
 }
@@ -171,6 +177,15 @@ function hasExpectedBehaviorGap(metadata: unknown): boolean {
 
 function hasOracleUpdatePlanTask(metadata: unknown): boolean {
   return record(metadata).oracle_update_plan_task === true;
+}
+
+function hasProductionRemainingWorkTask(metadata: unknown): boolean {
+  return record(metadata).production_remaining_work_task === true;
+}
+
+function productionRemainingWorkRequiresOracle(metadata: unknown): boolean {
+  return record(metadata).production_remaining_work_required_for_oracle === true
+    || record(metadata).production_readiness_oracle_gate === true;
 }
 
 function hasBackgroundAutomationTask(metadata: unknown): boolean {
@@ -248,14 +263,19 @@ function taskWeight(task: WeddingPlanningTaskItem, now: Date): number {
   const finalPhase = hasFinalPhaseTask(task.metadata) ? 20 : 0;
   const legalAdmin = hasLegalAdministrationTask(task.metadata) ? 24 : 0;
   const vendorSearch = hasVendorSearchReviewTask(task.metadata) ? 21 : 0;
+  const vendorComparison = hasVendorComparisonDecisionTask(task.metadata) ? 18 : 0;
   const vendorSeed = hasVendorSeedReviewTask(task.metadata) ? 5 : 0;
   const expectedBehaviorGap = hasExpectedBehaviorGap(task.metadata) ? 19 : 0;
   const oracleUpdatePlan = hasOracleUpdatePlanTask(task.metadata) ? oracleUpdateIsBlocked(task.metadata) ? 30 : 18 : 0;
+  const productionRemainingWork = hasProductionRemainingWorkTask(task.metadata)
+    ? productionRemainingWorkRequiresOracle(task.metadata) ? 28 : 12
+    : 0;
   const backgroundAutomation = hasBackgroundAutomationTask(task.metadata) ? 17 : 0;
   const providerHandoff = hasProviderHandoffTask(task.metadata) ? 23 : 0;
   return 20 + priority + duePressure(task.dueAt, now) + approval + loop + review
     + quote + payment + guest + finalCount + postWedding + vow + seating + delegation + finalPhase + legalAdmin
-    + vendorSearch + vendorSeed + expectedBehaviorGap + oracleUpdatePlan + backgroundAutomation + providerHandoff
+    + vendorSearch + vendorComparison + vendorSeed + expectedBehaviorGap + oracleUpdatePlan + productionRemainingWork
+    + backgroundAutomation + providerHandoff
     + outreachEscalationWeight(outreachEscalationStage(task.metadata));
 }
 
@@ -280,9 +300,13 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
     hasFinalPhaseTask(task.metadata) ? "final-phase coordination" : "",
     hasLegalAdministrationTask(task.metadata) ? "legal administration" : "",
     hasVendorSearchReviewTask(task.metadata) ? "vendor search freshness" : "",
+    hasVendorComparisonDecisionTask(task.metadata) ? "top-three vendor comparison" : "",
     hasVendorSeedReviewTask(task.metadata) ? "seeded vendor data" : "",
     hasExpectedBehaviorGap(task.metadata) ? "launch check" : "",
     hasOracleUpdatePlanTask(task.metadata) ? "live update check" : "",
+    hasProductionRemainingWorkTask(task.metadata)
+      ? productionRemainingWorkRequiresOracle(task.metadata) ? "launch blocker" : "production polish"
+      : "",
     hasBackgroundAutomationTask(task.metadata) ? "automation setup gap" : "",
     hasProviderHandoffTask(task.metadata) ? "vendor connection gap" : "",
     outreachEscalationEvidenceLabel(escalationStage) ?? "",
@@ -312,8 +336,14 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
       hasFinalPhaseTask(task.metadata) ? "Final-phase wedding work affects run sheet, confirmations, day-of fallback, guests, vendors, or final payments." : null,
       hasLegalAdministrationTask(task.metadata) ? "Legal document and NOIM preparation should stay visible before celebrant review; no form is lodged automatically." : null,
       hasVendorSearchReviewTask(task.metadata) ? "Vendor search results need source freshness, price/availability verification, and user selection before reports narrow or outreach is sent." : null,
+      hasVendorComparisonDecisionTask(task.metadata) ? "The top-three vendor comparison is ready for the user to choose preferred vendors before outreach or report narrowing." : null,
       hasVendorSeedReviewTask(task.metadata) ? "Seeded vendor rows are planning hints only; refresh source pages and verify fit before using them for recommendations or outreach." : null,
       hasExpectedBehaviorGap(task.metadata) ? "This wedding feature still needs proof before users can rely on it end-to-end." : null,
+      hasProductionRemainingWorkTask(task.metadata)
+        ? productionRemainingWorkRequiresOracle(task.metadata)
+          ? "This production-readiness item must clear before Oracle upload."
+          : "This production-readiness item can follow Oracle upload, but remains open before final production-ready signoff."
+        : null,
       hasBackgroundAutomationTask(task.metadata) ? "Automatic wedding updates are not fully set up yet; finish this before relying on them." : null,
       hasProviderHandoffTask(task.metadata) ? "This approved action still needs a connected vendor/email/calendar service before live delivery or sync." : null,
       hasOracleUpdatePlanTask(task.metadata)
@@ -326,6 +356,8 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
     ].filter(Boolean).join(" "),
     evidenceLabels,
     sourceSurface: "tasks",
+    linkedArtifactId: clean(task.linkedArtifactId) || null,
+    workspaceMenu: clean(record(task.metadata).wedding_workspace_menu) || null,
     simulatorSeedKind: simulatorKindForFamily(family),
   };
 }

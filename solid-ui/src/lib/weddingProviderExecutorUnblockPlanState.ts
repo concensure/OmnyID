@@ -57,9 +57,11 @@ const CREDENTIAL_ENV_HINTS: Record<WeddingProviderExecutorSuiteCapability, strin
   calendar: ["Google Calendar OAuth credentials", "Calendar provider refresh-token storage"],
   registry: ["Registry provider API credentials or connected-app identity"],
   vendor_search: [
+    "OMNYID_ADMIN_BRAVE_SEARCH_API_KEY_FILE",
     "OMNYID_BRAVE_SEARCH_API_KEY_FILE",
+    "OMNYID_ADMIN_GOOGLE_PLACES_API_KEY_FILE",
     "OMNYID_GOOGLE_PLACES_API_KEY_FILE",
-    "OMNYID_OVERPASS_ENDPOINT",
+    "OMNYID_OVERPASS_API_URL",
     "OMNYID_OVERPASS_CONTACT_EMAIL",
   ],
 };
@@ -148,7 +150,7 @@ function receiptStep(capability: WeddingProviderExecutorSuiteCapability): Weddin
     proofHints: ["provider suite readiness check", "wedding production-readiness evidence adapter", "AFP/searchable receipt"],
     acceptanceCriteria: [
       "Provider suite readiness marks this capability ready only after credential and executor proof.",
-      "Production readiness includes this capability in the required provider-executor gate.",
+      "Production readiness includes this capability in the required connected-app gate.",
       "Readiness copy tells the user exactly what remains blocked.",
     ],
   };
@@ -159,8 +161,8 @@ function readyStep(capability: WeddingProviderExecutorSuiteCapability): WeddingP
   return {
     capability,
     kind: "ready",
-    title: `${label} executor is production-ready`,
-    detail: "Credential and executor proof are both present.",
+    title: `${label} connected app action is production-ready`,
+    detail: "Sign-in and action proof are both present.",
     priority: "normal",
     setupSurface: SETUP_SURFACES[capability],
     envHints: [],
@@ -181,7 +183,7 @@ function stepsForCheck(check: WeddingProviderExecutorSuiteReadinessState["checks
   if (blockerText.includes("credential") || blockerText.includes("readiness proof is missing")) {
     steps.push(credentialStep(check.capability));
   }
-  if (blockerText.includes("executor") || blockerText.includes("readiness proof is missing")) {
+  if (blockerText.includes("executor") || blockerText.includes("connected app action") || blockerText.includes("readiness proof is missing")) {
     steps.push(executorStep(check.capability));
   }
   steps.push(smokeTestStep(check.capability), receiptStep(check.capability));
@@ -199,15 +201,15 @@ export function buildWeddingProviderExecutorUnblockPlanState(
   return {
     status: suite.productionEvidenceReady ? "ready" : "blocked",
     summary: suite.productionEvidenceReady
-      ? "External wedding provider executors are ready for approved production use."
-      : "Real provider execution is blocked until credentials, executor handlers, smoke tests, and production evidence are complete.",
+      ? "External wedding connected apps are ready for approved production use."
+      : "Real app delivery is blocked until sign-ins, connected app actions, smoke tests, and production evidence are complete.",
     nextStep,
     steps: unresolvedSteps,
     productionChecklist: [
       "Keep user approval required for every outbound email, calendar creation, registry publish, and vendor-facing share.",
-      "Use provider executors only for the selected wedding workflow, not unrelated Master Agent user queries.",
+      "Use connected apps only for the selected wedding workflow, not unrelated Master Agent user queries.",
       "Record every execution result as a receipt that can be projected into AFP search and audit history.",
-      "Keep Oracle upload blocked until provider suite, backend scale, approval UI, and release rollback evidence all pass.",
+      "Keep Oracle upload blocked until connected app suite, backend scale, approval UI, and release rollback evidence all pass.",
     ],
   };
 }

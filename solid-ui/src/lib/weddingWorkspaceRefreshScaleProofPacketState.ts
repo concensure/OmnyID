@@ -1,4 +1,8 @@
 // @locs-version: 2.0
+import {
+  cleanWeddingProductionLabel,
+  cleanWeddingProductionLabels,
+} from "@/lib/weddingProductionLabelState";
 import type { WeddingWorkspaceRefreshScaleProofState } from "@/lib/weddingWorkspaceRefreshScaleProofState";
 
 export type WeddingWorkspaceRefreshScaleProofRequirementKind =
@@ -104,15 +108,61 @@ const REQUIREMENTS: readonly {
 ] as const;
 
 function firstMatching(values: readonly string[] | null | undefined, pattern: RegExp): string | null {
-  return (values ?? []).find((value) => pattern.test(value)) ?? null;
+  return cleanWeddingProductionLabels(values ?? []).find((value) => pattern.test(value)) ?? null;
+}
+
+function stripEvidencePrefix(label: string | null): string | null {
+  if (!label) return null;
+  const [, ref] = label.split(/:\s(.+)/, 2);
+  return cleanWeddingProductionLabel(ref?.trim() || label);
+}
+
+function durableProofRef(value: string | null): string | null {
+  const ref = cleanWeddingProductionLabel(value);
+  if (!ref) return null;
+  if (ref === "...") return null;
+  if (/^(receipt|local|draft|display):/i.test(ref)) return null;
+  if (/^(dry-run|placeholder|test|example|fake|stub|mock):/i.test(ref)) return null;
+  if (/\b(?:placeholder|fake|stub|mock|test)\b/i.test(ref)) return null;
+  if (/^(file|blob|data):/i.test(ref)) return null;
+  if (/^https?:\/\//i.test(ref)) {
+    try {
+      const url = new URL(ref);
+      const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+      if (url.protocol !== "https:") return null;
+      if (
+        hostname === "localhost"
+        || hostname === "127.0.0.1"
+        || hostname === "0.0.0.0"
+        || hostname === "::1"
+      ) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return ref;
+}
+
+function proofRefEvidenceLabel(label: string | null): string | null {
+  const ref = durableProofRef(stripEvidencePrefix(label));
+  return ref ? cleanWeddingProductionLabel(`Scale proof reference: ${ref}`) : null;
+}
+
+function invalidProofRefBlocker(label: string | null): string | null {
+  if (!label || proofRefEvidenceLabel(label)) return null;
+  return "Scale proof reference must be a durable audit ID or remote HTTPS proof link, not a local, dry-run, placeholder, localhost, or browser-only reference.";
 }
 
 export function buildWeddingWorkspaceRefreshScaleProofPacketState(
   scaleProof: WeddingWorkspaceRefreshScaleProofState,
 ): WeddingWorkspaceRefreshScaleProofPacketState {
   const requirements = REQUIREMENTS.map((requirement): WeddingWorkspaceRefreshScaleProofRequirement => {
-    const evidenceLabel = firstMatching(scaleProof.evidenceLabels, requirement.evidencePattern);
-    const blockerLabel = firstMatching(scaleProof.blockerLabels, requirement.blockerPattern);
+    const rawEvidenceLabel = firstMatching(scaleProof.evidenceLabels, requirement.evidencePattern);
+    const evidenceLabel = requirement.kind === "proof_ref" ? proofRefEvidenceLabel(rawEvidenceLabel) : rawEvidenceLabel;
+    const blockerLabel = firstMatching(scaleProof.blockerLabels, requirement.blockerPattern)
+      ?? (requirement.kind === "proof_ref" ? invalidProofRefBlocker(rawEvidenceLabel) : null);
     const nextActionLabel = firstMatching(scaleProof.nextActionLabels, requirement.nextActionPattern);
     return {
       kind: requirement.kind,
@@ -123,9 +173,9 @@ export function buildWeddingWorkspaceRefreshScaleProofPacketState(
       nextActionLabel,
     };
   });
-  const missingEvidenceLabels = requirements
+  const missingEvidenceLabels = cleanWeddingProductionLabels(requirements
     .filter((requirement) => requirement.status !== "ready")
-    .map((requirement) => `${requirement.title}: evidence required`);
+    .map((requirement) => `${requirement.title}: evidence required`));
   const canClearBackendScaleGate = scaleProof.status === "pass" && missingEvidenceLabels.length === 0;
 
   return {
@@ -139,6 +189,6 @@ export function buildWeddingWorkspaceRefreshScaleProofPacketState(
     canClearBackendScaleGate,
     requirements,
     missingEvidenceLabels,
-    nextActionLabels: scaleProof.nextActionLabels ?? [],
+    nextActionLabels: cleanWeddingProductionLabels(scaleProof.nextActionLabels ?? []),
   };
 }

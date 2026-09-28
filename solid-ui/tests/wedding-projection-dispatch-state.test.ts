@@ -94,6 +94,8 @@ test("buildWeddingProjectionDispatchReceiptState records successful save outcome
   assert.equal(receipt.summaryLabel, "4 saved");
   assert.equal(receipt.canRetry, false);
   assert.ok(receipt.savedItems.every((item) => item.messageId?.startsWith("message-")));
+  assert.equal(receipt.savedItems.find((item) => item.kind === "context")?.semanticKind, "wedding_active_loop");
+  assert.ok(receipt.savedItems.find((item) => item.kind === "context")?.semanticTags.includes("wedding_context"));
 });
 
 test("buildWeddingProjectionDispatchReceiptState records failures and retry ids", () => {
@@ -116,6 +118,7 @@ test("buildWeddingProjectionDispatchReceiptState records failures and retry ids"
   assert.equal(receipt.title, "Some wedding outputs were not saved");
   assert.deepEqual(receipt.retryItemIds, [queue.pendingItems[1]?.id]);
   assert.equal(receipt.canRetry, true);
+  assert.equal(receipt.failedItems[0]?.semanticKind, null);
 });
 
 test("buildWeddingProjectionDispatchReceiptState skips blocked or already handled items without fake success", () => {

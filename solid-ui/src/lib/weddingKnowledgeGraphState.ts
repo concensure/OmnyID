@@ -128,7 +128,22 @@ function clean(value: unknown): string {
 function usableSourceUrls(values: readonly unknown[] | null | undefined): string[] {
   return (values ?? [])
     .map((value) => clean(value))
-    .filter((value) => /^https?:\/\//i.test(value));
+    .filter(remoteHttpUrl);
+}
+
+function remoteHttpUrl(value: string): boolean {
+  if (!/^https?:\/\//i.test(value)) return false;
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    return hostname !== "localhost"
+      && hostname !== "127.0.0.1"
+      && hostname !== "0.0.0.0"
+      && hostname !== "::1"
+      && hostname !== "[::1]";
+  } catch {
+    return false;
+  }
 }
 
 function importedPrivateLabel(value: string): boolean {
@@ -185,7 +200,7 @@ function sanitizedSelectedDecisionScope(value: unknown): Record<string, unknown>
     ...metadataLabels,
   ].filter((label): label is string => Boolean(label)).some(importedPrivateLabel);
   const sourceUrls = uniqueArrayStrings(scope.source_urls ?? scope.sourceUrls, 12)
-    .filter((url) => /^https?:\/\//i.test(url))
+    .filter(remoteHttpUrl)
     .filter((url) => !importedPrivateScope || !privateImportSourceUrl(url));
 
   return {

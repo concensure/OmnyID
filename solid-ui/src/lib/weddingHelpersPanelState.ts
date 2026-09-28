@@ -5,6 +5,7 @@ import {
   safeWeddingLabel,
 } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
+import type { WeddingSemanticUiObject } from "@/lib/weddingSemanticUiState";
 
 export type WeddingHelperPlanningTask = WeddingResponseWorkspaceViewState["planningTaskItems"][number];
 
@@ -119,6 +120,46 @@ function ref(type: string, target: string, label: string, metadata?: Record<stri
   return { type, target: cleanTarget, label, metadata };
 }
 
+function helperResponsibilitySemanticObject(input: {
+  taskId: string;
+  taskTitle: string;
+  status: WeddingHelperResponsibilityStatus;
+  ownerLabel: string;
+  consultedLabel: string;
+  lastContactDate: string;
+  dueLabel: string;
+  priorityLabel: string;
+}): WeddingSemanticUiObject {
+  const open = input.status !== "done";
+  const needsOwner = input.ownerLabel === "Unassigned";
+  return {
+    id: `semantic:wedding_helper_responsibility:${safeWeddingLabel(input.taskId)}:${input.status}`,
+    kind: needsOwner ? "wedding_approval_required" : "wedding_active_loop",
+    title: input.taskTitle,
+    stateLabel: input.status === "done" ? "Done" : needsOwner ? "Needs owner" : "Owner assigned",
+    tone: input.status === "done" ? "status" : needsOwner ? "action" : "status",
+    summary: needsOwner
+      ? "This wedding task needs one clear owner before the agent can help move it forward."
+      : `${input.ownerLabel} owns this task.${input.consultedLabel ? ` Consult ${input.consultedLabel}.` : ""}`,
+    comparison: null,
+    actions: [{
+      label: needsOwner ? "Assign owner" : open ? "Open task" : "Review completed work",
+      kind: needsOwner ? "assign_wedding_helper_owner" : open ? "open_wedding_task" : "review_wedding_task",
+      enabled: true,
+      targetMenu: "helpers",
+    }],
+    semanticTags: uniqueStrings([
+      needsOwner ? "wedding_approval_required" : "wedding_active_loop",
+      "wedding_helper_responsibility",
+      "wedding_workload",
+      `wedding_task_status:${input.status}`,
+      `wedding_priority:${safeWeddingLabel(input.priorityLabel)}`,
+      input.lastContactDate ? "wedding_last_contact_recorded" : null,
+      input.consultedLabel ? "wedding_consulted_person_recorded" : null,
+    ], 16),
+  };
+}
+
 function storageKey(workspaceId: string): string {
   return `${WEDDING_HELPER_LOCAL_STATE_KEY}:${workspaceId}`;
 }
@@ -197,16 +238,21 @@ function weddingHelperEstimatedTaskPoints(task: WeddingHelperPlanningTask, now: 
   return priorityPoints + (weddingHelperTaskIsOverdue(task, now) ? 1 : 0);
 }
 
-export function buildWeddingHelperPeople(contactNames: readonly string[], customHelpers: readonly string[]): string[] {
+export function buildWeddingHelperPeople(
+  contactNames: readonly string[],
+  customHelpers: readonly string[],
+  partnerNames: readonly string[] = [],
+): string[] {
   const seen = new Set<string>();
-  const names = [...contactNames, ...customHelpers, "Partner 1", "Partner 2"].filter((name) => {
+  const fallbackPartners = partnerNames.length > 0 ? [...partnerNames] : ["Partner 1", "Partner 2"];
+  const names = [...contactNames, ...customHelpers, ...fallbackPartners].filter((name) => {
     const label = clean(name);
     const key = label.toLowerCase();
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
   }).map((name) => clean(name));
-  return names.length > 0 ? names : ["Partner 1", "Partner 2"];
+  return names.length > 0 ? names : fallbackPartners;
 }
 
 function taskAssignee(task: WeddingHelperPlanningTask, taskAssignees: Record<string, string>): string {
@@ -338,6 +384,16 @@ export function weddingHelperResponsibilityToAfpMessage(
     ref("helper_owner", ownerLabel, "Task owner"),
     consultedLabel ? ref("consulted_person", consultedLabel, "Person to consult") : null,
   ].filter((item): item is AfpReference => item !== null);
+  const semanticObject = helperResponsibilitySemanticObject({
+    taskId,
+    taskTitle,
+    status,
+    ownerLabel,
+    consultedLabel,
+    lastContactDate,
+    dueLabel,
+    priorityLabel,
+  });
 
   return {
     id: `afp-wedding-helper-responsibility:${planLabel}:${workspaceLabel}:${taskLabel}:${status}`,
@@ -381,6 +437,10 @@ export function weddingHelperResponsibilityToAfpMessage(
       agent_action_requested: true,
       agent_action: status === "done" ? "advance_unblocked_wedding_work" : "track_wedding_responsibility",
       summary: `${ownerLabel} owns "${taskTitle}".${consultedLabel ? ` Consult ${consultedLabel}.` : ""}`,
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticObject.semanticTags,
+      semantic_object: semanticObject,
+      semantic_objects: [semanticObject],
     },
     metadata: {
       origin: "wedding_planning",
@@ -395,6 +455,10 @@ export function weddingHelperResponsibilityToAfpMessage(
       e2ee_required: true,
       couple_private_by_default: true,
       agent_action_requested: true,
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticObject.semanticTags,
+      semantic_object: semanticObject,
+      semantic_objects: [semanticObject],
       searchable_terms: uniqueStrings([
         taskTitle,
         taskId,
@@ -422,6 +486,8 @@ export function weddingHelperResponsibilityToAfpMessage(
             { label: "Due", value: dueLabel },
             { label: "Last contact", value: lastContactDate || "Not recorded" },
           ],
+          semantic_object: semanticObject,
+          semantic_objects: [semanticObject],
         },
       },
     ],

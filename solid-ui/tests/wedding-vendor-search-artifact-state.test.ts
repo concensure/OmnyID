@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { buildWeddingResponseWorkspaceState } from "@/lib/weddingResponseWorkspaceState";
 import {
+  buildWeddingVendorComparisonArtifactState,
   buildWeddingVendorSearchArtifactState,
   buildWeddingVendorSearchTaskItems,
 } from "@/lib/weddingVendorSearchArtifactState";
@@ -128,6 +129,114 @@ test("planned vendor search source packet preserves provider-specific search con
   assert.ok(workspace.results[0]?.searchText.includes("place id"));
 });
 
+test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices with A2UI comparison", async () => {
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        {
+          title: "Harbour Studio",
+          url: "https://harbour-studio.example",
+          snippet: "Sydney documentary wedding photographer with transparent packages, portfolio, and date availability.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Budget Lens",
+          url: "https://budget-lens.example",
+          snippet: "Wedding photography rates and simple packages for Sydney couples.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Portrait Hall",
+          url: "https://portrait-hall.example",
+          snippet: "Editorial portraits and gallery reviews.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Generic Events",
+          url: "https://generic-events.example",
+          snippet: "Event services.",
+          provider: "Brave Search",
+        },
+      ],
+    }),
+  });
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "documentary style and transparent pricing",
+    location: "Sydney",
+    budgetComfort: "balanced budget",
+    vendorCategories: ["photographer"],
+  });
+  const a2ui = comparison.artifactInput?.metadata && typeof comparison.artifactInput.metadata === "object"
+    ? (comparison.artifactInput.metadata as Record<string, unknown>).a2ui as Record<string, unknown>
+    : null;
+
+  assert.equal(comparison.status, "created");
+  assert.equal(comparison.topChoiceCount, 4);
+  assert.equal(comparison.summary?.title, "Top vendor comparison");
+  assert.equal(comparison.summary?.vendorLabels[0], "Harbour Studio");
+  assert.match(comparison.markdown ?? "", /Top five candidates/i);
+  assert.match(comparison.markdown ?? "", /documentary/i);
+  assert.match(comparison.markdown ?? "", /Confirm service area, date availability/i);
+  assert.equal(a2ui?.schema_version, "a2ui.v1");
+  assert.equal(Array.isArray(a2ui?.components), true);
+  const comparisonTable = (a2ui?.components as Array<Record<string, unknown>>)[0] as Record<string, unknown> | undefined;
+  const comparisonProps = comparisonTable?.props as Record<string, unknown> | undefined;
+  assert.equal(comparisonTable?.type, "comparison_table");
+  assert.equal((comparisonProps?.selection as Record<string, unknown> | undefined)?.mode, "multi");
+  assert.equal(((comparisonProps?.selection as Record<string, unknown> | undefined)?.confirm_action as Record<string, unknown> | undefined)?.kind, "confirm_vendor_choices");
+  const columnActions = comparisonProps?.column_actions as Array<Record<string, unknown>>;
+  assert.equal(columnActions.length, 4);
+  assert.equal(columnActions[0]?.vendor_label, "Harbour Studio");
+  assert.equal(columnActions[0]?.source_url, "https://harbour-studio.example");
+  assert.equal((columnActions[0]?.actions as Array<Record<string, unknown>>)[0]?.kind, "select_vendor_for_follow_up");
+  assert.equal((columnActions[0]?.actions as Array<Record<string, unknown>>)[1]?.kind, "open_vendor_source");
+  assert.equal((columnActions[0]?.actions as Array<Record<string, unknown>>)[2]?.kind, "prepare_approval_gated_outreach");
+  assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).topChoiceLabels, [
+    "Harbour Studio",
+    "Budget Lens",
+    "Portrait Hall",
+    "Generic Events",
+  ]);
+  const comparisonMetadata = comparison.artifactInput?.metadata as Record<string, unknown>;
+  const recommendationHandoff = comparisonMetadata.vendorComparisonHandoff as Record<string, unknown>;
+  assert.match(String(recommendationHandoff.recommendationLabel), /Harbour Studio/i);
+  assert.deepEqual(recommendationHandoff.whyLabels as string[], [
+    "4 source-backed choices ranked from live search results",
+    "2 choices matched stated preferences",
+    "2 choices surfaced package/pricing language",
+    "Location context: Sydney",
+    "Provider evidence: Brave Search",
+  ]);
+  assert.equal(recommendationHandoff.confidenceLabel, "Confidence: strong");
+  assert.match(String(recommendationHandoff.nextActionLabel), /approval-gated follow-up/i);
+  assert.equal(((comparisonMetadata.vendorComparisonSelection as Record<string, unknown>).confirmAction), "confirm_vendor_choices");
+  assert.equal(((comparisonMetadata.vendorComparisonSelection as Record<string, unknown>).approvalRequiredBeforeOutreach), true);
+  assert.equal(((comparisonMetadata.vendorComparisonSelection as Record<string, unknown>).selectedVendorsContinueToFollowUp), true);
+  assert.equal(((comparisonMetadata.vendorComparisonSelection as Record<string, unknown>).unselectedVendorsLeaveActiveQueues), true);
+  assert.equal(((comparisonMetadata.vendorComparisonSelection as Record<string, unknown>).closedVendorHistoryRetained), true);
+  assert.equal((comparisonMetadata.topChoiceActionRows as Array<Record<string, unknown>>).length, 4);
+  const semanticObject = comparisonMetadata.semantic_object as Record<string, unknown>;
+  const semanticActions = semanticObject.actions as Array<Record<string, unknown>>;
+  assert.deepEqual(semanticActions.map((action) => action.kind), [
+    "confirm_vendor_choices",
+    "prepare_follow_up_for_selected_vendors",
+    "open_vendor_sources",
+  ]);
+  assert.equal(semanticActions.find((action) => action.kind === "prepare_follow_up_for_selected_vendors")?.targetMenu, "response_queue");
+  assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).sourceProviderLabels, ["Brave Search"]);
+  assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).sourceCountsByProvider, { "Brave Search": 4 });
+  assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).sourceUrlCount, 4);
+  assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).parentSourceUrlCount, 4);
+});
+
 test("buildWeddingVendorSearchArtifactState does not create artifacts from dry-run or failed search", async () => {
   const dryRun = await runWeddingVendorSearchExecution({
     readiness,
@@ -191,6 +300,31 @@ test("buildWeddingVendorSearchArtifactState blocks malformed source URLs before 
   assert.equal(artifact.artifactInput, null);
 });
 
+test("buildWeddingVendorSearchArtifactState blocks local source URLs before artifact creation", async () => {
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        { title: "Localhost URL", url: "http://localhost:8787/vendor/profile", provider: "Brave Search" },
+        { title: "Loopback URL", url: "https://127.0.0.1/vendor/profile", provider: "Brave Search" },
+      ],
+    }),
+  });
+  const artifact = buildWeddingVendorSearchArtifactState({ metadata, execution });
+
+  assert.equal(execution.status, "executed");
+  assert.equal(execution.sourceCount, 2);
+  assert.equal(artifact.status, "not_created");
+  assert.equal(artifact.sourceCount, 0);
+  assert.match(artifact.reason ?? "", /no usable HTTP\(S\) source URLs/i);
+  assert.equal(artifact.artifactInput, null);
+});
+
 test("buildWeddingVendorSearchArtifactState drops malformed URLs from mixed source packets", async () => {
   const execution = await runWeddingVendorSearchExecution({
     readiness,
@@ -215,6 +349,32 @@ test("buildWeddingVendorSearchArtifactState drops malformed URLs from mixed sour
   assert.equal(artifact.artifactInput?.metadata.sourceUrlCount, 1);
   assert.equal(artifact.artifactInput?.metadata.unusableSourceUrlCount, 1);
   assert.doesNotMatch(artifact.markdown ?? "", /javascript:alert/);
+});
+
+test("buildWeddingVendorSearchArtifactState drops local URLs from mixed source packets", async () => {
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        { title: "Harbour Studio", url: "https://harbour-studio.example", provider: "Brave Search" },
+        { title: "Local URL", url: "http://localhost:8787/vendor/profile", provider: "Brave Search" },
+      ],
+    }),
+  });
+  const artifact = buildWeddingVendorSearchArtifactState({ metadata, execution });
+
+  assert.equal(artifact.status, "created");
+  assert.equal(artifact.sourceCount, 1);
+  assert.equal(artifact.summary?.sourceLinks.length, 1);
+  assert.equal(artifact.summary?.sourceLinks[0]?.url, "https://harbour-studio.example");
+  assert.equal(artifact.artifactInput?.metadata.sourceUrlCount, 1);
+  assert.equal(artifact.artifactInput?.metadata.unusableSourceUrlCount, 1);
+  assert.doesNotMatch(artifact.markdown ?? "", /localhost/);
 });
 
 test("buildWeddingVendorSearchTaskItems recovers review tasks from source packet artifacts", async () => {
@@ -247,4 +407,112 @@ test("buildWeddingVendorSearchTaskItems recovers review tasks from source packet
     (task.metadata as Record<string, unknown>).approval_required_before_outreach === true
     && (task.metadata as Record<string, unknown>).no_external_send_without_approval === true
   ));
+});
+
+test("buildWeddingVendorSearchTaskItems projects top-three comparison as a decision task", async () => {
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        { title: "Harbour Studio", url: "https://harbour-studio.example", snippet: "Documentary Sydney photographer packages.", provider: "Brave Search" },
+        { title: "Budget Lens", url: "https://budget-lens.example", snippet: "Transparent pricing for weddings.", provider: "Brave Search" },
+        { title: "Portrait Hall", url: "https://portrait-hall.example", snippet: "Portfolio and reviews.", provider: "Brave Search" },
+      ],
+    }),
+  });
+  const sourceArtifact = buildWeddingVendorSearchArtifactState({ metadata, execution });
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "documentary style and transparent pricing",
+    location: "Sydney",
+    vendorCategories: ["photographer"],
+  });
+  const tasks = buildWeddingVendorSearchTaskItems({
+    metadata,
+    artifacts: [
+      sourceArtifact.artifactInput!,
+      comparison.artifactInput!,
+    ],
+  });
+  const comparisonTask = tasks.find((task) =>
+    (task.metadata as Record<string, unknown>).vendor_comparison_decision_task === true
+  );
+
+  assert.equal(tasks.length, 1);
+  assert.ok(comparisonTask);
+  assert.equal(comparisonTask?.kind, "decision");
+  assert.match(comparisonTask?.title ?? "", /top-three comparison/i);
+  assert.deepEqual((comparisonTask?.metadata as Record<string, unknown>).vendor_comparison_top_choice_labels, [
+    "Harbour Studio",
+    "Budget Lens",
+    "Portrait Hall",
+  ]);
+  assert.equal((comparisonTask?.metadata as Record<string, unknown>).a2ui_primary_action, "open_vendor_comparison");
+});
+
+test("buildWeddingVendorSearchTaskItems hides comparison queue work after vendors are selected", async () => {
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        { title: "Harbour Studio", url: "https://harbour-studio.example", snippet: "Documentary Sydney photographer packages.", provider: "Brave Search" },
+        { title: "Budget Lens", url: "https://budget-lens.example", snippet: "Transparent pricing for weddings.", provider: "Brave Search" },
+        { title: "Portrait Hall", url: "https://portrait-hall.example", snippet: "Portfolio and reviews.", provider: "Brave Search" },
+      ],
+    }),
+  });
+  const sourceArtifact = buildWeddingVendorSearchArtifactState({ metadata, execution });
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "documentary style and transparent pricing",
+    location: "Sydney",
+    vendorCategories: ["photographer"],
+  });
+  assert.ok(comparison.artifactInput);
+
+  const tasks = buildWeddingVendorSearchTaskItems({
+    metadata,
+    artifacts: [
+      sourceArtifact.artifactInput!,
+      comparison.artifactInput,
+    ],
+    selectedDecisionItems: [{
+      id: "decision:harbour",
+      metadata,
+      artifactId: comparison.artifactInput.id,
+      artifactTitle: comparison.artifactInput.title,
+      artifactKind: "vendor_table",
+      sourceLabels: [],
+      sourceUrls: [],
+      sourceProviderLabels: [],
+      sourceCountsByProvider: null,
+      selectedOption: {
+        id: "0:harbour-studio",
+        rowIndex: 0,
+        label: "Harbour Studio",
+        detail: "Documentary Sydney photographer packages.",
+        cells: ["Harbour Studio"],
+        selected: true,
+        preferenceFitLabels: [],
+        missingPreferenceLabels: [],
+        tradeoffLabels: [],
+        preferenceSummaryLabel: "Selected by user",
+      },
+      source: "local_selection",
+    }],
+  });
+
+  assert.deepEqual(tasks, []);
 });

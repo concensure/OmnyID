@@ -1,6 +1,10 @@
 // @locs-version: 2.0
 import type { AfpMessage, CalendarEvent, SendAfpMessageInput } from "@/lib/api";
 import { decryptedDisplayContent } from "@/lib/decryptedDisplayState";
+import type {
+  WeddingSemanticUiKind,
+  WeddingSemanticUiObject,
+} from "@/lib/weddingSemanticUiState";
 import {
   normalizeWeddingPlanningMetadata,
   safeWeddingLabel,
@@ -8,8 +12,14 @@ import {
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
 
-export const WEDDING_CALENDAR_AFP_PROJECTIONS_KEY = "omnyid.wedding-calendar-afp-projections";
-export const WEDDING_TASK_AFP_PROJECTIONS_KEY = "omnyid.wedding-task-afp-projections";
+export {
+  WEDDING_CALENDAR_AFP_PROJECTIONS_KEY,
+  WEDDING_TASK_AFP_PROJECTIONS_KEY,
+  hasSentWeddingProjection,
+  loadWeddingProjectionIds,
+  markWeddingProjectionSent,
+  unmarkWeddingProjectionSent,
+} from "@/lib/weddingProjectionStorageState";
 
 export type WeddingPlanningScheduleItemKind =
   | "ceremony"
@@ -73,6 +83,9 @@ export type WeddingPlanningScheduleItem = {
   metadata?: unknown;
   linkedArtifactId?: string | null;
   notes?: string | null;
+  semanticKind?: WeddingSemanticUiKind | null;
+  semanticTags?: string[];
+  semanticObject?: WeddingSemanticUiObject | null;
 };
 
 export type WeddingPlanningTaskItem = {
@@ -89,6 +102,9 @@ export type WeddingPlanningTaskItem = {
   metadata?: unknown;
   linkedArtifactId?: string | null;
   notes?: string | null;
+  semanticKind?: WeddingSemanticUiKind | null;
+  semanticTags?: string[];
+  semanticObject?: WeddingSemanticUiObject | null;
 };
 
 function clean(value: unknown): string | null {
@@ -192,6 +208,8 @@ function taskGraphProjectionTags(projectedMetadata: Record<string, unknown>): st
     projectedMetadata.budget_payment_review === true ? "wedding_budget:payment_schedule" : null,
     projectedMetadata.budget_quote_verification === true ? "wedding_budget:quote_verification" : null,
     projectedMetadata.budget_payment_review === true || projectedMetadata.budget_quote_verification === true ? "decisionos" : null,
+    projectedMetadata.vendor_outreach_from_selected_decision === true ? "wedding_vendor_outreach" : null,
+    projectedMetadata.vendor_outreach_from_selected_decision === true ? "decisionos" : null,
     projectedMetadata.wedding_inspiration_task === true ? "wedding_inspiration" : null,
     projectedMetadata.wedding_inspiration_task === true ? "wedding_inspiration:preference_model" : null,
     projectedMetadata.wedding_inspiration_task === true ? "decisionos:wedding_style" : null,
@@ -208,6 +226,7 @@ function taskMessageRecipients(projectedMetadata: Record<string, unknown>): stri
     "agent://wedding-planning",
     projectedMetadata.budget_payment_review === true || projectedMetadata.budget_quote_verification === true ? "agent://decision-queue" : null,
     projectedMetadata.budget_payment_review === true || projectedMetadata.budget_quote_verification === true ? "agent://knowledge-graph" : null,
+    projectedMetadata.vendor_outreach_from_selected_decision === true ? "agent://decision-queue" : null,
     projectedMetadata.wedding_inspiration_task === true ? "agent://decision-queue" : null,
     projectedMetadata.wedding_inspiration_task === true ? "agent://knowledge-graph" : null,
     projectedMetadata.wedding_inspiration_task === true ? "agent://topology" : null,
@@ -246,6 +265,12 @@ function numberArray(value: unknown): number[] {
       .map((entry) => typeof entry === "number" ? entry : typeof entry === "string" ? Number(entry) : NaN)
       .filter((entry) => Number.isFinite(entry) && entry >= 0)
     : [];
+}
+
+function boundedPositiveInteger(value: unknown, fallback: number | null = null, max = 6): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.min(Math.ceil(value), max)
+    : fallback;
 }
 
 function isoDateOnly(date: Date): string {
@@ -302,6 +327,8 @@ function projectionMetadata(
   const followUpDueAt = clean(itemMetadata.follow_up_due_at);
   const budgetPaymentReview = itemMetadata.budget_payment_review === true;
   const budgetQuoteVerification = itemMetadata.budget_quote_verification === true;
+  const vendorOutreachFromSelectedDecision = itemMetadata.vendor_outreach_from_selected_decision === true;
+  const vendorOutreachRequestChecklist = stringArray(itemMetadata.vendor_outreach_request_checklist);
   const guestFollowUp = itemMetadata.guest_follow_up === true;
   const guestFinalCountDecision = itemMetadata.guest_final_count_decision === true;
   const postWeddingWrapUp = itemMetadata.post_wedding_wrap_up === true;
@@ -313,6 +340,7 @@ function projectionMetadata(
   const vendorSearchReviewTask = itemMetadata.vendor_search_review_task === true;
   const expectedBehaviorGap = itemMetadata.expected_behavior_gap === true;
   const oracleUpdatePlanTask = itemMetadata.oracle_update_plan_task === true;
+  const productionRemainingWorkTask = itemMetadata.production_remaining_work_task === true;
   const weddingInspirationTask = itemMetadata.wedding_inspiration_task === true;
   return {
     origin: "wedding_planning",
@@ -358,6 +386,18 @@ function projectionMetadata(
     budget_vendor_label: clean(itemMetadata.budget_vendor_label),
     budget_category_label: clean(itemMetadata.budget_category_label),
     budget_source_label: clean(itemMetadata.budget_source_label),
+    vendor_outreach_from_selected_decision: vendorOutreachFromSelectedDecision,
+    vendor_outreach_line_item_id: clean(itemMetadata.vendor_outreach_line_item_id),
+    vendor_outreach_vendor_label: clean(itemMetadata.vendor_outreach_vendor_label),
+    vendor_outreach_category_label: clean(itemMetadata.vendor_outreach_category_label),
+    vendor_outreach_source_label: clean(itemMetadata.vendor_outreach_source_label),
+    vendor_outreach_draft_subject: clean(itemMetadata.vendor_outreach_draft_subject),
+    vendor_outreach_draft_body: clean(itemMetadata.vendor_outreach_draft_body),
+    vendor_outreach_request_checklist: vendorOutreachRequestChecklist,
+    vendor_outreach_draft_requires_approval: itemMetadata.vendor_outreach_draft_requires_approval === true,
+    vendor_outreach_provider_receipt_required: itemMetadata.vendor_outreach_provider_receipt_required === true,
+    approval_required_before_outreach: itemMetadata.approval_required_before_outreach === true,
+    provider_receipt_required: itemMetadata.provider_receipt_required === true,
     guest_follow_up: guestFollowUp,
     guest_follow_up_candidate_id: clean(itemMetadata.guest_follow_up_candidate_id),
     guest_follow_up_reason: clean(itemMetadata.guest_follow_up_reason),
@@ -406,6 +446,11 @@ function projectionMetadata(
     oracle_update_guardrail_labels: stringArray(itemMetadata.oracle_update_guardrail_labels),
     oracle_update_command_label: clean(itemMetadata.oracle_update_command_label),
     production_readiness_oracle_gate: itemMetadata.production_readiness_oracle_gate === true,
+    production_remaining_work_task: productionRemainingWorkTask,
+    production_remaining_work_item_id: clean(itemMetadata.production_remaining_work_item_id),
+    production_remaining_work_tier: clean(itemMetadata.production_remaining_work_tier),
+    production_remaining_work_required_for_oracle: itemMetadata.production_remaining_work_required_for_oracle === true,
+    production_remaining_work_estimated_passes: boundedPositiveInteger(itemMetadata.production_remaining_work_estimated_passes),
     wedding_inspiration_task: weddingInspirationTask,
     inspiration_task_key: clean(itemMetadata.inspiration_task_key),
     inspiration_tags: stringArray(itemMetadata.inspiration_tags),
@@ -434,7 +479,6 @@ function projectionMetadata(
     selected_decision_required: itemMetadata.selected_decision_required === true,
     collapse_unselected_after_choice: itemMetadata.collapse_unselected_after_choice === true,
     budget_projection_update_required: itemMetadata.budget_projection_update_required === true,
-    approval_required_before_outreach: itemMetadata.approval_required_before_outreach === true,
     selected_decision_scope: Object.keys(selectedDecisionScope).length > 0 ? selectedDecisionScope : null,
     searchable_terms: [
       item.title,
@@ -502,6 +546,11 @@ function projectionMetadata(
       clean(itemMetadata.oracle_update_target_label),
       clean(itemMetadata.oracle_update_command_label),
       ...stringArray(itemMetadata.oracle_update_blocker_labels),
+      productionRemainingWorkTask ? "production remaining work" : null,
+      productionRemainingWorkTask ? "remaining production work" : null,
+      productionRemainingWorkTask ? itemMetadata.production_remaining_work_required_for_oracle === true ? "launch blocker" : "production polish" : null,
+      clean(itemMetadata.production_remaining_work_item_id),
+      clean(itemMetadata.production_remaining_work_tier),
       weddingInspirationTask ? "wedding inspiration" : null,
       weddingInspirationTask ? "style decisions" : null,
       weddingInspirationTask ? "preference model" : null,
@@ -536,6 +585,14 @@ function projectionMetadata(
   };
 }
 
+function semanticProjectionFields(item: WeddingPlanningScheduleItem | WeddingPlanningTaskItem): Record<string, unknown> {
+  return {
+    ...(item.semanticKind ? { semantic_kind: item.semanticKind } : {}),
+    ...(item.semanticTags && item.semanticTags.length > 0 ? { semantic_tags: item.semanticTags } : {}),
+    ...(item.semanticObject ? { semantic_object: item.semanticObject } : {}),
+  };
+}
+
 export function shouldProjectWeddingScheduleItemToAfpCalendarEvent(item: WeddingPlanningScheduleItem): boolean {
   return Boolean(clean(item.id) && clean(item.title) && clean(item.startAt))
     && item.reviewStatus !== "needs_review"
@@ -564,6 +621,7 @@ export function weddingScheduleItemToAfpCalendarMessage(
     `Source: ${source}.`,
     `Approval: ${metadata.approvalState}.`,
   ].filter(Boolean).join(" ");
+  const semanticFields = semanticProjectionFields(item);
 
   return {
     id: eventId,
@@ -593,11 +651,13 @@ export function weddingScheduleItemToAfpCalendarMessage(
       wedding_schedule_item_id: item.id,
       wedding_event_kind: item.kind,
       linked_artifact_id: clean(item.linkedArtifactId),
+      ...semanticFields,
     },
     metadata: {
       ...projectionMetadata(item, metadata, "wedding_schedule_item_to_afp_calendar_event"),
       wedding_schedule_item_id: item.id,
       wedding_event_kind: item.kind,
+      ...semanticFields,
     },
     views: [
       {
@@ -612,6 +672,7 @@ export function weddingScheduleItemToAfpCalendarMessage(
           wedding_plan_id: metadata.weddingPlanId,
           response_workspace_id: metadata.responseWorkspaceId,
           wedding_event_kind: item.kind,
+          ...semanticFields,
         },
       },
     ],
@@ -629,6 +690,7 @@ export function weddingTaskItemToAfpTaskMessage(
   const taskId = `afp-wedding-task:${safeWeddingLabel(item.id)}`;
   const source = clean(item.source) ?? "agent";
   const projectedMetadata = projectionMetadata(item, metadata, "wedding_task_item_to_afp_task");
+  const semanticFields = semanticProjectionFields(item);
 
   return {
     id: taskId,
@@ -683,6 +745,18 @@ export function weddingTaskItemToAfpTaskMessage(
       budget_vendor_label: projectedMetadata.budget_vendor_label,
       budget_category_label: projectedMetadata.budget_category_label,
       budget_source_label: projectedMetadata.budget_source_label,
+      vendor_outreach_from_selected_decision: projectedMetadata.vendor_outreach_from_selected_decision,
+      vendor_outreach_line_item_id: projectedMetadata.vendor_outreach_line_item_id,
+      vendor_outreach_vendor_label: projectedMetadata.vendor_outreach_vendor_label,
+      vendor_outreach_category_label: projectedMetadata.vendor_outreach_category_label,
+      vendor_outreach_source_label: projectedMetadata.vendor_outreach_source_label,
+      vendor_outreach_draft_subject: projectedMetadata.vendor_outreach_draft_subject,
+      vendor_outreach_draft_body: projectedMetadata.vendor_outreach_draft_body,
+      vendor_outreach_request_checklist: projectedMetadata.vendor_outreach_request_checklist,
+      vendor_outreach_draft_requires_approval: projectedMetadata.vendor_outreach_draft_requires_approval,
+      vendor_outreach_provider_receipt_required: projectedMetadata.vendor_outreach_provider_receipt_required,
+      approval_required_before_outreach: projectedMetadata.approval_required_before_outreach,
+      provider_receipt_required: projectedMetadata.provider_receipt_required,
       guest_follow_up: projectedMetadata.guest_follow_up,
       guest_follow_up_candidate_id: projectedMetadata.guest_follow_up_candidate_id,
       guest_follow_up_reason: projectedMetadata.guest_follow_up_reason,
@@ -694,11 +768,13 @@ export function weddingTaskItemToAfpTaskMessage(
       preferred_action_label: projectedMetadata.preferred_action_label,
       wedding_workspace_menu: projectedMetadata.wedding_workspace_menu,
       a2ui_primary_action: projectedMetadata.a2ui_primary_action,
+      ...semanticFields,
     },
     metadata: {
       ...projectedMetadata,
       wedding_task_item_id: item.id,
       wedding_task_kind: item.kind,
+      ...semanticFields,
     },
     views: [
       {
@@ -728,6 +804,14 @@ export function weddingTaskItemToAfpTaskMessage(
           budget_category_label: projectedMetadata.budget_category_label,
           budget_payment_due_amount_label: projectedMetadata.budget_payment_due_amount_label,
           budget_payment_due_date_label: projectedMetadata.budget_payment_due_date_label,
+          vendor_outreach_from_selected_decision: projectedMetadata.vendor_outreach_from_selected_decision,
+          vendor_outreach_vendor_label: projectedMetadata.vendor_outreach_vendor_label,
+          vendor_outreach_category_label: projectedMetadata.vendor_outreach_category_label,
+          vendor_outreach_draft_subject: projectedMetadata.vendor_outreach_draft_subject,
+          vendor_outreach_request_checklist: projectedMetadata.vendor_outreach_request_checklist,
+          vendor_outreach_draft_requires_approval: projectedMetadata.vendor_outreach_draft_requires_approval,
+          approval_required_before_outreach: projectedMetadata.approval_required_before_outreach,
+          provider_receipt_required: projectedMetadata.provider_receipt_required,
           guest_follow_up: projectedMetadata.guest_follow_up,
           seating_action: projectedMetadata.seating_action,
           wedding_inspiration_task: projectedMetadata.wedding_inspiration_task,
@@ -735,6 +819,7 @@ export function weddingTaskItemToAfpTaskMessage(
           preferred_action_label: projectedMetadata.preferred_action_label,
           wedding_workspace_menu: projectedMetadata.wedding_workspace_menu,
           a2ui_primary_action: projectedMetadata.a2ui_primary_action,
+          ...semanticFields,
         },
       },
     ],
@@ -887,38 +972,4 @@ export function weddingTaskItemToAfpSendInput(
 ): SendAfpMessageInput | null {
   const message = weddingTaskItemToAfpTaskMessage(item, nowIso);
   return message ? messageToSendInput(message) : null;
-}
-
-export function loadWeddingProjectionIds(key: string, storage: Storage = localStorage): string[] {
-  const raw = storage.getItem(key);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-      : [];
-  } catch {
-    storage.removeItem(key);
-    return [];
-  }
-}
-
-export function hasSentWeddingProjection(id: string, key: string, storage: Storage = localStorage): boolean {
-  const cleanId = clean(id);
-  return cleanId ? loadWeddingProjectionIds(key, storage).includes(cleanId) : false;
-}
-
-export function markWeddingProjectionSent(id: string, key: string, storage: Storage = localStorage): void {
-  const cleanId = clean(id);
-  if (!cleanId) return;
-  const next = [...new Set([cleanId, ...loadWeddingProjectionIds(key, storage)])].slice(0, 300);
-  storage.setItem(key, JSON.stringify(next));
-}
-
-export function unmarkWeddingProjectionSent(id: string, key: string, storage: Storage = localStorage): void {
-  const cleanId = clean(id);
-  if (!cleanId) return;
-  const next = loadWeddingProjectionIds(key, storage).filter((value) => value !== cleanId);
-  if (next.length > 0) storage.setItem(key, JSON.stringify(next));
-  else storage.removeItem(key);
 }

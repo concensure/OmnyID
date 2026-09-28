@@ -1,11 +1,19 @@
 // @locs-version: 2.0
 import type { WeddingProductionReadinessState } from "@/lib/weddingProductionReadinessState";
 import type { WeddingProductionGoNoGoPacketState } from "@/lib/weddingProductionGoNoGoPacketState";
+import {
+  weddingProductionGoNoGoPacketHasCompleteProofManifest,
+  weddingProductionGoNoGoPacketHasCompleteReadyGates,
+} from "@/lib/weddingProductionGoNoGoPacketState";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import {
   normalizeWeddingPlanningMetadata,
   safeWeddingLabel,
 } from "@/lib/weddingPlanningTemplateState";
+import {
+  cleanWeddingProductionLabel,
+  cleanWeddingProductionLabels,
+} from "@/lib/weddingProductionLabelState";
 
 export type WeddingOracleUpdateStepKind =
   | "blocked"
@@ -52,21 +60,41 @@ function blockedStep(blocker: string, index: number): WeddingOracleUpdateStep {
     id: `oracle-update-blocker:${index + 1}`,
     kind: "blocked",
     title: blocker,
-    detail: "Finish this required launch check before updating the live wedding planner.",
+    detail: blockedStepDetail(blocker),
     required: true,
   };
 }
 
+function blockedStepDetail(blocker: string): string {
+  if (/vendor quote reply|connected Gmail\/provider send|server thread proof|proof drawer|provider receipt persistence/i.test(blocker)) {
+    return "Finish the vendor quote reply live-send proof: verify the connected provider send, attach the durable receipt to the vendor thread, and confirm the proof drawer reconstructs quote, draft, and sent proof.";
+  }
+  return "Finish this required launch check before updating the live wedding planner.";
+}
+
 function goNoGoBlockedLabels(packet: WeddingProductionGoNoGoPacketState | null | undefined): string[] {
-  if (packet?.canUploadToOracle !== false) return [];
-  if (packet.blockerLabels.length > 0) return packet.blockerLabels;
-  if (packet.nextActionLabels.length > 0) {
-    return packet.nextActionLabels.map((label) => `Next action required: ${label}`);
+  if (!packet) return [];
+  if (packet.canUploadToOracle === true && !goNoGoPacketReadyForOracleUpdate(packet)) {
+    return ["Aggregate production go/no-go packet is marked ready but is missing complete gate counts or proof manifest receipts."];
+  }
+  if (packet.canUploadToOracle !== false) return [];
+  const blockerLabels = cleanWeddingProductionLabels(packet.blockerLabels);
+  if (blockerLabels.length > 0) return blockerLabels;
+  const nextActionLabels = cleanWeddingProductionLabels(packet.nextActionLabels);
+  if (nextActionLabels.length > 0) {
+    return cleanWeddingProductionLabels(nextActionLabels.map((label) => `Next action required: ${label}`));
   }
   const counts = packet.gateCounts;
   return [
     `Aggregate production go/no-go packet is blocked (${counts.ready}/${counts.total} gates ready, ${counts.blocked} blocked, ${counts.missing} missing).`,
   ];
+}
+
+function goNoGoPacketReadyForOracleUpdate(packet: WeddingProductionGoNoGoPacketState | null | undefined): boolean {
+  if (!packet) return false;
+  if (packet.status !== "ready" || packet.canUploadToOracle !== true) return false;
+  return weddingProductionGoNoGoPacketHasCompleteReadyGates(packet)
+    && weddingProductionGoNoGoPacketHasCompleteProofManifest(packet);
 }
 
 function readySteps(targetLabel: string): WeddingOracleUpdateStep[] {
@@ -110,22 +138,22 @@ export function buildWeddingOracleUpdatePlanState(input: {
   productionGoNoGoPacket?: WeddingProductionGoNoGoPacketState | null;
   targetLabel?: string | null;
 }): WeddingOracleUpdatePlanState {
-  const explicitTargetLabel = clean(input.targetLabel);
+  const explicitTargetLabel = cleanWeddingProductionLabel(input.targetLabel, { maxLength: 120 }) ?? "";
   const targetLabel = explicitTargetLabel || "Oracle production target";
   const readiness = input.productionReadiness;
-  const readinessBlockerLabels = readiness.checks
+  const readinessBlockerLabels = cleanWeddingProductionLabels(readiness.checks
     .filter((check) => check.requiredForOracle && check.status === "blocked")
-    .map((check) => check.label);
+    .map((check) => check.label));
   const goNoGoBlockerLabels = input.productionGoNoGoPacket
     ? goNoGoBlockedLabels(input.productionGoNoGoPacket)
     : readiness.oracleUploadAllowed
       ? ["Aggregate production go/no-go packet is missing."]
       : [];
-  const blockerLabels = [...new Set([
+  const blockerLabels = cleanWeddingProductionLabels([
     ...readinessBlockerLabels,
     ...goNoGoBlockerLabels.map((label) => `Production go/no-go: ${label}`),
-  ])];
-  const aggregateGoNoGoReady = input.productionGoNoGoPacket?.canUploadToOracle === true;
+  ]);
+  const aggregateGoNoGoReady = goNoGoPacketReadyForOracleUpdate(input.productionGoNoGoPacket);
   const targetBlockerLabels = readiness.oracleUploadAllowed && aggregateGoNoGoReady && !explicitTargetLabel
     ? ["Live launch target label is missing."]
     : [];
@@ -143,13 +171,13 @@ export function buildWeddingOracleUpdatePlanState(input: {
       : `${targetLabel} update is blocked by ${blockerLabels.length} required launch check${blockerLabels.length === 1 ? "" : "s"}.`,
     blockerLabels,
     steps,
-    guardrailLabels: [
+    guardrailLabels: cleanWeddingProductionLabels([
       "Never update the live wedding planner while required launch checks are blocked.",
       "The launch-readiness proof must be ready before any live update.",
       "Run release commands outside the UI only after readiness allows the update.",
       "Keep secrets file-backed and out of logs, screenshots, and planning files.",
       "Record durable proof references after release so future passes can verify what changed.",
-    ],
+    ]),
   };
 }
 

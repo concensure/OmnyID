@@ -1,0 +1,332 @@
+// @locs-version: 1.0
+import type { AfpMessage } from "@/lib/api";
+import { decryptedDisplayContent } from "@/lib/decryptedDisplayState";
+import type {
+  WeddingBoundaryChangeRequest,
+  WeddingBoundaryDecisionRationale,
+  WeddingBoundaryEventInvitation,
+  WeddingBoundaryGuestProfile,
+  WeddingBoundaryHousehold,
+  WeddingBoundaryLedgerKind,
+  WeddingBoundaryLedgerObject,
+  WeddingBoundaryPolicy,
+  WeddingBoundaryPolicyEnforcement,
+  WeddingBoundaryPolicyRuleType,
+  WeddingBoundaryRequestStatus,
+  WeddingBoundaryRole,
+  WeddingBoundaryRoleAssignment,
+  WeddingBoundaryVisibility,
+} from "@/lib/weddingBoundaryLedgerState";
+import {
+  normalizeWeddingPlanningMetadata,
+  type WeddingPlanningMetadata,
+} from "@/lib/weddingPlanningTemplateState";
+import type {
+  WeddingSeatingConstraintAction,
+  WeddingSeatingConstraintKind,
+} from "@/lib/weddingSeatingConstraintActionState";
+import {
+  isWeddingSemanticUiKind,
+  weddingSemanticUiObjectsFromAfpLikeMessage,
+  type WeddingSemanticUiKind,
+  type WeddingSemanticUiObject,
+} from "@/lib/weddingSemanticUiState";
+
+const BOUNDARY_KINDS = new Set<WeddingBoundaryLedgerKind>([
+  "wedding_boundary_policy",
+  "wedding_boundary_role_assignment",
+  "wedding_boundary_household",
+  "wedding_boundary_guest_profile",
+  "wedding_boundary_event_invitation",
+  "wedding_boundary_change_request",
+  "wedding_boundary_decision_rationale",
+  "wedding_boundary_decline_template",
+  "wedding_boundary_visibility_page",
+]);
+
+const BOUNDARY_VISIBILITIES = new Set<WeddingBoundaryVisibility>([
+  "couple_only",
+  "approved_shared",
+  "family_visible",
+  "vendor_logistics",
+]);
+
+const BOUNDARY_POLICY_RULE_TYPES = new Set<WeddingBoundaryPolicyRuleType>([
+  "plus_one",
+  "children",
+  "invitation_scope",
+  "access",
+  "seating",
+  "communication",
+]);
+
+const BOUNDARY_POLICY_ENFORCEMENTS = new Set<WeddingBoundaryPolicyEnforcement>([
+  "block",
+  "require_approval",
+  "warn",
+]);
+
+const BOUNDARY_ROLES = new Set<WeddingBoundaryRole>([
+  "couple",
+  "parent_family",
+  "helper",
+  "vendor",
+  "guest",
+]);
+
+const BOUNDARY_REQUEST_STATUSES = new Set<WeddingBoundaryRequestStatus>([
+  "pending",
+  "approved",
+  "declined",
+  "auto_blocked",
+]);
+
+const SEATING_CONSTRAINT_KINDS = new Set<WeddingSeatingConstraintKind>([
+  "keep_apart",
+  "prefer_together",
+  "prefer_quiet",
+  "social_group_together",
+]);
+
+function clean(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.flatMap((item) => clean(item) ?? []) : [];
+}
+
+function bool(value: unknown): boolean {
+  return value === true;
+}
+
+function contentValue(message: AfpMessage, key: string): unknown {
+  return decryptedDisplayContent(message)[key] ?? message.metadata?.[key];
+}
+
+function workspaceIdFrom(message: AfpMessage): string | null {
+  return clean(contentValue(message, "response_workspace_id")) ?? clean(message.metadata?.responseWorkspaceId);
+}
+
+function baseMetadata(message: AfpMessage, fallback: WeddingPlanningMetadata): WeddingPlanningMetadata {
+  return normalizeWeddingPlanningMetadata({
+    ...(message.metadata ?? {}),
+    weddingPlanId: clean(contentValue(message, "wedding_plan_id")) ?? fallback.weddingPlanId,
+    responseWorkspaceId: clean(contentValue(message, "response_workspace_id")) ?? fallback.responseWorkspaceId,
+    sourceResponseId: clean(contentValue(message, "source_response_id")) ?? fallback.sourceResponseId,
+    supertags: strings(message.supertags).length > 0 ? strings(message.supertags) : fallback.supertags,
+  });
+}
+
+function boundaryKindFrom(value: unknown): WeddingBoundaryLedgerKind | null {
+  return typeof value === "string" && BOUNDARY_KINDS.has(value as WeddingBoundaryLedgerKind)
+    ? value as WeddingBoundaryLedgerKind
+    : null;
+}
+
+function boundaryVisibilityFrom(value: unknown): WeddingBoundaryVisibility | null {
+  return typeof value === "string" && BOUNDARY_VISIBILITIES.has(value as WeddingBoundaryVisibility)
+    ? value as WeddingBoundaryVisibility
+    : null;
+}
+
+function boundaryPolicyRuleTypeFrom(value: unknown): WeddingBoundaryPolicyRuleType {
+  return typeof value === "string" && BOUNDARY_POLICY_RULE_TYPES.has(value as WeddingBoundaryPolicyRuleType)
+    ? value as WeddingBoundaryPolicyRuleType
+    : "invitation_scope";
+}
+
+function boundaryPolicyEnforcementFrom(value: unknown): WeddingBoundaryPolicyEnforcement {
+  return typeof value === "string" && BOUNDARY_POLICY_ENFORCEMENTS.has(value as WeddingBoundaryPolicyEnforcement)
+    ? value as WeddingBoundaryPolicyEnforcement
+    : "require_approval";
+}
+
+function boundaryRoleFrom(value: unknown): WeddingBoundaryRole {
+  return typeof value === "string" && BOUNDARY_ROLES.has(value as WeddingBoundaryRole)
+    ? value as WeddingBoundaryRole
+    : "helper";
+}
+
+function boundaryRequestStatusFrom(value: unknown): WeddingBoundaryRequestStatus {
+  return typeof value === "string" && BOUNDARY_REQUEST_STATUSES.has(value as WeddingBoundaryRequestStatus)
+    ? value as WeddingBoundaryRequestStatus
+    : "pending";
+}
+
+function seatingConstraintKindFrom(value: unknown): WeddingSeatingConstraintKind | null {
+  return typeof value === "string" && SEATING_CONSTRAINT_KINDS.has(value as WeddingSeatingConstraintKind)
+    ? value as WeddingSeatingConstraintKind
+    : null;
+}
+
+export function weddingPersistedSeatingConstraintFromAfpMessage(
+  message: AfpMessage,
+): WeddingSeatingConstraintAction | null {
+  if (message.subtype !== "wedding_seating_constraint" || workspaceIdFrom(message) === null) return null;
+  const kind = seatingConstraintKindFrom(contentValue(message, "constraint_kind") ?? message.metadata?.seating_constraint_kind);
+  const instruction = clean(contentValue(message, "instruction"));
+  if (!kind || !instruction) return null;
+  const confidenceValue = clean(contentValue(message, "confidence"));
+  const confidence = confidenceValue === "high" || confidenceValue === "medium" || confidenceValue === "low"
+    ? confidenceValue
+    : "medium";
+  return {
+    id: clean(contentValue(message, "constraint_id")) ?? message.id,
+    kind,
+    instruction,
+    primaryPersonId: clean(message.references?.find((reference) => reference.type === "seating_constraint_primary_person")?.target),
+    relatedPersonId: clean(message.references?.find((reference) => reference.type === "seating_constraint_related_person")?.target),
+    socialGroup: clean(message.references?.find((reference) => reference.type === "seating_constraint_social_group")?.target),
+    confidence,
+    statusLabel: clean(contentValue(message, "status_label")) ?? "Seating instruction saved.",
+  };
+}
+
+function boundaryBase(message: AfpMessage, fallback: WeddingPlanningMetadata): {
+  id: string;
+  title: string;
+  status: string | null;
+  visibility: WeddingBoundaryVisibility | null;
+  createdAt: string;
+  metadata: Record<string, unknown>;
+  semanticKind: WeddingSemanticUiKind | null;
+  semanticTags: string[];
+  semanticObject: WeddingSemanticUiObject | null;
+} {
+  const [semanticObject = null] = weddingSemanticUiObjectsFromAfpLikeMessage(message);
+  const semanticKind = semanticObject?.kind ?? (isWeddingSemanticUiKind(message.metadata?.semantic_kind) ? message.metadata.semantic_kind : null);
+  const semanticTags = [...new Set([
+    ...strings(message.metadata?.semantic_tags),
+    ...(semanticObject?.semanticTags ?? []),
+    semanticKind,
+  ].filter((item): item is string => Boolean(item)))].slice(0, 16);
+  return {
+    id: clean(contentValue(message, "boundary_object_id")) ?? clean(message.metadata?.boundary_object_id) ?? message.id,
+    title: clean(contentValue(message, "title")) ?? "Wedding boundary record",
+    status: clean(contentValue(message, "status")),
+    visibility: boundaryVisibilityFrom(contentValue(message, "visibility")),
+    createdAt: clean(contentValue(message, "created_at")) ?? message.timestamp,
+    metadata: {
+      ...baseMetadata(message, fallback),
+      persisted_afp_message_id: message.id,
+      persisted_boundary_ledger: true,
+      semantic_kind: semanticKind,
+      semantic_tags: semanticTags,
+    },
+    semanticKind,
+    semanticTags,
+    semanticObject,
+  };
+}
+
+export function weddingPersistedBoundaryObjectFromAfpMessage(
+  message: AfpMessage,
+  fallback: WeddingPlanningMetadata,
+): WeddingBoundaryLedgerObject | null {
+  const kind = boundaryKindFrom(message.subtype ?? message.kind ?? contentValue(message, "ledger_kind"));
+  if (!kind || workspaceIdFrom(message) === null) return null;
+  const base = boundaryBase(message, fallback);
+  if (kind === "wedding_boundary_policy") {
+    return {
+      ...base,
+      kind,
+      ruleType: boundaryPolicyRuleTypeFrom(contentValue(message, "rule_type")),
+      enforcement: boundaryPolicyEnforcementFrom(contentValue(message, "enforcement")),
+      plainLanguage: clean(contentValue(message, "plain_language")) ?? base.title,
+      scope: clean(contentValue(message, "scope")) as WeddingBoundaryPolicy["scope"],
+      approvedBy: strings(contentValue(message, "approved_by")),
+    };
+  }
+  if (kind === "wedding_boundary_role_assignment") {
+    const personId = clean(contentValue(message, "person_id"));
+    if (!personId) return null;
+    return {
+      ...base,
+      kind,
+      personId,
+      role: boundaryRoleFrom(contentValue(message, "role")),
+      canView: strings(contentValue(message, "can_view")),
+      canSuggest: strings(contentValue(message, "can_suggest")) as WeddingBoundaryRoleAssignment["canSuggest"],
+      canEdit: strings(contentValue(message, "can_edit")) as WeddingBoundaryRoleAssignment["canEdit"],
+      requiresApprovalFor: strings(contentValue(message, "requires_approval_for")) as WeddingBoundaryRoleAssignment["requiresApprovalFor"],
+      privateNotesVisible: bool(contentValue(message, "private_notes_visible")),
+    };
+  }
+  if (kind === "wedding_boundary_household") {
+    const householdId = clean(contentValue(message, "household_id"));
+    if (!householdId) return null;
+    return {
+      ...base,
+      kind,
+      householdId,
+      displayName: clean(contentValue(message, "display_name")) ?? base.title,
+      primaryContactPersonId: clean(contentValue(message, "primary_contact_person_id")),
+      memberPersonIds: strings(contentValue(message, "member_person_ids")),
+      familySide: clean(contentValue(message, "family_side")) as WeddingBoundaryHousehold["familySide"],
+    };
+  }
+  if (kind === "wedding_boundary_guest_profile") {
+    const personId = clean(contentValue(message, "person_id"));
+    if (!personId) return null;
+    return {
+      ...base,
+      kind,
+      personId,
+      displayName: clean(contentValue(message, "display_name")) ?? base.title,
+      householdId: clean(contentValue(message, "household_id")),
+      ageBand: clean(contentValue(message, "age_band")) as WeddingBoundaryGuestProfile["ageBand"],
+      relationshipLabel: clean(contentValue(message, "relationship_label")),
+      familySide: clean(contentValue(message, "family_side")) as WeddingBoundaryGuestProfile["familySide"],
+    };
+  }
+  if (kind === "wedding_boundary_event_invitation") {
+    const invitationId = clean(contentValue(message, "invitation_id"));
+    const eventId = clean(contentValue(message, "event_id"));
+    const personId = clean(contentValue(message, "person_id"));
+    if (!invitationId || !eventId || !personId) return null;
+    return {
+      ...base,
+      kind,
+      invitationId,
+      eventId,
+      personId,
+      invitationStatus: clean(contentValue(message, "invitation_status")) as WeddingBoundaryEventInvitation["invitationStatus"] ?? "invited",
+      plusOneAllowed: bool(contentValue(message, "plus_one_allowed")),
+      childrenInvited: bool(contentValue(message, "children_invited")),
+      visibleToGuest: contentValue(message, "visible_to_guest") !== false,
+    };
+  }
+  if (kind === "wedding_boundary_change_request") {
+    const requestId = clean(contentValue(message, "request_id"));
+    const requestedBy = clean(contentValue(message, "requested_by"));
+    if (!requestId || !requestedBy) return null;
+    return {
+      ...base,
+      kind,
+      requestId,
+      requestedBy,
+      changeType: clean(contentValue(message, "change_type")) as WeddingBoundaryChangeRequest["changeType"] ?? "add_guest",
+      targetPersonId: clean(contentValue(message, "target_person_id")),
+      targetEventId: clean(contentValue(message, "target_event_id")),
+      targetHouseholdId: clean(contentValue(message, "target_household_id")),
+      requestStatus: boundaryRequestStatusFrom(contentValue(message, "request_status")),
+      approvalRequired: bool(contentValue(message, "approval_gate_recorded")) || bool(contentValue(message, "approval_required")),
+      policyIds: strings(contentValue(message, "policy_ids")),
+      publicReason: clean(contentValue(message, "public_reason")),
+    };
+  }
+  if (kind === "wedding_boundary_decision_rationale") {
+    const decisionId = clean(contentValue(message, "decision_id"));
+    if (!decisionId) return null;
+    return {
+      ...base,
+      kind,
+      decisionId,
+      linkedPolicyId: clean(contentValue(message, "linked_policy_id")),
+      summaryPublic: clean(contentValue(message, "summary_public")),
+      rationaleCiphertext: clean(contentValue(message, "encrypted_private_payload")) ?? "",
+    } satisfies WeddingBoundaryDecisionRationale;
+  }
+  return null;
+}

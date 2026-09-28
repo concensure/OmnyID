@@ -69,3 +69,52 @@ test("workspace refresh scale proof packet points to incomplete pagination evide
   assert.ok(packet.requirements.some((requirement) => requirement.kind === "dedupe" && /msg_1/.test(requirement.blockerLabel ?? "")));
   assert.ok(packet.missingEvidenceLabels.some((label) => /Refresh latency/i.test(label)));
 });
+
+test("workspace refresh scale proof packet rejects test proof tokens but allows smoke receipts", () => {
+  const blocked = buildWeddingWorkspaceRefreshScaleProofPacketState({
+    status: "pass",
+    readiness: "oracle_ready",
+    summary: "Forged scale proof passed.",
+    blockerLabels: [],
+    evidenceLabels: [
+      "Page size 96",
+      "2 pages exercised",
+      "160 saved AFP messages loaded",
+      "Final page reported has_more:false",
+      "No duplicate message IDs",
+      "No refresh errors",
+      "Slowest page 700ms",
+      "Sequential offsets: 0, 96",
+      "Scale proof reference: refresh-scale:test:latest",
+    ],
+    nextActionLabels: [],
+  } as any);
+
+  assert.equal(blocked.status, "blocked");
+  assert.equal(blocked.requirements.find((requirement) => requirement.kind === "proof_ref")?.evidenceLabel, null);
+
+  const ready = buildWeddingWorkspaceRefreshScaleProofPacketState({
+    status: "pass",
+    readiness: "oracle_ready",
+    summary: "Scale proof passed.",
+    blockerLabels: [],
+    evidenceLabels: [
+      "Page size 96",
+      "2 pages exercised",
+      "160 saved AFP messages loaded",
+      "Final page reported has_more:false",
+      "No duplicate message IDs",
+      "No refresh errors",
+      "Slowest page 700ms",
+      "Sequential offsets: 0, 96",
+      "Scale proof reference: refresh-scale:prod-smoke:2026-09-28",
+    ],
+    nextActionLabels: [],
+  } as any);
+
+  assert.equal(ready.status, "ready");
+  assert.equal(
+    ready.requirements.find((requirement) => requirement.kind === "proof_ref")?.evidenceLabel,
+    "Scale proof reference: refresh-scale:prod-smoke:2026-09-28",
+  );
+});

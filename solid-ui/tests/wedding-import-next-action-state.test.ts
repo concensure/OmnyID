@@ -24,6 +24,6 @@ test("weddingImportNextActionTarget routes spreadsheet parser and source evidenc
 test("weddingImportNextActionTarget keeps generic import review on wedding documents", () => {
   const target = weddingImportNextActionTarget("Review 2 imports that did not expose clear rows.");
 
-  assert.equal(target.menuId, "home");
+  assert.equal(target.menuId, "documents");
   assert.equal(target.actionLabel, "Open wedding documents");
 });

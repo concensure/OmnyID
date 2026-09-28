@@ -22,6 +22,8 @@ test("buildWeddingArtifactPreviewState extracts markdown tables for vendor artif
   assert.equal(preview.rows.length, 2);
   assert.equal(preview.rows[0]?.[0], "Harbour Hall");
   assert.equal(preview.rowCountLabel, "2 rows");
+  assert.deepEqual(preview.columns?.map((column) => column.kind), ["option", "location", "risk"]);
+  assert.deepEqual(preview.columns?.map((column) => column.label), ["Option", "Location", "Watch-outs"]);
 });
 
 test("buildWeddingArtifactPreviewState summarizes budget sheet risk evidence", () => {
@@ -44,6 +46,14 @@ test("buildWeddingArtifactPreviewState summarizes budget sheet risk evidence", (
   assert.equal(preview.budgetSummary?.dueAmountCount, 1);
   assert.equal(preview.budgetSummary?.unpaidCount, 2);
   assert.equal(preview.budgetSummary?.warningCount, 2);
+  assert.deepEqual(preview.columns?.map((column) => column.kind), [
+    "text",
+    "price",
+    "price",
+    "text",
+    "price",
+    "risk",
+  ]);
   assert.match(preview.budgetSummary?.summaryLabel ?? "", /2 unknown costs/);
   assert.deepEqual(preview.budgetSummary?.warningLabels, [
     "Check minimum spend",
@@ -97,6 +107,66 @@ test("buildWeddingArtifactPreviewState extracts approval-gated email details", (
   assert.equal(preview.subject, "Availability request");
   assert.match(preview.disclosureSummary, /guest count/);
   assert.match(preview.body, /package inclusions/);
+});
+
+test("buildWeddingArtifactPreviewState creates structured quote previews before raw documents", () => {
+  const preview = buildWeddingArtifactPreviewState({
+    artifactKind: "vendor_table",
+    bodyText: [
+      "# Chloe's Florals quote",
+      "",
+      "Vendor: Chloe's Florals",
+      "Quote amount: AUD $799",
+      "Budget delta: $200 over budget",
+      "Valid until: 2026-10-15",
+      "Original PDF: https://example.com/chloe-quote.pdf",
+      "",
+      "## Inclusions",
+      "",
+      "- Bridal bouquet",
+      "- Ceremony arrangements",
+    ].join("\n"),
+  });
+
+  assert.equal(preview?.kind, "quote");
+  if (preview?.kind !== "quote") return;
+  assert.equal(preview.vendorName, "Chloe's Florals");
+  assert.equal(preview.amount, 799);
+  assert.equal(preview.currency, "AUD");
+  assert.equal(preview.budgetDeltaAmount, 200);
+  assert.equal(preview.validUntil, "2026-10-15");
+  assert.equal(preview.attachmentUrl, "https://example.com/chloe-quote.pdf");
+  assert.deepEqual(preview.inclusions, ["Bridal bouquet", "Ceremony arrangements"]);
+});
+
+test("buildWeddingArtifactPreviewState keeps explicit quote currencies distinct from dollar fallback", () => {
+  const usdPreview = buildWeddingArtifactPreviewState({
+    artifactKind: "vendor_table",
+    bodyText: [
+      "# Destination florist quote",
+      "",
+      "Vendor: Pacific Florals",
+      "Quote amount: USD $1,250",
+      "Budget delta: USD $150 over budget",
+    ].join("\n"),
+  });
+  const audPreview = buildWeddingArtifactPreviewState({
+    artifactKind: "vendor_table",
+    bodyText: [
+      "# Local florist quote",
+      "",
+      "Vendor: Chloe's Florals",
+      "Quote amount: AUD $799",
+    ].join("\n"),
+  });
+
+  assert.equal(usdPreview?.kind, "quote");
+  assert.equal(audPreview?.kind, "quote");
+  if (usdPreview?.kind !== "quote" || audPreview?.kind !== "quote") return;
+  assert.equal(usdPreview.currency, "USD");
+  assert.equal(usdPreview.amount, 1250);
+  assert.equal(usdPreview.budgetDeltaAmount, 150);
+  assert.equal(audPreview.currency, "AUD");
 });
 
 test("buildWeddingArtifactPreviewState falls back to document highlights", () => {

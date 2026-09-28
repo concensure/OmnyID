@@ -3,6 +3,10 @@ import type {
   WeddingProviderCapability,
   WeddingProviderExecutorReadinessState,
 } from "@/lib/weddingProviderExecutorReadinessState";
+import {
+  cleanWeddingProductionLabel,
+  cleanWeddingProductionLabels,
+} from "@/lib/weddingProductionLabelState";
 
 export type WeddingProviderExecutorSuiteCapability = Extract<
   WeddingProviderCapability,
@@ -55,7 +59,7 @@ function blockerLabelsFor(provider: WeddingProviderExecutorReadinessState | unde
   const blockers: string[] = [];
   if (provider.credentialStatus === "missing") blockers.push(`${PROVIDER_LABELS[capability]} credentials are missing.`);
   if (provider.credentialStatus === "stale") blockers.push(`${PROVIDER_LABELS[capability]} credentials need reconnection.`);
-  if (provider.executorStatus === "missing") blockers.push(`${PROVIDER_LABELS[capability]} executor implementation is missing.`);
+  if (provider.executorStatus === "missing") blockers.push(`${PROVIDER_LABELS[capability]} connected app action is missing.`);
   if (!provider.productionReady && blockers.length === 0) blockers.push(`${PROVIDER_LABELS[capability]} is not production-ready.`);
   return blockers;
 }
@@ -73,19 +77,32 @@ function clean(value: unknown): string {
 }
 
 function durableProofRef(value: unknown): string | null {
-  const proofRef = clean(value);
+  const proofRef = cleanWeddingProductionLabel(clean(value));
   if (!proofRef) return null;
+  if (proofRef === "...") return null;
   if (/^https?:\/\//i.test(proofRef)) return null;
   if (/^receipt:/i.test(proofRef)) return null;
+  if (/^(?:local|draft|display|dry-run|test|example|placeholder|fake|stub|mock):/i.test(proofRef)) return null;
+  if (/\b(?:placeholder|fake|stub|mock|test)\b/i.test(proofRef)) return null;
   return proofRef;
 }
 
 function nextActionFor(label: string): string {
   if (/credentials/i.test(label)) return "Reconnect or mount fresh provider credentials.";
-  if (/executor implementation/i.test(label)) return "Connect the provider executor implementation.";
-  if (/durable executor proof/i.test(label)) return "Attach durable executor proof receipt for this provider capability.";
+  if (/connected app action/i.test(label)) return "Connect the app action for this provider.";
+  if (/unique durable connected app proof/i.test(label)) return "Attach a separate durable connected app proof receipt for each provider capability.";
+  if (/durable connected app proof/i.test(label)) return "Attach a durable connected app proof receipt for this provider capability.";
   if (/readiness proof is missing/i.test(label)) return "Add provider readiness proof for the missing capability.";
-  return "Complete provider executor production proof.";
+  return "Complete connected app production proof.";
+}
+
+function duplicateProofRefs(checks: readonly WeddingProviderExecutorSuiteCapabilityCheck[]): Set<string> {
+  const counts = new Map<string, number>();
+  checks.forEach((check) => {
+    if (!check.proofRef) return;
+    counts.set(check.proofRef, (counts.get(check.proofRef) ?? 0) + 1);
+  });
+  return new Set([...counts].filter(([, count]) => count > 1).map(([proofRef]) => proofRef));
 }
 
 export function buildWeddingProviderExecutorSuiteReadinessState(
@@ -96,19 +113,19 @@ export function buildWeddingProviderExecutorSuiteReadinessState(
   const requiredCapabilities = input.requiredCapabilities?.length
     ? input.requiredCapabilities
     : WEDDING_REQUIRED_PROVIDER_EXECUTOR_CAPABILITIES;
-  const checks = requiredCapabilities.map((capability): WeddingProviderExecutorSuiteCapabilityCheck => {
+  const baseChecks = requiredCapabilities.map((capability): WeddingProviderExecutorSuiteCapabilityCheck => {
     const provider = bestProviderFor(providers, capability);
     const rawProofRef = clean(input.executorProofRefs?.[capability]);
     const proofRef = durableProofRef(rawProofRef);
-    const blockerLabels = [
+    const blockerLabels = cleanWeddingProductionLabels([
       ...blockerLabelsFor(provider, capability),
       proofReferencesRequired && provider?.productionReady === true && rawProofRef && !proofRef
-        ? `${PROVIDER_LABELS[capability]} proof reference must be a durable provider execution ID, not a local receipt ID or display link.`
+        ? `${PROVIDER_LABELS[capability]} proof reference must be a durable provider execution ID, not a local, dry-run, placeholder, receipt, or display reference.`
         : null,
       proofReferencesRequired && provider?.productionReady === true && !proofRef
-        ? `${PROVIDER_LABELS[capability]} is ready but has no durable executor proof reference.`
+        ? `${PROVIDER_LABELS[capability]} is ready but has no durable connected app proof reference.`
         : null,
-    ].filter((label): label is string => Boolean(label));
+    ]);
     return {
       capability,
       requiredProvider: PROVIDER_LABELS[capability],
@@ -117,13 +134,25 @@ export function buildWeddingProviderExecutorSuiteReadinessState(
       proofRef,
     };
   });
-  const missingCapabilityLabels = checks
+  const duplicateRefs = duplicateProofRefs(baseChecks);
+  const checks = baseChecks.map((check): WeddingProviderExecutorSuiteCapabilityCheck => {
+    if (!check.proofRef || !duplicateRefs.has(check.proofRef)) return check;
+    return {
+      ...check,
+      status: "blocked",
+      blockerLabels: cleanWeddingProductionLabels([
+        ...check.blockerLabels,
+        `${check.requiredProvider} must have a unique durable connected app proof reference.`,
+      ]),
+    };
+  });
+  const missingCapabilityLabels = cleanWeddingProductionLabels(checks
     .filter((check) => !providers.some((provider) => provider.capability === check.capability))
-    .map((check) => `${check.requiredProvider} readiness proof is missing.`);
-  const blockerLabels = checks.flatMap((check) => check.blockerLabels);
-  const proofReferenceLabels = checks
+    .map((check) => `${check.requiredProvider} readiness proof is missing.`));
+  const blockerLabels = cleanWeddingProductionLabels(checks.flatMap((check) => check.blockerLabels));
+  const proofReferenceLabels = cleanWeddingProductionLabels(checks
     .filter((check) => check.proofRef)
-    .map((check) => `${check.requiredProvider} executor proof: ${check.proofRef}`);
+    .map((check) => `${check.requiredProvider} connected app proof: ${check.proofRef}`));
   const productionEvidenceReady = checks.every((check) => check.status === "ready");
 
   return {
@@ -133,9 +162,9 @@ export function buildWeddingProviderExecutorSuiteReadinessState(
     missingCapabilityLabels,
     blockerLabels,
     proofReferenceLabels,
-    nextActionLabels: blockerLabels.map(nextActionFor),
+    nextActionLabels: cleanWeddingProductionLabels(blockerLabels.map(nextActionFor)),
     summary: productionEvidenceReady
-      ? "Email, calendar, registry, and vendor-search provider executors are production-ready."
-      : "External provider executor suite is not production-ready.",
+      ? "Email, calendar, registry, and vendor-search connected app actions are production-ready."
+      : "External connected app suite is not production-ready.",
   };
 }

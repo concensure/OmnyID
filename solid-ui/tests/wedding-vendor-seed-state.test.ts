@@ -167,6 +167,7 @@ test("buildWeddingVendorSeedState reports ready only with current price availabi
     location: "Sydney",
     selectedCategories: ["Photographer"],
     preferenceText: "editorial transparent pricing",
+    proofReferenceLabels: ["seeded-vendor-corpus:oracle-prod-1:2026-09-28"],
     seeds: [{
       vendorSlug: "verified-photo",
       vendorName: "Verified Photo Studio",
@@ -187,8 +188,85 @@ test("buildWeddingVendorSeedState reports ready only with current price availabi
 
   assert.equal(state.status, "ready");
   assert.equal(state.freshnessStatus, "ready_for_shortlist_review");
+  assert.deepEqual(state.proofReferenceLabels, ["seeded-vendor-corpus:oracle-prod-1:2026-09-28"]);
+  assert.deepEqual(state.artifactInput?.metadata.vendorSeedProofReferenceLabels, [
+    "seeded-vendor-corpus:oracle-prod-1:2026-09-28",
+  ]);
   assert.equal(state.artifactInput?.metadata.vendorFreshnessReady, true);
   assert.match(state.summary, /source-backed seeded vendor row available/i);
+});
+
+test("buildWeddingVendorSeedState rejects placeholder corpus proof references", () => {
+  const state = buildWeddingVendorSeedState({
+    metadata,
+    now: new Date("2026-09-14T12:00:00Z"),
+    location: "Sydney",
+    selectedCategories: ["Photographer"],
+    preferenceText: "editorial transparent pricing",
+    proofReferenceLabels: ["seeded-vendor-corpus:fake:test"],
+    seeds: [{
+      vendorSlug: "verified-photo",
+      vendorName: "Verified Photo Studio",
+      category: "Photographer",
+      serviceArea: "Sydney, NSW",
+      websiteUrl: "https://photo.example",
+      sourceUrl: "https://photo.example/source",
+      sourceLabel: "Official verified photo source",
+      sourceCheckedAt: "2026-09-14",
+      evidence: {
+        verified_fields: ["category", "service_area", "price", "availability"],
+        service_notes: ["editorial photography", "transparent pricing guide"],
+        price_basis: "official package guide verified on current source",
+        availability_basis: "date-specific availability confirmed by vendor inquiry",
+      },
+    }],
+  });
+
+  assert.equal(state.status, "ready");
+  assert.deepEqual(state.proofReferenceLabels, []);
+});
+
+test("buildWeddingVendorSeedState rejects bare test corpus proof references while accepting prod-smoke", () => {
+  const baseInput = {
+    metadata,
+    now: new Date("2026-09-14T12:00:00Z"),
+    location: "Sydney",
+    selectedCategories: ["Photographer"],
+    preferenceText: "editorial transparent pricing",
+    seeds: [{
+      vendorSlug: "verified-photo",
+      vendorName: "Verified Photo Studio",
+      category: "Photographer",
+      serviceArea: "Sydney, NSW",
+      websiteUrl: "https://photo.example",
+      sourceUrl: "https://photo.example/source",
+      sourceLabel: "Official verified photo source",
+      sourceCheckedAt: "2026-09-14",
+      evidence: {
+        verified_fields: ["category", "service_area", "price", "availability"],
+        service_notes: ["editorial photography", "transparent pricing guide"],
+        price_basis: "official package guide verified on current source",
+        availability_basis: "date-specific availability confirmed by vendor inquiry",
+      },
+    }],
+  };
+
+  const testProof = buildWeddingVendorSeedState({
+    ...baseInput,
+    proofReferenceLabels: ["seeded-vendor-corpus:test:latest"],
+  });
+  const prodSmokeProof = buildWeddingVendorSeedState({
+    ...baseInput,
+    proofReferenceLabels: ["seeded-vendor-corpus:prod-smoke:2026-09-28"],
+  });
+
+  assert.equal(testProof.status, "ready");
+  assert.deepEqual(testProof.proofReferenceLabels, []);
+  assert.equal(prodSmokeProof.status, "ready");
+  assert.deepEqual(prodSmokeProof.proofReferenceLabels, ["seeded-vendor-corpus:prod-smoke:2026-09-28"]);
+  assert.deepEqual(prodSmokeProof.artifactInput?.metadata.vendorSeedProofReferenceLabels, [
+    "seeded-vendor-corpus:prod-smoke:2026-09-28",
+  ]);
 });
 
 test("buildWeddingVendorSeedState flags stale seed sources without dropping the planning artifact", () => {
@@ -269,6 +347,36 @@ test("buildWeddingVendorSeedState does not create fake artifacts from empty or m
   assert.equal(state.summaryArtifact, null);
 });
 
+test("buildWeddingVendorSeedState does not create artifacts from local source URLs", () => {
+  const state = buildWeddingVendorSeedState({
+    metadata,
+    seeds: [
+      {
+        vendorSlug: "local-source-url",
+        vendorName: "Local Source Venue",
+        category: "Venue",
+        serviceArea: "Sydney",
+        sourceUrl: "http://localhost:8787/vendor/profile",
+        sourceLabel: "Local source",
+      },
+      {
+        vendorSlug: "loopback-source-url",
+        vendorName: "Loopback Source Venue",
+        category: "Venue",
+        serviceArea: "Sydney",
+        sourceUrl: "https://127.0.0.1/vendor/profile",
+        sourceLabel: "Loopback source",
+      },
+    ],
+  });
+
+  assert.equal(state.status, "empty");
+  assert.equal(state.vendorCount, 0);
+  assert.equal(state.sourceCount, 0);
+  assert.equal(state.artifactInput, null);
+  assert.equal(state.summaryArtifact, null);
+});
+
 test("buildWeddingVendorSeedState drops malformed source URLs from mixed seed packets", () => {
   const state = buildWeddingVendorSeedState({
     metadata,
@@ -301,6 +409,40 @@ test("buildWeddingVendorSeedState drops malformed source URLs from mixed seed pa
   assert.doesNotMatch(state.markdown ?? "", /javascript:alert/);
   assert.ok(state.summaryArtifact?.vendorLabels.includes("Safe Source Venue"));
   assert.ok(!state.summaryArtifact?.vendorLabels.includes("Bad Source URL"));
+});
+
+test("buildWeddingVendorSeedState drops local source URLs from mixed seed packets", () => {
+  const state = buildWeddingVendorSeedState({
+    metadata,
+    now: new Date("2026-09-14T12:00:00Z"),
+    seeds: [
+      {
+        vendorSlug: "local-source-url",
+        vendorName: "Local Source Venue",
+        category: "Venue",
+        serviceArea: "Sydney",
+        sourceUrl: "http://localhost:8787/vendor/profile",
+        sourceLabel: "Local source",
+      },
+      {
+        vendorSlug: "safe-source-url",
+        vendorName: "Safe Source Venue",
+        category: "Venue",
+        serviceArea: "Sydney",
+        sourceUrl: "https://safe-venue.example/source",
+        sourceLabel: "Safe venue source",
+        sourceCheckedAt: "2026-09-14",
+      },
+    ],
+  });
+
+  assert.equal(state.vendorCount, 1);
+  assert.equal(state.sourceCount, 1);
+  assert.equal(state.summaryArtifact?.sourceLinks.length, 1);
+  assert.equal(state.summaryArtifact?.sourceLinks[0]?.url, "https://safe-venue.example/source");
+  assert.doesNotMatch(state.markdown ?? "", /localhost/);
+  assert.ok(state.summaryArtifact?.vendorLabels.includes("Safe Source Venue"));
+  assert.ok(!state.summaryArtifact?.vendorLabels.includes("Local Source Venue"));
 });
 
 test("buildWeddingVendorSeedTaskItems turns seeded freshness blockers into review tasks", () => {

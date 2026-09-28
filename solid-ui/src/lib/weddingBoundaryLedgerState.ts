@@ -5,6 +5,7 @@ import {
   safeWeddingLabel,
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
+import type { WeddingSemanticUiKind, WeddingSemanticUiObject } from "@/lib/weddingSemanticUiState";
 
 export type WeddingBoundaryLedgerKind =
   | "wedding_boundary_policy"
@@ -40,6 +41,9 @@ export type WeddingBoundaryLedgerObjectBase = {
   createdBy?: string | null;
   createdAt?: string | null;
   metadata?: Record<string, unknown> | null;
+  semanticKind?: WeddingSemanticUiKind | null;
+  semanticTags?: string[] | null;
+  semanticObject?: WeddingSemanticUiObject | null;
 };
 
 export type WeddingBoundaryPolicy = WeddingBoundaryLedgerObjectBase & {
@@ -436,6 +440,78 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
   };
 }
 
+function semanticKindFor(object: WeddingBoundaryLedgerObject): WeddingSemanticUiKind {
+  if (object.semanticObject) return object.semanticObject.kind;
+  if (object.kind === "wedding_boundary_change_request" && changeRequestNeedsCoupleReview(object)) return "wedding_approval_required";
+  if (object.kind === "wedding_boundary_change_request" && object.requestStatus !== "approved") return "wedding_conflict";
+  if (object.kind === "wedding_boundary_policy") return object.enforcement === "block" ? "wedding_conflict" : "wedding_active_loop";
+  if (object.kind === "wedding_boundary_decision_rationale") return "wedding_decision";
+  return "wedding_active_loop";
+}
+
+function semanticToneFor(kind: WeddingSemanticUiKind): WeddingSemanticUiObject["tone"] {
+  if (kind === "wedding_approval_required") return "action";
+  if (kind === "wedding_conflict") return "risk";
+  if (kind === "wedding_comparison") return "options";
+  return "status";
+}
+
+function semanticStateLabelFor(object: WeddingBoundaryLedgerObject, semanticKind: WeddingSemanticUiKind): string {
+  if (object.kind === "wedding_boundary_change_request") {
+    if (changeRequestNeedsCoupleReview(object)) return "Needs approval";
+    if (object.requestStatus === "auto_blocked") return "Blocked by rule";
+    if (object.requestStatus === "approved") return "Approved";
+    if (object.requestStatus === "declined") return "Declined";
+    return "Waiting";
+  }
+  if (object.kind === "wedding_boundary_policy") return object.enforcement === "block" ? "Rule blocks changes" : "Rule active";
+  if (semanticKind === "wedding_decision") return "Private rationale";
+  return "Saved";
+}
+
+function semanticSummaryFor(object: WeddingBoundaryLedgerObject): string {
+  if (object.kind === "wedding_boundary_policy") return object.plainLanguage;
+  if (object.kind === "wedding_boundary_change_request") {
+    return object.publicReason ?? (
+      changeRequestNeedsCoupleReview(object)
+        ? "A guest or family change is waiting for couple approval."
+        : "This guest or family change is recorded in the wedding ledger."
+    );
+  }
+  if (object.kind === "wedding_boundary_role_assignment") return "This person has a clear wedding role and visibility scope.";
+  if (object.kind === "wedding_boundary_guest_profile") return "This guest profile keeps household, access, and invitation context together.";
+  if (object.kind === "wedding_boundary_event_invitation") return "This invitation links a guest to one wedding event and its RSVP state.";
+  if (object.kind === "wedding_boundary_visibility_page") return "This shared page controls what this audience can see.";
+  return "This family boundary record keeps responsibility and visibility clear.";
+}
+
+function semanticObjectFor(object: WeddingBoundaryLedgerObject): WeddingSemanticUiObject {
+  if (object.semanticObject) return object.semanticObject;
+  const kind = object.semanticKind ?? semanticKindFor(object);
+  const tags = uniqueStrings([
+    ...(object.semanticTags ?? []),
+    "wedding_boundary",
+    object.kind,
+    kind,
+    object.visibility,
+    object.kind === "wedding_boundary_change_request" ? object.changeType : null,
+    object.kind === "wedding_boundary_policy" ? object.ruleType : null,
+  ], 16);
+  return {
+    id: `semantic:${object.kind}:${safeWeddingLabel(objectId(object))}`,
+    kind,
+    title: object.title,
+    stateLabel: semanticStateLabelFor(object, kind),
+    tone: semanticToneFor(kind),
+    summary: semanticSummaryFor(object),
+    comparison: null,
+    actions: object.kind === "wedding_boundary_change_request" && changeRequestNeedsCoupleReview(object)
+      ? [{ label: "Review request", kind: "review", enabled: true, targetMenu: "people" }]
+      : [{ label: "Open people", kind: "open", enabled: true, targetMenu: "people" }],
+    semanticTags: tags,
+  };
+}
+
 function markdownFor(object: WeddingBoundaryLedgerObject): string {
   if (object.kind === "wedding_boundary_change_request") {
     return [
@@ -462,6 +538,12 @@ export function weddingBoundaryLedgerObjectToAfpMessage(
   const metadata = normalizeWeddingPlanningMetadata(metadataInput);
   const id = objectId(object);
   const content = publicContentFor(object);
+  const semanticObject = semanticObjectFor(object);
+  const semanticTags = uniqueStrings([
+    ...(object.semanticTags ?? []),
+    ...semanticObject.semanticTags,
+    semanticObject.kind,
+  ], 16);
   const privateEncrypted = object.kind === "wedding_boundary_policy" ? clean(object.privateRationaleCiphertext)
     : object.kind === "wedding_boundary_guest_profile" ? clean(object.privateNotesCiphertext)
       : object.kind === "wedding_boundary_change_request" ? clean(object.privateRationaleCiphertext)
@@ -481,12 +563,20 @@ export function weddingBoundaryLedgerObjectToAfpMessage(
       ...content,
       markdown: markdownFor(object),
       encrypted_private_payload: privateEncrypted || undefined,
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticTags,
+      semantic_object: semanticObject,
+      semantic_objects: [semanticObject],
     },
     metadata: {
       ...metadata,
       ...(object.metadata ?? {}),
       boundary_object_id: id,
       boundary_kind: object.kind,
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticTags,
+      semantic_object: semanticObject,
+      semantic_objects: [semanticObject],
       e2ee_required: object.visibility === "couple_only" || object.kind === "wedding_boundary_decision_rationale" || Boolean(privateEncrypted),
       private_fields: privateEncrypted ? ["encrypted_private_payload"] : [],
       searchable_terms: uniqueStrings([
@@ -509,6 +599,8 @@ export function weddingBoundaryLedgerObjectToAfpMessage(
         tone: object.kind === "wedding_boundary_change_request" && changeRequestNeedsCoupleReview(object) ? "attention" : "calm",
         summary: object.kind === "wedding_boundary_policy" ? object.plainLanguage : markdownFor(object).split(/\r?\n/)[2] ?? object.title,
         primary_action: object.kind === "wedding_boundary_change_request" && changeRequestNeedsCoupleReview(object) ? "Review request" : "View details",
+        semantic_object: semanticObject,
+        semantic_objects: [semanticObject],
       },
     }],
     attachments: [],

@@ -28,6 +28,7 @@ export type WeddingArrivalAction = {
   label: string;
   description: string;
   disabled: boolean;
+  draftPrompt?: string | null;
 };
 
 export type WeddingArrivalChip = {
@@ -74,6 +75,39 @@ function hasExpectedBehaviorAudit(
   return Boolean(packet && typeof packet === "object" && !Array.isArray(packet));
 }
 
+function hasResearchPrompt(
+  intent: WeddingNavigationIntent | WeddingNavigationStoredIntent,
+): boolean {
+  const packet = record(intent.metadata).wedding_research_prompt;
+  return Boolean(packet && typeof packet === "object" && !Array.isArray(packet));
+}
+
+function decisionFocusIntent(
+  intent: WeddingNavigationIntent | WeddingNavigationStoredIntent,
+): string {
+  const intentValue = stringValue(record(record(intent.metadata).decision_focus).intent);
+  return intentValue === "open_item" || intentValue === "explain_item" || intentValue === "review_all"
+    ? intentValue
+    : "";
+}
+
+function researchDraftPromptFor(
+  intent: WeddingNavigationIntent | WeddingNavigationStoredIntent,
+): string | null {
+  const packet = record(record(intent.metadata).wedding_research_prompt);
+  if (!Object.keys(packet).length) return null;
+  const title = stringValue(packet.title) || "this wedding planning topic";
+  const query = stringValue(packet.query);
+  const location = stringValue(packet.location);
+  const lines = [
+    `Please create a wedding research brief for ${title}.`,
+    query ? `Question: ${query}` : null,
+    location ? `Location: ${location}` : null,
+    "Use source-backed findings, show what still needs checking, and save useful findings back to our wedding documents.",
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
 function actionFor(
   surface: WeddingNavigationSurface,
   intent: WeddingNavigationIntent | WeddingNavigationStoredIntent,
@@ -87,6 +121,15 @@ function actionFor(
     };
   }
   if (surface === "continue_chat" || surface === "probe") {
+    if (hasResearchPrompt(intent)) {
+      return {
+        kind: "continue_chat",
+        label: "Start research brief",
+        description: "Ask OmnyID to research the carried topic and save useful findings back to wedding documents.",
+        disabled: false,
+        draftPrompt: researchDraftPromptFor(intent),
+      };
+    }
     return {
       kind: "continue_chat",
       label: surface === "probe" ? "Answer question" : "Continue chat",
@@ -116,6 +159,31 @@ function actionFor(
         kind: "review_tasks",
         label: "Review gap tasks",
         description: "Review suggested planning gap tasks, then keep only the ones with clear proof, owners, and due dates.",
+        disabled: false,
+      };
+    }
+    const focusIntent = decisionFocusIntent(intent);
+    if (focusIntent === "explain_item") {
+      return {
+        kind: "review_tasks",
+        label: "Show why it matters",
+        description: "Review the reason this wedding decision is in the top three before acting on it.",
+        disabled: false,
+      };
+    }
+    if (focusIntent === "open_item") {
+      return {
+        kind: "review_tasks",
+        label: "Open this decision",
+        description: "Open the specific wedding decision task so it can be approved, assigned, or deferred.",
+        disabled: false,
+      };
+    }
+    if (focusIntent === "review_all") {
+      return {
+        kind: "review_tasks",
+        label: "Review top decisions",
+        description: "Review the few wedding decisions that need attention now.",
         disabled: false,
       };
     }
@@ -213,6 +281,10 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function countFrom(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
@@ -308,6 +380,7 @@ function chipsFor(
   const decisionFocusCount = decisionFocusCountFrom(intent);
   const expectedBehaviorGapCount = expectedBehaviorGapCountFrom(intent);
   return [
+    hasResearchPrompt(intent) ? { label: "Request", value: "Research brief" } : null,
     decisionScopeCount > 0 ? { label: "Selected", value: `${decisionScopeCount} choice${decisionScopeCount === 1 ? "" : "s"}` } : null,
     decisionFocusCount > 0 ? { label: "Focus", value: `${decisionFocusCount} decision${decisionFocusCount === 1 ? "" : "s"}` } : null,
     expectedBehaviorGapCount > 0 ? { label: "Gaps", value: `${expectedBehaviorGapCount} planning gap${expectedBehaviorGapCount === 1 ? "" : "s"}` } : null,

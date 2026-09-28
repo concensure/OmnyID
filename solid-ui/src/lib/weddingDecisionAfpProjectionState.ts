@@ -7,6 +7,7 @@ import {
   safeWeddingLabel,
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
+import { weddingSemanticObjectFromDecisionProjection } from "@/lib/weddingSemanticUiState";
 
 export const WEDDING_DECISION_AFP_PROJECTIONS_KEY = "omnyid.wedding-decision-afp-projections";
 
@@ -30,6 +31,10 @@ function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
 function uniqueStrings(values: readonly unknown[], limit = 64): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -45,7 +50,22 @@ function uniqueStrings(values: readonly unknown[], limit = 64): string[] {
 }
 
 function uniqueSourceUrls(values: readonly unknown[], limit = 64): string[] {
-  return uniqueStrings(values, limit).filter((value) => /^https?:\/\//i.test(value));
+  return uniqueStrings(values, limit).filter(remoteHttpUrl);
+}
+
+function remoteHttpUrl(value: string): boolean {
+  if (!/^https?:\/\//i.test(value)) return false;
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    return hostname !== "localhost"
+      && hostname !== "127.0.0.1"
+      && hostname !== "0.0.0.0"
+      && hostname !== "::1"
+      && hostname !== "[::1]";
+  } catch {
+    return false;
+  }
 }
 
 export function isWeddingImportDecisionProjection(input: Pick<WeddingDecisionProjectionInput, "metadata" | "sourceLabels">): boolean {
@@ -74,6 +94,26 @@ function artifactTitleForProjection(input: WeddingDecisionProjectionInput): stri
 function isPrivateImportSourceUrl(value: string): boolean {
   return /\b(?:upload|uploads|attachment|attachments|storage|parser|source-file|source_file)\b/i.test(value)
     || /\b[^/?#]+\.(?:csv|tsv|xlsx?|ods)(?:$|[?#/])/i.test(value);
+}
+
+function isVendorComparisonDecision(input: WeddingDecisionProjectionInput): boolean {
+  const metadata = record(input.metadata);
+  return record(metadata.vendorComparisonSelection).selectedVendorsContinueToFollowUp === true
+    || clean(metadata.source) === "vendor_search_comparison"
+    || /top\s+vendor\s+comparison|vendor\s+comparison/i.test(`${input.artifactTitle} ${input.artifactId}`);
+}
+
+function vendorComparisonQueuePolicy(input: WeddingDecisionProjectionInput) {
+  if (!isVendorComparisonDecision(input)) return null;
+  const selection = record(record(input.metadata).vendorComparisonSelection);
+  return {
+    selected_vendors_continue_to_follow_up: selection.selectedVendorsContinueToFollowUp !== false,
+    unselected_vendors_leave_active_queues: selection.unselectedVendorsLeaveActiveQueues !== false,
+    unselected_vendors_audit_only: true,
+    no_queue_rehydration_for_unselected: true,
+    approval_required_before_outreach: selection.approvalRequiredBeforeOutreach !== false,
+    no_external_send_without_approval: selection.noExternalSendWithoutApproval !== false,
+  };
 }
 
 export function weddingDecisionSourceUrlsForProjection(input: WeddingDecisionProjectionInput): string[] {
@@ -105,6 +145,31 @@ function projectionId(metadata: WeddingPlanningMetadata, artifactId: string, opt
   return `wedding_decision:${safeWeddingLabel(metadata.responseWorkspaceId)}:${safeWeddingLabel(artifactId)}:${safeWeddingLabel(optionId)}`;
 }
 
+function selectedOptionColumnCells(option: WeddingDecisionSelectionOption): Array<{
+  header: string;
+  label: string;
+  kind: string;
+  value: string;
+}> {
+  const typed = Array.isArray(option.columnCells) ? option.columnCells : [];
+  if (typed.length > 0) {
+    return typed
+      .map((cell) => ({
+        header: clean(cell.header),
+        label: clean(cell.label) || clean(cell.header) || "Detail",
+        kind: clean(cell.kind) || "text",
+        value: clean(cell.value),
+      }))
+      .filter((cell) => cell.value || cell.label);
+  }
+  return option.cells.map((cell, index) => ({
+    header: `Cell ${index + 1}`,
+    label: `Cell ${index + 1}`,
+    kind: "text",
+    value: clean(cell),
+  }));
+}
+
 function markdownFor(input: WeddingDecisionProjectionInput, metadata: WeddingPlanningMetadata): string {
   const sourceLabels = weddingDecisionSourceLabelsForProjection(input);
   const sourceLabelCount = uniqueStrings(input.sourceLabels ?? []).length;
@@ -121,6 +186,8 @@ function markdownFor(input: WeddingDecisionProjectionInput, metadata: WeddingPla
     ...input.selectedOption.missingPreferenceLabels.map((label) => `- Not evidenced: ${label}`),
   ];
   const reportScope = input.reportScope ?? null;
+  const columnCells = selectedOptionColumnCells(input.selectedOption);
+  const vendorPolicy = vendorComparisonQueuePolicy(input);
   return [
     "# Wedding decision",
     "",
@@ -142,7 +209,7 @@ function markdownFor(input: WeddingDecisionProjectionInput, metadata: WeddingPla
     "",
     "## Captured row",
     "",
-    ...input.selectedOption.cells.map((cell, index) => `- Cell ${index + 1}: ${cell || "Unknown"}`),
+    ...columnCells.map((cell) => `- ${cell.label}: ${cell.value || "Unknown"}`),
     "",
     "## Preference fit",
     "",
@@ -161,7 +228,10 @@ function markdownFor(input: WeddingDecisionProjectionInput, metadata: WeddingPla
     "## Use in future reports",
     "",
     "- Treat this selected option as the active decision scope for follow-up reports and next actions.",
-    "- Keep unticked alternatives available in the source artifact for audit and comparison.",
+    vendorPolicy
+      ? "- Keep only selected vendors in active follow-up queues; unticked vendors are audit/history context only unless the user re-selects them."
+      : "- Keep unticked alternatives available in the source artifact for audit and comparison.",
+    vendorPolicy ? "- Do not regenerate decision queue or response queue work for unselected vendors from this comparison." : null,
     "- Do not infer booking, payment, legal compliance, availability, or external contact from this decision alone.",
     "",
     "## IDs",
@@ -188,8 +258,21 @@ export function weddingDecisionProjectionToAfpMessage(
   const sourceCountsByProvider = input.sourceCountsByProvider && typeof input.sourceCountsByProvider === "object"
     ? input.sourceCountsByProvider
     : {};
+  const columnCells = selectedOptionColumnCells(input.selectedOption);
+  const vendorPolicy = vendorComparisonQueuePolicy(input);
   const budgetDecision = /\bbudget|quote|price|cost|payment|deposit|invoice|contract\b/i
     .test(`${input.artifactKind} ${input.artifactTitle} ${input.selectedOption.label} ${input.selectedOption.detail} ${input.selectedOption.cells.join(" ")}`);
+  const semanticObject = weddingSemanticObjectFromDecisionProjection({
+    id,
+    artifactTitle,
+    selectedOption: {
+      label: input.selectedOption.label,
+      detail: input.selectedOption.detail,
+    },
+    columnCells,
+    reportScope: input.reportScope,
+    budgetDecision,
+  });
   const searchableTerms = uniqueStrings([
     id,
     "wedding decision",
@@ -204,9 +287,13 @@ export function weddingDecisionProjectionToAfpMessage(
     input.selectedOption.id,
     input.selectedOption.label,
     input.selectedOption.detail,
+    ...columnCells.flatMap((cell) => [cell.label, cell.kind, cell.value]),
     input.selectedOption.preferenceSummaryLabel,
     input.reportScope?.status,
     input.reportScope?.reportInstructionLabel,
+    vendorPolicy ? "selected vendors active" : null,
+    vendorPolicy ? "unselected vendors audit only" : null,
+    vendorPolicy ? "no queue rehydration for unselected vendors" : null,
     ...(input.reportScope?.blockerLabels ?? []),
     ...(input.reportScope?.auditContextLabels ?? []),
     ...input.selectedOption.preferenceFitLabels,
@@ -247,6 +334,7 @@ export function weddingDecisionProjectionToAfpMessage(
         detail: input.selectedOption.detail,
         row_index: input.selectedOption.rowIndex,
         cells: input.selectedOption.cells,
+        column_cells: columnCells,
         preference_summary: input.selectedOption.preferenceSummaryLabel,
         preference_fit_labels: input.selectedOption.preferenceFitLabels,
         preference_tradeoff_labels: input.selectedOption.tradeoffLabels,
@@ -270,11 +358,13 @@ export function weddingDecisionProjectionToAfpMessage(
       source_urls: sourceUrls,
       source_provider_labels: sourceProviderLabels,
       source_counts_by_provider: sourceCountsByProvider,
+      vendor_comparison_queue_policy: vendorPolicy,
       wedding_plan_id: metadata.weddingPlanId,
       response_workspace_id: metadata.responseWorkspaceId,
       source_response_id: metadata.sourceResponseId,
       privacy_scope: metadata.privacyScope,
       budget_decision: budgetDecision,
+      semantic_object: semanticObject,
       source: input.source ?? "local_selection",
     },
     metadata: {
@@ -287,6 +377,7 @@ export function weddingDecisionProjectionToAfpMessage(
       selected_option_preference_summary: input.selectedOption.preferenceSummaryLabel,
       selected_option_preference_fit_labels: input.selectedOption.preferenceFitLabels,
       selected_option_preference_tradeoff_labels: input.selectedOption.tradeoffLabels,
+      selected_option_column_cells: columnCells,
       decision_report_scope_status: input.reportScope?.status ?? null,
       decision_report_scope_instruction: input.reportScope?.reportInstructionLabel ?? null,
       decision_report_scope_blockers: input.reportScope?.blockerLabels ?? [],
@@ -299,10 +390,17 @@ export function weddingDecisionProjectionToAfpMessage(
       source_urls: sourceUrls,
       source_provider_labels: sourceProviderLabels,
       source_counts_by_provider: sourceCountsByProvider,
+      vendor_comparison_queue_policy: vendorPolicy,
+      vendor_comparison_selected_vendors_active: vendorPolicy?.selected_vendors_continue_to_follow_up ?? false,
+      vendor_comparison_unselected_vendors_audit_only: vendorPolicy?.unselected_vendors_audit_only ?? false,
+      vendor_comparison_no_queue_rehydration_for_unselected: vendorPolicy?.no_queue_rehydration_for_unselected ?? false,
       wedding_plan_id: metadata.weddingPlanId,
       response_workspace_id: metadata.responseWorkspaceId,
       source_response_id: metadata.sourceResponseId,
       searchable_terms: searchableTerms,
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticObject.semanticTags,
+      semantic_object: semanticObject,
     },
     views: [{
       format: "document",
@@ -311,6 +409,7 @@ export function weddingDecisionProjectionToAfpMessage(
         decision_id: id,
         title: `Decision: ${input.selectedOption.label}`,
         markdown,
+        semantic_object: semanticObject,
       },
     }],
     attachments: [],

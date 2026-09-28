@@ -7,6 +7,11 @@
  */
 
 use super::*;
+use crate::admin_tool_secrets::{
+    AdminToolSecretSpec, BRAVE_SEARCH_SPEC, CLOUDINARY_SPEC, GOOGLE_CALENDAR_SPEC,
+    GOOGLE_MAPS_SPEC, GOOGLE_PLACES_SPEC, STRIPE_SPEC, TWILIO_SPEC, WEATHER_API_SPEC,
+    admin_tool_secret_status,
+};
 fn validate_optional_http_url(
     value: Option<String>,
     label: &str,
@@ -265,6 +270,56 @@ pub(super) fn admin_wedding_ai_routing_policy_json() -> Value {
     })
 }
 
+fn admin_wedding_api_provider_status_json(
+    spec: AdminToolSecretSpec,
+    connected_app_id: &'static str,
+    required_for_stack: bool,
+) -> Value {
+    let status = admin_tool_secret_status(spec);
+    serde_json::json!({
+        "providerId": status.provider_id,
+        "connectedAppId": connected_app_id,
+        "label": status.label,
+        "credentialRequired": true,
+        "configured": status.configured,
+        "sourceLabel": status.source_label,
+        "requiredForStack": required_for_stack,
+    })
+}
+
+pub(super) fn admin_wedding_api_stack_json() -> Value {
+    let providers = vec![
+        admin_wedding_api_provider_status_json(BRAVE_SEARCH_SPEC, "brave-search-api", false),
+        admin_wedding_api_provider_status_json(GOOGLE_PLACES_SPEC, "google-places-api", true),
+        admin_wedding_api_provider_status_json(GOOGLE_MAPS_SPEC, "google-maps-platform", true),
+        admin_wedding_api_provider_status_json(GOOGLE_CALENDAR_SPEC, "gcal", true),
+        admin_wedding_api_provider_status_json(WEATHER_API_SPEC, "weatherapi", true),
+        admin_wedding_api_provider_status_json(STRIPE_SPEC, "stripe", true),
+        admin_wedding_api_provider_status_json(TWILIO_SPEC, "twilio-messaging", false),
+        admin_wedding_api_provider_status_json(CLOUDINARY_SPEC, "cloudinary", false),
+    ];
+    let connected_app_ids = providers
+        .iter()
+        .filter(|provider| {
+            provider
+                .get("configured")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .filter_map(|provider| provider.get("connectedAppId").and_then(Value::as_str))
+        .collect::<Vec<_>>();
+    serde_json::json!({
+        "providers": providers,
+        "connectedAppIds": connected_app_ids,
+        "guardrails": [
+            "Provider keys are resolved on the server only and are never serialized to users.",
+            "Users receive provider readiness, source labels, and blockers but never raw API keys.",
+            "Wedding planner provider calls must write wedding_shared_tool_usage_event before they are treated as production-ready.",
+            "Admin-funded providers are scoped to wedding-template background work and approved actions."
+        ],
+    })
+}
+
 fn env_optional_trimmed(key: &str) -> Option<String> {
     std::env::var(key)
         .ok()
@@ -276,12 +331,15 @@ pub(super) fn admin_third_party_tool_policy_json() -> Value {
     admin_third_party_tool_policy_json_with_file(admin_third_party_tool_policy_file_path())
 }
 
-fn admin_third_party_tool_policy_tools() -> [(&'static str, &'static str); 5] {
+fn admin_third_party_tool_policy_tools() -> [(&'static str, &'static str); 8] {
     [
+        ("brave-search-api", "OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API"),
+        ("google-places-api", "OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API"),
         (
             "google-maps-platform",
             "OMNYID_ADMIN_TOOL_GOOGLE_MAPS_PLATFORM",
         ),
+        ("gcal", "OMNYID_ADMIN_TOOL_GOOGLE_CALENDAR"),
         ("weatherapi", "OMNYID_ADMIN_TOOL_WEATHERAPI"),
         ("twilio-messaging", "OMNYID_ADMIN_TOOL_TWILIO_MESSAGING"),
         ("stripe", "OMNYID_ADMIN_TOOL_STRIPE"),
@@ -406,6 +464,20 @@ pub(super) async fn admin_wedding_ai_routing_policy_http(
         ));
     }
     Ok(Json(admin_wedding_ai_routing_policy_json()))
+}
+
+pub(super) async fn admin_wedding_api_stack_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator_user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&operator_user.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    Ok(Json(admin_wedding_api_stack_json()))
 }
 
 pub(super) async fn admin_third_party_tool_policy_http(

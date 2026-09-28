@@ -30,6 +30,7 @@ export type WeddingImportParserReadinessState = {
   maxTextBytes: number;
   maxRowsPerImport: number;
   readyLabels: string[];
+  proofReferenceLabels: string[];
   blockerLabels: string[];
   nextActionLabels: string[];
 };
@@ -115,17 +116,32 @@ function hasStorageReceipt(value: unknown): boolean {
   return Object.keys(storage).length > 0;
 }
 
+function placeholderReceiptPart(value: unknown): boolean {
+  const item = clean(value);
+  return !item || item === "..." || /\b(?:dry-run|test|example|placeholder|fake|stub|mock)\b/i.test(item);
+}
+
 function durableOriginalUploadReceipt(artifact: WeddingArtifactInput): boolean {
   const metadata = metadataForArtifact(artifact);
   return clean(metadata?.originalUploadStatus).toLowerCase() === "saved"
-    && Boolean(clean(metadata.originalUploadMessageId))
-    && Boolean(clean(metadata.originalUploadAttachmentId))
-    && Boolean(clean(metadata.originalUploadSha256))
+    && !placeholderReceiptPart(metadata.originalUploadMessageId)
+    && !placeholderReceiptPart(metadata.originalUploadAttachmentId)
+    && !placeholderReceiptPart(metadata.originalUploadSha256)
     && hasStorageReceipt(metadata.originalUploadStorage);
 }
 
 function originalUploadSaved(artifact: WeddingArtifactInput): boolean {
   return durableOriginalUploadReceipt(artifact);
+}
+
+function originalUploadProofReferenceLabel(artifact: WeddingArtifactInput): string | null {
+  if (!durableOriginalUploadReceipt(artifact)) return null;
+  const metadata = metadataForArtifact(artifact);
+  const messageId = safeWeddingLabel(metadata.originalUploadMessageId);
+  const attachmentId = safeWeddingLabel(metadata.originalUploadAttachmentId);
+  const sha = safeWeddingLabel(metadata.originalUploadSha256).slice(0, 24);
+  if (!messageId || !attachmentId || !sha) return null;
+  return `Wedding import original upload proof: ${messageId}:${attachmentId}:${sha}`;
 }
 
 function formulaCellCountForArtifact(artifact: WeddingArtifactInput): number {
@@ -253,6 +269,13 @@ export function buildWeddingImportParserReadinessState(input: {
   ].filter((label): label is string => Boolean(label));
   const productionReady = blockerLabels.length === 0;
   const status: WeddingImportParserReadinessStatus = productionReady ? "ready" : "blocked";
+  const proofReferenceLabels = productionReady
+    ? importedArtifactCount === 0
+      ? ["Wedding import parser proof: no-current-imports"]
+      : importedArtifacts
+        .map(originalUploadProofReferenceLabel)
+        .filter((label): label is string => Boolean(label))
+    : [];
 
   return {
     status,
@@ -274,6 +297,7 @@ export function buildWeddingImportParserReadinessState(input: {
     maxTextBytes,
     maxRowsPerImport,
     readyLabels,
+    proofReferenceLabels,
     blockerLabels,
     nextActionLabels,
   };

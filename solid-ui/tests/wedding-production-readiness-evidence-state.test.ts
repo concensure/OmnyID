@@ -12,6 +12,7 @@ import { buildWeddingWorkspaceRefreshScaleProofState } from "@/lib/weddingWorksp
 import { buildWeddingProviderExecutorSmokeProofState } from "@/lib/weddingProviderExecutorSmokeProofState";
 import { buildWeddingCollaborationLifecycleProjectionProofState } from "@/lib/weddingCollaborationLifecycleProjectionProofState";
 import { buildWeddingVendorQuoteReplyUiReadinessState } from "@/lib/weddingVendorQuoteReplyUiReadinessState";
+import { buildWeddingVendorComparisonUiReadinessState } from "@/lib/weddingVendorComparisonUiReadinessState";
 
 const readyProof = { productionEvidenceReady: true };
 const blockedProof = { productionEvidenceReady: false };
@@ -49,6 +50,10 @@ function readyVendorQuoteReplyUi() {
     wordingApprovalControlMounted: true,
     budgetAcknowledgementControlMounted: true,
     sendActionMounted: true,
+    primaryDecisionActionMounted: true,
+    secondaryDecisionActionMounted: true,
+    conditionalReplyEditorMounted: true,
+    sentReplyHistoryMounted: true,
     undoWindowMounted: true,
     persistentSentConfirmationMounted: true,
     proofDrawerActionMounted: true,
@@ -56,6 +61,23 @@ function readyVendorQuoteReplyUi() {
     liveRegionsMounted: true,
     failureTelemetryMounted: true,
     providerReadiness: readyEmailProvider,
+  });
+}
+
+function readyVendorComparisonUi() {
+  return buildWeddingVendorComparisonUiReadinessState({
+    comparisonTableMounted: true,
+    expandableTopFiveControlMounted: true,
+    multiSelectControlsMounted: true,
+    sourceLinkActionsMounted: true,
+    confirmSelectedActionMounted: true,
+    followUpQueueActionMounted: true,
+    approvalGatingCopyMounted: true,
+    selectedVendorProjectionMounted: true,
+    unselectedVendorQueueSuppressionMounted: true,
+    closedVendorHistoryMounted: true,
+    malformedSourceUrlGuardMounted: true,
+    localSourceUrlGuardMounted: true,
   });
 }
 
@@ -116,6 +138,7 @@ test("buildWeddingProductionReadinessEvidenceState maps complete helper proofs",
     liveMapGeocoding: readyProof as any,
     graphCanvasHighlighting: readyProof as any,
     approvalUi: readyProof as any,
+    vendorComparisonUi: readyVendorComparisonUi(),
     vendorQuoteReplyUi: readyVendorQuoteReplyUi(),
     vendorQuoteReplyProduction: readyVendorQuoteReplyProduction(),
     nativeExportWorkers: readyProof as any,
@@ -142,6 +165,7 @@ test("buildWeddingProductionReadinessEvidenceState maps complete helper proofs",
   assert.equal(state.evidence.liveMapGeocodingReady, true);
   assert.equal(state.evidence.graphCanvasHighlightingReady, true);
   assert.equal(state.evidence.approvalExecutionUiReady, true);
+  assert.equal(state.evidence.vendorComparisonUiReady, true);
   assert.equal(state.evidence.vendorQuoteReplyUiReady, true);
   assert.equal(state.evidence.vendorQuoteReplyProductionReady, true);
   assert.equal(state.vendorQuoteReplyUi?.productionReady, true);
@@ -163,6 +187,34 @@ test("buildWeddingProductionReadinessEvidenceState maps complete helper proofs",
   ));
   assert.ok(state.durableProofReferenceLabels.includes(
     "Actual connected provider send verified: gmail:prod-smoke:2026-09-27:gmail-message-123",
+  ));
+});
+
+test("buildWeddingProductionReadinessEvidenceState surfaces vendor comparison UI blockers", () => {
+  const state = buildWeddingProductionReadinessEvidenceState({
+    vendorComparisonUi: buildWeddingVendorComparisonUiReadinessState({
+      comparisonTableMounted: true,
+      expandableTopFiveControlMounted: true,
+      multiSelectControlsMounted: false,
+      sourceLinkActionsMounted: true,
+      confirmSelectedActionMounted: true,
+      followUpQueueActionMounted: false,
+      approvalGatingCopyMounted: true,
+      selectedVendorProjectionMounted: false,
+      unselectedVendorQueueSuppressionMounted: true,
+      closedVendorHistoryMounted: true,
+      malformedSourceUrlGuardMounted: true,
+      localSourceUrlGuardMounted: true,
+    }),
+  });
+
+  assert.equal(state.evidence.vendorComparisonUiReady, false);
+  assert.ok(!state.summaryLabels.includes("vendor comparison UI proof ready"));
+  assert.ok(state.missingRequiredEvidenceLabels.some((label) =>
+    /Vendor comparison UI proof is blocked/.test(label)
+    && /Multi-select vendor controls are not mounted/.test(label)
+    && /Follow-up queue action is not mounted/.test(label)
+    && /Selected-vendor projection fan-out is not mounted/.test(label)
   ));
 });
 
@@ -220,6 +272,10 @@ test("buildWeddingProductionReadinessEvidenceState surfaces vendor quote reply U
       wordingApprovalControlMounted: true,
       budgetAcknowledgementControlMounted: false,
       sendActionMounted: true,
+      primaryDecisionActionMounted: true,
+      secondaryDecisionActionMounted: true,
+      conditionalReplyEditorMounted: true,
+      sentReplyHistoryMounted: true,
       undoWindowMounted: true,
       persistentSentConfirmationMounted: true,
       proofDrawerActionMounted: true,
@@ -288,6 +344,7 @@ test("buildWeddingProductionReadinessEvidenceState normalizes noisy vendor quote
     "Backend saved-workspace scale proof is missing.",
     "Wedding template launch proof is missing.",
     "Approval UI proof is missing.",
+    "Vendor comparison UI proof is missing.",
     `Vendor quote reply live production proof is blocked: Actual connected Gmail/provider send proof is not attached. ${longBlockerLabel}`.slice(0, 237) + "...",
     "Wedding dependency-plan expected behavior audit is missing.",
     "Wedding import parser readiness is missing.",
@@ -686,6 +743,12 @@ test("buildWeddingProductionReadinessEvidenceState derives provider gate from li
           provider_executor_mode: "live",
           external_delivery_performed: true,
           external_id: "gmail:message-1",
+          delivery: {
+            channel: "email",
+            to: ["events@venue.example"],
+            subject: "Wedding planning follow-up",
+            text: "Hi, we are following up on our wedding planning request.",
+          },
         },
       },
       {

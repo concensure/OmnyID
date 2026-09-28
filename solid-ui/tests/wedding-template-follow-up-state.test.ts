@@ -28,6 +28,7 @@ test("buildWeddingTemplateFollowUpState turns answered prompts into saveable pla
     dateOrSeason: "October 2027",
     location: "Sydney NSW",
     guestCount: 80,
+    familyOrStakeholderRoles: "Alex and Sam",
     topPriorities: ["low stress", "food", "photos"],
     vendorCategories: ["photographer", "band", "cake_baker"],
     vendorPreferences: "Natural photos, acoustic music, transparent packages",
@@ -46,6 +47,7 @@ test("buildWeddingTemplateFollowUpState turns answered prompts into saveable pla
   assert.ok(state.answeredLabels.includes("Date/season: October 2027"));
   assert.ok(state.answeredLabels.includes("Location: Sydney NSW"));
   assert.ok(state.answeredLabels.includes("Guest count: 80"));
+  assert.ok(state.answeredLabels.includes("Couple: Alex and Sam"));
   assert.ok(state.answeredLabels.includes("Vendor needed: Photographer"));
   assert.ok(state.answeredLabels.includes("Vendor needed: Band"));
   assert.equal(state.artifactGeneration.artifacts.length, 1);

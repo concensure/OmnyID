@@ -6,10 +6,12 @@ import {
 import {
   buildWeddingBudgetPaymentTaskItems,
   buildWeddingBudgetQuoteTaskItems,
+  buildWeddingBudgetVendorOutreachTaskItems,
   type WeddingBudgetTrackingState,
 } from "@/lib/weddingBudgetTrackingState";
 import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
+import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 import {
   buildWeddingDelegationTaskItems,
   type WeddingDelegationState,
@@ -37,6 +39,10 @@ import {
   buildWeddingOracleUpdateTaskItems,
   type WeddingOracleUpdatePlanState,
 } from "@/lib/weddingOracleUpdatePlanState";
+import {
+  buildWeddingProductionRemainingWorkTaskItems,
+} from "@/lib/weddingProductionRemainingWorkTaskState";
+import type { WeddingProductionRemainingWorkState } from "@/lib/weddingProductionRemainingWorkState";
 import type { WeddingPersistedApprovalReceipt } from "@/lib/weddingPersistedWorkspaceState";
 import { buildWeddingPostWeddingWrapUpTaskItems } from "@/lib/weddingPostWeddingWrapUpState";
 import { buildWeddingProviderHandoffTaskItems } from "@/lib/weddingProviderHandoffTaskState";
@@ -50,6 +56,7 @@ import { buildWeddingVowPlanningTaskItems } from "@/lib/weddingVowPlanningState"
 
 export type WeddingWorkspaceGeneratedTaskItemsInput = {
   artifacts?: readonly WeddingArtifactInput[] | null;
+  selectedDecisionItems?: readonly WeddingDecisionProjectionInput[] | null;
   baseTaskItems?: readonly WeddingPlanningTaskItem[] | null;
   loopTaskItems?: readonly WeddingPlanningTaskItem[] | null;
   budgetTracking?: WeddingBudgetTrackingState | null;
@@ -62,6 +69,7 @@ export type WeddingWorkspaceGeneratedTaskItemsInput = {
   preparationTaskItems?: readonly WeddingPlanningTaskItem[] | null;
   auditTaskItems?: readonly WeddingPlanningTaskItem[] | null;
   oracleUpdatePlan?: WeddingOracleUpdatePlanState | null;
+  productionRemainingWork?: WeddingProductionRemainingWorkState | null;
   approvalReceipts?: readonly WeddingPersistedApprovalReceipt[] | null;
   weddingVendors?: readonly WeddingVendorContactOutreachVendor[] | null;
   now?: string | null;
@@ -72,6 +80,11 @@ export function buildWeddingWorkspaceGeneratedTaskItems(input: WeddingWorkspaceG
   const baseTaskItems = [...(input.baseTaskItems ?? [])];
   const generatedTaskItems = [
     ...buildWeddingBudgetQuoteTaskItems({
+      budgetTracking: input.budgetTracking,
+      metadata: input.metadata,
+      existingTaskItems: baseTaskItems,
+    }),
+    ...buildWeddingBudgetVendorOutreachTaskItems({
       budgetTracking: input.budgetTracking,
       metadata: input.metadata,
       existingTaskItems: baseTaskItems,
@@ -128,6 +141,7 @@ export function buildWeddingWorkspaceGeneratedTaskItems(input: WeddingWorkspaceG
     }),
     ...buildWeddingVendorSearchTaskItems({
       artifacts: input.artifacts,
+      selectedDecisionItems: input.selectedDecisionItems,
       metadata: input.metadata,
       existingTaskItems: baseTaskItems,
     }),
@@ -154,6 +168,11 @@ export function buildWeddingWorkspaceGeneratedTaskItems(input: WeddingWorkspaceG
     }),
     ...buildWeddingOracleUpdateTaskItems({
       oracleUpdatePlan: input.oracleUpdatePlan,
+      metadata: input.metadata,
+      existingTaskItems: baseTaskItems,
+    }),
+    ...buildWeddingProductionRemainingWorkTaskItems({
+      remainingWork: input.productionRemainingWork,
       metadata: input.metadata,
       existingTaskItems: baseTaskItems,
     }),

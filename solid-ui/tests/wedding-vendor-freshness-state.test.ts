@@ -22,6 +22,62 @@ test("buildWeddingVendorFreshnessState blocks fake freshness when vendor rows ar
   assert.match(state.summary, /No source-backed vendor rows/i);
 });
 
+test("buildWeddingVendorFreshnessState blocks local source URLs as freshness evidence", () => {
+  const state = buildWeddingVendorFreshnessState({
+    vendors: [
+      {
+        vendorName: "Local Source Venue",
+        category: "Venue",
+        serviceArea: "Sydney",
+        sourceUrl: "http://localhost:8787/vendor/profile",
+      },
+      {
+        vendorName: "Loopback Source Venue",
+        category: "Venue",
+        serviceArea: "Sydney",
+        sourceUrl: "https://127.0.0.1/vendor/profile",
+      },
+    ],
+  });
+
+  assert.equal(state.status, "blocked");
+  assert.equal(state.vendorCount, 0);
+  assert.equal(state.readyForRecommendation, false);
+  assert.deepEqual(state.rows, []);
+  assert.match(state.summary, /No source-backed vendor rows/i);
+});
+
+test("buildWeddingVendorFreshnessState drops local source URLs from mixed freshness rows", () => {
+  const state = buildWeddingVendorFreshnessState({
+    now: new Date("2026-09-14T12:00:00Z"),
+    vendors: [
+      {
+        vendorName: "Local Source Venue",
+        category: "Venue",
+        serviceArea: "Sydney",
+        sourceUrl: "http://localhost:8787/vendor/profile",
+        sourceCheckedAt: "2026-09-14",
+      },
+      {
+        vendorName: "Remote Source Venue",
+        category: "Venue",
+        serviceArea: "Sydney",
+        sourceUrl: "https://venue.example/weddings",
+        sourceCheckedAt: "2026-09-14",
+        evidence: {
+          price_basis: "not verified; request quote",
+          availability_basis: "not verified; request date-specific availability",
+        },
+      },
+    ],
+  });
+
+  assert.equal(state.vendorCount, 1);
+  assert.equal(state.rows[0]?.vendorName, "Remote Source Venue");
+  assert.equal(state.rows[0]?.sourceUrl, "https://venue.example/weddings");
+  assert.ok(!state.rows.some((row) => /Local Source Venue/i.test(row.vendorName)));
+});
+
 test("buildWeddingVendorFreshnessState requires price and availability recheck for unverified seeds", () => {
   const state = buildWeddingVendorFreshnessState({
     now: new Date("2026-09-14T12:00:00Z"),

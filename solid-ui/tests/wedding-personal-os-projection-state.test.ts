@@ -507,6 +507,37 @@ test("wedding PersonalOS projection ranks vendor search freshness tasks", () => 
   assert.match(state.rankedItems[0]?.explanation ?? "", /source freshness, price\/availability verification/i);
 });
 
+test("wedding PersonalOS projection ranks top-three vendor comparison decisions", () => {
+  const state = buildWeddingPersonalOsProjectionState({
+    now,
+    taskItems: [{
+      id: "wedding_vendor_search_task:choose-top-vendor-comparison:workspace",
+      title: "Choose preferred vendors from the top-three comparison",
+      kind: "decision",
+      priority: "high",
+      reviewStatus: "accepted",
+      approvalState: "draft",
+      linkedArtifactId: "wedding_artifact:vendor_comparison_top3:workspace",
+      metadata: {
+        vendor_search_review_task: true,
+        vendor_comparison_decision_task: true,
+        vendor_search_action_id: "choose-top-vendor-comparison",
+        vendor_comparison_top_choice_labels: ["Harbour Studio", "Budget Lens", "Portrait Hall"],
+        selected_decision_required: true,
+        wedding_workspace_menu: "documents",
+        second_order_loop: "vendor_choice_narrowing",
+      },
+    }],
+  });
+
+  assert.equal(state.rankedItems[0]?.title, "Choose preferred vendors from the top-three comparison");
+  assert.ok(state.rankedItems[0]?.evidenceLabels.includes("top-three vendor comparison"));
+  assert.equal(state.rankedItems[0]?.linkedArtifactId, "wedding_artifact:vendor_comparison_top3:workspace");
+  assert.equal(state.rankedItems[0]?.workspaceMenu, "documents");
+  assert.match(state.rankedItems[0]?.explanation ?? "", /choose preferred vendors before outreach/i);
+  assert.equal(state.decisionLoadRelief.focusItems[0]?.title, "Choose preferred vendors from the top-three comparison");
+});
+
 test("wedding PersonalOS projection explains seeded vendor review tasks", () => {
   const state = buildWeddingPersonalOsProjectionState({
     now,
@@ -582,6 +613,33 @@ test("wedding PersonalOS projection ranks live launch check tasks", () => {
   assert.equal(state.rankedItems[0]?.title, "Finish launch check: Provider executor integrations");
   assert.ok(state.rankedItems[0]?.evidenceLabels.includes("live update check"));
   assert.match(state.rankedItems[0]?.explanation ?? "", /cannot be updated/i);
+});
+
+test("wedding PersonalOS projection ranks production remaining-work tasks", () => {
+  const state = buildWeddingPersonalOsProjectionState({
+    now,
+    taskItems: [{
+      id: "wedding_production_remaining_work:provider-executor-integrations",
+      title: "Clear launch blocker: Connected app integrations",
+      kind: "vendor_coordination",
+      priority: "urgent",
+      reviewStatus: "accepted",
+      approvalState: "draft",
+      metadata: {
+        production_remaining_work_task: true,
+        production_remaining_work_item_id: "provider_executor_integrations",
+        production_remaining_work_tier: "oracle_blocker",
+        production_remaining_work_required_for_oracle: true,
+        production_remaining_work_estimated_passes: 2,
+        production_readiness_oracle_gate: true,
+        second_order_loop: "commitment_timing",
+      },
+    }],
+  });
+
+  assert.equal(state.rankedItems[0]?.title, "Clear launch blocker: Connected app integrations");
+  assert.ok(state.rankedItems[0]?.evidenceLabels.includes("launch blocker"));
+  assert.match(state.rankedItems[0]?.explanation ?? "", /must clear before Oracle upload/i);
 });
 
 test("wedding PersonalOS projection narrows decision-heavy work into a bounded focus list", () => {

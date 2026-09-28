@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildWeddingHomeStatusState,
   buildWeddingHomeOverviewActionTiles,
   buildWeddingHomeTimelineOverview,
 } from "@/lib/weddingHomeOverviewState";
@@ -29,6 +30,11 @@ function state(overrides: Partial<WeddingResponseWorkspaceViewState> = {}): Wedd
       undatedItems: [],
     },
     vendorContactCards: [],
+    planningTaskItems: [],
+    resilience: {
+      cards: [],
+      hasUrgentItem: false,
+    },
     ...overrides,
   } as unknown as WeddingResponseWorkspaceViewState;
 }
@@ -53,6 +59,41 @@ test("home overview guest tile is actionable before guests are added", () => {
   assert.equal(guest?.a2ui.tone, "needs_input");
   assert.equal(guest?.a2ui.tone_label, "Needs list");
   assert.equal(guest?.a2ui.support_label, "Open guests");
+});
+
+test("home status summarizes the whole wedding and opens the most useful next area", () => {
+  const status = buildWeddingHomeStatusState(state());
+  const action = status.a2ui.primary_action as Record<string, unknown>;
+
+  assert.equal(status.tone, "attention");
+  assert.equal(status.title, "Your wedding plan has a clear next step");
+  assert.equal(status.menuId, "budget");
+  assert.equal(status.actionLabel, "Open budget");
+  assert.ok(status.detail.includes("Budget: Set budget"));
+  assert.ok(status.metrics.some((metric) => metric.id === "date" && metric.value === "Add date"));
+  assert.equal(action.target_menu, "budget");
+});
+
+test("home status escalates urgent vendor and resilience work", () => {
+  const status = buildWeddingHomeStatusState(state({
+    budgetTracking: {
+      budgetTargetAmount: 60_000,
+      totalKnownAmount: 45_000,
+      remainingAmount: 15_000,
+    } as WeddingResponseWorkspaceViewState["budgetTracking"],
+    vendorContactCards: [
+      { tone: "urgent" },
+    ] as WeddingResponseWorkspaceViewState["vendorContactCards"],
+    resilience: {
+      cards: [{ id: "change" }],
+      hasUrgentItem: true,
+    } as WeddingResponseWorkspaceViewState["resilience"],
+  }));
+
+  assert.equal(status.tone, "risk");
+  assert.match(status.title, /needs attention/i);
+  assert.equal(status.menuId, "response_queue");
+  assert.equal(status.actionLabel, "Open vendor follow-ups");
 });
 
 test("home overview budget tile summarizes paid estimated and forecast amounts", () => {

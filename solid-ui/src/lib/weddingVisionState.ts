@@ -213,7 +213,7 @@ export function buildWeddingVisionState(state: WeddingResponseWorkspaceViewState
     sourceMixLabels: sourceMix.length ? sourceMix : ["No saved wedding evidence yet."],
     learningLabels: learning.length ? learning : ["Keep adding choices, uploads, and corrections. OmnyID will adjust this summary as the plan changes."],
     actionLabels: actionLabels(state),
-    correctionPrompt: "If this does not sound like you, edit the source details instead of fighting the plan later.",
+    correctionPrompt: "Does this sound right?",
   };
   return {
     ...vision,

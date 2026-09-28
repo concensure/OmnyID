@@ -41,7 +41,19 @@ function clean(value: unknown): string {
 }
 
 function usableSourceUrl(value: unknown): boolean {
-  return /^https?:\/\//i.test(clean(value));
+  const candidate = clean(value);
+  if (!/^https?:\/\//i.test(candidate)) return false;
+  try {
+    const url = new URL(candidate);
+    const hostname = url.hostname.toLowerCase();
+    return hostname !== "localhost"
+      && hostname !== "127.0.0.1"
+      && hostname !== "0.0.0.0"
+      && hostname !== "::1"
+      && hostname !== "[::1]";
+  } catch {
+    return false;
+  }
 }
 
 function parsedEvidence(value: WeddingVendorSeedDetail["evidence"]): Record<string, unknown> {

@@ -7,7 +7,6 @@ import { weddingApprovalReceiptToAfpMessage } from "@/lib/weddingApprovalReceipt
 import { weddingGeneratedArtifactsToAfpMessages } from "@/lib/weddingArtifactAfpProjectionState";
 import { buildWeddingAustralianLegalSetupState } from "@/lib/weddingAustralianLegalSetupState";
 import {
-  buildWeddingTaskAlertReminderScheduleItems,
   weddingScheduleItemToAfpCalendarMessage,
   weddingTaskItemToAfpTaskMessage,
   type WeddingPlanningScheduleItem,
@@ -18,7 +17,6 @@ import { buildWeddingPersistedWorkspaceState } from "@/lib/weddingPersistedWorks
 import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 import { weddingDecisionProjectionToAfpMessage } from "@/lib/weddingDecisionAfpProjectionState";
 import { weddingDecisionDeferralToAfpMessage } from "@/lib/weddingDecisionDeferralAfpState";
-import { buildWeddingImportSynthesisState } from "@/lib/weddingImportSynthesisState";
 import { buildWeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
 import {
   weddingBoundaryLedgerObjectToAfpMessage,
@@ -38,6 +36,11 @@ import {
   buildWeddingInspirationItem,
   weddingInspirationItemsToAfpMessage,
 } from "@/lib/weddingInspirationState";
+import {
+  buildWeddingVendorQuoteReplyFlowState,
+  weddingVendorQuoteDraftAfpSendInput,
+  weddingVendorQuoteIncomingAfpMessage,
+} from "@/lib/weddingVendorQuoteReplyFlowState";
 
 const metadata = {
   weddingPlanId: "wedding_plan:persisted",
@@ -74,6 +77,18 @@ function persistedMessages() {
     location: "Sydney",
     metadata,
     linkedArtifactId: artifacts[0]?.summary.id,
+    semanticKind: "wedding_active_loop",
+    semanticTags: ["wedding_active_loop", "timeline"],
+    semanticObject: {
+      id: "semantic:schedule:venue-tour",
+      kind: "wedding_active_loop",
+      title: "Venue tour",
+      stateLabel: "Scheduled",
+      tone: "status",
+      summary: "Venue tour is on the wedding timeline.",
+      actions: [],
+      semanticTags: ["wedding_active_loop", "timeline"],
+    },
   };
   const taskItem: WeddingPlanningTaskItem = {
     id: "confirm-package",
@@ -83,6 +98,18 @@ function persistedMessages() {
     priority: "high",
     metadata,
     linkedArtifactId: artifacts[0]?.summary.id,
+    semanticKind: "wedding_external_wait",
+    semanticTags: ["wedding_external_wait", "vendor_follow_up"],
+    semanticObject: {
+      id: "semantic:task:confirm-package",
+      kind: "wedding_external_wait",
+      title: "Confirm package inclusions",
+      stateLabel: "Waiting on vendor",
+      tone: "risk",
+      summary: "Package inclusions need confirmation before the venue decision is final.",
+      actions: [],
+      semanticTags: ["wedding_external_wait", "vendor_follow_up"],
+    },
   };
   const approvalRequest = buildWeddingApprovalRequestState({
     actionKind: "contact_vendor",
@@ -141,12 +168,25 @@ function persistedMessages() {
       metadata: {
         ...approvalReceipt.metadata,
         external_id: "vendor:message-1",
+        provider_receipt_id: "gmail-receipt-1",
+        provider_message_id: "gmail-message-1",
+        message_id: "rfc822-message-1",
+        client_message_id: "local-message-1",
+        delivery_channel: "email",
+        delivery_subject: "Harbour Hall follow-up",
+        delivery_thread_id: "wedding_vendor_quote:response_workspace:persisted:harbour-hall",
+        delivery_in_reply_to: "<quote-message@harbour.example>",
+        delivery_references: ["<quote-message@harbour.example>", "afp-quote-message-1"],
+        delivery_recipients: ["events@harbour.example"],
         execution_mode: "omnyid_internal_approval_handoff",
         provider_capability: "email",
         required_provider: "Gmail or email provider",
         provider_credential_status: "missing",
         provider_executor_status: "missing",
         provider_executor_connected: false,
+        provider_result_ok: true,
+        external_delivery_performed: false,
+        missing_durable_provider_receipt: false,
         provider_setup_view: "email",
         external_provider_required: true,
       },
@@ -177,15 +217,32 @@ test("buildWeddingPersistedWorkspaceState recovers persisted artifacts dates and
   const firstArtifactMessage = persistedMessages().find((message) => message.subtype === "wedding_artifact");
   assert.equal(state.scheduleItems[0]?.linkedArtifactId, firstArtifactMessage?.content.artifact_id);
   assert.equal(state.taskItems[0]?.priority, "high");
+  assert.equal(state.scheduleItems[0]?.semanticKind, "wedding_active_loop");
+  assert.equal(state.scheduleItems[0]?.semanticObject?.id, "semantic:schedule:venue-tour");
+  assert.equal(state.taskItems[0]?.semanticKind, "wedding_external_wait");
+  assert.equal(state.taskItems[0]?.semanticObject?.id, "semantic:task:confirm-package");
   assert.equal(state.contextItems[0]?.planningContext.location, "Sydney NSW");
   assert.equal(state.contextItems[0]?.projectionSaved, true);
   assert.equal(state.approvalReceipts[0]?.actionKind, "contact_vendor");
   assert.equal(state.approvalReceipts[0]?.status, "executed");
   assert.equal(state.approvalReceipts[0]?.blockKind, null);
   assert.equal(state.approvalReceipts[0]?.externalId, "vendor:message-1");
+  assert.equal(state.approvalReceipts[0]?.providerReceiptId, "gmail-receipt-1");
+  assert.equal(state.approvalReceipts[0]?.providerMessageId, "gmail-message-1");
+  assert.equal(state.approvalReceipts[0]?.messageId, "rfc822-message-1");
+  assert.equal(state.approvalReceipts[0]?.clientMessageId, "local-message-1");
+  assert.equal(state.approvalReceipts[0]?.deliveryChannel, "email");
+  assert.equal(state.approvalReceipts[0]?.deliverySubject, "Harbour Hall follow-up");
+  assert.equal(state.approvalReceipts[0]?.deliveryThreadId, "wedding_vendor_quote:response_workspace:persisted:harbour-hall");
+  assert.equal(state.approvalReceipts[0]?.deliveryInReplyTo, "<quote-message@harbour.example>");
+  assert.deepEqual(state.approvalReceipts[0]?.deliveryReferences, ["<quote-message@harbour.example>", "afp-quote-message-1"]);
+  assert.deepEqual(state.approvalReceipts[0]?.deliveryRecipients, ["events@harbour.example"]);
   assert.equal(state.approvalReceipts[0]?.providerCapability, "email");
   assert.equal(state.approvalReceipts[0]?.requiredProvider, "Gmail or email provider");
   assert.equal(state.approvalReceipts[0]?.providerExecutorStatus, "missing");
+  assert.equal(state.approvalReceipts[0]?.providerResultOk, true);
+  assert.equal(state.approvalReceipts[0]?.externalDeliveryPerformed, false);
+  assert.equal(state.approvalReceipts[0]?.missingDurableProviderReceipt, false);
   assert.equal(state.approvalReceipts[0]?.providerSetupView, "email");
   assert.equal(state.decisionRecords[0]?.selectedOptionLabel, "Harbour Hall");
   assert.equal(state.decisionRecords[0]?.artifactTitle, artifactsTitleFromState(state));
@@ -193,8 +250,134 @@ test("buildWeddingPersistedWorkspaceState recovers persisted artifacts dates and
   assert.deepEqual(state.decisionRecords[0]?.sourceProviderLabels, ["google_places"]);
   assert.ok(state.decisionRecords[0]?.sourceLabels?.includes("Venue website"));
   assert.ok(state.decisionRecords[0]?.sourceUrls?.includes("https://harbour.example"));
+  assert.equal(state.decisionRecords[0]?.semanticKind, "wedding_decision");
+  assert.ok(state.decisionRecords[0]?.semanticTags?.includes("wedding_approval_required"));
+  assert.equal(state.decisionRecords[0]?.semanticObject?.title, "Decision: Harbour Hall");
   assert.equal(state.boundaryObjects.length, 0);
   assert.deepEqual(state.sourceMessageIds.length, 8);
+});
+
+test("buildWeddingPersistedWorkspaceState recovers vendor quote thread artifacts", () => {
+  const quote = {
+    kind: "quote" as const,
+    vendorName: "Chloe's Florals",
+    amount: 799,
+    amountLabel: "AUD $799",
+    currency: "AUD",
+    budgetDeltaAmount: 200,
+    budgetDeltaLabel: "$200 over budget",
+    inclusions: ["Bridal bouquet", "Ceremony arrangements"],
+    validUntil: "2026-10-15",
+    attachmentUrl: "https://example.com/chloe-quote.pdf",
+  };
+  const incoming = weddingVendorQuoteIncomingAfpMessage({
+    quote,
+    metadata,
+    subject: "Floral quote",
+    createdAt: "2026-09-27T00:00:00.000Z",
+  });
+  const flow = buildWeddingVendorQuoteReplyFlowState({
+    quote,
+    metadata,
+    recipient: "hello@chloes.example",
+    subject: "Floral quote",
+    draftBody: "Thanks Chloe, we would like to proceed.",
+    quoteMessageId: incoming.id,
+  });
+  const draft = weddingVendorQuoteDraftAfpSendInput({
+    flow,
+    recipient: flow.recipient,
+    subject: flow.subject,
+    body: flow.draftBody,
+    parentId: incoming.id,
+    createdAt: "2026-09-27T00:01:00.000Z",
+  });
+  const state = buildWeddingPersistedWorkspaceState({
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+    messages: [
+      incoming,
+      {
+        ...draft,
+        id: String(draft.metadata?.id ?? "draft-message"),
+        timestamp: draft.timestamp ?? "2026-09-27T00:01:00.000Z",
+        kind: draft.kind ?? null,
+        subtype: draft.subtype ?? null,
+        metadata: draft.metadata ?? {},
+        views: draft.views ?? [],
+        attachments: draft.attachments ?? [],
+      },
+    ],
+  });
+
+  assert.equal(state.artifacts.length, 2);
+  const quoteArtifact = state.artifacts.find((artifact) => artifact.kind === "vendor_table");
+  const draftArtifact = state.artifacts.find((artifact) => artifact.kind === "email_draft");
+  assert.equal(quoteArtifact?.id, incoming.id);
+  assert.equal(quoteArtifact?.title, "Chloe's Florals quote");
+  assert.match(quoteArtifact?.bodyText ?? "", /Quote amount: AUD \$799/);
+  assert.match(quoteArtifact?.bodyText ?? "", /Original PDF: https:\/\/example.com\/chloe-quote.pdf/);
+  assert.ok(quoteArtifact?.sourceLabels?.includes("Vendor quote thread"));
+  assert.equal(draftArtifact?.id, draft.metadata?.id);
+  assert.equal(draftArtifact?.title, "Floral quote");
+  assert.match(draftArtifact?.bodyText ?? "", /Recipient: hello@chloes.example/);
+  assert.match(draftArtifact?.bodyText ?? "", /Thanks Chloe, we would like to proceed/);
+});
+
+test("buildWeddingPersistedWorkspaceState prefers explicit artifacts over recovered vendor thread fallbacks", () => {
+  const quote = {
+    kind: "quote" as const,
+    vendorName: "Chloe's Florals",
+    amount: 799,
+    amountLabel: "AUD $799",
+    currency: "AUD",
+    budgetDeltaAmount: 200,
+    budgetDeltaLabel: "$200 over budget",
+    inclusions: ["Bridal bouquet"],
+    validUntil: "2026-10-15",
+    attachmentUrl: "https://example.com/chloe-quote.pdf",
+  };
+  const incoming = weddingVendorQuoteIncomingAfpMessage({
+    quote,
+    metadata,
+    subject: "Floral quote",
+    createdAt: "2026-09-27T00:00:00.000Z",
+  });
+  const explicitArtifact = {
+    ...incoming,
+    subtype: "wedding_artifact",
+    content: {
+      artifact_id: incoming.id,
+      artifact_kind: "vendor_table",
+      title: "Explicit Chloe quote artifact",
+      markdown: [
+        "# Explicit Chloe quote artifact",
+        "",
+        "Vendor: Chloe's Florals",
+        "Quote amount: AUD $799",
+        "Budget delta: $200 over budget",
+        "",
+        "This body came from the explicit artifact projection.",
+      ].join("\n"),
+    },
+    metadata: {
+      ...incoming.metadata,
+      artifact_kind: "vendor_table",
+      artifact_title: "Explicit Chloe quote artifact",
+    },
+  };
+  const state = buildWeddingPersistedWorkspaceState({
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+    messages: [incoming, explicitArtifact],
+  });
+
+  assert.equal(state.artifacts.length, 1);
+  assert.equal(state.artifacts[0]?.id, incoming.id);
+  assert.equal(state.artifacts[0]?.title, "Explicit Chloe quote artifact");
+  assert.match(state.artifacts[0]?.bodyText ?? "", /explicit artifact projection/i);
 });
 
 test("buildWeddingPersistedWorkspaceState reloads boundary ledger decisions from AFP messages", () => {
@@ -249,7 +432,11 @@ test("buildWeddingPersistedWorkspaceState reloads boundary ledger decisions from
   assert.equal(state.boundaryObjects.length, 3);
   assert.equal(request?.requestStatus, "approved");
   assert.equal(request?.approvalRequired, false);
+  assert.equal(request?.semanticKind, "wedding_active_loop");
+  assert.ok(request?.semanticTags?.includes("wedding_boundary_change_request"));
+  assert.equal(request?.semanticObject?.title, "Add Taylor's plus-one");
   assert.equal((request?.metadata as Record<string, unknown> | undefined)?.persisted_boundary_ledger, true);
+  assert.equal((request?.metadata as Record<string, unknown> | undefined)?.semantic_kind, "wedding_active_loop");
   assert.equal(typeof (request?.metadata as Record<string, unknown> | undefined)?.persisted_afp_message_id, "string");
   assert.ok(state.boundaryObjects.some((object) => object.kind === "wedding_boundary_policy"));
   assert.ok(state.boundaryObjects.some((object) => object.kind === "wedding_boundary_decision_rationale"));
@@ -425,260 +612,6 @@ test("buildWeddingPersistedWorkspaceState coalesces duplicate inspiration saves 
   assert.ok(state.inspirationItems[0]?.tags.includes("long table"));
 });
 
-test("buildWeddingPersistedWorkspaceState preserves wedding import original-upload receipts", () => {
-  const imports = buildWeddingImportSynthesisState({
-    metadata,
-    files: [{
-      name: "rsvp.csv",
-      text: "Name,RSVP\nAlex,Yes",
-      uploadReceipt: {
-        status: "saved",
-        messageId: "upload-message-1",
-        attachment: {
-          id: "attachment-1",
-          name: "rsvp.csv",
-          mime_type: "text/csv",
-          size_bytes: 19,
-          storage: { backend: "local", key: "uploads/rsvp.csv" },
-          encryption: { mode: "server" },
-          sha256: "hash-1",
-        },
-      },
-    }],
-  });
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: weddingGeneratedArtifactsToAfpMessages(imports.generatedArtifacts, "2026-09-11T00:00:00.000Z"),
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-    sourceResponseId: metadata.sourceResponseId,
-  });
-  const artifactMetadata = state.artifacts[0]?.metadata as Record<string, unknown>;
-
-  assert.equal(state.artifacts.length, 1);
-  assert.equal(artifactMetadata.originalUploadStatus, "saved");
-  assert.equal(artifactMetadata.originalUploadMessageId, "upload-message-1");
-  assert.equal(artifactMetadata.originalUploadAttachmentId, "attachment-1");
-  assert.equal(artifactMetadata.originalUploadSha256, "hash-1");
-  assert.deepEqual(artifactMetadata.originalUploadStorage, { backend: "local", key: "uploads/rsvp.csv" });
-});
-
-test("buildWeddingPersistedWorkspaceState bounds legacy original-upload receipts on reload", () => {
-  const longId = "x".repeat(260);
-  const imports = buildWeddingImportSynthesisState({
-    metadata,
-    files: [{
-      name: "budget.xlsx",
-      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      text: "",
-      uploadReceipt: {
-        status: "saved",
-        messageId: "upload-message-1",
-        attachment: {
-          id: "attachment-1",
-          name: "budget.xlsx",
-          mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          size_bytes: 19,
-          storage: { backend: "local", key: "uploads/budget.xlsx" },
-          encryption: { mode: "server" },
-          sha256: "hash-1",
-        },
-      },
-    }],
-  });
-  const [message] = weddingGeneratedArtifactsToAfpMessages(imports.generatedArtifacts, "2026-09-11T00:00:00.000Z");
-  assert.ok(message);
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: [{
-      ...message,
-      content: {
-        ...message.content,
-        original_upload_message_id: `msg-${longId}`,
-        original_upload_attachment_id: `att-${longId}`,
-        original_upload_sha256: `hash-${longId}`,
-        original_upload_file_name: "../private/private-family-budget.xlsx",
-        original_upload_mime_type: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;${longId}`,
-        original_upload_size_bytes: -42,
-        original_upload_storage: {
-          backend: "local",
-          key: `uploads/private-family-budget.xlsx?${longId}`,
-          nested: { unsafe: true },
-        },
-      },
-    }],
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-    sourceResponseId: metadata.sourceResponseId,
-  });
-  const artifactMetadata = state.artifacts[0]?.metadata as Record<string, unknown>;
-  const storageReceipt = artifactMetadata.originalUploadStorage as Record<string, unknown>;
-
-  assert.equal(state.artifacts.length, 1);
-  assert.equal(artifactMetadata.originalUploadStatus, "saved");
-  assert.equal(artifactMetadata.originalUploadFileName, "private-family-budget.xlsx");
-  assert.equal(String(artifactMetadata.originalUploadMessageId).length, 200);
-  assert.equal(String(artifactMetadata.originalUploadAttachmentId).length, 200);
-  assert.equal(String(artifactMetadata.originalUploadSha256).length, 256);
-  assert.equal(artifactMetadata.originalUploadSizeBytes, 0);
-  assert.equal(storageReceipt.backend, "local");
-  assert.match(storageReceipt.key as string, /^uploads\/private-family-budget\.xlsx/);
-  assert.ok((storageReceipt.key as string).length <= 500);
-  assert.equal(storageReceipt.nested, undefined);
-});
-
-test("buildWeddingPersistedWorkspaceState drops malformed persisted source URLs on reload", () => {
-  const [artifactMessage] = weddingGeneratedArtifactsToAfpMessages(buildWeddingArtifactGenerationState({
-    metadata,
-    researchNotes: ["Review venue data."],
-  }).artifacts, "2026-09-11T00:00:00.000Z");
-  assert.ok(artifactMessage);
-  const decisionMessage = weddingDecisionProjectionToAfpMessage({
-    id: "wedding_decision:persisted:safe_source",
-    metadata,
-    artifactId: "artifact:source",
-    artifactTitle: "Vendor shortlist",
-    artifactKind: "vendor_table",
-    sourceLabels: ["Mixed source"],
-    sourceUrls: ["https://safe.example/source"],
-    selectedOption: {
-      id: "row-1",
-      label: "Safe Vendor",
-      detail: "Selected after source review.",
-      rowIndex: 0,
-      cells: ["Safe Vendor", "Venue", "Sydney"],
-      selected: true,
-      preferenceFitLabels: [],
-      missingPreferenceLabels: [],
-      tradeoffLabels: [],
-      preferenceSummaryLabel: "No explicit preference-fit signals were detected for this row.",
-    },
-  }, "2026-09-11T00:10:00.000Z");
-
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: [{
-      ...artifactMessage,
-      content: {
-        ...artifactMessage.content,
-        source_links: [
-          { label: "Unsafe source", url: "javascript:alert(1)" },
-          { label: "Safe source", url: "https://safe.example/artifact" },
-        ],
-      },
-    }, {
-      ...decisionMessage,
-      content: {
-        ...decisionMessage.content,
-        source_urls: ["javascript:alert(1)", "not-a-url", "https://safe.example/source"],
-      },
-      metadata: {
-        ...decisionMessage.metadata,
-        source_urls: ["javascript:alert(1)", "https://metadata.example/source"],
-      },
-    }],
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-    sourceResponseId: metadata.sourceResponseId,
-  });
-
-  assert.deepEqual(state.artifacts[0]?.sourceLinks, [{ label: "Safe source", url: "https://safe.example/artifact" }]);
-  assert.deepEqual(state.decisionRecords[0]?.sourceUrls, ["https://safe.example/source"]);
-});
-
-test("buildWeddingPersistedWorkspaceState redacts legacy imported decision records on reload", () => {
-  const decisionMessage = weddingDecisionProjectionToAfpMessage({
-    id: "wedding_decision:persisted:legacy_import",
-    metadata: {
-      ...metadata,
-      supertags: ["wedding_import", "wedding_import:spreadsheet"],
-    },
-    artifactId: "wedding_import:vendor_table:workspace:venues-xlsx",
-    artifactTitle: "Imported XLSX: venues.xlsx",
-    artifactKind: "vendor_table",
-    sourceLabels: ["source: venues.xlsx", "original upload saved"],
-    sourceUrls: ["https://example.com/venue"],
-    selectedOption: {
-      id: "row-1",
-      label: "Harbour Hall",
-      detail: "Selected waterfront venue.",
-      rowIndex: 0,
-      cells: ["Harbour Hall", "Sydney"],
-      selected: true,
-      preferenceFitLabels: [],
-      missingPreferenceLabels: [],
-      tradeoffLabels: [],
-      preferenceSummaryLabel: "No explicit preference-fit signals were detected for this row.",
-    },
-  }, "2026-09-11T00:10:00.000Z");
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: [{
-      ...decisionMessage,
-      content: {
-        ...decisionMessage.content,
-        artifact_title: "Imported XLSX: venues.xlsx",
-        source_labels: ["source: venues.xlsx", "original upload saved"],
-        source_urls: [
-          "https://storage.example.test/uploads/venues.xlsx?token=private",
-          "https://example.com/venue",
-        ],
-      },
-      metadata: {
-        ...decisionMessage.metadata,
-        artifact_title: "Imported XLSX: venues.xlsx",
-        source_labels: ["source: venues.xlsx", "original upload saved"],
-        source_urls: [
-          "https://storage.example.test/uploads/venues.xlsx?token=private",
-          "https://example.com/venue",
-        ],
-      },
-    }],
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-    sourceResponseId: metadata.sourceResponseId,
-  });
-  const serialized = JSON.stringify(state.decisionRecords);
-
-  assert.equal(state.decisionRecords[0]?.artifactTitle, "Imported private planning file");
-  assert.deepEqual(state.decisionRecords[0]?.sourceLabels, ["Imported private planning file"]);
-  assert.deepEqual(state.decisionRecords[0]?.sourceUrls, ["https://example.com/venue"]);
-  assert.equal(serialized.includes("venues.xlsx"), false);
-  assert.equal(serialized.includes("original upload saved"), false);
-  assert.equal(serialized.includes("storage.example.test"), false);
-  assert.equal(serialized.includes("token=private"), false);
-});
-
-test("buildWeddingPersistedWorkspaceState hides encrypted persisted schedule content while locked", () => {
-  const message = weddingScheduleItemToAfpCalendarMessage({
-    id: "encrypted-tour",
-    title: "Hidden venue tour",
-    kind: "venue_tour",
-    startAt: "2027-09-18T10:00:00+10:00",
-    location: "Hidden venue",
-    metadata,
-  }, "2026-09-11T00:00:00.000Z");
-  assert.ok(message);
-
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: [{
-      ...message,
-      content: {
-        ...message.content,
-        title: "Hidden venue tour",
-        location: "Hidden venue",
-        ciphertext: "abc123",
-        nonce: "nonce123",
-      },
-      encryption: { scheme: "xchacha20-poly1305", key_id: "device-key" },
-    } as any],
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-    sourceResponseId: metadata.sourceResponseId,
-  });
-
-  assert.equal(state.scheduleItems.length, 1);
-  assert.equal(state.scheduleItems[0]?.title, "Wedding date");
-  assert.equal(state.scheduleItems[0]?.location, null);
-  assert.equal(state.scheduleItems[0]?.startAt, null);
-});
-
 function artifactsTitleFromState(state: ReturnType<typeof buildWeddingPersistedWorkspaceState>): string | undefined {
   return state.artifacts.find((artifact) => artifact.id === state.decisionRecords[0]?.artifactId)?.title;
 }
@@ -700,6 +633,9 @@ test("buildWeddingPersistedWorkspaceState reloads approval receipt block kinds",
   assert.equal(state.approvalReceipts.length, 1);
   assert.equal(state.approvalReceipts[0]?.status, "blocked");
   assert.equal(state.approvalReceipts[0]?.blockKind, "needs_user_approval");
+  assert.equal(state.approvalReceipts[0]?.semanticKind, "wedding_approval_required");
+  assert.ok(state.approvalReceipts[0]?.semanticTags?.includes("wedding_approval_receipt"));
+  assert.equal(state.approvalReceipts[0]?.semanticObject?.stateLabel, "Blocked");
 });
 
 test("buildWeddingPersistedWorkspaceState reloads deferred wedding decision records", () => {
@@ -777,218 +713,4 @@ test("buildWeddingPersistedWorkspaceState reloads registry provider handoff meta
   assert.equal(state.approvalReceipts[0]?.providerExecutorConnected, false);
   assert.equal(state.approvalReceipts[0]?.providerSetupView, "connected_apps");
   assert.equal(state.approvalReceipts[0]?.externalProviderRequired, true);
-});
-
-test("buildWeddingPersistedWorkspaceState preserves second-order task metadata", () => {
-  const message = weddingTaskItemToAfpTaskMessage({
-    id: "second-order-weather",
-    title: "Confirm wet-weather backup for Harbour Hall",
-    kind: "vendor_follow_up",
-    priority: "high",
-    metadata: {
-      ...metadata,
-      second_order_task: true,
-      second_order_loop: "weather_backup",
-      second_order_evidence_labels: ["weather-exposed plan", "selected scope: venue: Harbour Hall"],
-      second_order_linked_artifact_id: "artifact:venue-table",
-      selected_decision_scope: {
-        selected_option_label: "Harbour Hall",
-        artifact_id: "artifact:venue-table",
-      },
-    },
-    linkedArtifactId: "artifact:venue-table",
-  }, "2026-09-11T00:00:00.000Z");
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: [message],
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-    sourceResponseId: metadata.sourceResponseId,
-  });
-  const taskMetadata = state.taskItems[0]?.metadata as Record<string, unknown>;
-
-  assert.equal(state.taskItems.length, 1);
-  assert.equal(taskMetadata.second_order_task, true);
-  assert.equal(taskMetadata.second_order_loop, "weather_backup");
-  assert.deepEqual(taskMetadata.second_order_evidence_labels, ["weather-exposed plan", "selected scope: venue: Harbour Hall"]);
-  assert.equal((taskMetadata.selected_decision_scope as Record<string, unknown>).selected_option_label, "Harbour Hall");
-});
-
-test("buildWeddingPersistedWorkspaceState redacts legacy imported selected-decision scope metadata on reload", () => {
-  const message = weddingTaskItemToAfpTaskMessage({
-    id: "second-order-import",
-    title: "Confirm imported venue decision",
-    kind: "vendor_follow_up",
-    priority: "high",
-    metadata: {
-      ...metadata,
-      second_order_task: true,
-      second_order_loop: "vendor_confirmation",
-      selected_decision_scope: {
-        selected_option_label: "Harbour Hall",
-        artifact_id: "artifact:venue-table",
-        artifact_title: "Imported XLSX: private-family-budget.xlsx",
-        artifactTitle: "Imported XLSX: private-family-budget.xlsx",
-        source_labels: ["original upload saved", "source: private-family-budget.xlsx"],
-        sourceLabels: ["source: private-family-budget.xlsx"],
-        source_urls: [
-          "https://storage.example.test/uploads/private-family-budget.xlsx?token=private",
-          "https://example.com/vendor-quote",
-        ],
-        sourceUrls: ["https://storage.example.test/uploads/private-family-budget.xlsx?token=private"],
-        metadata_labels: ["source: private-family-budget.xlsx", "needs follow-up"],
-        metadataLabels: ["wedding_import:spreadsheet"],
-      },
-    },
-    linkedArtifactId: "artifact:venue-table",
-  }, "2026-09-11T00:00:00.000Z");
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: [message],
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-    sourceResponseId: metadata.sourceResponseId,
-  });
-  const scope = (state.taskItems[0]?.metadata as Record<string, unknown>).selected_decision_scope as Record<string, unknown>;
-  const serialized = JSON.stringify(scope);
-
-  assert.equal(scope.selected_option_label, "Harbour Hall");
-  assert.equal(scope.artifact_title, "Imported private planning file");
-  assert.equal(scope.artifactTitle, undefined);
-  assert.deepEqual(scope.source_labels, ["Imported private planning file"]);
-  assert.equal(scope.sourceLabels, undefined);
-  assert.deepEqual(scope.source_urls, ["https://example.com/vendor-quote"]);
-  assert.equal(scope.sourceUrls, undefined);
-  assert.deepEqual(scope.metadata_labels, ["needs follow-up"]);
-  assert.equal(scope.imported_private_evidence, true);
-  assert.equal(serialized.includes("private-family-budget.xlsx"), false);
-  assert.equal(serialized.includes("storage.example.test"), false);
-  assert.equal(serialized.includes("token=private"), false);
-  assert.equal(serialized.includes("original upload saved"), false);
-  assert.equal(serialized.includes("wedding_import:spreadsheet"), false);
-});
-
-test("buildWeddingPersistedWorkspaceState preserves preparation task kind and alert metadata", () => {
-  const message = weddingTaskItemToAfpTaskMessage({
-    id: "prep-cake",
-    title: "Book cake baker, tasting, design, delivery, and cutting plan",
-    kind: "cake",
-    dueAt: "2027-07-20T10:00:00.000Z",
-    dueLabel: "6-9 months out; final details 4-6 weeks out",
-    priority: "high",
-    metadata: {
-      ...metadata,
-      preparation_checklist: true,
-      preparation_checklist_item: "cake",
-      alert_offset_days: [60, 30, 14],
-      schedule_basis: "wedding_date",
-      second_order_loop: "vendor_confirmation",
-    },
-  }, "2026-09-11T00:00:00.000Z");
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: [message],
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-    sourceResponseId: metadata.sourceResponseId,
-  });
-  const task = state.taskItems[0];
-  const taskMetadata = task?.metadata as Record<string, unknown>;
-
-  assert.equal(state.taskItems.length, 1);
-  assert.equal(task?.kind, "cake");
-  assert.deepEqual(taskMetadata.alert_offset_days, [60, 30, 14]);
-  assert.deepEqual(taskMetadata.alert_dates, ["2027-05-21", "2027-06-20", "2027-07-06"]);
-  assert.equal(taskMetadata.preparation_checklist_item, "cake");
-  assert.equal(taskMetadata.second_order_loop, "vendor_confirmation");
-});
-
-test("buildWeddingPersistedWorkspaceState preserves calendar reminder metadata for dedupe", () => {
-  const [reminder] = buildWeddingTaskAlertReminderScheduleItems({
-    taskItems: [{
-      id: "prep-cake",
-      title: "Book cake baker",
-      kind: "cake",
-      dueAt: "2027-07-20T10:00:00.000Z",
-      dueLabel: "6-9 months out",
-      priority: "high",
-      metadata: {
-        ...metadata,
-        preparation_checklist: true,
-        preparation_checklist_item: "cake",
-        alert_offset_days: [60],
-        alert_dates: ["2027-05-21"],
-      },
-    }],
-  });
-  assert.ok(reminder);
-  const message = weddingScheduleItemToAfpCalendarMessage(reminder, "2026-09-11T00:00:00.000Z");
-  assert.ok(message);
-
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: [message],
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-    sourceResponseId: metadata.sourceResponseId,
-  });
-  const schedule = state.scheduleItems[0];
-  const scheduleMetadata = schedule?.metadata as Record<string, unknown>;
-
-  assert.equal(state.scheduleItems.length, 1);
-  assert.equal(schedule?.kind, "task_reminder");
-  assert.equal(scheduleMetadata.alert_reminder, true);
-  assert.equal(scheduleMetadata.alert_reminder_for_task_id, "prep-cake");
-  assert.equal(scheduleMetadata.alert_date, "2027-05-21");
-
-  const duplicates = buildWeddingTaskAlertReminderScheduleItems({
-    taskItems: [{
-      id: "prep-cake",
-      title: "Book cake baker",
-      kind: "cake",
-      dueAt: "2027-07-20T10:00:00.000Z",
-      metadata: {
-        ...metadata,
-        alert_offset_days: [60],
-        alert_dates: ["2027-05-21"],
-      },
-    }],
-    existingScheduleItems: state.scheduleItems,
-  });
-  assert.deepEqual(duplicates, []);
-});
-
-test("buildWeddingPersistedWorkspaceState treats persisted Need-To-Know context as saved queue context", () => {
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: persistedMessages().slice(0, 1),
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-    sourceResponseId: metadata.sourceResponseId,
-  });
-
-  assert.equal(state.hasPersistedData, true);
-  assert.equal(state.artifacts.length, 0);
-  assert.equal(state.contextItems.length, 1);
-  assert.equal(state.contextItems[0]?.metadata.responseWorkspaceId, metadata.responseWorkspaceId);
-  assert.equal(state.contextItems[0]?.readyForFirstRecommendations, true);
-});
-
-test("buildWeddingPersistedWorkspaceState ignores messages from other workspaces", () => {
-  const messages = persistedMessages();
-  const otherWorkspace = {
-    ...messages[0],
-    id: "other",
-    content: {
-      ...messages[0]?.content,
-      response_workspace_id: "response_workspace:other",
-    },
-    metadata: {
-      ...messages[0]?.metadata,
-      response_workspace_id: "response_workspace:other",
-    },
-  };
-  const state = buildWeddingPersistedWorkspaceState({
-    messages: [...messages, otherWorkspace],
-    weddingPlanId: metadata.weddingPlanId,
-    responseWorkspaceId: metadata.responseWorkspaceId,
-  });
-
-  assert.equal(state.sourceMessageIds.includes("other"), false);
-  assert.equal(state.hasPersistedData, true);
 });

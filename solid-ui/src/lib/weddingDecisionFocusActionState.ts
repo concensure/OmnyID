@@ -4,20 +4,25 @@ import type {
   WeddingPersonalOsRankedItem,
 } from "@/lib/weddingPersonalOsProjectionState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
+import { isWeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 
 export type WeddingDecisionFocusActionIntent = "open_item" | "explain_item" | "review_all";
 
 function actionKindForItem(item: WeddingPersonalOsRankedItem | null): WeddingWorkspaceSidebarAction["kind"] {
   if (item?.sourceSurface === "calendar") return "open_calendar";
   if (item?.sourceSurface === "decision_queue" || item?.sourceSurface === "approval_queue") return "approve_action";
+  if (item?.sourceSurface === "tasks" && item.linkedArtifactId && isWeddingWorkspaceMenuId(item.workspaceMenu)) return "open_workspace_menu";
   return "open_tasks";
 }
 
-function actionLabelForKind(kind: WeddingWorkspaceSidebarAction["kind"]): string {
-  if (kind === "open_calendar") return "Open Calendar";
-  if (kind === "approve_action") return "Open Decision Queue";
-  if (kind === "defer_decision") return "Decide Later";
-  return "Open Tasks";
+function actionLabelForItem(item: WeddingPersonalOsRankedItem | null): string {
+  if (item?.sourceSurface === "calendar") return "Open date";
+  if (item?.sourceSurface === "approval_queue") return "Review approval";
+  if (item?.sourceSurface === "decision_queue") return "Choose option";
+  if (item?.sourceSurface === "tasks" && item.linkedArtifactId && isWeddingWorkspaceMenuId(item.workspaceMenu)) {
+    return item.evidenceLabels.some((label) => /top-three vendor comparison/i.test(label)) ? "Open comparison" : "Open file";
+  }
+  return "Open task";
 }
 
 export function buildWeddingDecisionFocusSidebarAction(
@@ -29,10 +34,12 @@ export function buildWeddingDecisionFocusSidebarAction(
   const kind = actionKindForItem(top);
   return {
     kind,
-    label: actionLabelForKind(kind),
+    label: actionLabelForItem(top),
     enabled: focusItems.length > 0,
     reason: focusItems.length > 0 ? null : "No decision-heavy wedding focus items are ready yet.",
     metadata: {
+      ...(top?.linkedArtifactId ? { linked_artifact_id: top.linkedArtifactId } : {}),
+      ...(isWeddingWorkspaceMenuId(top?.workspaceMenu) ? { wedding_workspace_menu: top?.workspaceMenu } : {}),
       decision_focus: {
         version: 1,
         intent,
@@ -47,6 +54,8 @@ export function buildWeddingDecisionFocusSidebarAction(
           pressure_family: item.pressureFamily,
           source_surface: item.sourceSurface,
           due_label: item.dueLabel,
+          linked_artifact_id: item.linkedArtifactId ?? null,
+          wedding_workspace_menu: isWeddingWorkspaceMenuId(item.workspaceMenu) ? item.workspaceMenu : null,
           evidence_labels: item.evidenceLabels,
         })),
       },

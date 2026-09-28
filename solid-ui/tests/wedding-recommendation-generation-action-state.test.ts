@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildWeddingResearchPromptAction,
   buildWeddingRecommendationGenerationAction,
   weddingRecommendationDraftReady,
   weddingRecommendationRequestedOutput,
@@ -23,6 +24,11 @@ function state(overrides: Partial<WeddingResponseWorkspaceViewState> = {}): Wedd
     },
     inspiration: {
       items: [{ id: "img-1" }, { id: "img-2" }],
+    },
+    workspace: {
+      artifacts: [{
+        locationLabels: ["Sydney NSW"],
+      }],
     },
     ...overrides,
   } as unknown as WeddingResponseWorkspaceViewState;
@@ -133,4 +139,52 @@ test("recommendation generation action stays useful with sparse context", () => 
   assert.equal(metadata.guest_count, 0);
   assert.equal(metadata.inspiration_count, 0);
   assert.deepEqual(action.contextLabels, ["Answer next detail", "Important details"]);
+});
+
+test("research prompt action carries document-level context through continue chat", () => {
+  const action = buildWeddingResearchPromptAction({
+    source: "artifact_detail",
+    title: "Harbour venue research",
+    artifactId: "artifact-research-1",
+    artifactKind: "research",
+    query: "wet weather venue options",
+    state: state(),
+  });
+
+  assert.equal(action.kind, "continue_chat");
+  assert.equal(action.label, "Research this further");
+  const metadata = action.metadata?.wedding_research_prompt as Record<string, unknown>;
+  assert.equal(metadata.version, 1);
+  assert.equal(metadata.source, "artifact_detail");
+  assert.equal(metadata.title, "Harbour venue research");
+  assert.equal(metadata.artifact_id, "artifact-research-1");
+  assert.equal(metadata.artifact_kind, "research");
+  assert.equal(metadata.requested_output, "research_brief");
+  assert.equal(metadata.query, "wet weather venue options");
+  assert.equal(metadata.location, "Sydney NSW");
+  assert.deepEqual(action.contextLabels, [
+    "Research this further",
+    "Harbour venue research",
+    "wet weather venue options",
+    "research",
+    "Sydney NSW",
+  ]);
+});
+
+test("research prompt action remains useful from the documents surface", () => {
+  const action = buildWeddingResearchPromptAction({
+    source: "documents",
+    title: "",
+    query: "",
+    state: state({ workspace: { artifacts: [] } } as unknown as Partial<WeddingResponseWorkspaceViewState>),
+  });
+
+  assert.equal(action.label, "Ask for research");
+  const metadata = action.metadata?.wedding_research_prompt as Record<string, unknown>;
+  assert.equal(metadata.title, "Wedding research");
+  assert.equal(metadata.artifact_id, null);
+  assert.equal(metadata.artifact_kind, null);
+  assert.equal(metadata.query, null);
+  assert.equal(metadata.location, null);
+  assert.deepEqual(action.contextLabels, ["Ask for research", "Wedding research"]);
 });

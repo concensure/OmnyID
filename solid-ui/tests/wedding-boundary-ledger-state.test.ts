@@ -102,10 +102,16 @@ test("wedding boundary policy projects as AFP ledger with topology and private r
   assert.equal(message.content.plain_language, "We are not adding extra plus-ones unless both of us approve it.");
   assert.equal(message.content.private_rationale_encrypted, true);
   assert.equal(message.content.encrypted_private_payload, "sealed:venue-capacity-and-budget-context");
+  assert.equal(message.content.semantic_kind, "wedding_active_loop");
+  assert.equal(message.content.semantic_object.kind, "wedding_active_loop");
+  assert.ok(message.content.semantic_tags.includes("wedding_boundary_policy"));
   assert.equal(message.metadata?.e2ee_required, true);
+  assert.equal(message.metadata?.semantic_kind, "wedding_active_loop");
+  assert.ok(message.metadata?.semantic_tags.includes("wedding_boundary"));
   assert.deepEqual(message.metadata?.private_fields, ["encrypted_private_payload"]);
   assert.ok(message.references?.some((reference) => reference.type === "wedding_plan"));
   assert.ok(message.views.some((view) => view.format === "a2ui"));
+  assert.equal(message.views.find((view) => view.format === "a2ui")?.content.semantic_object.kind, "wedding_active_loop");
 });
 
 test("wedding boundary send input preserves ledger tags and typed references", () => {
@@ -115,6 +121,8 @@ test("wedding boundary send input preserves ledger tags and typed references", (
   assert.equal(input.kind, "wedding_boundary_change_request");
   assert.equal(input.store_in_relational, true);
   assert.ok(input.supertags?.includes("wedding_boundary:approval_required"));
+  assert.equal(input.content.semantic_kind, "wedding_approval_required");
+  assert.ok(input.metadata?.semantic_tags.includes("plus_one_change"));
   assert.ok(input.supertags?.includes("topology:wedding_guest_graph"));
   assert.ok(input.references?.some((reference) => reference.type === "request_targets_guest" && reference.target === "person:taylor"));
   assert.ok(input.references?.some((reference) => reference.type === "request_targets_event" && reference.target === "event:reception"));

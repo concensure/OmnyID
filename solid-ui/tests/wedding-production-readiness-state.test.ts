@@ -16,7 +16,10 @@ test("wedding production readiness blocks Oracle upload while required gates rem
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(state.blockerCount > 0);
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Wedding template launch and first-run intake"));
+  assert.ok(state.nextActions.includes("Dynamic vendor comparison UI"));
+  assert.ok(state.nextActions.includes("Inline vendor quote reply flow"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
   assert.ok(state.nextActions.includes("Shared wedding workspace access controls"));
   assert.ok(state.nextActions.includes("Collaborator lifecycle audit records"));
   assert.ok(state.nextActions.includes("Admin-funded wedding AI routing policy"));
@@ -24,10 +27,13 @@ test("wedding production readiness blocks Oracle upload while required gates rem
   assert.ok(state.nextActions.includes("Wedding import parser readiness"));
 });
 
-test("optional gaps do not block Oracle upload when required gates pass", () => {
+test("production-polish gaps do not block Oracle upload when required gates pass", () => {
   const state = buildWeddingProductionReadinessState({
     backend_pagination: "pass",
+    template_launch_intake: "pass",
     approval_execution_ui: "pass",
+    vendor_comparison_ui: "pass",
+    vendor_quote_reply_ui: "pass",
     provider_executor_integrations: "pass",
     collaboration_access_controls: "pass",
     collaboration_lifecycle_audit: "pass",
@@ -51,7 +57,7 @@ test("backend pagination contract alone does not satisfy live scale-proof gate",
   assert.match(backendCheck?.detail ?? "", /live multi-page scale proof/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
   assert.ok(state.nextActions.includes("Admin-funded wedding AI routing policy"));
 });
 
@@ -66,7 +72,20 @@ test("backend pagination and scale evidence satisfy that gate without masking ot
   assert.match(backendCheck?.detail ?? "", /repeatable scale-proof evidence/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(!state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Wedding template launch and first-run intake"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
+});
+
+test("template launch and intake evidence clears only the template launch gate", () => {
+  const state = buildWeddingProductionReadinessState({}, { templateLaunchIntakeReady: true });
+
+  const templateCheck = state.checks.find((check) => check.id === "template_launch_intake");
+  assert.equal(templateCheck?.status, "pass");
+  assert.match(templateCheck?.detail ?? "", /first-run intake gate/);
+  assert.equal(state.oracleUploadAllowed, false);
+  assert.ok(!state.nextActions.includes("Wedding template launch and first-run intake"));
+  assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("approval execution UI evidence clears only the approval UI gate", () => {
@@ -77,7 +96,36 @@ test("approval execution UI evidence clears only the approval UI gate", () => {
   assert.match(approvalCheck?.detail ?? "", /disclosure preview/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(!state.nextActions.includes("Real approval execution UI"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
+});
+
+test("vendor quote reply UI evidence alone does not clear the live-send quote reply gate", () => {
+  const state = buildWeddingProductionReadinessState({}, { vendorQuoteReplyUiReady: true });
+
+  const quoteReplyCheck = state.checks.find((check) => check.id === "vendor_quote_reply_ui");
+  assert.equal(quoteReplyCheck?.status, "blocked");
+  assert.equal(quoteReplyCheck?.requiredForOracle, true);
+  assert.match(quoteReplyCheck?.detail ?? "", /live provider proof/);
+  assert.equal(state.oracleUploadAllowed, false);
+  assert.ok(state.nextActions.includes("Inline vendor quote reply flow"));
+  assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
+});
+
+test("vendor quote reply UI and live-send evidence clear the inline quote reply gate", () => {
+  const state = buildWeddingProductionReadinessState(
+    {},
+    { vendorQuoteReplyUiReady: true, vendorQuoteReplyProductionReady: true },
+  );
+
+  const quoteReplyCheck = state.checks.find((check) => check.id === "vendor_quote_reply_ui");
+  assert.equal(quoteReplyCheck?.status, "pass");
+  assert.equal(quoteReplyCheck?.requiredForOracle, true);
+  assert.match(quoteReplyCheck?.detail ?? "", /actual connected-provider send proof/);
+  assert.equal(state.oracleUploadAllowed, false);
+  assert.ok(!state.nextActions.includes("Inline vendor quote reply flow"));
+  assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("live map evidence clears only the map/geocoding gate", () => {
@@ -88,7 +136,7 @@ test("live map evidence clears only the map/geocoding gate", () => {
   assert.match(mapCheck?.detail ?? "", /verified live geocodes/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("graph canvas evidence clears only the graph highlighting gate", () => {
@@ -99,7 +147,7 @@ test("graph canvas evidence clears only the graph highlighting gate", () => {
   assert.match(graphCheck?.detail ?? "", /node highlights/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("provider executor evidence clears provider gate only when explicitly proven", () => {
@@ -108,7 +156,7 @@ test("provider executor evidence clears provider gate only when explicitly prove
   const providerCheck = state.checks.find((check) => check.id === "provider_executor_integrations");
   assert.equal(providerCheck?.status, "pass");
   assert.equal(state.oracleUploadAllowed, false);
-  assert.ok(!state.nextActions.includes("Provider executor integrations"));
+  assert.ok(!state.nextActions.includes("Connected app integrations"));
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
   assert.ok(state.nextActions.includes("Admin-funded wedding AI routing policy"));
 });
@@ -123,7 +171,7 @@ test("collaboration access-control evidence clears only the shared editing gate"
   assert.ok(!state.nextActions.includes("Shared wedding workspace access controls"));
   assert.ok(state.nextActions.includes("Collaborator lifecycle audit records"));
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("collaboration lifecycle audit evidence clears only the lifecycle projection gate", () => {
@@ -147,7 +195,7 @@ test("admin AI routing policy evidence clears only the admin routing gate", () =
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(!state.nextActions.includes("Admin-funded wedding AI routing policy"));
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("admin ops backend metrics evidence clears only the admin metrics gate", () => {
@@ -159,7 +207,7 @@ test("admin ops backend metrics evidence clears only the admin metrics gate", ()
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(!state.nextActions.includes("Admin Oracle and user metrics"));
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("expected behaviour coverage evidence clears only the behaviour audit gate", () => {
@@ -170,13 +218,16 @@ test("expected behaviour coverage evidence clears only the behaviour audit gate"
   assert.match(auditCheck?.detail ?? "", /ready, provider-blocked, and UI-blocked labels/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("expected behaviour coverage is visible but does not block Oracle when required gates pass", () => {
   const state = buildWeddingProductionReadinessState({
     backend_pagination: "pass",
+    template_launch_intake: "pass",
     approval_execution_ui: "pass",
+    vendor_comparison_ui: "pass",
+    vendor_quote_reply_ui: "pass",
     provider_executor_integrations: "pass",
     collaboration_access_controls: "pass",
     collaboration_lifecycle_audit: "pass",
@@ -197,6 +248,7 @@ test("missing import parser readiness stays Oracle-blocking by default", () => {
   const state = buildWeddingProductionReadinessState(
     {
       backend_pagination: "pass",
+      template_launch_intake: "pass",
       approval_execution_ui: "pass",
       provider_executor_integrations: "pass",
       collaboration_access_controls: "pass",
@@ -242,7 +294,7 @@ test("native export worker evidence clears only the native export gate", () => {
   assert.match(nativeExportCheck?.detail ?? "", /private-file filtering/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("LLM Need-To-Know extraction evidence clears only that extraction gate", () => {
@@ -253,7 +305,7 @@ test("LLM Need-To-Know extraction evidence clears only that extraction gate", ()
   assert.match(extractionCheck?.detail ?? "", /transcript\/chat proof/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("seeded vendor corpus evidence clears only the optional vendor seed gate", () => {
@@ -265,7 +317,7 @@ test("seeded vendor corpus evidence clears only the optional vendor seed gate", 
   assert.match(seedCheck?.detail ?? "", /source-backed rows/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
 });
 
 test("Oracle release evidence clears only the Oracle release gate", () => {
@@ -276,16 +328,19 @@ test("Oracle release evidence clears only the Oracle release gate", () => {
   assert.match(oracleCheck?.detail ?? "", /fresh Oracle remote proof/);
   assert.equal(state.oracleUploadAllowed, false);
   assert.ok(state.nextActions.includes("Backend refresh pagination and query tuning"));
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
   assert.ok(!state.nextActions.includes("Oracle release gate"));
 });
 
 test("all checks passing marks wedding planning production ready", () => {
   const state = buildWeddingProductionReadinessState({
     backend_pagination: "pass",
+    template_launch_intake: "pass",
     live_map_geocoding: "pass",
     graph_canvas_highlighting: "pass",
     approval_execution_ui: "pass",
+    vendor_comparison_ui: "pass",
+    vendor_quote_reply_ui: "pass",
     native_export_workers: "pass",
     llm_need_to_know_extraction: "pass",
     seeded_vendor_corpus: "pass",
@@ -308,7 +363,11 @@ test("production readiness accepts aggregated helper evidence", () => {
   const evidenceState = buildWeddingProductionReadinessEvidenceState({
     backendPaginationContractReady: true,
     backendScaleProof: { status: "pass" } as any,
+    templateLaunchReadiness: { productionEvidenceReady: true, proofReferenceLabel: "Wedding template launch proof: test" } as any,
     approvalUi: { productionEvidenceReady: true } as any,
+    vendorComparisonUi: { productionReady: true } as any,
+    vendorQuoteReplyUi: { productionReady: true } as any,
+    vendorQuoteReplyProduction: { productionReady: true, evidenceLabels: [] } as any,
     importParserReadiness: { productionReady: true, blockerLabels: [] } as any,
     collaboration: { productionReady: true } as any,
     collaborationLifecycleProjectionReady: true,
@@ -327,8 +386,11 @@ test("production readiness accepts aggregated helper evidence", () => {
   assert.equal(state.oracleUploadAllowed, true);
   assert.ok(state.blockerCount > 0);
   assert.ok(!state.nextActions.includes("Backend refresh pagination and query tuning"));
+  assert.ok(!state.nextActions.includes("Wedding template launch and first-run intake"));
   assert.ok(!state.nextActions.includes("Real approval execution UI"));
-  assert.ok(!state.nextActions.includes("Provider executor integrations"));
+  assert.ok(!state.nextActions.includes("Dynamic vendor comparison UI"));
+  assert.ok(!state.nextActions.includes("Inline vendor quote reply flow"));
+  assert.ok(!state.nextActions.includes("Connected app integrations"));
   assert.ok(!state.nextActions.includes("Wedding import parser readiness"));
   assert.ok(!state.nextActions.includes("Shared wedding workspace access controls"));
   assert.ok(!state.nextActions.includes("Collaborator lifecycle audit records"));
@@ -351,7 +413,7 @@ test("aggregated readiness blocks provider gate when required wedding API stack 
 
   const providerCheck = state.checks.find((check) => check.id === "provider_executor_integrations");
   assert.equal(providerCheck?.status, "blocked");
-  assert.ok(state.nextActions.includes("Provider executor integrations"));
+  assert.ok(state.nextActions.includes("Connected app integrations"));
   assert.ok(
     evidenceState.missingRequiredEvidenceLabels.some((label) =>
       /Google Maps Platform, Google Calendar API, WeatherAPI, Stripe/.test(label),

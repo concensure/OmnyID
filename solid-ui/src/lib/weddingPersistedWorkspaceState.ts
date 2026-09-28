@@ -1,7 +1,6 @@
 // @locs-version: 2.0
 import type { AfpMessage } from "@/lib/api";
-import { decryptedDisplayContent } from "@/lib/decryptedDisplayState";
-import type { WeddingArtifactInput, WeddingArtifactSourceLink } from "@/lib/weddingArtifactState";
+import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
 import type {
   WeddingPlanningScheduleItem,
   WeddingPlanningScheduleItemKind,
@@ -13,21 +12,36 @@ import type { WeddingPlanningContext } from "@/lib/weddingNeedToKnowProbingState
 import type { WeddingApprovalActionKind, WeddingApprovalBlockKind } from "@/lib/weddingApprovalState";
 import {
   coalesceWeddingBoundaryLedgerObjects,
-  type WeddingBoundaryChangeRequest,
-  type WeddingBoundaryDecisionRationale,
-  type WeddingBoundaryEventInvitation,
-  type WeddingBoundaryGuestProfile,
-  type WeddingBoundaryHousehold,
-  type WeddingBoundaryLedgerKind,
   type WeddingBoundaryLedgerObject,
-  type WeddingBoundaryPolicy,
-  type WeddingBoundaryPolicyEnforcement,
-  type WeddingBoundaryPolicyRuleType,
-  type WeddingBoundaryRequestStatus,
-  type WeddingBoundaryRole,
-  type WeddingBoundaryRoleAssignment,
-  type WeddingBoundaryVisibility,
 } from "@/lib/weddingBoundaryLedgerState";
+import {
+  weddingPersistedBoundaryObjectFromAfpMessage,
+  weddingPersistedSeatingConstraintFromAfpMessage,
+} from "@/lib/weddingPersistedBoundaryObjectState";
+import {
+  applyWeddingPersistedTaskDateUpdates,
+  weddingPersistedTaskDateUpdateFromAfpMessage,
+} from "@/lib/weddingPersistedTaskDateState";
+import {
+  bool,
+  boundedClean,
+  clean,
+  contentValue,
+  importedPrivateLabel,
+  numbers,
+  optionalBool,
+  originalUploadMetadata,
+  planIdFrom,
+  privateImportSourceUrl,
+  record,
+  sanitizedSelectedDecisionScope,
+  sourceLinks,
+  sourceResponseIdFrom,
+  strings,
+  uniqueStrings,
+  usableSourceUrls,
+  workspaceIdFrom,
+} from "@/lib/weddingPersistedWorkspaceMessageState";
 import {
   normalizeWeddingPlanningMetadata,
   type WeddingArtifactKind,
@@ -48,8 +62,13 @@ import {
 } from "@/lib/weddingInspirationState";
 import type {
   WeddingSeatingConstraintAction,
-  WeddingSeatingConstraintKind,
 } from "@/lib/weddingSeatingConstraintActionState";
+import {
+  isWeddingSemanticUiKind,
+  weddingSemanticUiObjectsFromAfpLikeMessage,
+  type WeddingSemanticUiKind,
+  type WeddingSemanticUiObject,
+} from "@/lib/weddingSemanticUiState";
 
 export type WeddingPersistedApprovalReceipt = {
   id: string;
@@ -63,17 +82,33 @@ export type WeddingPersistedApprovalReceipt = {
   blockedReason: string | null;
   blockKind: WeddingApprovalBlockKind | null;
   externalId: string | null;
+  providerReceiptId?: string | null;
+  providerMessageId?: string | null;
+  messageId?: string | null;
+  clientMessageId?: string | null;
+  deliveryChannel?: string | null;
+  deliverySubject?: string | null;
+  deliveryThreadId?: string | null;
+  deliveryInReplyTo?: string | null;
+  deliveryReferences?: string[];
+  deliveryRecipients?: string[];
   executionMode: string | null;
   providerCapability: string | null;
   requiredProvider: string | null;
   providerCredentialStatus: string | null;
   providerExecutorStatus: string | null;
   providerExecutorConnected: boolean;
+  providerResultOk?: boolean;
+  externalDeliveryPerformed?: boolean;
+  missingDurableProviderReceipt?: boolean;
   providerSetupView: string | null;
   externalProviderRequired: boolean;
   artifactIds: string[];
   scheduleItemIds: string[];
   taskItemIds: string[];
+  semanticKind?: WeddingSemanticUiKind | null;
+  semanticTags?: string[];
+  semanticObject?: WeddingSemanticUiObject | null;
 };
 
 export type WeddingPersistedDecisionRecord = {
@@ -91,6 +126,9 @@ export type WeddingPersistedDecisionRecord = {
   createdAt: string;
   source: string | null;
   metadataLabels: string[];
+  semanticKind?: WeddingSemanticUiKind | null;
+  semanticTags?: string[];
+  semanticObject?: WeddingSemanticUiObject | null;
 };
 
 export type WeddingPersistedDecisionDeferral = {
@@ -197,204 +235,6 @@ const APPROVAL_ACTION_KINDS = new Set<WeddingApprovalActionKind>([
   "export_sensitive_bundle",
 ]);
 
-const BOUNDARY_KINDS = new Set<WeddingBoundaryLedgerKind>([
-  "wedding_boundary_policy",
-  "wedding_boundary_role_assignment",
-  "wedding_boundary_household",
-  "wedding_boundary_guest_profile",
-  "wedding_boundary_event_invitation",
-  "wedding_boundary_change_request",
-  "wedding_boundary_decision_rationale",
-  "wedding_boundary_decline_template",
-  "wedding_boundary_visibility_page",
-]);
-
-const BOUNDARY_VISIBILITIES = new Set<WeddingBoundaryVisibility>([
-  "couple_only",
-  "approved_shared",
-  "family_visible",
-  "vendor_logistics",
-]);
-
-const BOUNDARY_POLICY_RULE_TYPES = new Set<WeddingBoundaryPolicyRuleType>([
-  "plus_one",
-  "children",
-  "invitation_scope",
-  "access",
-  "seating",
-  "communication",
-]);
-
-const BOUNDARY_POLICY_ENFORCEMENTS = new Set<WeddingBoundaryPolicyEnforcement>([
-  "block",
-  "require_approval",
-  "warn",
-]);
-
-const BOUNDARY_ROLES = new Set<WeddingBoundaryRole>([
-  "couple",
-  "parent_family",
-  "helper",
-  "vendor",
-  "guest",
-]);
-
-const BOUNDARY_REQUEST_STATUSES = new Set<WeddingBoundaryRequestStatus>([
-  "pending",
-  "approved",
-  "declined",
-  "auto_blocked",
-]);
-
-const SEATING_CONSTRAINT_KINDS = new Set<WeddingSeatingConstraintKind>([
-  "keep_apart",
-  "prefer_together",
-  "prefer_quiet",
-  "social_group_together",
-]);
-
-function clean(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function boundedClean(value: unknown, limit: number): string | null {
-  const trimmed = clean(value);
-  return trimmed ? trimmed.slice(0, Math.max(0, limit)) : null;
-}
-
-function strings(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
-}
-
-function uniqueStrings(value: unknown, limit = 32): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const item of strings(value)) {
-    const tag = item.trim();
-    const key = tag.toLowerCase();
-    if (!tag || seen.has(key)) continue;
-    seen.add(key);
-    result.push(tag);
-    if (result.length >= limit) break;
-  }
-  return result;
-}
-
-function usableSourceUrls(value: unknown): string[] {
-  return strings(value).filter((url) => /^https?:\/\//i.test(url.trim()));
-}
-
-function importedPrivateLabel(value: string): boolean {
-  return /^wedding_import(?:$|:)/i.test(value)
-    || /original upload/i.test(value)
-    || /\b(?:csv|tsv|excel|xlsx?|ods) import:/i.test(value)
-    || /\bsource:\s*[^,]+\.(?:csv|tsv|xlsx?|ods)\b/i.test(value)
-    || /\b[^,\s]+\.(?:csv|tsv|xlsx?|ods)\b/i.test(value);
-}
-
-function privateImportSourceUrl(value: string): boolean {
-  return /\b(?:upload|uploads|attachment|attachments|storage|parser|source-file|source_file)\b/i.test(value)
-    || /\b[^/?#]+\.(?:csv|tsv|xlsx?|ods)(?:$|[?#/])/i.test(value);
-}
-
-function numbers(value: unknown): number[] {
-  return Array.isArray(value)
-    ? value
-      .map((item) => typeof item === "number" ? item : typeof item === "string" ? Number(item) : NaN)
-      .filter((item) => Number.isFinite(item) && item >= 0)
-    : [];
-}
-
-function bool(value: unknown): boolean {
-  return value === true || value === "true";
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-function sourceFileName(value: unknown, fallback: unknown): string | null {
-  const raw = boundedClean(value, 180) ?? boundedClean(fallback, 180);
-  const parts = raw?.split(/[\\/]+/).map((part) => part.trim()).filter(Boolean) ?? [];
-  return parts.at(-1) ?? null;
-}
-
-function sanitizedStorageReceipt(value: unknown): Record<string, unknown> | null {
-  const storage = record(value);
-  if (!storage) return null;
-  const sanitized: Record<string, unknown> = {};
-  for (const [key, item] of Object.entries(storage).slice(0, 16)) {
-    const safeKey = boundedClean(key, 80);
-    if (!safeKey) continue;
-    if (typeof item === "string") sanitized[safeKey] = boundedClean(item, 500);
-    else if (typeof item === "number" && Number.isFinite(item)) sanitized[safeKey] = item;
-    else if (typeof item === "boolean" || item === null) sanitized[safeKey] = item;
-  }
-  return Object.keys(sanitized).length > 0 ? sanitized : null;
-}
-
-function originalUploadMetadata(message: AfpMessage, title: string): Record<string, unknown> {
-  const originalUpload = record(contentValue(message, "original_upload"));
-  const sizeBytes = contentValue(message, "original_upload_size_bytes") ?? originalUpload?.original_upload_size_bytes;
-  return {
-    originalUploadStatus: boundedClean(contentValue(message, "original_upload_status") ?? originalUpload?.original_upload_status, 80),
-    originalUploadMessageId: boundedClean(contentValue(message, "original_upload_message_id") ?? originalUpload?.original_upload_message_id, 200),
-    originalUploadAttachmentId: boundedClean(contentValue(message, "original_upload_attachment_id") ?? originalUpload?.original_upload_attachment_id, 200),
-    originalUploadSha256: boundedClean(contentValue(message, "original_upload_sha256") ?? originalUpload?.original_upload_sha256, 256),
-    originalUploadFileName: sourceFileName(contentValue(message, "original_upload_file_name") ?? originalUpload?.original_upload_file_name, title),
-    originalUploadMimeType: boundedClean(contentValue(message, "original_upload_mime_type") ?? originalUpload?.original_upload_mime_type, 160),
-    originalUploadSizeBytes: typeof sizeBytes === "number" && Number.isFinite(sizeBytes) ? Math.max(0, sizeBytes) : null,
-    originalUploadStorage: sanitizedStorageReceipt(contentValue(message, "original_upload_storage") ?? originalUpload?.original_upload_storage),
-    originalUploadFailureLabel: boundedClean(contentValue(message, "original_upload_failure_label") ?? originalUpload?.original_upload_failure_label, 240),
-  };
-}
-
-function sanitizedSelectedDecisionScope(value: unknown): Record<string, unknown> | null {
-  const scope = record(value);
-  if (!scope) return null;
-  const artifactTitle = clean(scope.artifact_title ?? scope.artifactTitle);
-  const sourceLabels = uniqueStrings(scope.source_labels ?? scope.sourceLabels, 12);
-  const metadataLabels = uniqueStrings(scope.metadata_labels ?? scope.metadataLabels, 12);
-  const importedPrivateScope = [
-    artifactTitle,
-    ...sourceLabels,
-    ...metadataLabels,
-  ].filter((label): label is string => Boolean(label)).some(importedPrivateLabel);
-  const sourceUrls = uniqueStrings(scope.source_urls ?? scope.sourceUrls, 12)
-    .filter((url) => /^https?:\/\//i.test(url))
-    .filter((url) => !importedPrivateScope || !privateImportSourceUrl(url));
-
-  return {
-    ...scope,
-    artifact_title: importedPrivateScope ? "Imported private planning file" : artifactTitle,
-    artifactTitle: undefined,
-    source_labels: importedPrivateScope && sourceLabels.length > 0 ? ["Imported private planning file"] : sourceLabels,
-    sourceLabels: undefined,
-    source_urls: sourceUrls,
-    sourceUrls: undefined,
-    metadata_labels: importedPrivateScope
-      ? metadataLabels.filter((label) => !importedPrivateLabel(label))
-      : metadataLabels,
-    metadataLabels: undefined,
-    imported_private_evidence: importedPrivateScope || scope.imported_private_evidence === true,
-  };
-}
-
-function sourceLinks(value: unknown): WeddingArtifactSourceLink[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((item): WeddingArtifactSourceLink[] => {
-    if (!item || typeof item !== "object") return [];
-    const record = item as Record<string, unknown>;
-    const label = clean(record.label);
-    const url = clean(record.url);
-    return label && url && /^https?:\/\//i.test(url) ? [{ label, url }] : [];
-  });
-}
-
-function contentValue(message: AfpMessage, key: string): unknown {
-  return decryptedDisplayContent(message)[key] ?? message.metadata?.[key];
-}
-
 function secondOrderTaskMetadata(message: AfpMessage, metadata: WeddingPlanningMetadata): WeddingPlanningMetadata | Record<string, unknown> {
   const secondOrderLoop = clean(contentValue(message, "second_order_loop"));
   const preparationChecklistItem = clean(contentValue(message, "preparation_checklist_item"));
@@ -437,18 +277,6 @@ function scheduleItemMetadata(message: AfpMessage, metadata: WeddingPlanningMeta
   };
 }
 
-function workspaceIdFrom(message: AfpMessage): string | null {
-  return clean(contentValue(message, "response_workspace_id")) ?? clean(message.metadata?.responseWorkspaceId);
-}
-
-function planIdFrom(message: AfpMessage): string | null {
-  return clean(contentValue(message, "wedding_plan_id")) ?? clean(message.metadata?.weddingPlanId);
-}
-
-function sourceResponseIdFrom(message: AfpMessage): string | null {
-  return clean(contentValue(message, "source_response_id")) ?? clean(message.metadata?.sourceResponseId);
-}
-
 function artifactKindFrom(value: unknown): WeddingArtifactKind | null {
   return typeof value === "string" && ARTIFACT_KINDS.has(value as WeddingArtifactKind)
     ? value as WeddingArtifactKind
@@ -481,48 +309,6 @@ function approvalBlockKindFrom(value: unknown): WeddingApprovalBlockKind | null 
     || value === "privacy_scope"
   ) return value;
   return null;
-}
-
-function boundaryKindFrom(value: unknown): WeddingBoundaryLedgerKind | null {
-  return typeof value === "string" && BOUNDARY_KINDS.has(value as WeddingBoundaryLedgerKind)
-    ? value as WeddingBoundaryLedgerKind
-    : null;
-}
-
-function boundaryVisibilityFrom(value: unknown): WeddingBoundaryVisibility | null {
-  return typeof value === "string" && BOUNDARY_VISIBILITIES.has(value as WeddingBoundaryVisibility)
-    ? value as WeddingBoundaryVisibility
-    : null;
-}
-
-function boundaryPolicyRuleTypeFrom(value: unknown): WeddingBoundaryPolicyRuleType {
-  return typeof value === "string" && BOUNDARY_POLICY_RULE_TYPES.has(value as WeddingBoundaryPolicyRuleType)
-    ? value as WeddingBoundaryPolicyRuleType
-    : "invitation_scope";
-}
-
-function boundaryPolicyEnforcementFrom(value: unknown): WeddingBoundaryPolicyEnforcement {
-  return typeof value === "string" && BOUNDARY_POLICY_ENFORCEMENTS.has(value as WeddingBoundaryPolicyEnforcement)
-    ? value as WeddingBoundaryPolicyEnforcement
-    : "require_approval";
-}
-
-function boundaryRoleFrom(value: unknown): WeddingBoundaryRole {
-  return typeof value === "string" && BOUNDARY_ROLES.has(value as WeddingBoundaryRole)
-    ? value as WeddingBoundaryRole
-    : "helper";
-}
-
-function boundaryRequestStatusFrom(value: unknown): WeddingBoundaryRequestStatus {
-  return typeof value === "string" && BOUNDARY_REQUEST_STATUSES.has(value as WeddingBoundaryRequestStatus)
-    ? value as WeddingBoundaryRequestStatus
-    : "pending";
-}
-
-function seatingConstraintKindFrom(value: unknown): WeddingSeatingConstraintKind | null {
-  return typeof value === "string" && SEATING_CONSTRAINT_KINDS.has(value as WeddingSeatingConstraintKind)
-    ? value as WeddingSeatingConstraintKind
-    : null;
 }
 
 function noimValue(value: unknown): WeddingPlanningContext["noimDownloaded"] {
@@ -570,9 +356,130 @@ function messageToArtifactInput(message: AfpMessage, fallback: WeddingPlanningMe
   };
 }
 
+function quoteBodyFromMessage(message: AfpMessage): string | null {
+  const quote = record(contentValue(message, "quote"));
+  if (!quote) return null;
+  const vendorName = clean(quote.vendorName ?? quote.vendor_name);
+  const amountLabel = clean(quote.amountLabel ?? quote.amount_label);
+  if (!vendorName || !amountLabel) return null;
+  const inclusions = strings(quote.inclusions);
+  return [
+    `# ${vendorName} quote`,
+    "",
+    `Vendor: ${vendorName}`,
+    `Quote amount: ${amountLabel}`,
+    clean(quote.budgetDeltaLabel ?? quote.budget_delta_label) ? `Budget delta: ${clean(quote.budgetDeltaLabel ?? quote.budget_delta_label)}` : null,
+    clean(quote.validUntil ?? quote.valid_until) ? `Valid until: ${clean(quote.validUntil ?? quote.valid_until)}` : null,
+    clean(quote.attachmentUrl ?? quote.attachment_url) ? `Original PDF: ${clean(quote.attachmentUrl ?? quote.attachment_url)}` : null,
+    inclusions.length > 0 ? "" : null,
+    inclusions.length > 0 ? "## Inclusions" : null,
+    inclusions.length > 0 ? "" : null,
+    ...inclusions.map((item) => `- ${item}`),
+  ].filter((line): line is string => line !== null).join("\n");
+}
+
+function emailDraftBodyFromMessage(message: AfpMessage): string | null {
+  const recipient = clean(contentValue(message, "to"));
+  const subject = clean(contentValue(message, "subject"));
+  const body = clean(contentValue(message, "text") ?? contentValue(message, "markdown") ?? contentValue(message, "body"));
+  if (!subject || !body) return null;
+  return [
+    recipient ? `Recipient: ${recipient}` : null,
+    `Subject: ${subject}`,
+    "",
+    "## Draft",
+    "",
+    body,
+  ].filter((line): line is string => line !== null).join("\n");
+}
+
+function messageToVendorQuoteThreadArtifactInput(
+  message: AfpMessage,
+  fallback: WeddingPlanningMetadata,
+): WeddingArtifactInput | null {
+  const workspaceId = workspaceIdFrom(message);
+  if (!workspaceId) return null;
+  const metadata = baseMetadata(message, fallback);
+  const createdAt = Date.parse(message.timestamp) || Date.now();
+  const tokens = [
+    message.type,
+    message.kind,
+    message.subtype,
+    ...strings(message.supertags),
+  ].map((value) => clean(value)?.toLowerCase() ?? "").join(" ");
+  if (tokens.includes("wedding_vendor_quote_received")) {
+    const bodyText = quoteBodyFromMessage(message);
+    const title = clean(contentValue(message, "title"))
+      ?? clean(message.metadata?.vendor_name)
+      ?? clean(record(contentValue(message, "quote"))?.vendorName)
+      ?? "Vendor quote";
+    return bodyText
+      ? {
+        id: message.id,
+        title: `${title.replace(/\s+quote$/i, "")} quote`,
+        kind: "vendor_table",
+        createdAt,
+        metadata: { ...metadata, artifactKind: "vendor_table", recoveredFromVendorThread: true },
+        exportTargets: ["markdown", "browser_pdf"],
+        sourceLabels: ["Vendor quote thread"],
+        sourceLinks: [],
+        vendorLabels: [title.replace(/\s+quote$/i, "")],
+        bodyText,
+      }
+      : null;
+  }
+  if (message.type === "email_draft" && tokens.includes("wedding_vendor_quote_reply_draft")) {
+    const bodyText = emailDraftBodyFromMessage(message);
+    const subject = clean(contentValue(message, "subject")) ?? "Vendor quote reply";
+    return bodyText
+      ? {
+        id: message.id,
+        title: subject,
+        kind: "email_draft",
+        createdAt,
+        metadata: { ...metadata, artifactKind: "email_draft", recoveredFromVendorThread: true },
+        exportTargets: ["markdown"],
+        sourceLabels: ["Vendor quote reply thread"],
+        sourceLinks: [],
+        vendorLabels: strings(message.metadata?.vendor_labels),
+        bodyText,
+      }
+      : null;
+  }
+  return null;
+}
+
+function recoveredFromVendorThread(input: WeddingArtifactInput): boolean {
+  return Boolean(input.metadata && typeof input.metadata === "object"
+    && (input.metadata as Record<string, unknown>).recoveredFromVendorThread === true);
+}
+
+function coalescePersistedArtifactInputs(inputs: readonly WeddingArtifactInput[]): WeddingArtifactInput[] {
+  const byId = new Map<string, WeddingArtifactInput>();
+  const withoutId: WeddingArtifactInput[] = [];
+  for (const input of inputs) {
+    const id = clean(input.id);
+    if (!id) {
+      withoutId.push(input);
+      continue;
+    }
+    const current = byId.get(id);
+    if (!current) {
+      byId.set(id, input);
+      continue;
+    }
+    if (recoveredFromVendorThread(current) && !recoveredFromVendorThread(input)) {
+      byId.set(id, input);
+    }
+  }
+  return [...withoutId, ...byId.values()];
+}
+
 function messageToScheduleItem(message: AfpMessage, fallback: WeddingPlanningMetadata): WeddingPlanningScheduleItem | null {
   if (message.subtype !== "wedding_event" || workspaceIdFrom(message) === null) return null;
   const metadata = baseMetadata(message, fallback);
+  const [semanticObject = null] = weddingSemanticUiObjectsFromAfpLikeMessage(message);
+  const semanticKind = semanticObject?.kind ?? (isWeddingSemanticUiKind(message.metadata?.semantic_kind) ? message.metadata.semantic_kind : null);
   return {
     id: clean(contentValue(message, "wedding_schedule_item_id")) ?? message.id,
     title: clean(contentValue(message, "title")) ?? "Wedding date",
@@ -588,12 +495,23 @@ function messageToScheduleItem(message: AfpMessage, fallback: WeddingPlanningMet
     metadata: scheduleItemMetadata(message, metadata),
     linkedArtifactId: clean(contentValue(message, "linked_artifact_id")),
     notes: clean(contentValue(message, "description")),
+    semanticKind,
+    semanticTags: [
+      ...new Set([
+        ...strings(message.metadata?.semantic_tags),
+        ...(semanticObject?.semanticTags ?? []),
+        semanticKind,
+      ].filter((tag): tag is string => Boolean(tag))),
+    ].slice(0, 16),
+    semanticObject,
   };
 }
 
 function messageToTaskItem(message: AfpMessage, fallback: WeddingPlanningMetadata): WeddingPlanningTaskItem | null {
   if (message.subtype !== "wedding_task" || workspaceIdFrom(message) === null) return null;
   const metadata = baseMetadata(message, fallback);
+  const [semanticObject = null] = weddingSemanticUiObjectsFromAfpLikeMessage(message);
+  const semanticKind = semanticObject?.kind ?? (isWeddingSemanticUiKind(message.metadata?.semantic_kind) ? message.metadata.semantic_kind : null);
   return {
     id: clean(contentValue(message, "wedding_task_item_id")) ?? message.id,
     title: clean(contentValue(message, "title")) ?? "Wedding task",
@@ -608,6 +526,15 @@ function messageToTaskItem(message: AfpMessage, fallback: WeddingPlanningMetadat
     metadata: secondOrderTaskMetadata(message, metadata),
     linkedArtifactId: clean(contentValue(message, "linked_artifact_id")),
     notes: clean(contentValue(message, "description")),
+    semanticKind,
+    semanticTags: [
+      ...new Set([
+        ...strings(message.metadata?.semantic_tags),
+        ...(semanticObject?.semanticTags ?? []),
+        semanticKind,
+      ].filter((tag): tag is string => Boolean(tag))),
+    ].slice(0, 16),
+    semanticObject,
   };
 }
 
@@ -650,6 +577,14 @@ function messageToNeedToKnowContext(
 function messageToApprovalReceipt(message: AfpMessage): WeddingPersistedApprovalReceipt | null {
   if (message.subtype !== "wedding_approval_receipt" || workspaceIdFrom(message) === null) return null;
   const status = contentValue(message, "status");
+  const delivery = record(contentValue(message, "delivery"));
+  const [semanticObject = null] = weddingSemanticUiObjectsFromAfpLikeMessage(message);
+  const semanticKind = semanticObject?.kind ?? (isWeddingSemanticUiKind(message.metadata?.semantic_kind) ? message.metadata.semantic_kind : null);
+  const semanticTags = [
+    ...strings(message.metadata?.semantic_tags),
+    ...(semanticObject?.semanticTags ?? []),
+    semanticKind,
+  ].filter((tag): tag is string => Boolean(tag));
   return {
     id: clean(contentValue(message, "receipt_id")) ?? message.id,
     requestId: clean(contentValue(message, "request_id")) ?? "",
@@ -662,17 +597,33 @@ function messageToApprovalReceipt(message: AfpMessage): WeddingPersistedApproval
     blockedReason: clean(contentValue(message, "blocked_reason")),
     blockKind: approvalBlockKindFrom(contentValue(message, "block_kind") ?? message.metadata?.block_kind),
     externalId: clean(contentValue(message, "external_id")),
+    providerReceiptId: clean(contentValue(message, "provider_receipt_id")),
+    providerMessageId: clean(contentValue(message, "provider_message_id")),
+    messageId: clean(contentValue(message, "message_id")),
+    clientMessageId: clean(contentValue(message, "client_message_id")),
+    deliveryChannel: clean(contentValue(message, "delivery_channel") ?? delivery?.channel),
+    deliverySubject: clean(contentValue(message, "delivery_subject") ?? delivery?.subject),
+    deliveryThreadId: clean(contentValue(message, "delivery_thread_id") ?? delivery?.threadId),
+    deliveryInReplyTo: clean(contentValue(message, "delivery_in_reply_to") ?? delivery?.inReplyTo),
+    deliveryReferences: strings(contentValue(message, "delivery_references") ?? delivery?.references).slice(0, 12),
+    deliveryRecipients: strings(contentValue(message, "delivery_recipients") ?? delivery?.to).slice(0, 12),
     executionMode: clean(contentValue(message, "execution_mode")),
     providerCapability: clean(contentValue(message, "provider_capability")),
     requiredProvider: clean(contentValue(message, "required_provider")),
     providerCredentialStatus: clean(contentValue(message, "provider_credential_status")),
     providerExecutorStatus: clean(contentValue(message, "provider_executor_status")),
     providerExecutorConnected: bool(contentValue(message, "provider_executor_connected")),
+    providerResultOk: optionalBool(contentValue(message, "provider_result_ok") ?? message.metadata?.provider_result_ok),
+    externalDeliveryPerformed: optionalBool(contentValue(message, "external_delivery_performed") ?? message.metadata?.external_delivery_performed),
+    missingDurableProviderReceipt: optionalBool(contentValue(message, "missing_durable_provider_receipt") ?? message.metadata?.missing_durable_provider_receipt),
     providerSetupView: clean(contentValue(message, "provider_setup_view")),
     externalProviderRequired: bool(contentValue(message, "external_provider_required")),
     artifactIds: strings(contentValue(message, "artifact_ids")),
     scheduleItemIds: strings(contentValue(message, "schedule_item_ids")),
     taskItemIds: strings(contentValue(message, "task_item_ids")),
+    semanticKind,
+    semanticTags: [...new Set(semanticTags)].slice(0, 16),
+    semanticObject,
   };
 }
 
@@ -691,6 +642,13 @@ function messageToDecisionRecord(message: AfpMessage): WeddingPersistedDecisionR
   const rawSourceLabels = strings(contentValue(message, "source_labels") ?? message.metadata?.source_labels).slice(0, 12);
   const rawSourceUrls = usableSourceUrls(contentValue(message, "source_urls") ?? message.metadata?.source_urls).slice(0, 12);
   const sourceProviderLabels = strings(contentValue(message, "source_provider_labels") ?? message.metadata?.source_provider_labels).slice(0, 12);
+  const [semanticObject = null] = weddingSemanticUiObjectsFromAfpLikeMessage(message);
+  const semanticKind = semanticObject?.kind ?? (isWeddingSemanticUiKind(message.metadata?.semantic_kind) ? message.metadata.semantic_kind : null);
+  const semanticTags = [
+    ...strings(message.metadata?.semantic_tags),
+    ...(semanticObject?.semanticTags ?? []),
+    semanticKind,
+  ].filter((tag): tag is string => Boolean(tag));
   const importedPrivateDecision = [
     artifactId,
     artifactTitle,
@@ -729,6 +687,9 @@ function messageToDecisionRecord(message: AfpMessage): WeddingPersistedDecisionR
       ...sourceMetadataLabels,
       clean(message.metadata?.projection),
     ].filter((label): label is string => Boolean(label)),
+    semanticKind,
+    semanticTags: [...new Set(semanticTags)].slice(0, 16),
+    semanticObject,
   };
 }
 
@@ -775,157 +736,6 @@ function messageToDecisionDeferral(message: AfpMessage): WeddingPersistedDecisio
   };
 }
 
-function messageToSeatingConstraint(message: AfpMessage): WeddingSeatingConstraintAction | null {
-  if (message.subtype !== "wedding_seating_constraint" || workspaceIdFrom(message) === null) return null;
-  const kind = seatingConstraintKindFrom(contentValue(message, "constraint_kind") ?? message.metadata?.seating_constraint_kind);
-  const instruction = clean(contentValue(message, "instruction"));
-  if (!kind || !instruction) return null;
-  const confidenceValue = clean(contentValue(message, "confidence"));
-  const confidence = confidenceValue === "high" || confidenceValue === "medium" || confidenceValue === "low"
-    ? confidenceValue
-    : "medium";
-  return {
-    id: clean(contentValue(message, "constraint_id")) ?? message.id,
-    kind,
-    instruction,
-    primaryPersonId: clean(message.references?.find((reference) => reference.type === "seating_constraint_primary_person")?.target),
-    relatedPersonId: clean(message.references?.find((reference) => reference.type === "seating_constraint_related_person")?.target),
-    socialGroup: clean(message.references?.find((reference) => reference.type === "seating_constraint_social_group")?.target),
-    confidence,
-    statusLabel: clean(contentValue(message, "status_label")) ?? "Seating instruction saved.",
-  };
-}
-
-function boundaryBase(message: AfpMessage, fallback: WeddingPlanningMetadata): {
-  id: string;
-  title: string;
-  status: string | null;
-  visibility: WeddingBoundaryVisibility | null;
-  createdAt: string;
-  metadata: Record<string, unknown>;
-} {
-  return {
-    id: clean(contentValue(message, "boundary_object_id")) ?? clean(message.metadata?.boundary_object_id) ?? message.id,
-    title: clean(contentValue(message, "title")) ?? "Wedding boundary record",
-    status: clean(contentValue(message, "status")),
-    visibility: boundaryVisibilityFrom(contentValue(message, "visibility")),
-    createdAt: clean(contentValue(message, "created_at")) ?? message.timestamp,
-    metadata: {
-      ...baseMetadata(message, fallback),
-      persisted_afp_message_id: message.id,
-      persisted_boundary_ledger: true,
-    },
-  };
-}
-
-function messageToBoundaryObject(message: AfpMessage, fallback: WeddingPlanningMetadata): WeddingBoundaryLedgerObject | null {
-  const kind = boundaryKindFrom(message.subtype ?? message.kind ?? contentValue(message, "ledger_kind"));
-  if (!kind || workspaceIdFrom(message) === null) return null;
-  const base = boundaryBase(message, fallback);
-  if (kind === "wedding_boundary_policy") {
-    return {
-      ...base,
-      kind,
-      ruleType: boundaryPolicyRuleTypeFrom(contentValue(message, "rule_type")),
-      enforcement: boundaryPolicyEnforcementFrom(contentValue(message, "enforcement")),
-      plainLanguage: clean(contentValue(message, "plain_language")) ?? base.title,
-      scope: clean(contentValue(message, "scope")) as WeddingBoundaryPolicy["scope"],
-      approvedBy: strings(contentValue(message, "approved_by")),
-    };
-  }
-  if (kind === "wedding_boundary_role_assignment") {
-    const personId = clean(contentValue(message, "person_id"));
-    if (!personId) return null;
-    return {
-      ...base,
-      kind,
-      personId,
-      role: boundaryRoleFrom(contentValue(message, "role")),
-      canView: strings(contentValue(message, "can_view")),
-      canSuggest: strings(contentValue(message, "can_suggest")) as WeddingBoundaryRoleAssignment["canSuggest"],
-      canEdit: strings(contentValue(message, "can_edit")) as WeddingBoundaryRoleAssignment["canEdit"],
-      requiresApprovalFor: strings(contentValue(message, "requires_approval_for")) as WeddingBoundaryRoleAssignment["requiresApprovalFor"],
-      privateNotesVisible: bool(contentValue(message, "private_notes_visible")),
-    };
-  }
-  if (kind === "wedding_boundary_household") {
-    const householdId = clean(contentValue(message, "household_id"));
-    if (!householdId) return null;
-    return {
-      ...base,
-      kind,
-      householdId,
-      displayName: clean(contentValue(message, "display_name")) ?? base.title,
-      primaryContactPersonId: clean(contentValue(message, "primary_contact_person_id")),
-      memberPersonIds: strings(contentValue(message, "member_person_ids")),
-      familySide: clean(contentValue(message, "family_side")) as WeddingBoundaryHousehold["familySide"],
-    };
-  }
-  if (kind === "wedding_boundary_guest_profile") {
-    const personId = clean(contentValue(message, "person_id"));
-    if (!personId) return null;
-    return {
-      ...base,
-      kind,
-      personId,
-      displayName: clean(contentValue(message, "display_name")) ?? base.title,
-      householdId: clean(contentValue(message, "household_id")),
-      ageBand: clean(contentValue(message, "age_band")) as WeddingBoundaryGuestProfile["ageBand"],
-      relationshipLabel: clean(contentValue(message, "relationship_label")),
-      familySide: clean(contentValue(message, "family_side")) as WeddingBoundaryGuestProfile["familySide"],
-    };
-  }
-  if (kind === "wedding_boundary_event_invitation") {
-    const invitationId = clean(contentValue(message, "invitation_id"));
-    const eventId = clean(contentValue(message, "event_id"));
-    const personId = clean(contentValue(message, "person_id"));
-    if (!invitationId || !eventId || !personId) return null;
-    return {
-      ...base,
-      kind,
-      invitationId,
-      eventId,
-      personId,
-      invitationStatus: clean(contentValue(message, "invitation_status")) as WeddingBoundaryEventInvitation["invitationStatus"] ?? "invited",
-      plusOneAllowed: bool(contentValue(message, "plus_one_allowed")),
-      childrenInvited: bool(contentValue(message, "children_invited")),
-      visibleToGuest: contentValue(message, "visible_to_guest") !== false,
-    };
-  }
-  if (kind === "wedding_boundary_change_request") {
-    const requestId = clean(contentValue(message, "request_id"));
-    const requestedBy = clean(contentValue(message, "requested_by"));
-    if (!requestId || !requestedBy) return null;
-    return {
-      ...base,
-      kind,
-      requestId,
-      requestedBy,
-      changeType: clean(contentValue(message, "change_type")) as WeddingBoundaryChangeRequest["changeType"] ?? "add_guest",
-      targetPersonId: clean(contentValue(message, "target_person_id")),
-      targetEventId: clean(contentValue(message, "target_event_id")),
-      targetHouseholdId: clean(contentValue(message, "target_household_id")),
-      requestStatus: boundaryRequestStatusFrom(contentValue(message, "request_status")),
-      approvalRequired: bool(contentValue(message, "approval_gate_recorded")) || bool(contentValue(message, "approval_required")),
-      policyIds: strings(contentValue(message, "policy_ids")),
-      publicReason: clean(contentValue(message, "public_reason")),
-    };
-  }
-  if (kind === "wedding_boundary_decision_rationale") {
-    const decisionId = clean(contentValue(message, "decision_id"));
-    if (!decisionId) return null;
-    return {
-      ...base,
-      kind,
-      decisionId,
-      linkedPolicyId: clean(contentValue(message, "linked_policy_id")),
-      summaryPublic: clean(contentValue(message, "summary_public")),
-      rationaleCiphertext: clean(contentValue(message, "encrypted_private_payload")) ?? "",
-    } satisfies WeddingBoundaryDecisionRationale;
-  }
-  return null;
-}
-
 export function buildWeddingPersistedWorkspaceState(input: {
   messages?: readonly AfpMessage[] | null;
   weddingPlanId: string;
@@ -939,10 +749,11 @@ export function buildWeddingPersistedWorkspaceState(input: {
     supertags: ["template:wedding_planning", "event:wedding", "response_workspace"],
   });
   const scopedMessages = (input.messages ?? []).filter((message) => workspaceIdFrom(message) === metadata.responseWorkspaceId);
-  const artifacts = scopedMessages.flatMap((message) => {
-    const artifact = messageToArtifactInput(message, metadata);
+  const artifacts = coalescePersistedArtifactInputs(scopedMessages.flatMap((message) => {
+    const artifact = messageToArtifactInput(message, metadata)
+      ?? messageToVendorQuoteThreadArtifactInput(message, metadata);
     return artifact ? [artifact] : [];
-  });
+  }));
   const contextItems = scopedMessages.flatMap((message) => {
     const item = messageToNeedToKnowContext(message, metadata);
     return item ? [item] : [];
@@ -960,11 +771,11 @@ export function buildWeddingPersistedWorkspaceState(input: {
     return item ? [item] : [];
   });
   const boundaryObjects = coalesceWeddingBoundaryLedgerObjects(scopedMessages.flatMap((message) => {
-    const item = messageToBoundaryObject(message, metadata);
+    const item = weddingPersistedBoundaryObjectFromAfpMessage(message, metadata);
     return item ? [item] : [];
   }));
   const seatingConstraints = scopedMessages.flatMap((message) => {
-    const item = messageToSeatingConstraint(message);
+    const item = weddingPersistedSeatingConstraintFromAfpMessage(message);
     return item ? [item] : [];
   });
   const seatingOptimizations = scopedMessages
@@ -996,6 +807,11 @@ export function buildWeddingPersistedWorkspaceState(input: {
     const item = messageToTaskItem(message, metadata);
     return item ? [item] : [];
   });
+  const taskDateUpdates = scopedMessages.flatMap((message) => {
+    const item = weddingPersistedTaskDateUpdateFromAfpMessage(message);
+    return item ? [item] : [];
+  });
+  const updatedTaskItems = applyWeddingPersistedTaskDateUpdates(taskItems, taskDateUpdates);
 
   return {
     metadata,
@@ -1010,7 +826,7 @@ export function buildWeddingPersistedWorkspaceState(input: {
     seatingDraftArchives,
     inspirationItems,
     scheduleItems,
-    taskItems,
+    taskItems: updatedTaskItems,
     sourceMessageIds: scopedMessages.map((message) => message.id),
     hasPersistedData: artifacts.length > 0
       || contextItems.length > 0
@@ -1023,6 +839,7 @@ export function buildWeddingPersistedWorkspaceState(input: {
       || seatingDraftArchives.length > 0
       || inspirationItems.length > 0
       || scheduleItems.length > 0
-      || taskItems.length > 0,
+      || updatedTaskItems.length > 0
+      || taskDateUpdates.length > 0,
   };
 }

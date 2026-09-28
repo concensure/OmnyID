@@ -549,6 +549,35 @@ test("wedding task projection preserves Oracle update gate metadata", () => {
   assert.ok((message.metadata?.searchable_terms as string[]).includes("scripts/deploy-oracle.ps1"));
 });
 
+test("wedding task projection preserves production remaining-work metadata", () => {
+  const message = weddingTaskItemToAfpTaskMessage({
+    ...taskItem,
+    id: "remaining-provider-proof",
+    title: "Clear launch blocker: Connected app integrations",
+    kind: "vendor_coordination",
+    metadata: {
+      ...(taskItem.metadata as Record<string, unknown>),
+      production_remaining_work_task: true,
+      production_remaining_work_item_id: "provider_executor_integrations",
+      production_remaining_work_tier: "oracle_blocker",
+      production_remaining_work_required_for_oracle: true,
+      production_remaining_work_estimated_passes: 9.2,
+      production_readiness_oracle_gate: true,
+      second_order_loop: "commitment_timing",
+    },
+  });
+
+  assert.ok(message);
+  assert.equal(message.metadata?.production_remaining_work_task, true);
+  assert.equal(message.metadata?.production_remaining_work_item_id, "provider_executor_integrations");
+  assert.equal(message.metadata?.production_remaining_work_tier, "oracle_blocker");
+  assert.equal(message.metadata?.production_remaining_work_required_for_oracle, true);
+  assert.equal(message.metadata?.production_remaining_work_estimated_passes, 6);
+  assert.equal(message.metadata?.production_readiness_oracle_gate, true);
+  assert.ok((message.metadata?.searchable_terms as string[]).some((term) => /Connected app integrations/i.test(term)));
+  assert.ok((message.metadata?.searchable_terms as string[]).includes("launch blocker"));
+});
+
 test("buildWeddingTaskAlertReminderScheduleItems derives calendar reminders from committed preparation tasks", () => {
   const reminders = buildWeddingTaskAlertReminderScheduleItems({
     taskItems: [{

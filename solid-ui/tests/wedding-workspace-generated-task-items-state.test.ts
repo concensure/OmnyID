@@ -233,6 +233,37 @@ test("buildWeddingWorkspaceGeneratedTaskItems includes live launch readiness tas
   ));
 });
 
+test("buildWeddingWorkspaceGeneratedTaskItems includes production remaining-work tasks", () => {
+  const tasks = buildWeddingWorkspaceGeneratedTaskItems({
+    metadata,
+    productionRemainingWork: {
+      productionReady: false,
+      oracleUploadAllowed: false,
+      totalBlockedItems: 1,
+      oracleBlockingItems: [],
+      productionPolishItems: [],
+      nextRecommendedItems: [{
+        id: "provider_executor_integrations",
+        label: "Connected app integrations",
+        requiredForOracle: true,
+        readinessTier: "oracle_blocker",
+        estimatedPasses: 2,
+        summary: "Email, calendar, maps, registry, and vendor connected-app actions need production proof before live use.",
+      }],
+      estimatedOraclePassesRemaining: 2,
+      estimatedFullProductionPassesRemaining: 2,
+      estimatedNextPasses: 2,
+      headline: "Wedding planner still has Oracle-blocking production-readiness items.",
+    },
+  });
+
+  assert.ok(tasks.some((task) => task.title === "Clear launch blocker: Connected app integrations"));
+  assert.ok(tasks.some((task) =>
+    (task.metadata as Record<string, unknown>).production_remaining_work_task === true
+    && (task.metadata as Record<string, unknown>).production_remaining_work_item_id === "provider_executor_integrations"
+  ));
+});
+
 test("buildWeddingWorkspaceGeneratedTaskItems surfaces due editable-vendor outreach follow-ups", () => {
   const tasks = buildWeddingWorkspaceGeneratedTaskItems({
     metadata,

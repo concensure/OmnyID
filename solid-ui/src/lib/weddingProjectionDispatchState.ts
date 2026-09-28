@@ -20,6 +20,10 @@ import type {
   WeddingProjectionQueueItemKind,
   WeddingProjectionQueueState,
 } from "@/lib/weddingProjectionQueueState";
+import type {
+  WeddingSemanticUiKind,
+  WeddingSemanticUiObject,
+} from "@/lib/weddingSemanticUiState";
 
 export type WeddingProjectionDispatchOutcomeStatus = "saved" | "failed" | "skipped";
 
@@ -36,6 +40,9 @@ export type WeddingProjectionDispatchReceiptItem = {
   itemId: string;
   sourceId: string;
   kind: WeddingProjectionQueueItemKind;
+  semanticKind: WeddingSemanticUiKind | null;
+  semanticTags: string[];
+  semanticObject: WeddingSemanticUiObject | null;
   title: string;
   status: WeddingProjectionDispatchOutcomeStatus;
   messageId: string | null;
@@ -94,6 +101,9 @@ function receiptItem(
     itemId: item.id,
     sourceId: item.sourceId,
     kind: item.kind,
+    semanticKind: item.semanticKind,
+    semanticTags: item.semanticTags,
+    semanticObject: item.semanticObject,
     title: item.title,
     status,
     messageId,

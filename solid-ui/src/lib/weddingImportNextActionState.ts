@@ -16,7 +16,7 @@ export function weddingImportNextActionTarget(label: string): WeddingImportNextA
     return { label, menuId: "advanced", actionLabel: "Review import setup" };
   }
   if (/\b(clear rows?|review)\b/.test(normalized)) {
-    return { label, menuId: "home", actionLabel: "Open wedding documents" };
+    return { label, menuId: "documents", actionLabel: "Open wedding documents" };
   }
-  return { label, menuId: "home", actionLabel: "Open wedding documents" };
+  return { label, menuId: "documents", actionLabel: "Open wedding documents" };
 }

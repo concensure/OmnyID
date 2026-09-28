@@ -13,6 +13,7 @@
 //! `google_maps` when an API key is present in `OMNYID_GOOGLE_MAPS_KEY`, otherwise
 //! falls back to `osm` (free, no key required).
 
+use crate::admin_tool_secrets::{resolve_admin_tool_secret, GOOGLE_MAPS_SPEC};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
@@ -789,12 +790,15 @@ impl MapService {
                 Self::new(Box::new(OsmProvider::new()))
             }
             _ => {
-                if let Ok(key) = std::env::var("OMNYID_GOOGLE_MAPS_KEY") {
+                if let Some(key) = resolve_admin_tool_secret(GOOGLE_MAPS_SPEC)
+                    .map(|secret| secret.secret)
+                    .or_else(|| std::env::var("OMNYID_GOOGLE_MAPS_KEY").ok())
+                {
                     debug!("MapService: using Google Maps provider");
                     return Self::new(Box::new(GoogleMapsProvider::new(key)));
                 }
                 warn!(
-                    "MapService: Google Maps requested but OMNYID_GOOGLE_MAPS_KEY not set; falling back to OSM"
+                    "MapService: Google Maps requested but no admin/deployment Google Maps key is set; falling back to OSM"
                 );
                 Self::new(Box::new(OsmProvider::new()))
             }

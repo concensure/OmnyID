@@ -8,6 +8,7 @@ import {
   weddingDayCountdownDetail,
   weddingDayCountdownLabel,
   weddingTaskSidebarAction,
+  weddingTimelinePrimarySidebarAction,
   weddingTimelineSidebarAction,
 } from "../src/lib/weddingWorkspaceSidebarActionState.ts";
 import type { WeddingResponseWorkspaceViewState } from "../src/lib/weddingResponseWorkspaceViewState.ts";
@@ -102,6 +103,10 @@ test("calendarActionLabel and timeline sidebar actions handle empty and selected
   const emptyCalendarAction = weddingTimelineSidebarAction("open_calendar", empty);
   assert.equal(emptyCalendarAction.enabled, false);
   assert.match(emptyCalendarAction.reason ?? "", /Add dated wedding tasks/i);
+  const emptyPrimaryAction = weddingTimelinePrimarySidebarAction(empty);
+  assert.equal(emptyPrimaryAction.kind, "open_tasks");
+  assert.equal(emptyPrimaryAction.enabled, true);
+  assert.equal(emptyPrimaryAction.reason, null);
 
   const workspace = state({
     ganttTimeline: {
@@ -115,6 +120,7 @@ test("calendarActionLabel and timeline sidebar actions handle empty and selected
   const metadata = selectedAction.metadata?.wedding_timeline as Record<string, unknown>;
 
   assert.equal(calendarActionLabel(workspace), "Open wedding calendar");
+  assert.equal(weddingTimelinePrimarySidebarAction(workspace).kind, "open_calendar");
   assert.equal(selectedAction.kind, "open_tasks");
   assert.equal(selectedAction.enabled, true);
   assert.deepEqual(selectedAction.contextLabels, ["Confirm final guest count", "2027-08-01", "2027-08-01"]);

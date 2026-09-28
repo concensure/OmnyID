@@ -58,6 +58,62 @@ test("buildWeddingNavigationArrivalState gives calendar-specific guidance", () =
   assert.match(state?.nextStep ?? "", /before syncing or inviting/);
 });
 
+test("buildWeddingNavigationArrivalState carries selected timeline item context", () => {
+  const state = buildWeddingNavigationArrivalState({
+    ...baseIntent,
+    view: "calendar",
+    surface: "calendar",
+    metadata: {
+      template: "wedding_planning",
+      wedding_timeline: {
+        version: 1,
+        selected_row_id: "timeline:weather-backup",
+        selected_title: "Confirm wet-weather backup",
+        selected_start: "2027-08-01",
+        selected_end: "2027-08-01",
+        selected_status: "Planned",
+        selected_bucket: "dated",
+        dated_count: 4,
+        undated_count: 2,
+      },
+    },
+  });
+
+  const timelineCard = state?.cards.find((card) => card.label === "Timeline item");
+  assert.ok(timelineCard);
+  assert.match(timelineCard.detail, /Confirm wet-weather backup/);
+  assert.match(timelineCard.detail, /2027-08-01/);
+  assert.match(timelineCard.detail, /4 dated items/);
+  assert.match(state?.nextStep ?? "", /calendar around "Confirm wet-weather backup"/);
+});
+
+test("buildWeddingNavigationArrivalState carries completed timeline file context into tasks", () => {
+  const state = buildWeddingNavigationArrivalState({
+    ...baseIntent,
+    view: "tasks",
+    surface: "tasks",
+    metadata: {
+      template: "wedding_planning",
+      wedding_timeline: {
+        version: 1,
+        selected_row_id: "timeline:noim",
+        selected_title: "Download the official Notice of Intended Marriage form",
+        selected_status: "Done",
+        selected_bucket: "done_or_no_date",
+        linked_artifact_id: "artifact:noim-form",
+        dated_count: 0,
+        undated_count: 2,
+      },
+    },
+  });
+
+  const timelineCard = state?.cards.find((card) => card.label === "Timeline item");
+  assert.ok(timelineCard);
+  assert.match(timelineCard.detail, /linked file available/);
+  assert.match(timelineCard.detail, /done or no-date/);
+  assert.match(state?.nextStep ?? "", /completed task or linked file/i);
+});
+
 test("buildWeddingNavigationArrivalState gives task and graph guidance", () => {
   const taskState = buildWeddingNavigationArrivalState({
     ...baseIntent,
@@ -107,6 +163,55 @@ test("buildWeddingNavigationArrivalState surfaces decision-focus task context", 
   assert.match(focusCard.detail, /Focus on 2 wedding decisions now/);
   assert.match(focusCard.detail, /Decide final caterer headcount/);
   assert.match(focusCard.detail, /1 lower-priority decision kept in backlog/);
+});
+
+test("buildWeddingNavigationArrivalState gives decision focus actions specific next steps", () => {
+  const explained = buildWeddingNavigationArrivalState({
+    ...baseIntent,
+    view: "tasks",
+    surface: "tasks",
+    metadata: {
+      template: "wedding_planning",
+      decision_focus: {
+        version: 1,
+        intent: "explain_item",
+        summary_label: "Focus on one decision.",
+        focus_items: [{ title: "Choose photographer" }],
+      },
+    },
+  });
+  const opened = buildWeddingNavigationArrivalState({
+    ...baseIntent,
+    view: "tasks",
+    surface: "tasks",
+    metadata: {
+      template: "wedding_planning",
+      decision_focus: {
+        version: 1,
+        intent: "open_item",
+        summary_label: "Focus on one decision.",
+        focus_items: [{ title: "Choose photographer" }],
+      },
+    },
+  });
+  const reviewAll = buildWeddingNavigationArrivalState({
+    ...baseIntent,
+    view: "tasks",
+    surface: "tasks",
+    metadata: {
+      template: "wedding_planning",
+      decision_focus: {
+        version: 1,
+        intent: "review_all",
+        summary_label: "Focus on three decisions.",
+        focus_items: [{ title: "Choose photographer" }],
+      },
+    },
+  });
+
+  assert.match(explained?.nextStep ?? "", /why this decision matters/i);
+  assert.match(opened?.nextStep ?? "", /specific decision task/i);
+  assert.match(reviewAll?.nextStep ?? "", /top wedding decisions/i);
 });
 
 test("buildWeddingNavigationArrivalState surfaces expected behaviour audit task context", () => {
@@ -233,6 +338,37 @@ test("buildWeddingNavigationArrivalState surfaces continue-chat context packets"
   assert.match(state?.nextStep ?? "", /selected option first/i);
 });
 
+test("buildWeddingNavigationArrivalState surfaces wedding research prompt context", () => {
+  const state = buildWeddingNavigationArrivalState({
+    ...baseIntent,
+    view: "threads",
+    surface: "continue_chat",
+    artifactId: "artifact_research_1",
+    metadata: {
+      template: "wedding_planning",
+      wedding_research_prompt: {
+        version: 1,
+        source: "artifact_detail",
+        title: "Harbour venue research",
+        artifact_id: "artifact_research_1",
+        artifact_kind: "research",
+        requested_output: "research_brief",
+        query: "wet weather venue options",
+        location: "Sydney NSW",
+      },
+    },
+  });
+
+  const researchCard = state?.cards.find((card) => card.label === "Research request");
+  assert.ok(researchCard);
+  assert.match(researchCard.detail, /Harbour venue research/);
+  assert.match(researchCard.detail, /wet weather venue options/);
+  assert.match(researchCard.detail, /source: research/);
+  assert.match(researchCard.detail, /location: Sydney NSW/);
+  assert.match(researchCard.detail, /output: research brief/);
+  assert.match(state?.nextStep ?? "", /specific research brief/);
+});
+
 test("buildWeddingNavigationArrivalState surfaces workspace handoff packets", () => {
   const state = buildWeddingNavigationArrivalState({
     ...baseIntent,
@@ -258,19 +394,19 @@ test("buildWeddingNavigationArrivalState surfaces workspace handoff packets", ()
     },
   });
 
-  const packetCard = state?.cards.find((card) => card.label === "Planning handoff");
+  const packetCard = state?.cards.find((card) => card.label === "Planning context");
   assert.ok(packetCard);
   assert.match(packetCard.detail, /4 planning files/);
   assert.match(packetCard.detail, /2 linked dates/);
   assert.match(packetCard.detail, /3 linked tasks/);
   assert.match(packetCard.detail, /1 selected decision scope/);
-  assert.match(packetCard.detail, /1 source-linked file/);
-  assert.match(packetCard.detail, /2 source-labelled files/);
+  assert.match(packetCard.detail, /1 file with web links/);
+  assert.match(packetCard.detail, /2 files with named sources/);
   assert.match(packetCard.detail, /1 file needs a fact check/);
   assert.match(packetCard.detail, /1 approval prompt/);
   assert.match(packetCard.detail, /2 sensitive exports excluded by default/);
   assert.match(packetCard.detail, /1 imported private planning file in workspace/);
-  assert.match(packetCard.detail, /1 imported file requires handoff review/);
+  assert.match(packetCard.detail, /1 imported file needs review before sharing/);
   assert.match(packetCard.detail, /5 planning outputs waiting to be approved/);
 });
 
@@ -382,7 +518,7 @@ test("buildWeddingNavigationArrivalState gives approval and export safety warnin
     notice: "Opening export options for artifact_budget.",
   });
 
-  assert.equal(approvalState?.badge, "Approval gate");
+  assert.equal(approvalState?.badge, "Review before sending");
   assert.match(approvalState?.cards.find((card) => card.label === "What not to assume")?.detail ?? "", /explicitly approved/);
   assert.equal(exportState?.badge, "Export context");
   assert.match(exportState?.nextStep ?? "", /review sensitive files/);

@@ -99,6 +99,23 @@ export type WeddingBudgetQuoteTaskInput = {
 };
 
 export type WeddingBudgetPaymentTaskInput = WeddingBudgetQuoteTaskInput;
+export type WeddingBudgetVendorOutreachTaskInput = WeddingBudgetQuoteTaskInput;
+
+export type WeddingVendorPursuitClosureReason =
+  | "not_suitable"
+  | "too_expensive"
+  | "no_availability"
+  | "chose_another_vendor"
+  | "unresponsive"
+  | "other";
+
+export type WeddingVendorPursuitClosureTaskInput = {
+  lineItem: WeddingBudgetLineItem;
+  metadata?: unknown;
+  reason?: WeddingVendorPursuitClosureReason | null;
+  note?: string | null;
+  closedAt?: string | null;
+};
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -107,7 +124,22 @@ function clean(value: unknown): string {
 function usableSourceUrls(values: readonly unknown[] | null | undefined): string[] {
   return (values ?? [])
     .map((value) => clean(value))
-    .filter((value) => /^https?:\/\//i.test(value));
+    .filter(remoteHttpUrl);
+}
+
+function remoteHttpUrl(value: string): boolean {
+  if (!/^https?:\/\//i.test(value)) return false;
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    return hostname !== "localhost"
+      && hostname !== "127.0.0.1"
+      && hostname !== "0.0.0.0"
+      && hostname !== "::1"
+      && hostname !== "[::1]";
+  } catch {
+    return false;
+  }
 }
 
 function metadataRecord(value: unknown): Record<string, unknown> {
@@ -527,6 +559,105 @@ function existingPaymentTaskKeys(taskItems: readonly WeddingPlanningTaskItem[]):
   return keys;
 }
 
+function existingVendorOutreachTaskKeys(taskItems: readonly WeddingPlanningTaskItem[]): Set<string> {
+  const keys = new Set<string>();
+  for (const item of taskItems) {
+    keys.add(item.id);
+    const metadata = taskRecord(item.metadata);
+    const sourceLineId = clean(metadata.vendor_outreach_line_item_id);
+    if (sourceLineId) keys.add(`wedding_vendor_outreach_task:${sourceLineId}`);
+  }
+  return keys;
+}
+
+function pursuitClosureReasonLabel(reason: WeddingVendorPursuitClosureReason | null | undefined): string {
+  if (reason === "too_expensive") return "Too expensive";
+  if (reason === "no_availability") return "No availability";
+  if (reason === "chose_another_vendor") return "Chose another vendor";
+  if (reason === "unresponsive") return "Unresponsive";
+  if (reason === "not_suitable") return "Not suitable";
+  return "Other reason";
+}
+
+function vendorOutreachDraftSubject(item: WeddingBudgetLineItem): string {
+  return `Wedding quote request - ${item.categoryLabel}`;
+}
+
+function vendorOutreachDraftBody(item: WeddingBudgetLineItem): string {
+  return [
+    `Hi ${item.vendorName},`,
+    "",
+    `We are considering you for our wedding ${item.categoryLabel.toLowerCase()} and would like to confirm availability, package inclusions, and a current quote.`,
+    "",
+    "Could you please share:",
+    "- Availability for our wedding date",
+    "- Package inclusions and exclusions",
+    "- Current pricing, deposit, payment schedule, and any overtime, travel, GST, or service fees",
+    "- Cancellation or change terms",
+    "- The best next step if we would like to proceed",
+    "",
+    "Thank you.",
+  ].join("\n");
+}
+
+export function buildWeddingVendorPursuitClosureTaskItem(
+  input: WeddingVendorPursuitClosureTaskInput,
+): WeddingPlanningTaskItem {
+  const metadata = normalizeWeddingPlanningMetadata(input.metadata);
+  const reason = input.reason ?? "other";
+  const reasonLabel = pursuitClosureReasonLabel(reason);
+  const note = clean(input.note);
+  const closedAt = clean(input.closedAt) || new Date(0).toISOString();
+  return {
+    id: `wedding_vendor_outreach_task:${input.lineItem.id}`,
+    title: `Stopped pursuing ${input.lineItem.vendorName}`,
+    kind: "vendor_follow_up",
+    dueLabel: "Closed",
+    priority: "normal",
+    source: "user",
+    reviewStatus: "ignored",
+    approvalState: "archived",
+    metadata: {
+      ...metadata,
+      vendor_outreach_from_selected_decision: true,
+      vendor_outreach_line_item_id: input.lineItem.id,
+      vendor_outreach_vendor_label: input.lineItem.vendorName,
+      vendor_outreach_category_label: input.lineItem.categoryLabel,
+      vendor_outreach_source_label: input.lineItem.sourceLabel,
+      budget_line_item_id: input.lineItem.id,
+      budget_quote_verification: true,
+      vendor_outreach_pursuit_status: "not_pursuing",
+      vendor_outreach_closure_reason: reason,
+      vendor_outreach_closed_at: closedAt,
+      outreach_escalation_stage: "closed",
+      second_order_loop: "vendor_choice_to_quote_thread",
+      second_order_task: true,
+      second_order_evidence_labels: [
+        "User chose not to pursue this selected vendor further.",
+        `Reason: ${reasonLabel}.`,
+        note ? `Note: ${note}.` : null,
+      ].filter(Boolean),
+      searchable_terms: [
+        "vendor outreach",
+        "not pursuing",
+        "closed",
+        reasonLabel,
+        input.lineItem.vendorName,
+        input.lineItem.categoryLabel,
+        input.lineItem.sourceLabel,
+        metadata.weddingPlanId,
+        metadata.responseWorkspaceId,
+      ].filter(Boolean),
+    },
+    linkedArtifactId: input.lineItem.linkedArtifactId,
+    notes: [
+      `${input.lineItem.vendorName} was removed from active follow-up.`,
+      `Reason: ${reasonLabel}.`,
+      note ? `Note: ${note}.` : null,
+    ].filter(Boolean).join(" "),
+  };
+}
+
 export function buildWeddingBudgetQuoteTaskItems(input: WeddingBudgetQuoteTaskInput): WeddingPlanningTaskItem[] {
   const budget = input.budgetTracking;
   if (!budget) return [];
@@ -583,6 +714,91 @@ export function buildWeddingBudgetQuoteTaskItems(input: WeddingBudgetQuoteTaskIn
         `Task key: ${safeWeddingLabel(candidate.id)}.`,
       ].join(" "),
     }));
+}
+
+export function buildWeddingBudgetVendorOutreachTaskItems(input: WeddingBudgetVendorOutreachTaskInput): WeddingPlanningTaskItem[] {
+  const budget = input.budgetTracking;
+  if (!budget) return [];
+  const metadata = normalizeWeddingPlanningMetadata(input.metadata);
+  const existingKeys = existingVendorOutreachTaskKeys(input.existingTaskItems ?? []);
+  return budget.lineItems
+    .filter((item) => item.priceStatus !== "quoted" || item.amount === null || item.warningLabels.length > 0)
+    .map((item) => ({
+      item,
+      id: `wedding_vendor_outreach_task:${item.id}`,
+    }))
+    .filter(({ id }) => !existingKeys.has(id))
+    .map(({ item, id }): WeddingPlanningTaskItem => {
+      const draftSubject = vendorOutreachDraftSubject(item);
+      const draftBody = vendorOutreachDraftBody(item);
+      const requestChecklist = [
+        "availability",
+        "package inclusions",
+        "current quote",
+        "deposit",
+        "payment schedule",
+        "overtime fees",
+        "travel fees",
+        "exclusions",
+        "cancellation terms",
+      ];
+      return {
+        id,
+        title: `Prepare approval-gated quote request for ${item.vendorName}`,
+        kind: "vendor_follow_up",
+        dueLabel: "After user confirms this vendor",
+        priority: item.amount === null ? "high" : "normal",
+        source: "agent",
+        reviewStatus: "accepted",
+        approvalState: "draft",
+        metadata: {
+          ...metadata,
+          vendor_outreach_from_selected_decision: true,
+          vendor_outreach_line_item_id: item.id,
+          vendor_outreach_vendor_label: item.vendorName,
+          vendor_outreach_category_label: item.categoryLabel,
+          vendor_outreach_source_label: item.sourceLabel,
+          vendor_outreach_draft_subject: draftSubject,
+          vendor_outreach_draft_body: draftBody,
+          vendor_outreach_request_checklist: requestChecklist,
+          vendor_outreach_draft_requires_approval: true,
+          vendor_outreach_provider_receipt_required: true,
+          approval_required_before_outreach: true,
+          no_external_send_without_approval: true,
+          selected_decision_required: true,
+          provider_receipt_required: true,
+          outreach_escalation_stage: "initial_quote_request",
+          second_order_loop: "vendor_choice_to_quote_thread",
+          second_order_task: true,
+          second_order_evidence_labels: [
+            "Vendor was selected from planning evidence.",
+            "Outreach must be reviewed before any external send.",
+            "Quote replies should attach to the vendor thread as proof.",
+          ],
+          preparation_checklist: true,
+          preparation_checklist_item: "selected_vendor_quote_request",
+          user_selectable: true,
+          can_deselect_before_commit: true,
+          searchable_terms: [
+            "vendor outreach",
+            "quote request",
+            "approval gated",
+            item.vendorName,
+            item.categoryLabel,
+            item.sourceLabel,
+            metadata.weddingPlanId,
+            metadata.responseWorkspaceId,
+          ].filter(Boolean),
+        },
+        linkedArtifactId: item.linkedArtifactId,
+        notes: [
+          `Draft an initial quote request for ${item.vendorName}.`,
+          "Do not send it externally until the user reviews and approves the message.",
+          "Ask for availability, package inclusions, final quote, deposit, payment schedule, overtime, travel, exclusions, and cancellation terms.",
+          `Source: ${item.sourceLabel}.`,
+        ].join(" "),
+      };
+    });
 }
 
 export function buildWeddingBudgetPaymentTaskItems(input: WeddingBudgetPaymentTaskInput): WeddingPlanningTaskItem[] {

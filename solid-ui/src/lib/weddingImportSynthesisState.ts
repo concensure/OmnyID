@@ -99,11 +99,16 @@ function hasStorageReceipt(value: unknown): boolean {
   return Object.keys(record(value)).length > 0;
 }
 
+function placeholderReceiptPart(value: unknown): boolean {
+  const item = clean(value);
+  return !item || item === "..." || /\b(?:dry-run|test|example|placeholder|fake|stub|mock)\b/i.test(item);
+}
+
 function durableUploadReceipt(receipt: WeddingImportUploadReceipt | null | undefined): boolean {
   return receipt?.status === "saved"
-    && Boolean(clean(receipt.messageId))
-    && Boolean(clean(receipt.attachment?.id))
-    && Boolean(clean(receipt.attachment?.sha256))
+    && !placeholderReceiptPart(receipt.messageId)
+    && !placeholderReceiptPart(receipt.attachment?.id)
+    && !placeholderReceiptPart(receipt.attachment?.sha256)
     && hasStorageReceipt(receipt.attachment?.storage);
 }
 
@@ -123,9 +128,9 @@ function normalizedUploadReceipt(
 
 function durableOriginalUploadMetadata(metadata: Record<string, unknown>): boolean {
   return clean(metadata.originalUploadStatus).toLowerCase() === "saved"
-    && Boolean(clean(metadata.originalUploadMessageId))
-    && Boolean(clean(metadata.originalUploadAttachmentId))
-    && Boolean(clean(metadata.originalUploadSha256))
+    && !placeholderReceiptPart(metadata.originalUploadMessageId)
+    && !placeholderReceiptPart(metadata.originalUploadAttachmentId)
+    && !placeholderReceiptPart(metadata.originalUploadSha256)
     && hasStorageReceipt(metadata.originalUploadStorage);
 }
 

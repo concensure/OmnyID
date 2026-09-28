@@ -171,6 +171,60 @@ export type UiCommandRequest = {
   optimization_mode?: string;
 } & Record<string, unknown>;
 
+export type WeddingVendorSearchApiQuery = {
+  provider_kind: string;
+  category?: string | null;
+  query: string;
+  google_place_types?: string[];
+  overpass_tags?: string[];
+};
+
+export type WeddingVendorSearchApiSource = {
+  title: string;
+  url: string;
+  snippet?: string | null;
+  provider?: string | null;
+};
+
+export type WeddingVendorSearchApiResponse = {
+  ok: boolean;
+  status: string;
+  external_search_performed: boolean;
+  provider_label: string | null;
+  query_count: number;
+  source_count: number;
+  queries: string[];
+  sources: WeddingVendorSearchApiSource[];
+  message: string;
+  receipt_metadata: Record<string, unknown>;
+};
+
+export type WeddingProviderCapabilityStatus = {
+  kind: string;
+  connectedAppId: string;
+  label: string;
+  credentialRequired: boolean;
+  configured: boolean;
+  sourceLabel: string | null;
+};
+
+export type WeddingProviderCapabilitiesResponse = {
+  providers: WeddingProviderCapabilityStatus[];
+  connectedAppIds: string[];
+  guardrails: string[];
+};
+
+export type WeddingLiveEvidenceResponse = {
+  ok: boolean;
+  status: string;
+  locationsRequested: number;
+  geocodes: Record<string, unknown>[];
+  weather: Record<string, unknown>[];
+  failures: string[];
+  receiptMetadata: Record<string, unknown>;
+  guardrails: string[];
+};
+
 export type AgentOrchestrationRequest = {
   objective: string;
   thread_id?: string;
@@ -4301,6 +4355,120 @@ export const executeUiCommand = (body: UiCommandRequest) =>
   submitUiCommand(body).then(normalizeUiCommandResponse);
 export const queueUiCommand = (body: UiCommandRequest) =>
   submitUiCommand(body).then(normalizeOkResponse);
+function normalizeWeddingVendorSearchApiResponse(value: unknown): WeddingVendorSearchApiResponse {
+  const record = isRecord(value) ? value : {};
+  const sources = Array.isArray(record.sources)
+    ? record.sources.flatMap((item): WeddingVendorSearchApiSource[] => {
+      const source = isRecord(item) ? item : {};
+      const title = typeof source.title === "string" ? source.title.trim() : "";
+      const url = typeof source.url === "string" ? source.url.trim() : "";
+      if (!title || !url) return [];
+      return [{
+        title,
+        url,
+        snippet: typeof source.snippet === "string" ? source.snippet : null,
+        provider: typeof source.provider === "string" ? source.provider : null,
+      }];
+    })
+    : [];
+  return {
+    ok: record.ok === true,
+    status: typeof record.status === "string" ? record.status : record.ok === true ? "executed" : "failed",
+    external_search_performed: record.external_search_performed === true,
+    provider_label: typeof record.provider_label === "string" ? record.provider_label : null,
+    query_count: typeof record.query_count === "number" ? record.query_count : 0,
+    source_count: typeof record.source_count === "number" ? record.source_count : sources.length,
+    queries: Array.isArray(record.queries)
+      ? record.queries.filter((query): query is string => typeof query === "string" && query.trim().length > 0)
+      : [],
+    sources,
+    message: typeof record.message === "string" ? record.message : "",
+    receipt_metadata: isRecord(record.receipt_metadata) ? record.receipt_metadata : {},
+  };
+}
+export const searchWeddingVendors = (body: {
+  workspace_id?: string | null;
+  queries: WeddingVendorSearchApiQuery[];
+  max_results_per_query?: number;
+}): Promise<WeddingVendorSearchApiResponse> =>
+  apiFetch<unknown>("/wedding/vendor-search", {
+    method: "POST",
+    bodyJson: body,
+  }).then(normalizeWeddingVendorSearchApiResponse);
+
+function redactedRecordArray(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): Record<string, unknown>[] => {
+    if (!isRecord(item)) return [];
+    const next: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(item)) {
+      if (/key|secret|token|credential|password/i.test(key)) continue;
+      next[key] = entry;
+    }
+    return [next];
+  });
+}
+
+export function normalizeWeddingLiveEvidenceResponse(value: unknown): WeddingLiveEvidenceResponse {
+  const record = isRecord(value) ? value : {};
+  return {
+    ok: record.ok === true,
+    status: typeof record.status === "string" ? record.status : record.ok === true ? "verified" : "blocked",
+    locationsRequested: typeof record.locationsRequested === "number" ? record.locationsRequested : 0,
+    geocodes: redactedRecordArray(record.geocodes),
+    weather: redactedRecordArray(record.weather),
+    failures: Array.isArray(record.failures)
+      ? record.failures.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [],
+    receiptMetadata: isRecord(record.receiptMetadata) ? record.receiptMetadata : {},
+    guardrails: Array.isArray(record.guardrails)
+      ? record.guardrails.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [],
+  };
+}
+
+export const fetchWeddingLiveEvidence = (body: {
+  workspace_id?: string | null;
+  locations: string[];
+  forecast_days?: number;
+  include_weather?: boolean;
+}): Promise<WeddingLiveEvidenceResponse> =>
+  apiFetch<unknown>("/wedding/live-evidence", {
+    method: "POST",
+    bodyJson: body,
+  }).then(normalizeWeddingLiveEvidenceResponse);
+
+function normalizeWeddingProviderCapabilitiesResponse(value: unknown): WeddingProviderCapabilitiesResponse {
+  const record = isRecord(value) ? value : {};
+  const providers = Array.isArray(record.providers)
+    ? record.providers.flatMap((item): WeddingProviderCapabilityStatus[] => {
+      const provider = isRecord(item) ? item : {};
+      const kind = typeof provider.kind === "string" ? provider.kind.trim() : "";
+      const connectedAppId = typeof provider.connectedAppId === "string" ? provider.connectedAppId.trim() : "";
+      const label = typeof provider.label === "string" ? provider.label.trim() : "";
+      if (!kind || !connectedAppId || !label) return [];
+      return [{
+        kind,
+        connectedAppId,
+        label,
+        credentialRequired: provider.credentialRequired === true,
+        configured: provider.configured === true,
+        sourceLabel: typeof provider.sourceLabel === "string" ? provider.sourceLabel : null,
+      }];
+    })
+    : [];
+  return {
+    providers,
+    connectedAppIds: Array.isArray(record.connectedAppIds)
+      ? record.connectedAppIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : providers.filter((provider) => provider.configured).map((provider) => provider.connectedAppId),
+    guardrails: Array.isArray(record.guardrails)
+      ? record.guardrails.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [],
+  };
+}
+export const fetchWeddingProviderCapabilities = (): Promise<WeddingProviderCapabilitiesResponse> =>
+  apiFetch<unknown>("/wedding/provider-capabilities").then(normalizeWeddingProviderCapabilitiesResponse);
 export const submitActionDecision = (body: {
   thread_id: string;
   target_message_id: string;
@@ -5215,6 +5383,22 @@ export type OperatorRuntimeRemediationHistoryResponse = {
 
 export type AdminWeddingOpsMetricsPayload = Record<string, unknown>;
 
+export type AdminWeddingApiProviderStatus = {
+  providerId: string;
+  connectedAppId: string;
+  label: string;
+  credentialRequired: boolean;
+  configured: boolean;
+  sourceLabel: string | null;
+  requiredForStack: boolean;
+};
+
+export type AdminWeddingApiStackPayload = {
+  providers: AdminWeddingApiProviderStatus[];
+  connectedAppIds: string[];
+  guardrails: string[];
+};
+
 export type AdminWeddingWaitlistSignup = {
   signupId: string;
   email: string;
@@ -5595,6 +5779,43 @@ export function normalizeAdminWeddingOpsMetricsPayload(value: unknown): AdminWed
   return isRecord(value) ? value : {};
 }
 
+function normalizeAdminWeddingApiProviderStatus(value: unknown): AdminWeddingApiProviderStatus | null {
+  if (!isRecord(value)) return null;
+  const providerId = apiString(value.providerId);
+  const connectedAppId = apiString(value.connectedAppId);
+  const label = apiString(value.label);
+  if (!providerId || !connectedAppId || !label) return null;
+  return {
+    providerId,
+    connectedAppId,
+    label,
+    credentialRequired: apiBoolean(value.credentialRequired),
+    configured: apiBoolean(value.configured),
+    sourceLabel: apiNullableString(value.sourceLabel) ?? null,
+    requiredForStack: apiBoolean(value.requiredForStack),
+  };
+}
+
+export function normalizeAdminWeddingApiStackPayload(value: unknown): AdminWeddingApiStackPayload {
+  const record = isRecord(value) ? value : {};
+  const providers = Array.isArray(record.providers)
+    ? record.providers.flatMap((entry): AdminWeddingApiProviderStatus[] => {
+        const normalized = normalizeAdminWeddingApiProviderStatus(entry);
+        return normalized ? [normalized] : [];
+      })
+    : [];
+  const connectedAppIds = Array.isArray(record.connectedAppIds)
+    ? record.connectedAppIds.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : providers.filter((provider) => provider.configured).map((provider) => provider.connectedAppId);
+  return {
+    providers,
+    connectedAppIds: Array.from(new Set(connectedAppIds)),
+    guardrails: Array.isArray(record.guardrails)
+      ? record.guardrails.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+      : [],
+  };
+}
+
 function normalizeAdminWeddingWaitlistSignup(value: unknown): AdminWeddingWaitlistSignup | null {
   if (!isRecord(value) || typeof value.signup_id !== "string" || typeof value.email !== "string") {
     return null;
@@ -5888,6 +6109,9 @@ export const fetchAdminWeddingOpsMetrics = () =>
 
 export const fetchAdminWeddingAiRoutingPolicy = () =>
   apiFetch<unknown>("/admin/wedding/ai-routing-policy").then(normalizeAdminWeddingAiRoutingPolicyPayload);
+
+export const fetchAdminWeddingApiStack = () =>
+  apiFetch<unknown>("/admin/wedding/api-stack").then(normalizeAdminWeddingApiStackPayload);
 
 export const fetchAdminThirdPartyToolPolicy = () =>
   apiFetch<unknown>("/admin/third-party-tool-policy").then(normalizeAdminThirdPartyToolPolicyPayload);

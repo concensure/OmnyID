@@ -22,6 +22,7 @@ const readyReadiness = buildWeddingNativeExportWorkerReadinessState({
       supportsDeterministicFilename: true,
       supportsReceipt: true,
       supportsFailureCopy: true,
+      proofReferenceLabel: "native-export:zip_packet_worker:oracle-prod-1:2026-09-28",
     },
     {
       id: "docx_packet_worker",
@@ -30,6 +31,7 @@ const readyReadiness = buildWeddingNativeExportWorkerReadinessState({
       supportsDeterministicFilename: true,
       supportsReceipt: true,
       supportsFailureCopy: true,
+      proofReferenceLabel: "native-export:docx_packet_worker:oracle-prod-1:2026-09-28",
     },
     {
       id: "image_packet_worker",
@@ -38,6 +40,7 @@ const readyReadiness = buildWeddingNativeExportWorkerReadinessState({
       supportsDeterministicFilename: true,
       supportsReceipt: true,
       supportsFailureCopy: true,
+      proofReferenceLabel: "native-export:image_packet_worker:oracle-prod-1:2026-09-28",
     },
   ],
 });

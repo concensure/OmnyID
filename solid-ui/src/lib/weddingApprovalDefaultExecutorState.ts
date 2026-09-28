@@ -54,7 +54,7 @@ function stageApprovedWeddingAction(
     ok: true,
     externalId: internalExecutionId(request),
     message: needsExternalProvider
-      ? `${ACTION_LABELS[request.actionKind]} approved and staged inside OmnyID. External delivery still requires the connected provider executor.`
+      ? `${ACTION_LABELS[request.actionKind]} approved and staged inside OmnyID. External delivery still requires the connected app.`
       : `${ACTION_LABELS[request.actionKind]} approved and staged inside OmnyID.`,
     metadata: {
       execution_mode: "omnyid_internal_approval_handoff",

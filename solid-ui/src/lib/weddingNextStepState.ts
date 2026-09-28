@@ -113,7 +113,7 @@ export function buildWeddingNextStepState(state: WeddingResponseWorkspaceViewSta
       priority: "wedding_date",
       title: "Add the wedding date first",
       detail: "Once the date is known, OmnyID can place legal deadlines, payment reminders, and vendor follow-ups on the timeline.",
-      actionLabel: "Open plan",
+      actionLabel: "Add wedding date",
       menuId: "plan",
       secondaryLabels: ["Calendar and reminders need a date.", ...baseLabels.slice(0, 2)],
     });
@@ -143,7 +143,7 @@ export function buildWeddingNextStepState(state: WeddingResponseWorkspaceViewSta
       priority: "vendor_follow_up",
       title: "Review vendor follow-ups",
       detail: "Some vendors need a reply, a follow-up, or a clear next step so outreach does not stall.",
-      actionLabel: "Open plan",
+      actionLabel: "Open follow-ups",
       menuId: "plan",
       secondaryLabels: [
         `${vendorsNeedingAction.length} vendor${vendorsNeedingAction.length === 1 ? "" : "s"} need attention.`,
@@ -188,7 +188,7 @@ export function buildWeddingNextStepState(state: WeddingResponseWorkspaceViewSta
     priority: "on_track",
     title: "You have a workable plan",
     detail: "Keep reviewing the next decisions, follow-ups, and dates. OmnyID will keep surfacing the next item as the plan changes.",
-    actionLabel: "Open plan",
+    actionLabel: "Open planning hub",
     menuId: "plan",
     secondaryLabels: baseLabels,
   });

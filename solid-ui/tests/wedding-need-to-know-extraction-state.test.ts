@@ -6,7 +6,7 @@ import { buildWeddingNeedToKnowExtractionState } from "@/lib/weddingNeedToKnowEx
 test("wedding need-to-know extraction captures a rich planning message", () => {
   const state = buildWeddingNeedToKnowExtractionState({
     responseWorkspaceId: "response_workspace:harbour",
-    text: "We are planning a wedding on 2027-10-03 in Sydney NSW for about 90 guests. Budget is mid-range. Priorities are food, photos, and low stress. We have not downloaded NOIM and need celebrant options.",
+    text: "We are Alex and Sam planning a wedding on 2027-10-03 in Sydney NSW for about 90 guests. Budget is mid-range. Priorities are food, photos, and low stress. We have not downloaded NOIM and need celebrant options.",
   });
 
   assert.equal(state.draft.dateOrSeason, "2027-10-03");
@@ -14,6 +14,7 @@ test("wedding need-to-know extraction captures a rich planning message", () => {
   assert.equal(state.draft.guestCount, "90");
   assert.equal(state.draft.budgetComfort, "mid-range");
   assert.equal(state.draft.prioritiesCsv, "food, photos, low stress");
+  assert.equal(state.draft.coupleNames, "Alex and Sam");
   assert.equal(state.draft.noimDownloaded, "no");
   assert.equal(state.draft.celebrantPath, "need_options");
   assert.equal(state.canGenerateFollowUp, true);
@@ -23,6 +24,7 @@ test("wedding need-to-know extraction captures a rich planning message", () => {
     "guest_count",
     "budget_comfort",
     "priorities",
+    "couple_names",
     "noim_status",
     "celebrant_path",
   ]);

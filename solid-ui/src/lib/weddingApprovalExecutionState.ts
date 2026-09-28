@@ -31,8 +31,16 @@ export type WeddingApprovalExecutionState = {
   message: string;
 };
 
+const MISSING_CONNECTED_APP_MESSAGE = "No connected app is ready for this wedding action.";
+
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function timestampOrNow(value: string | null | undefined): string {
+  const raw = clean(value);
+  if (!raw) return new Date().toISOString();
+  return Number.isFinite(Date.parse(raw)) ? raw : new Date().toISOString();
 }
 
 const DURABLE_RECEIPT_METADATA_KEYS = [
@@ -85,7 +93,7 @@ export async function runWeddingApprovalExecution(input: {
   handlers?: WeddingApprovalExecutionHandlers | null;
   nowIso?: string | null;
 }): Promise<WeddingApprovalExecutionState> {
-  const receipt = buildWeddingApprovalReceiptState(input.request, clean(input.nowIso) || new Date().toISOString());
+  const receipt = buildWeddingApprovalReceiptState(input.request, timestampOrNow(input.nowIso));
   if (!input.request.canExecute) {
     return stateFromReceipt({
       request: input.request,
@@ -104,11 +112,11 @@ export async function runWeddingApprovalExecution(input: {
         status: "blocked",
         metadata: {
           ...receipt.metadata,
-          blocked_reason: "No executor is connected for this wedding action.",
+          blocked_reason: MISSING_CONNECTED_APP_MESSAGE,
         },
       },
       status: "missing_executor",
-      message: "No executor is connected for this wedding action.",
+      message: MISSING_CONNECTED_APP_MESSAGE,
     });
   }
 
@@ -122,19 +130,19 @@ export async function runWeddingApprovalExecution(input: {
           status: "blocked",
           metadata: {
             ...receipt.metadata,
-            blocked_reason: clean(result.message) || "The connected executor declined this action.",
             ...(result.metadata ?? {}),
+            blocked_reason: clean(result.message) || "The connected app declined this action.",
           },
         },
         status: "failed",
-        message: result.message || "The connected executor declined this action.",
+        message: result.message || "The connected app declined this action.",
       });
     }
 
     const receiptId = durableReceiptId(result);
     if (!receiptId) {
       const message = clean(result.message)
-        || "The connected executor did not return a durable provider receipt.";
+        || "The connected app did not return a saved confirmation receipt.";
       return stateFromReceipt({
         request: input.request,
         receipt: {
@@ -142,9 +150,9 @@ export async function runWeddingApprovalExecution(input: {
           status: "blocked",
           metadata: {
             ...receipt.metadata,
+            ...(result.metadata ?? {}),
             blocked_reason: message,
             missing_durable_provider_receipt: true,
-            ...(result.metadata ?? {}),
           },
         },
         status: "failed",
@@ -167,7 +175,7 @@ export async function runWeddingApprovalExecution(input: {
       message: result.message || "Wedding action executed after explicit approval.",
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The connected executor failed.";
+    const message = error instanceof Error ? error.message : "The connected app action failed.";
     return stateFromReceipt({
       request: input.request,
       receipt: {

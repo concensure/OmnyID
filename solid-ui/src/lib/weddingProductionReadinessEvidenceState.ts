@@ -33,6 +33,7 @@ import {
 import type { WeddingVendorSearchProviderEnvState } from "@/lib/weddingVendorSearchProviderEnvState";
 import type { WeddingVendorQuoteReplyProductionReadinessState } from "@/lib/weddingVendorQuoteReplyProductionReadinessState";
 import type { WeddingVendorQuoteReplyUiReadinessState } from "@/lib/weddingVendorQuoteReplyUiReadinessState";
+import type { WeddingVendorComparisonUiReadinessState } from "@/lib/weddingVendorComparisonUiReadinessState";
 import type { WeddingTemplateProductionReadinessState } from "@/lib/weddingTemplateProductionReadinessState";
 import type { WeddingWorkspaceRefreshScaleProofState } from "@/lib/weddingWorkspaceRefreshScaleProofState";
 import {
@@ -62,6 +63,7 @@ export type WeddingProductionReadinessEvidenceInput = {
   liveMapGeocoding?: WeddingMapGeocodingReadinessState | null;
   graphCanvasHighlighting?: WeddingGraphCanvasReadinessState | null;
   approvalUi?: WeddingApprovalUiReadinessState | null;
+  vendorComparisonUi?: WeddingVendorComparisonUiReadinessState | null;
   vendorQuoteReplyUi?: WeddingVendorQuoteReplyUiReadinessState | null;
   vendorQuoteReplyProduction?: WeddingVendorQuoteReplyProductionReadinessState | null;
   nativeExportWorkers?: WeddingNativeExportWorkerReadinessState | null;
@@ -90,6 +92,7 @@ export type WeddingProductionReadinessEvidenceState = {
   durableProofReferenceLabels: string[];
   missingRequiredEvidenceLabels: string[];
   vendorQuoteReplyUi: WeddingVendorQuoteReplyUiReadinessState | null;
+  vendorComparisonUi: WeddingVendorComparisonUiReadinessState | null;
   vendorQuoteReplyProduction: WeddingVendorQuoteReplyProductionReadinessState | null;
   templateLaunchReadiness: WeddingTemplateProductionReadinessState | null;
   providerExecutorUnblockPlan: WeddingProviderExecutorUnblockPlanState;
@@ -389,6 +392,10 @@ const REQUIRED_VENDOR_QUOTE_REPLY_UI_EVIDENCE_PATTERNS = [
   /Inline email editor mounted/i,
   /Separate wording approval control mounted/i,
   /Separate budget acknowledgement control mounted/i,
+  /State-derived primary decision action mounted/i,
+  /State-derived secondary decision action mounted/i,
+  /Conditional reply editor visibility mounted/i,
+  /Sent reply history\/log surface mounted/i,
   /Undo window mounted before external send/i,
   /Persistent sent confirmation mounted/i,
   /Sent proof drawer action mounted/i,
@@ -396,6 +403,31 @@ const REQUIRED_VENDOR_QUOTE_REPLY_UI_EVIDENCE_PATTERNS = [
   /Failure telemetry hooks mounted/i,
   /External email provider ready/i,
 ] as const;
+
+const REQUIRED_VENDOR_COMPARISON_UI_EVIDENCE_PATTERNS = [
+  /Top-three vendor comparison table mounted/i,
+  /Top-five expansion control mounted/i,
+  /Multi-select vendor controls mounted/i,
+  /Per-vendor source link actions mounted/i,
+  /Confirm selected vendors action mounted/i,
+  /Follow-up queue action mounted/i,
+  /Approval-gated follow-up copy mounted/i,
+  /Selected-vendor projection fan-out mounted/i,
+  /Malformed source URL guard mounted/i,
+  /Local source URL guard mounted/i,
+] as const;
+
+function vendorComparisonUiReady(
+  readiness: WeddingVendorComparisonUiReadinessState | null | undefined,
+  strictOracleProofs: boolean,
+): boolean {
+  if (readiness?.productionReady !== true) return false;
+  if (!strictOracleProofs) return true;
+  const labels = readiness.evidenceLabels ?? [];
+  return REQUIRED_VENDOR_COMPARISON_UI_EVIDENCE_PATTERNS.every((pattern) =>
+    labels.some((label) => pattern.test(label)),
+  );
+}
 
 function vendorQuoteReplyUiReady(
   readiness: WeddingVendorQuoteReplyUiReadinessState | null | undefined,
@@ -463,6 +495,7 @@ export function buildWeddingProductionReadinessEvidenceState(
     liveMapGeocodingReady: liveMapGeocodingReady(input.liveMapGeocoding, strictOracleProofs),
     graphCanvasHighlightingReady: graphCanvasHighlightingReady(input.graphCanvasHighlighting, strictOracleProofs),
     approvalExecutionUiReady: approvalUiReady(input.approvalUi, strictOracleProofs),
+    vendorComparisonUiReady: vendorComparisonUiReady(input.vendorComparisonUi, strictOracleProofs),
     vendorQuoteReplyUiReady: vendorQuoteReplyUiReady(input.vendorQuoteReplyUi, strictOracleProofs),
     vendorQuoteReplyProductionReady: vendorQuoteReplyProductionReady(input.vendorQuoteReplyProduction, strictOracleProofs),
     nativeExportWorkersReady: nativeExportWorkersReady(input.nativeExportWorkers, strictOracleProofs),
@@ -495,6 +528,7 @@ export function buildWeddingProductionReadinessEvidenceState(
     evidence.liveMapGeocodingReady ? "live map/geocoding proof ready" : null,
     evidence.graphCanvasHighlightingReady ? "graph canvas proof ready" : null,
     evidence.approvalExecutionUiReady ? "approval UI proof ready" : null,
+    evidence.vendorComparisonUiReady ? "vendor comparison UI proof ready" : null,
     evidence.vendorQuoteReplyUiReady ? "vendor quote reply UI proof ready" : null,
     evidence.vendorQuoteReplyProductionReady ? "vendor quote reply live proof ready" : null,
     evidence.nativeExportWorkersReady ? "native export worker proof ready" : null,
@@ -537,6 +571,14 @@ export function buildWeddingProductionReadinessEvidenceState(
         && !hasDurableProofLabels(input.approvalUi.proofReferenceLabels)
         ? "Approval UI proof reference is missing."
         : "Approval UI proof is missing.",
+    evidence.vendorComparisonUiReady
+      ? null
+      : strictOracleProofs
+        && input.vendorComparisonUi?.productionReady === true
+        ? "Vendor comparison UI safeguard evidence is incomplete."
+      : input.vendorComparisonUi
+        ? `Vendor comparison UI proof is blocked: ${joinWeddingProductionLabels(input.vendorComparisonUi.blockerLabels)}`
+        : "Vendor comparison UI proof is missing.",
     evidence.vendorQuoteReplyUiReady
       ? null
       : strictOracleProofs
@@ -676,6 +718,7 @@ export function buildWeddingProductionReadinessEvidenceState(
     }),
     missingRequiredEvidenceLabels,
     vendorQuoteReplyUi: input.vendorQuoteReplyUi ?? null,
+    vendorComparisonUi: input.vendorComparisonUi ?? null,
     vendorQuoteReplyProduction: input.vendorQuoteReplyProduction ?? null,
     templateLaunchReadiness: input.templateLaunchReadiness ?? null,
     providerExecutorUnblockPlan,

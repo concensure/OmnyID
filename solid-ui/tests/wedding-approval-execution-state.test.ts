@@ -64,7 +64,7 @@ test("runWeddingApprovalExecution blocks approved requests without connected exe
   assert.equal(result.status, "missing_executor");
   assert.equal(result.canRetry, true);
   assert.equal(result.receipt.status, "blocked");
-  assert.match(result.message, /No executor is connected/i);
+  assert.match(result.message, /No connected app is ready/i);
 });
 
 test("runWeddingApprovalExecution records successful executor results", async () => {
@@ -99,6 +99,36 @@ test("runWeddingApprovalExecution records successful executor results", async ()
   assert.equal(result.receipt.metadata.external_id, "gcal:event-1");
 });
 
+test("runWeddingApprovalExecution replaces malformed receipt timestamps", async () => {
+  const request = buildWeddingApprovalRequestState({
+    actionKind: "create_external_calendar_event",
+    title: "Create venue tour event",
+    metadata,
+    userApproved: true,
+    externalProvider: "google_calendar",
+    scheduleItems: [{
+      id: "venue-tour",
+      title: "Venue tour",
+      kind: "venue_tour",
+      startAt: "2027-02-06T10:00:00+11:00",
+    }],
+  });
+  const result = await runWeddingApprovalExecution({
+    request,
+    nowIso: "not-a-date",
+    handlers: {
+      create_external_calendar_event: () => ({
+        ok: true,
+        externalId: "gcal:event-1",
+      }),
+    },
+  });
+
+  assert.equal(result.status, "executed");
+  assert.notEqual(result.receipt.createdAt, "not-a-date");
+  assert.equal(Number.isFinite(Date.parse(result.receipt.createdAt)), true);
+});
+
 test("runWeddingApprovalExecution fails closed when successful executors omit durable receipts", async () => {
   const request = buildWeddingApprovalRequestState({
     actionKind: "send_email",
@@ -124,6 +154,49 @@ test("runWeddingApprovalExecution fails closed when successful executors omit du
   assert.equal(result.externalId, null);
   assert.equal(result.receipt.status, "blocked");
   assert.equal(result.receipt.metadata.missing_durable_provider_receipt, true);
+});
+
+test("runWeddingApprovalExecution preserves safety metadata over unsafe executor failure metadata", async () => {
+  const request = buildWeddingApprovalRequestState({
+    actionKind: "send_email",
+    title: "Send venue email",
+    metadata,
+    recipients: ["events@harbour.example"],
+    userApproved: true,
+  });
+  const failed = await runWeddingApprovalExecution({
+    request,
+    nowIso: "2026-09-11T00:00:00.000Z",
+    handlers: {
+      send_email: () => ({
+        ok: false,
+        message: "Gmail connection expired.",
+        metadata: {
+          blocked_reason: "safe to ignore",
+        },
+      }),
+    },
+  });
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.receipt.metadata.blocked_reason, "Gmail connection expired.");
+
+  const missingReceipt = await runWeddingApprovalExecution({
+    request,
+    nowIso: "2026-09-11T00:00:00.000Z",
+    handlers: {
+      send_email: () => ({
+        ok: true,
+        message: "Email accepted without receipt.",
+        metadata: {
+          blocked_reason: "sent anyway",
+          missing_durable_provider_receipt: false,
+        },
+      }),
+    },
+  });
+  assert.equal(missingReceipt.status, "failed");
+  assert.equal(missingReceipt.receipt.metadata.blocked_reason, "Email accepted without receipt.");
+  assert.equal(missingReceipt.receipt.metadata.missing_durable_provider_receipt, true);
 });
 
 test("runWeddingApprovalExecution accepts durable provider receipt metadata", async () => {

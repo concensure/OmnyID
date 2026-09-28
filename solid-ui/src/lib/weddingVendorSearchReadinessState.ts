@@ -1,4 +1,9 @@
 // @locs-version: 2.0
+import {
+  cleanWeddingProductionLabel,
+  cleanWeddingProductionLabels,
+} from "@/lib/weddingProductionLabelState";
+
 export type WeddingVendorSearchReadinessStatus = "blocked" | "partial" | "ready";
 
 export type WeddingVendorSearchReadinessState = {
@@ -20,7 +25,7 @@ export type WeddingVendorSearchReadinessInput = {
 };
 
 function clean(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+  return cleanWeddingProductionLabel(typeof value === "string" ? value : null) ?? "";
 }
 
 function hasText(value: unknown): boolean {
@@ -33,7 +38,7 @@ function hasListValue(value: readonly string[] | null | undefined): boolean {
 
 function normalizedCategories(categories: readonly string[] | null | undefined): string[] {
   return Array.isArray(categories)
-    ? categories.map((category) => clean(category)).filter(Boolean)
+    ? cleanWeddingProductionLabels(categories)
     : [];
 }
 
@@ -46,7 +51,11 @@ function searchQueriesFor(input: WeddingVendorSearchReadinessInput, categories: 
   for (const category of categories.slice(0, 8)) {
     for (const kind of queryKinds) {
       const preferencePart = preferences ? ` ${preferences}` : "";
-      queries.push(`${location} wedding ${category} ${kind}${preferencePart}`.replace(/\s+/g, " ").trim());
+      const query = cleanWeddingProductionLabel(`${location} wedding ${category} ${kind}${preferencePart}`, {
+        maxLength: 180,
+        wordAware: true,
+      });
+      if (query) queries.push(query);
     }
   }
   return queries.slice(0, 20);
@@ -87,15 +96,15 @@ export function buildWeddingVendorSearchReadinessState(
       : status === "partial"
         ? "Ready for a structured search brief; live provider not connected"
         : "Needs vendor-search intake",
-    missing,
-    searchBrief: [
+    missing: cleanWeddingProductionLabels(missing),
+    searchBrief: cleanWeddingProductionLabels([
       hasText(input.location) ? `Location: ${clean(input.location)}` : null,
       categories.length > 0 ? `Vendor categories: ${categories.join(", ")}` : null,
       hasText(input.vendorPreferences) ? `Preferences: ${clean(input.vendorPreferences)}` : null,
       hasText(input.photographyScope) ? `Photography scope: ${clean(input.photographyScope)}` : null,
       input.musicOrBandNeeded === true || input.musicOrBandNeeded === "yes" ? "Music/entertainment needed" : null,
       input.musicOrBandNeeded === false || input.musicOrBandNeeded === "no" ? "No music/entertainment search requested" : null,
-    ].filter((item): item is string => item !== null),
+    ]),
     searchQueries: searchQueriesFor(input, categories),
     guardrails: [
       "Do not recommend specific vendors without location and vendor-category context.",

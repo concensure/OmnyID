@@ -6,6 +6,10 @@ import type {
 import type {
   WeddingProviderExecutorSuiteCapability,
 } from "@/lib/weddingProviderExecutorSuiteReadinessState";
+import {
+  cleanWeddingProductionLabel,
+  cleanWeddingProductionLabels,
+} from "@/lib/weddingProductionLabelState";
 
 export type WeddingVendorSearchSmokeReceipt = {
   proofRef?: string | null;
@@ -49,15 +53,35 @@ const CAPABILITY_LABELS: Record<WeddingProviderExecutorSuiteCapability, string> 
 };
 
 function clean(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+  return cleanWeddingProductionLabel(typeof value === "string" ? value : null) ?? "";
 }
 
 function durableProofRef(value: unknown): string | null {
   const ref = clean(value);
   if (!ref) return null;
-  if (/^(receipt|local|draft|display):/i.test(ref)) return null;
+  if (ref === "...") return null;
+  if (/^(?:test|example|placeholder|fake|stub|mock)$/i.test(ref)) return null;
+  if (/^(receipt|local|draft|display|dry-run|test|example|placeholder|fake|stub|mock):/i.test(ref)) return null;
+  if (/\b(?:test|example|placeholder|fake|stub|mock)\b/i.test(ref)) return null;
   if (/^(file|blob|data):/i.test(ref)) return null;
-  if (/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|::1)(?::|\/|$)/i.test(ref)) return null;
+  if (/^https?:\/\//i.test(ref)) {
+    try {
+      const url = new URL(ref);
+      const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+      if (url.protocol !== "https:") return null;
+      if (
+        hostname === "localhost"
+        || hostname === "127.0.0.1"
+        || hostname === "0.0.0.0"
+        || hostname === "::1"
+      ) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+  if (/(?:^|:)wedding_provider_dry_run(?::|$)/i.test(ref)) return null;
   return ref;
 }
 
@@ -86,6 +110,35 @@ function isLiveProductionReceipt(receipt: WeddingApprovalReceiptState): boolean 
     && Boolean(receiptProofRef(receipt));
 }
 
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return cleanWeddingProductionLabels(value);
+}
+
+function deliveryRecord(receipt: WeddingApprovalReceiptState): Record<string, unknown> | null {
+  const delivery = receipt.metadata.delivery;
+  return delivery && typeof delivery === "object" && !Array.isArray(delivery)
+    ? delivery as Record<string, unknown>
+    : null;
+}
+
+function hasEmailDeliveryPayload(receipt: WeddingApprovalReceiptState): boolean {
+  const delivery = deliveryRecord(receipt);
+  if (!delivery || delivery.channel !== "email") return false;
+  return stringArray(delivery.to).length > 0
+    && Boolean(clean(delivery.subject))
+    && Boolean(clean(delivery.text));
+}
+
+function liveReceiptBlocker(receipt: WeddingApprovalReceiptState): string | null {
+  if (receipt.actionKind !== "send_email" && receipt.actionKind !== "contact_vendor" && receipt.actionKind !== "invite_collaborator") {
+    return null;
+  }
+  return hasEmailDeliveryPayload(receipt)
+    ? null
+    : `${CAPABILITY_LABELS.email} live receipt needs the approved email delivery payload with recipient, subject, and body.`;
+}
+
 function isDryRunReceipt(receipt: WeddingApprovalReceiptState): boolean {
   return receipt.status === "executed"
     && receipt.metadata.provider_executor_mode === "dry_run"
@@ -96,7 +149,19 @@ function isDryRunReceipt(receipt: WeddingApprovalReceiptState): boolean {
 function usableSourceUrls(value: readonly unknown[] | null | undefined): string[] {
   return (value ?? [])
     .map((item) => clean(item))
-    .filter((url) => /^https?:\/\//i.test(url));
+    .filter((value) => {
+      try {
+        const url = new URL(value);
+        const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+        return (url.protocol === "http:" || url.protocol === "https:")
+          && hostname !== "localhost"
+          && hostname !== "127.0.0.1"
+          && hostname !== "0.0.0.0"
+          && hostname !== "::1";
+      } catch {
+        return false;
+      }
+    });
 }
 
 function proofForApprovalCapability(
@@ -104,7 +169,11 @@ function proofForApprovalCapability(
   receipts: readonly WeddingApprovalReceiptState[],
 ): WeddingProviderExecutorSmokeProofCapability {
   const matching = receipts.filter((receipt) => capabilityForAction(receipt.actionKind) === capability);
-  const live = matching.find(isLiveProductionReceipt);
+  const liveBlockedByPayload = matching
+    .filter(isLiveProductionReceipt)
+    .map(liveReceiptBlocker)
+    .find((blocker): blocker is string => Boolean(blocker));
+  const live = matching.find((receipt) => isLiveProductionReceipt(receipt) && !liveReceiptBlocker(receipt));
   if (live) {
     return {
       capability,
@@ -132,7 +201,7 @@ function proofForApprovalCapability(
     status: "blocked",
     proofRef: null,
     evidenceLabels: [],
-    blockerLabels: [`${CAPABILITY_LABELS[capability]} smoke proof is missing.`],
+    blockerLabels: [liveBlockedByPayload ?? `${CAPABILITY_LABELS[capability]} smoke proof is missing.`],
   };
 }
 
@@ -142,7 +211,8 @@ function vendorSearchProof(
   const valid = (receipts ?? []).find((receipt) =>
     Boolean(durableProofRef(receipt.proofRef)) &&
     usableSourceUrls(receipt.sourceUrls).length > 0 &&
-    (receipt.providerLabels?.filter((label) => clean(label)).length ?? 0) > 0,
+    (receipt.providerLabels?.filter((label) => clean(label)).length ?? 0) > 0 &&
+    Boolean(clean(receipt.queryContextLabel)),
   );
   if (!valid) {
     return {
@@ -154,17 +224,48 @@ function vendorSearchProof(
     };
   }
   const sourceUrls = usableSourceUrls(valid.sourceUrls);
+  const providerLabels = cleanWeddingProductionLabels(valid.providerLabels ?? []);
+  const queryContextLabel = clean(valid.queryContextLabel);
   return {
     capability: "vendor_search",
     status: "production_ready",
     proofRef: durableProofRef(valid.proofRef),
-    evidenceLabels: [
-      `Vendor search providers: ${valid.providerLabels?.filter((label) => clean(label)).join(", ")}`,
+    evidenceLabels: cleanWeddingProductionLabels([
+      `Vendor search providers: ${providerLabels.join(", ")}`,
       `Vendor search source URLs: ${sourceUrls.length}`,
-      clean(valid.queryContextLabel) ? `Query context: ${clean(valid.queryContextLabel)}` : null,
-    ].filter((label): label is string => Boolean(label)),
+      queryContextLabel ? `Query context: ${queryContextLabel}` : null,
+    ]),
     blockerLabels: [],
   };
+}
+
+function duplicateProofRefs(
+  proofs: readonly WeddingProviderExecutorSmokeProofCapability[],
+): Set<string> {
+  const counts = new Map<string, number>();
+  proofs.forEach((proof) => {
+    if (!proof.proofRef) return;
+    counts.set(proof.proofRef, (counts.get(proof.proofRef) ?? 0) + 1);
+  });
+  return new Set([...counts].filter(([, count]) => count > 1).map(([proofRef]) => proofRef));
+}
+
+function rejectDuplicateProofRefs(
+  proofs: readonly WeddingProviderExecutorSmokeProofCapability[],
+): WeddingProviderExecutorSmokeProofCapability[] {
+  const duplicateRefs = duplicateProofRefs(proofs);
+  return proofs.map((proof) => {
+    if (!proof.proofRef || !duplicateRefs.has(proof.proofRef)) return proof;
+    return {
+      ...proof,
+      status: "blocked",
+      evidenceLabels: [],
+      blockerLabels: cleanWeddingProductionLabels([
+        ...proof.blockerLabels,
+        `${CAPABILITY_LABELS[proof.capability]} needs a unique live provider proof reference.`,
+      ]),
+    };
+  });
 }
 
 function providerFromProof(proof: WeddingProviderExecutorSmokeProofCapability): WeddingProviderExecutorReadinessState {
@@ -195,10 +296,12 @@ export function buildWeddingProviderExecutorSmokeProofState(input: {
     ? input.requiredCapabilities
     : REQUIRED_CAPABILITIES;
   const approvalReceipts = input.approvalReceipts ?? [];
-  const capabilityProofs = requiredCapabilities.map((capability) =>
-    capability === "vendor_search"
-      ? vendorSearchProof(input.vendorSearchReceipts)
-      : proofForApprovalCapability(capability, approvalReceipts),
+  const capabilityProofs = rejectDuplicateProofRefs(
+    requiredCapabilities.map((capability) =>
+      capability === "vendor_search"
+        ? vendorSearchProof(input.vendorSearchReceipts)
+        : proofForApprovalCapability(capability, approvalReceipts),
+    ),
   );
   const providers = capabilityProofs.map(providerFromProof);
   const executorProofRefs = Object.fromEntries(
@@ -206,7 +309,7 @@ export function buildWeddingProviderExecutorSmokeProofState(input: {
       .filter((proof) => proof.status === "production_ready" && proof.proofRef)
       .map((proof) => [proof.capability, proof.proofRef]),
   ) as Partial<Record<WeddingProviderExecutorSuiteCapability, string>>;
-  const blockerLabels = capabilityProofs.flatMap((proof) => proof.blockerLabels);
+  const blockerLabels = cleanWeddingProductionLabels(capabilityProofs.flatMap((proof) => proof.blockerLabels));
   const productionEvidenceReady = capabilityProofs.every((proof) => proof.status === "production_ready");
 
   return {
@@ -216,6 +319,6 @@ export function buildWeddingProviderExecutorSmokeProofState(input: {
     providers,
     executorProofRefs,
     blockerLabels,
-    evidenceLabels: capabilityProofs.flatMap((proof) => proof.evidenceLabels),
+    evidenceLabels: cleanWeddingProductionLabels(capabilityProofs.flatMap((proof) => proof.evidenceLabels)),
   };
 }

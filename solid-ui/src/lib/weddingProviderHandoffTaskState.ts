@@ -40,6 +40,16 @@ function dueLabelForCapability(capability: string | null): string {
   return "Before claiming vendor email/follow-up was sent";
 }
 
+function userFacingProviderLabel(value: string | null): string | null {
+  const label = clean(value)
+    ?.replace(/\bNo executor is connected for this wedding action\b/gi, "No connected app is ready for this wedding action")
+    .replace(/\bNo executor is connected\b/gi, "No connected app is ready")
+    .replace(/\bprovider executor\b/gi, "connected app")
+    .replace(/\bexecutor\b/gi, "connected app")
+    .replace(/\bprovider\b/gi, "connected app");
+  return label || null;
+}
+
 export function buildWeddingProviderHandoffTaskItems(input: {
   approvalReceipts?: readonly WeddingPersistedApprovalReceipt[] | null;
   existingTaskItems?: readonly WeddingPlanningTaskItem[] | null;
@@ -54,7 +64,7 @@ export function buildWeddingProviderHandoffTaskItems(input: {
       const provider = receipt.requiredProvider ?? receipt.providerSetupView ?? capability;
       return {
         id: `wedding_provider_handoff:${safeWeddingLabel(receipt.id)}`,
-        title: `Connect external provider for: ${receipt.title}`,
+        title: `Connect app for: ${receipt.title}`,
         kind: taskKindForCapability(receipt.providerCapability),
         dueLabel: dueLabelForCapability(receipt.providerCapability),
         priority: receipt.status === "blocked" ? "high" : "normal",
@@ -76,9 +86,9 @@ export function buildWeddingProviderHandoffTaskItems(input: {
           schedule_basis: "pending_provider_handoff",
           second_order_loop: "contact_closure",
           second_order_evidence_labels: [
-            `provider capability: ${capability}`,
-            `provider setup: ${receipt.providerSetupView ?? "unknown"}`,
-            `executor: ${receipt.providerExecutorStatus ?? "unknown"}`,
+            `app type: ${capability}`,
+            `setup page: ${receipt.providerSetupView ?? "unknown"}`,
+            `app action: ${receipt.providerExecutorStatus ?? "unknown"}`,
           ],
           searchable_terms: [
             receipt.title,
@@ -98,10 +108,10 @@ export function buildWeddingProviderHandoffTaskItems(input: {
           ].filter(Boolean),
         },
         notes: [
-          receipt.blockedReason ?? "External provider execution still needs a connected executor.",
-          `Provider: ${provider}.`,
-          `Capability: ${capability}.`,
-          receipt.providerSetupView ? `Setup surface: ${receipt.providerSetupView}.` : null,
+          userFacingProviderLabel(receipt.blockedReason) ?? "External delivery still needs a connected app.",
+          `App: ${provider}.`,
+          `Action type: ${capability}.`,
+          receipt.providerSetupView ? `Setup page: ${receipt.providerSetupView}.` : null,
         ].filter(Boolean).join(" "),
       };
     })

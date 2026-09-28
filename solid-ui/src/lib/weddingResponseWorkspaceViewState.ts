@@ -1,17 +1,12 @@
 // @locs-version: 2.0
 import {
-  weddingArtifactEvidenceStatus,
+  type WeddingArtifactInput,
   type WeddingArtifactSourceLink,
   type WeddingArtifactSummary,
 } from "@/lib/weddingArtifactState";
+import type { AfpMessage } from "@/lib/api";
+import type { WeddingIntegrationReadinessState, WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
 import {
-  buildWeddingApprovalRequestState,
-  buildWeddingIntegrationReadinessState,
-  type WeddingIntegrationReadinessState,
-  type WeddingApprovalRequestState,
-} from "@/lib/weddingApprovalState";
-import {
-  buildWeddingArtifactExportManifest,
   buildWeddingPacketExportCapabilityState,
   type WeddingArtifactExportManifest,
   type WeddingPacketExportCapabilityState,
@@ -24,7 +19,7 @@ import type { WeddingGeneratedArtifact } from "@/lib/weddingArtifactGenerationSt
 import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 import {
   buildWeddingDecisionSelectionState,
-  loadWeddingDecisionSelection,
+  loadWeddingDecisionSelections,
 } from "@/lib/weddingDecisionSelectionState";
 import type {
   WeddingPlanningScheduleItem,
@@ -52,14 +47,8 @@ import {
   buildWeddingArtifactPreviewState,
   type WeddingArtifactPreviewState,
 } from "@/lib/weddingArtifactPreviewState";
-import {
-  buildWeddingExpectedBehaviorAuditState,
-  type WeddingExpectedBehaviorAuditItem,
-} from "@/lib/weddingExpectedBehaviorAuditState";
-import {
-  buildWeddingExpectedBehaviorTaskItems,
-  buildWeddingPreparationChecklistTaskItems,
-} from "@/lib/weddingExpectedBehaviorTaskState";
+import type { WeddingExpectedBehaviorAuditItem } from "@/lib/weddingExpectedBehaviorAuditState";
+import { buildWeddingPreparationChecklistTaskItems } from "@/lib/weddingExpectedBehaviorTaskState";
 import {
   buildWeddingWorkspaceBundleExportPayload,
   type WeddingWorkspaceBundleExportPayload,
@@ -98,6 +87,7 @@ import {
   buildWeddingResponseWorkspaceProductionReadinessState,
   type WeddingProductionGoNoGoPacketState,
   type WeddingProductionReadinessEvidenceState,
+  type WeddingProductionRemainingWorkState,
   type WeddingProductionReadinessState,
   type WeddingWorkspaceProductionReadinessInput,
 } from "@/lib/weddingResponseWorkspaceProductionReadinessState";
@@ -124,10 +114,9 @@ import {
   type WeddingImportParserReadinessState,
 } from "@/lib/weddingImportParserReadinessState";
 import { buildWeddingWorkspaceGeneratedTaskItems } from "@/lib/weddingWorkspaceGeneratedTaskItemsState";
-import {
-  buildWeddingOutreachEscalationStateFromVendorContact,
-  type WeddingOutreachEscalationStage,
-  type WeddingVendorContactOutreachVendor,
+import type {
+  WeddingOutreachEscalationStage,
+  WeddingVendorContactOutreachVendor,
 } from "@/lib/weddingOutreachEscalationState";
 import {
   buildWeddingCollaborationState,
@@ -144,7 +133,6 @@ import {
   type WeddingBoundaryTopologyState,
 } from "@/lib/weddingBoundaryTopologyState";
 import { buildWeddingBoundaryStarterObjects } from "@/lib/weddingBoundaryDefaultsState";
-import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
 import type { WeddingArtifactKind, WeddingApprovalState } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingSeatingConstraintAction } from "@/lib/weddingSeatingConstraintActionState";
@@ -153,6 +141,33 @@ import {
   buildWeddingSeatingDraftCards,
   type WeddingSeatingDraftCard,
 } from "@/lib/weddingSeatingDraftCardState";
+import {
+  buildWeddingResilienceDisplayState,
+  type WeddingResilienceDisplayState,
+} from "@/lib/weddingResilienceDisplayState";
+import { buildWeddingResilienceLedgerState } from "@/lib/weddingResilienceLedgerState";
+import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
+import {
+  buildWeddingVendorPursuitLogCards,
+  type WeddingVendorPursuitLogCard,
+} from "@/lib/weddingVendorPursuitLogPresentationState";
+import type { WeddingTemplateDeepLinkLaunchState } from "@/lib/weddingTemplateDeepLinkLaunchState";
+import type { WeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchState";
+import { shouldShowWeddingFirstRunIntake } from "@/lib/weddingFirstRunIntakeGateState";
+import { buildWeddingTemplateProductionReadinessState } from "@/lib/weddingTemplateProductionReadinessState";
+import {
+  approvalReceiptCards,
+  buildFilterChips,
+  contextCards,
+  decisionBundleScopes,
+  decisionRecordCards,
+  expectedBehaviorAuditCard,
+  previewForArtifact,
+  recommendationCards,
+  sidebarActions,
+  vendorContactCards,
+  vendorQuoteReplyFlowsFromPreviews,
+} from "@/lib/weddingResponseWorkspacePresentationState";
 
 export type WeddingWorkspaceFilterKind =
   | "artifact_kind"
@@ -173,10 +188,17 @@ export type WeddingWorkspaceArtifactPreview = {
   title: string;
   kind: WeddingArtifactKind;
   category: string;
+  createdAt: number;
   approvalState: WeddingApprovalState;
   metadataLabels: string[];
   sourceLabels: string[];
   sourceLinks: WeddingArtifactSourceLink[];
+  vendorComparisonHandoff: {
+    recommendationLabel: string;
+    whyLabels: string[];
+    confidenceLabel: string;
+    nextActionLabel: string;
+  } | null;
   evidenceSummary: WeddingArtifactEvidenceSummary;
   bodyText: string | null;
   preview: WeddingArtifactPreviewState | null;
@@ -265,6 +287,9 @@ export type WeddingResponseWorkspaceViewState = {
   contextCards: WeddingNeedToKnowContextCard[];
   approvalReceiptCards: WeddingApprovalReceiptCard[];
   vendorContactCards: WeddingVendorContactWorkspaceCard[];
+  vendorQuoteReplyFlows: WeddingVendorQuoteReplyFlowState[];
+  activeVendorQuoteReplyFlows: WeddingVendorQuoteReplyFlowState[];
+  vendorQuoteReplyLogFlows: WeddingVendorQuoteReplyFlowState[];
   providerHandoffAuditCard: WeddingProviderHandoffAuditCard | null;
   expectedBehaviorAuditCard: WeddingExpectedBehaviorAuditCard;
   decisionRecordCards: WeddingDecisionRecordCard[];
@@ -280,6 +305,8 @@ export type WeddingResponseWorkspaceViewState = {
   boundaryState: WeddingBoundaryState;
   boundaryTopology: WeddingBoundaryTopologyState;
   planningTaskItems: WeddingPlanningTaskItem[];
+  vendorPursuitLogTaskItems: WeddingPlanningTaskItem[];
+  vendorPursuitLogCards: WeddingVendorPursuitLogCard[];
   helperContactNames: string[];
   recommendationCards: WeddingWorkspaceRecommendationCard[];
   secondOrderLoopCards: WeddingSecondOrderLoopCard[];
@@ -289,8 +316,10 @@ export type WeddingResponseWorkspaceViewState = {
   productionReadinessEvidence: WeddingProductionReadinessEvidenceState | null;
   productionGoNoGoPacket: WeddingProductionGoNoGoPacketState | null;
   productionReadiness: WeddingProductionReadinessState;
+  productionRemainingWork: WeddingProductionRemainingWorkState;
   oracleUpdatePlan: WeddingOracleUpdatePlanState;
   personalOsProjection: WeddingPersonalOsProjectionState;
+  resilience: WeddingResilienceDisplayState;
   projectionQueue: WeddingProjectionQueueViewState | null;
   sidebarActions: WeddingWorkspaceSidebarAction[];
   headerTitle: string;
@@ -312,6 +341,27 @@ function isUserFacingWeddingPlanningTask(task: WeddingPlanningTaskItem): boolean
     || metadata.provider_handoff_task === true
     || metadata.expected_behavior_gap === true
   );
+}
+
+function isClosedVendorPursuitTask(task: WeddingPlanningTaskItem): boolean {
+  const metadata = record(task.metadata);
+  return metadata.vendor_outreach_pursuit_status === "not_pursuing"
+    || (
+      metadata.outreach_escalation_stage === "closed"
+      && Boolean(clean(metadata.vendor_outreach_line_item_id))
+      && task.reviewStatus === "ignored"
+    );
+}
+
+function closedVendorPursuitLineItemIds(taskItems: readonly WeddingPlanningTaskItem[]): Set<string> {
+  const ids = new Set<string>();
+  for (const task of taskItems) {
+    if (!isClosedVendorPursuitTask(task)) continue;
+    const metadata = record(task.metadata);
+    const lineItemId = clean(metadata.vendor_outreach_line_item_id) || clean(metadata.budget_line_item_id);
+    if (lineItemId) ids.add(lineItemId);
+  }
+  return ids;
 }
 
 function uniqueHelperNames(values: readonly unknown[]): string[] {
@@ -344,548 +394,28 @@ function guestNamesFromArtifacts(artifacts: readonly WeddingArtifactInput[]): st
 function usableSourceUrls(values: readonly unknown[] | null | undefined): string[] {
   return (values ?? [])
     .map((value) => clean(value))
-    .filter((value) => /^https?:\/\//i.test(value));
+    .filter(remoteHttpUrl);
+}
+
+function remoteHttpUrl(value: string): boolean {
+  if (!/^https?:\/\//i.test(value)) return false;
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    return hostname !== "localhost"
+      && hostname !== "127.0.0.1"
+      && hostname !== "0.0.0.0"
+      && hostname !== "::1"
+      && hostname !== "[::1]";
+  } catch {
+    return false;
+  }
 }
 
 function privateImportSourceUrl(value: string): boolean {
   return /\b(?:upload|uploads|attachment|attachments|storage|parser|source-file|source_file)\b/i.test(value)
     || /\b[^/?#]+\.(?:csv|tsv|xlsx?|ods)(?:$|[?#/])/i.test(value);
 }
-function labelForKind(kind: WeddingWorkspaceFilterKind, value: string): string {
-  if (kind === "artifact_kind") return value.replace(/_/g, " ");
-  if (kind === "approval_state") return value.replace(/_/g, " ");
-  if (kind === "export_target") return value.replace(/_/g, " ");
-  if (kind === "evidence_status") return value.replace(/_/g, " ");
-  return value;
-}
-
-function chipsFromValues(
-  artifacts: readonly WeddingArtifactSummary[],
-  kind: WeddingWorkspaceFilterKind,
-  valuesFor: (artifact: WeddingArtifactSummary) => readonly string[],
-): WeddingWorkspaceFilterChip[] {
-  const counts = new Map<string, number>();
-  for (const artifact of artifacts) {
-    for (const value of valuesFor(artifact).map(clean).filter(Boolean)) {
-      counts.set(value, (counts.get(value) ?? 0) + 1);
-    }
-  }
-  return Array.from(counts.entries())
-    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
-    .slice(0, 16)
-    .map(([value, count]) => ({
-      id: `${kind}:${value}`,
-      kind,
-      label: labelForKind(kind, value),
-      query: value,
-      count,
-    }));
-}
-
-function buildFilterChips(artifacts: readonly WeddingArtifactSummary[]): WeddingWorkspaceFilterChip[] {
-  return [
-    ...chipsFromValues(artifacts, "artifact_kind", (artifact) => [artifact.kind]),
-    ...chipsFromValues(artifacts, "approval_state", (artifact) => [artifact.approvalState]),
-    ...chipsFromValues(artifacts, "export_target", (artifact) => artifact.exportTargets),
-    ...chipsFromValues(artifacts, "evidence_status", (artifact) => [weddingArtifactEvidenceStatus(artifact)]),
-    ...chipsFromValues(artifacts, "vendor", (artifact) => artifact.vendorLabels),
-    ...chipsFromValues(artifacts, "location", (artifact) => artifact.locationLabels),
-  ];
-}
-
-function contextCards(contextItems: readonly WeddingNeedToKnowProjectionContext[] | null | undefined): WeddingNeedToKnowContextCard[] {
-  return (contextItems ?? []).slice(0, 4).map((item) => ({
-    id: item.metadata.responseWorkspaceId,
-    title: "Key wedding details",
-    statusLabel: item.projectionSaved
-      ? "Saved context"
-      : item.readyForFirstRecommendations ? "Ready for recommendations" : "Needs more context",
-    answeredLabels: item.answeredLabels.slice(0, 8),
-    nextQuestionLabel: item.nextQuestionLabel,
-    metadataLabels: [
-      item.metadata.weddingPlanId,
-      item.metadata.responseWorkspaceId,
-      item.readyForFirstRecommendations ? "recommendations ready" : "recommendations not ready",
-    ],
-  }));
-}
-
-function approvalReceiptCards(receipts: readonly WeddingPersistedApprovalReceipt[] | null | undefined): WeddingApprovalReceiptCard[] {
-  return (receipts ?? []).slice(0, 5).map((receipt) => ({
-    id: receipt.id,
-    title: receipt.title,
-    statusLabel: receipt.status === "executed" ? "Executed" : "Blocked",
-    detailLabel: receipt.externalId
-      ? `External ID: ${receipt.externalId}`
-      : receipt.blockedReason ?? `${receipt.actionKind.replace(/_/g, " ")} at ${receipt.createdAt}`,
-    blockLabel: receipt.blockKind ? receipt.blockKind.replace(/_/g, " ") : null,
-    metadataLabels: [
-      receipt.actionKind.replace(/_/g, " "),
-      receipt.providerCapability ? `provider: ${receipt.providerCapability.replace(/_/g, " ")}` : null,
-      receipt.requiredProvider,
-      receipt.providerExecutorStatus ? `executor: ${receipt.providerExecutorStatus.replace(/_/g, " ")}` : null,
-      receipt.providerCredentialStatus ? `credential: ${receipt.providerCredentialStatus.replace(/_/g, " ")}` : null,
-      receipt.providerSetupView ? `setup: ${receipt.providerSetupView.replace(/_/g, " ")}` : null,
-      receipt.externalProviderRequired && !receipt.providerExecutorConnected ? "external handoff pending" : null,
-      receipt.createdAt,
-      receipt.artifactIds.length > 0 ? `${receipt.artifactIds.length} artifact link${receipt.artifactIds.length === 1 ? "" : "s"}` : null,
-      receipt.scheduleItemIds.length > 0 ? `${receipt.scheduleItemIds.length} date link${receipt.scheduleItemIds.length === 1 ? "" : "s"}` : null,
-      receipt.taskItemIds.length > 0 ? `${receipt.taskItemIds.length} task link${receipt.taskItemIds.length === 1 ? "" : "s"}` : null,
-    ].filter((label): label is string => Boolean(label)).slice(0, 10),
-    riskLabels: receipt.riskLabels.slice(0, 3),
-  }));
-}
-
-function shortDateLabel(value: unknown): string | null {
-  const text = clean(value);
-  if (!text) return null;
-  const date = new Date(text);
-  if (!Number.isFinite(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
-}
-
-function vendorContactTone(stage: WeddingOutreachEscalationStage): WeddingVendorContactWorkspaceCard["tone"] {
-  if (stage === "closed") return "closed";
-  if (stage === "waiting_for_reply") return "waiting";
-  if (stage === "follow_up_due") return "due";
-  if (stage === "escalate_to_user" || stage === "mark_unresponsive") return "urgent";
-  return "neutral";
-}
-
-function vendorContactPrimaryActionLabel(stage: WeddingOutreachEscalationStage): string {
-  if (stage === "initial_outreach") return "Review and approve outreach";
-  if (stage === "follow_up_due") return "Review and approve follow-up";
-  if (stage === "escalate_to_user") return "Choose next step";
-  if (stage === "mark_unresponsive") return "Review alternatives";
-  if (stage === "waiting_for_reply") return "Open follow-up task";
-  if (stage === "closed") return "View response";
-  return "Review vendor";
-}
-
-function vendorContactCards(input: {
-  metadata?: unknown;
-  vendors?: readonly WeddingVendorContactOutreachVendor[] | null;
-  nowIso?: string | null;
-}): WeddingVendorContactWorkspaceCard[] {
-  return (input.vendors ?? [])
-    .map((vendor, index): WeddingVendorContactWorkspaceCard => {
-      const state = buildWeddingOutreachEscalationStateFromVendorContact({
-        metadata: input.metadata,
-        vendor,
-        now: input.nowIso,
-      });
-      const contact = vendor.userContact ?? null;
-      const lastContactLabel = shortDateLabel(contact?.lastContactAt);
-      const followUpLabel = shortDateLabel(contact?.followUpDueAt);
-      const replyLabel = shortDateLabel(contact?.responseReceivedAt);
-      const categoryLabel = clean(vendor.category) || "Vendor";
-      const vendorName = clean(vendor.vendorName) || state.vendorLabel;
-      const metadataLabels = [
-        categoryLabel,
-        contact?.contactMethod ? contact.contactMethod.replace(/_/g, " ") : null,
-        lastContactLabel ? `last contacted ${lastContactLabel}` : null,
-        followUpLabel && state.stage !== "closed" ? `follow-up ${followUpLabel}` : null,
-        replyLabel ? `reply ${replyLabel}` : null,
-        contact?.threadId ? `thread ${contact.threadId}` : null,
-      ].filter((label): label is string => Boolean(label)).slice(0, 5);
-
-      return {
-        id: clean(vendor.vendorId) || `vendor-contact:${index}:${vendorName.toLowerCase()}`,
-        vendorId: clean(vendor.vendorId) || null,
-        vendorName,
-        categoryLabel,
-        statusLabel: state.stageLabel,
-        stage: state.stage,
-        tone: vendorContactTone(state.stage),
-        detailLabel: state.decisionPrompt,
-        nextActionLabel: state.options[0]?.label ?? "Review vendor",
-        primaryActionLabel: vendorContactPrimaryActionLabel(state.stage),
-        actionMode: state.stage === "closed"
-          ? "reply_recorded"
-          : state.stage === "waiting_for_reply"
-            ? "waiting"
-            : "follow_up",
-        lastContactLabel,
-        followUpDueLabel: followUpLabel,
-        replyLabel,
-        metadataLabels,
-      };
-    })
-    .sort((left, right) => {
-      const rank: Record<WeddingVendorContactWorkspaceCard["tone"], number> = {
-        urgent: 0,
-        due: 1,
-        neutral: 2,
-        waiting: 3,
-        closed: 4,
-      };
-      return rank[left.tone] - rank[right.tone] || left.vendorName.localeCompare(right.vendorName);
-    })
-    .slice(0, 8);
-}
-
-function expectedBehaviorAuditCard(input: {
-  artifacts: readonly WeddingArtifactInput[];
-  artifactSummaries: readonly WeddingArtifactSummary[];
-  contextItems?: readonly WeddingNeedToKnowProjectionContext[] | null;
-  approvalReceipts?: readonly WeddingPersistedApprovalReceipt[] | null;
-  decisionRecords?: readonly WeddingPersistedDecisionRecord[] | null;
-  scheduleItems: readonly WeddingPlanningScheduleItem[];
-  taskItems: readonly WeddingPlanningTaskItem[];
-  secondOrderLoopCards: readonly WeddingSecondOrderLoopCard[];
-}): WeddingExpectedBehaviorAuditCard {
-  const artifactBodies = input.artifacts.map((artifact) => clean(artifact.bodyText).toLowerCase()).join("\n");
-  const artifactTitles = input.artifactSummaries.map((artifact) => artifact.title.toLowerCase()).join("\n");
-  const artifactKinds = new Set(input.artifactSummaries.map((artifact) => artifact.kind));
-  const externalReceipts = (input.approvalReceipts ?? []).filter((receipt) => receipt.externalProviderRequired);
-  const providerExecutorsReady = externalReceipts.length > 0 && externalReceipts.every((receipt) =>
-    receipt.providerExecutorConnected && receipt.providerExecutorStatus === "available"
-  );
-  const hasLifecycleTask = input.taskItems.some((task) =>
-    ["rsvp", "seating", "vendor_coordination", "contract_review"].includes(task.kind)
-  );
-  const hasFinalPhase = artifactKinds.has("timeline") || input.taskItems.some((task) =>
-    ["run_sheet", "weather_contingency"].includes(task.kind)
-  );
-  const hasLegal = artifactKinds.has("legal") || input.taskItems.some((task) =>
-    task.kind === "legal" || task.kind === "document_checklist"
-  );
-  const hasVendorPlanning = artifactKinds.has("vendor_table")
-    || input.artifactSummaries.some((artifact) => artifact.vendorLabels.length > 0)
-    || /vendor|photographer|venue|celebrant|caterer|florist|band|dj/.test(artifactBodies);
-  const hasWeather = input.secondOrderLoopCards.some((card) => card.id === "second_order:weather_backup")
-    || input.taskItems.some((task) => task.kind === "weather_contingency");
-  const hasDayOfExecutionEvidence = /day-of|day of|real-time|real time|live update|vendor delay|no-show|lost item|transport/i.test(artifactBodies);
-  const hasGuestMessagingEvidence = /e2ee|guest-safe|guest safe|live update|lost item|transport/i.test(artifactBodies);
-  const hasPaymentVerificationEvidence = /payment receipt|receipt evidence|payment verification|final payment confirmed/i.test(artifactBodies);
-  const hasPostWeddingWrapUp = /post-wedding|post wedding|thank-you|thank you/i.test(`${artifactTitles}\n${artifactBodies}`)
-    || input.taskItems.some((task) => /thank-you|thank you|post-wedding|post wedding/i.test(`${task.title} ${task.notes ?? ""}`));
-  const hasPostWeddingFeedbackCollection = /vendor feedback|rate your experience|rating|private feedback/i.test(artifactBodies)
-    || input.taskItems.some((task) => task.kind === "vendor_follow_up" && /feedback|rating|review/i.test(`${task.title} ${task.notes ?? ""}`));
-  const hasPostWeddingKeepsakeExport = /keepsake|digital scrapbook|secure pdf|wedding log/i.test(`${artifactTitles}\n${artifactBodies}`)
-    || input.artifactSummaries.some((artifact) =>
-      artifact.exportTargets.includes("browser_pdf") && artifact.exportTargets.includes("bundle_planned")
-    );
-  const audit = buildWeddingExpectedBehaviorAuditState({
-    hasPlanningContext: Boolean(input.contextItems?.length),
-    hasDecisionProjection: Boolean((input.decisionRecords ?? []).length || input.scheduleItems.length || input.taskItems.length),
-    hasNeedToKnowProbing: Boolean(input.contextItems?.length),
-    hasVendorChecklist: hasVendorPlanning,
-    hasVendorSearchPlanning: hasVendorPlanning,
-    vendorSearchProviderReady: input.artifactSummaries.some((artifact) => artifact.kind === "vendor_table" && artifact.sourceLinks.length > 0),
-    approvalUiReady: externalReceipts.length > 0,
-    providerExecutorsReady,
-    hasLegalAdministration: hasLegal,
-    hasAustralianLegalSetup: hasLegal && /australian|noim|attorney-general|marriage\.ag\.gov/.test(`${artifactTitles}\n${artifactBodies}`),
-    hasFinalPhaseCoordination: hasFinalPhase,
-    hasLifecycleManagement: hasLifecycleTask,
-    weatherProviderReady: hasWeather && input.artifactSummaries.some((artifact) =>
-      artifact.sourceLabels.some((label) => /weather|bom|forecast/i.test(label))
-      || artifact.sourceLinks.some((source) => /weather|bom|forecast/i.test(`${source.label} ${source.url}`))
-    ),
-    rsvpProviderReady: input.artifactSummaries.some((artifact) => artifact.kind === "guest_list" && artifact.sourceLinks.length > 0),
-    seatingCanvasReady: artifactBodies.includes("seating chart") || input.taskItems.some((task) => task.kind === "seating"),
-    liveRunSheetExecutionReady: hasDayOfExecutionEvidence && providerExecutorsReady,
-    guestMessagingProviderReady: hasGuestMessagingEvidence && providerExecutorsReady,
-    paymentVerificationProviderReady: hasPaymentVerificationEvidence,
-    hasPostWeddingWrapUp,
-    hasPostWeddingFeedbackCollection,
-    hasPostWeddingKeepsakeExport,
-  });
-  const readyItems = audit.items.filter((item) => item.status === "in_place");
-  const blockedItems = audit.items.filter((item) => item.status !== "in_place");
-  const suggestedTaskItems = buildWeddingExpectedBehaviorTaskItems({
-    metadata: input.artifacts[0]?.metadata,
-    blockedItems,
-    existingTaskItems: input.taskItems,
-  });
-  return {
-    id: "expected-behaviour-audit",
-    title: "Automation health check",
-    statusLabel: blockedItems.length === 0 ? "Ready" : "Needs setup",
-    detailLabel: blockedItems.length === 0
-      ? "Lifecycle, legal, vendor, outreach, RSVP, seating, and weather helpers have the details they need."
-      : "Some wedding helpers still need connected apps, dates, or clearer details before they can run safely.",
-    readyCountLabel: `${readyItems.length}/${audit.items.length} ready`,
-    blockerCountLabel: `${blockedItems.length} gap${blockedItems.length === 1 ? "" : "s"}`,
-    readyItems,
-    blockedItems,
-    suggestedTaskItems,
-    metadataLabels: audit.summaryLabels,
-    action: {
-      kind: "open_tasks",
-      label: "Review setup gaps",
-      enabled: blockedItems.length > 0,
-      reason: blockedItems.length > 0 ? null : "All expected wedding helpers have the details they need.",
-      metadata: {
-        expected_behavior_audit: {
-          ready_count: readyItems.length,
-          blocked_count: blockedItems.length,
-          suggested_task_count: suggestedTaskItems.length,
-          blocked_capabilities: blockedItems.map((item) => item.capability),
-          suggested_task_ids: suggestedTaskItems.map((task) => task.id),
-          suggested_task_titles: suggestedTaskItems.map((task) => task.title),
-          blocker_labels: audit.productionBlockerLabels.slice(0, 12),
-        },
-      },
-      contextLabels: blockedItems.map((item) => item.title).slice(0, 5),
-    },
-  };
-}
-
-function decisionRecordCards(records: readonly WeddingPersistedDecisionRecord[] | null | undefined): WeddingDecisionRecordCard[] {
-  return (records ?? []).slice(0, 6).map((record) => ({
-    id: record.id,
-    title: record.selectedOptionLabel,
-    statusLabel: "Decision scope saved",
-    detailLabel: record.selectedOptionDetail,
-    metadataLabels: [
-      decisionArtifactTitleForDisplay(record),
-      record.artifactKind.replace(/_/g, " "),
-      record.source ? `source: ${record.source}` : null,
-      ...(record.sourceProviderLabels ?? []).map((label) => `provider: ${label}`),
-      record.createdAt,
-      ...decisionMetadataLabelsForDisplay(record),
-    ].filter((label): label is string => Boolean(label)).slice(0, 6),
-    evidenceLabels: record.selectedOptionCells.slice(0, 4),
-  }));
-}
-
-function decisionActionMetadata(records: readonly WeddingPersistedDecisionRecord[] | null | undefined): Record<string, unknown> | undefined {
-  const scopes = (records ?? []).slice(0, 8).map((record) => ({
-    decision_id: record.id,
-    artifact_id: record.artifactId,
-    artifact_title: decisionArtifactTitleForDisplay(record),
-    artifact_kind: record.artifactKind,
-    selected_option_id: record.selectedOptionId,
-    selected_option_label: record.selectedOptionLabel,
-    selected_option_detail: record.selectedOptionDetail,
-    source_labels: decisionSourceLabelsForDisplay(record),
-    source_urls: decisionSourceUrlsForDisplay(record),
-    source_provider_labels: record.sourceProviderLabels ?? [],
-  }));
-  return scopes.length > 0 ? { decision_scopes: scopes } : undefined;
-}
-
-function decisionContextLabels(records: readonly WeddingPersistedDecisionRecord[] | null | undefined): string[] {
-  return (records ?? [])
-    .slice(0, 6)
-    .map((record) => `Selected ${record.artifactKind.replace(/_/g, " ")}: ${record.selectedOptionLabel}`);
-}
-
-function decisionBundleScopes(records: readonly WeddingPersistedDecisionRecord[] | null | undefined) {
-  return (records ?? []).slice(0, 8).map((record) => ({
-    title: record.selectedOptionLabel,
-    detail: record.selectedOptionDetail,
-    artifactTitle: decisionArtifactTitleForDisplay(record),
-    metadataLabels: [
-      record.artifactKind.replace(/_/g, " "),
-      record.source ? `source: ${record.source}` : null,
-      ...(record.sourceProviderLabels ?? []).map((label) => `provider: ${label}`),
-      record.createdAt,
-      ...decisionMetadataLabelsForDisplay(record),
-    ].filter((label): label is string => Boolean(label)),
-    sourceLabels: decisionSourceLabelsForDisplay(record),
-    sourceUrls: decisionSourceUrlsForDisplay(record),
-    sourceProviderLabels: record.sourceProviderLabels ?? [],
-  }));
-}
-
-function approvalForArtifact(
-  artifact: WeddingArtifactSummary,
-  decisionRecords?: readonly WeddingPersistedDecisionRecord[] | null,
-): WeddingApprovalRequestState | null {
-  if (artifact.approvalState !== "pending_user_approval") return null;
-  const decisionScopes = (decisionRecords ?? [])
-    .filter((record) => record.artifactId === artifact.id)
-    .slice(0, 4)
-    .map((record) => ({
-      title: record.selectedOptionLabel,
-      detail: record.selectedOptionDetail,
-      artifactId: record.artifactId,
-      artifactTitle: decisionArtifactTitleForDisplay(record),
-    }));
-  return buildWeddingApprovalRequestState({
-    actionKind: artifact.kind === "email_draft" ? "send_email" : "share_artifact",
-    title: `Approve ${artifactTitleForDisplay(artifact)}`,
-    metadata: artifact.metadata,
-    artifacts: [artifact],
-    decisionScopes,
-  });
-}
-
-function bodyTextForArtifact(artifact: WeddingArtifactSummary, inputs: readonly WeddingArtifactInput[]): string | null {
-  const match = inputs.find((input) => clean(input.id) === artifact.id);
-  return clean(match?.bodyText) || null;
-}
-
-function uniqueLabels(labels: readonly string[]): string[] {
-  return Array.from(new Set(labels.map(clean).filter(Boolean)));
-}
-
-function isImportedPrivateDecisionLabel(value: string): boolean {
-  return /^wedding_import(?:$|:)/i.test(value)
-    || /original upload/i.test(value)
-    || /\b(?:csv|tsv|excel|xlsx?|ods) import:/i.test(value)
-    || /\bsource:\s*[^,]+\.(?:csv|tsv|xlsx?|ods)\b/i.test(value)
-    || /\b[^,\s]+\.(?:csv|tsv|xlsx?|ods)\b/i.test(value);
-}
-
-function isImportedPrivateDecision(record: WeddingPersistedDecisionRecord): boolean {
-  return [
-    record.artifactId,
-    record.artifactTitle,
-    ...(record.sourceLabels ?? []),
-    ...(record.metadataLabels ?? []),
-  ].map(clean).some(isImportedPrivateDecisionLabel);
-}
-
-function decisionArtifactTitleForDisplay(record: WeddingPersistedDecisionRecord): string {
-  return isImportedPrivateDecision(record) ? "Imported private planning file" : record.artifactTitle;
-}
-
-function decisionSourceLabelsForDisplay(record: WeddingPersistedDecisionRecord): string[] {
-  const labels = uniqueLabels(record.sourceLabels ?? []);
-  if (!isImportedPrivateDecision(record)) return labels;
-  return labels.length > 0 ? ["Imported private planning file"] : [];
-}
-
-function decisionSourceUrlsForDisplay(record: WeddingPersistedDecisionRecord): string[] {
-  const sourceUrls = usableSourceUrls(record.sourceUrls);
-  if (!isImportedPrivateDecision(record)) return sourceUrls;
-  return sourceUrls.filter((url) => !privateImportSourceUrl(url));
-}
-
-function decisionMetadataLabelsForDisplay(record: WeddingPersistedDecisionRecord): string[] {
-  const labels = uniqueLabels(record.metadataLabels ?? []);
-  if (!isImportedPrivateDecision(record)) return labels;
-  return labels.filter((label) => !isImportedPrivateDecisionLabel(label));
-}
-
-function isImportedPrivateArtifact(artifact: WeddingArtifactSummary): boolean {
-  return artifact.metadata.supertags.some((tag) => /^wedding_import(?:$|:)/i.test(tag))
-    || artifact.id.startsWith("wedding_import:")
-    || artifact.sourceLabels.some((label) => (
-      /^wedding_import(?:$|:)/i.test(label)
-      || /original upload/i.test(label)
-      || /\b(?:csv|tsv|excel|xlsx?|ods) import:/i.test(label)
-      || /\bsource:\s*[^,]+\.(?:csv|tsv|xlsx?|ods)\b/i.test(label)
-    ));
-}
-
-function sourceLabelsForDisplay(artifact: WeddingArtifactSummary): string[] {
-  const sourceLabels = uniqueLabels(artifact.sourceLabels);
-  if (!isImportedPrivateArtifact(artifact)) return sourceLabels;
-  return sourceLabels.length > 0 ? ["Imported private planning file"] : [];
-}
-
-function sourceLinksForDisplay(artifact: WeddingArtifactSummary): WeddingArtifactSourceLink[] {
-  return isImportedPrivateArtifact(artifact) ? [] : artifact.sourceLinks;
-}
-
-function artifactTitleForDisplay(artifact: WeddingArtifactSummary): string {
-  return isImportedPrivateArtifact(artifact) ? "Imported private planning file" : artifact.title;
-}
-
-function evidenceSummaryForArtifact(artifact: WeddingArtifactSummary): WeddingArtifactEvidenceSummary {
-  const sourceLabels = sourceLabelsForDisplay(artifact);
-  const sourceLinks = sourceLinksForDisplay(artifact);
-  const sourceLinkLabels = uniqueLabels(sourceLinks.map((source) => source.label));
-  const sourceCount = uniqueLabels(artifact.sourceLabels).length + artifact.sourceLinks.length;
-  const evidenceStatus = weddingArtifactEvidenceStatus(artifact);
-  const statusLabel = evidenceStatus === "source_linked"
-    ? "Links included"
-    : evidenceStatus === "source_labelled" ? "Sources named" : "Needs a fact check";
-  const warningLabel = evidenceStatus === "source_linked"
-    ? null
-    : evidenceStatus === "source_labelled"
-      ? "Check prices, availability, legal details, and vendor claims before using this."
-      : "This is a planning draft. Confirm the facts before you rely on it.";
-  const labels = uniqueLabels([
-    ...sourceLinkLabels.map((label) => `Link: ${label}`),
-    ...sourceLabels.map((label) => `Source: ${label}`),
-    artifact.approvalState.replace(/_/g, " "),
-  ]).slice(0, 6);
-
-  return {
-    statusLabel,
-    sourceCountLabel: sourceCount === 0 ? "No sources listed yet" : `${sourceCount} source${sourceCount === 1 ? "" : "s"} listed`,
-    warningLabel,
-    labels,
-  };
-}
-
-function previewForArtifact(
-  artifact: WeddingArtifactSummary | null,
-  inputs: readonly WeddingArtifactInput[],
-  decisionRecords?: readonly WeddingPersistedDecisionRecord[] | null,
-): WeddingWorkspaceArtifactPreview | null {
-  if (!artifact) return null;
-  const exportManifest = buildWeddingArtifactExportManifest(artifact);
-  const bodyText = bodyTextForArtifact(artifact, inputs);
-  const approvalRequest = approvalForArtifact(artifact, decisionRecords);
-  return {
-    artifactId: artifact.id,
-    title: artifactTitleForDisplay(artifact),
-    kind: artifact.kind,
-    category: artifact.category,
-    approvalState: artifact.approvalState,
-    metadataLabels: exportManifest.metadataLabels,
-    sourceLabels: sourceLabelsForDisplay(artifact),
-    sourceLinks: sourceLinksForDisplay(artifact),
-    evidenceSummary: evidenceSummaryForArtifact(artifact),
-    bodyText,
-    preview: buildWeddingArtifactPreviewState({
-      artifactKind: artifact.kind,
-      bodyText,
-    }),
-    exportManifest,
-    approvalRequest,
-    integrationReadiness: buildWeddingIntegrationReadinessState(approvalRequest),
-    emptyBodyLabel: bodyText
-      ? "Planning document text is ready."
-      : "Preview text is still loading; summary details and actions are available now.",
-  };
-}
-
-function graphMetadataForRecommendation(recommendation: WeddingRecommendationExplanation): Record<string, unknown> {
-  return {
-    graph_context: {
-      recommendation_id: recommendation.id,
-      recommendation_kind: recommendation.kind,
-      recommendation_title: recommendation.title,
-      source_node_ids: recommendation.sourceNodeIds,
-      edge_ids: recommendation.edgeIds,
-      next_action_label: recommendation.nextActionLabel,
-    },
-  };
-}
-
-function recommendationCards(
-  recommendations: readonly WeddingRecommendationExplanation[],
-): WeddingWorkspaceRecommendationCard[] {
-  return recommendations.slice(0, 5).map((recommendation) => {
-    const nodeCount = recommendation.sourceNodeIds.length;
-    const edgeCount = recommendation.edgeIds.length;
-    return {
-      ...recommendation,
-      graphContextLabels: [
-        recommendation.kind.replace(/_/g, " "),
-        nodeCount > 0 ? `${nodeCount} related detail${nodeCount === 1 ? "" : "s"}` : "no related details yet",
-        edgeCount > 0 ? `${edgeCount} connection${edgeCount === 1 ? "" : "s"}` : "no connections yet",
-      ],
-      graphAction: {
-        kind: "open_graph",
-        label: "Show related details",
-        enabled: true,
-        reason: null,
-        metadata: graphMetadataForRecommendation(recommendation),
-        contextLabels: [recommendation.evidenceLabel, recommendation.nextActionLabel],
-      },
-    };
-  });
-}
-
 function decisionProjectionItems(
   artifacts: readonly WeddingArtifactInput[],
   experienceModel?: Pick<WeddingExperienceModelState, "traits"> | null,
@@ -902,19 +432,19 @@ function decisionProjectionItems(
       bodyText,
     });
     if (!preview || preview.kind !== "table") return [];
-    const selectedOptionId = loadWeddingDecisionSelection(artifactId, storage);
-    if (!selectedOptionId) return [];
+    const selectedOptionIds = loadWeddingDecisionSelections(artifactId, storage);
+    if (selectedOptionIds.length === 0) return [];
     const decision = buildWeddingDecisionSelectionState({
       artifactId,
       artifactKind,
       table: preview,
-      selectedOptionId,
+      selectedOptionIds,
       preferenceText: bodyText,
       experienceModel,
     });
-    if (!decision.selectedOption) return [];
-    return [{
-      id: `wedding_decision:${artifactId}:${decision.selectedOption.id}`,
+    if (decision.selectedOptions.length === 0) return [];
+    return decision.selectedOptions.map((selectedOption) => ({
+      id: `wedding_decision:${artifactId}:${selectedOption.id}`,
       metadata: artifact.metadata,
       artifactId,
       artifactTitle,
@@ -927,77 +457,10 @@ function decisionProjectionItems(
       sourceCountsByProvider: (artifact.metadata as Record<string, unknown>).sourceCountsByProvider && typeof (artifact.metadata as Record<string, unknown>).sourceCountsByProvider === "object"
         ? (artifact.metadata as Record<string, unknown>).sourceCountsByProvider as Record<string, unknown>
         : null,
-      selectedOption: decision.selectedOption,
+      selectedOption,
       source: "local_selection",
-    }];
+    }));
   });
-}
-
-function sidebarActions(input: {
-  workspace: WeddingResponseWorkspaceState;
-  preview: WeddingWorkspaceArtifactPreview | null;
-  recommendations: readonly WeddingWorkspaceRecommendationCard[];
-  decisionRecords?: readonly WeddingPersistedDecisionRecord[] | null;
-}): WeddingWorkspaceSidebarAction[] {
-  const primaryRecommendation = input.recommendations[0] ?? null;
-  const decisionMetadata = decisionActionMetadata(input.decisionRecords);
-  const selectedDecisionLabels = decisionContextLabels(input.decisionRecords);
-  return [
-    {
-      kind: "continue_chat",
-      label: "Ask planner about this",
-      enabled: true,
-      reason: "Continues with this wedding plan and the selected document.",
-      metadata: decisionMetadata,
-      contextLabels: selectedDecisionLabels,
-    },
-    {
-      kind: "open_graph",
-      label: "Show related details",
-      enabled: input.recommendations.length > 0,
-      reason: input.recommendations.length > 0 ? null : "Related details are not available yet.",
-      metadata: {
-        ...(primaryRecommendation ? graphMetadataForRecommendation(primaryRecommendation) : {}),
-        ...(decisionMetadata ?? {}),
-      },
-      contextLabels: [
-        ...(primaryRecommendation?.graphContextLabels ?? []),
-        ...selectedDecisionLabels,
-      ],
-    },
-    {
-      kind: "open_calendar",
-      label: "Open wedding calendar",
-      enabled: input.workspace.results.some((artifact) => artifact.linkedCalendarEventIds.length > 0),
-      reason: "Add or select a document with a wedding date first.",
-      metadata: decisionMetadata,
-      contextLabels: selectedDecisionLabels,
-    },
-    {
-      kind: "open_tasks",
-      label: "Open wedding tasks",
-      enabled: input.workspace.results.some((artifact) => artifact.linkedTaskIds.length > 0),
-      reason: "Add or select a document with a wedding task first.",
-      metadata: decisionMetadata,
-      contextLabels: selectedDecisionLabels,
-    },
-    {
-      kind: "export_bundle",
-      label: "Download wedding plan",
-      enabled: input.workspace.totalArtifacts > 0,
-      reason: input.workspace.totalArtifacts > 0 ? null : "No wedding documents exist yet.",
-      metadata: decisionMetadata,
-      contextLabels: selectedDecisionLabels,
-    },
-    {
-      kind: "approve_action",
-      label: "Review before sending",
-      enabled: Boolean(input.preview?.approvalRequest),
-      reason: input.preview?.approvalRequest ? null : "This document does not need approval before it is used.",
-      metadata: decisionMetadata,
-      contextLabels: selectedDecisionLabels,
-    },
-  ];
 }
 
 export type WeddingResponseWorkspaceViewInput = WeddingWorkspaceProductionReadinessInput & {
@@ -1027,10 +490,38 @@ export type WeddingResponseWorkspaceViewInput = WeddingWorkspaceProductionReadin
   scheduleItems?: readonly WeddingPlanningScheduleItem[] | null;
   taskItems?: readonly WeddingPlanningTaskItem[] | null;
   weddingVendors?: readonly WeddingVendorContactOutreachVendor[] | null;
+  afpMessages?: readonly AfpMessage[] | null;
   weddingImportBinaryParserReady?: boolean | null;
+  templateDeepLinkLaunch?: WeddingTemplateDeepLinkLaunchState | null;
+  templateLaunch?: WeddingTemplateLaunchState | null;
+  hasTemplateLaunch?: boolean | null;
+  hasPersistedWorkspaceContent?: boolean | null;
+  followUpRequested?: boolean | null;
+  templateLaunchProofRef?: string | null;
+  templateLaunchProofReferencePolicy?: "optional" | "required" | null;
   nowIso?: string | null;
   projectionStorage?: Storage | null;
 };
+
+function derivedTemplateLaunchReadiness(input: WeddingResponseWorkspaceViewInput) {
+  if (input.productionReadinessEvidence?.templateLaunchReadiness) {
+    return input.productionReadinessEvidence.templateLaunchReadiness;
+  }
+  if (!input.templateDeepLinkLaunch && !input.templateLaunch && input.hasTemplateLaunch !== true) return null;
+  const hasPersistedWorkspaceContent = input.hasPersistedWorkspaceContent
+    ?? Boolean((input.artifacts ?? []).length || (input.generatedArtifacts ?? []).length);
+  return buildWeddingTemplateProductionReadinessState({
+    deepLinkLaunch: input.templateDeepLinkLaunch,
+    templateLaunch: input.templateLaunch,
+    firstRunIntakeVisible: shouldShowWeddingFirstRunIntake({
+      hasTemplateLaunch: input.hasTemplateLaunch ?? Boolean(input.templateDeepLinkLaunch || input.templateLaunch),
+      hasPersistedWorkspaceContent,
+      followUpRequested: input.followUpRequested === true,
+    }),
+    proofReferencePolicy: input.templateLaunchProofReferencePolicy,
+    proofRef: input.templateLaunchProofRef,
+  });
+}
 
 export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWorkspaceViewInput): WeddingResponseWorkspaceViewState {
   const artifacts = input.artifacts ?? [];
@@ -1075,6 +566,16 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     ],
   });
   const activePreview = previewForArtifact(workspace.activeArtifact, artifacts, input.decisionRecords);
+  const artifactPreviews = workspace.results
+    .map((artifact) => previewForArtifact(artifact, artifacts, input.decisionRecords))
+    .filter((preview): preview is WeddingWorkspaceArtifactPreview => preview !== null);
+  const vendorQuoteReplyFlows = vendorQuoteReplyFlowsFromPreviews({
+    previews: artifactPreviews,
+    metadata: input.metadata ?? artifacts[0]?.metadata,
+    approvalReceipts: input.approvalReceipts,
+  });
+  const activeVendorQuoteReplyFlows = vendorQuoteReplyFlows.filter((flow) => flow.stage !== "sent");
+  const vendorQuoteReplyLogFlows = vendorQuoteReplyFlows.filter((flow) => flow.stage === "sent");
   const decisionScopes = decisionBundleScopes(input.decisionRecords);
   const packetExportCapability = buildWeddingPacketExportCapabilityState({
     title: "Wedding planning bundle",
@@ -1083,9 +584,14 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
   const inspiration = buildWeddingInspirationState(input.inspirationItems);
   const experienceModel = buildWeddingExperienceModelState(inspiration);
   const decisions = decisionProjectionItems(artifacts, experienceModel, input.projectionStorage);
+  const closedVendorLineItemIds = closedVendorPursuitLineItemIds(taskItems);
+  const activeDecisions = decisions.filter((decision) => !closedVendorLineItemIds.has(clean(decision.id)));
+  const activeDecisionRecords = (input.decisionRecords ?? []).filter((decision) =>
+    !closedVendorLineItemIds.has(clean(decision.id))
+  );
   const budgetTracking = buildWeddingBudgetTrackingState({
-    decisionRecords: input.decisionRecords,
-    selectedDecisionItems: decisions,
+    decisionRecords: activeDecisionRecords,
+    selectedDecisionItems: activeDecisions,
     artifacts,
   });
   const persistedBoundaryObjects = input.boundaryObjects ?? null;
@@ -1167,16 +673,19 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     productionReadinessEvidence,
     productionGoNoGoPacket,
     productionReadiness,
+    productionRemainingWork,
     oracleUpdatePlan,
   } = buildWeddingResponseWorkspaceProductionReadinessState({
     ...input,
     productionReadinessEvidence: {
       ...(input.productionReadinessEvidence ?? {}),
       importParserReadiness,
+      templateLaunchReadiness: derivedTemplateLaunchReadiness(input),
     },
   });
   const projectionTaskItems = buildWeddingWorkspaceGeneratedTaskItems({
     artifacts,
+    selectedDecisionItems: activeDecisions,
     baseTaskItems: taskItems,
     loopTaskItems,
     budgetTracking,
@@ -1189,21 +698,29 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     preparationTaskItems,
     auditTaskItems: auditCard.suggestedTaskItems,
     oracleUpdatePlan,
+    productionRemainingWork,
     approvalReceipts: input.approvalReceipts,
     weddingVendors: input.weddingVendors,
     now: input.nowIso,
     metadata: input.metadata ?? artifacts[0]?.metadata,
   });
-  const userFacingProjectionTaskItems = projectionTaskItems.filter(isUserFacingWeddingPlanningTask);
+  const activeProjectionTaskItems = projectionTaskItems.filter((task) => !isClosedVendorPursuitTask(task));
+  const userFacingProjectionTaskItems = activeProjectionTaskItems.filter(isUserFacingWeddingPlanningTask);
+  const vendorPursuitLogTaskItems = projectionTaskItems.filter(isClosedVendorPursuitTask);
+  const vendorPursuitLogCards = buildWeddingVendorPursuitLogCards(vendorPursuitLogTaskItems);
   const personalOsProjection = buildWeddingPersonalOsProjectionState({
     taskItems: userFacingProjectionTaskItems,
     scheduleItems: projectionScheduleItems,
-    decisionItems: decisions,
+    decisionItems: activeDecisions,
     approvalReceipts: input.approvalReceipts,
     decisionDeferrals: input.decisionDeferrals,
     now: input.nowIso ? new Date(input.nowIso) : null,
     limit: 40,
   });
+  const resilience = buildWeddingResilienceDisplayState(buildWeddingResilienceLedgerState({
+    messages: input.afpMessages,
+    responseWorkspaceId: workspace.metadata.responseWorkspaceId,
+  }));
   const decisionFocus = {
     summaryLabel: personalOsProjection.decisionLoadRelief.summaryLabel,
     backlogCount: personalOsProjection.decisionLoadRelief.backlogCount,
@@ -1263,10 +780,10 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
   });
   const projectionQueue = buildWeddingResponseWorkspaceProjectionQueueState({
     contextItems: input.contextItems,
-    decisionItems: decisions,
+    decisionItems: activeDecisions,
     artifacts: generatedArtifacts,
     scheduleItems: projectionScheduleItems,
-    taskItems: projectionTaskItems,
+    taskItems: activeProjectionTaskItems,
     collaborationInvites: collaboration.invites,
     collaborationMetadata: input.metadata ?? artifacts[0]?.metadata,
     boundaryObjects,
@@ -1299,6 +816,9 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
       vendors: input.weddingVendors,
       nowIso: input.nowIso,
     }),
+    vendorQuoteReplyFlows,
+    activeVendorQuoteReplyFlows,
+    vendorQuoteReplyLogFlows,
     providerHandoffAuditCard: buildWeddingProviderHandoffAuditCard(input.approvalReceipts),
     expectedBehaviorAuditCard: auditCard,
     decisionRecordCards: decisionRecordCards(input.decisionRecords),
@@ -1317,6 +837,8 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     boundaryState,
     boundaryTopology,
     planningTaskItems: userFacingProjectionTaskItems,
+    vendorPursuitLogTaskItems,
+    vendorPursuitLogCards,
     helperContactNames,
     recommendationCards: cards,
     secondOrderLoopCards: loopCards,
@@ -1326,8 +848,10 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     productionReadinessEvidence,
     productionGoNoGoPacket,
     productionReadiness,
+    productionRemainingWork,
     oracleUpdatePlan,
     personalOsProjection,
+    resilience,
     projectionQueue,
     sidebarActions: sidebarActions({
       workspace,

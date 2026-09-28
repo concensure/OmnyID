@@ -36,6 +36,8 @@ const PROVIDERS: readonly {
     connectedAppId: "brave-search-api",
     label: "Brave Search",
     keyNames: [
+      "OMNYID_ADMIN_BRAVE_SEARCH_API_KEY",
+      "OMNYID_ADMIN_BRAVE_SEARCH_API_KEY_FILE",
       "OMNYID_BRAVE_SEARCH_API_KEY",
       "OMNYID_BRAVE_SEARCH_API_KEY_FILE",
       "BRAVE_SEARCH_API_KEY",
@@ -51,6 +53,8 @@ const PROVIDERS: readonly {
     connectedAppId: "google-places-api",
     label: "Google Places API",
     keyNames: [
+      "OMNYID_ADMIN_GOOGLE_PLACES_API_KEY",
+      "OMNYID_ADMIN_GOOGLE_PLACES_API_KEY_FILE",
       "OMNYID_GOOGLE_PLACES_API_KEY",
       "OMNYID_GOOGLE_PLACES_API_KEY_FILE",
       "GOOGLE_PLACES_API_KEY",

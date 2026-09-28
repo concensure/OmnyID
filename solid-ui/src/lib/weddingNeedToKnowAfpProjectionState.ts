@@ -6,6 +6,7 @@ import {
   safeWeddingLabel,
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
+import { weddingSemanticObjectFromNeedToKnowContext } from "@/lib/weddingSemanticUiState";
 
 export const WEDDING_NEED_TO_KNOW_AFP_PROJECTIONS_KEY = "omnyid.wedding-need-to-know-afp-projections";
 
@@ -63,6 +64,7 @@ function markdownFor(context: WeddingNeedToKnowProjectionContext): string {
     `- Location: ${clean(planning.location) ?? "Unknown"}`,
     `- Guest count: ${clean(planning.guestCount) ?? "Unknown"}`,
     `- Budget comfort: ${clean(planning.budgetComfort) ?? "Unknown"}`,
+    `- Couple: ${clean(planning.familyOrStakeholderRoles) ?? "Unknown"}`,
     `- Top priorities: ${planning.topPriorities?.length ? planning.topPriorities.join(", ") : "Unknown"}`,
     `- NOIM status: ${clean(planning.noimDownloaded) ?? "Unknown"}`,
     `- Celebrant path: ${clean(planning.celebrantPath) ?? "Unknown"}`,
@@ -95,6 +97,12 @@ export function weddingNeedToKnowContextToAfpMessage(
   const metadata = normalizeWeddingPlanningMetadata(context.metadata);
   const id = contextId(metadata);
   const markdown = markdownFor({ ...context, metadata });
+  const semanticObject = weddingSemanticObjectFromNeedToKnowContext({
+    id,
+    readyForFirstRecommendations: context.readyForFirstRecommendations,
+    answeredLabels: context.answeredLabels,
+    nextQuestionLabel: context.nextQuestionLabel,
+  });
   const searchableTerms = uniqueStrings([
     id,
     "wedding planning",
@@ -109,6 +117,7 @@ export function weddingNeedToKnowContextToAfpMessage(
     clean(context.planningContext.location),
     clean(context.planningContext.guestCount),
     clean(context.planningContext.budgetComfort),
+    clean(context.planningContext.familyOrStakeholderRoles),
     ...(context.planningContext.topPriorities ?? []),
     clean(context.planningContext.noimDownloaded),
     clean(context.planningContext.celebrantPath),
@@ -131,6 +140,7 @@ export function weddingNeedToKnowContextToAfpMessage(
       answered_labels: context.answeredLabels,
       next_question_label: context.nextQuestionLabel,
       ready_for_first_recommendations: context.readyForFirstRecommendations,
+      semantic_object: semanticObject,
       planning_context: context.planningContext as Record<string, unknown>,
       wedding_plan_id: metadata.weddingPlanId,
       response_workspace_id: metadata.responseWorkspaceId,
@@ -145,6 +155,9 @@ export function weddingNeedToKnowContextToAfpMessage(
       source_response_id: metadata.sourceResponseId,
       context_id: id,
       ready_for_first_recommendations: context.readyForFirstRecommendations,
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticObject.semanticTags,
+      semantic_object: semanticObject,
       searchable_terms: searchableTerms,
     },
     views: [{
@@ -154,6 +167,7 @@ export function weddingNeedToKnowContextToAfpMessage(
         context_id: id,
         title: "Wedding Need-To-Know answers",
         markdown,
+        semantic_object: semanticObject,
       },
     }],
     attachments: [],

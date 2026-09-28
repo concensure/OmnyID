@@ -1,9 +1,14 @@
 // @locs-version: 2.0
 import type { WeddingArtifactKind } from "@/lib/weddingPlanningTemplateState";
+import {
+  buildWeddingComparisonColumns,
+  type WeddingComparisonColumnState,
+} from "@/lib/weddingComparisonColumnState";
 
 export type WeddingArtifactTablePreview = {
   kind: "table";
   headers: string[];
+  columns?: WeddingComparisonColumnState[];
   rows: string[][];
   rowCountLabel: string;
   budgetSummary?: WeddingArtifactBudgetSummary | null;
@@ -59,6 +64,19 @@ export type WeddingArtifactGuestPreview = {
   privacyLabel: string;
 };
 
+export type WeddingArtifactQuotePreview = {
+  kind: "quote";
+  vendorName: string;
+  amount: number | null;
+  amountLabel: string;
+  currency: string;
+  budgetDeltaAmount: number | null;
+  budgetDeltaLabel: string | null;
+  inclusions: string[];
+  validUntil: string | null;
+  attachmentUrl: string | null;
+};
+
 export type WeddingArtifactPreviewState =
   | WeddingArtifactTablePreview
   | WeddingArtifactEmailPreview
@@ -66,7 +84,8 @@ export type WeddingArtifactPreviewState =
   | WeddingArtifactLegalPreview
   | WeddingArtifactTimelinePreview
   | WeddingArtifactMapPreview
-  | WeddingArtifactGuestPreview;
+  | WeddingArtifactGuestPreview
+  | WeddingArtifactQuotePreview;
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -106,6 +125,7 @@ function parseMarkdownTable(body: string): WeddingArtifactTablePreview | null {
     return {
       kind: "table",
       headers,
+      columns: buildWeddingComparisonColumns(headers),
       rows,
       rowCountLabel: `${rows.length} row${rows.length === 1 ? "" : "s"}`,
     };
@@ -303,6 +323,57 @@ function parseEmailPreview(body: string): WeddingArtifactEmailPreview | null {
   };
 }
 
+function labeledValue(body: string, labels: readonly string[]): string {
+  const labelPattern = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  return clean(body.match(new RegExp(`^(?:${labelPattern})\\s*:\\s*(.+)$`, "im"))?.[1]);
+}
+
+function numericMoney(value: string): number | null {
+  const match = value.match(/-?\d[\d,]*(?:\.\d+)?/);
+  if (!match) return null;
+  const amount = Number(match[0].replace(/,/g, ""));
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function currencyFrom(value: string): string {
+  if (/\b(usd|us\$)\b/i.test(value)) return "USD";
+  if (/\b(gbp)\b|£/i.test(value)) return "GBP";
+  if (/\b(eur)\b|€/i.test(value)) return "EUR";
+  if (/\b(aud|a\$)\b|\$/i.test(value)) return "AUD";
+  return "AUD";
+}
+
+function urlFrom(value: string): string | null {
+  const candidate = clean(value.match(/https?:\/\/[^\s)]+/i)?.[0]);
+  try {
+    return candidate ? new URL(candidate).toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
+  const vendorName = labeledValue(body, ["Vendor", "Supplier", "Venue", "Quote from"]);
+  const amountLabel = labeledValue(body, ["Quote amount", "Quoted amount", "Total quote", "Total", "Amount"]);
+  if (!vendorName || !amountLabel || !/\bquote|quoted|total|amount|invoice|proposal\b/i.test(body)) return null;
+  const budgetDeltaLabel = labeledValue(body, ["Budget delta", "Budget impact", "Over budget", "Difference"]);
+  const inclusionLines = sectionLines(body, "Inclusions", 8);
+  const validUntil = labeledValue(body, ["Valid until", "Quote valid until", "Expires"]);
+  const attachmentRaw = labeledValue(body, ["Attachment", "Original PDF", "Quote PDF", "Source"]);
+  return {
+    kind: "quote",
+    vendorName,
+    amount: numericMoney(amountLabel),
+    amountLabel,
+    currency: currencyFrom(`${amountLabel} ${body}`),
+    budgetDeltaAmount: budgetDeltaLabel ? numericMoney(budgetDeltaLabel) : null,
+    budgetDeltaLabel: budgetDeltaLabel || null,
+    inclusions: inclusionLines,
+    validUntil: validUntil || null,
+    attachmentUrl: urlFrom(attachmentRaw),
+  };
+}
+
 function legalPreview(body: string): WeddingArtifactLegalPreview {
   const statusLines = sectionLines(body, "Current status", 6);
   const guidanceCards = ["How", "When", "Where", "Cost questions", "Sources to verify"]
@@ -394,6 +465,10 @@ export function buildWeddingArtifactPreviewState(input: {
 }): WeddingArtifactPreviewState | null {
   const body = clean(input.bodyText);
   if (!body) return null;
+  const quote = parseQuotePreview(body);
+  if (quote && (input.artifactKind === "vendor_table" || input.artifactKind === "budget_sheet" || input.artifactKind === "research")) {
+    return quote;
+  }
   if (input.artifactKind === "legal") return legalPreview(body);
   if (input.artifactKind === "timeline") return timelinePreview(body);
   if (input.artifactKind === "map_collection") return mapPreview(body);

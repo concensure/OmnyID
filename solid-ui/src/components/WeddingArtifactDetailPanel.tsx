@@ -1,17 +1,25 @@
 // @locs-version: 2.0
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
+import { AttachmentsRenderer } from "@/components/renderers/AttachmentsRenderer";
 import { WeddingApprovalPreviewPanel } from "@/components/WeddingApprovalPreviewPanel";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
+import {
+  buildWeddingComparisonColumns,
+  type WeddingComparisonColumnState,
+} from "@/lib/weddingComparisonColumnState";
 import type { WeddingExportManifestEntry } from "@/lib/weddingExportState";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingArtifactPreviewState } from "@/lib/weddingArtifactPreviewState";
+import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
+import { weddingQuoteAttachmentMessageState } from "@/lib/weddingQuoteAttachmentMessageState";
 import type { ViewName } from "@/lib/viewNames";
+import { buildWeddingVendorComparisonUiState } from "@/lib/weddingVendorComparisonUiState";
 import {
   buildWeddingDecisionSelectionState,
-  loadWeddingDecisionSelection,
-  toggleWeddingDecisionSelection,
+  loadWeddingDecisionSelections,
+  toggleWeddingDecisionSelectionValue,
 } from "@/lib/weddingDecisionSelectionState";
 
 function approvalTagClass(state: string): string {
@@ -45,27 +53,53 @@ function userFacingHighlight(line: string): { heading: string; detail: string | 
   };
 }
 
+function comparisonHeaderClass(column: WeddingComparisonColumnState): string {
+  if (column.tone === "money") return "px-3 py-2 font-semibold text-emerald-950";
+  if (column.tone === "match") return "px-3 py-2 font-semibold text-teal-950";
+  if (column.tone === "available") return "px-3 py-2 font-semibold text-sky-950";
+  if (column.tone === "risk") return "px-3 py-2 font-semibold text-red-700";
+  if (column.tone === "action") return "px-3 py-2 font-semibold text-indigo-950";
+  return "px-3 py-2 font-semibold text-teal-950";
+}
+
+function comparisonCellClass(column: WeddingComparisonColumnState, value: string): string {
+  const base = "max-w-[12rem] break-words px-3 py-2 align-top";
+  if (column.tone === "money") return `${base} font-semibold text-emerald-950`;
+  if (column.tone === "match") return `${base} text-teal-950`;
+  if (column.tone === "available") return `${base} text-sky-950`;
+  if (column.tone === "action") return `${base} font-semibold text-indigo-950`;
+  if (column.tone === "risk") {
+    return /\b(none|clear|low|ok|okay|no issue)\b/i.test(value)
+      ? `${base} text-slate-700`
+      : `${base} font-semibold text-red-700`;
+  }
+  return `${base} text-teal-950/80`;
+}
+
 function ArtifactPreviewCard(props: {
   artifact: WeddingWorkspaceArtifactPreview;
   preview: WeddingArtifactPreviewState;
+  onOpenFollowUpQueue?: () => void;
 }) {
   const preview = props.preview;
-  const [selectedOptionId, setSelectedOptionId] = createSignal<string | null>(null);
+  const [selectedOptionIds, setSelectedOptionIds] = createSignal<string[]>([]);
+  const [comparisonExpanded, setComparisonExpanded] = createSignal(false);
 
   createEffect(() => {
-    setSelectedOptionId(loadWeddingDecisionSelection(props.artifact.artifactId));
+    setSelectedOptionIds(loadWeddingDecisionSelections(props.artifact.artifactId));
+    setComparisonExpanded(false);
   });
 
   const decisionState = createMemo(() => buildWeddingDecisionSelectionState({
     artifactId: props.artifact.artifactId,
     artifactKind: props.artifact.kind,
     table: preview.kind === "table" ? preview : null,
-    selectedOptionId: selectedOptionId(),
+    selectedOptionIds: selectedOptionIds(),
     preferenceText: props.artifact.bodyText,
   }));
 
   function toggleOption(optionId: string): void {
-    setSelectedOptionId(toggleWeddingDecisionSelection(props.artifact.artifactId, optionId));
+    setSelectedOptionIds(toggleWeddingDecisionSelectionValue(props.artifact.artifactId, optionId));
   }
 
   if (preview.kind === "email") {
@@ -84,7 +118,67 @@ function ArtifactPreviewCard(props: {
     );
   }
 
+  if (preview.kind === "quote") {
+    const attachmentMessage = createMemo(() => weddingQuoteAttachmentMessageState({
+      quote: preview,
+      threadId: props.artifact.artifactId,
+    }));
+    return (
+      <div class="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/75 p-4">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold text-emerald-950">Vendor quote</p>
+            <h4 class="mt-1 break-words text-lg font-semibold text-emerald-950">{preview.vendorName}</h4>
+          </div>
+          <span class="max-w-full break-words rounded-full bg-white/85 px-3 py-1 text-sm font-semibold text-emerald-950">
+            {preview.amountLabel}
+          </span>
+        </div>
+        <div class="mt-3 grid gap-2 text-sm text-emerald-950 sm:grid-cols-3">
+          <div class="rounded-xl border border-emerald-100 bg-white/80 p-3">
+            <p class="text-xs font-semibold uppercase text-emerald-800/70">Budget impact</p>
+            <p class="mt-1 break-words font-semibold">{preview.budgetDeltaLabel ?? "Not measured yet"}</p>
+          </div>
+          <div class="rounded-xl border border-emerald-100 bg-white/80 p-3">
+            <p class="text-xs font-semibold uppercase text-emerald-800/70">Valid until</p>
+            <p class="mt-1 break-words font-semibold">{preview.validUntil ?? "Not stated"}</p>
+          </div>
+          <div class="rounded-xl border border-emerald-100 bg-white/80 p-3">
+            <p class="text-xs font-semibold uppercase text-emerald-800/70">Currency</p>
+            <p class="mt-1 break-words font-semibold">{preview.currency}</p>
+          </div>
+        </div>
+        <Show when={preview.inclusions.length > 0}>
+          <div class="mt-3 rounded-xl border border-emerald-100 bg-white/80 p-3">
+            <p class="text-sm font-semibold text-emerald-950">Included</p>
+            <ul class="mt-2 space-y-1">
+              <For each={preview.inclusions}>
+                {(item) => <li class="break-words text-sm leading-6 text-emerald-900/75">{item}</li>}
+              </For>
+            </ul>
+          </div>
+        </Show>
+        <Show when={attachmentMessage()}>
+          {(message) => (
+            <div class="mt-3 rounded-xl border border-emerald-100 bg-white/80 p-3">
+              <p class="mb-2 text-sm font-semibold text-emerald-950">Original file</p>
+              <AttachmentsRenderer message={message()} />
+            </div>
+          )}
+        </Show>
+      </div>
+    );
+  }
+
   if (preview.kind === "table") {
+    const comparisonColumns = createMemo(() => preview.columns ?? buildWeddingComparisonColumns(preview.headers));
+    const comparisonUi = createMemo(() => buildWeddingVendorComparisonUiState({
+      decision: decisionState(),
+      headers: preview.headers,
+      comparisonHandoffAvailable: Boolean(props.artifact.vendorComparisonHandoff),
+      expanded: comparisonExpanded(),
+    }));
+    const rowActionFor = (optionId: string) => comparisonUi().rowActions.find((action) => action.optionId === optionId) ?? null;
     return (
       <div class="min-w-0 rounded-2xl border border-teal-100 bg-teal-50/75 p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -107,6 +201,30 @@ function ArtifactPreviewCard(props: {
               </For>
             </div>
           </div>
+        </Show>
+        <Show when={props.artifact.vendorComparisonHandoff}>
+          {(handoff) => (
+            <div class="mt-3 rounded-xl border border-teal-100 bg-white/80 p-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-sm font-semibold text-teal-950">Recommendation</p>
+                <span class="rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-900">
+                  {handoff().confidenceLabel}
+                </span>
+              </div>
+              <p class="mt-1 break-words text-sm leading-6 text-teal-900/80">
+                {handoff().recommendationLabel}
+              </p>
+              <div class="mt-2 rounded-lg bg-teal-50/70 p-2">
+                <p class="text-xs font-semibold uppercase text-teal-800/60">Why</p>
+                <ul class="mt-1 space-y-1">
+                  <For each={handoff().whyLabels.slice(0, 5)}>
+                    {(label) => <li class="break-words text-xs leading-5 text-teal-900/75">{label}</li>}
+                  </For>
+                </ul>
+              </div>
+              <p class="mt-2 text-xs font-semibold text-teal-950">{handoff().nextActionLabel}</p>
+            </div>
+          )}
         </Show>
         <Show when={preview.budgetSummary}>
           {(summary) => (
@@ -142,16 +260,26 @@ function ArtifactPreviewCard(props: {
                   <Show when={decisionState().eligible && decisionState().options.length > 1}>
                     <th class="px-3 py-2 font-semibold">Pick</th>
                   </Show>
-                  <For each={preview.headers}>
-                    {(header) => <th class="px-3 py-2 font-semibold">{header}</th>}
+                  <For each={comparisonColumns()}>
+                    {(column) => (
+                      <th class={comparisonHeaderClass(column)}>
+                        <span>{column.label}</span>
+                        <Show when={column.label !== column.header}>
+                          <span class="ml-1 font-normal text-teal-900/50">({column.header})</span>
+                        </Show>
+                      </th>
+                    )}
                   </For>
                   <Show when={decisionState().eligible && decisionState().options.some((option) => option.preferenceFitLabels.length + option.tradeoffLabels.length > 0)}>
                     <th class="px-3 py-2 font-semibold">Preference fit</th>
                   </Show>
+                  <Show when={decisionState().eligible && decisionState().options.length > 1}>
+                    <th class="px-3 py-2 font-semibold">Actions</th>
+                  </Show>
                 </tr>
               </thead>
               <tbody>
-                <For each={decisionState().eligible ? decisionState().visibleOptions : preview.rows.slice(0, 8).map((row, rowIndex) => ({
+                <For each={decisionState().eligible ? comparisonUi().visibleOptions : preview.rows.slice(0, 8).map((row, rowIndex) => ({
                   id: String(rowIndex),
                   rowIndex,
                   label: row[0] ?? `Row ${rowIndex + 1}`,
@@ -180,7 +308,15 @@ function ArtifactPreviewCard(props: {
                         </td>
                       </Show>
                       <For each={option.cells}>
-                        {(cell) => <td class="max-w-[12rem] break-words px-3 py-2 align-top text-teal-950/80">{cell}</td>}
+                        {(cell, cellIndex) => {
+                          const column = () => comparisonColumns()[cellIndex()] ?? {
+                            header: "",
+                            kind: "text" as const,
+                            label: "Detail",
+                            tone: "status" as const,
+                          };
+                          return <td class={comparisonCellClass(column(), cell)}>{cell}</td>;
+                        }}
                       </For>
                       <Show when={decisionState().eligible && option.preferenceFitLabels.length + option.tradeoffLabels.length > 0}>
                         <td class="max-w-[14rem] break-words px-3 py-2 align-top">
@@ -197,11 +333,78 @@ function ArtifactPreviewCard(props: {
                           </div>
                         </td>
                       </Show>
+                      <Show when={comparisonUi().dynamic}>
+                        <td class="min-w-[10rem] px-3 py-2 align-top">
+                          <Show when={rowActionFor(option.id)}>
+                            {(action) => (
+                              <div class="flex flex-col gap-1.5">
+                                <Show when={action().sourceUrl}>
+                                  {(sourceUrl) => (
+                                    <a
+                                      class="inline-flex justify-center rounded-full border border-teal-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-teal-950 transition hover:bg-teal-50"
+                                      href={sourceUrl()}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      aria-label={action().sourceLabel ?? undefined}
+                                    >
+                                      Open source
+                                    </a>
+                                  )}
+                                </Show>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleOption(option.id)}
+                                  aria-label={action().selectAriaLabel}
+                                  class={`rounded-full px-2.5 py-1.5 text-xs font-semibold transition ${action().selected ? "bg-teal-900 text-white hover:bg-teal-800" : "border border-teal-200 bg-teal-50 text-teal-950 hover:bg-teal-100"}`}
+                                >
+                                  {action().selectLabel}
+                                </button>
+                              </div>
+                            )}
+                          </Show>
+                        </td>
+                      </Show>
                     </tr>
                   )}
                 </For>
               </tbody>
             </table>
+          </div>
+        </Show>
+        <Show when={comparisonUi().expansion.hiddenCount > 0}>
+          <div class="mt-3 rounded-xl border border-teal-100 bg-white/80 p-3">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-xs leading-5 text-teal-900/75">
+                {comparisonUi().expansion.summaryLabel}
+              </p>
+              <button
+                type="button"
+                class="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-950 transition hover:bg-teal-100"
+                onClick={() => setComparisonExpanded(true)}
+              >
+                {comparisonUi().expansion.actionLabel}
+              </button>
+            </div>
+          </div>
+        </Show>
+        <Show when={comparisonUi().dynamic}>
+          <div class="mt-3 flex flex-col gap-2 rounded-xl border border-teal-100 bg-white/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-teal-950">
+                {comparisonUi().footer.summaryLabel}
+              </p>
+              <p class="mt-1 text-xs leading-5 text-teal-900/70">
+                {comparisonUi().footer.consequenceLabel}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={!comparisonUi().footer.enabled}
+              onClick={() => props.onOpenFollowUpQueue?.()}
+              class="rounded-full bg-teal-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+            >
+              {comparisonUi().footer.actionLabel}
+            </button>
           </div>
         </Show>
         <Show when={decisionState().collapsedOptionCount > 0}>
@@ -364,6 +567,10 @@ function ArtifactPreviewCard(props: {
   );
 }
 
+function usesDedicatedVendorQuoteReplyFlow(preview: WeddingWorkspaceArtifactPreview): boolean {
+  return preview.preview?.kind === "quote";
+}
+
 export function WeddingArtifactDetailPanel(props: {
   preview: WeddingWorkspaceArtifactPreview | null;
   exportNotice: string | null;
@@ -376,6 +583,9 @@ export function WeddingArtifactDetailPanel(props: {
   onApprove: (request: WeddingApprovalRequestState) => void;
   onExecute: (request: WeddingApprovalRequestState) => void;
   onProviderSetup?: (view: ViewName) => void;
+  onResearch?: (action: WeddingWorkspaceSidebarAction) => void;
+  onOpenFollowUpQueue?: () => void;
+  researchAction?: WeddingWorkspaceSidebarAction | null;
 }) {
   const [showDocumentDetails, setShowDocumentDetails] = createSignal(false);
   createEffect(() => {
@@ -411,6 +621,19 @@ export function WeddingArtifactDetailPanel(props: {
                 >
                   {showDocumentDetails() ? "Hide details" : "Details"}
                 </button>
+                <Show when={props.researchAction}>
+                  {(action) => (
+                    <button
+                      type="button"
+                      disabled={!action().enabled}
+                      title={action().reason ?? "Ask OmnyID to research this document further."}
+                      class="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+                      onClick={() => props.onResearch?.(action())}
+                    >
+                      {action().label}
+                    </button>
+                  )}
+                </Show>
               </div>
             </div>
             <Show when={showDocumentDetails()}>
@@ -475,7 +698,13 @@ export function WeddingArtifactDetailPanel(props: {
               {(body) => (
                 <div class="mt-4 space-y-3">
                   <Show when={preview().preview}>
-                    {(previewState) => <ArtifactPreviewCard artifact={preview()} preview={previewState()} />}
+                    {(previewState) => (
+                      <ArtifactPreviewCard
+                        artifact={preview()}
+                        preview={previewState()}
+                        onOpenFollowUpQueue={props.onOpenFollowUpQueue}
+                      />
+                    )}
                   </Show>
                   <details class="rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 text-slate-800">
                     <summary class="cursor-pointer text-sm font-semibold text-slate-950">Show full document text</summary>
@@ -509,16 +738,18 @@ export function WeddingArtifactDetailPanel(props: {
               <Show when={props.exportNotice}>
                 {(notice) => <p class="text-xs text-sky-900/70">{notice()}</p>}
               </Show>
-              <WeddingApprovalPreviewPanel
-                preview={preview()}
-                approvalRunning={props.approvalRunning}
-                approvalReceipt={props.approvalReceipt}
-                approvalReceiptSaveNotice={props.approvalReceiptSaveNotice}
-                approvedRequest={props.approvedRequest}
-                onApprove={props.onApprove}
-                onExecute={props.onExecute}
-                onProviderSetup={props.onProviderSetup}
-              />
+              <Show when={!usesDedicatedVendorQuoteReplyFlow(preview())}>
+                <WeddingApprovalPreviewPanel
+                  preview={preview()}
+                  approvalRunning={props.approvalRunning}
+                  approvalReceipt={props.approvalReceipt}
+                  approvalReceiptSaveNotice={props.approvalReceiptSaveNotice}
+                  approvedRequest={props.approvedRequest}
+                  onApprove={props.onApprove}
+                  onExecute={props.onExecute}
+                  onProviderSetup={props.onProviderSetup}
+                />
+              </Show>
             </div>
           </div>
         )}

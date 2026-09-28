@@ -16,6 +16,15 @@ export type WeddingRecommendationDraftReadinessInput = {
   prioritiesCsv?: string | null;
 };
 
+export type WeddingResearchPromptActionInput = {
+  source: "documents" | "artifact_detail";
+  title?: string | null;
+  artifactId?: string | null;
+  artifactKind?: string | null;
+  query?: string | null;
+  state?: WeddingResponseWorkspaceViewState | null;
+};
+
 function clean(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
@@ -85,6 +94,44 @@ export function buildWeddingRecommendationGenerationAction(
       title,
       ...(nextQuestion ? [nextQuestion] : []),
       ...(evidenceLabel ? [evidenceLabel] : []),
+    ],
+  };
+}
+
+export function buildWeddingResearchPromptAction(
+  input: WeddingResearchPromptActionInput,
+): WeddingWorkspaceSidebarAction {
+  const title = clean(input.title) ?? "Wedding research";
+  const query = clean(input.query);
+  const artifactKind = clean(input.artifactKind);
+  const artifactId = clean(input.artifactId);
+  const locationLabel = input.state?.workspace.artifacts
+    .flatMap((artifact) => artifact.locationLabels)
+    .map((label) => clean(label))
+    .find((label): label is string => label !== null) ?? null;
+  return {
+    kind: "continue_chat",
+    label: input.source === "artifact_detail" ? "Research this further" : "Ask for research",
+    enabled: true,
+    reason: null,
+    metadata: {
+      wedding_research_prompt: {
+        version: 1,
+        source: input.source,
+        title,
+        artifact_id: artifactId,
+        artifact_kind: artifactKind,
+        requested_output: "research_brief",
+        query,
+        location: locationLabel,
+      },
+    },
+    contextLabels: [
+      input.source === "artifact_detail" ? "Research this further" : "Ask for research",
+      title,
+      ...(query ? [query] : []),
+      ...(artifactKind ? [artifactKind] : []),
+      ...(locationLabel ? [locationLabel] : []),
     ],
   };
 }

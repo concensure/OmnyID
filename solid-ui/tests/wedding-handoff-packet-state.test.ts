@@ -4,6 +4,7 @@ import test from "node:test";
 import { buildWeddingHandoffPacketState } from "../src/lib/weddingHandoffPacketState.ts";
 import { buildWeddingResponseWorkspaceViewState } from "../src/lib/weddingResponseWorkspaceViewState.ts";
 import type { WeddingArtifactInput } from "../src/lib/weddingArtifactState.ts";
+import { WEDDING_PRODUCTION_LABEL_MAX_LENGTH } from "../src/lib/weddingProductionLabelState.ts";
 
 const metadata = {
   wedding_plan_id: "wedding_plan:handoff",
@@ -92,8 +93,8 @@ test("buildWeddingHandoffPacketState summarizes workspace counts without artifac
   assert.ok(packet.labels.includes("1 selected decision scope"));
   assert.ok(packet.labels.some((label) => /decision focus item/i.test(label)));
   assert.ok(packet.labels.includes("decision providers: google_places"));
-  assert.ok(packet.labels.includes("1 source-linked file"));
-  assert.ok(packet.labels.includes("no source-unverified files"));
+  assert.ok(packet.labels.includes("1 file with web links"));
+  assert.ok(packet.labels.includes("no files needing a fact check"));
   assert.equal(JSON.stringify(packet).includes("Private body"), false);
 });
 
@@ -127,12 +128,12 @@ test("buildWeddingHandoffPacketState carries source verification counts without 
   assert.equal(packet.sourceLinkedCount, 1);
   assert.equal(packet.sourceLabelledCount, 1);
   assert.equal(packet.sourceUnverifiedCount, 1);
-  assert.ok(packet.labels.includes("1 source-linked file"));
-  assert.ok(packet.labels.includes("1 source-unverified file"));
+  assert.ok(packet.labels.includes("1 file with web links"));
+  assert.ok(packet.labels.includes("1 file needing a fact check"));
   assert.equal(JSON.stringify(packet).includes("Vendor page"), false);
 });
 
-test("buildWeddingHandoffPacketState flags imported files for handoff review even when inferred as research", () => {
+test("buildWeddingHandoffPacketState flags imported files for sharing review even when inferred as research", () => {
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,
     artifacts: [
@@ -163,7 +164,7 @@ test("buildWeddingHandoffPacketState flags imported files for handoff review eve
   assert.equal(packet.importedHandoffReviewCount, 1);
   assert.equal(packet.exportExcludedSensitiveCount, 1);
   assert.ok(packet.labels.includes("1 imported private planning file in workspace"));
-  assert.ok(packet.labels.includes("1 imported file requires handoff review"));
+  assert.ok(packet.labels.includes("1 imported file needs review before sharing"));
   assert.equal(JSON.stringify(packet).includes("private negotiation limits"), false);
   assert.equal(JSON.stringify(packet).includes("The Knot export"), false);
 });
@@ -195,4 +196,50 @@ test("buildWeddingHandoffPacketState includes projection readiness counts", () =
   assert.ok(packet.projectionPendingCount > 2);
   assert.equal(packet.projectionBlockedCount, 0);
   assert.equal(packet.projectionSentCount, 0);
+});
+
+test("buildWeddingHandoffPacketState bounds noisy handoff labels", () => {
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    artifacts: [
+      artifact({
+        title: `Venue research ${"with a very long decision focus title ".repeat(40)}`,
+        kind: "research",
+        createdAt: 1,
+        sourceLinks: [{ label: "Venue source", url: "https://example.com/venue" }],
+      }),
+    ],
+    decisionRecords: [{
+      id: "wedding_decision:venue:noisy-provider",
+      artifactId: "artifact:venue-research",
+      artifactTitle: "Venue research",
+      artifactKind: "research",
+      selectedOptionId: "row-1",
+      selectedOptionLabel: "Harbour Hall",
+      selectedOptionDetail: "Selected venue.",
+      selectedOptionCells: ["Harbour Hall"],
+      sourceProviderLabels: [
+        `  google_places ${"verified ".repeat(80)}  `,
+        `google_places ${"verified ".repeat(80)}`,
+      ],
+      createdAt: "2026-09-12T00:00:00.000Z",
+      source: "local_selection",
+      metadataLabels: [],
+    }],
+  });
+
+  const packet = buildWeddingHandoffPacketState({
+    ...state,
+    workspace: {
+      ...state.workspace,
+      summaryLabel: `  Wedding workspace ${"handoff ".repeat(80)}  `,
+    },
+  });
+
+  assert.ok(packet.summaryLabel.length <= WEDDING_PRODUCTION_LABEL_MAX_LENGTH);
+  assert.ok(packet.summaryLabel.endsWith("..."));
+  assert.ok(packet.labels.every((label) => label.length <= WEDDING_PRODUCTION_LABEL_MAX_LENGTH));
+  assert.ok(packet.decisionFocusLabels.every((label) => label.length <= WEDDING_PRODUCTION_LABEL_MAX_LENGTH));
+  assert.ok(packet.decisionSourceProviderLabels.every((label) => label.length <= WEDDING_PRODUCTION_LABEL_MAX_LENGTH));
+  assert.equal(packet.decisionSourceProviderLabels.length, 1);
 });

@@ -40,6 +40,7 @@ export type WeddingApprovalRequestInput = {
   shareScope?: WeddingPrivacyScope | null;
   externalProvider?: string | null;
   proposedMessage?: string | null;
+  delivery?: WeddingApprovalDeliveryPayload | null;
   decisionScopes?: readonly {
     title: string;
     detail?: string | null;
@@ -47,6 +48,17 @@ export type WeddingApprovalRequestInput = {
     artifactTitle?: string | null;
   }[] | null;
   userApproved?: boolean | null;
+};
+
+export type WeddingApprovalDeliveryPayload = {
+  channel: "email";
+  to: string[];
+  subject: string;
+  text: string;
+  html?: string | null;
+  threadId?: string | null;
+  inReplyTo?: string | null;
+  references?: string[];
 };
 
 export type WeddingApprovalRequestState = {
@@ -61,6 +73,7 @@ export type WeddingApprovalRequestState = {
   blockKind: WeddingApprovalBlockKind | null;
   shareScope: WeddingPrivacyScope;
   recipients: string[];
+  delivery: WeddingApprovalDeliveryPayload | null;
   disclosureLines: string[];
   riskLabels: string[];
   artifactIds: string[];
@@ -93,6 +106,25 @@ export type WeddingApprovalReceiptState = {
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function deliveryPayload(input: WeddingApprovalDeliveryPayload | null | undefined): WeddingApprovalDeliveryPayload | null {
+  if (!input || input.channel !== "email") return null;
+  const to = uniqueStrings(input.to);
+  const subject = clean(input.subject);
+  const text = clean(input.text);
+  const html = clean(input.html);
+  if (to.length === 0 || !subject || !text) return null;
+  return {
+    channel: "email",
+    to,
+    subject,
+    text,
+    html: html || null,
+    threadId: clean(input.threadId) || null,
+    inReplyTo: clean(input.inReplyTo) || null,
+    references: uniqueStrings(input.references ?? []),
+  };
 }
 
 function uniqueStrings(values: readonly unknown[], limit = 40): string[] {
@@ -267,6 +299,7 @@ export function buildWeddingApprovalRequestState(input: WeddingApprovalRequestIn
   const decisionScopes = input.decisionScopes ?? [];
   const shareScope = defaultScope(input.actionKind, input.shareScope);
   const recipients = uniqueStrings(input.recipients ?? []);
+  const delivery = deliveryPayload(input.delivery);
   const riskLabels = riskLabelsFor({
     actionKind: input.actionKind,
     artifacts,
@@ -324,6 +357,7 @@ export function buildWeddingApprovalRequestState(input: WeddingApprovalRequestIn
             : "Explicit user approval is required before this wedding action can run.",
     shareScope,
     recipients,
+    delivery,
     disclosureLines,
     riskLabels,
     artifactIds: artifacts.map((artifact) => artifact.id),
@@ -355,6 +389,7 @@ export function buildWeddingApprovalReceiptState(
       artifact_ids: request.artifactIds,
       schedule_item_ids: request.scheduleItemIds,
       task_item_ids: request.taskItemIds,
+      delivery: request.delivery,
       blocked_reason: request.blockedReason,
       block_kind: request.blockKind,
     },

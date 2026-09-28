@@ -200,10 +200,17 @@ test("weddingSeatingOptimizationResultToAfpMessage emits ledger, topology tags, 
   assert.ok(message.supertags?.includes("decisionos:wedding_seating"));
   assert.ok(message.references?.some((reference) => reference.type === "seats_person_at_table" && reference.target === "grandma-chen"));
   assert.equal(message.metadata?.e2ee_required, true);
+  assert.equal(message.metadata?.semantic_kind, "wedding_comparison");
+  assert.equal(message.content.semantic_object.kind, "wedding_comparison");
+  assert.equal(message.content.semantic_object.comparison.title, "Seating draft");
+  assert.ok(message.content.semantic_tags.includes("wedding_seating_optimization"));
   assert.equal(message.views[0]?.format, "a2ui");
+  assert.equal(message.views[0]?.content.semantic_object.kind, "wedding_comparison");
   assert.equal(Array.isArray(message.content.assignments), true);
   const restored = weddingSeatingOptimizationResultFromAfpMessage(message);
   assert.equal(restored?.assignments.length, result.assignments.length);
   assert.equal(restored?.assignments.find((assignment) => assignment.personId === "grandma-chen")?.personLabel, "Grandma Chen");
   assert.deepEqual(restored?.explanationLabels, result.explanationLabels);
+  assert.equal(restored?.semanticKind, "wedding_comparison");
+  assert.equal(restored?.semanticObject?.comparison?.columns[0]?.label, "Table");
 });

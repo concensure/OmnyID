@@ -4,6 +4,8 @@ use crate::db::{Db, UserExternalToolUsageEventInsert, UserExternalToolUsageEvent
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WeddingSharedToolProvider {
+    BraveSearch,
+    GooglePlaces,
     GoogleMapsPlatform,
     WeatherApi,
     TwilioMessaging,
@@ -13,6 +15,7 @@ pub enum WeddingSharedToolProvider {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WeddingSharedToolFeature {
+    VendorDiscovery,
     MapsTravel,
     WeatherContingency,
     SmsReminder,
@@ -46,6 +49,22 @@ struct WeddingSharedToolDescriptor {
 
 fn provider_descriptor(provider: WeddingSharedToolProvider) -> WeddingSharedToolDescriptor {
     match provider {
+        WeddingSharedToolProvider::BraveSearch => WeddingSharedToolDescriptor {
+            tool_slug: "brave-search-api",
+            tool_name: "Brave Search API",
+            provider_key: "brave-search-api",
+            provider_category: "search_api",
+            billing_category: "vendor_discovery",
+            default_usage_unit: "requests",
+        },
+        WeddingSharedToolProvider::GooglePlaces => WeddingSharedToolDescriptor {
+            tool_slug: "google-places-api",
+            tool_name: "Google Places API",
+            provider_key: "google-places-api",
+            provider_category: "places",
+            billing_category: "vendor_discovery",
+            default_usage_unit: "requests",
+        },
         WeddingSharedToolProvider::GoogleMapsPlatform => WeddingSharedToolDescriptor {
             tool_slug: "google-maps-platform",
             tool_name: "Google Maps Platform",
@@ -91,6 +110,7 @@ fn provider_descriptor(provider: WeddingSharedToolProvider) -> WeddingSharedTool
 
 fn feature_label(feature: WeddingSharedToolFeature) -> &'static str {
     match feature {
+        WeddingSharedToolFeature::VendorDiscovery => "vendor_discovery",
         WeddingSharedToolFeature::MapsTravel => "maps_travel",
         WeddingSharedToolFeature::WeatherContingency => "weather_contingency",
         WeddingSharedToolFeature::SmsReminder => "sms_reminder",
@@ -172,7 +192,7 @@ pub fn wedding_shared_tool_usage_event(
         quantity: input.quantity,
         estimated_cost_usd: input.estimated_cost_usd,
         currency: Some("USD".to_string()),
-        source: Some("wedding_planner_shared_tool".to_string()),
+        source: Some("wedding_shared_tool_usage_event".to_string()),
         occurred_at: clean_optional_rfc3339(input.occurred_at, "occurred_at")?,
         metadata_json: Some(Value::Object(metadata)),
     })
@@ -213,7 +233,10 @@ mod tests {
         assert_eq!(event.provider_category, "maps");
         assert_eq!(event.billing_category, "maps_travel");
         assert_eq!(event.usage_unit, "requests");
-        assert_eq!(event.source.as_deref(), Some("wedding_planner_shared_tool"));
+        assert_eq!(
+            event.source.as_deref(),
+            Some("wedding_shared_tool_usage_event")
+        );
         assert_eq!(
             event.metadata_json.as_ref().unwrap()["template_scope"],
             "wedding_planner"

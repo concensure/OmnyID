@@ -114,6 +114,9 @@ test("provider approval executor adapter fails live success without durable rece
         sendEmail: () => ({
           ok: true,
           message: "Email accepted.",
+          metadata: {
+            external_delivery_performed: true,
+          },
         }),
       },
     }),
@@ -123,7 +126,8 @@ test("provider approval executor adapter fails live success without durable rece
   assert.equal(result.receipt.status, "blocked");
   assert.equal(result.externalId, null);
   assert.equal(result.receipt.metadata.provider_executor_mode, "live");
-  assert.equal(result.receipt.metadata.external_delivery_performed, true);
+  assert.equal(result.receipt.metadata.provider_result_ok, true);
+  assert.equal(result.receipt.metadata.external_delivery_performed, false);
   assert.equal(result.receipt.metadata.missing_durable_provider_receipt, true);
 });
 
@@ -174,8 +178,12 @@ test("provider approval executor adapter fails safely when live port is missing"
   assert.equal(result.canRetry, true);
   assert.equal(result.receipt.status, "blocked");
   assert.equal(result.receipt.metadata.provider_executor_mode, "live");
+  assert.equal(result.receipt.metadata.provider_executor_status, "missing");
+  assert.equal(result.receipt.metadata.provider_executor_connected, false);
+  assert.equal(result.receipt.metadata.provider_capability, "publish_registry");
   assert.equal(result.receipt.metadata.external_delivery_performed, false);
-  assert.match(String(result.receipt.metadata.blocked_reason), /not connected/i);
+  assert.equal(result.receipt.metadata.missing_provider_port, "publish_registry");
+  assert.match(String(result.receipt.metadata.blocked_reason), /connected app is not ready/i);
 });
 
 test("weddingProviderApprovalExecutorAvailability exposes live port coverage", () => {

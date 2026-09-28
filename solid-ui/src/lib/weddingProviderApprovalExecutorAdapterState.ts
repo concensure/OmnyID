@@ -39,6 +39,19 @@ function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function durableProviderReceiptId(result: WeddingApprovalExecutorResult): string | null {
+  const externalId = clean(result.externalId);
+  if (externalId) return externalId;
+  const metadata = result.metadata ?? {};
+  return clean(metadata.external_id)
+    || clean(metadata.provider_receipt_id)
+    || clean(metadata.provider_message_id)
+    || clean(metadata.provider_event_id)
+    || clean(metadata.provider_publish_id)
+    || clean(metadata.message_id)
+    || null;
+}
+
 function dryRunExternalId(request: WeddingApprovalRequestState): string {
   return [
     "omnyid",
@@ -73,10 +86,13 @@ function dryRunResult(
 function missingLivePortResult(actionKind: WeddingApprovalActionKind): WeddingApprovalExecutorResult {
   return {
     ok: false,
-    message: `Live provider executor is not connected for ${actionKind.replace(/_/g, " ")}.`,
+    message: `The connected app is not ready for ${actionKind.replace(/_/g, " ")}.`,
     metadata: {
       provider_executor_mode: "live",
+      provider_executor_status: "missing",
+      provider_executor_connected: false,
       provider_smoke_test_only: false,
+      provider_capability: actionKind,
       external_delivery_performed: false,
       missing_provider_port: actionKind,
     },
@@ -96,11 +112,12 @@ function handlerFor(input: {
     return {
       ...result,
       metadata: {
+        ...(result.metadata ?? {}),
         provider_executor_mode: "live",
         provider_label: input.providerLabel,
         provider_smoke_test_only: false,
-        external_delivery_performed: result.ok,
-        ...(result.metadata ?? {}),
+        provider_result_ok: result.ok,
+        external_delivery_performed: result.ok && Boolean(durableProviderReceiptId(result)),
       },
     };
   };

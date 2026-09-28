@@ -566,7 +566,13 @@ test("buildWeddingKnowledgeGraphState drops malformed selected decision source U
     selectedOptionDetail: "Selected waterfront venue.",
     selectedOptionCells: ["Harbour Hall", "Sydney Harbour"],
     sourceLabels: ["Mixed source"],
-    sourceUrls: ["javascript:alert(1)", "not-a-url", "https://example.com/venue"],
+    sourceUrls: [
+      "javascript:alert(1)",
+      "not-a-url",
+      "http://localhost:8787/venue",
+      "https://127.0.0.1/venue",
+      "https://example.com/venue",
+    ],
     sourceProviderLabels: ["manual_review"],
     createdAt: "2026-09-12T00:00:00.000Z",
     source: "local_selection",
@@ -578,7 +584,7 @@ test("buildWeddingKnowledgeGraphState drops malformed selected decision source U
       ...decisions[0]!,
       metadata: {
         ...decisions[0]!.metadata as Record<string, unknown>,
-        source_urls: ["javascript:alert(1)", "https://example.com/venue"],
+        source_urls: ["javascript:alert(1)", "http://localhost:8787/venue", "https://example.com/venue"],
       },
     }],
   });
@@ -586,6 +592,8 @@ test("buildWeddingKnowledgeGraphState drops malformed selected decision source U
 
   assert.deepEqual(decisions[0]?.metadata && (decisions[0].metadata as Record<string, unknown>).source_urls, ["https://example.com/venue"]);
   assert.deepEqual(selectedDecision?.metadata.source_urls, ["https://example.com/venue"]);
+  assert.equal(JSON.stringify(state).includes("localhost"), false);
+  assert.equal(JSON.stringify(state).includes("127.0.0.1"), false);
 });
 
 test("buildWeddingKnowledgeGraphState redacts imported persisted-decision graph metadata", () => {

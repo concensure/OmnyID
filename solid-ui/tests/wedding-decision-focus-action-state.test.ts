@@ -38,7 +38,7 @@ test("buildWeddingDecisionFocusSidebarAction routes task focus to Tasks with com
   const packet = action.metadata?.decision_focus as Record<string, unknown>;
   const focusItems = packet.focus_items as Array<Record<string, unknown>>;
   assert.equal(action.kind, "open_tasks");
-  assert.equal(action.label, "Open Tasks");
+  assert.equal(action.label, "Open task");
   assert.equal(action.enabled, true);
   assert.deepEqual(action.contextLabels, ["Verify venue balance before payment", "Decide final caterer headcount"]);
   assert.equal(packet.intent, "open_item");
@@ -47,6 +47,31 @@ test("buildWeddingDecisionFocusSidebarAction routes task focus to Tasks with com
   assert.equal(packet.top_source_surface, "tasks");
   assert.equal(focusItems[0]?.title, "Verify venue balance before payment");
   assert.deepEqual(focusItems[0]?.evidence_labels, ["payment review"]);
+});
+
+test("buildWeddingDecisionFocusSidebarAction opens linked vendor comparison artifacts", () => {
+  const action = buildWeddingDecisionFocusSidebarAction({
+    summaryLabel: "Focus on 1 wedding decision now; 0 can wait.",
+    backlogCount: 0,
+    focusItems: [
+      item({
+        title: "Choose preferred vendors from the top-three comparison",
+        sourceSurface: "tasks",
+        linkedArtifactId: "wedding_artifact:vendor_comparison_top3:workspace",
+        workspaceMenu: "documents",
+        evidenceLabels: ["top-three vendor comparison"],
+      }),
+    ],
+  });
+  const packet = action.metadata?.decision_focus as Record<string, unknown>;
+  const focusItems = packet.focus_items as Array<Record<string, unknown>>;
+
+  assert.equal(action.kind, "open_workspace_menu");
+  assert.equal(action.label, "Open comparison");
+  assert.equal(action.metadata?.wedding_workspace_menu, "documents");
+  assert.equal(action.metadata?.linked_artifact_id, "wedding_artifact:vendor_comparison_top3:workspace");
+  assert.equal(focusItems[0]?.linked_artifact_id, "wedding_artifact:vendor_comparison_top3:workspace");
+  assert.equal(focusItems[0]?.wedding_workspace_menu, "documents");
 });
 
 test("buildWeddingDecisionFocusSidebarAction can request explanation instead of opening", () => {
@@ -96,9 +121,9 @@ test("buildWeddingDecisionFocusSidebarAction routes calendar and decision focus 
   });
 
   assert.equal(calendarAction.kind, "open_calendar");
-  assert.equal(calendarAction.label, "Open Calendar");
+  assert.equal(calendarAction.label, "Open date");
   assert.equal(decisionAction.kind, "approve_action");
-  assert.equal(decisionAction.label, "Open Decision Queue");
+  assert.equal(decisionAction.label, "Choose option");
 });
 
 test("buildWeddingDecisionFocusSidebarAction disables empty focus packets without dropping metadata", () => {

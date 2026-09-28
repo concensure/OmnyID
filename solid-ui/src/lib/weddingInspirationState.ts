@@ -1,6 +1,11 @@
 // @locs-version: 1.0
 import type { AfpMessage, AfpReference, SendAfpMessageInput } from "@/lib/api";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
+import type {
+  WeddingSemanticUiKind,
+  WeddingSemanticUiObject,
+} from "@/lib/weddingSemanticUiState";
+import { weddingSemanticUiObjectFromUnknown } from "@/lib/weddingSemanticUiState";
 import {
   normalizeWeddingPlanningMetadata,
   safeWeddingLabel,
@@ -30,6 +35,9 @@ export type WeddingInspirationItem = {
   preferenceSignals: string[];
   ontologyLinks: Array<{ type: string; target: string; label: string }>;
   storageRef: string | null;
+  semanticKind?: WeddingSemanticUiKind | null;
+  semanticTags?: string[];
+  semanticObject?: WeddingSemanticUiObject | null;
 };
 
 export type WeddingInspirationInsight = {
@@ -181,14 +189,51 @@ function isOriginalFileBacked(item: WeddingInspirationItem): boolean {
   return item.kind === "image" || item.kind === "screenshot" || item.kind === "pdf" || item.kind === "voice_note";
 }
 
+function semanticObjectForInspirationItem(input: {
+  id: string;
+  title: string;
+  tags: readonly string[];
+  preferenceSignals: readonly string[];
+}): WeddingSemanticUiObject {
+  return {
+    id: `semantic:${input.id}`,
+    kind: "wedding_active_loop",
+    title: input.title,
+    stateLabel: "Preference evidence saved",
+    tone: "status",
+    summary: input.preferenceSignals.length > 0
+      ? input.preferenceSignals.slice(0, 3).join(", ")
+      : input.tags.slice(0, 3).join(", ") || "Inspiration saved for the wedding.",
+    actions: [{
+      label: "Open Inspiration",
+      kind: "open_wedding_menu",
+      enabled: true,
+      targetMenu: "inspiration",
+    }],
+    semanticTags: uniqueStrings([
+      "wedding_active_loop",
+      "wedding_inspiration",
+      "wedding_preference_evidence",
+      ...input.tags.map((tag) => `inspiration:${safeWeddingLabel(tag)}`),
+    ], 20),
+  };
+}
+
 export function buildWeddingInspirationItem(input: WeddingInspirationDraftInput): WeddingInspirationItem {
   const kind = inferKind(input);
   const createdAt = clean(input.createdAt) || new Date().toISOString();
   const title = clean(input.title) || clean(input.fileName) || (kind === "thought" ? "Wedding thought" : "Wedding inspiration");
   const tags = inferTags({ ...input, kind, title });
   const signals = uniqueStrings(tags.map((tag) => TAG_RULES.find((rule) => rule.tag === tag)?.signal ?? tag));
+  const id = `wedding_inspiration:${safeWeddingLabel([title, createdAt].join(":")).slice(0, 120)}`;
+  const semanticObject = semanticObjectForInspirationItem({
+    id,
+    title,
+    tags,
+    preferenceSignals: signals,
+  });
   return {
-    id: `wedding_inspiration:${safeWeddingLabel([title, createdAt].join(":")).slice(0, 120)}`,
+    id,
     title,
     kind,
     createdAt,
@@ -200,6 +245,9 @@ export function buildWeddingInspirationItem(input: WeddingInspirationDraftInput)
     preferenceSignals: signals,
     ontologyLinks: ontologyLinks(tags),
     storageRef: clean(input.storageRef) || null,
+    semanticKind: semanticObject.kind,
+    semanticTags: semanticObject.semanticTags,
+    semanticObject,
   };
 }
 
@@ -233,6 +281,9 @@ function itemFromValue(value: unknown): WeddingInspirationItem | null {
         return { type, target, label: clean(row.label) || `${type} ${target}` };
       }).filter((link): link is WeddingInspirationItem["ontologyLinks"][number] => link !== null)
       : item.ontologyLinks,
+    semanticKind: weddingSemanticUiObjectFromUnknown(source.semantic_object)?.kind ?? item.semanticKind,
+    semanticTags: weddingSemanticUiObjectFromUnknown(source.semantic_object)?.semanticTags ?? item.semanticTags,
+    semanticObject: weddingSemanticUiObjectFromUnknown(source.semantic_object) ?? item.semanticObject,
   };
 }
 
@@ -421,7 +472,9 @@ export function weddingInspirationItemsToAfpMessage(input: {
         preference_signals: item.preferenceSignals,
         ontology_links: item.ontologyLinks,
         storage_ref: item.storageRef,
+        semantic_object: item.semanticObject,
       })),
+      semantic_objects: state.items.flatMap((item) => item.semanticObject ? [item.semanticObject] : []),
       preference_tags: state.tagCounts,
       insight: state.insight,
       original_file_status: {
@@ -461,6 +514,7 @@ export function weddingInspirationItemsToAfpMessage(input: {
       inspiration_original_file_count: state.originalFileCount,
       inspiration_unsaved_original_file_count: state.unsavedOriginalFileCount,
       inspiration_original_storage_ready: state.unsavedOriginalFileCount === 0,
+      semantic_objects: state.items.flatMap((item) => item.semanticObject ? [item.semanticObject] : []),
       e2ee_required: true,
       searchable_terms: uniqueStrings([
         "wedding inspiration",
@@ -479,6 +533,7 @@ export function weddingInspirationItemsToAfpMessage(input: {
         title: "Wedding inspiration saved",
         summary: experienceModel.traits.length > 0 ? experienceModel.summaryLabel : state.insight?.detail ?? `${state.items.length} inspiration item${state.items.length === 1 ? "" : "s"} saved.`,
         primary_action: "Open Inspiration",
+        semantic_objects: state.items.flatMap((item) => item.semanticObject ? [item.semanticObject] : []),
         experience_model: {
           confidence: experienceModel.confidenceLabel,
           traits: experienceModel.traits.slice(0, 4).map((trait) => trait.label),

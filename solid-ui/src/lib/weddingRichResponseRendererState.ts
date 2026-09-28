@@ -157,6 +157,6 @@ export function buildWeddingRichResponseRendererState(
     primaryAction: richAction(presentation.primaryAction) as WeddingRichResponseAction,
     sections,
     continueChatAction,
-    accessibilityFallbackLabel: "Every wedding response card action is available as a visible button.",
+    accessibilityFallbackLabel: "",
   };
 }

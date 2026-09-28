@@ -36,6 +36,9 @@ test("buildWeddingInspirationItem turns image filenames and notes into preferenc
   assert.ok(item.tags.includes("warm lighting"));
   assert.ok(item.preferenceSignals.includes("warm intimate lighting"));
   assert.ok(item.ontologyLinks.some((link) => link.type === "inspires" && link.target === "Reception"));
+  assert.equal(item.semanticKind, "wedding_active_loop");
+  assert.ok(item.semanticTags?.includes("wedding_preference_evidence"));
+  assert.equal(item.semanticObject?.actions[0]?.targetMenu, "inspiration");
 });
 
 test("buildWeddingInspirationState summarizes repeated visual patterns", () => {
@@ -102,8 +105,13 @@ test("wedding inspiration AFP message round-trips as private knowledge", () => {
   assert.equal(message.metadata?.e2ee_required, true);
   assert.equal(message.metadata?.wedding_experience_model, true);
   assert.ok((message.content.experience_model as Record<string, unknown> | undefined)?.traits);
+  assert.ok(Array.isArray(message.content.semantic_objects));
+  assert.equal((message.content.semantic_objects as Array<Record<string, unknown>>)[0]?.kind, "wedding_active_loop");
+  assert.equal((message.views[0]?.content.semantic_objects as Array<Record<string, unknown>>)[0]?.title, "Venue photograph");
   assert.equal(parsed.length, 1);
   assert.equal(parsed[0]?.title, "Venue photograph");
+  assert.equal(parsed[0]?.semanticKind, "wedding_active_loop");
+  assert.equal(parsed[0]?.semanticObject?.title, "Venue photograph");
 });
 
 test("wedding inspiration AFP message does not store local data-url previews", () => {

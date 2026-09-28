@@ -43,8 +43,10 @@ test("wedding helper overdue check ignores malformed dates", () => {
   assert.equal(weddingHelperTaskIsOverdue(task({ id: "bad", dueAt: "not a date" }), now), false);
 });
 
-test("wedding helper people dedupe contacts and custom helpers calmly", () => {
+test("wedding helper people dedupe contacts, custom helpers, and partner names calmly", () => {
   assert.deepEqual(buildWeddingHelperPeople(["Alex", " alex ", ""], ["Sam", "sam"]), ["Alex", "Sam", "Partner 1", "Partner 2"]);
+  assert.deepEqual(buildWeddingHelperPeople(["Alex"], ["Sam"], ["Claire", "James"]), ["Alex", "Sam", "Claire", "James"]);
+  assert.deepEqual(buildWeddingHelperPeople([], [], ["Claire", "Claire"]), ["Claire"]);
 });
 
 test("wedding helper workload rows and suggestion flag imbalance neutrally", () => {
@@ -206,11 +208,17 @@ test("wedding helper responsibility projects private AFP context for agents", ()
   assert.equal(message.content.owner_label, "Sam");
   assert.equal(message.content.consulted_label, "Mia");
   assert.equal(message.content.last_contact_date, "2027-07-20");
+  assert.equal(message.content.semantic_kind, "wedding_active_loop");
+  assert.equal(message.content.semantic_object.title, "Confirm wet-weather backup");
+  assert.ok(message.content.semantic_tags.includes("wedding_helper_responsibility"));
   assert.equal(message.metadata?.e2ee_required, true);
+  assert.equal(message.metadata?.semantic_kind, "wedding_active_loop");
+  assert.ok(message.metadata?.semantic_tags.includes("wedding_workload"));
   assert.ok(message.supertags?.includes("decisionos:wedding_workload"));
   assert.ok(message.supertags?.includes("topology:wedding_responsibility"));
   assert.ok(message.references?.some((reference) => reference.type === "wedding_task" && reference.target === "confirm-wet-weather"));
   assert.ok(message.views.some((view) => view.format === "a2ui"));
+  assert.equal(message.views.find((view) => view.format === "a2ui")?.content.semantic_object.kind, "wedding_active_loop");
 });
 
 test("wedding helper responsibility send input keeps relational storage enabled", () => {
@@ -228,6 +236,7 @@ test("wedding helper responsibility send input keeps relational storage enabled"
   assert.equal(sendInput.store_in_relational, true);
   assert.equal(sendInput.content.kind, "wedding_helper_responsibility");
   assert.equal(sendInput.content.status, "done");
+  assert.equal(sendInput.content.semantic_kind, "wedding_active_loop");
   assert.deepEqual(sendInput.metadata?.searchable_terms, [
     "Book transport",
     "task-one",
@@ -237,6 +246,23 @@ test("wedding helper responsibility send input keeps relational storage enabled"
     "wedding helper responsibility",
     "wedding workload",
   ]);
+});
+
+test("wedding helper responsibility marks unassigned work as needing owner action", () => {
+  const message = weddingHelperResponsibilityToAfpMessage({
+    task: task({ id: "missing-owner", title: "Confirm song list" }),
+    ownerLabel: "Unassigned",
+    status: "open",
+    metadata: {
+      wedding_plan_id: "plan-123",
+      response_workspace_id: "workspace-456",
+    },
+  });
+
+  assert.ok(message);
+  assert.equal(message.content.semantic_kind, "wedding_approval_required");
+  assert.equal(message.content.semantic_object.stateLabel, "Needs owner");
+  assert.equal(message.content.semantic_object.actions[0]?.label, "Assign owner");
 });
 
 test("wedding helper responsibility projection skips malformed tasks", () => {

@@ -42,6 +42,7 @@ export type WeddingVendorSeedState = {
   freshnessSummary: string;
   freshnessActionLabels: string[];
   caveatLabels: string[];
+  proofReferenceLabels: string[];
   metadata: WeddingPlanningMetadata;
   artifactInput: WeddingArtifactInput | null;
   summaryArtifact: WeddingArtifactSummary | null;
@@ -74,7 +75,19 @@ function clean(value: unknown): string {
 }
 
 function usableSourceUrl(value: unknown): boolean {
-  return /^https?:\/\//i.test(clean(value));
+  const candidate = clean(value);
+  if (!/^https?:\/\//i.test(candidate)) return false;
+  try {
+    const url = new URL(candidate);
+    const hostname = url.hostname.toLowerCase();
+    return hostname !== "localhost"
+      && hostname !== "127.0.0.1"
+      && hostname !== "0.0.0.0"
+      && hostname !== "::1"
+      && hostname !== "[::1]";
+  } catch {
+    return false;
+  }
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -396,6 +409,7 @@ export function buildWeddingVendorSeedState(input: {
   location?: string | null;
   selectedCategories?: readonly string[] | null;
   preferenceText?: string | null;
+  proofReferenceLabels?: readonly string[] | null;
 }): WeddingVendorSeedState {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
   const now = input.now ?? new Date();
@@ -415,6 +429,8 @@ export function buildWeddingVendorSeedState(input: {
     "Seeded vendors require live recheck before recommendation or outreach.",
     "Seeded vendors do not prove availability, pricing, or fit.",
   ]);
+  const proofReferenceLabels = unique(input.proofReferenceLabels ?? [])
+    .filter((label) => !/\b(?:dry-run|example|fake|mock|placeholder|stub|test)\b/i.test(label));
   const freshness = buildWeddingVendorFreshnessState({
     vendors: usableSeedInputs,
     now,
@@ -438,6 +454,7 @@ export function buildWeddingVendorSeedState(input: {
       freshnessSummary: freshness.summary,
       freshnessActionLabels: freshness.actionLabels,
       caveatLabels,
+      proofReferenceLabels: [],
       metadata,
       artifactInput: null,
       summaryArtifact: null,
@@ -466,6 +483,7 @@ export function buildWeddingVendorSeedState(input: {
       vendorPriceRecheckCount: freshness.priceRecheckCount,
       vendorAvailabilityRecheckCount: freshness.availabilityRecheckCount,
       vendorRelevanceBlockerCount: relevanceBlockerCount,
+      vendorSeedProofReferenceLabels: proofReferenceLabels,
     },
     sourceLabels: unique(seeds.map((seed) => seed.sourceLabel || seed.sourceUrl)),
     sourceLinks: seeds.map((seed) => ({
@@ -500,6 +518,7 @@ export function buildWeddingVendorSeedState(input: {
     freshnessSummary: freshness.summary,
     freshnessActionLabels: freshness.actionLabels,
     caveatLabels,
+    proofReferenceLabels,
     metadata,
     artifactInput: summaryArtifact ? artifactInput : null,
     summaryArtifact,

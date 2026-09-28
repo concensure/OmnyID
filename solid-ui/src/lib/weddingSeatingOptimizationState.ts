@@ -1,6 +1,11 @@
 // @locs-version: 1.0
 import type { AfpMessage, AfpReference, SendAfpMessageInput } from "@/lib/api";
 import { normalizeWeddingPlanningMetadata, safeWeddingLabel } from "@/lib/weddingPlanningTemplateState";
+import type { WeddingSemanticUiKind, WeddingSemanticUiObject } from "@/lib/weddingSemanticUiState";
+import {
+  weddingSemanticUiObjectFromUnknown,
+  weddingSemanticUiObjectsFromAfpLikeMessage,
+} from "@/lib/weddingSemanticUiState";
 
 export type WeddingSeatingOptimizationNeed =
   | "wheelchair"
@@ -75,6 +80,9 @@ export type WeddingSeatingOptimizationResult = {
   alternativeLabel: string;
   savedAt?: string | null;
   fingerprint?: string | null;
+  semanticKind?: WeddingSemanticUiKind | null;
+  semanticTags?: string[];
+  semanticObject?: WeddingSemanticUiObject | null;
 };
 
 type TableOccupancy = {
@@ -484,6 +492,79 @@ function assignmentsFromReferences(message: AfpMessage): WeddingSeatingOptimizat
     .filter((item): item is WeddingSeatingOptimizationAssignment => item !== null);
 }
 
+function buildSeatingSemanticComparison(result: WeddingSeatingOptimizationResult): WeddingSemanticUiObject["comparison"] {
+  const byTable = new Map<string, WeddingSeatingOptimizationAssignment[]>();
+  for (const assignment of result.assignments) {
+    const key = `${assignment.tableId}:${assignment.tableLabel}`;
+    byTable.set(key, [...(byTable.get(key) ?? []), assignment]);
+  }
+  const rows = Array.from(byTable.values()).slice(0, 8).map((assignments) => {
+    const first = assignments[0];
+    return {
+      id: first?.tableId ?? `table:${assignments.length}`,
+      cells: [
+        first?.tableLabel ?? "Table",
+        assignments.map((assignment) => assignment.personLabel).join(", "),
+        uniqueStrings(assignments.flatMap((assignment) => assignment.reasonLabels), 3).join("; ") || "Balanced fit",
+      ],
+    };
+  });
+  return rows.length > 0
+    ? {
+      title: "Seating draft",
+      columns: [
+        { label: "Table", kind: "entity" },
+        { label: "Guests", kind: "people" },
+        { label: "Why", kind: "rationale" },
+      ],
+      rows,
+    }
+    : null;
+}
+
+function buildSeatingSemanticObject(result: WeddingSeatingOptimizationResult, idFingerprint: string): WeddingSemanticUiObject {
+  const hasViolations = result.hardViolations.length > 0;
+  const hasReviewIssues = result.proactiveIssueLabels.length > 0;
+  const kind: WeddingSemanticUiKind = hasViolations
+    ? "wedding_conflict"
+    : hasReviewIssues
+      ? "wedding_approval_required"
+      : "wedding_comparison";
+  const summary = result.hardViolations[0]?.label
+    || result.proactiveIssueLabels[0]
+    || result.explanationLabels[0]
+    || "Seating draft ready for review.";
+  return {
+    id: `wedding-seating:${idFingerprint}`,
+    kind,
+    title: "Seating draft",
+    stateLabel: hasViolations ? "Needs rule review" : hasReviewIssues ? "Review before applying" : "Ready to review",
+    tone: hasViolations ? "risk" : hasReviewIssues ? "action" : "options",
+    summary,
+    comparison: buildSeatingSemanticComparison(result),
+    actions: [
+      {
+        label: result.applyLabel,
+        kind: "apply_wedding_seating_plan",
+        enabled: !hasViolations && result.assignments.length > 0,
+        targetMenu: "seating",
+      },
+      {
+        label: result.alternativeLabel,
+        kind: "show_wedding_seating_alternatives",
+        enabled: result.assignments.length > 0,
+        targetMenu: "seating",
+      },
+    ],
+    semanticTags: uniqueStrings([
+      kind,
+      "wedding_seating",
+      "wedding_seating_optimization",
+      hasViolations ? "wedding_seating_review_required" : "wedding_seating_ready_to_apply",
+    ]),
+  };
+}
+
 export function weddingSeatingOptimizationResultToAfpMessage(input: {
   result: WeddingSeatingOptimizationResult;
   metadata?: unknown;
@@ -496,6 +577,11 @@ export function weddingSeatingOptimizationResultToAfpMessage(input: {
     : "";
   const idFingerprint = safeWeddingLabel(assignmentFingerprint).slice(0, 96) || "empty";
   const id = `afp-wedding-seating-optimization-${safeWeddingLabel(metadata.responseWorkspaceId)}-${idFingerprint}`;
+  const semanticObject = input.result.semanticObject ?? buildSeatingSemanticObject(input.result, idFingerprint);
+  const semanticTags = uniqueStrings([
+    ...semanticObject.semanticTags,
+    ...(input.result.semanticTags ?? []),
+  ]);
   const references = [
     afpRef("wedding_plan", metadata.weddingPlanId, "Wedding plan"),
     afpRef("response_workspace", metadata.responseWorkspaceId, "Wedding workspace"),
@@ -536,6 +622,10 @@ export function weddingSeatingOptimizationResultToAfpMessage(input: {
       explanation_labels: input.result.explanationLabels,
       apply_label: input.result.applyLabel,
       alternative_label: input.result.alternativeLabel,
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticTags,
+      semantic_object: semanticObject,
+      semantic_objects: [semanticObject],
       created_at: timestamp,
       assignment_fingerprint: assignmentFingerprint,
       markdown: [
@@ -547,6 +637,9 @@ export function weddingSeatingOptimizationResultToAfpMessage(input: {
     metadata: {
       ...metadata,
       seating_optimization: true,
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticTags,
+      semantic_object: semanticObject,
       hard_violation_count: input.result.hardViolations.length,
       assignment_count: input.result.assignments.length,
       e2ee_required: true,
@@ -567,6 +660,10 @@ export function weddingSeatingOptimizationResultToAfpMessage(input: {
         summary: input.result.explanationLabels[0] ?? "Seating draft ready for review.",
         primary_action: input.result.applyLabel,
         secondary_action: input.result.alternativeLabel,
+        semantic_kind: semanticObject.kind,
+        semantic_tags: semanticTags,
+        semantic_object: semanticObject,
+        semantic_objects: [semanticObject],
         badges: [
           `${input.result.assignments.length} guests placed`,
           input.result.hardViolations.length === 0 ? "Rules clear" : `${input.result.hardViolations.length} rule checks`,
@@ -617,6 +714,9 @@ export function weddingSeatingOptimizationResultFromAfpMessage(message: AfpMessa
     : [];
   const proactiveIssueLabels = stringArray(content.proactive_issues);
   const explanationLabels = stringArray(content.explanation_labels);
+  const semanticObject = weddingSemanticUiObjectsFromAfpLikeMessage(message)[0]
+    ?? weddingSemanticUiObjectFromUnknown(content.semantic_object);
+  const semanticTags = semanticObject?.semanticTags ?? stringArray(content.semantic_tags);
   return {
     assignments,
     totalScore: numeric(content.total_score) || assignments.reduce((total, assignment) => total + assignment.score, 0),
@@ -628,5 +728,8 @@ export function weddingSeatingOptimizationResultFromAfpMessage(message: AfpMessa
     alternativeLabel: clean(content.alternative_label) || "Show alternatives",
     savedAt: clean(content.created_at) || message.timestamp || null,
     fingerprint: clean(content.assignment_fingerprint) || weddingSeatingOptimizationFingerprint({ assignments }),
+    semanticKind: semanticObject?.kind ?? null,
+    semanticTags,
+    semanticObject,
   };
 }

@@ -4,8 +4,11 @@ import test from "node:test";
 import {
   buildWeddingDecisionSelectionState,
   loadWeddingDecisionSelection,
+  loadWeddingDecisionSelections,
   toggleWeddingDecisionSelection,
+  toggleWeddingDecisionSelectionValue,
 } from "../src/lib/weddingDecisionSelectionState.ts";
+import { buildWeddingComparisonColumns } from "../src/lib/weddingComparisonColumnState.ts";
 import { buildWeddingExperienceModelState } from "../src/lib/weddingExperienceModelState.ts";
 import {
   buildWeddingInspirationItem,
@@ -60,6 +63,30 @@ test("toggleWeddingDecisionSelection is single-choice and reversible", () => {
   assert.equal(loadWeddingDecisionSelection("artifact:venues", storage), null);
 });
 
+test("toggleWeddingDecisionSelectionValue supports multiple selected vendors", () => {
+  const storage = memoryStorage();
+
+  assert.deepEqual(toggleWeddingDecisionSelectionValue("artifact:venues", "0:harbour-house", storage), ["0:harbour-house"]);
+  assert.deepEqual(toggleWeddingDecisionSelectionValue("artifact:venues", "1:garden-hall", storage), ["0:harbour-house", "1:garden-hall"]);
+  assert.deepEqual(loadWeddingDecisionSelections("artifact:venues", storage), ["0:harbour-house", "1:garden-hall"]);
+  assert.equal(loadWeddingDecisionSelection("artifact:venues", storage), "0:harbour-house");
+  assert.deepEqual(toggleWeddingDecisionSelectionValue("artifact:venues", "0:harbour-house", storage), ["1:garden-hall"]);
+});
+
+test("buildWeddingDecisionSelectionState accepts vendor comparison choice ids", () => {
+  const state = buildWeddingDecisionSelectionState({
+    artifactId: "artifact:venues",
+    artifactKind: "vendor_table",
+    table,
+    selectedOptionIds: ["vendor_choice:harbour_house:1", "vendor_choice:garden_hall:2"],
+  });
+
+  assert.deepEqual(state.selectedOptions.map((option) => option.label), ["Harbour House", "Garden Hall"]);
+  assert.deepEqual(state.selectedOptionIds, ["0:harbour-house", "1:garden-hall"]);
+  assert.equal(state.selectedOption?.label, "Harbour House");
+  assert.equal(state.collapsedOptionCount, 1);
+});
+
 test("buildWeddingDecisionSelectionState ignores non-shortlist artifact kinds", () => {
   const state = buildWeddingDecisionSelectionState({
     artifactId: "artifact:budget",
@@ -71,6 +98,43 @@ test("buildWeddingDecisionSelectionState ignores non-shortlist artifact kinds", 
   assert.equal(state.eligible, false);
   assert.equal(state.options.length, 0);
   assert.deepEqual(state.scopeLabels, []);
+});
+
+test("buildWeddingDecisionSelectionState uses typed option columns when table columns are reordered", () => {
+  const headers = ["Category", "Supplier", "Quoted total", "Availability"];
+  const state = buildWeddingDecisionSelectionState({
+    artifactId: "artifact:photo-options",
+    artifactKind: "vendor_table",
+    table: {
+      kind: "table",
+      headers,
+      columns: buildWeddingComparisonColumns(headers),
+      rows: [
+        ["Photography", "Aurora Weddings", "$4,800", "Available"],
+        ["Photography", "Northlight Studio", "$5,400", "Hold only"],
+      ],
+      rowCountLabel: "2 rows",
+    },
+    selectedOptionId: "0:aurora-weddings",
+  });
+
+  assert.equal(state.selectedOption?.label, "Aurora Weddings");
+  assert.equal(state.selectedOption?.id, "0:aurora-weddings");
+  assert.match(state.selectedOption?.detail ?? "", /Photography - \$4,800 - Available/);
+  assert.equal(state.selectedOption?.detail.includes("Aurora Weddings"), false);
+  assert.deepEqual(state.visibleOptions.map((option) => option.label), ["Aurora Weddings"]);
+});
+
+test("buildWeddingDecisionSelectionState keeps first-column IDs for legacy untyped tables", () => {
+  const state = buildWeddingDecisionSelectionState({
+    artifactId: "artifact:venues",
+    artifactKind: "vendor_table",
+    table,
+    selectedOptionId: "0:harbour-house",
+  });
+
+  assert.equal(state.selectedOption?.label, "Harbour House");
+  assert.equal(state.selectedOption?.id, "0:harbour-house");
 });
 
 test("buildWeddingDecisionSelectionState adds conservative preference-fit labels", () => {

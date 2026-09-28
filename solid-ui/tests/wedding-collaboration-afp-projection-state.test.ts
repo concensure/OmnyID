@@ -43,11 +43,16 @@ test("weddingCollaborationInviteToAfpMessage projects a collaborator invite as s
   assert.equal((message.content as any).ready_for_invite, true);
   assert.equal((message.content as any).shared_editing_enabled, false);
   assert.match((message.content as any).execution_guardrail, /Do not grant account access/);
+  assert.equal((message.content as any).semantic_kind, "wedding_active_loop");
+  assert.equal((message.content as any).semantic_object.stateLabel, "Ready to invite");
+  assert.ok((message.content as any).semantic_tags.includes("wedding_access_control"));
   assert.match((message.content as any).markdown, /Wedding collaborator invite/);
   assert.ok((message.metadata as any).searchable_terms.includes("Planner Pat"));
   assert.ok((message.metadata as any).local_only_until_backend_acl);
+  assert.equal((message.metadata as any).semantic_kind, "wedding_active_loop");
   assert.equal(message.views?.[0]?.format, "access_control_card");
   assert.equal((message.views?.[0]?.content as any).shared_editing_enabled, false);
+  assert.equal((message.views?.[0]?.content as any).semantic_object.kind, "wedding_active_loop");
 });
 
 test("weddingCollaborationInviteToAfpSendInput stores invite projection relationally", () => {
@@ -70,6 +75,8 @@ test("weddingCollaborationInviteToAfpSendInput stores invite projection relation
   assert.ok(sendInput.supertags?.includes("wedding_collaboration"));
   assert.ok(sendInput.supertags?.includes("wedding_collaborator_role:viewer"));
   assert.equal((sendInput.content as any).ready_for_invite, false);
+  assert.equal((sendInput.content as any).semantic_kind, "wedding_approval_required");
+  assert.equal((sendInput.content as any).semantic_object.stateLabel, "Needs details");
   assert.deepEqual((sendInput.content as any).missing_labels, ["valid email required"]);
 });
 
@@ -99,6 +106,9 @@ test("weddingCollaborationAccessToAfpMessage projects stale accepted access as r
   assert.ok(message.supertags?.includes("access_control:review"));
   assert.equal((message.content as any).shared_editing_enabled, false);
   assert.equal((message.content as any).can_grant_access, true);
+  assert.equal((message.content as any).semantic_kind, "wedding_approval_required");
+  assert.equal((message.content as any).semantic_object.stateLabel, "Review access");
+  assert.equal((message.content as any).semantic_object.actions[0]?.label, "Review access");
   assert.deepEqual((message.content as any).risk_labels, ["No recent activity; review or revoke stale access."]);
   assert.match((message.content as any).markdown, /audit\/review projection only/);
 });

@@ -5,10 +5,13 @@ import { markWeddingArtifactAfpProjectionSent } from "@/lib/weddingArtifactAfpPr
 import {
   WEDDING_CALENDAR_AFP_PROJECTIONS_KEY,
   markWeddingProjectionSent,
+  type WeddingPlanningTaskItem,
   type WeddingPlanningScheduleItem,
 } from "@/lib/weddingCalendarProjectionState";
 import { buildWeddingProjectionQueueViewState } from "@/lib/weddingProjectionQueueViewState";
 import { buildWeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
+import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
+import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -30,6 +33,17 @@ function artifactState() {
     metadata,
     researchNotes: ["Compare reception layouts."],
   });
+}
+
+function contextProjection(storage = memoryStorage()) {
+  return buildWeddingTemplateFollowUpState({
+    weddingPlanId: "plan-view",
+    responseWorkspaceId: "workspace-view",
+    dateOrSeason: "2027-10-03",
+    location: "Sydney",
+    guestCount: 80,
+    projectionStorage: storage,
+  }).contextProjection;
 }
 
 const scheduleItem: WeddingPlanningScheduleItem = {
@@ -57,6 +71,21 @@ test("buildWeddingProjectionQueueViewState exposes save action and dispatch payl
   assert.equal(state.groups[0]?.pendingCount, 1);
 });
 
+test("buildWeddingProjectionQueueViewState exposes semantic objects for meaning-first UI", () => {
+  const state = buildWeddingProjectionQueueViewState({
+    contextItems: [contextProjection()],
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.semanticObjects.length, 1);
+  assert.equal(state.semanticObjects[0]?.kind, "wedding_active_loop");
+  assert.ok(state.semanticObjects[0]?.semanticTags.includes("wedding_context"));
+  assert.equal(state.semanticSurface.source, "semantic");
+  assert.equal(state.semanticSurface.ignoredRendererFormat, "projection_queue");
+  assert.equal(state.semanticSurface.primitives[0]?.primitiveKind, "progress_loop");
+});
+
 test("buildWeddingProjectionQueueViewState groups collaborator access records", () => {
   const state = buildWeddingProjectionQueueViewState({
     collaborationMetadata: metadata,
@@ -78,6 +107,105 @@ test("buildWeddingProjectionQueueViewState groups collaborator access records", 
   assert.equal(state.groups[0]?.kind, "access_control");
   assert.equal(state.groups[0]?.label, "Access");
   assert.equal(state.dispatchPayload?.sendInputs[0]?.type, "access_control");
+});
+
+test("buildWeddingProjectionQueueViewState exposes selected-vendor draft previews", () => {
+  const task: WeddingPlanningTaskItem = {
+    id: "wedding_vendor_outreach_task:harbour-photos",
+    title: "Prepare approval-gated quote request for Harbour Photos",
+    kind: "vendor_follow_up",
+    source: "agent",
+    reviewStatus: "accepted",
+    approvalState: "draft",
+    metadata: {
+      ...metadata,
+      vendor_outreach_from_selected_decision: true,
+      vendor_outreach_vendor_label: "Harbour Photos",
+      vendor_outreach_category_label: "Photographer",
+      vendor_outreach_draft_subject: "Wedding quote request - Photographer",
+      vendor_outreach_draft_body: "Hi Harbour Photos,\n\nCould you please confirm availability and current quote details?",
+      vendor_outreach_request_checklist: ["availability", "current quote", "deposit"],
+      vendor_outreach_draft_requires_approval: true,
+      vendor_outreach_provider_receipt_required: true,
+      approval_required_before_outreach: true,
+      provider_receipt_required: true,
+    },
+  };
+
+  const state = buildWeddingProjectionQueueViewState({
+    taskItems: [task],
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.vendorOutreachDraftCards.length, 1);
+  assert.equal(state.vendorOutreachDraftCards[0]?.vendorLabel, "Harbour Photos");
+  assert.equal(state.vendorOutreachDraftCards[0]?.categoryLabel, "Photographer");
+  assert.equal(state.vendorOutreachDraftCards[0]?.subjectLabel, "Wedding quote request - Photographer");
+  assert.match(state.vendorOutreachDraftCards[0]?.bodyPreview ?? "", /confirm availability/);
+  assert.deepEqual(state.vendorOutreachDraftCards[0]?.checklistLabels, ["availability", "current quote", "deposit"]);
+  assert.equal(state.vendorOutreachDraftCards[0]?.saveLabel, "Saves an internal draft task");
+  assert.equal(state.vendorOutreachDraftCards[0]?.externalSendGuardLabel, "No external send from this action");
+  assert.equal(state.vendorOutreachDraftCards[0]?.approvalRequired, true);
+  assert.equal(state.vendorOutreachDraftCards[0]?.providerReceiptRequired, true);
+  assert.equal(state.title, "Save vendor draft tasks");
+  assert.match(state.description, /does not send email/i);
+  assert.equal(state.primaryAction.label, "Save 1 vendor draft");
+  assert.match(state.primaryAction.reason ?? "", /no external outreach/i);
+});
+
+test("buildWeddingProjectionQueueViewState exposes selected-vendor decision consequences", () => {
+  const decision: WeddingDecisionProjectionInput = {
+    id: "wedding_decision:workspace-view:vendor-comparison:harbour-studio",
+    metadata: {
+      ...metadata,
+      source: "vendor_search_comparison",
+      vendorComparisonSelection: {
+        selectedVendorsContinueToFollowUp: true,
+        unselectedVendorsLeaveActiveQueues: true,
+        approvalRequiredBeforeOutreach: true,
+        noExternalSendWithoutApproval: true,
+      },
+    },
+    artifactId: "artifact:top-vendor-comparison",
+    artifactTitle: "Top vendor comparison",
+    artifactKind: "vendor_table",
+    sourceLabels: ["Top vendor comparison"],
+    sourceUrls: ["https://harbour-studio.example"],
+    selectedOption: {
+      id: "vendor_choice:harbour_studio:1",
+      rowIndex: 0,
+      label: "Harbour Studio",
+      detail: "Sydney documentary wedding photographer with transparent packages.",
+      cells: ["#1 Harbour Studio", "Transparent packages", "https://harbour-studio.example"],
+      selected: true,
+      preferenceFitLabels: ["documentary"],
+      missingPreferenceLabels: [],
+      tradeoffLabels: [],
+      preferenceSummaryLabel: "Selected by user",
+    },
+    source: "local_selection",
+  };
+
+  const state = buildWeddingProjectionQueueViewState({
+    decisionItems: [decision],
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.vendorDecisionPolicyCards.length, 1);
+  assert.equal(state.vendorDecisionPolicyCards[0]?.selectedVendorLabel, "Harbour Studio");
+  assert.deepEqual(state.vendorDecisionPolicyCards[0]?.consequenceLabels, [
+    "Selected vendor stays active",
+    "Unselected vendors leave active queues",
+    "No queue rehydration for unselected vendors",
+  ]);
+  assert.equal(state.vendorDecisionPolicyCards[0]?.approvalRequired, true);
+  assert.equal(state.vendorDecisionPolicyCards[0]?.noExternalSendWithoutApproval, true);
+  assert.equal(state.title, "Save selected vendor decisions");
+  assert.match(state.description, /move unselected vendors out of the live decision queue/i);
+  assert.equal(state.primaryAction.label, "Save 1 vendor decision");
+  assert.match(state.primaryAction.reason ?? "", /removes unselected vendors from active queues/i);
 });
 
 test("buildWeddingProjectionQueueViewState prefers blocked review action when nothing is dispatchable", () => {

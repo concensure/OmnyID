@@ -1,4 +1,9 @@
 // @locs-version: 2.0
+import {
+  cleanWeddingProductionLabel,
+  cleanWeddingProductionLabels,
+} from "@/lib/weddingProductionLabelState";
+
 export type WeddingWorkspaceRefreshScaleProofInput = {
   requestedPageSize?: number | null;
   pageCount?: number | null;
@@ -34,9 +39,28 @@ function clean(value: unknown): string {
 function durableProofRef(value: unknown): string | null {
   const ref = clean(value);
   if (!ref) return null;
+  if (ref === "...") return null;
   if (/^(receipt|local|draft|display):/i.test(ref)) return null;
+  if (/^(dry-run|placeholder|test|example|fake|stub|mock):/i.test(ref)) return null;
+  if (/\b(?:placeholder|fake|stub|mock|test)\b/i.test(ref)) return null;
   if (/^(file|blob|data):/i.test(ref)) return null;
-  if (/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|::1)(?::|\/|$)/i.test(ref)) return null;
+  if (/^https?:\/\//i.test(ref)) {
+    try {
+      const url = new URL(ref);
+      const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+      if (url.protocol !== "https:") return null;
+      if (
+        hostname === "localhost"
+        || hostname === "127.0.0.1"
+        || hostname === "0.0.0.0"
+        || hostname === "::1"
+      ) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
   return ref;
 }
 
@@ -61,7 +85,7 @@ function nextActionFor(label: string): string {
   if (/Duplicate AFP message IDs/i.test(label)) return "Fix backend pagination cursor/offset handling before Oracle upload.";
   if (/refresh error/i.test(label)) return "Resolve refresh errors and rerun scale proof.";
   if (/Slowest refresh page/i.test(label)) return `Tune refresh query until every page is at or below ${MAX_PAGE_MS}ms.`;
-  if (/durable proof reference|local receipt|localhost URL|browser-only file reference/i.test(label)) return "Attach the saved scale-proof receipt ID, artifact path, or audit link.";
+  if (/proof reference|local|dry-run|placeholder|localhost|browser-only/i.test(label)) return "Attach the saved scale-proof receipt ID, artifact path, or audit link.";
   return "Complete saved-workspace refresh scale proof.";
 }
 
@@ -75,7 +99,8 @@ export function buildWeddingWorkspaceRefreshScaleProofState(
   const duplicateMessageIds = input.duplicateMessageIds?.filter(Boolean) ?? [];
   const errorCount = Math.trunc(input.errorCount ?? 0);
   const finalPageExhausted = input.hasMoreAfterFinalPage === false;
-  const source = clean(input.source) || "wedding workspace refresh scale proof";
+  const source = cleanWeddingProductionLabel(input.source, { maxLength: 120, wordAware: true })
+    ?? "wedding workspace refresh scale proof";
   const targetLabel = clean(input.targetLabel);
   const rawProofRef = clean(input.proofRef);
   const proofRef = durableProofRef(rawProofRef);
@@ -138,13 +163,14 @@ export function buildWeddingWorkspaceRefreshScaleProofState(
   if (proofReferenceRequired && !rawProofRef) {
     blockerLabels.push("Scale proof passed fields but has no durable proof reference.");
   } else if (proofReferenceRequired && rawProofRef && !proofRef) {
-    blockerLabels.push("Scale proof reference must be a durable audit ID or remote proof link, not a local receipt, localhost URL, or browser-only file reference.");
+    blockerLabels.push("Scale proof reference must be a durable audit ID or remote HTTPS proof link, not a local, dry-run, placeholder, localhost, or browser-only reference.");
   } else if (proofRef) {
     evidenceLabels.push(`Scale proof reference: ${proofRef}`);
   }
   if (targetLabel) evidenceLabels.push(`Target: ${targetLabel}`);
 
   const status = blockerLabels.length === 0 ? "pass" : "blocked";
+  const cleanBlockerLabels = cleanWeddingProductionLabels(blockerLabels);
 
   return {
     status,
@@ -154,8 +180,8 @@ export function buildWeddingWorkspaceRefreshScaleProofState(
         ? `${source} passed across ${pageCount} pages and ${totalLoaded} saved AFP messages.`
         : `${source} still needs live scale proof before Oracle upload.`,
     requiredEvidenceLabels,
-    blockerLabels,
-    evidenceLabels,
-    nextActionLabels: blockerLabels.map(nextActionFor),
+    blockerLabels: cleanBlockerLabels,
+    evidenceLabels: cleanWeddingProductionLabels(evidenceLabels),
+    nextActionLabels: cleanWeddingProductionLabels(cleanBlockerLabels.map(nextActionFor)),
   };
 }

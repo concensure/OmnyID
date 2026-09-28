@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   buildWeddingBudgetPaymentTaskItems,
   buildWeddingBudgetTrackingState,
+  buildWeddingBudgetVendorOutreachTaskItems,
+  buildWeddingVendorPursuitClosureTaskItem,
 } from "@/lib/weddingBudgetTrackingState";
 import type { WeddingPersistedDecisionRecord } from "@/lib/weddingPersistedWorkspaceState";
 
@@ -174,6 +176,47 @@ test("buildWeddingBudgetTrackingState exposes category rollups and quote tasks",
   assert.ok(state.quoteTaskCandidates.some((task) => /Verify Harbour Photos pricing/i.test(task.title)));
 });
 
+test("buildWeddingBudgetVendorOutreachTaskItems creates approval-gated draft metadata", () => {
+  const state = buildWeddingBudgetTrackingState({
+    decisionRecords: [
+      decision({
+        selectedOptionLabel: "Harbour Photos",
+        selectedOptionDetail: "Projected package AUD 4000-5000",
+        selectedOptionCells: ["Harbour Photos", "Photographer", "AUD 4,000-5,000"],
+      }),
+    ],
+  });
+
+  const tasks = buildWeddingBudgetVendorOutreachTaskItems({
+    budgetTracking: state,
+    metadata: {
+      wedding_plan_id: "wedding_plan:budget",
+      response_workspace_id: "response_workspace:budget",
+    },
+  });
+  const metadata = record(tasks[0]?.metadata);
+
+  assert.equal(tasks.length, 1);
+  assert.equal(tasks[0]?.title, "Prepare approval-gated quote request for Harbour Photos");
+  assert.equal(metadata.vendor_outreach_draft_requires_approval, true);
+  assert.equal(metadata.vendor_outreach_provider_receipt_required, true);
+  assert.equal(metadata.approval_required_before_outreach, true);
+  assert.equal(metadata.no_external_send_without_approval, true);
+  assert.equal(metadata.vendor_outreach_draft_subject, "Wedding quote request - Photographer");
+  assert.match(String(metadata.vendor_outreach_draft_body ?? ""), /Hi Harbour Photos/);
+  assert.deepEqual(metadata.vendor_outreach_request_checklist, [
+    "availability",
+    "package inclusions",
+    "current quote",
+    "deposit",
+    "payment schedule",
+    "overtime fees",
+    "travel fees",
+    "exclusions",
+    "cancellation terms",
+  ]);
+});
+
 test("buildWeddingBudgetTrackingState extracts payment review tasks from budget sheets", () => {
   const state = buildWeddingBudgetTrackingState({
     artifacts: [{
@@ -248,6 +291,48 @@ test("buildWeddingBudgetPaymentTaskItems creates searchable payment-review task 
     }],
   });
   assert.equal(duplicate.length, 0);
+});
+
+test("buildWeddingVendorPursuitClosureTaskItem archives a selected vendor and suppresses regenerated outreach", () => {
+  const state = buildWeddingBudgetTrackingState({
+    decisionRecords: [
+      decision({
+        id: "decision:florist",
+        artifactTitle: "Florist shortlist",
+        selectedOptionLabel: "Petal Studio",
+        selectedOptionDetail: "Projected package $2200, request current quote",
+        selectedOptionCells: ["Petal Studio", "Floral Designer", "$2,200"],
+      }),
+    ],
+  });
+  const lineItem = state.lineItems[0];
+  assert.ok(lineItem);
+
+  const closure = buildWeddingVendorPursuitClosureTaskItem({
+    lineItem,
+    metadata: {
+      wedding_plan_id: "wedding_plan:budget",
+      response_workspace_id: "response_workspace:budget",
+    },
+    reason: "chose_another_vendor",
+    note: "Harbour Blooms is a better fit.",
+    closedAt: "2026-09-28T00:00:00.000Z",
+  });
+  const metadata = record(closure.metadata);
+
+  assert.equal(closure.reviewStatus, "ignored");
+  assert.equal(closure.approvalState, "archived");
+  assert.equal(metadata.vendor_outreach_pursuit_status, "not_pursuing");
+  assert.equal(metadata.vendor_outreach_line_item_id, lineItem.id);
+  assert.equal(metadata.budget_line_item_id, lineItem.id);
+  assert.equal(metadata.outreach_escalation_stage, "closed");
+  assert.match(closure.notes ?? "", /Harbour Blooms is a better fit/);
+
+  const regenerated = buildWeddingBudgetVendorOutreachTaskItems({
+    budgetTracking: state,
+    existingTaskItems: [closure],
+  });
+  assert.equal(regenerated.length, 0);
 });
 
 test("buildWeddingBudgetTrackingState surfaces a saved budget allocation without treating it as a vendor spend line", () => {

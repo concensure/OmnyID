@@ -78,6 +78,17 @@ export function weddingTimelineSidebarAction(
   };
 }
 
+export function weddingTimelinePrimarySidebarAction(
+  state: WeddingResponseWorkspaceViewState,
+  rowId?: string | null,
+): WeddingWorkspaceSidebarAction {
+  return weddingTimelineSidebarAction(
+    state.ganttTimeline.rows.length > 0 ? "open_calendar" : "open_tasks",
+    state,
+    rowId ?? undefined,
+  );
+}
+
 export function weddingBudgetSidebarAction(state: WeddingResponseWorkspaceViewState): WeddingWorkspaceSidebarAction {
   return {
     kind: "open_budget",

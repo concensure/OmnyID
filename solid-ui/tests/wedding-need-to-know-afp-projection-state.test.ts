@@ -27,6 +27,7 @@ function projectionContext() {
     location: "Sydney NSW",
     guestCount: 80,
     budgetComfort: "Mid-range",
+    familyOrStakeholderRoles: "Alex and Sam",
     topPriorities: ["food", "photos"],
     noimDownloaded: "no",
     celebrantPath: "need_options",
@@ -46,8 +47,16 @@ test("weddingNeedToKnowContextToAfpMessage creates a searchable AFP context note
   assert.ok(message.supertags.includes("wedding_need_to_know"));
   assert.ok(message.supertags.includes("location:sydney-nsw"));
   assert.equal(message.content.response_workspace_id, "response_workspace:harbour");
+  assert.equal(message.content.semantic_object.kind, "wedding_active_loop");
+  assert.equal(message.content.semantic_object.stateLabel, "Ready for first recommendations");
+  assert.equal(message.content.semantic_object.actions[0].kind, "generate_wedding_recommendations");
+  assert.equal(message.metadata?.semantic_kind, "wedding_active_loop");
+  assert.ok((message.metadata?.semantic_tags as string[]).includes("wedding_recommendations_ready"));
+  assert.equal(message.views[0]?.content.semantic_object.kind, "wedding_active_loop");
   assert.match(message.content.markdown as string, /Guest count: 80/i);
+  assert.match(message.content.markdown as string, /Couple: Alex and Sam/i);
   assert.ok((message.metadata?.searchable_terms as string[]).includes("Sydney NSW"));
+  assert.ok((message.metadata?.searchable_terms as string[]).includes("Alex and Sam"));
   assert.ok(message.views.some((view) => view.format === "document"));
 });
 
