@@ -11,6 +11,7 @@ import {
   fetchThread,
   orchestrateAgent,
   readSession,
+  retryFederatedAgentMessage,
   sendAfpMessage,
   sendFederatedAgentMessage,
   subscribeThread,
@@ -222,6 +223,59 @@ function isFederatedAgentId(value: string): boolean {
   );
 }
 
+type FederationDeliveryStatus = {
+  label: string;
+  detail: string;
+  tone: "pending" | "sent" | "failed";
+  attemptedMessageId?: string;
+};
+
+function federationDeliveryStatus(message: AfpMessage): FederationDeliveryStatus | null {
+  const content = afpRecord(message.content);
+  const metadata = afpRecord(message.metadata);
+  if (message.subtype === "federated_outbound") {
+    const recipient = typeof content["recipient_agent_id"] === "string"
+      ? content["recipient_agent_id"]
+      : "peer agent";
+    const status = typeof content["delivery_status"] === "string"
+      ? content["delivery_status"].replace(/_/g, " ")
+      : "pending relay";
+    return {
+      label: "Federation pending",
+      detail: `Queued for ${recipient}; ${status}.`,
+      tone: "pending",
+    };
+  }
+  if (message.subtype === "federated_delivery_sent") {
+    const attemptedMessageId = typeof content["attempted_message_id"] === "string"
+      ? content["attempted_message_id"]
+      : typeof metadata["attempted_message_id"] === "string"
+        ? metadata["attempted_message_id"]
+        : undefined;
+    return {
+      label: "Federation accepted",
+      detail: "Peer homeserver accepted the relay request.",
+      tone: "sent",
+      attemptedMessageId,
+    };
+  }
+  if (message.subtype === "federated_delivery_failed") {
+    const attemptedMessageId = typeof content["attempted_message_id"] === "string"
+      ? content["attempted_message_id"]
+      : typeof metadata["attempted_message_id"] === "string"
+        ? metadata["attempted_message_id"]
+        : undefined;
+    const error = typeof content["error"] === "string" ? content["error"] : "Delivery failed.";
+    return {
+      label: "Federation failed",
+      detail: error,
+      tone: "failed",
+      attemptedMessageId,
+    };
+  }
+  return null;
+}
+
 /**
  * Full thread view: loads all AFP messages for a given thread_id,
  * renders each through ViewDispatcher, and keeps the thread live via
@@ -333,6 +387,7 @@ export function ThreadView(props: {
   const [federationBody, setFederationBody] = createSignal("");
   const [federationSending, setFederationSending] = createSignal(false);
   const [federationError, setFederationError] = createSignal("");
+  const [retryingFederationAttemptId, setRetryingFederationAttemptId] = createSignal<string | null>(null);
   let appliedInitialReplyDraft: string | null = null;
   createEffect(() => {
     const draft = props.initialReplyDraft?.trim() ?? "";
@@ -448,8 +503,25 @@ export function ThreadView(props: {
       await reload({ preserveExisting: true });
     } catch (error) {
       setFederationError(error instanceof Error ? error.message : "Federated send failed");
+      await reload({ preserveExisting: true });
     } finally {
       setFederationSending(false);
+    }
+  }
+
+  async function retryFederatedMessage(attemptedMessageId: string) {
+    const messageId = attemptedMessageId.trim();
+    if (!messageId || retryingFederationAttemptId()) return;
+    setRetryingFederationAttemptId(messageId);
+    try {
+      const response = await retryFederatedAgentMessage({ attempted_message_id: messageId });
+      toast.success(response.retried ? "Federation retry sent" : "Federation delivery already accepted");
+      await reload({ preserveExisting: true });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Federation retry failed");
+      await reload({ preserveExisting: true });
+    } finally {
+      setRetryingFederationAttemptId((current) => current === messageId ? null : current);
     }
   }
 
@@ -1254,6 +1326,7 @@ export function ThreadView(props: {
                 const isUser = role === "user" || role === "workspace";
                 const name = senderLabel(msg.from ?? "agent");
                 const mentionsCurrentUser = !isUser && messageMentionsCurrentUser(msg);
+                const federationStatus = federationDeliveryStatus(msg);
                 return (
                   <div
                     class={`group space-y-1.5 rounded-2xl transition ${
@@ -1413,6 +1486,53 @@ export function ThreadView(props: {
                           </Show>
                         </>
                       )}
+                      <Show when={federationStatus}>
+                        {(status) => (
+                          <div
+                            class={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs ${
+                              status().tone === "failed"
+                                ? "border-red-200/80 bg-red-50/80 text-red-800"
+                                : status().tone === "sent"
+                                  ? "border-emerald-200/80 bg-emerald-50/80 text-emerald-800"
+                                  : "border-sky-200/80 bg-sky-50/80 text-sky-800"
+                            }`}
+                          >
+                            <div class="min-w-0">
+                              <p class="font-mono text-[9px] font-semibold uppercase tracking-[0.16em]">
+                                {status().label}
+                              </p>
+                              <p class="mt-0.5 break-words">{status().detail}</p>
+                            </div>
+                            <Show when={status().attemptedMessageId}>
+                              {(attemptedMessageId) => (
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    class="rounded-full border border-current/20 bg-white/60 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] transition hover:bg-white"
+                                    onClick={() => {
+                                      const el = messagesContainerRef?.querySelector(`[data-msg-id="${attemptedMessageId()}"]`) as HTMLElement | null;
+                                      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                      setFocusedMessageId(attemptedMessageId());
+                                    }}
+                                  >
+                                    Attempt
+                                  </button>
+                                  <Show when={status().tone === "failed"}>
+                                    <button
+                                      type="button"
+                                      class="rounded-full border border-current/20 bg-white/70 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                                      disabled={retryingFederationAttemptId() === attemptedMessageId()}
+                                      onClick={() => void retryFederatedMessage(attemptedMessageId())}
+                                    >
+                                      {retryingFederationAttemptId() === attemptedMessageId() ? "Retrying" : "Retry"}
+                                    </button>
+                                  </Show>
+                                </div>
+                              )}
+                            </Show>
+                          </div>
+                        )}
+                      </Show>
                       <Show when={openTraces().has(msg.id)}>
                         <div class="animate-fade-in rounded-xl border border-primary/15 bg-primary/5 p-3">
                           <p class="mb-1 font-mono text-[8px] uppercase tracking-[0.18em] text-outline">Agent intent trace</p>

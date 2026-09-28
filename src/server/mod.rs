@@ -118,6 +118,8 @@ mod dashboard_routes;
 mod dashboard_runtime_routes;
 mod email_group_routes;
 mod export_routes;
+mod federation_delivery_failure;
+mod federation_retry_routes;
 #[cfg(test)]
 mod federation_route_tests;
 mod feed_routes;
@@ -168,6 +170,13 @@ use self::approval_surfaces::{
 use self::auth::*;
 use self::billing::*;
 use self::compat_helpers::*;
+use self::federation_delivery_failure::{
+    build_federated_agent_message, build_federated_delivery_failure_message,
+    build_federated_delivery_sent_message, federation_delivery_error_summary,
+};
+use self::federation_retry_routes::{
+    dispatch_federated_message_with_receipt, federation_retry_http,
+};
 use self::health::*;
 use self::persona_routes::*;
 use self::relay::*;
@@ -1152,6 +1161,7 @@ pub async fn run() {
         .route("/relay/ws", get(relay_ws_http))
         .route("/send", post(send_http))
         .route("/federation/send", post(federation_send_http))
+        .route("/federation/retry", post(federation_retry_http))
         .route("/federation/relay", post(federation_relay_http))
         .route("/thread/{thread_id}", get(get_thread_http))
         .route("/actions/decision", post(record_action_decision_http))
@@ -26535,7 +26545,6 @@ struct FederationSendRequest {
 
 const FEDERATION_SUBJECT_MAX_CHARS: usize = 200;
 const FEDERATION_BODY_MAX_CHARS: usize = 8_000;
-
 fn validate_federation_send_fields(
     recipient_agent_id: &str,
     thread_id: &str,
@@ -26575,75 +26584,6 @@ fn validate_federation_send_fields(
         ));
     }
     Ok(())
-}
-
-fn federation_delivery_thread_id(request_thread_id: &str) -> (String, Option<String>) {
-    let trimmed = request_thread_id.trim();
-    if is_valid_ulid(trimmed) {
-        return (trimmed.to_string(), None);
-    }
-    (Ulid::new().to_string(), Some(trimmed.to_string()))
-}
-
-fn build_federated_agent_message(
-    from_agent_id: &str,
-    recipient_agent_id: &str,
-    request_thread_id: &str,
-    subject: &str,
-    body: &str,
-    sender_user_id: &str,
-) -> AFPMessage {
-    let (delivery_thread_id, source_thread_id) = federation_delivery_thread_id(request_thread_id);
-    let mut content = serde_json::json!({
-        "subject": subject,
-        "body": body,
-        "recipient_agent_id": recipient_agent_id,
-        "delivery_thread_id": delivery_thread_id,
-    });
-    if let Some(source_thread_id) = source_thread_id.as_deref() {
-        content["source_thread_id"] = serde_json::json!(source_thread_id);
-    }
-
-    let mut metadata = serde_json::json!({
-        "origin": "thread_federation_compose",
-        "source": "federation",
-        "delivery": "outbound",
-        "sender_user_id": sender_user_id,
-    });
-    if let Some(source_thread_id) = source_thread_id.as_deref() {
-        metadata["source_thread_id"] = serde_json::json!(source_thread_id);
-        metadata["delivery_thread_id"] = serde_json::json!(delivery_thread_id);
-    }
-
-    AFPMessage {
-        protocol: "afp-v1".to_string(),
-        id: Ulid::new().to_string(),
-        thread_id: delivery_thread_id,
-        parent_id: None,
-        from: from_agent_id.to_string(),
-        to: vec![recipient_agent_id.to_string()],
-        timestamp: chrono::Utc::now().to_rfc3339(),
-        r#type: "agent_message".to_string(),
-        kind: Some("communication".to_string()),
-        supertags: vec!["federation".to_string(), "agent_to_agent".to_string()],
-        subtype: Some("federated_outbound".to_string()),
-        content,
-        metadata: Some(metadata),
-        signature: String::new(),
-        encryption: None,
-        views: vec![serde_json::json!({
-            "format": "rich_text",
-            "priority": 1,
-            "content": {
-                "markdown": format!("### Federated message to `{}`\n\n{}", recipient_agent_id, body)
-            }
-        })],
-        references: vec![],
-        typed_refs: vec![],
-        attachments: vec![],
-        store_in_relational: true,
-        prev_hash: None,
-    }
 }
 
 /// POST /federation/send
@@ -26715,14 +26655,15 @@ async fn federation_send_http(
     .await
     .map_err(status_to_http)?;
 
-    crate::federation::dispatch_relay(
-        serde_json::to_value(&message).map_err(internal_http_error)?,
+    dispatch_federated_message_with_receipt(
+        &state,
+        &user.id,
+        &message,
         recipient_agent_id,
         own_domain,
-        &hex::encode(signing_key),
+        &signing_key,
     )
-    .await
-    .map_err(|err| (StatusCode::BAD_GATEWAY, err.to_string()))?;
+    .await?;
 
     Ok(Json(serde_json::json!({
         "success": true,

@@ -4339,6 +4339,20 @@ export const sendFederatedAgentMessage = (body: {
     method: "POST",
     bodyJson: body,
   });
+export const retryFederatedAgentMessage = (body: {
+  attempted_message_id: string;
+}) =>
+  apiFetch<{
+    success: boolean;
+    retried: boolean;
+    message_id: string;
+    thread_id?: string;
+    recipient_agent_id: string;
+    delivery_status?: string;
+  }>("/federation/retry", {
+    method: "POST",
+    bodyJson: body,
+  });
 export const fetchThreadRelatedContext = (
   messageId: string,
   options?: { limit?: number; type?: string },

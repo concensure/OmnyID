@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   fetchGmailOAuthUrl,
   fetchGmailStatus,
+  retryFederatedAgentMessage,
   sendAfpMessage,
   sendAfpPayloadMessage,
   sendFederatedAgentMessage,
@@ -125,6 +126,43 @@ test("sendFederatedAgentMessage posts the signed relay compose request shape", a
       thread_id: "01K8THREAD0000000000000000",
       subject: "Planning handoff",
       body: "Can your agent review this plan?",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("retryFederatedAgentMessage posts the retry request shape", async () => {
+  const originalFetch = globalThis.fetch;
+  let seenPath = "";
+  let seenBody: Record<string, unknown> | null = null;
+  globalThis.fetch = async (input, init) => {
+    seenPath = String(input);
+    seenBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    return jsonResponse({
+      success: true,
+      retried: true,
+      message_id: "01K8FEDERATEDMESSAGE0000000",
+      thread_id: "01K8DELIVERYTHREAD00000000",
+      recipient_agent_id: "agent:casey@example.net",
+      delivery_status: "already_accepted",
+    });
+  };
+
+  try {
+    const response = await retryFederatedAgentMessage({
+      attempted_message_id: "01K8FEDERATEDMESSAGE0000000",
+    });
+
+    assert.equal(response.success, true);
+    assert.equal(response.retried, true);
+    assert.equal(response.message_id, "01K8FEDERATEDMESSAGE0000000");
+    assert.equal(response.thread_id, "01K8DELIVERYTHREAD00000000");
+    assert.equal(response.recipient_agent_id, "agent:casey@example.net");
+    assert.equal(response.delivery_status, "already_accepted");
+    assert.equal(seenPath, "/federation/retry");
+    assert.deepEqual(seenBody, {
+      attempted_message_id: "01K8FEDERATEDMESSAGE0000000",
     });
   } finally {
     globalThis.fetch = originalFetch;
