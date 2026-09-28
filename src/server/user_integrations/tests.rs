@@ -3,6 +3,10 @@
 // @primary-capability: user-integration-route-tests
 // @stability: test
 
+use super::calendar::{
+    calendar_google_oauth_client_id_configured, calendar_google_oauth_client_secret_configured,
+    calendar_google_oauth_client_source, calendar_google_oauth_is_fully_configured,
+};
 use super::{
     gmail_access_token_from_token_response, gmail_connection_change_requires_recent_session,
     gmail_oauth_client_id_configured, gmail_oauth_client_secret_configured,
@@ -221,6 +225,73 @@ fn gmail_oauth_config_payload_returns_redacted_diagnostics() {
     );
     assert!(!payload.to_string().contains("gmail-client-secret"));
     assert!(!payload.to_string().contains("session-secret"));
+
+    unsafe {
+        std::env::remove_var("OMNYID_GMAIL_CLIENT_ID");
+        std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET");
+        std::env::remove_var("OMNYID_HOMESERVER_URL");
+        std::env::remove_var("OMNYID_SESSION_SECRET");
+    }
+}
+
+#[test]
+fn calendar_oauth_prefers_dedicated_google_calendar_client() {
+    let _guard = env_lock().lock().expect("env lock");
+    unsafe {
+        std::env::set_var("OMNYID_GOOGLE_CALENDAR_CLIENT_ID", "calendar-client-id");
+        std::env::set_var(
+            "OMNYID_GOOGLE_CALENDAR_CLIENT_SECRET",
+            "calendar-client-secret",
+        );
+        std::env::set_var("OMNYID_GMAIL_CLIENT_ID", "gmail-client-id");
+        std::env::set_var("OMNYID_GMAIL_CLIENT_SECRET", "gmail-client-secret");
+        std::env::set_var("OMNYID_HOMESERVER_URL", "https://api.omnyid.com");
+        std::env::set_var("OMNYID_SESSION_SECRET", "session-secret");
+    }
+
+    assert_eq!(
+        calendar_google_oauth_client_id_configured().expect("calendar client id"),
+        "calendar-client-id"
+    );
+    assert_eq!(
+        calendar_google_oauth_client_secret_configured().expect("calendar client secret"),
+        "calendar-client-secret"
+    );
+    assert_eq!(calendar_google_oauth_client_source(), "calendar");
+    assert!(calendar_google_oauth_is_fully_configured());
+
+    unsafe {
+        std::env::remove_var("OMNYID_GOOGLE_CALENDAR_CLIENT_ID");
+        std::env::remove_var("OMNYID_GOOGLE_CALENDAR_CLIENT_SECRET");
+        std::env::remove_var("OMNYID_GMAIL_CLIENT_ID");
+        std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET");
+        std::env::remove_var("OMNYID_HOMESERVER_URL");
+        std::env::remove_var("OMNYID_SESSION_SECRET");
+    }
+}
+
+#[test]
+fn calendar_oauth_falls_back_to_gmail_client_when_calendar_client_missing() {
+    let _guard = env_lock().lock().expect("env lock");
+    unsafe {
+        std::env::remove_var("OMNYID_GOOGLE_CALENDAR_CLIENT_ID");
+        std::env::remove_var("OMNYID_GOOGLE_CALENDAR_CLIENT_SECRET");
+        std::env::set_var("OMNYID_GMAIL_CLIENT_ID", "gmail-client-id");
+        std::env::set_var("OMNYID_GMAIL_CLIENT_SECRET", "gmail-client-secret");
+        std::env::set_var("OMNYID_HOMESERVER_URL", "https://api.omnyid.com");
+        std::env::set_var("OMNYID_SESSION_SECRET", "session-secret");
+    }
+
+    assert_eq!(
+        calendar_google_oauth_client_id_configured().expect("gmail fallback client id"),
+        "gmail-client-id"
+    );
+    assert_eq!(
+        calendar_google_oauth_client_secret_configured().expect("gmail fallback client secret"),
+        "gmail-client-secret"
+    );
+    assert_eq!(calendar_google_oauth_client_source(), "gmail_fallback");
+    assert!(calendar_google_oauth_is_fully_configured());
 
     unsafe {
         std::env::remove_var("OMNYID_GMAIL_CLIENT_ID");

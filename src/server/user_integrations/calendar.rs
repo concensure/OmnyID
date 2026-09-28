@@ -40,14 +40,60 @@ fn calendar_google_oauth_redirect_uri() -> Result<String, (StatusCode, String)> 
     Ok(format!("{trimmed}/calendar/google/callback"))
 }
 
-fn calendar_google_oauth_is_fully_configured() -> bool {
-    gmail_oauth_client_id_configured().is_ok()
-        && gmail_oauth_client_secret_configured().is_ok()
+pub(super) fn calendar_google_oauth_is_fully_configured() -> bool {
+    calendar_google_oauth_client_id_configured().is_ok()
+        && calendar_google_oauth_client_secret_configured().is_ok()
         && calendar_google_oauth_redirect_uri().is_ok()
         && oauth_csrf_secret().is_ok()
 }
 
-/// GET /calendar/google/connect-url — returns the Google OAuth authorization URL for Calendar scopes
+pub(super) fn calendar_google_oauth_client_id_configured() -> Result<String, (StatusCode, String)> {
+    for env_key in [
+        "OMNYID_GOOGLE_CALENDAR_CLIENT_ID",
+        "OMNYID_ADMIN_GOOGLE_CALENDAR_CLIENT_ID",
+    ] {
+        if let Ok(client_id) = std::env::var(env_key) {
+            let trimmed = client_id.trim();
+            if !trimmed.is_empty() {
+                return Ok(trimmed.to_string());
+            }
+        }
+    }
+    gmail_oauth_client_id_configured()
+}
+
+pub(super) fn calendar_google_oauth_client_secret_configured()
+-> Result<String, (StatusCode, String)> {
+    for env_key in [
+        "OMNYID_GOOGLE_CALENDAR_CLIENT_SECRET",
+        "OMNYID_ADMIN_GOOGLE_CALENDAR_CLIENT_SECRET",
+        "GOOGLE_CALENDAR_CLIENT_SECRET",
+        "GOOGLE_CLIENT_SECRET",
+    ] {
+        if let Some(secret) = read_process_secret_trimmed(env_key) {
+            return Ok(secret);
+        }
+    }
+    gmail_oauth_client_secret_configured()
+}
+
+pub(super) fn calendar_google_oauth_client_source() -> &'static str {
+    if std::env::var("OMNYID_GOOGLE_CALENDAR_CLIENT_ID")
+        .ok()
+        .is_some_and(|value| !value.trim().is_empty())
+    {
+        return "calendar";
+    }
+    if std::env::var("OMNYID_ADMIN_GOOGLE_CALENDAR_CLIENT_ID")
+        .ok()
+        .is_some_and(|value| !value.trim().is_empty())
+    {
+        return "admin_calendar";
+    }
+    "gmail_fallback"
+}
+
+/// GET /calendar/google/connect-url - returns the Google OAuth authorization URL for Calendar scopes.
 pub(super) async fn calendar_google_connect_url_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -56,7 +102,7 @@ pub(super) async fn calendar_google_connect_url_http(
     if gmail_connection_change_requires_recent_session() {
         require_recent_high_risk_session(&session)?;
     }
-    let client_id = gmail_oauth_client_id_configured()?;
+    let client_id = calendar_google_oauth_client_id_configured()?;
     let redirect_uri = calendar_google_oauth_redirect_uri()?;
     let signed_state = gmail_oauth_state_sign(&user.id)?;
     let url = google_oauth_authorization_url(
@@ -77,13 +123,14 @@ pub(super) async fn calendar_google_config_http(
     let redirect_uri = calendar_google_oauth_redirect_uri().ok();
     Ok(Json(serde_json::json!({
         "configured": calendar_google_oauth_is_fully_configured(),
-        "client_id_configured": gmail_oauth_client_id_configured().is_ok(),
-        "client_secret_configured": gmail_oauth_client_secret_configured().is_ok(),
+        "client_id_configured": calendar_google_oauth_client_id_configured().is_ok(),
+        "client_secret_configured": calendar_google_oauth_client_secret_configured().is_ok(),
         "csrf_secret_configured": oauth_csrf_secret().is_ok(),
         "homeserver_url_configured": redirect_uri.is_some(),
         "redirect_uri": redirect_uri,
         "required_authorized_redirect_uri": redirect_uri,
         "required_scopes": GOOGLE_CALENDAR_SCOPES.split_whitespace().collect::<Vec<_>>(),
+        "oauth_client_source": calendar_google_oauth_client_source(),
     })))
 }
 
@@ -120,13 +167,13 @@ pub(super) async fn calendar_google_callback_http(
         }
     };
 
-    let Ok(client_id) = gmail_oauth_client_id_configured() else {
+    let Ok(client_id) = calendar_google_oauth_client_id_configured() else {
         return axum::response::Redirect::temporary(&calendar_google_oauth_redirect_target(
             "not_configured",
         ))
         .into_response();
     };
-    let Ok(client_secret) = gmail_oauth_client_secret_configured() else {
+    let Ok(client_secret) = calendar_google_oauth_client_secret_configured() else {
         return axum::response::Redirect::temporary(&calendar_google_oauth_redirect_target(
             "not_configured",
         ))
@@ -395,8 +442,8 @@ async fn calendar_google_ensure_access_token(
                     .to_string(),
             )
         })?;
-    let client_id = gmail_oauth_client_id_configured()?;
-    let client_secret = gmail_oauth_client_secret_configured()?;
+    let client_id = calendar_google_oauth_client_id_configured()?;
+    let client_secret = calendar_google_oauth_client_secret_configured()?;
 
     let resp = reqwest::Client::new()
         .post("https://oauth2.googleapis.com/token")
