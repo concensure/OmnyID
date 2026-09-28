@@ -152,6 +152,7 @@ mod ui_decision_routes;
 mod user_integrations;
 mod user_management_routes;
 mod value_signal_helpers;
+mod wedding_understanding_routes;
 mod workflow_connector_bindings;
 mod workflow_skill_capsule_runtime;
 mod workspace_routes;
@@ -1148,6 +1149,8 @@ pub async fn run() {
         .route("/ingest/internal/{event_type}", post(internal_ingest_http))
         .route("/relay/ws", get(relay_ws_http))
         .route("/send", post(send_http))
+        .route("/federation/send", post(federation_send_http))
+        .route("/federation/relay", post(federation_relay_http))
         .route("/thread/{thread_id}", get(get_thread_http))
         .route("/actions/decision", post(record_action_decision_http))
         .route("/actions/execute", post(execute_action_http))
@@ -1270,6 +1273,7 @@ pub async fn run() {
         .merge(ui_decision_routes::routes())
         .merge(user_integrations::routes())
         .merge(user_management_routes::routes())
+        .merge(wedding_understanding_routes::routes())
         .merge(workspace_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
@@ -5372,7 +5376,21 @@ async fn serve_agent_card(
 }
 
 async fn serve_afp_delegation() -> Json<Value> {
+    let card = AgentCard::from_env();
+    let relay_endpoint = std::env::var("OMNYID_AFP_RELAY_ENDPOINT")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| {
+            let base = std::env::var("OMNYID_HOMESERVER_URL")
+                .unwrap_or_else(|_| "https://your-homeserver:8080".to_string());
+            format!("{}/federation/relay", base.trim_end_matches('/'))
+        });
+
     Json(serde_json::json!({
+        "agent_id": card.agent_id,
+        "relay_endpoint": relay_endpoint,
+        "signing_key": card.public_key_hex,
+        "version": "1.0",
         "afp.server": std::env::var("OMNYID_AFP_DELEGATION")
             .unwrap_or_else(|_| "homeserver.yourdomain.ai:443".to_string())
     }))
@@ -26504,6 +26522,189 @@ async fn export_json_ld_http(
 
 // -- Federation inbound handler -------------------------------------------------
 
+#[derive(serde::Deserialize)]
+struct FederationSendRequest {
+    recipient_agent_id: String,
+    thread_id: String,
+    body: String,
+    #[serde(default)]
+    subject: Option<String>,
+}
+
+fn federation_delivery_thread_id(request_thread_id: &str) -> (String, Option<String>) {
+    let trimmed = request_thread_id.trim();
+    if is_valid_ulid(trimmed) {
+        return (trimmed.to_string(), None);
+    }
+    (Ulid::new().to_string(), Some(trimmed.to_string()))
+}
+
+fn build_federated_agent_message(
+    from_agent_id: &str,
+    recipient_agent_id: &str,
+    request_thread_id: &str,
+    subject: &str,
+    body: &str,
+    sender_user_id: &str,
+) -> AFPMessage {
+    let (delivery_thread_id, source_thread_id) = federation_delivery_thread_id(request_thread_id);
+    let mut content = serde_json::json!({
+        "subject": subject,
+        "body": body,
+        "recipient_agent_id": recipient_agent_id,
+        "delivery_thread_id": delivery_thread_id,
+    });
+    if let Some(source_thread_id) = source_thread_id.as_deref() {
+        content["source_thread_id"] = serde_json::json!(source_thread_id);
+    }
+
+    let mut metadata = serde_json::json!({
+        "origin": "thread_federation_compose",
+        "source": "federation",
+        "delivery": "outbound",
+        "sender_user_id": sender_user_id,
+    });
+    if let Some(source_thread_id) = source_thread_id.as_deref() {
+        metadata["source_thread_id"] = serde_json::json!(source_thread_id);
+        metadata["delivery_thread_id"] = serde_json::json!(delivery_thread_id);
+    }
+
+    AFPMessage {
+        protocol: "afp-v1".to_string(),
+        id: Ulid::new().to_string(),
+        thread_id: delivery_thread_id,
+        parent_id: None,
+        from: from_agent_id.to_string(),
+        to: vec![recipient_agent_id.to_string()],
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        r#type: "agent_message".to_string(),
+        kind: Some("communication".to_string()),
+        supertags: vec!["federation".to_string(), "agent_to_agent".to_string()],
+        subtype: Some("federated_outbound".to_string()),
+        content,
+        metadata: Some(metadata),
+        signature: String::new(),
+        encryption: None,
+        views: vec![serde_json::json!({
+            "format": "rich_text",
+            "priority": 1,
+            "content": {
+                "markdown": format!("### Federated message to `{}`\n\n{}", recipient_agent_id, body)
+            }
+        })],
+        references: vec![],
+        typed_refs: vec![],
+        attachments: vec![],
+        store_in_relational: true,
+        prev_hash: None,
+    }
+}
+
+/// POST /federation/send
+///
+/// Authenticated UI endpoint for sending a signed AFP message to a peer agent on
+/// another homeserver. Stores the outbound message locally, then relays it using
+/// `.well-known/afp-delegation` discovery.
+async fn federation_send_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<FederationSendRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("federation_send", &headers),
+        RateLimitPolicy {
+            max_requests: 20,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let user = authenticated_user(&state.db, &headers).await?;
+
+    let recipient_agent_id = req.recipient_agent_id.trim();
+    if crate::federation::parse_agent_id(recipient_agent_id).is_none() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "recipient_agent_id must look like agent:name@example.com".to_string(),
+        ));
+    }
+    let body = req.body.trim();
+    if body.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "message body is required".to_string(),
+        ));
+    }
+    let thread_id = req.thread_id.trim();
+    if thread_id.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "thread_id is required for federated delivery".to_string(),
+        ));
+    }
+
+    let local_card = AgentCard::from_env();
+    let Some((_, own_domain)) = crate::federation::parse_agent_id(&local_card.agent_id) else {
+        return Err((
+            StatusCode::PRECONDITION_FAILED,
+            "OMNYID_AGENT_ID must be a valid agent id before federation can send".to_string(),
+        ));
+    };
+    let signing_key = env_hex_32("OMNYID_SIGNING_KEY_HEX")
+        .map_err(|err| (StatusCode::PRECONDITION_FAILED, err))?
+        .ok_or_else(|| {
+            (
+                StatusCode::PRECONDITION_FAILED,
+                "OMNYID_SIGNING_KEY_HEX is required for signed federation send".to_string(),
+            )
+        })?;
+
+    let subject = req
+        .subject
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("Agent to agent message");
+    let mut message = build_federated_agent_message(
+        &local_card.agent_id,
+        recipient_agent_id,
+        thread_id,
+        subject,
+        body,
+        &user.id,
+    );
+    sign_message(&mut message, &signing_key);
+
+    let message_id = message.id.clone();
+    let delivery_thread_id = message.thread_id.clone();
+    store_private_app_message(
+        &state.db,
+        &state.metrics,
+        &state.relay_tx,
+        &user.id,
+        message.clone(),
+    )
+    .await
+    .map_err(status_to_http)?;
+
+    crate::federation::dispatch_relay(
+        serde_json::to_value(&message).map_err(internal_http_error)?,
+        recipient_agent_id,
+        own_domain,
+        &hex::encode(signing_key),
+    )
+    .await
+    .map_err(|err| (StatusCode::BAD_GATEWAY, err.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message_id": message_id,
+        "thread_id": delivery_thread_id,
+        "source_thread_id": if delivery_thread_id == thread_id { Value::Null } else { Value::String(thread_id.to_string()) },
+        "recipient_agent_id": recipient_agent_id,
+    })))
+}
+
 // GAP-110: in-process nonce store for federation replay protection.
 // Nonces are ULIDs (time-prefixed); entries older than 5 minutes are pruned on access.
 fn federation_seen_nonces()
@@ -31101,6 +31302,94 @@ mod tests {
         unsafe {
             std::env::remove_var("OMNYID_AFP_DELEGATION");
         }
+    }
+
+    #[tokio::test]
+    async fn delegation_endpoint_serves_federation_document_shape() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_AGENT_ID", "agent:test@omnyid.test");
+            std::env::set_var("OMNYID_HOMESERVER_URL", "https://omnyid.test");
+            std::env::set_var(
+                "OMNYID_SIGNING_KEY_HEX",
+                "abababababababababababababababababababababababababababababababab",
+            );
+            std::env::remove_var("OMNYID_AFP_RELAY_ENDPOINT");
+        }
+
+        let payload = serve_afp_delegation().await.0;
+
+        assert_eq!(payload["agent_id"], "agent:test@omnyid.test");
+        assert_eq!(
+            payload["relay_endpoint"],
+            "https://omnyid.test/federation/relay"
+        );
+        assert_eq!(payload["version"], "1.0");
+        assert!(
+            payload["signing_key"]
+                .as_str()
+                .is_some_and(|value| value.len() == 64)
+        );
+
+        unsafe {
+            std::env::remove_var("OMNYID_AGENT_ID");
+            std::env::remove_var("OMNYID_HOMESERVER_URL");
+            std::env::remove_var("OMNYID_SIGNING_KEY_HEX");
+            std::env::remove_var("OMNYID_AFP_RELAY_ENDPOINT");
+        }
+    }
+
+    #[test]
+    fn federation_send_and_relay_routes_are_registered() {
+        let source = include_str!("mod.rs");
+        assert!(source.contains(r#".route("/federation/send", post(federation_send_http))"#));
+        assert!(source.contains(r#".route("/federation/relay", post(federation_relay_http))"#));
+        assert!(
+            source.contains(r#".route("/.well-known/afp-delegation", get(serve_afp_delegation))"#)
+        );
+    }
+
+    #[test]
+    fn federated_agent_message_preserves_ulid_thread_id() {
+        let message = super::build_federated_agent_message(
+            "agent:local@omnyid.test",
+            "agent:peer@example.net",
+            "01K8THREAD0000000000000000",
+            "Subject",
+            "Body",
+            "user-1",
+        );
+
+        assert_eq!(message.thread_id, "01K8THREAD0000000000000000");
+        assert_eq!(message.content["delivery_thread_id"], message.thread_id);
+        assert!(message.content.get("source_thread_id").is_none());
+        let metadata = message.metadata.as_ref().expect("metadata");
+        assert!(metadata.get("source_thread_id").is_none());
+    }
+
+    #[test]
+    fn federated_agent_message_uses_delivery_thread_for_semantic_source_thread() {
+        let message = super::build_federated_agent_message(
+            "agent:local@omnyid.test",
+            "agent:peer@example.net",
+            "wedding_vendor_quote:workspace-1:chloes-florals",
+            "Subject",
+            "Body",
+            "user-1",
+        );
+
+        assert!(super::is_valid_ulid(&message.thread_id));
+        assert_eq!(message.content["delivery_thread_id"], message.thread_id);
+        assert_eq!(
+            message.content["source_thread_id"],
+            "wedding_vendor_quote:workspace-1:chloes-florals"
+        );
+        let metadata = message.metadata.as_ref().expect("metadata");
+        assert_eq!(
+            metadata["source_thread_id"],
+            "wedding_vendor_quote:workspace-1:chloes-florals"
+        );
+        assert_eq!(metadata["delivery_thread_id"], message.thread_id);
     }
 
     #[test]

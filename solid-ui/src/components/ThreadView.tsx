@@ -1,14 +1,134 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
-import type { AfpMessage } from "@/lib/api";
+import { Portal } from "solid-js/web";
+import type { AfpMessage, DashboardBootstrap } from "@/lib/api";
+import type {
+  WorkspaceAssistNavigationView,
+  WorkspaceAssistDraftRefreshInput,
+  WorkspaceAssistRefreshOrigin,
+} from "@/lib/workspaceAssist";
 import { AlternateViewsInspector } from "@/components/AlternateViewsInspector";
-import { fetchThread, orchestrate, subscribeThread } from "@/lib/api";
+import {
+  fetchThread,
+  orchestrateAgent,
+  readSession,
+  sendAfpMessage,
+  sendFederatedAgentMessage,
+  subscribeThread,
+} from "@/lib/api";
+import { EmptyState } from "@/components/EmptyState";
 import { ViewDispatcher } from "@/components/ViewDispatcher";
 import { GlassPanel } from "@/components/GlassPanel";
+import { ProcessingGlyph } from "@/components/ProcessingGlyph";
 import { ThreadMiniMap } from "@/components/ThreadMiniMap";
+import { Tip } from "@/components/Tip";
+import { toast } from "@/components/Toast";
+import { openObjectSearch } from "@/lib/objectSearchNavigation";
+import { dispatchOpenThreadEvent } from "@/lib/openThreadEvent";
+import { loadUserProfile } from "@/lib/profileLocalState";
+import {
+  loadThreadViewLastReadMessageId,
+  loadThreadViewReactions,
+  loadThreadViewScrollPosition,
+  loadThreadViewStarredMessageIds,
+  saveThreadViewLastReadMessageId,
+  saveThreadViewReactions,
+  saveThreadViewScrollPosition,
+  saveThreadViewStarredMessageIds,
+} from "@/lib/threadViewLocalState";
+import { WorkspaceAssistPanel } from "@/components/WorkspaceAssistPanel";
+import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import {
+  detectWorkspaceAssistTopic,
+  selectWorkspaceAssistSuggestion,
+} from "afp-ts/workspace-assistance";
+import {
+  buildDashboardWorkspaceAssistCandidates,
+  buildDashboardWorkspaceAssistRecentTitles,
+  workspaceAssistNavigationView,
+} from "@/lib/workspaceAssist";
+import {
+  buildThreadOrchestrationFailureReceipt,
+  type ThreadOrchestrationFailureReceipt,
+} from "@/lib/threadOrchestrationFailureState";
+import {
+  buildThreadLoadFailureReceipt,
+  type ThreadLoadFailureReceipt,
+} from "@/lib/threadLoadFailureState";
+import { afpRecord } from "@/lib/afpMessageRecord";
+import { loadAgentResponseStylePayload } from "@/lib/agentResponseStyle";
+import {
+  absoluteUtcTimestamp,
+  displayMessageTimestamp,
+  relativeMessageTime,
+} from "@/lib/messageTimestampPresentation";
+import {
+  senderColorClassForThreadView,
+  threadViewAtSuggestions,
+  threadViewMentionAliases,
+  threadViewMessageCostCents,
+  threadViewMessageMentionsCurrentUser,
+  threadViewMessageMetadata,
+  threadViewMessageObjectSearchSeed,
+  threadViewMessageSmtpId,
+  threadViewMessageStringValues,
+  threadViewMessageTextContent,
+  threadViewMessageWordCount,
+  threadViewObjectSearchSeed,
+  threadViewRecentTitles,
+  threadViewSenderCounts,
+  threadViewSenderLabel,
+  threadViewSenderRole,
+  threadViewTokenEstimate,
+  threadViewTotalCostCents,
+  threadViewTypingStatusLabel,
+  threadViewTypingTask,
+  threadViewMessageDates,
+} from "@/lib/threadViewPresentationState";
+import {
+  threadViewBuildRawMessageById,
+  threadViewBuildRenderEntries,
+  threadViewBuildRenderUnits,
+  threadViewDateLabel,
+  threadViewFilterRenderEntriesByQuery,
+  threadViewFilterRenderEntriesBySender,
+  threadViewMessageContentCardId,
+  threadViewRenderableEntries,
+  threadViewRenderUnitMessage,
+  type ThreadViewRenderEntry,
+  type ThreadViewRenderUnit,
+} from "@/lib/threadViewRenderState";
 
-const STARRED_KEY = "omnyid.thread.starred";
-const REACTIONS = ["👍", "❤️", "💡", "✅"] as const;
-const REACTIONS_KEY = "omnyid.thread.reactions";
+const REACTIONS = ["+1", "heart", "ok", "idea"] as const;
+
+const AFP_TYPE_DEFS: Record<string, string> = {
+  note: "Free-form note stored in the append-only message log",
+  task: "Action item assigned to a user or agent",
+  summary: "Agent-generated distillation of thread or document content",
+  research: "Agent research result with sources and citations",
+  knowledge_card: "Curated knowledge atom indexed by the Knowledge Curator",
+  daemon_heartbeat: "Periodic liveness ping emitted by a background daemon",
+  backlink_update: "Audit record of a cross-reference between two messages",
+  email_inbound: "Incoming email captured from the Email Gateway",
+  email_draft: "Outbound email draft pending user review",
+  proactive_suggestion: "Agent-initiated recommendation without a user prompt",
+  clarification_request: "Agent asking for more information before proceeding",
+  branch_create: "Agent opened a copy-on-write branch for exploratory work",
+  branch_merge: "Agent branch merged back into the main message log",
+  workspace_create: "New ephemeral workspace initialised for isolated work",
+  agent_task: "Sub-task dispatched to a specialist agent",
+  generative_card: "Rich multi-section card built incrementally by an agent",
+  card_section_update: "Incremental update to an in-progress generative card",
+  approval_request: "Agent requesting user sign-off before a high-impact action",
+  approval_response: "User grant or denial in response to an approval request",
+};
+
+const QUICK_REPLIES = ["Tell me more", "Summarise this", "What's next?"] as const;
+const TYPING_FALLBACK_LABELS = [
+  "Searching...",
+  "Reading context...",
+  "Drafting...",
+  "Reviewing...",
+] as const;
 
 const SENDER_COLORS = [
   "border-l-2 border-l-sky-400/50",
@@ -16,32 +136,88 @@ const SENDER_COLORS = [
   "border-l-2 border-l-emerald-400/50",
   "border-l-2 border-l-rose-400/50",
   "border-l-2 border-l-amber-400/50",
-];
+] as const;
+type MessageContextMenuState = {
+  msgId: string;
+  x: number;
+  y: number;
+};
 function senderColorClass(senderName: string): string {
-  let h = 0;
-  for (let i = 0; i < senderName.length; i++) h = (h * 31 + senderName.charCodeAt(i)) & 0xffff;
-  return SENDER_COLORS[h % SENDER_COLORS.length];
+  return senderColorClassForThreadView(senderName, SENDER_COLORS);
+}
+
+function buildMessageObjectSearchSeed(message: AfpMessage): string {
+  return threadViewMessageObjectSearchSeed(message);
 }
 
 function senderLabel(from: string): string {
-  // "omnyid://agent/knowledge_curator" → "knowledge_curator"
-  const parts = from.split("/").filter(Boolean);
-  const raw = parts[parts.length - 1] ?? from;
-  return raw.replace(/_/g, " ");
+  return threadViewSenderLabel(from);
 }
 
 function senderRole(from: string): string {
-  const parts = from.split("/").filter(Boolean);
-  // segment before the name: "agent", "workspace", "user"
-  return parts[parts.length - 2] ?? "";
+  return threadViewSenderRole(from);
 }
 
 function relativeTime(ts: string): string {
-  const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  return relativeMessageTime(ts);
+}
+
+function displayTimestamp(ts: string): string {
+  return displayMessageTimestamp(ts);
+}
+
+function buildThreadObjectSearchSeed(messages: AfpMessage[]): string {
+  return threadViewObjectSearchSeed(messages);
+}
+
+function mentionAliasesFromProfile(): string[] {
+  if (typeof window === "undefined") return [];
+  const profile = loadUserProfile(readSession()?.user?.id ?? null);
+  return threadViewMentionAliases(profile.displayName);
+}
+
+function messageTextContent(message: AfpMessage): string {
+  return threadViewMessageTextContent(message);
+}
+
+function messageStringValues(message: AfpMessage): string[] {
+  return threadViewMessageStringValues(message);
+}
+
+function messageWordCount(message: AfpMessage): number {
+  return threadViewMessageWordCount(message);
+}
+
+function messageMetadata(message: AfpMessage): Record<string, unknown> | undefined {
+  return threadViewMessageMetadata(message);
+}
+
+function messageCostCents(message: AfpMessage): number {
+  return threadViewMessageCostCents(message);
+}
+
+function messageSmtpId(message: AfpMessage): string | null {
+  return threadViewMessageSmtpId(message);
+}
+
+function messageMentionsCurrentUser(message: AfpMessage): boolean {
+  return threadViewMessageMentionsCurrentUser(message, mentionAliasesFromProfile());
+}
+
+function isFederatedAgentId(value: string): boolean {
+  const trimmed = value.trim();
+  const match = /^agent:([A-Za-z0-9._+\-]+)@([A-Za-z0-9.-]+)$/.exec(trimmed);
+  if (!match) return false;
+  const local = match[1] ?? "";
+  const domain = match[2] ?? "";
+  if (!local || local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
+  if (!domain || domain.startsWith(".") || domain.endsWith(".") || domain.includes("..")) return false;
+  return domain.split(".").every((label) =>
+    Boolean(label)
+    && !label.startsWith("-")
+    && !label.endsWith("-")
+    && /^[A-Za-z0-9-]+$/.test(label)
+  );
 }
 
 /**
@@ -49,20 +225,35 @@ function relativeTime(ts: string): string {
  * renders each through ViewDispatcher, and keeps the thread live via
  * the relay WebSocket (/relay/ws subscribe_thread).
  *
- * Agents' view hints (views[].format) take full effect here —
+ * Agents' view hints (views[].format) take full effect here.
  * each message is independently dispatched to its renderer.
  */
-export function ThreadView(props: { threadId: string; advanced?: boolean; onBack?: () => void }) {
+export function ThreadView(props: {
+  threadId: string;
+  initialFocusMessageId?: string | null;
+  initialReplyDraft?: string | null;
+  bootstrap?: DashboardBootstrap | null;
+  advanced?: boolean;
+  onBack?: () => void;
+  onOpenWorkspaceAssist?: (view: WorkspaceAssistNavigationView) => void;
+  onRequestWorkspaceAssistDraftRefresh?: (input: WorkspaceAssistDraftRefreshInput) => void;
+  workspaceAssistRefreshOrigin?: WorkspaceAssistRefreshOrigin | null;
+}) {
   const [messages, setMessages] = createSignal<AfpMessage[]>([]);
   const [loading, setLoading] = createSignal(true);
-  const [error, setError] = createSignal("");
+  const [loadError, setLoadError] = createSignal<ThreadLoadFailureReceipt | null>(null);
+  const [refreshError, setRefreshError] = createSignal<ThreadLoadFailureReceipt | null>(null);
   const [live, setLive] = createSignal(false);
+  const [focusedMessageId, setFocusedMessageId] = createSignal<string | null>(null);
   const [atBottom, setAtBottom] = createSignal(true);
   const [showScrollTop, setShowScrollTop] = createSignal(false);
   const [unseenCount, setUnseenCount] = createSignal(0);
+  const [readingProgress, setReadingProgress] = createSignal(0);
   const [copied, setCopied] = createSignal(false);
   const [copiedMsgId, setCopiedMsgId] = createSignal<string | null>(null);
   const [copiedMsgText, setCopiedMsgText] = createSignal<string | null>(null);
+  const [copiedDeepLinkId, setCopiedDeepLinkId] = createSignal<string | null>(null);
+  const [messageContextMenu, setMessageContextMenu] = createSignal<MessageContextMenuState | null>(null);
   const [showMsgSearch, setShowMsgSearch] = createSignal(false);
   const [msgSearch, setMsgSearch] = createSignal("");
   let msgSearchInputRef: HTMLInputElement | undefined;
@@ -72,26 +263,49 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
       setTimeout(() => setCopiedMsgId((prev) => (prev === id ? null : prev)), 1500);
     });
   }
-  function copyMsgText(content: Record<string, unknown>, msgId: string) {
+  function copyMsgText(content: unknown, msgId: string) {
+    const record = afpRecord(content);
     const parts: string[] = [];
-    const title = content["title"] ?? content["subject"];
+    const title = record["title"] ?? record["subject"];
     if (typeof title === "string" && title) parts.push(title);
-    const body = content["body"] ?? content["summary"] ?? content["description"] ?? content["text"] ?? content["markdown"] ?? content["query"];
+    const body = record["body"] ?? record["summary"] ?? record["description"] ?? record["text"] ?? record["markdown"] ?? record["query"];
     if (typeof body === "string" && body) parts.push(body);
-    const text = parts.join("\n\n") || JSON.stringify(content, null, 2);
+    const text = parts.join("\n\n") || JSON.stringify(record, null, 2);
     navigator.clipboard.writeText(text).then(() => {
       setCopiedMsgText(msgId);
       setTimeout(() => setCopiedMsgText((prev) => (prev === msgId ? null : prev)), 1500);
     });
   }
-  const [starredMsgs, setStarredMsgs] = createSignal<Set<string>>(
-    (() => { try { return new Set<string>(JSON.parse(localStorage.getItem(STARRED_KEY) ?? "[]")); } catch { return new Set<string>(); } })()
-  );
+  function messageDeepLink(msgId: string): string {
+    return `omnyid://thread/${props.threadId}/msg/${msgId}`;
+  }
+  function copyMessageDeepLink(msgId: string) {
+    navigator.clipboard.writeText(messageDeepLink(msgId)).then(() => {
+      setCopiedDeepLinkId(msgId);
+      setTimeout(() => setCopiedDeepLinkId((prev) => (prev === msgId ? null : prev)), 1500);
+    });
+  }
+  function openMessageContextMenu(event: MouseEvent, msgId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    setMessageContextMenu({
+      msgId,
+      x: Math.min(event.clientX, window.innerWidth - 220),
+      y: Math.min(event.clientY, window.innerHeight - 180),
+    });
+  }
+  function closeMessageContextMenu() {
+    setMessageContextMenu(null);
+  }
+  const sessionUserId = readSession()?.user?.id ?? null;
+  const [starredMsgs, setStarredMsgs] = createSignal<Set<string>>(loadThreadViewStarredMessageIds(sessionUserId));
   function toggleStar(id: string) {
-    const next = new Set(starredMsgs());
-    if (next.has(id)) { next.delete(id); } else { next.add(id); }
-    setStarredMsgs(next);
-    localStorage.setItem(STARRED_KEY, JSON.stringify([...next]));
+    setStarredMsgs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return saveThreadViewStarredMessageIds(next, sessionUserId);
+    });
   }
   const [starredNavIdx, setStarredNavIdx] = createSignal(0);
   const [collapsedMsgs, setCollapsedMsgs] = createSignal<Set<string>>(new Set<string>());
@@ -110,26 +324,133 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
   const [replySending, setReplySending] = createSignal(false);
   const [replySent, setReplySent] = createSignal(false);
   const [replyError, setReplyError] = createSignal("");
-  let replyRef: HTMLTextAreaElement | undefined;
+  const [replyFailureReceipt, setReplyFailureReceipt] = createSignal<ThreadOrchestrationFailureReceipt | null>(null);
+  const [federationComposerOpen, setFederationComposerOpen] = createSignal(false);
+  const [federationRecipientAgentId, setFederationRecipientAgentId] = createSignal("");
+  const [federationSubject, setFederationSubject] = createSignal("");
+  const [federationBody, setFederationBody] = createSignal("");
+  const [federationSending, setFederationSending] = createSignal(false);
+  const [federationError, setFederationError] = createSignal("");
+  let appliedInitialReplyDraft: string | null = null;
+  createEffect(() => {
+    const draft = props.initialReplyDraft?.trim() ?? "";
+    if (!draft || draft === appliedInitialReplyDraft || replyText().trim()) return;
+    appliedInitialReplyDraft = draft;
+    setReplyText(draft);
+  });
 
   async function sendReply() {
     const text = replyText().trim();
     if (!text || replySending()) return;
     setReplySending(true);
     setReplyError("");
+    setReplyFailureReceipt(null);
     try {
       const mention = text.match(/^@(\w+)\s+/);
       const routedText = mention ? `[Route to ${mention[1]}]: ${text.slice(mention[0].length)}` : text;
       setAtQuery(null);
-      await orchestrate(routedText, { thread_id: props.threadId });
+      await orchestrateAgent({
+        objective: routedText,
+        thread_id: props.threadId,
+        ...(await loadAgentResponseStylePayload()),
+      });
       setReplyText("");
       setReplySent(true);
       setTimeout(() => setReplySent(false), 2000);
     } catch (e) {
-      setReplyError(e instanceof Error ? e.message : "Send failed");
+      const errorMessage = e instanceof Error ? e.message : "Send failed";
+      const receipt = buildThreadOrchestrationFailureReceipt(errorMessage);
+      setReplyError(receipt.title);
+      setReplyFailureReceipt(receipt);
+      try {
+        const latestMessage = messages()[messages().length - 1] ?? null;
+        await sendAfpMessage({
+          thread_id: props.threadId,
+          parent_id: latestMessage?.id ?? null,
+          from: "agent:thread-assist@omnyid.com",
+          to: [],
+          type: "note",
+          subtype: "thread_orchestration_failure",
+          content: {
+            title: receipt.title,
+            body: `${receipt.summary} ${receipt.nextStep}`,
+            error_summary: receipt.summary,
+            next_step: receipt.nextStep,
+          },
+          views: [
+            {
+              format: "rich_text",
+              priority: 1,
+              content: {
+                markdown: `### ${receipt.title}\n\n${receipt.summary}\n\n**Next step:** ${receipt.nextStep}`,
+              },
+            },
+          ],
+          metadata: {
+            origin: "thread_orchestration_failure",
+            failure_tone: receipt.tone,
+            raw_error_message: errorMessage,
+          },
+          store_in_relational: true,
+        });
+      } catch {
+        // Keep the inline recovery receipt even if the thread log append fails.
+      }
     }
     setReplySending(false);
   }
+
+  async function sendFederatedMessage() {
+    const recipient = federationRecipientAgentId().trim();
+    const body = federationBody().trim();
+    if (!recipient || !body || federationSending()) return;
+    if (!isFederatedAgentId(recipient)) {
+      setFederationError("Enter an agent id like agent:name@example.com.");
+      return;
+    }
+    setFederationSending(true);
+    setFederationError("");
+    try {
+      const response = await sendFederatedAgentMessage({
+        recipient_agent_id: recipient,
+        thread_id: props.threadId,
+        subject: federationSubject().trim() || null,
+        body,
+      });
+      setFederationComposerOpen(false);
+      setFederationRecipientAgentId("");
+      setFederationSubject("");
+      setFederationBody("");
+      if (response.source_thread_id && response.thread_id) {
+        toast.success("Agent message sent in federation delivery thread", {
+          duration: 7000,
+          action: {
+            label: "Open",
+            onClick: () => dispatchOpenThreadEvent({
+              threadId: response.thread_id!,
+              messageId: response.message_id,
+            }),
+          },
+        });
+      } else {
+        toast.success("Agent message sent");
+      }
+      await reload({ preserveExisting: true });
+    } catch (error) {
+      setFederationError(error instanceof Error ? error.message : "Federated send failed");
+    } finally {
+      setFederationSending(false);
+    }
+  }
+
+  function applyQuickReply(text: string) {
+    setReplyText(text);
+    setPreviewReply(false);
+  }
+
+  const threadTokenEstimate = createMemo(() =>
+    threadViewTokenEstimate(messages())
+  );
 
   function copyThreadId() {
     navigator.clipboard.writeText(props.threadId).then(() => {
@@ -148,18 +469,27 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
   }
 
   let messagesContainerRef: HTMLDivElement | undefined;
+  let focusHighlightTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const lastReadKey = () => `omnyid.thread.lastread.${props.threadId}`;
-  const scrollPosKey = `omnyid.thread.scrollpos.${props.threadId}`;
+  function updateReadingProgress() {
+    if (!messagesContainerRef) {
+      setReadingProgress(0);
+      return;
+    }
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef;
+    const scrollableHeight = Math.max(1, scrollHeight - clientHeight);
+    setReadingProgress(Math.max(0, Math.min(1, scrollTop / scrollableHeight)));
+  }
 
   function scrollToBottom() {
     if (messagesContainerRef) {
       messagesContainerRef.scrollTop = messagesContainerRef.scrollHeight;
       setAtBottom(true);
       setUnseenCount(0);
+      setReadingProgress(1);
       const msgs = messages();
       const last = msgs[msgs.length - 1];
-      if (last) localStorage.setItem(lastReadKey(), last.id);
+      if (last) saveThreadViewLastReadMessageId(props.threadId, last.id, sessionUserId);
     }
   }
 
@@ -168,121 +498,116 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef;
     setAtBottom(scrollHeight - scrollTop - clientHeight < 80);
     setShowScrollTop(scrollTop > 200);
-    sessionStorage.setItem(scrollPosKey, String(scrollTop));
+    updateReadingProgress();
+    saveThreadViewScrollPosition(props.threadId, scrollTop, sessionUserId);
   }
 
-  /**
-   * Group messages for rendering:
-   * - `generative_card` messages are rendered with their associated `card_section_update` messages.
-   * - All other messages pass through ViewDispatcher unchanged.
-   * Returns a list of render units.
-   */
-  type RenderUnit =
-    | { kind: "standalone"; message: AfpMessage }
-    | { kind: "generative_card"; card: AfpMessage; updates: AfpMessage[] };
+  createEffect(() => {
+    const targetId = props.initialFocusMessageId;
+    if (!targetId || !messagesContainerRef) return;
+    if (!messages().some((message) => message.id === targetId)) return;
+    const el = messagesContainerRef.querySelector(`[data-msg-id="${targetId}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setFocusedMessageId(targetId);
+    if (focusHighlightTimer) clearTimeout(focusHighlightTimer);
+    focusHighlightTimer = setTimeout(() => setFocusedMessageId((current) => current === targetId ? null : current), 2500);
+  });
 
-  type RenderEntry =
-    | { kind: "date_separator"; label: string; id: string }
-    | RenderUnit;
+  createEffect(() => {
+    if (!messageContextMenu()) return;
+    const close = () => setMessageContextMenu(null);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", handleKeyDown);
+    });
+  });
 
-  const renderUnits = createMemo<RenderUnit[]>(() => {
-    const msgs = messages();
-    // Build a map of card_id → generative_card message
-    const cardMap = new Map<string, AfpMessage>();
-    for (const m of msgs) {
-      if (m.type === "generative_card") {
-        const cardId = String((m.content as any)?.card_id ?? m.id);
-        cardMap.set(cardId, m);
-      }
-    }
+  onCleanup(() => {
+    if (focusHighlightTimer) clearTimeout(focusHighlightTimer);
+  });
 
-    // Collect updates per card_id
-    const updatesMap = new Map<string, AfpMessage[]>();
-    for (const m of msgs) {
-      if (m.type === "card_section_update") {
-        const cardId = String((m.content as any)?.card_id ?? "");
-        if (cardId) {
-          const arr = updatesMap.get(cardId) ?? [];
-          arr.push(m);
-          updatesMap.set(cardId, arr);
-        }
-      }
-    }
+/**
+ * Group messages for rendering:
+ * - `generative_card` messages are rendered with their associated `card_section_update` messages.
+ * - All other messages pass through ViewDispatcher unchanged.
+ * Returns a list of render units.
+ */
+  type RenderUnit = ThreadViewRenderUnit;
 
-    const units: RenderUnit[] = [];
-    const seenCardIds = new Set<string>();
+  type RenderEntry = ThreadViewRenderEntry;
 
-    for (const m of msgs) {
-      if (m.type === "card_section_update") continue; // folded into card units
+  const renderUnits = createMemo<RenderUnit[]>(() => threadViewBuildRenderUnits(messages()));
 
-      if (m.type === "generative_card") {
-        const cardId = String((m.content as any)?.card_id ?? m.id);
-        if (!seenCardIds.has(cardId)) {
-          seenCardIds.add(cardId);
-          units.push({
-            kind: "generative_card",
-            card: m,
-            updates: updatesMap.get(cardId) ?? [],
-          });
-        }
-        continue;
-      }
-
-      units.push({ kind: "standalone", message: m });
-    }
-
-    return units;
+  const rawMessageById = createMemo(() => {
+    return threadViewBuildRawMessageById(renderUnits());
   });
 
   const filteredRenderEntries = createMemo<RenderEntry[]>(() => {
     const q = msgSearch().toLowerCase().trim();
     if (!q || !showMsgSearch()) return renderEntries();
-    return renderEntries().filter((entry) => {
-      if (entry.kind === "date_separator") return false;
-      const msg = entry.kind === "generative_card" ? entry.card : entry.message;
-      const c = msg.content as Record<string, unknown>;
-      const text = [c.title, c.subject, c.body, c.summary, c.text, c.markdown, c.query, msg.type]
-        .filter((v): v is string => typeof v === "string").join(" ").toLowerCase();
-      return text.includes(q);
-    });
+    return threadViewFilterRenderEntriesByQuery(renderEntries(), q);
   });
 
   const displayedEntries = createMemo<RenderEntry[]>(() => {
-    const sf = senderFilter();
-    if (!sf) return filteredRenderEntries();
-    return filteredRenderEntries().filter((entry) => {
-      if (entry.kind === "date_separator") return false;
-      const msg = entry.kind === "generative_card" ? entry.card : entry.message;
-      return senderLabel(msg.from ?? "agent") === sf;
-    });
+    return threadViewFilterRenderEntriesBySender(filteredRenderEntries(), senderFilter());
   });
 
   const renderEntries = createMemo<RenderEntry[]>(() => {
-    const units = renderUnits();
-    const result: RenderEntry[] = [];
-    let lastDate = "";
-    for (const unit of units) {
-      const msg = unit.kind === "generative_card" ? unit.card : unit.message;
-      const ts = msg.timestamp;
-      if (ts) {
-        const dateLabel = new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-        if (dateLabel !== lastDate) {
-          lastDate = dateLabel;
-          result.push({ kind: "date_separator", label: dateLabel, id: `sep-${dateLabel}` });
-        }
-      }
-      result.push(unit);
-    }
-    return result;
+    const lastReadId = loadThreadViewLastReadMessageId(props.threadId, sessionUserId);
+    return threadViewBuildRenderEntries(renderUnits(), lastReadId);
   });
 
-  async function reload() {
+  async function reload(opts?: { preserveExisting?: boolean }) {
     try {
       const msgs = await fetchThread(props.threadId);
       setMessages(msgs);
-      setError("");
-    } catch (err) {
-      setError((err as Error).message);
+      setLoadError(null);
+      setRefreshError(null);
+    } catch (err: unknown) {
+      if (opts?.preserveExisting) {
+        setRefreshError(
+          buildThreadLoadFailureReceipt(
+            "Refresh thread",
+            err instanceof Error ? err.message : "Could not refresh thread.",
+          ),
+        );
+      } else {
+        setLoadError(
+          buildThreadLoadFailureReceipt(
+            "Load thread",
+            err instanceof Error ? err.message : "Could not load thread.",
+          ),
+        );
+      }
+    }
+  }
+
+  async function copyFocusedMessageJson() {
+    const focusedId = focusedMessageId();
+    if (!focusedId) {
+      toast.warning("Focus a message first.");
+      return;
+    }
+    const message = rawMessageById().get(focusedId);
+    if (!message) {
+      toast.error("Could not find the focused message.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(message, null, 2));
+      toast.success("Copied raw AFP JSON.");
+    } catch {
+      toast.error("Could not copy raw AFP JSON.");
     }
   }
 
@@ -291,23 +616,28 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
     await reload();
     setLoading(false);
 
-    // Restore scroll position: saved pos → last-read message → bottom
+    // Restore scroll position: saved pos -> last-read message -> bottom
     requestAnimationFrame(() => {
-      const savedPos = sessionStorage.getItem(scrollPosKey);
-      if (savedPos && messagesContainerRef) {
-        messagesContainerRef.scrollTop = parseInt(savedPos);
+      const savedPos = loadThreadViewScrollPosition(props.threadId, sessionUserId);
+      if (savedPos !== null && messagesContainerRef) {
+        messagesContainerRef.scrollTop = savedPos;
+        updateReadingProgress();
         return;
       }
-      const lastId = localStorage.getItem(lastReadKey());
+      const lastId = loadThreadViewLastReadMessageId(props.threadId, sessionUserId);
       if (lastId && messagesContainerRef) {
         const el = messagesContainerRef.querySelector(`[data-msg-id="${lastId}"]`) as HTMLElement | null;
-        if (el) { el.scrollIntoView({ block: "start" }); return; }
+        if (el) {
+          el.scrollIntoView({ block: "start" });
+          updateReadingProgress();
+          return;
+        }
       }
       scrollToBottom();
     });
 
     // Subscribe to relay for real-time updates
-    const unsub = subscribeThread(props.threadId, () => void reload());
+    const unsub = subscribeThread(props.threadId, () => void reload({ preserveExisting: true }));
     setLive(true);
 
     function onKeyDown(e: KeyboardEvent) {
@@ -317,6 +647,15 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
           e.preventDefault();
           setShowMsgSearch((v) => !v);
           requestAnimationFrame(() => msgSearchInputRef?.focus());
+          return;
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "c") {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA") {
+          e.preventDefault();
+          void copyFocusedMessageJson();
           return;
         }
       }
@@ -333,7 +672,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
       document.removeEventListener("keydown", onKeyDown);
       clearInterval(typingTimerId);
       if (messagesContainerRef) {
-        sessionStorage.setItem(scrollPosKey, String(messagesContainerRef.scrollTop));
+        saveThreadViewScrollPosition(props.threadId, messagesContainerRef.scrollTop, sessionUserId);
       }
     });
   });
@@ -360,12 +699,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
   };
 
   const senderCounts = createMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const m of messages()) {
-      const name = senderLabel(m.from ?? "agent");
-      counts[name] = (counts[name] ?? 0) + 1;
-    }
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return threadViewSenderCounts(messages());
   });
   const [showSenderBreakdown, setShowSenderBreakdown] = createSignal(false);
   const [senderFilter, setSenderFilter] = createSignal<string | null>(null);
@@ -373,14 +707,13 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
   const [agentTrustMsgId, setAgentTrustMsgId] = createSignal<string | null>(null);
   const [openTraces, setOpenTraces] = createSignal<Set<string>>(new Set());
   const [reactions, setReactions] = createSignal<Record<string, Record<string, number>>>(
-    (() => { try { return JSON.parse(localStorage.getItem(REACTIONS_KEY) ?? "{}"); } catch { return {}; } })()
+    loadThreadViewReactions(sessionUserId)
   );
   function addReaction(msgId: string, emoji: string) {
     setReactions((prev) => {
       const msgR = prev[msgId] ?? {};
       const next = { ...prev, [msgId]: { ...msgR, [emoji]: (msgR[emoji] ?? 0) + 1 } };
-      localStorage.setItem(REACTIONS_KEY, JSON.stringify(next));
-      return next;
+      return saveThreadViewReactions(next, sessionUserId);
     });
   }
   function agentHue(from: string): number {
@@ -395,24 +728,20 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
   const [atQuery, setAtQuery] = createSignal<string | null>(null);
   const AGENT_NAMES = ["knowledge_curator", "email_gateway", "master", "health_maintenance"] as const;
   const atSuggestions = createMemo(() => {
-    const q = atQuery();
-    if (q === null) return [] as string[];
-    return (AGENT_NAMES as readonly string[]).filter((a) => a.startsWith(q));
+    return threadViewAtSuggestions(atQuery(), AGENT_NAMES);
   });
   const totalCostCents = createMemo(() =>
-    messages().reduce((sum, m) => {
-      const c = (m.metadata as Record<string, unknown> | undefined)?.cost_cents;
-      return sum + (typeof c === "number" ? c : 0);
-    }, 0)
+    threadViewTotalCostCents(messages())
   );
   const typingTask = createMemo<string | null>(() => {
-    const dm = messages().find((m) => m.type === "daemon_typing" && m.timestamp && Date.now() - new Date(m.timestamp).getTime() < 30_000);
-    const act = dm ? String((dm.metadata as Record<string, unknown> | undefined)?.action ?? (dm.content as Record<string, unknown>)?.action ?? "") : "";
-    return act.includes("search") || act.includes("web") ? "Searching the web…" : act.includes("email") ? "Checking email…" : act.includes("read") ? "Reading documents…" : act || null;
+    return threadViewTypingTask(messages());
   });
 
   const [typingStartedAt, setTypingStartedAt] = createSignal<number | null>(null);
   const [typingElapsed, setTypingElapsed] = createSignal(0);
+  const typingStatusLabel = createMemo(() => {
+    return threadViewTypingStatusLabel(typingTask(), typingElapsed(), TYPING_FALLBACK_LABELS);
+  });
   let typingTimerId: ReturnType<typeof setInterval> | undefined;
   function formatTypingElapsed(secs: number): string {
     if (secs < 60) return `${secs}s`;
@@ -445,21 +774,51 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
   });
 
   const messageDates = createMemo(() => {
-    const seen = new Set<string>();
-    const dates: string[] = [];
-    for (const m of messages()) {
-      if (!m.timestamp) continue;
-      const d = new Date(m.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-      if (!seen.has(d)) { seen.add(d); dates.push(d); }
-    }
-    return dates;
+    return threadViewMessageDates(messages());
   });
+  const threadObjectSearchSeed = createMemo(() => buildThreadObjectSearchSeed(messages()));
+  const threadRecentTitles = createMemo(() => threadViewRecentTitles(messages()));
+  const replyWorkspaceAssist = createMemo(() => {
+    if (!replyText().trim()) return null;
+
+    const topic = detectWorkspaceAssistTopic({
+      app_label: "Thread reply composer",
+      document_title: props.threadId,
+      editor_text: replyText(),
+      recent_activity_titles: [
+        ...threadRecentTitles(),
+        ...buildDashboardWorkspaceAssistRecentTitles(props.bootstrap ?? null),
+      ],
+    });
+
+    return selectWorkspaceAssistSuggestion({
+      topic,
+      candidates: buildDashboardWorkspaceAssistCandidates(props.bootstrap ?? null, {
+        refreshOrigin: props.workspaceAssistRefreshOrigin ?? "cached",
+      }),
+    });
+  });
+  createEffect(() => {
+    props.onRequestWorkspaceAssistDraftRefresh?.({
+      channelId: `thread:${props.threadId}`,
+      surfaceKey: `thread:${props.threadId}`,
+      documentTitle: props.threadId,
+      text: replyText(),
+    });
+  });
+
+  function openReplyWorkspaceAssist() {
+    const destination = workspaceAssistNavigationView(replyWorkspaceAssist()?.destination_view);
+    if (destination) {
+      props.onOpenWorkspaceAssist?.(destination);
+    }
+  }
 
   function jumpToDate(dateLabel: string) {
     if (!messagesContainerRef) return;
     for (const m of messages()) {
       if (!m.timestamp) continue;
-      const d = new Date(m.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const d = threadViewDateLabel(m.timestamp);
       if (d === dateLabel) {
         const el = messagesContainerRef.querySelector(`[data-msg-id="${m.id}"]`) as HTMLElement | null;
         el?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -485,7 +844,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                 title="Copy thread ID"
                 class="flex-shrink-0 rounded-full border border-white/30 bg-white/30 px-2 py-0.5 font-mono text-[10px] text-on-surface-variant transition hover:bg-white/60"
               >
-                {copied() ? "✓" : "⧉"}
+                {copied() ? "OK" : "Copy"}
               </button>
             </div>
           </div>
@@ -515,7 +874,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                     onClick={() => scrollToStarred(starredNavIdx() - 1)}
                     class="rounded-full px-2 py-1 font-mono text-[9px] text-amber-500 transition hover:bg-amber-400/20"
                   >
-                    ◀
+                    prev
                   </button>
                   <button
                     type="button"
@@ -523,7 +882,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                     onClick={() => scrollToStarred(starredNavIdx())}
                     class="px-1 font-mono text-[9px] text-amber-600"
                   >
-                    ★ {starredMsgs().size}
+                    * {starredMsgs().size}
                   </button>
                   <button
                     type="button"
@@ -531,7 +890,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                     onClick={() => scrollToStarred(starredNavIdx() + 1)}
                     class="rounded-full px-2 py-1 font-mono text-[9px] text-amber-500 transition hover:bg-amber-400/20"
                   >
-                    ▶
+                    next
                   </button>
                 </div>
               </Show>
@@ -552,7 +911,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                         class="rounded-full bg-white/50 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-on-surface-variant transition hover:bg-white/70"
                         title="Message count by sender"
                       >
-                        by sender {showSenderBreakdown() ? "▴" : "▾"}
+                        by sender {showSenderBreakdown() ? "^" : "v"}
                       </button>
                       <Show when={showSenderBreakdown()}>
                         <div class="absolute right-0 top-full z-40 mt-1 min-w-[160px] animate-fade-in rounded-xl border border-white/45 bg-white/95 p-2 shadow-panel backdrop-blur-xl">
@@ -609,11 +968,39 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                   </Show>
                   <button
                     type="button"
+                    title="Open indexed object retrieval for this thread"
+                    onClick={() =>
+                      openObjectSearch({
+                        query: threadObjectSearchSeed(),
+                        focusThreadId: props.threadId,
+                        launchContext: {
+                          sourceLabel: "Thread",
+                          reason: "Related objects for this thread",
+                        },
+                      })
+                    }
+                    class="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 font-mono text-[9px] text-primary transition hover:bg-primary/20"
+                  >
+                    related objects
+                  </button>
+                  <button
+                    type="button"
+                    title="Send a signed AFP message to another agent"
+                    onClick={() => {
+                      setFederationError("");
+                      setFederationComposerOpen(true);
+                    }}
+                    class="rounded-full border border-teal-500/25 bg-teal-500/10 px-2.5 py-1 font-mono text-[9px] text-teal-700 transition hover:bg-teal-500/20"
+                  >
+                    agent to agent
+                  </button>
+                  <button
+                    type="button"
                     title="Search messages (Ctrl+F)"
                     onClick={() => { setShowMsgSearch((v) => !v); requestAnimationFrame(() => msgSearchInputRef?.focus()); }}
                     class={`rounded-full border px-2.5 py-1 font-mono text-[9px] transition ${showMsgSearch() ? "border-primary/30 bg-primary/10 text-primary" : "border-white/30 bg-white/25 text-on-surface-variant hover:bg-white/50"}`}
                   >
-                    ⌕
+                    search
                   </button>
                   <Show when={senderFilter()}>
                     <button
@@ -622,7 +1009,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                       title="Clear sender filter"
                       class="flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 font-mono text-[9px] text-primary transition hover:bg-primary/20"
                     >
-                      {senderFilter()} ×
+                      {senderFilter()} x
                     </button>
                   </Show>
                   <Show when={unseenCount() > 0 && !atBottom()}>
@@ -638,21 +1025,21 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
               <div class="relative">
                 <button type="button" onClick={() => setShowCostReceipt((v) => !v)}
                   class={`rounded-full border px-2.5 py-1 font-mono text-[9px] transition ${showCostReceipt() ? "border-primary/30 bg-primary/10 text-primary" : "border-white/30 bg-white/25 text-on-surface-variant/50 hover:bg-white/50"}`}>
-                  ¢{(totalCostCents() / 100).toFixed(3)}
+                  {`$${(totalCostCents() / 100).toFixed(3)}`}
                 </button>
                 <Show when={showCostReceipt()}>
                   <div class="absolute right-0 top-full z-40 mt-1 w-64 animate-fade-in rounded-xl border border-white/45 bg-white/97 p-3 shadow-panel backdrop-blur-xl">
                     <p class="mb-2 font-mono text-[8px] uppercase tracking-[0.18em] text-outline">Cost Receipt</p>
-                    <For each={messages().filter((m) => (m.metadata as Record<string, unknown> | undefined)?.cost_cents)}>
+                    <For each={messages().filter((m) => messageCostCents(m) > 0)}>
                       {(m) => (
                         <div class="flex items-center justify-between py-0.5 text-[10px]">
                           <span class="truncate font-mono text-on-surface-variant/70 max-w-[75%]">{m.type}</span>
-                          <span class="font-mono text-on-surface-variant">¢{(((m.metadata as Record<string, unknown>).cost_cents as number) / 100).toFixed(3)}</span>
+                          <span class="font-mono text-on-surface-variant">{`$${(messageCostCents(m) / 100).toFixed(3)}`}</span>
                         </div>
                       )}
                     </For>
                     <div class="mt-1.5 border-t border-white/20 pt-1.5 flex justify-between font-mono text-[9px] font-semibold text-on-surface">
-                      <span>Total</span><span>¢{(totalCostCents() / 100).toFixed(3)}</span>
+                      <span>Total</span><span>{`$${(totalCostCents() / 100).toFixed(3)}`}</span>
                     </div>
                   </div>
                 </Show>
@@ -677,7 +1064,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
               onClick={() => setHeaderCollapsed((v) => !v)}
               class="rounded-full border border-white/30 bg-white/20 px-2 py-0.5 font-mono text-[10px] text-on-surface-variant/50 transition hover:bg-white/40 hover:text-on-surface-variant"
             >
-              {headerCollapsed() ? "▾" : "▴"}
+              {headerCollapsed() ? "show" : "hide"}
             </button>
             <Show when={props.onBack}>
               <button
@@ -685,7 +1072,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                 onClick={props.onBack}
                 class="rounded-full border border-white/40 bg-white/30 px-4 py-2 text-sm font-medium text-on-surface transition hover:bg-white/50"
               >
-                ← Back
+                Back
               </button>
             </Show>
           </div>
@@ -703,16 +1090,53 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
         </div>
       </Show>
 
-      {/* Error */}
-      <Show when={error()}>
-        <GlassPanel class="p-5">
-          <p class="text-sm text-error">{error()}</p>
-        </GlassPanel>
+      {/* Load failure */}
+      <Show when={!loading() && loadError() && messages().length === 0}>
+        <EmptyState
+          icon="TH"
+          title={loadError()?.title ?? "Could not load thread"}
+          body={`${loadError()?.summary ?? "This thread is unavailable right now."} ${loadError()?.nextStep ?? ""}`.trim()}
+          action={
+            <button
+              type="button"
+              onClick={() => void reload()}
+              class="rounded-xl border border-rose-200/70 bg-white/80 px-3 py-1.5 text-sm font-medium text-rose-700 transition hover:bg-white"
+            >
+              Retry thread
+            </button>
+          }
+        />
       </Show>
 
       {/* Messages via ViewDispatcher (with generative card grouping) */}
-      <Show when={!loading() && !error()}>
+      <Show when={!loading() && !loadError()}>
         <div class="relative">
+          <Show when={refreshError()}>
+            <div
+              class={`mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm shadow-card ${
+                refreshError()?.tone === "danger"
+                  ? "border-red-200/70 bg-red-50/85 text-red-700"
+                  : "border-amber-200/70 bg-amber-50/85 text-amber-800"
+              }`}
+            >
+              <div class="space-y-1">
+                <p class="font-semibold">{refreshError()?.title}</p>
+                <p>{refreshError()?.summary}</p>
+                <p class="text-xs opacity-80">Next step: {refreshError()?.nextStep}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void reload({ preserveExisting: true })}
+                class={`rounded-xl border bg-white/80 px-3 py-1.5 text-xs font-medium transition hover:bg-white ${
+                  refreshError()?.tone === "danger"
+                    ? "border-red-200/70 text-red-700"
+                    : "border-amber-200/70 text-amber-800"
+                }`}
+              >
+                Retry refresh
+              </button>
+            </div>
+          </Show>
           <Show when={showScrollTop()}>
             <div class="absolute top-0 left-0 right-0 z-10 flex justify-center pointer-events-none animate-fade-in">
               <button
@@ -720,7 +1144,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                 class="pointer-events-auto flex items-center gap-[0.375em] rounded-full border border-white/50 bg-white/80 px-[1em] py-[0.375em] text-xs font-medium text-on-surface shadow-md backdrop-blur-sm transition hover:bg-white"
                 onClick={() => { if (messagesContainerRef) messagesContainerRef.scrollTop = 0; }}
               >
-                ↑ top
+                ^ top
               </button>
             </div>
           </Show>
@@ -732,26 +1156,25 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                 type="text"
                 value={msgSearch()}
                 onInput={(e) => setMsgSearch(e.currentTarget.value)}
-                placeholder="Search messages… (Ctrl+F)"
+                placeholder="Search messages... (Ctrl+F)"
                 class="flex-1 rounded-xl border border-white/30 bg-white/30 px-4 py-2 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/40 focus:border-primary/40"
               />
               <Show when={msgSearch()}>
                 <span class="flex-shrink-0 font-mono text-[10px] text-on-surface-variant/50">
-                  {filteredRenderEntries().filter((e) => e.kind !== "date_separator").length} match{filteredRenderEntries().filter((e) => e.kind !== "date_separator").length === 1 ? "" : "es"}
+                  {threadViewRenderableEntries(filteredRenderEntries()).length} match{threadViewRenderableEntries(filteredRenderEntries()).length === 1 ? "" : "es"}
                 </span>
               </Show>
               <button
                 type="button"
                 onClick={() => { setShowMsgSearch(false); setMsgSearch(""); }}
                 class="rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-xs text-on-surface-variant/50 transition hover:text-on-surface-variant"
-              >×</button>
+              >x</button>
             </div>
           </Show>
-          {/* Bookmarks minimap — vertical track on right edge */}
+          {/* Bookmarks minimap vertical track on right edge */}
           <Show when={starredMsgs().size > 0}>
             {(() => {
-              type RenderUnit2 = { kind: "standalone"; message: AfpMessage } | { kind: "generative_card"; card: AfpMessage; updates: AfpMessage[] };
-              const msgEntries = renderEntries().filter((e): e is RenderUnit2 => e.kind !== "date_separator");
+              const msgEntries = threadViewRenderableEntries(renderEntries());
               const total = msgEntries.length;
               if (total === 0) return null;
               return (
@@ -759,7 +1182,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                   <div class="relative flex-1 rounded-full bg-white/15">
                     <For each={msgEntries}>
                       {(entry, i) => {
-                        const msgId = entry.kind === "generative_card" ? entry.card.id : entry.kind === "standalone" ? entry.message.id : null;
+                        const msgId = threadViewRenderUnitMessage(entry).id;
                         if (!msgId || !starredMsgs().has(msgId)) return null;
                         const pct = total > 1 ? (i() / (total - 1)) * 100 : 50;
                         return (
@@ -804,13 +1227,41 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                     </div>
                   );
                 }
+                if (entry.kind === "last_visit_divider") {
+                  return (
+                    <div class="flex items-center gap-3 py-1.5">
+                      <div class="h-px flex-1 bg-amber-300/40" />
+                      <span class="rounded-full border border-amber-300/50 bg-amber-50/80 px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+                        New since last visit
+                      </span>
+                      <div class="h-px flex-1 bg-amber-300/40" />
+                    </div>
+                  );
+                }
                 const unit = entry;
-                const msg = unit.kind === "generative_card" ? unit.card : unit.message;
+                const msg = threadViewRenderUnitMessage(unit);
                 const role = senderRole(msg.from ?? "");
                 const isUser = role === "user" || role === "workspace";
                 const name = senderLabel(msg.from ?? "agent");
+                const mentionsCurrentUser = !isUser && messageMentionsCurrentUser(msg);
                 return (
-                  <div class={`group space-y-1.5 ${senderCounts().length > 1 && !isUser ? senderColorClass(name) : ""}`} data-msg-id={msg.id}>
+                  <div
+                    class={`group space-y-1.5 rounded-2xl transition ${
+                      senderCounts().length > 1 && !isUser ? senderColorClass(name) : ""
+                    } ${
+                      focusedMessageId() === msg.id
+                        ? "bg-amber-100/70 ring-2 ring-amber-300/70 ring-offset-2 ring-offset-transparent"
+                        : mentionsCurrentUser
+                          ? "bg-amber-50/80 ring-1 ring-amber-300/55 ring-offset-1 ring-offset-transparent"
+                          : ""
+                    }`}
+                    data-msg-id={msg.id}
+                    tabIndex={0}
+                    onFocus={() => setFocusedMessageId(msg.id)}
+                    onClick={() => setFocusedMessageId(msg.id)}
+                    onPointerEnter={() => setFocusedMessageId(msg.id)}
+                    onContextMenu={(event) => openMessageContextMenu(event, msg.id)}
+                  >
                     <div class={`flex items-center gap-1.5 ${isUser ? "justify-end" : "justify-start"}`}>
                       <div class="relative">
                         <button
@@ -843,18 +1294,29 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                         </Show>
                       </div>
                       <Show when={!isUser}>
-                        <span class="rounded-full border border-white/30 bg-white/25 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] text-on-surface-variant/40">
-                          {msg.type}
-                        </span>
+                        <Tip label={AFP_TYPE_DEFS[msg.type] ?? `AFP message type: ${msg.type}`} side="bottom">
+                          <span class="cursor-help rounded-full border border-white/30 bg-white/25 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] text-on-surface-variant/40">
+                            {msg.type}
+                          </span>
+                        </Tip>
                       </Show>
-                      <Show when={(msg.type === "email_inbound" || msg.type === "inbound_email") && !!(msg.content as Record<string, unknown>).message_id}>
-                        <button type="button" title={`SMTP ID: ${(msg.content as Record<string, unknown>).message_id} — click to copy`}
-                          onClick={() => navigator.clipboard.writeText(String((msg.content as Record<string, unknown>).message_id ?? ""))}
-                          class="rounded-full bg-amber-400/10 px-1.5 py-0.5 font-mono text-[8px] text-amber-700 transition hover:bg-amber-400/20">↩ SMTP</button>
+                      <Show when={messageSmtpId(msg)}>
+                        {(smtpId) => <button type="button" title={`SMTP ID: ${smtpId()} - click to copy`}
+                          onClick={() => navigator.clipboard.writeText(smtpId())}
+                          class="rounded-full bg-amber-400/10 px-1.5 py-0.5 font-mono text-[8px] text-amber-700 transition hover:bg-amber-400/20">SMTP</button>
+                        }
                       </Show>
                       <Show when={msg.timestamp}>
-                        <span class="font-mono text-[8px] text-on-surface-variant/30">
-                          {relativeTime(msg.timestamp)}
+                        <span
+                          title={absoluteUtcTimestamp(msg.timestamp)}
+                          class="font-mono text-[8px] text-on-surface-variant/30"
+                        >
+                          {displayTimestamp(msg.timestamp)}
+                        </span>
+                      </Show>
+                      <Show when={mentionsCurrentUser}>
+                        <span class="rounded-full border border-amber-300/60 bg-amber-100/85 px-1.5 py-0.5 font-mono text-[8px] font-semibold uppercase tracking-[0.14em] text-amber-800">
+                          @you
                         </span>
                       </Show>
                       <button
@@ -863,7 +1325,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                         onClick={() => copyMsgText(msg.content, msg.id)}
                         class="font-mono text-[0.55em] text-on-surface-variant/20 opacity-0 transition group-hover:opacity-100 hover:!text-on-surface-variant/60"
                       >
-                        {copiedMsgText() === msg.id ? "✓" : "copy"}
+                        {copiedMsgText() === msg.id ? "OK" : "copy"}
                       </button>
                       <button
                         type="button"
@@ -871,7 +1333,33 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                         onClick={() => copyMsgId(msg.id)}
                         class="font-mono text-[0.55em] text-on-surface-variant/20 opacity-0 transition group-hover:opacity-100 hover:!text-on-surface-variant/60"
                       >
-                        {copiedMsgId() === msg.id ? "✓" : "⧉"}
+                        {copiedMsgId() === msg.id ? "OK" : "id"}
+                      </button>
+                      <button
+                        type="button"
+                        title={`Copy deep link: ${messageDeepLink(msg.id)}`}
+                        onClick={() => copyMessageDeepLink(msg.id)}
+                        class="font-mono text-[0.55em] text-on-surface-variant/20 opacity-0 transition group-hover:opacity-100 hover:!text-primary"
+                      >
+                        {copiedDeepLinkId() === msg.id ? "copied" : "link"}
+                      </button>
+                      <button
+                        type="button"
+                        title="Find related objects for this message"
+                        onClick={() =>
+                          openObjectSearch({
+                            query: buildMessageObjectSearchSeed(msg),
+                            focusThreadId: props.threadId,
+                            focusObjectId: msg.id,
+                            launchContext: {
+                              sourceLabel: "Thread message",
+                              reason: `Related objects for ${msg.kind ?? "this"} message`,
+                            },
+                          })
+                        }
+                        class="font-mono text-[0.55em] text-primary/40 opacity-0 transition group-hover:opacity-100 hover:!text-primary"
+                      >
+                        objects
                       </button>
                       <button
                         type="button"
@@ -879,7 +1367,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                         onClick={() => toggleStar(msg.id)}
                         class={`text-[0.7em] transition ${starredMsgs().has(msg.id) ? "text-amber-400 opacity-100" : "text-on-surface-variant/20 opacity-0 group-hover:opacity-100 hover:!text-amber-400"}`}
                       >
-                        {starredMsgs().has(msg.id) ? "★" : "☆"}
+                        {starredMsgs().has(msg.id) ? "*" : "o"}
                       </button>
                       <button
                         type="button"
@@ -887,19 +1375,19 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                         onClick={() => toggleCollapse(msg.id)}
                         class="font-mono text-[0.6em] text-on-surface-variant/20 opacity-0 transition group-hover:opacity-100 hover:!text-on-surface-variant/60"
                       >
-                        {collapsedMsgs().has(msg.id) ? "▸" : "▾"}
+                        {collapsedMsgs().has(msg.id) ? "+" : "-"}
                       </button>
-                      <Show when={!isUser && msg.metadata && Object.keys(msg.metadata as Record<string, unknown>).length > 0}>
+                      <Show when={!isUser && Object.keys(messageMetadata(msg) ?? {}).length > 0}>
                         <button
                           type="button"
                           title={openTraces().has(msg.id) ? "Hide intent trace" : "Show agent intent trace"}
                           onClick={() => setOpenTraces((prev) => { const next = new Set(prev); if (next.has(msg.id)) next.delete(msg.id); else next.add(msg.id); return next; })}
                           class={`font-mono text-[0.5em] transition ${openTraces().has(msg.id) ? "text-primary opacity-100" : "text-on-surface-variant/15 opacity-0 group-hover:opacity-100 hover:!text-primary"}`}
-                        >⟨/⟩</button>
+                        >meta</button>
                       </Show>
                     </div>
                     <Show when={!collapsedMsgs().has(msg.id)}>
-                    <div class="space-y-3">
+                    <div class="content-font-body space-y-3">
                       {unit.kind === "generative_card" ? (
                         <>
                           <ViewDispatcher message={unit.card} cardUpdates={unit.updates} />
@@ -923,10 +1411,10 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                       </Show>
                     </div>
                     </Show>
-                    {/* Supertag chips — detected #tags from message content */}
+                    {/* Supertag chips detected #tags from message content */}
                     {(() => {
                       const tags = [...new Set(
-                        Object.values(msg.content as Record<string, unknown>).filter((v): v is string => typeof v === "string")
+                        messageStringValues(msg)
                           .join(" ").match(/#[\w-]+/g) ?? []
                       )];
                       if (!tags.length) return null;
@@ -941,7 +1429,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                                   <p class="mb-0.5 font-mono text-[8px] uppercase tracking-[0.18em] text-outline">Supertag Definition</p>
                                   <p class="text-xs font-semibold text-on-surface">{tag}</p>
                                   <p class="mt-1 font-mono text-[9px] text-on-surface-variant/70">
-                                    {messages().filter((m) => JSON.stringify(m.content).includes(tag)).length} uses · ⚡ Auto-indexed by Curator
+                                    {messages().filter((m) => JSON.stringify(m.content).includes(tag)).length} uses · Auto-indexed by Curator
                                   </p>
                                 </div>
                               </Show>
@@ -950,13 +1438,33 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                         </div>
                       );
                     })()}
+                    {/* Smart reply suggestions shown after long agent messages (>100 words) */}
+                    {(() => {
+                      if (isUser) return null;
+                      const wc = messageWordCount(msg);
+                      if (wc <= 100) return null;
+                      return (
+                        <div class="flex flex-wrap gap-1.5 animate-fade-in">
+                          <For each={QUICK_REPLIES}>
+                            {(reply) => (
+                              <button
+                                type="button"
+                                onClick={() => applyQuickReply(reply)}
+                                class="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-[9px] text-primary/70 transition hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                              >
+                                {reply}
+                              </button>
+                            )}
+                          </For>
+                        </div>
+                      );
+                    })()}
                     {/* Reactions */}
                     <div class="flex flex-wrap items-center gap-1 min-h-[1.125rem]">
                       <For each={Object.entries(reactions()[msg.id] ?? {})}>
                         {([emoji, count]) => {
                           const key = `${msg.id}:${emoji}`;
-                          const wordCount = Object.values(msg.content as Record<string, unknown>)
-                            .filter((v): v is string => typeof v === "string").join(" ").split(/\s+/).filter(Boolean).length;
+                          const wordCount = messageWordCount(msg);
                           return (
                             <div class="relative">
                               <button type="button" onClick={() => addReaction(msg.id, emoji)}
@@ -1000,24 +1508,20 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
                 onClick={scrollToBottom}
                 class="flex items-center gap-1.5 rounded-full border border-white/50 bg-white/80 px-4 py-1.5 text-xs font-medium text-on-surface shadow-md backdrop-blur-sm transition hover:bg-white"
               >
-                ↓ {unseenCount() > 0 ? `${unseenCount()} new` : "Jump to latest"}
+                v {unseenCount() > 0 ? `${unseenCount()} new` : "Jump to latest"}
               </button>
             </div>
           </Show>
         </div>
       </Show>
 
-      {/* Typing indicator — shows contextual task label + progress bar for long-running ops */}
+      {/* Typing indicator shows contextual task label + progress bar for long-running ops */}
       <Show when={typingStartedAt() !== null}>
         <div class="space-y-1.5 px-2 py-1 animate-fade-in">
           <div class="flex items-center gap-2">
-            <div class="flex gap-[3px]">
-              <span class="h-1.5 w-1.5 rounded-full bg-primary/50 animate-bounce" style="animation-delay: 0ms" />
-              <span class="h-1.5 w-1.5 rounded-full bg-primary/50 animate-bounce" style="animation-delay: 150ms" />
-              <span class="h-1.5 w-1.5 rounded-full bg-primary/50 animate-bounce" style="animation-delay: 300ms" />
-            </div>
+            <ProcessingGlyph class="flex-shrink-0 text-primary/55" size={18} strokeWidth={1.4} />
             <span class="font-mono text-[9px] text-on-surface-variant/50">
-              {typingTask() ?? "agent is thinking…"} {formatTypingElapsed(typingElapsed())}
+              {typingStatusLabel()} {formatTypingElapsed(typingElapsed())}
             </span>
           </div>
           <Show when={typingElapsed() >= 5}>
@@ -1028,9 +1532,152 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
           </Show>
         </div>
       </Show>
+      <Show when={messageContextMenu()} keyed>
+        {(menu) => (
+          <Portal>
+            <div
+              class="fixed inset-0 z-[140]"
+              onPointerDown={() => closeMessageContextMenu()}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                closeMessageContextMenu();
+              }}
+            >
+              <div
+                class="absolute w-56 rounded-2xl border border-white/55 bg-white/96 p-2 shadow-panel backdrop-blur-xl"
+                style={{ left: `${menu.x}px`, top: `${menu.y}px` }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onContextMenu={(event) => event.preventDefault()}
+              >
+                <div class="px-2 pb-2 pt-1">
+                  <p class="truncate text-sm font-semibold text-on-surface">AFP message</p>
+                  <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-on-surface-variant/55">{menu.msgId}</p>
+                </div>
+                <div class="space-y-1">
+                  <button
+                    type="button"
+                    class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-on-surface transition hover:bg-white/80"
+                    onClick={() => {
+                      copyMessageDeepLink(menu.msgId);
+                      closeMessageContextMenu();
+                    }}
+                  >
+                    <span>Copy deep link</span>
+                    <span class="font-mono text-[10px] text-on-surface-variant/55">{copiedDeepLinkId() === menu.msgId ? "copied" : "omnyid://"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Portal>
+        )}
+      </Show>
+      <Show when={federationComposerOpen()}>
+        <Portal>
+          <div
+            class="fixed inset-0 z-[150] flex items-center justify-center bg-black/35 px-4 py-6 backdrop-blur-sm"
+            onPointerDown={() => {
+              if (!federationSending()) setFederationComposerOpen(false);
+            }}
+          >
+            <form
+              class="w-full max-w-xl rounded-2xl border border-white/55 bg-white/96 p-5 shadow-panel backdrop-blur-xl"
+              onPointerDown={(event) => event.stopPropagation()}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void sendFederatedMessage();
+              }}
+            >
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Federation</p>
+                  <h3 class="mt-1 text-lg font-semibold text-on-surface">Send agent message</h3>
+                </div>
+                <button
+                  type="button"
+                  disabled={federationSending()}
+                  onClick={() => setFederationComposerOpen(false)}
+                  class="rounded-full border border-white/40 bg-white/40 px-2.5 py-1 text-xs text-on-surface-variant transition hover:bg-white/70 disabled:opacity-50"
+                >
+                  x
+                </button>
+              </div>
+
+              <label class="mt-5 block">
+                <span class="font-mono text-[10px] uppercase tracking-[0.16em] text-on-surface-variant/60">
+                  Agent ID
+                </span>
+                <input
+                  value={federationRecipientAgentId()}
+                  onInput={(event) => {
+                    setFederationRecipientAgentId(event.currentTarget.value);
+                    if (federationError()) setFederationError("");
+                  }}
+                  placeholder="agent:alice@example.com"
+                  class="mt-1 w-full rounded-xl border border-white/40 bg-white/70 px-3 py-2 font-mono text-sm text-on-surface outline-none placeholder:text-on-surface-variant/35 focus:border-teal-500/40"
+                  autocomplete="off"
+                  required
+                />
+              </label>
+
+              <label class="mt-3 block">
+                <span class="font-mono text-[10px] uppercase tracking-[0.16em] text-on-surface-variant/60">
+                  Subject
+                </span>
+                <input
+                  value={federationSubject()}
+                  onInput={(event) => setFederationSubject(event.currentTarget.value)}
+                  placeholder="Optional"
+                  class="mt-1 w-full rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/35 focus:border-teal-500/40"
+                />
+              </label>
+
+              <label class="mt-3 block">
+                <span class="font-mono text-[10px] uppercase tracking-[0.16em] text-on-surface-variant/60">
+                  Message
+                </span>
+                <textarea
+                  value={federationBody()}
+                  onInput={(event) => setFederationBody(event.currentTarget.value)}
+                  placeholder="Compose the message this agent should receive."
+                  class="mt-1 min-h-36 w-full resize-y rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-sm leading-6 text-on-surface outline-none placeholder:text-on-surface-variant/35 focus:border-teal-500/40"
+                  required
+                />
+              </label>
+
+              <Show when={federationError()}>
+                <div class="mt-3 rounded-xl border border-red-200/70 bg-red-50/85 px-3 py-2 text-sm text-red-700">
+                  {federationError()}
+                </div>
+              </Show>
+
+              <div class="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={federationSending()}
+                  onClick={() => setFederationComposerOpen(false)}
+                  class="rounded-full border border-white/40 bg-white/35 px-4 py-1.5 text-xs font-medium text-on-surface-variant transition hover:bg-white/70 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    federationSending()
+                    || !isFederatedAgentId(federationRecipientAgentId())
+                    || !federationBody().trim()
+                  }
+                  class="rounded-full bg-teal-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-teal-700 disabled:opacity-40"
+                >
+                  {federationSending() ? "Sending..." : "Send message"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </Portal>
+      </Show>
 
       {/* Thread knowledge mini-map */}
-      <ThreadMiniMap threadId={props.threadId} />
+      <ThreadMiniMap threadId={props.threadId} readingProgress={readingProgress()} />
 
       {/* Reply compose box */}
       <GlassPanel class="p-4">
@@ -1049,25 +1696,73 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
               </For>
             </div>
           </Show>
-          <textarea
-            ref={replyRef}
-            rows={1}
-            value={replyText()}
-            onInput={(e) => {
-              setReplyText(e.currentTarget.value);
-              e.currentTarget.style.height = "auto";
-              e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
-              const m = e.currentTarget.value.match(/@(\w*)$/);
+          <TiptapEditor
+            mode="compact"
+            initialContent={replyText()}
+            disabled={replySending()}
+            placeholder="Reply... (@agent to route)"
+            clearOnSend
+            onChange={(text) => {
+              setReplyText(text);
+              const m = text.match(/@(\w*)$/);
               setAtQuery(m ? m[1] : null);
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendReply(); }
+            onSend={async (payload) => {
+              setReplyText(payload.text);
+              await sendReply();
             }}
-            placeholder="Reply… (Enter to send · @agent to route · Shift+Enter for newline)"
-            disabled={replySending()}
-            class="w-full resize-none overflow-hidden rounded-xl border border-white/30 bg-white/30 px-4 py-2.5 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/40 focus:border-primary/40 disabled:opacity-60"
-            style="min-height: 40px"
           />
+          <div class="mt-3">
+            <WorkspaceAssistPanel
+              suggestion={replyWorkspaceAssist()}
+              refreshOrigin={props.workspaceAssistRefreshOrigin}
+              onOpen={openReplyWorkspaceAssist}
+            />
+          </div>
+          <Show when={replyFailureReceipt()}>
+            <div
+              class={`mt-3 rounded-2xl border px-4 py-3 ${
+                replyFailureReceipt()?.tone === "danger"
+                  ? "border-[#f2cbc0] bg-[#fff4f0]"
+                  : "border-[#f1dfb9] bg-[#fff9ee]"
+              }`}
+            >
+              <p
+                class={`text-sm font-semibold ${
+                  replyFailureReceipt()?.tone === "danger" ? "text-[#b2644b]" : "text-[#8b6421]"
+                }`}
+              >
+                {replyFailureReceipt()?.title}
+              </p>
+              <p
+                class={`mt-1 text-xs leading-5 ${
+                  replyFailureReceipt()?.tone === "danger" ? "text-[#b2644b]" : "text-[#8b6421]"
+                }`}
+              >
+                {replyFailureReceipt()?.summary}
+              </p>
+              <p class="mt-2 text-xs font-medium text-on-surface-variant">
+                Next step: {replyFailureReceipt()?.nextStep}
+              </p>
+              <p class="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-on-surface-variant/60">
+                Logged in this thread
+              </p>
+            </div>
+          </Show>
+          {/* Token budget bar: green < 60%, amber < 80%, red >= 80% of 100k token limit */}
+          {(() => {
+            const total = threadTokenEstimate() + Math.ceil(replyText().length / 4);
+            const pct = Math.min(100, (total / 100000) * 100);
+            const color = pct < 60 ? "bg-green-500/50" : pct < 80 ? "bg-amber-400/60" : "bg-red-500/60";
+            return (
+              <div
+                class="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-white/15"
+                title={`~${total.toLocaleString()} tokens in context · ${Math.round(pct)}% of 100k limit`}
+              >
+                <div class={`h-full rounded-full transition-all duration-300 ${color}`} style={`width: ${pct}%`} />
+              </div>
+            );
+          })()}
           {/* Draft preview panel */}
           <Show when={previewReply() && replyText().trim()}>
             <div class="mt-1.5 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-on-surface whitespace-pre-wrap animate-fade-in">
@@ -1080,7 +1775,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
               <span class="text-xs text-red-500">{replyError()}</span>
             </Show>
             <Show when={replySent()}>
-              <span class="text-xs font-medium text-green-600">✓ Sent to orchestrator</span>
+              <span class="text-xs font-medium text-green-600">OK Sent to orchestrator</span>
             </Show>
             <Show when={replyText().length > 50}>
               <span class="font-mono text-[0.65em] tabular-nums text-on-surface-variant/40">
@@ -1099,7 +1794,7 @@ export function ThreadView(props: { threadId: string; advanced?: boolean; onBack
               disabled={replySending() || !replyText().trim()}
               class="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40 transition hover:bg-primary/80"
             >
-              {replySending() ? "Sending…" : "Send"}
+              {replySending() ? "Sending..." : "Send"}
             </button>
           </div>
         </form>

@@ -103,6 +103,8 @@ function Invoke-CheckedRemoteCommand {
         [switch]$ScanDockerBuildOutput
     )
 
+    $Command = ($Command -replace "`r`n", "`n").Trim()
+
     # A local ErrorActionPreference override (not just 2>&1 capture) is required: under
     # $ErrorActionPreference = "Stop", PowerShell 5.1 escalates ANY stderr line from a
     # native call into a terminating NativeCommandError even when the process exits 0 and

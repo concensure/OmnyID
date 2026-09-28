@@ -4092,6 +4092,65 @@ export const sendGmailDraft = (body: {
     method: "POST",
     bodyJson: body,
   }).then(normalizeOkResponse);
+export type GmailApprovedDraftSendInput = {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string | null;
+  thread_id?: string | null;
+  in_reply_to?: string | null;
+  references?: string[];
+};
+export type GmailApprovedDraftSendResponse = {
+  ok: boolean;
+  sent: boolean;
+  messageId: string | null;
+  clientMessageId: string | null;
+  draftMessageId: string | null;
+  message: string | null;
+};
+function normalizeGmailApprovedDraftSendResponse(value: unknown): GmailApprovedDraftSendResponse {
+  const record = isRecord(value) ? value : {};
+  const messageId = typeof record.message_id === "string" && record.message_id.trim()
+    ? record.message_id.trim()
+    : typeof record.messageId === "string" && record.messageId.trim()
+      ? record.messageId.trim()
+      : typeof record.id === "string" && record.id.trim()
+        ? record.id.trim()
+        : null;
+  const clientMessageId = typeof record.client_message_id === "string" && record.client_message_id.trim()
+    ? record.client_message_id.trim()
+    : typeof record.clientMessageId === "string" && record.clientMessageId.trim()
+      ? record.clientMessageId.trim()
+      : null;
+  const draftMessageId = typeof record.draft_message_id === "string" && record.draft_message_id.trim()
+    ? record.draft_message_id.trim()
+    : typeof record.draftMessageId === "string" && record.draftMessageId.trim()
+      ? record.draftMessageId.trim()
+      : null;
+  const message = typeof record.message === "string" && record.message.trim()
+    ? record.message.trim()
+    : typeof record.error === "string" && record.error.trim()
+      ? record.error.trim()
+      : typeof record.detail === "string" && record.detail.trim()
+        ? record.detail.trim()
+        : null;
+  return {
+    ok: record.ok === true || record.sent === true,
+    sent: record.sent === true || record.ok === true,
+    messageId,
+    clientMessageId,
+    draftMessageId,
+    message,
+  };
+}
+export const sendGmailApprovedDraft = (
+  body: GmailApprovedDraftSendInput,
+): Promise<GmailApprovedDraftSendResponse> =>
+  apiFetch<unknown>("/integrations/gmail/send-draft", {
+    method: "POST",
+    bodyJson: body,
+  }).then(normalizeGmailApprovedDraftSendResponse);
 export const fetchBriefToday = (): Promise<BriefApiResponse | null> =>
   apiFetch<unknown>("/api/brief/today").then(normalizeBriefResponse);
 const fetchActiveGoalsCollection = async (limit?: number) => {
@@ -4264,6 +4323,22 @@ export const saveThreadMessage = (payload: Record<string, unknown>) =>
     method: "POST",
     bodyJson: payload,
   }).then(normalizeOkResponse);
+export const sendFederatedAgentMessage = (body: {
+  recipient_agent_id: string;
+  thread_id: string;
+  body: string;
+  subject?: string | null;
+}) =>
+  apiFetch<{
+    success: boolean;
+    message_id: string;
+    thread_id?: string;
+    source_thread_id?: string | null;
+    recipient_agent_id: string;
+  }>("/federation/send", {
+    method: "POST",
+    bodyJson: body,
+  });
 export const fetchThreadRelatedContext = (
   messageId: string,
   options?: { limit?: number; type?: string },
@@ -5238,6 +5313,20 @@ export type AdminWeddingAiRoutingPolicyPayload = {
   policySourceLabel?: string | null;
 };
 
+export type AdminThirdPartyToolPolicyRecordPayload = {
+  toolId: string;
+  enabledForAllUsers: boolean;
+  enabledForWeddingTemplate: boolean;
+  monthlyFreeQuotaLabel?: string | null;
+  quotaUsedLabel?: string | null;
+};
+
+export type AdminThirdPartyToolPolicyPayload = {
+  policies: AdminThirdPartyToolPolicyRecordPayload[];
+  updatedAt?: string | null;
+  sourceLabel?: string | null;
+};
+
 export type OperatorSupportAccessState = NonNullable<DashboardBootstrap["support_access"]>;
 
 export type OperatorSupportAccessHistoryEntry = NonNullable<DashboardBootstrap["support_access_history"]>[number];
@@ -5644,6 +5733,33 @@ export function normalizeAdminWeddingAiRoutingPolicyPayload(value: unknown): Adm
   };
 }
 
+function normalizeAdminThirdPartyToolPolicyRecordPayload(
+  value: unknown,
+): AdminThirdPartyToolPolicyRecordPayload | null {
+  if (!isRecord(value) || typeof value.toolId !== "string") return null;
+  return {
+    toolId: value.toolId,
+    enabledForAllUsers: apiBoolean(value.enabledForAllUsers),
+    enabledForWeddingTemplate: apiBoolean(value.enabledForWeddingTemplate),
+    monthlyFreeQuotaLabel: apiNullableString(value.monthlyFreeQuotaLabel),
+    quotaUsedLabel: apiNullableString(value.quotaUsedLabel),
+  };
+}
+
+export function normalizeAdminThirdPartyToolPolicyPayload(value: unknown): AdminThirdPartyToolPolicyPayload {
+  const record = isRecord(value) ? value : {};
+  return {
+    policies: Array.isArray(record.policies)
+      ? record.policies.flatMap((entry): AdminThirdPartyToolPolicyRecordPayload[] => {
+          const normalized = normalizeAdminThirdPartyToolPolicyRecordPayload(entry);
+          return normalized ? [normalized] : [];
+        })
+      : [],
+    updatedAt: apiNullableString(record.updatedAt),
+    sourceLabel: apiNullableString(record.sourceLabel),
+  };
+}
+
 export function normalizeOperatorSessionEntry(value: unknown): OperatorSessionEntry | null {
   if (!isRecord(value) || typeof value.session_ref !== "string") return null;
   return {
@@ -5758,6 +5874,13 @@ export const fetchAdminWeddingOpsMetrics = () =>
 
 export const fetchAdminWeddingAiRoutingPolicy = () =>
   apiFetch<unknown>("/admin/wedding/ai-routing-policy").then(normalizeAdminWeddingAiRoutingPolicyPayload);
+
+export const fetchAdminThirdPartyToolPolicy = () =>
+  apiFetch<unknown>("/admin/third-party-tool-policy").then(normalizeAdminThirdPartyToolPolicyPayload);
+
+export const saveAdminThirdPartyToolPolicy = (body: AdminThirdPartyToolPolicyPayload) =>
+  apiFetch<unknown>("/admin/third-party-tool-policy", { method: "POST", bodyJson: body })
+    .then(normalizeAdminThirdPartyToolPolicyPayload);
 
 export const fetchAdminWeddingWaitlist = () =>
   apiFetch<unknown>("/admin/wedding/waitlist").then(normalizeAdminWeddingWaitlistResponse);

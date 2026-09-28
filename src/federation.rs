@@ -103,6 +103,40 @@ pub struct AfpDelegation {
     pub version: String,
 }
 
+fn validate_afp_delegation_for_domain(
+    delegation: &AfpDelegation,
+    domain: &str,
+) -> Result<(), FederationError> {
+    let Some((_, delegation_domain)) = parse_agent_id(&delegation.agent_id) else {
+        return Err(FederationError::DelegationInvalid(
+            "delegation agent_id must be a valid agent id".to_string(),
+        ));
+    };
+    if delegation_domain != domain {
+        return Err(FederationError::DelegationInvalid(format!(
+            "delegation agent_id domain '{}' does not match requested domain '{}'",
+            delegation_domain, domain
+        )));
+    }
+
+    let signing_key_bytes = hex::decode(delegation.signing_key.trim()).map_err(|_| {
+        FederationError::DelegationInvalid("delegation signing_key must be hex".to_string())
+    })?;
+    if signing_key_bytes.len() != 32 {
+        return Err(FederationError::DelegationInvalid(
+            "delegation signing_key must decode to 32 bytes".to_string(),
+        ));
+    }
+
+    if delegation.relay_endpoint.trim().is_empty() {
+        return Err(FederationError::DelegationInvalid(
+            "delegation relay_endpoint is required".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
 /// Reject domains whose hostnames match private/loopback ranges (SSRF guard).
 fn is_ssrf_blocked_domain(domain: &str) -> bool {
     let h = domain.split(':').next().unwrap_or(domain).to_lowercase();
@@ -175,6 +209,7 @@ pub async fn fetch_afp_delegation(domain: &str) -> Result<AfpDelegation, Federat
         .json::<AfpDelegation>()
         .await
         .map_err(|e| FederationError::Serialization(e.to_string()))?;
+    validate_afp_delegation_for_domain(&delegation, domain)?;
 
     // Populate cache.
     if let Ok(mut cache) = delegation_cache().lock() {
@@ -371,6 +406,7 @@ fn validate_inbound_relay_request(
 pub enum FederationError {
     InvalidAgentId(String),
     DelegationNotFound(String),
+    DelegationInvalid(String),
     Http(String),
     Serialization(String),
     Signature(String),
@@ -383,6 +419,7 @@ impl std::fmt::Display for FederationError {
         match self {
             FederationError::InvalidAgentId(s) => write!(f, "invalid agent id: {s}"),
             FederationError::DelegationNotFound(s) => write!(f, "afp-delegation not found for {s}"),
+            FederationError::DelegationInvalid(s) => write!(f, "invalid afp-delegation: {s}"),
             FederationError::Http(s) => write!(f, "HTTP error: {s}"),
             FederationError::Serialization(s) => write!(f, "serialization error: {s}"),
             FederationError::Signature(s) => write!(f, "signature error: {s}"),
@@ -428,6 +465,43 @@ mod tests {
     fn is_foreign_agent_detects_different_domain() {
         assert!(is_foreign_agent("agent:alice@foreign.com", "omnyid.com"));
         assert!(!is_foreign_agent("agent:alice@omnyid.com", "omnyid.com"));
+    }
+
+    fn valid_delegation(domain: &str) -> AfpDelegation {
+        AfpDelegation {
+            agent_id: format!("agent:relay@{domain}"),
+            relay_endpoint: format!("https://{domain}/federation/relay"),
+            signing_key: "ab".repeat(32),
+            version: "1.0".to_string(),
+        }
+    }
+
+    #[test]
+    fn validate_afp_delegation_accepts_matching_domain_and_key() {
+        let delegation = valid_delegation("example.com");
+        validate_afp_delegation_for_domain(&delegation, "example.com").unwrap();
+    }
+
+    #[test]
+    fn validate_afp_delegation_rejects_agent_domain_mismatch() {
+        let delegation = valid_delegation("evil.example");
+        let err = validate_afp_delegation_for_domain(&delegation, "example.com")
+            .expect_err("domain mismatch should fail");
+        assert!(err.to_string().contains("does not match requested domain"));
+    }
+
+    #[test]
+    fn validate_afp_delegation_rejects_malformed_signing_key() {
+        let mut delegation = valid_delegation("example.com");
+        delegation.signing_key = "abcd".to_string();
+        let err = validate_afp_delegation_for_domain(&delegation, "example.com")
+            .expect_err("short key should fail");
+        assert!(err.to_string().contains("32 bytes"));
+
+        delegation.signing_key = "not-hex".to_string();
+        let err = validate_afp_delegation_for_domain(&delegation, "example.com")
+            .expect_err("non-hex key should fail");
+        assert!(err.to_string().contains("must be hex"));
     }
 
     #[test]
