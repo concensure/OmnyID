@@ -15,6 +15,7 @@ import {
   type BacklinkItem,
   type CalendarEvent,
   type DashboardBootstrap,
+  type GoogleCalendarOAuthConfig,
 } from "@/lib/api";
 import { type GoogleCalendarConnectionStatus } from "@/lib/googleCalendarConnectionState";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
@@ -485,6 +486,7 @@ export function MonthlyCalendarView(props: {
   const [addingDate, setAddingDate] = createSignal<Date | null>(null);
   const [weddingNavigationIntent, setWeddingNavigationIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
   const [googleCalendarStatus, setGoogleCalendarStatus] = createSignal<GoogleCalendarConnectionStatus | null>(null);
+  const [googleCalendarOAuthConfig, setGoogleCalendarOAuthConfig] = createSignal<GoogleCalendarOAuthConfig | null>(null);
   const [googleCalendarBusy, setGoogleCalendarBusy] = createSignal(false);
   const [googleCalendarNotice, setGoogleCalendarNotice] = createSignal<string | null>(null);
 
@@ -514,6 +516,14 @@ export function MonthlyCalendarView(props: {
     }
   }
 
+  async function loadGoogleCalendarOAuthConfig() {
+    try {
+      setGoogleCalendarOAuthConfig(await fetchGoogleCalendarOAuthConfig());
+    } catch {
+      setGoogleCalendarOAuthConfig(null);
+    }
+  }
+
   async function connectGoogleCalendar() {
     if (googleCalendarBusy()) return;
     setGoogleCalendarBusy(true);
@@ -524,6 +534,7 @@ export function MonthlyCalendarView(props: {
     } catch (err) {
       try {
         const config = await fetchGoogleCalendarOAuthConfig();
+        setGoogleCalendarOAuthConfig(config);
         const redirect = config.requiredAuthorizedRedirectUri ?? config.redirectUri;
         const setupHint = redirect
           ? ` Google Cloud must authorize this redirect URI: ${redirect}.`
@@ -570,6 +581,7 @@ export function MonthlyCalendarView(props: {
     if (weddingIntent?.view === "calendar") setWeddingNavigationIntent(weddingIntent);
     void loadEvents();
     void loadGoogleCalendarStatus();
+    void loadGoogleCalendarOAuthConfig();
     const calendarRedirectStatus = new URLSearchParams(window.location.search).get("calendar");
     if (calendarRedirectStatus) {
       setGoogleCalendarNotice(
@@ -933,9 +945,21 @@ export function MonthlyCalendarView(props: {
               "border-radius": "0.75em",
             }}
           >
-            <p style={{ margin: 0, "font-size": "0.85em", color: TOKEN.textSecondary }}>
-              Connect Google Calendar to see your Google events here.
-            </p>
+            <div style={{ display: "grid", gap: "0.2em", "min-width": 0 }}>
+              <p style={{ margin: 0, "font-size": "0.85em", color: TOKEN.textSecondary }}>
+                Connect Google Calendar to see your Google events here.
+              </p>
+              <Show when={googleCalendarOAuthConfig()?.requiredAuthorizedRedirectUri}>
+                {(redirectUri) => (
+                  <p style={{ margin: 0, "font-size": "0.72em", color: TOKEN.textSecondary, "word-break": "break-word" }}>
+                    Authorized redirect URI: {redirectUri()}
+                    <Show when={googleCalendarOAuthConfig()?.oauthClientSource}>
+                      {(source) => <> | OAuth client: {source().replace(/_/g, " ")}</>}
+                    </Show>
+                  </p>
+                )}
+              </Show>
+            </div>
             <button
               type="button"
               disabled={googleCalendarBusy()}

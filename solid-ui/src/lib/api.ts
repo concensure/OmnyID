@@ -4143,6 +4143,7 @@ export type GoogleCalendarOAuthConfig = {
   redirectUri: string | null;
   requiredAuthorizedRedirectUri: string | null;
   requiredScopes: string[];
+  oauthClientSource: string | null;
 };
 function normalizeGoogleCalendarOAuthConfig(value: unknown): GoogleCalendarOAuthConfig {
   const record = isRecord(value) ? value : {};
@@ -4155,6 +4156,7 @@ function normalizeGoogleCalendarOAuthConfig(value: unknown): GoogleCalendarOAuth
     redirectUri: typeof record.redirect_uri === "string" ? record.redirect_uri : null,
     requiredAuthorizedRedirectUri: typeof record.required_authorized_redirect_uri === "string" ? record.required_authorized_redirect_uri : null,
     requiredScopes: apiStringList(record.required_scopes),
+    oauthClientSource: typeof record.oauth_client_source === "string" ? record.oauth_client_source : null,
   };
 }
 export const fetchGoogleCalendarOAuthConfig = (): Promise<GoogleCalendarOAuthConfig> =>
