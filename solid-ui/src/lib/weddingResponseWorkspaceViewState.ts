@@ -96,6 +96,7 @@ import {
   buildWeddingBudgetTrackingState,
   type WeddingBudgetTrackingState,
 } from "@/lib/weddingBudgetTrackingState";
+import { loadWeddingBudgetAllocationPendingDecision } from "@/lib/weddingBudgetAllocationState";
 import {
   buildWeddingGuestTrackingState,
   type WeddingGuestTrackingState,
@@ -133,7 +134,11 @@ import {
   type WeddingBoundaryTopologyState,
 } from "@/lib/weddingBoundaryTopologyState";
 import { buildWeddingBoundaryStarterObjects } from "@/lib/weddingBoundaryDefaultsState";
-import type { WeddingArtifactKind, WeddingApprovalState } from "@/lib/weddingPlanningTemplateState";
+import {
+  normalizeWeddingPlanningMetadata,
+  type WeddingArtifactKind,
+  type WeddingApprovalState,
+} from "@/lib/weddingPlanningTemplateState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingSeatingConstraintAction } from "@/lib/weddingSeatingConstraintActionState";
 import type { WeddingSeatingOptimizationResult } from "@/lib/weddingSeatingOptimizationState";
@@ -602,9 +607,16 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
   const activeDecisionRecords = (input.decisionRecords ?? []).filter((decision) =>
     !closedVendorLineItemIds.has(clean(decision.id))
   );
+  const metadataForLocalState = normalizeWeddingPlanningMetadata(input.metadata ?? artifacts[0]?.metadata);
+  const localBudgetDecision = input.projectionStorage
+    ? loadWeddingBudgetAllocationPendingDecision(metadataForLocalState.weddingPlanId, input.projectionStorage)
+    : null;
+  const budgetDecisionItems = localBudgetDecision
+    ? [...activeDecisions, localBudgetDecision]
+    : activeDecisions;
   const budgetTracking = buildWeddingBudgetTrackingState({
     decisionRecords: activeDecisionRecords,
-    selectedDecisionItems: activeDecisions,
+    selectedDecisionItems: budgetDecisionItems,
     artifacts,
   });
   const persistedBoundaryObjects = input.boundaryObjects ?? null;

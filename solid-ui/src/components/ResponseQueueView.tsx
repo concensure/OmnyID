@@ -112,6 +112,7 @@ import {
   WEDDING_VENDOR_CHECKLIST,
   weddingVendorSelectionLabels,
 } from "@/lib/weddingVendorChecklistState";
+import { WEDDING_BUDGET_ALLOCATION_LOCAL_SAVE_EVENT } from "@/lib/weddingBudgetAllocationState";
 import {
   buildWeddingVendorComparisonArtifactState,
   buildWeddingVendorSearchArtifactState,
@@ -390,6 +391,7 @@ export function ResponseQueueView(props: {
   const [weddingAdminDataConsentEnabled, setWeddingAdminDataConsentEnabled] = createSignal(false);
   const [weddingProjectionRefreshKey, setWeddingProjectionRefreshKey] = createSignal(0);
   const [weddingLocalDateRefreshKey, setWeddingLocalDateRefreshKey] = createSignal(0);
+  const [weddingLocalBudgetRefreshKey, setWeddingLocalBudgetRefreshKey] = createSignal(0);
   const [weddingImportRefreshKey, setWeddingImportRefreshKey] = createSignal(0);
   const [weddingRefreshRunning, setWeddingRefreshRunning] = createSignal(false);
   const [weddingRefreshState, setWeddingRefreshState] = createSignal<WeddingWorkspaceRefreshState | null>(null);
@@ -678,6 +680,7 @@ export function ResponseQueueView(props: {
     if (!intent || intent.surface !== "planning_files") return null;
     weddingProjectionRefreshKey();
     weddingLocalDateRefreshKey();
+    weddingLocalBudgetRefreshKey();
     weddingImportRefreshKey();
     const importedArtifacts = loadWeddingImportedArtifacts(intent.responseWorkspaceId, localStorage, weddingStorageUserId());
     const importedArtifactInputs = importedArtifacts.map((artifact) => artifact.input);
@@ -1015,6 +1018,10 @@ export function ResponseQueueView(props: {
     window.addEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_EVENT, vendorSearchLaunchHandler);
     onCleanup(() => window.removeEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_EVENT, vendorSearchLaunchHandler));
     applyWeddingVendorSearchLaunch(consumeWeddingVendorSearchLaunch());
+
+    const budgetLocalSaveHandler = () => setWeddingLocalBudgetRefreshKey((value) => value + 1);
+    window.addEventListener(WEDDING_BUDGET_ALLOCATION_LOCAL_SAVE_EVENT, budgetLocalSaveHandler);
+    onCleanup(() => window.removeEventListener(WEDDING_BUDGET_ALLOCATION_LOCAL_SAVE_EVENT, budgetLocalSaveHandler));
 
     const intent = consumeWeddingNavigationIntent();
     if (intent?.view === "response_queue") {

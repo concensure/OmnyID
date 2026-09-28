@@ -16,7 +16,9 @@ import { normalizeWeddingPlanningMetadata, type WeddingPlanningMetadata } from "
 export const WEDDING_BUDGET_ALLOCATION_ARTIFACT_KIND = "budget_sheet";
 export const WEDDING_BUDGET_ALLOCATION_ARTIFACT_ID = "wedding-budget-allocation";
 export const WEDDING_BUDGET_ALLOCATION_SELECTED_OPTION_ID = "total-budget";
+export const WEDDING_BUDGET_ALLOCATION_LOCAL_SAVE_EVENT = "omnyid:wedding-budget-allocation-local-save";
 const WEDDING_BUDGET_ALLOCATION_DRAFT_KEY_PREFIX = "omnyid.wedding.budget-allocation-draft.";
+const WEDDING_BUDGET_ALLOCATION_PENDING_DECISION_KEY_PREFIX = "omnyid.wedding.budget-allocation-pending-decision.";
 
 export type WeddingBudgetCategoryId =
   | "venue_ceremony"
@@ -138,6 +140,59 @@ function draftStorageKey(weddingPlanId: string): string {
   return `${WEDDING_BUDGET_ALLOCATION_DRAFT_KEY_PREFIX}${weddingPlanId}`;
 }
 
+function pendingDecisionStorageKey(weddingPlanId: string): string {
+  return `${WEDDING_BUDGET_ALLOCATION_PENDING_DECISION_KEY_PREFIX}${weddingPlanId}`;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+}
+
+function normalizePendingDecision(value: unknown): WeddingDecisionProjectionInput | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const selectedOption = record.selectedOption;
+  if (!selectedOption || typeof selectedOption !== "object" || Array.isArray(selectedOption)) return null;
+  const optionRecord = selectedOption as Record<string, unknown>;
+  const id = typeof record.id === "string" ? record.id.trim() : "";
+  const artifactId = typeof record.artifactId === "string" ? record.artifactId.trim() : "";
+  const artifactTitle = typeof record.artifactTitle === "string" ? record.artifactTitle.trim() : "";
+  const artifactKind = typeof record.artifactKind === "string" ? record.artifactKind.trim() : "";
+  const optionId = typeof optionRecord.id === "string" ? optionRecord.id.trim() : "";
+  const optionLabel = typeof optionRecord.label === "string" ? optionRecord.label.trim() : "";
+  if (!id || artifactId !== WEDDING_BUDGET_ALLOCATION_ARTIFACT_ID || artifactKind !== WEDDING_BUDGET_ALLOCATION_ARTIFACT_KIND || optionId !== WEDDING_BUDGET_ALLOCATION_SELECTED_OPTION_ID || !optionLabel) {
+    return null;
+  }
+  return {
+    id,
+    metadata: record.metadata,
+    artifactId,
+    artifactTitle: artifactTitle || "Wedding Budget",
+    artifactKind,
+    sourceLabels: stringArray(record.sourceLabels),
+    sourceUrls: stringArray(record.sourceUrls),
+    sourceProviderLabels: stringArray(record.sourceProviderLabels),
+    selectedOption: {
+      id: optionId,
+      rowIndex: typeof optionRecord.rowIndex === "number" && Number.isFinite(optionRecord.rowIndex) ? optionRecord.rowIndex : 0,
+      label: optionLabel,
+      detail: typeof optionRecord.detail === "string" ? optionRecord.detail : "",
+      cells: stringArray(optionRecord.cells),
+      selected: optionRecord.selected === true,
+      preferenceFitLabels: stringArray(optionRecord.preferenceFitLabels),
+      missingPreferenceLabels: stringArray(optionRecord.missingPreferenceLabels),
+      tradeoffLabels: stringArray(optionRecord.tradeoffLabels),
+      preferenceSummaryLabel: typeof optionRecord.preferenceSummaryLabel === "string" ? optionRecord.preferenceSummaryLabel : "",
+    },
+    source: record.source === "user" || record.source === "agent" || record.source === "manual" || record.source === "local_selection"
+      ? record.source
+      : "local_selection",
+    createdAt: typeof record.createdAt === "string" ? record.createdAt : null,
+  };
+}
+
 export function loadWeddingBudgetAllocationDraft(
   weddingPlanId: string,
   storage: Storage = localStorage,
@@ -159,6 +214,19 @@ export function loadWeddingBudgetAllocationDraft(
   }
 }
 
+export function loadWeddingBudgetAllocationPendingDecision(
+  weddingPlanId: string,
+  storage: Storage = localStorage,
+): WeddingDecisionProjectionInput | null {
+  try {
+    const raw = storage.getItem(pendingDecisionStorageKey(weddingPlanId));
+    if (!raw) return null;
+    return normalizePendingDecision(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
 export function saveWeddingBudgetAllocationDraft(
   weddingPlanId: string,
   draft: WeddingBudgetAllocationDraft,
@@ -169,6 +237,35 @@ export function saveWeddingBudgetAllocationDraft(
   } catch {
     // Draft persistence is convenience state only; ignore storage failures.
   }
+}
+
+export function saveWeddingBudgetAllocationPendingDecision(
+  weddingPlanId: string,
+  decision: WeddingDecisionProjectionInput,
+  storage: Storage = localStorage,
+): void {
+  try {
+    storage.setItem(pendingDecisionStorageKey(weddingPlanId), JSON.stringify(decision));
+  } catch {
+    // Pending decision persistence is local fallback state only.
+  }
+}
+
+export function clearWeddingBudgetAllocationPendingDecision(
+  weddingPlanId: string,
+  storage: Storage = localStorage,
+): void {
+  try {
+    storage.removeItem(pendingDecisionStorageKey(weddingPlanId));
+  } catch {
+    // Local fallback cleanup is best-effort.
+  }
+}
+
+export function dispatchWeddingBudgetAllocationLocalSave(
+  target: Window = window,
+): void {
+  target.dispatchEvent(new CustomEvent(WEDDING_BUDGET_ALLOCATION_LOCAL_SAVE_EVENT));
 }
 
 /** Builds the AFP-ready decision projection for a balanced draft — the same shape a vendor-table pick produces. */

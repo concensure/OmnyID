@@ -10,6 +10,8 @@ import {
   buildWeddingBudgetAllocationProjectionInput,
   emptyWeddingBudgetAllocationDraft,
   loadWeddingBudgetAllocationDraft,
+  loadWeddingBudgetAllocationPendingDecision,
+  saveWeddingBudgetAllocationPendingDecision,
   saveWeddingBudgetAllocationDraft,
   weddingBudgetAllocationAllocatedAmount,
   weddingBudgetAllocationFromDecisionRecords,
@@ -285,4 +287,22 @@ test("draft persistence round-trips through storage and rejects malformed data",
 
   storage.setItem("omnyid.wedding.budget-allocation-draft.plan-3", "not json");
   assert.equal(loadWeddingBudgetAllocationDraft("plan-3", storage), null);
+});
+
+test("pending budget allocation decision round-trips as local fallback state", () => {
+  const storage = fakeStorage();
+  const decision = buildWeddingBudgetAllocationProjectionInput(filledDraft(), {
+    weddingPlanId: "plan-1",
+    responseWorkspaceId: "workspace-1",
+  }, "2026-09-28T00:00:00.000Z");
+
+  assert.equal(loadWeddingBudgetAllocationPendingDecision("plan-1", storage), null);
+  saveWeddingBudgetAllocationPendingDecision("plan-1", decision, storage);
+
+  const loaded = loadWeddingBudgetAllocationPendingDecision("plan-1", storage);
+  assert.equal(loaded?.id, decision.id);
+  assert.equal(loaded?.artifactId, decision.artifactId);
+  assert.equal(loaded?.selectedOption.label, decision.selectedOption.label);
+  assert.deepEqual(loaded?.selectedOption.cells, decision.selectedOption.cells);
+  assert.equal(loadWeddingBudgetAllocationPendingDecision("plan-2", storage), null);
 });

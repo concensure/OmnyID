@@ -10,9 +10,12 @@ import {
   WEDDING_BUDGET_CATEGORIES,
   buildWeddingBudgetAllocationSaveState,
   buildWeddingBudgetAllocationProjectionInput,
+  clearWeddingBudgetAllocationPendingDecision,
+  dispatchWeddingBudgetAllocationLocalSave,
   emptyWeddingBudgetAllocationDraft,
   loadWeddingBudgetAllocationDraft,
   saveWeddingBudgetAllocationDraft,
+  saveWeddingBudgetAllocationPendingDecision,
   weddingBudgetAllocationAllocatedAmount,
   weddingBudgetAllocationIsBalanced,
   weddingBudgetAllocationRemaining,
@@ -116,9 +119,13 @@ export function WeddingBudgetTrackerCard(props: {
     try {
       const projection = buildWeddingBudgetAllocationProjectionInput(draft(), props.metadata ?? {});
       await props.onSaveAllocation(weddingDecisionProjectionToAfpSendInput(projection));
+      if (props.weddingPlanId) clearWeddingBudgetAllocationPendingDecision(props.weddingPlanId);
       setSaveNotice("Budget saved. Your planner will use it when checking costs and next steps.");
     } catch {
       if (props.weddingPlanId) saveWeddingBudgetAllocationDraft(props.weddingPlanId, draft());
+      const projection = buildWeddingBudgetAllocationProjectionInput(draft(), props.metadata ?? {});
+      if (props.weddingPlanId) saveWeddingBudgetAllocationPendingDecision(props.weddingPlanId, projection);
+      dispatchWeddingBudgetAllocationLocalSave();
       setSaveNotice("Budget saved on this device. Account memory will sync when saving is available.");
     } finally {
       setSaving(false);
