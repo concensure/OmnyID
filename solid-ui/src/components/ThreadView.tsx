@@ -129,6 +129,8 @@ const TYPING_FALLBACK_LABELS = [
   "Drafting...",
   "Reviewing...",
 ] as const;
+const FEDERATION_SUBJECT_MAX_CHARS = 200;
+const FEDERATION_BODY_MAX_CHARS = 8000;
 
 const SENDER_COLORS = [
   "border-l-2 border-l-sky-400/50",
@@ -406,6 +408,14 @@ export function ThreadView(props: {
     if (!recipient || !body || federationSending()) return;
     if (!isFederatedAgentId(recipient)) {
       setFederationError("Enter an agent id like agent:name@example.com.");
+      return;
+    }
+    if (federationSubject().trim().length > FEDERATION_SUBJECT_MAX_CHARS) {
+      setFederationError(`Subject must be ${FEDERATION_SUBJECT_MAX_CHARS} characters or fewer.`);
+      return;
+    }
+    if (body.length > FEDERATION_BODY_MAX_CHARS) {
+      setFederationError(`Message must be ${FEDERATION_BODY_MAX_CHARS.toLocaleString()} characters or fewer.`);
       return;
     }
     setFederationSending(true);
@@ -1627,6 +1637,7 @@ export function ThreadView(props: {
                   value={federationSubject()}
                   onInput={(event) => setFederationSubject(event.currentTarget.value)}
                   placeholder="Optional"
+                  maxLength={FEDERATION_SUBJECT_MAX_CHARS}
                   class="mt-1 w-full rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/35 focus:border-teal-500/40"
                 />
               </label>
@@ -1639,10 +1650,14 @@ export function ThreadView(props: {
                   value={federationBody()}
                   onInput={(event) => setFederationBody(event.currentTarget.value)}
                   placeholder="Compose the message this agent should receive."
+                  maxLength={FEDERATION_BODY_MAX_CHARS}
                   class="mt-1 min-h-36 w-full resize-y rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-sm leading-6 text-on-surface outline-none placeholder:text-on-surface-variant/35 focus:border-teal-500/40"
                   required
                 />
               </label>
+              <div class="mt-1 flex justify-end font-mono text-[10px] text-on-surface-variant/45">
+                {federationBody().length.toLocaleString()} / {FEDERATION_BODY_MAX_CHARS.toLocaleString()}
+              </div>
 
               <Show when={federationError()}>
                 <div class="mt-3 rounded-xl border border-red-200/70 bg-red-50/85 px-3 py-2 text-sm text-red-700">
