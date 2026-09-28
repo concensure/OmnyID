@@ -7,6 +7,7 @@ import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationAr
 import { decisionOsQueueBootstrapState } from "@/lib/decisionOsQueueBootstrapState";
 import {
   loadDecisionQueueDensity,
+  queueDensityIsCompact,
   saveDecisionQueueDensity,
   type QueueDensity,
 } from "@/lib/queueDensityLocalState";
@@ -63,7 +64,7 @@ export function DecisionQueueView(props: {
       density: currentDensity,
       densityTone: "indigo" as const,
       workspaceQueueState: decisionQueueState(),
-      workspaceCompactMode: currentDensity === "compact",
+      workspaceCompactMode: queueDensityIsCompact(currentDensity),
     };
   });
 

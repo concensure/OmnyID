@@ -5,18 +5,10 @@
 import { For } from "solid-js";
 import type { QueueDensity } from "@/lib/queueDensityLocalState";
 
-export const QUEUE_DENSITY_MODES = ["comfortable", "compact"] as const;
+export const QUEUE_DENSITY_MODES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] as const;
 const QUEUE_DENSITY_LABEL = "Density";
 const QUEUE_DENSITY_BUTTON_BASE_CLASS =
-  "inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border text-[10px] font-semibold transition";
-const QUEUE_DENSITY_MODE_TITLE = {
-  comfortable: "Comfortable spacing",
-  compact: "Compact spacing",
-} as const;
-const QUEUE_DENSITY_MODE_LABEL = {
-  comfortable: "M",
-  compact: "S",
-} as const;
+  "inline-flex min-h-8 min-w-7 items-center justify-center rounded-full border font-semibold transition";
 
 const DENSITY_TONE_STYLES = {
   indigo: {
@@ -58,8 +50,17 @@ export function QueueDensityToggle(props: {
     isActiveMode(mode) ? toneStyles().activeButtonClass : toneStyles().idleButtonClass;
   const buttonClass = (mode: QueueDensity) =>
     `${QUEUE_DENSITY_BUTTON_BASE_CLASS} ${buttonStateClass(mode)}`;
-  const modeTitle = (mode: QueueDensity) => QUEUE_DENSITY_MODE_TITLE[mode];
-  const modeLabel = (mode: QueueDensity) => QUEUE_DENSITY_MODE_LABEL[mode];
+  const modeTitle = (mode: QueueDensity) => `Text density ${mode} of 10`;
+  const modeLabel = (mode: QueueDensity) => {
+    if (mode === "1") return "A";
+    if (mode === "10") return "A";
+    return "";
+  };
+  const modeLabelClass = (mode: QueueDensity) => {
+    if (mode === "1") return "text-[9px] leading-none";
+    if (mode === "10") return "text-[15px] leading-none";
+    return "h-1.5 w-1.5 rounded-full bg-current opacity-70";
+  };
   const selectMode = (mode: QueueDensity) => onSelect()(mode);
   const toggleState = () => ({
     shellClass: shellClass(),
@@ -70,6 +71,7 @@ export function QueueDensityToggle(props: {
       buttonClass: buttonClass(mode),
       title: modeTitle(mode),
       label: modeLabel(mode),
+      labelClass: modeLabelClass(mode),
     })),
   });
 
@@ -82,10 +84,11 @@ export function QueueDensityToggle(props: {
             type="button"
             onClick={() => selectMode(item.mode)}
             aria-pressed={item.active}
+            aria-label={item.title}
             class={item.buttonClass}
             title={item.title}
           >
-            {item.label}
+            <span class={item.labelClass}>{item.label}</span>
           </button>
         )}
       </For>

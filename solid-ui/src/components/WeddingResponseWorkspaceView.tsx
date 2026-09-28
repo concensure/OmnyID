@@ -75,7 +75,6 @@ const WEDDING_HOME_SECTION_IDS = [
   "vendor_search",
   "live_evidence",
   "vendor_smoke",
-  "vendor_validation",
   "notice",
   "overview",
   "status",
@@ -762,6 +761,16 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
               {props.vendorSearchRunning ? "Searching..." : "Search vendors"}
             </button>
           </div>
+          <label class="mt-3 block">
+            <span class="text-xs font-semibold text-rose-950/75">Search query</span>
+            <input
+              type="text"
+              value={props.vendorSearchQuery ?? ""}
+              onInput={(event) => props.onVendorSearchQueryChange?.(event.currentTarget.value)}
+              placeholder="florist in Sydney specialising in wedding"
+              class="mt-1 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm text-rose-950 outline-none transition placeholder:text-rose-950/35 focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+            />
+          </label>
           <Show when={props.vendorSearchNotice}>
             {(notice) => (
               <p class="mt-2 break-words text-xs leading-5 text-rose-950/70">
@@ -855,79 +864,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           </div>
         </div>
       ),
-    },
-    {
-      id: "vendor_validation",
-      title: "Vendor workflow validation",
-      visible: Boolean(props.vendorEndToEndValidation),
-      render: () => {
-        const validation = props.vendorEndToEndValidation;
-        if (!validation) return <></>;
-        return (
-          <div class={`rounded-2xl border p-3 shadow-sm ${
-            validation.status === "ready_for_usage_validation"
-              ? "border-emerald-200 bg-emerald-50/80"
-              : "border-amber-200 bg-amber-50/80"
-          }`}>
-            <div class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div class="min-w-0">
-                <p class={`text-sm font-semibold ${
-                  validation.status === "ready_for_usage_validation" ? "text-emerald-950" : "text-amber-950"
-                }`}>
-                  Vendor workflow validation
-                </p>
-                <p class={`mt-1 break-words text-xs leading-5 ${
-                  validation.status === "ready_for_usage_validation" ? "text-emerald-900/75" : "text-amber-900/75"
-                }`}>
-                  {validation.passedCount}/{validation.steps.length} checks passed.
-                  {validation.blockedCount > 0
-                    ? ` Estimated ${validation.estimatedPassesToUsage} pass${validation.estimatedPassesToUsage === 1 ? "" : "es"} to usage validation.`
-                    : " Ready for a usage-validation run with correct user data."}
-                </p>
-              </div>
-              <div class="flex shrink-0 flex-wrap gap-2">
-                <span class="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-800">
-                  {validation.passedCount} passed
-                </span>
-                <span class={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  validation.blockedCount > 0 ? "bg-amber-100 text-amber-950" : "bg-emerald-100 text-emerald-950"
-                }`}>
-                  {validation.blockedCount} blocked
-                </span>
-              </div>
-            </div>
-            <Show when={validation.nextActionLabels.length > 0}>
-              <div class="mt-3 rounded-xl border border-white/70 bg-white/70 p-3">
-                <p class="text-xs font-semibold text-slate-950">Next actions</p>
-                <ul class="mt-2 space-y-1 text-xs leading-5 text-slate-700">
-                  <For each={validation.nextActionLabels.slice(0, 3)}>
-                    {(action) => <li class="break-words">{action}</li>}
-                  </For>
-                </ul>
-              </div>
-            </Show>
-            <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              <For each={validation.steps}>
-                {(step) => (
-                  <div class="min-w-0 rounded-xl border border-white/75 bg-white/75 px-3 py-2">
-                    <div class="flex min-w-0 items-center justify-between gap-2">
-                      <p class="min-w-0 truncate text-xs font-semibold text-slate-950">{step.label}</p>
-                      <span class={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                        step.status === "passed"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-amber-100 text-amber-800"
-                      }`}>
-                        {step.status === "passed" ? "Pass" : "Block"}
-                      </span>
-                    </div>
-                    <p class="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-600">{step.detail}</p>
-                  </div>
-                )}
-              </For>
-            </div>
-          </div>
-        );
-      },
     },
     {
       id: "notice",

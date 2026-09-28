@@ -2,13 +2,19 @@
 // @module-id: queue-density-local-state
 // @primary-capability: queue-density-preferences
 // @stability: beta
-export type QueueDensity = "comfortable" | "compact";
+export type QueueDensity = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10";
 
 export const DECISION_QUEUE_DENSITY_KEY = "omnyid.decision-queue.density";
 export const RESPONSE_QUEUE_DENSITY_KEY = "omnyid.response-queue.density";
+export const DEFAULT_QUEUE_DENSITY: QueueDensity = "7";
 
 function normalizeQueueDensity(value: unknown): QueueDensity {
-  return value === "compact" ? "compact" : "comfortable";
+  if (value === "compact") return "3";
+  if (value === "comfortable") return DEFAULT_QUEUE_DENSITY;
+  const normalized = typeof value === "number" ? String(Math.round(value)) : String(value ?? "").trim();
+  return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"].includes(normalized)
+    ? normalized as QueueDensity
+    : DEFAULT_QUEUE_DENSITY;
 }
 
 function loadQueueDensity(key: string): QueueDensity {
@@ -20,7 +26,7 @@ function loadQueueDensity(key: string): QueueDensity {
     }
     return normalized;
   } catch {
-    return "comfortable";
+    return DEFAULT_QUEUE_DENSITY;
   }
 }
 
@@ -46,4 +52,12 @@ export function loadResponseQueueDensity(): QueueDensity {
 
 export function saveResponseQueueDensity(density: QueueDensity): void {
   saveQueueDensity(RESPONSE_QUEUE_DENSITY_KEY, density);
+}
+
+export function queueDensityLevel(density: QueueDensity): number {
+  return Number(normalizeQueueDensity(density));
+}
+
+export function queueDensityIsCompact(density: QueueDensity): boolean {
+  return queueDensityLevel(density) <= 4;
 }

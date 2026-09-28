@@ -50,6 +50,8 @@ export type WeddingResponseWorkspaceViewProps = {
   onRunLiveVendorSearch?: () => void;
   vendorSearchRunning?: boolean;
   vendorSearchNotice?: string | null;
+  vendorSearchQuery?: string | null;
+  onVendorSearchQueryChange?: (query: string) => void;
   vendorSearchReadiness?: WeddingLiveWorkflowReadinessState | null;
   vendorSearchBlockedReason?: string | null;
   onRunLiveEvidenceCheck?: () => void;

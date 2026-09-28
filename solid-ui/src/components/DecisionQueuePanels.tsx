@@ -200,11 +200,18 @@ export function DecisionQueueCard(props: {
     };
   };
   const openQueueEntry = () => onSelect()();
+  const handleCardKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    openQueueEntry();
+  };
 
   return (
-    <button
-      type={BUTTON_TYPE}
+    <article
+      role="button"
+      tabIndex={0}
       onClick={openQueueEntry}
+      onKeyDown={handleCardKeyDown}
       class={cardClass(decisionQueueUrgencyStyle(cardState().decision.urgency).border, cardState().selectedStateClass)}
       data-magic-action="open"
       data-magic-icon="continuity"
@@ -255,11 +262,18 @@ export function DecisionQueueCard(props: {
         <span class={QUEUE_CARD_WHY_SUMMARY_CLASS}>
           {cardState().whySummaryText}
         </span>
-        <span class={QUEUE_CARD_OPEN_CHIP_CLASS}>
+        <button
+          type={BUTTON_TYPE}
+          class={`${QUEUE_CARD_OPEN_CHIP_CLASS} transition hover:border-primary/35 hover:bg-primary/10`}
+          onClick={(event) => {
+            event.stopPropagation();
+            openQueueEntry();
+          }}
+        >
           {cardState().openLabel}
-        </span>
+        </button>
       </div>
-    </button>
+    </article>
   );
 }
 

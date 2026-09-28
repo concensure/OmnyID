@@ -69,6 +69,7 @@ import {
 import { buildWeddingHandoffPacketState } from "@/lib/weddingHandoffPacketState";
 import {
   loadResponseQueueDensity,
+  queueDensityIsCompact,
   saveResponseQueueDensity,
   type QueueDensity,
 } from "@/lib/queueDensityLocalState";
@@ -387,6 +388,7 @@ export function ResponseQueueView(props: {
   const [weddingRefreshState, setWeddingRefreshState] = createSignal<WeddingWorkspaceRefreshState | null>(null);
   const [weddingVendorSearchRunning, setWeddingVendorSearchRunning] = createSignal(false);
   const [weddingVendorSearchNotice, setWeddingVendorSearchNotice] = createSignal<string | null>(null);
+  const [weddingVendorSearchQuery, setWeddingVendorSearchQuery] = createSignal("");
   const [weddingVendorSearchCategoryScope, setWeddingVendorSearchCategoryScope] = createSignal<string[] | null>(null);
   const [weddingLiveEvidenceRunning, setWeddingLiveEvidenceRunning] = createSignal(false);
   const [weddingLiveEvidenceNotice, setWeddingLiveEvidenceNotice] = createSignal<string | null>(null);
@@ -644,7 +646,11 @@ export function ResponseQueueView(props: {
     guestCount: weddingFollowUpGuests(),
     budgetComfort: weddingFollowUpBudget(),
     prioritiesCsv: weddingFollowUpPriorities(),
-    vendorCategories: weddingVendorSelectionLabels(weddingFollowUpVendorIds()),
+    vendorCategories: weddingVendorSelectionLabels(weddingFollowUpVendorIds()).length > 0
+      ? weddingVendorSelectionLabels(weddingFollowUpVendorIds())
+      : weddingVendorSearchQuery().trim()
+        ? ["Custom vendor search"]
+        : [],
   }));
   const weddingLiveEvidenceReadiness = createMemo(() => buildWeddingLiveWorkflowReadinessState({
     workflow: "live_evidence",
@@ -1422,6 +1428,12 @@ export function ResponseQueueView(props: {
       const categoryLabels = weddingVendorSelectionLabels(
         scopedCategoryIds && scopedCategoryIds.length > 0 ? scopedCategoryIds : weddingFollowUpVendorIds(),
       );
+      const freeformQuery = weddingVendorSearchQuery().trim();
+      const effectiveCategoryLabels = categoryLabels.length > 0
+        ? categoryLabels
+        : freeformQuery
+          ? ["Custom vendor search"]
+          : categoryLabels;
       const liveWorkflowReadiness = buildWeddingLiveWorkflowReadinessState({
         workflow: "vendor_search",
         dateOrSeason: weddingFollowUpDate(),
@@ -1429,7 +1441,7 @@ export function ResponseQueueView(props: {
         guestCount: weddingFollowUpGuests(),
         budgetComfort: weddingFollowUpBudget(),
         prioritiesCsv: weddingFollowUpPriorities(),
-        vendorCategories: categoryLabels,
+        vendorCategories: effectiveCategoryLabels,
       });
       if (liveWorkflowReadiness.status === "blocked") {
         setWeddingLiveEvidenceNotice(null);
@@ -1440,7 +1452,7 @@ export function ResponseQueueView(props: {
       const configuredProviderKinds = weddingConfiguredVendorSearchProviderKinds(latestProviderCapabilities);
       const readiness = buildWeddingVendorSearchReadinessState({
         location: weddingFollowUpLocation(),
-        vendorCategories: categoryLabels,
+        vendorCategories: effectiveCategoryLabels,
         vendorPreferences: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
         photographyScope: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
         musicOrBandNeeded: null,
@@ -1460,9 +1472,22 @@ export function ResponseQueueView(props: {
         providerKinds: configuredProviderKinds,
         maxCategories: 6,
       });
-      const queries = plan.providerPlans
+      const plannedQueries = plan.providerPlans
         .flatMap((providerPlan) => providerPlan.queries)
         .slice(0, 8);
+      const queries = freeformQuery
+        ? configuredProviderKinds.map((providerKind) => ({
+          providerKind,
+          category: "custom_vendor_search",
+          query: freeformQuery,
+          googlePlaceTypes: providerKind === "google_places" ? ["point_of_interest"] : [],
+          overpassTags: providerKind === "overpass" ? ["name~wedding"] : [],
+          expectedFields: plannedQueries.find((query) => query.providerKind === providerKind)?.expectedFields
+            ?? ["name", "website", "phone", "address", "rating", "review count", "source"],
+          guardrails: plannedQueries.find((query) => query.providerKind === providerKind)?.guardrails
+            ?? ["Use the user's exact vendor-search wording as the search intent.", "Cite source-backed vendor facts before recommending follow-up."],
+        }))
+        : plannedQueries;
       if (queries.length === 0) {
         setWeddingVendorSearchNotice("Vendor search needs at least one vendor category before it can run.");
         return;
@@ -1515,7 +1540,7 @@ export function ResponseQueueView(props: {
         atmosphereDescription: weddingFollowUpAtmosphere(),
         inspirationImageUrls: linesFromText(weddingFollowUpImageLinks()),
         topPriorities: linesFromText(weddingFollowUpPriorities()),
-        vendorCategories: categoryLabels,
+        vendorCategories: effectiveCategoryLabels,
       });
       const generatedArtifacts: WeddingGeneratedArtifact[] = [
         generatedArtifact,
@@ -1646,7 +1671,7 @@ export function ResponseQueueView(props: {
       density: currentDensity,
       densityTone: "sky" as const,
       responseSurfaceState: queueCompanion(),
-      responseSurfaceCompactMode: currentDensity === "compact",
+      responseSurfaceCompactMode: queueDensityIsCompact(currentDensity),
     };
   });
   const weddingSetupChecklist = createMemo(() => {
@@ -1914,6 +1939,8 @@ export function ResponseQueueView(props: {
             onRunLiveVendorSearch={runLiveWeddingVendorSearch}
             vendorSearchRunning={weddingVendorSearchRunning()}
             vendorSearchNotice={weddingVendorSearchNotice()}
+            vendorSearchQuery={weddingVendorSearchQuery()}
+            onVendorSearchQueryChange={setWeddingVendorSearchQuery}
             vendorSearchReadiness={weddingLiveVendorSearchReadiness()}
             vendorSearchBlockedReason={weddingVendorSearchBlockedReason()}
             onRunLiveEvidenceCheck={runWeddingLiveEvidenceCheck}

@@ -1096,6 +1096,7 @@ function App() {
     initialActiveView
   );
   const [weddingNavigationIntent, setWeddingNavigationIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
+  const [weddingReturnContextActive, setWeddingReturnContextActive] = createSignal(false);
   const weddingArrivalBanner = createMemo(() =>
     buildWeddingNavigationArrivalBannerState(weddingNavigationIntent()),
   );
@@ -1476,6 +1477,7 @@ function App() {
     } else {
       addToNavTrail(nextView);
     }
+    if (nextView === "response_queue") setWeddingReturnContextActive(false);
     setActiveView(nextView);
     persistPrefs(nextView, openThreadId());
   }
@@ -2851,6 +2853,7 @@ function App() {
         if (intent.view === "search" || intent.view === "threads") {
           setWeddingNavigationIntent({ ...intent, savedAt: new Date().toISOString() });
         }
+        if (intent.view !== "response_queue") setWeddingReturnContextActive(true);
       },
     });
 
@@ -3120,6 +3123,16 @@ function App() {
 
         {/* Chat bar — always visible */}
         <div class="mt-7">
+          <Show when={weddingReturnContextActive() && activeView() !== "response_queue"}>
+            <button
+              type="button"
+              onClick={() => selectView("response_queue")}
+              class="mb-2 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-white/85 px-3 py-1.5 text-xs font-semibold text-rose-950 shadow-sm transition hover:border-rose-300 hover:bg-rose-50"
+            >
+              <span aria-hidden="true">&lt;</span>
+              Wedding Planner Home
+            </button>
+          </Show>
           {/* Breadcrumb trail — shows navigation path, clickable to jump back */}
           <Show when={navTrail().length > 1}>
             <div class="mb-2.5 flex items-center gap-0.5 text-xs text-on-surface-variant/60 animate-fade-in">
@@ -3283,7 +3296,11 @@ function App() {
               llmConfig={llmConfig()}
               browserAiLabel={browserAiLabel()}
               signedIn={Boolean(session()?.token)}
-              onSettingsClick={() => { selectView("agent_settings"); setAgentSettingsFocusLlm(true); }}
+              onSettingsClick={() => {
+                setAgentSettingsFocusLlm(true);
+                setAgentSettingsFocusTab("llm");
+                selectView("agent_settings");
+              }}
               onSignIn={() => openAuthModalIfSignedOut()}
             />
             {/* Approval-gate notice — surfaces when orchestration is waiting for a decision */}
