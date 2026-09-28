@@ -70,7 +70,7 @@ if [[ -n "$WORKSPACE_URL" ]]; then
   }
 
   if [[ -n "$EXPECTED_CSP_FRAGMENT" ]]; then
-    printf '%s' "$workspace_headers" | grep -qi "^content-security-policy: .*${EXPECTED_CSP_FRAGMENT}" || {
+    printf '%s' "$workspace_headers" | grep -Eqi "^[[:space:]]*content-security-policy[[:space:]]*: .*${EXPECTED_CSP_FRAGMENT}" || {
       echo "[verify-deployment] workspace CSP is missing expected fragment: ${EXPECTED_CSP_FRAGMENT}" >&2
       exit 1
     }

@@ -470,7 +470,7 @@ printf '%s' "`$workspace_headers" | grep -qi '^www-authenticate: basic' && {
   echo 'workspace smoke check failed: /workspace/ is still behind Basic auth and no preview auth hash is configured' >&2
   exit 1
 }
-printf '%s' "`$workspace_headers" | grep -qi '^content-security-policy:' || {
+printf '%s' "`$workspace_headers" | grep -Eqi '^[[:space:]]*content-security-policy[[:space:]]*:' || {
   echo 'workspace smoke check failed: workspace CSP header is missing' >&2
   exit 1
 }
