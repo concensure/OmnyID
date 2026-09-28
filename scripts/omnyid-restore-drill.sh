@@ -293,6 +293,15 @@ migration_rows="$(docker exec -e PGPASSWORD="${PG_PASSWORD}" "${PG_CONTAINER_NAM
   psql -U "${PG_USER}" -d "${PG_DB}" -Atqc \
   "SELECT count(*) FROM omnyid_schema_migrations;")"
 
+if [[ "${seaweedfs_file_count}" == "0" ]]; then
+  echo "[omnyid-restore-drill] Skipping object-store replay because the backup manifest contains no SeaweedFS objects."
+  echo "[omnyid-restore-drill] OK: restore replay succeeded."
+  echo "[omnyid-restore-drill] Public table count: ${table_count}"
+  echo "[omnyid-restore-drill] Migration rows: ${migration_rows:-0}"
+  echo "[omnyid-restore-drill] Restored object count: 0"
+  exit 0
+fi
+
 echo "[omnyid-restore-drill] Starting disposable object-store container ${OBJECTSTORE_CONTAINER_NAME}..."
 docker run -d \
   --name "${OBJECTSTORE_CONTAINER_NAME}" \
