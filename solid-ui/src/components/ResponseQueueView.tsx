@@ -12,6 +12,7 @@ import { WeddingResponseWorkspaceView } from "@/components/WeddingResponseWorksp
 import { WeddingRichResponseView } from "@/components/WeddingRichResponseView";
 import { WorkspaceSetupBanner } from "@/components/WorkspaceSetupBanner";
 import { WeddingSiteIntakeWizard } from "@/components/WeddingSiteIntakeWizard";
+import { toast } from "@/components/Toast";
 import { RailIcon, type IconId } from "@/components/RailIcons";
 import {
   loadWeddingWorkspaceMenu,
@@ -1610,7 +1611,9 @@ export function ResponseQueueView(props: {
       location,
     });
     if (liveWorkflowReadiness.status === "blocked") {
-      setWeddingLiveEvidenceNotice(`Live map and weather evidence needs ${liveWorkflowReadiness.missing.join(", ")}.`);
+      const notice = `Live map and weather evidence needs ${liveWorkflowReadiness.missing.join(", ")}.`;
+      setWeddingLiveEvidenceNotice(notice);
+      toast.warning(notice);
       return;
     }
     setWeddingLiveEvidenceRunning(true);
@@ -1630,7 +1633,9 @@ export function ResponseQueueView(props: {
       });
       if (artifact.status !== "created" || !artifact.summary || !artifact.artifactInput || !artifact.markdown) {
         const suffix = response.failures.length > 0 ? ` ${response.failures.join(" ")}` : "";
-        setWeddingLiveEvidenceNotice(`${artifact.reason ?? "Live evidence could not be saved."}${suffix}`);
+        const notice = `${artifact.reason ?? "Live evidence could not be saved."}${suffix}`;
+        setWeddingLiveEvidenceNotice(notice);
+        toast.warning(notice);
         return;
       }
       const generatedArtifact: WeddingGeneratedArtifact = {
@@ -1648,11 +1653,20 @@ export function ResponseQueueView(props: {
       }
       setWeddingImportRefreshKey((value) => value + 1);
       setActiveWeddingArtifactId(generatedArtifact.summary.id);
-      setWeddingWorkspaceMenu("documents");
       const failureSuffix = response.failures.length > 0 ? ` Provider notes: ${response.failures.join(" ")}` : "";
-      setWeddingLiveEvidenceNotice(`Saved live location evidence with ${artifact.evidenceCount} result${artifact.evidenceCount === 1 ? "" : "s"}.${failureSuffix}`);
+      const notice = `Location verified with ${artifact.evidenceCount} live evidence result${artifact.evidenceCount === 1 ? "" : "s"}.${failureSuffix}`;
+      setWeddingLiveEvidenceNotice(notice);
+      toast.success(notice, {
+        duration: 6000,
+        action: {
+          label: "View evidence",
+          onClick: () => setWeddingWorkspaceMenu("documents"),
+        },
+      });
     } catch (error) {
-      setWeddingLiveEvidenceNotice(error instanceof Error ? error.message : "Live map and weather evidence failed.");
+      const notice = error instanceof Error ? error.message : "Live map and weather evidence failed.";
+      setWeddingLiveEvidenceNotice(notice);
+      toast.error(notice);
     } finally {
       setWeddingLiveEvidenceRunning(false);
     }
