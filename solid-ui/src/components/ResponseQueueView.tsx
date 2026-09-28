@@ -629,9 +629,6 @@ export function ResponseQueueView(props: {
   const weddingRichResponse = createMemo(() =>
     weddingTemplateFollowUp()?.richResponse ?? weddingTemplateLaunch()?.richResponse ?? null,
   );
-  const standaloneWeddingRichResponse = createMemo(() =>
-    weddingWorkspace() ? null : weddingRichResponse(),
-  );
   const weddingLiveVendorSearchReadiness = createMemo(() => buildWeddingLiveWorkflowReadinessState({
     workflow: "vendor_search",
     dateOrSeason: weddingFollowUpDate(),
@@ -804,6 +801,9 @@ export function ResponseQueueView(props: {
       projectionStorage: localStorage,
     });
   });
+  const standaloneWeddingRichResponse = createMemo(() =>
+    weddingWorkspace() ? null : weddingRichResponse(),
+  );
 
   const weddingVendorEndToEndValidation = createMemo(() => {
     const intent = weddingNavigationIntent();
