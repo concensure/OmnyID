@@ -1156,6 +1156,8 @@ function App() {
   // this same workspace sign-in form instead of a separate static one.
   const deepLinkParams = new URLSearchParams(window.location.search);
   const pendingAuthSource = deepLinkParams.get("source");
+  const shouldLaunchWeddingTemplateFromDeepLink = () =>
+    pendingAuthSource === "wedding" || pendingAuthSource === "marketing";
   // Shared by both the "already signed in" boot check and the post-login handler below,
   // so the wedding-site deep-link launch behaves identically no matter which path fires.
   function launchWeddingTemplateFromDeepLink() {
@@ -1347,7 +1349,7 @@ function App() {
   // auth modal never opens and onLogin never fires) still deep-link in with
   // ?source=wedding. Handle that case here at boot, mirroring the onLogin path.
   onMount(() => {
-    if (pendingAuthSource !== "wedding" || !readSession()?.token) return;
+    if (!shouldLaunchWeddingTemplateFromDeepLink() || !readSession()?.token) return;
     launchWeddingTemplateFromDeepLink();
   });
 
@@ -2946,7 +2948,7 @@ function App() {
             // Wedding-site visitors who deep-linked in with ?source=wedding
             // land straight on the wedding template instead of the default
             // chat view, matching what they came here to do.
-            if (pendingAuthSource === "wedding") launchWeddingTemplateFromDeepLink();
+            if (shouldLaunchWeddingTemplateFromDeepLink()) launchWeddingTemplateFromDeepLink();
           }}
         />
       </Show>

@@ -507,7 +507,7 @@ export function NavBar(props: {
   );
   const [sessionTick, setSessionTick] = createSignal(0);
   const [showSessionMenu, setShowSessionMenu] = createSignal(false);
-  const [idCopied, setIdCopied] = createSignal(false);
+  const [userIdCopyAcknowledged, setUserIdCopyAcknowledged] = createSignal(false);
   const [sessionActionError, setSessionActionError] = createSignal<string | null>(null);
   const [signingOut, setSigningOut] = createSignal(false);
   const [connStatus, setConnStatus] = createSignal<"fast" | "connected" | "slow" | "offline">(navigator.onLine ? "connected" : "offline");
@@ -557,6 +557,24 @@ export function NavBar(props: {
     const ago = secs < 60 ? "just now" : secs < 3600 ? `${Math.floor(secs / 60)}m ago` : `${Math.floor(secs / 3600)}h ago`;
     return `last: ${lr.name.replace(/_/g, " ")} ${ago}`;
   };
+
+  function userIdCopyLabel(): string {
+    if (!props.userId) return "";
+    return userIdCopyAcknowledged() ? "Copied!" : `${props.userId.slice(0, 8)}...`;
+  }
+
+  function copyUserIdToClipboard() {
+    const id = props.userId;
+    if (!id) return;
+    setSessionActionError(null);
+    navigator.clipboard.writeText(id).then(() => {
+      setUserIdCopyAcknowledged(true);
+      setTimeout(() => setUserIdCopyAcknowledged(false), 1500);
+    }).catch((error) => {
+      setSessionActionError(error instanceof Error ? error.message : "Could not copy the user ID.");
+    });
+  }
+
   const sessionStarted = (() => {
     return loadNavBarSessionStarted() ?? saveNavBarSessionStarted(Date.now());
   })();
@@ -1248,20 +1266,12 @@ export function NavBar(props: {
                       type="button"
                       title={`User ID: ${props.userId} - click to copy`}
                       aria-label="Copy user ID"
-                      onClick={() => {
-                        setSessionActionError(null);
-                        navigator.clipboard.writeText(props.userId!).then(() => {
-                          setIdCopied(true);
-                          setTimeout(() => setIdCopied(false), 1500);
-                        }).catch((error) => {
-                          setSessionActionError(error instanceof Error ? error.message : "Could not copy the user ID.");
-                        });
-                      }}
+                      onClick={copyUserIdToClipboard}
                       class="mb-2 flex w-full items-center gap-1.5 rounded-lg bg-on-surface/4 px-2 py-1 text-left transition hover:bg-on-surface/8"
                     >
                       <span class="font-mono text-[9px] text-outline select-none flex-shrink-0">ID</span>
                       <span class="font-mono text-[10px] text-on-surface-variant truncate">
-                        {idCopied() ? "Copied!" : `${props.userId!.slice(0, 8)}...`}
+                        {userIdCopyLabel()}
                       </span>
                     </button>
                   </Show>

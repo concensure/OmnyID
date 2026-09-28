@@ -1,5 +1,5 @@
 // OmnyID Service Worker - offline shell + update notification
-const SHELL_CACHE = "omnyid-shell-v7";
+const SHELL_CACHE = "omnyid-shell-v8";
 const API_CACHE = "omnyid-api-v1";
 
 const SHELL_ASSETS = [
