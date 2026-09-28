@@ -598,51 +598,85 @@ async fn search_google_places(
         .map(|secret| secret.secret)
         .ok_or_else(|| "Google Places API key is not configured.".to_string())?;
     let response = client
-        .get("https://maps.googleapis.com/maps/api/place/textsearch/json")
-        .query(&[("query", query.query.as_str()), ("key", key.as_str())])
+        .post("https://places.googleapis.com/v1/places:searchText")
+        .header("X-Goog-Api-Key", key)
+        .header(
+            "X-Goog-FieldMask",
+            "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.googleMapsUri,places.websiteUri",
+        )
+        .json(&json!({
+            "textQuery": query.query,
+            "maxResultCount": limit.clamp(1, 20),
+        }))
         .send()
         .await
         .map_err(|err| format!("Google Places request failed: {err}"))?;
+    if !response.status().is_success() {
+        return Err(format!("Google Places returned {}", response.status()));
+    }
     let json = response
         .json::<serde_json::Value>()
         .await
         .map_err(|err| format!("Google Places response parse failed: {err}"))?;
+    Ok(google_places_sources_from_response(&json, query, limit))
+}
+
+fn google_places_sources_from_response(
+    json: &serde_json::Value,
+    query: &WeddingVendorSearchQueryRequest,
+    limit: usize,
+) -> Vec<WeddingVendorSearchSource> {
     let place_types = query
         .google_place_types
         .clone()
         .unwrap_or_default()
         .join(", ");
-    let results = json["results"]
+    json["places"]
         .as_array()
         .cloned()
         .unwrap_or_default()
         .into_iter()
         .take(limit)
         .filter_map(|item| {
-            let name = item["name"].as_str()?.to_string();
-            let place_id = item["place_id"].as_str().unwrap_or("");
-            let vicinity = item["formatted_address"]
+            let name = item["displayName"]["text"]
                 .as_str()
-                .or_else(|| item["vicinity"].as_str())
-                .unwrap_or("");
+                .or_else(|| item["displayName"].as_str())?
+                .to_string();
+            let place_id = item["id"].as_str().unwrap_or("");
+            let vicinity = item["formattedAddress"].as_str().unwrap_or("");
             let rating = item["rating"].as_f64();
+            let review_count = item["userRatingCount"].as_u64();
             let rating_text = rating
-                .map(|value| format!(" rating {value:.1}"))
+                .map(|value| {
+                    let count = review_count
+                        .map(|count| {
+                            format!(
+                                " across {count} review{}",
+                                if count == 1 { "" } else { "s" }
+                            )
+                        })
+                        .unwrap_or_default();
+                    format!(" rating {value:.1}{count}")
+                })
                 .unwrap_or_default();
+            let maps_url = item["googleMapsUri"].as_str().map(str::to_string);
+            let website_url = item["websiteUri"].as_str().map(str::to_string);
             Some(WeddingVendorSearchSource {
                 title: name,
-                url: if place_id.is_empty() {
-                    format!(
-                        "https://www.google.com/maps/search/?api=1&query={}",
-                        urlencoding::encode(&query.query)
-                    )
-                } else {
-                    format!(
-                        "https://www.google.com/maps/search/?api=1&query={}&query_place_id={}",
-                        urlencoding::encode(&query.query),
-                        place_id
-                    )
-                },
+                url: maps_url.or(website_url).unwrap_or_else(|| {
+                    if place_id.is_empty() {
+                        format!(
+                            "https://www.google.com/maps/search/?api=1&query={}",
+                            urlencoding::encode(&query.query)
+                        )
+                    } else {
+                        format!(
+                            "https://www.google.com/maps/search/?api=1&query={}&query_place_id={}",
+                            urlencoding::encode(&query.query),
+                            place_id
+                        )
+                    }
+                }),
                 snippet: Some(format!(
                     "{}{}{}",
                     vicinity,
@@ -656,8 +690,7 @@ async fn search_google_places(
                 provider: "Google Places API".to_string(),
             })
         })
-        .collect();
-    Ok(results)
+        .collect()
 }
 
 async fn search_overpass(
@@ -890,11 +923,13 @@ mod tests {
         assert_eq!(brave["credentialConfigured"].as_bool(), Some(true));
         assert_eq!(brave["sharedCreditEnabled"].as_bool(), Some(true));
         assert_eq!(brave["configured"].as_bool(), Some(true));
-        assert!(payload["connectedAppIds"]
-            .as_array()
-            .expect("connected ids")
-            .iter()
-            .any(|id| id.as_str() == Some("brave-search-api")));
+        assert!(
+            payload["connectedAppIds"]
+                .as_array()
+                .expect("connected ids")
+                .iter()
+                .any(|id| id.as_str() == Some("brave-search-api"))
+        );
 
         clear_provider_capability_env();
     }
@@ -969,5 +1004,41 @@ mod tests {
         assert!(admin_shared_tool_policy_enabled("weatherapi"));
 
         clear_provider_capability_env();
+    }
+
+    #[test]
+    fn google_places_sources_from_response_reads_places_api_new_shape() {
+        let query = WeddingVendorSearchQueryRequest {
+            provider_kind: "google_places".to_string(),
+            category: Some("florist".to_string()),
+            query: "florist in Sydney specialising in wedding".to_string(),
+            google_place_types: Some(vec!["point_of_interest".to_string()]),
+            overpass_tags: None,
+        };
+        let response = json!({
+            "places": [{
+                "id": "places/example",
+                "displayName": { "text": "Chloe's Florals" },
+                "formattedAddress": "12 Test Street, Sydney NSW",
+                "rating": 4.9,
+                "userRatingCount": 63,
+                "googleMapsUri": "https://maps.google.com/?cid=example",
+                "websiteUri": "https://example.test"
+            }]
+        });
+
+        let sources = google_places_sources_from_response(&response, &query, 5);
+
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].title, "Chloe's Florals");
+        assert_eq!(sources[0].url, "https://maps.google.com/?cid=example");
+        assert!(
+            sources[0]
+                .snippet
+                .as_deref()
+                .unwrap_or_default()
+                .contains("rating 4.9 across 63 reviews")
+        );
+        assert_eq!(sources[0].provider, "Google Places API");
     }
 }
