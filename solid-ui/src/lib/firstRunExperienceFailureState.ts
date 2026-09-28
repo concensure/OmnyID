@@ -50,3 +50,14 @@ export function buildFirstRunExperienceFailureReceipt(
     tone: "warning",
   };
 }
+
+export function buildFirstRunGmailOAuthFailureReceipt(
+  diagnosticMessage: string,
+): FirstRunExperienceFailureReceipt {
+  return {
+    title: "Gmail connection needs configuration",
+    summary: diagnosticMessage.trim() || "Gmail OAuth could not start from this homeserver.",
+    nextStep: "Fix the Google OAuth client setup, then retry Connect Gmail from this setup flow.",
+    tone: "danger",
+  };
+}

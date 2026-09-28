@@ -12,16 +12,24 @@
  */
 
 import { createSignal, For, Show, onCleanup } from "solid-js";
-import { fetchGmailInboxSummary, fetchGmailOAuthUrl, fetchGmailStatus, sendGmailDraft } from "../lib/api";
+import {
+  fetchGmailInboxSummary,
+  fetchGmailOAuthConfig,
+  fetchGmailOAuthUrl,
+  fetchGmailStatus,
+  sendGmailDraft,
+} from "../lib/api";
 import { ApprovalDecisionButtons } from "@/components/ApprovalDecisionButtons";
 import { ApprovalDecisionNotice } from "@/components/ApprovalDecisionNotice";
 import { ProcessingGlyph } from "@/components/ProcessingGlyph";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import {
+  buildFirstRunGmailOAuthFailureReceipt,
   buildFirstRunExperienceFailureReceipt,
   type FirstRunExperienceFailureReceipt,
 } from "@/lib/firstRunExperienceFailureState";
 import { saveFirstRunExperienceDone } from "@/lib/firstRunExperienceLocalState";
+import { gmailOAuthConfigFailureMessage } from "@/lib/gmailConnectionState";
 import {
   type InboxSummary,
 } from "@/lib/firstRunExperienceResponseState";
@@ -59,7 +67,6 @@ export function FirstRunExperience(props: { onComplete: () => void }) {
   const [sendResult, setSendResult] = createSignal<"sent" | "skipped" | null>(null);
   const [error, setError] = createSignal<FirstRunExperienceFailureReceipt | null>(null);
   const [sendError, setSendError] = createSignal<FirstRunExperienceFailureReceipt | null>(null);
-  const [usingDemoData, setUsingDemoData] = createSignal(false);
   const [oauthPollCount, setOauthPollCount] = createSignal(0);
 
   let loadTimer: ReturnType<typeof setInterval> | undefined;
@@ -80,9 +87,13 @@ export function FirstRunExperience(props: { onComplete: () => void }) {
       setPhase("awaiting_oauth");
       startOAuthPoll();
     } catch {
-      // Endpoint not yet live — proceed to mock loading for demo
-      setPhase("loading");
-      startLoadingAnimation();
+      try {
+        const config = await fetchGmailOAuthConfig("integration");
+        setError(buildFirstRunGmailOAuthFailureReceipt(gmailOAuthConfigFailureMessage(config)));
+      } catch {
+        setError(buildFirstRunGmailOAuthFailureReceipt(gmailOAuthConfigFailureMessage(null)));
+      }
+      setPhase("connect");
     }
   }
 
@@ -108,8 +119,7 @@ export function FirstRunExperience(props: { onComplete: () => void }) {
             "Gmail authorisation was not confirmed in time.",
           ),
         );
-        setPhase("loading");
-        startLoadingAnimation();
+        setPhase("connect");
       }
     }, 3000);
   }
@@ -133,23 +143,14 @@ export function FirstRunExperience(props: { onComplete: () => void }) {
       const data = await fetchGmailInboxSummary();
       applySummary(data);
     } catch {
-      // API not live — use illustrative placeholder so the flow can be demoed
-      applySummary({
-        total_unread: 12,
-        needs_reply: 3,
-        newsletters: 2,
-        priority_emails: [
-          { id: "e1", sender: "Alex Chen", subject: "Re: Project Deadline", preview: "Can you confirm EOD today? The client is waiting." },
-          { id: "e2", sender: "Sarah Okonkwo", subject: "Meeting Notes", preview: "Here are the action items from this morning's call." },
-          { id: "e3", sender: "Support Team", subject: "Account Update Required", preview: "Please verify your recovery email by Thursday." },
-        ],
-        draft: {
-          email_id: "e1",
-          to: "Alex Chen",
-          subject: "Re: Project Deadline",
-          body: "Hi Alex,\n\nI'll review the document by end of day and circle back with feedback.\n\nBest,",
-        },
-      });
+      setError(
+        buildFirstRunExperienceFailureReceipt(
+          "Fetch Gmail summary",
+          "Could not load the live Gmail summary.",
+        ),
+      );
+      setPhase("connect");
+      return;
     }
   }
 
@@ -367,11 +368,6 @@ export function FirstRunExperience(props: { onComplete: () => void }) {
 
                 <Show when={s.draft}>
                   <div class="rounded-[28px] border border-primary/30 bg-primary/8 p-6 shadow-2xl backdrop-blur-md">
-                    <Show when={usingDemoData()}>
-                      <div class="mb-3 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-200">
-                        This summary is using local demo inbox data because the live Gmail summary could not be loaded.
-                      </div>
-                    </Show>
                     <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-primary/60">Draft Reply · {s.draft!.to}</p>
                     <p class="text-xs text-white/60">Subject: {s.draft!.subject}</p>
                     <p class="mt-2 text-sm leading-6 text-white/80 whitespace-pre-line">{s.draft!.body}</p>
