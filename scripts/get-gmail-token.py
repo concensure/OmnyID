@@ -2,15 +2,18 @@
 get-gmail-token.py
 ------------------
 One-shot helper that completes the Gmail OAuth consent flow and prints a
-refresh token you can paste into oracle-cloud.local.env as
-OMNYID_GMAIL_REFRESH_TOKEN.
+refresh token for the platform's outbound-mail Gmail account
+(OMNYID_GMAIL_REFRESH_TOKEN). Run this whenever that refresh token expires
+or is revoked (surfaces in server logs as "invalid_grant").
 
 Usage (from repo root):
-    python-sdk\\.venv\\Scripts\\python.exe scripts\\get-gmail-token.py
+    $env:OMNYID_GMAIL_CLIENT_SECRET = "GOCSPX-..."   # get from Google Cloud Console
+    python scripts\\get-gmail-token.py
 
-Requirements: only stdlib + the httpx that is already in the SDK venv.
+Requirements: Python stdlib only.
 The script starts a tiny HTTP server on http://localhost:3000 to receive the
-OAuth callback (this URI must be in your Google Cloud Console authorized list).
+OAuth callback at /oauth2callback — this exact redirect URI must be registered
+as an authorized redirect URI for the OAuth client in Google Cloud Console.
 """
 
 import http.server
@@ -23,9 +26,9 @@ import json
 import webbrowser
 
 CLIENT_ID     = os.environ.get("OMNYID_GMAIL_CLIENT_ID",
-                "975613409177-nv214f97lors4g5j2dcvuftv5pf9c88p.apps.googleusercontent.com")
+                "975613409177-vhs1cjo7qhu7rr5j7arfv06o4vcfqi5n.apps.googleusercontent.com")
 CLIENT_SECRET = os.environ.get("OMNYID_GMAIL_CLIENT_SECRET", "")
-REDIRECT_URI  = "http://localhost:3000/auth/google/callback"
+REDIRECT_URI  = "http://localhost:3000/oauth2callback"
 SCOPES        = " ".join([
     "https://www.googleapis.com/auth/gmail.modify",
     "https://www.googleapis.com/auth/gmail.send",
@@ -51,7 +54,7 @@ _server_ready = threading.Event()
 class _CallbackHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
-        if parsed.path == "/auth/google/callback":
+        if parsed.path == "/oauth2callback":
             params = urllib.parse.parse_qs(parsed.query)
             code = params.get("code", [None])[0]
             if code:
@@ -138,7 +141,9 @@ if not refresh_token:
     sys.exit(1)
 
 print("\n" + "=" * 60)
-print("SUCCESS — paste this into oracle-cloud.local.env:")
-print(f"\n  OMNYID_GMAIL_REFRESH_TOKEN={refresh_token}\n")
+print("SUCCESS — update these on the server (.env.oracle) and restart homeserver:")
+print(f"\n  OMNYID_GMAIL_CLIENT_ID={CLIENT_ID}")
+print(f"  OMNYID_GMAIL_CLIENT_SECRET={CLIENT_SECRET}")
+print(f"  OMNYID_GMAIL_REFRESH_TOKEN={refresh_token}\n")
 print("=" * 60)
-print("\nAlso set OMNYID_EMAIL_ADDRESS to the Gmail address you just authorized.")
+print("\nAlso set OMNYID_EMAIL_ADDRESS / FROM_ADDRESS to the Gmail address you just authorized.")

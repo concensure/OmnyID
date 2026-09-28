@@ -141,7 +141,7 @@ export function ChatQuickAdd(props: { onClose: () => void }) {
         </button>
         <button type="button" onClick={submit} disabled={busy()}
           class="flex-1 rounded-xl bg-primary py-1.5 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-50">
-          {busy() ? "Sendingâ€¦" : "Send"}
+          {busy() ? "Sending…" : "Send"}
         </button>
       </div>
     </div>
@@ -220,7 +220,7 @@ export function EmailQuickAdd(props: {
         </button>
         <button type="button" onClick={submit} disabled={busy()}
           class="flex-1 rounded-xl bg-primary py-1.5 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-50">
-          {busy() ? "Sendingâ€¦" : "Compose"}
+          {busy() ? "Sending…" : "Compose"}
         </button>
       </div>
     </div>
@@ -285,7 +285,7 @@ export function DataQuickAdd(props: { onClose: () => void }) {
         </button>
         <button type="button" onClick={submit} disabled={busy()}
           class="flex-1 rounded-xl bg-primary py-1.5 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-50">
-          {busy() ? "Savingâ€¦" : "Save"}
+          {busy() ? "Saving…" : "Save"}
         </button>
       </div>
     </div>
@@ -394,7 +394,7 @@ export function QuickAddPanel(props: {
         </button>
         <button type="button" onClick={submit} disabled={busy()}
           class="flex-1 rounded-xl bg-primary py-1.5 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-50">
-          {busy() ? "Savingâ€¦" : "Create"}
+          {busy() ? "Saving…" : "Create"}
         </button>
       </div>
     </div>
@@ -466,7 +466,7 @@ export function TaskQuickAdd(props: { onClose: () => void }) {
           Cancel</button>
         <button type="button" onClick={create} disabled={busy()}
           class="flex-1 rounded-xl bg-primary py-1.5 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-50">
-          {busy() ? "Savingâ€¦" : "Add Task"}</button>
+          {busy() ? "Saving…" : "Add Task"}</button>
       </div>
     </div>
   );
@@ -561,7 +561,7 @@ export function CalendarQuickAdd(props: { onClose: () => void }) {
           Cancel</button>
         <button type="button" onClick={create} disabled={busy()}
           class="flex-1 rounded-xl bg-primary py-1.5 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-50">
-          {busy() ? "Savingâ€¦" : "Create"}</button>
+          {busy() ? "Saving…" : "Create"}</button>
       </div>
     </div>
   );

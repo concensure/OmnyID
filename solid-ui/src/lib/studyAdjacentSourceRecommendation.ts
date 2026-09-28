@@ -39,7 +39,7 @@ function anchorParts(evidence: RecommendationEvidence): string[] {
 function anchorLabel(evidence: RecommendationEvidence): string {
   const parts = anchorParts(evidence);
   if (parts.length === 0) return "the same study topic";
-  return parts.join(" Â· ");
+  return parts.join(" · ");
 }
 
 function nextSourceLabel(evidence: RecommendationEvidence): string {

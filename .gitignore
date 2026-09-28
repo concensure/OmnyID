@@ -39,6 +39,7 @@ target/
 
 # Secrets and cloud credentials
 secrets/
+.secrets/
 *.pem
 *.key
 *.crt
@@ -52,6 +53,15 @@ scripts/oracle-config.local.ps1
 oracle-cloud.quic.local.env
 ovhcloud.env
 vault.env
+runpod.env
+
+# Dev launcher artifacts (browser profiles, seeded session tokens)
+.dev-launch/
+solid-ui/public/.dev-launch/
 
 # Logs
 *.log
+
+# Rollback / crash-recovery snapshots
+*.bak
+*.rollback.*

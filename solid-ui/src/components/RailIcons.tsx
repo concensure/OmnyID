@@ -66,6 +66,17 @@ export function RailIcon(props: { id: IconId }) {
       </I>
     );
 
+    case "study": return (
+      <I>
+        <path d="M3.5 4 h6.5 a2 2 0 0 1 2 2 v11 a2 2 0 0 0 -2 -2 h-6.5 z" />
+        <path d="M16.5 4 h-4.5 a2 2 0 0 0 -2 2 v11 a2 2 0 0 1 2 -2 h4.5 z" />
+        <path d="M6 7.5 h3" />
+        <path d="M13 7.5 h1.5" />
+        <path d="M6 10.5 h3" />
+        <path d="M13 10.5 h1.5" />
+      </I>
+    );
+
     case "response_queue": return (
       <I>
         <path d="M3 6.5 h14 v7.5 a2,2 0,0,1 -2,2 h-10 a2,2 0,0,1 -2,-2 z" />

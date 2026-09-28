@@ -16,7 +16,7 @@ function gridLayoutItemId(item: unknown): string | null {
 // GridStack.save() can include a "content" field (the live innerHTML of the
 // card, drag-handle markup and all) unless saveContent=false is passed at the
 // call site. Strip it defensively here too, so any layout already poisoned by
-// that â€” saved to localStorage before the call site was fixed â€” self-heals
+// that — saved to localStorage before the call site was fixed — self-heals
 // instead of re-injecting stale card markup on every future load.
 function withoutCardContent(item: GridLayoutItem): GridLayoutItem {
   if (!("content" in item)) return item;

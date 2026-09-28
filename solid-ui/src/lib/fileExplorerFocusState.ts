@@ -138,7 +138,7 @@ export function buildFileExplorerFocusState(input: {
     };
   }
 
-  const focusLabel = appliedFocus.join(" Â· ");
+  const focusLabel = appliedFocus.join(" · ");
   const reusableCount =
     input.readyCount > 0
       ? input.readyCount

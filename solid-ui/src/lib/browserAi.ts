@@ -1,3 +1,6 @@
+import { isRecord } from "@/lib/eventDetail";
+import { parseJsonValue } from "@/lib/jsonParseState";
+
 /**
  * Browser-native AI detection and intent classification.
  *
@@ -15,6 +18,27 @@ type WindowWithAi = Window & { ai?: { languageModel?: LmApi } };
 
 function lm(): LmApi | undefined {
   return (window as WindowWithAi).ai?.languageModel;
+}
+
+function cleanBrowserAiJson(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^```json\n?/, "")
+    .replace(/^```\n?/, "")
+    .replace(/\n?```$/, "")
+    .trim();
+}
+
+export function parseBrowserAiClassification(raw: string): { intent: string; parsed: Record<string, unknown> } | null {
+  const parsed = parseJsonValue(cleanBrowserAiJson(raw));
+  if (!parsed.ok) return null;
+
+  if (!isRecord(parsed.value)) return null;
+
+  const intent = typeof parsed.value.intent === "string" && parsed.value.intent.trim()
+    ? parsed.value.intent.trim()
+    : "web_research";
+  return { intent, parsed: parsed.value };
 }
 
 /** Returns a human-readable label for the detected browser AI, or null if unavailable. */
@@ -60,14 +84,7 @@ export async function classifyWithBrowserAi(
     const session = await api.create({ systemPrompt: INTENT_SYSTEM });
     const raw = await session.prompt(query);
     session.destroy();
-    const cleaned = raw
-      .trim()
-      .replace(/^```json\n?/, "")
-      .replace(/^```\n?/, "")
-      .replace(/\n?```$/, "")
-      .trim();
-    const parsed = JSON.parse(cleaned) as Record<string, unknown>;
-    return { intent: String(parsed.intent ?? "web_research"), parsed };
+    return parseBrowserAiClassification(raw);
   } catch {
     return null;
   }

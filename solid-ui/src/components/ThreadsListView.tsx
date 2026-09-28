@@ -1,43 +1,98 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
+import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import type { AfpMessage, ThreadSummary, ThreadSummariesResponse } from "@/lib/api";
-import { apiFetch, createNoteFromThread, fetchThreadSummaries } from "@/lib/api";
+import {
+  createNoteFromThread,
+  fetchThreadSummaries,
+  readSession,
+} from "@/lib/api";
 import { EmptyState } from "@/components/EmptyState";
 import { ThreadDiscoveryLens } from "@/components/ThreadDiscoveryLens";
 import { ThreadDiscoveryStateSummary } from "@/components/ThreadDiscoveryStateSummary";
-import { MAGIC_ACTION_EVENT, readMagicActionEventDetail } from "@/lib/magicActionEvent";
+import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
 import { collectKindCounts, objectKindLabel } from "@/lib/objectKinds";
 import { createLocalSemanticRouterPreviewController } from "@/lib/localSemanticRouter";
 import { buildThreadSearchInput, parseThreadSearchInput } from "@/lib/threadSearch";
-import { threadMessagePreview, threadMessagePreviewBullets, threadMessageTitle } from "@/lib/threadMessageRowState";
+import {
+  buildThreadSummariesSearchRequest,
+  isThreadSummariesSearchActive,
+  threadSummariesList,
+  threadSummariesRetrievalState,
+} from "@/lib/threadSummariesResponseState";
+import { isRecord } from "@/lib/eventDetail";
+import { threadMessagePreview, threadMessagePreviewBullets } from "@/lib/threadMessageRowState";
 import type { ThreadSearchLaunchContext } from "@/lib/threadSearchNavigation";
 import { threadSortMillis, type ThreadSortMode } from "@/lib/threadSort";
+import {
+  loadDismissedMergePairs,
+  loadArchivedThreadIds,
+  loadThreadDensity,
+  loadThreadLastRead,
+  loadLockedThreadIds,
+  loadThreadOrder,
+  loadPinnedThreadIds,
+  loadThreadPriority,
+  loadThreadQueryHistory,
+  loadThreadSortMode,
+  loadStarredThreadIds,
+  loadThreadTitles,
+  saveArchivedThreadIds,
+  saveDismissedMergePairs,
+  saveThreadDensity,
+  saveThreadLastRead,
+  saveLockedThreadIds,
+  saveThreadOrder,
+  savePinnedThreadIds,
+  saveThreadPriority,
+  saveThreadSortMode,
+  saveStarredThreadIds,
+  saveThreadTitles,
+  type ThreadDensity,
+  type ThreadPriorityLevel,
+} from "@/lib/threadListLocalState";
 import { applyThreadSelection, pruneThreadSelectionToVisible } from "@/lib/threadMultiSelect";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
 import {
+  buildThreadSearchFailureReceipt,
+  type ThreadSearchFailureReceipt,
+} from "@/lib/threadSearchFailureState";
+import {
   loadVimNavigationEnabled,
-  readVimNavigationPreferenceEventDetail,
-  VIM_NAVIGATION_PREFERENCE_EVENT,
+  subscribeVimNavigationPreference,
 } from "@/lib/vimNavigationPreference";
+import { afpRecord } from "@/lib/afpMessageRecord";
+import * as threadListState from "@/lib/threadListViewState";
+import {
+  loadThreadRelatedContextState,
+  mergeSelectedThreadsState,
+  submitThreadReplyState,
+  toggleThreadReplyComposerState,
+  type ThreadRelatedContextEntry as ThreadInteractionContextEntry,
+} from "@/lib/threadInteractionState";
+import type { ThreadOrchestrationFailureReceipt } from "@/lib/threadOrchestrationFailureState";
+
+function threadListScalarString(value: unknown, fallback = ""): string {
+  return threadListState.threadListScalarString(value, fallback);
+}
+
+function threadListFirstString(record: Record<string, unknown>, keys: string[], fallback = ""): string {
+  return threadListState.threadListFirstString(record, keys, fallback);
+}
 
 // 15a/15o — derive a human-readable title from the first message's content
 function threadTitle(tid: string, msgs: AfpMessage[]): string {
-  return threadMessageTitle(tid, msgs);
+  return threadListState.threadTitle(tid, msgs);
 }
 
 // 15r — derive sender name from AFP message content/metadata
 function deriveSender(msg: AfpMessage): string {
-  const c = msg.content as Record<string, unknown> | undefined;
-  const m = msg.metadata as Record<string, unknown> | undefined;
-  return String(c?.from ?? c?.sender ?? c?.author ?? c?.from_name ??
-    m?.sender ?? m?.from ?? m?.author ?? "Unknown");
+  return threadListState.deriveThreadSender(msg);
 }
 
 // 15r — derive channel label from AFP message type
 function deriveNoticeChannel(msg: AfpMessage): { label: string; icon: string } {
-  if (msg.type.includes("email") || msg.type.includes("inbox")) return { label: "email", icon: "✉" };
-  if (msg.type.includes("slack") || msg.subtype?.includes("slack")) return { label: "Slack", icon: "💬" };
-  return { label: "chat", icon: "🗨" };
+  return threadListState.deriveThreadNoticeChannel(msg);
 }
 
 type SenderGroup = {
@@ -49,31 +104,8 @@ type SenderGroup = {
 
 // 13l — relative timestamp helper
 function relativeTime(isoStr: string | undefined): string {
-  if (!isoStr) return "";
-  const d = new Date(isoStr);
-  if (isNaN(d.getTime())) return "";
-  const diffMs = Date.now() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return threadListState.relativeThreadTime(isoStr);
 }
-
-const QUERY_HISTORY_KEY = "omnyid.query-history";
-const THREAD_LAST_READ_KEY = "omnyid.thread-last-read";
-const THREAD_ORDER_KEY = "omnyid.thread-order";
-const THREAD_STARS_KEY = "omnyid.thread-stars";
-const ARCHIVED_THREADS_KEY = "omnyid.archived-threads";
-const THREAD_TITLES_KEY = "omnyid.thread-titles";
-const LOCKED_THREADS_KEY = "omnyid.locked-threads";
-const THREAD_PRIORITY_KEY = "omnyid.thread-priority";
-const THREAD_PINNED_KEY = "omnyid.thread-pinned";
-const THREAD_DENSITY_KEY = "omnyid.threads.density";
-const THREAD_SORT_MODE_KEY = "omnyid.threads.sort-mode";
 
 // 16i — avatar initials colour derived from sender name hash
 function senderColor(name: string): string {
@@ -90,12 +122,7 @@ function senderInitials(name: string): string {
 
 // 27b — one-word intent label derived from message type for preview panel
 function intentLabel(msgType: string): string {
-  if (msgType === 'proactive_suggestion') return 'Suggestion';
-  if (msgType === 'summary') return 'Summary';
-  if (msgType.includes('draft')) return 'Draft';
-  if (msgType === 'clarification_request') return 'Question';
-  if (msgType === 'research') return 'Update';
-  return 'Update';
+  return threadListState.threadIntentLabel(msgType);
 }
 
 function escapeHtml(s: string): string {
@@ -115,6 +142,18 @@ function highlightMatch(text: string, query: string): string {
     const safeQuery = escapeHtml(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
     return safe.replace(new RegExp(`(${safeQuery})`, "gi"), "<mark>$1</mark>");
   } catch { return safe; }
+}
+
+function threadPreviewMeta(message: Pick<AfpMessage, "type" | "timestamp">) {
+  return threadListState.threadPreviewMetaState(message);
+}
+
+function threadBoundaryText(timestamp: string | undefined) {
+  return threadListState.threadBoundaryLabel(timestamp);
+}
+
+function threadQueryHistoryMeta(timestamp: string) {
+  return threadListState.threadQueryHistoryPresentation({ timestamp });
 }
 
 function targetIsTypingSurface(target: EventTarget | null): boolean {
@@ -145,7 +184,6 @@ function supertagTopicKey(tags: string[]): string | null {
 }
 
 type ThreadFilter = "all" | "search" | "notice" | "suggestions";
-type ThreadDensity = "comfortable" | "compact";
 type ThreadContextMenuState = {
   threadId: string;
   x: number;
@@ -159,56 +197,29 @@ export function ThreadsListView(props: {
   initialSearchQuery?: string | null;
   initialSearchLaunchContext?: ThreadSearchLaunchContext | null;
   onOpenThread: (threadId: string) => void;
+  onRequestSearchFocus?: () => void;
+  onOpenAgentSettings?: () => void;
 }) {
+  const sessionUserId = readSession()?.user?.id ?? null;
   let threadsRootRef: HTMLDivElement | undefined;
+  let threadSearchInputRef: HTMLInputElement | undefined;
   const [filter, setFilter] = createSignal<ThreadFilter>("all");
-  const [density, setDensity] = createSignal<ThreadDensity>(
-    (() => {
-      try {
-        const saved = localStorage.getItem(THREAD_DENSITY_KEY);
-        return saved === "compact" ? "compact" : "comfortable";
-      } catch {
-        return "comfortable";
-      }
-    })()
-  );
+  const [density, setDensity] = createSignal<ThreadDensity>(loadThreadDensity(sessionUserId));
   function setDensityMode(mode: ThreadDensity) {
     setDensity(mode);
-    try { localStorage.setItem(THREAD_DENSITY_KEY, mode); } catch { /* ignore */ }
+    saveThreadDensity(mode, sessionUserId);
   }
-  const [sortMode, setSortMode] = createSignal<ThreadSortMode>(
-    (() => {
-      try {
-        const saved = localStorage.getItem(THREAD_SORT_MODE_KEY);
-        return saved === "recently_edited" ? "recently_edited" : "activity";
-      } catch {
-        return "activity";
-      }
-    })()
-  );
+  const [sortMode, setSortMode] = createSignal<ThreadSortMode>(loadThreadSortMode(sessionUserId));
   function setThreadSortMode(mode: ThreadSortMode) {
     setSortMode(mode);
-    try { localStorage.setItem(THREAD_SORT_MODE_KEY, mode); } catch { /* ignore */ }
+    saveThreadSortMode(mode, sessionUserId);
   }
   // 16g — thread search query
   const [threadSearch, setThreadSearch] = createSignal("");
   const [threadContextMenu, setThreadContextMenu] = createSignal<ThreadContextMenuState | null>(null);
   // 16f — last-read timestamps per thread
   const MAX_LAST_READ = 500;
-  const [lastRead, setLastRead] = createSignal<Record<string, string>>(
-    (() => {
-      try {
-        const parsed: unknown = JSON.parse(localStorage.getItem(THREAD_LAST_READ_KEY) ?? "{}");
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-        // Validate: keep only string-keyed, string-valued entries
-        const valid: Record<string, string> = {};
-        for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-          if (typeof k === "string" && typeof v === "string") valid[k] = v;
-        }
-        return valid;
-      } catch { return {}; }
-    })()
-  );
+  const [lastRead, setLastRead] = createSignal<Record<string, string>>(loadThreadLastRead(sessionUserId));
   function markRead(tid: string) {
     const ts = new Date().toISOString();
     setLastRead(prev => {
@@ -219,7 +230,7 @@ export function ThreadsListView(props: {
         const sorted = keys.sort((a, b) => (n[a] ?? "").localeCompare(n[b] ?? ""));
         for (const k of sorted.slice(0, keys.length - MAX_LAST_READ)) delete n[k];
       }
-      try { localStorage.setItem(THREAD_LAST_READ_KEY, JSON.stringify(n)); } catch { /* ignore */ }
+      saveThreadLastRead(n, sessionUserId);
       return n;
     });
   }
@@ -232,51 +243,40 @@ export function ThreadsListView(props: {
     return unreadCount(tid, msgs) > 0;
   }
   // 19l — archived threads
-  const [archivedThreads, setArchivedThreads] = createSignal<Set<string>>(
-    (() => { try { return new Set<string>(JSON.parse(localStorage.getItem(ARCHIVED_THREADS_KEY) ?? "[]")); } catch { return new Set<string>(); } })()
-  );
+  const [archivedThreads, setArchivedThreads] = createSignal<Set<string>>(loadArchivedThreadIds(sessionUserId));
   const [showArchived, setShowArchived] = createSignal(false);
   function archiveThread(tid: string) {
     setArchivedThreads(prev => {
       const next = new Set(prev);
       next.add(tid);
-      try { localStorage.setItem(ARCHIVED_THREADS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
-      return next;
+      return saveArchivedThreadIds(next, sessionUserId);
     });
   }
   function unarchiveThread(tid: string) {
     setArchivedThreads(prev => {
       const next = new Set(prev);
       next.delete(tid);
-      try { localStorage.setItem(ARCHIVED_THREADS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
-      return next;
+      return saveArchivedThreadIds(next, sessionUserId);
     });
   }
 
   // 19n — inline thread title edit
-  const [threadTitles, setThreadTitles] = createSignal<Record<string, string>>(
-    (() => { try { return JSON.parse(localStorage.getItem(THREAD_TITLES_KEY) ?? "{}"); } catch { return {}; } })()
-  );
+  const [threadTitles, setThreadTitles] = createSignal<Record<string, string>>(loadThreadTitles(sessionUserId));
   const [editingTitleId, setEditingTitleId] = createSignal<string | null>(null);
   const [titleDraft, setTitleDraft] = createSignal("");
 
   // 18m — starred threads
-  const [starredThreads, setStarredThreads] = createSignal<Set<string>>(
-    (() => { try { return new Set<string>(JSON.parse(localStorage.getItem(THREAD_STARS_KEY) ?? "[]")); } catch { return new Set<string>(); } })()
-  );
+  const [starredThreads, setStarredThreads] = createSignal<Set<string>>(loadStarredThreadIds(sessionUserId));
   function toggleStar(tid: string) {
     setStarredThreads(prev => {
       const next = new Set(prev);
       if (next.has(tid)) next.delete(tid); else next.add(tid);
-      try { localStorage.setItem(THREAD_STARS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
-      return next;
+      return saveStarredThreadIds(next, sessionUserId);
     });
   }
 
   // 17q — thread drag reorder
-  const [threadOrder, setThreadOrder] = createSignal<string[]>(
-    (() => { try { return JSON.parse(localStorage.getItem(THREAD_ORDER_KEY) ?? "[]"); } catch { return []; } })()
-  );
+  const [threadOrder, setThreadOrder] = createSignal<string[]>(loadThreadOrder(sessionUserId));
   const [dragSrc, setDragSrc] = createSignal<string | null>(null);
   const [dragOver, setDragOver] = createSignal<string | null>(null);
   // Cross-domain drag: track when an email card is being dragged toward a note target
@@ -290,8 +290,7 @@ export function ThreadsListView(props: {
       const next = [...order];
       const si = next.indexOf(srcId); const ti = next.indexOf(tgtId);
       if (si < 0) { next.unshift(srcId); } else { next.splice(si, 1); next.splice(ti < 0 ? 0 : ti, 0, srcId); }
-      try { localStorage.setItem(THREAD_ORDER_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
+      return saveThreadOrder(next, sessionUserId);
     });
   }
   // 16h — swipe-to-archive tracking
@@ -299,33 +298,29 @@ export function ThreadsListView(props: {
   const [swipeRevealed, setSwipeRevealed] = createSignal<string | null>(null);
   // 14c — inline thread preview: expand to show message snippet before opening
   const [previewThreadId, setPreviewThreadId] = createSignal<string | null>(null);
-  const [remoteThreadSummaries, setRemoteThreadSummaries] = createSignal<ThreadSummary[]>([]);
   const [remoteThreadResponse, setRemoteThreadResponse] = createSignal<ThreadSummariesResponse | null>(null);
-  const [remoteThreadRetrievalState, setRemoteThreadRetrievalState] =
-    createSignal<ThreadSummariesResponse["retrieval_state"] | null>(null);
-  const [remoteThreadSearchError, setRemoteThreadSearchError] = createSignal<string | null>(null);
+  const [remoteThreadSearchError, setRemoteThreadSearchError] = createSignal<ThreadSearchFailureReceipt | null>(null);
   const localRouterPreview = createLocalSemanticRouterPreviewController({ profile: "thread" });
   // Progressive summary disclosure: which thread row has its summary bullets expanded
   const [expandedSummaryId, setExpandedSummaryId] = createSignal<string | null>(null);
   // Contextual echoes: related knowledge cards fetched for the open preview
-  type CtxEntry = { loading: boolean; items: Array<{ id: string; label: string; type: string }> };
-  const [relatedCtx, setRelatedCtx] = createSignal<Map<string, CtxEntry>>(new Map());
+  const [relatedCtx, setRelatedCtx] = createSignal<Map<string, ThreadInteractionContextEntry>>(new Map());
+  const [threadActionError, setThreadActionError] = createSignal<ThreadOrchestrationFailureReceipt | null>(null);
+
+  function focusThreadSearchInput() {
+    setFilter("all");
+    queueMicrotask(() => threadSearchInputRef?.focus());
+  }
 
   async function fetchRelatedCtx(threadId: string, messageId: string) {
-    setRelatedCtx(prev => { const m = new Map(prev); m.set(threadId, { loading: true, items: [] }); return m; });
-    try {
-      const result = await apiFetch<{ messages: Array<{ id: string; type: string; content: Record<string, unknown> }> }>(
-        `/knowledge/context-window?message_id=${encodeURIComponent(messageId)}&limit=5&type=knowledge_card`
-      );
-      const items = (result.messages ?? []).slice(0, 5).map(m => ({
-        id: m.id,
-        type: m.type,
-        label: String(m.content?.claim ?? m.content?.title ?? m.content?.text ?? m.type).slice(0, 60),
-      }));
-      setRelatedCtx(prev => { const map = new Map(prev); map.set(threadId, { loading: false, items }); return map; });
-    } catch {
-      setRelatedCtx(prev => { const map = new Map(prev); map.set(threadId, { loading: false, items: [] }); return map; });
-    }
+    const current = relatedCtx();
+    setRelatedCtx(new Map(current).set(threadId, { loading: true, items: [] }));
+    const next = await loadThreadRelatedContextState({
+      current,
+      threadId,
+      messageId,
+    });
+    setRelatedCtx(next);
   }
 
   createEffect(() => {
@@ -386,14 +381,13 @@ export function ThreadsListView(props: {
   async function mergeSelectedThreads() {
     const ids = [...selectedForMerge()];
     if (ids.length < 2) return;
+    setThreadActionError(null);
     setMerging(true);
     try {
-      await apiFetch("/ui/command", {
-        method: "POST",
-        bodyJson: { query: "Merge threads", intent: "merge_threads", thread_ids: ids },
-      });
-      clearSelectedThreads();
-    } catch { /* ignore */ } finally { setMerging(false); }
+      const result = await mergeSelectedThreadsState(ids);
+      if (result.shouldClearSelection) clearSelectedThreads();
+      setThreadActionError(result.error);
+    } finally { setMerging(false); }
   }
 
   function selectAllVisibleThreads() {
@@ -408,72 +402,72 @@ export function ThreadsListView(props: {
     setArchivedThreads((prev) => {
       const next = new Set(prev);
       for (const id of ids) next.add(id);
-      try { localStorage.setItem(ARCHIVED_THREADS_KEY, JSON.stringify([...next])); } catch {}
-      return next;
+      return saveArchivedThreadIds(next);
     });
     clearSelectedThreads();
   }
 
   // 21f — locked threads (prevent archive/merge)
-  const [lockedThreads, setLockedThreads] = createSignal<Set<string>>(
-    (() => { try { return new Set<string>(JSON.parse(localStorage.getItem(LOCKED_THREADS_KEY) ?? "[]")); } catch { return new Set<string>(); } })()
-  );
+  const [lockedThreads, setLockedThreads] = createSignal<Set<string>>(loadLockedThreadIds());
   function toggleLock(tid: string) {
     setLockedThreads(prev => {
       const next = new Set(prev);
       if (next.has(tid)) next.delete(tid); else next.add(tid);
-      try { localStorage.setItem(LOCKED_THREADS_KEY, JSON.stringify([...next])); } catch {}
-      return next;
+      return saveLockedThreadIds(next);
     });
   }
 
-  const [pinnedThreads, setPinnedThreads] = createSignal<Set<string>>(
-    (() => { try { return new Set<string>(JSON.parse(localStorage.getItem(THREAD_PINNED_KEY) ?? "[]")); } catch { return new Set<string>(); } })()
-  );
+  const [pinnedThreads, setPinnedThreads] = createSignal<Set<string>>(loadPinnedThreadIds());
   function togglePin(tid: string) {
     setPinnedThreads(prev => {
       const next = new Set(prev);
       if (next.has(tid)) next.delete(tid); else next.add(tid);
-      try { localStorage.setItem(THREAD_PINNED_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
-      return next;
+      return savePinnedThreadIds(next);
     });
   }
 
   // 22f — inline quick reply composer
   const [replyingToThread, setReplyingToThread] = createSignal<string | null>(null);
   const [replyDraft, setReplyDraft] = createSignal("");
+  const [replySubmittingThreadId, setReplySubmittingThreadId] = createSignal<string | null>(null);
 
   // 27c — dismissed merge suggestion pairs (persisted to avoid re-showing)
-  const [dismissedMergePairs, setDismissedMergePairs] = createSignal<Set<string>>(
-    (() => { try { return new Set<string>(JSON.parse(localStorage.getItem('omnyid.dismissed-merge-pairs') ?? '[]')); } catch { return new Set<string>(); } })()
-  );
+  const [dismissedMergePairs, setDismissedMergePairs] = createSignal<Set<string>>(loadDismissedMergePairs());
 
   async function submitReply(threadId: string) {
-    await apiFetch("/ui/command", {
-      method: "POST",
-      bodyJson: { intent: "reply", thread_id: threadId, content: { text: replyDraft() } },
-    });
-    setReplyDraft("");
-    setReplyingToThread(null);
+    if (!replyDraft().trim() || replySubmittingThreadId() === threadId) return;
+    setThreadActionError(null);
+    setReplySubmittingThreadId(threadId);
+    try {
+      const result = await submitThreadReplyState({
+        threadId,
+        replyDraft: replyDraft(),
+        replyingToThreadId: replyingToThread(),
+        submittingThreadId: replySubmittingThreadId(),
+      });
+      setReplyDraft(result.nextReplyDraft);
+      setReplyingToThread(result.nextReplyingThreadId);
+      setThreadActionError(result.error);
+    } finally {
+      if (replySubmittingThreadId() === threadId) setReplySubmittingThreadId(null);
+    }
   }
 
   // 22g — thread priority flag
-  type PriorityLevel = "high" | "medium" | "low";
-  const [threadPriority, setThreadPrioritySignal] = createSignal<Record<string, PriorityLevel | null>>(
-    (() => { try { return JSON.parse(localStorage.getItem(THREAD_PRIORITY_KEY) ?? "{}"); } catch { return {}; } })()
+  const [threadPriority, setThreadPrioritySignal] = createSignal<Record<string, ThreadPriorityLevel | null>>(
+    loadThreadPriority(sessionUserId)
   );
 
-  function setPriority(threadId: string, level: PriorityLevel | null) {
+  function setPriority(threadId: string, level: ThreadPriorityLevel | null) {
     setThreadPrioritySignal(prev => {
       const next = { ...prev, [threadId]: level };
-      try { localStorage.setItem(THREAD_PRIORITY_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
+      return saveThreadPriority(next, sessionUserId);
     });
   }
 
   function cyclePriority(threadId: string) {
     const current = threadPriority()[threadId] ?? null;
-    const next: PriorityLevel | null =
+    const next: ThreadPriorityLevel | null =
       current === null ? "high" :
       current === "high" ? "medium" :
       current === "medium" ? "low" :
@@ -481,24 +475,18 @@ export function ThreadsListView(props: {
     setPriority(threadId, next);
   }
 
-  function priorityEmoji(level: PriorityLevel | null | undefined): string {
+  function priorityEmoji(level: ThreadPriorityLevel | null | undefined): string {
     if (level === "high") return "🔴";
     if (level === "medium") return "🟡";
     if (level === "low") return "🔵";
     return "○";
   }
 
-  function threadMarkdownLines(thread: { threadId: string; messages: AfpMessage[] }) {
-    const title = threadTitles()[thread.threadId] ?? threadTitle(thread.threadId, thread.messages);
-    const lines: string[] = [`# ${title}`, ``, `> Thread ID: ${thread.threadId}`, ``];
-    for (const msg of thread.messages) {
-      const c = msg.content as Record<string, unknown> | undefined;
-      const text = String(c?.summary ?? c?.text ?? c?.body ?? "").trim();
-      const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleString() : "";
-      lines.push(`## ${msg.type}${ts ? ` — ${ts}` : ""}`, ``);
-      if (text) lines.push(text, ``);
-    }
-    return lines;
+    function threadMarkdownLines(thread: { threadId: string; messages: AfpMessage[] }) {
+    return threadListState.threadMarkdownLines(
+      thread,
+      threadTitles()[thread.threadId] ?? threadTitle(thread.threadId, thread.messages),
+    );
   }
 
   // 21e — export thread as Markdown
@@ -535,19 +523,10 @@ export function ThreadsListView(props: {
   // 20m — smart topic grouping
   const [groupByTopic, setGroupByTopic] = createSignal(false);
   function topicWords(msgs: AfpMessage[]): string[] {
-    const STOP = new Set(["a","an","the","is","are","was","were","be","been","to","of","in","for","on","with","at","by","from","this","that","it","as","we","i","you"]);
-    const words: Record<string, number> = {};
-    for (const m of msgs) {
-      const c = m.content as Record<string, unknown> | undefined;
-      const text = String(c?.summary ?? c?.text ?? c?.body ?? "").toLowerCase();
-      text.split(/\W+/).filter(w => w.length > 3 && !STOP.has(w)).forEach(w => { words[w] = (words[w] ?? 0) + 1; });
-    }
-    return Object.entries(words).sort((a,b) => b[1]-a[1]).slice(0,3).map(([w]) => w);
+    return threadListState.topicWords(msgs);
   }
   function dominantTopicKey(msgs: AfpMessage[]): string {
-    const canonical = supertagTopicKey(threadSupertags(msgs));
-    if (canonical) return canonical;
-    return topicWords(msgs)[0] ?? "general";
+    return threadListState.dominantThreadTopicKey(msgs);
   }
 function togglePreview(tid: string, e: MouseEvent) {
     e.stopPropagation();
@@ -621,22 +600,17 @@ function togglePreview(tid: string, e: MouseEvent) {
 
   // 29a — Magic Pointer action handler for thread items
   onMount(() => {
-    function handleVimNavigationPreference(event: Event) {
-      const next = readVimNavigationPreferenceEventDetail(event);
-      if (typeof next === "boolean") setVimNavigationEnabled(next);
-    }
-    window.addEventListener(VIM_NAVIGATION_PREFERENCE_EVENT, handleVimNavigationPreference as EventListener);
-    onCleanup(() => window.removeEventListener(VIM_NAVIGATION_PREFERENCE_EVENT, handleVimNavigationPreference as EventListener));
+    const unsubscribeVimNavigationPreference = subscribeVimNavigationPreference((enabled) => {
+      setVimNavigationEnabled(enabled);
+    });
+    onCleanup(() => unsubscribeVimNavigationPreference());
 
-    function handleMagicAction(e: DocumentEventMap["magic-action"]) {
-      const detail = readMagicActionEventDetail(e);
-      const { action, msgId } = detail ?? {};
+    const unsubscribeMagicActionEvent = subscribeMagicActionEvent(({ action, msgId }) => {
       if (!msgId) return;
       if (action === 'open') { markRead(msgId); props.onOpenThread(msgId); }
       if (action === 'star') toggleStar(msgId);
-    }
-    document.addEventListener(MAGIC_ACTION_EVENT, handleMagicAction);
-    onCleanup(() => document.removeEventListener(MAGIC_ACTION_EVENT, handleMagicAction));
+    });
+    onCleanup(() => unsubscribeMagicActionEvent());
 
     // 30i — Keyboard Nav Mode handler
     function handleKbNav(e: KeyboardEvent) {
@@ -692,11 +666,7 @@ function togglePreview(tid: string, e: MouseEvent) {
   });
 
   const queryHistory = createMemo((): Array<{ query: string; timestamp: string; result?: string }> => {
-    try {
-      const raw = localStorage.getItem(QUERY_HISTORY_KEY);
-      if (!raw) return [];
-      return JSON.parse(raw);
-    } catch { return []; }
+    return loadThreadQueryHistory(sessionUserId);
   });
 
   const parsedThreadSearch = createMemo(() => parseThreadSearchInput(threadSearch()));
@@ -709,42 +679,25 @@ function togglePreview(tid: string, e: MouseEvent) {
 
   createEffect(() => {
     const parsed = parsedThreadSearch();
-    if (
-      parsed.query.length < 2
-      && parsed.tags.length === 0
-      && !parsed.kind
-      && parsed.threadIds.length === 0
-      && parsed.fromAgents.length === 0
-      && !parsed.timeRange?.from
-      && !parsed.timeRange?.to
-    ) {
-      setRemoteThreadSummaries([]);
+    if (!isThreadSummariesSearchActive(parsed)) {
       setRemoteThreadResponse(null);
-      setRemoteThreadRetrievalState(null);
       setRemoteThreadSearchError(null);
       return;
     }
     const timer = window.setTimeout(() => {
       setRemoteThreadSearchError(null);
-      void fetchThreadSummaries({
-        query: parsed.query || undefined,
-        tags: parsed.tags,
-        kind: parsed.kind,
-        threadIds: parsed.threadIds,
-        fromAgents: parsed.fromAgents,
-        timeFrom: parsed.timeRange?.from,
-        timeTo: parsed.timeRange?.to,
-        match: parsed.tags.length > 1 ? "all" : "any",
-        limit: 40,
-      })
+      void fetchThreadSummaries(buildThreadSummariesSearchRequest(parsed, 40))
         .then((response) => {
           setRemoteThreadResponse(response);
-          setRemoteThreadSummaries(response.thread_summaries ?? []);
-          setRemoteThreadRetrievalState(response.retrieval_state ?? null);
           setRemoteThreadSearchError(null);
         })
         .catch((error: unknown) => {
-          setRemoteThreadSearchError(error instanceof Error ? error.message : "Could not load thread search results.");
+          setRemoteThreadSearchError(
+            buildThreadSearchFailureReceipt(
+              "Load remote thread search",
+              error instanceof Error ? error.message : "Could not load thread search results.",
+            ),
+          );
         });
     }, 180);
     onCleanup(() => window.clearTimeout(timer));
@@ -752,50 +705,25 @@ function togglePreview(tid: string, e: MouseEvent) {
 
   function retryRemoteThreadSearch() {
     const parsed = parsedThreadSearch();
-    if (
-      parsed.query.length < 2
-      && parsed.tags.length === 0
-      && !parsed.kind
-      && parsed.threadIds.length === 0
-      && parsed.fromAgents.length === 0
-      && !parsed.timeRange?.from
-      && !parsed.timeRange?.to
-    ) {
-      return;
-    }
+    if (!isThreadSummariesSearchActive(parsed)) return;
     setRemoteThreadSearchError(null);
-    void fetchThreadSummaries({
-      query: parsed.query || undefined,
-      tags: parsed.tags,
-      kind: parsed.kind,
-      threadIds: parsed.threadIds,
-      fromAgents: parsed.fromAgents,
-      timeFrom: parsed.timeRange?.from,
-      timeTo: parsed.timeRange?.to,
-      match: parsed.tags.length > 1 ? "all" : "any",
-      limit: 40,
-    })
+    void fetchThreadSummaries(buildThreadSummariesSearchRequest(parsed, 40))
       .then((response) => {
         setRemoteThreadResponse(response);
-        setRemoteThreadSummaries(response.thread_summaries ?? []);
-        setRemoteThreadRetrievalState(response.retrieval_state ?? null);
       })
       .catch((error: unknown) => {
-        setRemoteThreadSearchError(error instanceof Error ? error.message : "Could not load thread search results.");
+        setRemoteThreadSearchError(
+          buildThreadSearchFailureReceipt(
+            "Load remote thread search",
+            error instanceof Error ? error.message : "Could not load thread search results.",
+          ),
+        );
       });
   }
 
   createEffect(() => {
     const parsed = parsedThreadSearch();
-    if (
-      parsed.query.length < 2
-      && parsed.tags.length === 0
-      && !parsed.kind
-      && parsed.threadIds.length === 0
-      && parsed.fromAgents.length === 0
-      && !parsed.timeRange?.from
-      && !parsed.timeRange?.to
-    ) {
+    if (!isThreadSummariesSearchActive(parsed)) {
       localRouterPreview.clear();
       return;
     }
@@ -803,60 +731,12 @@ function togglePreview(tid: string, e: MouseEvent) {
   });
 
   function summaryToPseudoMessage(summary: ThreadSummary): AfpMessage {
-    return {
-      id: `thread-summary:${summary.thread_id}`,
-      thread_id: summary.thread_id,
-      from: "system",
-      to: [],
-      timestamp: summary.last_message_at,
-      type: "ledger",
-      kind: summary.dominant_kind ?? "chat_thread",
-      subtype: "thread_summary",
-      supertags: summary.supertags,
-      content: {
-        title: summary.title,
-        summary: summary.preview,
-      },
-      metadata: {
-        source: "thread_summary_search",
-        score: summary.score,
-        message_count: summary.message_count,
-      },
-      views: [],
-      attachments: [],
-      references: [],
-      encryption: null,
-      signature: "",
-    };
+    return threadListState.summaryToPseudoMessage(summary);
   }
 
   // Group all messages into threads by thread_id
   const threads = createMemo(() => {
-    const map = new Map<string, AfpMessage[]>();
-    for (const msg of props.messages) {
-      const arr = map.get(msg.thread_id) ?? [];
-      arr.push(msg);
-      map.set(msg.thread_id, arr);
-    }
-    const locals = [...map.entries()].map(([tid, msgs]) => ({
-      threadId: tid,
-      messages: msgs,
-      lastMessage: msgs[msgs.length - 1],
-      isSearch: msgs.some(m => m.type === "research"),
-    }));
-    const rank = new Map((props.threadSummaries ?? []).map((summary, index) => [summary.thread_id, index]));
-    return locals.sort((a, b) => {
-      const ar = rank.get(a.threadId);
-      const br = rank.get(b.threadId);
-      if (ar !== undefined || br !== undefined) {
-        if (ar === undefined) return 1;
-        if (br === undefined) return -1;
-        return ar - br;
-      }
-      const at = a.lastMessage?.timestamp ?? "";
-      const bt = b.lastMessage?.timestamp ?? "";
-      return bt.localeCompare(at);
-    });
+    return threadListState.buildThreadEntries(props.messages, props.threadSummaries);
   });
 
   createEffect(() => {
@@ -872,16 +752,7 @@ function togglePreview(tid: string, e: MouseEvent) {
 
   // 19m — thread mention detector
   const threadMentions = createMemo(() => {
-    const result = new Map<string, boolean>();
-    for (const t of threads()) {
-      const hasMention = t.messages.some(m => {
-        const c = m.content as Record<string, unknown> | undefined;
-        const text = String(c?.text ?? c?.body ?? c?.summary ?? "");
-        return /@\w+/.test(text);
-      });
-      result.set(t.threadId, hasMention);
-    }
-    return result;
+    return threadListState.buildThreadMentionMap(threads());
   });
 
   // 15r — group notice items by sender then channel (e.g. "3 emails from Sarah", "5 messages from John on Slack")
@@ -895,67 +766,19 @@ function togglePreview(tid: string, e: MouseEvent) {
   }
 
   const noticeGroupsBySender = createMemo<SenderGroup[]>(() => {
-    const allNotices = props.messages.filter(m =>
-      m.type.includes("email") || m.type.includes("inbox") ||
-      m.type.includes("slack") || m.subtype?.includes("slack") ||
-      m.type === "agent"
-    ).slice(0, 50);
-
-    const map = new Map<string, SenderGroup>();
-    for (const msg of allNotices) {
-      const sender = deriveSender(msg);
-      const { label: channel, icon: channelIcon } = deriveNoticeChannel(msg);
-      const key = `${sender}::${channel}`;
-      if (!map.has(key)) map.set(key, { sender, channel, channelIcon, msgs: [] });
-      map.get(key)!.msgs.push(msg);
-    }
-    return [...map.values()].sort((a, b) => b.msgs.length - a.msgs.length);
+    return threadListState.buildNoticeGroupsBySender(props.messages);
   });
 
   // 17q — sorted threads respecting user drag order
   const filteredThreads = createMemo(() => {
-    const order = threadOrder();
-    const all = threads();
     const parsed = parsedThreadSearch();
-    const query = parsed.query.toLowerCase();
-    const searchByServer =
-      parsed.query.length >= 2
-      || parsed.tags.length > 0
-      || !!parsed.kind
-      || parsed.threadIds.length > 0
-      || parsed.fromAgents.length > 0
-      || !!parsed.timeRange?.from
-      || !!parsed.timeRange?.to;
-    if (searchByServer) {
-      const localById = new Map(all.map((thread) => [thread.threadId, thread]));
-      const remoteOrdered = remoteThreadSummaries().map((summary) => {
-        const existing = localById.get(summary.thread_id);
-        if (existing) return existing;
-        const pseudo = summaryToPseudoMessage(summary);
-        return {
-          threadId: summary.thread_id,
-          messages: [pseudo],
-          lastMessage: pseudo,
-          isSearch: false,
-        };
-      });
-      return remoteOrdered;
-    }
-    const filtered = query
-      ? all.filter(t => {
-          const title = threadTitle(t.threadId, t.messages).toLowerCase();
-          const topic = dominantTopicKey(t.messages).toLowerCase();
-          const tags = threadSupertags(t.messages);
-          return title.includes(query)
-            || topic.includes(query)
-            || tags.some((tag) => tag.includes(query));
-        })
-      : all;
-    if (order.length === 0) return filtered;
-    const map = new Map(filtered.map(t => [t.threadId, t]));
-    const sorted = order.map(id => map.get(id)).filter(Boolean) as typeof filtered;
-    const rest = filtered.filter(t => !order.includes(t.threadId));
-    return [...sorted, ...rest];
+    return threadListState.filterOrderedThreads({
+      threads: threads(),
+      order: threadOrder(),
+      query: parsed.query,
+      remoteThreadResponse: remoteThreadResponse(),
+      searchByServer: isThreadSummariesSearchActive(parsed),
+    });
   });
 
   const availableThreadKinds = createMemo(() => {
@@ -967,19 +790,7 @@ function togglePreview(tid: string, e: MouseEvent) {
   });
 
   const availableThreadSupertags = createMemo(() => {
-    const counts = new Map<string, number>();
-    for (const thread of threads()) {
-      for (const tag of threadSupertags(thread.messages)) {
-        counts.set(tag, (counts.get(tag) ?? 0) + 1);
-      }
-    }
-    return [...counts.entries()]
-      .sort((a, b) => {
-        const byCount = b[1] - a[1];
-        return byCount !== 0 ? byCount : a[0].localeCompare(b[0]);
-      })
-      .slice(0, 10)
-      .map(([tag, count]) => ({ tag, count }));
+    return threadListState.availableThreadSupertagCounts(threads());
   });
 
   function toggleThreadKindLens(kind: string) {
@@ -1023,117 +834,58 @@ function togglePreview(tid: string, e: MouseEvent) {
 
   // 18m + 19m — sort: pinned > mentions > starred > unread > normal
   const sortedThreads = createMemo(() =>
-    [...filteredThreads()].sort((a, b) => {
-      const pinA = pinnedThreads().has(a.threadId) ? 8 : 0;
-      const pinB = pinnedThreads().has(b.threadId) ? 8 : 0;
-      const score = (t: typeof a) => {
-        let s = 0;
-        if (threadMentions().get(t.threadId)) s += 4;
-        if (starredThreads().has(t.threadId)) s += 2;
-        if (unreadCount(t.threadId, t.messages) > 0) s += 1;
-        return s;
-      };
-      const weightedDiff = (pinB + score(b)) - (pinA + score(a));
-      if (weightedDiff !== 0) return weightedDiff;
-      const recencyDiff =
-        threadSortMillis(b.messages, sortMode()) - threadSortMillis(a.messages, sortMode());
-      if (recencyDiff !== 0) return recencyDiff;
-      return b.threadId.localeCompare(a.threadId);
+    threadListState.sortVisibleThreads({
+      threads: filteredThreads(),
+      pinnedThreads: pinnedThreads(),
+      mentionedThreads: threadMentions(),
+      starredThreads: starredThreads(),
+      unreadCount,
+      sortMode: sortMode(),
     })
   );
 
   // 19l — filter archived/active threads
   const filteredForArchive = createMemo(() =>
-    sortedThreads().filter(t => showArchived() ? archivedThreads().has(t.threadId) : !archivedThreads().has(t.threadId))
+    threadListState.filterArchivedThreads(sortedThreads(), archivedThreads(), showArchived())
   );
 
   // 27c — detect pairs of threads with ≥2 overlapping topic words (soft merge suggestion)
   const mergeablePairs = createMemo(() => {
-    const ts = filteredForArchive();
-    const stop = new Set(['this', 'that', 'with', 'from', 'have', 'will', 'your', 'about', 'been', 'they', 'email', 'thread']);
-    const pairs: Array<{pairKey: string; idA: string; idB: string}> = [];
-    for (let i = 0; i < Math.min(ts.length, 12); i++) {
-      for (let j = i + 1; j < Math.min(ts.length, 12); j++) {
-        const a = ts[i], b = ts[j];
-        const pairKey = [a.threadId, b.threadId].sort().join('::');
-        if (dismissedMergePairs().has(pairKey)) continue;
-        const titleA = (threadTitles()[a.threadId] ?? threadTitle(a.threadId, a.messages)).toLowerCase();
-        const titleB = (threadTitles()[b.threadId] ?? threadTitle(b.threadId, b.messages)).toLowerCase();
-        const wordsA = new Set(titleA.split(/\W+/).filter(w => w.length > 3 && !stop.has(w)));
-        const common = titleB.split(/\W+/).filter(w => w.length > 3 && !stop.has(w) && wordsA.has(w));
-        if (common.length >= 2) pairs.push({ pairKey, idA: a.threadId, idB: b.threadId });
-      }
-    }
-    return pairs.slice(0, 1);
+    return threadListState.buildMergeableThreadPairs(
+      filteredForArchive(),
+      dismissedMergePairs(),
+      threadTitles(),
+    );
   });
 
   // 22g — priority-sorted flat thread list (high > medium > low > none)
   const prioritySortedThreads = createMemo(() => {
-    const priorityRank: Record<string, number> = { high: 3, medium: 2, low: 1 };
-    return [...filteredForArchive()].sort((a, b) => {
-      const pa = priorityRank[threadPriority()[a.threadId] ?? ""] ?? 0;
-      const pb = priorityRank[threadPriority()[b.threadId] ?? ""] ?? 0;
-      return pb - pa;
-    });
+    return threadListState.prioritySortedThreads(filteredForArchive(), threadPriority());
   });
 
   // 24f — flat list with day-boundary dividers
-  type DayDivider = { _kind: "divider"; label: string };
-  type ThreadEntryFlat = { _kind: "thread"; threadId: string; messages: AfpMessage[]; lastMessage: AfpMessage; isSearch: boolean };
-  type FlatListItem = DayDivider | ThreadEntryFlat;
+  type FlatListItem = threadListState.FlatListItem;
   const flatItemsWithDividers = createMemo<FlatListItem[]>(() => {
-    const items: FlatListItem[] = [];
-    let lastDay = "";
-    for (const thread of prioritySortedThreads()) {
-      const lastMsg = thread.messages[thread.messages.length - 1];
-      const d = lastMsg?.timestamp ? new Date(lastMsg.timestamp) : null;
-      let dayLabel = "";
-      if (d) {
-        const now = new Date();
-        const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-        if (diffDays === 0) dayLabel = "Today";
-        else if (diffDays === 1) dayLabel = "Yesterday";
-        else dayLabel = d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
-      }
-      if (dayLabel && dayLabel !== lastDay) {
-        items.push({ _kind: "divider", label: dayLabel });
-        lastDay = dayLabel;
-      }
-      items.push({ _kind: "thread", ...thread });
-    }
-    return items;
+    return threadListState.buildFlatItemsWithDividers(prioritySortedThreads());
   });
 
   // 20m — group filtered threads by canonical supertag topic when available,
   // falling back to heuristic content words for legacy messages.
-  type ThreadEntry = { threadId: string; messages: AfpMessage[]; lastMessage: AfpMessage; isSearch: boolean };
-  const topicGroups = createMemo((): Map<string, ThreadEntry[]> | null => {
+  const topicGroups = createMemo((): Map<string, threadListState.ThreadListEntry[]> | null => {
     if (!groupByTopic()) return null;
-    const groups = new Map<string, ThreadEntry[]>();
-    for (const t of filteredForArchive()) {
-      const key = dominantTopicKey(t.messages);
-      const arr = groups.get(key) ?? [];
-      arr.push(t);
-      groups.set(key, arr);
-    }
-    return groups;
+    return threadListState.buildTopicGroups(filteredForArchive());
   });
 
   // P5.4 — group proactive suggestions by entity_id for the Suggestions tab
-  type SuggestionGroup = {
-    entityId: string | null;
-    label: string;
-    msgs: AfpMessage[];
-    urgency: string;
-  };
+  type SuggestionGroup = threadListState.SuggestionGroup;
 
   const suggestionGroups = createMemo<SuggestionGroup[]>(() => {
     const proactiveMsgs = props.messages.filter(m => m.type === "proactive_suggestion");
     const map = new Map<string, SuggestionGroup>();
     for (const msg of proactiveMsgs) {
-      const c = msg.content as Record<string, unknown> | undefined;
-      const entityId = String(c?.entity_id ?? "general");
-      const urgency = String(c?.urgency ?? "medium");
+      const c = afpRecord(msg.content);
+      const entityId = threadListScalarString(c.entity_id, "general");
+      const urgency = threadListScalarString(c.urgency, "medium");
       const label = entityId === "general"
         ? "Agent suggestions"
         : `Agent suggestions — ${entityId}`;
@@ -1149,7 +901,7 @@ function togglePreview(tid: string, e: MouseEvent) {
   });
 
   const proactiveTotalCount = createMemo(() =>
-    props.messages.filter(m => m.type === "proactive_suggestion").length
+    threadListState.proactiveSuggestionCount(props.messages)
   );
 
   const filterTabs: Array<{ id: ThreadFilter; label: string }> = [
@@ -1243,6 +995,7 @@ function togglePreview(tid: string, e: MouseEvent) {
             placeholder="Search threads, #tags, kind:task, from:agent, after:2026-06-01…"
             class="min-w-0 flex-1 bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant/40"
             aria-label="Search conversations"
+            ref={threadSearchInputRef}
           />
           <Show when={threadSearch()}>
             <button type="button" class="text-[10px] text-on-surface-variant/50 hover:text-on-surface-variant" onClick={() => setThreadSearch("")} aria-label="Clear search">✕</button>
@@ -1327,12 +1080,12 @@ function togglePreview(tid: string, e: MouseEvent) {
               || parsedThreadSearch().fromAgents.length > 0
               || !!parsedThreadSearch().timeRange?.from
               || !!parsedThreadSearch().timeRange?.to)
-            && remoteThreadRetrievalState()
+            && threadSummariesRetrievalState(remoteThreadResponse())
           }
         >
           <ThreadDiscoveryStateSummary
             class="mt-2 rounded-2xl border border-primary/20 bg-primary/8 px-4 py-3 shadow-card backdrop-blur"
-            state={remoteThreadRetrievalState()}
+            state={threadSummariesRetrievalState(remoteThreadResponse())}
             launchContext={props.initialSearchLaunchContext}
             query={parsedThreadSearch().query}
             localRouterResult={localRouterPreview.result()}
@@ -1359,15 +1112,57 @@ function togglePreview(tid: string, e: MouseEvent) {
           />
         </Show>
         <Show when={remoteThreadSearchError()}>
-          <div class="rounded-2xl border border-amber-200/70 bg-amber-50/85 px-4 py-3 text-sm text-amber-800 shadow-card">
+          <div
+            class={`rounded-2xl border px-4 py-3 text-sm shadow-card ${
+              remoteThreadSearchError()?.tone === "danger"
+                ? "border-red-200/70 bg-red-50/85 text-red-700"
+                : "border-amber-200/70 bg-amber-50/85 text-amber-800"
+            }`}
+          >
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <span>{remoteThreadSearchError()}</span>
+              <div class="space-y-1">
+                <p class="font-semibold">{remoteThreadSearchError()?.title}</p>
+                <p>{remoteThreadSearchError()?.summary}</p>
+                <p class="text-xs opacity-80">Next step: {remoteThreadSearchError()?.nextStep}</p>
+              </div>
               <button
                 type="button"
                 onClick={retryRemoteThreadSearch}
-                class="rounded-xl border border-amber-200/70 bg-white/80 px-3 py-1.5 text-xs font-medium text-amber-800 transition hover:bg-white"
+                class={`rounded-xl border bg-white/80 px-3 py-1.5 text-xs font-medium transition hover:bg-white ${
+                  remoteThreadSearchError()?.tone === "danger"
+                    ? "border-red-200/70 text-red-700"
+                    : "border-amber-200/70 text-amber-800"
+                }`}
               >
                 Retry search
+              </button>
+            </div>
+          </div>
+        </Show>
+        <Show when={threadActionError()}>
+          <div
+            class={`rounded-2xl border px-4 py-3 text-sm shadow-card ${
+              threadActionError()?.tone === "danger"
+                ? "border-red-200/70 bg-red-50/85 text-red-700"
+                : "border-amber-200/70 bg-amber-50/85 text-amber-800"
+            }`}
+          >
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="space-y-1">
+                <p class="font-semibold">{threadActionError()?.title}</p>
+                <p>{threadActionError()?.summary}</p>
+                <p class="text-xs opacity-80">Next step: {threadActionError()?.nextStep}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setThreadActionError(null)}
+                class={`rounded-xl border bg-white/80 px-3 py-1.5 text-xs font-medium transition hover:bg-white ${
+                  threadActionError()?.tone === "danger"
+                    ? "border-red-200/70 text-red-700"
+                    : "border-amber-200/70 text-amber-800"
+                }`}
+              >
+                Dismiss
               </button>
             </div>
           </div>
@@ -1440,8 +1235,7 @@ function togglePreview(tid: string, e: MouseEvent) {
                     onClick={() => {
                       setDismissedMergePairs(prev => {
                         const next = new Set(prev); next.add(pair.pairKey);
-                        try { localStorage.setItem('omnyid.dismissed-merge-pairs', JSON.stringify([...next])); } catch {}
-                        return next;
+                        return saveDismissedMergePairs(next);
                       });
                     }}
                     class='text-[10px] text-sky-700/60 hover:text-sky-800 transition'>
@@ -1491,11 +1285,12 @@ function togglePreview(tid: string, e: MouseEvent) {
             async function handleNoteDrop() {
               setNoteDropZone("over");
               try {
+                const lastContent = t?.lastMessage ? afpRecord(t.lastMessage.content) : {};
                 const title = t?.lastMessage
-                  ? String((t.lastMessage.content as Record<string, unknown>)?.subject ?? (t.lastMessage.content as Record<string, unknown>)?.title ?? tid)
+                  ? String(lastContent.subject ?? lastContent.title ?? tid)
                   : tid;
                 const summary = t?.lastMessage
-                  ? String((t.lastMessage.content as Record<string, unknown>)?.summary ?? (t.lastMessage.content as Record<string, unknown>)?.text ?? "").slice(0, 300)
+                  ? String(lastContent.summary ?? lastContent.text ?? "").slice(0, 300)
                   : "";
                 await createNoteFromThread({ threadId: tid, title, summary, sourceMessageId: t?.lastMessage?.id });
                 setNoteDropZone("success");
@@ -1589,8 +1384,8 @@ function togglePreview(tid: string, e: MouseEvent) {
                           {(() => {
                             const firstMsg = thread.messages[0];
                             if (!firstMsg || thread.messages.length < 2) return null;
-                            const fc = firstMsg.content as Record<string, unknown> | undefined;
-                            const intent = String(fc?.intent ?? fc?.query ?? fc?.subject ?? "").trim().slice(0, 72);
+                            const fc = afpRecord(firstMsg.content);
+                            const intent = threadListFirstString(fc, ["intent", "query", "subject"]).slice(0, 72);
                             if (!intent) return null;
                             return (
                               <div class="border-b border-white/15 bg-white/10 px-4 py-1">
@@ -1660,12 +1455,15 @@ function togglePreview(tid: string, e: MouseEvent) {
                                     onInput={e => setTitleDraft(e.currentTarget.value)}
                                     onKeyDown={e => {
                                       if (e.key === "Enter") {
+                                        recordShortcutUse("form_submit");
                                         const next = { ...threadTitles(), [thread.threadId]: titleDraft().trim() || title() };
-                                        setThreadTitles(next);
-                                        try { localStorage.setItem(THREAD_TITLES_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+                                        setThreadTitles(saveThreadTitles(next, sessionUserId));
                                         setEditingTitleId(null);
                                       }
-                                      if (e.key === "Escape") setEditingTitleId(null);
+                                      if (e.key === "Escape") {
+                                        recordShortcutUse("form_cancel");
+                                        setEditingTitleId(null);
+                                      }
                                     }}
                                     onBlur={() => setEditingTitleId(null)}
                                     class="flex-1 rounded border border-primary/30 bg-white/50 px-1.5 py-0.5 text-sm text-on-surface outline-none"
@@ -1689,6 +1487,7 @@ function togglePreview(tid: string, e: MouseEvent) {
                                 {(msg) => {
                                   const preview = threadMessagePreview(msg);
                                   const bullets = threadMessagePreviewBullets(preview);
+                                  const meta = threadPreviewMeta(msg);
                                   return (
                                     <div class="mt-2 rounded-2xl border border-white/25 bg-white/50 px-3.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]">
                                       <div class="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-on-surface-variant/50">
@@ -1697,11 +1496,11 @@ function togglePreview(tid: string, e: MouseEvent) {
                                         </span>
                                         <span class="text-on-surface-variant/20">•</span>
                                         <span class="font-mono uppercase tracking-[0.12em] text-on-surface-variant/45">
-                                          {intentLabel(msg.type)}
+                                          {meta.intentLabelText}
                                         </span>
                                         <span class="text-on-surface-variant/20">•</span>
-                                        <span title={msg.timestamp ? new Date(msg.timestamp).toLocaleString() : ""}>
-                                          {relativeTime(msg.timestamp)}
+                                        <span title={meta.absoluteTimestampText}>
+                                          {meta.relativeTimestampText}
                                         </span>
                                       </div>
                                       <Show when={expandedSummaryId() !== thread.threadId}>
@@ -1783,12 +1582,13 @@ function togglePreview(tid: string, e: MouseEvent) {
                             <div class="border-t border-white/20 px-4 py-3 space-y-1.5 max-h-40 overflow-y-auto">
                               <For each={thread.messages.slice(-3)}>
                                 {(msg) => {
-                                  const c = msg.content as Record<string, unknown> | undefined;
+                                  const c = afpRecord(msg.content);
                                   const text = (c?.summary ?? c?.text ?? c?.body ?? msg.type) as string;
+                                  const meta = threadPreviewMeta(msg);
                                   return (
                                     <div class="rounded-lg bg-white/20 px-3 py-2">
                                       <p class="truncate text-xs text-on-surface">{String(text).slice(0, 120)}</p>
-                                      <p class="mt-0.5 font-mono text-[9px] text-on-surface-variant/50">{msg.type} · {relativeTime(msg.timestamp)}</p>
+                                      <p class="mt-0.5 font-mono text-[9px] text-on-surface-variant/50">{msg.type} · {meta.relativeTimestampText}</p>
                                     </div>
                                   );
                                 }}
@@ -1821,8 +1621,8 @@ function togglePreview(tid: string, e: MouseEvent) {
                 fallback={
                   <EmptyState
                     icon="TS"
-                    title="Could not load remote thread search"
-                    body={remoteThreadSearchError() ?? "Remote thread search is unavailable right now."}
+                    title={remoteThreadSearchError()?.title ?? "Could not load remote thread search"}
+                    body={`${remoteThreadSearchError()?.summary ?? "Remote thread search is unavailable right now."} ${remoteThreadSearchError()?.nextStep ?? ""}`.trim()}
                     action={
                       <button
                         type="button"
@@ -1839,6 +1639,24 @@ function togglePreview(tid: string, e: MouseEvent) {
                   {/* 13e — smart empty state with context-sensitive call to action */}
                   <p class="text-2xl">💬</p>
                   <p class="text-sm font-medium text-on-surface">No conversations yet</p>
+                  <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+                    <Show when={props.onRequestSearchFocus}>
+                      <button
+                        type="button"
+                        onClick={() => props.onRequestSearchFocus?.()}
+                        class="rounded-full border border-white/45 bg-white/80 px-3 py-1.5 text-xs font-medium text-on-surface transition hover:bg-white"
+                      >
+                        Ask your agent
+                      </button>
+                    </Show>
+                    <button
+                      type="button"
+                      onClick={focusThreadSearchInput}
+                      class="rounded-full border border-white/45 bg-white/80 px-3 py-1.5 text-xs font-medium text-on-surface transition hover:bg-white"
+                    >
+                      Search threads
+                    </button>
+                  </div>
                   <p class="text-xs text-on-surface-variant">Ask the agent something to start a thread — try "Summarise my emails" or "What's on my calendar today?"</p>
                 </div>
               </Show>
@@ -1917,8 +1735,8 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                 {(() => {
                   const firstMsg = thread.messages[0];
                   if (!firstMsg || thread.messages.length < 2) return null;
-                  const fc = firstMsg.content as Record<string, unknown> | undefined;
-                  const intent = String(fc?.intent ?? fc?.query ?? fc?.subject ?? "").trim().slice(0, 72);
+                  const fc = afpRecord(firstMsg.content);
+                  const intent = threadListFirstString(fc, ["intent", "query", "subject"]).slice(0, 72);
                   if (!intent) return null;
                   return (
                     <div class="border-b border-white/15 bg-white/10 px-4 py-1">
@@ -1998,12 +1816,15 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                           onInput={e => setTitleDraft(e.currentTarget.value)}
                           onKeyDown={e => {
                             if (e.key === "Enter") {
+                              recordShortcutUse("form_submit");
                               const next = { ...threadTitles(), [thread.threadId]: titleDraft().trim() || title() };
-                              setThreadTitles(next);
-                              try { localStorage.setItem(THREAD_TITLES_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+                              setThreadTitles(saveThreadTitles(next, sessionUserId));
                               setEditingTitleId(null);
                             }
-                            if (e.key === "Escape") setEditingTitleId(null);
+                            if (e.key === "Escape") {
+                              recordShortcutUse("form_cancel");
+                              setEditingTitleId(null);
+                            }
                           }}
                           onBlur={() => setEditingTitleId(null)}
                           class="flex-1 rounded border border-primary/30 bg-white/50 px-1.5 py-0.5 text-sm text-on-surface outline-none"
@@ -2031,6 +1852,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                       {(msg) => {
                         const preview = threadMessagePreview(msg);
                         const bullets = threadMessagePreviewBullets(preview);
+                        const meta = threadPreviewMeta(msg);
                         return (
                           <div class={`rounded-2xl border border-white/25 bg-white/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] ${compact() ? "mt-1.5 px-3 py-2" : "mt-2 px-3.5 py-2.5"}`}>
                             <div class={`flex flex-wrap items-center gap-x-2 gap-y-1 text-on-surface-variant/45 ${compact() ? "mb-1 text-[9px]" : "mb-1.5 text-[10px]"}`}>
@@ -2039,11 +1861,11 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                               </span>
                               <span class="text-on-surface-variant/20">•</span>
                               <span class="font-mono uppercase tracking-[0.12em] text-on-surface-variant/45">
-                                {intentLabel(msg.type)}
+                                {meta.intentLabelText}
                               </span>
                               <span class="text-on-surface-variant/20">•</span>
-                              <span title={msg.timestamp ? new Date(msg.timestamp).toLocaleString() : ""}>
-                                {relativeTime(msg.timestamp)}
+                              <span title={meta.absoluteTimestampText}>
+                                {meta.relativeTimestampText}
                               </span>
                             </div>
                             <Show when={expandedSummaryId() !== thread.threadId}>
@@ -2165,7 +1987,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                     <button
                       type="button"
                       title="Quick reply"
-                      onClick={(e) => { e.stopPropagation(); setReplyingToThread(prev => prev === thread.threadId ? null : thread.threadId); }}
+                      onClick={(e) => { e.stopPropagation(); setThreadActionError(null); setReplyingToThread((prev) => toggleThreadReplyComposerState(prev, thread.threadId)); }}
                       class="flex-shrink-0 text-[10px] text-transparent group-hover:text-on-surface-variant/50 hover:text-primary transition"
                       aria-label="Reply"
                     >
@@ -2187,32 +2009,36 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                   <div class="border-t border-white/20 px-4 py-3">
                     <div class="mt-2 flex flex-col gap-1">
                       {/* 30c — Smart Compose Autocomplete wrapper */}
-                      <div class="relative">
-                        <textarea
-                          class="w-full rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-sm p-2 resize-none"
-                          rows={3}
-                          placeholder="Quick reply..."
-                          value={replyDraft()}
-                          onInput={e => { setReplyDraft(e.currentTarget.value); updateAutocomplete(e.currentTarget.value); }}
-                          onKeyDown={e => {
-                            if (e.key === "Tab" && autocompleteHint()) {
-                              e.preventDefault();
-                              setReplyDraft(prev => prev + autocompleteHint());
-                              setAutocompleteHint("");
-                            }
-                          }}
-                        />
-                        <Show when={autocompleteHint()}>
-                          <span class="pointer-events-none absolute left-2 top-2 text-sm text-neutral-400 select-none compose-autocomplete" aria-hidden="true">
-                            {replyDraft()}<span class="opacity-50">{autocompleteHint()}</span>
-                          </span>
-                        </Show>
-                      </div>
+                      <TiptapEditor
+                        mode="compact"
+                        initialContent={replyDraft()}
+                        disabled={replySubmittingThreadId() === thread.threadId}
+                        placeholder="Quick reply..."
+                        clearOnSend
+                        onChange={(text) => {
+                          setReplyDraft(text);
+                          updateAutocomplete(text);
+                        }}
+                        onSend={async (payload) => {
+                          setReplyDraft(payload.text);
+                          await submitReply(thread.threadId);
+                        }}
+                      />
                       <div class="flex gap-2 justify-end">
-                        <button onClick={() => { setReplyingToThread(null); setReplyDraft(""); }}
-                          class="text-xs text-neutral-500 px-2 py-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700">Cancel</button>
-                        <button onClick={() => submitReply(thread.threadId)}
-                          class="text-xs bg-primary text-white px-3 py-1 rounded hover:opacity-80">Send</button>
+                        <button
+                          disabled={replySubmittingThreadId() === thread.threadId}
+                          onClick={() => { setThreadActionError(null); setReplyingToThread(null); setReplyDraft(""); }}
+                          class="text-xs text-neutral-500 px-2 py-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          disabled={replySubmittingThreadId() === thread.threadId || !replyDraft().trim()}
+                          onClick={() => submitReply(thread.threadId)}
+                          class="text-xs bg-primary text-white px-3 py-1 rounded hover:opacity-80 disabled:opacity-50"
+                        >
+                          {replySubmittingThreadId() === thread.threadId ? "Sending..." : "Send"}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2222,13 +2048,14 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                   <div class="border-t border-white/20 px-4 py-3 space-y-1.5 max-h-48 overflow-y-auto">
                     <For each={thread.messages.slice(-4)}>
                       {(msg, msgIdx) => {
-                        const c = msg.content as Record<string, unknown> | undefined;
+                        const c = afpRecord(msg.content);
                         const text = (c?.summary ?? c?.text ?? c?.body ?? msg.type) as string;
                         const allSlice = thread.messages.slice(-4);
                         const prevMsg = msgIdx() > 0 ? allSlice[msgIdx() - 1] : null;
                         const showBoundary = !!(prevMsg?.timestamp && msg.timestamp &&
                           new Date(msg.timestamp).getTime() - new Date(prevMsg.timestamp).getTime() > 86400000);
                         const label = intentLabel(msg.type);
+                        const meta = threadPreviewMeta(msg);
                         const isQuestion = msg.type === 'clarification_request';
                         return (
                           <div class='space-y-1'>
@@ -2236,7 +2063,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                             <Show when={showBoundary}>
                               <div class='flex items-center gap-2 py-0.5'>
                                 <div class='h-px flex-1 bg-white/15' />
-                                <span class='font-mono text-[8px] text-on-surface-variant/35'>You returned · {msg.timestamp ? new Date(msg.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}</span>
+                                <span class='font-mono text-[8px] text-on-surface-variant/35'>{threadBoundaryText(msg.timestamp)}</span>
                                 <div class='h-px flex-1 bg-white/15' />
                               </div>
                             </Show>
@@ -2244,7 +2071,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                             <div class={`rounded-lg px-3 py-2 ${isQuestion ? 'border border-sky-200/50 bg-sky-50/30' : 'bg-white/20'}`}>
                               <span class={`mb-0.5 block font-mono text-[8px] uppercase tracking-[0.1em] ${isQuestion ? 'text-sky-600 font-semibold' : 'text-on-surface-variant/40'}`}>{label}</span>
                               <p class='truncate text-xs text-on-surface'>{String(text).slice(0, 120)}</p>
-                              <p class='mt-0.5 font-mono text-[9px] text-on-surface-variant/50'>{msg.type} · {relativeTime(msg.timestamp)}</p>
+                              <p class='mt-0.5 font-mono text-[9px] text-on-surface-variant/50'>{msg.type} · {meta.relativeTimestampText}</p>
                             </div>
                           </div>
                         );
@@ -2295,8 +2122,8 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                     <p class="font-mono text-[8px] uppercase tracking-[0.14em] text-on-surface-variant/40 mb-1">Quick preview</p>
                     <For each={thread.messages.slice(-2)}>
                       {(msg) => {
-                        const c = msg.content as Record<string, unknown> | undefined;
-                        const text = String(c?.summary ?? c?.text ?? c?.body ?? msg.type).slice(0, 100);
+                        const c = afpRecord(msg.content);
+                        const text = threadListFirstString(c, ["summary", "text", "body"], msg.type).slice(0, 100);
                         return (
                           <div class="flex items-start gap-2">
                             <span class="font-mono text-[8px] uppercase tracking-[0.1em] text-on-surface-variant/40 shrink-0 mt-0.5 w-12 truncate">{msg.type}</span>
@@ -2327,6 +2154,24 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                 <p class="text-2xl">🔍</p>
                 <p class="text-sm font-medium text-on-surface">No search history yet</p>
                 <p class="text-xs text-on-surface-variant">Use the search bar or press <kbd class="rounded border border-white/30 px-1 font-mono text-[10px]">Ctrl+/</kbd> to run your first search.</p>
+                <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  <Show when={props.onRequestSearchFocus}>
+                    <button
+                      type="button"
+                      onClick={() => props.onRequestSearchFocus?.()}
+                      class="rounded-full border border-white/45 bg-white/80 px-3 py-1.5 text-xs font-medium text-on-surface transition hover:bg-white"
+                    >
+                      Ask your agent
+                    </button>
+                  </Show>
+                  <button
+                    type="button"
+                    onClick={focusThreadSearchInput}
+                    class="rounded-full border border-white/45 bg-white/80 px-3 py-1.5 text-xs font-medium text-on-surface transition hover:bg-white"
+                  >
+                    Search threads
+                  </button>
+                </div>
               </div>
             }
           >
@@ -2335,7 +2180,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                 <div class="rounded-2xl border border-white/40 bg-white/35 px-4 py-3 backdrop-blur">
                   <div class="flex items-start justify-between gap-2">
                     <p class="text-sm font-medium text-on-surface">{entry.query}</p>
-                    <p class="flex-shrink-0 font-mono text-[10px] text-on-surface-variant/50" title={new Date(entry.timestamp).toLocaleString()}>
+                    <p class="flex-shrink-0 font-mono text-[10px] text-on-surface-variant/50" title={threadQueryHistoryMeta(entry.timestamp).absoluteTimestampText}>
                       {relativeTime(entry.timestamp)}
                     </p>
                   </div>
@@ -2343,7 +2188,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                     <p class="mt-1 truncate text-xs text-on-surface-variant/70">{entry.result}</p>
                   </Show>
                   <p class="mt-1 font-mono text-[10px] text-on-surface-variant/40">
-                    {new Date(entry.timestamp).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                    {threadQueryHistoryMeta(entry.timestamp).weekdayDateText}
                   </p>
                 </div>
               )}
@@ -2363,6 +2208,24 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                 <p class="text-2xl">🔔</p>
                 <p class="text-sm font-medium text-on-surface">No notices yet</p>
                 <p class="text-xs text-on-surface-variant">Notices will appear here grouped by sender when your agent receives emails, Slack messages, or other communications.</p>
+                <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  <Show when={props.onRequestSearchFocus}>
+                    <button
+                      type="button"
+                      onClick={() => props.onRequestSearchFocus?.()}
+                      class="rounded-full border border-white/45 bg-white/80 px-3 py-1.5 text-xs font-medium text-on-surface transition hover:bg-white"
+                    >
+                      Ask your agent
+                    </button>
+                  </Show>
+                  <button
+                    type="button"
+                    onClick={focusThreadSearchInput}
+                    class="rounded-full border border-white/45 bg-white/80 px-3 py-1.5 text-xs font-medium text-on-surface transition hover:bg-white"
+                  >
+                    Search threads
+                  </button>
+                </div>
               </div>
             }
           >
@@ -2405,8 +2268,9 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                       <div class="border-t border-white/20 px-4 py-2 space-y-1">
                         <For each={group.msgs}>
                           {(msg) => {
-                            const c = msg.content as Record<string, unknown> | undefined;
-                            const text = String(c?.summary ?? c?.subject ?? c?.text ?? msg.type);
+                            const c = afpRecord(msg.content);
+                            const text = threadListFirstString(c, ["summary", "subject", "text"], msg.type);
+                            const meta = threadPreviewMeta(msg);
                             return (
                               <button
                                 type="button"
@@ -2415,7 +2279,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                               >
                                 <span class="block truncate">{text}</span>
                                 <span class="mt-0.5 block font-mono text-[9px] text-on-surface-variant/50">
-                                  {relativeTime(msg.timestamp)}
+                                  {meta.relativeTimestampText}
                                 </span>
                               </button>
                             );
@@ -2445,6 +2309,26 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                   Your agent will surface proactive suggestions here when it detects patterns in your workflow.
                   Enable heuristic packs in Agent Settings to get started.
                 </p>
+                <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  <Show when={props.onOpenAgentSettings}>
+                    <button
+                      type="button"
+                      onClick={() => props.onOpenAgentSettings?.()}
+                      class="rounded-full border border-white/45 bg-white/80 px-3 py-1.5 text-xs font-medium text-on-surface transition hover:bg-white"
+                    >
+                      Open Agent Settings
+                    </button>
+                  </Show>
+                  <Show when={props.onRequestSearchFocus}>
+                    <button
+                      type="button"
+                      onClick={() => props.onRequestSearchFocus?.()}
+                      class="rounded-full border border-white/45 bg-white/80 px-3 py-1.5 text-xs font-medium text-on-surface transition hover:bg-white"
+                    >
+                      Ask your agent
+                    </button>
+                  </Show>
+                </div>
               </div>
             }
           >
@@ -2479,15 +2363,16 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                       <div class="border-t border-white/20 px-4 py-2 space-y-1">
                         <For each={group.msgs}>
                           {(msg) => {
-                            const c = msg.content as Record<string, unknown> | undefined;
-                            const desc = String(c?.description ?? c?.action_label ?? msg.subtype ?? "Suggestion");
-                            const label = String(c?.action_label ?? "View");
+                            const c = afpRecord(msg.content);
+                            const desc = threadListFirstString(c, ["description", "action_label"], msg.subtype ?? "Suggestion");
+                            const label = threadListScalarString(c.action_label, "View");
+                            const meta = threadPreviewMeta(msg);
                             return (
                               <div class="flex items-start justify-between gap-3 rounded-lg px-3 py-2 hover:bg-white/20">
                                 <div class="min-w-0 flex-1">
                                   <p class="truncate text-xs text-on-surface">{desc}</p>
                                   <p class="mt-0.5 font-mono text-[9px] text-on-surface-variant/50">
-                                    {relativeTime(msg.timestamp)}
+                                    {meta.relativeTimestampText}
                                   </p>
                                 </div>
                                 <button
@@ -2644,7 +2529,8 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                         type="button"
                         class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-on-surface transition hover:bg-white/80"
                         onClick={() => {
-                          setReplyingToThread(prev => prev === menu.threadId ? null : menu.threadId);
+                          setThreadActionError(null);
+                          setReplyingToThread((prev) => toggleThreadReplyComposerState(prev, menu.threadId));
                           closeThreadContextMenu();
                         }}
                       >
@@ -2686,3 +2572,6 @@ onPointerDown={(e) => { // 26h — long-press opens preview
     </div>
   );
 }
+
+
+

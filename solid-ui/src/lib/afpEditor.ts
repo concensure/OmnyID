@@ -8,7 +8,7 @@ export function buildEditorAfpMessage(opts: {
   markdown: string;
   text: string;
   json: JSONContent;
-  /** Sanitized HTML â€” required for email mode only. */
+  /** Sanitized HTML — required for email mode only. */
   html?: string;
   threadId?: string;
   supertags?: string[];
@@ -18,14 +18,14 @@ export function buildEditorAfpMessage(opts: {
   const isEmail = opts.mode === "email";
   const type    = isEmail ? "email_draft" : "note";
 
-  // â”€â”€ Views â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Views ────────────────────────────────────────────────────────────
   // Email:  one email view containing the sanitized HTML (required by email clients).
   // Other:  one rich_text view carrying the Markdown for the workspace renderer.
   const views: AfpView[] = isEmail
     ? [{ format: "email",     content: { html: opts.html ?? "", to: opts.emailTo, subject: opts.emailSubject }, priority: 1 }]
     : [{ format: "rich_text", content: { markdown: opts.markdown },                                             priority: 1 }];
 
-  // â”€â”€ Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Content ──────────────────────────────────────────────────────────
   // Markdown is the primary durable content for note/compact/full modes.
   // HTML is kept only in email mode where downstream clients require it.
   // The Tiptap JSON is stored in metadata for lossless editor re-hydration.

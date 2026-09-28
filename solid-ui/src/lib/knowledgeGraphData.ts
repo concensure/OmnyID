@@ -203,7 +203,7 @@ function excerptText(value: string, maxLength: number = 220): string {
   const normalized = value.replace(/\s+/g, " ").trim();
   if (!normalized) return "";
   if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength - 1).trimEnd()}â€¦`;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
 function deriveKnowledgeCardTitle(message: AfpMessage, content: Record<string, unknown>): string {

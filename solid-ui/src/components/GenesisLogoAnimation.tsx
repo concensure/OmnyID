@@ -5,12 +5,12 @@ import { onCleanup, onMount } from "solid-js";
  * "Genesis" animation: particles condense from a singularity into the
  * OmnyID spiral mark, then idle with wandering sparks. Ported from
  * public/logo-animation.html, parameterised by `size` so it can be embedded
- * at any scale instead of only as a fixed 600Ã—600 standalone page.
+ * at any scale instead of only as a fixed 600×600 standalone page.
  *
  * `mode="full"` (default) plays the ~10s condensation sequence once, then
- * idles â€” reserve this for rare, meaningful, one-time waits (identity/
+ * idles — reserve this for rare, meaningful, one-time waits (identity/
  * workspace creation, a multi-minute provisioning step). `mode="idle"`
- * skips straight to the crystallised mark with its wandering-spark loop â€”
+ * skips straight to the crystallised mark with its wandering-spark loop —
  * use this for short or frequent waits (buffering, a quick save) where a
  * 10s intro would be an annoyance rather than a delight.
  */
@@ -41,8 +41,8 @@ export function GenesisLogoAnimation(props: { size?: number; class?: string; mod
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-    const P_RGB = [49, 86, 142] as const; // #31568e â€” primary blue
-    const E_RGB = [217, 107, 57] as const; // #d96b39 â€” ember orange
+    const P_RGB = [49, 86, 142] as const; // #31568e — primary blue
+    const E_RGB = [217, 107, 57] as const; // #d96b39 — ember orange
 
     const B = 0.24;
     const T_MIN = 0.45;

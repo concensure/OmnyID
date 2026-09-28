@@ -123,7 +123,7 @@ export function buildStudyQuickStartChoiceState(input?: {
   return {
     headline: "Choose the fastest first run for the kind of pressure you are under.",
     detail:
-      "Start with the lowest-friction path that matches the studentâ€™s immediate problem. OmnyID should return a useful grounded result first, then retain enough structure for Files, supertags, and linked ideas to stay useful afterward.",
+      "Start with the lowest-friction path that matches the student’s immediate problem. OmnyID should return a useful grounded result first, then retain enough structure for Files, supertags, and linked ideas to stay useful afterward.",
     cards: [
       choiceCard("first_upload", {
         badge: "Best first win",

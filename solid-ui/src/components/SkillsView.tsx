@@ -44,15 +44,15 @@ import {
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
 
-// â”€â”€ localStorage keys â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── localStorage keys ─────────────────────────────────────────────────────────
 type GeneratedSkill = SkillCapsuleCatalogEntry & { generated: true };
 
-// â”€â”€ localStorage helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── localStorage helpers ──────────────────────────────────────────────────────
 
-// â”€â”€ Context overhead heuristic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€ TTL countdown helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€ Category pill colours â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€ ContextBudgetBar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Context overhead heuristic ────────────────────────────────────────────────
+// ── TTL countdown helper ──────────────────────────────────────────────────────
+// ── Category pill colours ─────────────────────────────────────────────────────
+// ── ContextBudgetBar ──────────────────────────────────────────────────────────
 function ContextBudgetBar(props: { pct: number }) {
   const colour = () =>
     props.pct >= 50 ? "bg-rose-400" : props.pct >= 30 ? "bg-amber-400" : "bg-emerald-400";
@@ -71,7 +71,7 @@ function ContextBudgetBar(props: { pct: number }) {
   );
 }
 
-// â”€â”€ DeactivateModal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── DeactivateModal ───────────────────────────────────────────────────────────
 function DeactivateModal(props: {
   skill: SkillCapsuleCatalogEntry;
   onConfirm: () => void;
@@ -122,7 +122,7 @@ function DeactivateModal(props: {
   );
 }
 
-// â”€â”€ SkillCard (Active tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SkillCard (Active tab) ────────────────────────────────────────────────────
 function ActiveSkillCard(props: {
   entry: SkillCapsuleCatalogEntry;
   activatedAt: number | undefined;
@@ -154,10 +154,10 @@ function ActiveSkillCard(props: {
             <span class="rounded-full border border-emerald-200/60 bg-emerald-50/60 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
               active
             </span>
-            {/* TTL countdown â€” only shown when < 20 min remaining */}
+            {/* TTL countdown — only shown when < 20 min remaining */}
             <Show when={countdown()}>
               <span class="rounded-full border border-amber-200/60 bg-amber-50/70 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                â± {countdown()}
+                ⏱ {countdown()}
               </span>
             </Show>
           </div>
@@ -189,7 +189,7 @@ function ActiveSkillCard(props: {
         class="mt-2.5 flex items-center gap-1 text-[11px] text-on-surface-variant/60 transition hover:text-on-surface-variant"
         onClick={props.onToggleHistory}
       >
-        <span>{props.expanded ? "â–²" : "â–¼"}</span>
+        <span>{props.expanded ? "▲" : "▼"}</span>
         <span>Activation history ({props.history.length})</span>
       </button>
       <Show when={props.expanded && props.history.length > 0}>
@@ -221,7 +221,7 @@ function ActiveSkillCard(props: {
   );
 }
 
-// â”€â”€ CatalogSkillCard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── CatalogSkillCard ──────────────────────────────────────────────────────────
 function CatalogSkillCard(props: {
   entry: SkillCapsuleCatalogEntry;
   active: boolean;
@@ -246,7 +246,7 @@ function CatalogSkillCard(props: {
         </span>
         <Show when={props.generated}>
           <span class="rounded-full border border-fuchsia-200/60 bg-fuchsia-50/80 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700">
-            âœ¨ Generated
+            ✨ Generated
           </span>
         </Show>
         <For each={(props.entry.tags ?? []).slice(0, 2)}>
@@ -287,7 +287,7 @@ function CatalogSkillCard(props: {
   );
 }
 
-// â”€â”€ AI Chat Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── AI Chat Bar ───────────────────────────────────────────────────────────────
 function AIChatBar(props: {
   onGenerate: (description: string) => Promise<void>;
   busy: boolean;
@@ -303,15 +303,15 @@ function AIChatBar(props: {
         onClick={() => setOpen((v) => !v)}
       >
         <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-lg">
-          âœ¨
+          ✨
         </span>
         <div>
           <p class="text-sm font-semibold text-primary">Create a custom skill capsule</p>
           <p class="text-xs text-on-surface-variant">
-            Describe what you want your agent to do â€” it will generate a skill for you.
+            Describe what you want your agent to do — it will generate a skill for you.
           </p>
         </div>
-        <span class="ml-auto text-sm text-primary/60">{open() ? "â–²" : "â–¼"}</span>
+        <span class="ml-auto text-sm text-primary/60">{open() ? "▲" : "▼"}</span>
       </button>
 
       <Show when={open()}>
@@ -345,7 +345,7 @@ function AIChatBar(props: {
   );
 }
 
-// â”€â”€ SkillsView â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SkillsView ────────────────────────────────────────────────────────────────
 export function SkillsView(props: { signedIn: boolean }) {
   const sessionUserId = readSession()?.user?.id ?? null;
   const [catalog, setCatalog] = createSignal<SkillCapsuleCatalogEntry[]>([]);
@@ -372,7 +372,7 @@ export function SkillsView(props: { signedIn: boolean }) {
   const [runtimeWarnings, setRuntimeWarnings] = createSignal<string[]>([]);
   const [saveMsg, setSaveMsg] = createSignal<string | null>(null);
 
-  // â”€â”€ Load catalog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Load catalog ──────────────────────────────────────────────────────────
   async function loadCatalog() {
     setLoading(true);
     setError(null);
@@ -404,7 +404,7 @@ export function SkillsView(props: { signedIn: boolean }) {
     await loadCatalog();
   });
 
-  // â”€â”€ Listen for external deactivation events (from thread cards, etc.) â”€â”€â”€â”€â”€â”€
+  // ── Listen for external deactivation events (from thread cards, etc.) ──────
   onMount(() => {
     const unsubscribeSkillDeactivation = subscribeSkillDeactivationEvent((detail) => {
       void doDeactivate(detail.skillId);
@@ -412,7 +412,7 @@ export function SkillsView(props: { signedIn: boolean }) {
     onCleanup(() => unsubscribeSkillDeactivation());
   });
 
-  // â”€â”€ Persist state helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Persist state helpers ─────────────────────────────────────────────────
   function recordActivation(skillId: string) {
     const times = { ...activationTimes(), [skillId]: Date.now() };
     setActivationTimes(times);
@@ -442,7 +442,7 @@ export function SkillsView(props: { signedIn: boolean }) {
     }
   }
 
-  // â”€â”€ Activate / deactivate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Activate / deactivate ─────────────────────────────────────────────────
   async function doActivate(skillId: string) {
     const next = [...activeIds(), skillId];
     setSaving(true);
@@ -495,7 +495,7 @@ export function SkillsView(props: { signedIn: boolean }) {
     setTimeout(() => setSaveMsg(null), 2500);
   }
 
-  // â”€â”€ Toggle history panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Toggle history panel ──────────────────────────────────────────────────
   function toggleHistory(skillId: string) {
     setExpandedHistory((prev) => {
       const next = new Set(prev);
@@ -505,7 +505,7 @@ export function SkillsView(props: { signedIn: boolean }) {
     });
   }
 
-  // â”€â”€ Profiles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Profiles ──────────────────────────────────────────────────────────────
   function saveProfile() {
     const name = profileNameInput().trim();
     if (!name) return;
@@ -571,7 +571,7 @@ export function SkillsView(props: { signedIn: boolean }) {
     saveProfiles(updated, sessionUserId);
   }
 
-  // â”€â”€ AI skill generation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── AI skill generation ───────────────────────────────────────────────────
   async function handleGenerate(description: string) {
     setGenerateBusy(true);
     setActionError(null);
@@ -580,7 +580,7 @@ export function SkillsView(props: { signedIn: boolean }) {
       if (result?.entry) {
         setGeneratedSkills((prev) => [...prev, { ...result.entry, generated: true }]);
         setActiveTab("catalog");
-        showSaveMsg("Skill capsule generated â€” review and activate below");
+        showSaveMsg("Skill capsule generated — review and activate below");
       }
     } catch (err) {
       setActionError(
@@ -590,13 +590,13 @@ export function SkillsView(props: { signedIn: boolean }) {
         ),
       );
       return;
-      showSaveMsg("Skill capsule created â€” review and activate below");
+      showSaveMsg("Skill capsule created — review and activate below");
     } finally {
       setGenerateBusy(false);
     }
   }
 
-  // â”€â”€ Derived state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Derived state ─────────────────────────────────────────────────────────
   const allCatalogEntries = createMemo(() => [
     ...new Map(
       [...generatedSkills(), ...catalog()].map((entry) => [entry.id, entry]),
@@ -635,7 +635,7 @@ export function SkillsView(props: { signedIn: boolean }) {
 
   return (
     <div class="space-y-5">
-      {/* â”€â”€ Header â”€â”€ */}
+      {/* ── Header ── */}
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 class="text-xl font-bold text-on-surface">Skill Capsules</h1>
@@ -650,7 +650,7 @@ export function SkillsView(props: { signedIn: boolean }) {
         </Show>
       </div>
 
-      {/* â”€â”€ Stats row â”€â”€ */}
+      {/* ── Stats row ── */}
       <Show when={!loading() && !error()}>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
@@ -671,10 +671,10 @@ export function SkillsView(props: { signedIn: boolean }) {
         </div>
       </Show>
 
-      {/* â”€â”€ Loading / error â”€â”€ */}
+      {/* ── Loading / error ── */}
       <Show when={loading()}>
         <div class="rounded-2xl border border-white/40 bg-white/25 p-8 text-center text-sm text-on-surface-variant">
-          Loading skill catalogâ€¦
+          Loading skill catalog…
         </div>
       </Show>
       <Show when={error()}>
@@ -702,7 +702,7 @@ export function SkillsView(props: { signedIn: boolean }) {
         </div>
       </Show>
 
-      {/* â”€â”€ Tabs â”€â”€ */}
+      {/* ── Tabs ── */}
       <Show when={!loading() && !error()}>
         <Show when={actionError()}>
           <div
@@ -771,7 +771,7 @@ export function SkillsView(props: { signedIn: boolean }) {
           ))}
         </div>
 
-        {/* â”€â”€ Active tab â”€â”€ */}
+        {/* ── Active tab ── */}
         <Show when={activeTab() === "active"}>
         <Show when={activeEntries().length === 0}>
           <div class="rounded-2xl border border-white/40 bg-white/25 p-8 text-center">
@@ -835,7 +835,7 @@ export function SkillsView(props: { signedIn: boolean }) {
           {/* Overall overhead warning */}
           <Show when={totalOverhead() > 50}>
             <div class="rounded-xl border border-amber-200/60 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-800">
-              <strong>High context overhead ({totalOverhead()}%)</strong> â€” consider deactivating unused skills
+              <strong>High context overhead ({totalOverhead()}%)</strong> — consider deactivating unused skills
               to keep the agent's context window efficient.
             </div>
           </Show>
@@ -856,13 +856,13 @@ export function SkillsView(props: { signedIn: boolean }) {
           </div>
         </Show>
 
-        {/* â”€â”€ Catalog tab â”€â”€ */}
+        {/* ── Catalog tab ── */}
         <Show when={activeTab() === "catalog"}>
           {/* Search + filter bar */}
           <div class="flex flex-wrap items-center gap-2">
             <input
               type="search"
-              placeholder="Search skills by name, description or tagâ€¦"
+              placeholder="Search skills by name, description or tag…"
               class="flex-1 min-w-[200px] rounded-xl border border-white/50 bg-white/40 px-4 py-2 text-sm text-on-surface placeholder-on-surface-variant/40 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
@@ -926,7 +926,7 @@ export function SkillsView(props: { signedIn: boolean }) {
           </div>
         </Show>
 
-        {/* â”€â”€ Profiles tab â”€â”€ */}
+        {/* ── Profiles tab ── */}
         <Show when={activeTab() === "profiles"}>
           {/* Save current as profile */}
           <div class="rounded-2xl border border-white/40 bg-white/30 p-4">
@@ -980,7 +980,7 @@ export function SkillsView(props: { signedIn: boolean }) {
                       <p class="text-sm font-semibold text-on-surface">{profile.name}</p>
                       <p class="mt-0.5 text-xs text-on-surface-variant">
                         {profile.skill_ids.length} skill{profile.skill_ids.length !== 1 ? "s" : ""}
-                        {" Â· "}
+                        {" · "}
                         Saved {skillProfileSavedDateLabel(profile.created_at)}
                       </p>
                       <div class="mt-2 flex flex-wrap gap-1">
@@ -1026,7 +1026,7 @@ export function SkillsView(props: { signedIn: boolean }) {
         </Show>
       </Show>
 
-      {/* â”€â”€ Deactivate confirmation modal â”€â”€ */}
+      {/* ── Deactivate confirmation modal ── */}
       <Show when={confirmDeactivate() && confirmEntry()}>
         <DeactivateModal
           skill={confirmEntry()!}

@@ -84,7 +84,7 @@ export function buildTemplateCatalogState(input: {
       description: weddingEntry.description,
       category: "life_event",
       icon: "Wedding",
-      tags: ["Documents", "Key details", "Calendar", "Approvals"],
+      tags: ["Documents", "Need-To-Know", "Calendar", "Approvals"],
       viewTarget: "response_queue",
       estimatedTime: "Under 60 sec",
       featured: true,

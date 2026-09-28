@@ -284,7 +284,7 @@ else
   RUNTIME_ROOT="/srv/omnyid/$SLUG"
 fi
 
-MINIO_ROOT_PASSWORD="$(openssl rand -hex 18)"
+SEAWEEDFS_ROOT_PASSWORD="$(openssl rand -hex 18)"
 TENANT_KEY_REF="omnyid/$SLUG/data-key"
 
 write_file "$BUNDLE_PATH/.env.private" \
@@ -312,8 +312,8 @@ write_file "$BUNDLE_PATH/.env.private" \
   "OMNYID_RUNTIME_ROOT=$RUNTIME_ROOT" \
   "OMNYID_TENANT_KEY_REF=$TENANT_KEY_REF" \
   "OMNYID_SUPPORT_ACCESS=disabled_by_default" \
-  "MINIO_ROOT_USER=omnyid_$SLUG" \
-  "MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD" \
+  "SEAWEEDFS_ROOT_USER=omnyid_$SLUG" \
+  "SEAWEEDFS_ROOT_PASSWORD=$SEAWEEDFS_ROOT_PASSWORD" \
   "OMNYID_MAIL_PROVIDER=optional_human_inbox_bridge" \
   "OMNYID_GMAIL_CLIENT_ID=__OPTIONAL__" \
   "OMNYID_GMAIL_CLIENT_SECRET=__OPTIONAL__" \

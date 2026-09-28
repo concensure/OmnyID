@@ -334,11 +334,11 @@ export function PreparedDraftSurface(props: PreparedDraftSurfaceProps) {
                     </span>
                   </div>
                   {/* The whole card is the click target (data-magic-action="open" above), but nothing
-                      previously signaled that or where the primary action was â€” this makes it explicit. */}
+                      previously signaled that or where the primary action was — this makes it explicit. */}
                   <div class="mt-3 flex justify-end">
                     <span class={`inline-flex items-center gap-1.5 rounded-full bg-emerald-700 font-semibold text-white shadow-sm transition group-hover:bg-emerald-800 ${surfaceState().compact ? "px-3 py-1.5 text-[11px]" : "px-4 py-2 text-xs"}`}>
                       {draftCardState.draftActionText}
-                      <span aria-hidden="true">â†’</span>
+                      <span aria-hidden="true">→</span>
                     </span>
                   </div>
                 </button>

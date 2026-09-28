@@ -7,10 +7,10 @@ const PDF_WORKER_SRC = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`;
 
 export type ConvertibleFormat = "docx" | "html" | "pdf" | "pptx" | "txt" | "md";
 
-/** 50 MB client-side guard â€” server also enforces 32 MB on the PDF path. */
+/** 50 MB client-side guard — server also enforces 32 MB on the PDF path. */
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
-/** Timeout for the server-side HTMLâ†’PDF fetch call (must outlast the 30 s node timeout). */
+/** Timeout for the server-side HTML→PDF fetch call (must outlast the 30 s node timeout). */
 const PDF_FETCH_TIMEOUT_MS = 40_000;
 
 export type ConversionResult = {
@@ -46,7 +46,7 @@ const EXT_FORMAT: Record<string, ConvertibleFormat> = {
   md: "md", markdown: "md",
 };
 
-// Ordered keyword patterns â†’ target format, matched against user query.
+// Ordered keyword patterns → target format, matched against user query.
 const INTENT_PATTERNS: Array<[RegExp, ConvertibleFormat]> = [
   [/\bto\s+(?:a\s+)?(?:word|docx?)\b/i, "docx"],
   [/\bto\s+(?:a\s+)?pdf\b/i, "pdf"],
@@ -117,7 +117,7 @@ function readAsText(file: File): Promise<string> {
   });
 }
 
-// â”€â”€ DOCX â†’ HTML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── DOCX → HTML ───────────────────────────────────────────────────────────────
 
 async function docxToHtml(file: File): Promise<string> {
   const mammoth = await import("mammoth");
@@ -126,7 +126,7 @@ async function docxToHtml(file: File): Promise<string> {
   return typeof result.value === "string" ? result.value : "";
 }
 
-// â”€â”€ HTML â†’ DOCX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── HTML → DOCX ───────────────────────────────────────────────────────────────
 
 // CGAP-010: walk the DOM recursively so nested sections, pre/code blocks,
 // and inline bold/italic are preserved in the DOCX output.
@@ -169,7 +169,7 @@ function collectDocxChildren(
     } else if (tag === "br") {
       out.push(new Paragraph({ children: [new TextRun({ break: 1 })] }));
     } else {
-      // container elements (div, section, article, blockquote, etc.) â€” recurse
+      // container elements (div, section, article, blockquote, etc.) — recurse
       out.push(...collectDocxChildren(el, docx));
     }
   }
@@ -216,7 +216,7 @@ async function htmlToDocx(html: string): Promise<Blob> {
   return Packer.toBlob(wordDoc);
 }
 
-// â”€â”€ HTML â†’ PPTX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── HTML → PPTX ──────────────────────────────────────────────────────────────
 
 interface SlideChunk { heading: string; body: string; }
 
@@ -279,7 +279,7 @@ async function htmlToPptx(html: string, title: string): Promise<Blob> {
   return new Blob([buf], { type: FORMAT_MIME.pptx });
 }
 
-// â”€â”€ PDF â†’ text â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── PDF → text ────────────────────────────────────────────────────────────────
 
 async function pdfToText(file: File): Promise<string> {
   const pdfjs = await import("pdfjs-dist");
@@ -299,7 +299,7 @@ async function pdfToText(file: File): Promise<string> {
   return pages.join("\n\n");
 }
 
-// â”€â”€ HTML â†’ PDF (server-side via Playwright) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── HTML → PDF (server-side via Playwright) ────────────────────────────────
 
 async function htmlToPdf(html: string, apiBase: string): Promise<Blob> {
   const controller = new AbortController();
@@ -318,14 +318,14 @@ async function htmlToPdf(html: string, apiBase: string): Promise<Blob> {
         throw new Error("File is too large for PDF conversion (max 32 MB)");
       }
       if (res.status === 504) {
-        throw new Error("PDF generation timed out â€” the document may be too complex");
+        throw new Error("PDF generation timed out — the document may be too complex");
       }
       throw new Error(`PDF conversion failed (${res.status}): ${text}`);
     }
     return res.blob();
   } catch (err) {
     if ((err as Error).name === "AbortError") {
-      throw new Error("PDF request timed out â€” try a smaller document");
+      throw new Error("PDF request timed out — try a smaller document");
     }
     throw err;
   } finally {
@@ -333,7 +333,7 @@ async function htmlToPdf(html: string, apiBase: string): Promise<Blob> {
   }
 }
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function wrapInHtmlDoc(text: string): string {
   const escaped = text
@@ -343,7 +343,7 @@ function wrapInHtmlDoc(text: string): string {
   return `<!DOCTYPE html><html><body><pre style="font-family:sans-serif;white-space:pre-wrap">${escaped}</pre></body></html>`;
 }
 
-// â”€â”€ Main conversion entry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main conversion entry ─────────────────────────────────────────────────────
 
 export async function convertFile(
   file: File,
@@ -352,17 +352,17 @@ export async function convertFile(
 ): Promise<ConversionResult> {
   if (file.size > MAX_FILE_BYTES) {
     throw new Error(
-      `File too large: ${(file.size / 1024 / 1024).toFixed(1)} MB â€” maximum is ${MAX_FILE_BYTES / 1024 / 1024} MB`,
+      `File too large: ${(file.size / 1024 / 1024).toFixed(1)} MB — maximum is ${MAX_FILE_BYTES / 1024 / 1024} MB`,
     );
   }
   if (file.size === 0) {
-    throw new Error("File is empty â€” nothing to convert");
+    throw new Error("File is empty — nothing to convert");
   }
 
   const sourceFormat = detectFormat(file);
   if (!sourceFormat) {
     throw new Error(
-      `Unsupported file type: ".${file.name.split(".").pop() ?? "?"}" â€” ` +
+      `Unsupported file type: ".${file.name.split(".").pop() ?? "?"}" — ` +
       "supported types are DOCX, PDF, TXT, MD, HTML",
     );
   }
@@ -387,7 +387,7 @@ export async function convertFile(
     } else if (targetFormat === "pptx") {
       blob = await htmlToPptx(html, name);
     } else {
-      throw new Error(`Cannot convert DOCX â†’ ${targetFormat}`);
+      throw new Error(`Cannot convert DOCX → ${targetFormat}`);
     }
 
   } else if (sourceFormat === "pdf") {
@@ -401,7 +401,7 @@ export async function convertFile(
     } else if (targetFormat === "pptx") {
       blob = await htmlToPptx(wrapInHtmlDoc(text), name);
     } else {
-      throw new Error(`Cannot convert PDF â†’ ${targetFormat}`);
+      throw new Error(`Cannot convert PDF → ${targetFormat}`);
     }
 
   } else if (sourceFormat === "txt" || sourceFormat === "md") {
@@ -419,7 +419,7 @@ export async function convertFile(
       blob = new Blob([text], { type: FORMAT_MIME[targetFormat] });
       ext = targetFormat;
     } else {
-      throw new Error(`Cannot convert ${sourceFormat} â†’ ${targetFormat}`);
+      throw new Error(`Cannot convert ${sourceFormat} → ${targetFormat}`);
     }
 
   } else if (sourceFormat === "html") {
@@ -434,7 +434,7 @@ export async function convertFile(
       const doc = new DOMParser().parseFromString(html, "text/html");
       blob = new Blob([doc.body.innerText], { type: FORMAT_MIME[targetFormat] });
     } else {
-      throw new Error(`Cannot convert HTML â†’ ${targetFormat}`);
+      throw new Error(`Cannot convert HTML → ${targetFormat}`);
     }
 
   } else {
@@ -444,7 +444,7 @@ export async function convertFile(
   return { blob: blob!, filename: `${name}.${ext}`, mimeType: FORMAT_MIME[targetFormat] };
 }
 
-// â”€â”€ Supported conversion matrix â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Supported conversion matrix ───────────────────────────────────────────────
 
 const SUPPORTED: Partial<Record<ConvertibleFormat, ConvertibleFormat[]>> = {
   docx: ["html", "txt", "md", "pdf", "pptx"],

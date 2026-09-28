@@ -34,10 +34,10 @@ function buildContextLabel(
     return `${courseTags[0]} / ${unitTags[0]}`;
   }
   if (courseTags.length === 1 && weekTags.length === 1 && lectureTags.length === 1) {
-    return `${courseTags[0]} Â· ${weekTags[0]} Â· ${lectureTags[0]}`;
+    return `${courseTags[0]} · ${weekTags[0]} · ${lectureTags[0]}`;
   }
   if (courseTags.length === 1 && weekTags.length === 1) {
-    return `${courseTags[0]} Â· ${weekTags[0]}`;
+    return `${courseTags[0]} · ${weekTags[0]}`;
   }
   if (courseTags.length === 1) return courseTags[0] ?? null;
   if (chapterTags.length === 1) return chapterTags[0] ?? null;

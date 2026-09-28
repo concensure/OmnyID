@@ -226,7 +226,7 @@ $delegation = switch ($Mode) {
     "local" { "127.0.0.1:8080" }
     default { "api.omnyid.com:443" }
 }
-$minioPassword = New-HexSecret
+$seaweedfsPassword = New-HexSecret
 $tenantKeyRef = "omnyid/$slug/data-key"
 $privacyMode = if ($Mode -eq "local") {
     "local_private"
@@ -266,8 +266,8 @@ $envLines = @(
     "OMNYID_RUNTIME_ROOT=$runtimeRoot",
     "OMNYID_TENANT_KEY_REF=$tenantKeyRef",
     "OMNYID_SUPPORT_ACCESS=disabled_by_default",
-    "MINIO_ROOT_USER=omnyid_$slug",
-    "MINIO_ROOT_PASSWORD=$minioPassword",
+    "SEAWEEDFS_ROOT_USER=omnyid_$slug",
+    "SEAWEEDFS_ROOT_PASSWORD=$seaweedfsPassword",
     "OMNYID_MAIL_PROVIDER=optional_human_inbox_bridge",
     "OMNYID_GMAIL_CLIENT_ID=__OPTIONAL__",
     "OMNYID_GMAIL_CLIENT_SECRET=__OPTIONAL__",

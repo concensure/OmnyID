@@ -1,7 +1,7 @@
 ﻿// @locs-version: 1.0
-// Daily Intelligence Brief â€” full-width ambient morning panel for the home workspace.
+// Daily Intelligence Brief — full-width ambient morning panel for the home workspace.
 // Distinct from Decision Queue (action-required) and Response Queue (reply-required).
-// This is ambient, readable, and calming â€” one offer max, qualitative goal pulse only.
+// This is ambient, readable, and calming — one offer max, qualitative goal pulse only.
 import { createEffect, createSignal, For, onMount, Show } from "solid-js";
 import {
   type BriefApiResponse,
@@ -32,28 +32,28 @@ import {
 } from "@/lib/intelligenceBriefViewState";
 import type { GoalDomain } from "@/lib/profileLedger";
 
-// â”€â”€â”€ Settings storage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€â”€ Momentum labels for goal pulse (no scores/streaks) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Settings storage ─────────────────────────────────────────────────────────
+// ─── Momentum labels for goal pulse (no scores/streaks) ───────────────────────
 const GOAL_DOMAIN_ICONS: Record<GoalDomain, string> = {
-  career: "ðŸ’¼", finance: "ðŸ’°", health: "ðŸƒ", relationships: "â¤ï¸",
-  personal_growth: "ðŸŒ±", creativity: "ðŸŽ¨", community: "ðŸ¤", lifestyle: "âœ¨", other: "â—†",
+  career: "💼", finance: "💰", health: "🏃", relationships: "❤️",
+  personal_growth: "🌱", creativity: "🎨", community: "🤝", lifestyle: "✨", other: "◆",
 };
 
 const MOMENTUM_LABELS: Record<Momentum, string> = {
   building: "building", steady: "steady", quiet: "quiet", paused: "paused", recent: "recent",
 };
 
-// â”€â”€â”€ Section icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Section icons ────────────────────────────────────────────────────────────
 const SECTION_ICONS: Record<BriefSectionType, string> = {
-  context:    "ðŸ“…",
-  goal_pulse: "ðŸŽ¯",
-  ambient:    "ðŸŒ",
-  peripheral: "âœ¨",
-  agent_offer:"ðŸ¤–",
+  context:    "📅",
+  goal_pulse: "🎯",
+  ambient:    "🌐",
+  peripheral: "✨",
+  agent_offer:"🤖",
 };
 
-// â”€â”€â”€ API types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€â”€ Settings dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── API types ────────────────────────────────────────────────────────────────
+// ─── Settings dropdown ────────────────────────────────────────────────────────
 function BriefSettingsMenu(props: {
   settings: BriefSettings;
   onChange: (s: BriefSettings) => void;
@@ -88,7 +88,7 @@ function BriefSettingsMenu(props: {
   );
 }
 
-// â”€â”€â”€ Goal pulse pills â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Goal pulse pills ─────────────────────────────────────────────────────────
 function GoalPulsePill(props: { item: GoalPulseItem }) {
   return (
     <div class="flex items-center gap-1.5 rounded-full border border-white/60 bg-white/70 px-3 py-1.5 text-xs shadow-sm">
@@ -100,7 +100,7 @@ function GoalPulsePill(props: { item: GoalPulseItem }) {
   );
 }
 
-// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main component ───────────────────────────────────────────────────────────
 export function IntelligenceBrief(props: { onOpenView?: (view: ViewName) => void; signedIn?: boolean }) {
   const [settings, setSettings] = createSignal(loadBriefSettings());
   const [brief, setBrief] = createSignal<BriefApiResponse | null>(null);
@@ -271,7 +271,7 @@ export function IntelligenceBrief(props: { onOpenView?: (view: ViewName) => void
           onClick={() => setCollapsed((v) => !v)}
           class="flex flex-1 items-center gap-2 min-w-0 text-left outline-none"
         >
-          <span class="text-lg leading-none" aria-hidden>â˜€ï¸</span>
+          <span class="text-lg leading-none" aria-hidden>☀️</span>
           <div class="min-w-0">
             <p class="text-xs font-semibold text-on-surface">
               {brief()?.greeting ?? `Good ${getTimeOfDay()}, here's your day`}
@@ -302,7 +302,7 @@ export function IntelligenceBrief(props: { onOpenView?: (view: ViewName) => void
               title="Brief settings"
               aria-label="Brief settings"
             >
-              âš™
+              ⚙
             </button>
             <Show when={showSettings()}>
               <BriefSettingsMenu
@@ -319,7 +319,7 @@ export function IntelligenceBrief(props: { onOpenView?: (view: ViewName) => void
             class="flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant/50 transition hover:bg-on-surface/8 hover:text-on-surface text-xs"
             title={collapsed() ? "Expand" : "Collapse"}
           >
-            {collapsed() ? "â–¾" : "â–´"}
+            {collapsed() ? "▾" : "▴"}
           </button>
         </div>
       </div>
@@ -427,7 +427,7 @@ export function IntelligenceBrief(props: { onOpenView?: (view: ViewName) => void
                         class="flex w-full items-center gap-2 text-left outline-none"
                       >
                         <span class="text-sm leading-none flex-shrink-0" aria-hidden>
-                          {SECTION_ICONS[section.type as BriefSectionType] ?? "â—"}
+                          {SECTION_ICONS[section.type as BriefSectionType] ?? "●"}
                         </span>
                         <div class="flex-1 min-w-0">
                           <p class={`text-xs font-semibold ${isOffer() ? "text-primary" : "text-on-surface"}`}>
@@ -438,7 +438,7 @@ export function IntelligenceBrief(props: { onOpenView?: (view: ViewName) => void
                           </p>
                         </div>
                         <Show when={!isOffer() && section.body.length >= 100}>
-                          <span class="text-[10px] text-on-surface-variant/50 flex-shrink-0">{isExpanded() ? "â–´" : "â–¾"}</span>
+                          <span class="text-[10px] text-on-surface-variant/50 flex-shrink-0">{isExpanded() ? "▴" : "▾"}</span>
                         </Show>
                       </button>
                       <Show when={isOffer() && section.action}>
@@ -470,7 +470,7 @@ function getTimeOfDay(): string {
   return "evening";
 }
 
-// â”€â”€â”€ Tile settings menu (shared pattern for all home tiles) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tile settings menu (shared pattern for all home tiles) ───────────────────
 // Used by BentoGrid tiles to expose a gear icon with at least one setting.
 export interface TileSettings {
   enabled: boolean;
@@ -517,7 +517,7 @@ export function TileSettingsButton(props: {
         aria-label="Tile settings"
         title="Settings"
       >
-        âš™
+        ⚙
       </button>
       <Show when={open()}>
         <>

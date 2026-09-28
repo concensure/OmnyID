@@ -36,90 +36,55 @@ import {
   onMount,
   Show,
 } from "solid-js";
-import * as d3 from "d3";
+import { recordShortcutUse } from "@/lib/shortcutRecency";
 import {
   sendNoteMessage,
+  fetchThread,
+  subscribeThread,
   type AfpMessage,
   type FolderRulePayload,
   type AreaRulesPayload,
+  type NoteContentPayload,
 } from "@/lib/api";
+import type { Area, BacklinkRef, Folder, Note } from "@/lib/noteDomain";
+import { noteRelativeTime } from "@/lib/noteRelativeTime";
+import { afpRecord } from "@/lib/afpMessageRecord";
+import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import {
+  afpNoteFromMessage,
+  areaFromRuleMessage,
+  folderFromRuleMessage,
+  noteFromAfpMessage,
+  notePreviewFromBody,
+  noteStringArray,
+  noteTagUpdateFromMessage,
+  resolveNoteTags,
+  type NoteTagUpdate,
+} from "@/lib/noteViewState";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 1 — Data model
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type NoteBlockType =
-  | "paragraph"
-  | "heading"
-  | "image"
-  | "ocr"
-  | "3d";
-
-export interface NoteBlock {
-  type: NoteBlockType;
-  text?: string;
-  url?: string;
-  ocrText?: string;
-  ocrConfidence?: number; // 0–1
-  modelUrl?: string;      // for 3d blocks
+function backlinkTargetExists(backlink: BacklinkRef, notes: Note[]): boolean {
+  return notes.some((note) => note.id === backlink.targetId);
 }
 
-export interface BacklinkRef {
-  targetId: string;
-  targetTitle: string;
-  relation: string;
-}
-
-export interface Note {
-  id: string;
+interface NoteDraft {
   title: string;
-  preview: string;          // first 2 lines / summary
-  blocks: NoteBlock[];
-  summary: string;
-  tags: string[];
-  supertags: string[];
-  backlinks: BacklinkRef[];
-  updatedAt: string;        // ISO string
-  createdAt: string;
-  folderId?: string;
-  areaId?: string;
-  metadata: {
-    hasVoice?: boolean;
-    hasImage?: boolean;
-    hasOcr?: boolean;
-    has3d?: boolean;
-  };
+  body: string;
 }
+type NoteSaveState = {
+  state: "idle" | "saving" | "saved" | "warning" | "error";
+  message?: string;
+  savedAt?: string;
+};
 
-/** A named folder in the sidebar. */
-export interface Folder {
-  id: string;
-  name: string;
-  /** Area this folder belongs to, if any. */
-  areaId?: string;
-  /** Latest folder_rule AFP message content, if set. */
-  rule?: FolderRulePayload;
-}
-
-/** An area grouping that can span multiple folders. */
-export interface Area {
-  id: string;
-  /** Latest area_rules AFP message content. */
-  rules: AreaRulesPayload;
-}
-
-/** A tag_update AFP message content, used by the client-side resolver. */
-interface TagUpdateMsg {
-  /** AFP message id of the tag_update. */
-  updateId: string;
-  /** AFP message id of the original note being updated. */
-  sourceId: string;
-  timestamp: string;
-  removeTags: string[];
-  addTags: string[];
-  removeSupertags: string[];
-  addSupertags: string[];
-}
+type NotePersistedMeta = {
+  threadId: string;
+  messageId: string;
+  savedAt: string;
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Seed demo data so the view is never empty
@@ -230,12 +195,12 @@ const DEMO_NOTES: Note[] = [
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function relativeTime(iso: string): string {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+function noteBodyFromBlocks(note: Note): string {
+  const blockText = note.blocks
+    .map((block) => block.text?.trim() || block.ocrText?.trim() || "")
+    .filter(Boolean)
+    .join("\n\n");
+  return blockText || note.summary || note.preview || "";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -290,6 +255,8 @@ function NoteTopBar(props: {
   onNewNote: (kind: "text" | "voice" | "camera" | "handwriting") => void;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  focusMode: boolean;
+  onToggleFocus: () => void;
 }) {
   const [showNewMenu, setShowNewMenu] = createSignal(false);
 
@@ -357,7 +324,7 @@ function NoteTopBar(props: {
             <path d="M10.5 10.5 14 14" stroke={TOKEN.textSecondary} stroke-width="1.5" stroke-linecap="round" />
           </svg>
           <input
-            type="search"
+            type="text"
             placeholder="Search notes, tags, OCR text…"
             value={props.query}
             onInput={(e) => props.onQuery(e.currentTarget.value)}
@@ -426,6 +393,36 @@ function NoteTopBar(props: {
           );
         })}
       </div>
+
+      {/* Focus mode toggle */}
+      <button
+        aria-label={props.focusMode ? "Exit focus mode" : "Enter focus mode (distraction-free writing)"}
+        onClick={props.onToggleFocus}
+        title={props.focusMode ? "Exit focus mode" : "Focus mode — hide all navigation"}
+        style={{
+          "min-width": TOKEN.touchTarget,
+          "min-height": TOKEN.touchTarget,
+          display: "flex",
+          "align-items": "center",
+          "justify-content": "center",
+          background: props.focusMode ? TOKEN.accent : "transparent",
+          border: props.focusMode ? "none" : `1px solid ${TOKEN.border}`,
+          cursor: "pointer",
+          "border-radius": TOKEN.radius.button,
+          color: props.focusMode ? "#fff" : TOKEN.textSecondary,
+          transition: TOKEN.transition,
+          "flex-shrink": "0",
+        }}
+      >
+        <svg width="1em" height="1em" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden>
+          <Show when={!props.focusMode}>
+            <path d="M1 1h4M11 1h4M1 15h4M11 15h4M1 1v4M15 1v4M1 15v-4M15 15v-4" />
+          </Show>
+          <Show when={props.focusMode}>
+            <path d="M5 1H1v4M11 1h4v4M5 15H1v-4M11 15h4v-4" />
+          </Show>
+        </svg>
+      </button>
 
       {/* New Note button + popover — Phase 4 */}
       <div style={{ position: "relative", "flex-shrink": "0" }}>
@@ -532,6 +529,25 @@ function NoteLeftSidebar(props: {
   onSetAreaRule: (area?: Area) => void;
 }) {
   const [folderCtx, setFolderCtx] = createSignal<Folder | null>(null);
+  const prioritySupertags = [
+    "Profile",
+    "People",
+    "Relationships",
+    "Objectives",
+    "Values",
+    "Knowledge",
+    "Work",
+    "Life",
+    "Infrastructure",
+  ];
+  const visibleSupertags = createMemo(() => {
+    const available = new Set(props.allSupertags);
+    const ordered = prioritySupertags.filter((tag) => available.has(tag));
+    const remaining = props.allSupertags
+      .filter((tag) => !prioritySupertags.includes(tag))
+      .sort((a, b) => a.localeCompare(b));
+    return [...ordered, ...remaining].slice(0, 12);
+  });
 
   const navItems = [
     { id: "all", label: "All Notes", icon: "≡" },
@@ -615,6 +631,24 @@ function NoteLeftSidebar(props: {
         </div>
       </Show>
 
+      <Show when={props.open && visibleSupertags().length > 0}>
+        <div style={{ padding: `${TOKEN.gap.section} ${TOKEN.padding.sidebar} 0` }}>
+          <p style={{ "font-size": "0.6875em", "font-weight": "600", "letter-spacing": "0.1em", "text-transform": "uppercase", color: TOKEN.textSecondary, margin: "0 0 0.5em" }}>Seeded domains</p>
+          <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.375em" }}>
+            <For each={visibleSupertags()}>
+              {(tag) => (
+                <button
+                  onClick={() => props.onFilter(`supertag:${tag}`)}
+                  style={{ padding: "0.25em 0.625em", background: props.activeFilter === `supertag:${tag}` ? TOKEN.accent : TOKEN.bg, color: props.activeFilter === `supertag:${tag}` ? "#fff" : TOKEN.textSecondary, border: `1px solid ${TOKEN.border}`, "border-radius": "9999px", "font-size": "0.8125em", cursor: "pointer", transition: TOKEN.transition, "font-family": "Inter, system-ui, sans-serif", "min-height": TOKEN.touchTarget, display: "flex", "align-items": "center" }}
+                  onFocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `2px solid ${TOKEN.accent}`; }}
+                  onBlur={(e) => { (e.currentTarget as HTMLElement).style.outline = "none"; }}
+                >{tag}</button>
+              )}
+            </For>
+          </div>
+        </div>
+      </Show>
+
       {/* Folders */}
       <Show when={props.open}>
         <div style={{ padding: `${TOKEN.gap.section} ${TOKEN.padding.sidebar} 0` }}>
@@ -623,7 +657,12 @@ function NoteLeftSidebar(props: {
           </div>
           <div style={{ display: "flex", "flex-direction": "column", gap: "0.125em" }}>
             <For each={props.folders} fallback={
-              <p style={{ "font-size": "0.8125em", color: TOKEN.textSecondary, margin: 0 }}>No folders yet</p>
+              <div style={{ display: "flex", "flex-direction": "column", gap: "0.4em", padding: "0.25em 0.625em" }}>
+                <p style={{ "font-size": "0.8125em", color: TOKEN.textSecondary, margin: 0 }}>No folders yet</p>
+                <p style={{ "font-size": "0.75em", color: TOKEN.textSecondary, margin: 0, "line-height": 1.5 }}>
+                  Folder groups appear when notes are organized into recurring buckets.
+                </p>
+              </div>
             }>
               {(folder) => {
                 const isActive = () => props.activeFilter === `folder:${folder.id}`;
@@ -675,7 +714,27 @@ function NoteLeftSidebar(props: {
           </div>
           <div style={{ display: "flex", "flex-direction": "column", gap: "0.125em" }}>
             <For each={props.areas} fallback={
-              <p style={{ "font-size": "0.8125em", color: TOKEN.textSecondary, margin: 0 }}>No areas yet</p>
+              <div style={{ display: "flex", "flex-direction": "column", gap: "0.45em", padding: "0.25em 0.625em" }}>
+                <p style={{ "font-size": "0.8125em", color: TOKEN.textSecondary, margin: 0 }}>No areas yet</p>
+                <button
+                  type="button"
+                  onClick={() => props.onSetAreaRule(undefined)}
+                  style={{
+                    width: "fit-content",
+                    border: `1px solid ${TOKEN.border}`,
+                    background: TOKEN.bg,
+                    color: TOKEN.text,
+                    "border-radius": "9999px",
+                    padding: "0.35em 0.7em",
+                    cursor: "pointer",
+                    "font-size": "0.75em",
+                    "font-weight": 600,
+                    "min-height": TOKEN.touchTarget,
+                  }}
+                >
+                  Create area rule
+                </button>
+              </div>
             }>
               {(area) => {
                 const isActive = () => props.activeFilter === `area:${area.id}`;
@@ -808,7 +867,7 @@ function NoteListCard(props: {
           </span>
         </Show>
         <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary, "white-space": "nowrap" }}>
-          {relativeTime(props.note.updatedAt)}
+          {noteRelativeTime(props.note.updatedAt)}
         </span>
       </div>
 
@@ -953,7 +1012,7 @@ function NoteGridCard(props: {
           </For>
         </div>
         <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary, "white-space": "nowrap" }}>
-          {relativeTime(props.note.updatedAt)}
+          {noteRelativeTime(props.note.updatedAt)}
         </span>
       </div>
     </article>
@@ -961,161 +1020,104 @@ function NoteGridCard(props: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Phase 6 — Knowledge Graph (D3 force simulation)
+// Phase 6 — Knowledge Graph
 // ─────────────────────────────────────────────────────────────────────────────
-
-interface GraphNode extends d3.SimulationNodeDatum {
-  id: string;
-  title: string;
-  supertag?: string;
-}
-
-interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
-  relation: string;
-}
 
 function NoteGraphView(props: {
   notes: Note[];
   onSelectNote: (id: string) => void;
   selectedId: string | null;
 }) {
-  let svgRef!: SVGSVGElement;
-  let containerRef!: HTMLDivElement;
-
-  onMount(() => {
-    const W = containerRef.clientWidth || 700;
-    const H = containerRef.clientHeight || 480;
-
-    const nodes: GraphNode[] = props.notes.map((n) => ({
-      id: n.id,
-      title: n.title,
-      supertag: n.supertags[0],
-    }));
-
-    const links: GraphLink[] = props.notes.flatMap((n) =>
-      n.backlinks.map((bl) => ({
-        source: n.id,
-        target: bl.targetId,
-        relation: bl.relation,
-      }))
-    );
-
-    const svg = d3.select(svgRef);
-    svg.selectAll("*").remove();
-
-    const defs = svg.append("defs");
-    defs.append("marker")
-      .attr("id", "arrow")
-      .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 22)
-      .attr("markerWidth", 6)
-      .attr("markerHeight", 6)
-      .attr("orient", "auto")
-      .append("path")
-      .attr("d", "M0,-5L10,0L0,5")
-      .attr("fill", TOKEN.border);
-
-    const simulation = d3.forceSimulation<GraphNode>(nodes)
-      .force("link", d3.forceLink<GraphNode, GraphLink>(links).id((d) => d.id).distance(110))
-      .force("charge", d3.forceManyBody().strength(-260))
-      .force("center", d3.forceCenter(W / 2, H / 2))
-      .force("collision", d3.forceCollide(40));
-
-    const g = svg.append("g");
-
-    // Zoom + pan
-    svg.call(
-      d3.zoom<SVGSVGElement, unknown>()
-        .scaleExtent([0.3, 3])
-        .on("zoom", (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
-          g.attr("transform", String(event.transform));
-        })
-    );
-
-    const link = g.append("g")
-      .selectAll<SVGLineElement, GraphLink>("line")
-      .data(links)
-      .join("line")
-      .attr("stroke", TOKEN.border)
-      .attr("stroke-width", 1.5)
-      .attr("marker-end", "url(#arrow)");
-
-    const node = g.append("g")
-      .selectAll<SVGGElement, GraphNode>("g")
-      .data(nodes)
-      .join("g")
-      .style("cursor", "pointer")
-      .on("click", (_event, d) => props.onSelectNote(d.id))
-      .call(
-        d3.drag<SVGGElement, GraphNode>()
-          .on("start", (event, d) => {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-          })
-          .on("drag", (event, d) => {
-            d.fx = event.x;
-            d.fy = event.y;
-          })
-          .on("end", (event, d) => {
-            if (!event.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-          })
-      );
-
-    node.append("circle")
-      .attr("r", 18)
-      .attr("fill", (d) => d.id === props.selectedId ? TOKEN.accent : TOKEN.surface)
-      .attr("stroke", (d) => d.id === props.selectedId ? TOKEN.accent : TOKEN.border)
-      .attr("stroke-width", (d) => d.id === props.selectedId ? 2.5 : 1.5);
-
-    node.append("text")
-      .attr("text-anchor", "middle")
-      .attr("dy", "0.35em")
-      .attr("font-size", "10")
-      .attr("font-family", "Inter, system-ui, sans-serif")
-      .attr("fill", (d) => d.id === props.selectedId ? "#fff" : TOKEN.text)
-      .text((d) => d.title.slice(0, 2).toUpperCase());
-
-    node.append("text")
-      .attr("text-anchor", "middle")
-      .attr("dy", "2.4em")
-      .attr("font-size", "9")
-      .attr("font-family", "Inter, system-ui, sans-serif")
-      .attr("fill", TOKEN.textSecondary)
-      .text((d) => d.title.length > 18 ? d.title.slice(0, 18) + "…" : d.title);
-
-    simulation.on("tick", () => {
-      link
-        .attr("x1", (d) => (d.source as GraphNode).x ?? 0)
-        .attr("y1", (d) => (d.source as GraphNode).y ?? 0)
-        .attr("x2", (d) => (d.target as GraphNode).x ?? 0)
-        .attr("y2", (d) => (d.target as GraphNode).y ?? 0);
-
-      node.attr("transform", (d) => `translate(${d.x ?? 0},${d.y ?? 0})`);
-    });
-
-    onCleanup(() => simulation.stop());
-  });
+  const graphRows = createMemo(() =>
+    props.notes.map((note) => ({
+      id: note.id,
+      title: note.title,
+      supertag: note.supertags[0] ?? null,
+      backlinks: note.backlinks,
+      brokenBacklinks: note.backlinks.filter((backlink) => !backlinkTargetExists(backlink, props.notes)),
+    }))
+  );
 
   return (
     <div
-      ref={containerRef}
       aria-label="Note knowledge graph"
       style={{
         width: "100%",
-        height: "28em",
-        background: TOKEN.bg,
+        background: TOKEN.surface,
         "border-radius": TOKEN.radius.gridCard,
-        overflow: "hidden",
         border: `1px solid ${TOKEN.border}`,
+        padding: "1em",
+        display: "flex",
+        "flex-direction": "column",
+        gap: "0.75em",
       }}
     >
-      <svg ref={svgRef} width="100%" height="100%" role="img" aria-label="Force-directed note graph" />
-      <p style={{ margin: "0.5em 1em", "font-size": "0.75em", color: TOKEN.textSecondary, position: "absolute", bottom: "0.5em", left: "1em" }}>
-        Drag to pan · scroll to zoom · click node to select note
-      </p>
+      <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "1em" }}>
+        <div>
+          <h2 style={{ margin: 0, "font-size": "0.9375em", "font-weight": "600", color: TOKEN.text }}>Knowledge graph</h2>
+          <p style={{ margin: "0.25em 0 0", "font-size": "0.75em", color: TOKEN.textSecondary }}>
+            Graph view currently uses a lightweight relationship list in this workspace build.
+          </p>
+        </div>
+      </div>
+      <div style={{ display: "flex", "flex-direction": "column", gap: "0.5em" }}>
+        <For each={graphRows()} fallback={
+          <div style={{ padding: "2em", "text-align": "center", color: TOKEN.textSecondary, "font-size": "0.875em" }}>
+            No linked notes available yet.
+          </div>
+        }>
+          {(row) => (
+            <button
+              type="button"
+              onClick={() => props.onSelectNote(row.id)}
+              style={{
+                display: "flex",
+                "flex-direction": "column",
+                gap: "0.35em",
+                padding: "0.875em 1em",
+                border: `1px solid ${props.selectedId === row.id ? TOKEN.accent : TOKEN.border}`,
+                background: props.selectedId === row.id ? "rgba(255,107,53,0.08)" : TOKEN.bg,
+                "border-radius": "0.75em",
+                cursor: "pointer",
+                "text-align": "left",
+                transition: TOKEN.transition,
+              }}
+            >
+              <div style={{ display: "flex", "align-items": "center", gap: "0.5em", "justify-content": "space-between" }}>
+                <span style={{ "font-size": "0.875em", "font-weight": "600", color: TOKEN.text }}>{row.title}</span>
+                <Show when={row.supertag}>
+                  <span style={{ "font-size": "0.6875em", color: TOKEN.accent, background: "rgba(255,107,53,0.08)", padding: "0.2em 0.55em", "border-radius": "9999px" }}>
+                    {row.supertag}
+                  </span>
+                </Show>
+              </div>
+              <Show
+                when={row.backlinks.length > 0}
+                fallback={<span style={{ "font-size": "0.75em", color: TOKEN.textSecondary }}>No backlinks yet.</span>}
+              >
+                <div style={{ display: "flex", "flex-direction": "column", gap: "0.25em" }}>
+                  <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary }}>
+                    Links to {row.backlinks.map((link) => link.targetTitle).join(", ")}
+                  </span>
+                  <Show when={row.brokenBacklinks.length > 0}>
+                    <span
+                      title="This link is broken"
+                      style={{
+                        "font-size": "0.75em",
+                        color: "#b2644b",
+                        "text-decoration": "line-through",
+                        "text-decoration-thickness": "1px",
+                      }}
+                    >
+                      Broken: {row.brokenBacklinks.map((link) => link.targetTitle).join(", ")}
+                    </span>
+                  </Show>
+                </div>
+              </Show>
+            </button>
+          )}
+        </For>
+      </div>
     </div>
   );
 }
@@ -1124,56 +1126,901 @@ function NoteGraphView(props: {
 // Phase 9 — 3D Block viewer (three.js, lazy, with fallback)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ThreeDViewer(props: { modelUrl?: string }) {
-  let mountRef!: HTMLDivElement;
-  const [error, setError] = createSignal<string | null>(null);
-  const [loaded, setLoaded] = createSignal(false);
+function NoteGraphAccessPane(props: {
+  open: boolean;
+  onToggle: () => void;
+  notes: Note[];
+  selectedId: string | null;
+  onSelectNote: (id: string) => void;
+  folders: Folder[];
+  areas: Area[];
+  tags: string[];
+  supertags: string[];
+  activeBrowserFilter: string;
+  onApplyBrowserFilter: (filter: string) => void;
+}) {
+  const [scopeMenu, setScopeMenu] = createSignal<"all" | "areas" | "folders" | "tags" | "supertags">("all");
+  const [scopeFilter, setScopeFilter] = createSignal("all");
+  const [lastSyncedBrowserFilter, setLastSyncedBrowserFilter] = createSignal("all");
+  const [localNeighborhoodOnly, setLocalNeighborhoodOnly] = createSignal(false);
+  const [showAllNeighborhoodPreview, setShowAllNeighborhoodPreview] = createSignal(false);
+  const [neighborhoodRelationFilter, setNeighborhoodRelationFilter] =
+    createSignal<"mutual" | "outgoing" | "incoming" | "linked" | null>(null);
 
-  onMount(() => {
-    // Lazy-load three.js to avoid blocking initial render
-    import("three").then(({ WebGLRenderer, Scene, PerspectiveCamera, Mesh, BoxGeometry, MeshNormalMaterial, AmbientLight, DirectionalLight }) => {
-      if (!mountRef) return;
-      const W = mountRef.clientWidth || 320;
-      const H = 220;
+  function menuFromFilter(filter: string): "all" | "areas" | "folders" | "tags" | "supertags" {
+    if (filter.startsWith("area:")) return "areas";
+    if (filter.startsWith("folder:")) return "folders";
+    if (filter.startsWith("tag:")) return "tags";
+    if (filter.startsWith("supertag:")) return "supertags";
+    return "all";
+  }
 
-      const renderer = new WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setSize(W, H);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      mountRef.appendChild(renderer.domElement);
+  function applyGraphScope(filter: string, options?: { keepNeighborhood?: boolean }) {
+    setScopeMenu(menuFromFilter(filter));
+    setScopeFilter(filter);
+    setShowAllNeighborhoodPreview(false);
+    setNeighborhoodRelationFilter(null);
+    if (!options?.keepNeighborhood) {
+      setLocalNeighborhoodOnly(false);
+    }
+  }
 
-      const scene = new Scene();
-      const camera = new PerspectiveCamera(45, W / H, 0.1, 100);
-      camera.position.set(0, 1, 3);
-
-      scene.add(new AmbientLight(0xffffff, 0.8));
-      const dir = new DirectionalLight(0xffffff, 1);
-      dir.position.set(2, 4, 2);
-      scene.add(dir);
-
-      // Placeholder: rotating cube (replace with GLTF loader for real modelUrl)
-      const mesh = new Mesh(new BoxGeometry(1, 1, 1), new MeshNormalMaterial());
-      scene.add(mesh);
-
-      let frameId: number;
-      function animate() {
-        frameId = requestAnimationFrame(animate);
-        mesh.rotation.x += 0.008;
-        mesh.rotation.y += 0.012;
-        renderer.render(scene, camera);
-      }
-      animate();
-      setLoaded(true);
-
-      onCleanup(() => {
-        cancelAnimationFrame(frameId);
-        renderer.dispose();
-        if (mountRef && renderer.domElement.parentNode === mountRef) {
-          mountRef.removeChild(renderer.domElement);
-        }
-      });
-    }).catch(() => setError("3D viewer unavailable on this device."));
+  createEffect(() => {
+    if (scopeMenu() === "all") setScopeFilter("all");
   });
 
+  createEffect(() => {
+    if (!selectedNote() && localNeighborhoodOnly()) {
+      setLocalNeighborhoodOnly(false);
+    }
+  });
+
+  createEffect(() => {
+    if (!localNeighborhoodOnly()) {
+      setShowAllNeighborhoodPreview(false);
+      setNeighborhoodRelationFilter(null);
+    }
+  });
+
+  createEffect(() => {
+    if (!props.open) return;
+    const browserFilter = props.activeBrowserFilter || "all";
+    const currentlyFollowingBrowser =
+      scopeFilter() === "all"
+      || scopeFilter() === lastSyncedBrowserFilter();
+    if (!currentlyFollowingBrowser) return;
+    applyGraphScope(browserFilter);
+    setLastSyncedBrowserFilter(browserFilter);
+  });
+
+  const scopedNotes = createMemo<Note[]>(() => {
+    const filter = scopeFilter();
+    if (filter === "all") return props.notes;
+    if (filter.startsWith("area:")) return props.notes.filter((note) => note.areaId === filter.slice(5));
+    if (filter.startsWith("folder:")) return props.notes.filter((note) => note.folderId === filter.slice(7));
+    if (filter.startsWith("tag:")) return props.notes.filter((note) => note.tags.includes(filter.slice(4)));
+    if (filter.startsWith("supertag:")) return props.notes.filter((note) => note.supertags.includes(filter.slice(9)));
+    return props.notes;
+  });
+
+  const scopeLabel = createMemo(() => {
+    const filter = scopeFilter();
+    if (filter === "all") return "All notes";
+    if (filter.startsWith("area:")) return `Area: ${filter.slice(5)}`;
+    if (filter.startsWith("folder:")) return `Folder: ${filter.slice(7)}`;
+    if (filter.startsWith("tag:")) return `Tag: ${filter.slice(4)}`;
+    if (filter.startsWith("supertag:")) return `Supertag: ${filter.slice(9)}`;
+    return "All notes";
+  });
+
+  const browserScopeLabel = createMemo(() => {
+    const filter = props.activeBrowserFilter || "all";
+    if (filter === "all") return "All notes";
+    if (filter.startsWith("area:")) return `Area: ${filter.slice(5)}`;
+    if (filter.startsWith("folder:")) return `Folder: ${filter.slice(7)}`;
+    if (filter.startsWith("tag:")) return `Tag: ${filter.slice(4)}`;
+    if (filter.startsWith("supertag:")) return `Supertag: ${filter.slice(9)}`;
+    return "All notes";
+  });
+
+  const selectedNote = createMemo(() =>
+    props.notes.find((note) => note.id === props.selectedId) ?? null,
+  );
+
+  const selectedNeighborhoodIds = createMemo<Set<string>>(() => {
+    const note = selectedNote();
+    if (!note) return new Set<string>();
+    const ids = new Set<string>([note.id]);
+    for (const backlink of note.backlinks) ids.add(backlink.targetId);
+    for (const candidate of props.notes) {
+      if (candidate.backlinks.some((backlink) => backlink.targetId === note.id)) {
+        ids.add(candidate.id);
+      }
+    }
+    return ids;
+  });
+
+  const selectedNoteScopeOptions = createMemo<Array<{ label: string; filter: string }>>(() => {
+    const note = selectedNote();
+    if (!note) return [];
+    const options: Array<{ label: string; filter: string }> = [];
+    if (note.areaId) options.push({ label: `Area: ${note.areaId}`, filter: `area:${note.areaId}` });
+    if (note.folderId) {
+      const folderName = props.folders.find((folder) => folder.id === note.folderId)?.name ?? note.folderId;
+      options.push({ label: `Folder: ${folderName}`, filter: `folder:${note.folderId}` });
+    }
+    for (const tag of note.tags.slice(0, 4)) {
+      options.push({ label: `Tag: ${tag}`, filter: `tag:${tag}` });
+    }
+    for (const tag of note.supertags.slice(0, 4)) {
+      options.push({ label: `Supertag: ${tag}`, filter: `supertag:${tag}` });
+    }
+    return options.filter(
+      (option, index, array) => array.findIndex((entry) => entry.filter === option.filter) === index,
+    );
+  });
+
+  const browserHandoffLabel = createMemo(() => {
+    if (scopeFilter() === "all") return "Open selection in browser";
+    if (scopeFilter().startsWith("area:")) return `Open area in browser`;
+    if (scopeFilter().startsWith("folder:")) return `Open folder in browser`;
+    if (scopeFilter().startsWith("tag:")) return `Open tag in browser`;
+    if (scopeFilter().startsWith("supertag:")) return `Open supertag in browser`;
+    return "Open selection in browser";
+  });
+
+  const selectedNotePrimaryScope = createMemo<{ label: string; filter: string } | null>(() =>
+    selectedNoteScopeOptions()[0] ?? null,
+  );
+
+  const selectedNoteMatchReasons = createMemo<string[]>(() => {
+    const note = selectedNote();
+    if (!note) return [];
+    const filter = scopeFilter();
+    if (filter === "all") return ["Visible in the current all-notes graph slice."];
+    if (filter.startsWith("area:") && note.areaId === filter.slice(5)) {
+      return [`Matches area ${filter.slice(5)}.`];
+    }
+    if (filter.startsWith("folder:") && note.folderId === filter.slice(7)) {
+      const folderName = props.folders.find((folder) => folder.id === note.folderId)?.name ?? filter.slice(7);
+      return [`Matches folder ${folderName}.`];
+    }
+    if (filter.startsWith("tag:") && note.tags.includes(filter.slice(4))) {
+      return [`Carries tag ${filter.slice(4)}.`];
+    }
+    if (filter.startsWith("supertag:") && note.supertags.includes(filter.slice(9))) {
+      return [`Carries supertag ${filter.slice(9)}.`];
+    }
+    const reasons: string[] = [];
+    if (note.areaId) reasons.push(`Area ${note.areaId}`);
+    if (note.folderId) {
+      reasons.push(`Folder ${props.folders.find((folder) => folder.id === note.folderId)?.name ?? note.folderId}`);
+    }
+    for (const tag of note.tags.slice(0, 2)) reasons.push(`Tag ${tag}`);
+    for (const tag of note.supertags.slice(0, 2)) reasons.push(`Supertag ${tag}`);
+    return reasons.length > 0
+      ? [`Visible here, with stronger context available through ${reasons.join(", ")}.`]
+      : ["Visible in the current graph slice."];
+  });
+
+  const currentOptions = createMemo<Array<{ id: string; label: string; filter: string }>>(() => {
+    if (scopeMenu() === "areas") {
+      return props.areas.map((area) => ({ id: area.id, label: area.id, filter: `area:${area.id}` }));
+    }
+    if (scopeMenu() === "folders") {
+      return props.folders.map((folder) => ({ id: folder.id, label: folder.name, filter: `folder:${folder.id}` }));
+    }
+    if (scopeMenu() === "tags") {
+      return props.tags.map((tag) => ({ id: tag, label: tag, filter: `tag:${tag}` }));
+    }
+    if (scopeMenu() === "supertags") {
+      return props.supertags.map((tag) => ({ id: tag, label: tag, filter: `supertag:${tag}` }));
+    }
+    return [{ id: "all", label: "All notes", filter: "all" }];
+  });
+
+  const menuHint = createMemo(() => {
+    if (scopeMenu() === "areas") return "PARA-adjacent access via existing note areas.";
+    if (scopeMenu() === "folders") return "Folder-scoped graph access inside the current note model.";
+    if (scopeMenu() === "tags") return "Tag-based graph narrowing.";
+    if (scopeMenu() === "supertags") return "Higher-level topic narrowing through supertags.";
+    return "Open the graph without leaving the editor flow.";
+  });
+
+  const neighborhoodHint = createMemo(() =>
+    localNeighborhoodOnly()
+      ? "Showing the selected note and its nearby links only."
+      : "Broad graph scope."
+  );
+
+  const graphNotes = createMemo<Note[]>(() => {
+    const base = scopedNotes();
+    if (!localNeighborhoodOnly()) return base;
+    const neighborhoodIds = selectedNeighborhoodIds();
+    if (neighborhoodIds.size === 0) return base;
+    return base.filter((note) => neighborhoodIds.has(note.id));
+  });
+
+  const neighborhoodSummary = createMemo(() => {
+    if (!localNeighborhoodOnly()) return null;
+    const selectedId = props.selectedId;
+    const linkedCount = graphNotes().filter((note) => note.id !== selectedId).length;
+    if (linkedCount <= 0) return "No nearby linked notes yet.";
+    if (linkedCount === 1) return "1 linked note in this local neighborhood.";
+    return `${linkedCount} linked notes in this local neighborhood.`;
+  });
+
+  const neighborhoodLinkedPreview = createMemo(() => {
+    if (!localNeighborhoodOnly()) return [];
+    const selectedId = props.selectedId;
+    const relationFilter = neighborhoodRelationFilter();
+    const ranked = graphNotes()
+      .filter((note) => note.id !== selectedId)
+      .filter((note) => !relationFilter || neighborhoodRelationLabel(note) === relationFilter)
+      .sort((a, b) => {
+        const score = (note: Note) => {
+          const relation = neighborhoodRelationLabel(note);
+          if (relation === "mutual") return 0;
+          if (relation === "outgoing") return 1;
+          if (relation === "incoming") return 2;
+          return 3;
+        };
+        return score(a) - score(b) || a.title.localeCompare(b.title);
+      });
+    return showAllNeighborhoodPreview() ? ranked : ranked.slice(0, 4);
+  });
+
+  const neighborhoodLinkedOverflow = createMemo(() => {
+    if (!localNeighborhoodOnly()) return 0;
+    const selectedId = props.selectedId;
+    const totalLinked = graphNotes().filter((note) => note.id !== selectedId).length;
+    return Math.max(0, totalLinked - neighborhoodLinkedPreview().length);
+  });
+
+  const neighborhoodPreviewLabel = createMemo(() => {
+    const shown = neighborhoodLinkedPreview().length;
+    const total = graphNotes().filter((note) => note.id !== props.selectedId).length;
+    if (!showAllNeighborhoodPreview()) return `Nearby strongest: ${shown} of ${total}`;
+    return `All nearby: ${shown}`;
+  });
+
+  const neighborhoodRelationMix = createMemo(() => {
+    if (!localNeighborhoodOnly()) return [];
+    const totals = {
+      mutual: 0,
+      outgoing: 0,
+      incoming: 0,
+      linked: 0,
+    };
+    for (const note of graphNotes()) {
+      if (note.id === props.selectedId) continue;
+      const relation = neighborhoodRelationLabel(note);
+      totals[relation] += 1;
+    }
+    return [
+      totals.mutual > 0 ? { relation: "mutual" as const, label: `${totals.mutual} mutual` } : null,
+      totals.outgoing > 0 ? { relation: "outgoing" as const, label: `${totals.outgoing} outgoing` } : null,
+      totals.incoming > 0 ? { relation: "incoming" as const, label: `${totals.incoming} incoming` } : null,
+      totals.linked > 0 ? { relation: "linked" as const, label: `${totals.linked} linked` } : null,
+    ].filter((value): value is { relation: "mutual" | "outgoing" | "incoming" | "linked"; label: string } => Boolean(value));
+  });
+
+  const activeNeighborhoodRelationFilterLabel = createMemo(() => {
+    const active = neighborhoodRelationFilter();
+    if (!active) return null;
+    const total = graphNotes().filter((note) => note.id !== props.selectedId).length;
+    const shown = neighborhoodLinkedPreview().length;
+    if (active === "mutual") return `Filtered: mutual only ${shown} of ${total}`;
+    if (active === "outgoing") return `Filtered: outgoing only ${shown} of ${total}`;
+    if (active === "incoming") return `Filtered: incoming only ${shown} of ${total}`;
+    return `Filtered: linked only ${shown} of ${total}`;
+  });
+
+  const activeNeighborhoodRelationEmptyLabel = createMemo(() => {
+    const active = neighborhoodRelationFilter();
+    if (!active || neighborhoodLinkedPreview().length > 0) return null;
+    if (active === "mutual") return "No mutual nearby notes in this local neighborhood.";
+    if (active === "outgoing") return "No outgoing nearby notes in this local neighborhood.";
+    if (active === "incoming") return "No incoming nearby notes in this local neighborhood.";
+    return "No nearby notes match this local link filter.";
+  });
+
+  const neighborhoodPreviewStateLabel = createMemo(() => {
+    const parts: string[] = [];
+    if (showAllNeighborhoodPreview()) {
+      parts.push("all nearby expanded");
+    } else {
+      parts.push("strongest nearby");
+    }
+    const relation = neighborhoodRelationFilter();
+    if (relation) {
+      parts.push(`${relation} only`);
+    }
+    return parts.join(" · ");
+  });
+
+  const neighborhoodRelationLabel = (note: Note) => {
+    const current = selectedNote();
+    if (!current) return "linked";
+    const outgoing = current.backlinks.some((backlink) => backlink.targetId === note.id);
+    const incoming = note.backlinks.some((backlink) => backlink.targetId === current.id);
+    if (outgoing && incoming) return "mutual";
+    if (outgoing) return "outgoing";
+    if (incoming) return "incoming";
+    return "linked";
+  };
+
+  return (
+    <section
+      aria-label="Knowledge graph access"
+      style={{
+        background: TOKEN.surface,
+        border: `1px solid ${TOKEN.border}`,
+        "border-radius": TOKEN.radius.gridCard,
+        padding: "1em 1.25em",
+        display: "flex",
+        "flex-direction": "column",
+        gap: "0.875em",
+      }}
+    >
+      <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "1em", "flex-wrap": "wrap" }}>
+        <div>
+          <p style={{ margin: 0, "font-size": "0.6875em", "font-weight": "700", "letter-spacing": "0.1em", "text-transform": "uppercase", color: TOKEN.textSecondary }}>
+            Knowledge graph access
+          </p>
+          <p style={{ margin: "0.25em 0 0", "font-size": "0.8125em", color: TOKEN.textSecondary }}>
+            Reach graph context from the note workspace through an expandable pane, without making graph the default home.
+          </p>
+        </div>
+        <div style={{ display: "flex", "align-items": "center", gap: "0.5em", "flex-wrap": "wrap" }}>
+          <Show when={scopeFilter() !== props.activeBrowserFilter}>
+            <button
+              type="button"
+              onClick={() => props.onApplyBrowserFilter(scopeFilter())}
+              style={{
+                "min-height": TOKEN.touchTarget,
+                padding: "0 0.875em",
+                border: `1px solid ${TOKEN.border}`,
+                "border-radius": "9999px",
+                background: TOKEN.bg,
+                color: TOKEN.textSecondary,
+                cursor: "pointer",
+                "font-size": "0.75em",
+                "font-family": "Inter, system-ui, sans-serif",
+              }}
+            >
+              Use in browser
+            </button>
+          </Show>
+          <button
+            type="button"
+            onClick={props.onToggle}
+            style={{
+              "min-height": TOKEN.touchTarget,
+              padding: "0 0.875em",
+              border: `1px solid ${TOKEN.border}`,
+              "border-radius": "9999px",
+              background: props.open ? TOKEN.accent : TOKEN.surface,
+              color: props.open ? "#fff" : TOKEN.textSecondary,
+              cursor: "pointer",
+              "font-size": "0.75em",
+              "font-family": "Inter, system-ui, sans-serif",
+            }}
+          >
+            {props.open ? "Hide graph pane" : "Show graph pane"}
+          </button>
+        </div>
+      </div>
+
+      <Show when={props.open}>
+        <div style={{ display: "flex", "flex-direction": "column", gap: "0.875em" }}>
+          <div style={{ display: "flex", "align-items": "center", gap: "0.5em", "flex-wrap": "wrap" }}>
+            <For each={["all", "areas", "folders", "tags", "supertags"] as const}>
+              {(menu) => (
+                <button
+                  type="button"
+                  onClick={() => setScopeMenu(menu)}
+                  style={{
+                    "min-height": TOKEN.touchTarget,
+                    padding: "0 0.875em",
+                    border: `1px solid ${TOKEN.border}`,
+                    "border-radius": "9999px",
+                    background: scopeMenu() === menu ? TOKEN.accent : TOKEN.surface,
+                    color: scopeMenu() === menu ? "#fff" : TOKEN.textSecondary,
+                    cursor: "pointer",
+                    "font-size": "0.75em",
+                    "font-family": "Inter, system-ui, sans-serif",
+                    "text-transform": menu === "all" ? "none" : "capitalize",
+                  }}
+                >
+                  {menu === "all" ? "All notes" : menu}
+                </button>
+              )}
+            </For>
+            <Show when={selectedNote()}>
+              <button
+                type="button"
+                onClick={() => setLocalNeighborhoodOnly((value) => !value)}
+                style={{
+                  "min-height": TOKEN.touchTarget,
+                  padding: "0 0.875em",
+                  border: `1px solid ${TOKEN.border}`,
+                  "border-radius": "9999px",
+                  background: localNeighborhoodOnly() ? TOKEN.accent : TOKEN.surface,
+                  color: localNeighborhoodOnly() ? "#fff" : TOKEN.textSecondary,
+                  cursor: "pointer",
+                  "font-size": "0.75em",
+                  "font-family": "Inter, system-ui, sans-serif",
+                }}
+              >
+                {localNeighborhoodOnly() ? "Showing linked only" : "Show linked only"}
+              </button>
+            </Show>
+            <Show when={localNeighborhoodOnly()}>
+              <button
+                type="button"
+                onClick={() => setLocalNeighborhoodOnly(false)}
+                style={{
+                  "min-height": TOKEN.touchTarget,
+                  padding: "0 0.875em",
+                  border: `1px solid ${TOKEN.border}`,
+                  "border-radius": "9999px",
+                  background: TOKEN.bg,
+                  color: TOKEN.textSecondary,
+                  cursor: "pointer",
+                  "font-size": "0.75em",
+                  "font-family": "Inter, system-ui, sans-serif",
+                }}
+              >
+                Return to broad slice
+              </button>
+            </Show>
+          </div>
+          <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "1em", "flex-wrap": "wrap" }}>
+            <p style={{ margin: 0, "font-size": "0.75em", color: TOKEN.textSecondary }}>
+              {menuHint()} {neighborhoodHint()}
+            </p>
+            <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary }}>
+              {scopeLabel()} · {graphNotes().length} note{graphNotes().length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <Show when={neighborhoodSummary()}>
+            <div style={{ display: "flex", "flex-direction": "column", gap: "0.5em", "align-items": "flex-start" }}>
+              <span
+                style={{
+                  padding: "0.25em 0.625em",
+                  background: TOKEN.bg,
+                  color: TOKEN.textSecondary,
+                  border: `1px solid ${TOKEN.border}`,
+                  "border-radius": "9999px",
+                  "font-size": "0.75em",
+                  display: "inline-flex",
+                  "align-items": "center",
+                }}
+              >
+                {neighborhoodSummary()}
+              </span>
+              <Show when={neighborhoodLinkedPreview().length > 0}>
+                <div style={{ display: "flex", "align-items": "center", gap: "0.4em", "flex-wrap": "wrap" }}>
+                  <span style={{ "font-size": "0.72em", color: TOKEN.textSecondary }}>
+                    {neighborhoodPreviewLabel()}
+                  </span>
+                  <Show when={showAllNeighborhoodPreview() || neighborhoodRelationFilter()}>
+                    <span
+                      style={{
+                        padding: "0.18em 0.5em",
+                        background: TOKEN.bg,
+                        color: TOKEN.textSecondary,
+                        border: `1px solid ${TOKEN.border}`,
+                        "border-radius": "9999px",
+                        "font-size": "0.68em",
+                      }}
+                    >
+                      {neighborhoodPreviewStateLabel()}
+                    </span>
+                    <Show when={neighborhoodRelationFilter()}>
+                      <button
+                        type="button"
+                        onClick={() => setNeighborhoodRelationFilter(null)}
+                        style={{
+                          padding: "0.18em 0.5em",
+                          background: TOKEN.surface,
+                          color: TOKEN.textSecondary,
+                          border: `1px solid ${TOKEN.border}`,
+                          "border-radius": "9999px",
+                          "font-size": "0.68em",
+                          cursor: "pointer",
+                          "font-family": "Inter, system-ui, sans-serif",
+                        }}
+                      >
+                        Show all relations
+                      </button>
+                    </Show>
+                    <Show when={showAllNeighborhoodPreview() && neighborhoodLinkedPreview().length > 4}>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllNeighborhoodPreview(false)}
+                        style={{
+                          padding: "0.18em 0.5em",
+                          background: TOKEN.surface,
+                          color: TOKEN.textSecondary,
+                          border: `1px solid ${TOKEN.border}`,
+                          "border-radius": "9999px",
+                          "font-size": "0.68em",
+                          cursor: "pointer",
+                          "font-family": "Inter, system-ui, sans-serif",
+                        }}
+                      >
+                        Show strongest only
+                      </button>
+                    </Show>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAllNeighborhoodPreview(false);
+                        setNeighborhoodRelationFilter(null);
+                      }}
+                      style={{
+                        padding: "0.18em 0.5em",
+                        background: TOKEN.surface,
+                        color: TOKEN.textSecondary,
+                        border: `1px solid ${TOKEN.border}`,
+                        "border-radius": "9999px",
+                        "font-size": "0.68em",
+                        cursor: "pointer",
+                        "font-family": "Inter, system-ui, sans-serif",
+                      }}
+                    >
+                      Reset local preview
+                    </button>
+                  </Show>
+                  <For each={neighborhoodRelationMix()}>
+                    {(item) => (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setNeighborhoodRelationFilter((current) =>
+                            current === item.relation ? null : item.relation,
+                          )
+                        }
+                        style={{
+                          padding: "0.18em 0.5em",
+                          background:
+                            neighborhoodRelationFilter() === item.relation ? TOKEN.accent : TOKEN.surface,
+                          color:
+                            neighborhoodRelationFilter() === item.relation ? "#fff" : TOKEN.textSecondary,
+                          border: `1px solid ${TOKEN.border}`,
+                          "border-radius": "9999px",
+                          "font-size": "0.68em",
+                          cursor: "pointer",
+                          "font-family": "Inter, system-ui, sans-serif",
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    )}
+                  </For>
+                  <Show when={!showAllNeighborhoodPreview()}>
+                    <span
+                      style={{
+                        padding: "0.18em 0.5em",
+                        background: TOKEN.surface,
+                        color: TOKEN.textSecondary,
+                        border: `1px solid ${TOKEN.border}`,
+                        "border-radius": "9999px",
+                        "font-size": "0.68em",
+                      }}
+                    >
+                      mutual → outgoing → incoming
+                    </span>
+                  </Show>
+                  <For each={neighborhoodLinkedPreview()}>
+                    {(note) => (
+                      <button
+                        type="button"
+                        onClick={() => props.onSelectNote(note.id)}
+                        style={{
+                          padding: "0.2em 0.55em",
+                          background: TOKEN.bg,
+                          color: props.selectedId === note.id ? TOKEN.accent : TOKEN.textSecondary,
+                          border: `1px solid ${TOKEN.border}`,
+                          "border-radius": "9999px",
+                          "font-size": "0.72em",
+                          cursor: "pointer",
+                          "font-family": "Inter, system-ui, sans-serif",
+                        }}
+                      >
+                        {(note.title.trim() || "Untitled note")} · {neighborhoodRelationLabel(note)}
+                      </button>
+                    )}
+                  </For>
+                  <Show when={neighborhoodLinkedOverflow() > 0}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllNeighborhoodPreview(true)}
+                      style={{
+                        padding: "0.2em 0.55em",
+                        background: TOKEN.surface,
+                        color: TOKEN.textSecondary,
+                        border: `1px dashed ${TOKEN.border}`,
+                        "border-radius": "9999px",
+                        "font-size": "0.72em",
+                        cursor: "pointer",
+                        "font-family": "Inter, system-ui, sans-serif",
+                      }}
+                    >
+                      +{neighborhoodLinkedOverflow()} more nearby
+                    </button>
+                  </Show>
+                </div>
+              </Show>
+              <Show when={activeNeighborhoodRelationEmptyLabel()}>
+                <div style={{ display: "flex", "align-items": "center", gap: "0.45em", "flex-wrap": "wrap" }}>
+                  <Show when={showAllNeighborhoodPreview() || neighborhoodRelationFilter()}>
+                    <span
+                      style={{
+                        padding: "0.18em 0.5em",
+                        background: TOKEN.bg,
+                        color: TOKEN.textSecondary,
+                        border: `1px solid ${TOKEN.border}`,
+                        "border-radius": "9999px",
+                        "font-size": "0.68em",
+                      }}
+                    >
+                      {neighborhoodPreviewStateLabel()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAllNeighborhoodPreview(false);
+                        setNeighborhoodRelationFilter(null);
+                      }}
+                      style={{
+                        padding: "0.18em 0.5em",
+                        background: TOKEN.surface,
+                        color: TOKEN.textSecondary,
+                        border: `1px solid ${TOKEN.border}`,
+                        "border-radius": "9999px",
+                        "font-size": "0.68em",
+                        cursor: "pointer",
+                        "font-family": "Inter, system-ui, sans-serif",
+                      }}
+                    >
+                      Reset local preview
+                    </button>
+                  </Show>
+                  <span
+                    style={{
+                      padding: "0.18em 0.5em",
+                      background: TOKEN.bg,
+                      color: TOKEN.textSecondary,
+                      border: `1px solid ${TOKEN.border}`,
+                      "border-radius": "9999px",
+                      "font-size": "0.68em",
+                    }}
+                  >
+                    {activeNeighborhoodRelationEmptyLabel()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setNeighborhoodRelationFilter(null)}
+                    style={{
+                      padding: "0.18em 0.5em",
+                      background: TOKEN.surface,
+                      color: TOKEN.textSecondary,
+                      border: `1px solid ${TOKEN.border}`,
+                      "border-radius": "9999px",
+                      "font-size": "0.68em",
+                      cursor: "pointer",
+                      "font-family": "Inter, system-ui, sans-serif",
+                    }}
+                  >
+                    Show all relations
+                  </button>
+                </div>
+              </Show>
+            </div>
+          </Show>
+          <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "1em", "flex-wrap": "wrap" }}>
+            <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary }}>
+              Browser scope: {browserScopeLabel()}
+            </span>
+            <div style={{ display: "flex", "align-items": "center", gap: "0.5em", "flex-wrap": "wrap" }}>
+              <Show when={props.selectedId && scopeFilter() !== "all"}>
+                <button
+                  type="button"
+                  onClick={() => props.onApplyBrowserFilter(scopeFilter())}
+                  style={{
+                    "min-height": TOKEN.touchTarget,
+                    padding: "0 0.875em",
+                    border: `1px solid ${TOKEN.border}`,
+                    "border-radius": "9999px",
+                    background: TOKEN.bg,
+                    color: TOKEN.textSecondary,
+                    cursor: "pointer",
+                    "font-size": "0.75em",
+                    "font-family": "Inter, system-ui, sans-serif",
+                  }}
+                >
+                  {browserHandoffLabel()}
+                </button>
+              </Show>
+              <Show when={selectedNotePrimaryScope()}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const primaryScope = selectedNotePrimaryScope();
+                    if (!primaryScope) return;
+                    props.onApplyBrowserFilter(primaryScope.filter);
+                  }}
+                  style={{
+                    "min-height": TOKEN.touchTarget,
+                    padding: "0 0.875em",
+                    border: `1px solid ${TOKEN.border}`,
+                    "border-radius": "9999px",
+                    background: TOKEN.bg,
+                    color: TOKEN.textSecondary,
+                    cursor: "pointer",
+                    "font-size": "0.75em",
+                    "font-family": "Inter, system-ui, sans-serif",
+                  }}
+                >
+                  Open selected note context
+                </button>
+              </Show>
+              <Show when={scopeFilter() !== (props.activeBrowserFilter || "all")}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const browserFilter = props.activeBrowserFilter || "all";
+                    applyGraphScope(browserFilter);
+                    setLastSyncedBrowserFilter(browserFilter);
+                  }}
+                  style={{
+                    "min-height": TOKEN.touchTarget,
+                    padding: "0 0.875em",
+                    border: `1px solid ${TOKEN.border}`,
+                    "border-radius": "9999px",
+                    background: TOKEN.bg,
+                    color: TOKEN.textSecondary,
+                    cursor: "pointer",
+                    "font-size": "0.75em",
+                    "font-family": "Inter, system-ui, sans-serif",
+                  }}
+                >
+                  Follow browser scope
+                </button>
+              </Show>
+            </div>
+          </div>
+          <Show when={selectedNoteScopeOptions().length > 0}>
+            <div style={{ display: "flex", "flex-direction": "column", gap: "0.5em" }}>
+              <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary }}>
+                Current note context: {selectedNote()?.title}
+              </span>
+              <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.5em" }}>
+                <For each={selectedNoteScopeOptions()}>
+                  {(option) => (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        applyGraphScope(option.filter);
+                      }}
+                      style={{
+                        padding: "0.25em 0.625em",
+                        background: scopeFilter() === option.filter ? TOKEN.accent : TOKEN.bg,
+                        color: scopeFilter() === option.filter ? "#fff" : TOKEN.textSecondary,
+                        border: `1px solid ${TOKEN.border}`,
+                        "border-radius": "9999px",
+                        "font-size": "0.8125em",
+                        cursor: "pointer",
+                        transition: TOKEN.transition,
+                        "font-family": "Inter, system-ui, sans-serif",
+                        "min-height": TOKEN.touchTarget,
+                        display: "flex",
+                        "align-items": "center",
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
+          <Show when={selectedNote()}>
+            <div style={{ display: "flex", "flex-direction": "column", gap: "0.5em" }}>
+              <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "1em", "flex-wrap": "wrap" }}>
+                <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary }}>
+                  Selected graph note fit
+                </span>
+                <Show when={selectedNotePrimaryScope() && selectedNotePrimaryScope()!.filter !== scopeFilter()}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const primaryScope = selectedNotePrimaryScope();
+                      if (!primaryScope) return;
+                      applyGraphScope(primaryScope.filter);
+                    }}
+                    style={{
+                      "min-height": TOKEN.touchTarget,
+                      padding: "0 0.875em",
+                      border: `1px solid ${TOKEN.border}`,
+                      "border-radius": "9999px",
+                      background: TOKEN.bg,
+                      color: TOKEN.textSecondary,
+                      cursor: "pointer",
+                      "font-size": "0.75em",
+                      "font-family": "Inter, system-ui, sans-serif",
+                    }}
+                  >
+                    Focus graph on selected note
+                  </button>
+                </Show>
+              </div>
+              <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.5em" }}>
+                <For each={selectedNoteMatchReasons()}>
+                  {(reason) => (
+                    <span
+                      style={{
+                        padding: "0.25em 0.625em",
+                        background: TOKEN.bg,
+                        color: TOKEN.textSecondary,
+                        border: `1px solid ${TOKEN.border}`,
+                        "border-radius": "9999px",
+                        "font-size": "0.75em",
+                        display: "flex",
+                        "align-items": "center",
+                      }}
+                    >
+                      {reason}
+                    </span>
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
+          <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.5em" }}>
+            <For each={currentOptions()} fallback={
+              <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary }}>
+                No options in this scope yet.
+              </span>
+            }>
+              {(option) => (
+                <button
+                  type="button"
+                  onClick={() => applyGraphScope(option.filter)}
+                  style={{
+                    padding: "0.25em 0.625em",
+                    background: scopeFilter() === option.filter ? TOKEN.accent : TOKEN.bg,
+                    color: scopeFilter() === option.filter ? "#fff" : TOKEN.textSecondary,
+                    border: `1px solid ${TOKEN.border}`,
+                    "border-radius": "9999px",
+                    "font-size": "0.8125em",
+                    cursor: "pointer",
+                    transition: TOKEN.transition,
+                    "font-family": "Inter, system-ui, sans-serif",
+                    "min-height": TOKEN.touchTarget,
+                    display: "flex",
+                    "align-items": "center",
+                  }}
+                >
+                  {option.label}
+                </button>
+              )}
+            </For>
+          </div>
+          <NoteGraphView
+            notes={graphNotes()}
+            selectedId={props.selectedId}
+            onSelectNote={props.onSelectNote}
+          />
+        </div>
+      </Show>
+    </section>
+  );
+}
+function ThreeDViewer(props: { modelUrl?: string }) {
   return (
     <div
       style={{
@@ -1184,21 +2031,27 @@ function ThreeDViewer(props: { modelUrl?: string }) {
         width: "100%",
       }}
     >
-      <Show when={error()}>
-        <div style={{ padding: "1.5em", "font-size": "0.875em", color: TOKEN.textSecondary, "text-align": "center" }}>
-          {error()}
-        </div>
-      </Show>
-      <Show when={!error()}>
-        <div ref={mountRef} style={{ width: "100%" }} aria-label="3D object viewer" role="img" />
-        <Show when={!loaded()}>
-          <div style={{ padding: "1em", "font-size": "0.8125em", color: TOKEN.textSecondary }}>Loading 3D viewer…</div>
-        </Show>
-        <Show when={props.modelUrl}>
-          <p style={{ margin: "0", padding: "0.375em 0.75em", "font-size": "0.75em", color: TOKEN.textSecondary }}>
-            Model: {props.modelUrl}
-          </p>
-        </Show>
+      <div
+        aria-label="3D object viewer"
+        role="img"
+        style={{
+          width: "100%",
+          height: "13.75em",
+          display: "flex",
+          "align-items": "center",
+          "justify-content": "center",
+          background:
+            "radial-gradient(circle at 30% 30%, rgba(255,107,53,0.18), transparent 45%), linear-gradient(135deg, rgba(28,28,28,0.04), rgba(28,28,28,0.12))",
+          color: TOKEN.textSecondary,
+          "font-size": "0.875em",
+        }}
+      >
+        3D preview placeholder
+      </div>
+      <Show when={props.modelUrl}>
+        <p style={{ margin: "0", padding: "0.375em 0.75em", "font-size": "0.75em", color: TOKEN.textSecondary }}>
+          Model: {props.modelUrl}
+        </p>
       </Show>
     </div>
   );
@@ -1286,19 +2139,72 @@ function AIActionsPanel(props: { note: Note; onClose: () => void }) {
 // Phase 2 + 7 — Right Panel (context panel, appears when note is selected)
 // ─────────────────────────────────────────────────────────────────────────────
 
+function NoteSupportSection(props: {
+  title: string;
+  defaultOpen?: boolean;
+  children: any;
+}) {
+  const [open, setOpen] = createSignal(props.defaultOpen ?? false);
+
+  return (
+    <section
+      aria-label={props.title}
+      style={{
+        display: "flex",
+        "flex-direction": "column",
+        gap: "0.5em",
+        padding: "0.75em",
+        background: TOKEN.bg,
+        border: `1px solid ${TOKEN.border}`,
+        "border-radius": "0.75em",
+      }}
+    >
+      <button
+        onClick={() => setOpen((value) => !value)}
+        style={{
+          display: "flex",
+          "align-items": "center",
+          "justify-content": "space-between",
+          gap: "0.75em",
+          padding: 0,
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          color: TOKEN.text,
+          "font-size": "0.75em",
+          "font-weight": "700",
+          "letter-spacing": "0.1em",
+          "text-transform": "uppercase",
+          "text-align": "left",
+          "font-family": "Inter, system-ui, sans-serif",
+        }}
+      >
+        <span>{props.title}</span>
+        <span aria-hidden style={{ color: TOKEN.textSecondary, "font-size": "0.9em" }}>
+          {open() ? "-" : "+"}
+        </span>
+      </button>
+      <Show when={open()}>
+        <div style={{ display: "flex", "flex-direction": "column", gap: "0.625em" }}>{props.children}</div>
+      </Show>
+    </section>
+  );
+}
+
 function NoteRightPanel(props: {
   note: Note | null;
   allNotes: Note[];
   onClose: () => void;
   onSelectNote: (id: string) => void;
+  onFilter: (filter: string) => void;
   onTagUpdate: (note: Note, removeTags: string[], addTags: string[], removeSupertags: string[], addSupertags: string[]) => void;
 }) {
   return (
     <aside
       aria-label="Note details"
       style={{
-        width: TOKEN.rightPanelW,
-        "min-width": TOKEN.rightPanelW,
+        width: "16.5em",
+        "min-width": "16.5em",
         "border-left": `1px solid ${TOKEN.border}`,
         background: TOKEN.surface,
         "overflow-y": "auto",
@@ -1323,12 +2229,14 @@ function NoteRightPanel(props: {
         {(note) => {
           const [newTag, setNewTag] = createSignal("");
           const [addingTag, setAddingTag] = createSignal(false);
+          const [supertagMenu, setSupertagMenu] = createSignal<{ tag: string; x: number; y: number } | null>(null);
 
           function removeTag(tag: string) {
             props.onTagUpdate(note(), [tag], [], [], []);
           }
           function removeSupertag(tag: string) {
             props.onTagUpdate(note(), [], [], [tag], []);
+            setSupertagMenu(null);
           }
           function confirmAddTag() {
             const t = newTag().trim().replace(/^#/, "");
@@ -1336,14 +2244,36 @@ function NoteRightPanel(props: {
             setNewTag("");
             setAddingTag(false);
           }
+          createEffect(() => {
+            if (!supertagMenu()) return;
+            const close = () => setSupertagMenu(null);
+            const handleKeyDown = (event: KeyboardEvent) => {
+              if (event.key === "Escape") close();
+            };
+            window.addEventListener("pointerdown", close);
+            window.addEventListener("scroll", close, true);
+            window.addEventListener("resize", close);
+            window.addEventListener("keydown", handleKeyDown);
+            onCleanup(() => {
+              window.removeEventListener("pointerdown", close);
+              window.removeEventListener("scroll", close, true);
+              window.removeEventListener("resize", close);
+              window.removeEventListener("keydown", handleKeyDown);
+            });
+          });
 
           return (
-          <div style={{ display: "flex", "flex-direction": "column", gap: TOKEN.gap.section, padding: TOKEN.padding.sidebar }}>
+          <div style={{ display: "flex", "flex-direction": "column", gap: "0.875em", padding: "1em" }}>
             {/* Header */}
             <div style={{ display: "flex", "align-items": "flex-start", "justify-content": "space-between", gap: "0.5em" }}>
-              <h1 style={{ margin: 0, "font-size": "1.125em", "font-weight": "600", color: TOKEN.text, "line-height": "1.25", "font-feature-settings": '"ss01"' }}>
-                {note().title}
-              </h1>
+              <div style={{ display: "flex", "flex-direction": "column", gap: "0.25em" }}>
+                <p style={{ margin: 0, "font-size": "0.6875em", "font-weight": "700", "letter-spacing": "0.1em", "text-transform": "uppercase", color: TOKEN.textSecondary }}>
+                  Support rail
+                </p>
+                <h1 style={{ margin: 0, "font-size": "1em", "font-weight": "600", color: TOKEN.text, "line-height": "1.25", "font-feature-settings": '"ss01"' }}>
+                  {note().title}
+                </h1>
+              </div>
               <button
                 aria-label="Close detail panel"
                 onClick={props.onClose}
@@ -1359,7 +2289,23 @@ function NoteRightPanel(props: {
               <For each={note().supertags}>
                 {(t) => (
                   <span style={{ display: "inline-flex", "align-items": "center", gap: "0.25em", padding: "0.125em 0.4em 0.125em 0.625em", background: `rgba(255,107,53,0.1)`, color: TOKEN.accent, "border-radius": "9999px", "font-size": "0.75em", "font-weight": "600" }}>
-                    {t}
+                    <button
+                      type="button"
+                      onClick={() => props.onFilter(`supertag:${t}`)}
+                      onContextMenu={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setSupertagMenu({
+                          tag: t,
+                          x: Math.min(event.clientX, window.innerWidth - 220),
+                          y: Math.min(event.clientY, window.innerHeight - 190),
+                        });
+                      }}
+                      style={{ border: "none", background: "transparent", cursor: "pointer", color: TOKEN.accent, padding: 0, margin: 0, "font-size": "1em", "font-weight": "600", "line-height": 1.2, "font-family": "Inter, system-ui, sans-serif" }}
+                      title={`Filter to supertag ${t}`}
+                    >
+                      {t}
+                    </button>
                     <button
                       aria-label={`Remove supertag ${t}`}
                       onClick={() => removeSupertag(t)}
@@ -1368,6 +2314,58 @@ function NoteRightPanel(props: {
                   </span>
                 )}
               </For>
+              <Show when={supertagMenu()}>
+                {(menu) => {
+                  const relatedCount = () => props.allNotes.filter((entry) => entry.supertags.includes(menu().tag)).length;
+                  return (
+                    <div
+                      style={{
+                        position: "fixed",
+                        left: `${menu().x}px`,
+                        top: `${menu().y}px`,
+                        width: "13.5em",
+                        padding: "0.5em",
+                        background: "rgba(255,255,255,0.98)",
+                        border: `1px solid ${TOKEN.border}`,
+                        "border-radius": "1em",
+                        "box-shadow": "0 0.75em 2.5em rgba(28,28,28,0.18)",
+                        "backdrop-filter": "blur(18px)",
+                        "z-index": "140",
+                        display: "flex",
+                        "flex-direction": "column",
+                        gap: "0.25em",
+                      }}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onContextMenu={(event) => event.preventDefault()}
+                    >
+                      <div style={{ padding: "0.25em 0.5em 0.375em 0.5em" }}>
+                        <p style={{ margin: 0, "font-size": "0.75em", "font-weight": "600", color: TOKEN.text }}>{menu().tag}</p>
+                        <p style={{ margin: "0.25em 0 0 0", "font-size": "0.625em", color: TOKEN.textSecondary }}>
+                          Higher-level topic narrowing through supertags. Used by {relatedCount()} note{relatedCount() === 1 ? "" : "s"}.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { props.onFilter(`supertag:${menu().tag}`); setSupertagMenu(null); }}
+                        style={{ border: "none", background: "transparent", cursor: "pointer", "text-align": "left", padding: "0.5em 0.75em", "border-radius": "0.75em", color: TOKEN.text, "font-size": "0.75em", transition: TOKEN.transition }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = TOKEN.bg; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                      >
+                        Filter to this tag
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { removeSupertag(menu().tag); }}
+                        style={{ border: "none", background: "transparent", cursor: "pointer", "text-align": "left", padding: "0.5em 0.75em", "border-radius": "0.75em", color: "#c2410c", "font-size": "0.75em", transition: TOKEN.transition }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(254,215,170,0.35)"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                      >
+                        Remove from this note
+                      </button>
+                    </div>
+                  );
+                }}
+              </Show>
               {/* Tags */}
               <For each={note().tags}>
                 {(t) => (
@@ -1409,24 +2407,14 @@ function NoteRightPanel(props: {
             </div>
 
             <p style={{ margin: 0, "font-size": "0.75em", color: TOKEN.textSecondary }}>
-              Updated {relativeTime(note().updatedAt)}
+              Updated {noteRelativeTime(note().updatedAt)}
+            </p>
+            <p style={{ margin: 0, "font-size": "0.8125em", color: TOKEN.textSecondary, "line-height": "1.5" }}>
+              Secondary support for summary, backlinks, AI actions, and note metadata.
             </p>
 
             {/* AI Summary */}
-            <section aria-labelledby="summary-heading">
-              <h2
-                id="summary-heading"
-                style={{
-                  margin: "0 0 0.5em",
-                  "font-size": "0.6875em",
-                  "font-weight": "700",
-                  "letter-spacing": "0.1em",
-                  "text-transform": "uppercase",
-                  color: TOKEN.textSecondary,
-                }}
-              >
-                AI Summary
-              </h2>
+            <NoteSupportSection title="AI Summary" defaultOpen={true}>
               <p
                 style={{
                   margin: 0,
@@ -1441,25 +2429,12 @@ function NoteRightPanel(props: {
               >
                 {note().summary}
               </p>
-            </section>
+            </NoteSupportSection>
 
             {/* AI Actions — Phase 7 */}
-            <section aria-labelledby="ai-actions-heading">
-              <h2
-                id="ai-actions-heading"
-                style={{
-                  margin: "0 0 0.5em",
-                  "font-size": "0.6875em",
-                  "font-weight": "700",
-                  "letter-spacing": "0.1em",
-                  "text-transform": "uppercase",
-                  color: TOKEN.textSecondary,
-                }}
-              >
-                AI Actions
-              </h2>
+            <NoteSupportSection title="AI Actions">
               <AIActionsPanel note={note()} onClose={() => {}} />
-            </section>
+            </NoteSupportSection>
 
             {/* Contextual suggestion chips — Phase 7 */}
             <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.375em" }}>
@@ -1491,26 +2466,17 @@ function NoteRightPanel(props: {
 
             {/* Backlinks — Phase 6 */}
             <Show when={note().backlinks.length > 0}>
-              <section aria-labelledby="backlinks-heading">
-                <h2
-                  id="backlinks-heading"
-                  style={{
-                    margin: "0 0 0.5em",
-                    "font-size": "0.6875em",
-                    "font-weight": "700",
-                    "letter-spacing": "0.1em",
-                    "text-transform": "uppercase",
-                    color: TOKEN.textSecondary,
-                  }}
-                >
-                  Backlinks
-                </h2>
+              <NoteSupportSection title="Backlinks" defaultOpen={true}>
                 <div style={{ display: "flex", "flex-direction": "column", gap: "0.5em" }}>
                   <For each={note().backlinks}>
                     {(bl) => {
                       const target = () => props.allNotes.find((n) => n.id === bl.targetId);
+                      const isBroken = () => !target();
                       return (
                         <button
+                          type="button"
+                          disabled={isBroken()}
+                          title={isBroken() ? "This link is broken" : undefined}
                           onClick={() => target() && props.onSelectNote(bl.targetId)}
                           style={{
                             display: "flex",
@@ -1518,70 +2484,65 @@ function NoteRightPanel(props: {
                             gap: "0.625em",
                             padding: "0.5em 0.75em",
                             background: TOKEN.bg,
-                            border: `1px solid ${TOKEN.border}`,
+                            border: `1px solid ${isBroken() ? "#f2cbc0" : TOKEN.border}`,
                             "border-radius": "0.5em",
-                            cursor: "pointer",
+                            cursor: isBroken() ? "not-allowed" : "pointer",
                             "font-size": "0.875em",
-                            color: TOKEN.text,
+                            color: isBroken() ? "#9b8f84" : TOKEN.text,
                             "font-family": "Inter, system-ui, sans-serif",
                             "text-align": "left",
                             transition: TOKEN.transition,
                             "min-height": TOKEN.touchTarget,
+                            opacity: isBroken() ? "0.78" : "1",
                           }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = TOKEN.accent; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = TOKEN.border; }}
+                          onMouseEnter={(e) => {
+                            if (isBroken()) return;
+                            (e.currentTarget as HTMLElement).style.borderColor = TOKEN.accent;
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.borderColor = isBroken() ? "#f2cbc0" : TOKEN.border;
+                          }}
                           onFocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `2px solid ${TOKEN.accent}`; }}
                           onBlur={(e) => { (e.currentTarget as HTMLElement).style.outline = "none"; }}
                         >
-                          <span aria-hidden style={{ color: TOKEN.accent, "flex-shrink": "0" }}>→</span>
+                          <span aria-hidden style={{ color: isBroken() ? "#b2644b" : TOKEN.accent, "flex-shrink": "0" }}>
+                            {isBroken() ? "!" : "->"}
+                          </span>
                           <div>
-                            <span style={{ "font-weight": "500" }}>{bl.targetTitle}</span>
+                            <span
+                              style={{
+                                "font-weight": "500",
+                                "text-decoration": isBroken() ? "line-through" : "none",
+                                "text-decoration-thickness": isBroken() ? "1px" : undefined,
+                              }}
+                            >
+                              {bl.targetTitle}
+                            </span>
                             <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary, display: "block" }}>{bl.relation}</span>
+                            <Show when={isBroken()}>
+                              <span style={{ "font-size": "0.75em", color: "#b2644b", display: "block" }}>
+                                This link is broken
+                              </span>
+                            </Show>
                           </div>
                         </button>
                       );
                     }}
                   </For>
                 </div>
-              </section>
+              </NoteSupportSection>
             </Show>
 
             {/* 3D block — Phase 9 */}
             <Show when={note().metadata.has3d}>
-              <section aria-labelledby="3d-heading">
-                <h2
-                  id="3d-heading"
-                  style={{
-                    margin: "0 0 0.5em",
-                    "font-size": "0.6875em",
-                    "font-weight": "700",
-                    "letter-spacing": "0.1em",
-                    "text-transform": "uppercase",
-                    color: TOKEN.textSecondary,
-                  }}
-                >
-                  3D Object
-                </h2>
+              <NoteSupportSection title="3D Object">
                 <ThreeDViewer modelUrl={note().blocks.find((b) => b.type === "3d")?.modelUrl} />
-              </section>
+              </NoteSupportSection>
             </Show>
 
             {/* OCR info — Phase 8 */}
             <Show when={note().metadata.hasOcr}>
-              <section aria-labelledby="ocr-heading">
-                <h2
-                  id="ocr-heading"
-                  style={{
-                    margin: "0 0 0.5em",
-                    "font-size": "0.6875em",
-                    "font-weight": "700",
-                    "letter-spacing": "0.1em",
-                    "text-transform": "uppercase",
-                    color: TOKEN.textSecondary,
-                  }}
-                >
-                  OCR (PaddleOCR)
-                </h2>
+              <NoteSupportSection title="OCR">
                 <div
                   style={{
                     padding: "0.75em",
@@ -1598,24 +2559,11 @@ function NoteRightPanel(props: {
                   <span style={{ color: "#2E8B57", "font-weight": "700" }}>OCR</span>
                   <span style={{ color: TOKEN.textSecondary }}>Text extracted · Confidence ≥ 90% · Stored for search</span>
                 </div>
-              </section>
+              </NoteSupportSection>
             </Show>
 
             {/* Version timeline stub */}
-            <section aria-labelledby="version-heading">
-              <h2
-                id="version-heading"
-                style={{
-                  margin: "0 0 0.5em",
-                  "font-size": "0.6875em",
-                  "font-weight": "700",
-                  "letter-spacing": "0.1em",
-                  "text-transform": "uppercase",
-                  color: TOKEN.textSecondary,
-                }}
-              >
-                Version History
-              </h2>
+            <NoteSupportSection title="Version History">
               <div style={{ display: "flex", "flex-direction": "column", gap: "0.375em" }}>
                 {[
                   { label: "Current", time: note().updatedAt },
@@ -1642,11 +2590,11 @@ function NoteRightPanel(props: {
                   >
                     <span style={{ color: TOKEN.accent, "flex-shrink": "0", "font-size": "0.75em" }}>●</span>
                     <span style={{ "font-weight": "500" }}>{v.label}</span>
-                    <span style={{ color: TOKEN.textSecondary }}>— {relativeTime(v.time)}</span>
+                    <span style={{ color: TOKEN.textSecondary }}>— {noteRelativeTime(v.time)}</span>
                   </button>
                 ))}
               </div>
-            </section>
+            </NoteSupportSection>
           </div>
           );
         }}
@@ -1658,6 +2606,297 @@ function NoteRightPanel(props: {
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 5 — "Ask your notes" mode
 // ─────────────────────────────────────────────────────────────────────────────
+
+function NoteEditorWorkspace(props: {
+  note: Note | null;
+  onUpdateDraft: (noteId: string, draft: NoteDraft) => void;
+  onSaveDraft?: (note: Note) => void;
+  onReloadLatest?: (note: Note) => void;
+  onKeepDraft?: (note: Note) => void;
+  saveState?: NoteSaveState;
+  hasLocalDraft?: boolean;
+  compactScreen?: boolean;
+  browserOpen?: boolean;
+  supportOpen?: boolean;
+  onToggleBrowser?: () => void;
+  onToggleSupport?: () => void;
+}) {
+  return (
+    <Show
+      when={props.note}
+      fallback={
+        <section
+          aria-label="Note editor"
+          style={{
+            background: TOKEN.surface,
+            border: `1px solid ${TOKEN.border}`,
+            "border-radius": TOKEN.radius.gridCard,
+            padding: "1.25em",
+          }}
+        >
+          <p style={{ margin: 0, "font-size": "0.9375em", color: TOKEN.textSecondary }}>
+            Select a note to start editing.
+          </p>
+        </section>
+      }
+    >
+      {(note) => {
+        const body = () => noteBodyFromBlocks(note());
+        const canSave = () => props.saveState?.state === "warning" || Boolean(props.hasLocalDraft);
+        const statusTone = () => {
+          if (props.saveState?.state === "saving") {
+            return { label: "Saving", bg: `${TOKEN.accent}1A`, color: TOKEN.accent };
+          }
+          if (props.saveState?.state === "warning") {
+            return { label: "Remote update", bg: "#FFF7ED", color: "#B54708" };
+          }
+          if (props.saveState?.state === "error") {
+            return { label: "Save error", bg: "#FEF3F2", color: "#B42318" };
+          }
+          if (props.hasLocalDraft) {
+            return { label: "Draft", bg: `${TOKEN.accent}14`, color: TOKEN.accent };
+          }
+          if (props.saveState?.state === "saved") {
+            return { label: "Synced", bg: "#E8F5EC", color: "#2E8B57" };
+          }
+          return { label: "Ready", bg: TOKEN.bg, color: TOKEN.textSecondary };
+        };
+        return (
+          <section
+            aria-label="Note editor"
+            style={{
+              background: TOKEN.surface,
+              border: `1px solid ${TOKEN.border}`,
+              "border-radius": TOKEN.radius.gridCard,
+              padding: "1.25em",
+              display: "flex",
+              "flex-direction": "column",
+              gap: "0.875em",
+            }}
+          >
+            <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "1em" }}>
+              <div>
+                <p
+                  style={{
+                    margin: 0,
+                    "font-size": "0.6875em",
+                    "font-weight": "700",
+                    "letter-spacing": "0.1em",
+                    "text-transform": "uppercase",
+                    color: TOKEN.accent,
+                  }}
+                >
+                  Editor
+                </p>
+                <p style={{ margin: "0.25em 0 0", "font-size": "0.8125em", color: TOKEN.textSecondary }}>
+                  Primary note workspace. Search, graph, and AI tools stay secondary.
+                </p>
+              </div>
+              <div style={{ display: "flex", "align-items": "center", gap: "0.5em", "flex-wrap": "wrap", "justify-content": "flex-end" }}>
+                <Show when={props.compactScreen}>
+                  <button
+                    onClick={() => props.onToggleBrowser?.()}
+                    style={{
+                      "min-height": "2.25em",
+                      padding: "0 0.75em",
+                      border: `1px solid ${TOKEN.border}`,
+                      "border-radius": "9999px",
+                      background: props.browserOpen ? TOKEN.accent : TOKEN.surface,
+                      color: props.browserOpen ? "#fff" : TOKEN.textSecondary,
+                      cursor: "pointer",
+                      "font-size": "0.75em",
+                      "font-family": "Inter, system-ui, sans-serif",
+                    }}
+                  >
+                    {props.browserOpen ? "Hide browser" : "Show browser"}
+                  </button>
+                  <button
+                    onClick={() => props.onToggleSupport?.()}
+                    style={{
+                      "min-height": "2.25em",
+                      padding: "0 0.75em",
+                      border: `1px solid ${TOKEN.border}`,
+                      "border-radius": "9999px",
+                      background: props.supportOpen ? TOKEN.accent : TOKEN.surface,
+                      color: props.supportOpen ? "#fff" : TOKEN.textSecondary,
+                      cursor: "pointer",
+                      "font-size": "0.75em",
+                      "font-family": "Inter, system-ui, sans-serif",
+                    }}
+                  >
+                    {props.supportOpen ? "Hide support" : "Show support"}
+                  </button>
+                </Show>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    "align-items": "center",
+                    "min-height": "2.1em",
+                    padding: "0 0.75em",
+                    "border-radius": "9999px",
+                    background: statusTone().bg,
+                    color: statusTone().color,
+                    "font-size": "0.75em",
+                    "font-weight": "600",
+                    "font-family": "Inter, system-ui, sans-serif",
+                  }}
+                >
+                  {statusTone().label}
+                </span>
+                <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary }}>
+                  Updated {noteRelativeTime(note().updatedAt)}
+                </span>
+                <button
+                  onClick={() => props.onSaveDraft?.(note())}
+                  disabled={props.saveState?.state === "saving" || !canSave()}
+                  style={{
+                    "min-height": "2.25em",
+                    padding: "0 0.9em",
+                    border: "none",
+                    "border-radius": "9999px",
+                    background: TOKEN.accent,
+                    color: "#fff",
+                    cursor: props.saveState?.state === "saving" || !canSave() ? "not-allowed" : "pointer",
+                    "font-size": "0.75em",
+                    "font-weight": "600",
+                    "font-family": "Inter, system-ui, sans-serif",
+                    opacity: props.saveState?.state === "saving" || !canSave() ? "0.6" : "1",
+                  }}
+                >
+                  {props.saveState?.state === "saving"
+                    ? "Saving..."
+                    : props.saveState?.state === "warning"
+                      ? "Overwrite latest"
+                    : props.hasLocalDraft
+                      ? "Save changes"
+                      : "No changes"}
+                </button>
+              </div>
+            </div>
+            <Show when={props.saveState && (props.saveState.state !== "idle" || Boolean(props.saveState.message))}>
+              <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "0.75em", "flex-wrap": "wrap" }}>
+                <p
+                  style={{
+                    margin: 0,
+                    "font-size": "0.75em",
+                    color:
+                      props.saveState?.state === "error"
+                        ? "#B42318"
+                        : props.saveState?.state === "warning"
+                          ? "#B54708"
+                          : props.hasLocalDraft
+                            ? TOKEN.accent
+                          : TOKEN.textSecondary,
+                  }}
+                >
+                  {props.saveState?.message ??
+                    (props.saveState?.state === "saved"
+                      ? "Saved to AFP note lane."
+                      : props.saveState?.state === "warning"
+                        ? "A newer AFP note update is available."
+                      : props.saveState?.state === "saving"
+                        ? "Saving to AFP note lane..."
+                        : "")}
+                </p>
+                <Show when={props.saveState?.state === "warning"}>
+                  <div style={{ display: "flex", "align-items": "center", gap: "0.5em", "flex-wrap": "wrap" }}>
+                    <button
+                      onClick={() => props.onKeepDraft?.(note())}
+                      style={{
+                        "min-height": "2em",
+                        padding: "0 0.75em",
+                        border: `1px solid ${TOKEN.border}`,
+                        "border-radius": "9999px",
+                        background: TOKEN.bg,
+                        color: TOKEN.textSecondary,
+                        cursor: "pointer",
+                        "font-size": "0.75em",
+                        "font-weight": "600",
+                        "font-family": "Inter, system-ui, sans-serif",
+                      }}
+                    >
+                      Keep draft
+                    </button>
+                    <button
+                      onClick={() => props.onReloadLatest?.(note())}
+                      style={{
+                        "min-height": "2em",
+                        padding: "0 0.75em",
+                        border: `1px solid ${TOKEN.border}`,
+                        "border-radius": "9999px",
+                        background: TOKEN.surface,
+                        color: TOKEN.text,
+                        cursor: "pointer",
+                        "font-size": "0.75em",
+                        "font-weight": "600",
+                        "font-family": "Inter, system-ui, sans-serif",
+                      }}
+                    >
+                      Load latest
+                    </button>
+                  </div>
+                </Show>
+              </div>
+            </Show>
+            <div
+              style={{
+                width: "100%",
+                "max-width": "65ch",
+              }}
+            >
+              <input
+                type="text"
+                value={note().title}
+                disabled={props.saveState?.state === "saving"}
+                onInput={(e) =>
+                  props.onUpdateDraft(note().id, {
+                    title: e.currentTarget.value,
+                    body: body(),
+                  })
+                }
+                aria-label="Note title"
+                style={{
+                  width: "100%",
+                  border: "none",
+                  background: "transparent",
+                  outline: "none",
+                  padding: 0,
+                  "font-size": "1.5em",
+                  "font-weight": "700",
+                  color: TOKEN.text,
+                  "font-family": "var(--font-body)",
+                }}
+              />
+              <div style={{ "margin-top": "0.875em" }}>
+                <TiptapEditor
+                  mode="full"
+                  initialContent={body()}
+                  disabled={props.saveState?.state === "saving"}
+                  placeholder="Start writing..."
+                  submitLabel={
+                    props.saveState?.state === "warning"
+                      ? "Overwrite latest"
+                      : "Save note"
+                  }
+                  clearOnSend={false}
+                  onChange={(_, markdown) =>
+                    props.onUpdateDraft(note().id, {
+                      title: note().title,
+                      body: markdown,
+                    })
+                  }
+                  onSend={async () => {
+                    props.onSaveDraft?.(note());
+                  }}
+                />
+              </div>
+            </div>
+          </section>
+        );
+      }}
+    </Show>
+  );
+}
 
 function AskNotesBar(props: { notes: Note[] }) {
   const [question, setQuestion] = createSignal("");
@@ -1714,7 +2953,18 @@ function AskNotesBar(props: { notes: Note[] }) {
           placeholder="What did we decide about the graph model?"
           value={question()}
           onInput={(e) => setQuestion(e.currentTarget.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") ask(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              recordShortcutUse("form_submit");
+              ask();
+              return;
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              recordShortcutUse("form_cancel");
+              setQuestion("");
+            }
+          }}
           aria-label="Ask your notes a question"
           style={{
             flex: 1,
@@ -1803,7 +3053,7 @@ function FolderRuleModal(props: {
           Folder rules — {props.folder.name}
         </h2>
         <p style={{ margin: 0, "font-size": "0.8125em", color: TOKEN.textSecondary }}>
-          These rules become a first-class <code>folder_rule</code> AFP message. The Knowledge Curator applies them to all notes in this folder.
+          These rules become a first-class <code style={{ padding: "0.1em 0.35em", "border-radius": "0.35em", background: TOKEN.bg, color: TOKEN.text, "font-family": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace", "font-size": "0.95em" }}>folder_rule</code> AFP message. The Knowledge Curator applies them to all notes in this folder.
         </p>
         {(
           [
@@ -1884,7 +3134,7 @@ function AreaRuleModal(props: {
           {props.area ? `Area rules — ${props.area.rules.area}` : "New area rules"}
         </h2>
         <p style={{ margin: 0, "font-size": "0.8125em", color: TOKEN.textSecondary }}>
-          An <code>area_rules</code> AFP message spans multiple folders. The Knowledge Curator applies these rules across all folders in this area.
+          An <code style={{ padding: "0.1em 0.35em", "border-radius": "0.35em", background: TOKEN.bg, color: TOKEN.text, "font-family": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace", "font-size": "0.95em" }}>area_rules</code> AFP message spans multiple folders. The Knowledge Curator applies these rules across all folders in this area.
         </p>
         <label style={{ display: "flex", "flex-direction": "column", gap: "0.375em" }}>
           <span style={{ "font-size": "0.8125em", "font-weight": "600", color: TOKEN.textSecondary }}>Area name</span>
@@ -1946,12 +3196,22 @@ export function NoteView(props: NoteViewProps) {
   const [query, setQuery] = createSignal("");
   const [viewMode, setViewMode] = createSignal<"list" | "grid" | "graph">("list");
   const [sidebarOpen, setSidebarOpen] = createSignal(true);
+  const [focusMode, setFocusMode] = createSignal(false);
   const [activeFilter, setActiveFilter] = createSignal("all");
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
+  const [compactScreen, setCompactScreen] = createSignal(false);
+  const [browserSectionOpen, setBrowserSectionOpen] = createSignal(true);
+  const [supportRailOpen, setSupportRailOpen] = createSignal(true);
+  const [graphPaneOpen, setGraphPaneOpen] = createSignal(false);
+  const [noteSaveStates, setNoteSaveStates] = createSignal<Record<string, NoteSaveState>>({});
+  const [persistedNoteMeta, setPersistedNoteMeta] = createSignal<Record<string, NotePersistedMeta>>({});
+  const [refreshedNoteMessages, setRefreshedNoteMessages] = createSignal<Record<string, AfpMessage>>({});
+  const [acknowledgedRemoteNoteIds, setAcknowledgedRemoteNoteIds] = createSignal<Record<string, string>>({});
   const [folderRuleTarget, setFolderRuleTarget] = createSignal<Folder | null>(null);
   const [areaRuleTarget, setAreaRuleTarget] = createSignal<Area | "new" | null>(null);
+  const [noteDrafts, setNoteDrafts] = createSignal<Record<string, NoteDraft>>({});
   // Local tag deltas applied before the server echoes back (optimistic update)
-  const [localTagDeltas, setLocalTagDeltas] = createSignal<TagUpdateMsg[]>([]);
+  const [localTagDeltas, setLocalTagDeltas] = createSignal<NoteTagUpdate[]>([]);
 
   // Collapse sidebar on narrow screens automatically
   onMount(() => {
@@ -1959,7 +3219,26 @@ export function NoteView(props: NoteViewProps) {
     if (mq.matches) setSidebarOpen(false);
     const handler = (e: MediaQueryListEvent) => setSidebarOpen(!e.matches);
     mq.addEventListener("change", handler);
-    onCleanup(() => mq.removeEventListener("change", handler));
+
+    const compactMq = window.matchMedia("(max-width: 40em)");
+    const applyCompactState = (matches: boolean) => {
+      setCompactScreen(matches);
+      if (matches) {
+        setBrowserSectionOpen(false);
+        setSupportRailOpen(false);
+      } else {
+        setBrowserSectionOpen(true);
+        setSupportRailOpen(true);
+      }
+    };
+    applyCompactState(compactMq.matches);
+    const compactHandler = (e: MediaQueryListEvent) => applyCompactState(e.matches);
+    compactMq.addEventListener("change", compactHandler);
+
+    onCleanup(() => {
+      mq.removeEventListener("change", handler);
+      compactMq.removeEventListener("change", compactHandler);
+    });
   });
 
   // ── Data ─────────────────────────────────────────────────────────────────
@@ -1967,23 +3246,11 @@ export function NoteView(props: NoteViewProps) {
   // Parse folder_rule AFP messages → Folder[]
   const folders = createMemo<Folder[]>(() => {
     const msgs = (props.messages ?? []).filter((m) => m.type === "folder_rule");
-    // Latest message per folder_id wins (server returns oldest-first)
     const byFolder = new Map<string, Folder>();
     for (const m of msgs) {
-      const c = m.content as Record<string, unknown>;
-      const fid = typeof c.folder_id === "string" ? c.folder_id : "";
-      if (!fid) continue;
-      byFolder.set(fid, {
-        id: fid,
-        name: fid.charAt(0).toUpperCase() + fid.slice(1),
-        areaId: typeof c.area_id === "string" ? c.area_id : undefined,
-        rule: {
-          folder_id: fid,
-          summary_style: typeof c.summary_style === "string" ? c.summary_style : undefined,
-          backlink_rules: typeof c.backlink_rules === "string" ? c.backlink_rules : undefined,
-          tag_suggestions: Array.isArray(c.tag_suggestions) ? (c.tag_suggestions as string[]) : [],
-        },
-      });
+      const folder = folderFromRuleMessage(m);
+      if (!folder) continue;
+      byFolder.set(folder.id, folder);
     }
     return Array.from(byFolder.values());
   });
@@ -1993,79 +3260,26 @@ export function NoteView(props: NoteViewProps) {
     const msgs = (props.messages ?? []).filter((m) => m.type === "area_rules");
     const byArea = new Map<string, Area>();
     for (const m of msgs) {
-      const c = m.content as Record<string, unknown>;
-      const areaName = typeof c.area === "string" ? c.area : "";
-      if (!areaName) continue;
-      byArea.set(areaName, {
-        id: areaName,
-        rules: {
-          area: areaName,
-          summary_style: typeof c.summary_style === "string" ? c.summary_style : undefined,
-          backlink_rules: typeof c.backlink_rules === "string" ? c.backlink_rules : undefined,
-          tag_suggestions: Array.isArray(c.tag_suggestions) ? (c.tag_suggestions as string[]) : [],
-        },
-      });
+      const area = areaFromRuleMessage(m);
+      if (!area) continue;
+      byArea.set(area.id, area);
     }
     return Array.from(byArea.values());
   });
 
   // Parse tag_update AFP messages (server + local deltas combined)
-  const allTagUpdates = createMemo<TagUpdateMsg[]>(() => {
+  const allTagUpdates = createMemo<NoteTagUpdate[]>(() => {
     const fromServer = (props.messages ?? [])
       .filter((m) => m.type === "tag_update")
-      .map((m) => {
-        const c = m.content as Record<string, unknown>;
-        const refs = (m.references ?? []) as Array<Record<string, unknown>>;
-        return {
-          updateId: m.id,
-          sourceId: typeof refs[0]?.id === "string" ? refs[0].id : "",
-          timestamp: m.timestamp,
-          removeTags: Array.isArray(c.remove_tags) ? (c.remove_tags as string[]) : [],
-          addTags: Array.isArray(c.add_tags) ? (c.add_tags as string[]) : [],
-          removeSupertags: Array.isArray(c.remove_supertags) ? (c.remove_supertags as string[]) : [],
-          addSupertags: Array.isArray(c.add_supertags) ? (c.add_supertags as string[]) : [],
-        } satisfies TagUpdateMsg;
-      });
+      .map((m) => noteTagUpdateFromMessage(m));
     return [...fromServer, ...localTagDeltas()];
   });
-
-  /** Apply all tag_update deltas for a note and return effective (supertags, tags). */
-  function resolveNoteTags(note: Note): { tags: string[]; supertags: string[] } {
-    const deltas = allTagUpdates().filter((u) => u.sourceId === note.id);
-    deltas.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    let tags = [...note.tags];
-    let supertags = [...note.supertags];
-    for (const d of deltas) {
-      tags = tags.filter((t) => !d.removeTags.includes(t));
-      for (const t of d.addTags) { if (!tags.includes(t)) tags.push(t); }
-      supertags = supertags.filter((t) => !d.removeSupertags.includes(t));
-      for (const t of d.addSupertags) { if (!supertags.includes(t)) supertags.push(t); }
-    }
-    return { tags, supertags };
-  }
 
   // Merge AFP note messages as additional notes
   const afpNotes = createMemo<Note[]>(() =>
     (props.messages ?? [])
       .filter((m) => m.type.includes("note") || m.type === "knowledge_card")
-      .map((m) => {
-        const c = m.content as Record<string, unknown>;
-        return {
-          id: m.id,
-          title: typeof c.title === "string" ? c.title : m.id.slice(0, 16),
-          preview: typeof c.summary === "string" ? c.summary : "",
-          blocks: [],
-          summary: typeof c.summary === "string" ? c.summary : "",
-          tags: Array.isArray(c.tags) ? (c.tags as string[]) : [],
-          supertags: Array.isArray(c.supertags) ? (c.supertags as string[]) : [],
-          backlinks: [],
-          updatedAt: m.timestamp,
-          createdAt: m.timestamp,
-          folderId: typeof c.folder_id === "string" ? c.folder_id : undefined,
-          areaId: typeof c.area_id === "string" ? c.area_id : undefined,
-          metadata: {},
-        } satisfies Note;
-      })
+      .map((m) => afpNoteFromMessage(m))
   );
 
   const allNotes = createMemo<Note[]>(() => [...afpNotes(), ...DEMO_NOTES]);
@@ -2073,8 +3287,39 @@ export function NoteView(props: NoteViewProps) {
   // Notes with resolved tags applied
   const allNotesResolved = createMemo<Note[]>(() =>
     allNotes().map((n) => {
-      const { tags, supertags } = resolveNoteTags(n);
-      return { ...n, tags, supertags };
+      const refreshed = refreshedNoteMessages()[n.id];
+      const serverBackedNote = refreshed
+        ? {
+            ...n,
+            ...noteFromAfpMessage(refreshed),
+          }
+        : n;
+      const { tags, supertags } = resolveNoteTags(serverBackedNote, allTagUpdates());
+      const draft = noteDrafts()[n.id];
+      const persisted = persistedNoteMeta()[n.id];
+      if (!draft) {
+        return {
+          ...serverBackedNote,
+          threadId: persisted?.threadId ?? serverBackedNote.threadId,
+          messageId: persisted?.messageId ?? serverBackedNote.messageId,
+          updatedAt: persisted?.savedAt ?? serverBackedNote.updatedAt,
+          tags,
+          supertags,
+        };
+      }
+      const preview = notePreviewFromBody(draft.body);
+      return {
+        ...serverBackedNote,
+        threadId: persisted?.threadId ?? serverBackedNote.threadId,
+        messageId: persisted?.messageId ?? serverBackedNote.messageId,
+        title: draft.title,
+        preview: preview || serverBackedNote.preview,
+        summary: preview || serverBackedNote.summary,
+        blocks: [{ type: "paragraph", text: draft.body }],
+        updatedAt: persisted?.savedAt ?? serverBackedNote.updatedAt,
+        tags,
+        supertags,
+      };
     })
   );
 
@@ -2085,6 +3330,10 @@ export function NoteView(props: NoteViewProps) {
     [...new Set(allNotesResolved().flatMap((n) => n.supertags))]
   );
 
+  const noteEditorPrimaryId = createMemo<string | null>(() =>
+    filteredNotes()[0]?.id ?? allNotesResolved()[0]?.id ?? null
+  );
+
   // ── Filtering + search (Phase 5) ─────────────────────────────────────────
   const filteredNotes = createMemo<Note[]>(() => {
     let notes = allNotesResolved();
@@ -2092,6 +3341,9 @@ export function NoteView(props: NoteViewProps) {
     if (f.startsWith("tag:")) {
       const tag = f.slice(4);
       notes = notes.filter((n) => n.tags.includes(tag));
+    } else if (f.startsWith("supertag:")) {
+      const supertag = f.slice(9);
+      notes = notes.filter((n) => n.supertags.includes(supertag));
     } else if (f.startsWith("folder:")) {
       const fid = f.slice(7);
       notes = notes.filter((n) => n.folderId === fid);
@@ -2116,6 +3368,85 @@ export function NoteView(props: NoteViewProps) {
   const selectedNote = createMemo<Note | null>(() =>
     allNotesResolved().find((n) => n.id === selectedId()) ?? null
   );
+  const noteBrowserLabel = createMemo(() => {
+    const mode = viewMode();
+    if (mode === "grid") return "Grid browser";
+    if (mode === "graph") return "Graph lens";
+    return "List browser";
+  });
+
+  function handleReloadLatestNote(note: Note) {
+    const refreshed = refreshedNoteMessages()[note.id];
+    if (!refreshed) return;
+    setNoteDrafts((current) => {
+      const next = { ...current };
+      delete next[note.id];
+      return next;
+    });
+    setPersistedNoteMeta((current) => ({
+      ...current,
+      [note.id]: {
+        threadId: refreshed.thread_id,
+        messageId: refreshed.id,
+        savedAt: refreshed.timestamp,
+      },
+    }));
+    setNoteSaveStates((current) => ({
+      ...current,
+      [note.id]: {
+        state: "saved",
+        message: "Loaded latest AFP note update.",
+        savedAt: refreshed.timestamp,
+      },
+    }));
+    setAcknowledgedRemoteNoteIds((current) => {
+      const next = { ...current };
+      delete next[note.id];
+      return next;
+    });
+  }
+
+  function handleKeepLocalDraft(note: Note) {
+    const refreshed = refreshedNoteMessages()[note.id];
+    if (refreshed) {
+      setAcknowledgedRemoteNoteIds((current) => ({
+        ...current,
+        [note.id]: refreshed.id,
+      }));
+    }
+    setNoteSaveStates((current) => ({
+      ...current,
+      [note.id]: {
+        state: "idle",
+        message: "Unsaved local edits.",
+      },
+    }));
+  }
+
+  createEffect(() => {
+    const primaryId = noteEditorPrimaryId();
+    if (!primaryId) return;
+    if (selectedId() === null) {
+      setSelectedId(primaryId);
+    }
+  });
+
+  createEffect(() => {
+    const currentSelectedId = selectedId();
+    if (!currentSelectedId) return;
+    const filtered = filteredNotes();
+    if (filtered.length === 0) return;
+    if (!filtered.some((note) => note.id === currentSelectedId)) {
+      setSelectedId(filtered[0]!.id);
+    }
+  });
+
+  createEffect(() => {
+    if (!compactScreen()) return;
+    if (selectedNote()) {
+      setBrowserSectionOpen(false);
+    }
+  });
 
   // ── tag_update dispatch ───────────────────────────────────────────────────
   function handleTagUpdate(
@@ -2216,9 +3547,290 @@ export function NoteView(props: NoteViewProps) {
     setSelectedId(id);
   }
 
+  function clearNoteBrowserFilters() {
+    setQuery("");
+    setActiveFilter("all");
+    setBrowserSectionOpen(true);
+  }
+
+  function renderNoteBrowserEmptyState() {
+    const filtered = activeFilter() !== "all" || query().trim().length > 0;
+    return (
+      <div style={{ padding: "3em", "text-align": "center", color: TOKEN.textSecondary, "font-size": "0.9375em" }}>
+        <p style={{ margin: 0 }}>
+          {filtered
+            ? "No notes match the current search or filter."
+            : "No notes found yet."}
+        </p>
+        <div style={{ display: "flex", gap: "0.75em", "justify-content": "center", "flex-wrap": "wrap", "margin-top": "1em" }}>
+          <button
+            type="button"
+            onClick={() => handleNewNote("text")}
+            style={{
+              border: "none",
+              background: TOKEN.accent,
+              color: "#fff",
+              "border-radius": "0.75em",
+              padding: "0.8em 1em",
+              cursor: "pointer",
+              "font-size": "0.875em",
+              "font-weight": 600,
+              "min-height": TOKEN.touchTarget,
+            }}
+          >
+            New Note
+          </button>
+          <Show when={filtered}>
+            <button
+              type="button"
+              onClick={clearNoteBrowserFilters}
+              style={{
+                border: `1px solid ${TOKEN.border}`,
+                background: TOKEN.bg,
+                color: TOKEN.text,
+                "border-radius": "0.75em",
+                padding: "0.8em 1em",
+                cursor: "pointer",
+                "font-size": "0.875em",
+                "font-weight": 500,
+                "min-height": TOKEN.touchTarget,
+              }}
+            >
+              Clear filters
+            </button>
+          </Show>
+        </div>
+      </div>
+    );
+  }
+
+  function handleUpdateDraft(noteId: string, draft: NoteDraft) {
+    setNoteDrafts((current) => ({
+      ...current,
+      [noteId]: draft,
+    }));
+    setNoteSaveStates((current) => ({
+      ...current,
+      [noteId]: {
+        state: "idle",
+        message: "Unsaved local edits.",
+      },
+    }));
+  }
+
+  async function refreshNoteFromThread(noteId: string, threadId: string): Promise<AfpMessage | null> {
+    const threadMessages = await fetchThread(threadId);
+    const latestSavedNote = [...threadMessages]
+      .reverse()
+      .find((message) => message.type === "note");
+    if (!latestSavedNote) return null;
+    setRefreshedNoteMessages((current) => ({
+      ...current,
+      [noteId]: latestSavedNote,
+    }));
+    setPersistedNoteMeta((current) => ({
+      ...current,
+      [noteId]: {
+        threadId,
+        messageId: latestSavedNote.id,
+        savedAt: latestSavedNote.timestamp,
+      },
+    }));
+    setAcknowledgedRemoteNoteIds((current) => {
+      if (!current[noteId]) return current;
+      const next = { ...current };
+      delete next[noteId];
+      return next;
+    });
+    return latestSavedNote;
+  }
+
+  async function handleSaveNote(note: Note) {
+    const draft = noteDrafts()[note.id];
+    const body = draft?.body ?? noteBodyFromBlocks(note);
+    const title = (draft?.title ?? note.title).trim();
+    const summary = notePreviewFromBody(body);
+    const threadId = note.threadId ?? note.id;
+    const content: NoteContentPayload = {
+      title: title || "Untitled note",
+      body,
+      summary,
+      tags: note.tags,
+      supertags: note.supertags,
+      folder_id: note.folderId,
+      area_id: note.areaId,
+    };
+
+    setNoteSaveStates((current) => ({
+      ...current,
+      [note.id]: {
+        state: "saving",
+        message: "Saving to AFP note lane...",
+      },
+    }));
+
+    try {
+      const messageId = await sendNoteMessage({
+        type: "note",
+        thread_id: threadId,
+        content,
+        references: note.messageId ? [{ id: note.messageId }] : undefined,
+      });
+      const savedAt = new Date().toISOString();
+      setPersistedNoteMeta((current) => ({
+        ...current,
+        [note.id]: {
+          threadId,
+          messageId,
+          savedAt,
+        },
+      }));
+      setNoteSaveStates((current) => ({
+        ...current,
+        [note.id]: {
+          state: "saved",
+          message: `Saved to AFP note lane as ${messageId.slice(0, 8)}...`,
+          savedAt,
+        },
+      }));
+
+      try {
+        const latestSavedNote = await refreshNoteFromThread(note.id, threadId);
+        if (latestSavedNote) {
+          setNoteDrafts((current) => {
+            const next = { ...current };
+            delete next[note.id];
+            return next;
+          });
+          setNoteSaveStates((current) => ({
+            ...current,
+            [note.id]: {
+              state: "saved",
+              message: "Saved and refreshed from AFP note lane.",
+              savedAt: latestSavedNote.timestamp,
+            },
+          }));
+        }
+      } catch {
+        setNoteSaveStates((current) => ({
+          ...current,
+          [note.id]: {
+            state: "saved",
+            message: "Saved to AFP note lane. Refresh pending.",
+            savedAt,
+          },
+        }));
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to save note.";
+      setNoteSaveStates((current) => ({
+        ...current,
+        [note.id]: {
+          state: "error",
+          message,
+        },
+      }));
+    }
+  }
+
   // ── Keyboard nav (Phase 10) ──────────────────────────────────────────────
+  createEffect(() => {
+    const note = selectedNote();
+    const threadId = note?.threadId;
+    if (!note || !threadId) return;
+
+    let cancelled = false;
+    const refreshSelectedNote = async () => {
+      try {
+        const previousMessageId = persistedNoteMeta()[note.id]?.messageId ?? note.messageId ?? null;
+        const acknowledgedRemoteId = acknowledgedRemoteNoteIds()[note.id] ?? null;
+        const latestSavedNote = await refreshNoteFromThread(note.id, threadId);
+        if (!latestSavedNote || cancelled) return;
+        if (!noteDrafts()[note.id]) {
+          setNoteSaveStates((current) => {
+            const previous = current[note.id];
+            if (!previous || previous.state === "saving") return current;
+            return {
+              ...current,
+              [note.id]: {
+                state: "saved",
+                message: "Reconciled with latest AFP note update.",
+                savedAt: latestSavedNote.timestamp,
+              },
+            };
+          });
+        } else if (
+          latestSavedNote.id !== previousMessageId &&
+          latestSavedNote.id !== acknowledgedRemoteId
+        ) {
+          setNoteSaveStates((current) => {
+            const previous = current[note.id];
+            if (previous?.state === "saving") return current;
+            return {
+              ...current,
+              [note.id]: {
+                state: "warning",
+                message: "A newer AFP note update arrived while local edits are open. Save to overwrite or keep editing before reloading.",
+                savedAt: latestSavedNote.timestamp,
+              },
+            };
+          });
+        }
+      } catch {
+        // Keep the editor stable if background reconciliation misses a frame.
+      }
+    };
+
+    const unsubscribe = subscribeThread(threadId, () => {
+      void refreshSelectedNote();
+    });
+
+    onCleanup(() => {
+      cancelled = true;
+      unsubscribe();
+    });
+  });
+
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape") setSelectedId(null);
+    if (e.key === "Escape") setFocusMode(false);
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      const note = selectedNote();
+      if (!note) return;
+      e.preventDefault();
+      const saveState = note ? noteSaveStates()[note.id] : undefined;
+      const hasLocalDraft = Boolean(note && noteDrafts()[note.id]);
+      const canSave = Boolean(
+        note &&
+        saveState?.state !== "saving" &&
+        (saveState?.state === "warning" || hasLocalDraft)
+      );
+      if (canSave) {
+        void handleSaveNote(note);
+        return;
+      }
+      setNoteSaveStates((current) => ({
+        ...current,
+        [note.id]: {
+          state: "idle",
+          message: "No local changes to save.",
+        },
+      }));
+      window.setTimeout(() => {
+        setNoteSaveStates((current) => {
+          const existing = current[note.id];
+          if (!existing || existing.message !== "No local changes to save.") {
+            return current;
+          }
+          return {
+            ...current,
+            [note.id]: {
+              state: "idle",
+            },
+          };
+        });
+      }, 1800);
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === "k") {
       e.preventDefault();
       (document.querySelector('[aria-label="Search notes"]') as HTMLElement | null)?.focus();
@@ -2246,21 +3858,37 @@ export function NoteView(props: NoteViewProps) {
       }}
     >
       {/* Phase 2 — Top bar */}
-      <NoteTopBar
-        query={query()}
-        onQuery={setQuery}
-        viewMode={viewMode()}
-        onViewMode={setViewMode}
-        onNewNote={handleNewNote}
-        sidebarOpen={sidebarOpen()}
-        onToggleSidebar={() => setSidebarOpen((v) => !v)}
-      />
+      <Show when={!focusMode()}>
+        <NoteTopBar
+          query={query()}
+          onQuery={setQuery}
+          viewMode={viewMode()}
+          onViewMode={setViewMode}
+          onNewNote={handleNewNote}
+          sidebarOpen={sidebarOpen()}
+          onToggleSidebar={() => setSidebarOpen((v) => !v)}
+          focusMode={focusMode()}
+          onToggleFocus={() => setFocusMode((v) => !v)}
+        />
+      </Show>
+      <Show when={focusMode()}>
+        {/* Minimal focus bar — just title + exit button */}
+        <div style={{ display: "flex", "align-items": "center", "justify-content": "flex-end", padding: "0.5em 1em", "flex-shrink": "0", "border-bottom": `1px solid ${TOKEN.border}` }}>
+          <button
+            onClick={() => setFocusMode(false)}
+            title="Exit focus mode"
+            style={{ background: "transparent", border: `1px solid ${TOKEN.border}`, "border-radius": TOKEN.radius.button, padding: "0.25em 0.75em", "font-size": "0.8125em", color: TOKEN.textSecondary, cursor: "pointer", "font-family": "Inter, system-ui, sans-serif", transition: TOKEN.transition }}
+          >
+            ✕ Exit focus
+          </button>
+        </div>
+      </Show>
 
       {/* Body row */}
       <div style={{ display: "flex", flex: 1, "min-height": 0, overflow: "hidden" }}>
-        {/* Phase 2 — Left sidebar */}
+        {/* Phase 2 — Left sidebar (hidden in focus mode) */}
         <NoteLeftSidebar
-          open={sidebarOpen()}
+          open={sidebarOpen() && !focusMode()}
           activeFilter={activeFilter()}
           onFilter={setActiveFilter}
           allTags={allTags()}
@@ -2285,34 +3913,92 @@ export function NoteView(props: NoteViewProps) {
           }}
         >
           {/* Phase 5 — Ask your notes bar */}
-          <AskNotesBar notes={allNotes()} />
+          <NoteEditorWorkspace
+            note={selectedNote()}
+            onUpdateDraft={handleUpdateDraft}
+            onSaveDraft={handleSaveNote}
+            onReloadLatest={handleReloadLatestNote}
+            onKeepDraft={handleKeepLocalDraft}
+            saveState={selectedNote() ? noteSaveStates()[selectedNote()!.id] : undefined}
+            hasLocalDraft={Boolean(selectedNote() && noteDrafts()[selectedNote()!.id])}
+            compactScreen={compactScreen()}
+            browserOpen={browserSectionOpen()}
+            supportOpen={supportRailOpen()}
+            onToggleBrowser={() => setBrowserSectionOpen((value) => !value)}
+            onToggleSupport={() => setSupportRailOpen((value) => !value)}
+          />
+          <NoteGraphAccessPane
+            open={graphPaneOpen()}
+            onToggle={() => setGraphPaneOpen((value) => !value)}
+            notes={allNotesResolved()}
+            selectedId={selectedId()}
+            onSelectNote={(id) => setSelectedId(id)}
+            folders={folders()}
+            areas={areas()}
+            tags={allTags()}
+            supertags={allSupertags()}
+            activeBrowserFilter={activeFilter()}
+            onApplyBrowserFilter={(filter) => {
+              setActiveFilter(filter);
+              setBrowserSectionOpen(true);
+            }}
+          />
+          <AskNotesBar notes={allNotesResolved()} />
 
+          <Show when={!compactScreen() || browserSectionOpen()}>
+          <section
+            aria-label="Note browser"
+            style={{
+              background: TOKEN.surface,
+              border: `1px solid ${TOKEN.border}`,
+              "border-radius": TOKEN.radius.gridCard,
+              padding: "1em 1.25em",
+              display: "flex",
+              "flex-direction": "column",
+              gap: "0.875em",
+            }}
+          >
           {/* Note count / empty state */}
           <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between" }}>
+            <div>
+              <p style={{ margin: 0, "font-size": "0.6875em", "font-weight": "700", "letter-spacing": "0.1em", "text-transform": "uppercase", color: TOKEN.textSecondary }}>
+                {noteBrowserLabel()}
+              </p>
+              <p style={{ margin: "0.25em 0 0", "font-size": "0.8125em", color: TOKEN.textSecondary }}>
+                {filteredNotes().length} note{filteredNotes().length !== 1 ? "s" : ""}
+                <Show when={query()}> matching <strong style={{ color: TOKEN.text }}>"{query()}"</strong></Show>
+              </p>
+            </div>
             <p style={{ margin: 0, "font-size": "0.8125em", color: TOKEN.textSecondary }}>
-              {filteredNotes().length} note{filteredNotes().length !== 1 ? "s" : ""}
-              <Show when={query()}> matching <strong style={{ color: TOKEN.text }}>"{query()}"</strong></Show>
+              <Show when={selectedNote()} fallback={<>Select a note to move from browse into edit.</>}>
+                Browse stays secondary while the editor is open.
+              </Show>
             </p>
           </div>
 
           {/* Phase 3 & 6 — Views */}
+          <div
+            style={{
+              "max-height": selectedNote() ? "18em" : "none",
+              overflow: "auto",
+              display: "flex",
+              "flex-direction": "column",
+              gap: TOKEN.gap.card,
+            }}
+          >
           <Show when={viewMode() === "list"}>
             <div
               role="list"
               aria-label="Notes list"
               style={{ display: "flex", "flex-direction": "column", gap: TOKEN.gap.card }}
             >
-              <For each={filteredNotes()} fallback={
-                <div style={{ padding: "3em", "text-align": "center", color: TOKEN.textSecondary, "font-size": "0.9375em" }}>
-                  No notes found. Create your first note with the <strong style={{ color: TOKEN.accent }}>+ New Note</strong> button.
-                </div>
-              }>
+              <For each={filteredNotes()} fallback={renderNoteBrowserEmptyState()}>
                 {(note) => (
                   <div role="listitem">
                     <NoteListCard
                       note={note}
                       selected={selectedId() === note.id}
-                      onSelect={() => setSelectedId(note.id === selectedId() ? null : note.id)}
+                      onSelect={() => setSelectedId(note.id)}
                     />
                   </div>
                 )}
@@ -2330,17 +4016,13 @@ export function NoteView(props: NoteViewProps) {
                 gap: TOKEN.gap.card,
               }}
             >
-              <For each={filteredNotes()} fallback={
-                <div style={{ padding: "3em", "text-align": "center", color: TOKEN.textSecondary, "font-size": "0.9375em" }}>
-                  No notes found.
-                </div>
-              }>
+              <For each={filteredNotes()} fallback={renderNoteBrowserEmptyState()}>
                 {(note) => (
                   <div role="listitem">
                     <NoteGridCard
                       note={note}
                       selected={selectedId() === note.id}
-                      onSelect={() => setSelectedId(note.id === selectedId() ? null : note.id)}
+                      onSelect={() => setSelectedId(note.id)}
                     />
                   </div>
                 )}
@@ -2352,18 +4034,25 @@ export function NoteView(props: NoteViewProps) {
             <NoteGraphView
               notes={filteredNotes()}
               selectedId={selectedId()}
-              onSelectNote={(id) => setSelectedId(id === selectedId() ? null : id)}
+              onSelectNote={(id) => setSelectedId(id)}
             />
+          </Show>
+          </div>
+          </section>
           </Show>
         </main>
 
         {/* Phase 2 + 7 — Right panel (shown when note selected) */}
-        <Show when={selectedNote()}>
+        <Show when={selectedNote() && (!compactScreen() || supportRailOpen())}>
           <NoteRightPanel
             note={selectedNote()}
             allNotes={allNotesResolved()}
-            onClose={() => setSelectedId(null)}
+            onClose={() => setSelectedId(noteEditorPrimaryId())}
             onSelectNote={(id) => setSelectedId(id)}
+            onFilter={(filter) => {
+              setActiveFilter(filter);
+              setBrowserSectionOpen(true);
+            }}
             onTagUpdate={handleTagUpdate}
           />
         </Show>

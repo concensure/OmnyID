@@ -1,13 +1,26 @@
 import { createSignal, For, Show, onCleanup } from "solid-js";
 import {
+  approvalOptionActionTitle,
+  approvalOptionLabel,
+  approvalPendingStatusLabel,
+} from "afp-ts/continuity";
+import { workflowApprovalGateCountSummary } from "@/lib/workflowGraphCopy";
+import {
   saveWorkflow,
   startWorkflowRun,
   openRunStream,
   listWorkflowWaitResumeRecords,
   decideWorkflowWaitResume,
-  type WorkflowRunStartResponse,
-  type WorkflowWaitResumeListResponse,
 } from "@/lib/api";
+import {
+  buildCofounderStudioFailureReceipt,
+  type CofounderStudioFailureReceipt,
+} from "@/lib/cofounderStudioFailureState";
+import { isRecord } from "@/lib/eventDetail";
+import { parseCofounderStudioStreamEvent } from "@/lib/cofounderStudioStreamState";
+import { ApprovalDecisionButtons } from "@/components/ApprovalDecisionButtons";
+import { ProcessingGlyph } from "@/components/ProcessingGlyph";
+import { TiptapEditor } from "@/components/editor/TiptapEditor";
 
 // ── Stage definitions ─────────────────────────────────────────────────────────
 
@@ -116,7 +129,9 @@ export function CofounderStudioView(props: { onNavigateBack?: () => void }) {
   const [stages, setStages] = createSignal<Stage[]>(INITIAL_STAGES.map(s => ({ ...s })));
   const [workflowId, setWorkflowId] = createSignal<string | null>(null);
   const [runId, setRunId] = createSignal<string | null>(null);
-  const [error, setError] = createSignal<string | null>(null);
+  const [launchError, setLaunchError] = createSignal<CofounderStudioFailureReceipt | null>(null);
+  const [actionError, setActionError] = createSignal<CofounderStudioFailureReceipt | null>(null);
+  const [streamError, setStreamError] = createSignal<CofounderStudioFailureReceipt | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [economyMode, setEconomyMode] = createSignal(true);
   const [activeApprovalWaitId, setActiveApprovalWaitId] = createSignal<string | null>(null);
@@ -137,59 +152,68 @@ export function CofounderStudioView(props: { onNavigateBack?: () => void }) {
 
   function subscribeToRun(wfId: string, rId: string) {
     if (eventSource) { eventSource.close(); eventSource = null; }
+    setStreamError(null);
     eventSource = openRunStream(wfId, rId);
 
     eventSource.addEventListener("node_started", (ev: MessageEvent<string>) => {
-      try {
-        const data = JSON.parse(ev.data) as { node_id?: string; slot_name?: string };
-        const slotName = data.slot_name;
-        const stage = INITIAL_STAGES.find(s => s.slotName === slotName);
-        if (stage) updateStage(stage.id, { status: "running" });
-      } catch { /* ignore */ }
+      setStreamError(null);
+      const data = parseCofounderStudioStreamEvent(ev.data);
+      const stage = INITIAL_STAGES.find(s => s.slotName === data?.slotName);
+      if (stage) updateStage(stage.id, { status: "running" });
     });
 
     eventSource.addEventListener("node_completed", (ev: MessageEvent<string>) => {
-      try {
-        const data = JSON.parse(ev.data) as { node_id?: string; slot_name?: string; output?: Record<string, unknown> };
-        const slotName = data.slot_name;
-        const stage = INITIAL_STAGES.find(s => s.slotName === slotName);
-        if (stage) {
-          const output: StageOutput = {};
-          if (typeof data.output?.summary === "string") output.text = data.output.summary as string;
-          updateStage(stage.id, { status: stage.requiresApproval ? "awaiting_approval" : "complete", output });
-          if (stage.requiresApproval) void pollApprovals(wfId, rId);
-        }
-      } catch { /* ignore */ }
+      setStreamError(null);
+      const data = parseCofounderStudioStreamEvent(ev.data);
+      const stage = INITIAL_STAGES.find(s => s.slotName === data?.slotName);
+      if (stage) {
+        const output: StageOutput = {};
+        if (typeof data?.output?.summary === "string") output.text = data.output.summary;
+        updateStage(stage.id, { status: stage.requiresApproval ? "awaiting_approval" : "complete", output });
+        if (stage.requiresApproval) void pollApprovals(wfId, rId);
+      }
     });
 
     eventSource.addEventListener("node_failed", (ev: MessageEvent<string>) => {
-      try {
-        const data = JSON.parse(ev.data) as { slot_name?: string; error?: string };
-        const slotName = data.slot_name;
-        const stage = INITIAL_STAGES.find(s => s.slotName === slotName);
-        if (stage) updateStage(stage.id, { status: "failed", output: { text: data.error ?? "Stage failed" } });
-      } catch { /* ignore */ }
+      setStreamError(null);
+      const data = parseCofounderStudioStreamEvent(ev.data);
+      const stage = INITIAL_STAGES.find(s => s.slotName === data?.slotName);
+      if (stage) updateStage(stage.id, { status: "failed", output: { text: data?.error ?? "Stage failed" } });
     });
 
     eventSource.addEventListener("run_completed", () => {
+      setStreamError(null);
       setPhase("complete");
       setStages(prev => prev.map(s => s.status !== "failed" ? { ...s, status: "complete" } : s));
       eventSource?.close();
     });
 
     eventSource.onerror = () => {
-      setError("Lost connection to run stream. Check the Automations tab for status.");
+      setStreamError(
+        buildCofounderStudioFailureReceipt(
+          "Run stream",
+          "Lost connection to run stream. Retry the stream or check the Automations tab for status.",
+        ),
+      );
       eventSource?.close();
+      eventSource = null;
     };
   }
 
   onCleanup(() => { eventSource?.close(); });
 
+  function retryRunStream() {
+    const wfId = workflowId();
+    const rId = runId();
+    if (!wfId || !rId) return;
+    subscribeToRun(wfId, rId);
+  }
+
   // ── Approval polling ──────────────────────────────────────────────────────
 
   async function pollApprovals(wfId: string, rId: string) {
     try {
-      const res = await listWorkflowWaitResumeRecords(wfId, rId) as WorkflowWaitResumeListResponse;
+      const res = await listWorkflowWaitResumeRecords(wfId, rId);
       const pending = res.wait_resume_records?.find(r => r.status === "pending");
       if (pending) {
         setActiveApprovalWaitId(pending.wait_resume_id);
@@ -207,6 +231,7 @@ export function CofounderStudioView(props: { onNavigateBack?: () => void }) {
     if (!wfId || !rId || !waitId) return;
 
     try {
+      setActionError(null);
       await decideWorkflowWaitResume(wfId, rId, waitId, {
         decision,
         option_id: optionId,
@@ -217,7 +242,12 @@ export function CofounderStudioView(props: { onNavigateBack?: () => void }) {
       setApprovalNote("");
       setStages(prev => prev.map(s => s.status === "awaiting_approval" ? { ...s, status: "complete" } : s));
     } catch (e) {
-      setError((e as Error).message);
+      setActionError(
+        buildCofounderStudioFailureReceipt(
+          decision === "approved" ? "Approve stage" : "Reject stage",
+          e instanceof Error ? e.message : "Approval decision failed.",
+        ),
+      );
     }
   }
 
@@ -227,16 +257,21 @@ export function CofounderStudioView(props: { onNavigateBack?: () => void }) {
     const idea = ideaInput().trim();
     if (!idea) return;
     setBusy(true);
-    setError(null);
+    setLaunchError(null);
+    setActionError(null);
+    setStreamError(null);
 
     try {
       // 1. Save the workflow
       const graph = buildLaunchpadGraph(idea, "");
       if (economyMode()) {
         // In economy mode cap max_cost_cents at half the normal values
-        const nodes = graph.nodes as Array<Record<string, unknown>>;
+        const nodes = Array.isArray(graph.nodes)
+          ? graph.nodes.filter((node): node is Record<string, unknown> => isRecord(node))
+          : [];
         nodes.forEach(n => {
-          const policy = n.policy as Record<string, unknown>;
+          const policy = isRecord(n.policy) ? n.policy : null;
+          if (!policy) return;
           if (typeof policy.max_cost_cents === "number" && policy.max_cost_cents > 0) {
             policy.max_cost_cents = Math.ceil(policy.max_cost_cents as number / 2);
           }
@@ -248,7 +283,7 @@ export function CofounderStudioView(props: { onNavigateBack?: () => void }) {
       setWorkflowId(wfId);
 
       // 2. Start a run
-      const run = await startWorkflowRun(wfId, { trigger_kind: "manual" }) as WorkflowRunStartResponse;
+      const run = await startWorkflowRun(wfId, { trigger_kind: "manual" });
       const rId = run.run.run_id;
       setRunId(rId);
 
@@ -259,7 +294,12 @@ export function CofounderStudioView(props: { onNavigateBack?: () => void }) {
       // 4. Subscribe to SSE stream
       subscribeToRun(wfId, rId);
     } catch (e) {
-      setError((e as Error).message);
+      setLaunchError(
+        buildCofounderStudioFailureReceipt(
+          "Launch startup workflow",
+          e instanceof Error ? e.message : "Launch failed.",
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -314,12 +354,18 @@ export function CofounderStudioView(props: { onNavigateBack?: () => void }) {
             {/* Idea input */}
             <div class="mb-6 rounded-[22px] border border-white/40 bg-white/70 p-5 shadow-panel backdrop-blur-md">
               <label class="mb-2 block text-sm font-semibold text-on-surface">Your idea</label>
-              <textarea
-                class="w-full resize-none rounded-xl border border-white/50 bg-white/80 px-4 py-3 text-sm text-on-surface placeholder-on-surface-variant/60 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
-                rows={4}
-                placeholder="e.g. A SaaS tool that helps solo founders track their MRR, churn, and growth metrics in one place — no code required…"
-                value={ideaInput()}
-                onInput={(e) => setIdeaInput(e.currentTarget.value)}
+              <TiptapEditor
+                mode="compact"
+                initialContent={ideaInput()}
+                disabled={busy()}
+                placeholder="e.g. A SaaS tool that helps solo founders track their MRR, churn, and growth metrics in one place - no code required..."
+                submitLabel={busy() ? "Launching..." : "Launch startup idea"}
+                clearOnSend={false}
+                onChange={(_text, markdown) => setIdeaInput(markdown)}
+                onSend={async (payload) => {
+                  setIdeaInput(payload.markdown || payload.text);
+                  await launchWorkflow();
+                }}
               />
               <p class="mt-2 text-[11px] text-on-surface-variant">Be as brief or detailed as you like. The AI will ask clarifying questions in the first stage.</p>
             </div>
@@ -361,20 +407,25 @@ export function CofounderStudioView(props: { onNavigateBack?: () => void }) {
             </div>
 
             {/* Error */}
-            <Show when={error()}>
-              <div class="mb-4 rounded-xl border border-rose-200/70 bg-rose-50/80 px-4 py-3 text-sm text-rose-700">{error()}</div>
+            <Show when={launchError()}>
+              {(receipt) => (
+                <div
+                  class={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+                    receipt().tone === "danger"
+                      ? "border-rose-200/70 bg-rose-50/80 text-rose-700"
+                      : "border-amber-200/70 bg-amber-50/80 text-amber-800"
+                  }`}
+                >
+                  <p class="font-semibold">{receipt().title}</p>
+                  <p class="mt-1">{receipt().summary}</p>
+                  <p class="mt-1 text-xs opacity-80">{receipt().nextStep}</p>
+                </div>
+              )}
             </Show>
 
-            {/* Launch button */}
-            <button
-              type="button"
-              disabled={busy() || ideaInput().trim().length < 10}
-              onClick={() => void launchWorkflow()}
-              class="w-full rounded-[22px] border border-primary/40 bg-primary px-6 py-4 text-base font-bold text-white shadow-lg transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {busy() ? "Launching…" : "🚀 Launch My Startup Idea"}
-            </button>
-            <p class="mt-3 text-center text-[10px] text-on-surface-variant">3 human approval gates • All data stays private and E2EE</p>
+            <p class="mt-3 text-center text-[10px] text-on-surface-variant">
+              {workflowApprovalGateCountSummary(3)} • All data stays private and E2EE
+            </p>
           </div>
         </Show>
 
@@ -404,8 +455,49 @@ export function CofounderStudioView(props: { onNavigateBack?: () => void }) {
             </div>
 
             {/* Error */}
-            <Show when={error()}>
-              <div class="mt-4 rounded-xl border border-rose-200/70 bg-rose-50/80 px-4 py-3 text-sm text-rose-700">{error()}</div>
+            <Show when={streamError()}>
+              {(receipt) => (
+                <div
+                  class={`mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+                    receipt().tone === "danger"
+                      ? "border-rose-200/70 bg-rose-50/80 text-rose-700"
+                      : "border-amber-200/70 bg-amber-50/80 text-amber-800"
+                  }`}
+                >
+                  <div class="min-w-0">
+                    <p class="font-semibold">{receipt().title}</p>
+                    <p class="mt-1">{receipt().summary}</p>
+                    <p class="mt-1 text-xs opacity-80">{receipt().nextStep}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={retryRunStream}
+                    class={`rounded-full border bg-white/80 px-3 py-1.5 text-xs font-medium transition hover:bg-white ${
+                      receipt().tone === "danger"
+                        ? "border-rose-200/70 text-rose-700"
+                        : "border-amber-200/70 text-amber-800"
+                    }`}
+                  >
+                    Retry stream
+                  </button>
+                </div>
+              )}
+            </Show>
+
+            <Show when={actionError()}>
+              {(receipt) => (
+                <div
+                  class={`mt-4 rounded-xl border px-4 py-3 text-sm ${
+                    receipt().tone === "danger"
+                      ? "border-rose-200/70 bg-rose-50/80 text-rose-700"
+                      : "border-amber-200/70 bg-amber-50/80 text-amber-800"
+                  }`}
+                >
+                  <p class="font-semibold">{receipt().title}</p>
+                  <p class="mt-1">{receipt().summary}</p>
+                  <p class="mt-1 text-xs opacity-80">{receipt().nextStep}</p>
+                </div>
+              )}
             </Show>
 
             {/* Complete CTA */}
@@ -456,7 +548,7 @@ function StageCard(props: {
   const statusPill = () => {
     switch (stage.status) {
       case "running":           return { text: "Running…", cls: "bg-primary/20 text-primary animate-pulse" };
-      case "awaiting_approval": return { text: "Awaiting your approval", cls: "bg-amber-100/80 text-amber-800" };
+      case "awaiting_approval": return { text: approvalPendingStatusLabel(), cls: "bg-amber-100/80 text-amber-800" };
       case "complete":          return { text: "Complete", cls: "bg-emerald-100/80 text-emerald-800" };
       case "failed":            return { text: "Failed", cls: "bg-rose-100/80 text-rose-800" };
       default:                  return { text: "Pending", cls: "bg-white/50 text-on-surface-variant" };
@@ -470,7 +562,12 @@ function StageCard(props: {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <p class="text-sm font-semibold text-on-surface">{stage.label}</p>
-            <span class={`rounded-full px-2 py-0.5 text-[10px] font-medium ${statusPill().cls}`}>{statusPill().text}</span>
+            <span class={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusPill().cls}`}>
+              <Show when={stage.status === "running"}>
+                <ProcessingGlyph class="text-current opacity-80" size={12} strokeWidth={1.55} />
+              </Show>
+              {statusPill().text}
+            </span>
           </div>
           <p class="mt-0.5 text-[11px] text-on-surface-variant">{stage.description}</p>
 
@@ -495,14 +592,33 @@ function StageCard(props: {
               <div class="flex gap-2 flex-wrap">
                 <Show when={props.approvalOptions.length > 0} fallback={
                   <>
-                    <button type="button" onClick={() => props.onApprove()} class="rounded-full border border-emerald-300/70 bg-emerald-100/80 px-4 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-200">✓ Approve & continue</button>
-                    <button type="button" onClick={props.onReject} class="rounded-full border border-rose-200/70 bg-rose-50/80 px-4 py-2 text-xs font-medium text-rose-700 transition hover:bg-rose-100">✕ Stop here</button>
+                    <ApprovalDecisionButtons
+                      class="flex gap-2"
+                      onApprove={() => props.onApprove()}
+                      onReject={props.onReject}
+                      approveClass="rounded-full border border-emerald-300/70 bg-emerald-100/80 px-4 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-50"
+                      rejectClass="rounded-full border border-rose-200/70 bg-rose-50/80 px-4 py-2 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                    />
                   </>
                 }>
                   <For each={props.approvalOptions}>{(opt) => (
-                    <button type="button" onClick={() => props.onApprove(opt)} class="rounded-full border border-sky-200/70 bg-sky-50/80 px-4 py-2 text-xs font-medium text-sky-700 transition hover:bg-sky-100">{opt.replace(/_/g, " ")}</button>
+                    <button
+                      type="button"
+                      title={approvalOptionActionTitle(opt)}
+                      onClick={() => props.onApprove(opt)}
+                      class="rounded-full border border-sky-200/70 bg-sky-50/80 px-4 py-2 text-xs font-medium text-sky-700 transition hover:bg-sky-100"
+                    >
+                      {approvalOptionLabel(opt)}
+                    </button>
                   )}</For>
-                  <button type="button" onClick={props.onReject} class="rounded-full border border-rose-200/70 bg-rose-50/80 px-4 py-2 text-xs font-medium text-rose-700 transition hover:bg-rose-100">✕ Stop</button>
+                  <button
+                    type="button"
+                    title={approvalOptionActionTitle("rejected")}
+                    onClick={props.onReject}
+                    class="rounded-full border border-rose-200/70 bg-rose-50/80 px-4 py-2 text-xs font-medium text-rose-700 transition hover:bg-rose-100"
+                  >
+                    {approvalOptionLabel("rejected")}
+                  </button>
                 </Show>
               </div>
             </div>

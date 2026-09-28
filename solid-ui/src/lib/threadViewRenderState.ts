@@ -10,7 +10,8 @@ import {
 
 export type ThreadViewRenderUnit =
   | { kind: "standalone"; message: AfpMessage }
-  | { kind: "generative_card"; card: AfpMessage; updates: AfpMessage[] };
+  | { kind: "generative_card"; card: AfpMessage; updates: AfpMessage[] }
+  | { kind: "ledger_board"; message: AfpMessage; taskUpdates: AfpMessage[] };
 
 export type ThreadViewRenderEntry =
   | { kind: "date_separator"; label: string; id: string }
@@ -32,26 +33,39 @@ export function threadViewDateLabel(timestamp: string): string {
 
 export function threadViewBuildRenderUnits(messages: AfpMessage[]): ThreadViewRenderUnit[] {
   const cardMap = new Map<string, AfpMessage>();
+  const ledgerBoardMap = new Map<string, AfpMessage>();
   for (const message of messages) {
-    if (message.type !== "generative_card") continue;
-    const cardId = threadViewMessageContentCardId(message) ?? message.id;
-    cardMap.set(cardId, message);
+    if (message.type === "generative_card") {
+      const cardId = threadViewMessageContentCardId(message) ?? message.id;
+      cardMap.set(cardId, message);
+    }
+    if (message.type === "task" && message.subtype !== "update") {
+      ledgerBoardMap.set(message.id, message);
+    }
   }
 
   const updatesByCardId = new Map<string, AfpMessage[]>();
+  const taskUpdatesByBoardId = new Map<string, AfpMessage[]>();
   for (const message of messages) {
-    if (message.type !== "card_section_update") continue;
-    const cardId = threadViewMessageContentCardId(message) ?? "";
-    if (!cardId || !cardMap.has(cardId)) continue;
-    const updates = updatesByCardId.get(cardId) ?? [];
-    updates.push(message);
-    updatesByCardId.set(cardId, updates);
+    if (message.type === "card_section_update") {
+      const cardId = threadViewMessageContentCardId(message) ?? "";
+      if (!cardId || !cardMap.has(cardId)) continue;
+      const updates = updatesByCardId.get(cardId) ?? [];
+      updates.push(message);
+      updatesByCardId.set(cardId, updates);
+    }
+    if (isActiveTodosTaskUpdate(message) && message.parent_id && ledgerBoardMap.has(message.parent_id)) {
+      const updates = taskUpdatesByBoardId.get(message.parent_id) ?? [];
+      updates.push(message);
+      taskUpdatesByBoardId.set(message.parent_id, updates);
+    }
   }
 
   const units: ThreadViewRenderUnit[] = [];
   const seenCardIds = new Set<string>();
   for (const message of messages) {
     if (message.type === "card_section_update") continue;
+    if (isActiveTodosTaskUpdate(message) && message.parent_id && ledgerBoardMap.has(message.parent_id)) continue;
     if (message.type === "generative_card") {
       const cardId = threadViewMessageContentCardId(message) ?? message.id;
       if (seenCardIds.has(cardId)) continue;
@@ -63,9 +77,26 @@ export function threadViewBuildRenderUnits(messages: AfpMessage[]): ThreadViewRe
       });
       continue;
     }
+    if (ledgerBoardMap.has(message.id)) {
+      units.push({
+        kind: "ledger_board",
+        message,
+        taskUpdates: taskUpdatesByBoardId.get(message.id) ?? [],
+      });
+      continue;
+    }
     units.push({ kind: "standalone", message });
   }
   return units;
+}
+
+function isActiveTodosTaskUpdate(message: AfpMessage): boolean {
+  const metadata = message.metadata && typeof message.metadata === "object" && !Array.isArray(message.metadata)
+    ? message.metadata
+    : {};
+  return message.type === "task"
+    && message.subtype === "update"
+    && metadata.task_update_source === "active_todos";
 }
 
 export function threadViewBuildRawMessageById(units: ThreadViewRenderUnit[]): Map<string, AfpMessage> {
@@ -109,7 +140,7 @@ export function threadViewBuildRenderEntries(
 
 export function threadViewRenderableEntries(entries: ThreadViewRenderEntry[]): ThreadViewRenderUnit[] {
   return entries.filter((entry): entry is ThreadViewRenderUnit =>
-    entry.kind === "standalone" || entry.kind === "generative_card"
+    entry.kind === "standalone" || entry.kind === "generative_card" || entry.kind === "ledger_board"
   );
 }
 

@@ -1416,6 +1416,13 @@ export function ThreadView(props: {
                             <AlternateViewsInspector message={unit.card} cardUpdates={unit.updates} compact />
                           </Show>
                         </>
+                      ) : unit.kind === "ledger_board" ? (
+                        <>
+                          <ViewDispatcher message={unit.message} taskUpdates={unit.taskUpdates} />
+                          <Show when={props.advanced}>
+                            <AlternateViewsInspector message={unit.message} compact />
+                          </Show>
+                        </>
                       ) : (
                         <>
                           <ViewDispatcher message={unit.message} />

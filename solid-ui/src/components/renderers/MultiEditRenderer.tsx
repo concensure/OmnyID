@@ -69,7 +69,7 @@ const MULTI_EDIT_EXPAND_ALL = "Expand all";
 const MULTI_EDIT_COLLAPSE_ALL = "Collapse all";
 const MULTI_EDIT_APPLYING_PREFIX = "Applying...";
 const MULTI_EDIT_LINE_NOTE = "Showing line-by-line comparison - reordered lines may appear as changes.";
-const MULTI_EDIT_SEPARATOR = " Â· ";
+const MULTI_EDIT_SEPARATOR = " · ";
 
 function multiEditString(value: unknown, fallback = ""): string {
   return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
@@ -129,7 +129,7 @@ function fileDiffPanelState(props: {
     removedCount: removed,
     showAddedCount: added > 0,
     showRemovedCount: removed > 0,
-    toggleGlyph: props.expanded ? "â–²" : "â–¼",
+    toggleGlyph: props.expanded ? "▲" : "▼",
     containerClass: props.selected
       ? "rounded-xl border border-primary/30 bg-primary/5 transition"
       : "rounded-xl border border-white/10 bg-white/4 opacity-60 transition",
@@ -167,7 +167,7 @@ function FileDiffPanel(props: {
           }}
           aria-label={props.state.selected ? "Deselect file" : "Select file"}
         >
-          âœ“
+          ✓
         </button>
 
         <span class="min-w-0 flex-1 break-all font-mono text-xs text-on-surface">{props.state.displayPath}</span>

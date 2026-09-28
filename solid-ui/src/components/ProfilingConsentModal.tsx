@@ -35,7 +35,7 @@ export function ProfilingConsentModal(props: { onDismiss: () => void }) {
     >
       <>
         <div class="flex items-start gap-3">
-          <span class="mt-0.5 select-none text-2xl leading-none">ðŸ§ </span>
+          <span class="mt-0.5 select-none text-2xl leading-none">🧠</span>
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <p id="profiling-consent-title" class="text-sm font-semibold text-on-surface">Personalise your AI</p>

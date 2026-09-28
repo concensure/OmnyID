@@ -110,7 +110,7 @@ export function calendarAnchorLabel(value: unknown): string | null {
 export function calendarSemanticTag(event: CalendarEvent): string | null {
   const anchorType = calendarAnchorLabel(calendarProfileString(event.profile ?? null, "schedule_anchor_type"));
   const noteKind = calendarAnchorLabel(event.note_kind ?? calendarProfileString(event.profile ?? null, "schedule_note_kind"));
-  if (anchorType && noteKind) return `${anchorType} Â· ${noteKind}`;
+  if (anchorType && noteKind) return `${anchorType} · ${noteKind}`;
   if (anchorType) return anchorType;
   if (noteKind) return noteKind;
   return null;

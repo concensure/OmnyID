@@ -4,6 +4,7 @@ import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
 
 export type LocalEmailMailboxKey = "inbox" | "sent" | "drafts" | "archive" | "trash";
+export type LocalGmailSyncPreference = "new_only" | "full_inbox";
 
 export type LocalEmailDraft = {
   id: string;
@@ -20,6 +21,7 @@ export type LocalEmailDraft = {
 export const LOCAL_EMAIL_DRAFTS_KEY = "omnyid.email.local-drafts";
 export const LOCAL_EMAIL_READ_STATE_KEY = "omnyid.email.read-state";
 export const LOCAL_EMAIL_MAILBOX_OVERRIDES_KEY = "omnyid.email.mailbox-overrides";
+export const LOCAL_GMAIL_SYNC_PREFERENCE_KEY = "omnyid.email.gmail-sync-preference";
 
 function readTrimmedString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -64,6 +66,10 @@ function normalizeLocalEmailDraft(value: unknown): LocalEmailDraft | null {
 
 function isMailboxKey(value: unknown): value is LocalEmailMailboxKey {
   return value === "inbox" || value === "sent" || value === "drafts" || value === "archive" || value === "trash";
+}
+
+function normalizeGmailSyncPreference(value: unknown): LocalGmailSyncPreference {
+  return value === "full_inbox" ? "full_inbox" : "new_only";
 }
 
 function normalizeLocalEmailDrafts(value: unknown): LocalEmailDraft[] {
@@ -209,5 +215,34 @@ export function persistLocalEmailMailboxOverrides(overrides: Record<string, Loca
     LOCAL_EMAIL_MAILBOX_OVERRIDES_KEY,
     userId,
     JSON.stringify(normalizeLocalEmailMailboxOverrides(overrides)),
+  );
+}
+
+export function loadLocalGmailSyncPreference(userId?: string | null): LocalGmailSyncPreference {
+  try {
+    const raw = loadLocalEmailStorageJson(LOCAL_GMAIL_SYNC_PREFERENCE_KEY, userId);
+    if (!raw) return "new_only";
+    const parsed = parseJsonValue(raw);
+    if (!parsed.ok) {
+      clearLocalEmailStorageJson(LOCAL_GMAIL_SYNC_PREFERENCE_KEY, userId);
+      return "new_only";
+    }
+    const normalized = normalizeGmailSyncPreference(parsed.value);
+    const serialized = JSON.stringify(normalized);
+    if (serialized !== raw || readScopedLocalEmailStorageJson(LOCAL_GMAIL_SYNC_PREFERENCE_KEY, userId) !== serialized) {
+      persistLocalEmailStorageJson(LOCAL_GMAIL_SYNC_PREFERENCE_KEY, userId, serialized);
+    }
+    return normalized;
+  } catch {
+    clearLocalEmailStorageJson(LOCAL_GMAIL_SYNC_PREFERENCE_KEY, userId);
+    return "new_only";
+  }
+}
+
+export function persistLocalGmailSyncPreference(preference: LocalGmailSyncPreference, userId?: string | null) {
+  persistLocalEmailStorageJson(
+    LOCAL_GMAIL_SYNC_PREFERENCE_KEY,
+    userId,
+    JSON.stringify(normalizeGmailSyncPreference(preference)),
   );
 }

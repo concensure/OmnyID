@@ -10,16 +10,37 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./continuity": {
+      "import": "./dist/continuity.js",
+      "types": "./dist/continuity.d.ts"
+    },
+    "./retrieval": {
+      "import": "./dist/retrieval.js",
+      "types": "./dist/retrieval.d.ts"
+    },
+    "./workflows": {
+      "import": "./dist/workflows.js",
+      "types": "./dist/workflows.d.ts"
+    },
+    "./semantic-router": {
+      "import": "./dist/semantic-router/index.js",
+      "types": "./dist/semantic-router/index.d.ts"
+    },
+    "./workspace-assistance": {
+      "import": "./dist/workspace-assistance.js",
+      "types": "./dist/workspace-assistance.d.ts"
     }
   },
   "files": ["dist", "src"],
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
+    "build": "node ./scripts/build-clean.mjs",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "test:continuity": "npm run build && node --test tests/continuity.test.mjs tests/package-exports.test.mjs",
     "prepublishOnly": "npm run build"
   },
   "engines": {
-    "node": ">=22.22.1 <23"
+    "node": ">=22.22.1 <25"
   },
   "license": "MIT",
   "repository": {

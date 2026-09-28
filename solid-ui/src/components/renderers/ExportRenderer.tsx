@@ -35,8 +35,8 @@ type ExportResultContent = {
   workflow_family_context?: unknown;
 };
 
-const EXPORT_ICON = "ðŸ“Š";
-const EXPORT_READY_ICON = "âœ…";
+const EXPORT_ICON = "📊";
+const EXPORT_READY_ICON = "✅";
 const EXPORT_REQUEST_TITLE = "Export request";
 const EXPORT_READY_TITLE = "Export ready";
 const EXPORT_AUTOMATION_TITLE = "From automation";

@@ -1,54 +1,54 @@
-import { For, Show, createSignal } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
+import {
+  type ApprovalReviewLike,
+  type AutonomyDecisionLike,
+  approvalRequestTitle,
+} from "afp-ts/continuity";
 import type { AfpMessage, AfpView } from "@/lib/api";
-import { apiFetch } from "@/lib/api";
+import { submitActionDecision } from "@/lib/api";
+import {
+  approvalMessageContent,
+  approvalReviewForMessage,
+  autonomyDecisionForMessage,
+  approvalReviewFromUnknown,
+  autonomyDecisionFromUnknown,
+} from "@/lib/approvalReviewState";
+import { ApprovalDecisionNotice } from "@/components/ApprovalDecisionNotice";
+import { ApprovalReviewSummary } from "@/components/ApprovalReviewSummary";
+import { ApprovalDecisionButtons } from "@/components/ApprovalDecisionButtons";
+import { TrustSummaryBlocks } from "@/components/renderers/TrustSummaryBlocks";
+import { afpRecord } from "@/lib/afpMessageRecord";
+import { approvalItemsForMessage, type ApprovalItem } from "@/lib/approvalPresentationState";
+import { approvalCardState } from "@/lib/approvalCardState";
 
-type ApprovalItem = {
-  messageId: string;
-  threadId: string;
-  actionType: string;
-  title: string;
-  summary: string;
-  status: "pending" | "approved" | "rejected" | string;
-  requestedBy: string;
+type ApprovalsRendererState = {
+  titleText: string;
+  requestedByText: string;
+  items: ApprovalItem[];
 };
+const APPROVAL_HEADER_SEPARATOR = "|";
 
-/**
- * Renders pending agent actions that require human approval.
- * Agents set `views: [{format:"approvals", content:{items:[...]}}]`.
- * Decisions are posted to POST /actions/decision.
- */
-export function ApprovalsRenderer(props: { message: AfpMessage; view?: AfpView }) {
-  const rawContent = () => props.view?.content ?? props.message.content;
-
-  const items = (): ApprovalItem[] => {
-    const raw = rawContent().items;
-    if (Array.isArray(raw)) return raw as ApprovalItem[];
-    // Treat the message itself as a single approval item
-    return [
-      {
-        messageId: props.message.id,
-        threadId: props.message.thread_id,
-        actionType: props.message.type,
-        title:
-          (rawContent().title as string | undefined) ??
-          (rawContent().subject as string | undefined) ??
-          props.message.type,
-        summary:
-          (rawContent().summary as string | undefined) ??
-          (rawContent().body as string | undefined) ??
-          "Agent action awaiting review.",
-        status: (rawContent().status as string | undefined) ?? "pending",
-        requestedBy: props.message.from
-      }
-    ];
+function approvalsRendererState(props: {
+  message: AfpMessage;
+  view?: AfpView;
+}): ApprovalsRendererState {
+  const rawContent = approvalMessageContent(props.message, props.view);
+  return {
+    titleText: approvalRequestTitle(),
+    requestedByText: props.message.from,
+    items: approvalItemsForMessage({ message: props.message, rawContent, view: props.view }),
   };
+}
+
+export function ApprovalsRenderer(props: { message: AfpMessage; view?: AfpView }) {
+  const rendererState = createMemo(() => approvalsRendererState(props));
 
   return (
     <div class="space-y-2">
       <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-outline">
-        Approval required · {props.message.from}
+        {rendererState().titleText} {APPROVAL_HEADER_SEPARATOR} {rendererState().requestedByText}
       </p>
-      <For each={items()}>
+      <For each={rendererState().items}>
         {(item) => <ApprovalCard item={item} />}
       </For>
     </div>
@@ -59,71 +59,90 @@ function ApprovalCard(props: { item: ApprovalItem }) {
   const [status, setStatus] = createSignal(props.item.status);
   const [busy, setBusy] = createSignal(false);
   const [feedback, setFeedback] = createSignal("");
+  const [decisionFeedback, setDecisionFeedback] = createSignal<"approved" | "rejected" | null>(
+    null,
+  );
+
+  const cardState = createMemo(() =>
+    approvalCardState({
+      item: props.item,
+      statusText: status(),
+      busy: busy(),
+      feedbackText: feedback(),
+      decisionFeedback: decisionFeedback(),
+    }));
 
   async function decide(decision: "approved" | "rejected") {
     setBusy(true);
     try {
-      await apiFetch("/actions/decision", {
-        method: "POST",
-        bodyJson: {
-          thread_id: props.item.threadId,
-          target_message_id: props.item.messageId,
-          decision
-        }
+      await submitActionDecision({
+        thread_id: props.item.threadId,
+        target_message_id: props.item.messageId,
+        decision,
       });
       setStatus(decision);
-      setFeedback(decision === "approved" ? "Approved and queued for execution." : "Rejected.");
-    } catch (err) {
-      setFeedback((err as Error).message);
+      setDecisionFeedback(decision);
+      setFeedback("");
+    } catch (error) {
+      setDecisionFeedback(null);
+      setFeedback((error as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
-  const statusColor = () => {
-    if (status() === "approved") return "bg-green-500/20 text-green-700 border-green-500/30";
-    if (status() === "rejected") return "bg-error/10 text-error border-error/20";
-    return "bg-amber-400/20 text-amber-700 border-amber-400/30";
-  };
-
   return (
     <div class="rounded-2xl border border-white/30 bg-white/20 px-4 py-3">
-      <div class="flex items-start justify-between gap-4">
+      <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div class="min-w-0">
-          <p class="truncate font-medium text-on-surface">{props.item.title}</p>
-          <p class="mt-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-outline">
-            {props.item.actionType} · {props.item.requestedBy}
+          <p class="break-words font-medium text-on-surface">{cardState().titleText}</p>
+          <p class="mt-0.5 break-words font-mono text-[10px] uppercase tracking-[0.15em] text-outline">
+            {cardState().actionTypeText} {APPROVAL_HEADER_SEPARATOR} {cardState().requestedByText}
           </p>
         </div>
         <span
-          class={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${statusColor()}`}
+          class={`max-w-full break-words rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-wider ${cardState().statusClass}`}
         >
-          {status()}
+          {cardState().statusText}
         </span>
       </div>
-      <p class="mt-2 text-sm leading-6 text-on-surface-variant">{props.item.summary}</p>
-      <Show when={status() === "pending"}>
-        <div class="mt-3 flex gap-2">
-          <button
-            type="button"
-            disabled={busy()}
-            onClick={() => void decide("approved")}
-            class="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-          >
-            Approve
-          </button>
-          <button
-            type="button"
-            disabled={busy()}
-            onClick={() => void decide("rejected")}
-            class="rounded-xl border border-outline-variant bg-surface px-4 py-2 text-xs font-semibold text-on-surface transition hover:bg-surface-container-low disabled:opacity-50"
-          >
-            Reject
-          </button>
-        </div>
+      <p class="mt-2 break-words text-sm leading-6 text-on-surface-variant">{cardState().primaryReasonText}</p>
+      <ApprovalReviewSummary
+        class="mt-3 space-y-2 rounded-xl border border-white/20 bg-white/25 px-3 py-3"
+        approvalReview={props.item.approvalReview}
+        autonomyDecision={props.item.autonomyDecision}
+        fallbackReason={cardState().primaryReasonText}
+      />
+      <div class="mt-3 grid gap-2 sm:grid-cols-2">
+        <TrustSummaryBlocks
+          selectionReason={props.item.trustSummary.selectionReason}
+          showSelectionReason={props.item.trustSummary.showSelectionReason}
+          consequencePreview={cardState().consequencePreviewText}
+          provenanceCue={cardState().provenanceCueText}
+          sourceSummary={cardState().sourceSummaryText}
+          previewBoundarySummary={props.item.previewOnly ? cardState().previewBoundaryText : null}
+        />
+      </div>
+      <Show when={cardState().showDecisionButtons}>
+        <ApprovalDecisionButtons
+          class="mt-3 flex gap-2"
+          busy={cardState().busy}
+          onApprove={() => void decide("approved")}
+          onReject={() => void decide("rejected")}
+        />
       </Show>
-      <Show when={feedback()}>
-        <p class="mt-2 text-xs text-on-surface-variant">{feedback()}</p>
+      <Show when={cardState().decisionFeedback}>
+        {(decision) => (
+          <ApprovalDecisionNotice
+            decision={decision()}
+            context="queued_execution"
+            class="mt-3 border-0 bg-transparent px-0 py-0 text-xs text-on-surface-variant"
+            detailClass="text-on-surface-variant/80"
+          />
+        )}
+      </Show>
+      <Show when={cardState().showFeedbackText}>
+        <p class="mt-2 text-xs text-on-surface-variant">{cardState().feedbackText}</p>
       </Show>
     </div>
   );

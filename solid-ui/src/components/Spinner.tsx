@@ -27,7 +27,7 @@ export function Spinner(props: { size?: SpinnerSize; class?: string }) {
 }
 
 /**
- * Shimmer skeleton line â€” used as a placeholder while data is loading.
+ * Shimmer skeleton line — used as a placeholder while data is loading.
  * Accepts Tailwind width classes via `class` prop (e.g. "w-32").
  */
 export function SkeletonLine(props: { class?: string }) {
@@ -40,7 +40,7 @@ export function SkeletonLine(props: { class?: string }) {
 }
 
 /**
- * Full-width block skeleton row â€” used for list items or cards.
+ * Full-width block skeleton row — used for list items or cards.
  */
 export function SkeletonBlock(props: { lines?: number; class?: string }) {
   const count = () => props.lines ?? 3;

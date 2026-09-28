@@ -1,6 +1,6 @@
 ﻿// @locs-version: 1.0
 /**
- * Tiptap JSON â†’ Markdown serializer.
+ * Tiptap JSON → Markdown serializer.
  *
  * Handles all node/mark types used by TiptapEditor:
  *   Nodes:  doc, paragraph, heading, bulletList, orderedList, taskList,
@@ -8,21 +8,21 @@
  *           horizontalRule, image, table/tableRow/tableHeader/tableCell,
  *           text, mention
  *   Marks:  bold, italic, strike, underline, code, link, highlight
- *           (textStyle/color are dropped â€” no Markdown equivalent)
+ *           (textStyle/color are dropped — no Markdown equivalent)
  *
- * Text alignment is intentionally omitted â€” it is a display concern and the
+ * Text alignment is intentionally omitted — it is a display concern and the
  * Tiptap viewer that re-hydrates the Markdown applies alignment from the view.
  */
 
 import type { JSONContent } from "@tiptap/core";
 
-// â”€â”€ Public entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Public entry point ────────────────────────────────────────────────────
 
 export function tiptapToMarkdown(doc: JSONContent): string {
   return serializeBlock(doc).trimEnd();
 }
 
-// â”€â”€ Block serializer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Block serializer ─────────────────────────────────────────────────────
 
 function serializeBlock(node: JSONContent): string {
   switch (node.type) {
@@ -81,7 +81,7 @@ function serializeBlock(node: JSONContent): string {
   }
 }
 
-// â”€â”€ List helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── List helpers ─────────────────────────────────────────────────────────
 
 function joinBlocks(nodes: JSONContent[]): string {
   return nodes.map(n => serializeBlock(n)).join("");
@@ -106,7 +106,7 @@ function serializeListItem(item: JSONContent, marker: string): string {
 
   let result = marker + firstText + "\n";
 
-  // Nested lists / continuation paragraphs â€” indent by two spaces
+  // Nested lists / continuation paragraphs — indent by two spaces
   for (const child of rest) {
     const nested = serializeBlock(child)
       .trimEnd()
@@ -146,7 +146,7 @@ function serializeTaskItem(item: JSONContent): string {
   return result;
 }
 
-// â”€â”€ Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Table ────────────────────────────────────────────────────────────────
 
 function serializeTable(node: JSONContent): string {
   const rows = node.content ?? [];
@@ -174,7 +174,7 @@ function serializeTable(node: JSONContent): string {
   return lines.join("\n") + "\n";
 }
 
-// â”€â”€ Inline serializer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Inline serializer ─────────────────────────────────────────────────────
 
 function serializeInlineNodes(nodes: JSONContent[]): string {
   return nodes.map(serializeInlineNode).join("");
@@ -195,7 +195,7 @@ function serializeInlineNode(node: JSONContent): string {
 
   const marks: JSONContent[] = node.marks ?? [];
 
-  // Code mark takes full precedence â€” no escaping, no other marks
+  // Code mark takes full precedence — no escaping, no other marks
   if (marks.some(m => m.type === "code")) {
     return "`" + raw.replace(/`/g, "\\`") + "`";
   }

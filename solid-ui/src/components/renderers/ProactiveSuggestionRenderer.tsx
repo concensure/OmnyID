@@ -30,7 +30,7 @@ import { decisionOsContextPackTrustState } from "@/lib/decisionOsContextPackPres
 import { isRecord } from "@/lib/eventDetail";
 import { afpRecord } from "@/lib/afpMessageRecord";
 
-const COMPARISON_VALUE_SEPARATOR = " Â· ";
+const COMPARISON_VALUE_SEPARATOR = " · ";
 
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;

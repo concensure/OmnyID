@@ -113,7 +113,7 @@ export function buildFileLibraryItemValueStoryState(
     const contextBits = [academicKind?.replace(/_/g, " "), courseTag, unitTag, chapterTag, weekTag, lectureTag].filter((value): value is string => Boolean(value));
     signals.push({
       label: "Academic anchor",
-      value: `The file is already grounded to ${contextBits.join(" Â· ")}, so it can participate in a real study thread rather than sitting as generic storage.`,
+      value: `The file is already grounded to ${contextBits.join(" · ")}, so it can participate in a real study thread rather than sitting as generic storage.`,
       tone: "emerald",
     });
   }

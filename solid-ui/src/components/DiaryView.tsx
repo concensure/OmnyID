@@ -1,6 +1,6 @@
 ﻿// @locs-version: 1.0
 /**
- * DiaryView â€” Daily personal diary
+ * DiaryView — Daily personal diary
  *
  * Shows a chronological timeline of the user's day, grouped by
  * Morning / Afternoon / Evening, with sections for:
@@ -29,9 +29,9 @@ const MAX_DIARY_DAYS = 14;
 type Period = "morning" | "afternoon" | "evening";
 
 const PERIOD_META: Record<Period, { label: string; icon: string; range: string }> = {
-  morning:   { label: "Morning",   icon: "ðŸŒ…", range: "Before noon" },
-  afternoon: { label: "Afternoon", icon: "â˜€ï¸", range: "12PM â€“ 5PM" },
-  evening:   { label: "Evening",   icon: "ðŸŒ‡", range: "After 5PM" },
+  morning:   { label: "Morning",   icon: "🌅", range: "Before noon" },
+  afternoon: { label: "Afternoon", icon: "☀️", range: "12PM – 5PM" },
+  evening:   { label: "Evening",   icon: "🌇", range: "After 5PM" },
 };
 
 const ENTRY_BG: Record<DiaryEntry["type"], string> = {
@@ -43,7 +43,7 @@ const ENTRY_BG: Record<DiaryEntry["type"], string> = {
   milestone: "bg-rose-50/50 border-rose-200/40",
 };
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toDateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -85,7 +85,7 @@ function formatOutcomeCheckChip(checkAt: string): string {
   return `Check in ${Math.max(1, Math.round(diffMs / hourMs))}h`;
 }
 
-// â”€â”€ Summary stats for the day â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Summary stats for the day ─────────────────────────────────────────────────
 
 function DaySummary(props: { entries: DiaryEntry[] }) {
   const counts = createMemo(() => {
@@ -111,12 +111,12 @@ function DaySummary(props: { entries: DiaryEntry[] }) {
       </Show>
       <Show when={counts().decisions > 0}>
         <span class="rounded-full border border-emerald-200/60 bg-emerald-50/60 px-3 py-1 text-[11px] text-emerald-700">
-          âœ… {counts().decisions} decision{counts().decisions !== 1 ? "s" : ""} handled
+          ✅ {counts().decisions} decision{counts().decisions !== 1 ? "s" : ""} handled
         </span>
       </Show>
       <Show when={counts().notes > 0}>
         <span class="rounded-full border border-amber-200/60 bg-amber-50/60 px-3 py-1 text-[11px] text-amber-700">
-          ðŸ“ {counts().notes} note{counts().notes !== 1 ? "s" : ""}
+          📝 {counts().notes} note{counts().notes !== 1 ? "s" : ""}
         </span>
       </Show>
       <Show when={props.entries.length === 0}>
@@ -126,7 +126,7 @@ function DaySummary(props: { entries: DiaryEntry[] }) {
   );
 }
 
-// â”€â”€ Timeline entry card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Timeline entry card ───────────────────────────────────────────────────────
 
 function EntryCard(props: { entry: DiaryEntry }) {
   const e = props.entry;
@@ -162,7 +162,7 @@ function EntryCard(props: { entry: DiaryEntry }) {
             class="mt-1 ml-1 inline-block rounded-full border border-sky-200/70 bg-sky-50/80 px-2 py-0.5 text-[9px] font-medium text-sky-700"
             title={new Date(pendingOutcomeCheck()!).toLocaleString()}
           >
-            â³ {formatOutcomeCheckChip(pendingOutcomeCheck()!)}
+            ⏳ {formatOutcomeCheckChip(pendingOutcomeCheck()!)}
           </span>
         </Show>
       </div>
@@ -170,7 +170,7 @@ function EntryCard(props: { entry: DiaryEntry }) {
   );
 }
 
-// â”€â”€ Main view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main view ─────────────────────────────────────────────────────────────────
 
 export function DiaryView() {
   const sessionUserId = readSession()?.user?.id ?? null;
@@ -213,7 +213,7 @@ export function DiaryView() {
     const entry: DiaryEntry = {
       ts: new Date().toISOString(),
       type: "note",
-      icon: "ðŸ“",
+      icon: "📝",
       title: text,
     };
     appendDecisionOsDiaryEntry(entry, sessionUserId, {
@@ -294,7 +294,7 @@ export function DiaryView() {
       {/* Empty state */}
       <Show when={entries().length === 0}>
         <div class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-black/10 py-16 text-center">
-          <span class="text-4xl mb-3">ðŸ“–</span>
+          <span class="text-4xl mb-3">📖</span>
           <p class="text-sm font-semibold text-on-surface">Nothing here yet</p>
           <p class="mt-1 max-w-xs text-xs text-on-surface-variant/60">
             Decisions you approve, moods you log on the Home screen, and notes you add on this device will appear here.
@@ -326,7 +326,7 @@ export function DiaryView() {
                   setNewNote("");
                 }
               }}
-              placeholder="Capture a thought, reflection, or momentâ€¦"
+              placeholder="Capture a thought, reflection, or moment…"
               class="flex-1 rounded-xl border border-black/[0.08] bg-white/70 px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/40 outline-none transition focus:border-primary/40 focus:bg-white/90"
             />
             <button

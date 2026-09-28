@@ -21,10 +21,18 @@ PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
 BACKUP_DIR="${1:-/var/backups/omnyid}"
 COMPOSE_FILE="${OMNYID_COMPOSE_FILE:-${PROJECT_ROOT}/docker-compose.oracle.minimal.yml}"
 SKIP_BACKUP="${OMNYID_SKIP_BACKUP:-0}"
+ENV_FILE="${OMNYID_ENV_FILE:-${PROJECT_ROOT}/.env.oracle}"
 
 cd "${PROJECT_ROOT}"
 
 echo "[omnyid-upgrade] Starting upgrade from ${PROJECT_ROOT}"
+
+if [[ -f "${ENV_FILE}" ]]; then
+  echo "[omnyid-upgrade] Validating startup policy with ${ENV_FILE}..."
+  bash "${SCRIPT_DIR}/startup-policy-check.sh" "${ENV_FILE}"
+else
+  echo "[omnyid-upgrade] No env file found at ${ENV_FILE}; skipping startup policy preflight."
+fi
 
 # ── 1. Pre-upgrade backup ──────────────────────────────────────────────────────
 if [[ "${SKIP_BACKUP}" != "1" ]]; then

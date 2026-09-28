@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { apiFetch } from "../lib/api";
+import { updateAgentMask } from "../lib/api";
 
 type Mask = "private" | "team" | "public";
 
@@ -23,7 +23,7 @@ export function MaskSwitcher() {
     setMask(m);
     setOpen(false);
     try {
-      await apiFetch("/agent/mask", { method: "PATCH", bodyJson: { mask: m } });
+      await updateAgentMask(m);
     } catch { /* best-effort */ }
   }
 

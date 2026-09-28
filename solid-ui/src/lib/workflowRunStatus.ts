@@ -77,7 +77,7 @@ export function waitResumeFamilyLabel(record: {
 }): string {
   const family = record.resume_family.replaceAll("_", " ");
   const kind = record.resume_kind.replaceAll("_", " ");
-  return family === kind ? family : `${family} Â· ${kind}`;
+  return family === kind ? family : `${family} · ${kind}`;
 }
 
 export function runTimelineWaitChainSummary(

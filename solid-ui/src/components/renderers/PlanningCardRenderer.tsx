@@ -7,7 +7,7 @@ import { recordShortcutUse } from "@/lib/shortcutRecency";
 
 const COPY_BUTTON_IDLE_TEXT = "Copy";
 const COPY_BUTTON_DONE_TEXT = "Copied";
-const HEADER_SEPARATOR = "Â·";
+const HEADER_SEPARATOR = "·";
 const RISK_FLAG_PREFIX = "!";
 const UNRESOLVED_ANSWER_LABEL = "Answer";
 

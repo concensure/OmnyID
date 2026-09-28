@@ -166,7 +166,7 @@ function ImportModal(props: { defaultTable: string; onClose: () => void; onCreat
       return;
     }
     const rows = databaseImportRows(raw());
-    if (rows.length === 0) { setError("No records found â€” paste CSV or JSON."); return; }
+    if (rows.length === 0) { setError("No records found — paste CSV or JSON."); return; }
     setBusy(true);
     try {
       for (const row of rows) await sendRecord(table(), row);
@@ -230,10 +230,10 @@ function ImportModal(props: { defaultTable: string; onClose: () => void; onCreat
           <div class="mt-2 overflow-x-auto rounded-xl border border-primary/15 bg-primary/4">
             <table class="w-full text-[11px]">
               <thead><tr class="border-b border-primary/10">{preview()[0].map((h) => <th class="px-2 py-1 text-left font-mono text-primary/60 uppercase text-[9px]">{h}</th>)}</tr></thead>
-              <tbody>{preview().slice(1).map((row) => <tr class="border-b border-white/20 last:border-0">{row.map((c) => <td class="px-2 py-1 text-on-surface-variant">{c || "â€”"}</td>)}</tr>)}</tbody>
+              <tbody>{preview().slice(1).map((row) => <tr class="border-b border-white/20 last:border-0">{row.map((c) => <td class="px-2 py-1 text-on-surface-variant">{c || "—"}</td>)}</tr>)}</tbody>
             </table>
           </div>
-          <p class="mt-1 text-[10px] text-on-surface-variant/50">Preview â€” first 3 rows</p>
+          <p class="mt-1 text-[10px] text-on-surface-variant/50">Preview — first 3 rows</p>
         </Show>
         <Show when={error()}>
           {(() => {
@@ -321,7 +321,7 @@ function AddRecordModal(props: { tables: string[]; onClose: () => void; onCreate
               <For each={props.tables}>{(t) => <option value={t}>{t}</option>}</For>
             </select>
           </Show>
-          <input type="text" placeholder={props.tables.length > 0 ? "Or create new tableâ€¦" : "Table / collection name *"}
+          <input type="text" placeholder={props.tables.length > 0 ? "Or create new table…" : "Table / collection name *"}
             value={newTable()} onInput={(e) => { setError(""); setNewTable(e.currentTarget.value); }}
             class="w-full rounded-xl border border-white/40 bg-white/60 px-3 py-2 text-sm text-on-surface outline-none focus:border-primary/50 transition" />
           <textarea rows={4} placeholder={'Record data (JSON or plain text)\n{"name": "Alice", "status": "active"}'}
@@ -372,7 +372,7 @@ function AddRecordModal(props: { tables: string[]; onClose: () => void; onCreate
               class="flex-1 rounded-xl border border-outline/20 py-2 text-xs text-on-surface-variant transition hover:bg-on-surface/5">Cancel</button>
             <button type="button" onClick={save} disabled={busy() || contentState().format === "invalid-json"}
               class="flex-1 rounded-xl bg-primary py-2 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-50">
-              {busy() ? "Savingâ€¦" : "Save Record"}</button>
+              {busy() ? "Saving…" : "Save Record"}</button>
           </div>
         </div>
       </div>
@@ -598,7 +598,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
             class="mt-1 block w-full bg-transparent text-xl font-bold text-on-surface outline-none border-b border-transparent focus:border-primary/30 transition placeholder:text-on-surface/30"
             placeholder="Unnamed Database"
           />
-          <p class="mt-0.5 text-sm text-on-surface-variant">AFP database records â€” append-only, agent-indexed.</p>
+          <p class="mt-0.5 text-sm text-on-surface-variant">AFP database records — append-only, agent-indexed.</p>
         </div>
         <div class="flex items-center gap-2 mt-2 flex-shrink-0">
           {/* Density mode */}
@@ -614,26 +614,26 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
           <button type="button" onClick={() => setFullscreen((v) => !v)}
             class="rounded-full border border-outline/20 bg-white/40 px-3 py-1.5 text-xs font-medium text-on-surface-variant transition hover:bg-white/60"
             title={fullscreen() ? "Exit fullscreen" : "Fullscreen mode"}>
-            {fullscreen() ? "âŠ  Exit" : "âŠž Fullscreen"}
+            {fullscreen() ? "⊠ Exit" : "⊞ Fullscreen"}
           </button>
           {/* Plus menu */}
           <div class="relative">
             <button type="button" onClick={() => setShowPlusMenu((v) => !v)}
               class="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/80 flex items-center gap-1">
               + New
-              <span class={`text-[8px] opacity-70 transition-transform ${showPlusMenu() ? "rotate-180" : ""}`}>â–¼</span>
+              <span class={`text-[8px] opacity-70 transition-transform ${showPlusMenu() ? "rotate-180" : ""}`}>▼</span>
             </button>
             <Show when={showPlusMenu()}>
               <div class="absolute right-0 top-full z-50 mt-1 min-w-[168px] rounded-2xl border border-white/45 bg-white/96 p-1.5 shadow-panel backdrop-blur-xl animate-fade-in"
                 onPointerDown={(e) => e.stopPropagation()}>
                 {([
-                  { icon: "â—ˆ", label: "New Record", action: () => { setShowAdd(true); setShowPlusMenu(false); } },
-                  { icon: "âŠž", label: "New Field", action: () => {
+                  { icon: "◈", label: "New Record", action: () => { setShowAdd(true); setShowPlusMenu(false); } },
+                  { icon: "⊞", label: "New Field", action: () => {
                     const col = prompt("Field name:");
                     if (col?.trim()) setGhostHeaders((h) => [...h, col.trim()]);
                     setShowPlusMenu(false);
                   }},
-                  { icon: "â†‘", label: "Import CSV / JSON", action: () => { setShowImport(true); setShowPlusMenu(false); } },
+                  { icon: "↑", label: "Import CSV / JSON", action: () => { setShowImport(true); setShowPlusMenu(false); } },
                 ] as const).map((item) => (
                   <button type="button" onClick={item.action}
                     class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-on-surface hover:bg-primary/6 transition">
@@ -779,7 +779,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
                       <span class="rounded-full border border-primary/20 bg-primary/8 px-2 py-0.5 font-mono text-[9px] text-primary">{row.table}</span>
                     </td>
                     <td class={`${cellPad()} text-on-surface-variant/60 whitespace-nowrap`}>
-                      {row.timestamp ? surfaceShortDateLabel(row.timestamp) || "â€”" : "â€”"}
+                      {row.timestamp ? surfaceShortDateLabel(row.timestamp) || "—" : "—"}
                     </td>
                     <For each={columns()}>
                       {(col) => {
@@ -795,7 +795,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
                               fallback={
                                 <span class="block truncate cursor-pointer hover:text-primary transition"
                                   onDblClick={() => beginEditingCell(row, col.key)}>
-                                  {str || <span class="text-outline/30 italic text-[10px]">â€”</span>}
+                                  {str || <span class="text-outline/30 italic text-[10px]">—</span>}
                                 </span>
                               }
                             >
@@ -880,13 +880,13 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         </div>
       </Show>
 
-      {/* Table name prompt â€” shown inline when records exist but no named table */}
+      {/* Table name prompt — shown inline when records exist but no named table */}
       <Show when={showNamePrompt()}>
         <div class="fixed inset-0 z-[200] flex items-center justify-center bg-on-surface/20 backdrop-blur-sm animate-fade-in"
           onClick={(e) => { if (e.target === e.currentTarget) setShowNamePrompt(false); }}>
           <div class="w-full max-w-xs rounded-3xl border border-white/45 bg-white/96 p-5 shadow-panel backdrop-blur-xl">
             <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline mb-3">Name your database</p>
-            <input type="text" placeholder="e.g. Contacts, Projectsâ€¦" value={tableName()}
+            <input type="text" placeholder="e.g. Contacts, Projects…" value={tableName()}
               onInput={(e) => setTableName(e.currentTarget.value)}
               class="w-full rounded-xl border border-white/40 bg-white/60 px-3 py-2 text-sm outline-none focus:border-primary/50 transition mb-3" />
             <button type="button" onClick={() => setShowNamePrompt(false)}

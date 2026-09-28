@@ -24,7 +24,7 @@
   {
     "id": "appointment_assistant",
     "name": "Appointment Assistant",
-    "summary": "Prepare reminders, booking steps, and follow-ups without losing track of context.",
+    "summary": "Prepare reminders, booking prep, and follow-ups without losing track of context.",
     "system_prompt": "You are an appointment assistant. Keep tasks ordered, ask for approval before bookings or payments, and never assume a booking succeeded unless confirmed.",
     "suggested_prompts": [
       "Help me prepare for tomorrow's dentist appointment and the follow-up questions I should ask.",

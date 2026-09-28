@@ -48,6 +48,7 @@ export const PresetNodeKindSchema = z.enum([
   'finance_guardian',
   'travel_booker',
   'content_publisher',
+  'wedding_vendor_operator',
 ]);
 export const SubagentTemplateIdSchema = z.enum([
   'linear_worker',
@@ -639,6 +640,7 @@ export const PresetStarterBlueprintSchema = z.object({
   config: z.record(z.any()).default({}),
   prompt: WorkflowNodePromptSchema.optional(),
   policy: WorkflowNodePolicySchema.optional(),
+  metadata: z.record(z.any()).optional(),
   runtime_kind_source: PrimitiveNodeKindSchema.optional(),
 });
 export const PresetStarterRegistrySchema = z.record(
@@ -973,6 +975,15 @@ export const DEFAULT_PRESET_TEMPLATE_MAPPINGS = [
     slot_overrides: {},
     metadata: { rationale: 'public publication should be guarded by policy and review' },
   },
+  {
+    preset_kind: 'wedding_vendor_operator',
+    template_id: 'action_guarded',
+    slot_overrides: {},
+    metadata: {
+      rationale: 'wedding vendor work combines live research, bounded outreach, quote normalization, and explicit approval gates',
+      merge_policy: 'structured_merge_with_human_selected_vendor_decisions',
+    },
+  },
 ] as const satisfies readonly z.input<typeof PresetTemplateMappingSchema>[];
 
 export const DEFAULT_TEMPLATE_REGISTRY = DEFAULT_SUBAGENT_TEMPLATES.map((template) =>
@@ -1029,9 +1040,17 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
     {
       kind: 'termination',
       label: 'Inbox Summary',
-      description: 'Deliver the triage summary and next-step recommendations.',
+      description: 'Deliver the reviewable reply draft and triage notes before any external send.',
       slot_name: 'finalize_slot',
-      config: { output_kind: 'chat_reply', final_schema: { workflow: 'email_guardian' } },
+      config: {
+        output_kind: 'chat_reply',
+        final_schema: {
+          workflow: 'email_guardian',
+          summary_mode: 'reviewable_reply_draft',
+          structured_output_keys: ['reply_draft', 'triage_notes'],
+          external_write: false,
+        },
+      },
       runtime_kind_source: 'termination',
     },
   ],
@@ -1039,10 +1058,10 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
     {
       kind: 'agent',
       label: 'Calendar Coordinator',
-      description: 'Coordinate schedule intent and meeting context.',
+      description: 'Coordinate schedule intent and draft reviewable meeting recommendations.',
       slot_name: 'intake_slot',
       config: {
-        objective: 'Coordinate scheduling intent and meeting context.',
+        objective: 'Coordinate scheduling intent and prepare reviewable meeting recommendations.',
         preset_kind: 'calendar_coordinator',
         memory_scope: 'thread_summary',
       },
@@ -1059,14 +1078,14 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
     {
       kind: 'approval',
       label: 'Confirm Time',
-      description: 'Review the recommended time slot before locking it in.',
+      description: 'Review the recommended time slot before treating it as a confirmed plan.',
       slot_name: 'approval_slot',
       config: {
-        approval_reason: 'A human should confirm the proposed meeting slot.',
+        approval_reason: 'A human should confirm the proposed meeting slot before it is treated as final.',
         decision_point_id: '',
         options: [
-          { option_id: 'approve_slot', label: 'Confirm slot', consequence_summary: 'Proceed with the booking.' },
-          { option_id: 'reject_slot', label: 'Reject slot', consequence_summary: 'Return to planning without booking.' },
+          { option_id: 'approve_slot', label: 'Confirm draft slot', consequence_summary: 'Proceed with the reviewed schedule draft.' },
+          { option_id: 'reject_slot', label: 'Reject slot', consequence_summary: 'Return to planning without treating any slot as confirmed.' },
         ],
       },
       runtime_kind_source: 'approval',
@@ -1074,9 +1093,17 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
     {
       kind: 'termination',
       label: 'Schedule Summary',
-      description: 'Return the selected slot and any remaining scheduling notes.',
+      description: 'Return the recommended slot and any remaining scheduling notes for review.',
       slot_name: 'finalize_slot',
-      config: { output_kind: 'chat_reply', final_schema: { workflow: 'calendar_coordinator' } },
+      config: {
+        output_kind: 'chat_reply',
+        final_schema: {
+          workflow: 'calendar_coordinator',
+          summary_mode: 'reviewable_schedule_recommendation',
+          structured_output_keys: ['recommended_slot', 'scheduling_notes', 'calendar_context'],
+          external_write: false,
+        },
+      },
       runtime_kind_source: 'termination',
     },
   ],
@@ -1114,7 +1141,15 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
       label: 'Ledger Update Summary',
       description: 'Return the categorized receipt entry for review or posting.',
       slot_name: 'finalize_slot',
-      config: { output_kind: 'chat_reply', final_schema: { workflow: 'receipt_tracker' } },
+      config: {
+        output_kind: 'chat_reply',
+        final_schema: {
+          workflow: 'receipt_tracker',
+          summary_mode: 'reviewable_receipt_entry',
+          structured_output_keys: ['receipt_entry', 'receipt_notes'],
+          external_write: false,
+        },
+      },
       runtime_kind_source: 'termination',
     },
   ],
@@ -1122,10 +1157,10 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
     {
       kind: 'agent',
       label: 'Study Planner',
-      description: 'Plan study blocks from goals, deadlines, and priorities.',
+      description: 'Draft study blocks from goals, deadlines, and priorities.',
       slot_name: 'intake_slot',
       config: {
-        objective: 'Plan study blocks from goals, deadlines, and priorities.',
+        objective: 'Draft study blocks from goals, deadlines, and priorities.',
         preset_kind: 'study_planner',
         memory_scope: 'thread_summary',
       },
@@ -1150,9 +1185,17 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
     {
       kind: 'termination',
       label: 'Study Plan Summary',
-      description: 'Deliver the planned blocks and reminders.',
+      description: 'Deliver the recommended study blocks and reminders.',
       slot_name: 'finalize_slot',
-      config: { output_kind: 'chat_reply', final_schema: { workflow: 'study_planner' } },
+      config: {
+        output_kind: 'chat_reply',
+        final_schema: {
+          workflow: 'study_planner',
+          summary_mode: 'draft_study_plan',
+          structured_output_keys: ['study_blocks', 'reminders', 'study_input_context', 'calendar_context'],
+          external_write: false,
+        },
+      },
       runtime_kind_source: 'termination',
     },
   ],
@@ -1188,9 +1231,18 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
     {
       kind: 'termination',
       label: 'Research Summary',
-      description: 'Return a concise summary with supporting findings.',
+      description: 'Return a structured research brief with findings and source references.',
       slot_name: 'finalize_slot',
-      config: { output_kind: 'chat_reply', final_schema: { workflow: 'research_assistant', include_sources: true } },
+      config: {
+        output_kind: 'chat_reply',
+        final_schema: {
+          workflow: 'research_assistant',
+          summary_mode: 'research_brief',
+          structured_output_keys: ['research_brief', 'key_findings', 'source_refs'],
+          external_write: false,
+          include_sources: true,
+        },
+      },
       runtime_kind_source: 'termination',
     },
   ],
@@ -1226,9 +1278,17 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
     {
       kind: 'termination',
       label: 'Finance Digest',
-      description: 'Return trends, anomalies, and suggested next steps.',
+      description: 'Return transaction trends, anomaly notes, and finance context from the user ledger.',
       slot_name: 'finalize_slot',
-      config: { output_kind: 'chat_reply', final_schema: { workflow: 'finance_guardian' } },
+      config: {
+        output_kind: 'chat_reply',
+        final_schema: {
+          workflow: 'finance_guardian',
+          summary_mode: 'finance_digest',
+          structured_output_keys: ['finance_digest', 'anomaly_notes', 'finance_input_context'],
+          external_write: false,
+        },
+      },
       runtime_kind_source: 'termination',
     },
   ],
@@ -1271,9 +1331,17 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
     {
       kind: 'termination',
       label: 'Travel Options Summary',
-      description: 'Return the shortlisted travel plan and approval outcome.',
+      description: 'Return the draft booking recommendation and review notes before any external confirmation.',
       slot_name: 'finalize_slot',
-      config: { output_kind: 'chat_reply', final_schema: { workflow: 'travel_booker' } },
+      config: {
+        output_kind: 'chat_reply',
+        final_schema: {
+          workflow: 'travel_booker',
+          summary_mode: 'reviewable_booking_recommendation',
+          structured_output_keys: ['booking_recommendation', 'booking_notes'],
+          external_write: false,
+        },
+      },
       runtime_kind_source: 'termination',
     },
   ],
@@ -1325,9 +1393,148 @@ export const DEFAULT_PRESET_STARTER_BLUEPRINTS = PresetStarterRegistrySchema.par
     {
       kind: 'termination',
       label: 'Publishing Summary',
-      description: 'Return the final content package and publication readiness.',
+      description: 'Return the reviewable publication draft and publish notes before any public release.',
       slot_name: 'finalize_slot',
-      config: { output_kind: 'chat_reply', final_schema: { workflow: 'content_publisher', visibility: 'public' } },
+      config: {
+        output_kind: 'chat_reply',
+        final_schema: {
+          workflow: 'content_publisher',
+          summary_mode: 'reviewable_publication_draft',
+          structured_output_keys: ['publication_draft', 'publication_notes'],
+          external_write: false,
+          visibility: 'public',
+        },
+      },
+      runtime_kind_source: 'termination',
+    },
+  ],
+  wedding_vendor_operator: [
+    {
+      kind: 'agent',
+      label: 'Wedding Vendor Operator',
+      description: 'Coordinate live wedding vendor research, quote follow-up, and approval-gated outreach.',
+      slot_name: 'intake_slot',
+      config: {
+        objective: 'Coordinate live wedding vendor research, quote follow-up, and approval-gated outreach.',
+        preset_kind: 'wedding_vendor_operator',
+        memory_scope: 'workspace_slice',
+      },
+      policy: {
+        mask: 'private',
+        approval_mode: 'human_approval_required',
+        allowed_tools: ['wedding.vendor_search', 'wedding.live_evidence', 'gmail.send_draft'],
+        allowed_capabilities: ['vendor_search', 'maps_travel', 'weather_contingency', 'email'],
+        max_steps: 12,
+        max_cost_cents: 150,
+        outbound_allowlist: ['brave_search', 'google_places', 'google_maps', 'weatherapi', 'overpass', 'gmail'],
+      },
+      metadata: {
+        daemon_family: 'wedding_vendor_operator',
+        heartbeat_interval_minutes: 60,
+        merge_policy: 'append_evidence_then_require_user_selected_vendor_decision',
+        external_write_policy: 'approval_required_before_vendor_contact_or_send',
+      },
+      runtime_kind_source: 'agent',
+    },
+    {
+      kind: 'tool',
+      label: 'Live Vendor Discovery',
+      description: 'Search live provider sources for vendors after intake basics are present.',
+      slot_name: 'gather_slot',
+      config: { capability_id: 'wedding.vendor_search', operation: 'search', timeout_seconds: 120 },
+      policy: {
+        mask: 'private',
+        approval_mode: 'suggest_only',
+        allowed_tools: ['wedding.vendor_search'],
+        allowed_capabilities: ['vendor_search'],
+        max_steps: 4,
+        max_cost_cents: 80,
+        outbound_allowlist: ['brave_search', 'google_places', 'overpass'],
+      },
+      metadata: {
+        heartbeat_required: true,
+        result_contract: 'source_linked_vendor_notes',
+        forbidden_claims: ['booking_confirmed', 'availability_confirmed', 'price_final_without_quote'],
+      },
+      runtime_kind_source: 'tool',
+    },
+    {
+      kind: 'tool',
+      label: 'Map And Weather Evidence',
+      description: 'Verify planning locations and weather context with admin-connected providers.',
+      slot_name: 'check_slot',
+      config: { capability_id: 'wedding.live_evidence', operation: 'verify_location_weather', timeout_seconds: 90 },
+      policy: {
+        mask: 'private',
+        approval_mode: 'suggest_only',
+        allowed_tools: ['wedding.live_evidence'],
+        allowed_capabilities: ['maps_travel', 'weather_contingency'],
+        max_steps: 3,
+        max_cost_cents: 40,
+        outbound_allowlist: ['google_maps', 'weatherapi', 'overpass'],
+      },
+      metadata: {
+        heartbeat_required: true,
+        result_contract: 'map_collection_artifact',
+        weather_guardrail: 'planning_evidence_not_day_of_safety_clearance',
+      },
+      runtime_kind_source: 'tool',
+    },
+    {
+      kind: 'merge',
+      label: 'Vendor Evidence Merge',
+      description: 'Merge vendor, map, weather, quote, and user-selected decision evidence without overwriting approvals.',
+      slot_name: 'merge_slot',
+      config: { merge_strategy: 'structured_merge' },
+      metadata: {
+        merge_policy: 'append_only_evidence_preserve_user_approvals',
+        conflict_resolution: 'surface_conflict_before_shortlisting_or_sending',
+      },
+      runtime_kind_source: 'merge',
+    },
+    {
+      kind: 'approval',
+      label: 'Vendor Outreach Review',
+      description: 'Require explicit approval before contacting, following up with, or accepting a vendor quote.',
+      slot_name: 'approval_slot',
+      config: {
+        approval_reason: 'Vendor contact, quote acceptance, deposits, and external email sends require explicit human approval.',
+        decision_point_id: '',
+        options: [
+          { option_id: 'approve_vendor_outreach', label: 'Approve outreach', consequence_summary: 'Allow the reviewed vendor message to be sent through the connected provider.' },
+          { option_id: 'hold_for_edits', label: 'Hold for edits', consequence_summary: 'Keep the vendor workflow in draft/review without contacting the vendor.' },
+        ],
+      },
+      policy: {
+        mask: 'private',
+        approval_mode: 'human_approval_required',
+        allowed_tools: ['gmail.send_draft'],
+        allowed_capabilities: ['email'],
+        max_steps: 2,
+        max_cost_cents: 30,
+        outbound_allowlist: ['gmail'],
+      },
+      metadata: {
+        external_write_policy: 'require_confirmed_provider_receipt',
+        undo_window_seconds: 120,
+      },
+      runtime_kind_source: 'approval',
+    },
+    {
+      kind: 'termination',
+      label: 'Vendor Operations Summary',
+      description: 'Return source-backed vendor notes, quote actions, and blocked items before any unapproved external write.',
+      slot_name: 'finalize_slot',
+      config: {
+        output_kind: 'chat_reply',
+        final_schema: {
+          workflow: 'wedding_vendor_operator',
+          summary_mode: 'reviewable_vendor_operations_packet',
+          structured_output_keys: ['vendor_notes', 'quote_actions', 'blocked_items', 'provider_receipts'],
+          external_write: false,
+          evidence_required: true,
+        },
+      },
       runtime_kind_source: 'termination',
     },
   ],
@@ -1382,6 +1589,15 @@ export type TemplateRegistryRecord = z.infer<typeof TemplateRegistryRecordSchema
 export type PresetStarterBlueprint = z.infer<typeof PresetStarterBlueprintSchema>;
 export type WorkflowIntentExpansion = z.infer<typeof WorkflowIntentExpansionSchema>;
 export type NodeMessageSubtype = z.infer<typeof NodeMessageSubtypeSchema>;
+export interface WorkflowTerminationContractDescriptor {
+  output_kind: string;
+  workflow?: string;
+  summary_mode?: string;
+  structured_output_keys: string[];
+  external_write: boolean | null;
+  headline: string;
+  detail: string;
+}
 
 export function parseWorkflowGraph(input: unknown): WorkflowGraph {
   return WorkflowGraphSchema.parse(input);
@@ -1409,6 +1625,145 @@ export function presetStarterBlueprintsForPreset(
   return DEFAULT_PRESET_STARTER_BLUEPRINTS[presetKind] ?? [];
 }
 
+function recordValue(input: unknown): Record<string, unknown> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {};
+  }
+  return input as Record<string, unknown>;
+}
+
+function stringValue(input: unknown): string | undefined {
+  return typeof input === 'string' && input.trim().length > 0 ? input : undefined;
+}
+
+function stringListValue(input: unknown): string[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+  return input.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
+function humanizeIdentifier(value: string): string {
+  return value
+    .split(/[_\-.]+/g)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+}
+
+const TERMINATION_SUMMARY_MODE_HEADLINES: Record<string, string> = {
+  research_brief: 'Research brief',
+  finance_digest: 'Finance digest',
+  reviewable_receipt_entry: 'Reviewable receipt entry',
+  reviewable_reply_draft: 'Reviewable reply draft',
+  reviewable_schedule_recommendation: 'Reviewable schedule recommendation',
+  draft_study_plan: 'Draft study plan',
+  reviewable_booking_recommendation: 'Reviewable booking recommendation',
+  reviewable_publication_draft: 'Reviewable publication draft',
+  reviewable_vendor_operations_packet: 'Reviewable vendor operations packet',
+};
+
+const TERMINATION_OUTPUT_KIND_HEADLINES: Record<string, string> = {
+  chat_reply: 'Chat reply',
+  artifact: 'Artifact output',
+  api_result: 'API result',
+  saved_workflow_output: 'Saved workflow output',
+  spreadsheet_export: 'Spreadsheet export',
+  chart_view: 'Chart view',
+  content_digest: 'Content digest',
+};
+
+function describeTerminationContractDetail(
+  outputKind: string,
+  summaryMode: string | undefined,
+  structuredOutputKeys: string[],
+  externalWrite: boolean | null,
+): string {
+  if (summaryMode === 'research_brief') {
+    return 'Returns a structured research brief with findings and source references without performing external writes.';
+  }
+  if (summaryMode === 'finance_digest') {
+    return 'Returns transaction trends, anomaly notes, and finance context from the user ledger without performing external writes.';
+  }
+  if (summaryMode === 'reviewable_receipt_entry') {
+    return 'Returns a categorized receipt entry and posting notes for review before any ledger write.';
+  }
+  if (summaryMode === 'reviewable_reply_draft') {
+    return 'Returns a reply draft and triage notes for review before any external send.';
+  }
+  if (summaryMode === 'reviewable_schedule_recommendation') {
+    return 'Returns a recommended slot and scheduling notes for review before any external write.';
+  }
+  if (summaryMode === 'draft_study_plan') {
+    return 'Returns study blocks, reminders, and pending study-input context as a draft plan for review.';
+  }
+  if (summaryMode === 'reviewable_booking_recommendation') {
+    return 'Returns a booking recommendation and review notes before any external confirmation.';
+  }
+  if (summaryMode === 'reviewable_publication_draft') {
+    return 'Returns a publication draft and release notes for review before any public release.';
+  }
+  if (summaryMode === 'reviewable_vendor_operations_packet') {
+    return 'Returns source-backed vendor notes, quote actions, blocked items, and provider receipts before any unapproved vendor contact.';
+  }
+  if (outputKind === 'spreadsheet_export') {
+    return 'Exports structured data as spreadsheet files for human review or handoff.';
+  }
+  if (outputKind === 'chart_view') {
+    return 'Returns chart-ready output for visual review.';
+  }
+  if (outputKind === 'content_digest') {
+    return 'Returns a human-facing summary or digest.';
+  }
+
+  const writeSuffix =
+    externalWrite === false
+      ? ' No external write is implied by this contract.'
+      : externalWrite === true
+        ? ' This contract may perform an external write.'
+        : '';
+
+  if (structuredOutputKeys.length > 0) {
+    return `Returns structured output fields: ${structuredOutputKeys.join(', ')}.${writeSuffix}`;
+  }
+
+  return `Returns a ${TERMINATION_OUTPUT_KIND_HEADLINES[outputKind] ?? humanizeIdentifier(outputKind)}.${writeSuffix}`;
+}
+
+export function describeWorkflowTerminationContract(config: {
+  output_kind?: string;
+  final_schema?: Record<string, unknown>;
+}): WorkflowTerminationContractDescriptor {
+  const finalSchema = recordValue(config.final_schema);
+  const outputKind = stringValue(config.output_kind) ?? 'chat_reply';
+  const workflow = stringValue(finalSchema.workflow);
+  const summaryMode = stringValue(finalSchema.summary_mode);
+  const structuredOutputKeys = stringListValue(finalSchema.structured_output_keys);
+  const externalWrite =
+    typeof finalSchema.external_write === 'boolean'
+      ? finalSchema.external_write
+      : null;
+  const headline =
+    (summaryMode && TERMINATION_SUMMARY_MODE_HEADLINES[summaryMode]) ??
+    TERMINATION_OUTPUT_KIND_HEADLINES[outputKind] ??
+    humanizeIdentifier(outputKind);
+
+  return {
+    output_kind: outputKind,
+    workflow,
+    summary_mode: summaryMode,
+    structured_output_keys: structuredOutputKeys,
+    external_write: externalWrite,
+    headline,
+    detail: describeTerminationContractDetail(
+      outputKind,
+      summaryMode,
+      structuredOutputKeys,
+      externalWrite,
+    ),
+  };
+}
+
 const PRESET_INTENT_KEYWORDS: Record<PresetNodeKind, string[]> = {
   email_guardian: ['email', 'inbox', 'reply', 'respond', 'triage', 'mail', 'outreach'],
   calendar_coordinator: ['calendar', 'schedule', 'meeting', 'availability', 'timeslot', 'appointment'],
@@ -1418,6 +1773,7 @@ const PRESET_INTENT_KEYWORDS: Record<PresetNodeKind, string[]> = {
   finance_guardian: ['finance', 'spending', 'budget', 'transaction', 'anomaly', 'expenses', 'cashflow'],
   travel_booker: ['travel', 'flight', 'hotel', 'trip', 'itinerary', 'book', 'booking'],
   content_publisher: ['publish', 'article', 'blog', 'content', 'post', 'newsletter', 'draft'],
+  wedding_vendor_operator: ['wedding vendor', 'wedding vendors', 'florist', 'photographer', 'venue', 'caterer', 'celebrant', 'quote reply', 'vendor quote'],
 };
 
 export function inferPresetFromIntent(intent: string): PresetNodeKind | null {
@@ -1457,7 +1813,7 @@ export function expandWorkflowIntent(intent: string): WorkflowIntentExpansion {
 
   const requiresApproval =
     /approval|approve|review|confirm|before sending|before booking|before publishing|human/.test(normalized) ||
-    ['travel_booker', 'content_publisher', 'email_guardian', 'calendar_coordinator'].includes(presetKind);
+    ['travel_booker', 'content_publisher', 'email_guardian', 'calendar_coordinator', 'wedding_vendor_operator'].includes(presetKind);
   const needsBranching =
     /compare|comparison|options|choose|branch|fallback|if |when |anomaly|route|otherwise/.test(normalized);
   const needsResearchSupport =
@@ -1535,7 +1891,7 @@ export const PRESET_DEFAULT_TRIGGER_CONFIGS: Record<
     trigger_family: "event",
     trigger_kind: "internal_event",
     event_source: "calendar",
-    event_type: "calendar.event_starting",
+    event_type: "appointment_approaching",
   },
   receipt_tracker: {
     trigger_family: "event",
@@ -1566,6 +1922,10 @@ export const PRESET_DEFAULT_TRIGGER_CONFIGS: Record<
     trigger_kind: "manual",
   },
   content_publisher: {
+    trigger_family: "manual",
+    trigger_kind: "manual",
+  },
+  wedding_vendor_operator: {
     trigger_family: "manual",
     trigger_kind: "manual",
   },

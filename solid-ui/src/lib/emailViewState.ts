@@ -160,11 +160,15 @@ export function splitQuotedEmailBody(body: string): QuotedEmailSegment {
 
 export function extractEmailMessage(message: AfpMessage): EmailMessageCard {
   const content = isRecord(decryptedDisplayContent(message)) ? decryptedDisplayContent(message) : {};
+  const contentMetadata = isRecord(content.metadata) ? content.metadata : {};
+  const payload = isRecord(content.payload) ? content.payload : {};
   const metadata = isRecord(message.metadata) ? message.metadata : {};
   const searchable = isRecord(metadata.searchable_metadata) ? metadata.searchable_metadata : {};
   const labels = Array.from(
     new Set([
       ...readStringArray(content.labels),
+      ...readStringArray(contentMetadata.labels),
+      ...readStringArray(payload.labels),
       ...readStringArray(metadata.labels),
       ...readStringArray(searchable.labels),
       ...readStringArray(searchable.suggested_actions),
@@ -173,8 +177,11 @@ export function extractEmailMessage(message: AfpMessage): EmailMessageCard {
   const supertags = Array.from(new Set(message.supertags ?? []));
   const rawMailbox = firstNonEmpty(
     content.mailbox,
+    contentMetadata.mailbox,
+    payload.mailbox,
     metadata.mailbox,
     searchable.mailbox,
+    content.event_type === "email_incoming" ? "inbox" : null,
     message.kind,
     message.subtype,
     message.type,
@@ -190,6 +197,14 @@ export function extractEmailMessage(message: AfpMessage): EmailMessageCard {
     content.sender_name,
     content.from,
     content.sender,
+    contentMetadata.from_name,
+    contentMetadata.sender_name,
+    contentMetadata.from_address,
+    contentMetadata.from,
+    payload.from_name,
+    payload.sender_name,
+    payload.from_address,
+    payload.from,
     metadata.from_name,
     metadata.sender_name,
     message.from,
@@ -197,23 +212,51 @@ export function extractEmailMessage(message: AfpMessage): EmailMessageCard {
   const senderDetail = firstNonEmpty(
     content.from_email,
     content.sender_email,
+    contentMetadata.from_email,
+    contentMetadata.sender_email,
+    contentMetadata.account_ref,
+    contentMetadata.gmail_email,
+    contentMetadata.to_address,
+    payload.from_email,
+    payload.sender_email,
+    payload.account_ref,
+    payload.gmail_email,
+    payload.to_address,
     metadata.from_email,
     metadata.sender_email,
     metadata.source_ref,
   );
   const subject = firstNonEmpty(
     content.subject,
+    contentMetadata.subject,
+    payload.subject,
     metadata.subject,
     content.title,
     metadata.title,
     content.summary,
   ) ?? decryptedDisplayLabel(message) ?? "Untitled email";
-  const preview = snippetFromContent(content);
+  const preview = firstNonEmpty(
+    content.preview,
+    content.snippet,
+    content.body_preview,
+    contentMetadata.preview,
+    contentMetadata.snippet,
+    contentMetadata.body_preview,
+    payload.preview,
+    payload.snippet,
+    payload.body_preview,
+  ) ?? snippetFromContent(content);
   const body = firstNonEmpty(
     content.body_text,
     content.body,
     content.text,
     content.message,
+    contentMetadata.body_text,
+    contentMetadata.body,
+    contentMetadata.snippet,
+    payload.body_text,
+    payload.body,
+    payload.snippet,
     content.summary,
     content.preview,
   ) ?? preview;
@@ -322,15 +365,7 @@ export function buildEmailItems(args: {
 }): EmailMessageCard[] {
   return [
     ...args.messages
-      .filter((message) =>
-        message.type.includes("email")
-        || message.type.includes("inbox")
-        || message.type.includes("reply")
-        || message.type.includes("action_log")
-        || message.type.includes("approval")
-        || message.kind === "email"
-        || message.kind === "prepared_draft",
-      )
+      .filter(emailMessageVisibleInMailbox)
       .map(extractEmailMessage),
     ...args.localDrafts.map(localDraftToEmailMessage),
   ]
@@ -340,6 +375,22 @@ export function buildEmailItems(args: {
       unread: args.readMessageIds.has(item.id) ? false : item.unread,
     }))
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}
+
+export function emailMessageVisibleInMailbox(message: AfpMessage): boolean {
+  const content = isRecord(decryptedDisplayContent(message)) ? decryptedDisplayContent(message) : {};
+  const contentMetadata = isRecord(content.metadata) ? content.metadata : {};
+  const payload = isRecord(content.payload) ? content.payload : {};
+  const eventType = firstNonEmpty(content.event_type, contentMetadata.event_type, payload.event_type);
+  const provider = firstNonEmpty(content.provider, contentMetadata.provider, payload.provider);
+  return message.type.includes("email")
+    || message.type.includes("inbox")
+    || message.type.includes("reply")
+    || message.type.includes("action_log")
+    || message.type.includes("approval")
+    || message.kind === "email"
+    || message.kind === "prepared_draft"
+    || (eventType === "email_incoming" && /gmail|email|smtp/i.test(provider ?? "email"));
 }
 
 export function emailLabelOptions(items: EmailMessageCard[]): string[] {

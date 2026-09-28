@@ -6,7 +6,8 @@
  * as rich agent-generated cards with "Open Original" links.
  */
 
-import { createSignal, createMemo, For, Show } from "solid-js";
+import { createSignal, createMemo, For, Show, onMount } from "solid-js";
+import { safeHref } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -180,15 +181,33 @@ const CARD_GLYPH: Record<FeedCard["category"], string> = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function DiscoverView() {
+const FEED_AGENTS = [
+  { id: "knowledge_curator",   label: "Knowledge Curator",   desc: "Indexes your notes and surfaces relevant connections." },
+  { id: "research_assistant",  label: "Research Assistant",  desc: "Synthesises papers and articles into weekly digests." },
+  { id: "news_scout",          label: "News Scout",          desc: "Monitors topics you follow and surfaces relevant news." },
+];
+
+export function DiscoverView(props: { isDemo?: boolean }) {
   const [activeCategory, setActiveCategory] = createSignal<FeedCategory>("all");
   const [agentsConfigured] = createSignal(false); // set true when real agents push cards
+  const [loading, setLoading] = createSignal(true);
+  const [showFeedConfig, setShowFeedConfig] = createSignal(false);
+  const [enabledAgents, setEnabledAgents] = createSignal<Set<string>>(
+    new Set(["knowledge_curator", "research_assistant"])
+  );
+
+  onMount(() => {
+    // Simulate async feed load — replace with real AFP subscription when agents are active
+    const t = setTimeout(() => setLoading(false), 450);
+    return () => clearTimeout(t);
+  });
 
   const visibleCards = createMemo(() => {
     const cat = activeCategory();
     if (cat === "all") return MOCK_CARDS;
     return MOCK_CARDS.filter((c) => c.category === cat);
   });
+  const isPreview = createMemo(() => props.isDemo || !agentsConfigured());
 
   return (
     <div class="view-enter flex flex-col gap-0" style="min-height: calc(100vh - 8em);">
@@ -198,15 +217,32 @@ export function DiscoverView() {
         <div>
           <h1 class="text-xl font-bold text-on-surface tracking-tight">Discover</h1>
           <p class="mt-0.5 text-sm text-on-surface-variant">
-            Your private, agent-curated feed. Zero ads. Zero tracking. Fully E2EE.
+            <Show
+              when={isPreview()}
+              fallback={<>Your private, agent-curated feed. Zero ads. Zero tracking. Fully E2EE.</>}
+            >
+              {props.isDemo
+                ? "Demo preview of an agent-curated private feed. Sign in to replace these sample cards with your own sources and agents."
+                : "Preview feed. Real private feed delivery starts once your curation agents are active and publishing live cards here."}
+            </Show>
           </p>
         </div>
 
         {/* Privacy badge */}
-        <div class="flex items-center gap-2 rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-3.5 py-2 text-xs text-emerald-700 shadow-sm">
-          <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          <span class="font-semibold">E2EE · No ads · Agent-controlled</span>
-        </div>
+        <Show
+          when={isPreview()}
+          fallback={
+            <div class="flex items-center gap-2 rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-3.5 py-2 text-xs text-emerald-700 shadow-sm">
+              <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span class="font-semibold">E2EE · No ads · Agent-controlled</span>
+            </div>
+          }
+        >
+          <div class="flex items-center gap-2 rounded-2xl border border-amber-200/70 bg-amber-50/80 px-3.5 py-2 text-xs text-amber-700 shadow-sm">
+            <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+            <span class="font-semibold">Demo preview · Sample cards · Agent-style feed</span>
+          </div>
+        </Show>
       </div>
 
       {/* Category tabs */}
@@ -228,117 +264,219 @@ export function DiscoverView() {
         </For>
 
         <div class="ml-auto flex items-center gap-2">
-          <span class="text-[11px] text-on-surface-variant">Powered by your agents</span>
+          <span class="text-[11px] text-on-surface-variant">
+            {isPreview() ? "Agent-curated preview" : "Powered by your agents"}
+          </span>
           <button
             type="button"
-            class="rounded-full border border-white/50 bg-white/60 px-3 py-1 text-[11px] font-medium text-on-surface-variant transition hover:bg-white/80"
+            onClick={() => setShowFeedConfig((v) => !v)}
+            class={`rounded-full border px-3 py-1 text-[11px] font-medium transition ${
+              showFeedConfig()
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-white/50 bg-white/60 text-on-surface-variant hover:bg-white/80"
+            }`}
             title="Configure which agents curate your feed"
           >
-            Configure feed
+            {showFeedConfig() ? "Done" : "Configure feed"}
           </button>
         </div>
       </div>
 
+      {/* Feed config panel — shown when "Configure feed" is open */}
+      <Show when={showFeedConfig()}>
+        <div class="mb-5 rounded-[22px] border border-primary/20 bg-white/80 px-5 py-4 shadow-soft animate-fade-in backdrop-blur-sm">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Curating agents</p>
+          <p class="mt-1 mb-3 text-[11px] text-on-surface-variant">
+            Toggle which agents contribute to your feed. Changes take effect on the next agent run.
+          </p>
+          <div class="space-y-2">
+            <For each={FEED_AGENTS}>
+              {(agent) => {
+                const enabled = () => enabledAgents().has(agent.id);
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setEnabledAgents((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(agent.id)) next.delete(agent.id);
+                      else next.add(agent.id);
+                      return next;
+                    })}
+                    class={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
+                      enabled()
+                        ? "border-primary/30 bg-primary/8"
+                        : "border-white/40 bg-white/40 hover:bg-white/60"
+                    }`}
+                  >
+                    <span class={`mt-0.5 h-4 w-4 flex-shrink-0 rounded-full border-2 transition ${
+                      enabled() ? "border-primary bg-primary" : "border-slate-300 bg-white"
+                    }`} />
+                    <div>
+                      <p class={`text-xs font-semibold ${enabled() ? "text-primary" : "text-on-surface"}`}>
+                        {agent.label}
+                      </p>
+                      <p class="mt-0.5 text-[10px] text-on-surface-variant">{agent.desc}</p>
+                    </div>
+                  </button>
+                );
+              }}
+            </For>
+          </div>
+        </div>
+      </Show>
+
       {/* Agent setup prompt (shown until agents are configured) */}
-      <Show when={!agentsConfigured()}>
+      <Show when={isPreview()}>
         <div class="mb-5 rounded-[22px] border border-amber-200/70 bg-amber-50/80 px-5 py-4 shadow-soft">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Feed preview</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+            {props.isDemo ? "Demo feed preview" : "Feed preview"}
+          </p>
           <p class="mt-1 text-sm text-amber-900">
-            You're seeing sample cards. To get your real private feed, activate the{" "}
-            <span class="font-semibold">Knowledge Curator</span> and{" "}
-            <span class="font-semibold">Research Assistant</span> agents from the{" "}
-            <span class="font-semibold">Automations</span> tab. Once running, they'll push
-            personalised cards here in real time — no algorithms, no advertisers.
+            <Show
+              when={props.isDemo}
+              fallback={
+                <>
+                  You're seeing sample cards. To get your real private feed, activate the{" "}
+                  <span class="font-semibold">Knowledge Curator</span> and{" "}
+                  <span class="font-semibold">Research Assistant</span> agents from the{" "}
+                  <span class="font-semibold">Automations</span> tab. Once running, they'll push
+                  personalised cards here in real time — no algorithms, no advertisers.
+                </>
+              }
+            >
+              You're seeing sample cards only. Sign in and activate the{" "}
+              <span class="font-semibold">Knowledge Curator</span> and{" "}
+              <span class="font-semibold">Research Assistant</span> agents to replace this preview
+              with your own private feed.
+            </Show>
           </p>
         </div>
       </Show>
 
-      {/* Feed grid */}
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <For each={visibleCards()}>
-          {(card) => (
-            <article
-              class={`flex flex-col rounded-[22px] border bg-white/88 p-5 shadow-soft backdrop-blur-sm transition hover:shadow-md ${CARD_BORDER[card.category]}`}
-            >
-              {/* Card header */}
-              <div class="mb-3 flex items-start justify-between gap-3">
+      {/* Skeleton loading state */}
+      <Show when={loading()}>
+        <div class="skeleton-crossfade grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <For each={Array(6).fill(0)}>
+            {() => (
+              <div class="flex flex-col rounded-[22px] border border-slate-200/70 bg-white/60 p-5 space-y-3 animate-pulse">
                 <div class="flex items-center gap-2">
-                  <span class="text-xl select-none" aria-hidden>{CARD_GLYPH[card.category]}</span>
-                  <div>
-                    <p class={`text-[10px] font-bold uppercase tracking-[0.18em] ${CATEGORY_ACCENT[card.category]}`}>
-                      {CATEGORY_LABELS[card.category]}
-                    </p>
-                    <p class="text-[11px] text-on-surface-variant">{card.source}</p>
-                  </div>
+                  <div class="h-5 w-5 rounded-full bg-slate-200" />
+                  <div class="h-3 w-20 rounded-full bg-slate-200" />
                 </div>
-                <span class="shrink-0 text-[11px] text-on-surface-variant">{card.publishedAt}</span>
+                <div class="h-4 w-full rounded-full bg-slate-200" />
+                <div class="h-3 w-5/6 rounded-full bg-slate-200" />
+                <div class="h-3 w-4/6 rounded-full bg-slate-200" />
+                <div class="mt-1 h-8 rounded-xl bg-violet-100/70" />
+                <div class="flex gap-1.5">
+                  <div class="h-4 w-12 rounded-full bg-slate-200" />
+                  <div class="h-4 w-16 rounded-full bg-slate-200" />
+                </div>
               </div>
+            )}
+          </For>
+        </div>
+        <p class="mt-4 text-center text-xs text-on-surface-variant animate-pulse">
+          Loading your agent-curated feed…
+        </p>
+      </Show>
 
-              {/* Title & summary */}
-              <h2 class="mb-2 text-sm font-semibold leading-snug text-on-surface line-clamp-2">
-                {card.title}
-              </h2>
-              <p class="flex-1 text-[12px] leading-5 text-on-surface-variant line-clamp-4">
-                {card.summary}
-              </p>
+      {/* Feed grid */}
+      <Show when={!loading()}>
+        <div class="content-crossfade grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <For each={visibleCards()}>
+            {(card) => (
+              <article
+                class={`flex flex-col rounded-[22px] border bg-white/88 p-5 shadow-soft backdrop-blur-sm transition hover:shadow-md ${CARD_BORDER[card.category]}`}
+              >
+                {/* Card header */}
+                <div class="mb-3 flex items-start justify-between gap-3">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xl select-none" aria-hidden>{CARD_GLYPH[card.category]}</span>
+                    <div>
+                      <p class={`text-[10px] font-bold uppercase tracking-[0.18em] ${CATEGORY_ACCENT[card.category]}`}>
+                        {CATEGORY_LABELS[card.category]}
+                      </p>
+                      <p class="text-[11px] text-on-surface-variant">{card.source}</p>
+                    </div>
+                  </div>
+                  <span class="shrink-0 text-[11px] text-on-surface-variant">{card.publishedAt}</span>
+                </div>
 
-              {/* Agent note */}
-              <Show when={card.agentNote}>
+                {/* Title & summary */}
+                <h2 class="mb-2 text-sm font-semibold leading-snug text-on-surface line-clamp-2">
+                  {card.title}
+                </h2>
+                <p class="flex-1 text-[12px] leading-5 text-on-surface-variant line-clamp-4">
+                  {card.summary}
+                </p>
+
+                {/* Agent rationale — always visible, reinforces agent-first value */}
                 <div class="mt-3 rounded-xl border border-violet-200/60 bg-violet-50/70 px-3 py-2">
                   <p class="text-[10px] leading-4 text-violet-700">
-                    <span class="font-semibold">Agent note: </span>{card.agentNote}
+                    <span class="font-semibold">Why surfaced: </span>
+                    {card.agentNote ?? "Matched based on your saved interests and topics."}
                   </p>
                 </div>
-              </Show>
 
-              {/* Tags */}
-              <div class="mt-3 flex flex-wrap gap-1.5">
-                <For each={card.tags}>
-                  {(tag) => (
-                    <span class={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${CARD_TAG_BG[card.category]}`}>
-                      {tag}
+                {/* Tags */}
+                <div class="mt-3 flex flex-wrap gap-1.5">
+                  <For each={card.tags}>
+                    {(tag) => (
+                      <span class={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${CARD_TAG_BG[card.category]}`}>
+                        {tag}
+                      </span>
+                    )}
+                  </For>
+                  <Show when={card.readTimeMin}>
+                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                      {card.readTimeMin} min
                     </span>
-                  )}
-                </For>
-                <Show when={card.readTimeMin}>
-                  <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                    {card.readTimeMin} min
-                  </span>
-                </Show>
-              </div>
+                  </Show>
+                </div>
 
-              {/* Footer actions */}
-              <div class="mt-4 flex items-center justify-between border-t border-black/5 pt-3">
-                <Show when={card.originalUrl} fallback={
-                  <span class="text-[11px] text-on-surface-variant/60 italic">Original link via agent</span>
-                }>
-                  <a
-                    href={card.originalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-[11px] font-semibold text-primary underline-offset-2 hover:underline"
+                {/* Footer actions */}
+                <div class="mt-4 flex items-center justify-between border-t border-black/5 pt-3">
+                  <Show when={card.originalUrl} fallback={
+                    <span class="text-[11px] text-on-surface-variant/60 italic">Original link via agent</span>
+                  }>
+                    <a
+                      href={safeHref(card.originalUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-[11px] font-semibold text-primary underline-offset-2 hover:underline"
+                    >
+                      Open Original →
+                    </a>
+                  </Show>
+                  <button
+                    type="button"
+                    class="rounded-full border border-white/50 bg-white/60 px-3 py-1 text-[10px] font-medium text-on-surface-variant transition hover:bg-white/85"
+                    title="Save to Notes"
                   >
-                    Open Original →
-                  </a>
-                </Show>
-                <button
-                  type="button"
-                  class="rounded-full border border-white/50 bg-white/60 px-3 py-1 text-[10px] font-medium text-on-surface-variant transition hover:bg-white/85"
-                  title="Save to Notes"
-                >
-                  Save
-                </button>
-              </div>
-            </article>
-          )}
-        </For>
-      </div>
+                    Save
+                  </button>
+                </div>
+              </article>
+            )}
+          </For>
+        </div>
+      </Show>
 
       {/* Load more hint */}
       <div class="mt-8 pb-6 text-center">
         <p class="text-xs text-on-surface-variant">
-          Your agents deliver new cards automatically.{" "}
-          <span class="font-medium text-primary">More cards appear as agents run.</span>
+          <Show
+            when={isPreview()}
+            fallback={
+              <>
+                Your agents deliver new cards automatically.{" "}
+                <span class="font-medium text-primary">More cards appear as agents run.</span>
+              </>
+            }
+          >
+            This preview stays static until your curation agents are active.{" "}
+            <span class="font-medium text-primary">Live cards appear here once those agents start publishing.</span>
+          </Show>
         </p>
       </div>
     </div>

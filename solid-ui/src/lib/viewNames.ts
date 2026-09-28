@@ -5,6 +5,7 @@ export const VIEW_NAMES = [
   "threads",
   "workflows",
   "email",
+  "study",
   "note",
   "calendar",
   "database",

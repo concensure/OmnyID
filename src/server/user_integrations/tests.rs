@@ -19,6 +19,18 @@ fn env_lock() -> &'static Mutex<()> {
 }
 
 #[test]
+fn gmail_routes_include_workspace_and_integration_status_aliases() {
+    let source = include_str!("../user_integrations.rs");
+
+    assert!(source.contains(".route(\"/gmail/status\", get(gmail_status_http))"));
+    assert!(source.contains(".route(\"/integrations/gmail/status\", get(gmail_status_http))"));
+    assert!(source.contains(".route(\"/gmail/connect-url\", get(gmail_connect_url_http))"));
+    assert!(
+        source.contains(".route(\"/integrations/gmail/oauth-url\", get(gmail_connect_url_http))")
+    );
+}
+
+#[test]
 fn gmail_oauth_redirect_target_defaults_to_workspace_relative_path() {
     let _guard = env_lock().lock().expect("env lock");
     unsafe {

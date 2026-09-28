@@ -1398,7 +1398,7 @@ export default function FilesView(props: {
                   <p class="mt-1">
                     {categoryCounts().study} study file{categoryCounts().study === 1 ? "" : "s"} are visible in the current library view.
                     <Show when={studyFocusSummary().length > 0}>
-                      <span> Focused by {studyFocusSummary().join(" Â· ")}.</span>
+                      <span> Focused by {studyFocusSummary().join(" · ")}.</span>
                     </Show>
                   </p>
                   <p class="mt-1 text-xs leading-5 text-violet-900/80">

@@ -1,5 +1,6 @@
 import { createSignal, onMount, Show } from "solid-js";
-import { readSession, apiFetch } from "./lib/api";
+import { readSession, getDashboardSession, getFleet } from "./lib/api";
+import { loadOnboardingDone } from "./lib/onboardingLocalState";
 import { AgentPulse } from "./components/AgentPulse";
 import { MaskSwitcher } from "./components/MaskSwitcher";
 import { AgentFleetView } from "./components/AgentFleetView";
@@ -19,6 +20,20 @@ export function DashboardApp() {
   const [showOnboarding, setShowOnboarding] = createSignal(false);
   const [loraScore, setLoraScore] = createSignal(0);
   const [loraActive, setLoraActive] = createSignal(false);
+  const [fleetActiveCount, setFleetActiveCount] = createSignal(0);
+  const [fleetIdleCount, setFleetIdleCount] = createSignal(0);
+  const [loraLoadError, setLoraLoadError] = createSignal<string | null>(null);
+
+  async function loadLoraStatus() {
+    setLoraLoadError(null);
+    const fleet = await getFleet();
+    setFleetActiveCount(fleet.active_count ?? 0);
+    setFleetIdleCount(fleet.idle_count ?? 0);
+    if (fleet.instance) {
+      setLoraScore(fleet.instance.lora_confidence_score ?? 0);
+      setLoraActive(fleet.instance.lora_genome_active ?? false);
+    }
+  }
 
   onMount(async () => {
     const session = readSession();
@@ -26,7 +41,7 @@ export function DashboardApp() {
       setIsAnon(true);
       // Gate anonymous access
       try {
-        await apiFetch("/dashboard/session");
+        await getDashboardSession();
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("429") || msg.includes("403") || msg.includes("Session limit")) {
@@ -37,17 +52,15 @@ export function DashboardApp() {
       }
     } else {
       // Check onboarding status for authenticated users
-      const done = window.localStorage.getItem("omnyid.onboarding.done");
+      const done = loadOnboardingDone();
       if (!done) setShowOnboarding(true);
 
       // Load LoRA score
       try {
-        const fleet = await apiFetch<{ instance?: { lora_confidence_score?: number; lora_genome_active?: boolean } }>("/agent/fleet");
-        if (fleet.instance) {
-          setLoraScore(fleet.instance.lora_confidence_score ?? 0);
-          setLoraActive(fleet.instance.lora_genome_active ?? false);
-        }
-      } catch { /* ignore */ }
+        await loadLoraStatus();
+      } catch (error) {
+        setLoraLoadError(error instanceof Error ? error.message : "Could not load fleet status.");
+      }
     }
     setReady(true);
   });
@@ -123,9 +136,28 @@ export function DashboardApp() {
             {/* Right sidebar — auth only */}
             <Show when={!isAnon()}>
               <aside class="w-64 border-l border-white/15 bg-white/5 p-4">
+                <Show when={loraLoadError()}>
+                  <div class="mb-3 rounded-xl border border-amber-200/70 bg-amber-50/85 px-3 py-3 text-xs text-amber-900">
+                    <div class="space-y-2">
+                      <p>Could not load fleet status: {loraLoadError()}</p>
+                      <button
+                        type="button"
+                        class="rounded-full border border-amber-200/70 bg-white/80 px-3 py-1 text-[10px] font-medium text-amber-900 transition hover:bg-white"
+                        onClick={() => void loadLoraStatus().catch((error) => {
+                          setLoraLoadError(error instanceof Error ? error.message : "Could not load fleet status.");
+                        })}
+                      >
+                        Retry fleet status
+                      </button>
+                    </div>
+                  </div>
+                </Show>
                 <LoraStatusWidget
                   score={loraScore()}
                   active={loraActive()}
+                  activeCount={fleetActiveCount()}
+                  idleCount={fleetIdleCount()}
+                  onFleetOpen={() => setView("fleet")}
                 />
               </aside>
             </Show>

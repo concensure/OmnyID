@@ -1,14 +1,59 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import {
-  apiFetch,
   createCalendarEvent,
+  executeUiCommand,
   deleteCalendarEvent,
+  disconnectGoogleCalendar,
   fetchBacklinksForMessage,
+  fetchGoogleCalendarOAuthUrl,
+  fetchGoogleCalendarStatus,
   installDefaultSupertags,
   listCalendarEvents,
+  sendAfpMessage,
+  syncGoogleCalendar,
   type BacklinkItem,
   type CalendarEvent,
+  type DashboardBootstrap,
 } from "@/lib/api";
+import { type GoogleCalendarConnectionStatus } from "@/lib/googleCalendarConnectionState";
+import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
+import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import { navigateToView } from "@/lib/decisionosNavigation";
+import {
+  CALENDAR_CATEGORY_META,
+  calendarAbsoluteDateLabel,
+  calendarBuildMiniCalendar,
+  calendarCommandSummary,
+  calendarDateTimeIso,
+  calendarDaysInMonth,
+  calendarEventOverlaps,
+  calendarEventsFromAfpMessages,
+  calendarFirstWeekday,
+  calendarIsSameDay,
+  calendarItemFromEvent,
+  calendarLongDateLabel,
+  calendarMatchesSearch,
+  mergeCalendarEvents,
+  calendarMonthLabel,
+  calendarMonthShortLabel,
+  calendarMonthStartIso,
+  calendarNormalizeText,
+  calendarReviewActionLabel,
+  calendarReviewSummaryText,
+  calendarStartOfDay,
+  calendarTimeLabel,
+  type CalendarItem,
+  type CategoryKey,
+  type DerivedCategory,
+  type QuickFilter,
+  type ViewMode,
+} from "@/lib/monthlyCalendarViewState";
+import { consumeWeddingNavigationIntent } from "@/lib/weddingNavigationLocalState";
+import {
+  buildWeddingNavigationArrivalBannerState,
+  weddingArrivalActionDestinationView,
+  type WeddingArrivalAction,
+} from "@/lib/weddingNavigationArrivalViewState";
 
 const TOKEN = {
   accent: "#FF6B35",
@@ -34,185 +79,22 @@ const TOKEN = {
 };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
-type ViewMode = "month" | "week" | "day";
-type CategoryKey =
-  | "all"
-  | "notes"
-  | "emails"
-  | "chat"
-  | "locations"
-  | "people"
-  | "weather"
-  | "knowledge";
-type QuickFilter = "today" | "upcoming" | "past" | "conflicts";
-type DerivedCategory = Exclude<CategoryKey, "all">;
-
-type CalendarItem = CalendarEvent & {
-  derivedCategory: DerivedCategory;
-  markerColor: string;
-  relatedPeople: string[];
-  relatedLocation: string | null;
-  weatherTag: string | null;
-  sourceLabel: string;
-  summary: string;
+type CalendarSpeechRecognition = SpeechRecognition & {
+  maxAlternatives: number;
 };
 
-const CATEGORY_META: Record<DerivedCategory, { label: string; color: string }> = {
-  notes: { label: "Notes", color: "#2E8B57" },
-  emails: { label: "Emails", color: "#5B7CFA" },
-  chat: { label: "Chat", color: "#8D6CCF" },
-  locations: { label: "Locations", color: "#688B45" },
-  people: { label: "People", color: "#A77B52" },
-  weather: { label: "Weather", color: "#3BA7C6" },
-  knowledge: { label: "Knowledge Keywords", color: "#8B8175" },
+type CalendarSpeechRecognitionCtor = new () => CalendarSpeechRecognition;
+type CalendarSpeechWindow = Window & {
+  SpeechRecognition?: unknown;
+  webkitSpeechRecognition?: unknown;
 };
 
-function daysInMonth(year: number, month: number) {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-function firstWeekday(year: number, month: number) {
-  return new Date(year, month, 1).getDay();
-}
-
-function monthStartIso(year: number, month: number) {
-  return `${year}-${String(month + 1).padStart(2, "0")}-01`;
-}
-
-function toIso(year: number, month: number, day: number, time = "00:00") {
-  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}T${time}:00`;
-}
-
-function startOfDay(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-}
-
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-function formatMonthLabel(year: number, month: number) {
-  return `${MONTH_NAMES[month]} ${year}`;
-}
-
-function formatMonthShort(date: Date) {
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function formatAbsoluteDate(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-function normalizeText(value: string | null | undefined) {
-  return (value ?? "").trim().toLowerCase();
-}
-
-function parsePeople(text: string) {
-  const matches = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/g) ?? [];
-  return [...new Set(matches.filter((item) => item.length > 2))].slice(0, 3);
-}
-
-function parseLocation(text: string) {
-  const match = text.match(/\(([^)]+)\)/);
-  if (match?.[1]) return match[1];
-  const lower = text.toLowerCase();
-  const locations = ["Bondi", "Sydney", "Melbourne", "Office", "Zoom", "Home", "Airport"];
-  return locations.find((item) => lower.includes(item.toLowerCase())) ?? null;
-}
-
-function parseWeather(text: string) {
-  const lower = text.toLowerCase();
-  const tags = ["sunny", "cloudy", "rainy", "storm", "windy"];
-  return tags.find((item) => lower.includes(item)) ?? null;
-}
-
-function deriveCategory(event: CalendarEvent): DerivedCategory {
-  const combined = `${event.title} ${event.description ?? ""}`.toLowerCase();
-  if (combined.includes("weather") || combined.includes("sunny") || combined.includes("rain")) return "weather";
-  if (combined.includes("chat") || combined.includes("call") || combined.includes("slack")) return "chat";
-  if (combined.includes("note") || combined.includes("memo") || combined.includes("voice")) return "notes";
-  if (combined.includes("email") || combined.includes("inbox") || combined.includes("reply")) return "emails";
-  if (combined.includes("flight") || combined.includes("hotel") || combined.includes("bondi") || combined.includes("zoom") || combined.includes("office")) return "locations";
-  if (combined.includes("sarah") || combined.includes("alex") || combined.includes("sam") || combined.includes("with ")) return "people";
-  return "knowledge";
-}
-
-function toCalendarItem(event: CalendarEvent): CalendarItem {
-  const derivedCategory = deriveCategory(event);
-  const text = `${event.title} ${event.description ?? ""}`;
-  const relatedPeople = parsePeople(text);
-  const relatedLocation = parseLocation(text);
-  const weatherTag = parseWeather(text);
-  return {
-    ...event,
-    derivedCategory,
-    markerColor: CATEGORY_META[derivedCategory].color,
-    relatedPeople,
-    relatedLocation,
-    weatherTag,
-    sourceLabel: CATEGORY_META[derivedCategory].label,
-    summary: event.description?.trim() || "Derived calendar event curated by the Knowledge Curator.",
-  };
-}
-
-function matchesSearch(item: CalendarItem, query: string) {
-  if (!query) return true;
-  const haystack = [
-    item.title,
-    item.description ?? "",
-    item.relatedPeople.join(" "),
-    item.relatedLocation ?? "",
-    item.weatherTag ?? "",
-    item.sourceLabel,
-  ].join(" ").toLowerCase();
-  return haystack.includes(query);
-}
-
-function eventOverlaps(target: CalendarItem, all: CalendarItem[]) {
-  if (target.all_day) return false;
-  const start = new Date(target.start_at).getTime();
-  const end = target.end_at ? new Date(target.end_at).getTime() : start + 30 * 60 * 1000;
-  return all.some((item) => {
-    if (item.id === target.id || item.all_day) return false;
-    const itemStart = new Date(item.start_at).getTime();
-    const itemEnd = item.end_at ? new Date(item.end_at).getTime() : itemStart + 30 * 60 * 1000;
-    return itemStart < end && start < itemEnd;
-  });
-}
-
-function buildMiniCalendar(year: number, month: number) {
-  const first = firstWeekday(year, month);
-  const totalDays = daysInMonth(year, month);
-  const cells: Array<number | null> = [];
-  for (let i = 0; i < first; i += 1) cells.push(null);
-  for (let day = 1; day <= totalDays; day += 1) cells.push(day);
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
+function speechRecognitionCtor(): CalendarSpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const browserWindow: CalendarSpeechWindow = window;
+  const ctor = browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition;
+  return typeof ctor === "function" ? ctor as CalendarSpeechRecognitionCtor : null;
 }
 
 function AddEventModal(props: {
@@ -220,6 +102,7 @@ function AddEventModal(props: {
   onClose: () => void;
   onCreated: (event: CalendarEvent) => void;
 }) {
+  const [itemType, setItemType] = createSignal<"event" | "task">("event");
   const [title, setTitle] = createSignal("");
   const [description, setDescription] = createSignal("");
   const [location, setLocation] = createSignal("");
@@ -233,16 +116,13 @@ function AddEventModal(props: {
   // ── Voice note capture (Web Speech API — live transcription) ────────────
   const [voiceRecording, setVoiceRecording] = createSignal(false);
   const [voiceLiveText, setVoiceLiveText] = createSignal("");
-  let recognitionRef: any = null;
+  let recognitionRef: CalendarSpeechRecognition | null = null;
 
-  const speechApiAvailable = () =>
-    typeof window !== "undefined" &&
-    ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  const speechApiAvailable = () => speechRecognitionCtor() !== null;
 
   function startVoiceCapture() {
     setError("");
-    const SpeechRecognitionCtor =
-      (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    const SpeechRecognitionCtor = speechRecognitionCtor();
     if (!SpeechRecognitionCtor) {
       setError("Voice capture is not supported in this browser. Try Chrome or Edge.");
       return;
@@ -254,7 +134,7 @@ function AddEventModal(props: {
     recognition.maxAlternatives = 1;
 
     let finalTranscript = "";
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
@@ -266,7 +146,7 @@ function AddEventModal(props: {
       }
       setVoiceLiveText((finalTranscript + interim).trim());
     };
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error !== "aborted") setError(`Voice error: ${event.error}`);
       setVoiceRecording(false);
     };
@@ -290,8 +170,7 @@ function AddEventModal(props: {
     setVoiceRecording(false);
   }
 
-  const dateLabel = () =>
-    props.date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const dateLabel = () => calendarLongDateLabel(props.date);
 
   async function save() {
     if (!title().trim()) {
@@ -301,8 +180,36 @@ function AddEventModal(props: {
     setSaving(true);
     setError("");
     try {
-      const start = toIso(props.date.getFullYear(), props.date.getMonth(), props.date.getDate(), allDay() ? "00:00" : time());
-      const end = allDay() ? undefined : toIso(props.date.getFullYear(), props.date.getMonth(), props.date.getDate(), endTime());
+      if (itemType() === "task") {
+        const dueIso = calendarDateTimeIso(props.date.getFullYear(), props.date.getMonth(), props.date.getDate(), time());
+        await sendAfpMessage({
+          thread_id: `task_${Date.now()}`,
+          from: "user@omnyid.local",
+          to: ["agent://calendar"],
+          type: "task",
+          content: {
+            kind: "task",
+            title: title().trim(),
+            due_date: dueIso,
+            description: description().trim() || undefined,
+            status: "pending",
+          },
+          metadata: {
+            origin: "calendar_view",
+            item_kind: "task",
+          },
+          memory_scope: {
+            memory_space: "personal",
+            author_mask: "private",
+            author_type: "human",
+            human_only: true,
+          },
+        });
+        props.onClose();
+        return;
+      }
+      const start = calendarDateTimeIso(props.date.getFullYear(), props.date.getMonth(), props.date.getDate(), allDay() ? "00:00" : time());
+      const end = allDay() ? undefined : calendarDateTimeIso(props.date.getFullYear(), props.date.getMonth(), props.date.getDate(), endTime());
       const event = await createCalendarEvent({
         title: title().trim(),
         description: description().trim() || undefined,
@@ -313,15 +220,13 @@ function AddEventModal(props: {
       });
       props.onCreated(event);
       try {
-        const response = await apiFetch<{ summary: string }>("/ui/command", {
-          method: "POST",
-          bodyJson: {
-            query: `Check whether calendar event "${title().trim()}" on ${dateLabel()}${allDay() ? "" : ` at ${time()}`} conflicts with existing events. If it conflicts, return one brief alternative suggestion.`,
-            engine: "agent",
-          },
+        const response = await executeUiCommand({
+          query: `Check whether calendar event "${title().trim()}" on ${dateLabel()}${allDay() ? "" : ` at ${time()}`} conflicts with existing events. If it conflicts, return one brief alternative suggestion.`,
+          engine: "agent",
         });
-        if (response.summary && !response.summary.toLowerCase().includes("no conflict")) {
-          setConflictSuggestion(response.summary);
+        const summary = calendarCommandSummary(response);
+        if (summary && !summary.toLowerCase().includes("no conflict")) {
+          setConflictSuggestion(summary);
         } else {
           props.onClose();
         }
@@ -363,7 +268,7 @@ function AddEventModal(props: {
         <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "0.75em" }}>
           <div>
             <p style={{ margin: 0, "font-size": "0.75em", "letter-spacing": "0.18em", "text-transform": "uppercase", color: TOKEN.textSecondary }}>
-              Add Event
+              {itemType() === "task" ? "Add Task" : "Add Event"}
             </p>
             <h3 style={{ margin: "0.35em 0 0", "font-size": "1.125em", color: TOKEN.text }}>{dateLabel()}</h3>
           </div>
@@ -394,6 +299,28 @@ function AddEventModal(props: {
               {voiceRecording() ? "Stop" : "Voice"}
             </button>
           </Show>
+        </div>
+
+        {/* Event / Task tab switcher */}
+        <div style={{ display: "flex", background: TOKEN.bg, border: `1px solid ${TOKEN.border}`, "border-radius": "0.75em", padding: "0.22em", "margin-top": "1em" }}>
+          <button
+            type="button"
+            disabled={saving()}
+            onClick={() => { setItemType("event"); setError(""); }}
+            style={{ flex: 1, border: "none", background: itemType() === "event" ? TOKEN.surface : "transparent",
+              color: itemType() === "event" ? TOKEN.text : TOKEN.textSecondary, "border-radius": "0.55em",
+              padding: "0.55em", cursor: "pointer", "font-size": "0.84em", "font-weight": itemType() === "event" ? 600 : 400,
+              "box-shadow": itemType() === "event" ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: TOKEN.transition }}
+          >Event</button>
+          <button
+            type="button"
+            disabled={saving()}
+            onClick={() => { setItemType("task"); setError(""); }}
+            style={{ flex: 1, border: "none", background: itemType() === "task" ? TOKEN.surface : "transparent",
+              color: itemType() === "task" ? TOKEN.text : TOKEN.textSecondary, "border-radius": "0.55em",
+              padding: "0.55em", cursor: "pointer", "font-size": "0.84em", "font-weight": itemType() === "task" ? 600 : 400,
+              "box-shadow": itemType() === "task" ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: TOKEN.transition }}
+          >Task</button>
         </div>
 
         <Show when={voiceRecording() || voiceLiveText()}>
@@ -447,46 +374,61 @@ function AddEventModal(props: {
               <input
                 type="text"
                 value={title()}
+                disabled={saving()}
                 onInput={(event) => setTitle(event.currentTarget.value)}
-                placeholder="Meeting, task, reminder"
+                placeholder={itemType() === "task" ? "Task name" : "Meeting, reminder…"}
                 style={fieldStyle()}
                 autofocus
               />
             </Field>
 
-            <Field label="Location">
-              <input
-                type="text"
-                value={location()}
-                onInput={(event) => setLocation(event.currentTarget.value)}
-                placeholder="Bondi, Zoom, Office"
-                style={fieldStyle()}
-              />
-            </Field>
+            <Show when={itemType() === "event"}>
+              <Field label="Location">
+                <input
+                  type="text"
+                  value={location()}
+                  disabled={saving()}
+                  onInput={(event) => setLocation(event.currentTarget.value)}
+                  placeholder="Bondi, Zoom, Office"
+                  style={fieldStyle()}
+                />
+              </Field>
 
-            <label style={{ display: "flex", "align-items": "center", gap: "0.6em", color: TOKEN.textSecondary, "font-size": "0.875em" }}>
-              <input type="checkbox" checked={allDay()} onChange={(event) => setAllDay(event.currentTarget.checked)} />
-              All day
-            </label>
+              <label style={{ display: "flex", "align-items": "center", gap: "0.6em", color: TOKEN.textSecondary, "font-size": "0.875em" }}>
+                <input type="checkbox" checked={allDay()} disabled={saving()} onChange={(event) => setAllDay(event.currentTarget.checked)} />
+                All day
+              </label>
 
-            <Show when={!allDay()}>
-              <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "0.75em" }}>
-                <Field label="Start">
-                  <input type="time" value={time()} onInput={(event) => setTime(event.currentTarget.value)} style={fieldStyle()} />
-                </Field>
-                <Field label="End">
-                  <input type="time" value={endTime()} onInput={(event) => setEndTime(event.currentTarget.value)} style={fieldStyle()} />
-                </Field>
-              </div>
+              <Show when={!allDay()}>
+                <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "0.75em" }}>
+                  <Field label="Start">
+                    <input type="time" value={time()} disabled={saving()} onInput={(event) => setTime(event.currentTarget.value)} style={fieldStyle()} />
+                  </Field>
+                  <Field label="End">
+                    <input type="time" value={endTime()} disabled={saving()} onInput={(event) => setEndTime(event.currentTarget.value)} style={fieldStyle()} />
+                  </Field>
+                </div>
+              </Show>
             </Show>
 
-            <Field label="Note">
-              <textarea
-                value={description()}
-                onInput={(event) => setDescription(event.currentTarget.value)}
-                rows={3}
-                placeholder="Details, agenda, link"
-                style={{ ...fieldStyle(), resize: "vertical" }}
+            <Show when={itemType() === "task"}>
+              <Field label="Due time">
+                <input type="time" value={time()} disabled={saving()} onInput={(event) => setTime(event.currentTarget.value)} style={fieldStyle()} />
+              </Field>
+            </Show>
+
+            <Field label={itemType() === "task" ? "Notes" : "Note"}>
+              <TiptapEditor
+                mode="compact"
+                initialContent={description()}
+                disabled={saving()}
+                placeholder={itemType() === "task" ? "Details, links…" : "Details, agenda, link"}
+                submitLabel={saving() ? "Saving..." : itemType() === "task" ? "Add task" : "Add event"}
+                clearOnSend={false}
+                onChange={(_, markdown) => setDescription(markdown)}
+                onSend={async () => {
+                  await save();
+                }}
               />
             </Field>
 
@@ -496,9 +438,9 @@ function AddEventModal(props: {
 
             <div style={{ display: "flex", gap: "0.6em", "flex-wrap": "wrap" }}>
               <button type="button" onClick={save} disabled={saving()} style={primaryButtonStyle(saving())}>
-                {saving() ? "Saving..." : "Add event"}
+                {saving() ? "Saving..." : itemType() === "task" ? "Add task" : "Add event"}
               </button>
-              <button type="button" onClick={props.onClose} style={secondaryButtonStyle()}>
+              <button type="button" onClick={props.onClose} disabled={saving()} style={secondaryButtonStyle()}>
                 Cancel
               </button>
             </div>
@@ -520,7 +462,13 @@ function Field(props: { label: string; children: any }) {
   );
 }
 
-export function MonthlyCalendarView() {
+export function MonthlyCalendarView(props: {
+  initialDate?: string | null;
+  initialEventId?: string | null;
+  afpMessages?: DashboardBootstrap["messages"];
+  reversibleSummary?: DashboardBootstrap["calendar_runtime_summary"];
+  onOpenThread?: (threadId: string, messageId?: string | null) => void;
+}) {
   const today = new Date();
   const [year, setYear] = createSignal(today.getFullYear());
   const [month, setMonth] = createSignal(today.getMonth());
@@ -531,26 +479,100 @@ export function MonthlyCalendarView() {
   const [search, setSearch] = createSignal("");
   const [selectedCategories, setSelectedCategories] = createSignal<CategoryKey[]>([]);
   const [quickFilter, setQuickFilter] = createSignal<QuickFilter | null>(null);
-  const [selectedDate, setSelectedDate] = createSignal<Date>(startOfDay(today));
+  const [selectedDate, setSelectedDate] = createSignal<Date>(calendarStartOfDay(today));
   const [selectedEventId, setSelectedEventId] = createSignal<string | null>(null);
   const [addingDate, setAddingDate] = createSignal<Date | null>(null);
+  const [weddingNavigationIntent, setWeddingNavigationIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
+  const [googleCalendarStatus, setGoogleCalendarStatus] = createSignal<GoogleCalendarConnectionStatus | null>(null);
+  const [googleCalendarBusy, setGoogleCalendarBusy] = createSignal(false);
+  const [googleCalendarNotice, setGoogleCalendarNotice] = createSignal<string | null>(null);
 
-  const monthKey = createMemo(() => monthStartIso(year(), month()));
+  const monthKey = createMemo(() => calendarMonthStartIso(year(), month()));
+  const weddingArrivalBanner = createMemo(() =>
+    buildWeddingNavigationArrivalBannerState(weddingNavigationIntent()),
+  );
 
   async function loadEvents() {
     setLoading(true);
     try {
       const response = await listCalendarEvents(monthKey());
-      setEvents(response.events.map(toCalendarItem));
+      const projectedEvents = calendarEventsFromAfpMessages(props.afpMessages ?? []);
+      setEvents(mergeCalendarEvents(response.events, projectedEvents).map(calendarItemFromEvent));
     } catch {
-      setEvents([]);
+      setEvents(calendarEventsFromAfpMessages(props.afpMessages ?? []).map(calendarItemFromEvent));
     } finally {
       setLoading(false);
     }
   }
 
+  async function loadGoogleCalendarStatus() {
+    try {
+      setGoogleCalendarStatus(await fetchGoogleCalendarStatus());
+    } catch {
+      setGoogleCalendarStatus(null);
+    }
+  }
+
+  async function connectGoogleCalendar() {
+    if (googleCalendarBusy()) return;
+    setGoogleCalendarBusy(true);
+    setGoogleCalendarNotice(null);
+    try {
+      const url = await fetchGoogleCalendarOAuthUrl();
+      window.location.assign(url);
+    } catch (err) {
+      setGoogleCalendarNotice(err instanceof Error ? err.message : "Could not start Google Calendar connection.");
+      setGoogleCalendarBusy(false);
+    }
+  }
+
+  async function syncGoogleCalendarNow() {
+    if (googleCalendarBusy()) return;
+    setGoogleCalendarBusy(true);
+    setGoogleCalendarNotice(null);
+    try {
+      const result = await syncGoogleCalendar();
+      setGoogleCalendarNotice(`Synced ${result.synced_count} event${result.synced_count === 1 ? "" : "s"} from Google Calendar.`);
+      await loadEvents();
+    } catch (err) {
+      setGoogleCalendarNotice(err instanceof Error ? err.message : "Google Calendar sync failed.");
+    } finally {
+      setGoogleCalendarBusy(false);
+    }
+  }
+
+  async function disconnectGoogleCalendarNow() {
+    if (googleCalendarBusy()) return;
+    setGoogleCalendarBusy(true);
+    setGoogleCalendarNotice(null);
+    try {
+      await disconnectGoogleCalendar();
+      await loadGoogleCalendarStatus();
+    } catch (err) {
+      setGoogleCalendarNotice(err instanceof Error ? err.message : "Could not disconnect Google Calendar.");
+    } finally {
+      setGoogleCalendarBusy(false);
+    }
+  }
+
   onMount(() => {
+    const weddingIntent = consumeWeddingNavigationIntent();
+    if (weddingIntent?.view === "calendar") setWeddingNavigationIntent(weddingIntent);
     void loadEvents();
+    void loadGoogleCalendarStatus();
+    const calendarRedirectStatus = new URLSearchParams(window.location.search).get("calendar");
+    if (calendarRedirectStatus) {
+      setGoogleCalendarNotice(
+        calendarRedirectStatus === "connected"
+          ? "Google Calendar connected."
+          : calendarRedirectStatus === "not_configured"
+            ? "Google Calendar isn't configured on this server yet."
+            : "Could not connect Google Calendar. Please try again.",
+      );
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("calendar");
+      window.history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search);
+    }
     const tabletMq = window.matchMedia("(max-width: 64em)");
     if (tabletMq.matches) setSidebarOpen(false);
     const handler = (event: MediaQueryListEvent) => setSidebarOpen(!event.matches);
@@ -558,20 +580,51 @@ export function MonthlyCalendarView() {
     onCleanup(() => tabletMq.removeEventListener("change", handler));
   });
 
-  const selectedDateKey = createMemo(() => startOfDay(selectedDate()).toDateString());
-  const normalizedSearch = createMemo(() => normalizeText(search()));
+  createEffect(() => {
+    const projectedEvents = calendarEventsFromAfpMessages(props.afpMessages ?? []);
+    if (projectedEvents.length === 0) return;
+    setEvents((current) => mergeCalendarEvents(current, projectedEvents).map(calendarItemFromEvent));
+  });
+
+  createEffect(() => {
+    const rawDate = props.initialDate?.trim();
+    if (!rawDate) return;
+    const date = new Date(rawDate);
+    if (Number.isNaN(date.getTime())) return;
+    setYear(date.getFullYear());
+    setMonth(date.getMonth());
+    setSelectedDate(calendarStartOfDay(date));
+    if (props.initialEventId) {
+      setSelectedEventId(props.initialEventId);
+    }
+  });
+
+  createEffect(() => {
+    const eventId = props.initialEventId?.trim();
+    if (!eventId) return;
+    const matched = events().find((event) => event.id === eventId);
+    if (!matched) return;
+    const eventDate = new Date(matched.start_at);
+    setYear(eventDate.getFullYear());
+    setMonth(eventDate.getMonth());
+    setSelectedDate(calendarStartOfDay(eventDate));
+    setSelectedEventId(matched.id);
+  });
+
+  const selectedDateKey = createMemo(() => calendarStartOfDay(selectedDate()).toDateString());
+  const normalizedSearch = createMemo(() => calendarNormalizeText(search()));
 
   const visibleEvents = createMemo(() => {
     const selected = selectedCategories();
     return events().filter((event) => {
       const eventDate = new Date(event.start_at);
-      const eventDay = startOfDay(eventDate);
-      if (!matchesSearch(event, normalizedSearch())) return false;
+      const eventDay = calendarStartOfDay(eventDate);
+      if (!calendarMatchesSearch(event, normalizedSearch())) return false;
       if (selected.length > 0 && !selected.includes(event.derivedCategory)) return false;
-      if (quickFilter() === "today" && !isSameDay(eventDay, today)) return false;
-      if (quickFilter() === "upcoming" && eventDay < startOfDay(today)) return false;
-      if (quickFilter() === "past" && eventDay > startOfDay(today)) return false;
-      if (quickFilter() === "conflicts" && !eventOverlaps(event, events())) return false;
+      if (quickFilter() === "today" && !calendarIsSameDay(eventDay, today)) return false;
+      if (quickFilter() === "upcoming" && eventDay < calendarStartOfDay(today)) return false;
+      if (quickFilter() === "past" && eventDay > calendarStartOfDay(today)) return false;
+      if (quickFilter() === "conflicts" && !calendarEventOverlaps(event, events())) return false;
       return true;
     });
   });
@@ -592,8 +645,8 @@ export function MonthlyCalendarView() {
   });
 
   const gridCells = createMemo(() => {
-    const first = firstWeekday(year(), month());
-    const totalDays = daysInMonth(year(), month());
+    const first = calendarFirstWeekday(year(), month());
+    const totalDays = calendarDaysInMonth(year(), month());
     const cells: Array<number | null> = [];
     for (let i = 0; i < first; i += 1) cells.push(null);
     for (let day = 1; day <= totalDays; day += 1) cells.push(day);
@@ -601,17 +654,35 @@ export function MonthlyCalendarView() {
     return cells;
   });
 
-  const miniCalendar = createMemo(() => buildMiniCalendar(year(), month()));
-  const categoryEntries = createMemo(() => Object.entries(CATEGORY_META) as Array<[DerivedCategory, { label: string; color: string }]>);
+  const miniCalendar = createMemo(() => calendarBuildMiniCalendar(year(), month()));
+  const categoryEntries = createMemo(() => Object.entries(CALENDAR_CATEGORY_META) as Array<[DerivedCategory, { label: string; color: string }]>);
 
   const selectedDayEvents = createMemo(() => {
     return visibleEvents()
-      .filter((event) => isSameDay(new Date(event.start_at), selectedDate()))
+      .filter((event) => calendarIsSameDay(new Date(event.start_at), selectedDate()))
       .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
   });
 
   const selectedEvent = createMemo(() => {
     return visibleEvents().find((event) => event.id === selectedEventId()) ?? selectedDayEvents()[0] ?? null;
+  });
+  const selectedReversibleReviewTarget = createMemo(() => {
+    const summary = props.reversibleSummary;
+    const event = selectedEvent();
+    if (
+      !event
+      || event.id !== summary?.latest_tentative_event_id
+      || !summary?.latest_tentative_thread_id
+      || !summary?.latest_tentative_action_message_id
+    ) {
+      return null;
+    }
+    return {
+      threadId: summary.latest_tentative_thread_id,
+      messageId: summary.latest_tentative_action_message_id,
+      label: calendarReviewActionLabel(summary),
+      summary: calendarReviewSummaryText(summary),
+    };
   });
 
   // ── Real backlinks for the selected event ─────────────────────────────────
@@ -669,7 +740,7 @@ export function MonthlyCalendarView() {
   function goToToday() {
     setYear(today.getFullYear());
     setMonth(today.getMonth());
-    const nextDate = startOfDay(today);
+    const nextDate = calendarStartOfDay(today);
     setSelectedDate(nextDate);
     void loadEvents();
   }
@@ -704,6 +775,11 @@ export function MonthlyCalendarView() {
     }
   }
 
+  function runWeddingArrivalAction(action: WeddingArrivalAction) {
+    const destination = weddingArrivalActionDestinationView(action);
+    if (destination) navigateToView(destination);
+  }
+
   return (
     <div
       aria-label="Calendar"
@@ -722,19 +798,19 @@ export function MonthlyCalendarView() {
     >
       <header
         style={{
-          height: TOKEN.topBarH,
+          "min-height": TOKEN.topBarH,
           background: TOKEN.surface,
           "border-bottom": `1px solid ${TOKEN.border}`,
           display: "flex",
           "align-items": "center",
           gap: "1em",
-          padding: `0 ${TOKEN.mainPadding}`,
+          padding: `0.75em ${TOKEN.mainPadding}`,
           "flex-shrink": "0",
           "justify-content": "space-between",
           "flex-wrap": "wrap",
         }}
       >
-        <div style={{ display: "flex", "align-items": "center", gap: "0.6em" }}>
+        <div style={{ display: "flex", "align-items": "center", gap: "0.6em", "flex-wrap": "wrap" }}>
           <button type="button" aria-label="Toggle filters" onClick={() => setSidebarOpen((value) => !value)} style={iconButtonStyle()}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
@@ -757,9 +833,9 @@ export function MonthlyCalendarView() {
           </div>
         </div>
 
-        <div style={{ display: "flex", "align-items": "center", gap: "1em", flex: 1, "justify-content": "center", "min-width": "18em" }}>
-          <div style={{ "text-align": "center" }}>
-            <h2 style={{ margin: 0, "font-size": "1.5em", "line-height": 1.2, color: TOKEN.text }}>{formatMonthLabel(year(), month())}</h2>
+        <div style={{ display: "flex", "align-items": "center", gap: "1em", flex: 1, "justify-content": "center", "min-width": "min(100%, 18em)", "flex-wrap": "wrap" }}>
+          <div style={{ "text-align": "center", "min-width": 0 }}>
+            <h2 style={{ margin: 0, "font-size": "clamp(1.1em, 4vw, 1.5em)", "line-height": 1.2, color: TOKEN.text }}>{calendarMonthLabel(year(), month())}</h2>
           </div>
           <label
             style={{
@@ -797,7 +873,7 @@ export function MonthlyCalendarView() {
           </label>
         </div>
 
-        <div style={{ display: "flex", "align-items": "center", gap: "0.6em" }}>
+        <div style={{ display: "flex", "align-items": "center", gap: "0.6em", "flex-wrap": "wrap" }}>
           <div style={{ display: "flex", background: TOKEN.bg, border: `1px solid ${TOKEN.border}`, "border-radius": "0.7em", padding: "0.22em" }}>
             <For each={(["month", "week", "day"] as ViewMode[])}>
               {(mode) => (
@@ -827,6 +903,95 @@ export function MonthlyCalendarView() {
         </div>
       </header>
 
+      <div style={{ padding: "1em 1em 0", "flex-shrink": 0 }}>
+        <WeddingNavigationArrivalBanner
+          state={weddingArrivalBanner()}
+          onAction={runWeddingArrivalAction}
+          onDismiss={() => setWeddingNavigationIntent(null)}
+        />
+        <Show when={googleCalendarStatus()?.configured && !googleCalendarStatus()?.connected}>
+          <div
+            style={{
+              display: "flex",
+              "align-items": "center",
+              "justify-content": "space-between",
+              gap: "0.75em",
+              padding: "0.75em 1em",
+              "margin-bottom": "1em",
+              background: TOKEN.surface,
+              border: `1px solid ${TOKEN.border}`,
+              "border-radius": "0.75em",
+            }}
+          >
+            <p style={{ margin: 0, "font-size": "0.85em", color: TOKEN.textSecondary }}>
+              Connect Google Calendar to see your Google events here.
+            </p>
+            <button
+              type="button"
+              disabled={googleCalendarBusy()}
+              onClick={() => void connectGoogleCalendar()}
+              style={{
+                border: "none",
+                background: TOKEN.accent,
+                color: "#FFFFFF",
+                "border-radius": "0.6em",
+                padding: "0.5em 0.9em",
+                cursor: googleCalendarBusy() ? "not-allowed" : "pointer",
+                "font-size": "0.8em",
+                "font-weight": 600,
+                opacity: googleCalendarBusy() ? 0.6 : 1,
+                "white-space": "nowrap",
+              }}
+            >
+              {googleCalendarBusy() ? "Connecting…" : "Connect Google Calendar"}
+            </button>
+          </div>
+        </Show>
+        <Show when={googleCalendarStatus()?.connected}>
+          <div
+            style={{
+              display: "flex",
+              "align-items": "center",
+              "justify-content": "space-between",
+              gap: "0.75em",
+              "flex-wrap": "wrap",
+              padding: "0.6em 1em",
+              "margin-bottom": "1em",
+              background: TOKEN.surface,
+              border: `1px solid ${TOKEN.border}`,
+              "border-radius": "0.75em",
+            }}
+          >
+            <p style={{ margin: 0, "font-size": "0.8em", color: TOKEN.textSecondary }}>
+              {googleCalendarStatus()?.token_expired
+                ? "Google Calendar connection expired — reconnect to keep syncing."
+                : `Synced with Google Calendar${googleCalendarStatus()?.google_email ? ` (${googleCalendarStatus()?.google_email})` : ""}.`}
+            </p>
+            <div style={{ display: "flex", gap: "0.5em" }}>
+              <button
+                type="button"
+                disabled={googleCalendarBusy()}
+                onClick={() => (googleCalendarStatus()?.token_expired ? void connectGoogleCalendar() : void syncGoogleCalendarNow())}
+                style={secondaryButtonStyle()}
+              >
+                {googleCalendarStatus()?.token_expired ? "Reconnect" : googleCalendarBusy() ? "Syncing…" : "Sync now"}
+              </button>
+              <button
+                type="button"
+                disabled={googleCalendarBusy()}
+                onClick={() => void disconnectGoogleCalendarNow()}
+                style={{ ...secondaryButtonStyle(), color: TOKEN.textSecondary }}
+              >
+                Disconnect
+              </button>
+            </div>
+          </div>
+        </Show>
+        <Show when={googleCalendarNotice()}>
+          <p style={{ margin: "0 0 1em", "font-size": "0.78em", color: TOKEN.textSecondary }}>{googleCalendarNotice()}</p>
+        </Show>
+      </div>
+
       <div style={{ display: "flex", flex: 1, "min-height": 0, overflow: "hidden" }}>
         <aside
           style={{
@@ -851,7 +1016,7 @@ export function MonthlyCalendarView() {
             <section>
               <p style={capsLabelStyle()}>Navigator</p>
               <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", "margin-bottom": "0.8em" }}>
-                <p style={{ margin: 0, "font-size": "0.95em", "font-weight": 600, color: TOKEN.text }}>{MONTH_NAMES[month()].slice(0, 3)} {year()}</p>
+                <p style={{ margin: 0, "font-size": "0.95em", "font-weight": 600, color: TOKEN.text }}>{calendarMonthShortLabel(new Date(year(), month(), 1)).split(" ")[0]} {year()}</p>
                 <div style={{ display: "flex", gap: "0.35em" }}>
                   <button type="button" onClick={prevMonth} style={miniIconButtonStyle()}>
                     <span aria-hidden="true">‹</span>
@@ -876,7 +1041,7 @@ export function MonthlyCalendarView() {
                       }}
                       style={{
                         border: "none",
-                        background: day !== null && isSameDay(new Date(year(), month(), day), selectedDate()) ? "#fff2eb" : "transparent",
+                        background: day !== null && calendarIsSameDay(new Date(year(), month(), day), selectedDate()) ? "#fff2eb" : "transparent",
                         color: day === null ? TOKEN.border : TOKEN.text,
                         "border-radius": "0.6em",
                         height: "2.1em",
@@ -998,7 +1163,7 @@ export function MonthlyCalendarView() {
                       const date = new Date(year(), month(), day);
                       const dayEvents = () => eventsByDay().get(day) ?? [];
                       const selected = () => selectedDateKey() === date.toDateString();
-                      const isCurrentDay = () => isSameDay(date, today);
+                      const isCurrentDay = () => calendarIsSameDay(date, today);
                       return (
                         <div
                           role="button"
@@ -1103,7 +1268,7 @@ export function MonthlyCalendarView() {
                                       "white-space": "nowrap",
                                     }}
                                   >
-                                    {event.all_day ? event.title : `${formatTime(event.start_at)} ${event.title}`}
+                                    {event.all_day ? event.title : `${calendarTimeLabel(event.start_at)} ${event.title}`}
                                   </span>
                                 </button>
                               )}
@@ -1162,7 +1327,7 @@ export function MonthlyCalendarView() {
           <section>
             <p style={capsLabelStyle()}>Selected Day</p>
             <h3 style={{ margin: "0.35em 0 0", "font-size": "1.125em", color: TOKEN.text }}>
-              {selectedDate().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+              {calendarLongDateLabel(selectedDate(), { includeYear: false })}
             </h3>
             <p style={{ margin: "0.45em 0 0", "font-size": "0.875em", color: TOKEN.textSecondary, "line-height": 1.6 }}>
               {selectedDayEvents().length > 0
@@ -1175,7 +1340,16 @@ export function MonthlyCalendarView() {
             <p style={capsLabelStyle()}>Day Agenda</p>
             <Show
               when={selectedDayEvents().length > 0}
-              fallback={<div style={emptyPanelStyle()}>Select a day with events to inspect the thread context.</div>}
+              fallback={
+                <div style={emptyPanelStyle()}>
+                  <p style={{ margin: 0 }}>No events are scheduled for this day yet.</p>
+                  <div style={{ display: "flex", gap: "0.65em", "flex-wrap": "wrap", "margin-top": "0.9em" }}>
+                    <button type="button" onClick={() => setAddingDate(selectedDate())} style={primaryButtonStyle()}>
+                      New Event
+                    </button>
+                  </div>
+                </div>
+              }
             >
               <div style={{ display: "flex", "flex-direction": "column", gap: "0.65em" }}>
                 <For each={selectedDayEvents()}>
@@ -1195,13 +1369,20 @@ export function MonthlyCalendarView() {
                       <div style={{ display: "flex", gap: "0.55em", "align-items": "center" }}>
                         <span style={{ width: "0.55em", height: "0.55em", "border-radius": "9999px", background: event.markerColor }} />
                         <span style={{ "font-size": "0.84em", color: TOKEN.textSecondary }}>
-                          {event.all_day ? "All day" : formatTime(event.start_at)}
+                          {event.all_day ? "All day" : calendarTimeLabel(event.start_at)}
                         </span>
                       </div>
                       <p style={{ margin: "0.45em 0 0", "font-size": "0.92em", "font-weight": 600, color: TOKEN.text }}>{event.title}</p>
                       <p style={{ margin: "0.3em 0 0", "font-size": "0.82em", color: TOKEN.textSecondary, "line-height": 1.55 }}>
-                        {event.relatedLocation ? `${event.relatedLocation} · ` : ""}{event.sourceLabel}
+                        {event.relatedLocation ? `${event.relatedLocation} - ` : ""}{event.sourceLabel}
                       </p>
+                      <Show when={event.semanticTag}>
+                        {(tag) => (
+                          <p style={{ margin: "0.3em 0 0", "font-size": "0.72em", color: TOKEN.accent, "line-height": 1.5, "text-transform": "uppercase", "letter-spacing": "0.12em" }}>
+                            {tag()}
+                          </p>
+                        )}
+                      </Show>
                     </button>
                   )}
                 </For>
@@ -1211,7 +1392,19 @@ export function MonthlyCalendarView() {
 
           <section>
             <p style={capsLabelStyle()}>Thread Context</p>
-            <Show when={selectedEvent()} fallback={<div style={emptyPanelStyle()}>Choose an event to open the readable source thread.</div>}>
+            <Show
+              when={selectedEvent()}
+              fallback={
+                <div style={emptyPanelStyle()}>
+                  <p style={{ margin: 0 }}>Choose an event to open the readable source thread.</p>
+                  <div style={{ display: "flex", gap: "0.65em", "flex-wrap": "wrap", "margin-top": "0.9em" }}>
+                    <button type="button" onClick={() => setAddingDate(selectedDate())} style={secondaryButtonStyle()}>
+                      Add event first
+                    </button>
+                  </div>
+                </div>
+              }
+            >
               <div style={{ display: "flex", "flex-direction": "column", gap: "0.9em" }}>
                 <div style={detailCardStyle()}>
                   <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "0.75em" }}>
@@ -1219,14 +1412,34 @@ export function MonthlyCalendarView() {
                       <span style={{ width: "0.65em", height: "0.65em", "border-radius": "9999px", background: selectedEvent()!.markerColor }} />
                       <span style={{ ...softTagStyle(), padding: "0.2em 0.55em" }}>{selectedEvent()!.sourceLabel}</span>
                     </div>
-                    <button type="button" onClick={() => void removeEvent(selectedEvent()!.id)} style={dangerButtonStyle()}>
-                      Remove
-                    </button>
+                    <div style={{ display: "flex", gap: "0.5em", "align-items": "center", "flex-wrap": "wrap", "justify-content": "flex-end" }}>
+                      <Show when={selectedReversibleReviewTarget()}>
+                        {(target) => (
+                          <button
+                            type="button"
+                            onClick={() => props.onOpenThread?.(target().threadId, target().messageId)}
+                            style={secondaryButtonStyle()}
+                          >
+                            {target().label}
+                          </button>
+                        )}
+                      </Show>
+                      <button type="button" onClick={() => void removeEvent(selectedEvent()!.id)} style={dangerButtonStyle()}>
+                        Remove
+                      </button>
+                    </div>
                   </div>
                   <h4 style={{ margin: "0.7em 0 0", "font-size": "1em", color: TOKEN.text }}>{selectedEvent()!.title}</h4>
                   <p style={{ margin: "0.4em 0 0", "font-size": "0.84em", color: TOKEN.textSecondary }}>
-                    {selectedEvent()!.all_day ? formatMonthShort(new Date(selectedEvent()!.start_at)) : formatAbsoluteDate(selectedEvent()!.start_at)}
+                    {selectedEvent()!.all_day ? calendarMonthShortLabel(new Date(selectedEvent()!.start_at)) : calendarAbsoluteDateLabel(selectedEvent()!.start_at)}
                   </p>
+                  <Show when={selectedReversibleReviewTarget()?.summary}>
+                    {(summary) => (
+                      <p style={{ margin: "0.6em 0 0", "font-size": "0.8em", color: TOKEN.accent, "line-height": 1.6 }}>
+                        {summary()}
+                      </p>
+                    )}
+                  </Show>
                   <p style={{ margin: "0.8em 0 0", "font-size": "0.88em", color: TOKEN.text, "line-height": 1.65 }}>
                     {selectedEvent()!.summary}
                   </p>
@@ -1268,6 +1481,9 @@ export function MonthlyCalendarView() {
                     {selectedEvent()!.summary}
                   </p>
                   <div style={{ display: "flex", gap: "0.45em", "flex-wrap": "wrap", "margin-top": "0.8em" }}>
+                    <Show when={selectedEvent()!.semanticTag}>
+                      <span style={softTagStyle()}>{selectedEvent()!.semanticTag}</span>
+                    </Show>
                     <Show when={selectedEvent()!.relatedPeople.length > 0}>
                       <For each={selectedEvent()!.relatedPeople}>
                         {(person) => <span style={softTagStyle()}>{person}</span>}
@@ -1318,9 +1534,9 @@ export function MonthlyCalendarView() {
           date={addingDate()!}
           onClose={() => setAddingDate(null)}
           onCreated={(event) => {
-            const next = toCalendarItem(event);
+            const next = calendarItemFromEvent(event);
             setEvents((prev) => [...prev, next]);
-            setSelectedDate(startOfDay(new Date(event.start_at)));
+            setSelectedDate(calendarStartOfDay(new Date(event.start_at)));
             setSelectedEventId(event.id);
             setAddingDate(null);
           }}
@@ -1341,7 +1557,7 @@ function WeekView(props: {
 }) {
   const HOURS = Array.from({ length: 24 }, (_, i) => i);
   const weekStart = createMemo(() => {
-    const d = startOfDay(props.selectedDate);
+    const d = calendarStartOfDay(props.selectedDate);
     const dow = d.getDay();
     return new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow);
   });
@@ -1356,7 +1572,7 @@ function WeekView(props: {
   const eventsByWeekDay = createMemo(() => {
     const map = new Map<string, CalendarItem[]>();
     for (const ev of props.events) {
-      const evDay = startOfDay(new Date(ev.start_at));
+      const evDay = calendarStartOfDay(new Date(ev.start_at));
       const key = evDay.toDateString();
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(ev);
@@ -1388,7 +1604,7 @@ function WeekView(props: {
         <div />
         <For each={weekDays()}>
           {(day) => {
-            const isToday = isSameDay(day, new Date());
+            const isToday = calendarIsSameDay(day, new Date());
             return (
               <div
                 style={{
@@ -1507,7 +1723,7 @@ function DayView(props: {
   const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
   const dayEvents = createMemo(() =>
-    props.events.filter((ev) => isSameDay(new Date(ev.start_at), props.date)),
+    props.events.filter((ev) => calendarIsSameDay(new Date(ev.start_at), props.date)),
   );
 
   const eventsInHour = (hour: number) =>
@@ -1516,13 +1732,7 @@ function DayView(props: {
       return new Date(ev.start_at).getHours() === hour;
     });
 
-  const dateLabel = () =>
-    props.date.toLocaleDateString(undefined, {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
+  const dateLabel = () => calendarLongDateLabel(props.date);
 
   return (
     <section
@@ -1604,9 +1814,16 @@ function DayView(props: {
                         <div>
                           <p style={{ margin: 0, "font-size": "0.88em", "font-weight": 600, color: TOKEN.text }}>{ev.title}</p>
                           <p style={{ margin: "0.2em 0 0", "font-size": "0.76em", color: TOKEN.textSecondary }}>
-                            {ev.all_day ? "All day" : formatTime(ev.start_at)}
+                            {ev.all_day ? "All day" : calendarTimeLabel(ev.start_at)}
                             {ev.relatedLocation ? ` · ${ev.relatedLocation}` : ""}
                           </p>
+                          <Show when={ev.semanticTag}>
+                            {(tag) => (
+                              <p style={{ margin: "0.22em 0 0", "font-size": "0.68em", color: TOKEN.accent, "line-height": 1.5, "text-transform": "uppercase", "letter-spacing": "0.12em" }}>
+                                {tag()}
+                              </p>
+                            )}
+                          </Show>
                         </div>
                       </button>
                     )}

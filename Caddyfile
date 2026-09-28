@@ -229,12 +229,21 @@
         root * /srv/docs
         try_files {path} /index.html
         file_server
+        header /index.html Cache-Control "no-cache, no-store, must-revalidate"
+        header /app.js Cache-Control "no-cache, no-store, must-revalidate"
     }
 
+    # No explicit Cache-Control here previously meant browsers could apply
+    # heuristic freshness caching (RFC 7234 4.2.2) to index.html/app.js with
+    # no way to force a refresh, which reads as "the deploy didn't take" even
+    # though the server already has the new file. Matches /workspace/'s
+    # no-cache treatment of its own index.html above.
     handle {
         root * /srv/docs
         try_files {path} {path}.html /index.html
         file_server
+        header /index.html Cache-Control "no-cache, no-store, must-revalidate"
+        header /app.js Cache-Control "no-cache, no-store, must-revalidate"
     }
 }
 

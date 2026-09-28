@@ -1,6 +1,8 @@
-import { Show } from "solid-js";
+import { Show, Suspense, lazy } from "solid-js";
 import type { AfpMessage, AfpView } from "@/lib/api";
-import { KNOWN_VIEW_FORMATS, pickView } from "@/lib/api";
+import { navigateToView } from "@/lib/decisionosNavigation";
+import { resolveViewDispatcherRouting } from "@/lib/viewDispatcherRouting";
+import { decryptedDisplayLabel } from "@/lib/decryptedDisplayState";
 import { InboxRenderer } from "@/components/renderers/InboxRenderer";
 import { CanvasRenderer } from "@/components/renderers/CanvasRenderer";
 import { TableRenderer } from "@/components/renderers/TableRenderer";
@@ -13,7 +15,40 @@ import { GenerativeCardRenderer } from "@/components/renderers/GenerativeCardRen
 import { BlueprintRenderer } from "@/components/renderers/BlueprintRenderer";
 import { A2UIRenderer } from "@/components/renderers/A2UIRenderer";
 import { PresentationCardRenderer } from "@/components/renderers/PresentationCardRenderer";
+import { ProactiveSuggestionRenderer } from "@/components/renderers/ProactiveSuggestionRenderer";
 import { RichTextRenderer } from "@/components/renderers/RichTextRenderer";
+import { LedgerDiffRenderer } from "@/components/renderers/LedgerDiffRenderer";
+import { InboxCanvasRenderer } from "@/components/renderers/InboxCanvasRenderer";
+const LazyLedgerBoardRenderer = lazy(() =>
+  import("@/components/renderers/LedgerBoardRenderer").then((m) => ({ default: m.LedgerBoardRenderer })),
+);
+const LazyMultiEditRenderer = lazy(() =>
+  import("@/components/renderers/MultiEditRenderer").then((m) => ({ default: m.MultiEditRenderer })),
+);
+const LazyShellResultRenderer = lazy(() =>
+  import("@/components/renderers/ShellResultRenderer").then((m) => ({ default: m.ShellResultRenderer })),
+);
+const LazyPlanningCardRenderer = lazy(() =>
+  import("@/components/renderers/PlanningCardRenderer").then((m) => ({ default: m.PlanningCardRenderer })),
+);
+const LazyExportRequestRenderer = lazy(() =>
+  import("@/components/renderers/ExportRenderer").then((m) => ({ default: m.ExportRequestRenderer })),
+);
+const LazyExportResultRenderer = lazy(() =>
+  import("@/components/renderers/ExportRenderer").then((m) => ({ default: m.ExportResultRenderer })),
+);
+const LazyThreadDashboardRenderer = lazy(() =>
+  import("@/components/renderers/ThreadDashboardRenderer").then((m) => ({ default: m.ThreadDashboardRenderer })),
+);
+const LazyParsedDocumentRenderer = lazy(() =>
+  import("@/components/renderers/ParsedDocumentRenderer").then((m) => ({ default: m.ParsedDocumentRenderer })),
+);
+const LazyTranscriptRenderer = lazy(() =>
+  import("@/components/renderers/TranscriptRenderer").then((m) => ({ default: m.TranscriptRenderer })),
+);
+const LazySupertagGridRendererLite = lazy(() =>
+  import("@/components/renderers/SupertagGridRendererLite").then((m) => ({ default: m.SupertagGridRenderer })),
+);
 
 /**
  * The agent-first renderer registry.
@@ -32,57 +67,65 @@ export function ViewDispatcher(props: {
   compact?: boolean;
   /** card_section_update messages belonging to this card (for generative_card format) */
   cardUpdates?: AfpMessage[];
+  /** task update messages belonging to this ledger board */
+  taskUpdates?: AfpMessage[];
   onDecision?: (cardId: string, dpId: string, optionId: string) => void;
   /** Called by ui_presentation cards when user clicks "View workflow →" */
   onViewWorkflow?: () => void;
 }) {
-  const chosenView = () => props.viewOverride ?? pickView(props.message, [...KNOWN_VIEW_FORMATS]);
-
-  const effectiveFormat = (): string => {
-    const raw = chosenView()?.format;
-    // Normalize single-node A2UI view formats to a2ui.v1 so A2UIRenderer handles them.
-    if (raw === "insight_line" || raw === "action_chips" || raw === "stat_row") return "a2ui.v1";
-    if (raw) return raw;
-    // Heuristic fallback from message type
-    const t = props.message.type;
-    const subtype = props.message.subtype ?? "";
-    const kind = (props.message.content?.kind as string | undefined) ?? "";
-    if (t === "research" || t === "search_result" || t.includes("search")) return "search_result";
-    if (t === "task") return "task_card";
-    if (t.includes("email") || t.includes("inbox") || t.includes("reply")) return "email";
-    if (t === "calendar" || t.includes("calendar") || t.includes("event") || t.includes("booking")) return "calendar";
-    if (t.includes("table") || t.includes("action_log") || t.includes("database")) return "table";
-    if (t.includes("canvas") || t.includes("note")) return "canvas";
-    if (t.includes("attachment") || t.includes("file")) return "attachments";
-    if (t.includes("approval") || t.includes("decision") || t.includes("review")) return "approvals";
-    if (t === "agent" && subtype === "ui_presentation") return "ui_presentation";
-    if (t === "agent" && subtype === "orchestration_card") return "generative_card";
-    if (t === "agent" && subtype === "plan") return "task_card";
-    if (t === "agent" && (subtype === "dashboard_panel" || subtype === "runner_editor" || subtype === "workspace_panel")) return "a2ui.v1";
-    if (t === "note" && (subtype === "content" || kind.includes("note"))) return "rich_text";
-    if (t === "calendar" && (subtype === "plan" || kind.includes("schedule"))) return "calendar";
-    if (t === "task" && (subtype === "card" || kind.includes("task"))) return "task_card";
-    if (t === "research" && (subtype === "content" || kind.includes("research"))) return "search_result";
-    if (t.includes("blueprint") || t.includes("ui")) return "ui_blueprint";
-    // Continuity AFP types — route to A2UIRenderer which handles their embedded views.
-    if (
-      t === "watcher_alert" || t === "smart_suggestion" || t === "behavior_pattern" ||
-      t === "projection" || t === "temporal_projection" || t === "state_synthesis"
-    ) return "a2ui.v1";
-    // Content-shape heuristic: if content has bullets/summary it's a search result
-    const c = props.message.content;
-    if (c && typeof c === "object" && !Array.isArray(c) && ("bullets" in c || "sources" in c)) return "search_result";
-    // Default to inbox-style card for unknown types
-    return "email";
+  const routing = () => resolveViewDispatcherRouting(props.message, props.viewOverride);
+  const chosenView = () => routing().chosenView ?? undefined;
+  const proactiveSourceReference = () =>
+    props.message.references?.find((reference) => {
+      if (reference.type !== "message") return false;
+      const metadata =
+        reference.metadata && typeof reference.metadata === "object" && !Array.isArray(reference.metadata)
+          ? reference.metadata
+          : null;
+      return metadata?.relation === "proactive_source";
+    }) ?? null;
+  const proactiveSourceThreadId = () => {
+    const metadata = proactiveSourceReference()?.metadata;
+    return metadata && typeof metadata["thread_id"] === "string" ? metadata["thread_id"] : null;
   };
+  const proactiveSourceMessageId = () => proactiveSourceReference()?.target ?? null;
+
+  const effectiveFormat = () => routing().effectiveFormat;
 
   return (
     <article class="glass-surface rounded-xl border border-white/35 p-5 shadow-panel">
       <Show when={!props.compact}>
-        <FormatBadge format={effectiveFormat()} agentDriven={Boolean(chosenView())} />
+        <FormatBadge format={effectiveFormat()} agentDriven={routing().agentDriven} />
+      </Show>
+
+      <Show when={proactiveSourceReference()}>
+        <div class={props.compact ? "mt-2" : "mt-3"}>
+          <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-300/20 bg-sky-400/10 px-3 py-2">
+            <p class="text-xs leading-5 text-sky-50">
+              Promoted from a proactive suggestion.
+            </p>
+            <Show when={proactiveSourceThreadId() && proactiveSourceMessageId()}>
+              <button
+                type="button"
+                onClick={() =>
+                  navigateToView("threads", {
+                    threadId: proactiveSourceThreadId() ?? undefined,
+                    messageId: proactiveSourceMessageId() ?? undefined,
+                  })
+                }
+                class="rounded-full border border-sky-300/20 bg-sky-400/12 px-3 py-1.5 text-[11px] font-medium text-sky-50 transition hover:bg-sky-400/20"
+              >
+                Open source suggestion
+              </button>
+            </Show>
+          </div>
+        </div>
       </Show>
 
       <div class={props.compact ? "" : "mt-3"}>
+        <Show when={effectiveFormat() === "encrypted_placeholder"}>
+          <EncryptedMessagePlaceholder message={props.message} compact={props.compact} />
+        </Show>
         <Show when={effectiveFormat() === "email"}>
           <InboxRenderer message={props.message} />
         </Show>
@@ -107,6 +150,42 @@ export function ViewDispatcher(props: {
         <Show when={effectiveFormat() === "task_card"}>
           <TaskCardRenderer message={props.message} view={chosenView() ?? undefined} />
         </Show>
+        <Show when={effectiveFormat() === "ledger_diff"}>
+          <LedgerDiffRenderer message={props.message} view={chosenView() ?? undefined} />
+        </Show>
+        <Show when={effectiveFormat() === "ledger_board"}>
+          <Suspense fallback={<RendererFallback label="board" compact={props.compact} />}>
+            <LazyLedgerBoardRenderer message={props.message} tasks={props.taskUpdates} />
+          </Suspense>
+        </Show>
+        <Show when={effectiveFormat() === "multi_edit"}>
+          <Suspense fallback={<RendererFallback label="batch editor" compact={props.compact} />}>
+            <LazyMultiEditRenderer message={props.message} view={chosenView() ?? undefined} />
+          </Suspense>
+        </Show>
+        <Show when={effectiveFormat() === "shell_result"}>
+          <Suspense fallback={<RendererFallback label="shell result" compact={props.compact} />}>
+            <LazyShellResultRenderer message={props.message} view={chosenView() ?? undefined} />
+          </Suspense>
+        </Show>
+        <Show when={effectiveFormat() === "planning_result"}>
+          <Suspense fallback={<RendererFallback label="plan" compact={props.compact} />}>
+            <LazyPlanningCardRenderer message={props.message} view={chosenView() ?? undefined} />
+          </Suspense>
+        </Show>
+        <Show when={effectiveFormat() === "export_request"}>
+          <Suspense fallback={<RendererFallback label="export request" compact={props.compact} />}>
+            <LazyExportRequestRenderer message={props.message} />
+          </Suspense>
+        </Show>
+        <Show when={effectiveFormat() === "export_result"}>
+          <Suspense fallback={<RendererFallback label="export result" compact={props.compact} />}>
+            <LazyExportResultRenderer message={props.message} />
+          </Suspense>
+        </Show>
+        <Show when={effectiveFormat() === "proactive_suggestion"}>
+          <ProactiveSuggestionRenderer message={props.message} />
+        </Show>
         <Show when={effectiveFormat() === "generative_card"}>
           <GenerativeCardRenderer
             message={props.message}
@@ -127,11 +206,64 @@ export function ViewDispatcher(props: {
         <Show when={effectiveFormat() === "rich_text"}>
           <RichTextRenderer message={props.message} view={chosenView() ?? undefined} />
         </Show>
+        <Show when={effectiveFormat() === "inbox_canvas"}>
+          <InboxCanvasRenderer message={props.message} />
+        </Show>
+        <Show when={effectiveFormat() === "inbox_thread_dashboard"}>
+          <Suspense fallback={<RendererFallback label="thread dashboard" compact={props.compact} />}>
+            <LazyThreadDashboardRenderer message={props.message} />
+          </Suspense>
+        </Show>
+        <Show when={effectiveFormat() === "parsed_document"}>
+          <Suspense fallback={<RendererFallback label="document" compact={props.compact} />}>
+            <LazyParsedDocumentRenderer message={props.message} view={chosenView() ?? undefined} />
+          </Suspense>
+        </Show>
+        <Show when={effectiveFormat() === "transcript"}>
+          <Suspense fallback={<RendererFallback label="transcript" compact={props.compact} />}>
+            <LazyTranscriptRenderer message={props.message} view={chosenView() ?? undefined} />
+          </Suspense>
+        </Show>
+        <Show when={effectiveFormat() === "supertag_grid"}>
+          <Suspense fallback={<RendererFallback label="grid" compact={props.compact} />}>
+            <LazySupertagGridRendererLite message={props.message} />
+          </Suspense>
+        </Show>
         <Show when={effectiveFormat() === "ui_blueprint" || effectiveFormat() === "blueprint"}>
           <BlueprintRenderer message={props.message} view={chosenView() ?? undefined} />
         </Show>
       </div>
     </article>
+  );
+}
+
+function RendererFallback(props: { label: string; compact?: boolean }) {
+  return (
+    <div
+      class={
+        props.compact
+          ? "rounded-xl border border-white/15 bg-white/6 px-3 py-2 text-[11px] text-white/65"
+          : "rounded-xl border border-white/15 bg-white/6 px-4 py-3 text-xs text-white/65"
+      }
+    >
+      Loading {props.label}...
+    </div>
+  );
+}
+
+function EncryptedMessagePlaceholder(props: { message: AfpMessage; compact?: boolean }) {
+  const label = () => decryptedDisplayLabel(props.message) ?? "Encrypted message - decrypting on this device";
+  return (
+    <div
+      class={
+        props.compact
+          ? "rounded-xl border border-emerald-200/20 bg-emerald-400/10 px-3 py-2 text-[11px] text-emerald-50"
+          : "rounded-xl border border-emerald-200/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-50"
+      }
+    >
+      <p class="font-semibold">Encrypted</p>
+      <p class="mt-1 text-xs opacity-80">{label()}</p>
+    </div>
   );
 }
 
@@ -146,19 +278,33 @@ function FormatBadge(props: { format: string; agentDriven: boolean }) {
       approvals: "Approval",
       search_result: "Research",
       task_card: "Task",
+      proactive_suggestion: "Suggestion",
       generative_card: "Agent",
       "a2ui.v1": "A2UI",
+      ledger_diff: "Diff",
+      ledger_board: "Board",
+      multi_edit: "Batch Edit",
+      shell_result: "Shell",
+      planning_result: "Plan",
+      export_request: "Export",
+      export_result: "Export",
       rich_text: "Note",
+      inbox_canvas: "Inbox Canvas",
+      inbox_thread_dashboard: "Thread Dashboard",
+      parsed_document: "Document",
+      transcript: "Transcript",
+      supertag_grid: "Grid",
       ui_blueprint: "Blueprint",
       blueprint: "Blueprint",
       ui_presentation: "Presentation",
+      encrypted_placeholder: "Encrypted",
     };
     return map[props.format] ?? props.format;
   };
 
   return (
     <div class="flex items-center gap-2">
-      <span class="rounded-full bg-white/50 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-on-surface-variant">
+      <span class="rounded-full bg-white/65 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-on-surface/80">
         {label()}
       </span>
       <Show when={props.agentDriven}>

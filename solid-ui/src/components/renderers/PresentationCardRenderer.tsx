@@ -1,28 +1,8 @@
-/**
- * PresentationCardRenderer — universal UI Presentation Node.
- *
- * This is the ONLY component responsible for rendering structured results as
- * interactive UI cards. It bridges the AFP agent layer and the visual layer.
- *
- * Extension guide:
- *   • Add a new card type: update CardType in presentationState.ts,
- *     add a component to PresentationCards.tsx, register in CARD_REGISTRY.
- *   • Add a new domain: update DOMAIN_SIGNALS + DOMAIN_DEFAULT_CARDS in presentationState.ts.
- *   • Change layout: edit the CardGrid component below.
- *   • Change card shell controls: edit CardShell below.
- *
- * Responsibilities (UIPresentationNode spec):
- *   ✓ Interprets structured AFP view content → card specs
- *   ✓ Groups cards by subject (multi-instance: Tokyo + Kyoto map cards)
- *   ✓ Manages expand/collapse, hide, save per card
- *   ✓ Shares PresentationStateCtx across all cards reactively
- *   ✗ Does NOT perform research or call tools
- *   ✗ Does NOT replace the master agent
- */
-
 import { createMemo, createSignal, For, Show } from "solid-js";
+import type { JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import type { AfpMessage, AfpView } from "@/lib/api";
+import { decryptedDisplayContent } from "@/lib/decryptedDisplayState";
 import {
   createPresentationState,
   detectDomain,
@@ -35,89 +15,161 @@ import {
 } from "@/lib/presentationState";
 import { CARD_REGISTRY } from "@/components/renderers/PresentationCards";
 
-// ── Card metadata (labels, icons, descriptions) ───────────────────────────────
-// To add a new card type's label/icon, add one entry here.
-
 const CARD_META: Record<CardType, { label: string; icon: string; description: string }> = {
-  summary:           { label: "Overview",         icon: "✦", description: "Summary of results"       },
-  key_facts:         { label: "Key Facts",         icon: "⊞", description: "Structured key-value data"},
-  sources:           { label: "Sources",           icon: "↗", description: "Reference links"          },
-  timeline:          { label: "Timeline",          icon: "◎", description: "Chronological events"     },
-  definition:        { label: "Definition",        icon: "≡", description: "Concept explanation"      },
-  comparison:        { label: "Comparison",        icon: "⇌", description: "Side-by-side comparison"  },
-  compound:          { label: "Compound",          icon: "⬡", description: "Chemical compound"        },
-  element_breakdown: { label: "Structure",         icon: "⬢", description: "Elemental breakdown"      },
-  properties_table:  { label: "Properties",        icon: "⊟", description: "Scientific properties"   },
-  map:               { label: "Location",          icon: "📍", description: "Map & location"           },
-  weather:           { label: "Weather",           icon: "🌡", description: "Climate conditions"       },
-  flights:           { label: "Flights",           icon: "✈", description: "Flight options"           },
-  accommodation:     { label: "Stays",             icon: "🏨", description: "Accommodation options"   },
-  activities:        { label: "Activities",        icon: "✿", description: "Things to do"             },
-  itinerary:         { label: "Itinerary",         icon: "📅", description: "Day-by-day plan"         },
-  price_metrics:     { label: "Price",             icon: "◈", description: "Price & metrics"          },
-  ingredients:       { label: "Ingredients",       icon: "⊕", description: "Recipe ingredients"      },
-  steps:             { label: "Steps",             icon: "→", description: "Step-by-step guide"       },
-  code_snippet:      { label: "Code",              icon: "⌥", description: "Code example"            },
-  profile:           { label: "Profile",           icon: "◉", description: "Entity profile"          },
+  summary: { label: "Overview", icon: "◆", description: "Summary of results" },
+  key_facts: { label: "Key Facts", icon: "⊞", description: "Structured key-value data" },
+  sources: { label: "Sources", icon: "↗", description: "Reference links" },
+  timeline: { label: "Timeline", icon: "◎", description: "Chronological events" },
+  definition: { label: "Definition", icon: "≡", description: "Concept explanation" },
+  comparison: { label: "Comparison", icon: "⇌", description: "Side-by-side comparison" },
+  compound: { label: "Compound", icon: "□", description: "Chemical compound" },
+  element_breakdown: { label: "Structure", icon: "⬢", description: "Elemental breakdown" },
+  properties_table: { label: "Properties", icon: "⊟", description: "Scientific properties" },
+  map: { label: "Location", icon: "Map", description: "Map and location" },
+  weather: { label: "Weather", icon: "Sun", description: "Climate conditions" },
+  flights: { label: "Flights", icon: "Flight", description: "Flight options" },
+  accommodation: { label: "Stays", icon: "Stay", description: "Accommodation options" },
+  activities: { label: "Activities", icon: "Leaf", description: "Things to do" },
+  itinerary: { label: "Itinerary", icon: "Plan", description: "Day-by-day plan" },
+  price_metrics: { label: "Price", icon: "◇", description: "Price and metrics" },
+  ingredients: { label: "Ingredients", icon: "⊕", description: "Recipe ingredients" },
+  steps: { label: "Steps", icon: "→", description: "Step-by-step guide" },
+  code_snippet: { label: "Code", icon: "⌥", description: "Code example" },
+  profile: { label: "Profile", icon: "◉", description: "Entity profile" },
 };
 
-// ── Content parser ────────────────────────────────────────────────────────────
-// Builds PresentationContent from an AFP view's content blob.
-// The server may send a fully-formed PresentationContent, or a raw
-// UiCommandResponse-style payload which we normalise here.
+const SUBJECT_SEPARATOR = "·";
+const CARD_COLLAPSE_ICON = "▲";
+const CARD_EXPAND_ICON = "▼";
+const CARD_SAVE_ICON = "♡";
+const CARD_SAVED_ICON = "♥";
+const CARD_CLOSE_ICON = "×";
+const SHOW_MORE_SUFFIX = "▾";
+const PRESENTATION_SUBJECT_BOUND_TYPES: CardType[] = [
+  "map",
+  "weather",
+  "accommodation",
+  "activities",
+  "compound",
+  "element_breakdown",
+  "properties_table",
+  "profile",
+];
+const MAX_PRIMARY = 4;
+
+function activateOnEnterOrSpace(event: KeyboardEvent, action: () => void) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    action();
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function scalarString(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
+function stringItems(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => scalarString(item).trim()).filter((item) => item.length > 0)
+    : [];
+}
+
+function linkItems(value: unknown): Array<{ title: string; url: string }> {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).flatMap((link) => {
+    const url = scalarString(link.url);
+    if (!url) return [];
+    return [{ title: scalarString(link.title), url }];
+  });
+}
+
+function isCardType(value: unknown): value is CardType {
+  return typeof value === "string" && value in CARD_META;
+}
+
+function isPresentationDomain(value: unknown): value is PresentationContent["domain"] {
+  return typeof value === "string" && value in DOMAIN_DEFAULT_CARDS;
+}
+
+function normalizePresentationDomain(value: unknown, query: string): PresentationContent["domain"] {
+  return isPresentationDomain(value) ? value : detectDomain(query);
+}
+
+function normalizeCardSpec(value: unknown): CardSpec | null {
+  if (!isRecord(value) || !isCardType(value.type)) return null;
+  const id = scalarString(value.id);
+  if (!id) return null;
+  return {
+    id,
+    type: value.type,
+    subject: typeof value.subject === "string" ? value.subject : undefined,
+    title: scalarString(value.title, CARD_META[value.type].label),
+    data: isRecord(value.data) ? value.data : {},
+  };
+}
+
+function presentationContentFromMountedCards(
+  content: Record<string, unknown>,
+  query: string,
+): PresentationContent | null {
+  if (!Array.isArray(content.cards)) return null;
+  const cards = content.cards.map(normalizeCardSpec).filter((card): card is CardSpec => Boolean(card));
+  if (cards.length === 0) return null;
+  return {
+    presentation_id: scalarString(content.presentation_id, `pres.${Date.now()}`),
+    query: typeof content.query === "string" ? content.query : query,
+    summary: typeof content.summary === "string" ? content.summary : query,
+    domain: normalizePresentationDomain(content.domain, query),
+    subjects: stringItems(content.subjects),
+    cards,
+  };
+}
 
 function parsePresentationContent(
   content: Record<string, unknown>,
   query: string,
 ): PresentationContent {
-  // If the server already sent a well-formed PresentationContent, use it directly.
-  if (Array.isArray(content.cards)) {
-    return content as unknown as PresentationContent;
-  }
+  const mountedContent = presentationContentFromMountedCards(content, query);
+  if (mountedContent) return mountedContent;
 
-  // Normalise from UiCommandResponse-style payload (bullets, summary, links).
   const summary = typeof content.summary === "string" ? content.summary : query;
-  const bullets = Array.isArray(content.bullets) ? (content.bullets as string[]) : [];
-  const links = Array.isArray(content.sources)
-    ? (content.sources as Array<{ title: string; url: string }>)
-    : Array.isArray(content.links)
-    ? (content.links as Array<{ title: string; url: string }>)
-    : [];
+  const bullets = stringItems(content.bullets);
+  const links = linkItems(Array.isArray(content.sources) ? content.sources : content.links);
 
   const domain = detectDomain(query);
-  const subjects = Array.isArray(content.subjects)
-    ? (content.subjects as string[])
-    : extractSubjects(query);
-
+  const mountedSubjects = stringItems(content.subjects);
+  const subjects = mountedSubjects.length > 0 ? mountedSubjects : extractSubjects(query);
   const cardTypes = DOMAIN_DEFAULT_CARDS[domain];
   const keyFacts = parseKeyFacts(bullets);
-
-  // Build a card spec per type. Cards get data extracted from bullets/summary.
   const cards: CardSpec[] = [];
 
   for (const type of cardTypes) {
-    // Multi-instance: for subject-bound cards, create one per subject.
-    const isSubjectBound: CardType[] = ["map", "weather", "accommodation", "activities", "compound", "element_breakdown", "properties_table", "profile"];
-
-    if (isSubjectBound.includes(type) && subjects.length > 1) {
+    if (PRESENTATION_SUBJECT_BOUND_TYPES.includes(type) && subjects.length > 1) {
       for (const subject of subjects) {
         cards.push({
           id: `${type}_${subject.toLowerCase().replace(/\s+/g, "_")}`,
           type,
           subject,
-          title: `${CARD_META[type].label} — ${subject}`,
-          data: extractCardData(type, subject, bullets, summary),
+          title: `${CARD_META[type].label} ${SUBJECT_SEPARATOR} ${subject}`,
+          data: extractCardData(type, subject, bullets, summary, links, keyFacts),
         });
       }
-    } else {
-      cards.push({
-        id: type,
-        type,
-        subject: subjects[0],
-        title: CARD_META[type].label,
-        data: extractCardData(type, subjects[0] ?? query, bullets, summary, links, keyFacts),
-      });
+      continue;
     }
+
+    cards.push({
+      id: type,
+      type,
+      subject: subjects[0],
+      title: CARD_META[type].label,
+      data: extractCardData(type, subjects[0] ?? query, bullets, summary, links, keyFacts),
+    });
   }
 
   return {
@@ -130,8 +182,6 @@ function parsePresentationContent(
   };
 }
 
-// Extracts card-specific data from the raw bullet/summary payload.
-// Override by returning a fully-formed data blob from the server instead.
 function extractCardData(
   type: CardType,
   subject: string,
@@ -146,59 +196,62 @@ function extractCardData(
     case "key_facts":
       return { facts: keyFacts, bullets };
     case "sources":
-      return { sources: links.map((l) => ({ title: l.title, url: l.url, snippet: "" })) };
+      return { sources: links.map((link) => ({ title: link.title, url: link.url, snippet: "" })) };
     case "definition":
       return { term: subject, definition: summary };
     case "compound":
       return { name: subject, formula: subject, description: summary };
     case "element_breakdown": {
-      // Parse element tokens from formula-like subject (e.g. "H2O" → H×2, O×1)
       const elements: Array<{ symbol: string; count: number }> = [];
-      const re = /([A-Z][a-z]?)(\d*)/g;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(subject)) !== null) {
-        if (m[1]) elements.push({ symbol: m[1], count: parseInt(m[2] || "1", 10) });
+      const elementRegex = /([A-Z][a-z]?)(\d*)/g;
+      let match: RegExpExecArray | null;
+      while ((match = elementRegex.exec(subject)) !== null) {
+        if (match[1]) {
+          elements.push({ symbol: match[1], count: parseInt(match[2] || "1", 10) });
+        }
       }
-      const bondBullet = bullets.find((b) => /bond/i.test(b));
+      const bondBullet = bullets.find((bullet) => /bond/i.test(bullet));
       const bonds = bondBullet ? [{ type: bondBullet.split(":")[1]?.trim() ?? bondBullet }] : [];
       return { elements, bonds };
     }
     case "map":
       return { location: subject };
     case "weather":
-      return { conditions: "See forecast", avg_temp: "—", subject };
+      return { conditions: "See forecast", avg_temp: "-", subject };
     case "flights":
       return { options: [] };
     case "accommodation":
       return { options: [] };
     case "activities":
-      return { activities: bullets.slice(0, 5).map((b) => ({ name: b })) };
+      return { activities: bullets.slice(0, 5).map((bullet) => ({ name: bullet })) };
     case "itinerary":
       return { days: [] };
     case "timeline":
-      return { events: bullets.slice(0, 6).map((b, i) => ({ date: `${i + 1}`, label: b })) };
+      return { events: bullets.slice(0, 6).map((bullet, index) => ({ date: `${index + 1}`, label: bullet })) };
     case "comparison":
-      return { headers: [subject], rows: keyFacts.map((f) => ({ attribute: f.key, values: [f.value] })) };
+      return {
+        headers: [subject],
+        rows: keyFacts.map((fact) => ({ attribute: fact.key, values: [fact.value] })),
+      };
     case "price_metrics":
-      return { price: "—", change_pct: 0, facts: keyFacts, bullets };
+      return { price: "-", change_pct: 0, facts: keyFacts, bullets };
     case "ingredients":
-      return { ingredients: bullets.map((b) => ({ name: b, amount: "", unit: "" })), servings: 4 };
+      return {
+        ingredients: bullets.map((bullet) => ({ name: bullet, amount: "", unit: "" })),
+        servings: 4,
+      };
     case "steps":
-      return { steps: bullets.map((b, i) => ({ step: i + 1, instruction: b })) };
+      return { steps: bullets.map((bullet, index) => ({ step: index + 1, instruction: bullet })) };
     case "code_snippet":
       return { code: bullets.join("\n"), language: "text", explanation: summary };
     case "profile":
       return { name: subject, bio: summary };
     case "properties_table":
-      return { properties: keyFacts.map((f) => ({ property: f.key, value: f.value })) };
+      return { properties: keyFacts.map((fact) => ({ property: fact.key, value: fact.value })) };
     default:
       return { summary, bullets };
   }
 }
-
-// ── CardShell — reusable wrapper for every card ───────────────────────────────
-// Controls: expand/collapse (click title), hide (×), save (♡), accessible.
-// Controls are hidden by default and revealed on hover for minimal clutter.
 
 function CardShell(props: {
   id: string;
@@ -207,90 +260,117 @@ function CardShell(props: {
   description: string;
   subject?: string;
   ctx: ReturnType<typeof createPresentationState>;
-  children: unknown;
+  children: JSX.Element;
 }) {
-  const isExpanded = createMemo(() => props.ctx.state().expanded.has(props.id));
-  const isSaved    = createMemo(() => props.ctx.state().saved.has(props.id));
+  const shellState = createMemo(() => {
+    const state = props.ctx.state();
+    return {
+      expanded: state.expanded.has(props.id),
+      saved: state.saved.has(props.id),
+      subjectText: props.subject ?? null,
+      showSubject: Boolean(props.subject),
+      showDescription: !state.expanded.has(props.id),
+      saveLabel: state.saved.has(props.id) ? "Unsave" : "Save",
+      saveIcon: state.saved.has(props.id) ? CARD_SAVED_ICON : CARD_SAVE_ICON,
+      expandIcon: state.expanded.has(props.id) ? CARD_COLLAPSE_ICON : CARD_EXPAND_ICON,
+    };
+  });
+
+  const toggleExpanded = () => {
+    if (shellState().expanded) {
+      props.ctx.collapse(props.id);
+      return;
+    }
+    props.ctx.expand(props.id);
+  };
 
   return (
-    <div class="group glass-card card-hover rounded-2xl shadow-card overflow-hidden">
-      {/* Card header */}
-      <button
-        type="button"
+    <div class="group glass-card card-hover overflow-hidden rounded-2xl shadow-card">
+      <div
+        role="button"
+        tabindex={0}
         class="flex w-full items-center gap-2.5 px-4 pt-4 pb-2 text-left"
-        onClick={() => isExpanded() ? props.ctx.collapse(props.id) : props.ctx.expand(props.id)}
-        aria-expanded={isExpanded()}
+        onClick={toggleExpanded}
+        onKeyDown={(event) => activateOnEnterOrSpace(event, toggleExpanded)}
+        aria-expanded={shellState().expanded}
       >
         <span class="shrink-0 text-base leading-none text-on-surface-variant">{props.icon}</span>
-        <div class="flex-1 min-w-0">
-          <p class="text-xs font-semibold text-on-surface truncate">
+        <div class="min-w-0 flex-1">
+          <p class="break-words text-xs font-semibold text-on-surface">
             {props.label}
-            <Show when={props.subject}>
-              <span class="ml-1 font-normal text-on-surface-variant">· {props.subject}</span>
+            <Show when={shellState().showSubject}>
+              <span class="ml-1 font-normal text-on-surface-variant">
+                {SUBJECT_SEPARATOR} {shellState().subjectText}
+              </span>
             </Show>
           </p>
-          <Show when={!isExpanded()}>
-            <p class="text-[10px] text-on-surface-variant truncate">{props.description}</p>
+          <Show when={shellState().showDescription}>
+            <p class="break-words text-[10px] text-on-surface-variant">{props.description}</p>
           </Show>
         </div>
 
-        {/* Context controls — hidden until group-hover */}
         <div class="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <button
             type="button"
-            title={isSaved() ? "Unsave" : "Save"}
+            title={shellState().saveLabel}
             class="flex h-6 w-6 items-center justify-center rounded-lg text-xs text-outline transition hover:text-primary"
-            onClick={(e) => { e.stopPropagation(); props.ctx.toggleSaved(props.id); }}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.ctx.toggleSaved(props.id);
+            }}
           >
-            {isSaved() ? "♥" : "♡"}
+            {shellState().saveIcon}
           </button>
           <button
             type="button"
             title="Remove card"
             class="flex h-6 w-6 items-center justify-center rounded-lg text-xs text-outline transition hover:text-error"
-            onClick={(e) => { e.stopPropagation(); props.ctx.hide(props.id); }}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.ctx.hide(props.id);
+            }}
           >
-            ×
+            {CARD_CLOSE_ICON}
           </button>
           <span class="ml-1 text-[11px] text-outline transition">
-            {isExpanded() ? "▲" : "▼"}
+            {shellState().expandIcon}
           </span>
         </div>
-      </button>
+      </div>
 
-      {/* Card body — shown when expanded */}
-      <Show when={isExpanded()}>
+      <Show when={shellState().expanded}>
         <div class="animate-fade-in px-4 pb-4">
-          <div class="h-px w-full bg-outline-variant/20 mb-3" />
-          {props.children as unknown as Element}
+          <div class="mb-3 h-px w-full bg-outline-variant/20" />
+          {props.children}
         </div>
       </Show>
     </div>
   );
 }
 
-// ── CardGrid — responsive grid layout ────────────────────────────────────────
-// Primary cards (first MAX_PRIMARY) show in a grid.
-// Remaining cards stack below in a secondary row.
-
-const MAX_PRIMARY = 4;
-
 function CardGrid(props: {
   cards: CardSpec[];
   ctx: ReturnType<typeof createPresentationState>;
 }) {
-  const visible = createMemo(() =>
-    props.cards.filter((c) => !props.ctx.state().hidden.has(c.id))
-  );
-  const primary   = createMemo(() => visible().slice(0, MAX_PRIMARY));
-  const secondary = createMemo(() => visible().slice(MAX_PRIMARY));
   const [showAll, setShowAll] = createSignal(false);
+  const gridState = createMemo(() => {
+    const visibleCards = props.cards.filter((card) => !props.ctx.state().hidden.has(card.id));
+    const primaryCards = visibleCards.slice(0, MAX_PRIMARY);
+    const secondaryCards = visibleCards.slice(MAX_PRIMARY);
+    return {
+      primaryCards,
+      secondaryCards,
+      showSecondaryCards: showAll(),
+      showSecondaryToggle: secondaryCards.length > 0 && !showAll(),
+      showSecondaryGrid: secondaryCards.length > 0 && showAll(),
+      showMoreLabel: `Show ${secondaryCards.length} more card${secondaryCards.length > 1 ? "s" : ""} ${SHOW_MORE_SUFFIX}`,
+    };
+  });
 
   return (
     <div class="space-y-3">
-      {/* Primary card grid */}
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">
-        <For each={primary()}>
+        <For each={gridState().primaryCards}>
           {(card) => {
             const Component = CARD_REGISTRY[card.type];
             const meta = CARD_META[card.type];
@@ -316,53 +396,47 @@ function CardGrid(props: {
         </For>
       </div>
 
-      {/* Secondary cards — collapsed by default */}
-      <Show when={secondary().length > 0}>
-        <Show
-          when={showAll()}
-          fallback={
-            <button
-              type="button"
-              class="w-full rounded-xl border border-outline-variant/30 bg-white/30 py-2 text-xs font-medium text-on-surface-variant transition hover:bg-white/50"
-              onClick={() => setShowAll(true)}
-            >
-              Show {secondary().length} more card{secondary().length > 1 ? "s" : ""} ▾
-            </button>
-          }
+      <Show when={gridState().showSecondaryToggle}>
+        <button
+          type="button"
+          class="w-full rounded-xl border border-outline-variant/30 bg-white/30 py-2 text-xs font-medium text-on-surface-variant transition hover:bg-white/50"
+          onClick={() => setShowAll(true)}
         >
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 animate-fade-in">
-            <For each={secondary()}>
-              {(card) => {
-                const Component = CARD_REGISTRY[card.type];
-                const meta = CARD_META[card.type];
-                return (
-                  <CardShell
+          {gridState().showMoreLabel}
+        </button>
+      </Show>
+
+      <Show when={gridState().showSecondaryGrid}>
+        <div class="grid animate-fade-in grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">
+          <For each={gridState().secondaryCards}>
+            {(card) => {
+              const Component = CARD_REGISTRY[card.type];
+              const meta = CARD_META[card.type];
+              return (
+                <CardShell
+                  id={card.id}
+                  label={meta.label}
+                  icon={meta.icon}
+                  description={meta.description}
+                  subject={card.subject}
+                  ctx={props.ctx}
+                >
+                  <Dynamic
+                    component={Component}
                     id={card.id}
-                    label={meta.label}
-                    icon={meta.icon}
-                    description={meta.description}
-                    subject={card.subject}
+                    data={card.data}
                     ctx={props.ctx}
-                  >
-                    <Dynamic
-                      component={Component}
-                      id={card.id}
-                      data={card.data}
-                      ctx={props.ctx}
-                      subject={card.subject}
-                    />
-                  </CardShell>
-                );
-              }}
-            </For>
-          </div>
-        </Show>
+                    subject={card.subject}
+                  />
+                </CardShell>
+              );
+            }}
+          </For>
+        </div>
       </Show>
     </div>
   );
 }
-
-// ── PresentationHeader — summary text + domain badge ─────────────────────────
 
 function PresentationHeader(props: {
   summary: string;
@@ -370,80 +444,91 @@ function PresentationHeader(props: {
   subjects: string[];
   onViewWorkflow?: () => void;
 }) {
+  const headerState = createMemo(() => ({
+    summaryText: props.summary,
+    domainText: props.domain,
+    visibleSubjects: props.subjects.slice(0, 3),
+    showSubjects: props.subjects.length > 0,
+    showWorkflowAction: Boolean(props.onViewWorkflow),
+  }));
+
   return (
     <div class="mb-6 space-y-3">
-      {/* Domain + workflow toggle */}
-      <div class="flex items-center gap-2">
-        <span class="rounded-full bg-primary-fixed/60 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-primary">
-          {props.domain}
+      <div class="flex min-w-0 flex-wrap items-center gap-2">
+        <span class="max-w-full break-words rounded-full bg-primary-fixed/60 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.2em] text-primary">
+          {headerState().domainText}
         </span>
-        <Show when={props.subjects.length > 0}>
-          <For each={props.subjects.slice(0, 3)}>
-            {(s) => (
-              <span class="rounded-full bg-white/60 border border-outline-variant/30 px-2 py-0.5 text-[11px] text-on-surface-variant">
-                {s}
+        <Show when={headerState().showSubjects}>
+          <For each={headerState().visibleSubjects}>
+            {(subject) => (
+              <span class="max-w-full break-words rounded-full border border-outline-variant/30 bg-white/60 px-2 py-1 text-[11px] text-on-surface-variant">
+                {subject}
               </span>
             )}
           </For>
         </Show>
-        <Show when={props.onViewWorkflow}>
+        <Show when={headerState().showWorkflowAction}>
           <button
             type="button"
-            class="ml-auto rounded-full border border-outline-variant/40 bg-white/50 px-3 py-0.5 text-[11px] font-medium text-on-surface-variant transition hover:border-primary/40 hover:text-primary"
-            onClick={props.onViewWorkflow}
+            class="w-full rounded-full border border-outline-variant/40 bg-white/50 px-3 py-2 text-[11px] font-medium text-on-surface-variant transition hover:border-primary/40 hover:text-primary sm:ml-auto sm:w-auto sm:py-1"
+            onClick={() => props.onViewWorkflow?.()}
           >
             View workflow →
           </button>
         </Show>
       </div>
 
-      {/* Summary text — generous line-height for readability */}
-      <p class="text-sm leading-[1.75] text-on-surface max-w-prose">
-        {props.summary}
+      <p class="max-w-prose text-sm leading-[1.75] text-on-surface">
+        {headerState().summaryText}
       </p>
     </div>
   );
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
-
 export function PresentationCardRenderer(props: {
   message: AfpMessage;
   view?: AfpView;
-  /** Called when user clicks "View workflow →" */
   onViewWorkflow?: () => void;
 }) {
-  const rawContent = createMemo(() => {
-    const v = props.view ?? props.message.views.find((v) => v.format === "ui_presentation");
-    return (v?.content ?? props.message.content) as Record<string, unknown>;
+  const rendererState = createMemo(() => {
+    const presentationView =
+      props.view ?? props.message.views.find((view) => view.format === "ui_presentation");
+    const safeMessageContent = decryptedDisplayContent(props.message);
+    const candidateContent = props.message.encryption
+      ? safeMessageContent
+      : presentationView?.content ?? safeMessageContent;
+    const rawContent = isRecord(candidateContent) ? candidateContent : {};
+    const messageContent = isRecord(safeMessageContent) ? safeMessageContent : {};
+    const query =
+      typeof rawContent.query === "string"
+        ? rawContent.query
+        : typeof messageContent.query === "string"
+          ? messageContent.query
+          : "";
+    const content = parsePresentationContent(rawContent, query);
+    return {
+      rawContent,
+      query,
+      content,
+    };
   });
 
-  const query = createMemo(() =>
-    typeof rawContent().query === "string"
-      ? (rawContent().query as string)
-      : (props.message.content.query as string | undefined) ?? ""
-  );
-
-  const content = createMemo(() => parsePresentationContent(rawContent(), query()));
-
-  // Create shared state — all cards read/write this signal
   const ctx = createPresentationState({
-    query: query(),
-    domain: content().domain,
-    subjects: content().subjects,
-    // Start with first 4 cards expanded, rest collapsed
-    expanded: new Set(content().cards.slice(0, 4).map((c) => c.id)),
+    query: rendererState().query,
+    domain: rendererState().content.domain,
+    subjects: rendererState().content.subjects,
+    expanded: new Set(rendererState().content.cards.slice(0, 4).map((card) => card.id)),
   });
 
   return (
     <div class="view-enter space-y-2">
       <PresentationHeader
-        summary={content().summary}
-        domain={content().domain}
-        subjects={content().subjects}
+        summary={rendererState().content.summary}
+        domain={rendererState().content.domain}
+        subjects={rendererState().content.subjects}
         onViewWorkflow={props.onViewWorkflow}
       />
-      <CardGrid cards={content().cards} ctx={ctx} />
+      <CardGrid cards={rendererState().content.cards} ctx={ctx} />
     </div>
   );
 }

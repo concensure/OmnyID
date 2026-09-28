@@ -1,5 +1,5 @@
 ﻿// @locs-version: 1.0
-// Profile Ledger V2 â€” local-first user personality model
+// Profile Ledger V2 — local-first user personality model
 // Encrypted with a key derived from AFP identity (HKDF-SHA256), never sessionStorage.
 
 import { isRecord } from "@/lib/eventDetail";
@@ -16,7 +16,7 @@ const MIN_CORROBORATIONS = 3;
 
 export type StorageStatus = "ok" | "quota_exceeded" | "crypto_unavailable";
 
-// â”€â”€â”€ Trait categories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Trait categories ─────────────────────────────────────────────────────────
 
 export type TraitCategory =
   | "communication_style"
@@ -31,7 +31,7 @@ export type TraitCategory =
 // Identity-level categories: observations always go to base genome regardless of persona
 const IDENTITY_CATEGORIES = new Set<TraitCategory>(["personal_values", "emotional_landscape", "aspirations", "life_orientation"]);
 
-// Temporal guard per category â€” deeper traits need longer patterns
+// Temporal guard per category — deeper traits need longer patterns
 const TRAIT_GRAVITY_MS: Record<TraitCategory, number> = {
   communication_style: 24  * 60 * 60 * 1_000,
   workflow_style:      24  * 60 * 60 * 1_000,
@@ -49,7 +49,7 @@ const MIN_CORROBORATIONS_BY_CATEGORY: Partial<Record<TraitCategory, number>> = {
   life_orientation: 5,
 };
 
-// â”€â”€â”€ LoRA weight set â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── LoRA weight set ──────────────────────────────────────────────────────────
 
 export type LoraWeightSet = {
   directness_weight:       number; // 0=measured, 1=blunt
@@ -91,7 +91,7 @@ const VALID_TRAIT_CATEGORIES = new Set<string>([
   "personal_values", "emotional_landscape", "aspirations", "life_orientation",
 ]);
 
-// â”€â”€â”€ Goal domain â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Goal domain ──────────────────────────────────────────────────────────────
 
 export type GoalDomain =
   | "career" | "finance" | "health" | "relationships"
@@ -125,7 +125,7 @@ export type ValueOverride = {
   updated_at: string;
 };
 
-// â”€â”€â”€ Behavior vetos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Behavior vetos ───────────────────────────────────────────────────────────
 
 export type VetoScope = "prompt_style" | "suggestions" | "scheduling" | "content" | "channel";
 
@@ -193,7 +193,7 @@ const VALID_PRIMARY_USE_CASE_SOURCES = new Set<string>([
   "manual",
 ]);
 
-// â”€â”€â”€ Self-profile ground truth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Self-profile ground truth ────────────────────────────────────────────────
 
 export type UserSelfProfile = {
   display_name?: string;
@@ -203,7 +203,7 @@ export type UserSelfProfile = {
   life_stage?: "student" | "early_career" | "established" | "parent" | "caregiver" | "retired";
   primary_use_case?: PrimaryUseCaseProfile | null;
   interests: string[];
-  me_document?: string;       // rich-text narrative, max 5000 chars â€” treated as ground truth
+  me_document?: string;       // rich-text narrative, max 5000 chars — treated as ground truth
   goals_domains: GoalDomain[];
   value_weights: ValueWeightSet;
   active_value_override?: ValueOverride | null;
@@ -242,7 +242,7 @@ function parsePrimaryUseCase(raw: unknown): PrimaryUseCaseProfile | null {
   };
 }
 
-// â”€â”€â”€ Persona-scoped genome partition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Persona-scoped genome partition ─────────────────────────────────────────
 
 export type PersonaGenome = {
   persona_id: string;
@@ -251,7 +251,7 @@ export type PersonaGenome = {
   last_active: string;
 };
 
-// â”€â”€â”€ Ledger entry types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Ledger entry types ───────────────────────────────────────────────────────
 
 export type LedgerEntry = {
   id: string;
@@ -301,7 +301,7 @@ export type ProfileLedger = {
   persona_genomes: PersonaGenome[];
 };
 
-// â”€â”€â”€ UI signal recording hooks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── UI signal recording hooks ────────────────────────────────────────────────
 
 export type UISignalKind =
   | "compact_view_selected"
@@ -314,9 +314,9 @@ export type UISignalKind =
 
 export type UISignal = { kind: UISignalKind; context?: string };
 
-// â”€â”€â”€ Key derivation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Key derivation ───────────────────────────────────────────────────────────
 // SEC-01: Derive a stable AES-GCM key from the AFP Ed25519 private key via HKDF-SHA256.
-// The key is never stored â€” reconstructed from identity on each session.
+// The key is never stored — reconstructed from identity on each session.
 
 function getLedgerSalt(): Uint8Array {
   const stored = localStorage.getItem(SALT_KEY);
@@ -394,7 +394,7 @@ export async function initLedgerKey(afpPrivateKeyBytes?: Uint8Array): Promise<vo
     const k = await deriveLedgerKey(afpPrivateKeyBytes);
     if (k) { _resolvedKey = k; _keyIsIdentityDerived = true; return; }
   }
-  // Fallback to session key â€” ledger survives only for current session
+  // Fallback to session key — ledger survives only for current session
   _resolvedKey = await getSessionFallbackKey();
   _keyIsIdentityDerived = false;
 }
@@ -408,7 +408,7 @@ async function getCryptoKey(): Promise<CryptoKey | null> {
   return _resolvedKey;
 }
 
-// â”€â”€â”€ Encryption helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Encryption helpers ───────────────────────────────────────────────────────
 
 function uint8ToBase64(bytes: Uint8Array): string {
   let s = "";
@@ -436,7 +436,7 @@ async function decryptJson(key: CryptoKey, packed: string): Promise<string | nul
   } catch { return null; }
 }
 
-// â”€â”€â”€ Runtime validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Runtime validation ───────────────────────────────────────────────────────
 
 function clampNum(v: unknown, fallback = 0.5): number {
   const n = typeof v === "number" ? v : fallback;
@@ -639,13 +639,13 @@ function defaultLedger(): ProfileLedger {
   };
 }
 
-// â”€â”€â”€ Storage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Storage ──────────────────────────────────────────────────────────────────
 
 export async function loadLedger(): Promise<ProfileLedger> {
   const cryptoKey = await getCryptoKey();
   const raw = localStorage.getItem(LEDGER_KEY);
   if (!raw) {
-    // Attempt migration from old .e1 key (session-based) â€” if it fails, start fresh silently
+    // Attempt migration from old .e1 key (session-based) — if it fails, start fresh silently
     const oldRaw = localStorage.getItem("omnyid.profile.ledger.e1");
     if (oldRaw) localStorage.removeItem("omnyid.profile.ledger.e1");
     return defaultLedger();
@@ -688,7 +688,7 @@ export async function saveLedger(ledger: ProfileLedger): Promise<StorageStatus> 
   }
 }
 
-// â”€â”€â”€ Consent â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Consent ──────────────────────────────────────────────────────────────────
 
 export function hasConsentBeenAsked(): boolean { return localStorage.getItem(CONSENT_KEY) === "done"; }
 export function markConsentAsked(): void { localStorage.setItem(CONSENT_KEY, "done"); }
@@ -700,7 +700,7 @@ export async function setProfilingEnabled(enabled: boolean): Promise<StorageStat
   return saveLedger(ledger);
 }
 
-// â”€â”€â”€ LoRA helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── LoRA helpers ─────────────────────────────────────────────────────────────
 
 function clampWeight(v: number): number { return Math.min(1.0, Math.max(0.0, v)); }
 
@@ -722,7 +722,7 @@ export function mergePersonaOverlay(base: LoraWeightSet, overlay: Partial<LoraWe
   return result;
 }
 
-// â”€â”€â”€ Temporal clustering guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Temporal clustering guard ────────────────────────────────────────────────
 
 function meetsTemporalGuard(observations: PendingObservation[], category: TraitCategory): boolean {
   const required = MIN_CORROBORATIONS_BY_CATEGORY[category] ?? MIN_CORROBORATIONS;
@@ -756,7 +756,7 @@ function promoteHypothesis(hyp: PendingHypothesis): LedgerEntry {
   };
 }
 
-// â”€â”€â”€ Core ledger entry API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Core ledger entry API ────────────────────────────────────────────────────
 
 export async function addLedgerEntry(
   entry: Omit<LedgerEntry, "id" | "corroboration_count">,
@@ -854,7 +854,7 @@ export async function updateLoraGenome(genome: LoraWeightSet): Promise<StorageSt
   return saveLedger(ledger);
 }
 
-// â”€â”€â”€ Self-profile API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Self-profile API ─────────────────────────────────────────────────────────
 
 export async function updateSelfProfile(patch: Partial<UserSelfProfile>): Promise<StorageStatus> {
   const ledger = await loadLedger();
@@ -867,7 +867,7 @@ export async function getSelfProfile(): Promise<UserSelfProfile> {
   return ledger.self_profile;
 }
 
-// â”€â”€â”€ Behavior veto API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Behavior veto API ────────────────────────────────────────────────────────
 
 export async function addVeto(veto: Omit<BehaviorVeto, "id" | "created_at">): Promise<StorageStatus> {
   const ledger = await loadLedger();
@@ -891,7 +891,7 @@ export async function getActiveVetos(): Promise<BehaviorVeto[]> {
   return ledger.self_profile.vetos ?? [];
 }
 
-// â”€â”€â”€ Persona genome API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Persona genome API ───────────────────────────────────────────────────────
 
 export async function getPersonaGenome(persona_id: string): Promise<PersonaGenome | null> {
   const ledger = await loadLedger();
@@ -906,7 +906,7 @@ export async function ensurePersonaGenome(persona_id: string): Promise<void> {
   }
 }
 
-// â”€â”€â”€ UI signal hooks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── UI signal hooks ──────────────────────────────────────────────────────────
 
 const UI_SIGNAL_MAP: Record<UISignalKind, { category: TraitCategory; shifts: Partial<LoraWeightSet>; confidence: number }> = {
   compact_view_selected:    { category: "communication_style", shifts: { brevity_weight: 0.15 },   confidence: 0.35 },
@@ -932,14 +932,14 @@ export function recordUISignal(signal: UISignal): void {
   });
 }
 
-// â”€â”€â”€ Style prompt synthesis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Style prompt synthesis ───────────────────────────────────────────────────
 // SEC-03: Only static template strings reach the LLM. No user text interpolated.
 
 const STYLE_TEMPLATES: [keyof LoraWeightSet, number, string, string][] = [
   ["directness_weight",      0.6, "be direct and to the point",               "be thoughtful and measured in tone"         ],
-  ["brevity_weight",         0.6, "keep it concise â€” omit filler sentences",  "provide thorough context and explanation"   ],
+  ["brevity_weight",         0.6, "keep it concise — omit filler sentences",  "provide thorough context and explanation"   ],
   ["formality_weight",       0.6, "use formal, professional language",         "use casual, conversational language"        ],
-  ["diplomacy_weight",       0.6, "soften feedback diplomatically",            "be candid â€” skip corporate softening language"],
+  ["diplomacy_weight",       0.6, "soften feedback diplomatically",            "be candid — skip corporate softening language"],
   ["technical_depth_weight", 0.6, "include technical specifics and precision", "avoid jargon and keep language accessible"  ],
   ["optimism_bias",          0.65,"frame uncertainties as opportunities",      "be direct about risks and downsides"        ],
   ["proactivity_preference", 0.65,"proactively anticipate next steps",         ""                                           ],

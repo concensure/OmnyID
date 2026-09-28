@@ -5,7 +5,7 @@ import type { EditorMode } from "@/lib/editorMode";
 import type { EditorState } from "./tiptapEditorTypes";
 import type { AgentPersona } from "@/lib/api";
 
-// â”€â”€ Toolbar button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Toolbar button ─────────────────────────────────────────────────────────
 
 function ToolBtn(props: {
   active?: boolean;
@@ -36,7 +36,7 @@ function Sep() {
   return <div class="mx-1 h-5 w-px bg-black/10" />;
 }
 
-// â”€â”€ Heading select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Heading select ─────────────────────────────────────────────────────────
 
 function HeadingSelect(props: { editor: Editor; state: EditorState }) {
   const current = () =>
@@ -63,7 +63,7 @@ function HeadingSelect(props: { editor: Editor; state: EditorState }) {
   );
 }
 
-// â”€â”€ Color picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Color picker ───────────────────────────────────────────────────────────
 
 const COLORS = ["#1c1b1f", "#635bff", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
@@ -89,13 +89,13 @@ function ColorPicker(props: { editor: Editor }) {
         onClick={() => props.editor.chain().focus().unsetColor().run()}
         class="h-4 w-4 rounded-full border border-black/10 bg-white text-[8px] text-on-surface-variant hover:bg-black/5 transition"
       >
-        âœ•
+        ✕
       </button>
     </div>
   );
 }
 
-// â”€â”€ Link dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Link dialog ────────────────────────────────────────────────────────────
 
 function insertLink(editor: Editor) {
   const prev = editor.getAttributes("link").href ?? "";
@@ -108,24 +108,24 @@ function insertLink(editor: Editor) {
   editor.chain().focus().extendMarkRange("link").setLink({ href: url, target: "_blank" }).run();
 }
 
-// â”€â”€ Table insert helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Table insert helper ────────────────────────────────────────────────────
 
 function insertTable(editor: Editor) {
   editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
 }
 
-// â”€â”€ Image insert â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Image insert ───────────────────────────────────────────────────────────
 
 function insertImage(editor: Editor) {
   const url = window.prompt("Image URL or paste data URI");
   if (url) editor.chain().focus().setImage({ src: url }).run();
 }
 
-// â”€â”€ Email signature â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Email signature ────────────────────────────────────────────────────────
 
 function insertSignature(editor: Editor) {
   editor.chain().focus().insertContent(
-    `<p><br/></p><div class="email-signature">â€”<br/>Sent via OmnyID</div>`
+    `<p><br/></p><div class="email-signature">—<br/>Sent via OmnyID</div>`
   ).run();
 }
 
@@ -138,7 +138,7 @@ const STYLE_DOT: Record<string, string> = {
   analytical: "bg-emerald-400",
 };
 
-// â”€â”€ Main toolbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main toolbar ───────────────────────────────────────────────────────────
 
 export function EditorToolbar(props: {
   editor: Editor;
@@ -156,7 +156,7 @@ export function EditorToolbar(props: {
       {/* Compact + Full + Email: basic formatting */}
       <ToolBtn active={s().bold} title="Bold (Ctrl+B)" onClick={() => e().chain().focus().toggleBold().run()}>B</ToolBtn>
       <ToolBtn active={s().italic} title="Italic (Ctrl+I)" onClick={() => e().chain().focus().toggleItalic().run()}>I</ToolBtn>
-      <ToolBtn active={s().strike} title="Strike" onClick={() => e().chain().focus().toggleStrike().run()}>SÌ¶</ToolBtn>
+      <ToolBtn active={s().strike} title="Strike" onClick={() => e().chain().focus().toggleStrike().run()}>S̶</ToolBtn>
 
       {/* Full + Email: underline */}
       <Show when={props.mode !== "compact"}>
@@ -169,7 +169,7 @@ export function EditorToolbar(props: {
 
       {/* Compact: just link */}
       <Show when={props.mode === "compact"}>
-        <ToolBtn active={s().link} title="Insert link" onClick={() => insertLink(e())}>ðŸ”—</ToolBtn>
+        <ToolBtn active={s().link} title="Insert link" onClick={() => insertLink(e())}>🔗</ToolBtn>
       </Show>
 
       {/* Full + Email: headings, alignment, lists */}
@@ -177,53 +177,53 @@ export function EditorToolbar(props: {
         <HeadingSelect editor={e()} state={s()} />
         <Sep />
 
-        <ToolBtn active={s().alignLeft} title="Align left" onClick={() => e().chain().focus().setTextAlign("left").run()}>â¬…</ToolBtn>
-        <ToolBtn active={s().alignCenter} title="Align center" onClick={() => e().chain().focus().setTextAlign("center").run()}>â˜°</ToolBtn>
-        <ToolBtn active={s().alignRight} title="Align right" onClick={() => e().chain().focus().setTextAlign("right").run()}>âž¡</ToolBtn>
+        <ToolBtn active={s().alignLeft} title="Align left" onClick={() => e().chain().focus().setTextAlign("left").run()}>⬅</ToolBtn>
+        <ToolBtn active={s().alignCenter} title="Align center" onClick={() => e().chain().focus().setTextAlign("center").run()}>☰</ToolBtn>
+        <ToolBtn active={s().alignRight} title="Align right" onClick={() => e().chain().focus().setTextAlign("right").run()}>➡</ToolBtn>
         <Sep />
 
-        <ToolBtn active={s().bulletList} title="Bullet list" onClick={() => e().chain().focus().toggleBulletList().run()}>â€¢ â€“</ToolBtn>
+        <ToolBtn active={s().bulletList} title="Bullet list" onClick={() => e().chain().focus().toggleBulletList().run()}>• –</ToolBtn>
         <ToolBtn active={s().orderedList} title="Ordered list" onClick={() => e().chain().focus().toggleOrderedList().run()}>1.</ToolBtn>
 
         {/* Full only: task list, code block, blockquote, table, mention */}
         <Show when={props.mode === "full"}>
-          <ToolBtn active={s().taskList} title="Task list" onClick={() => e().chain().focus().toggleTaskList().run()}>â˜‘</ToolBtn>
+          <ToolBtn active={s().taskList} title="Task list" onClick={() => e().chain().focus().toggleTaskList().run()}>☑</ToolBtn>
           <Sep />
-          <ToolBtn active={s().blockquote} title="Blockquote" onClick={() => e().chain().focus().toggleBlockquote().run()}>â</ToolBtn>
+          <ToolBtn active={s().blockquote} title="Blockquote" onClick={() => e().chain().focus().toggleBlockquote().run()}>❝</ToolBtn>
           <ToolBtn active={s().codeBlock} title="Code block" onClick={() => e().chain().focus().toggleCodeBlock().run()}>{ "</>" }</ToolBtn>
           <Sep />
-          <ToolBtn active={false} title="Insert table" onClick={() => insertTable(e())}>âŠž</ToolBtn>
-          <ToolBtn active={false} title="Insert image" onClick={() => insertImage(e())}>ðŸ–¼</ToolBtn>
+          <ToolBtn active={false} title="Insert table" onClick={() => insertTable(e())}>⊞</ToolBtn>
+          <ToolBtn active={false} title="Insert image" onClick={() => insertImage(e())}>🖼</ToolBtn>
         </Show>
 
         <Sep />
-        <ToolBtn active={s().link} title="Insert link" onClick={() => insertLink(e())}>ðŸ”—</ToolBtn>
-        <ToolBtn active={s().highlight} title="Highlight" onClick={() => e().chain().focus().toggleHighlight().run()}>ðŸ–</ToolBtn>
+        <ToolBtn active={s().link} title="Insert link" onClick={() => insertLink(e())}>🔗</ToolBtn>
+        <ToolBtn active={s().highlight} title="Highlight" onClick={() => e().chain().focus().toggleHighlight().run()}>🖍</ToolBtn>
 
         {/* Email only: signature */}
         <Show when={props.mode === "email"}>
           <Sep />
-          <ToolBtn active={false} title="Insert signature" onClick={() => insertSignature(e())}>âœ’</ToolBtn>
-          <ToolBtn active={false} title="Insert image" onClick={() => insertImage(e())}>ðŸ–¼</ToolBtn>
+          <ToolBtn active={false} title="Insert signature" onClick={() => insertSignature(e())}>✒</ToolBtn>
+          <ToolBtn active={false} title="Insert image" onClick={() => insertImage(e())}>🖼</ToolBtn>
         </Show>
 
         <Sep />
         <ColorPicker editor={e()} />
       </Show>
 
-      {/* Undo/Redo + Persona chip â€” all modes */}
+      {/* Undo/Redo + Persona chip — all modes */}
       <div class="ml-auto flex items-center gap-1.5">
-        <ToolBtn disabled={!s().canUndo} title="Undo (Ctrl+Z)" onClick={() => e().chain().focus().undo().run()}>â†©</ToolBtn>
-        <ToolBtn disabled={!s().canRedo} title="Redo (Ctrl+Y)" onClick={() => e().chain().focus().redo().run()}>â†ª</ToolBtn>
+        <ToolBtn disabled={!s().canUndo} title="Undo (Ctrl+Z)" onClick={() => e().chain().focus().undo().run()}>↩</ToolBtn>
+        <ToolBtn disabled={!s().canRedo} title="Redo (Ctrl+Y)" onClick={() => e().chain().focus().redo().run()}>↪</ToolBtn>
 
-        {/* Persona chip â€” shows active persona, opens picker on click */}
+        {/* Persona chip — shows active persona, opens picker on click */}
         <Show when={props.onPersonaPickerOpen}>
           <div class="ml-1 h-5 w-px bg-black/10" />
           <button
             type="button"
             title={props.activePersona
-              ? `Active persona: ${props.activePersona.name} Â· Click to switch Â· or type /persona`
-              : "No active persona Â· Click to select one Â· or type /persona"}
+              ? `Active persona: ${props.activePersona.name} · Click to switch · or type /persona`
+              : "No active persona · Click to select one · or type /persona"}
             aria-label={props.activePersona
               ? `Active persona ${props.activePersona.name}. Open persona picker`
               : "No active persona. Open persona picker"}
@@ -242,7 +242,7 @@ export function EditorToolbar(props: {
             <span>
               {props.activePersona ? props.activePersona.name : "No persona"}
             </span>
-            <span class="opacity-40 text-[9px]">â–¾</span>
+            <span class="opacity-40 text-[9px]">▾</span>
           </button>
         </Show>
       </div>

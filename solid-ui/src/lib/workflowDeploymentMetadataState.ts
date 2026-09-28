@@ -428,7 +428,7 @@ export function workflowTemplateSuggestionFamilyStatusLabel(
   workflowFamily: string,
   implementationStatus: string,
 ): string {
-  return `${workflowFamily.replaceAll("_", " ")} Â· ${implementationStatus.replaceAll("_", " ")}`;
+  return `${workflowFamily.replaceAll("_", " ")} · ${implementationStatus.replaceAll("_", " ")}`;
 }
 
 export function workflowTemplateSuggestionScoreLabel(score: number): string {
@@ -891,7 +891,7 @@ export function deploymentChangeSummaryEntries(
       ? entry.field_changes
           .filter(isRecord)
           .map((change) => `${String(change.field).replaceAll("_", " ")} ${change.previous ?? "unset"} -> ${change.current ?? "unset"}`)
-          .join(" Â· ")
+          .join(" · ")
       : "",
   }));
 }

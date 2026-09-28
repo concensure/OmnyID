@@ -301,7 +301,7 @@ export function ObjectSearchLens(props: {
                       : "border-white/45 bg-white/50 text-on-surface-variant hover:bg-white/70"
                   }`}
                 >
-                  {objectKindLabel(entry.kind)} Â· {entry.count}
+                  {objectKindLabel(entry.kind)} · {entry.count}
                 </button>
               )}
             </For>
@@ -324,7 +324,7 @@ export function ObjectSearchLens(props: {
                       : "border-white/45 bg-white/50 text-on-surface-variant hover:bg-white/70"
                   }`}
                 >
-                  #{entry.tag} Â· {entry.count}
+                  #{entry.tag} · {entry.count}
                 </button>
               )}
             </For>

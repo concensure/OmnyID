@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Build stage
 FROM rust:1.94-slim AS builder
 
@@ -17,7 +18,14 @@ COPY service-adapter-templates/ ./service-adapter-templates/
 COPY scripts/ ./scripts/
 COPY src/ ./src/
 
-RUN cargo build --release
+# Cache the crate registry and incremental build artifacts across builds so an
+# interrupted or re-triggered deploy doesn't recompile the world from scratch.
+# The cache mount isn't visible to later Dockerfile steps, so the resulting
+# binary is copied out to a normal (non-cached) path before the mount is torn down.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --release && \
+    cp target/release/omnyid-homeserver /app/omnyid-homeserver
 
 # Runtime stage
 FROM debian:trixie-slim
@@ -29,7 +37,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=builder /app/target/release/omnyid-homeserver .
+COPY --from=builder /app/omnyid-homeserver .
 
 EXPOSE 8080
 

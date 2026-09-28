@@ -288,6 +288,8 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/gmail/connect-url", get(gmail_connect_url_http))
         .route("/gmail/callback", get(gmail_callback_http))
         .route("/gmail/status", get(gmail_status_http))
+        .route("/integrations/gmail/oauth-url", get(gmail_connect_url_http))
+        .route("/integrations/gmail/status", get(gmail_status_http))
         .route("/gmail/disconnect", post(gmail_disconnect_http))
         .route(
             "/calendar/google/connect-url",

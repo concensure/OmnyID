@@ -449,7 +449,7 @@ export function AgentPersonasPanel() {
 
         <Show when={!loading() && !loadError() && personas().length === 0 && !edit()}>
           <EmptyState
-            icon="â—Œ"
+            icon="◌"
             title="No personas yet"
             body="Create your own persona or install one from Browse Templates so your response style can switch deliberately without changing the underlying agent process."
             action={

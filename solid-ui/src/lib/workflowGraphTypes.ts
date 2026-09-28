@@ -54,6 +54,13 @@ export type WorkflowGraphDraft = {
   }>;
   optimization_mode: string;
   metadata: Record<string, unknown>;
+  instance_inputs?: {
+    family_id?: string;
+    family_workflow_id?: string;
+    family_asset_workflow_id?: string;
+    instance_workflow_id?: string;
+    values?: Record<string, unknown>;
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -89,6 +96,9 @@ export const PRESETS = [
   "travel_planner",
   "social_poster",
   "expense_tracker",
+  // Phase 14: proactive user-profiling daemons
+  "intelligence_brief_agent",
+  "news_delivery_agent",
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -101,6 +111,9 @@ export const DAEMON_PRESETS = [
   "relational_sync",
   "archive_cold_storage",
   "health_maintenance",
+  "intelligence_brief_agent",
+  "news_delivery_agent",
+  "finance_guardian",
 ] as const;
 
 export type DaemonPreset = typeof DAEMON_PRESETS[number];
@@ -139,7 +152,7 @@ export type EdgeExecutionState =
 // Timeline filter mode
 // ---------------------------------------------------------------------------
 
-export type RunTimelineFilterMode = "all" | "deployment_context" | "replay_drift";
+export type RunTimelineFilterMode = "all" | "deployment_context" | "replay_drift" | "failed";
 
 // ---------------------------------------------------------------------------
 // Deployment override types
@@ -304,9 +317,9 @@ export const DAEMON_PALETTE_ENTRIES: DaemonPaletteEntry[] = [
   {
     presetKind: "archive_cold_storage",
     displayName: "Archive & Cold Storage",
-    description: "Moves aged messages to MinIO cold storage preserving E2EE. Never deletes without user approval.",
+    description: "Moves aged messages to SeaweedFS cold storage preserving E2EE. Never deletes without user approval.",
     glyph: "🗄",
-    scopeSummary: "Writes: archived_notice · uploads to MinIO (encrypted blobs only)",
+    scopeSummary: "Writes: archived_notice · uploads to SeaweedFS (encrypted blobs only)",
   },
   {
     presetKind: "health_maintenance",
@@ -314,6 +327,29 @@ export const DAEMON_PALETTE_ENTRIES: DaemonPaletteEntry[] = [
     description: "Runs during idle windows: re-indexes embeddings, detects duplicates, cleans the knowledge graph.",
     glyph: "⟳",
     scopeSummary: "Writes: merge_suggestion, insight, system_health",
+  },
+  {
+    presetKind: "intelligence_brief_agent",
+    displayName: "Intelligence Brief Agent",
+    description: "Runs nightly when active goals exist. Reads calendar, goal progress, and knowledge graph to generate the next-day morning brief AFP message.",
+    glyph: "☀",
+    // Conditional: skips execution when user has no active goals
+    scopeSummary: "Writes: intelligence_brief · Condition: active goals required",
+  },
+  {
+    presetKind: "news_delivery_agent",
+    displayName: "News Delivery Agent",
+    description: "Fetches and delivers news items per active subscriptions. Auto-deactivates when all channels are disabled or deleted. Creates AFP knowledge notes for items saved by the user.",
+    glyph: "📡",
+    // Conditional: only activates when at least one news_subscriptions row has enabled = true
+    scopeSummary: "Writes: news_item, knowledge_note · Condition: active subscriptions required",
+  },
+  {
+    presetKind: "finance_guardian",
+    displayName: "Finance Guardian",
+    description: "Monitors linked bank accounts and CSV-imported transactions. Classifies spending, detects anomalies (>3× category average), and surfaces insights. All data stays in your private E2EE ledger.",
+    glyph: "₿",
+    scopeSummary: "Writes: finance_report, finance_anomaly, finance_insight · Reads: finance_transactions",
   },
 ];
 

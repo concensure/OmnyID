@@ -17,14 +17,9 @@ interface VoiceInputOptions {
   onError?: (err?: unknown) => void;
 }
 
-type SpeechRecognitionCtor = new () => SpeechRecognition;
-
-function getSpeechRecognition(): SpeechRecognitionCtor | null {
-  return (
-    (window as unknown as Record<string, unknown>)["SpeechRecognition"] ??
-    (window as unknown as Record<string, unknown>)["webkitSpeechRecognition"] ??
-    null
-  ) as SpeechRecognitionCtor | null;
+function getSpeechRecognition(): SpeechRecognitionConstructor | null {
+  if (typeof window === "undefined") return null;
+  return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
 }
 
 export class VoiceInput {

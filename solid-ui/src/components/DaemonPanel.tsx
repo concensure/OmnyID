@@ -6,6 +6,11 @@ import {
   type DaemonHeartbeatDetail,
   type DaemonRecord,
 } from "@/lib/api";
+import { EmptyState } from "@/components/EmptyState";
+import {
+  buildDaemonPanelFailureReceipt,
+  type DaemonPanelFailureReceipt,
+} from "@/lib/daemonPanelFailureState";
 
 export function DaemonPanel(props: { signedIn?: boolean }) {
   const [daemons, setDaemons] = createSignal<DaemonRecord[]>([]);
@@ -13,41 +18,73 @@ export function DaemonPanel(props: { signedIn?: boolean }) {
   const [selectedDaemonId, setSelectedDaemonId] = createSignal<string | null>(null);
   const [selectedHeartbeat, setSelectedHeartbeat] = createSignal<DaemonHeartbeatDetail | null>(null);
   const [busyDaemonId, setBusyDaemonId] = createSignal<string | null>(null);
-  const [error, setError] = createSignal<string>("");
+  const [loadError, setLoadError] = createSignal<DaemonPanelFailureReceipt | null>(null);
+  const [actionError, setActionError] = createSignal<DaemonPanelFailureReceipt | null>(null);
+  const [heartbeatError, setHeartbeatError] = createSignal<DaemonPanelFailureReceipt | null>(null);
 
   async function refresh(selectedId?: string | null) {
-    setError("");
+    setLoadError(null);
+    setActionError(null);
+    setHeartbeatError(null);
+    setLoading(true);
     try {
       const next = await listDaemons();
       setDaemons(next);
       const target = selectedId ?? selectedDaemonId();
       if (target) {
-        const detail = await fetchDaemonHeartbeat(target);
-        setSelectedDaemonId(target);
-        setSelectedHeartbeat(detail.heartbeat);
+        try {
+          const detail = await fetchDaemonHeartbeat(target);
+          setSelectedDaemonId(target);
+          setSelectedHeartbeat(detail.heartbeat);
+        } catch (err) {
+          setSelectedDaemonId(target);
+          setSelectedHeartbeat(null);
+          setHeartbeatError(
+            buildDaemonPanelFailureReceipt(
+              "Load heartbeat",
+              err instanceof Error ? err.message : "Failed to load daemon heartbeat.",
+            ),
+          );
+        }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load daemons.");
+      setDaemons([]);
+      setSelectedHeartbeat(null);
+      setSelectedDaemonId(null);
+      setLoadError(
+        buildDaemonPanelFailureReceipt(
+          "Load daemons",
+          err instanceof Error ? err.message : "Failed to load daemons.",
+        ),
+      );
     }
     setLoading(false);
   }
 
   async function inspect(daemonId: string) {
     setBusyDaemonId(daemonId);
-    setError("");
+    setActionError(null);
+    setHeartbeatError(null);
     try {
       const detail = await fetchDaemonHeartbeat(daemonId);
       setSelectedDaemonId(daemonId);
       setSelectedHeartbeat(detail.heartbeat);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load daemon heartbeat.");
+      setSelectedDaemonId(daemonId);
+      setSelectedHeartbeat(null);
+      setHeartbeatError(
+        buildDaemonPanelFailureReceipt(
+          "Load heartbeat",
+          err instanceof Error ? err.message : "Failed to load daemon heartbeat.",
+        ),
+      );
     }
     setBusyDaemonId(null);
   }
 
   async function revoke(daemonId: string) {
     setBusyDaemonId(daemonId);
-    setError("");
+    setActionError(null);
     try {
       await revokeDaemon(daemonId);
       if (selectedDaemonId() === daemonId) {
@@ -56,7 +93,12 @@ export function DaemonPanel(props: { signedIn?: boolean }) {
       }
       await refresh(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to revoke daemon.");
+      setActionError(
+        buildDaemonPanelFailureReceipt(
+          "Revoke daemon",
+          err instanceof Error ? err.message : "Failed to revoke daemon.",
+        ),
+      );
     }
     setBusyDaemonId(null);
   }
@@ -89,10 +131,43 @@ export function DaemonPanel(props: { signedIn?: boolean }) {
       </div>
 
       <Show when={props.signedIn === false}>
-        <p class="mt-3 text-xs text-on-surface-variant">Sign in to inspect daemon state.</p>
+        <div class="mt-4">
+          <EmptyState
+            icon="DM"
+            title="Sign in to inspect daemon state"
+            body="Daemon registrations, heartbeat freshness, and revoke controls are only available for signed-in accounts."
+          />
+        </div>
       </Show>
-      <Show when={error()}>
-        <p class="mt-3 rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error()}</p>
+      <Show when={loadError()}>
+        {(receipt) => (
+          <div
+            class={`mt-3 rounded-lg border px-3 py-2 text-xs ${
+              receipt().tone === "danger"
+                ? "border-red-400/20 bg-red-500/10 text-red-300"
+                : "border-amber-400/20 bg-amber-500/10 text-amber-200"
+            }`}
+          >
+            <p class="font-semibold">{receipt().title}</p>
+            <p class="mt-1">{receipt().summary}</p>
+            <p class="mt-1 opacity-80">Next step: {receipt().nextStep}</p>
+          </div>
+        )}
+      </Show>
+      <Show when={actionError()}>
+        {(receipt) => (
+          <div
+            class={`mt-3 rounded-lg border px-3 py-2 text-xs ${
+              receipt().tone === "danger"
+                ? "border-red-400/20 bg-red-500/10 text-red-300"
+                : "border-amber-400/20 bg-amber-500/10 text-amber-200"
+            }`}
+          >
+            <p class="font-semibold">{receipt().title}</p>
+            <p class="mt-1">{receipt().summary}</p>
+            <p class="mt-1 opacity-80">Next step: {receipt().nextStep}</p>
+          </div>
+        )}
       </Show>
 
       <Show when={props.signedIn !== false}>
@@ -100,8 +175,38 @@ export function DaemonPanel(props: { signedIn?: boolean }) {
           <div class="space-y-2">
             <Show when={!loading()} fallback={<p class="text-xs text-on-surface-variant">Loading daemons...</p>}>
               <Show
-                when={daemons().length > 0}
-                fallback={<p class="text-xs text-on-surface-variant">No active daemon registrations for this account.</p>}
+                when={!loadError() && daemons().length > 0}
+                fallback={
+                  <Show
+                    when={!loadError()}
+                    fallback={
+                      <EmptyState
+                        icon="DM"
+                        title={loadError()?.title ?? "Could not load daemon registrations"}
+                        body={
+                          loadError()
+                            ? `${loadError()!.summary} Next step: ${loadError()!.nextStep}`
+                            : "Retry loading daemon registrations."
+                        }
+                        action={
+                          <button
+                            type="button"
+                            onClick={() => void refresh(null)}
+                            class="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium text-on-surface transition hover:bg-white/20"
+                          >
+                            Retry daemons
+                          </button>
+                        }
+                      />
+                    }
+                  >
+                    <EmptyState
+                      icon="DM"
+                      title="No active daemon registrations"
+                      body="This account does not currently have any background daemon registrations to inspect."
+                    />
+                  </Show>
+                }
               >
                 <For each={daemons()}>
                   {(daemon) => (
@@ -154,8 +259,28 @@ export function DaemonPanel(props: { signedIn?: boolean }) {
               fallback={<p class="mt-2 text-xs text-on-surface-variant">Select a daemon to inspect its latest heartbeat.</p>}
             >
               <p class="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-outline">{selectedDaemonId()}</p>
+              <Show when={heartbeatError()}>
+                <div
+                  class={`mt-3 rounded-lg border px-3 py-2 text-xs ${
+                    heartbeatError()?.tone === "danger"
+                      ? "border-red-400/20 bg-red-500/10 text-red-300"
+                      : "border-amber-400/20 bg-amber-500/10 text-amber-200"
+                  }`}
+                >
+                  <p class="font-semibold">{heartbeatError()?.title}</p>
+                  <p class="mt-1">{heartbeatError()?.summary}</p>
+                  <p class="mt-1 opacity-80">Next step: {heartbeatError()?.nextStep}</p>
+                  <button
+                    type="button"
+                    onClick={() => selectedDaemonId() && void inspect(selectedDaemonId()!)}
+                    class="mt-3 rounded-lg border border-current bg-transparent px-3 py-1.5 text-xs font-medium text-inherit transition hover:bg-white/10"
+                  >
+                    Retry heartbeat
+                  </button>
+                </div>
+              </Show>
               <Show
-                when={selectedHeartbeat()}
+                when={selectedHeartbeat() && !heartbeatError()}
                 fallback={<p class="mt-2 text-xs text-on-surface-variant">No heartbeat has been recorded yet.</p>}
               >
                 <div class="mt-3 space-y-2 text-xs text-on-surface-variant">

@@ -299,7 +299,7 @@ export class PGliteStore implements LocalStore {
       );
       return res.rows.map(r => ({ message: toMessage(r), score: Math.max(0, r.score) }));
     } catch {
-      // pgvector extension not loaded in this PGlite instance â€” degrade gracefully.
+      // pgvector extension not loaded in this PGlite instance — degrade gracefully.
       return [];
     }
   }

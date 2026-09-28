@@ -1,11 +1,11 @@
 ﻿// @locs-version: 1.0
 /**
- * TiptapEditor â€” shared rich text editor for OmnyID.
+ * TiptapEditor — shared rich text editor for OmnyID.
  *
  * Modes:
- *   compact â€” minimal toolbar; used in chat composers and short replies
- *   full    â€” full Notion-like toolbar with headings, tables, images, mentions
- *   email   â€” email-optimised toolbar with alignment, signature, inline images
+ *   compact — minimal toolbar; used in chat composers and short replies
+ *   full    — full Notion-like toolbar with headings, tables, images, mentions
+ *   email   — email-optimised toolbar with alignment, signature, inline images
  *
  * On submit: fires onSend(payload) with html + text + json + a pre-built AFP
  * message (type: "note" or "email_draft") ready to POST.
@@ -56,7 +56,7 @@ import { formatEditorDatetime, loadEditorDatetimePreference } from "@/lib/editor
 import { dispatchEditorSubmitEvent } from "@/lib/editorSubmitEvent";
 import "./editor.css";
 
-// â”€â”€ Active persona store (module-level so all editors share it) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Active persona store (module-level so all editors share it) ───────────
 
 let _activePersona: AgentPersona | null = null;
 const _personaListeners: Array<(p: AgentPersona | null) => void> = [];
@@ -80,7 +80,7 @@ async function refreshActivePersona() {
   setGlobalPersona(active);
 }
 
-// â”€â”€ Default editor state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Default editor state ───────────────────────────────────────────────────
 
 const DEFAULT_STATE: EditorState = {
   bold: false, italic: false, strike: false, underline: false, code: false,
@@ -91,7 +91,7 @@ const DEFAULT_STATE: EditorState = {
   highlight: false, canUndo: false, canRedo: false,
 };
 
-// â”€â”€ Snapshot editor state from Tiptap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Snapshot editor state from Tiptap ─────────────────────────────────────
 
 function snapshotState(editor: Editor): EditorState {
   return {
@@ -118,7 +118,7 @@ function snapshotState(editor: Editor): EditorState {
   };
 }
 
-// â”€â”€ Build mention suggestion renderer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Build mention suggestion renderer ─────────────────────────────────────
 
 function buildMentionSuggestion(suggestions: MentionSuggestion[]) {
   let dropdown: HTMLDivElement | null = null;
@@ -200,7 +200,7 @@ function buildMentionSuggestion(suggestions: MentionSuggestion[]) {
   };
 }
 
-// â”€â”€ Build extension list per mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Build extension list per mode ──────────────────────────────────────────
 
 function buildExtensions(mode: EditorMode, placeholder: string, mentionSuggestions?: MentionSuggestion[]) {
   const base = [
@@ -242,7 +242,7 @@ function buildExtensions(mode: EditorMode, placeholder: string, mentionSuggestio
   ];
 }
 
-// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Component ─────────────────────────────────────────────────────────────
 
 type SlashCommandEntry = {
   id: string;
@@ -488,15 +488,15 @@ export function TiptapEditor(props: TiptapEditorProps) {
   const [personaRefreshError, setPersonaRefreshError] = createSignal<string | null>(null);
   const [pendingTablePaste, setPendingTablePaste] = createSignal<PendingTablePaste | null>(null);
 
-  // â”€â”€ Persona picker state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Persona picker state ────────────────────────────────────────────────
   const [activePersona, setActivePersona] = createSignal<AgentPersona | null>(_activePersona);
   const [personaPicker, setPersonaPicker] = createSignal<{ x: number; y: number } | null>(null);
   const slashCommands = () => filterSlashCommands(slashCommandsForMode(props.mode), slashMenu()?.query ?? "");
 
   const placeholderText = () => props.placeholder ?? (
-    props.mode === "compact" ? "Write a messageâ€¦" :
-    props.mode === "email"   ? "Compose your emailâ€¦" :
-                               "Start writingâ€¦"
+    props.mode === "compact" ? "Write a message…" :
+    props.mode === "email"   ? "Compose your email…" :
+                               "Start writing…"
   );
   const showToolbar = () => props.showToolbar ?? true;
   const showFooter = () => props.showFooter ?? true;
@@ -697,7 +697,7 @@ export function TiptapEditor(props: TiptapEditorProps) {
         }
         props.onChange?.(editor.getText(), tiptapToMarkdown(editor.getJSON()));
 
-        // â”€â”€ /persona slash command detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── /persona slash command detection ──────────────────────────
         const nextSlashMenu = slashCommandsEnabled() ? detectSlashMenuState(editor) : null;
         setSlashMenu(nextSlashMenu);
         setSlashSelectedIndex((current) => {
@@ -750,7 +750,7 @@ export function TiptapEditor(props: TiptapEditorProps) {
     setPersonaPicker(null);
   }
 
-  // â”€â”€ Sync initialContent if it changes (A2UI pre-fill) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Sync initialContent if it changes (A2UI pre-fill) ─────────────────
 
   let lastContent = props.initialContent ?? "";
   const syncContent = (newContent: string) => {
@@ -768,7 +768,7 @@ export function TiptapEditor(props: TiptapEditorProps) {
   // Call once during render to register dependency
   watchContent();
 
-  // â”€â”€ Submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Submit ─────────────────────────────────────────────────────────────
 
   async function handleSend() {
     if (!editorInstance || isEmpty() || !isEditable() || isSubmitting()) return;
@@ -822,7 +822,7 @@ export function TiptapEditor(props: TiptapEditorProps) {
       data-readonly={isReadOnly() ? "true" : undefined}
     >
 
-      {/* Toolbar â€” shown in all modes */}
+      {/* Toolbar — shown in all modes */}
       <Show when={editorInstance && showToolbar()}>
         <EditorToolbar
           editor={editorInstance!}
@@ -930,14 +930,14 @@ export function TiptapEditor(props: TiptapEditorProps) {
             onClick={handleSend}
             class="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {isSubmitting() ? "Sendingâ€¦" : submitLabel()}
+            {isSubmitting() ? "Sending…" : submitLabel()}
           </button>
         </div>
       </div>
       </Show>
     </div>
 
-    {/* Persona picker portal â€” rendered outside editor DOM */}
+    {/* Persona picker portal — rendered outside editor DOM */}
     <Show when={slashCommandsEnabled() && slashMenu()}>
       <Portal>
         <div

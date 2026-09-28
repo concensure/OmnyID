@@ -41,11 +41,11 @@ export function AfpInspector() {
           <div class="flex min-w-0 flex-wrap items-center gap-2">
             <button type="button" onClick={copy}
               class="rounded-xl border border-outline/15 px-2.5 py-2 text-[11px] font-medium text-on-surface-variant transition hover:bg-on-surface/6 sm:py-1">
-              {copied() ? "Copied âœ“" : "Copy JSON"}
+              {copied() ? "Copied ✓" : "Copy JSON"}
             </button>
             <button type="button" onClick={close}
               class="flex h-9 w-9 items-center justify-center rounded-xl text-on-surface-variant/60 transition hover:bg-on-surface/6 hover:text-on-surface sm:h-7 sm:w-7">
-              Ã—
+              ×
             </button>
           </div>
         </div>

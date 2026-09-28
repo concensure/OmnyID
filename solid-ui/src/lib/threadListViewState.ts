@@ -87,12 +87,12 @@ export function deriveThreadSender(message: AfpMessage): string {
 
 export function deriveThreadNoticeChannel(message: AfpMessage): { label: string; icon: string } {
   if (message.type.includes("email") || message.type.includes("inbox")) {
-    return { label: "email", icon: "âœ‰" };
+    return { label: "email", icon: "✉" };
   }
   if (message.type.includes("slack") || message.subtype?.includes("slack")) {
-    return { label: "Slack", icon: "ðŸ’¬" };
+    return { label: "Slack", icon: "💬" };
   }
-  return { label: "chat", icon: "ðŸ—¨" };
+  return { label: "chat", icon: "🗨" };
 }
 
 export function relativeThreadTime(isoString: string | undefined, nowMs = Date.now()): string {
@@ -157,7 +157,7 @@ export function threadPreviewMetaState(
 
 export function threadBoundaryLabel(timestamp: string | undefined): string {
   const label = threadShortDateLabel(timestamp);
-  return label ? `You returned Â· ${label}` : "";
+  return label ? `You returned · ${label}` : "";
 }
 
 export function threadQueryHistoryPresentation(
@@ -524,7 +524,7 @@ export function buildSuggestionGroups(messages: AfpMessage[]): SuggestionGroup[]
     const content = decryptedDisplayContent(message);
     const entityId = threadListScalarString(content.entity_id, "general");
     const urgency = threadListScalarString(content.urgency, "medium");
-    const label = entityId === "general" ? "Agent suggestions" : `Agent suggestions â€” ${entityId}`;
+    const label = entityId === "general" ? "Agent suggestions" : `Agent suggestions — ${entityId}`;
     if (!grouped.has(entityId)) {
       grouped.set(entityId, { entityId, label, msgs: [], urgency });
     }

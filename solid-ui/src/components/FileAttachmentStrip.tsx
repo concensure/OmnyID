@@ -15,7 +15,7 @@ import {
 export type { ConvertibleFormat };
 
 const FORMAT_ICON: Record<string, string> = {
-  pdf: "ðŸ“„", docx: "ðŸ“", pptx: "ðŸ“Š", html: "ðŸŒ", txt: "ðŸ“ƒ", md: "ðŸ“ƒ",
+  pdf: "📄", docx: "📝", pptx: "📊", html: "🌐", txt: "📃", md: "📃",
 };
 
 /** Pill + format-picker + convert button for one attached file. */
@@ -67,7 +67,7 @@ function FilePill(props: {
       >
         {/* Icon based on format */}
         <span class="text-[13px] leading-none select-none" aria-hidden>
-          {FORMAT_ICON[fmt() ?? ""] ?? "ðŸ“Ž"}
+          {FORMAT_ICON[fmt() ?? ""] ?? "📎"}
         </span>
 
         {/* Filename */}
@@ -101,7 +101,7 @@ function FilePill(props: {
             unsupported
           </span>
         }>
-          <span class="text-outline/40">â†’</span>
+          <span class="text-outline/40">→</span>
 
           {/* Target format picker */}
           <select
@@ -110,7 +110,7 @@ function FilePill(props: {
             onChange={(e) => { setTarget(e.currentTarget.value as ConvertibleFormat); setErr(null); }}
             class="rounded border border-outline/20 bg-transparent px-1 py-0 text-[11px] text-on-surface-variant outline-none focus:border-primary cursor-pointer disabled:opacity-50"
           >
-            <option value="">Convert toâ€¦</option>
+            <option value="">Convert to…</option>
             <For each={targets()}>
               {(t) => <option value={t}>{FORMAT_LABEL[t]}</option>}
             </For>
@@ -125,7 +125,7 @@ function FilePill(props: {
               class="rounded-lg bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary transition hover:bg-primary/20 active:scale-95 disabled:opacity-50 flex-shrink-0"
               title={`Convert to ${FORMAT_LABEL[target() as ConvertibleFormat]}`}
             >
-              {busy() ? "â€¦" : done() ? "âœ“ Done" : "â†“ Get"}
+              {busy() ? "…" : done() ? "✓ Done" : "↓ Get"}
             </button>
           </Show>
         </Show>
@@ -138,7 +138,7 @@ function FilePill(props: {
           title="Remove attachment"
           aria-label="Remove"
         >
-          Ã—
+          ×
         </button>
       </div>
 

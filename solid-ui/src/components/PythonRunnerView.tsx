@@ -1,9 +1,14 @@
 import { For, Show } from "solid-js";
 import { AlternateViewsInspector } from "./AlternateViewsInspector";
 import { ViewDispatcher } from "./ViewDispatcher";
+import { WorkspaceAssistPanel } from "./WorkspaceAssistPanel";
 import type { AfpMessage, AfpView } from "@/lib/api";
 import type { RuntimeWorkspaceFileEntry, RuntimeWorkspaceFileResponse, UiCommandResponse } from "@/lib/api";
+import type { RuntimeRunnerFailureReceipt } from "@/lib/runtimeRunnerFailureState";
 import { CodeEditor } from "./CodeEditor";
+import type { WorkspaceAssistSuggestion } from "afp-ts/workspace-assistance";
+import type { WorkspaceAssistRefreshOrigin } from "@/lib/workspaceAssist";
+import { afpRecord } from "@/lib/afpMessageRecord";
 
 export function PythonRunnerView(props: {
   files: RuntimeWorkspaceFileEntry[];
@@ -12,6 +17,7 @@ export function PythonRunnerView(props: {
   logs: string[];
   logSource: string;
   feedback: string;
+  feedbackReceipt?: RuntimeRunnerFailureReceipt | null;
   runtimeStatus: string;
   runtimeFramework: string | null;
   advanced?: boolean;
@@ -21,11 +27,14 @@ export function PythonRunnerView(props: {
   runtimeBusy: boolean;
   hasRuntime: boolean;
   commandDraft: UiCommandResponse | null;
+  workspaceAssist: WorkspaceAssistSuggestion | null;
+  workspaceAssistRefreshOrigin?: WorkspaceAssistRefreshOrigin | null;
   signedIn: boolean;
   onSelectFile: (fileId: string) => void;
   onEditorChange: (value: string) => void;
   onSave: () => void;
   onApplyDraft: () => void;
+  onOpenWorkspaceAssist?: () => void;
   onDeploy: () => void;
   onRefreshLogs: () => void;
   onRuntimeAction: (action: "start" | "stop" | "restart") => void;
@@ -45,7 +54,7 @@ export function PythonRunnerView(props: {
     to: ["omnyid://workspace/user"],
     timestamp: new Date().toISOString(),
     type: "agent_ui",
-    content: (props.runtimeStatusPanel ?? {}) as Record<string, unknown>,
+    content: afpRecord(props.runtimeStatusPanel),
     views: runtimeViews(),
     attachments: [],
     references: [],
@@ -58,7 +67,7 @@ export function PythonRunnerView(props: {
     to: ["omnyid://workspace/user"],
     timestamp: new Date().toISOString(),
     type: "agent_ui",
-    content: (props.runtimeUpdatesPanel ?? {}) as Record<string, unknown>,
+    content: afpRecord(props.runtimeUpdatesPanel),
     views: props.runtimeUpdatesPanel
       ? [{ format: "a2ui.v1", priority: 100, content: props.runtimeUpdatesPanel }]
       : [],
@@ -181,7 +190,30 @@ export function PythonRunnerView(props: {
             </button>
           </div>
         </div>
-        <p class="mt-4 text-sm text-on-surface-variant">{props.feedback}</p>
+        <Show
+          when={props.feedbackReceipt}
+          fallback={<p class="mt-4 text-sm text-on-surface-variant">{props.feedback}</p>}
+        >
+          {(receipt) => (
+            <div
+              class={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
+                receipt().tone === "danger"
+                  ? "border-rose-200 bg-rose-50/90 text-rose-900"
+                  : "border-amber-200 bg-amber-50/90 text-amber-900"
+              }`}
+              role="alert"
+            >
+              <p class="font-semibold">{receipt().title}</p>
+              <p class="mt-1">{receipt().summary}</p>
+              <p class="mt-2 text-xs font-medium">Next step: {receipt().nextStep}</p>
+            </div>
+          )}
+        </Show>
+        <WorkspaceAssistPanel
+          suggestion={props.workspaceAssist}
+          refreshOrigin={props.workspaceAssistRefreshOrigin}
+          onOpen={props.onOpenWorkspaceAssist}
+        />
         <Show when={runtimePanelMessage.views.length > 0}>
           <div class="mt-5 space-y-3 rounded-[22px] border border-white/25 bg-white/25 p-4">
             <ViewDispatcher message={runtimePanelMessage} compact />

@@ -200,8 +200,8 @@ export function saveDashboardFeedGridLayout(
 ): GridLayoutItem[] | null {
   try {
     // saveContent=false: this layout is position/size only. GridStack's
-    // default (true) would otherwise capture each card's live innerHTML â€”
-    // drag-handle markup included â€” into the saved layout, which then gets
+    // default (true) would otherwise capture each card's live innerHTML —
+    // drag-handle markup included — into the saved layout, which then gets
     // replayed back into the DOM (or displayed) as stale, escaped markup.
     return saveDashboardFeedStoredLayout(
       key,

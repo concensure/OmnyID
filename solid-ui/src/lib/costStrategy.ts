@@ -15,6 +15,7 @@
  */
 
 import { createSignal, createMemo } from "solid-js";
+import { parseCostBudgetResponse } from "@/lib/costBudgetResponseState";
 import type { CardType } from "@/lib/presentationState";
 
 // ── Card load strategy ────────────────────────────────────────────────────────
@@ -234,18 +235,7 @@ export function createCostStrategy(initialBudget?: Partial<BudgetSnapshot>) {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (!res.ok) return;
-      const data = await res.json() as {
-        max_cost_usd?: number;
-        max_api_calls?: number;
-        max_llm_tokens?: number;
-        soft_limit_ratio?: number;
-      };
-      setBudget({
-        maxCostUSD:    data.max_cost_usd    ?? 0.10,
-        maxAPICalls:   data.max_api_calls   ?? 20,
-        maxLLMTokens:  data.max_llm_tokens  ?? 50_000,
-        softLimitRatio: data.soft_limit_ratio ?? 0.80,
-      });
+      setBudget(parseCostBudgetResponse(await res.json()));
     } catch {
       // Non-fatal: budget defaults are sufficient
     }

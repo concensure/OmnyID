@@ -120,7 +120,7 @@ function trimSentence(value: string | null, maxLength = 180): string | null {
   if (!value) return null;
   const compact = value.replace(/\s+/g, " ").trim();
   if (compact.length <= maxLength) return compact;
-  return `${compact.slice(0, maxLength - 1).trimEnd()}â€¦`;
+  return `${compact.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
 function followUpFocusSuffix(sections: readonly StudySearchSection[] | undefined): string {

@@ -383,7 +383,7 @@ export function WorkspaceSetupBanner(props: {
 
             {/* Free tier note */}
             <p class="mt-3 px-1 text-[10px] text-on-surface-variant/40">
-              Weather and maps work out of the box â€” no API key needed.
+              Weather and maps work out of the box — no API key needed.
             </p>
           </div>
         </Show>

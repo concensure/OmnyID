@@ -152,6 +152,7 @@ import { loadShouldShowGuidedTour } from "@/lib/guidedTourLocalState";
 import { type OnboardingQuickStartSeed } from "@/lib/onboardingQuickStart";
 import { saveReportNavigationIntent, type ReportNavigationIntent } from "@/lib/reportNavigationState";
 import { subscribeWeddingNavigationAppBridge } from "@/lib/weddingNavigationAppBridge";
+import { weddingNavigationCalendarTarget } from "@/lib/weddingNavigationCalendarTargetState";
 import { consumeWeddingNavigationIntent } from "@/lib/weddingNavigationLocalState";
 import { loadWeddingEntrySource, saveWeddingEntrySource } from "@/lib/weddingEntrySourceState";
 import {
@@ -551,6 +552,7 @@ const VIEW_PRELOADERS: Partial<Record<ViewName, () => Promise<unknown>>> = {
   ]),
   workflows: () => import("@/components/WorkflowsView"),
   email: () => import("@/components/EmailView"),
+  study: () => import("@/components/StudyLensDashboard"),
   note: () => import("@/components/NoteView"),
   calendar: () => import("@/components/MonthlyCalendarView"),
   database: () => import("@/components/DatabaseView"),
@@ -580,7 +582,7 @@ const NAV_BLOCKLIST = new Set(["agent_settings", "connected_apps", "cost_dashboa
 
 const VIEW_LABELS: Partial<Record<ViewName, string>> = {
   home: "Home", search: "Chat", threads: "Threads", workflows: "Workflows",
-  email: "Email", note: "Notes", calendar: "Calendar", database: "Database",
+  email: "Email", study: "Study", note: "Notes", calendar: "Calendar", database: "Database",
   templates: "Templates", runner: "Runner", agent_settings: "Agent Settings",
   diary: "Diary", discover: "Discover", cofounder_studio: "Co-Founder",
   space_feed: "Spaces", public_feed: "Public Feed",
@@ -595,6 +597,7 @@ const VIEW_LABELS: Partial<Record<ViewName, string>> = {
 
 const GUEST_SIGN_IN_REQUIRED_VIEWS = new Set<ViewName>([
   "workflows",
+  "study",
   "note",
   "database",
   "diary",
@@ -1098,6 +1101,7 @@ function App() {
   );
   const [openThreadId, setOpenThreadId] = createSignal<string | null>(_prefs.openThreadId);
   const [openThreadMessageId, setOpenThreadMessageId] = createSignal<string | null>(null);
+  const [threadInitialReplyDraft, setThreadInitialReplyDraft] = createSignal<string | null>(null);
   const [threadSessionHistory, setThreadSessionHistory] = createSignal(loadThreadSessionHistory(initUserId));
   const [navTrail, setNavTrail] = createSignal<ViewName[]>([initialActiveView]);
 
@@ -1156,19 +1160,11 @@ function App() {
   // so the wedding-site deep-link launch behaves identically no matter which path fires.
   function launchWeddingTemplateFromDeepLink() {
     saveWeddingEntrySource("wedding_site");
-    void Promise.all([
-      import("@/lib/templateCatalogState"),
-      import("@/lib/weddingNavigationState"),
-    ]).then(([{ buildTemplateCatalogState }, { dispatchWeddingNavigationIntent }]) => {
-      const weddingTemplate = buildTemplateCatalogState().find(
-        (item) => item.id === "wedding_planning",
-      );
-      if (weddingTemplate) {
-        if (weddingTemplate.launchIntent) {
-          dispatchWeddingNavigationIntent(weddingTemplate.launchIntent);
-        }
-        selectView(weddingTemplate.viewTarget);
-      }
+    void savePrimaryUseCase("wedding_planning", "inferred").catch(() => {});
+    void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
+      const launch = buildWeddingTemplateDeepLinkLaunch();
+      dispatchWeddingTemplateDeepLinkLaunch(launch);
+      selectView(launch.viewTarget);
     });
   }
   const [showAuthModal, setShowAuthModal] = createSignal(
@@ -1496,7 +1492,11 @@ function App() {
   );
 
   function toggleStudyLens() {
-    setStudyLensEnabled(saveStudyLensEnabled(!studyLensEnabled()));
+    const next = saveStudyLensEnabled(!studyLensEnabled());
+    setStudyLensEnabled(next);
+    if (!next && activeView() === "study") {
+      selectView("home");
+    }
   }
 
   function openStudyLensReport(kind: ReportKind) {
@@ -1682,6 +1682,11 @@ function App() {
   }
 
   function runWeddingArrivalAction(action: WeddingArrivalAction) {
+    const draftPrompt = action.draftPrompt?.trim();
+    if (!action.disabled && action.kind === "continue_chat" && draftPrompt) {
+      openThread(`thread_wedding_research_${Date.now()}`, null, { initialReplyDraft: draftPrompt });
+      return;
+    }
     const destination = weddingArrivalActionDestinationView(action);
     if (destination) selectView(destination);
   }
@@ -1699,7 +1704,7 @@ function App() {
   function openThread(
     threadId: string,
     messageId?: string | null,
-    options?: { trackHistory?: boolean },
+    options?: { trackHistory?: boolean; initialReplyDraft?: string | null },
   ) {
     const target = { threadId, messageId: messageId ?? null };
     if (options?.trackHistory !== false) {
@@ -1707,6 +1712,7 @@ function App() {
         pushThreadSessionHistory(threadSessionHistory(), currentThreadSessionEntry(), target),
       );
     }
+    setThreadInitialReplyDraft(options?.initialReplyDraft?.trim() || null);
     setOpenThreadId(threadId);
     setOpenThreadMessageId(messageId ?? null);
     selectView("threads"); // selectView calls persistPrefs with the current openThreadId — set ID first
@@ -2832,6 +2838,14 @@ function App() {
     const unsubscribeWeddingNavigation = subscribeWeddingNavigationAppBridge({
       selectView,
       onSaved: (intent) => {
+        const calendarTarget = weddingNavigationCalendarTarget(intent);
+        if (calendarTarget) {
+          setCalendarNavigationDate(calendarTarget.initialDate);
+          setCalendarNavigationEventId(calendarTarget.initialEventId);
+        } else if (intent.view === "calendar") {
+          setCalendarNavigationDate(null);
+          setCalendarNavigationEventId(null);
+        }
         if (intent.view === "search" || intent.view === "threads") {
           setWeddingNavigationIntent({ ...intent, savedAt: new Date().toISOString() });
         }
@@ -3351,59 +3365,67 @@ function App() {
                     body="You're exploring a sample home workspace in guest mode. Tiles, queues, and cards here are demo content until you sign in."
                   />
                 </Show>
-                <Show
-                  when={studyLensEnabled()}
-                  fallback={
-                    <>
-                      <Suspense fallback={<HomeWorkspaceFallback label="home queues" />}>
-                        <LazyHomeQueuesSection bootstrap={workspaceBootstrap()} />
-                      </Suspense>
+                <Suspense fallback={<HomeWorkspaceFallback label="home queues" />}>
+                  <LazyHomeQueuesSection bootstrap={workspaceBootstrap()} />
+                </Suspense>
 
-                      {/* PARA quick-access strip */}
-                      <Show when={paraViewEnabled()}>
-                        <Suspense fallback={<HomeWorkspaceFallback label="PARA overview" compact />}>
-                          <LazyPARAOverviewStrip
-                            onOpen={() => selectView(paraViewEnabled() ? "para" : "home")}
-                            token={session()?.token ?? ""}
-                          />
-                        </Suspense>
-                      </Show>
-
-                      <div class="view-enter">
-                        <Suspense fallback={<HomeWorkspaceFallback label="workspace grid" />}>
-                          <LazyBentoGrid
-                            bootstrap={workspaceBootstrap()}
-                            signedIn={Boolean(session()?.token)}
-                            onOpenView={(view) => selectView(view)}
-                            onRequestSearchFocus={() => {
-                              selectView("search");
-                              setSearchFocusTick((n) => n + 1);
-                            }}
-                            onRequestWorkspaceAssistDraftRefresh={requestWorkspaceAssistDraftRefresh}
-                            workspaceAssistRefreshOrigin={workspaceAssistRefreshOrigin}
-                          />
-                        </Suspense>
-                      </div>
-                    </>
-                  }
-                >
-                  <Suspense fallback={<HomeWorkspaceFallback label="Study Lens" />}>
-                    <LazyStudyLensDashboard
-                      state={studyLensDashboard()}
-                      onOpenReport={openStudyLensReport}
-                      onOpenReportIntent={openStudyLensReportIntent}
-                      onOpenFileLibraryIntent={openStudyLensFileLibraryIntent}
-                      onOpenKnowledgeGraphIntent={openStudyLensKnowledgeGraphIntent}
-                      onNavigate={selectView}
-                      onAddCourse={addStudyLensCourse}
-                      onAddDeadline={addStudyLensDeadline}
-                      onUpdateDeadlineReview={updateStudyLensDeadlineReview}
-                      onRecordAttempt={addStudyLensAttempt}
-                      onRecordMedicalMissedTopic={addStudyLensMedicalMissedTopic}
+                {/* PARA quick-access strip */}
+                <Show when={paraViewEnabled()}>
+                  <Suspense fallback={<HomeWorkspaceFallback label="PARA overview" compact />}>
+                    <LazyPARAOverviewStrip
+                      onOpen={() => selectView(paraViewEnabled() ? "para" : "home")}
+                      token={session()?.token ?? ""}
                     />
                   </Suspense>
                 </Show>
+
+                <div class="view-enter">
+                  <Suspense fallback={<HomeWorkspaceFallback label="workspace grid" />}>
+                    <LazyBentoGrid
+                      bootstrap={workspaceBootstrap()}
+                      signedIn={Boolean(session()?.token)}
+                      onOpenView={(view) => selectView(view)}
+                      onRequestSearchFocus={() => {
+                        selectView("search");
+                        setSearchFocusTick((n) => n + 1);
+                      }}
+                      onRequestWorkspaceAssistDraftRefresh={requestWorkspaceAssistDraftRefresh}
+                      workspaceAssistRefreshOrigin={workspaceAssistRefreshOrigin}
+                    />
+                  </Suspense>
+                </div>
               </div>
+            </Show>
+
+            <Show when={activeView() === "study" && !studyLensEnabled()}>
+              <div class="view-enter rounded-2xl border border-outline-variant/50 bg-surface/70 p-5">
+                <p class="text-sm font-semibold text-on-surface">Study Lens is off</p>
+                <p class="mt-1 text-sm text-on-surface-variant">Turn Study Lens on to open the dedicated study workspace.</p>
+                <button
+                  type="button"
+                  onClick={toggleStudyLens}
+                  class="mt-4 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90"
+                >
+                  Turn on Study Lens
+                </button>
+              </div>
+            </Show>
+            <Show when={activeView() === "study" && studyLensEnabled()}>
+              <Suspense fallback={<HomeWorkspaceFallback label="Study Lens" />}>
+                <LazyStudyLensDashboard
+                  state={studyLensDashboard()}
+                  onOpenReport={openStudyLensReport}
+                  onOpenReportIntent={openStudyLensReportIntent}
+                  onOpenFileLibraryIntent={openStudyLensFileLibraryIntent}
+                  onOpenKnowledgeGraphIntent={openStudyLensKnowledgeGraphIntent}
+                  onNavigate={selectView}
+                  onAddCourse={addStudyLensCourse}
+                  onAddDeadline={addStudyLensDeadline}
+                  onUpdateDeadlineReview={updateStudyLensDeadlineReview}
+                  onRecordAttempt={addStudyLensAttempt}
+                  onRecordMedicalMissedTopic={addStudyLensMedicalMissedTopic}
+                />
+              </Suspense>
             </Show>
 
             {/* Chat / search view */}
@@ -3582,6 +3604,7 @@ function App() {
                       <LazyThreadView
                         threadId={openThreadId()!}
                         initialFocusMessageId={openThreadMessageId()}
+                        initialReplyDraft={threadInitialReplyDraft()}
                         bootstrap={workspaceBootstrap()}
                         advanced={advanced()}
                         onOpenWorkspaceAssist={(view: "home" | "search" | "response_queue" | "decision_queue" | "files") =>
@@ -3646,8 +3669,6 @@ function App() {
                     <LazyEmailView
                       bootstrap={workspaceBootstrap()}
                       signedIn={Boolean(session()?.token)}
-                      onOpenWorkspaceAssist={(view, query) => openWorkspaceAssistNavigation(view, query)}
-                      workspaceAssistRefreshOrigin={workspaceAssistRefreshOrigin("email")}
                     />
                   </div>
                 </Suspense>

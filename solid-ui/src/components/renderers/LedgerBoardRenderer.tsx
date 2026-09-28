@@ -25,37 +25,13 @@ import {
 import {
   buildWeddingTaskHierarchyState,
 } from "@/lib/weddingTaskHierarchyState";
-
-export interface LedgerTask {
-  task_id: string;
-  title: string;
-  description?: string;
-  status: "pending" | "in_progress" | "blocked" | "done" | "cancelled" | string;
-  raw_status?: string;
-  priority: "low" | "normal" | "high" | "critical" | string;
-  progress: number;
-  milestone?: string;
-  assigned_to?: string;
-  due_date?: string;
-  due_label?: string;
-  depends_on?: string[];
-  blockers?: string[];
-  background?: boolean;
-  summary?: string;
-  error?: string;
-  wedding_task_kind?: string;
-  wedding_plan_id?: string;
-  response_workspace_id?: string;
-  second_order_loop?: string;
-  second_order_evidence_labels?: string[];
-  preparation_checklist?: boolean;
-  preparation_checklist_item?: string;
-  alert_offset_days?: number[];
-  alert_dates?: string[];
-  schedule_basis?: string;
-  tool_meta?: ToolResultMetadata;
-  execution_explanation?: TaskExecutionExplanation | null;
-}
+import {
+  ledgerTaskUpdateSendInput,
+  ledgerTaskWithOverrides,
+  todoTaskStates,
+  type LedgerTask,
+  type TodoTaskState,
+} from "@/lib/ledgerBoardTodoState";
 
 type BoardView = "kanban" | "todo" | "timeline";
 
@@ -104,21 +80,6 @@ type KanbanColumnState = {
   count: number;
   taskItems: TaskCardState[];
   showEmpty: boolean;
-};
-
-type TodoTaskState = {
-  task: LedgerTask;
-  title: string;
-  done: boolean;
-  titleClass: string;
-  statusDotClass: string;
-  showBackgroundBadge: boolean;
-  showProgress: boolean;
-  progress: number;
-  showBlockers: boolean;
-  blockersText: string | null;
-  showDueDate: boolean;
-  dueDateText: string | null;
 };
 
 type TimelineTaskState = {
@@ -233,6 +194,8 @@ function mergeTasks(messages: AfpMessage[]): LedgerTask[] {
 
     taskMap.set(taskId, {
       task_id: taskId,
+      thread_id: message.thread_id ?? existing.thread_id ?? "",
+      source_message_id: message.id ?? existing.source_message_id ?? "",
       title: ledgerString(content.title, existing.title ?? "Untitled"),
       description: ledgerString(content.description, existing.description ?? ""),
       status: normalizeTaskStatus(rawStatus),
@@ -397,36 +360,6 @@ function kanbanColumnStates(tasks: LedgerTask[]): KanbanColumnState[] {
   });
 }
 
-function todoTaskStates(tasks: LedgerTask[]): TodoTaskState[] {
-  const sorted = [...tasks].sort((left, right) => {
-    const leftDone = DONE_STATUSES.has(left.status) ? 1 : 0;
-    const rightDone = DONE_STATUSES.has(right.status) ? 1 : 0;
-    if (leftDone !== rightDone) return leftDone - rightDone;
-    const priorityOrder = ["critical", "high", "normal", "low"];
-    return priorityOrder.indexOf(left.priority) - priorityOrder.indexOf(right.priority);
-  });
-
-  return sorted.map((task) => {
-    const done = DONE_STATUSES.has(task.status);
-    const blockersText = (task.blockers ?? []).length > 0 ? task.blockers!.join(", ") : null;
-    const dueDateText = task.due_date ? formatDueDate(task.due_date) : null;
-    return {
-      task,
-      title: task.title,
-      done,
-      titleClass: done ? "line-through text-on-surface-variant" : "text-on-surface",
-      statusDotClass: STATUS_DOT[task.status] ?? "bg-slate-400",
-      showBackgroundBadge: Boolean(task.background),
-      showProgress: task.progress > 0 && !done,
-      progress: task.progress,
-      showBlockers: Boolean(blockersText),
-      blockersText,
-      showDueDate: Boolean(dueDateText),
-      dueDateText,
-    };
-  });
-}
-
 function timelineTaskState(task: LedgerTask): TimelineTaskState {
   return {
     task,
@@ -535,7 +468,7 @@ function TaskPill(props: { state: TaskCardState }) {
               class="inline-flex items-center gap-1 text-[11px] font-medium text-sky-300 transition hover:text-sky-200"
             >
               <span>{props.state.toolLabelText}</span>
-              <span aria-hidden="true">â†—</span>
+              <span aria-hidden="true">-&gt;</span>
             </a>
           </Show>
         </div>
@@ -573,16 +506,39 @@ function KanbanBoard(props: { columns: KanbanColumnState[] }) {
   );
 }
 
-function TodoList(props: { tasks: TodoTaskState[] }) {
+function TodoList(props: {
+  tasks: TodoTaskState[];
+  ownerDrafts: Record<string, string>;
+  savingTaskIds: Record<string, boolean>;
+  onSelectTask: (taskId: string, selected: boolean) => void;
+  onToggleDone: (task: LedgerTask, done: boolean) => void;
+  onOwnerDraftChange: (taskId: string, value: string) => void;
+  onAssignOwner: (task: LedgerTask, assignedTo: string) => void;
+}) {
   return (
     <div class="space-y-1.5">
       <For each={props.tasks}>
         {(task) => (
-          <div class={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition ${task.done ? "opacity-45" : "border border-white/10 bg-white/5"}`}>
-            <span class={`mt-0.5 h-2.5 w-2.5 flex-shrink-0 rounded-full ${task.statusDotClass}`} />
+          <div class={`flex items-start gap-3 rounded-xl border px-3 py-2.5 transition ${task.selected ? "border-primary/45 bg-primary/10" : task.done ? "border-white/5 bg-white/[0.03] opacity-60" : "border-white/10 bg-white/5"}`}>
+            <input
+              type="checkbox"
+              checked={task.done}
+              disabled={props.savingTaskIds[task.task.task_id] === true}
+              aria-label={task.done ? `Mark ${task.title} not done` : `Mark ${task.title} done`}
+              onChange={(event) => props.onToggleDone(task.task, event.currentTarget.checked)}
+              class="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/10 text-primary focus:ring-primary/40"
+            />
             <div class="min-w-0 flex-1 space-y-1">
-              <div class="flex items-center gap-2">
-                <p class={`text-sm leading-5 ${task.titleClass}`}>{task.title}</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  aria-pressed={task.selected}
+                  onClick={() => props.onSelectTask(task.task.task_id, !task.selected)}
+                  class={`min-w-0 rounded-lg px-1.5 py-0.5 text-left text-sm leading-5 transition ${task.selected ? "bg-primary/15 text-on-surface" : task.titleClass}`}
+                >
+                  {task.title}
+                </button>
+                <span class={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${task.statusDotClass}`} />
                 <Show when={task.showBackgroundBadge}>
                   <span
                     title="Background task - running without blocking the main flow"
@@ -591,6 +547,35 @@ function TodoList(props: { tasks: TodoTaskState[] }) {
                     bg
                   </span>
                 </Show>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 text-[11px] text-on-surface-variant">
+                <Show when={task.showAssignedTo} fallback={<span>Owner: Unassigned</span>}>
+                  <span>Owner: {task.assignedToText}</span>
+                </Show>
+                <Show when={task.showDueDate}>
+                  <span>{task.dueDateText}</span>
+                </Show>
+                <Show when={props.savingTaskIds[task.task.task_id] === true}>
+                  <span class="text-primary">Saving...</span>
+                </Show>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <label class="sr-only" for={`task-owner-${task.task.task_id}`}>Assign owner for {task.title}</label>
+                <input
+                  id={`task-owner-${task.task.task_id}`}
+                  value={props.ownerDrafts[task.task.task_id] ?? task.assignedToText ?? ""}
+                  placeholder="Assign owner"
+                  disabled={props.savingTaskIds[task.task.task_id] === true}
+                  onInput={(event) => props.onOwnerDraftChange(task.task.task_id, event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      props.onAssignOwner(task.task, event.currentTarget.value);
+                    }
+                  }}
+                  onBlur={(event) => props.onAssignOwner(task.task, event.currentTarget.value)}
+                  class="min-w-40 rounded-lg border border-white/10 bg-white/10 px-2 py-1 text-xs text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary/60 focus:outline-none"
+                />
               </div>
               <Show when={task.showProgress}>
                 <div class="flex items-center gap-2">
@@ -601,12 +586,9 @@ function TodoList(props: { tasks: TodoTaskState[] }) {
                 </div>
               </Show>
               <Show when={task.showBlockers}>
-                <p class="text-[11px] text-amber-300">âš  {task.blockersText}</p>
+                <p class="text-[11px] text-amber-300">Warning: {task.blockersText}</p>
               </Show>
             </div>
-            <Show when={task.showDueDate}>
-              <span class="flex-shrink-0 text-[10px] text-on-surface-variant">{task.dueDateText}</span>
-            </Show>
           </div>
         )}
       </For>
@@ -719,6 +701,15 @@ export function LedgerBoardRenderer(props: {
 }) {
   const allMessages = createMemo(() => [props.message, ...(props.tasks ?? [])]);
   const tasks = createMemo(() => mergeTasks(allMessages()));
+  const [selectedTaskIds, setSelectedTaskIds] = createSignal<Record<string, boolean>>({});
+  const [localStatusOverrides, setLocalStatusOverrides] = createSignal<Record<string, string>>({});
+  const [localOwnerOverrides, setLocalOwnerOverrides] = createSignal<Record<string, string>>({});
+  const [ownerDrafts, setOwnerDrafts] = createSignal<Record<string, string>>({});
+  const [savingTaskIds, setSavingTaskIds] = createSignal<Record<string, boolean>>({});
+  const displayedTasks = createMemo(() => tasks().map((task) => ledgerTaskWithOverrides(task, {
+    status: localStatusOverrides()[task.task_id] ?? null,
+    assignedTo: localOwnerOverrides()[task.task_id] ?? null,
+  })));
   const content = createMemo(() => afpRecord(decryptedDisplayContent(props.message)));
   const defaultView = createMemo<BoardView>(() => {
     const candidate = content().default_view as BoardView;
@@ -728,12 +719,15 @@ export function LedgerBoardRenderer(props: {
   const [activeView, setActiveView] = createSignal<BoardView>(defaultView());
 
   const boardState = createMemo(() => {
-    const taskItems = tasks();
+    const taskItems = displayedTasks();
     const title = ledgerString(content().title, "Task board");
     const description = ledgerString(content().description);
     const stats = statsState(taskItems);
     const kanbanColumns = kanbanColumnStates(taskItems);
-    const todoItems = todoTaskStates(taskItems);
+    const selectedIds = new Set(Object.entries(selectedTaskIds())
+      .filter(([, selected]) => selected)
+      .map(([taskId]) => taskId));
+    const todoItems = todoTaskStates(taskItems, selectedIds);
     const timelineMilestones = timelineMilestoneStates(taskItems);
     const weddingHierarchy = buildWeddingTaskHierarchyState(taskItems);
 
@@ -763,6 +757,37 @@ export function LedgerBoardRenderer(props: {
 
   function handleBlockedClick() {
     setActiveView("todo");
+  }
+
+  async function saveTaskUpdate(task: LedgerTask, update: { assignedTo?: string | null; status?: string | null }) {
+    const sendInput = ledgerTaskUpdateSendInput(task, update);
+    if (!sendInput) return;
+    setSavingTaskIds((current) => ({ ...current, [task.task_id]: true }));
+    try {
+      await sendAfpMessage(sendInput);
+    } catch {
+      // The optimistic row remains usable; the source AFP thread can be retried by changing it again.
+    } finally {
+      setSavingTaskIds((current) => {
+        const next = { ...current };
+        delete next[task.task_id];
+        return next;
+      });
+    }
+  }
+
+  function toggleTodoDone(task: LedgerTask, done: boolean) {
+    const nextStatus = done ? "done" : "pending";
+    setLocalStatusOverrides((current) => ({ ...current, [task.task_id]: nextStatus }));
+    void saveTaskUpdate(task, { status: nextStatus });
+  }
+
+  function assignTodoOwner(task: LedgerTask, value: string) {
+    const assignedTo = value.trim();
+    if ((task.assigned_to ?? "") === assignedTo && localOwnerOverrides()[task.task_id] === undefined) return;
+    setLocalOwnerOverrides((current) => ({ ...current, [task.task_id]: assignedTo }));
+    setOwnerDrafts((current) => ({ ...current, [task.task_id]: assignedTo }));
+    void saveTaskUpdate(task, { assignedTo });
   }
 
   return (
@@ -813,7 +838,15 @@ export function LedgerBoardRenderer(props: {
           <KanbanBoard columns={boardState().kanbanColumns} />
         </Show>
         <Show when={boardState().showTodo}>
-          <TodoList tasks={boardState().todoItems} />
+          <TodoList
+            tasks={boardState().todoItems}
+            ownerDrafts={ownerDrafts()}
+            savingTaskIds={savingTaskIds()}
+            onSelectTask={(taskId, selected) => setSelectedTaskIds((current) => ({ ...current, [taskId]: selected }))}
+            onToggleDone={toggleTodoDone}
+            onOwnerDraftChange={(taskId, value) => setOwnerDrafts((current) => ({ ...current, [taskId]: value }))}
+            onAssignOwner={assignTodoOwner}
+          />
         </Show>
         <Show when={boardState().showTimeline}>
           <TimelineView milestones={boardState().timelineMilestones} />

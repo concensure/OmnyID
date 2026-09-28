@@ -65,7 +65,7 @@ export function WorkspaceAssistPanel(props: {
           </Show>
           <Show when={suggestion().topic_evidence.length > 0}>
             <p class="mt-3 text-[11px] leading-5 text-on-surface-variant/65">
-              {suggestion().topic_evidence.slice(0, 2).join(" Â· ")}
+              {suggestion().topic_evidence.slice(0, 2).join(" · ")}
             </p>
           </Show>
           <Show when={props.refreshOrigin}>

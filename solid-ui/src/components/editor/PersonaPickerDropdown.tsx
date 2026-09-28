@@ -151,7 +151,7 @@ export function PersonaPickerDropdown(props: PersonaPickerProps) {
               class="text-sm text-on-surface-variant/50 hover:text-on-surface-variant"
               onClick={props.onClose}
             >
-              Ã—
+              ×
             </button>
           </div>
           <input
@@ -265,7 +265,7 @@ export function PersonaPickerDropdown(props: PersonaPickerProps) {
         <div class="border-t border-white/10 px-3 py-2">
           <p class="text-[10px] text-on-surface-variant/40">
             Type <span class="font-mono text-primary/70">/persona</span> in any editor to open this
-            picker Â· <span class="font-mono text-primary/70">Esc</span> to close
+            picker · <span class="font-mono text-primary/70">Esc</span> to close
           </p>
           <p class="mt-1 text-[10px] text-on-surface-variant/35">
             Personas restyle user-facing replies and drafts only.
@@ -324,7 +324,7 @@ function PersonaCard(props: {
           <span class="mt-0.5 shrink-0 text-xs text-primary/60">...</span>
         </Show>
         <Show when={!props.isActive && !props.isLoading}>
-          <span class="mt-0.5 shrink-0 text-[10px] text-on-surface-variant/40">Activate â†’</span>
+          <span class="mt-0.5 shrink-0 text-[10px] text-on-surface-variant/40">Activate →</span>
         </Show>
       </div>
     </button>

@@ -11,6 +11,8 @@
  */
 
 import type { AfpMessage } from "@/lib/api";
+import { isRecord } from "@/lib/eventDetail";
+import { parseJsonValue } from "@/lib/jsonParseState";
 import sodium from "libsodium-wrappers";
 
 let _keyBytes: Uint8Array | null = null;
@@ -59,7 +61,8 @@ export function tryDecryptMessage(msg: AfpMessage): AfpMessage {
       _keyBytes,
     );
 
-    const decryptedContent = JSON.parse(new TextDecoder().decode(plaintext)) as Record<string, unknown>;
+    const decryptedContent = parseDecryptedAfpContent(new TextDecoder().decode(plaintext));
+    if (!decryptedContent) return msg;
     return { ...msg, content: decryptedContent, encryption: null };
   } catch {
     // Wrong key, corrupted data, or unsupported format — return ciphertext form
@@ -73,9 +76,18 @@ export function decryptMessages(msgs: AfpMessage[]): AfpMessage[] {
   return msgs.map(tryDecryptMessage);
 }
 
+export function parseDecryptedAfpContent(text: string): Record<string, unknown> | null {
+  const parsed = parseJsonValue(text);
+  if (!parsed.ok) return null;
+
+  return isRecord(parsed.value)
+    ? parsed.value
+    : null;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function hexToBytes(hex: string): Uint8Array {
+export function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
@@ -95,13 +107,13 @@ function base64ToBytes(b64: string): Uint8Array {
  * Must produce the same string as the Rust server's canonical_json_string().
  */
 function canonicalJson(obj: unknown): string {
-  if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
+  if (!isRecord(obj)) {
     return JSON.stringify(obj);
   }
-  const sorted = Object.keys(obj as object)
+  const sorted = Object.keys(obj)
     .sort()
     .reduce<Record<string, unknown>>((acc, k) => {
-      acc[k] = (obj as Record<string, unknown>)[k];
+      acc[k] = obj[k];
       return acc;
     }, {});
   return JSON.stringify(sorted);

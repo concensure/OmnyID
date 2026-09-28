@@ -8,7 +8,7 @@ import { TrustSummaryBlocks } from "@/components/renderers/TrustSummaryBlocks";
 import { trustSummaryStateFromContents } from "@/lib/trustFieldState";
 import { surfaceNoteHeaderTimestamp } from "@/lib/surfaceTimestampPresentation";
 
-const RICH_TEXT_HEADER_SEPARATOR = " Â· ";
+const RICH_TEXT_HEADER_SEPARATOR = " · ";
 const RICH_TEXT_DEFAULT_TITLE = "Note";
 const RICH_TEXT_EMPTY_COPY = "Empty note.";
 

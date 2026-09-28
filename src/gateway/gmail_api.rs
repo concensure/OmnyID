@@ -14,6 +14,7 @@ const URL_SAFE_LENIENT: GeneralPurpose = GeneralPurpose::new(
 );
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use std::sync::OnceLock;
 
 use super::smtp_out::OutgoingEmailRequest;
@@ -71,9 +72,19 @@ pub async fn send_gmail_message(
     request: &OutgoingEmailRequest,
     config: &GmailOAuthConfig,
 ) -> Result<(), String> {
+    send_gmail_message_with_receipt(request, config)
+        .await
+        .map(|_| ())
+}
+
+pub async fn send_gmail_message_with_receipt(
+    request: &OutgoingEmailRequest,
+    config: &GmailOAuthConfig,
+) -> Result<String, String> {
     let client = gmail_client();
     let token = exchange_refresh_token(&client, config).await?;
     let raw_message = build_gmail_raw_message(request, &config.from_address);
+    let payload = gmail_send_payload(request, raw_message);
 
     let response = client
         .post(format!(
@@ -81,7 +92,7 @@ pub async fn send_gmail_message(
             GMAIL_SEND_URL_BASE, config.user_id
         ))
         .bearer_auth(token.access_token)
-        .json(&serde_json::json!({ "raw": raw_message }))
+        .json(&payload)
         .send()
         .await
         .map_err(|err| format!("Gmail API send request failed: {err}"))?;
@@ -91,7 +102,31 @@ pub async fn send_gmail_message(
         return Err(gmail_upstream_status_error("Gmail API send", status));
     }
 
-    Ok(())
+    let payload = response
+        .json::<GmailMessageId>()
+        .await
+        .map_err(|err| format!("Gmail API send response decode failed: {err}"))?;
+
+    validated_gmail_message_id(payload)
+}
+
+fn gmail_send_payload(request: &OutgoingEmailRequest, raw_message: String) -> Value {
+    let mut payload = Map::new();
+    payload.insert("raw".to_string(), Value::String(raw_message));
+    let thread_id = request.thread_id.trim();
+    if !thread_id.is_empty() {
+        payload.insert("threadId".to_string(), Value::String(thread_id.to_string()));
+    }
+    Value::Object(payload)
+}
+
+fn validated_gmail_message_id(payload: GmailMessageId) -> Result<String, String> {
+    let id = payload.id.trim();
+    if id.is_empty() {
+        Err("Gmail API send response omitted message id".to_string())
+    } else {
+        Ok(id.to_string())
+    }
 }
 
 async fn exchange_refresh_token(
@@ -235,7 +270,8 @@ mod tests {
     use base64::Engine as _;
 
     use super::{
-        GmailMessageId, build_gmail_raw_message, gmail_client, gmail_upstream_status_error,
+        GmailMessageId, build_gmail_raw_message, gmail_client, gmail_send_payload,
+        gmail_upstream_status_error, validated_gmail_message_id,
     };
     use crate::gateway::smtp_out::OutgoingEmailRequest;
 
@@ -281,6 +317,43 @@ mod tests {
         .expect("gmail message id");
 
         assert_eq!(payload.id, "18c5d2f0b1");
+    }
+
+    #[test]
+    fn gmail_send_payload_includes_thread_id_when_present() {
+        let request = OutgoingEmailRequest {
+            thread_id: " thread_provider_01 ".to_string(),
+            message_id: "msg_test_01".to_string(),
+            parent_id: None,
+            to: vec!["friend@example.com".to_string()],
+            subject: "Hello".to_string(),
+            body: "Body text".to_string(),
+            in_reply_to: None,
+            references: vec![],
+        };
+
+        let payload = gmail_send_payload(&request, "encoded".to_string());
+
+        assert_eq!(payload["raw"], "encoded");
+        assert_eq!(payload["threadId"], "thread_provider_01");
+    }
+
+    #[test]
+    fn gmail_send_receipt_requires_provider_message_id() {
+        assert_eq!(
+            validated_gmail_message_id(GmailMessageId {
+                id: " provider_msg_01 ".to_string()
+            })
+            .expect("provider id"),
+            "provider_msg_01"
+        );
+        assert_eq!(
+            validated_gmail_message_id(GmailMessageId {
+                id: " ".to_string()
+            })
+            .expect_err("missing provider id"),
+            "Gmail API send response omitted message id"
+        );
     }
 
     #[test]

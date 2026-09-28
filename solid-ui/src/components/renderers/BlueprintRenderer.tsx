@@ -1,5 +1,8 @@
-import { For, Show } from "solid-js";
+import { createMemo, For, Show } from "solid-js";
 import type { AfpMessage, AfpView } from "@/lib/api";
+import { safeHref } from "@/lib/api";
+import { afpRecord } from "@/lib/afpMessageRecord";
+import { decryptedDisplayContent } from "@/lib/decryptedDisplayState";
 
 type BlueprintBlock =
   | {
@@ -33,88 +36,94 @@ type BlueprintContent = {
   blocks?: BlueprintBlock[];
 };
 
-function asString(v: unknown, fallback = ""): string {
-  return typeof v === "string" ? v : fallback;
+type BlueprintTextTone = "default" | "muted" | "danger" | "success" | "warning";
+
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return Boolean(v) && typeof v === "object" && !Array.isArray(v);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function normalizeBlocks(v: unknown): BlueprintBlock[] {
-  if (!Array.isArray(v)) return [];
+function normalizeBlocks(value: unknown): BlueprintBlock[] {
+  if (!Array.isArray(value)) return [];
 
-  const out: BlueprintBlock[] = [];
-  for (const raw of v) {
-    if (!isRecord(raw)) continue;
-    const t = asString(raw.type);
-    if (t === "text") {
-      out.push({
+  const blocks: BlueprintBlock[] = [];
+  for (const rawBlock of value) {
+    if (!isRecord(rawBlock)) continue;
+    const blockType = asString(rawBlock.type);
+
+    if (blockType === "text") {
+      blocks.push({
         type: "text",
-        text: asString(raw.text),
-        tone: (asString(raw.tone) as any) || "default",
+        text: asString(rawBlock.text),
+        tone: (asString(rawBlock.tone) as BlueprintTextTone) || "default",
       });
       continue;
     }
-    if (t === "code") {
-      out.push({
+
+    if (blockType === "code") {
+      blocks.push({
         type: "code",
-        code: asString(raw.code),
-        language: asString(raw.language) || undefined,
+        code: asString(rawBlock.code),
+        language: asString(rawBlock.language) || undefined,
       });
       continue;
     }
-    if (t === "stats" && Array.isArray(raw.items)) {
-      const items = raw.items
+
+    if (blockType === "stats" && Array.isArray(rawBlock.items)) {
+      const items = rawBlock.items
         .filter(isRecord)
-        .map((it) => ({
-          label: asString(it.label),
-          value: asString(it.value),
-          hint: asString(it.hint) || undefined,
+        .map((item) => ({
+          label: asString(item.label),
+          value: asString(item.value),
+          hint: asString(item.hint) || undefined,
         }))
-        .filter((it) => it.label && it.value);
-      out.push({ type: "stats", items });
+        .filter((item) => item.label && item.value);
+      blocks.push({ type: "stats", items });
       continue;
     }
-    if (t === "links" && Array.isArray(raw.items)) {
-      const items = raw.items
+
+    if (blockType === "links" && Array.isArray(rawBlock.items)) {
+      const items = rawBlock.items
         .filter(isRecord)
-        .map((it) => ({
-          title: asString(it.title),
-          url: asString(it.url),
-          subtitle: asString(it.subtitle) || undefined,
+        .map((item) => ({
+          title: asString(item.title),
+          url: asString(item.url),
+          subtitle: asString(item.subtitle) || undefined,
         }))
-        .filter((it) => it.url);
-      out.push({ type: "links", items });
+        .filter((item) => item.url);
+      blocks.push({ type: "links", items });
       continue;
     }
-    if (t === "table" && Array.isArray(raw.columns) && Array.isArray(raw.rows)) {
-      const columns = raw.columns.map((c) => asString(c)).filter(Boolean);
-      const rows = raw.rows
+
+    if (blockType === "table" && Array.isArray(rawBlock.columns) && Array.isArray(rawBlock.rows)) {
+      const columns = rawBlock.columns.map((column) => asString(column)).filter(Boolean);
+      const rows = rawBlock.rows
         .filter(Array.isArray)
-        .map((r) => r.map((cell) => (cell === null ? "" : String(cell))));
+        .map((row) => row.map((cell) => (cell === null ? "" : String(cell))));
       if (columns.length > 0 && rows.length > 0) {
-        out.push({
+        blocks.push({
           type: "table",
           columns,
           rows,
-          caption: asString(raw.caption) || undefined,
+          caption: asString(rawBlock.caption) || undefined,
         });
       }
-      continue;
     }
   }
 
-  return out;
+  return blocks;
 }
 
 function normalizeBlueprint(
   viewContent: Record<string, unknown>,
-  msgContent: Record<string, unknown>
+  messageContent: Record<string, unknown>,
 ): BlueprintContent {
-  const title = asString(viewContent.title ?? msgContent.title);
-  const subtitle = asString(viewContent.subtitle ?? msgContent.subtitle);
-  const blocks = normalizeBlocks(viewContent.blocks ?? msgContent.blocks);
+  const title = asString(viewContent.title ?? messageContent.title);
+  const subtitle = asString(viewContent.subtitle ?? messageContent.subtitle);
+  const blocks = normalizeBlocks(viewContent.blocks ?? messageContent.blocks);
   return {
     title: title || undefined,
     subtitle: subtitle || undefined,
@@ -138,122 +147,159 @@ function toneClass(tone: string | undefined): string {
 }
 
 export function BlueprintRenderer(props: { message: AfpMessage; view?: AfpView }) {
-  const viewContent = () => (props.view?.content ?? {}) as Record<string, unknown>;
-  const msgContent = () => (props.message.content ?? {}) as Record<string, unknown>;
-  const blueprint = () => normalizeBlueprint(viewContent(), msgContent());
+  const rendererState = createMemo(() => {
+    const viewContent = afpRecord(props.message.encryption ? undefined : props.view?.content);
+    const messageContent = afpRecord(decryptedDisplayContent(props.message));
+    const blueprint = normalizeBlueprint(viewContent, messageContent);
+    return {
+      blueprint,
+      showHeader: Boolean(blueprint.title || blueprint.subtitle),
+      showBlocks: Boolean(blueprint.blocks && blueprint.blocks.length > 0),
+      blocks: blueprint.blocks ?? [],
+    };
+  });
 
   return (
     <div class="space-y-4">
-      <Show when={blueprint().title || blueprint().subtitle}>
+      <Show when={rendererState().showHeader}>
         <header class="space-y-1">
-          <Show when={blueprint().title}>
-            <h3 class="text-base font-semibold tracking-tight text-on-surface">{blueprint().title}</h3>
+          <Show when={rendererState().blueprint.title}>
+            <h3 class="text-base font-semibold tracking-tight text-on-surface">
+              {rendererState().blueprint.title}
+            </h3>
           </Show>
-          <Show when={blueprint().subtitle}>
-            <p class="text-sm leading-6 text-on-surface-variant">{blueprint().subtitle}</p>
+          <Show when={rendererState().blueprint.subtitle}>
+            <p class="text-sm leading-6 text-on-surface-variant">
+              {rendererState().blueprint.subtitle}
+            </p>
           </Show>
         </header>
       </Show>
 
-      <Show when={blueprint().blocks && blueprint().blocks!.length > 0}>
+      <Show when={rendererState().showBlocks}>
         <div class="space-y-4">
-          <For each={blueprint().blocks ?? []}>
-            {(block) => (
-              <Show
-                when={block.type}
-                fallback={
-                  <div class="rounded-lg border border-white/20 bg-white/10 p-3 text-sm text-on-surface-variant">
-                    Unsupported blueprint block
-                  </div>
-                }
-              >
-                <Show when={block.type === "text"}>
-                  <p class={`text-sm leading-6 ${toneClass((block as any).tone)}`}>{(block as any).text}</p>
-                </Show>
+          <For each={rendererState().blocks}>
+            {(block) => {
+              const blockState = createMemo(() => ({
+                block,
+                showText: block.type === "text",
+                showCode: block.type === "code",
+                showStats: block.type === "stats",
+                showLinks: block.type === "links",
+                showTable: block.type === "table",
+                textToneClass:
+                  block.type === "text"
+                    ? toneClass((block as Extract<BlueprintBlock, { type: "text" }>).tone)
+                    : "",
+                showCaption: block.type === "table" && Boolean(block.caption),
+              }));
 
-                <Show when={block.type === "code"}>
-                  <div class="rounded-xl border border-white/20 bg-surface-container-high/70 p-3">
-                    <Show when={(block as any).language}>
-                      <div class="mb-2 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">
-                        {(block as any).language}
-                      </div>
-                    </Show>
-                    <pre class="overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-on-surface">
-                      {(block as any).code}
-                    </pre>
-                  </div>
-                </Show>
+              return (
+                <Show
+                  when={
+                    blockState().showText
+                    || blockState().showCode
+                    || blockState().showStats
+                    || blockState().showLinks
+                    || blockState().showTable
+                  }
+                  fallback={
+                    <div class="rounded-lg border border-white/20 bg-white/10 p-3 text-sm text-on-surface-variant">
+                      Unsupported blueprint block
+                    </div>
+                  }
+                >
+                  <Show when={blockState().showText}>
+                    <p class={`text-sm leading-6 ${blockState().textToneClass}`}>
+                      {(block as Extract<BlueprintBlock, { type: "text" }>).text}
+                    </p>
+                  </Show>
 
-                <Show when={block.type === "stats"}>
-                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <For each={(block as any).items ?? []}>
-                      {(it: any) => (
-                        <div class="rounded-xl border border-white/25 bg-white/15 p-3">
-                          <div class="text-xs text-on-surface-variant">{it.label}</div>
-                          <div class="mt-1 text-sm font-semibold text-on-surface">{it.value}</div>
-                          <Show when={it.hint}>
-                            <div class="mt-1 text-xs text-outline">{it.hint}</div>
-                          </Show>
+                  <Show when={blockState().showCode}>
+                    <div class="rounded-xl border border-white/20 bg-surface-container-high/70 p-3">
+                      <Show when={(block as Extract<BlueprintBlock, { type: "code" }>).language}>
+                        <div class="mb-2 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">
+                          {(block as Extract<BlueprintBlock, { type: "code" }>).language}
                         </div>
-                      )}
-                    </For>
-                  </div>
-                </Show>
+                      </Show>
+                      <pre class="overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-on-surface">
+                        {(block as Extract<BlueprintBlock, { type: "code" }>).code}
+                      </pre>
+                    </div>
+                  </Show>
 
-                <Show when={block.type === "links"}>
-                  <div class="flex flex-col gap-2">
-                    <For each={(block as any).items ?? []}>
-                      {(it: any) => (
-                        <a
-                          href={it.url}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          class="rounded-xl border border-white/25 bg-white/15 p-3 transition hover:bg-white/25"
-                        >
-                          <div class="text-sm font-medium text-on-surface">{it.title || it.url}</div>
-                          <Show when={it.subtitle}>
-                            <div class="mt-1 text-xs text-on-surface-variant">{it.subtitle}</div>
-                          </Show>
-                          <div class="mt-1 text-xs text-outline break-all">{it.url}</div>
-                        </a>
-                      )}
-                    </For>
-                  </div>
-                </Show>
+                  <Show when={blockState().showStats}>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <For each={(block as Extract<BlueprintBlock, { type: "stats" }>).items}>
+                        {(item) => (
+                          <div class="rounded-xl border border-white/25 bg-white/15 p-3">
+                            <div class="text-xs text-on-surface-variant">{item.label}</div>
+                            <div class="mt-1 text-sm font-semibold text-on-surface">{item.value}</div>
+                            <Show when={item.hint}>
+                              <div class="mt-1 text-xs text-outline">{item.hint}</div>
+                            </Show>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
 
-                <Show when={block.type === "table"}>
-                  <div class="rounded-xl border border-white/20 bg-white/10 p-3 overflow-auto">
-                    <Show when={(block as any).caption}>
-                      <div class="mb-2 text-xs text-on-surface-variant">{(block as any).caption}</div>
-                    </Show>
-                    <table class="w-full text-left text-sm">
-                      <thead class="text-xs uppercase tracking-[0.14em] text-outline">
-                        <tr>
-                          <For each={(block as any).columns ?? []}>
-                            {(c: string) => <th class="pb-2 pr-3 font-mono">{c}</th>}
+                  <Show when={blockState().showLinks}>
+                    <div class="flex flex-col gap-2">
+                      <For each={(block as Extract<BlueprintBlock, { type: "links" }>).items}>
+                        {(item) => (
+                          <a
+                            href={safeHref(item.url)}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            class="rounded-xl border border-white/25 bg-white/15 p-3 transition hover:bg-white/25"
+                          >
+                            <div class="text-sm font-medium text-on-surface">{item.title || item.url}</div>
+                            <Show when={item.subtitle}>
+                              <div class="mt-1 text-xs text-on-surface-variant">{item.subtitle}</div>
+                            </Show>
+                            <div class="mt-1 break-all text-xs text-outline">{item.url}</div>
+                          </a>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+
+                  <Show when={blockState().showTable}>
+                    <div class="overflow-auto rounded-xl border border-white/20 bg-white/10 p-3">
+                      <Show when={blockState().showCaption}>
+                        <div class="mb-2 text-xs text-on-surface-variant">
+                          {(block as Extract<BlueprintBlock, { type: "table" }>).caption}
+                        </div>
+                      </Show>
+                      <table class="w-full text-left text-sm">
+                        <thead class="text-xs uppercase tracking-[0.14em] text-outline">
+                          <tr>
+                            <For each={(block as Extract<BlueprintBlock, { type: "table" }>).columns}>
+                              {(column) => <th class="pb-2 pr-3 font-mono">{column}</th>}
+                            </For>
+                          </tr>
+                        </thead>
+                        <tbody class="text-on-surface">
+                          <For each={(block as Extract<BlueprintBlock, { type: "table" }>).rows}>
+                            {(row) => (
+                              <tr class="border-t border-white/10">
+                                <For each={row}>
+                                  {(cell) => <td class="py-2 pr-3 align-top">{String(cell)}</td>}
+                                </For>
+                              </tr>
+                            )}
                           </For>
-                        </tr>
-                      </thead>
-                      <tbody class="text-on-surface">
-                        <For each={(block as any).rows ?? []}>
-                          {(row: string[]) => (
-                            <tr class="border-t border-white/10">
-                              <For each={row}>
-                                {(cell: string) => <td class="py-2 pr-3 align-top">{cell}</td>}
-                              </For>
-                            </tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </table>
-                  </div>
+                        </tbody>
+                      </table>
+                    </div>
+                  </Show>
                 </Show>
-              </Show>
-            )}
+              );
+            }}
           </For>
         </div>
       </Show>
     </div>
   );
 }
-

@@ -17,7 +17,7 @@ export function PARAOverviewStrip(props: { onOpen: () => void; token: string }) 
         </span>
         <div>
           <p class="text-sm font-semibold text-on-surface">PARA Navigator</p>
-          <p class="text-xs text-on-surface-variant/50">Projects Â· Areas Â· Resources Â· Archive</p>
+          <p class="text-xs text-on-surface-variant/50">Projects · Areas · Resources · Archive</p>
         </div>
       </div>
       <svg

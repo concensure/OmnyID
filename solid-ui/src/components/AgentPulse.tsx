@@ -1,21 +1,32 @@
 import { createSignal, onMount, onCleanup } from "solid-js";
-import { apiFetch } from "../lib/api";
-
-type FleetSummary = {
-  active_count?: number;
-  idle_count?: number;
-  healthy?: boolean;
-  recent_tasks?: Array<{ status: string }>;
-};
+import {
+  type AgentPulseFailureReceipt,
+} from "@/lib/agentPulseFailureState";
+import {
+  createDefaultAgentPulseSummary,
+  loadAgentPulseState,
+} from "@/lib/agentPulseState";
 
 export function AgentPulse() {
-  const [summary, setSummary] = createSignal<FleetSummary>({});
+  const [summary, setSummary] = createSignal(createDefaultAgentPulseSummary());
+  const [loadError, setLoadError] = createSignal<AgentPulseFailureReceipt | null>(null);
+  const [hasLoaded, setHasLoaded] = createSignal(false);
+  const [retrying, setRetrying] = createSignal(false);
 
   async function poll() {
+    const result = await loadAgentPulseState(summary(), hasLoaded());
+    setSummary(result.summary);
+    setLoadError(result.error);
+    setHasLoaded(result.hasLoaded);
+  }
+
+  async function retryPulse() {
+    setRetrying(true);
     try {
-      const data = await apiFetch<FleetSummary>("/agent/fleet");
-      setSummary(data);
-    } catch { /* ignore */ }
+      await poll();
+    } finally {
+      setRetrying(false);
+    }
   }
 
   onMount(() => {
@@ -24,20 +35,51 @@ export function AgentPulse() {
     onCleanup(() => clearInterval(timer));
   });
 
-  const active = () => summary().active_count
-    ?? (summary().recent_tasks ?? []).filter(t => t.status === "in_progress").length;
-  const idle = () => summary().idle_count
-    ?? (summary().recent_tasks ?? []).filter(t => t.status === "pending").length;
-  const healthy = () => summary().healthy !== false;
+  const active = () => summary().active_count;
+  const idle = () => summary().idle_count;
+  const healthy = () => summary().healthy;
+  const unavailable = () => !hasLoaded() && !!loadError();
+  const stale = () => hasLoaded() && !!loadError();
 
   return (
     <div
-      class={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-        healthy() ? "bg-green-500/20 text-green-700" : "bg-orange-500/20 text-orange-700"
+      class={`flex min-w-0 flex-wrap items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium sm:py-1 ${
+        unavailable()
+          ? "bg-white/15 text-on-surface-variant"
+          : healthy()
+            ? "bg-green-500/20 text-green-700"
+            : "bg-orange-500/20 text-orange-700"
       }`}
+      title={loadError() ? `${loadError()!.title}. ${loadError()!.summary} ${loadError()!.nextStep}`.trim() : undefined}
     >
-      <span class={`h-2 w-2 rounded-full ${healthy() ? "bg-green-500" : "bg-orange-400"}`} />
-      {active()} active / {idle()} idle
+      <span
+        class={`h-2 w-2 flex-shrink-0 rounded-full ${
+          unavailable()
+            ? "bg-white/45"
+            : healthy()
+              ? "bg-green-500"
+              : "bg-orange-400"
+        }`}
+      />
+      <span class="min-w-0 break-words">
+        {unavailable() ? (loadError()?.title ?? "Pulse unavailable") : `${active()} active / ${idle()} idle`}
+      </span>
+      {stale() ? (
+        <span class="max-w-full break-words text-[10px] opacity-70">
+          {loadError()?.tone === "danger" ? "reauth" : "stale"}
+        </span>
+      ) : null}
+      {(unavailable() || stale()) ? (
+        <button
+          type="button"
+          class="rounded-full border border-white/30 bg-white/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition hover:bg-white/25 sm:ml-1"
+          onClick={() => void retryPulse()}
+          disabled={retrying()}
+          aria-label="Retry agent pulse"
+        >
+          {retrying() ? "Retrying..." : "Retry"}
+        </button>
+      ) : null}
     </div>
   );
 }

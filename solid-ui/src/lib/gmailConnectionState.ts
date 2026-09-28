@@ -15,18 +15,38 @@ function optionalGmailString(value: unknown): string | null | undefined {
   return typeof value === "string" || value === null ? value : undefined;
 }
 
+function stringAlias(payload: Record<string, unknown>, snakeKey: string, camelKey: string): string {
+  const snake = payload[snakeKey];
+  if (typeof snake === "string") return snake;
+  const camel = payload[camelKey];
+  return typeof camel === "string" ? camel : "";
+}
+
+function optionalStringAlias(payload: Record<string, unknown>, snakeKey: string, camelKey: string): string | null | undefined {
+  const snake = optionalGmailString(payload[snakeKey]);
+  if (snake !== undefined) return snake;
+  return optionalGmailString(payload[camelKey]);
+}
+
+function optionalBooleanAlias(payload: Record<string, unknown>, snakeKey: string, camelKey: string): boolean | undefined {
+  const snake = payload[snakeKey];
+  if (typeof snake === "boolean") return snake;
+  const camel = payload[camelKey];
+  return typeof camel === "boolean" ? camel : undefined;
+}
+
 export function normalizeGmailConnectionStatus(payload: unknown): GmailConnectionStatus {
   if (!isRecord(payload)) {
     return { connected: false, gmail_email: "", configured: true };
   }
   return {
     connected: typeof payload.connected === "boolean" ? payload.connected : false,
-    gmail_email: typeof payload.gmail_email === "string" ? payload.gmail_email : "",
+    gmail_email: stringAlias(payload, "gmail_email", "gmailEmail"),
     configured: typeof payload.configured === "boolean" ? payload.configured : true,
-    token_expiry: optionalGmailString(payload.token_expiry),
-    connected_at: optionalGmailString(payload.connected_at),
-    token_expired: typeof payload.token_expired === "boolean" ? payload.token_expired : undefined,
-    expires_within_24h: typeof payload.expires_within_24h === "boolean" ? payload.expires_within_24h : undefined,
+    token_expiry: optionalStringAlias(payload, "token_expiry", "tokenExpiry"),
+    connected_at: optionalStringAlias(payload, "connected_at", "connectedAt"),
+    token_expired: optionalBooleanAlias(payload, "token_expired", "tokenExpired"),
+    expires_within_24h: optionalBooleanAlias(payload, "expires_within_24h", "expiresWithin24h"),
   };
 }
 

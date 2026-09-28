@@ -11,9 +11,214 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # ── Rust backend ─────────────────────────────────────────────────────────────
+  # Rust backend
   rust:
-    name: Rust check + test
+    name: Rust correctness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install protoc
+        run: sudo apt-get install -y protobuf-compiler
+
+      - name: Correctness gate
+        run: bash scripts/rust-correctness.sh
+
+  rust-api-flows:
+    name: Rust integration api_flows
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: omnyid_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d omnyid_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/omnyid_test
+      RUN_RUST_API_FLOWS: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install protoc
+        run: sudo apt-get install -y protobuf-compiler
+
+      - name: Integration gate
+        run: bash scripts/rust-correctness.sh
+
+  rust-startup-policy:
+    name: Rust startup policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install protoc
+        run: sudo apt-get install -y protobuf-compiler
+
+      - name: Production env policy tests
+        run: |
+          cargo test --lib startup_policy_is_disabled_outside_production --quiet
+          cargo test --lib startup_policy_blocks_unsafe_production_defaults --quiet
+          cargo test --lib startup_policy_accepts_hardened_production_configuration --quiet
+
+  deployment-ops-selftest:
+    name: Deployment ops self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Bash deployment ops self-test
+        run: bash scripts/deployment-ops-selftest.sh
+
+      - name: Run PowerShell deployment ops self-test
+        shell: pwsh
+        run: ./scripts/deployment-ops-pwsh-selftest.ps1
+
+  release-readiness-selftest:
+    name: Release readiness self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Bash release readiness self-test
+        run: bash scripts/release-readiness-selftest.sh
+
+      - name: Run PowerShell release readiness self-test
+        shell: pwsh
+        run: ./scripts/release-readiness-pwsh-selftest.ps1
+
+  deployment-rehearsal-selftest:
+    name: Deployment rehearsal self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Bash deployment rehearsal self-test
+        run: bash scripts/deployment-rehearsal-selftest.sh
+
+      - name: Run PowerShell deployment rehearsal self-test
+        shell: pwsh
+        run: ./scripts/deployment-rehearsal-pwsh-selftest.ps1
+
+  release-readiness:
+    name: Release readiness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install protoc
+        run: sudo apt-get install -y protobuf-compiler
+
+      - name: Run Bash release readiness wrapper
+        run: bash scripts/release-readiness.sh "" artifacts/release-readiness-bash
+
+      - name: Run PowerShell release readiness wrapper
+        shell: pwsh
+        run: ./scripts/release-readiness.ps1 -OutDir artifacts/release-readiness-pwsh
+
+      - name: Publish release readiness summary
+        if: always()
+        shell: bash
+        run: |
+          for dir in artifacts/release-readiness-bash artifacts/release-readiness-pwsh; do
+            label="$(basename "$dir")"
+            echo "## ${label}" >> "$GITHUB_STEP_SUMMARY"
+            if [[ -f "$dir/summary.md" ]]; then
+              cat "$dir/summary.md" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "summary missing" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload release readiness artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-readiness-artifacts
+          path: |
+            artifacts/release-readiness-bash
+            artifacts/release-readiness-pwsh
+
+  # Rust hygiene advisory
+  rust-hygiene:
+    name: Rust hygiene advisory
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install protoc
+        run: sudo apt-get install -y protobuf-compiler
+
+      - name: Run advisory hygiene checks
+        continue-on-error: true
+        run: bash scripts/rust-hygiene.sh artifacts/rust-hygiene
+
+      - name: Publish hygiene summary
+        if: always()
+        run: |
+          if [[ -f artifacts/rust-hygiene/summary.md ]]; then
+            cat artifacts/rust-hygiene/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Rust hygiene summary missing." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ -f artifacts/rust-hygiene/summary.env ]]; then
+            # shellcheck disable=SC1091
+            source artifacts/rust-hygiene/summary.env
+            echo >> "$GITHUB_STEP_SUMMARY"
+            echo "Regression detected: ${REGRESSION_DETECTED:-unknown}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload hygiene logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-hygiene-logs
+          path: artifacts/rust-hygiene
+
+  # Rust hygiene no-regression gate
+  rust-hygiene-no-regression:
+    name: Rust hygiene no-regression
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,21 +234,96 @@ jobs:
       - name: Install protoc
         run: sudo apt-get install -y protobuf-compiler
 
-      - name: Format check
-        run: cargo fmt --check
+      - name: Run hygiene helper self-test
+        run: bash scripts/rust-hygiene-selftest.sh
 
-      - name: Clippy (warnings as errors)
-        run: cargo clippy --all-targets -- -D warnings
+      - name: Run PowerShell hygiene wrapper self-test
+        shell: pwsh
+        run: ./scripts/rust-hygiene.ps1 -Mode selftest
 
-      - name: Build
-        run: cargo build --locked
+      - name: Run PowerShell wrapper status self-test
+        shell: pwsh
+        run: ./scripts/rust-hygiene-pwsh-selftest.ps1
 
-      - name: Unit tests
-        run: cargo test --lib -- --nocapture
+      - name: Check hygiene regression
+        run: bash scripts/rust-hygiene-no-regression.sh artifacts/rust-hygiene-no-regression
 
-  # ── TypeScript SDK ────────────────────────────────────────────────────────────
+      - name: Publish no-regression verdict
+        if: always()
+        run: |
+          if [[ -f artifacts/rust-hygiene-no-regression/summary.md ]]; then
+            cat artifacts/rust-hygiene-no-regression/summary.md >> "$GITHUB_STEP_SUMMARY"
+            echo >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Rust hygiene no-regression summary missing." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ -f artifacts/rust-hygiene-no-regression/no-regression-verdict.md ]]; then
+            cat artifacts/rust-hygiene-no-regression/no-regression-verdict.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Rust hygiene no-regression verdict missing." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload hygiene no-regression logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-hygiene-no-regression-logs
+          path: artifacts/rust-hygiene-no-regression
+
+  # Rust hygiene PowerShell wrapper on Windows
+  rust-hygiene-pwsh-windows:
+    name: Rust hygiene PowerShell wrapper (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install protoc
+        run: choco install protoc --no-progress
+
+      - name: Run PowerShell hygiene wrapper self-test
+        shell: pwsh
+        run: ./scripts/rust-hygiene.ps1 -Mode selftest
+
+      - name: Run PowerShell wrapper status self-test
+        shell: pwsh
+        run: ./scripts/rust-hygiene-pwsh-selftest.ps1
+
+      - name: Run PowerShell hygiene wrapper no-regression
+        shell: pwsh
+        run: ./scripts/rust-hygiene.ps1 -Mode no-regression -OutDir artifacts/rust-hygiene-windows
+
+      - name: Publish Windows hygiene summary
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "artifacts/rust-hygiene-windows/summary.env") {
+            ./scripts/rust-hygiene.ps1 -Mode status -OutDir artifacts/rust-hygiene-windows >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            "Windows Rust hygiene summary missing." >> $env:GITHUB_STEP_SUMMARY
+          }
+          if (Test-Path "artifacts/rust-hygiene-windows/no-regression-verdict.md") {
+            "" >> $env:GITHUB_STEP_SUMMARY
+            Get-Content "artifacts/rust-hygiene-windows/no-regression-verdict.md" >> $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Upload Windows hygiene logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-hygiene-windows-logs
+          path: artifacts/rust-hygiene-windows
+
+  # TypeScript SDK
   typescript-sdk:
-    name: TypeScript SDK typecheck
+    name: TypeScript SDK build + test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,19 +334,25 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "24"
           cache: npm
           cache-dependency-path: typescript-sdk/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Build
+        run: npm run build
+
       - name: Type check
         run: npm run typecheck
 
-  # ── SolidJS workspace UI ──────────────────────────────────────────────────────
+      - name: Package export tests
+        run: npm run test:continuity
+
+  # SolidJS workspace UI
   solid-ui:
-    name: SolidJS UI build
+    name: SolidJS UI build + test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -77,17 +363,33 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "24"
           cache: npm
           cache-dependency-path: solid-ui/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Local router regression suite
+        run: npm run test:local-router
+
       - name: Build
         run: npm run build
 
-  # ── Security audit ────────────────────────────────────────────────────────────
+  # SolidJS UI Docker build
+  solid-ui-docker:
+    name: SolidJS UI Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker build
+        run: docker build -f solid-ui/Dockerfile -t omnyid-solidui-ci .
+
+  # Security audit
   audit:
     name: Security audit
     runs-on: ubuntu-latest

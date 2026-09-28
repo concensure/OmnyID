@@ -409,7 +409,7 @@ export const demoThread: ThreadData = {
           mimeType: 'application/pdf',
           sizeBytes: 348122,
           storage: {
-            backend: 'minio',
+            backend: 'seaweedfs',
             bucket: 'attachments',
             object_key: 'thread_travel_invoice_2026/att_invoice_pdf',
           },

@@ -57,7 +57,7 @@ export function AlternateViewsInspector(props: {
                   }`}
                   onClick={() => setSelectedKey(entry.key)}
                 >
-                  {entry.view.format} · p{entry.view.priority ?? 0}
+                  {entry.view.format} | p{entry.view.priority ?? 0}
                 </button>
               )}
             </For>

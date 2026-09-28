@@ -1,6 +1,6 @@
 ﻿// @locs-version: 1.0
 /**
- * DOM-based HTML sanitizer â€” used for both email and Markdown rendering.
+ * DOM-based HTML sanitizer — used for both email and Markdown rendering.
  *
  * Uses the browser's DOMParser to parse raw HTML, then walks the tree and:
  *   - Removes any element not on the allowlist (unwrapping children)
@@ -25,7 +25,7 @@ interface SanitizerConfig {
   postProcess?: (el: Element, tag: string) => void;
 }
 
-// â”€â”€ Email mode config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Email mode config ─────────────────────────────────────────────────────────
 
 const EMAIL_CONFIG: SanitizerConfig = {
   allowedTags: new Set([
@@ -46,7 +46,7 @@ const EMAIL_CONFIG: SanitizerConfig = {
     td:  ["colspan", "rowspan"],
   },
   safeHref: /^(https?:|mailto:)/i,
-  // Raster image data URIs only â€” SVG data URIs are excluded (can carry scripts)
+  // Raster image data URIs only — SVG data URIs are excluded (can carry scripts)
   safeSrc: /^(https?:|data:image\/(png|jpeg|jpg|gif|webp|avif);base64,)/i,
   allowStyle: true,
   postProcess(el, tag) {
@@ -57,7 +57,7 @@ const EMAIL_CONFIG: SanitizerConfig = {
   },
 };
 
-// â”€â”€ Markdown mode config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Markdown mode config ──────────────────────────────────────────────────────
 // Stricter than email: no style attributes, no div/span/img, add task-list inputs.
 // Only language-* classes are preserved on <code> for future syntax highlighting.
 
@@ -111,7 +111,7 @@ const MARKDOWN_CONFIG: SanitizerConfig = {
   },
 };
 
-// â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Public API ────────────────────────────────────────────────────────────────
 
 export function sanitizeEmailHtml(rawHtml: string): string {
   return sanitize(rawHtml, EMAIL_CONFIG);
@@ -121,7 +121,7 @@ export function sanitizeMarkdownHtml(rawHtml: string): string {
   return sanitize(rawHtml, MARKDOWN_CONFIG);
 }
 
-// â”€â”€ Core sanitizer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Core sanitizer ────────────────────────────────────────────────────────────
 
 function sanitize(rawHtml: string, cfg: SanitizerConfig): string {
   const doc = new DOMParser().parseFromString(rawHtml, "text/html");

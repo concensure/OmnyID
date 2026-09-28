@@ -1,4 +1,3 @@
-version: '3.9'
 services:
   postgres:
     image: pgvector/pgvector:pg18
@@ -12,24 +11,52 @@ services:
       - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations
     restart: unless-stopped
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: afpadmin
-      MINIO_ROOT_PASSWORD: afpadmin123
+  seaweedfs:
+    image: chrislusf/seaweedfs
+    command:
+      - server
+      - -dir=/data
+      - -ip=seaweedfs
+      - -s3
+      - -s3.config=/etc/seaweedfs/s3-config.json
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "8333:8333"
+      - "9333:9333"
     volumes:
-      - minio-data:/data
+      - seaweedfs-data:/data
+      - ./infra/seaweedfs/s3-config.json:/etc/seaweedfs/s3-config.json:ro
     restart: unless-stopped
+
+  seaweedfs-init:
+    image: amazon/aws-cli:2
+    depends_on:
+      - seaweedfs
+    environment:
+      AWS_ACCESS_KEY_ID: ${OMNYID_SEAWEEDFS_ACCESS_KEY:-omnyid}
+      AWS_SECRET_ACCESS_KEY: ${OMNYID_SEAWEEDFS_SECRET_KEY:-omnyid-dev-secret}
+      AWS_DEFAULT_REGION: ${OMNYID_SEAWEEDFS_REGION:-us-east-1}
+      AWS_EC2_METADATA_DISABLED: "true"
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command: >
+      until aws --endpoint-url http://seaweedfs:8333 s3api list-buckets >/dev/null 2>&1; do sleep 2; done;
+      aws --endpoint-url http://seaweedfs:8333 s3api head-bucket --bucket ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments} >/dev/null 2>&1
+      || aws --endpoint-url http://seaweedfs:8333 s3api create-bucket --bucket ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
+    restart: "no"
 
   homeserver:
     build: .
-    depends_on: [postgres, minio]
+    depends_on: [postgres, seaweedfs]
     environment:
       DATABASE_URL: postgres://afp:afp@postgres:5432/afp
+      SEAWEEDFS_MASTER_URL: http://seaweedfs:9333
+      OMNYID_SEAWEEDFS_S3_ENDPOINT: http://seaweedfs:8333
+      OMNYID_SEAWEEDFS_ACCESS_KEY: ${OMNYID_SEAWEEDFS_ACCESS_KEY:-omnyid}
+      OMNYID_SEAWEEDFS_SECRET_KEY: ${OMNYID_SEAWEEDFS_SECRET_KEY:-omnyid-dev-secret}
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
+      OMNYID_SEAWEEDFS_PREFIX: ${OMNYID_SEAWEEDFS_PREFIX:-archives}
+      OMNYID_SEAWEEDFS_REGION: ${OMNYID_SEAWEEDFS_REGION:-us-east-1}
       OMNYID_AGENT_ID: agent:you@yourdomain.ai
       OMNYID_GATEWAY_AGENT_ID: agent:email-gateway@yourdomain.ai
       OMNYID_HOMESERVER_URL: https://your-homeserver.example.com
@@ -60,9 +87,6 @@ services:
       OMNYID_IMAP_HOST: ${OMNYID_IMAP_HOST:-}
       OMNYID_IMAP_USERNAME: ${OMNYID_IMAP_USERNAME:-}
       OMNYID_IMAP_PASSWORD: ${OMNYID_IMAP_PASSWORD:-}
-      MINIO_URL: http://minio:9000
-      MINIO_USER: afpadmin
-      MINIO_PASS: afpadmin123
       SMTP_HOST: smtp.gmail.com
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
@@ -86,6 +110,6 @@ services:
       - default
 
 volumes:
-  minio-data:
   caddy-data:
   caddy-config:
+  seaweedfs-data:

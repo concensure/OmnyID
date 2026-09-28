@@ -320,7 +320,7 @@ export function buildKnowledgeGraphStudyContinuationSeed(input: {
       query: `Using ${contextLabel} from my current knowledge graph, summarize the key ideas, likely exam angles, and next revision steps.${searchQuery ? ` Also keep this focus in view: ${searchQuery}.` : ""}${graphSuffix}`,
       notice: "Study follow-up prompt loaded from your current graph focus.",
       helper: adjacentSource?.helperLabel ?? "Attach another source from the same week or lecture if you want stronger overlap.",
-      valuePromise: "Carry the graphâ€™s current topic focus directly into the next grounded study answer.",
+      valuePromise: "Carry the graph’s current topic focus directly into the next grounded study answer.",
       recommendedUpload: adjacentSource?.recommendedUploadLabel ?? "Best with one week-specific lecture source plus a reading or rough note from the same topic.",
       knowledgeMode: "connected_notes",
       retentionMode: "keep_extracted_only",

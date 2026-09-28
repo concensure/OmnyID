@@ -54,7 +54,7 @@ export async function loadGoogleIdentityClient(
     if (existing) {
       // The script's load/error events are one-shot. If a previous attempt
       // already saw one of them fire, attaching a fresh listener here would
-      // wait forever (success) or need a retry (failure) â€” resolve/retry
+      // wait forever (success) or need a retry (failure) — resolve/retry
       // based on the outcome we recorded, instead of re-listening on a tag
       // whose events will never fire again.
       if (existing.dataset.omnyidGoogleLoaded === "true") {

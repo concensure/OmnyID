@@ -120,7 +120,7 @@ export function buildKnowledgeGraphExplorerFocusState(input: {
     };
   }
 
-  const focusLabel = appliedFocus.join(" Â· ");
+  const focusLabel = appliedFocus.join(" · ");
   const reusableCount =
     input.strongCount > 0
       ? input.strongCount

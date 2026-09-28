@@ -1,6 +1,6 @@
 # Omnyid - AFP v1 Reference Implementation
 
-Omnyid is a private, self-hosted, agent-first personal workspace built around AFP v1:
+Omnyid is a private, self-hosted, agent-native personal workspace built around AFP v1:
 
 - one signed, structured message model for email, notes, actions, and views
 - one shared AFP thread history used by both the human inbox surface and the agent inbox code path
@@ -17,7 +17,7 @@ Encryption happens on the sender’s device before any message is transmitted or
 Local-First
 The primary data store is ElectricSQL (Postgres + PGlite) running on the user’s own devices. Most operations (reading recent messages, running agents) happen locally without network round-trips.
 
-Agent-First / Agent-Centric
+Agent-Native / Agent-Centric
 Every design decision starts from the perspective of autonomous agents with their own cryptographic Agent ID. Humans are secondary users of the same system.
 
 Immutable / Append-Only
@@ -49,6 +49,76 @@ The protocol and SDKs deliberately minimize required fields and cognitive load. 
 
 These 12 principles are the foundation of every technical decision made in the project. They are not aspirational — they are actively enforced in the code, schemas, and SDKs that have already been published in the OmnyID repository.
 
+## Rust hygiene boundary
+
+The Rust repo currently uses a split quality boundary:
+
+- correctness gate: `cargo check --quiet` plus `cargo test --lib`
+- integration gate: `tests/api_flows.rs` runs separately when `TEST_DATABASE_URL` is set
+- startup policy gate: production env-policy tests verify the homeserver refuses unsafe production flags and dev/default DB settings
+- hygiene gate: no regression against the checked-in fmt/clippy baseline
+
+The local scripts, artifact formats, and CI behavior are documented in [docs/RUST_HYGIENE.md](docs/RUST_HYGIENE.md).
+
+## Production env contract
+
+When the homeserver runs with `OMNYID_ENV=production` (or `APP_ENV`, `ENVIRONMENT`, `RUST_ENV`, `NODE_ENV` set to `production`/`prod`), startup now fails closed unless the deployment satisfies these minimum requirements:
+
+- `DATABASE_URL` must be set to a non-default production database; dev defaults like `postgres://afp:afp@postgres:5432/afp` are rejected
+- `OMNYID_ALLOW_INSECURE_UNSIGNED` must remain unset or false
+- `OMNYID_ALLOW_PLAINTEXT_STORAGE` must remain unset or false
+- `OMNYID_DELEGATION_MASTER_KEY_HEX` must be a real 32-byte hex key and cannot be the all-zeros placeholder
+- `OMNYID_SESSION_SECRET` or `OMNYID_SESSION_SECRET_FILE` must be configured so session-backed auth and OAuth flows can boot safely
+- file-backed secrets such as `OMNYID_SESSION_SECRET_FILE` must point to existing non-blank files; relative paths are resolved from the supplied env file directory during preflight
+- if any Stripe self-serve billing env vars are present, production must also provide a valid Stripe secret key, webhook secret, Pro price id, and workspace return URL base
+- simulator rollout flags must be valid booleans, and promotion/sampling cannot be enabled for a simulator surface that is explicitly disabled
+
+This is a deployment safety boundary, not a feature flag. It exists to prevent a production environment from booting with local-dev security settings that would otherwise only fail later at runtime.
+
+You can preflight the current shell env or a candidate env file before rollout:
+
+- Bash: `bash scripts/startup-policy-check.sh`
+- Bash with env file: `bash scripts/startup-policy-check.sh .env.production`
+- PowerShell: `./scripts/startup-policy-check.ps1`
+- PowerShell with env file: `./scripts/startup-policy-check.ps1 -EnvFile .env.production`
+- Bash post-deploy verify: `bash scripts/verify-deployment.sh`
+- PowerShell post-deploy verify: `./scripts/verify-deployment.ps1`
+- PowerShell Oracle runtime-only stage: `./scripts/stage-oracle-runtime.ps1 -OutputDir C:\temp\omnyid-oracle-runtime`
+- Bash local release rehearsal: `bash scripts/release-readiness.sh .env.production`
+- PowerShell local release rehearsal: `./scripts/release-readiness.ps1 -EnvFile .env.production`
+- Bash release rehearsal with artifact: `bash scripts/release-readiness.sh .env.production artifacts/release-readiness`
+- PowerShell release rehearsal with artifact: `./scripts/release-readiness.ps1 -EnvFile .env.production -OutDir artifacts/release-readiness`
+- Bash release rehearsal with backup verification: `bash scripts/release-readiness.sh .env.production artifacts/release-readiness /path/to/backup_dir`
+- PowerShell release rehearsal with backup verification: `./scripts/release-readiness.ps1 -EnvFile .env.production -OutDir artifacts/release-readiness -BackupDir C:\path\to\backup_dir`
+- Bash deployment rehearsal with live verify: `bash scripts/deployment-rehearsal.sh .env.production artifacts/deployment-rehearsal /path/to/backup_dir https://api.omnyid.example https://app.omnyid.example/workspace/`
+- PowerShell deployment rehearsal with live verify: `./scripts/deployment-rehearsal.ps1 -EnvFile .env.production -OutDir artifacts/deployment-rehearsal -BackupDir C:\path\to\backup_dir -BaseUrl https://api.omnyid.example -WorkspaceUrl https://app.omnyid.example/workspace/`
+
+The operator rollout procedure is documented in [docs/PRODUCTION_ROLLOUT_RUNBOOK.md](docs/PRODUCTION_ROLLOUT_RUNBOOK.md).
+
+`release-readiness` now checks the full local stack:
+
+- Rust backend correctness
+- TypeScript SDK typecheck, build, and continuity export tests
+- `solid-ui` typecheck, local-router tests, and production build
+- production startup-policy preflight when an env file is supplied
+- deployment-ops self-test and optional backup verification
+
+Oracle packaging note:
+
+- `scripts/stage-oracle-runtime.ps1` creates a runtime-only deployment tree for Oracle Cloud
+- it stages runtime code, compose files, selected ops scripts, docs served by Caddy, and the small simulated-data fixture `benchmarks/sample.jsonl`
+- it intentionally excludes local build output and residue such as `target`, `artifacts`, `training_data`, `.git`, `.dev-launch`, and SDK `node_modules`
+- `scripts/deploy-oracle.ps1` now rewrites uploaded `*_FILE` env values onto container-visible `/run/secrets/...` paths and syncs the referenced local secret files into the remote `.secrets` directory automatically
+
+Composio note:
+
+- the TypeScript SDK path is valid, but production still depends on a real `COMPOSIO_API_KEY` or `COMPOSIO_API_KEY_FILE`
+- `/readyz` treats a configured but invalid Composio key as not ready, and current official examples initialize `Composio` with an API key before `create(userId, ...)`
+
+Operational readiness note:
+
+- `/readyz` now fails closed on misconfigured Gmail OAuth, Composio, or Stripe self-serve billing
+- Stripe self-serve readiness requires a valid `OMNYID_STRIPE_SECRET_KEY`, `OMNYID_STRIPE_WEBHOOK_SECRET`, a valid Pro price id, and a workspace return URL base such as `OMNYID_WORKSPACE_BASE_URL`
 
 The current Oracle preview deployment also includes:
 
@@ -63,118 +133,41 @@ Important product boundary:
 - Gmail and custom mailbox linking are optional human inbox bridges only
 
 
-## Current Status (OmnyID Cloud)
+## Current Status
 
-Phases 0.5 through 13 are now complete or have concrete implementation artifacts.
+OmnyID is commercially ready in the current audited lane as of Tuesday, August 25, 2026.
 
-Phase 0.5 is complete and audited.
+Current audited state:
 
-Phase 1 is complete:
+- Default commercial lane: `ready` with promotion gate `go`.
+- Strict commercial lane: `ready` with promotion gate `go`.
+- Oracle production proof is passing; the current host root filesystem is at `77%` use with about `11G` free.
+- The newest audited Oracle backup is `/var/backups/omnyid/20260825T050754Z`.
+- Backup verification is `pass`.
+- Restore-drill status is `pass`.
+- The local staged runtime manifest includes all required runtime scripts.
+- The `personalOS` implementation plan is complete in the latest audit: `13` implemented phases, `0` partial phases, `0` not-started phases, and `0` open tasks.
 
-- canonical AFP v1 schema frozen
-- Rust backend passes `cargo check`
-- Rust AFP contract tests pass
-- Python and TypeScript SDKs converge on the same contract shape
+Use the checked artifacts instead of this README for the operator verdict:
 
-Phase 2 and Phase 3 are complete:
+- `artifacts/production-go-no-go-current/production-go-no-go.json`
+- `artifacts/commercial-readiness-snapshot-current/commercial-readiness-snapshot.json`
+- `artifacts/oracle-production-proof-current/oracle-production-proof.json`
+- `artifacts/personalos-readiness-audit-current/personalos-readiness-audit.json`
 
-- deterministic Ed25519 signing and verification landed
-- signed ingress is enforced by default unless dev mode explicitly allows unsigned traffic
-- a real `omnyid-envelope-v1` XChaCha20-Poly1305 content envelope now exists
-- the Python SDK can encrypt before send and decrypt after fetch when `OMNYID_ENCRYPTION_KEY_HEX` is configured
-- the TypeScript SDK can now sign, encrypt before send, and decrypt after fetch using the same env conventions
-- both SDKs now support recipient-wrapped content keys when peer public keys are known
-- AgentCards can now be signed by the homeserver and verified by SDK discovery helpers
-- inbound SMTP-to-AFP conversion can now sign and encrypt generated messages when Omnyid keys are configured
-- standard self-host deployment defaults now require signed and encrypted traffic
-- encrypted messages now avoid plaintext storage by default when a supported encryption envelope is present
-- the homeserver now exposes `/healthz` and `/readyz`, and message persistence is idempotent on replay
-- the backend now uses a tracked embedded migration baseline aligned with Docker bootstrap
-- the homeserver now exposes `/metricsz` with non-plaintext operational counters
-- the server and outbound gateway now emit metadata-only tracing spans for transport and delivery flows
-- the same AFP thread can now safely carry human-ingested email and agent-emitted follow-up history
-- the homeserver now exposes a bidirectional realtime relay path at `/relay/ws`
-- both SDKs now expose relay subscription helpers, thread-scoped subscriptions, and WebSocket send with HTTP fallback
-- the TypeScript SDK now includes WebTransport-first transport planning with WebSocket and HTTP fallback
-- the TypeScript SDK now also exposes a WebTransport-capable `openThreadSubscription(...)` realtime helper with WebSocket fallback
-- the Python SDK now follows the same transport-capability policy and includes a real `aioquic`-backed WebTransport send path plus transport-aware thread watching
-- the homeserver now exposes a real WebTransport relay listener backed by QUIC when cert and key paths are configured
-- the repo now includes a built-in development certificate generator for WebTransport bootstrapping
-- internal gRPC is now disabled by default and intended only for private service use
-- mail sync is now modeled as OAuth-first for Gmail/Outlook with custom IMAP credentials only as fallback
-- mail sync now persists checkpoint/status state so the gateway can evolve toward restart-safe provider workers
-- Gmail inbound sync now uses the real Gmail API to list recent message ids, fetch raw RFC822 payloads, convert them into AFP messages, and persist checkpointed progress
-- custom-domain inbound sync now performs real IMAP inbox fetches with checkpointed UID tracking before converting raw RFC822 payloads into AFP messages
-- inbound email replies now preserve SMTP threading hints and can rejoin existing AFP threads on ingest
-- outbound AFP email intents now flow through a shared provider-aware gateway dispatch path after durable message storage
-- outbound Gmail delivery now uses real OAuth token exchange plus Gmail API send, and custom-domain fallback now uses real SMTP delivery via `lettre`
+For the current Oracle remediation flow and readiness commands, see:
 
-Phase 4 is complete:
+- [docs/COMMERCIAL_READINESS_STATUS.md](docs/COMMERCIAL_READINESS_STATUS.md)
+- [docs/PRODUCTION_ROLLOUT_RUNBOOK.md](docs/PRODUCTION_ROLLOUT_RUNBOOK.md)
+- [Documents/deployment/OMNYID_ORACLE_DEPLOYMENT.md](Documents/deployment/OMNYID_ORACLE_DEPLOYMENT.md)
 
-- Agent ID parsing now exists across Rust, Python, and TypeScript surfaces
-- a working Agent ID spec now exists in `OMNYID_AGENT_ID_SPEC.md`
-- AgentCard verification now rejects malformed Agent IDs
-- AgentCards now carry rotation-oriented `key_id` metadata
-- SDK discovery now requires valid rotation metadata on AgentCards
-- `/.well-known/afp-delegation` is now env-backed instead of hardcoded
-- both SDKs now follow delegated discovery before resolving `agent-card`, while preserving requested-domain authority
-- both SDKs now support explicit discovery trust modes, defaulting to `strict`
-- the Caddy and discovery deployment baseline is now templated and documented
-
-Phases 5 through 7 are complete:
-
-- Phase 5: shared-thread reply flow across the outbound gateway and both SDKs; RFC-aware inbound parsing and durable outbound delivery receipts
-- Phase 6: SDK examples demonstrate reply, shared-thread fetch, and verified discovery
-- Phase 7: typed UI thread surface and renderer-oriented workspace shell; realtime relay refresh; metadata-first encrypted attachment previews; Solid-based unified app shell in `solid-ui`
-
-Phase 8 is complete:
-
-- integration capability and action audit contract in `src/integration.rs`
-- approval queue for risky agent actions persisted back into AFP thread history via `/actions/decision`
-- risky outbound email actions gated behind approval
-- signed API request framework in `src/gateway/rest_adapter.rs`: Ed25519-signed `X-Agent-Id`, `X-Agent-Timestamp`, `X-Agent-Signature` headers on every outbound HTTP/GraphQL call
-- `POST /actions/execute` endpoint validates `ApprovalMode`, executes the action, and stores intent and result AFP audit messages in-thread
-- `execute_capability()` SDK helper available in Python and TypeScript SDKs
-
-Phase 9 has the server-side shape contract complete; client-side ElectricSQL wiring is the remaining step:
-
-- sync slice, conflict mode, and device bootstrap contract in `src/local_sync.rs`
-- `GET /sync/shapes` returns `SliceShapeDescriptor` items (table + where clause) clients use to configure their Electric subscriptions
-- `GET /sync/bootstrap` returns a full device bootstrap bundle including sync endpoint
-- per-device sync policy registry persisted in Postgres; dashboard generates downloadable bootstrap bundles for desktop, mobile, and watch
-- **instant edge updates require wiring an Electric server into the Docker stack and adding client-side PGLite subscription — that step is not yet complete**
-
-Phase 10 is complete:
-
-- personalization event, LoRA artifact, and weekly local training contract in `src/personalization.rs`
-- `POST /personalization/event` stores feedback signals (approved, rejected, edited, ignored) per-agent
-- `GET /personalization/stats` returns signal counts and active LoRA artifact ID for training-readiness checks
-- LoRA training job runs locally on user-owned data only; no plaintext leaves the device
-
-Phase 11 is complete:
-
-- `scripts/omnyid-backup.sh`: pg_dump + gzip + MinIO mirror + manifest + 30-day retention prune
-- `scripts/omnyid-restore.sh`: drop/recreate DB + pg_restore from MinIO archive
-- `scripts/omnyid-upgrade.sh`: backup → pull → build → restart → healthcheck loop
-- `docker-compose.oracle.minimal.yml` includes a `backup` service on a daily 02:00 UTC cron
-- Knowledge Curator backlink writes now use lightweight `backlink_update` AFP audit messages while maintaining a derived `afp_backlinks` index for fast traversal
-- the server keeps an optional real-time in-memory Knowledge Curator graph view in sync with new `backlink_update` messages
-- low-value internal agent steps are expected to use `metadata.store: false`, with older internal-heavy history moving to cold storage so the hot path stays lean
-
-Phase 12 is complete:
-
-- `postgres/migrations/0016_billing.sql`: `billing_subscriptions` and `billing_events` tables
-- `POST /billing/webhook`: HMAC-SHA256 Stripe signature verification, idempotent event recording, subscription upsert
-- `GET /billing/status`: returns current plan and status for an account
-- billing event storage is idempotent via `UNIQUE (stripe_event_id)` to safely absorb Stripe retries
-
-Phase 13 is complete:
+Implemented areas already present in the repo include:
 
 - `.github/workflows/ci.yml`: four-job CI pipeline — `rust` (fmt + clippy + test), `typescript-sdk` (typecheck), `solid-ui` (build), `audit` (cargo-audit)
 - 8 exhaustive property-style parse tests for the relay protocol in `src/relay.rs`
 - 112 unit tests passing across all modules
 
-Knowledge Curator Enhanced (Phase 11 supplement) is complete as of 2026-04-15:
+Knowledge Curator additions already present in the repo include:
 
 - `GET /backlinks/graph?root={id}&depth={n}` — BFS multi-hop backlink graph traversal, depth clamped to 4; returns node set + edge list
 - `POST /notes/supertags/install-defaults` — one-click install of 8 default supertag definitions (`#Work`, `#Personal`, `#Health`, `#Finance`, `#Travel`, `#Learning`, `#Ideas`, `#Urgent`)

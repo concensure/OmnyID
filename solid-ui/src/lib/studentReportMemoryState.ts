@@ -65,7 +65,7 @@ export function buildStudentReportMemoryState(
     title: result.title,
     subtitle: result.subtitle,
     detail: result.description,
-    chips: result.badges.slice(0, 12),
+    chips: result.badges,
     actions: result.actions,
     quickStartSeed: buildStudyReportArtifactContinuationSeed(result.artifact),
   }));
@@ -81,7 +81,6 @@ export function buildStudentReportMemoryState(
   const outputFormats = sorted.map((artifact) => formatReportKind(artifact.outputFormat));
   const recoveryChips = recoveryItems.flatMap((item) => item.chips);
   const chips = uniqueFirst([
-    ...recoveryChips,
     ...reportLabels,
     ...courseLabels,
     ...unitLabels,
@@ -89,6 +88,7 @@ export function buildStudentReportMemoryState(
     ...sessionLabels,
     ...sourceLabels,
     ...outputFormats,
+    ...recoveryChips,
   ], 12);
   const primaryQuickStartSeed =
     recoveryItems[0]?.quickStartSeed ?? buildStudyReportArtifactContinuationSeed(latest);

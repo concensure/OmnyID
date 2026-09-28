@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.email-group-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -286,7 +286,78 @@ struct GmailSendRequest {
     subject: String,
     html: String,
     #[serde(default)]
+    text: Option<String>,
+    #[serde(default)]
+    thread_id: Option<String>,
+    #[serde(default)]
+    references: Vec<String>,
+    #[serde(default)]
     in_reply_to: Option<String>,
+}
+
+fn clean_optional(value: Option<String>) -> Option<String> {
+    value
+        .map(|item| item.trim().to_string())
+        .filter(|item| !item.is_empty())
+}
+
+fn clean_non_empty(value: String, field: &str) -> Result<String, (StatusCode, String)> {
+    let clean = value.trim().to_string();
+    if clean.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("{field} must not be empty"),
+        ));
+    }
+    Ok(clean)
+}
+
+fn clean_email_recipient(value: String) -> Result<String, (StatusCode, String)> {
+    let clean = clean_non_empty(value, "to")?;
+    if clean.contains(['\r', '\n']) || !clean.contains('@') {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "to must be a valid email address".to_string(),
+        ));
+    }
+    Ok(clean)
+}
+
+fn clean_references(values: Vec<String>) -> Vec<String> {
+    values
+        .into_iter()
+        .filter(|item| !item.contains(['\r', '\n']))
+        .map(|item| item.trim().to_string())
+        .filter(|item| !item.is_empty())
+        .take(20)
+        .collect()
+}
+
+fn outgoing_request_from_gmail_send_body(
+    user_id: &str,
+    body: GmailSendRequest,
+) -> Result<crate::gateway::smtp_out::OutgoingEmailRequest, (StatusCode, String)> {
+    let to = clean_email_recipient(body.to)?;
+    let subject = clean_non_empty(body.subject, "subject")?;
+    let html = body.html.trim().to_string();
+    let text = clean_optional(body.text);
+    let message_body = text
+        .or_else(|| if html.is_empty() { None } else { Some(html) })
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            "body must not be empty".to_string(),
+        ))?;
+    let message_id = ulid::Ulid::new().to_string();
+    Ok(crate::gateway::smtp_out::OutgoingEmailRequest {
+        thread_id: clean_optional(body.thread_id).unwrap_or_else(|| format!("compose:{user_id}")),
+        message_id,
+        parent_id: None,
+        to: vec![to],
+        subject,
+        body: message_body,
+        in_reply_to: clean_optional(body.in_reply_to),
+        references: clean_references(body.references),
+    })
 }
 
 async fn gmail_config_for_user(
@@ -329,55 +400,20 @@ async fn gmail_send_http(
     Json(body): Json<GmailSendRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let request = outgoing_request_from_gmail_send_body(&user.id, body)?;
+    let gmail_config = gmail_config_for_user(&state, &user.id).await?;
 
-    let token = state
-        .db
-        .get_gmail_token(&user.id)
-        .await
-        .map_err(internal_error)
-        .map_err(status_to_http)?
-        .ok_or((
-            StatusCode::PRECONDITION_FAILED,
-            "Gmail not connected".to_string(),
-        ))?;
+    let provider_message_id =
+        crate::gateway::gmail_api::send_gmail_message_with_receipt(&request, &gmail_config)
+            .await
+            .map_err(|e| (StatusCode::BAD_GATEWAY, e))?;
 
-    let refresh_token = token["refresh_token"].as_str().unwrap_or("").to_string();
-    let from_address = token["gmail_email"].as_str().unwrap_or("").to_string();
-
-    if refresh_token.is_empty() || from_address.is_empty() {
-        return Err((
-            StatusCode::PRECONDITION_FAILED,
-            "Gmail token incomplete â€” reconnect Gmail".to_string(),
-        ));
-    }
-
-    let gmail_config = crate::gateway::gmail_api::GmailOAuthConfig {
-        client_id: std::env::var("OMNYID_GMAIL_CLIENT_ID").unwrap_or_default(),
-        client_secret: std::env::var("OMNYID_GMAIL_CLIENT_SECRET").unwrap_or_default(),
-        refresh_token,
-        user_id: "me".to_string(),
-        from_address: from_address.clone(),
-    };
-
-    let msg_id = ulid::Ulid::new().to_string();
-    let request = crate::gateway::smtp_out::OutgoingEmailRequest {
-        thread_id: format!("compose:{}", user.id),
-        message_id: msg_id.clone(),
-        parent_id: None,
-        to: vec![body.to],
-        subject: body.subject,
-        body: body.html,
-        in_reply_to: body.in_reply_to,
-        references: vec![],
-    };
-
-    crate::gateway::gmail_api::send_gmail_message(&request, &gmail_config)
-        .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, e))?;
-
-    Ok(Json(
-        serde_json::json!({ "sent": true, "message_id": msg_id }),
-    ))
+    Ok(Json(serde_json::json!({
+        "ok": true,
+        "sent": true,
+        "message_id": provider_message_id,
+        "client_message_id": request.message_id,
+    })))
 }
 
 // â”€â”€ Approve and send agent draft â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -387,6 +423,12 @@ struct GmailSendDraftRequest {
     to: String,
     subject: String,
     html: String,
+    #[serde(default)]
+    text: Option<String>,
+    #[serde(default)]
+    thread_id: Option<String>,
+    #[serde(default)]
+    references: Vec<String>,
     #[serde(default)]
     in_reply_to: Option<String>,
 }
@@ -403,6 +445,9 @@ async fn gmail_send_draft_http(
             to: body.to,
             subject: body.subject,
             html: body.html,
+            text: body.text,
+            thread_id: body.thread_id,
+            references: body.references,
             in_reply_to: body.in_reply_to,
         }),
     )
@@ -434,14 +479,16 @@ async fn gmail_send_prepared_draft_http(
         outgoing_request_from_prepared_draft(&user.id, &body.draft_message_id, &draft_message)?;
     let gmail_config = gmail_config_for_user(&state, &user.id).await?;
 
-    crate::gateway::gmail_api::send_gmail_message(&request, &gmail_config)
-        .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, e))?;
+    let provider_message_id =
+        crate::gateway::gmail_api::send_gmail_message_with_receipt(&request, &gmail_config)
+            .await
+            .map_err(|e| (StatusCode::BAD_GATEWAY, e))?;
 
     Ok(Json(serde_json::json!({
         "sent": true,
         "draft_message_id": body.draft_message_id,
-        "message_id": request.message_id,
+        "message_id": provider_message_id,
+        "client_message_id": request.message_id,
     })))
 }
 
@@ -552,7 +599,11 @@ fn outgoing_request_from_prepared_draft(
 
 #[cfg(test)]
 mod tests {
-    use super::outgoing_request_from_prepared_draft;
+    use super::{
+        GmailSendRequest, outgoing_request_from_gmail_send_body,
+        outgoing_request_from_prepared_draft,
+    };
+    use axum::http::StatusCode;
     use serde_json::json;
 
     #[test]
@@ -588,5 +639,50 @@ mod tests {
         assert_eq!(request.body, "Draft body");
         assert_eq!(request.in_reply_to.as_deref(), Some("thread:gmail:4"));
         assert_eq!(request.references, vec!["thread:gmail:4".to_string()]);
+    }
+
+    #[test]
+    fn gmail_send_route_builds_threaded_outgoing_request_from_approved_draft() {
+        let request = outgoing_request_from_gmail_send_body(
+            "user_1",
+            GmailSendRequest {
+                to: "vendor@example.com".to_string(),
+                subject: "Re: Floral quote".to_string(),
+                html: "<p>HTML copy</p>".to_string(),
+                text: Some("Plain copy".to_string()),
+                thread_id: Some("wedding_vendor_quote:workspace:vendor".to_string()),
+                references: vec!["<root@example.com>".to_string(), "\r\nbad".to_string()],
+                in_reply_to: Some("<parent@example.com>".to_string()),
+            },
+        )
+        .expect("outgoing request");
+
+        assert_eq!(request.thread_id, "wedding_vendor_quote:workspace:vendor");
+        assert_eq!(request.parent_id, None);
+        assert_eq!(request.to, vec!["vendor@example.com".to_string()]);
+        assert_eq!(request.subject, "Re: Floral quote");
+        assert_eq!(request.body, "Plain copy");
+        assert_eq!(request.in_reply_to.as_deref(), Some("<parent@example.com>"));
+        assert_eq!(request.references, vec!["<root@example.com>".to_string()]);
+        assert!(!request.message_id.is_empty());
+    }
+
+    #[test]
+    fn gmail_send_route_rejects_malformed_approved_drafts_before_gmail() {
+        let error = outgoing_request_from_gmail_send_body(
+            "user_1",
+            GmailSendRequest {
+                to: "not-an-address".to_string(),
+                subject: "Subject".to_string(),
+                html: "Body".to_string(),
+                text: None,
+                thread_id: None,
+                references: vec![],
+                in_reply_to: None,
+            },
+        )
+        .expect_err("invalid recipient rejected");
+
+        assert_eq!(error.0, StatusCode::BAD_REQUEST);
     }
 }

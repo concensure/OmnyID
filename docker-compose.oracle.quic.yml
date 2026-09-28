@@ -1,42 +1,79 @@
-version: '3.9'
 services:
   postgres:
     image: pgvector/pgvector:pg18
+    mem_limit: ${OMNYID_POSTGRES_MEM_LIMIT:-2g}
+    cpus: ${OMNYID_POSTGRES_CPUS:-1.5}
+    pids_limit: ${OMNYID_POSTGRES_PIDS_LIMIT:-256}
     environment:
-      POSTGRES_DB: afp
-      POSTGRES_USER: afp
-      POSTGRES_PASSWORD: afp
+      POSTGRES_DB: ${POSTGRES_DB:-afp}
+      POSTGRES_USER: ${POSTGRES_USER:-afp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_PASSWORD_FILE: ${POSTGRES_PASSWORD_FILE:-}
     volumes:
+      - ./.secrets:/run/secrets:ro
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations
     restart: unless-stopped
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z
+  electric:
+    image: electricsql/electric:latest
+    mem_limit: ${OMNYID_ELECTRIC_MEM_LIMIT:-768m}
+    cpus: ${OMNYID_ELECTRIC_CPUS:-0.75}
+    pids_limit: ${OMNYID_ELECTRIC_PIDS_LIMIT:-128}
+    depends_on:
+      - postgres
+    entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
+      ELECTRIC_INSECURE: "true"
+      ELECTRIC_USAGE_REPORTING: "false"
+    ports:
+      - "127.0.0.1:5133:5133"
+    volumes:
+      - ./.secrets:/run/secrets:ro
+      - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
+    restart: unless-stopped
+
+  seaweedfs:
+    image: quay.io/seaweedfs/seaweedfs:RELEASE.2025-02-28T09-55-16Z
+    mem_limit: ${OMNYID_SEAWEEDFS_MEM_LIMIT:-1536m}
+    cpus: ${OMNYID_SEAWEEDFS_CPUS:-1.0}
+    pids_limit: ${OMNYID_SEAWEEDFS_PIDS_LIMIT:-256}
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      SEAWEEDFS_ROOT_USER: ${SEAWEEDFS_ROOT_USER:-${MINIO_ROOT_USER:-omnyid}}
+      SEAWEEDFS_ROOT_PASSWORD: ${SEAWEEDFS_ROOT_PASSWORD:-${MINIO_ROOT_PASSWORD:-omnyid-dev-secret}}
     volumes:
-      - minio-data:/data
+      - seaweedfs-data:/data
     restart: unless-stopped
 
   homeserver:
     build: .
+    mem_limit: ${OMNYID_HOMESERVER_MEM_LIMIT:-4g}
+    cpus: ${OMNYID_HOMESERVER_CPUS:-2.5}
+    pids_limit: ${OMNYID_HOMESERVER_PIDS_LIMIT:-512}
     depends_on:
       - postgres
-      - minio
+      - electric
+      - seaweedfs
+    entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgres://afp:afp@postgres:5432/afp}
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
       OMNYID_AGENT_ID: ${OMNYID_AGENT_ID}
       OMNYID_GATEWAY_AGENT_ID: ${OMNYID_GATEWAY_AGENT_ID}
       OMNYID_HOMESERVER_URL: ${OMNYID_HOMESERVER_URL}
       OMNYID_AFP_DELEGATION: ${OMNYID_AFP_DELEGATION}
       OMNYID_DOMAIN: ${OMNYID_DOMAIN}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
       OMNYID_PUBLIC_KEY_HEX: ${OMNYID_PUBLIC_KEY_HEX}
       OMNYID_SIGNING_KEY_HEX: ${OMNYID_SIGNING_KEY_HEX}
+      OMNYID_SIGNING_KEY_HEX_FILE: ${OMNYID_SIGNING_KEY_HEX_FILE:-/run/secrets/omnyid_signing_key_hex}
       OMNYID_ENCRYPTION_KEY_HEX: ${OMNYID_ENCRYPTION_KEY_HEX}
+      OMNYID_ENCRYPTION_KEY_HEX_FILE: ${OMNYID_ENCRYPTION_KEY_HEX_FILE:-/run/secrets/omnyid_encryption_key_hex}
+      OMNYID_SESSION_SECRET_FILE: ${OMNYID_SESSION_SECRET_FILE:-/run/secrets/omnyid_session_secret}
       OMNYID_RECIPIENT_KEYS_JSON: ${OMNYID_RECIPIENT_KEYS_JSON:-{}}
       OMNYID_ALLOW_INSECURE_UNSIGNED: "false"
       OMNYID_REQUIRE_ENCRYPTION: "true"
@@ -49,21 +86,31 @@ services:
       OMNYID_IMAP_POLL_SECONDS: ${OMNYID_IMAP_POLL_SECONDS:-30}
       OMNYID_EMAIL_ADDRESS: ${OMNYID_EMAIL_ADDRESS}
       OMNYID_GMAIL_CLIENT_ID: ${OMNYID_GMAIL_CLIENT_ID:-}
+      OMNYID_GOOGLE_CLIENT_ID: ${OMNYID_GOOGLE_CLIENT_ID:-}
       OMNYID_GMAIL_CLIENT_SECRET: ${OMNYID_GMAIL_CLIENT_SECRET:-}
+      OMNYID_GMAIL_CLIENT_SECRET_FILE: ${OMNYID_GMAIL_CLIENT_SECRET_FILE:-/run/secrets/omnyid_gmail_client_secret}
       OMNYID_GMAIL_REFRESH_TOKEN: ${OMNYID_GMAIL_REFRESH_TOKEN:-}
+      OMNYID_GMAIL_REFRESH_TOKEN_FILE: ${OMNYID_GMAIL_REFRESH_TOKEN_FILE:-/run/secrets/omnyid_gmail_refresh_token}
       OMNYID_GMAIL_USER_ID: ${OMNYID_GMAIL_USER_ID:-me}
       OMNYID_IMAP_HOST: ${OMNYID_IMAP_HOST:-}
       OMNYID_IMAP_PORT: ${OMNYID_IMAP_PORT:-993}
       OMNYID_IMAP_USERNAME: ${OMNYID_IMAP_USERNAME:-}
       OMNYID_IMAP_PASSWORD: ${OMNYID_IMAP_PASSWORD:-}
+      OMNYID_IMAP_PASSWORD_FILE: ${OMNYID_IMAP_PASSWORD_FILE:-/run/secrets/omnyid_imap_password}
       FROM_ADDRESS: ${FROM_ADDRESS}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_PASS_FILE: ${SMTP_PASS_FILE:-/run/secrets/omnyid_smtp_pass}
       SMTP_PORT: ${SMTP_PORT:-587}
-      MINIO_URL: http://minio:9000
-      MINIO_USER: ${MINIO_ROOT_USER}
-      MINIO_PASS: ${MINIO_ROOT_PASSWORD}
+      OMNYID_ANTHROPIC_KEY_FILE: ${OMNYID_ANTHROPIC_KEY_FILE:-/run/secrets/omnyid_anthropic_api_key}
+      OMNYID_RUNPOD_API_KEY_FILE: ${OMNYID_RUNPOD_API_KEY_FILE:-/run/secrets/omnyid_runpod_api_key}
+      OMNYID_OPENAI_API_KEY_FILE: ${OMNYID_OPENAI_API_KEY_FILE:-/run/secrets/omnyid_openai_api_key}
+      SEAWEEDFS_URL: http://seaweedfs:9000
+      SEAWEEDFS_USER: ${SEAWEEDFS_ROOT_USER:-${MINIO_ROOT_USER:-omnyid}}
+      SEAWEEDFS_PASS: ${SEAWEEDFS_ROOT_PASSWORD:-${MINIO_ROOT_PASSWORD:-omnyid-dev-secret}}
+      OMNYID_ELECTRIC_URL: ${OMNYID_ELECTRIC_URL:-http://electric:5133}
+      OMNYID_ENABLE_PRIVATE_RUNTIMES: "false"
       OMNYID_ENABLE_WEBTRANSPORT: "true"
       OMNYID_WEBTRANSPORT_BIND_ADDR: 0.0.0.0:8443
       OMNYID_WEBTRANSPORT_CERT_PATH: ${OMNYID_WEBTRANSPORT_CERT_PATH}
@@ -71,12 +118,11 @@ services:
     ports:
       - "127.0.0.1:18080:8080"
       - "443:8443/udp"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
-      - /srv/omnyid/runtimes:/srv/omnyid/runtimes
     restart: unless-stopped
+    volumes:
+      - ./.secrets:/run/secrets:ro
+      - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
 
 volumes:
   postgres-data:
-  minio-data:
+  seaweedfs-data:

@@ -1,7 +1,7 @@
 ﻿// @locs-version: 1.0
 import { createSignal, For, Show, onCleanup } from "solid-js";
 
-// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ToastVariant = "success" | "error" | "info" | "warning";
 
@@ -12,7 +12,7 @@ export type ToastItem = {
   action?: { label: string; onClick: () => void };
 };
 
-// â”€â”€ Store (module-level singleton) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Store (module-level singleton) ────────────────────────────────────────────
 
 const [toasts, setToasts] = createSignal<ToastItem[]>([]);
 let nextId = 1;
@@ -49,16 +49,16 @@ export const toast = {
   warning: (msg: string, opts?: Parameters<typeof showToast>[2]) => showToast(msg, "warning", opts),
 };
 
-// â”€â”€ Visual config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Visual config ─────────────────────────────────────────────────────────────
 
 const VARIANT_STYLES: Record<ToastVariant, { border: string; icon: string; iconColor: string }> = {
-  success: { border: "border-emerald-200/60", icon: "âœ“", iconColor: "text-emerald-500" },
-  error:   { border: "border-red-200/60",     icon: "âœ•", iconColor: "text-red-500"     },
-  info:    { border: "border-primary/20",      icon: "â„¹", iconColor: "text-primary"    },
-  warning: { border: "border-amber-200/60",   icon: "âš ", iconColor: "text-amber-500"  },
+  success: { border: "border-emerald-200/60", icon: "✓", iconColor: "text-emerald-500" },
+  error:   { border: "border-red-200/60",     icon: "✕", iconColor: "text-red-500"     },
+  info:    { border: "border-primary/20",      icon: "ℹ", iconColor: "text-primary"    },
+  warning: { border: "border-amber-200/60",   icon: "⚠", iconColor: "text-amber-500"  },
 };
 
-// â”€â”€ ToastItem component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ToastItem component ───────────────────────────────────────────────────────
 
 function ToastEntry(props: { item: ToastItem }) {
   const styles = () => VARIANT_STYLES[props.item.variant];
@@ -97,13 +97,13 @@ function ToastEntry(props: { item: ToastItem }) {
         class="ml-1 text-on-surface-variant/40 hover:text-on-surface-variant transition text-base leading-none shrink-0"
         onClick={() => dismiss(props.item.id)}
       >
-        Ã—
+        ×
       </button>
     </div>
   );
 }
 
-// â”€â”€ ToastContainer â€” mount once in App.tsx â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ToastContainer — mount once in App.tsx ────────────────────────────────────
 
 export function ToastContainer() {
   return (
