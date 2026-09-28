@@ -135,11 +135,13 @@ export function DecisionQueueCard(props: {
   entry: QueueEntry;
   selected: boolean;
   onSelect: () => void;
+  onOpen: () => void;
   compact?: boolean;
 }) {
   const entry = () => props.entry;
   const compact = () => props.compact ?? false;
   const onSelect = () => props.onSelect;
+  const onOpen = () => props.onOpen;
   const selected = () => props.selected;
   const compactMode = () => (compact() ? "compact" : "comfortable");
   const cardClass = (borderClass: string, selectedClass: string) =>
@@ -199,18 +201,19 @@ export function DecisionQueueCard(props: {
       openLabel: queueEntryReviewLabel(currentEntry),
     };
   };
-  const openQueueEntry = () => onSelect()();
+  const selectQueueEntry = () => onSelect()();
+  const openQueueEntry = () => onOpen()();
   const handleCardKeyDown = (event: KeyboardEvent) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    openQueueEntry();
+    selectQueueEntry();
   };
 
   return (
     <article
       role="button"
       tabIndex={0}
-      onClick={openQueueEntry}
+      onClick={selectQueueEntry}
       onKeyDown={handleCardKeyDown}
       class={cardClass(decisionQueueUrgencyStyle(cardState().decision.urgency).border, cardState().selectedStateClass)}
       data-magic-action="open"

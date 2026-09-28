@@ -113,6 +113,7 @@ export function DecisionQueueWorkspace(props: DecisionQueueWorkspaceProps) {
               entry={entry}
               selected={isSelectedQueueEntry(entry.id)}
               onSelect={queueEntrySelectAction(entry.id)}
+              onOpen={() => openQueueEntryById(entry.id)}
               compact={compactMode()}
             />
           )}
