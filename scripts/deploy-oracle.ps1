@@ -241,10 +241,7 @@ function Sync-OracleSecrets {
             $remoteTarget = ($RemoteDirValue.TrimEnd('/') + '/' + ($entry.RemoteHostRelativePath -replace '\\', '/').TrimStart('/')).Replace("//", "/")
             $remoteTargetLiteral = Convert-ToShellSingleQuotedLiteral $remoteTarget
 
-            $promoteCommand = @"
-sudo mkdir -p $remoteSecretsDirLiteral &&
-sudo install -m 600 $stageTargetLiteral $remoteTargetLiteral
-"@
+            $promoteCommand = "sudo mkdir -p $remoteSecretsDirLiteral && sudo install -m 600 $stageTargetLiteral $remoteTargetLiteral"
             $promoteOutput = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" $promoteCommand 2>&1
             if ($promoteOutput) { $promoteOutput | ForEach-Object { Write-Host $_ } }
             if ($LASTEXITCODE -ne 0) {
@@ -252,9 +249,7 @@ sudo install -m 600 $stageTargetLiteral $remoteTargetLiteral
             }
         }
 
-        $normalizeCommand = @"
-sudo sh -lc 'chmod 700 $remoteSecretsRootLiteral && chmod 600 $remoteSecretsRootLiteral/*'
-"@
+        $normalizeCommand = "sudo sh -lc 'chmod 700 $remoteSecretsRootLiteral && chmod 600 $remoteSecretsRootLiteral/*'"
         $normalizeOutput = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" $normalizeCommand 2>&1
         if ($normalizeOutput) { $normalizeOutput | ForEach-Object { Write-Host $_ } }
         if ($LASTEXITCODE -ne 0) {
