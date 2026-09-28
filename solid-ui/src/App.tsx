@@ -1183,6 +1183,34 @@ function App() {
   const [primaryUseCasePromptVisible, setPrimaryUseCasePromptVisible] = createSignal(false);
   const [primaryUseCaseSaving, setPrimaryUseCaseSaving] = createSignal(false);
   const [primaryUseCaseError, setPrimaryUseCaseError] = createSignal<string | null>(null);
+  const [searchBusy, setSearchBusy] = createSignal(false);
+  const [searchFeedback, setSearchFeedback] = createSignal("");
+  const [isSearchError, setIsSearchError] = createSignal(false);
+  const [attachmentIngestCapabilities, setAttachmentIngestCapabilities] =
+    createSignal<AttachmentIngestCapabilities | null>(null);
+  const [searchFailureReceipt, setSearchFailureReceipt] = createSignal<CommandSearchFailureReceipt | null>(null);
+  const [commandResult, setCommandResult] = createSignal<UiCommandResponse | null>(null);
+  const [searchComposerSeed, setSearchComposerSeed] =
+    createSignal<(OnboardingQuickStartSeed & { id: number }) | null>(null);
+  const [lastStudyLaunchMetadata, setLastStudyLaunchMetadata] =
+    createSignal<SearchSubmitPayload["studyLaunchMetadata"] | null>(null);
+  const [searchAttachmentGrounding, setSearchAttachmentGrounding] =
+    createSignal<AttachmentGroundingEvidence | null>(null);
+  const [pendingSearchCleanupMessageIds, setPendingSearchCleanupMessageIds] = createSignal<string[]>([]);
+  const [retryingSearchCleanup, setRetryingSearchCleanup] = createSignal(false);
+  const [persistingSearchAttachments, setPersistingSearchAttachments] = createSignal(false);
+  const [workflowPendingIntent, setWorkflowPendingIntent] =
+    createSignal<CommandPreviewWorkflowPendingIntentSeed | null>(null);
+  const [objectSearchResult, setObjectSearchResult] = createSignal<ObjectMessagesResponse | null>(null);
+  const [objectSearchFocusObjectId, setObjectSearchFocusObjectId] = createSignal<string | null>(null);
+  const [objectSearchFocusThreadId, setObjectSearchFocusThreadId] = createSignal<string | null>(null);
+  const [objectSearchLaunchContext, setObjectSearchLaunchContext] = createSignal<ObjectSearchLaunchContext | null>(null);
+  const objectSearchRouterPreview = createLocalSemanticRouterPreviewController({ profile: "object" });
+  const workspaceSearchRouterPreview = createLocalSemanticRouterPreviewController({ profile: "workspace" });
+  const [lastQuery, setLastQuery] = createSignal("");
+  const [lastEngine, setLastEngine] = createSignal("auto");
+  const [lastOptMode, setLastOptMode] = createSignal("balanced");
+  const [queryChipDismissed, setQueryChipDismissed] = createSignal(false);
 
   function primaryUseCasePromptDismissedKey() {
     return `omnyid.primary-use-case.prompt.dismissed.${userId() || "guest"}`;
@@ -1734,34 +1762,6 @@ function App() {
     if (!force && session()?.token) return;
     setShowAuthModal(true);
   }
-  const [searchBusy, setSearchBusy] = createSignal(false);
-  const [searchFeedback, setSearchFeedback] = createSignal("");
-  const [isSearchError, setIsSearchError] = createSignal(false);
-  const [attachmentIngestCapabilities, setAttachmentIngestCapabilities] =
-    createSignal<AttachmentIngestCapabilities | null>(null);
-  const [searchFailureReceipt, setSearchFailureReceipt] = createSignal<CommandSearchFailureReceipt | null>(null);
-  const [commandResult, setCommandResult] = createSignal<UiCommandResponse | null>(null);
-  const [searchComposerSeed, setSearchComposerSeed] =
-    createSignal<(OnboardingQuickStartSeed & { id: number }) | null>(null);
-  const [lastStudyLaunchMetadata, setLastStudyLaunchMetadata] =
-    createSignal<SearchSubmitPayload["studyLaunchMetadata"] | null>(null);
-  const [searchAttachmentGrounding, setSearchAttachmentGrounding] =
-    createSignal<AttachmentGroundingEvidence | null>(null);
-  const [pendingSearchCleanupMessageIds, setPendingSearchCleanupMessageIds] = createSignal<string[]>([]);
-  const [retryingSearchCleanup, setRetryingSearchCleanup] = createSignal(false);
-  const [persistingSearchAttachments, setPersistingSearchAttachments] = createSignal(false);
-  const [workflowPendingIntent, setWorkflowPendingIntent] =
-    createSignal<CommandPreviewWorkflowPendingIntentSeed | null>(null);
-  const [objectSearchResult, setObjectSearchResult] = createSignal<ObjectMessagesResponse | null>(null);
-  const [objectSearchFocusObjectId, setObjectSearchFocusObjectId] = createSignal<string | null>(null);
-  const [objectSearchFocusThreadId, setObjectSearchFocusThreadId] = createSignal<string | null>(null);
-  const [objectSearchLaunchContext, setObjectSearchLaunchContext] = createSignal<ObjectSearchLaunchContext | null>(null);
-  const objectSearchRouterPreview = createLocalSemanticRouterPreviewController({ profile: "object" });
-  const workspaceSearchRouterPreview = createLocalSemanticRouterPreviewController({ profile: "workspace" });
-  const [lastQuery, setLastQuery] = createSignal("");
-  const [lastEngine, setLastEngine] = createSignal("auto");
-  const [lastOptMode, setLastOptMode] = createSignal("balanced");
-  const [queryChipDismissed, setQueryChipDismissed] = createSignal(false);
   const [runnerFiles, setRunnerFiles] = createSignal<RuntimeWorkspaceFileEntry[]>([]);
   const [activeFile, setActiveFile] = createSignal<RuntimeWorkspaceFileResponse | null>(null);
   const [editorValue, setEditorValue] = createSignal("");
