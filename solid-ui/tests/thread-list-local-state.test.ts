@@ -67,9 +67,9 @@ test("thread list local state falls back to supported density and sort values", 
   localStorageState.set(THREAD_DENSITY_KEY, "dense");
   localStorageState.set(THREAD_SORT_MODE_KEY, "priority");
 
-  assert.equal(loadThreadDensity(userId), "comfortable");
+  assert.equal(loadThreadDensity(userId), "7");
   assert.equal(loadThreadSortMode(userId), "activity");
-  assert.equal(localStorageState.get(scopedKey(THREAD_DENSITY_KEY)), "comfortable");
+  assert.equal(localStorageState.get(scopedKey(THREAD_DENSITY_KEY)), "7");
   assert.equal(localStorageState.get(scopedKey(THREAD_SORT_MODE_KEY)), "activity");
   assert.equal(localStorageState.has(THREAD_DENSITY_KEY), false);
   assert.equal(localStorageState.has(THREAD_SORT_MODE_KEY), false);
@@ -283,7 +283,7 @@ test("thread list local state writers persist only normalized values", () => {
     },
     userId,
   );
-  saveThreadDensity("compact", userId);
+  saveThreadDensity("3", userId);
   saveThreadSortMode("recently_edited", userId);
   saveThreadLastRead(
     {
@@ -350,7 +350,7 @@ test("thread list local state writers persist only normalized values", () => {
       "thread-b": "Beta",
     }),
   );
-  assert.equal(localStorageState.get(scopedKey(THREAD_DENSITY_KEY)), "compact");
+  assert.equal(localStorageState.get(scopedKey(THREAD_DENSITY_KEY)), "3");
   assert.equal(localStorageState.get(scopedKey(THREAD_SORT_MODE_KEY)), "recently_edited");
   assert.equal(
     localStorageState.get(scopedKey(THREAD_LAST_READ_KEY)),

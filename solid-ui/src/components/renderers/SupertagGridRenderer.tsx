@@ -70,7 +70,9 @@ interface HighlightRule {
   color: "red" | "amber" | "emerald" | "sky" | "violet";
 }
 
-type Density = "compact" | "comfortable" | "spacious";
+type Density = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10";
+type DensityBucket = "compact" | "comfortable" | "spacious";
+const DENSITY_MODES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] as const;
 
 interface SortKey { field: string; asc: boolean; }
 
@@ -420,9 +422,37 @@ function TagPill(props: { label: string; small?: boolean }) {
   );
 }
 
+function normalizeDensity(value: unknown): Density {
+  if (value === "compact") return "3";
+  if (value === "comfortable") return "7";
+  if (value === "spacious") return "10";
+  const normalized = typeof value === "number" ? String(Math.round(value)) : String(value ?? "").trim();
+  return DENSITY_MODES.includes(normalized as Density) ? normalized as Density : "7";
+}
+
+function densityBucket(d: Density): DensityBucket {
+  const level = Number(d);
+  if (level <= 4) return "compact";
+  if (level >= 9) return "spacious";
+  return "comfortable";
+}
+
+function densityScaleLabel(d: Density): string {
+  if (d === "1") return "A";
+  if (d === "10") return "A";
+  return "";
+}
+
+function densityScaleLabelClass(d: Density): string {
+  if (d === "1") return "text-[0.55rem] leading-none";
+  if (d === "10") return "text-sm leading-none";
+  return "h-1.5 w-1.5 rounded-full bg-current opacity-70";
+}
+
 function densityPadding(d: Density) {
-  if (d === "compact") return "4px 12px";
-  if (d === "spacious") return "14px 12px";
+  const bucket = densityBucket(d);
+  if (bucket === "compact") return "4px 12px";
+  if (bucket === "spacious") return "14px 12px";
   return "8px 12px";
 }
 
@@ -639,10 +669,10 @@ function ColumnMenuPopover(props: {
       )}</For>
       <div class="mx-3 my-2 border-t border-white/30" />
       <p class="px-3 pb-1 font-mono text-[0.55rem] uppercase tracking-[0.2em] text-on-surface-variant/50">Density</p>
-      <div class="flex gap-1 px-3 pb-1.5">
-        {(["compact", "comfortable", "spacious"] as const).map((d) => (
-          <button type="button" class={`flex-1 rounded-lg border py-1 text-[0.6rem] font-medium transition ${props.density === d ? "border-primary/60 bg-primary/10 text-primary" : "border-white/30 text-on-surface-variant hover:bg-white/50"}`} onClick={() => props.onDensity(d)}>
-            {d === "compact" ? "▪" : d === "comfortable" ? "▬" : "▰"}
+      <div class="grid grid-cols-5 gap-1 px-3 pb-1.5">
+        {DENSITY_MODES.map((d) => (
+          <button type="button" class={`inline-flex min-h-7 items-center justify-center rounded-lg border text-[0.6rem] font-medium transition ${props.density === d ? "border-primary/60 bg-primary/10 text-primary" : "border-white/30 text-on-surface-variant hover:bg-white/50"}`} onClick={() => props.onDensity(d)} aria-pressed={props.density === d} aria-label={`Text density ${d} of 10`} title={`Text density ${d} of 10`}>
+            <span class={densityScaleLabelClass(d)}>{densityScaleLabel(d)}</span>
           </button>
         ))}
       </div>
@@ -1503,7 +1533,7 @@ export function SupertagGridRenderer(props: { message: AfpMessage }) {
   const [pinnedCols, setPinnedCols] = createSignal<Set<string>>(new Set());
   const [groupBy, setGroupBy] = createSignal(false);
   const [hiddenCols, setHiddenCols] = createSignal<Set<string>>(new Set());
-  const [density, setDensity] = createSignal<Density>("comfortable");
+  const [density, setDensity] = createSignal<Density>("7");
   const [zebraStripe, setZebraStripe] = createSignal(true);
   const [filterCombinator, setFilterCombinator] = createSignal<"and" | "or">("or");
   const [presets, setPresets] = createSignal<ViewPreset[]>([]);
@@ -1878,7 +1908,7 @@ export function SupertagGridRenderer(props: { message: AfpMessage }) {
     if (Array.isArray(s.pinnedCols)) setPinnedCols(new Set(s.pinnedCols));
     if (typeof s.groupBy === "boolean") setGroupBy(s.groupBy);
     if (Array.isArray(s.hiddenCols)) setHiddenCols(new Set(s.hiddenCols));
-    if (s.density) setDensity(s.density);
+    if (s.density) setDensity(normalizeDensity(s.density));
     if (typeof s.zebraStripe === "boolean") setZebraStripe(s.zebraStripe);
     if (s.filterCombinator) setFilterCombinator(s.filterCombinator);
   };

@@ -4,7 +4,7 @@ import type { ThreadSortMode } from "@/lib/threadSort";
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
 
-export type ThreadDensity = "comfortable" | "compact";
+export type ThreadDensity = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10";
 export type ThreadPriorityLevel = "high" | "medium" | "low";
 export type ThreadQueryHistoryEntry = {
   query: string;
@@ -26,7 +26,13 @@ export const THREAD_DENSITY_KEY = "omnyid.threads.density";
 export const THREAD_SORT_MODE_KEY = "omnyid.threads.sort-mode";
 
 function normalizeThreadDensity(value: unknown): ThreadDensity {
-  return value === "compact" ? "compact" : "comfortable";
+  if (value === "compact") return "3";
+  if (value === "comfortable") return "7";
+  if (value === "spacious") return "10";
+  const normalized = typeof value === "number" ? String(Math.round(value)) : String(value ?? "").trim();
+  return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"].includes(normalized)
+    ? normalized as ThreadDensity
+    : "7";
 }
 
 function normalizeThreadSortMode(value: unknown): ThreadSortMode {
@@ -178,12 +184,16 @@ export function loadThreadDensity(userId?: string | null): ThreadDensity {
     }
     return normalized;
   } catch {
-    return "comfortable";
+    return "7";
   }
 }
 
 export function saveThreadDensity(value: ThreadDensity, userId?: string | null): void {
   writeScopedThreadListStorageValue(THREAD_DENSITY_KEY, userId, normalizeThreadDensity(value));
+}
+
+export function threadDensityIsCompact(value: ThreadDensity): boolean {
+  return Number(normalizeThreadDensity(value)) <= 4;
 }
 
 export function loadThreadSortMode(userId?: string | null): ThreadSortMode {

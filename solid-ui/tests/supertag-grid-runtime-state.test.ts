@@ -41,7 +41,7 @@ test("parseSupertagGridShareHash decodes matching share links only", () => {
     activeFilters: ["x"],
     pinnedCols: [],
     hiddenCols: [],
-    density: "compact",
+    density: "3",
   });
   assert.equal(parseSupertagGridShareHash(hash, "grid-2"), null);
   assert.equal(parseSupertagGridShareHash("#sgrid_grid-1=bad-base64", "grid-1"), null);

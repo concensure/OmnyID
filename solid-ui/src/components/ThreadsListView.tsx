@@ -8,6 +8,7 @@ import {
   readSession,
 } from "@/lib/api";
 import { EmptyState } from "@/components/EmptyState";
+import { QueueDensityToggle } from "@/components/QueueDensityToggle";
 import { ThreadDiscoveryLens } from "@/components/ThreadDiscoveryLens";
 import { ThreadDiscoveryStateSummary } from "@/components/ThreadDiscoveryStateSummary";
 import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
@@ -48,6 +49,7 @@ import {
   saveThreadSortMode,
   saveStarredThreadIds,
   saveThreadTitles,
+  threadDensityIsCompact,
   type ThreadDensity,
   type ThreadPriorityLevel,
 } from "@/lib/threadListLocalState";
@@ -942,26 +944,7 @@ function togglePreview(tid: string, e: MouseEvent) {
               )}
             </For>
           </div>
-          <div class="flex items-center gap-1 rounded-full border border-white/35 bg-white/35 px-1.5 py-1">
-            <span class="px-1.5 font-mono text-[9px] uppercase tracking-[0.16em] text-outline/70">Density</span>
-            <For each={(["comfortable", "compact"] as const)}>
-              {(mode) => (
-                <button
-                  type="button"
-                  onClick={() => setDensityMode(mode)}
-                  class={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
-                    density() === mode
-                      ? "bg-white text-on-surface shadow-sm"
-                      : "text-on-surface-variant/70 hover:bg-white/45"
-                  }`}
-                  aria-pressed={density() === mode}
-                  title={mode === "comfortable" ? "Comfortable spacing" : "Compact spacing"}
-                >
-                  {mode === "comfortable" ? "M" : "S"}
-                </button>
-              )}
-            </For>
-          </div>
+          <QueueDensityToggle density={density()} onSelect={setDensityMode} tone="indigo" />
           {/* Filter tabs */}
           <nav class="flex items-center gap-1 rounded-full border border-white/35 bg-white/35 px-2 py-1.5">
             <For each={filterTabs}>
@@ -1678,7 +1661,7 @@ function togglePreview(tid: string, e: MouseEvent) {
               const unread = () => unreadCount(thread.threadId, thread.messages);
               const firstSender = () => deriveSender(thread.messages[0] ?? ({} as AfpMessage));
               const isDragOver = () => dragOver() === thread.threadId;
-              const compact = () => density() === "compact";
+              const compact = () => threadDensityIsCompact(density());
               return (
               <div
                 class={`group relative overflow-hidden rounded-2xl border backdrop-blur transition ${isDragOver() ? "border-primary/50 bg-primary/10" : "border-white/40 bg-white/35 hover:bg-white/45"} ${kbNavActive() && kbNavIdx() === sortedThreads().indexOf(thread) ? "ring-2 ring-primary/60" : ""}`}

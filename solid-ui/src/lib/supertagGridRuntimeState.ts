@@ -2,7 +2,7 @@
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
 
-export type SupertagGridDensity = "compact" | "comfortable" | "spacious";
+export type SupertagGridDensity = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10";
 export type SupertagGridFilterCombinator = "and" | "or";
 
 export type SupertagGridSortKey = {
@@ -54,7 +54,13 @@ function sortKeys(value: unknown): SupertagGridSortKey[] {
 }
 
 function density(value: unknown): SupertagGridDensity | undefined {
-  return value === "compact" || value === "comfortable" || value === "spacious" ? value : undefined;
+  if (value === "compact") return "3";
+  if (value === "comfortable") return "7";
+  if (value === "spacious") return "10";
+  const normalized = typeof value === "number" ? String(Math.round(value)) : String(value ?? "").trim();
+  return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"].includes(normalized)
+    ? normalized as SupertagGridDensity
+    : undefined;
 }
 
 function filterCombinator(value: unknown): SupertagGridFilterCombinator | undefined {

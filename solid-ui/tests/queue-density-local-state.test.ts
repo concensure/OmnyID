@@ -24,20 +24,30 @@ Object.assign(globalThis, {
   },
 });
 
-test("queue density local state falls back to comfortable for malformed stored values", () => {
+test("queue density local state falls back to 7/10 for malformed stored values", () => {
   localStorageState.set("omnyid.decision-queue.density", "wide");
   localStorageState.set("omnyid.response-queue.density", "dense");
 
-  assert.equal(loadDecisionQueueDensity(), "comfortable");
-  assert.equal(loadResponseQueueDensity(), "comfortable");
-  assert.equal(localStorageState.get("omnyid.decision-queue.density"), "comfortable");
-  assert.equal(localStorageState.get("omnyid.response-queue.density"), "comfortable");
+  assert.equal(loadDecisionQueueDensity(), "7");
+  assert.equal(loadResponseQueueDensity(), "7");
+  assert.equal(localStorageState.get("omnyid.decision-queue.density"), "7");
+  assert.equal(localStorageState.get("omnyid.response-queue.density"), "7");
 });
 
-test("queue density local state persists only supported density values", () => {
-  saveDecisionQueueDensity("compact");
-  saveResponseQueueDensity("comfortable");
+test("queue density local state persists only supported density levels", () => {
+  saveDecisionQueueDensity("3");
+  saveResponseQueueDensity("10");
 
-  assert.equal(localStorageState.get("omnyid.decision-queue.density"), "compact");
-  assert.equal(localStorageState.get("omnyid.response-queue.density"), "comfortable");
+  assert.equal(localStorageState.get("omnyid.decision-queue.density"), "3");
+  assert.equal(localStorageState.get("omnyid.response-queue.density"), "10");
+});
+
+test("queue density local state migrates legacy density labels", () => {
+  localStorageState.set("omnyid.decision-queue.density", "compact");
+  localStorageState.set("omnyid.response-queue.density", "comfortable");
+
+  assert.equal(loadDecisionQueueDensity(), "3");
+  assert.equal(loadResponseQueueDensity(), "7");
+  assert.equal(localStorageState.get("omnyid.decision-queue.density"), "3");
+  assert.equal(localStorageState.get("omnyid.response-queue.density"), "7");
 });

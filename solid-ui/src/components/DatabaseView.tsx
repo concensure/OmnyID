@@ -380,7 +380,28 @@ function AddRecordModal(props: { tables: string[]; onClose: () => void; onCreate
   );
 }
 
-type DensityMode = "compact" | "comfortable" | "spacious";
+type DensityMode = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10";
+type DensityBucket = "compact" | "comfortable" | "spacious";
+const DENSITY_MODES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] as const;
+
+function densityBucket(mode: DensityMode): DensityBucket {
+  const level = Number(mode);
+  if (level <= 4) return "compact";
+  if (level >= 9) return "spacious";
+  return "comfortable";
+}
+
+function densityScaleLabel(mode: DensityMode): string {
+  if (mode === "1") return "A";
+  if (mode === "10") return "A";
+  return "";
+}
+
+function densityScaleLabelClass(mode: DensityMode): string {
+  if (mode === "1") return "text-[9px] leading-none";
+  if (mode === "10") return "text-[15px] leading-none";
+  return "h-1.5 w-1.5 rounded-full bg-current opacity-70";
+}
 
 export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   const DEFAULT_HEADERS = ["Name", "Status", "Date", "Value", "Notes"];
@@ -396,7 +417,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   const [editingValue, setEditingValue] = createSignal("");
   const [savingCell, setSavingCell] = createSignal<{ rowId: string; col: string } | null>(null);
   const [editError, setEditError] = createSignal<DatabaseViewFailureReceipt | null>(null);
-  const [densityMode, setDensityMode] = createSignal<DensityMode>("comfortable");
+  const [densityMode, setDensityMode] = createSignal<DensityMode>("7");
   const [showPlusMenu, setShowPlusMenu] = createSignal(false);
   const [showImport, setShowImport] = createSignal(false);
   const [tableScrollTop, setTableScrollTop] = createSignal(0);
@@ -407,18 +428,18 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     compact: "px-2 py-1",
     comfortable: "px-3 py-2.5",
     spacious: "px-4 py-4",
-  }[densityMode()]));
+  }[densityBucket(densityMode())]));
 
   const cellPad = createMemo(() => ({
     compact: "px-2 py-0.5",
     comfortable: "px-3 py-1.5",
     spacious: "px-4 py-3",
-  }[densityMode()]))
+  }[densityBucket(densityMode())]))
   const rowHeightPx = createMemo(() => ({
     compact: 28,
     comfortable: 40,
     spacious: 56,
-  }[densityMode()]));
+  }[densityBucket(densityMode())]));
   const shouldVirtualizeRows = createMemo(() => visibleRecords().length > 200);
   const virtualWindow = createMemo(() => {
     const total = visibleRecords().length;
@@ -602,12 +623,15 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         </div>
         <div class="flex items-center gap-2 mt-2 flex-shrink-0">
           {/* Density mode */}
-          <div class="flex items-center gap-0.5 rounded-full border border-outline/15 bg-white/30 px-1 py-0.5">
-            {(["compact", "comfortable", "spacious"] as const).map((m) => (
-              <button type="button" onClick={() => setDensityMode(m)}
-                class={`rounded-full px-2 py-0.5 text-[10px] transition ${densityMode() === m ? "bg-primary/15 text-primary font-semibold" : "text-on-surface-variant/50 hover:text-on-surface-variant"}`}
-                title={m.charAt(0).toUpperCase() + m.slice(1)}>
-                {m === "compact" ? "S" : m === "comfortable" ? "M" : "L"}
+          <div class="inline-flex items-center gap-1 rounded-full border border-outline/15 bg-white/30 p-1 text-[10px] text-on-surface-variant">
+            <span class="px-1.5 font-mono uppercase tracking-[0.16em] text-outline/70">Density</span>
+            {DENSITY_MODES.map((mode) => (
+              <button type="button" onClick={() => setDensityMode(mode)}
+                class={`inline-flex min-h-8 min-w-7 items-center justify-center rounded-full border font-semibold transition ${densityMode() === mode ? "border-primary/25 bg-primary/15 text-primary shadow-sm" : "border-transparent text-on-surface-variant/60 hover:bg-white/55"}`}
+                aria-pressed={densityMode() === mode}
+                aria-label={`Text density ${mode} of 10`}
+                title={`Text density ${mode} of 10`}>
+                <span class={densityScaleLabelClass(mode)}>{densityScaleLabel(mode)}</span>
               </button>
             ))}
           </div>
