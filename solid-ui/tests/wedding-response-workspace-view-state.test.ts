@@ -162,6 +162,38 @@ test("buildWeddingResponseWorkspaceViewState exposes conservative artifact evide
   assert.match(unverified.activePreview?.evidenceSummary.warningLabel ?? "", /Confirm the facts/);
 });
 
+test("buildWeddingResponseWorkspaceViewState projects wedding helper AFP contacts into People helpers", () => {
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    afpMessages: [{
+      id: "afp-helper-mia",
+      thread_id: "wedding_helper_contact:workspace:mia",
+      from: "system://wedding-planning",
+      to: ["agent://wedding-planning", "agent://contacts"],
+      timestamp: "2027-07-21T00:00:00.000Z",
+      type: "ledger",
+      kind: "wedding_helper_contact",
+      subtype: "wedding_helper_contact_upsert",
+      supertags: ["template:wedding_planning", "wedding_helper_contact"],
+      content: {
+        kind: "wedding_helper_contact",
+        name: "Mia Chen",
+        role: "Coordinator",
+      },
+      metadata: {
+        helper_name: "Mia Chen",
+        wedding_plan_id: "wedding_plan:harbour",
+        response_workspace_id: "response_workspace:planning-pass",
+      },
+      views: [],
+      attachments: [],
+    }],
+  });
+
+  assert.ok(state.helperContactNames.includes("Mia Chen"));
+  assert.ok(state.boundaryState.familyVisibleObjects.some((item) => /Mia Chen/i.test(item.title)));
+});
+
 test("buildWeddingResponseWorkspaceViewState redacts imported source filenames in preview labels", () => {
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,

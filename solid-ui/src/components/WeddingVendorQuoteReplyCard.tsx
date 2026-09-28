@@ -9,6 +9,7 @@ import { buildWeddingProviderSetupPresentationState } from "@/lib/weddingProvide
 import { weddingQuoteAttachmentMessageState } from "@/lib/weddingQuoteAttachmentMessageState";
 import {
   weddingVendorQuoteReplyConsentChangeState,
+  weddingVendorQuoteReplyContextualSurfaceState,
   weddingVendorQuoteReplyDraftSyncState,
   weddingVendorQuoteReplyDraftPersistenceState,
   weddingVendorQuoteReplyEditorDirtyState,
@@ -159,6 +160,12 @@ export function WeddingVendorQuoteReplyCard(props: {
     proofPersistence: proofPersistence(),
     providerReadiness: providerReadiness(),
   });
+  const contextualSurface = () => weddingVendorQuoteReplyContextualSurfaceState({
+    flow: props.flow,
+    dirtyState: dirtyState(),
+    draftPersistence: draftPersistence(),
+    primaryActionEnabled: !primaryActionDisabled(),
+  });
   const draftPersistenceClass = () => {
     if (draftPersistence().tone === "success") return "border-emerald-200 bg-emerald-50/90 text-emerald-950";
     if (draftPersistence().tone === "warning") return "border-amber-200 bg-amber-50/90 text-amber-950";
@@ -188,6 +195,45 @@ export function WeddingVendorQuoteReplyCard(props: {
         <span class="max-w-full break-words rounded-full bg-white/85 px-3 py-1 text-sm font-semibold text-emerald-950">
           {props.flow.semanticObject.stateLabel}
         </span>
+      </div>
+
+      <div class={`mt-4 rounded-xl border p-3 ${
+        contextualSurface().surfaceWeight === "receipt"
+          ? "border-emerald-200 bg-white/85"
+          : "border-emerald-100 bg-white/80"
+      }`}>
+        <div class="grid gap-3 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div class="min-w-0">
+            <p class="text-xs font-semibold uppercase text-emerald-800/60">Status</p>
+            <p class="mt-1 break-words text-sm font-semibold text-emerald-950">
+              {contextualSurface().statusLabel}
+            </p>
+          </div>
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="text-xs font-semibold uppercase text-emerald-800/60">Recommendation</p>
+              <span class="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-950">
+                {contextualSurface().confidenceLabel}
+              </span>
+            </div>
+            <p class="mt-1 break-words text-sm font-semibold text-emerald-950">
+              {contextualSurface().recommendationLabel}
+            </p>
+            <p class="mt-1 break-words text-sm leading-6 text-emerald-900/75">
+              {contextualSurface().rationaleLabel}
+            </p>
+          </div>
+        </div>
+        <Show when={contextualSurface().whyLabels.length > 0}>
+          <div class="mt-3 rounded-lg bg-emerald-50/75 p-2">
+            <p class="text-xs font-semibold uppercase text-emerald-800/60">Why</p>
+            <ul class="mt-1 grid gap-1 sm:grid-cols-2">
+              <For each={contextualSurface().whyLabels.slice(0, 4)}>
+                {(label) => <li class="break-words text-xs leading-5 text-emerald-900/75">{label}</li>}
+              </For>
+            </ul>
+          </div>
+        </Show>
       </div>
 
       <Show when={props.flow.stage === "sent"}>

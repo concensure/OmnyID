@@ -64,6 +64,15 @@ export type WeddingProjectionVendorDecisionPolicyCard = {
   noExternalSendWithoutApproval: boolean;
 };
 
+export type WeddingProjectionVendorApprovalCardState = {
+  decisionCount: number;
+  draftCount: number;
+  ctaCopy: string;
+  summaryLabel: string;
+  detailToggleLabel: string;
+  collapsedByDefault: boolean;
+};
+
 export type WeddingProjectionQueueViewState = {
   queue: WeddingProjectionQueueState;
   title: string;
@@ -75,6 +84,8 @@ export type WeddingProjectionQueueViewState = {
   groups: WeddingProjectionQueueGroup[];
   vendorOutreachDraftCards: WeddingProjectionVendorOutreachDraftCard[];
   vendorDecisionPolicyCards: WeddingProjectionVendorDecisionPolicyCard[];
+  vendorApprovalCard: WeddingProjectionVendorApprovalCardState | null;
+  externalSendGuardLabel: string | null;
   semanticObjects: WeddingSemanticUiObject[];
   semanticSurface: WeddingSemanticSurfaceState;
   dispatchPayload: {
@@ -118,7 +129,17 @@ function primaryAction(
   } = { vendorDraftCount: 0, vendorDecisionPolicyCount: 0 },
 ): WeddingProjectionQueueAction {
   if (queue.pendingItems.length > 0) {
-    if (context.vendorDraftCount > 0 && context.vendorDraftCount === queue.pendingItems.length) {
+    const vendorFollowUpCount = context.vendorDraftCount + context.vendorDecisionPolicyCount;
+    const isVendorOnlyQueue = vendorFollowUpCount > 0 && vendorFollowUpCount === queue.pendingItems.length;
+    if (context.vendorDraftCount > 0 && context.vendorDecisionPolicyCount > 0 && isVendorOnlyQueue) {
+      return {
+        kind: "save_pending_outputs",
+        label: `Save ${vendorFollowUpCount} vendor follow-up item${vendorFollowUpCount === 1 ? "" : "s"}`,
+        enabled: true,
+        reason: "Saves selected vendor decisions and internal outreach draft tasks; no external outreach is sent from this action.",
+      };
+    }
+    if (context.vendorDraftCount > 0 && isVendorOnlyQueue) {
       return {
         kind: "save_pending_outputs",
         label: `Save ${context.vendorDraftCount} vendor draft${context.vendorDraftCount === 1 ? "" : "s"}`,
@@ -126,7 +147,7 @@ function primaryAction(
         reason: "Saves internal vendor draft tasks only; no external outreach is sent from this action.",
       };
     }
-    if (context.vendorDecisionPolicyCount > 0 && context.vendorDecisionPolicyCount === queue.pendingItems.length) {
+    if (context.vendorDecisionPolicyCount > 0 && isVendorOnlyQueue) {
       return {
         kind: "save_pending_outputs",
         label: `Save ${context.vendorDecisionPolicyCount} vendor decision${context.vendorDecisionPolicyCount === 1 ? "" : "s"}`,
@@ -265,14 +286,23 @@ function surfaceCopy(input: {
   vendorDraftCount: number;
   vendorDecisionPolicyCount: number;
 }): Pick<WeddingProjectionQueueViewState, "title" | "subtitle" | "description"> {
-  if (input.vendorDraftCount > 0) {
+  const vendorFollowUpCount = input.vendorDraftCount + input.vendorDecisionPolicyCount;
+  const isVendorOnlyQueue = vendorFollowUpCount > 0 && vendorFollowUpCount === input.queue.pendingItems.length;
+  if (input.vendorDraftCount > 0 && input.vendorDecisionPolicyCount > 0 && isVendorOnlyQueue) {
+    return {
+      title: "Save selected vendors and drafts",
+      subtitle: input.queue.summaryLabel,
+      description: "Keep selected vendors active, move unselected vendors out of live queues, and save approval-gated outreach drafts without sending email.",
+    };
+  }
+  if (input.vendorDraftCount > 0 && isVendorOnlyQueue) {
     return {
       title: "Save vendor draft tasks",
       subtitle: input.queue.summaryLabel,
       description: "Keep the editable vendor outreach drafts in this wedding plan. This does not send email or contact vendors.",
     };
   }
-  if (input.vendorDecisionPolicyCount > 0) {
+  if (input.vendorDecisionPolicyCount > 0 && isVendorOnlyQueue) {
     return {
       title: "Save selected vendor decisions",
       subtitle: input.queue.summaryLabel,
@@ -283,6 +313,47 @@ function surfaceCopy(input: {
     title: "Save planning outputs",
     subtitle: input.queue.summaryLabel,
     description: "Save the files, dates, tasks, and notes OmnyID just prepared so they stay in this wedding plan.",
+  };
+}
+
+function externalSendGuardLabel(input: {
+  vendorDraftCount: number;
+  vendorDecisionPolicyCount: number;
+}): string | null {
+  if (input.vendorDraftCount > 0 && input.vendorDecisionPolicyCount > 0) {
+    return "This save records selected vendors and draft tasks only. No vendor email is sent.";
+  }
+  if (input.vendorDraftCount > 0) {
+    return "This save keeps editable vendor draft tasks only. No vendor email is sent.";
+  }
+  if (input.vendorDecisionPolicyCount > 0) {
+    return "This save records the selected-vendor decision only. Vendor outreach remains approval-gated.";
+  }
+  return null;
+}
+
+function vendorApprovalCardState(input: {
+  vendorDraftCount: number;
+  vendorDecisionPolicyCount: number;
+  primaryActionLabel: string;
+}): WeddingProjectionVendorApprovalCardState | null {
+  const total = input.vendorDraftCount + input.vendorDecisionPolicyCount;
+  if (total <= 0) return null;
+  const parts = [
+    input.vendorDecisionPolicyCount > 0
+      ? `${input.vendorDecisionPolicyCount} selected-vendor decision${input.vendorDecisionPolicyCount === 1 ? "" : "s"}`
+      : null,
+    input.vendorDraftCount > 0
+      ? `${input.vendorDraftCount} approval-gated draft task${input.vendorDraftCount === 1 ? "" : "s"}`
+      : null,
+  ].filter((part): part is string => Boolean(part));
+  return {
+    decisionCount: input.vendorDecisionPolicyCount,
+    draftCount: input.vendorDraftCount,
+    ctaCopy: input.primaryActionLabel,
+    summaryLabel: `Ready to save ${parts.join(" and ")}.`,
+    detailToggleLabel: `Review ${total} vendor follow-up detail${total === 1 ? "" : "s"}`,
+    collapsedByDefault: input.vendorDraftCount > 0,
   };
 }
 
@@ -303,6 +374,10 @@ export function buildWeddingProjectionQueueViewState(input: {
   const pendingCount = queue.pendingItems.length;
   const vendorDraftCards = vendorOutreachDraftCards(queue.pendingItems);
   const vendorPolicyCards = vendorDecisionPolicyCards(queue.pendingItems);
+  const action = primaryAction(queue, {
+    vendorDraftCount: vendorDraftCards.length,
+    vendorDecisionPolicyCount: vendorPolicyCards.length,
+  });
   const copy = surfaceCopy({
     queue,
     vendorDraftCount: vendorDraftCards.length,
@@ -316,14 +391,20 @@ export function buildWeddingProjectionQueueViewState(input: {
     subtitle: copy.subtitle,
     description: copy.description,
     statusTone: statusTone(queue),
-    primaryAction: primaryAction(queue, {
-      vendorDraftCount: vendorDraftCards.length,
-      vendorDecisionPolicyCount: vendorPolicyCards.length,
-    }),
+    primaryAction: action,
     secondaryActions: secondaryActions(queue),
     groups: groupItems(queue.items),
     vendorOutreachDraftCards: vendorDraftCards,
     vendorDecisionPolicyCards: vendorPolicyCards,
+    vendorApprovalCard: vendorApprovalCardState({
+      vendorDraftCount: vendorDraftCards.length,
+      vendorDecisionPolicyCount: vendorPolicyCards.length,
+      primaryActionLabel: action.label,
+    }),
+    externalSendGuardLabel: externalSendGuardLabel({
+      vendorDraftCount: vendorDraftCards.length,
+      vendorDecisionPolicyCount: vendorPolicyCards.length,
+    }),
     semanticObjects: objects,
     semanticSurface: buildWeddingSemanticSurfaceState({
       semanticObjects: objects,

@@ -30,6 +30,8 @@ test("buildWeddingTemplateFollowUpState turns answered prompts into saveable pla
     guestCount: 80,
     familyOrStakeholderRoles: "Alex and Sam",
     topPriorities: ["low stress", "food", "photos"],
+    atmosphereDescription: "garden ceremony with relaxed dinner energy",
+    inspirationImageUrls: ["https://example.com/inspiration/garden.jpg"],
     vendorCategories: ["photographer", "band", "cake_baker"],
     vendorPreferences: "Natural photos, acoustic music, transparent packages",
     photographyScope: "day-of coverage and wedding-photo style inspiration",
@@ -48,6 +50,8 @@ test("buildWeddingTemplateFollowUpState turns answered prompts into saveable pla
   assert.ok(state.answeredLabels.includes("Location: Sydney NSW"));
   assert.ok(state.answeredLabels.includes("Guest count: 80"));
   assert.ok(state.answeredLabels.includes("Couple: Alex and Sam"));
+  assert.ok(state.answeredLabels.includes("Atmosphere: garden ceremony with relaxed dinner energy"));
+  assert.ok(state.answeredLabels.includes("Inspiration links: 1"));
   assert.ok(state.answeredLabels.includes("Vendor needed: Photographer"));
   assert.ok(state.answeredLabels.includes("Vendor needed: Band"));
   assert.equal(state.artifactGeneration.artifacts.length, 1);
@@ -66,8 +70,14 @@ test("buildWeddingTemplateFollowUpState turns answered prompts into saveable pla
   assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /wedding photographer/i);
   assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /Focused vendor search queries/i);
   assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /Provider-specific vendor search plan/i);
+  assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /garden ceremony with relaxed dinner energy/i);
+  assert.deepEqual(state.contextProjection.planningContext.inspirationImageUrls, ["https://example.com/inspiration/garden.jpg"]);
   assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /Google Places API/i);
   assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /OSM \/ Overpass API/i);
+  assert.equal(
+    state.vendorSearchLaunchQuery,
+    "Photographer or Band or Cake Baker in Sydney NSW for low stress, food, photos with garden ceremony with relaxed dinner energy",
+  );
   assert.deepEqual(state.artifactGeneration.artifacts[0]?.summary.vendorLabels.slice(0, 3), ["Photographer", "Band", "Cake Baker"]);
   assert.ok(state.workspaceView.workspace.results.some((artifact) => /Wedding lifecycle brief/i.test(artifact.title)));
   assert.ok(state.workspaceView.workspace.results.some((artifact) => /Legal and administrative/i.test(artifact.title)));

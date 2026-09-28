@@ -76,8 +76,8 @@ import {
   type QueueDensity,
 } from "@/lib/queueDensityLocalState";
 import {
-  loadShouldShowWeddingPlannerWalkthrough,
   saveWeddingPlannerWalkthroughSeen,
+  shouldAutoShowWeddingPlannerWalkthrough,
 } from "@/lib/weddingPlannerWalkthroughLocalState";
 import {
   markWeddingArtifactAfpProjectionSent,
@@ -121,6 +121,8 @@ import {
 import {
   consumeWeddingVendorSearchLaunch,
   WEDDING_VENDOR_SEARCH_LAUNCH_EVENT,
+  weddingVendorSearchEffectiveQueryState,
+  weddingVendorSearchQueryFromIntake,
   weddingVendorSearchLaunchFromEvent,
   type WeddingVendorSearchLaunchState,
 } from "@/lib/weddingVendorSearchLaunchState";
@@ -136,7 +138,10 @@ import {
 } from "@/lib/weddingVendorProviderCapabilityState";
 import {
   loadWeddingTemplateFollowUpDraft,
+  mergeWeddingTemplateFollowUpDraftWithApprovedContext,
   saveWeddingTemplateFollowUpDraft,
+  weddingTemplateFollowUpDraftFromPlanningContext,
+  type WeddingTemplateFollowUpDraft,
 } from "@/lib/weddingTemplateFollowUpLocalState";
 import { buildWeddingNeedToKnowExtractionState } from "@/lib/weddingNeedToKnowExtractionState";
 import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
@@ -169,6 +174,15 @@ import type { WeddingRichResponseAction } from "@/lib/weddingRichResponseRendere
 import type { WeddingProjectionDispatchReceiptState } from "@/lib/weddingProjectionDispatchState";
 import type { ViewName } from "@/lib/viewNames";
 import type { WeddingPlanningScheduleItem } from "@/lib/weddingCalendarProjectionState";
+import {
+  buildWeddingVendorSearchQueryEditState,
+  buildWeddingVendorSearchResultAction,
+  buildWeddingVendorSearchResultActionFromArtifacts,
+  hasWeddingVendorComparisonArtifactSummary,
+  hasWeddingVendorSearchArtifactSummary,
+  hasWeddingVendorTopFiveComparisonExpansion,
+  type WeddingVendorSearchResultAction,
+} from "@/lib/weddingVendorSearchResultActionState";
 
 const RESPONSE_QUEUE_VIEW_CLASS =
   "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm sm:rounded-[32px] sm:p-5";
@@ -399,6 +413,8 @@ export function ResponseQueueView(props: {
   const [weddingRefreshState, setWeddingRefreshState] = createSignal<WeddingWorkspaceRefreshState | null>(null);
   const [weddingVendorSearchRunning, setWeddingVendorSearchRunning] = createSignal(false);
   const [weddingVendorSearchNotice, setWeddingVendorSearchNotice] = createSignal<string | null>(null);
+  const [weddingVendorSearchResultAction, setWeddingVendorSearchResultAction] = createSignal<WeddingVendorSearchResultAction | null>(null);
+  const [weddingVendorSearchResultActionSuppressed, setWeddingVendorSearchResultActionSuppressed] = createSignal(false);
   const [weddingVendorSearchQuery, setWeddingVendorSearchQuery] = createSignal("");
   const [weddingVendorSearchCategoryScope, setWeddingVendorSearchCategoryScope] = createSignal<string[] | null>(null);
   const [weddingLiveEvidenceRunning, setWeddingLiveEvidenceRunning] = createSignal(false);
@@ -436,6 +452,7 @@ export function ResponseQueueView(props: {
   const [weddingFollowUpNoim, setWeddingFollowUpNoim] = createSignal("");
   const [weddingFollowUpCelebrant, setWeddingFollowUpCelebrant] = createSignal("");
   const [weddingFollowUpRequested, setWeddingFollowUpRequested] = createSignal(false);
+  const [weddingContextHydratedKey, setWeddingContextHydratedKey] = createSignal("");
   const [weddingExtractionText, setWeddingExtractionText] = createSignal("");
   const [weddingExtractionNotice, setWeddingExtractionNotice] = createSignal("");
   const [weddingImportNotice, setWeddingImportNotice] = createSignal("");
@@ -445,9 +462,76 @@ export function ResponseQueueView(props: {
     const query = launch?.query.trim();
     if (!query) return;
     setWeddingVendorSearchQuery(query);
+    setWeddingVendorSearchResultAction(null);
+    setWeddingVendorSearchResultActionSuppressed(true);
     setWeddingVendorSearchCategoryScope(null);
     setWeddingWorkspaceMenu("home");
     setWeddingVendorSearchNotice("Vendor search is ready. Review the query, then run live search when you are ready.");
+  }
+
+  function updateWeddingVendorSearchQueryFromInput(query: string) {
+    const editState = buildWeddingVendorSearchQueryEditState(query);
+    setWeddingVendorSearchQuery(query);
+    setWeddingVendorSearchCategoryScope(null);
+    setWeddingVendorSearchResultAction(editState.resultAction);
+    setWeddingVendorSearchResultActionSuppressed(true);
+    setWeddingVendorSearchNotice(editState.notice);
+  }
+
+  function currentWeddingFollowUpDraft(responseWorkspaceId: string): WeddingTemplateFollowUpDraft {
+    const vowPreference = weddingFollowUpVowPreference();
+    const noimDownloaded = weddingFollowUpNoim();
+    return {
+      responseWorkspaceId,
+      dateOrSeason: weddingFollowUpDate(),
+      location: weddingFollowUpLocation(),
+      guestCount: weddingFollowUpGuests(),
+      budgetComfort: weddingFollowUpBudget(),
+      prioritiesCsv: weddingFollowUpPriorities(),
+      atmosphereDescription: weddingFollowUpAtmosphere(),
+      inspirationImageUrlsText: weddingFollowUpImageLinks(),
+      coupleNames: weddingFollowUpCoupleNames(),
+      vendorCategoryIds: weddingFollowUpVendorIds(),
+      vowPreference: (vowPreference === "standard"
+        || vowPreference === "create"
+        || vowPreference === "undecided")
+        ? vowPreference
+        : "",
+      vowStyle: weddingFollowUpVowStyle(),
+      relationshipFactsCsv: weddingFollowUpRelationshipFacts(),
+      vowChecklistCsv: weddingFollowUpVowChecklist(),
+      noimDownloaded: (noimDownloaded === "yes"
+        || noimDownloaded === "no"
+        || noimDownloaded === "unknown")
+        ? noimDownloaded
+        : "",
+      celebrantPath: weddingFollowUpCelebrant(),
+      requested: weddingFollowUpRequested(),
+      savedAt: new Date().toISOString(),
+    };
+  }
+
+  function hydrateWeddingFollowUpDraftFromApprovedContext(draft: WeddingTemplateFollowUpDraft) {
+    const merged = mergeWeddingTemplateFollowUpDraftWithApprovedContext({
+      current: currentWeddingFollowUpDraft(draft.responseWorkspaceId),
+      approved: draft,
+    });
+    setWeddingFollowUpDate(merged.dateOrSeason);
+    setWeddingFollowUpLocation(merged.location);
+    setWeddingFollowUpGuests(merged.guestCount);
+    setWeddingFollowUpBudget(merged.budgetComfort);
+    setWeddingFollowUpPriorities(merged.prioritiesCsv);
+    setWeddingFollowUpAtmosphere(merged.atmosphereDescription);
+    setWeddingFollowUpImageLinks(merged.inspirationImageUrlsText);
+    setWeddingFollowUpCoupleNames(merged.coupleNames);
+    setWeddingFollowUpVendorIds(merged.vendorCategoryIds);
+    setWeddingFollowUpVowPreference(merged.vowPreference);
+    setWeddingFollowUpVowStyle(merged.vowStyle);
+    setWeddingFollowUpRelationshipFacts(merged.relationshipFactsCsv);
+    setWeddingFollowUpVowChecklist(merged.vowChecklistCsv);
+    setWeddingFollowUpNoim(merged.noimDownloaded);
+    setWeddingFollowUpCelebrant(merged.celebrantPath);
+    setWeddingFollowUpRequested(merged.requested);
   }
 
   const weddingStorageUserId = createMemo(() => bootstrap()?.user?.id ?? null);
@@ -669,7 +753,7 @@ export function ResponseQueueView(props: {
     prioritiesCsv: weddingFollowUpPriorities(),
     vendorCategories: weddingVendorSelectionLabels(weddingFollowUpVendorIds()).length > 0
       ? weddingVendorSelectionLabels(weddingFollowUpVendorIds())
-      : weddingVendorSearchQuery().trim()
+      : currentWeddingVendorSearchQuery()
         ? ["Custom vendor search"]
         : [],
   }));
@@ -841,6 +925,18 @@ export function ResponseQueueView(props: {
     weddingWorkspace() ? null : weddingRichResponse(),
   );
 
+  function currentWeddingVendorSearchResultAction(): WeddingVendorSearchResultAction | null {
+    const explicit = weddingVendorSearchResultAction();
+    if (explicit) return explicit;
+    if (weddingVendorSearchResultActionSuppressed()) return null;
+    return buildWeddingVendorSearchResultActionFromArtifacts(weddingWorkspace()?.workspace.results ?? []);
+  }
+
+  function openWeddingVendorSearchResult(action: WeddingVendorSearchResultAction) {
+    setActiveWeddingArtifactId(action.artifactId);
+    setWeddingWorkspaceMenu(action.menu);
+  }
+
   const weddingVendorEndToEndValidation = createMemo(() => {
     const intent = weddingNavigationIntent();
     const state = weddingWorkspace();
@@ -858,43 +954,12 @@ export function ResponseQueueView(props: {
       || Boolean(smokeQuoteFlow);
     const quoteFlow = smokeQuoteFlow ?? quoteFlows[0] ?? null;
     const configuredProviderKinds = weddingConfiguredVendorSearchProviderKinds(weddingProviderCapabilities());
-    const liveVendorArtifactSaved = state.workspace.results.some((artifact) => {
-      const searchText = [
-        artifact.id,
-        artifact.title,
-        artifact.searchText,
-        artifact.sourceLabels.join(" "),
-        artifact.sourceLinks.map((source) => source.label).join(" "),
-      ].join("\n").toLowerCase();
-      return artifact.kind === "vendor_table"
-        && /vendor_search_executor|source-backed vendor-search|vendor search source packet|google_places|brave search|overpass/.test(searchText);
-    });
-    const liveVendorComparisonSaved = state.workspace.results.some((artifact) => {
-      const searchText = [
-        artifact.id,
-        artifact.title,
-        artifact.searchText,
-        artifact.sourceLabels.join(" "),
-        artifact.sourceLinks.map((source) => source.label).join(" "),
-      ].join("\n").toLowerCase();
-      return artifact.kind === "vendor_table"
-        && /vendor_search_comparison|top vendor comparison|top-three|top three vendor/i.test(searchText);
-    });
-    const topFiveComparisonExpansionAvailable = state.workspace.results.some((artifact) => {
-      const metadata = artifact.metadata && typeof artifact.metadata === "object" && !Array.isArray(artifact.metadata)
-        ? artifact.metadata as Record<string, unknown>
-        : {};
-      const topChoiceCount = Number(metadata.topChoiceCount);
-      const handoff = metadata.vendorComparisonHandoff;
-      return artifact.kind === "vendor_table"
-        && metadata.source === "vendor_search_comparison"
-        && Number.isFinite(topChoiceCount)
-        && topChoiceCount > 3
-        && handoff !== null
-        && typeof handoff === "object"
-        && !Array.isArray(handoff);
-    });
-    const dynamicVendorDecisionSurfaceVisible = (state.projectionQueue?.vendorDecisionPolicyCards.length ?? 0) > 0;
+    const liveVendorArtifactSaved = hasWeddingVendorSearchArtifactSummary(state.workspace.results);
+    const liveVendorComparisonSaved = hasWeddingVendorComparisonArtifactSummary(state.workspace.results);
+    const topFiveComparisonExpansionAvailable = hasWeddingVendorTopFiveComparisonExpansion(state.workspace.results);
+    const vendorApprovalCard = state.projectionQueue?.vendorApprovalCard ?? null;
+    const dynamicVendorDecisionSurfaceVisible = Boolean(vendorApprovalCard)
+      || (state.projectionQueue?.vendorDecisionPolicyCards.length ?? 0) > 0;
     const selectedVendorDraftTaskMetadata = state.planningTaskItems
       .map((item) => item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
         ? item.metadata as Record<string, unknown>
@@ -965,13 +1030,17 @@ export function ResponseQueueView(props: {
       testVendorCleanupRequired: smokeFixturePresent,
       testVendorCleanupConfirmed: importedArtifacts.every((artifact) => !isWeddingVendorSmokeFixtureArtifact(artifact)),
       vendorSearchReadiness: weddingLiveVendorSearchReadiness(),
+      vendorSearchLaunchQuery: currentWeddingVendorSearchQuery(),
       vendorProviderConfigured: configuredProviderKinds.length > 0,
       liveVendorArtifactSaved,
       liveVendorComparisonSaved,
+      vendorSearchResultOpenTargetAvailable: Boolean(currentWeddingVendorSearchResultAction()),
       topFiveComparisonExpansionAvailable,
       selectedComparisonVendorsConfirmed,
       unselectedVendorQueueSuppressed,
       dynamicVendorDecisionSurfaceVisible,
+      vendorApprovalCardModeled: Boolean(vendorApprovalCard),
+      vendorApprovalCardCtaCopy: vendorApprovalCard?.ctaCopy ?? null,
       selectedVendorDraftTasksProjected,
       selectedVendorDraftsApprovalGated,
       quoteReplyFlowCount: quoteFlows.length,
@@ -983,6 +1052,19 @@ export function ResponseQueueView(props: {
       followUpTaskProjected,
       responseEvidenceRecorded,
     });
+  });
+  createEffect(() => {
+    const workspace = weddingWorkspace();
+    const contextCard = workspace?.contextCards.find((card) => card.planningContext) ?? null;
+    const responseWorkspaceId = workspace?.workspace.metadata.responseWorkspaceId ?? "";
+    if (!contextCard || !responseWorkspaceId) return;
+    const key = `${responseWorkspaceId}:${contextCard.id}`;
+    if (weddingContextHydratedKey() === key) return;
+    hydrateWeddingFollowUpDraftFromApprovedContext(weddingTemplateFollowUpDraftFromPlanningContext(
+      responseWorkspaceId,
+      contextCard.planningContext,
+    ));
+    setWeddingContextHydratedKey(key);
   });
   const weddingVendorSmokeCleanupGate = createMemo(() => {
     const intent = weddingNavigationIntent();
@@ -999,13 +1081,23 @@ export function ResponseQueueView(props: {
       ? weddingVendorSmokeCleanupGate().blockerLabel
       : weddingVendorSearchProviderBlockedReason(weddingProviderCapabilities()),
   );
+  const weddingFirstIntakeComplete = createMemo(() => {
+    const workspace = weddingWorkspace();
+    return weddingFollowUpRequested()
+      || Boolean(weddingPersistedWorkspace()?.hasPersistedData)
+      || Boolean(workspace?.contextCards.some((card) => card.planningContext));
+  });
 
   createEffect(() => {
-    if (weddingWalkthroughChecked() || !weddingWorkspace()) return;
+    const workspace = weddingWorkspace();
+    if (!shouldAutoShowWeddingPlannerWalkthrough({
+      alreadyChecked: weddingWalkthroughChecked(),
+      hasWeddingWorkspace: Boolean(workspace),
+      firstIntakeComplete: weddingFirstIntakeComplete(),
+      userId: weddingStorageUserId(),
+    })) return;
     setWeddingWalkthroughChecked(true);
-    if (loadShouldShowWeddingPlannerWalkthrough(weddingStorageUserId())) {
-      setShowWeddingWalkthrough(true);
-    }
+    setShowWeddingWalkthrough(true);
   });
 
   onMount(() => {
@@ -1193,6 +1285,8 @@ export function ResponseQueueView(props: {
       : "";
     if (action.metadata?.vendor_lead_time_research_task === true && scopedVendorCategoryId) {
       setWeddingVendorSearchCategoryScope([scopedVendorCategoryId]);
+      setWeddingVendorSearchResultAction(null);
+      setWeddingVendorSearchResultActionSuppressed(true);
       const label = weddingVendorSelectionLabels([scopedVendorCategoryId])[0] ?? scopedVendorCategoryId;
       setWeddingVendorSearchNotice(`Ready to research ${label}. Search will use admin-configured providers and this user's wedding context.`);
     } else if (action.metadata?.vendor_search_scope !== "lead_time_category") {
@@ -1318,24 +1412,30 @@ export function ResponseQueueView(props: {
   }
 
   function defaultWeddingVendorSearchQueryFromIntake(): string {
-    const location = weddingFollowUpLocation().trim();
-    const labels = weddingVendorSelectionLabels(weddingFollowUpVendorIds());
-    const priorities = weddingFollowUpPriorities().trim();
-    const atmosphere = weddingFollowUpAtmosphere().trim();
-    const focus = labels.length > 0
-      ? labels.slice(0, 3).join(" or ")
-      : "wedding vendors";
-    return [
-      focus,
-      location ? `in ${location}` : null,
-      priorities ? `for ${priorities}` : null,
-      atmosphere ? `with ${atmosphere}` : null,
-    ].filter(Boolean).join(" ");
+    const stateQuery = weddingTemplateFollowUp()?.vendorSearchLaunchQuery;
+    if (stateQuery?.trim()) return stateQuery;
+    return weddingVendorSearchQueryFromIntake({
+      location: weddingFollowUpLocation(),
+      vendorLabels: weddingVendorSelectionLabels(weddingFollowUpVendorIds()),
+      priorities: weddingFollowUpPriorities(),
+      atmosphere: weddingFollowUpAtmosphere(),
+    });
+  }
+
+  function currentWeddingVendorSearchQueryState() {
+    return weddingVendorSearchEffectiveQueryState(
+      weddingVendorSearchQuery(),
+      weddingTemplateFollowUp()?.vendorSearchLaunchQuery || defaultWeddingVendorSearchQueryFromIntake(),
+    );
+  }
+
+  function currentWeddingVendorSearchQuery(): string {
+    return currentWeddingVendorSearchQueryState().query;
   }
 
   async function searchWeddingVendorsFromIntake() {
     await generateWeddingFollowUp();
-    if (!weddingVendorSearchQuery().trim() && weddingFollowUpVendorIds().length === 0) {
+    if (!weddingVendorSearchQuery().trim()) {
       setWeddingVendorSearchQuery(defaultWeddingVendorSearchQueryFromIntake());
     }
     setWeddingWorkspaceMenu("home");
@@ -1482,6 +1582,8 @@ export function ResponseQueueView(props: {
     const workspace = weddingWorkspace();
     if (!intent || intent.surface !== "planning_files" || !workspace || weddingVendorSearchRunning()) return;
     setWeddingVendorSearchRunning(true);
+    setWeddingVendorSearchResultAction(null);
+    setWeddingVendorSearchResultActionSuppressed(true);
     setWeddingVendorSearchNotice("Running live vendor search with connected providers...");
     try {
       const metadata = workspace.workspace.metadata;
@@ -1494,7 +1596,7 @@ export function ResponseQueueView(props: {
       const categoryLabels = weddingVendorSelectionLabels(
         scopedCategoryIds && scopedCategoryIds.length > 0 ? scopedCategoryIds : weddingFollowUpVendorIds(),
       );
-      const freeformQuery = weddingVendorSearchQuery().trim();
+      const freeformQuery = currentWeddingVendorSearchQuery();
       const effectiveCategoryLabels = categoryLabels.length > 0
         ? categoryLabels
         : freeformQuery
@@ -1629,9 +1731,17 @@ export function ResponseQueueView(props: {
         // Local artifact storage is still useful; refresh will retry via saved outputs later.
       }
       setWeddingImportRefreshKey((value) => value + 1);
-      setActiveWeddingArtifactId(comparisonArtifact.summary?.id ?? generatedArtifact.summary.id);
+      const resultAction = buildWeddingVendorSearchResultAction({
+        sourceArtifactId: generatedArtifact.summary.id,
+        comparisonArtifactId: comparisonArtifact.summary?.id ?? null,
+        comparisonCreated: comparisonArtifact.status === "created",
+        topChoiceCount: comparisonArtifact.topChoiceCount,
+      });
+      setActiveWeddingArtifactId(resultAction?.artifactId ?? generatedArtifact.summary.id);
       setWeddingWorkspaceMenu(options?.stayOnHome ? "home" : "documents");
       setWeddingVendorSearchCategoryScope(null);
+      setWeddingVendorSearchResultAction(resultAction);
+      setWeddingVendorSearchResultActionSuppressed(false);
       setWeddingVendorSearchNotice(comparisonArtifact.status === "created"
         ? `${execution.message} Saved source-backed vendor notes and a top-${comparisonArtifact.topChoiceCount} comparison.`
         : `${execution.message} Saved source-backed vendor notes. ${comparisonArtifact.reason ?? ""}`.trim()
@@ -1918,7 +2028,7 @@ export function ResponseQueueView(props: {
           onDismiss={() => setWeddingNavigationIntent(null)}
         />
       </Show>
-      <Show when={weddingWorkspace() && showWeddingWalkthrough()}>
+      <Show when={showWeddingWalkthrough()}>
         <WeddingPlannerWalkthrough
           onClose={closeWeddingWalkthrough}
           onOpenSharePlan={() => setShowWeddingSharePlan(true)}
@@ -1969,6 +2079,8 @@ export function ResponseQueueView(props: {
             onWeddingFollowUpCelebrantChange={setWeddingFollowUpCelebrant}
             onGenerateFollowUp={generateWeddingFollowUp}
             onSearchVendors={searchWeddingVendorsFromIntake}
+            vendorSearchResultAction={currentWeddingVendorSearchResultAction()}
+            onOpenVendorSearchResult={openWeddingVendorSearchResult}
             vendorSearchRunning={weddingVendorSearchRunning()}
             vendorSearchNotice={weddingVendorSearchNotice()}
             weddingTemplateFollowUp={weddingTemplateFollowUp}
@@ -1995,6 +2107,7 @@ export function ResponseQueueView(props: {
             approvalHandlers={weddingApprovalHandlers()}
             gmailStatus={weddingGmailStatus()}
             projectionStorage={localStorage}
+            contactUserId={weddingStorageUserId()}
             importNotice={weddingImportNotice()}
             importRunning={weddingImportRunning()}
             activeMenu={weddingWorkspaceMenu()}
@@ -2021,8 +2134,10 @@ export function ResponseQueueView(props: {
             onRunLiveVendorSearch={runLiveWeddingVendorSearch}
             vendorSearchRunning={weddingVendorSearchRunning()}
             vendorSearchNotice={weddingVendorSearchNotice()}
-            vendorSearchQuery={weddingVendorSearchQuery()}
-            onVendorSearchQueryChange={setWeddingVendorSearchQuery}
+            vendorSearchQuery={currentWeddingVendorSearchQuery()}
+            vendorSearchQuerySourceLabel={currentWeddingVendorSearchQueryState().sourceLabel}
+            vendorSearchResultAction={currentWeddingVendorSearchResultAction()}
+            onVendorSearchQueryChange={updateWeddingVendorSearchQueryFromInput}
             vendorSearchReadiness={weddingLiveVendorSearchReadiness()}
             vendorSearchBlockedReason={weddingVendorSearchBlockedReason()}
             onRunLiveEvidenceCheck={runWeddingLiveEvidenceCheck}

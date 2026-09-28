@@ -1,5 +1,12 @@
 // @locs-version: 1.0
 import type { AfpMessage, AfpReference, SendAfpMessageInput } from "@/lib/api";
+import { addContactRole } from "@/lib/contactRoleState";
+import {
+  findDuplicateContact,
+  normalizeContactNameForMatch,
+  replaceContact,
+} from "@/lib/contactManagementState";
+import type { Contact } from "@/lib/contactsLocalState";
 import {
   normalizeWeddingPlanningMetadata,
   safeWeddingLabel,
@@ -45,6 +52,28 @@ export type WeddingHelperResponsibilityProjectionInput = {
   status?: WeddingHelperResponsibilityStatus | null;
   metadata?: unknown;
   nowIso?: string | null;
+};
+
+export type WeddingHelperContactProjectionInput = {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  role?: string | null;
+  metadata?: unknown;
+  nowIso?: string | null;
+};
+
+export type WeddingHelperContactDraft = {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  role?: string | null;
+};
+
+export type WeddingHelperContactUpsertResult = {
+  action: "created" | "updated";
+  contact: Contact;
+  contacts: Contact[];
 };
 
 const WEDDING_HELPER_LOCAL_STATE_KEY = "omnyid.wedding.helpers.v1";
@@ -253,6 +282,70 @@ export function buildWeddingHelperPeople(
     return true;
   }).map((name) => clean(name));
   return names.length > 0 ? names : fallbackPartners;
+}
+
+export function weddingHelperContactRelationshipKind(role: string | null | undefined): Contact["relationshipKind"] {
+  const normalized = clean(role).toLowerCase();
+  if (/vendor|supplier|celebrant|venue|florist|photographer|caterer/.test(normalized)) return "supplier";
+  if (/planner|coordinator|assistant|team/.test(normalized)) return "team";
+  if (/friend|family|parent|sibling|partner|wedding party/.test(normalized)) return "friend";
+  return "other";
+}
+
+export function weddingHelperContactId(name: string): string {
+  return `wedding-helper:${safeWeddingLabel(name, "helper")}`;
+}
+
+export function weddingHelperDraftToContact(draft: WeddingHelperContactDraft): Contact | null {
+  const name = clean(draft.name);
+  if (!name) return null;
+  const role = clean(draft.role) || "Helper";
+  const email = clean(draft.email);
+  const phone = clean(draft.phone);
+  return {
+    id: weddingHelperContactId(name),
+    name,
+    email: email || undefined,
+    phone: phone || undefined,
+    relationshipKind: weddingHelperContactRelationshipKind(role),
+    roles: addContactRole(["Helper"], role),
+    notes: `Wedding helper role: ${role}`,
+  };
+}
+
+export function upsertWeddingHelperContact(
+  contacts: readonly Contact[],
+  draft: WeddingHelperContactDraft,
+): WeddingHelperContactUpsertResult | null {
+  const contact = weddingHelperDraftToContact(draft);
+  if (!contact) return null;
+  const existingContacts = [...contacts];
+  const nameDuplicate = existingContacts.find((item) =>
+    normalizeContactNameForMatch(item.name) === normalizeContactNameForMatch(contact.name)
+  );
+  const duplicate = findDuplicateContact(existingContacts, contact)
+    ?? (nameDuplicate ? { contact: nameDuplicate, reason: "name" as const } : null);
+  if (!duplicate) {
+    return {
+      action: "created",
+      contact,
+      contacts: [contact, ...existingContacts],
+    };
+  }
+  const role = clean(draft.role) || "Helper";
+  const updated: Contact = {
+    ...duplicate.contact,
+    email: duplicate.contact.email ?? contact.email,
+    phone: duplicate.contact.phone ?? contact.phone,
+    relationshipKind: duplicate.contact.relationshipKind === "other" ? contact.relationshipKind : duplicate.contact.relationshipKind,
+    notes: duplicate.contact.notes ?? contact.notes,
+    roles: addContactRole(addContactRole(duplicate.contact.roles, "Helper"), role),
+  };
+  return {
+    action: "updated",
+    contact: updated,
+    contacts: replaceContact(existingContacts, updated),
+  };
 }
 
 function taskAssignee(task: WeddingHelperPlanningTask, taskAssignees: Record<string, string>): string {
@@ -500,5 +593,121 @@ export function weddingHelperResponsibilityToAfpSendInput(
   input: WeddingHelperResponsibilityProjectionInput,
 ): SendAfpMessageInput | null {
   const message = weddingHelperResponsibilityToAfpMessage(input);
+  return message ? messageToSendInput(message) : null;
+}
+
+export function weddingHelperContactToAfpMessage(
+  input: WeddingHelperContactProjectionInput,
+): AfpMessage | null {
+  const name = clean(input.name);
+  if (!name) return null;
+  const email = clean(input.email);
+  const phone = clean(input.phone);
+  const role = clean(input.role) || "Helper";
+  const metadata = normalizeWeddingPlanningMetadata(input.metadata);
+  const nowIso = clean(input.nowIso) || new Date().toISOString();
+  const planLabel = safeWeddingLabel(metadata.weddingPlanId);
+  const workspaceLabel = safeWeddingLabel(metadata.responseWorkspaceId);
+  const helperLabel = safeWeddingLabel(name, "helper");
+  const references = [
+    ref("wedding_plan", metadata.weddingPlanId, "Wedding plan"),
+    ref("response_workspace", metadata.responseWorkspaceId, "Wedding workspace"),
+    ref("contact_name", name, "Helper contact", { role }),
+    email ? ref("contact_email", email, "Helper email") : null,
+    phone ? ref("contact_phone", phone, "Helper phone") : null,
+  ].filter((item): item is AfpReference => item !== null);
+
+  return {
+    id: `afp-wedding-helper-contact:${planLabel}:${workspaceLabel}:${helperLabel}`,
+    thread_id: `wedding_helper_contact:${workspaceLabel}:${helperLabel}`,
+    from: "system://wedding-planning",
+    to: [
+      "agent://wedding-planning",
+      "agent://contacts",
+      "agent://decision-os",
+      "agent://knowledge-graph",
+      "agent://topology",
+    ],
+    timestamp: nowIso,
+    type: "ledger",
+    kind: "wedding_helper_contact",
+    subtype: "wedding_helper_contact_upsert",
+    supertags: [
+      "template:wedding_planning",
+      "wedding_helper_contact",
+      "wedding_people",
+      "contact",
+      "decisionos:wedding_people",
+      `wedding_plan:${planLabel}`,
+      `response_workspace:${workspaceLabel}`,
+      `wedding_helper:${helperLabel}`,
+    ],
+    content: {
+      kind: "wedding_helper_contact",
+      name,
+      email: email || null,
+      phone: phone || null,
+      role,
+      wedding_plan_id: metadata.weddingPlanId,
+      response_workspace_id: metadata.responseWorkspaceId,
+      agent_action_requested: true,
+      agent_action: "index_wedding_helper_contact",
+      summary: `${name} was added as a wedding helper${role ? ` (${role})` : ""}.`,
+      searchable_terms: uniqueStrings([
+        name,
+        email,
+        phone,
+        role,
+        "wedding helper",
+        "wedding contact",
+        "who is helping",
+      ]),
+    },
+    metadata: {
+      origin: "wedding_planning",
+      projection: "wedding_helper_contact_to_afp",
+      wedding_plan_id: metadata.weddingPlanId,
+      response_workspace_id: metadata.responseWorkspaceId,
+      helper_name: name,
+      helper_email: email || null,
+      helper_phone: phone || null,
+      helper_role: role,
+      e2ee_required: true,
+      couple_private_by_default: true,
+      agent_action_requested: true,
+      searchable_terms: uniqueStrings([
+        name,
+        email,
+        phone,
+        role,
+        "wedding helper contact",
+        "wedding people",
+      ]),
+    },
+    views: [
+      {
+        format: "a2ui",
+        priority: 1,
+        content: {
+          title: "Wedding helper contact",
+          summary: `${name} can help with the wedding plan.`,
+          rows: [
+            { label: "Name", value: name },
+            { label: "Role", value: role },
+            { label: "Email", value: email || "Not added" },
+            { label: "Phone", value: phone || "Not added" },
+          ],
+        },
+      },
+    ],
+    attachments: [],
+    references,
+  };
+}
+
+export function weddingHelperContactToAfpSendInput(
+  input: WeddingHelperContactProjectionInput,
+): SendAfpMessageInput | null {
+  const message = weddingHelperContactToAfpMessage(input);
   return message ? messageToSendInput(message) : null;
 }

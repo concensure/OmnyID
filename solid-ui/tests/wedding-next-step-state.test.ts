@@ -79,6 +79,20 @@ test("wedding next step accepts an exact saved wedding date from context", () =>
   assert.equal(next.menuId, "budget");
 });
 
+test("wedding next step acknowledges target season before exact date is known", () => {
+  const next = buildWeddingNextStepState(state({
+    contextCards: [{
+      answeredLabels: ["Date/season: October 2027"],
+    }] as WeddingResponseWorkspaceViewState["contextCards"],
+  }));
+
+  assert.equal(next.priority, "wedding_date");
+  assert.equal(next.title, "Confirm the exact wedding date");
+  assert.equal(next.actionLabel, "Pick exact date");
+  assert.match(next.detail, /October 2027/);
+  assert.equal(next.secondaryLabels[0], "Target captured: October 2027");
+});
+
 test("wedding next step moves to budget after a date exists", () => {
   const next = buildWeddingNextStepState(state({
     ganttTimeline: {

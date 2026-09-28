@@ -12,6 +12,7 @@ import {
   weddingVendorQuoteReplyExecutionSelectionState,
   weddingVendorQuoteReplyRequestMatchState,
   weddingVendorQuoteReplyBusyLabelState,
+  weddingVendorQuoteReplyContextualSurfaceState,
   weddingVendorQuoteReplyPendingSendRetryState,
   weddingVendorQuoteReplyPendingSendTokenState,
   weddingVendorQuoteReplyPresentationState,
@@ -62,6 +63,80 @@ test("vendor quote reply flow separates wording approval from budget acknowledge
   assert.equal(flow.recommendationConfidenceLabel, "Confidence: strong");
   assert.equal(flow.semanticObject.stateLabel, "Confirm budget impact");
   assert.ok(flow.semanticObject.comparison?.rows.some((row) => row.id === "recommendation_rationale"));
+});
+
+test("vendor quote reply contextual surface exposes status recommendation why and dynamic action", () => {
+  const flow = buildWeddingVendorQuoteReplyFlowState({
+    quote,
+    metadata,
+    recipient: "hello@chloes.example",
+    subject: "Floral quote",
+    draftBody: "Thanks Chloe, we would like to proceed.",
+    approvedWording: true,
+    budgetImpactAcknowledged: false,
+  });
+
+  const surface = weddingVendorQuoteReplyContextualSurfaceState({ flow });
+  assert.equal(surface.lifecycleStage, "decision_surfaced");
+  assert.equal(surface.surfaceWeight, "full_card");
+  assert.equal(surface.statusLabel, "Chloe's Florals sent a quote.");
+  assert.equal(surface.recommendationLabel, "Ask for trade-offs before approving");
+  assert.match(surface.rationaleLabel, /\$200 over budget/);
+  assert.equal(surface.confidenceLabel, "Confidence: strong");
+  assert.ok(surface.whyLabels.includes("Budget impact: $200 over budget"));
+  assert.deepEqual(surface.primaryAction, {
+    kind: "acknowledge_budget",
+    label: "Confirm budget impact",
+    enabled: true,
+  });
+  assert.deepEqual(surface.secondaryAction, {
+    kind: "edit_reply",
+    label: "Edit reply",
+  });
+});
+
+test("vendor quote reply contextual surface collapses sent flow to receipt semantics", () => {
+  const sentAt = "2026-09-27T03:30:00.000Z";
+  const flow = buildWeddingVendorQuoteReplyFlowState({
+    quote,
+    metadata,
+    recipient: "hello@chloes.example",
+    subject: "Floral quote",
+    draftBody: "Thanks Chloe, we would like to proceed.",
+    approvedWording: true,
+    budgetImpactAcknowledged: true,
+    execution: {
+      requestId: "approval-1",
+      actionKind: "send_email",
+      status: "executed",
+      externalId: "gmail-msg-1",
+      createdAt: sentAt,
+      message: "Sent",
+      receipt: {
+        receiptId: "receipt-1",
+        requestId: "approval-1",
+        actionKind: "send_email",
+        status: "executed",
+        summary: "Sent",
+        createdAt: sentAt,
+        metadata: {
+          external_delivery_performed: true,
+          provider_label: "Gmail",
+          provider_message_id: "gmail-msg-1",
+        },
+      },
+    },
+  });
+
+  const surface = weddingVendorQuoteReplyContextualSurfaceState({ flow });
+  assert.equal(surface.lifecycleStage, "resolved");
+  assert.equal(surface.surfaceWeight, "receipt");
+  assert.match(surface.statusLabel, /Sent to Chloe's Florals/i);
+  assert.equal(surface.recommendationLabel, "Keep this as history");
+  assert.equal(surface.confidenceLabel, "Proof recorded");
+  assert.equal(surface.primaryAction.kind, "view_sent_log");
+  assert.equal(surface.primaryAction.label, "View what was sent");
+  assert.equal(surface.secondaryAction, null);
 });
 
 test("vendor quote reply recommendation handoff lowers confidence when evidence is thin", () => {

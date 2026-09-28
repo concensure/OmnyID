@@ -40,7 +40,7 @@ export function WeddingHomeStatusStrip(props: {
           {status().actionLabel}
         </button>
       </div>
-      <div class="mt-3 grid gap-2 sm:grid-cols-4">
+      <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
         <For each={status().metrics}>
           {(metric) => (
             <button
@@ -48,8 +48,8 @@ export function WeddingHomeStatusStrip(props: {
               class={`min-w-0 rounded-2xl border px-3 py-2 text-left transition hover:bg-white ${metricClass(metric.tone)}`}
               onClick={() => props.onSelectMenu?.(metric.menuId)}
             >
-              <p class="truncate text-[11px] font-semibold uppercase tracking-[0.12em] opacity-70">{metric.label}</p>
-              <p class="mt-1 truncate text-sm font-bold">{metric.value}</p>
+              <p class="break-words text-[11px] font-semibold uppercase tracking-[0.12em] opacity-70">{metric.label}</p>
+              <p class="mt-1 break-words text-sm font-bold leading-5">{metric.value}</p>
             </button>
           )}
         </For>
@@ -57,4 +57,3 @@ export function WeddingHomeStatusStrip(props: {
     </section>
   );
 }
-

@@ -1,4 +1,5 @@
 // @locs-version: 2.0
+import type { WeddingPlanningContext } from "@/lib/weddingNeedToKnowProbingState";
 import { normalizeWeddingVendorSelections } from "@/lib/weddingVendorChecklistState";
 
 export const WEDDING_TEMPLATE_FOLLOW_UP_KEY_PREFIX = "omnyid.wedding-template-follow-up";
@@ -29,8 +30,18 @@ export type WeddingTemplateFollowUpDraftInput = Partial<Omit<WeddingTemplateFoll
   nowIso?: string | null;
 };
 
+export type WeddingTemplateFollowUpDraftMergeInput = {
+  current: WeddingTemplateFollowUpDraft;
+  approved: WeddingTemplateFollowUpDraft;
+};
+
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanText(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return clean(value);
 }
 
 function storageOrNull(storage?: Storage | null): Storage | null {
@@ -48,6 +59,81 @@ function normalizedNoim(value: unknown): WeddingTemplateFollowUpDraft["noimDownl
 
 function normalizedVowPreference(value: unknown): WeddingTemplateFollowUpDraft["vowPreference"] {
   return value === "standard" || value === "create" || value === "undecided" ? value : "";
+}
+
+function normalizedNoimFromContext(value: unknown): WeddingTemplateFollowUpDraft["noimDownloaded"] {
+  if (value === true) return "yes";
+  if (value === false) return "no";
+  return normalizedNoim(value);
+}
+
+function textLines(values: readonly unknown[] | null | undefined): string {
+  return (values ?? []).map(clean).filter(Boolean).join("\n");
+}
+
+export function weddingTemplateFollowUpDraftFromPlanningContext(
+  responseWorkspaceId: string,
+  planningContext: WeddingPlanningContext | null | undefined,
+  input?: { nowIso?: string | null; requested?: boolean | null },
+): WeddingTemplateFollowUpDraft {
+  const context = planningContext ?? {};
+  return {
+    responseWorkspaceId: clean(responseWorkspaceId),
+    dateOrSeason: clean(context.dateOrSeason),
+    location: clean(context.location),
+    guestCount: cleanText(context.guestCount),
+    budgetComfort: clean(context.budgetComfort),
+    prioritiesCsv: textLines(context.topPriorities).replace(/\n/g, ", "),
+    atmosphereDescription: clean(context.atmosphereDescription),
+    inspirationImageUrlsText: textLines(context.inspirationImageUrls),
+    coupleNames: clean(context.familyOrStakeholderRoles),
+    vendorCategoryIds: normalizeWeddingVendorSelections(context.vendorCategories ?? []),
+    vowPreference: normalizedVowPreference(context.vowPreference),
+    vowStyle: clean(context.vowStyle),
+    relationshipFactsCsv: textLines(context.relationshipFactLabels),
+    vowChecklistCsv: textLines(context.vowChecklistItems),
+    noimDownloaded: normalizedNoimFromContext(context.noimDownloaded),
+    celebrantPath: clean(context.celebrantPath),
+    requested: input?.requested !== false,
+    savedAt: clean(input?.nowIso) || new Date().toISOString(),
+  };
+}
+
+function preferredText(approved: string, current: string): string {
+  return clean(approved) || clean(current);
+}
+
+function preferredEnum<T extends string>(approved: T, current: T): T {
+  return (clean(approved) ? approved : current) as T;
+}
+
+export function mergeWeddingTemplateFollowUpDraftWithApprovedContext(
+  input: WeddingTemplateFollowUpDraftMergeInput,
+): WeddingTemplateFollowUpDraft {
+  const current = input.current;
+  const approved = input.approved;
+  return {
+    responseWorkspaceId: clean(approved.responseWorkspaceId) || clean(current.responseWorkspaceId),
+    dateOrSeason: preferredText(approved.dateOrSeason, current.dateOrSeason),
+    location: preferredText(approved.location, current.location),
+    guestCount: preferredText(approved.guestCount, current.guestCount),
+    budgetComfort: preferredText(approved.budgetComfort, current.budgetComfort),
+    prioritiesCsv: preferredText(approved.prioritiesCsv, current.prioritiesCsv),
+    atmosphereDescription: preferredText(approved.atmosphereDescription, current.atmosphereDescription),
+    inspirationImageUrlsText: preferredText(approved.inspirationImageUrlsText, current.inspirationImageUrlsText),
+    coupleNames: preferredText(approved.coupleNames, current.coupleNames),
+    vendorCategoryIds: approved.vendorCategoryIds.length > 0
+      ? approved.vendorCategoryIds
+      : current.vendorCategoryIds,
+    vowPreference: preferredEnum(approved.vowPreference, current.vowPreference),
+    vowStyle: preferredText(approved.vowStyle, current.vowStyle),
+    relationshipFactsCsv: preferredText(approved.relationshipFactsCsv, current.relationshipFactsCsv),
+    vowChecklistCsv: preferredText(approved.vowChecklistCsv, current.vowChecklistCsv),
+    noimDownloaded: preferredEnum(approved.noimDownloaded, current.noimDownloaded),
+    celebrantPath: preferredText(approved.celebrantPath, current.celebrantPath),
+    requested: approved.requested || current.requested,
+    savedAt: clean(approved.savedAt) || clean(current.savedAt) || new Date().toISOString(),
+  };
 }
 
 function normalizeDraft(value: unknown): WeddingTemplateFollowUpDraft | null {

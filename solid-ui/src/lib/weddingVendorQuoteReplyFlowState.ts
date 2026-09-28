@@ -172,6 +172,25 @@ export type WeddingVendorQuoteReplyPresentationState = {
   readOnlyReplyLabel: string | null;
 };
 
+export type WeddingVendorQuoteReplyContextualSurfaceState = {
+  lifecycleStage: "decision_surfaced" | "action_taken" | "resolved";
+  surfaceWeight: "full_card" | "receipt";
+  statusLabel: string;
+  recommendationLabel: string;
+  rationaleLabel: string;
+  confidenceLabel: string;
+  whyLabels: string[];
+  primaryAction: {
+    kind: WeddingVendorQuoteReplyPrimaryActionKind;
+    label: string;
+    enabled: boolean;
+  };
+  secondaryAction: {
+    kind: WeddingVendorQuoteReplySecondaryActionKind;
+    label: string;
+  } | null;
+};
+
 export type WeddingVendorQuoteReplyPendingSendTokenState = {
   stillCurrent: boolean;
 };
@@ -591,6 +610,80 @@ export function weddingVendorQuoteReplyPresentationState(input: {
     readOnlyReplyLabel: showReplyEditor
       ? null
       : `Reply wording is approved for ${vendorName}.`,
+  };
+}
+
+export function weddingVendorQuoteReplyContextualSurfaceState(input: {
+  flow: Pick<
+    WeddingVendorQuoteReplyFlowState,
+    | "quote"
+    | "stage"
+    | "summary"
+    | "failureMessage"
+    | "undoUntilIso"
+    | "canSend"
+    | "recommendationLabel"
+    | "recommendationRationale"
+    | "recommendationWhyLabels"
+    | "recommendationConfidenceLabel"
+    | "sentConfirmationLabel"
+  >;
+  dirtyState?: WeddingVendorQuoteReplyEditorDirtyState | null;
+  draftPersistence?: WeddingVendorQuoteReplyDraftPersistenceState | null;
+  primaryActionEnabled?: boolean | null;
+  nowIso?: string | null;
+}): WeddingVendorQuoteReplyContextualSurfaceState {
+  const presentation = weddingVendorQuoteReplyPresentationState({
+    flow: input.flow,
+    dirtyState: input.dirtyState,
+    draftPersistence: input.draftPersistence,
+    nowIso: input.nowIso,
+  });
+  const vendorName = clean(input.flow.quote.vendorName) || "vendor";
+  const lifecycleStage: WeddingVendorQuoteReplyContextualSurfaceState["lifecycleStage"] =
+    input.flow.stage === "sent"
+      ? "resolved"
+      : input.flow.stage === "sending_undo_window"
+        ? "action_taken"
+        : "decision_surfaced";
+  const statusLabel = input.flow.stage === "sent"
+    ? input.flow.sentConfirmationLabel ?? `Reply sent to ${vendorName}.`
+    : input.flow.stage === "sending_undo_window"
+      ? presentation.undoTitle ?? `Sending to ${vendorName} soon.`
+      : input.flow.stage === "blocked"
+        ? input.flow.failureMessage || `The ${vendorName} quote reply needs attention.`
+        : `${vendorName} sent a quote.`;
+  const recommendationLabel = input.flow.stage === "sent"
+    ? "Keep this as history"
+    : input.flow.stage === "sending_undo_window"
+      ? "Undo is still available"
+      : input.flow.recommendationLabel;
+  const rationaleLabel = input.flow.stage === "sent"
+    ? "This workflow has left the live decision queue and is available as a saved thread proof."
+    : input.flow.stage === "sending_undo_window"
+      ? presentation.undoDetail ?? "The reply has not left OmnyID yet."
+      : input.flow.recommendationRationale;
+  return {
+    lifecycleStage,
+    surfaceWeight: input.flow.stage === "sent" ? "receipt" : "full_card",
+    statusLabel,
+    recommendationLabel,
+    rationaleLabel,
+    confidenceLabel: input.flow.stage === "sent" ? "Proof recorded" : input.flow.recommendationConfidenceLabel,
+    whyLabels: input.flow.stage === "sent"
+      ? ["The sent reply is retained in the vendor thread.", "Resolved quote replies collapse to history instead of staying in the live queue."]
+      : input.flow.recommendationWhyLabels,
+    primaryAction: {
+      kind: presentation.primaryActionKind,
+      label: presentation.primaryActionLabel,
+      enabled: input.primaryActionEnabled !== false && presentation.primaryActionKind !== "resolve_blocker",
+    },
+    secondaryAction: presentation.secondaryActionKind && presentation.secondaryActionLabel
+      ? {
+        kind: presentation.secondaryActionKind,
+        label: presentation.secondaryActionLabel,
+      }
+      : null,
   };
 }
 

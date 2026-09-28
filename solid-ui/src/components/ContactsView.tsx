@@ -1,12 +1,18 @@
 ﻿// @locs-version: 1.0
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { postAgentMessage, readSession } from "@/lib/api";
 import type { ResponseQueueRelationship } from "@/lib/responseQueuePolicy";
 import { EmptyState } from "@/components/EmptyState";
 import { ContactEditControls } from "@/components/ContactEditControls";
 import { ContactImportControls } from "@/components/ContactImportControls";
 import { ContactRoleChips, ContactRoleInput } from "@/components/ContactRoleControls";
-import { loadContacts, saveContacts, type Contact } from "@/lib/contactsLocalState";
+import {
+  contactStorageEventMatchesUser,
+  loadContacts,
+  saveContacts,
+  subscribeContactsChangedEvent,
+  type Contact,
+} from "@/lib/contactsLocalState";
 import { findDuplicateContact, replaceContact } from "@/lib/contactManagementState";
 import { removeContactRole } from "@/lib/contactRoleState";
 import {
@@ -84,6 +90,26 @@ export function ContactsView() {
   const [responseSummariesEnabled, setResponseSummariesEnabled] = createSignal(
     contacts().some((contact) => contact.responseSummaryEnabled),
   );
+
+  onMount(() => {
+    const refreshContacts = () => {
+      const next = loadContacts(sessionUserId);
+      setContacts(next);
+      setResponseSummariesEnabled(next.some((contact) => contact.responseSummaryEnabled));
+    };
+    const unsubscribe = subscribeContactsChangedEvent((detail) => {
+      if ((detail.userId ?? null) !== (sessionUserId ?? null)) return;
+      refreshContacts();
+    });
+    const handleStorage = (event: StorageEvent) => {
+      if (contactStorageEventMatchesUser(event, sessionUserId)) refreshContacts();
+    };
+    window.addEventListener("storage", handleStorage);
+    onCleanup(() => {
+      unsubscribe();
+      window.removeEventListener("storage", handleStorage);
+    });
+  });
   const importState = () => buildContactImportState({
     source: importSource(),
     text: importText(),

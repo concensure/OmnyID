@@ -9,6 +9,12 @@ import {
   loadWeddingHelperLocalState,
   normalizeWeddingHelperLocalState,
   saveWeddingHelperLocalState,
+  upsertWeddingHelperContact,
+  weddingHelperContactId,
+  weddingHelperContactRelationshipKind,
+  weddingHelperContactToAfpMessage,
+  weddingHelperContactToAfpSendInput,
+  weddingHelperDraftToContact,
   weddingHelperResponsibilityToAfpMessage,
   weddingHelperResponsibilityToAfpSendInput,
   weddingHelperTaskDueLabel,
@@ -47,6 +53,71 @@ test("wedding helper people dedupe contacts, custom helpers, and partner names c
   assert.deepEqual(buildWeddingHelperPeople(["Alex", " alex ", ""], ["Sam", "sam"]), ["Alex", "Sam", "Partner 1", "Partner 2"]);
   assert.deepEqual(buildWeddingHelperPeople(["Alex"], ["Sam"], ["Claire", "James"]), ["Alex", "Sam", "Claire", "James"]);
   assert.deepEqual(buildWeddingHelperPeople([], [], ["Claire", "Claire"]), ["Claire"]);
+});
+
+test("wedding helper contact drafts become stable contacts with wedding roles", () => {
+  assert.equal(weddingHelperContactId(" Mia Chen "), "wedding-helper:mia-chen");
+  assert.equal(weddingHelperContactRelationshipKind("Florist vendor"), "supplier");
+  assert.equal(weddingHelperContactRelationshipKind("Wedding party"), "friend");
+  assert.equal(weddingHelperContactRelationshipKind("Coordinator"), "team");
+
+  const contact = weddingHelperDraftToContact({
+    name: " Mia Chen ",
+    email: " mia@example.test ",
+    phone: " +61 400 000 000 ",
+    role: " Coordinator ",
+  });
+
+  assert.deepEqual(contact, {
+    id: "wedding-helper:mia-chen",
+    name: "Mia Chen",
+    email: "mia@example.test",
+    phone: "+61 400 000 000",
+    relationshipKind: "team",
+    roles: ["Helper", "Coordinator"],
+    notes: "Wedding helper role: Coordinator",
+  });
+  assert.equal(weddingHelperDraftToContact({ name: "" }), null);
+});
+
+test("wedding helper contact upsert creates new contacts and updates duplicates without losing existing data", () => {
+  const created = upsertWeddingHelperContact([], {
+    name: "Mia Chen",
+    email: "mia@example.test",
+    role: "Coordinator",
+  });
+
+  assert.ok(created);
+  assert.equal(created.action, "created");
+  assert.equal(created.contacts[0]?.name, "Mia Chen");
+
+  const updated = upsertWeddingHelperContact([
+    {
+      id: "contact-1",
+      name: "Mia Chen",
+      relationshipKind: "other",
+      notes: "Existing note",
+      roles: ["Guest"],
+    },
+  ], {
+    name: "Mia Chen",
+    email: "mia@example.test",
+    phone: "+61 400 000 000",
+    role: "Coordinator",
+  });
+
+  assert.ok(updated);
+  assert.equal(updated.action, "updated");
+  assert.deepEqual(updated.contact, {
+    id: "contact-1",
+    name: "Mia Chen",
+    email: "mia@example.test",
+    phone: "+61 400 000 000",
+    relationshipKind: "team",
+    notes: "Existing note",
+    roles: ["Guest", "Helper", "Coordinator"],
+  });
+  assert.equal(upsertWeddingHelperContact([], { name: "" }), null);
 });
 
 test("wedding helper workload rows and suggestion flag imbalance neutrally", () => {
@@ -268,4 +339,55 @@ test("wedding helper responsibility marks unassigned work as needing owner actio
 test("wedding helper responsibility projection skips malformed tasks", () => {
   assert.equal(weddingHelperResponsibilityToAfpMessage({ task: task({ id: "" }) }), null);
   assert.equal(weddingHelperResponsibilityToAfpSendInput({ task: task({ id: "missing-title", title: "" }) }), null);
+});
+
+test("wedding helper contact projects durable AFP context for contacts and wedding views", () => {
+  const message = weddingHelperContactToAfpMessage({
+    name: "Mia Chen",
+    email: "mia@example.test",
+    phone: "+61 400 000 000",
+    role: "Coordinator",
+    nowIso: "2027-07-21T00:00:00.000Z",
+    metadata: {
+      wedding_plan_id: "plan-123",
+      response_workspace_id: "workspace-456",
+    },
+  });
+
+  assert.ok(message);
+  assert.equal(message.kind, "wedding_helper_contact");
+  assert.equal(message.subtype, "wedding_helper_contact_upsert");
+  assert.deepEqual(message.to, [
+    "agent://wedding-planning",
+    "agent://contacts",
+    "agent://decision-os",
+    "agent://knowledge-graph",
+    "agent://topology",
+  ]);
+  assert.equal(message.content.name, "Mia Chen");
+  assert.equal(message.content.email, "mia@example.test");
+  assert.equal(message.content.phone, "+61 400 000 000");
+  assert.equal(message.content.role, "Coordinator");
+  assert.equal(message.metadata?.helper_name, "Mia Chen");
+  assert.equal(message.metadata?.e2ee_required, true);
+  assert.ok(message.supertags?.includes("wedding_helper_contact"));
+  assert.ok(message.references?.some((reference) => reference.type === "contact_email" && reference.target === "mia@example.test"));
+  assert.equal(message.views.find((view) => view.format === "a2ui")?.content.rows[1]?.value, "Coordinator");
+});
+
+test("wedding helper contact send input enables relational storage and skips blank names", () => {
+  const sendInput = weddingHelperContactToAfpSendInput({
+    name: "Sam Rivera",
+    metadata: {
+      wedding_plan_id: "plan-123",
+      response_workspace_id: "workspace-456",
+    },
+  });
+
+  assert.ok(sendInput);
+  assert.equal(sendInput.store_in_relational, true);
+  assert.equal(sendInput.content.kind, "wedding_helper_contact");
+  assert.equal(sendInput.content.email, null);
+  assert.equal(sendInput.content.role, "Helper");
+  assert.equal(weddingHelperContactToAfpSendInput({ name: "" }), null);
 });

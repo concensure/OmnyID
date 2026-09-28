@@ -10,6 +10,21 @@ export type WeddingVendorSearchLaunchState = {
   savedAt: string;
 };
 
+export type WeddingVendorSearchIntakeQueryInput = {
+  location?: string | null;
+  vendorLabels?: readonly string[] | null;
+  priorities?: string | null;
+  atmosphere?: string | null;
+};
+
+export type WeddingVendorSearchEffectiveQuerySource = "manual" | "onboarding" | "empty";
+
+export type WeddingVendorSearchEffectiveQueryState = {
+  query: string;
+  source: WeddingVendorSearchEffectiveQuerySource;
+  sourceLabel: string;
+};
+
 const MAX_QUERY_LENGTH = 280;
 
 function storageOrNull(storage?: Storage | null): Storage | null {
@@ -28,6 +43,57 @@ function withStorage<T>(storage: Storage | null, fallback: T, fn: (storage: Stor
 export function normalizeWeddingVendorSearchLaunchQuery(value: unknown): string {
   if (typeof value !== "string") return "";
   return value.replace(/\s+/g, " ").trim().slice(0, MAX_QUERY_LENGTH);
+}
+
+export function weddingVendorSearchQueryFromIntake(input: WeddingVendorSearchIntakeQueryInput): string {
+  const labels = (input.vendorLabels ?? [])
+    .map((label) => normalizeWeddingVendorSearchLaunchQuery(label))
+    .filter(Boolean);
+  const focus = labels.length > 0
+    ? labels.slice(0, 3).join(" or ")
+    : "wedding vendors";
+  return normalizeWeddingVendorSearchLaunchQuery([
+    focus,
+    normalizeWeddingVendorSearchLaunchQuery(input.location) ? `in ${normalizeWeddingVendorSearchLaunchQuery(input.location)}` : null,
+    normalizeWeddingVendorSearchLaunchQuery(input.priorities) ? `for ${normalizeWeddingVendorSearchLaunchQuery(input.priorities)}` : null,
+    normalizeWeddingVendorSearchLaunchQuery(input.atmosphere) ? `with ${normalizeWeddingVendorSearchLaunchQuery(input.atmosphere)}` : null,
+  ].filter(Boolean).join(" "));
+}
+
+export function weddingVendorSearchEffectiveQuery(
+  manualQuery?: string | null,
+  onboardingQuery?: string | null,
+): string {
+  return weddingVendorSearchEffectiveQueryState(manualQuery, onboardingQuery).query;
+}
+
+export function weddingVendorSearchEffectiveQueryState(
+  manualQuery?: string | null,
+  onboardingQuery?: string | null,
+): WeddingVendorSearchEffectiveQueryState {
+  const manual = normalizeWeddingVendorSearchLaunchQuery(manualQuery);
+  if (manual) {
+    return {
+      query: manual,
+      source: "manual",
+      sourceLabel: "Using your edited query",
+    };
+  }
+
+  const onboarding = normalizeWeddingVendorSearchLaunchQuery(onboardingQuery);
+  if (onboarding) {
+    return {
+      query: onboarding,
+      source: "onboarding",
+      sourceLabel: "Using your onboarding answers",
+    };
+  }
+
+  return {
+    query: "",
+    source: "empty",
+    sourceLabel: "No vendor search query yet",
+  };
 }
 
 export function isWeddingVendorSearchIntent(value: unknown): boolean {

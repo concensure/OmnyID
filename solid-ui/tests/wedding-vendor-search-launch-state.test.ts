@@ -9,6 +9,9 @@ import {
   loadWeddingVendorSearchLaunch,
   saveWeddingVendorSearchLaunch,
   WEDDING_VENDOR_SEARCH_LAUNCH_KEY,
+  weddingVendorSearchEffectiveQuery,
+  weddingVendorSearchEffectiveQueryState,
+  weddingVendorSearchQueryFromIntake,
   weddingVendorSearchLaunchFromEvent,
 } from "../src/lib/weddingVendorSearchLaunchState.ts";
 
@@ -61,6 +64,68 @@ test("save and consumeWeddingVendorSearchLaunch stores a normalized one-shot que
 
   assert.equal(consumed?.query, "wedding cake vendors in Sydney");
   assert.equal(loadWeddingVendorSearchLaunch(storage), null);
+});
+
+test("weddingVendorSearchQueryFromIntake builds a concrete query from selected intake vendors", () => {
+  assert.equal(
+    weddingVendorSearchQueryFromIntake({
+      location: " Sydney ",
+      vendorLabels: ["Florist", "Photographer", "Venue", "Cake"],
+      priorities: "low budget, reliable reviews",
+      atmosphere: "garden ceremony",
+    }),
+    "Florist or Photographer or Venue in Sydney for low budget, reliable reviews with garden ceremony",
+  );
+});
+
+test("weddingVendorSearchQueryFromIntake still searches when no vendor category was selected", () => {
+  assert.equal(
+    weddingVendorSearchQueryFromIntake({
+      location: "Melbourne",
+      vendorLabels: [],
+      priorities: "",
+      atmosphere: "relaxed dinner",
+    }),
+    "wedding vendors in Melbourne with relaxed dinner",
+  );
+});
+
+test("weddingVendorSearchEffectiveQuery prefers user edits and falls back to onboarding query", () => {
+  assert.equal(
+    weddingVendorSearchEffectiveQuery("  florist in Sydney specialising in wedding  ", "Photographer in Sydney"),
+    "florist in Sydney specialising in wedding",
+  );
+  assert.equal(
+    weddingVendorSearchEffectiveQuery("   ", "Photographer in Sydney with garden ceremony"),
+    "Photographer in Sydney with garden ceremony",
+  );
+  assert.equal(weddingVendorSearchEffectiveQuery("", ""), "");
+});
+
+test("weddingVendorSearchEffectiveQueryState explains the active query source", () => {
+  assert.deepEqual(
+    weddingVendorSearchEffectiveQueryState("  florist in Sydney  ", "Photographer in Sydney"),
+    {
+      query: "florist in Sydney",
+      source: "manual",
+      sourceLabel: "Using your edited query",
+    },
+  );
+
+  assert.deepEqual(
+    weddingVendorSearchEffectiveQueryState("   ", "Photographer in Sydney with garden ceremony"),
+    {
+      query: "Photographer in Sydney with garden ceremony",
+      source: "onboarding",
+      sourceLabel: "Using your onboarding answers",
+    },
+  );
+
+  assert.deepEqual(weddingVendorSearchEffectiveQueryState("", ""), {
+    query: "",
+    source: "empty",
+    sourceLabel: "No vendor search query yet",
+  });
 });
 
 test("loadWeddingVendorSearchLaunch clears malformed values", () => {

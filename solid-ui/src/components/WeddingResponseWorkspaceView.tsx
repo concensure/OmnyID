@@ -10,7 +10,6 @@ import { WeddingNextStepCard } from "@/components/WeddingNextStepCard";
 import { WeddingPlanningThreadsCard } from "@/components/WeddingPlanningThreadsCard";
 import { WeddingProjectionApprovalCard } from "@/components/WeddingProjectionApprovalCard";
 import { WeddingResilienceCardList } from "@/components/WeddingResilienceCardList";
-import { WeddingRichResponseView } from "@/components/WeddingRichResponseView";
 import { WeddingVendorQuoteProofDrawer } from "@/components/WeddingVendorQuoteProofDrawer";
 import { WeddingVendorQuoteReplyCard } from "@/components/WeddingVendorQuoteReplyCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
@@ -73,7 +72,6 @@ const WEDDING_HOME_SECTION_IDS = [
   "next_step",
   "planning_basics",
   "vendor_search",
-  "live_evidence",
   "vendor_smoke",
   "notice",
   "overview",
@@ -174,6 +172,8 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const [homeLayoutScope, setHomeLayoutScope] = createSignal("");
   const [homeSectionOrder, setHomeSectionOrder] = createSignal<WeddingHomeSectionId[]>([...WEDDING_HOME_SECTION_IDS]);
   const [draggingHomeSectionId, setDraggingHomeSectionId] = createSignal<WeddingHomeSectionId | null>(null);
+  const [homeControlsSectionId, setHomeControlsSectionId] = createSignal<WeddingHomeSectionId | null>(null);
+  let homeControlsHideTimer: number | undefined;
   const localQuoteReplyReceiptProofMessage = (): AfpMessage | null => {
     const thread = quoteReplyProofThread();
     const execution = thread
@@ -249,6 +249,10 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       element.click();
     });
     onCleanup(unsubscribe);
+  });
+
+  onCleanup(() => {
+    if (homeControlsHideTimer !== undefined) window.clearTimeout(homeControlsHideTimer);
   });
 
   createEffect(() => {
@@ -350,6 +354,40 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     moveHomeSectionToIndex(sourceId, targetIndex);
   }
 
+  function showHomeSectionControls(sectionId: WeddingHomeSectionId) {
+    if (homeControlsHideTimer !== undefined) {
+      window.clearTimeout(homeControlsHideTimer);
+      homeControlsHideTimer = undefined;
+    }
+    setHomeControlsSectionId(sectionId);
+  }
+
+  function scheduleHideHomeSectionControls(sectionId: WeddingHomeSectionId) {
+    if (draggingHomeSectionId() === sectionId) return;
+    if (homeControlsHideTimer !== undefined) window.clearTimeout(homeControlsHideTimer);
+    homeControlsHideTimer = window.setTimeout(() => {
+      if (homeControlsSectionId() === sectionId && draggingHomeSectionId() !== sectionId) {
+        setHomeControlsSectionId(null);
+      }
+      homeControlsHideTimer = undefined;
+    }, 500);
+  }
+
+  function updateHomeSectionControlsFromPointer(sectionId: WeddingHomeSectionId, event: MouseEvent & { currentTarget: HTMLDivElement }) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const nearVerticalEdge = event.clientY - rect.top < 56 || rect.bottom - event.clientY < 24;
+    const nearHorizontalEdge = event.clientX - rect.left < 24 || rect.right - event.clientX < 24;
+    if (nearVerticalEdge || nearHorizontalEdge) {
+      showHomeSectionControls(sectionId);
+      return;
+    }
+    scheduleHideHomeSectionControls(sectionId);
+  }
+
+  function homeSectionControlsVisible(sectionId: WeddingHomeSectionId): boolean {
+    return homeControlsSectionId() === sectionId || draggingHomeSectionId() === sectionId;
+  }
+
   function researchPromptAction(): WeddingWorkspaceSidebarAction {
     return buildWeddingResearchPromptAction({
       source: "documents",
@@ -383,6 +421,30 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     props.onSelectMenu?.("home");
     setShowPlanningFiles(false);
     setExportNotice(cta.noticeLabel);
+    if (!cta.shouldScrollToTarget || !cta.targetSectionId || typeof window === "undefined") return;
+    window.setTimeout(() => {
+      document.querySelector(`[data-wedding-home-section='${cta.targetSectionId}']`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+  }
+
+  function openVendorQuoteReplySurface() {
+    props.onSelectMenu?.(state().activeVendorQuoteReplyFlows.length > 0 ? "home" : "response_queue");
+    setShowPlanningFiles(false);
+    setExportNotice(
+      state().activeVendorQuoteReplyFlows.length > 0
+        ? "Continue this quote from the live vendor reply card. The document detail stays read-only so the decision cannot drift across two surfaces."
+        : "This quote reply is no longer live. Check the vendor response log for the saved thread and delivery proof.",
+    );
+    if (typeof window === "undefined") return;
+    window.setTimeout(() => {
+      document.querySelector("[data-wedding-home-section='quote_replies']")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
   }
 
   function approveRequest(request: WeddingApprovalRequestState) {
@@ -699,7 +761,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     {
       id: "planning_basics",
       title: "Planning basics needed",
-      visible: props.vendorSearchReadiness?.status === "blocked" || props.liveEvidenceReadiness?.status === "blocked",
+      visible: props.vendorSearchReadiness?.status === "blocked",
       render: () => (
         <div class="rounded-2xl border border-amber-200 bg-amber-50/90 p-3 shadow-sm">
           <div class="flex flex-wrap items-start justify-between gap-3">
@@ -719,14 +781,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
                 <p class="text-xs font-semibold uppercase text-amber-800/70">Vendor search</p>
                 <p class="mt-1 break-words text-sm leading-6 text-amber-950">
                   Needs {props.vendorSearchReadiness?.missing.join(", ")}.
-                </p>
-              </div>
-            </Show>
-            <Show when={props.liveEvidenceReadiness?.status === "blocked"}>
-              <div class="rounded-xl border border-amber-100 bg-white/75 p-3">
-                <p class="text-xs font-semibold uppercase text-amber-800/70">Map and weather</p>
-                <p class="mt-1 break-words text-sm leading-6 text-amber-950">
-                  Needs {props.liveEvidenceReadiness?.missing.join(", ")}.
                 </p>
               </div>
             </Show>
@@ -762,7 +816,16 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             </button>
           </div>
           <label class="mt-3 block">
-            <span class="text-xs font-semibold text-rose-950/75">Search query</span>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-xs font-semibold text-rose-950/75">Search query</span>
+              <Show when={props.vendorSearchQuerySourceLabel}>
+                {(label) => (
+                  <span class="rounded-full border border-rose-100 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-900">
+                    {label()}
+                  </span>
+                )}
+              </Show>
+            </div>
             <input
               type="text"
               value={props.vendorSearchQuery ?? ""}
@@ -778,46 +841,29 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
               </p>
             )}
           </Show>
+          <Show when={props.vendorSearchResultAction}>
+            {(action) => (
+              <button
+                type="button"
+                class="mt-3 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-950 transition hover:border-rose-300 hover:bg-rose-100"
+                title={action().detail ?? undefined}
+                onClick={() => {
+                  props.onSelectMenu?.(action().menu ?? "documents");
+                  props.onSelectArtifact?.(action().artifactId);
+                }}
+                data-magic-action="open"
+                data-magic-icon="file"
+                data-magic-label={action().label}
+                data-magic-id="wedding:vendor-search:open-result"
+              >
+                {action().label}
+              </button>
+            )}
+          </Show>
           <Show when={props.vendorSearchBlockedReason}>
             {(reason) => (
               <p class="mt-2 break-words text-xs leading-5 text-rose-950/70">
                 {reason()}
-              </p>
-            )}
-          </Show>
-        </div>
-      ),
-    },
-    {
-      id: "live_evidence",
-      title: "Live map and weather evidence",
-      visible: true,
-      render: () => (
-        <div class="rounded-2xl border border-sky-100 bg-white/85 p-3 shadow-sm">
-          <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-sky-950">Live map and weather evidence</p>
-              <p class="mt-1 break-words text-xs leading-5 text-sky-950/65">
-                Verifies the planning location with server-side map and weather providers and saves the evidence into documents.
-              </p>
-            </div>
-            <button
-              type="button"
-              class="shrink-0 rounded-full bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-sky-300"
-              disabled={props.liveEvidenceRunning || !props.onRunLiveEvidenceCheck || props.liveEvidenceReadiness?.status === "blocked"}
-              onClick={() => props.onRunLiveEvidenceCheck?.()}
-              data-magic-action="open"
-              data-magic-icon="map"
-              data-magic-label={props.liveEvidenceRunning ? "Location check running" : "Verify wedding location"}
-              data-magic-id="wedding:live-evidence:run"
-            >
-              {props.liveEvidenceRunning ? "Verifying..." : "Verify location"}
-            </button>
-          </div>
-          <Show when={props.liveEvidenceNotice}>
-            {(notice) => (
-              <p class="mt-2 break-words text-xs leading-5 text-sky-950/70">
-                {notice()}
               </p>
             )}
           </Show>
@@ -939,21 +985,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
               );
             }}
           </For>
-          <Show when={quoteReplyProofThread()}>
-            {(thread) => (
-              <WeddingVendorQuoteProofDrawer
-                vendorName={thread().vendorName}
-                messages={quoteReplyProofRows()}
-                loading={quoteReplyProofLoading()}
-                error={quoteReplyProofError()}
-                onClose={() => {
-                  setQuoteReplyProofThread(null);
-                  setQuoteReplyProofMessages([]);
-                  setQuoteReplyProofError(null);
-                }}
-              />
-            )}
-          </Show>
         </div>
       ),
     },
@@ -985,16 +1016,29 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     },
     {
       id: "rich_response",
-      title: "Planner response",
+      title: "Wedding documents",
       visible: Boolean(props.richResponse),
-      render: () => props.richResponse
-        ? (
-          <WeddingRichResponseView
-            state={props.richResponse}
-            onAction={props.onRichResponseAction}
-          />
-        )
-        : <></>,
+      render: () => {
+        const richResponse = props.richResponse;
+        if (!richResponse) return <></>;
+        return (
+          <div class="flex flex-col gap-3 rounded-[20px] border border-rose-100 bg-white/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-on-surface">Private wedding operations room</p>
+              <p class="mt-1 text-sm leading-6 text-on-surface-variant">
+                Open the wedding documents and saved planning outputs for this workspace.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="w-full rounded-full bg-rose-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:w-auto"
+              onClick={() => props.onRichResponseAction?.(richResponse.primaryAction)}
+            >
+              Open documents
+            </button>
+          </div>
+        );
+      },
     },
   ]);
 
@@ -1084,10 +1128,21 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             {(section, index) => (
               <div
                 class="rounded-[24px] border border-white/55 bg-white/45 p-2 shadow-sm backdrop-blur"
+                data-wedding-home-section={section.id}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => dropHomeSection(section.id)}
+                onMouseMove={(event) => updateHomeSectionControlsFromPointer(section.id, event)}
+                onMouseLeave={() => scheduleHideHomeSectionControls(section.id)}
               >
-                <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div
+                  class={`mb-2 flex flex-wrap items-center justify-between gap-2 transition duration-200 ${
+                    homeSectionControlsVisible(section.id)
+                      ? "opacity-100"
+                      : "pointer-events-none h-0 overflow-hidden opacity-0"
+                  }`}
+                  onMouseEnter={() => showHomeSectionControls(section.id)}
+                  onMouseLeave={() => scheduleHideHomeSectionControls(section.id)}
+                >
                   <button
                     type="button"
                     class="inline-flex cursor-grab items-center gap-2 rounded-full border border-stone-200 bg-white/85 px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-sm active:cursor-grabbing"
@@ -1165,6 +1220,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onExecute={(request) => void executeRequest(request)}
           onResearch={handleSidebarAction}
           onOpenFollowUpQueue={openSelectedVendorFollowUpQueue}
+          onOpenVendorQuoteReplySurface={openVendorQuoteReplySurface}
         />
 
         <Show when={showTechnicalDetails() && state().projectionQueue}>
@@ -1192,13 +1248,30 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onToggleSharePlan={props.onToggleSharePlan}
           saveProjection={props.saveProjection}
           onRefreshWorkspace={props.onRefreshWorkspace}
+          contactUserId={props.contactUserId}
           onSelectMenu={props.onSelectMenu}
           onOpenArtifact={openArtifactFromContext}
           onOpenSavedOutputs={props.onOpenSavedOutputs}
           onSaveWeddingDate={props.onSaveWeddingDate}
+          onViewQuoteReplyProof={(flow) => void viewQuoteReplyThread(flow)}
           onSidebarAction={handleSidebarAction}
         />
       </aside>
+      <Show when={quoteReplyProofThread()}>
+        {(thread) => (
+          <WeddingVendorQuoteProofDrawer
+            vendorName={thread().vendorName}
+            messages={quoteReplyProofRows()}
+            loading={quoteReplyProofLoading()}
+            error={quoteReplyProofError()}
+            onClose={() => {
+              setQuoteReplyProofThread(null);
+              setQuoteReplyProofMessages([]);
+              setQuoteReplyProofError(null);
+            }}
+          />
+        )}
+      </Show>
     </section>
   );
 }

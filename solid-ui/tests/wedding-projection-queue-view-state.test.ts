@@ -153,6 +153,15 @@ test("buildWeddingProjectionQueueViewState exposes selected-vendor draft preview
   assert.equal(state.vendorOutreachDraftCards[0]?.providerReceiptRequired, true);
   assert.equal(state.title, "Save vendor draft tasks");
   assert.match(state.description, /does not send email/i);
+  assert.deepEqual(state.vendorApprovalCard, {
+    decisionCount: 0,
+    draftCount: 1,
+    ctaCopy: "Save 1 vendor draft",
+    summaryLabel: "Ready to save 1 approval-gated draft task.",
+    detailToggleLabel: "Review 1 vendor follow-up detail",
+    collapsedByDefault: true,
+  });
+  assert.equal(state.externalSendGuardLabel, "This save keeps editable vendor draft tasks only. No vendor email is sent.");
   assert.equal(state.primaryAction.label, "Save 1 vendor draft");
   assert.match(state.primaryAction.reason ?? "", /no external outreach/i);
 });
@@ -207,8 +216,119 @@ test("buildWeddingProjectionQueueViewState exposes selected-vendor decision cons
   assert.equal(state.vendorDecisionPolicyCards[0]?.noExternalSendWithoutApproval, true);
   assert.equal(state.title, "Save selected vendor decisions");
   assert.match(state.description, /move unselected vendors out of the live decision queue/i);
+  assert.deepEqual(state.vendorApprovalCard, {
+    decisionCount: 1,
+    draftCount: 0,
+    ctaCopy: "Save 1 vendor decision",
+    summaryLabel: "Ready to save 1 selected-vendor decision.",
+    detailToggleLabel: "Review 1 vendor follow-up detail",
+    collapsedByDefault: false,
+  });
+  assert.equal(state.externalSendGuardLabel, "This save records the selected-vendor decision only. Vendor outreach remains approval-gated.");
   assert.equal(state.primaryAction.label, "Save 1 vendor decision");
   assert.match(state.primaryAction.reason ?? "", /removes unselected vendors from active queues/i);
+});
+
+test("buildWeddingProjectionQueueViewState explains combined selected-vendor decisions and outreach drafts", () => {
+  const decision: WeddingDecisionProjectionInput = {
+    id: "wedding_decision:workspace-view:vendor-comparison:harbour-studio",
+    metadata: {
+      ...metadata,
+      source: "vendor_search_comparison",
+      vendorComparisonSelection: {
+        selectedVendorsContinueToFollowUp: true,
+        unselectedVendorsLeaveActiveQueues: true,
+        approvalRequiredBeforeOutreach: true,
+        noExternalSendWithoutApproval: true,
+      },
+    },
+    artifactId: "artifact:top-vendor-comparison",
+    artifactTitle: "Top vendor comparison",
+    artifactKind: "vendor_table",
+    selectedOption: {
+      id: "vendor_choice:harbour_studio:1",
+      rowIndex: 0,
+      label: "Harbour Studio",
+      detail: "Sydney documentary wedding photographer with transparent packages.",
+      cells: ["#1 Harbour Studio", "Transparent packages", "https://harbour-studio.example"],
+      selected: true,
+      preferenceFitLabels: ["documentary"],
+      missingPreferenceLabels: [],
+      tradeoffLabels: [],
+      preferenceSummaryLabel: "Selected by user",
+    },
+  };
+  const task: WeddingPlanningTaskItem = {
+    id: "wedding_vendor_outreach_task:harbour-photos",
+    title: "Prepare approval-gated quote request for Harbour Photos",
+    kind: "vendor_follow_up",
+    source: "agent",
+    reviewStatus: "accepted",
+    approvalState: "draft",
+    metadata: {
+      ...metadata,
+      vendor_outreach_from_selected_decision: true,
+      vendor_outreach_vendor_label: "Harbour Photos",
+      vendor_outreach_draft_subject: "Wedding quote request - Photographer",
+      vendor_outreach_draft_body: "Please confirm availability and current quote details.",
+      vendor_outreach_draft_requires_approval: true,
+      approval_required_before_outreach: true,
+    },
+  };
+
+  const state = buildWeddingProjectionQueueViewState({
+    decisionItems: [decision],
+    taskItems: [task],
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.title, "Save selected vendors and drafts");
+  assert.match(state.description, /move unselected vendors out of live queues/i);
+  assert.match(state.description, /without sending email/i);
+  assert.deepEqual(state.vendorApprovalCard, {
+    decisionCount: 1,
+    draftCount: 1,
+    ctaCopy: "Save 2 vendor follow-up items",
+    summaryLabel: "Ready to save 1 selected-vendor decision and 1 approval-gated draft task.",
+    detailToggleLabel: "Review 2 vendor follow-up details",
+    collapsedByDefault: true,
+  });
+  assert.equal(state.externalSendGuardLabel, "This save records selected vendors and draft tasks only. No vendor email is sent.");
+  assert.equal(state.primaryAction.label, "Save 2 vendor follow-up items");
+  assert.match(state.primaryAction.reason ?? "", /no external outreach/i);
+});
+
+test("buildWeddingProjectionQueueViewState keeps general save copy when vendor items are mixed with other outputs", () => {
+  const task: WeddingPlanningTaskItem = {
+    id: "wedding_vendor_outreach_task:harbour-photos",
+    title: "Prepare approval-gated quote request for Harbour Photos",
+    kind: "vendor_follow_up",
+    source: "agent",
+    reviewStatus: "accepted",
+    approvalState: "draft",
+    metadata: {
+      ...metadata,
+      vendor_outreach_from_selected_decision: true,
+      vendor_outreach_vendor_label: "Harbour Photos",
+      vendor_outreach_draft_subject: "Wedding quote request - Photographer",
+      vendor_outreach_draft_body: "Please confirm availability and current quote details.",
+      vendor_outreach_draft_requires_approval: true,
+      approval_required_before_outreach: true,
+    },
+  };
+
+  const state = buildWeddingProjectionQueueViewState({
+    artifacts: artifactState().artifacts,
+    taskItems: [task],
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.title, "Save planning outputs");
+  assert.match(state.description, /files, dates, tasks, and notes/i);
+  assert.doesNotMatch(state.primaryAction.label, /vendor/i);
+  assert.equal(state.externalSendGuardLabel, "This save keeps editable vendor draft tasks only. No vendor email is sent.");
 });
 
 test("buildWeddingProjectionQueueViewState prefers blocked review action when nothing is dispatchable", () => {

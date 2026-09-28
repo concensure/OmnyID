@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { weddingTimelineWeddingDateLabel } from "@/lib/weddingTimelineWeddingDateState";
+import {
+  weddingTargetDateOrSeasonLabel,
+  weddingTimelineWeddingDateLabel,
+} from "@/lib/weddingTimelineWeddingDateState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 
 function state(overrides: Partial<WeddingResponseWorkspaceViewState> = {}): WeddingResponseWorkspaceViewState {
@@ -39,6 +42,17 @@ test("weddingTimelineWeddingDateLabel falls back to an exact saved context date"
   assert.equal(result, "2027-09-18");
 });
 
+test("weddingTimelineWeddingDateLabel reads an exact date from structured planning context", () => {
+  const result = weddingTimelineWeddingDateLabel(state({
+    contextCards: [{
+      planningContext: { dateOrSeason: "2027-10-03" },
+      answeredLabels: [],
+    }] as WeddingResponseWorkspaceViewState["contextCards"],
+  }));
+
+  assert.equal(result, "2027-10-03");
+});
+
 test("weddingTimelineWeddingDateLabel ignores seasons and non-wedding timeline dates", () => {
   const result = weddingTimelineWeddingDateLabel(state({
     ganttTimeline: {
@@ -49,4 +63,15 @@ test("weddingTimelineWeddingDateLabel ignores seasons and non-wedding timeline d
   }));
 
   assert.equal(result, null);
+});
+
+test("weddingTargetDateOrSeasonLabel reads season-only structured planning context", () => {
+  const result = weddingTargetDateOrSeasonLabel(state({
+    contextCards: [{
+      planningContext: { dateOrSeason: "October 2027" },
+      answeredLabels: [],
+    }] as WeddingResponseWorkspaceViewState["contextCards"],
+  }));
+
+  assert.equal(result, "October 2027");
 });

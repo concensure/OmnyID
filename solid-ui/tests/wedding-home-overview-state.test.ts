@@ -61,17 +61,77 @@ test("home overview guest tile is actionable before guests are added", () => {
   assert.equal(guest?.a2ui.support_label, "Open guests");
 });
 
+test("home overview tiles surface captured intake guest count and budget comfort", () => {
+  const tiles = buildWeddingHomeOverviewActionTiles(state({
+    contextCards: [{
+      planningContext: {
+        guestCount: 80,
+        budgetComfort: "Keep the budget lean",
+      },
+      answeredLabels: ["Guest count: 80", "Budget comfort: Keep the budget lean"],
+    }] as WeddingResponseWorkspaceViewState["contextCards"],
+  }));
+  const budget = tiles.find((tile) => tile.id === "budget");
+  const guests = tiles.find((tile) => tile.id === "guests");
+
+  assert.equal(budget?.valueLabel, "Budget noted");
+  assert.equal(budget?.detailLabel, "Intake: Keep the budget lean");
+  assert.equal(budget?.supportLabel, "Open budget to set a numeric target.");
+  assert.equal(budget?.toneLabel, "Needs target");
+  assert.equal(guests?.valueLabel, "80 expected");
+  assert.equal(guests?.detailLabel, "Guest count captured from intake; make the guest list next.");
+  assert.equal(guests?.tone, "attention");
+  assert.equal(guests?.toneLabel, "Estimate only");
+});
+
 test("home status summarizes the whole wedding and opens the most useful next area", () => {
   const status = buildWeddingHomeStatusState(state());
   const action = status.a2ui.primary_action as Record<string, unknown>;
 
   assert.equal(status.tone, "attention");
   assert.equal(status.title, "Your wedding plan has a clear next step");
-  assert.equal(status.menuId, "budget");
-  assert.equal(status.actionLabel, "Open budget");
+  assert.equal(status.menuId, "timeline");
+  assert.equal(status.actionLabel, "Add wedding date");
   assert.ok(status.detail.includes("Budget: Set budget"));
   assert.ok(status.metrics.some((metric) => metric.id === "date" && metric.value === "Add date"));
-  assert.equal(action.target_menu, "budget");
+  assert.equal(action.target_menu, "timeline");
+});
+
+test("home status shows captured target season while exact date remains open", () => {
+  const status = buildWeddingHomeStatusState(state({
+    contextCards: [{
+      answeredLabels: ["Date/season: October 2027"],
+    }] as WeddingResponseWorkspaceViewState["contextCards"],
+  }));
+  const dateMetric = status.metrics.find((metric) => metric.id === "date");
+
+  assert.equal(dateMetric?.value, "Confirm date");
+  assert.equal(dateMetric?.tone, "attention");
+  assert.equal(status.menuId, "timeline");
+  assert.equal(status.actionLabel, "Pick exact date");
+  assert.match(status.detail, /Date: Confirm date/);
+});
+
+test("home status surfaces captured location from onboarding context", () => {
+  const status = buildWeddingHomeStatusState(state({
+    contextCards: [{
+      planningContext: {
+        location: "Sydney NSW",
+        dateOrSeason: "October 2027",
+      },
+      answeredLabels: [],
+    }] as WeddingResponseWorkspaceViewState["contextCards"],
+  }));
+  const locationMetric = status.metrics.find((metric) => metric.id === "location");
+  const a2uiMetric = (status.a2ui.metrics as Array<Record<string, unknown>>)
+    .find((metric) => metric.id === "location");
+  const action = a2uiMetric?.action as Record<string, unknown> | undefined;
+
+  assert.equal(locationMetric?.value, "Sydney NSW");
+  assert.equal(locationMetric?.tone, "good");
+  assert.equal(locationMetric?.menuId, "plan");
+  assert.match(status.detail, /Location: Sydney NSW/);
+  assert.equal(action?.target_menu, "plan");
 });
 
 test("home status escalates urgent vendor and resilience work", () => {
@@ -159,16 +219,18 @@ test("home overview budget tile names over-target status clearly", () => {
   assert.equal(firstActionTarget(budget!), "budget");
 });
 
-test("home overview seating tile sends empty plans to guests first", () => {
+test("home overview seating tile opens seating even before guest list exists", () => {
   const tiles = buildWeddingHomeOverviewActionTiles(state());
   const seating = tiles.find((tile) => tile.id === "seating");
 
   assert.equal(seating?.valueLabel, "Plan seating");
   assert.equal(seating?.tone, "needs_input");
   assert.equal(seating?.toneLabel, "Needs guests");
-  assert.equal(seating?.menuId, "guests");
-  assert.match(seating?.detailLabel ?? "", /Add attending guests first/i);
-  assert.equal(firstActionTarget(seating!), "guests");
+  assert.equal(seating?.menuId, "seating");
+  assert.equal(seating?.actionLabel, "Open seating");
+  assert.equal(seating?.supportLabel, "Needs guest list first");
+  assert.match(seating?.detailLabel ?? "", /Open seating/i);
+  assert.equal(firstActionTarget(seating!), "seating");
 });
 
 test("home overview vendor tile opens response queue before outreach exists", () => {

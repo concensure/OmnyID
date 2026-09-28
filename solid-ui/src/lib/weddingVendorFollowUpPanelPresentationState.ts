@@ -10,15 +10,18 @@ export type WeddingVendorFollowUpPanelPresentationState = {
 export function buildWeddingVendorFollowUpPanelPresentationState(input: {
   activeCount?: number | null;
   closedCount?: number | null;
+  sentQuoteReplyCount?: number | null;
 }): WeddingVendorFollowUpPanelPresentationState {
   const activeCount = Math.max(0, input.activeCount ?? 0);
   const closedCount = Math.max(0, input.closedCount ?? 0);
+  const sentQuoteReplyCount = Math.max(0, input.sentQuoteReplyCount ?? 0);
+  const historyCount = closedCount + sentQuoteReplyCount;
 
-  if (activeCount > 0 && closedCount > 0) {
+  if (activeCount > 0 && historyCount > 0) {
     return {
       title: "Vendor follow-ups and history",
-      badgeLabel: `${activeCount} active, ${closedCount} closed`,
-      descriptionLabel: "Active vendors stay in follow-up; closed vendor paths remain available as history.",
+      badgeLabel: `${activeCount} active, ${historyCount} history`,
+      descriptionLabel: "Active vendors stay in follow-up; sent replies and closed vendor paths remain available as history.",
       showFollowUpTip: true,
     };
   }
@@ -32,10 +35,10 @@ export function buildWeddingVendorFollowUpPanelPresentationState(input: {
     };
   }
 
-  if (closedCount > 0) {
+  if (historyCount > 0) {
     return {
       title: "Vendor history",
-      badgeLabel: `${closedCount} closed`,
+      badgeLabel: `${historyCount} history`,
       descriptionLabel: "Resolved or stopped vendor paths are out of the live queue and kept here for review.",
       showFollowUpTip: false,
     };

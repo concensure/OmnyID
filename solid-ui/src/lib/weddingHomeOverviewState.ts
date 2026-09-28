@@ -2,6 +2,7 @@
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import { weddingDayCountdownLabel } from "@/lib/weddingWorkspaceSidebarActionState";
+import { weddingTimelineWeddingDateLabel } from "@/lib/weddingTimelineWeddingDateState";
 
 export type WeddingHomeStatusTone = "good" | "attention" | "risk";
 
@@ -58,6 +59,23 @@ function finiteAmount(value: unknown, fallback = 0): number {
 
 function optionalArray<T>(value: readonly T[] | null | undefined): readonly T[] {
   return Array.isArray(value) ? value : [];
+}
+
+function cleanText(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function firstPlanningContextText(
+  state: WeddingResponseWorkspaceViewState,
+  key: "budgetComfort" | "guestCount" | "location",
+): string {
+  for (const card of state.contextCards ?? []) {
+    const value = card.planningContext?.[key];
+    const text = cleanText(value);
+    if (text) return text;
+  }
+  return "";
 }
 
 function homeStatusA2ui(state: Omit<WeddingHomeStatusState, "a2ui">): Record<string, unknown> {
@@ -163,8 +181,10 @@ export function buildWeddingHomeStatusState(state: WeddingResponseWorkspaceViewS
   const budget = tiles.find((tile) => tile.id === "budget") ?? null;
   const guests = tiles.find((tile) => tile.id === "guests") ?? null;
   const vendors = tiles.find((tile) => tile.id === "vendors") ?? null;
+  const location = firstPlanningContextText(state, "location");
   const openTasks = optionalArray(state.planningTaskItems).filter((task) => !isDoneTimelineRow(task)).length;
   const urgentChanges = state.resilience?.hasUrgentItem === true;
+  const hasExactWeddingDate = weddingTimelineWeddingDateLabel(state) !== null;
   const urgentVendorCount = optionalArray(state.vendorContactCards).filter((card) => card.tone === "urgent").length;
   const budgetRisk = budget?.tone === "risk";
   const needsInput = tiles.some((tile) => tile.tone === "needs_input");
@@ -184,11 +204,14 @@ export function buildWeddingHomeStatusState(state: WeddingResponseWorkspaceViewS
   const detailParts = [
     budget ? `Budget: ${budget.valueLabel}` : null,
     guests ? `Guests: ${guests.valueLabel}` : null,
+    location ? `Location: ${location}` : null,
     `Date: ${weddingDayCountdownLabel(state)}`,
     openTasks > 0 ? `${openTasks} open task${openTasks === 1 ? "" : "s"}` : null,
   ].filter((part): part is string => Boolean(part));
   const actionTile = urgentChanges
     ? vendors ?? budget ?? guests
+    : !hasExactWeddingDate
+      ? null
     : budget?.tone === "needs_input" || budget?.tone === "risk"
       ? budget
       : guests?.tone === "needs_input" || guests?.tone === "attention"
@@ -196,14 +219,18 @@ export function buildWeddingHomeStatusState(state: WeddingResponseWorkspaceViewS
         : vendors?.tone === "risk" || vendors?.tone === "attention"
           ? vendors
           : null;
-  const actionLabel = actionTile?.actionLabel ?? (tone === "good" ? "Open plan" : "Review next step");
-  const menuId = actionTile?.menuId ?? "plan";
+  const actionLabel = !urgentChanges && !hasExactWeddingDate
+    ? weddingDayCountdownLabel(state) === "Confirm date" ? "Pick exact date" : "Add wedding date"
+    : actionTile?.actionLabel ?? (tone === "good" ? "Open plan" : "Review next step");
+  const menuId = !urgentChanges && !hasExactWeddingDate
+    ? "timeline"
+    : actionTile?.menuId ?? "plan";
   const metrics: WeddingHomeStatusMetric[] = [
     {
       id: "date",
       label: "Wedding date",
       value: weddingDayCountdownLabel(state),
-      tone: weddingDayCountdownLabel(state) === "Add date" ? "attention" : "good",
+      tone: hasExactWeddingDate ? "good" : "attention",
       menuId: "timeline",
     },
     budget ? {
@@ -219,6 +246,13 @@ export function buildWeddingHomeStatusState(state: WeddingResponseWorkspaceViewS
       value: guests.valueLabel,
       tone: guests.tone === "risk" ? "risk" : guests.tone === "ready" ? "good" : "attention",
       menuId: guests.menuId,
+    } : null,
+    location ? {
+      id: "location",
+      label: "Location",
+      value: location,
+      tone: "good" as const,
+      menuId: "plan" as const,
     } : null,
     {
       id: "tasks",
@@ -241,6 +275,7 @@ export function buildWeddingHomeStatusState(state: WeddingResponseWorkspaceViewS
 
 export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorkspaceViewState): WeddingHomeOverviewActionTile[] {
   const budget = state.budgetTracking;
+  const intakeBudgetComfort = firstPlanningContextText(state, "budgetComfort");
   const budgetTarget = budget.budgetTargetAmount;
   const budgetInsights = budget.insights;
   const committedAmount = finiteAmount(budgetInsights?.committedAmount, finiteAmount(budget.totalKnownAmount));
@@ -253,7 +288,9 @@ export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorksp
   const atRiskAmount = budgetInsights?.atRiskAmount ?? 0;
   const budgetRemaining = budget.remainingAmount;
   const budgetSupport = budgetTarget === null
-    ? "Add a target, then compare committed and expected costs."
+    ? intakeBudgetComfort
+      ? "Open budget to set a numeric target."
+      : "Add a target, then compare committed and expected costs."
     : budgetInsights?.monthlyCashNeedsSummaryLabel
       ? budgetInsights.monthlyCashNeedsSummaryLabel
       : atRiskAmount > 0
@@ -273,32 +310,37 @@ export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorksp
   const budgetTile = {
     id: "budget" as const,
     valueLabel: budgetTarget === null
-      ? "Set budget"
+      ? intakeBudgetComfort ? "Budget noted" : "Set budget"
       : budgetRemaining === null
         ? currencyLabel(budgetTarget)
         : budgetRemaining >= 0
           ? currencyLabel(budgetRemaining)
           : `${currencyLabel(Math.abs(budgetRemaining))} over`,
-    detailLabel: `Paid ${currencyLabel(paidAmount)} - Estimated ${currencyLabel(estimatedAmount)} - Forecast ${currencyLabel(forecastAmount)}`,
+    detailLabel: budgetTarget === null && intakeBudgetComfort
+      ? `Intake: ${intakeBudgetComfort}`
+      : `Paid ${currencyLabel(paidAmount)} - Estimated ${currencyLabel(estimatedAmount)} - Forecast ${currencyLabel(forecastAmount)}`,
     supportLabel: budgetSupport,
     tone: budgetTone as WeddingHomeOverviewActionTile["tone"],
-    toneLabel: budgetTone === "needs_input" ? "Needs budget" : budgetTone === "risk" ? "Over target" : budgetTone === "attention" ? "Check risk" : "On track",
+    toneLabel: budgetTone === "needs_input" ? intakeBudgetComfort ? "Needs target" : "Needs budget" : budgetTone === "risk" ? "Over target" : budgetTone === "attention" ? "Check risk" : "On track",
     menuId: "budget" as const,
     actionLabel: "Open budget",
   };
 
   const guestTracking = state.guestTracking;
+  const intakeGuestCount = firstPlanningContextText(state, "guestCount");
   const respondedCount = guestTracking.attendingCount + guestTracking.declinedCount;
   const hasGuests = guestTracking.guestRowCount > 0;
   const guestTile = {
     id: "guests" as const,
-    valueLabel: hasGuests ? `${guestTracking.guestRowCount} guests` : "Add guests",
+    valueLabel: hasGuests ? `${guestTracking.guestRowCount} guests` : intakeGuestCount ? `${intakeGuestCount} expected` : "Add guests",
     detailLabel: hasGuests
       ? `${respondedCount} replied - ${guestTracking.pendingCount} awaiting`
-      : "Start the guest list so food, seating, and follow-ups have real numbers.",
-    supportLabel: hasGuests ? `${guestTracking.attendingCount} attending` : "Open guests",
-    tone: !hasGuests ? "needs_input" as const : guestTracking.pendingCount > 0 ? "attention" as const : "ready" as const,
-    toneLabel: !hasGuests ? "Needs list" : guestTracking.pendingCount > 0 ? "Replies waiting" : "Replies clear",
+      : intakeGuestCount
+        ? "Guest count captured from intake; make the guest list next."
+        : "Start the guest list so food, seating, and follow-ups have real numbers.",
+    supportLabel: hasGuests ? `${guestTracking.attendingCount} attending` : intakeGuestCount ? "Open guests to build list" : "Open guests",
+    tone: !hasGuests ? intakeGuestCount ? "attention" as const : "needs_input" as const : guestTracking.pendingCount > 0 ? "attention" as const : "ready" as const,
+    toneLabel: !hasGuests ? intakeGuestCount ? "Estimate only" : "Needs list" : guestTracking.pendingCount > 0 ? "Replies waiting" : "Replies clear",
     menuId: "guests" as const,
     actionLabel: "Open guests",
   };
@@ -310,12 +352,12 @@ export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorksp
     valueLabel: canSeatGuests ? `${seating.assignedSeatCount} seated` : "Plan seating",
     detailLabel: canSeatGuests
       ? `${seating.unassignedAttendingCount} still unassigned`
-      : "Add attending guests first, then draft tables from the seating page.",
-    supportLabel: canSeatGuests ? "Open seating" : "Add guests first",
+      : "Open seating to see what is needed before tables can be drafted.",
+    supportLabel: canSeatGuests ? "Open seating" : "Needs guest list first",
     tone: !canSeatGuests ? "needs_input" as const : seating.unassignedAttendingCount > 0 ? "attention" as const : "ready" as const,
     toneLabel: !canSeatGuests ? "Needs guests" : seating.unassignedAttendingCount > 0 ? "Seats left" : "Seating clear",
-    menuId: canSeatGuests ? "seating" as const : "guests" as const,
-    actionLabel: canSeatGuests ? "Open seating" : "Open guests",
+    menuId: "seating" as const,
+    actionLabel: "Open seating",
   };
 
   const vendorCards = state.vendorContactCards ?? [];

@@ -96,7 +96,7 @@ export function buildWeddingPeopleAggregateState(state: WeddingResponseWorkspace
       },
       {
         id: "seating",
-        title: "Seating plan",
+        title: "Seating Plan",
         detail: "Draft tables, keep conflicts apart, place access needs carefully, and prepare vendor-ready notes.",
         metaLabel: `${countLabel(state.seatingPlan.assignedSeatCount, "guest")} already seated`,
         targetMenu: "seating",

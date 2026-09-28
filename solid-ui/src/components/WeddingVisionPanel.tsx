@@ -25,7 +25,6 @@ export function WeddingVisionPanel(props: {
   const [feelDraft, setFeelDraft] = createSignal("");
   const [priorityDraft, setPriorityDraft] = createSignal("");
   const [avoidDraft, setAvoidDraft] = createSignal("");
-  const [peopleDraft, setPeopleDraft] = createSignal("");
   const [rulesDraft, setRulesDraft] = createSignal("");
   const [agentNote, setAgentNote] = createSignal("");
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
@@ -49,14 +48,12 @@ export function WeddingVisionPanel(props: {
     reason: "Edited by the couple.",
   })) ?? vision().priorityRows;
   const avoidLabels = () => splitLines(overrides().avoidLabels) ?? vision().avoidLabels;
-  const importantPeopleLabels = () => splitLines(overrides().importantPeopleLabels) ?? vision().importantPeopleLabels;
   const decisionRules = () => splitLines(overrides().decisionRules) ?? vision().decisionRules;
 
   createEffect(() => {
     setFeelDraft(feelTags().join("\n"));
     setPriorityDraft(priorityRows().map((row) => row.label).join("\n"));
     setAvoidDraft(avoidLabels().join("\n"));
-    setPeopleDraft(importantPeopleLabels().join("\n"));
     setRulesDraft(decisionRules().join("\n"));
   });
 
@@ -97,7 +94,6 @@ export function WeddingVisionPanel(props: {
       feelTags: feelDraft(),
       priorityRows: priorityDraft(),
       avoidLabels: avoidDraft(),
-      importantPeopleLabels: peopleDraft(),
       decisionRules: rulesDraft(),
     };
     localStorage.setItem(storageKey(), JSON.stringify(payload));
@@ -108,7 +104,6 @@ export function WeddingVisionPanel(props: {
         `How it should feel:\n${feelDraft()}`,
         `What matters most:\n${priorityDraft()}`,
         `What we do not want:\n${avoidDraft()}`,
-        `Important people:\n${peopleDraft()}`,
         `How we decide:\n${rulesDraft()}`,
       ].join("\n\n"), "Wedding vision correction");
       setSaveNotice("Vision saved.");
@@ -175,15 +170,6 @@ export function WeddingVisionPanel(props: {
           <p class="text-sm font-semibold text-rose-950">What we do not want</p>
           <ul class="mt-2 space-y-1">
             <For each={avoidLabels()}>
-              {(label) => <li class="text-xs leading-5 text-rose-950/75">{label}</li>}
-            </For>
-          </ul>
-        </div>
-
-        <div class="rounded-2xl border border-rose-100 bg-white/75 p-3">
-          <p class="text-sm font-semibold text-rose-950">Important people</p>
-          <ul class="mt-2 space-y-1">
-            <For each={importantPeopleLabels()}>
               {(label) => <li class="text-xs leading-5 text-rose-950/75">{label}</li>}
             </For>
           </ul>
@@ -270,7 +256,6 @@ export function WeddingVisionPanel(props: {
             ["How it should feel", feelDraft, setFeelDraft],
             ["What matters most", priorityDraft, setPriorityDraft],
             ["What we do not want", avoidDraft, setAvoidDraft],
-            ["Important people", peopleDraft, setPeopleDraft],
             ["How we decide", rulesDraft, setRulesDraft],
           ].map(([label, value, setter]) => (
             <label class="text-xs font-semibold text-rose-950">

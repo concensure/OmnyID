@@ -290,7 +290,10 @@ fn admin_third_party_tool_policy_rejects_unknown_tools() {
 fn admin_wedding_api_stack_reports_redacted_admin_secret_status() {
     let _env = env_lock();
     unsafe {
-        std::env::set_var("OMNYID_ADMIN_GOOGLE_PLACES_API_KEY", "secret-google-places-key");
+        std::env::set_var(
+            "OMNYID_ADMIN_GOOGLE_PLACES_API_KEY",
+            "secret-google-places-key",
+        );
         std::env::remove_var("OMNYID_ADMIN_GOOGLE_MAPS_KEY");
         std::env::remove_var("OMNYID_GOOGLE_MAPS_KEY");
     }
@@ -300,7 +303,11 @@ fn admin_wedding_api_stack_reports_redacted_admin_secret_status() {
         .as_array()
         .expect("connected app ids");
     assert!(connected.iter().any(|value| value == "google-places-api"));
-    assert!(!connected.iter().any(|value| value == "google-maps-platform"));
+    assert!(
+        !connected
+            .iter()
+            .any(|value| value == "google-maps-platform")
+    );
     assert!(!stack.to_string().contains("secret-google-places-key"));
 
     let providers = stack["providers"].as_array().expect("providers");
@@ -309,7 +316,10 @@ fn admin_wedding_api_stack_reports_redacted_admin_secret_status() {
         .find(|entry| entry["connectedAppId"] == "google-places-api")
         .expect("places status");
     assert_eq!(places["configured"], true);
-    assert_eq!(places["sourceLabel"], "env:OMNYID_ADMIN_GOOGLE_PLACES_API_KEY");
+    assert_eq!(
+        places["sourceLabel"],
+        "env:OMNYID_ADMIN_GOOGLE_PLACES_API_KEY"
+    );
 
     unsafe {
         std::env::remove_var("OMNYID_ADMIN_GOOGLE_PLACES_API_KEY");

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.map-service
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -13,7 +13,7 @@
 //! `google_maps` when an API key is present in `OMNYID_GOOGLE_MAPS_KEY`, otherwise
 //! falls back to `osm` (free, no key required).
 
-use crate::admin_tool_secrets::{resolve_admin_tool_secret, GOOGLE_MAPS_SPEC};
+use crate::admin_tool_secrets::{GOOGLE_MAPS_SPEC, resolve_admin_tool_secret};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};

@@ -9,13 +9,17 @@ export type WeddingVendorEndToEndValidationInput = {
   testVendorCleanupRequired?: boolean | null;
   testVendorCleanupConfirmed?: boolean | null;
   vendorSearchReadiness?: WeddingLiveWorkflowReadinessState | null;
+  vendorSearchLaunchQuery?: string | null;
   vendorProviderConfigured?: boolean | null;
   liveVendorArtifactSaved?: boolean | null;
   liveVendorComparisonSaved?: boolean | null;
+  vendorSearchResultOpenTargetAvailable?: boolean | null;
   topFiveComparisonExpansionAvailable?: boolean | null;
   selectedComparisonVendorsConfirmed?: boolean | null;
   unselectedVendorQueueSuppressed?: boolean | null;
   dynamicVendorDecisionSurfaceVisible?: boolean | null;
+  vendorApprovalCardModeled?: boolean | null;
+  vendorApprovalCardCtaCopy?: string | null;
   selectedVendorDraftTasksProjected?: boolean | null;
   selectedVendorDraftsApprovalGated?: boolean | null;
   quoteReplyFlowCount?: number | null;
@@ -78,12 +82,16 @@ function nextActionFor(stepId: string, detail: string): string {
       return "Remove the disposable test vendor before using live search for real vendors again.";
     case "intake":
       return "Capture the missing date/season, location, guests, budget, priorities, and vendor categories.";
+    case "onboarding_search_query":
+      return "Generate a concrete vendor-search query from the approved onboarding context before running Search Vendors.";
     case "provider_search":
       return "Confirm admin-configured Brave Search, Google Places, or Overpass provider status.";
     case "vendor_artifact":
       return "Run live vendor search and save the generated vendor-search artifact into the workspace.";
     case "vendor_comparison":
       return "Save the source-backed vendor comparison after live vendor search.";
+    case "vendor_search_handoff":
+      return "Expose an action that opens the saved vendor search result or comparison from the search surface.";
     case "top_five_expansion":
       return "Verify the comparison starts with the top three and can expand to the top five when more source-backed choices are available.";
     case "selected_vendor_choice":
@@ -92,6 +100,8 @@ function nextActionFor(stepId: string, detail: string): string {
       return "Verify unselected comparison vendors leave the active decision and response queues.";
     case "dynamic_decision_surface":
       return "Open the projection approval surface and verify it shows selected-vendor consequences before saving.";
+    case "vendor_approval_card":
+      return "Verify the approval surface has a compact selected-vendor card with CTA copy before saving follow-up work.";
     case "selected_vendor_drafts":
       return "Project internal outreach draft tasks for selected vendors only, without sending external email.";
     case "selected_vendor_draft_guard":
@@ -127,6 +137,9 @@ export function buildWeddingVendorEndToEndValidationState(
   const missingIntake = input.vendorSearchReadiness?.status === "blocked"
     ? input.vendorSearchReadiness.missing.map(clean).filter(Boolean)
     : [];
+  const vendorSearchLaunchQuery = clean(input.vendorSearchLaunchQuery);
+  const vendorSearchResultOpenTargetAvailable = input.vendorSearchResultOpenTargetAvailable
+    ?? (input.liveVendorComparisonSaved === true || input.liveVendorArtifactSaved === true);
   const steps = [
     step(
       "planner_identity",
@@ -160,6 +173,13 @@ export function buildWeddingVendorEndToEndValidationState(
         : "Vendor-search readiness has not been evaluated.",
     ),
     step(
+      "onboarding_search_query",
+      "Onboarding search query",
+      vendorSearchLaunchQuery.length > 0,
+      `Onboarding produced vendor-search query "${vendorSearchLaunchQuery}".`,
+      "Onboarding has not produced a concrete vendor-search query.",
+    ),
+    step(
       "provider_search",
       "Search provider",
       input.vendorProviderConfigured === true,
@@ -179,6 +199,13 @@ export function buildWeddingVendorEndToEndValidationState(
       input.liveVendorComparisonSaved === true,
       "Source-backed vendor comparison is saved.",
       "No saved vendor comparison has been confirmed.",
+    ),
+    step(
+      "vendor_search_handoff",
+      "Search result handoff",
+      vendorSearchResultOpenTargetAvailable === true,
+      "Saved vendor-search output has an open target from the workflow surface.",
+      "Saved vendor-search output is not yet exposed as an openable result target.",
     ),
     step(
       "top_five_expansion",
@@ -207,6 +234,13 @@ export function buildWeddingVendorEndToEndValidationState(
       input.dynamicVendorDecisionSurfaceVisible === true,
       "Projection approval surface shows selected-vendor consequences before saving.",
       "Selected-vendor consequences are not yet visible in the approval surface.",
+    ),
+    step(
+      "vendor_approval_card",
+      "Vendor approval card",
+      input.vendorApprovalCardModeled === true && clean(input.vendorApprovalCardCtaCopy).length > 0,
+      `Selected-vendor approval card is modeled with CTA "${clean(input.vendorApprovalCardCtaCopy)}".`,
+      "Selected-vendor approval card is not yet modeled with CTA copy.",
     ),
     step(
       "selected_vendor_drafts",

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   loadShouldShowWeddingPlannerWalkthrough,
   saveWeddingPlannerWalkthroughSeen,
+  shouldAutoShowWeddingPlannerWalkthrough,
 } from "../src/lib/weddingPlannerWalkthroughLocalState.ts";
 
 function fakeStorage(): Storage {
@@ -35,4 +36,45 @@ test("wedding planner walkthrough supports an unscoped guest flag", () => {
   assert.equal(loadShouldShowWeddingPlannerWalkthrough(null, storage), true);
   saveWeddingPlannerWalkthroughSeen(null, storage);
   assert.equal(loadShouldShowWeddingPlannerWalkthrough(null, storage), false);
+});
+
+test("wedding planner walkthrough auto-opens only after first intake completes", () => {
+  const storage = fakeStorage();
+  assert.equal(shouldAutoShowWeddingPlannerWalkthrough({
+    alreadyChecked: false,
+    hasWeddingWorkspace: true,
+    firstIntakeComplete: false,
+    userId: "user-1",
+    storage,
+  }), false);
+  assert.equal(shouldAutoShowWeddingPlannerWalkthrough({
+    alreadyChecked: false,
+    hasWeddingWorkspace: false,
+    firstIntakeComplete: true,
+    userId: "user-1",
+    storage,
+  }), false);
+  assert.equal(shouldAutoShowWeddingPlannerWalkthrough({
+    alreadyChecked: true,
+    hasWeddingWorkspace: true,
+    firstIntakeComplete: true,
+    userId: "user-1",
+    storage,
+  }), false);
+  assert.equal(shouldAutoShowWeddingPlannerWalkthrough({
+    alreadyChecked: false,
+    hasWeddingWorkspace: true,
+    firstIntakeComplete: true,
+    userId: "user-1",
+    storage,
+  }), true);
+
+  saveWeddingPlannerWalkthroughSeen("user-1", storage);
+  assert.equal(shouldAutoShowWeddingPlannerWalkthrough({
+    alreadyChecked: false,
+    hasWeddingWorkspace: true,
+    firstIntakeComplete: true,
+    userId: "user-1",
+    storage,
+  }), false);
 });

@@ -22,7 +22,7 @@ test("vendor follow-up panel labels closed-only state as history", () => {
   });
 
   assert.equal(state.title, "Vendor history");
-  assert.equal(state.badgeLabel, "3 closed");
+  assert.equal(state.badgeLabel, "3 history");
   assert.match(state.descriptionLabel, /out of the live queue/i);
   assert.equal(state.showFollowUpTip, false);
 });
@@ -34,7 +34,20 @@ test("vendor follow-up panel labels mixed active and closed state", () => {
   });
 
   assert.equal(state.title, "Vendor follow-ups and history");
-  assert.equal(state.badgeLabel, "1 active, 2 closed");
+  assert.equal(state.badgeLabel, "1 active, 2 history");
   assert.match(state.descriptionLabel, /Active vendors stay in follow-up/i);
   assert.equal(state.showFollowUpTip, true);
+});
+
+test("vendor follow-up panel counts sent quote replies as history", () => {
+  const state = buildWeddingVendorFollowUpPanelPresentationState({
+    activeCount: 0,
+    closedCount: 1,
+    sentQuoteReplyCount: 2,
+  });
+
+  assert.equal(state.title, "Vendor history");
+  assert.equal(state.badgeLabel, "3 history");
+  assert.match(state.descriptionLabel, /out of the live queue/i);
+  assert.equal(state.showFollowUpTip, false);
 });

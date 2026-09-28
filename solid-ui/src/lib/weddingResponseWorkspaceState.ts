@@ -77,7 +77,7 @@ function activeArtifactFrom(
   activeArtifactId?: string | null,
 ): WeddingArtifactSummary | null {
   const explicit = clean(activeArtifactId);
-  if (explicit) return artifacts.find((artifact) => artifact.id === explicit) ?? artifacts[0] ?? null;
+  if (explicit) return artifacts.find((artifact) => artifact.id === explicit) ?? null;
   return artifacts[0] ?? null;
 }
 

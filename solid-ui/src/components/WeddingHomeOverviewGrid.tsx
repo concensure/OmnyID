@@ -5,6 +5,7 @@ import {
   buildWeddingHomeOverviewActionTiles,
   buildWeddingHomeTimelineOverview,
 } from "@/lib/weddingHomeOverviewState";
+import { weddingTimelineWeddingDateLabel } from "@/lib/weddingTimelineWeddingDateState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
@@ -24,6 +25,7 @@ export function WeddingHomeOverviewGrid(props: {
 }) {
   const countdown = () => weddingDayCountdownLabel(props.state);
   const countdownDetail = () => weddingDayCountdownDetail(props.state);
+  const hasExactWeddingDate = () => weddingTimelineWeddingDateLabel(props.state) !== null;
   const timelineOverview = () => buildWeddingHomeTimelineOverview(props.state);
   const actionTiles = () => buildWeddingHomeOverviewActionTiles(props.state);
   const budgetTile = () => actionTiles().find((tile) => tile.id === "budget");
@@ -57,8 +59,8 @@ export function WeddingHomeOverviewGrid(props: {
           <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-indigo-900">Timeline</span>
         </div>
         <p class="mt-3 text-3xl font-bold tracking-tight text-indigo-950">{countdown()}</p>
-        <p class="text-xs text-indigo-900/70">days to the wedding</p>
-        {countdown() === "Add date" && props.onSaveWeddingDate
+        <p class="text-xs text-indigo-900/70">{hasExactWeddingDate() ? "days to the wedding" : "target date"}</p>
+        {!hasExactWeddingDate() && props.onSaveWeddingDate
           ? (
             <div class="mt-2">
               <WeddingDateEntryControl onSave={props.onSaveWeddingDate} locale="en-AU" compact />

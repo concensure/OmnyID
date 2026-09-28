@@ -80,6 +80,7 @@ function ArtifactPreviewCard(props: {
   artifact: WeddingWorkspaceArtifactPreview;
   preview: WeddingArtifactPreviewState;
   onOpenFollowUpQueue?: () => void;
+  onOpenVendorQuoteReplySurface?: () => void;
 }) {
   const preview = props.preview;
   const [selectedOptionIds, setSelectedOptionIds] = createSignal<string[]>([]);
@@ -166,6 +167,22 @@ function ArtifactPreviewCard(props: {
             </div>
           )}
         </Show>
+        <div class="mt-3 flex flex-col gap-2 rounded-xl border border-emerald-100 bg-white/85 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-emerald-950">Reply decision lives in one place</p>
+            <p class="mt-1 text-xs leading-5 text-emerald-900/70">
+              This quote is evidence. Review wording, budget impact, sending, undo, and proof from the live vendor reply card.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => props.onOpenVendorQuoteReplySurface?.()}
+            disabled={!props.onOpenVendorQuoteReplySurface}
+            class="rounded-full bg-emerald-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          >
+            Continue reply
+          </button>
+        </div>
       </div>
     );
   }
@@ -588,6 +605,7 @@ export function WeddingArtifactDetailPanel(props: {
   onProviderSetup?: (view: ViewName) => void;
   onResearch?: (action: WeddingWorkspaceSidebarAction) => void;
   onOpenFollowUpQueue?: () => void;
+  onOpenVendorQuoteReplySurface?: () => void;
   researchAction?: WeddingWorkspaceSidebarAction | null;
 }) {
   const [showDocumentDetails, setShowDocumentDetails] = createSignal(false);
@@ -706,6 +724,7 @@ export function WeddingArtifactDetailPanel(props: {
                         artifact={preview()}
                         preview={previewState()}
                         onOpenFollowUpQueue={props.onOpenFollowUpQueue}
+                        onOpenVendorQuoteReplySurface={props.onOpenVendorQuoteReplySurface}
                       />
                     )}
                   </Show>

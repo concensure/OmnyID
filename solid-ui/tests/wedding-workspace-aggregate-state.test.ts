@@ -52,6 +52,7 @@ test("people aggregate state summarizes guests seating and family-boundary actio
   assert.equal(people.actions[0]?.title, "Guests and family boundaries");
   assert.equal(people.actions[0]?.metaLabel, "3 requests waiting for review - 2 rules active - 1 private note couple-only");
   assert.equal(people.actions[1]?.targetMenu, "seating");
+  assert.equal(people.actions[1]?.title, "Seating Plan");
   assert.equal(people.actions[1]?.metaLabel, "48 guests already seated");
   assert.equal(people.a2ui.kind, "wedding_workspace_aggregate");
 });

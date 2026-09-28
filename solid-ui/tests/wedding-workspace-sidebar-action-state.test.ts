@@ -99,7 +99,7 @@ test("wedding day countdown can use an exact saved context date", () => {
 
 test("calendarActionLabel and timeline sidebar actions handle empty and selected timelines", () => {
   const empty = state();
-  assert.equal(calendarActionLabel(empty), "Add wedding date");
+  assert.equal(calendarActionLabel(empty), "Pick exact wedding date");
   const emptyCalendarAction = weddingTimelineSidebarAction("open_calendar", empty);
   assert.equal(emptyCalendarAction.enabled, false);
   assert.match(emptyCalendarAction.reason ?? "", /Add dated wedding tasks/i);

@@ -2134,7 +2134,7 @@ function App() {
       };
       dispatchWeddingVendorSearchLaunch(savedLaunch);
       saveWeddingEntrySource("generic");
-      void savePrimaryUseCase("wedding_planning", "explicit").catch(() => {});
+      void savePrimaryUseCase("wedding_planning", "manual").catch(() => {});
       void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
         const launch = buildWeddingTemplateDeepLinkLaunch();
         dispatchWeddingTemplateDeepLinkLaunch(launch);

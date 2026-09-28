@@ -10,6 +10,7 @@ import type { WeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchStat
 import type { WeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
 import { weddingVendorSelectionLabels } from "@/lib/weddingVendorChecklistState";
 import { weddingVendorMustDecideFirstCategories } from "@/lib/weddingVendorLeadTimeState";
+import type { WeddingVendorSearchResultAction } from "@/lib/weddingVendorSearchResultActionState";
 import { WEDDING_VOW_STYLE_OPTIONS } from "@/lib/weddingVowPlanningState";
 
 const STEP_LABELS = ["The basics", "Vendors", "Legal & vows", "Review"] as const;
@@ -54,6 +55,8 @@ export function WeddingSiteIntakeWizard(props: {
   onWeddingFollowUpCelebrantChange: (value: string) => void;
   onGenerateFollowUp: () => void;
   onSearchVendors?: () => Promise<void> | void;
+  vendorSearchResultAction?: WeddingVendorSearchResultAction | null;
+  onOpenVendorSearchResult?: (action: WeddingVendorSearchResultAction) => void;
   vendorSearchRunning?: boolean;
   vendorSearchNotice?: string | null;
   weddingTemplateFollowUp: () => WeddingTemplateFollowUpState | null;
@@ -460,6 +463,17 @@ export function WeddingSiteIntakeWizard(props: {
                 <p class="mt-2 break-words text-xs leading-5 text-rose-950">
                   {notice()}
                 </p>
+              )}
+            </Show>
+            <Show when={props.vendorSearchResultAction}>
+              {(action) => (
+                <button
+                  type="button"
+                  class="mt-2 w-full rounded-full bg-rose-900 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-rose-800 sm:w-auto sm:py-2"
+                  onClick={() => props.onOpenVendorSearchResult?.(action())}
+                >
+                  {action().label}
+                </button>
               )}
             </Show>
           </div>

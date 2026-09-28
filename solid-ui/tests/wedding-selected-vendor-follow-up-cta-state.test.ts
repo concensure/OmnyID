@@ -26,8 +26,8 @@ const metadata = {
   source_response_id: "afp:response-1",
 };
 
-test("buildWeddingSelectedVendorFollowUpCtaState points selected vendor decisions to the approval card", () => {
-  const decision: WeddingDecisionProjectionInput = {
+function selectedVendorDecision(): WeddingDecisionProjectionInput {
+  return {
     id: "wedding_decision:workspace:vendor-comparison:harbour-studio",
     metadata: {
       ...metadata,
@@ -55,19 +55,10 @@ test("buildWeddingSelectedVendorFollowUpCtaState points selected vendor decision
       preferenceSummaryLabel: "Selected by user",
     },
   };
-  const queue = buildWeddingProjectionQueueViewState({
-    decisionItems: [decision],
-    storage: memoryStorage(),
-  });
-  const state = buildWeddingSelectedVendorFollowUpCtaState(queue);
+}
 
-  assert.equal(state.target, "projection_queue");
-  assert.match(state.noticeLabel, /Selected vendor decision ready to save/i);
-  assert.match(state.noticeLabel, /move unselected vendors to the log/i);
-});
-
-test("buildWeddingSelectedVendorFollowUpCtaState distinguishes vendor draft tasks from external sends", () => {
-  const task: WeddingPlanningTaskItem = {
+function selectedVendorDraftTask(): WeddingPlanningTaskItem {
+  return {
     id: "task:vendor-outreach:harbour",
     title: "Draft outreach to Harbour Studio",
     kind: "vendor_follow_up",
@@ -85,14 +76,49 @@ test("buildWeddingSelectedVendorFollowUpCtaState distinguishes vendor draft task
       approval_required_before_outreach: true,
     },
   };
+}
+
+test("buildWeddingSelectedVendorFollowUpCtaState points selected vendor decisions to the approval card", () => {
   const queue = buildWeddingProjectionQueueViewState({
-    taskItems: [task],
+    decisionItems: [selectedVendorDecision()],
     storage: memoryStorage(),
   });
   const state = buildWeddingSelectedVendorFollowUpCtaState(queue);
 
   assert.equal(state.target, "projection_queue");
+  assert.equal(state.targetSectionId, "approval");
+  assert.equal(state.shouldScrollToTarget, true);
+  assert.match(state.noticeLabel, /Selected vendor decision ready to save/i);
+  assert.match(state.noticeLabel, /move unselected vendors to the log/i);
+});
+
+test("buildWeddingSelectedVendorFollowUpCtaState distinguishes vendor draft tasks from external sends", () => {
+  const queue = buildWeddingProjectionQueueViewState({
+    taskItems: [selectedVendorDraftTask()],
+    storage: memoryStorage(),
+  });
+  const state = buildWeddingSelectedVendorFollowUpCtaState(queue);
+
+  assert.equal(state.target, "projection_queue");
+  assert.equal(state.targetSectionId, "approval");
+  assert.equal(state.shouldScrollToTarget, true);
   assert.match(state.noticeLabel, /Vendor follow-up draft ready to save/i);
+  assert.match(state.noticeLabel, /without sending anything externally/i);
+});
+
+test("buildWeddingSelectedVendorFollowUpCtaState explains combined selected-vendor decisions and drafts", () => {
+  const queue = buildWeddingProjectionQueueViewState({
+    decisionItems: [selectedVendorDecision()],
+    taskItems: [selectedVendorDraftTask()],
+    storage: memoryStorage(),
+  });
+  const state = buildWeddingSelectedVendorFollowUpCtaState(queue);
+
+  assert.equal(state.target, "projection_queue");
+  assert.equal(state.targetSectionId, "approval");
+  assert.equal(state.shouldScrollToTarget, true);
+  assert.match(state.noticeLabel, /Selected vendor decision and follow-up draft task ready to save/i);
+  assert.match(state.noticeLabel, /move unselected vendors to the log/i);
   assert.match(state.noticeLabel, /without sending anything externally/i);
 });
 
@@ -100,5 +126,7 @@ test("buildWeddingSelectedVendorFollowUpCtaState handles empty queues calmly", (
   const state = buildWeddingSelectedVendorFollowUpCtaState(null);
 
   assert.equal(state.target, "saved_or_empty");
+  assert.equal(state.targetSectionId, null);
+  assert.equal(state.shouldScrollToTarget, false);
   assert.match(state.noticeLabel, /No selected-vendor follow-up is waiting/i);
 });

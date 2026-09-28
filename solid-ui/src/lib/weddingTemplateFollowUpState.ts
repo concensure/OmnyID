@@ -24,6 +24,7 @@ import {
   type WeddingResponseWorkspaceViewState,
 } from "@/lib/weddingResponseWorkspaceViewState";
 import { weddingVendorSearchTerms, weddingVendorSelectionLabels } from "@/lib/weddingVendorChecklistState";
+import { weddingVendorSearchQueryFromIntake } from "@/lib/weddingVendorSearchLaunchState";
 import {
   buildWeddingVendorSearchReadinessState,
   type WeddingVendorSearchReadinessState,
@@ -55,6 +56,7 @@ export type WeddingTemplateFollowUpState = {
   scheduleItems: WeddingPlanningScheduleItem[];
   taskItems: WeddingPlanningTaskItem[];
   vendorSearchReadiness: WeddingVendorSearchReadinessState;
+  vendorSearchLaunchQuery: string;
   legalSetup: WeddingAustralianLegalSetupState | null;
   presentation: WeddingPresentationState;
   richResponse: WeddingRichResponseRendererState;
@@ -291,6 +293,12 @@ export function buildWeddingTemplateFollowUpState(input: WeddingTemplateFollowUp
     ],
   });
   const vendorSearchReadiness = vendorSearchReadinessFor(planningContext);
+  const vendorSearchLaunchQuery = weddingVendorSearchQueryFromIntake({
+    location: planningContext.location,
+    vendorLabels: weddingVendorSelectionLabels(planningContext.vendorCategories),
+    priorities: planningContext.topPriorities?.join(", ") || planningContext.vendorPreferences,
+    atmosphere: planningContext.atmosphereDescription,
+  });
   const artifactGeneration = buildWeddingArtifactGenerationState({
     metadata,
     title: "Wedding planning follow-up brief",
@@ -403,6 +411,7 @@ export function buildWeddingTemplateFollowUpState(input: WeddingTemplateFollowUp
     scheduleItems,
     taskItems,
     vendorSearchReadiness,
+    vendorSearchLaunchQuery,
     legalSetup,
     presentation,
     richResponse,

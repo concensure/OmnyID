@@ -2,11 +2,11 @@ pub mod afp {
     tonic::include_proto!("afp");
 }
 
+pub mod admin_tool_secrets;
 pub mod agent_id;
 pub mod agent_memory_store;
 pub mod agent_personas;
 pub mod agent_template;
-pub mod admin_tool_secrets;
 pub mod agentcard;
 pub mod audit_chain;
 pub mod autonomy_policy;

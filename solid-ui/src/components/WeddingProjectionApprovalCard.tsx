@@ -17,22 +17,18 @@ export function WeddingProjectionApprovalCard(props: {
 }) {
   const [saving, setSaving] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
+  const [vendorDetailsExpanded, setVendorDetailsExpanded] = createSignal(false);
   const readyCount = () => props.state?.queue.pendingItems.length ?? 0;
   const blockedCount = () => props.state?.queue.blockedItems.length ?? 0;
   const semanticItems = () => props.state?.semanticSurface.primitives.slice(0, 3) ?? [];
   const vendorDrafts = () => props.state?.vendorOutreachDraftCards ?? [];
   const vendorDecisionPolicies = () => props.state?.vendorDecisionPolicyCards ?? [];
+  const vendorApprovalCard = () => props.state?.vendorApprovalCard ?? null;
+  const showVendorDetails = () => !vendorApprovalCard()?.collapsedByDefault || vendorDetailsExpanded();
   const shouldShow = () => readyCount() > 0 || blockedCount() > 0;
   const primaryButtonLabel = () => {
     if (saving()) return "Saving...";
-    if (readyCount() === 0) return "Nothing ready to save";
-    if (vendorDrafts().length > 0 && vendorDrafts().length === readyCount()) {
-      return `Save ${readyCount()} draft task${readyCount() === 1 ? "" : "s"}`;
-    }
-    if (vendorDecisionPolicies().length > 0 && vendorDecisionPolicies().length === readyCount()) {
-      return `Save ${readyCount()} vendor decision${readyCount() === 1 ? "" : "s"}`;
-    }
-    return `Approve ${readyCount()} item${readyCount() === 1 ? "" : "s"}`;
+    return props.state?.primaryAction.label ?? "Nothing ready to save";
   };
 
   async function approveReadyItems() {
@@ -71,6 +67,36 @@ export function WeddingProjectionApprovalCard(props: {
                 Draft - not saved to your account yet
               </div>
             </Show>
+            <Show when={props.state?.externalSendGuardLabel}>
+              {(label) => (
+                <p class="mt-2 rounded-2xl border border-rose-100 bg-rose-50/80 px-3 py-2 text-xs font-semibold leading-5 text-rose-950">
+                  {label()}
+                </p>
+              )}
+            </Show>
+            <Show when={vendorApprovalCard()}>
+              {(card) => (
+                <div class="mt-3 rounded-2xl border border-emerald-200/80 bg-white/75 px-3 py-2">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-800/70">
+                        Vendor follow-up
+                      </p>
+                      <p class="mt-1 text-xs font-semibold text-emerald-950">{card().summaryLabel}</p>
+                    </div>
+                    <Show when={card().collapsedByDefault}>
+                      <button
+                        type="button"
+                        onClick={() => setVendorDetailsExpanded((value) => !value)}
+                        class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-900 transition hover:bg-emerald-100"
+                      >
+                        {showVendorDetails() ? "Hide vendor details" : card().detailToggleLabel}
+                      </button>
+                    </Show>
+                  </div>
+                </div>
+              )}
+            </Show>
             <Show when={semanticItems().length > 0}>
               <div class="mt-3 grid gap-2">
                 <For each={semanticItems()}>
@@ -86,7 +112,7 @@ export function WeddingProjectionApprovalCard(props: {
                 </For>
               </div>
             </Show>
-            <Show when={vendorDrafts().length > 0}>
+            <Show when={vendorDrafts().length > 0 && showVendorDetails()}>
               <div class="mt-3 grid gap-2">
                 <For each={vendorDrafts()}>
                   {(draft) => (
@@ -127,7 +153,7 @@ export function WeddingProjectionApprovalCard(props: {
                 </For>
               </div>
             </Show>
-            <Show when={vendorDecisionPolicies().length > 0}>
+            <Show when={vendorDecisionPolicies().length > 0 && showVendorDetails()}>
               <div class="mt-3 grid gap-2">
                 <For each={vendorDecisionPolicies()}>
                   {(policy) => (

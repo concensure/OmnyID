@@ -19,6 +19,7 @@ test("vendor end-to-end validation lists blockers across search response and fol
       searchQueries: [],
       guardrails: [],
     },
+    vendorSearchLaunchQuery: "",
     vendorProviderConfigured: true,
     liveVendorArtifactSaved: false,
     liveVendorComparisonSaved: false,
@@ -26,6 +27,8 @@ test("vendor end-to-end validation lists blockers across search response and fol
     selectedComparisonVendorsConfirmed: false,
     unselectedVendorQueueSuppressed: false,
     dynamicVendorDecisionSurfaceVisible: false,
+    vendorApprovalCardModeled: false,
+    vendorApprovalCardCtaCopy: "",
     selectedVendorDraftTasksProjected: false,
     selectedVendorDraftsApprovalGated: false,
     quoteReplyFlowCount: 0,
@@ -39,15 +42,18 @@ test("vendor end-to-end validation lists blockers across search response and fol
   });
 
   assert.equal(state.status, "blocked");
-  assert.equal(state.blockedCount, 17);
+  assert.equal(state.blockedCount, 20);
   assert.ok(state.blockerLabels.some((label) => /date or season, budget comfort/i.test(label)));
   assert.ok(state.blockerLabels.some((label) => /concensure\+omnyidtest@gmail\.com/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /Run live vendor search/i.test(label)));
+  assert.ok(state.nextActionLabels.some((label) => /concrete vendor-search query/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /vendor comparison/i.test(label)));
+  assert.ok(state.nextActionLabels.some((label) => /opens the saved vendor search result/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /expand to the top five/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /Select one or more vendors/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /unselected comparison vendors/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /selected-vendor consequences/i.test(label)));
+  assert.ok(state.nextActionLabels.some((label) => /compact selected-vendor card with CTA copy/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /internal outreach draft tasks/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /require approval and cannot send externally/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /leaves the live decision queue/i.test(label)));
@@ -55,7 +61,7 @@ test("vendor end-to-end validation lists blockers across search response and fol
   assert.ok(state.nextActionLabels.some((label) => /Connect the Gmail\/email executor/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /Record or refresh the vendor thread/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /Remove the disposable test vendor/i.test(label)));
-  assert.equal(state.estimatedPassesToUsage, 9);
+  assert.equal(state.estimatedPassesToUsage, 10);
 });
 
 test("vendor end-to-end validation passes when the usage path has proof", () => {
@@ -74,6 +80,7 @@ test("vendor end-to-end validation passes when the usage path has proof", () => 
       searchQueries: ["Sydney wedding florist packages"],
       guardrails: [],
     },
+    vendorSearchLaunchQuery: "Sydney wedding florist packages",
     vendorProviderConfigured: true,
     liveVendorArtifactSaved: true,
     liveVendorComparisonSaved: true,
@@ -81,6 +88,8 @@ test("vendor end-to-end validation passes when the usage path has proof", () => 
     selectedComparisonVendorsConfirmed: true,
     unselectedVendorQueueSuppressed: true,
     dynamicVendorDecisionSurfaceVisible: true,
+    vendorApprovalCardModeled: true,
+    vendorApprovalCardCtaCopy: "Save 2 vendor follow-up items",
     selectedVendorDraftTasksProjected: true,
     selectedVendorDraftsApprovalGated: true,
     quoteReplyFlowCount: 1,
@@ -94,7 +103,7 @@ test("vendor end-to-end validation passes when the usage path has proof", () => 
   });
 
   assert.equal(state.status, "ready_for_usage_validation");
-  assert.equal(state.passedCount, 21);
+  assert.equal(state.passedCount, 24);
   assert.equal(state.blockedCount, 0);
   assert.deepEqual(state.blockerLabels, []);
   assert.equal(state.estimatedPassesToUsage, 1);
@@ -112,6 +121,7 @@ test("vendor end-to-end validation distinguishes comparison from selected-vendor
       searchQueries: ["Sydney wedding florist packages"],
       guardrails: [],
     },
+    vendorSearchLaunchQuery: "Sydney wedding florist packages",
     vendorProviderConfigured: true,
     liveVendorArtifactSaved: true,
     liveVendorComparisonSaved: true,
@@ -119,6 +129,8 @@ test("vendor end-to-end validation distinguishes comparison from selected-vendor
     selectedComparisonVendorsConfirmed: false,
     unselectedVendorQueueSuppressed: false,
     dynamicVendorDecisionSurfaceVisible: false,
+    vendorApprovalCardModeled: false,
+    vendorApprovalCardCtaCopy: null,
     selectedVendorDraftTasksProjected: false,
     selectedVendorDraftsApprovalGated: false,
   });
@@ -127,6 +139,7 @@ test("vendor end-to-end validation distinguishes comparison from selected-vendor
   assert.ok(state.blockerLabels.some((label) => /Selected vendor choices/i.test(label)));
   assert.ok(state.blockerLabels.some((label) => /Unselected vendor suppression/i.test(label)));
   assert.ok(state.blockerLabels.some((label) => /Dynamic decision surface/i.test(label)));
+  assert.ok(state.blockerLabels.some((label) => /Vendor approval card/i.test(label)));
   assert.ok(state.blockerLabels.some((label) => /Selected-vendor draft tasks/i.test(label)));
   assert.ok(state.blockerLabels.some((label) => /Selected-vendor draft guard/i.test(label)));
   assert.ok(!state.blockerLabels.some((label) => /Vendor comparison/i.test(label)));
@@ -145,6 +158,7 @@ test("vendor end-to-end validation blocks comparison that cannot expand to top f
       searchQueries: ["Sydney wedding florist packages"],
       guardrails: [],
     },
+    vendorSearchLaunchQuery: "Sydney wedding florist packages",
     vendorProviderConfigured: true,
     liveVendorArtifactSaved: true,
     liveVendorComparisonSaved: true,
@@ -152,6 +166,8 @@ test("vendor end-to-end validation blocks comparison that cannot expand to top f
     selectedComparisonVendorsConfirmed: true,
     unselectedVendorQueueSuppressed: true,
     dynamicVendorDecisionSurfaceVisible: true,
+    vendorApprovalCardModeled: true,
+    vendorApprovalCardCtaCopy: "Save 1 vendor decision",
     selectedVendorDraftTasksProjected: true,
     selectedVendorDraftsApprovalGated: true,
   });
@@ -160,6 +176,29 @@ test("vendor end-to-end validation blocks comparison that cannot expand to top f
   assert.ok(state.blockerLabels.some((label) => /Top-five expansion/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /expand to the top five/i.test(label)));
   assert.ok(!state.blockerLabels.some((label) => /Vendor comparison: No saved vendor comparison/i.test(label)));
+});
+
+test("vendor end-to-end validation blocks saved search output without an open handoff target", () => {
+  const state = buildWeddingVendorEndToEndValidationState({
+    vendorSearchReadiness: {
+      status: "ready",
+      label: "Ready for live vendor search",
+      missing: [],
+      searchBrief: [],
+      searchQueries: ["Sydney wedding florist packages"],
+      guardrails: [],
+    },
+    vendorSearchLaunchQuery: "Sydney wedding florist packages",
+    vendorProviderConfigured: true,
+    liveVendorArtifactSaved: true,
+    liveVendorComparisonSaved: true,
+    vendorSearchResultOpenTargetAvailable: false,
+    topFiveComparisonExpansionAvailable: true,
+  });
+
+  assert.equal(state.status, "blocked");
+  assert.ok(state.blockerLabels.some((label) => /Search result handoff/i.test(label)));
+  assert.ok(state.nextActionLabels.some((label) => /opens the saved vendor search result/i.test(label)));
 });
 
 test("vendor end-to-end validation blocks selected-vendor drafts that are not approval gated", () => {
@@ -174,6 +213,7 @@ test("vendor end-to-end validation blocks selected-vendor drafts that are not ap
       searchQueries: ["Sydney wedding florist packages"],
       guardrails: [],
     },
+    vendorSearchLaunchQuery: "Sydney wedding florist packages",
     vendorProviderConfigured: true,
     liveVendorArtifactSaved: true,
     liveVendorComparisonSaved: true,
@@ -181,6 +221,8 @@ test("vendor end-to-end validation blocks selected-vendor drafts that are not ap
     selectedComparisonVendorsConfirmed: true,
     unselectedVendorQueueSuppressed: true,
     dynamicVendorDecisionSurfaceVisible: true,
+    vendorApprovalCardModeled: true,
+    vendorApprovalCardCtaCopy: "Save 1 vendor draft",
     selectedVendorDraftTasksProjected: true,
     selectedVendorDraftsApprovalGated: false,
   });
@@ -188,6 +230,54 @@ test("vendor end-to-end validation blocks selected-vendor drafts that are not ap
   assert.equal(state.status, "blocked");
   assert.ok(state.blockerLabels.some((label) => /Selected-vendor draft guard/i.test(label)));
   assert.ok(!state.blockerLabels.some((label) => /Selected-vendor draft tasks/i.test(label)));
+});
+
+test("vendor end-to-end validation blocks vendor approval cards without CTA copy", () => {
+  const state = buildWeddingVendorEndToEndValidationState({
+    vendorSearchReadiness: {
+      status: "ready",
+      label: "Ready for live vendor search",
+      missing: [],
+      searchBrief: [],
+      searchQueries: ["Sydney wedding florist packages"],
+      guardrails: [],
+    },
+    vendorSearchLaunchQuery: "Sydney wedding florist packages",
+    vendorProviderConfigured: true,
+    liveVendorArtifactSaved: true,
+    liveVendorComparisonSaved: true,
+    topFiveComparisonExpansionAvailable: true,
+    selectedComparisonVendorsConfirmed: true,
+    unselectedVendorQueueSuppressed: true,
+    dynamicVendorDecisionSurfaceVisible: true,
+    vendorApprovalCardModeled: true,
+    vendorApprovalCardCtaCopy: "",
+    selectedVendorDraftTasksProjected: true,
+    selectedVendorDraftsApprovalGated: true,
+  });
+
+  assert.equal(state.status, "blocked");
+  assert.ok(state.blockerLabels.some((label) => /Vendor approval card/i.test(label)));
+  assert.ok(state.nextActionLabels.some((label) => /CTA copy/i.test(label)));
+});
+
+test("vendor end-to-end validation blocks ready intake without a launch query", () => {
+  const state = buildWeddingVendorEndToEndValidationState({
+    vendorSearchReadiness: {
+      status: "ready",
+      label: "Ready for live vendor search",
+      missing: [],
+      searchBrief: [],
+      searchQueries: ["Sydney wedding florist packages"],
+      guardrails: [],
+    },
+    vendorSearchLaunchQuery: "",
+    vendorProviderConfigured: true,
+  });
+
+  assert.equal(state.status, "blocked");
+  assert.ok(state.blockerLabels.some((label) => /Onboarding search query/i.test(label)));
+  assert.ok(state.nextActionLabels.some((label) => /approved onboarding context/i.test(label)));
 });
 
 test("vendor end-to-end validation blocks sent replies that are not logged as history", () => {
@@ -202,6 +292,7 @@ test("vendor end-to-end validation blocks sent replies that are not logged as hi
       searchQueries: ["Sydney wedding florist packages"],
       guardrails: [],
     },
+    vendorSearchLaunchQuery: "Sydney wedding florist packages",
     vendorProviderConfigured: true,
     liveVendorArtifactSaved: true,
     liveVendorComparisonSaved: true,
@@ -209,6 +300,8 @@ test("vendor end-to-end validation blocks sent replies that are not logged as hi
     selectedComparisonVendorsConfirmed: true,
     unselectedVendorQueueSuppressed: true,
     dynamicVendorDecisionSurfaceVisible: true,
+    vendorApprovalCardModeled: true,
+    vendorApprovalCardCtaCopy: "Save 1 vendor draft",
     selectedVendorDraftTasksProjected: true,
     selectedVendorDraftsApprovalGated: true,
     quoteReplyFlowCount: 1,

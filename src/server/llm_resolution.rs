@@ -3,7 +3,7 @@
 // @primary-capability: user-scoped-llm-provider-resolution
 // @stability: beta
 use crate::admin_tool_secrets::{
-    resolve_admin_tool_secret, ANTHROPIC_LLM_SPEC, NVIDIA_LLM_SPEC, RUNPOD_LLM_SPEC,
+    ANTHROPIC_LLM_SPEC, NVIDIA_LLM_SPEC, RUNPOD_LLM_SPEC, resolve_admin_tool_secret,
 };
 use crate::inference::InferenceBackend;
 use crate::secret_manager::read_process_secret_trimmed;

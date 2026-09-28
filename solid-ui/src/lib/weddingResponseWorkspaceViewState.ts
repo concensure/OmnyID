@@ -383,6 +383,24 @@ function uniqueHelperNames(values: readonly unknown[]): string[] {
   return result.slice(0, 40);
 }
 
+function weddingHelperContactNamesFromAfpMessages(messages: readonly AfpMessage[] | null | undefined): string[] {
+  return uniqueHelperNames((messages ?? []).flatMap((message) => {
+    const content = record(message.content);
+    const metadata = record(message.metadata);
+    const supertags = message.supertags ?? [];
+    const isHelperContact = message.kind === "wedding_helper_contact"
+      || message.subtype === "wedding_helper_contact_upsert"
+      || supertags.includes("wedding_helper_contact");
+    if (!isHelperContact) return [];
+    return [
+      content.name,
+      content.helper_name,
+      metadata.helper_name,
+      metadata.contact_name,
+    ];
+  }));
+}
+
 function guestNamesFromArtifacts(artifacts: readonly WeddingArtifactInput[]): string[] {
   return artifacts
     .filter((artifact) => artifact.kind === "guest_list")
@@ -654,6 +672,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
   const helperContactNames = uniqueHelperNames([
     ...delegation.items.map((item) => item.personName),
     ...collaboration.invites.map((invite) => invite.displayName),
+    ...weddingHelperContactNamesFromAfpMessages(input.afpMessages),
     ...taskItems.map((item) => item.assignee),
     ...guestNamesFromArtifacts(artifacts),
   ]);

@@ -7,6 +7,7 @@ import type {
   WeddingVendorContactWorkspaceCard,
 } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingVendorPursuitLogCard } from "@/lib/weddingVendorPursuitLogPresentationState";
+import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
 import { buildWeddingVendorFollowUpPanelPresentationState } from "@/lib/weddingVendorFollowUpPanelPresentationState";
 import {
   weddingVendorFollowUpPrimaryAction,
@@ -67,10 +68,12 @@ function closedVendorSourceAction(card: WeddingVendorPursuitLogCard): WeddingWor
 export function WeddingVendorFollowUpPanel(props: {
   state: WeddingResponseWorkspaceViewState;
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
+  onViewQuoteReplyProof?: (flow: WeddingVendorQuoteReplyFlowState) => void;
 }) {
   const panelState = () => buildWeddingVendorFollowUpPanelPresentationState({
     activeCount: props.state.vendorContactCards.length,
     closedCount: props.state.vendorPursuitLogCards.length,
+    sentQuoteReplyCount: props.state.vendorQuoteReplyLogFlows.length,
   });
   return (
     <div class="min-w-0 rounded-[24px] border border-amber-100/80 bg-amber-50/85 p-3 shadow-card sm:rounded-[28px] sm:p-4">
@@ -230,6 +233,67 @@ export function WeddingVendorFollowUpPanel(props: {
                       onClick={() => props.onSidebarAction(closedVendorSourceAction(card))}
                     >
                       Open vendor history
+                    </button>
+                  </article>
+                )}
+              </For>
+            </div>
+          </div>
+        </Show>
+        <Show when={props.state.vendorQuoteReplyLogFlows.length > 0}>
+          <div class="rounded-2xl border border-emerald-100 bg-white/75 p-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="break-words text-sm font-semibold text-emerald-950">Sent quote replies</p>
+                <p class="mt-0.5 text-xs leading-5 text-emerald-900/70">
+                  Resolved quote decisions leave the live queue and stay here with delivery proof.
+                </p>
+              </div>
+              <span class="max-w-full shrink-0 break-words rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-950">
+                {props.state.vendorQuoteReplyLogFlows.length} sent
+              </span>
+            </div>
+            <div class="mt-3 space-y-2">
+              <For each={props.state.vendorQuoteReplyLogFlows}>
+                {(flow) => (
+                  <article class="rounded-xl border border-emerald-100 bg-emerald-50/60 px-2.5 py-2">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="break-words text-sm font-semibold text-emerald-950">{flow.quote.vendorName}</p>
+                        <p class="mt-0.5 text-xs leading-5 text-emerald-900/70">
+                          {flow.sentConfirmationLabel ?? "Reply sent."}
+                        </p>
+                      </div>
+                      <span class="max-w-full shrink-0 break-words rounded-full bg-white px-2 py-1 text-xs font-semibold text-emerald-900">
+                        {flow.sentReceiptId ? "Proof ready" : "Proof pending"}
+                      </span>
+                    </div>
+                    <p class="mt-2 break-words text-xs leading-5 text-emerald-900/75">
+                      {flow.summary}
+                    </p>
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                      <span class="max-w-full break-words rounded-full border border-emerald-100 bg-white/80 px-2 py-0.5 text-[11px] text-emerald-900">
+                        {flow.quote.amountLabel}
+                      </span>
+                      <Show when={flow.quote.budgetDeltaLabel}>
+                        {(label) => (
+                          <span class="max-w-full break-words rounded-full border border-emerald-100 bg-white/80 px-2 py-0.5 text-[11px] text-emerald-900">
+                            {label()}
+                          </span>
+                        )}
+                      </Show>
+                    </div>
+                    <button
+                      type="button"
+                      class="mt-2 rounded-full border border-emerald-200 bg-white/90 px-3 py-2 text-xs font-semibold text-emerald-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={!props.onViewQuoteReplyProof}
+                      data-magic-action="open"
+                      data-magic-icon="proof"
+                      data-magic-label="View sent proof"
+                      data-magic-id={`wedding:sent-quote-reply:${flow.id}:proof`}
+                      onClick={() => props.onViewQuoteReplyProof?.(flow)}
+                    >
+                      View sent proof
                     </button>
                   </article>
                 )}

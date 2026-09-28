@@ -6,7 +6,10 @@ import {
   type WeddingWorkspaceMenuId,
 } from "@/lib/weddingWorkspaceMenuState";
 import { weddingTimelineStatusLabel } from "@/lib/weddingTimelineDisplayState";
-import { weddingTimelineWeddingDateLabel } from "@/lib/weddingTimelineWeddingDateState";
+import {
+  weddingTargetDateOrSeasonLabel,
+  weddingTimelineWeddingDateLabel,
+} from "@/lib/weddingTimelineWeddingDateState";
 
 type WeddingPlanningTask = WeddingResponseWorkspaceViewState["planningTaskItems"][number];
 
@@ -21,7 +24,7 @@ export function currencyLabel(amount: number | null | undefined): string {
 
 export function weddingDayCountdownLabel(state: WeddingResponseWorkspaceViewState): string {
   const weddingDate = weddingTimelineWeddingDateLabel(state);
-  if (!weddingDate) return "Add date";
+  if (!weddingDate) return weddingTargetDateOrSeasonLabel(state) ? "Confirm date" : "Add date";
   const weddingTime = new Date(`${weddingDate}T09:00:00.000Z`).getTime();
   if (!Number.isFinite(weddingTime)) return "Add date";
   const days = Math.ceil((weddingTime - Date.now()) / 86_400_000);
@@ -32,7 +35,9 @@ export function weddingDayCountdownLabel(state: WeddingResponseWorkspaceViewStat
 
 export function weddingDayCountdownDetail(state: WeddingResponseWorkspaceViewState): string {
   const weddingDate = weddingTimelineWeddingDateLabel(state);
-  return weddingDate ? `Wedding day: ${weddingDate}` : "Add the wedding date to start the countdown.";
+  if (weddingDate) return `Wedding day: ${weddingDate}`;
+  const target = weddingTargetDateOrSeasonLabel(state);
+  return target ? `Target captured: ${target}. Pick the exact date to start the countdown.` : "Add the wedding date to start the countdown.";
 }
 
 export function weddingTimelineSidebarAction(
@@ -142,5 +147,5 @@ export function weddingTaskSidebarAction(
 }
 
 export function calendarActionLabel(state: WeddingResponseWorkspaceViewState): string {
-  return state.ganttTimeline.rows.length > 0 ? "Open wedding calendar" : "Add wedding date";
+  return state.ganttTimeline.rows.length > 0 ? "Open wedding calendar" : "Pick exact wedding date";
 }

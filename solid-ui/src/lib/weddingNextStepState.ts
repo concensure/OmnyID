@@ -1,7 +1,10 @@
 // @locs-version: 1.0
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
-import { weddingTimelineWeddingDateLabel } from "@/lib/weddingTimelineWeddingDateState";
+import {
+  weddingTargetDateOrSeasonLabel,
+  weddingTimelineWeddingDateLabel,
+} from "@/lib/weddingTimelineWeddingDateState";
 
 export type WeddingNextStepPriority =
   | "wedding_date"
@@ -89,6 +92,7 @@ export function buildWeddingNextStepState(state: WeddingResponseWorkspaceViewSta
   const guestCount = state.guestTracking.guestRowCount;
   const respondedCount = state.guestTracking.attendingCount + state.guestTracking.declinedCount;
   const hasWeddingDate = weddingTimelineWeddingDateLabel(state) !== null;
+  const targetDateOrSeason = weddingTargetDateOrSeasonLabel(state);
   const budgetTarget = state.budgetTracking.budgetTargetAmount;
   const openTasks = state.planningTaskItems.filter((task) => {
     const status = (task.reviewStatus ?? task.approvalState ?? "").toLowerCase();
@@ -111,11 +115,16 @@ export function buildWeddingNextStepState(state: WeddingResponseWorkspaceViewSta
   if (!hasWeddingDate) {
     return make({
       priority: "wedding_date",
-      title: "Add the wedding date first",
-      detail: "Once the date is known, OmnyID can place legal deadlines, payment reminders, and vendor follow-ups on the timeline.",
-      actionLabel: "Add wedding date",
+      title: targetDateOrSeason ? "Confirm the exact wedding date" : "Add the wedding date first",
+      detail: targetDateOrSeason
+        ? `I have ${targetDateOrSeason} from intake. Pick the exact date when you know it so OmnyID can place legal deadlines, payment reminders, and vendor follow-ups on the timeline.`
+        : "Once the date is known, OmnyID can place legal deadlines, payment reminders, and vendor follow-ups on the timeline.",
+      actionLabel: targetDateOrSeason ? "Pick exact date" : "Add wedding date",
       menuId: "plan",
-      secondaryLabels: ["Calendar and reminders need a date.", ...baseLabels.slice(0, 2)],
+      secondaryLabels: [
+        targetDateOrSeason ? `Target captured: ${targetDateOrSeason}` : "Calendar and reminders need a date.",
+        ...baseLabels.slice(0, 2),
+      ],
     });
   }
   if (budgetTarget === null) {

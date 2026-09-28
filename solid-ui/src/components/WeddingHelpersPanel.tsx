@@ -4,12 +4,15 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import type { SendAfpMessageInput } from "@/lib/api";
+import { loadContacts, saveContacts } from "@/lib/contactsLocalState";
 import {
   buildWeddingHelperPeople,
   buildWeddingHelperWeeklyAgendaRows,
   buildWeddingHelperWorkloadRows,
   loadWeddingHelperLocalState,
   saveWeddingHelperLocalState,
+  upsertWeddingHelperContact,
+  weddingHelperContactToAfpSendInput,
   weddingHelperResponsibilityToAfpSendInput,
   weddingHelperTaskDueLabel,
   weddingHelperTaskPriorityLabel,
@@ -36,6 +39,7 @@ export function WeddingHelpersPanel(props: {
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
   onRefreshWorkspace?: (() => void) | null;
   metadata?: unknown;
+  contactUserId?: string | null;
 }) {
   const workspaceId = () => props.state.workspace.metadata.responseWorkspaceId;
   const initialState = loadWeddingHelperLocalState(workspaceId());
@@ -45,6 +49,9 @@ export function WeddingHelpersPanel(props: {
   const [taskLastContactDates, setTaskLastContactDates] = createSignal<Record<string, string>>(initialState.taskLastContactDates);
   const [taskTab, setTaskTab] = createSignal<WeddingHelperTaskTab>("open");
   const [customHelperName, setCustomHelperName] = createSignal("");
+  const [customHelperEmail, setCustomHelperEmail] = createSignal("");
+  const [customHelperPhone, setCustomHelperPhone] = createSignal("");
+  const [customHelperRole, setCustomHelperRole] = createSignal("Helper");
   const [customHelpers, setCustomHelpers] = createSignal<string[]>(initialState.customHelpers);
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
   const inferredPartnerNames = createMemo(() => inferWeddingPartnerNames(props.state));
@@ -122,11 +129,50 @@ export function WeddingHelpersPanel(props: {
     }
   }
 
-  function addCustomHelper(): void {
+  function upsertHelperContact(draft: {
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    role?: string | null;
+  }): "created" | "updated" {
+    const result = upsertWeddingHelperContact(loadContacts(props.contactUserId), draft);
+    if (!result) return "created";
+    saveContacts(result.contacts, props.contactUserId);
+    return result.action;
+  }
+
+  async function addCustomHelper(): Promise<void> {
     const name = customHelperName().trim();
     if (!name) return;
+    const role = customHelperRole().trim() || "Helper";
+    const email = customHelperEmail().trim();
+    const phone = customHelperPhone().trim();
     setCustomHelpers((current) => current.some((item) => item.toLowerCase() === name.toLowerCase()) ? current : [...current, name]);
+    const contactAction = upsertHelperContact({ name, email, phone, role });
+    if (props.saveProjection) {
+      const sendInput = weddingHelperContactToAfpSendInput({
+        name,
+        email,
+        phone,
+        role,
+        metadata: props.metadata ?? props.state.workspace.metadata,
+      });
+      if (sendInput) {
+        try {
+          await props.saveProjection(sendInput);
+          setSaveNotice(`Added ${name} to helpers and ${contactAction === "created" ? "Contacts" : "updated Contacts"}.`);
+          props.onRefreshWorkspace?.();
+        } catch {
+          setSaveNotice(`Added ${name} here and in Contacts. Wedding memory will sync when saving is available.`);
+        }
+      }
+    } else {
+      setSaveNotice(`Added ${name} here and in Contacts.`);
+    }
     setCustomHelperName("");
+    setCustomHelperEmail("");
+    setCustomHelperPhone("");
+    setCustomHelperRole("Helper");
   }
 
   function inferWeddingPartnerNames(state: WeddingResponseWorkspaceViewState): string[] {
@@ -186,8 +232,8 @@ export function WeddingHelpersPanel(props: {
           </p>
         )}
       </Show>
-      <div class="mt-3 flex flex-col gap-2 rounded-2xl border border-fuchsia-100 bg-white/70 p-3 sm:flex-row sm:items-end">
-        <label class="min-w-0 flex-1 text-xs font-semibold text-fuchsia-950">
+      <div class="mt-3 grid gap-2 rounded-2xl border border-fuchsia-100 bg-white/70 p-3 md:grid-cols-[1.25fr_1fr_1fr_1fr_auto] md:items-end">
+        <label class="min-w-0 text-xs font-semibold text-fuchsia-950">
           Add a helper
           <input
             list="wedding-helper-suggestions"
@@ -202,10 +248,45 @@ export function WeddingHelpersPanel(props: {
             </For>
           </datalist>
         </label>
+        <label class="min-w-0 text-xs font-semibold text-fuchsia-950">
+          Email
+          <input
+            type="email"
+            value={customHelperEmail()}
+            onInput={(event) => setCustomHelperEmail(event.currentTarget.value)}
+            placeholder="Optional"
+            class="mt-1 w-full rounded-full border border-fuchsia-100 bg-white px-3 py-2 text-sm font-normal text-fuchsia-950 outline-none focus:border-fuchsia-300"
+          />
+        </label>
+        <label class="min-w-0 text-xs font-semibold text-fuchsia-950">
+          Phone
+          <input
+            type="tel"
+            value={customHelperPhone()}
+            onInput={(event) => setCustomHelperPhone(event.currentTarget.value)}
+            placeholder="Optional"
+            class="mt-1 w-full rounded-full border border-fuchsia-100 bg-white px-3 py-2 text-sm font-normal text-fuchsia-950 outline-none focus:border-fuchsia-300"
+          />
+        </label>
+        <label class="min-w-0 text-xs font-semibold text-fuchsia-950">
+          Role
+          <select
+            value={customHelperRole()}
+            onChange={(event) => setCustomHelperRole(event.currentTarget.value)}
+            class="mt-1 w-full rounded-full border border-fuchsia-100 bg-white px-3 py-2 text-sm font-normal text-fuchsia-950 outline-none focus:border-fuchsia-300"
+          >
+            <option value="Helper">Helper</option>
+            <option value="Partner">Partner</option>
+            <option value="Parent / family">Parent / family</option>
+            <option value="Wedding party">Wedding party</option>
+            <option value="Coordinator">Coordinator</option>
+            <option value="Planner">Planner</option>
+          </select>
+        </label>
         <button
           type="button"
           disabled={!customHelperName().trim()}
-          onClick={addCustomHelper}
+          onClick={() => void addCustomHelper()}
           class="rounded-full border border-fuchsia-200 bg-fuchsia-100/80 px-3 py-2 text-xs font-semibold text-fuchsia-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
         >
           Add person

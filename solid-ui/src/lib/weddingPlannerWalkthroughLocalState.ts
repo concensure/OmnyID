@@ -20,3 +20,14 @@ export function saveWeddingPlannerWalkthroughSeen(userId?: string | null, storag
     // Ignore unavailable storage; the guide button remains available.
   }
 }
+
+export function shouldAutoShowWeddingPlannerWalkthrough(input: {
+  alreadyChecked: boolean;
+  hasWeddingWorkspace: boolean;
+  firstIntakeComplete: boolean;
+  userId?: string | null;
+  storage?: Storage;
+}): boolean {
+  if (input.alreadyChecked || !input.hasWeddingWorkspace || !input.firstIntakeComplete) return false;
+  return loadShouldShowWeddingPlannerWalkthrough(input.userId, input.storage);
+}

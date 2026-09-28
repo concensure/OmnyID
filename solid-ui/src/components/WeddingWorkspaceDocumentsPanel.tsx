@@ -44,6 +44,7 @@ type WeddingWorkspaceDocumentsPanelProps = {
   onExecute: (request: WeddingApprovalRequestState) => void;
   onResearch: (action: WeddingWorkspaceSidebarAction) => void;
   onOpenFollowUpQueue: () => void;
+  onOpenVendorQuoteReplySurface: () => void;
 };
 
 export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsPanelProps) {
@@ -289,6 +290,7 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
               onProviderSetup={props.onProviderSetup}
               onResearch={props.onResearch}
               onOpenFollowUpQueue={props.onOpenFollowUpQueue}
+              onOpenVendorQuoteReplySurface={props.onOpenVendorQuoteReplySurface}
               researchAction={props.researchAction}
             />
           </div>

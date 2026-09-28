@@ -174,3 +174,18 @@ test("buildWeddingResponseWorkspaceState honors active artifact selection", () =
   assert.equal(state.activeArtifact?.id, "artifact:venue-email");
   assert.equal(state.continueContext.activeArtifactId, "artifact:venue-email");
 });
+
+test("buildWeddingResponseWorkspaceState does not fall back when an explicit active artifact is missing", () => {
+  const state = buildWeddingResponseWorkspaceState({
+    metadata: { response_workspace_id: "response_workspace:venue-pass" },
+    activeArtifactId: "artifact:deleted-vendor-comparison",
+    artifacts: [
+      artifact({ title: "Venue shortlist", kind: "vendor_table", createdAt: 2 }),
+      artifact({ id: "artifact:venue-email", title: "Venue email", kind: "email_draft", createdAt: 1 }),
+    ],
+  });
+
+  assert.equal(state.activeArtifact, null);
+  assert.equal(state.continueContext.activeArtifactId, null);
+  assert.equal(state.resultCount, 2);
+});

@@ -5,6 +5,7 @@ import type { SendAfpMessageInput } from "@/lib/api";
 import type {
   WeddingResponseWorkspaceViewState,
 } from "@/lib/weddingResponseWorkspaceViewState";
+import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
 import type {
   WeddingBoundaryChangeType,
   WeddingBoundaryPolicyRuleType,
@@ -81,6 +82,7 @@ export function WeddingWorkspaceContextPanels(props: {
   showHomeOverview?: boolean;
   activeMenu?: WeddingWorkspaceMenuId;
   sharePlanOpen?: boolean;
+  contactUserId?: string | null;
   onToggleSharePlan?: () => void;
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
   onRefreshWorkspace?: () => void;
@@ -88,6 +90,7 @@ export function WeddingWorkspaceContextPanels(props: {
   onOpenArtifact?: (artifactId: string) => void;
   onOpenSavedOutputs?: () => void;
   onSaveWeddingDate?: (date: string) => Promise<void> | void;
+  onViewQuoteReplyProof?: (flow: WeddingVendorQuoteReplyFlowState) => void;
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
 }) {
   const activeMenu = () => props.activeMenu ?? "home";
@@ -302,6 +305,9 @@ export function WeddingWorkspaceContextPanels(props: {
                   <span class="text-sm font-semibold text-amber-950">{action.title}</span>
                   <span class="mt-1 block text-xs leading-5 text-amber-950/70">{action.detail}</span>
                   <span class="mt-2 block text-[11px] font-semibold text-amber-950/65">{action.metaLabel}</span>
+                  <span class="mt-3 inline-flex rounded-full bg-amber-900 px-3 py-1 text-[11px] font-semibold text-white">
+                    Open {action.title}
+                  </span>
                 </button>
               )}
             </For>
@@ -314,6 +320,7 @@ export function WeddingWorkspaceContextPanels(props: {
             saveProjection={props.saveProjection}
             onRefreshWorkspace={props.onRefreshWorkspace}
             metadata={props.state.workspace.metadata}
+            contactUserId={props.contactUserId}
           />
         </div>
       </div>
@@ -380,6 +387,17 @@ export function WeddingWorkspaceContextPanels(props: {
           saveProjection={props.saveProjection}
           onRefreshWorkspace={props.onRefreshWorkspace}
         />
+        <Show when={props.state.contextCards.length > 0}>
+          <div class="mt-3">
+            <WeddingImportantDetailsPanel
+              cards={props.state.contextCards}
+              metadata={props.state.workspace.metadata}
+              saveProjection={props.saveProjection}
+              onRefreshWorkspace={props.onRefreshWorkspace}
+              onGenerateRecommendations={generateRecommendationSet}
+            />
+          </div>
+        </Show>
         <div class="mt-3">
           <WeddingVisionPanel
             state={props.state}
@@ -409,18 +427,16 @@ export function WeddingWorkspaceContextPanels(props: {
         />
       </div>
 
-      <div hidden={activeMenu() !== "home" || props.state.contextCards.length === 0}>
-        <WeddingImportantDetailsPanel
-          cards={props.state.contextCards}
-          metadata={props.state.workspace.metadata}
-          saveProjection={props.saveProjection}
-          onRefreshWorkspace={props.onRefreshWorkspace}
-          onGenerateRecommendations={generateRecommendationSet}
+      <div hidden={activeMenu() !== "response_queue" || (
+        props.state.vendorContactCards.length === 0
+        && props.state.vendorPursuitLogCards.length === 0
+        && props.state.vendorQuoteReplyLogFlows.length === 0
+      )}>
+        <WeddingVendorFollowUpPanel
+          state={props.state}
+          onSidebarAction={props.onSidebarAction}
+          onViewQuoteReplyProof={props.onViewQuoteReplyProof}
         />
-      </div>
-
-      <div hidden={activeMenu() !== "response_queue" || (props.state.vendorContactCards.length === 0 && props.state.vendorPursuitLogCards.length === 0)}>
-        <WeddingVendorFollowUpPanel state={props.state} onSidebarAction={props.onSidebarAction} />
       </div>
     </>
   );

@@ -12,6 +12,7 @@ import type { WeddingVendorEndToEndValidationState } from "@/lib/weddingVendorEn
 import type { WeddingLiveWorkflowReadinessState } from "@/lib/weddingLiveWorkflowReadinessState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
+import type { WeddingVendorSearchResultAction } from "@/lib/weddingVendorSearchResultActionState";
 import type { ViewName } from "@/lib/viewNames";
 
 export type WeddingProjectionSaveFn = (input: SendAfpMessageInput) => Promise<unknown>;
@@ -30,6 +31,7 @@ export type WeddingResponseWorkspaceViewProps = {
   approvalHandlers?: WeddingApprovalExecutionHandlers | null;
   gmailStatus?: GmailConnectionStatus | null;
   projectionStorage?: Storage | null;
+  contactUserId?: string | null;
   importNotice?: string | null;
   importRunning?: boolean | null;
   activeMenu?: WeddingWorkspaceMenuId;
@@ -51,6 +53,8 @@ export type WeddingResponseWorkspaceViewProps = {
   vendorSearchRunning?: boolean;
   vendorSearchNotice?: string | null;
   vendorSearchQuery?: string | null;
+  vendorSearchQuerySourceLabel?: string | null;
+  vendorSearchResultAction?: WeddingVendorSearchResultAction | null;
   onVendorSearchQueryChange?: (query: string) => void;
   vendorSearchReadiness?: WeddingLiveWorkflowReadinessState | null;
   vendorSearchBlockedReason?: string | null;
