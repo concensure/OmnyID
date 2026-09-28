@@ -494,6 +494,15 @@ export function MonthlyCalendarView(props: {
   const weddingArrivalBanner = createMemo(() =>
     buildWeddingNavigationArrivalBannerState(weddingNavigationIntent()),
   );
+  const googleCalendarSetupMissing = createMemo(() => {
+    const config = googleCalendarOAuthConfig();
+    const missing: string[] = [];
+    if (config && !config.clientIdConfigured) missing.push("OAuth client ID");
+    if (config && !config.clientSecretConfigured) missing.push("OAuth client secret");
+    if (config && !config.homeserverUrlConfigured) missing.push("homeserver URL");
+    if (config && !config.csrfSecretConfigured) missing.push("OAuth state secret");
+    return missing;
+  });
 
   async function loadEvents() {
     setLoading(true);
@@ -931,6 +940,38 @@ export function MonthlyCalendarView(props: {
           onAction={runWeddingArrivalAction}
           onDismiss={() => setWeddingNavigationIntent(null)}
         />
+        <Show when={googleCalendarStatus() && !googleCalendarStatus()?.configured && !googleCalendarStatus()?.connected}>
+          <div
+            style={{
+              display: "grid",
+              gap: "0.35em",
+              padding: "0.75em 1em",
+              "margin-bottom": "1em",
+              background: TOKEN.surface,
+              border: `1px solid ${TOKEN.border}`,
+              "border-radius": "0.75em",
+            }}
+          >
+            <p style={{ margin: 0, "font-size": "0.85em", color: TOKEN.textSecondary }}>
+              Google Calendar is not ready on this server yet.
+            </p>
+            <Show when={googleCalendarSetupMissing().length > 0}>
+              <p style={{ margin: 0, "font-size": "0.72em", color: TOKEN.textSecondary }}>
+                Missing setup: {googleCalendarSetupMissing().join(", ")}.
+              </p>
+            </Show>
+            <Show when={googleCalendarOAuthConfig()?.requiredAuthorizedRedirectUri}>
+              {(redirectUri) => (
+                <p style={{ margin: 0, "font-size": "0.72em", color: TOKEN.textSecondary, "word-break": "break-word" }}>
+                  Authorized redirect URI: {redirectUri()}
+                  <Show when={googleCalendarOAuthConfig()?.oauthClientSource}>
+                    {(source) => <> | OAuth client: {source().replace(/_/g, " ")}</>}
+                  </Show>
+                </p>
+              )}
+            </Show>
+          </div>
+        </Show>
         <Show when={googleCalendarStatus()?.configured && !googleCalendarStatus()?.connected}>
           <div
             style={{
