@@ -153,7 +153,7 @@ import { type OnboardingQuickStartSeed } from "@/lib/onboardingQuickStart";
 import { saveReportNavigationIntent, type ReportNavigationIntent } from "@/lib/reportNavigationState";
 import { subscribeWeddingNavigationAppBridge } from "@/lib/weddingNavigationAppBridge";
 import { consumeWeddingNavigationIntent } from "@/lib/weddingNavigationLocalState";
-import { saveWeddingEntrySource } from "@/lib/weddingEntrySourceState";
+import { loadWeddingEntrySource, saveWeddingEntrySource } from "@/lib/weddingEntrySourceState";
 import {
   buildWeddingNavigationArrivalBannerState,
   weddingArrivalActionDestinationView,
@@ -1228,12 +1228,13 @@ function App() {
       if (status === "ok") profile = await getSelfProfile();
     }
 
+    const entrySource = loadWeddingEntrySource();
     setPrimaryUseCaseProfile(profile.primary_use_case ?? null);
-    setPrimaryUseCaseNeedsPrompt(profileNeedsPrimaryUseCasePrompt(profile));
+    setPrimaryUseCaseNeedsPrompt(profileNeedsPrimaryUseCasePrompt(profile, entrySource));
     applyPrimaryUseCaseTheme(profile);
 
     const dismissed = primaryUseCasePromptDismissedThisSession();
-    setPrimaryUseCasePromptVisible(forcePrompt || (profileNeedsPrimaryUseCasePrompt(profile) && !dismissed));
+    setPrimaryUseCasePromptVisible(forcePrompt || (profileNeedsPrimaryUseCasePrompt(profile, entrySource) && !dismissed));
   }
 
   async function handlePrimaryUseCaseSelect(kind: PrimaryUseCaseKind) {

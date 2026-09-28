@@ -8,7 +8,7 @@ export type TrustSummaryBlockItem = {
 };
 
 // Colors are tuned for the light/white card backgrounds these blocks actually render
-// on in the wedding response queue and elsewhere â€” dark, saturated -800/-900/-950 text
+// on in the wedding response queue and elsewhere — dark, saturated -800/-900/-950 text
 // on a solid -50 fill and a -200 border, not the pale -100/-200 translucent tokens this
 // used before (those read fine on a dark backdrop but fail WCAG AA on white and were
 // reported as "near-invisible text"). font-semibold on the label offsets its small size.

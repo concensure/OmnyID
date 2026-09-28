@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   normalizeWeddingCustomSurfaceItem,
+  reorderWeddingCustomSurfaceItems,
+  weddingCustomSurfaceItemsForMenu,
   weddingCustomSurfaceItemToAfpMessage,
   weddingCustomSurfaceItemToAfpSendInput,
   type WeddingCustomSurfaceItem,
@@ -86,4 +88,41 @@ test("normalizeWeddingCustomSurfaceItem accepts older local drafts and fills tim
   assert.equal(parsed?.order, 4);
   assert.equal(parsed?.imageUrl, "https://example.test/dress.jpg");
   assert.ok(parsed?.createdAt);
+});
+
+test("weddingCustomSurfaceItemsForMenu returns stable page order", () => {
+  const items: WeddingCustomSurfaceItem[] = [
+    { ...item, id: "budget-late", order: 2, createdAt: "2026-09-26T00:02:00.000Z" },
+    { ...item, id: "other-page", menu: "timeline", order: 0 },
+    { ...item, id: "budget-early", order: 0, createdAt: "2026-09-26T00:01:00.000Z" },
+  ];
+
+  assert.deepEqual(weddingCustomSurfaceItemsForMenu(items, "budget").map((entry) => entry.id), [
+    "budget-early",
+    "budget-late",
+  ]);
+});
+
+test("reorderWeddingCustomSurfaceItems reorders only the active wedding page", () => {
+  const items: WeddingCustomSurfaceItem[] = [
+    { ...item, id: "budget-a", order: 0, title: "A" },
+    { ...item, id: "timeline-a", menu: "timeline", order: 0, title: "Timeline A" },
+    { ...item, id: "budget-b", order: 1, title: "B" },
+    { ...item, id: "budget-c", order: 2, title: "C" },
+  ];
+  const reordered = reorderWeddingCustomSurfaceItems({
+    items,
+    menu: "budget",
+    itemId: "budget-c",
+    targetIndex: 0,
+    nowIso: "2026-09-26T01:00:00.000Z",
+  });
+
+  assert.deepEqual(weddingCustomSurfaceItemsForMenu(reordered, "budget").map((entry) => `${entry.id}:${entry.order}`), [
+    "budget-c:0",
+    "budget-a:1",
+    "budget-b:2",
+  ]);
+  assert.equal(reordered.find((entry) => entry.id === "timeline-a")?.order, 0);
+  assert.equal(reordered.find((entry) => entry.id === "budget-c")?.updatedAt, "2026-09-26T01:00:00.000Z");
 });

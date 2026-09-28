@@ -26,6 +26,40 @@ export type WeddingCustomSurfaceItem = {
   updatedAt: string;
 };
 
+export function weddingCustomSurfaceItemsForMenu(
+  items: readonly WeddingCustomSurfaceItem[],
+  menu: WeddingWorkspaceMenuId,
+): WeddingCustomSurfaceItem[] {
+  return items
+    .filter((item) => item.menu === menu)
+    .slice()
+    .sort((left, right) => left.order - right.order || left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
+}
+
+export function reorderWeddingCustomSurfaceItems(input: {
+  items: readonly WeddingCustomSurfaceItem[];
+  menu: WeddingWorkspaceMenuId;
+  itemId: string;
+  targetIndex: number;
+  nowIso?: string | null;
+}): WeddingCustomSurfaceItem[] {
+  const pageItems = weddingCustomSurfaceItemsForMenu(input.items, input.menu);
+  const pageIndex = pageItems.findIndex((item) => item.id === input.itemId);
+  if (pageIndex < 0 || input.targetIndex < 0 || input.targetIndex >= pageItems.length || pageIndex === input.targetIndex) {
+    return [...input.items];
+  }
+  const reordered = [...pageItems];
+  const [moving] = reordered.splice(pageIndex, 1);
+  reordered.splice(input.targetIndex, 0, moving!);
+  const nowIso = input.nowIso?.trim() || new Date().toISOString();
+  const reorderedById = new Map(reordered.map((item, order) => [item.id, {
+    ...item,
+    order,
+    updatedAt: nowIso,
+  }]));
+  return input.items.map((item) => reorderedById.get(item.id) ?? item);
+}
+
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }

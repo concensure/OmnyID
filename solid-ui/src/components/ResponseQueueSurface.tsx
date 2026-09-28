@@ -329,6 +329,7 @@ export function ResponseQueueSurface(props: {
         >
           {(item, index) => {
             const feedback = responseItemOutcomeFeedbackForItem(item, proactiveSuggestions());
+            const [showWhy, setShowWhy] = createSignal(false);
             const responseCardState = (() => {
               const preparedDraftDisplayedSummaryLines =
                 responseItemPreparedDraftDisplayedSummaryLines(item);
@@ -392,9 +393,16 @@ export function ResponseQueueSurface(props: {
                     && item.prepared_draft_class
                     && item.prepared_draft_class !== "communication_reply",
                 ),
-                showSourceSummary: Boolean(presentationState.sourceSummary),
-                showConsequencePreview: Boolean(presentationState.consequencePreview),
-                showProvenanceCue: Boolean(presentationState.provenanceCue),
+                showSourceSummary: Boolean(trustState.trustBlocks.sourceSummary),
+                showConsequencePreview: Boolean(trustState.trustBlocks.consequencePreview),
+                showProvenanceCue: Boolean(trustState.trustBlocks.provenanceCue),
+                showConfidenceSummary: Boolean(trustState.trustBlocks.confidence),
+                showTrustDetails: Boolean(
+                  trustState.trustBlocks.sourceSummary
+                    || trustState.trustBlocks.consequencePreview
+                    || trustState.trustBlocks.provenanceCue
+                    || trustState.trustBlocks.confidence,
+                ),
                 showAutonomySummary: Boolean(presentationState.autonomySummary),
                 showPreparedDraftLeadSummary: Boolean(preparedDraftLeadSummary),
                 showObjectAnchorSummary: Boolean(
@@ -496,14 +504,38 @@ export function ResponseQueueSurface(props: {
                           {responseCardState.feedbackDetail}
                         </p>
                     </Show>
-                    <div class="mt-2 space-y-2">
-                      <TrustSummaryBlocks
-                        confidence={responseCardState.confidenceSummary}
-                        sourceSummary={responseCardState.sourceSummary}
-                        consequencePreview={responseCardState.consequencePreview}
-                        provenanceCue={responseCardState.provenanceCue}
-                      />
-                    </div>
+                    <Show when={responseCardState.showTrustDetails}>
+                      <div class="mt-2">
+                        <span
+                          role="button"
+                          tabindex="0"
+                          aria-expanded={showWhy()}
+                          class="inline-flex rounded-full border border-slate-200 bg-white/75 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-white"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setShowWhy((current) => !current);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key !== "Enter" && event.key !== " ") return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setShowWhy((current) => !current);
+                          }}
+                        >
+                          {showWhy() ? "Hide details" : "Show why"}
+                        </span>
+                        <Show when={showWhy()}>
+                          <div class="mt-2 space-y-2">
+                            <TrustSummaryBlocks
+                              confidence={responseCardState.confidenceSummary}
+                              sourceSummary={responseCardState.sourceSummary}
+                              consequencePreview={responseCardState.consequencePreview}
+                              provenanceCue={responseCardState.provenanceCue}
+                            />
+                          </div>
+                        </Show>
+                      </div>
+                    </Show>
                     <Show when={responseCardState.showAutonomySummary}>
                       <p class={cardBodyTextClass("text-on-surface-variant/65")}>
                         {responseCardState.autonomySummary}

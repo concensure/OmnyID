@@ -1,10 +1,9 @@
 ﻿// @locs-version: 1.0
-import { For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import {
   ContextPanelEmptyState,
   WhyMattersSection,
 } from "@/components/DecisionContextSections";
-import { TrustSummaryBlocks } from "@/components/renderers/TrustSummaryBlocks";
 import {
   decisionQueueUrgencyStyle,
   type QueueEntry,
@@ -20,8 +19,8 @@ import {
 const BUTTON_TYPE = "button" as const;
 const SEPARATOR_LABEL = "\u00b7";
 const PRIORITY_BADGE_LABEL = "priority";
-const QUEUE_CONTEXT_TITLE = "Queue Context";
-const QUEUE_CONTEXT_DETAIL = "Select a queue item to see synthesized context and reasoning.";
+const QUEUE_CONTEXT_TITLE = "Decision details";
+const QUEUE_CONTEXT_DETAIL = "Select a decision to review its source, options, and next action.";
 const CLOSE_PANEL_ARIA_LABEL = "Close context panel";
 const CLOSE_BUTTON_LABEL = "\u00d7";
 const SUGGESTED_OPTIONS_LABEL = "Suggested options";
@@ -123,7 +122,13 @@ function queueEntryDestinationLabel(entry: QueueEntry) {
 }
 
 function queueEntryOpenLabel(entry: QueueEntry) {
+  if (entry.source === "priority") return "Review source";
+  if (entry.decision.options.length > 0) return "Review options";
   return `Open ${queueEntryDestinationLabel(entry)}`;
+}
+
+function queueEntryReviewLabel(entry: QueueEntry) {
+  return entry.decision.options.length > 0 ? "Review options" : "Review details";
 }
 
 export function DecisionQueueCard(props: {
@@ -191,7 +196,7 @@ export function DecisionQueueCard(props: {
       showProvenanceSummary: Boolean(provenanceSummary),
       provenanceSummary,
       whySummaryText: whyBullets[0]?.text ?? decision.whyMatters,
-      openLabel: queueEntryOpenLabel(currentEntry),
+      openLabel: queueEntryReviewLabel(currentEntry),
     };
   };
   const openQueueEntry = () => onSelect()();
@@ -246,16 +251,6 @@ export function DecisionQueueCard(props: {
           {cardState().autonomySummary}
         </p>
       </Show>
-      <div class="mt-2 space-y-2">
-        <TrustSummaryBlocks
-          confidence={cardState().confidenceSummaryText}
-          sourceSummary={cardState().sourceSummaryText}
-          boundedReason={cardState().boundedReason}
-          consequencePreview={cardState().consequencePreview}
-          provenanceCue={cardState().provenanceSummary}
-        />
-      </div>
-
       <div class={footerClass()}>
         <span class={QUEUE_CARD_WHY_SUMMARY_CLASS}>
           {cardState().whySummaryText}
@@ -273,6 +268,7 @@ export function DecisionQueueContextPanel(props: {
   onOpen: () => void;
   onClose?: () => void;
 }) {
+  const [showReviewDetails, setShowReviewDetails] = createSignal(false);
   const entry = () => props.entry;
   const onOpen = () => props.onOpen;
   const onClose = () => props.onClose;
@@ -287,6 +283,7 @@ export function DecisionQueueContextPanel(props: {
     const provenanceCue =
       sourceReferenceItems.length > 0 ? trustState.provenanceCue : null;
     const confidenceReason = queueEntryConfidenceReason(currentEntry);
+    const consequencePreview = trustState.consequencePreview;
 
     return {
       queueEntry: currentEntry,
@@ -299,6 +296,8 @@ export function DecisionQueueContextPanel(props: {
       footerActionText: queueEntryOpenLabel(currentEntry),
       confidenceReason,
       showConfidenceReason: Boolean(confidenceReason),
+      consequencePreview,
+      showConsequencePreview: Boolean(consequencePreview),
       showCloseButton: Boolean(onClose()),
       showSuggestedOptionsSection: suggestedOptionItems.length > 0,
       showSourceReferencesSection: sourceReferenceItems.length > 0,
@@ -345,9 +344,6 @@ export function DecisionQueueContextPanel(props: {
                 <div class={QUEUE_PANEL_HEADER_CONTENT_CLASS}>
                   <p class={QUEUE_PANEL_KICKER_CLASS}>{QUEUE_CONTEXT_TITLE}</p>
                   <h3 class={QUEUE_PANEL_TITLE_CLASS}>{panel().decisionTitle}</h3>
-                  <Show when={panel().showConfidenceReason}>
-                    <p class={QUEUE_PANEL_CONFIDENCE_REASON_CLASS}>{panel().confidenceReason}</p>
-                  </Show>
                 </div>
                 <Show when={panel().showCloseButton}>
                   <button
@@ -362,15 +358,17 @@ export function DecisionQueueContextPanel(props: {
               </div>
 
               <div class={QUEUE_PANEL_BODY_CLASS}>
-                <WhyMattersSection bullets={panel().whyMattersBullets} />
-
                 <Show when={panel().showSuggestedOptionsSection}>
                   <div class={QUEUE_PANEL_SECTION_CLASS}>
                     <p class={QUEUE_PANEL_SECTION_HEADING_CLASS}>{SUGGESTED_OPTIONS_LABEL}</p>
                     <div class={QUEUE_PANEL_OPTION_LIST_CLASS}>
                       <For each={panel().suggestedOptionViewItems}>
                         {(option) => (
-                          <div class={QUEUE_PANEL_OPTION_CARD_CLASS}>
+                          <button
+                            type={BUTTON_TYPE}
+                            class={`${QUEUE_PANEL_OPTION_CARD_CLASS} w-full text-left transition hover:border-primary/20 hover:bg-primary/5`}
+                            onClick={openQueueEntry}
+                          >
                             <div class={QUEUE_PANEL_OPTION_HEADER_CLASS}>
                               <span>{option.label}</span>
                               <Show when={option.showAiRecommendation}>
@@ -380,30 +378,59 @@ export function DecisionQueueContextPanel(props: {
                             <Show when={option.showDetail}>
                               <p class={QUEUE_PANEL_OPTION_DETAIL_CLASS}>{option.detailText}</p>
                             </Show>
-                          </div>
+                          </button>
                         )}
                       </For>
                     </div>
                   </div>
                 </Show>
 
-                <Show when={panel().showSourceReferencesSection}>
-                  <div class={QUEUE_PANEL_SECTION_CLASS}>
-                    <p class={QUEUE_PANEL_SECTION_HEADING_CLASS}>{SOURCE_REFERENCES_LABEL}</p>
-                    <Show when={panel().showProvenanceCue}>
-                      <p class={QUEUE_PANEL_PROVENANCE_CUE_CLASS}>
-                        {panel().provenanceCue}
-                      </p>
+                <button
+                  type={BUTTON_TYPE}
+                  class="w-full rounded-xl border border-black/[0.06] bg-white/75 px-3 py-2 text-left text-[11px] font-semibold text-on-surface transition hover:bg-white"
+                  onClick={() => setShowReviewDetails((current) => !current)}
+                  aria-expanded={showReviewDetails()}
+                >
+                  {showReviewDetails() ? "Hide review details" : "Show why, sources, confidence"}
+                </button>
+
+                <Show when={showReviewDetails()}>
+                  <div class="space-y-3">
+                    <WhyMattersSection bullets={panel().whyMattersBullets} />
+
+                    <Show when={panel().showConfidenceReason}>
+                      <div class={QUEUE_PANEL_SECTION_CLASS}>
+                        <p class={QUEUE_PANEL_SECTION_HEADING_CLASS}>Confidence</p>
+                        <p class={QUEUE_PANEL_CONFIDENCE_REASON_CLASS}>{panel().confidenceReason}</p>
+                      </div>
                     </Show>
-                    <div class={QUEUE_PANEL_SOURCE_REFERENCE_LIST_CLASS}>
-                      <For each={panel().sourceReferenceItems}>
-                        {(ref) => (
-                          <span class={QUEUE_PANEL_SOURCE_REFERENCE_CHIP_CLASS}>
-                            {ref}
-                          </span>
-                        )}
-                      </For>
-                    </div>
+
+                    <Show when={panel().showConsequencePreview}>
+                      <div class={QUEUE_PANEL_SECTION_CLASS}>
+                        <p class={QUEUE_PANEL_SECTION_HEADING_CLASS}>Consequence preview</p>
+                        <p class={QUEUE_PANEL_CONFIDENCE_REASON_CLASS}>{panel().consequencePreview}</p>
+                      </div>
+                    </Show>
+
+                    <Show when={panel().showSourceReferencesSection}>
+                      <div class={QUEUE_PANEL_SECTION_CLASS}>
+                        <p class={QUEUE_PANEL_SECTION_HEADING_CLASS}>{SOURCE_REFERENCES_LABEL}</p>
+                        <Show when={panel().showProvenanceCue}>
+                          <p class={QUEUE_PANEL_PROVENANCE_CUE_CLASS}>
+                            {panel().provenanceCue}
+                          </p>
+                        </Show>
+                        <div class={QUEUE_PANEL_SOURCE_REFERENCE_LIST_CLASS}>
+                          <For each={panel().sourceReferenceItems}>
+                            {(ref) => (
+                              <span class={QUEUE_PANEL_SOURCE_REFERENCE_CHIP_CLASS}>
+                                {ref}
+                              </span>
+                            )}
+                          </For>
+                        </div>
+                      </div>
+                    </Show>
                   </div>
                 </Show>
 

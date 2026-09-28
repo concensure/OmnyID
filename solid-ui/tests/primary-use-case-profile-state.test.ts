@@ -41,6 +41,23 @@ test("primary use case prompt is required when profile has no active use case", 
   assert.equal(profileNeedsPrimaryUseCasePrompt(profile), false);
 });
 
+test("wedding-site entry source skips the primary use case prompt entirely", () => {
+  assert.equal(profileNeedsPrimaryUseCasePrompt(baseProfile(), "wedding_site"), false);
+
+  const completed = {
+    ...baseProfile(),
+    primary_use_case: completePrimaryUseCaseProfile(
+      buildPrimaryUseCaseProfile("wedding_planning", "profile", "2026-09-13T00:00:00.000Z"),
+      "2026-09-14T00:00:00.000Z",
+    ),
+  };
+  assert.equal(profileNeedsPrimaryUseCasePrompt(completed, "wedding_site"), false);
+
+  // A generic (non-wedding) or unrecorded entry source keeps the original first-time-user gating.
+  assert.equal(profileNeedsPrimaryUseCasePrompt(baseProfile(), "generic"), true);
+  assert.equal(profileNeedsPrimaryUseCasePrompt(baseProfile(), null), true);
+});
+
 test("completed primary use case reverts active theme", () => {
   const activeWedding = buildPrimaryUseCaseProfile("wedding_planning", "profile", "2026-09-13T00:00:00.000Z");
   const profile = { ...baseProfile(), primary_use_case: activeWedding };

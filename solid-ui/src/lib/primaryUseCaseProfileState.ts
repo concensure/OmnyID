@@ -8,6 +8,7 @@ import {
   type StorageStatus,
   type UserSelfProfile,
 } from "@/lib/profileLedger";
+import type { WeddingEntrySource } from "@/lib/weddingEntrySourceState";
 
 export type PrimaryUseCaseOption = {
   kind: PrimaryUseCaseKind;
@@ -147,7 +148,13 @@ export function shouldApplyAgentInferredPrimaryUseCase(
   return primary.kind === "general" && inferred !== "general";
 }
 
-export function profileNeedsPrimaryUseCasePrompt(profile: UserSelfProfile | null | undefined): boolean {
+export function profileNeedsPrimaryUseCasePrompt(
+  profile: UserSelfProfile | null | undefined,
+  entrySource?: WeddingEntrySource | null,
+): boolean {
+  // Wedding-site visitors already declared their intent by arriving via the
+  // wedding funnel — asking again is redundant and breaks the dedicated flow.
+  if (entrySource === "wedding_site") return false;
   const primary = profile?.primary_use_case ?? null;
   return !primary || primary.status === "completed";
 }

@@ -4,6 +4,8 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import type { SendAfpMessageInput } from "@/lib/api";
 import {
   normalizeWeddingCustomSurfaceItem,
+  reorderWeddingCustomSurfaceItems,
+  weddingCustomSurfaceItemsForMenu,
   weddingCustomSurfaceItemToAfpSendInput,
   type WeddingCustomSurfaceAction,
   type WeddingCustomSurfaceItem,
@@ -49,7 +51,8 @@ export function WeddingCustomSurfaceTools(props: {
   const [imageUrl, setImageUrl] = createSignal<string | null>(null);
   const [saveStatus, setSaveStatus] = createSignal<string | null>(null);
   const [items, setItems] = createSignal<WeddingCustomSurfaceItem[]>(loadCustomWorkspaceItems(props.storageKey));
-  const visibleItems = createMemo(() => items().filter((item) => item.menu === props.activeMenu));
+  const [draggingItemId, setDraggingItemId] = createSignal<string | null>(null);
+  const visibleItems = createMemo(() => weddingCustomSurfaceItemsForMenu(items(), props.activeMenu));
 
   createEffect(() => {
     saveCustomWorkspaceItems(props.storageKey, items());
@@ -63,7 +66,10 @@ export function WeddingCustomSurfaceTools(props: {
   }
 
   async function saveItemAction(item: WeddingCustomSurfaceItem, action: WeddingCustomSurfaceAction) {
-    if (!props.saveProjection) return;
+    if (!props.saveProjection) {
+      setSaveStatus("Saved on this page.");
+      return;
+    }
     setSaveStatus("Saving...");
     try {
       await props.saveProjection(weddingCustomSurfaceItemToAfpSendInput({
@@ -74,7 +80,7 @@ export function WeddingCustomSurfaceTools(props: {
       props.onRefreshWorkspace?.();
       setSaveStatus("Saved to wedding memory.");
     } catch {
-      setSaveStatus("This stayed on the page, but could not be saved yet.");
+      setSaveStatus("Saved on this page. Wedding memory sync is not available yet.");
     }
   }
 
@@ -106,25 +112,30 @@ export function WeddingCustomSurfaceTools(props: {
   }
 
   function moveItem(id: string, direction: -1 | 1) {
+    moveItemToIndex(id, visibleItems().findIndex((item) => item.id === id) + direction);
+  }
+
+  function moveItemToIndex(id: string, targetPageIndex: number) {
     setItems((current) => {
-      const pageItems = current.filter((item) => item.menu === props.activeMenu);
-      const pageIndex = pageItems.findIndex((item) => item.id === id);
-      const swapIndex = pageIndex + direction;
-      if (pageIndex < 0 || swapIndex < 0 || swapIndex >= pageItems.length) return current;
-      const reordered = [...pageItems];
-      const moving = reordered[pageIndex]!;
-      reordered[pageIndex] = reordered[swapIndex]!;
-      reordered[swapIndex] = moving;
-      let nextPageIndex = 0;
-      const next = current.map((item) => item.menu === props.activeMenu ? {
-        ...reordered[nextPageIndex]!,
-        order: nextPageIndex++,
-        updatedAt: new Date().toISOString(),
-      } : item);
+      const next = reorderWeddingCustomSurfaceItems({
+        items: current,
+        menu: props.activeMenu,
+        itemId: id,
+        targetIndex: targetPageIndex,
+      });
+      if (next === current || next.every((item, index) => item === current[index])) return current;
       const saved = next.find((item) => item.id === id);
       if (saved) void saveItemAction(saved, "reorder");
       return next;
     });
+  }
+
+  function dropItem(targetId: string) {
+    const sourceId = draggingItemId();
+    setDraggingItemId(null);
+    if (!sourceId || sourceId === targetId) return;
+    const targetIndex = visibleItems().findIndex((item) => item.id === targetId);
+    moveItemToIndex(sourceId, targetIndex);
   }
 
   function removeItem(id: string) {
@@ -253,11 +264,33 @@ export function WeddingCustomSurfaceTools(props: {
         <div class="mt-3 space-y-2">
           <For each={visibleItems()}>
             {(item, index) => (
-              <article class="rounded-2xl border border-stone-200 bg-white/80 p-3">
+              <article
+                class="rounded-2xl border border-stone-200 bg-white/80 p-3"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => dropItem(item.id)}
+              >
                 <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0">
+                  <div class="flex min-w-0 items-start gap-2">
+                    <button
+                      type="button"
+                      class="mt-0.5 cursor-grab rounded-full border border-stone-200 bg-white px-2 py-1 text-xs font-bold text-stone-500 active:cursor-grabbing"
+                      title="Drag to move this item"
+                      aria-label={`Move ${item.title}`}
+                      draggable={visibleItems().length > 1}
+                      onDragStart={(event) => {
+                        setDraggingItemId(item.id);
+                        event.dataTransfer?.setData("text/plain", item.id);
+                      }}
+                      onDragEnd={() => setDraggingItemId(null)}
+                    >
+                      ::
+                    </button>
+                    <div class="min-w-0">
                     <p class="break-words text-sm font-semibold text-stone-900">{item.title}</p>
-                    <p class="mt-0.5 text-[11px] font-medium text-stone-500">Move handle: use up or down to place this where you want.</p>
+                    <p class="mt-0.5 text-[11px] font-medium text-stone-500">
+                      {visibleItems().length > 1 ? "Drag the handle or use up/down to reorder." : "Add another item to reorder this page."}
+                    </p>
+                    </div>
                   </div>
                   <div class="flex shrink-0 flex-wrap justify-end gap-1">
                     <button type="button" class="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-1 text-xs font-semibold text-stone-700 disabled:opacity-40" disabled={index() === 0} title="Move this item up" onClick={() => moveItem(item.id, -1)}>
