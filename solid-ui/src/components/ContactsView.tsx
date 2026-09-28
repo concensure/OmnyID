@@ -733,10 +733,10 @@ export function ContactsView() {
           </Show>
         }
       >
-        <div class="grid gap-2 sm:grid-cols-2">
+        <div class="grid justify-items-start gap-2 sm:grid-cols-2">
           <For each={visible()}>
             {(contact) => (
-              <div class="group flex min-w-0 items-start gap-3 rounded-2xl border border-white/50 bg-white/40 px-4 py-3 shadow-card">
+              <div class="group flex w-full min-w-0 items-start gap-3 rounded-2xl border border-white/50 bg-white/40 px-4 py-3 shadow-card">
                 <div class="flex h-9 w-9 flex-shrink-0 select-none items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                   {contact.name.charAt(0).toUpperCase()}
                 </div>

@@ -58,6 +58,7 @@ import { buildWeddingContinueContextPacket } from "@/lib/weddingContinueContextS
 import { weddingPersistedDecisionRecordsToGraphDecisions } from "@/lib/weddingDecisionGraphState";
 import {
   loadLocalWeddingDate,
+  parseWeddingDateInput,
   saveLocalWeddingDate,
   weddingDateToAfpSendInputs,
   weddingDateToScheduleItem,
@@ -1282,7 +1283,7 @@ export function ResponseQueueView(props: {
     });
   }
 
-  function generateWeddingFollowUp() {
+  async function generateWeddingFollowUp(options?: { seedExactDate?: boolean }) {
     const intent = weddingNavigationIntent();
     if (intent) {
       saveWeddingTemplateFollowUpDraft({
@@ -1308,6 +1309,37 @@ export function ResponseQueueView(props: {
     setWeddingFollowUpRequested(true);
     setActiveWeddingArtifactId(null);
     setWeddingWorkspaceQuery("");
+    if (options?.seedExactDate !== false) {
+      const exactDate = parseWeddingDateInput(weddingFollowUpDate());
+      if (exactDate) {
+        await saveWeddingDate(exactDate);
+      }
+    }
+  }
+
+  function defaultWeddingVendorSearchQueryFromIntake(): string {
+    const location = weddingFollowUpLocation().trim();
+    const labels = weddingVendorSelectionLabels(weddingFollowUpVendorIds());
+    const priorities = weddingFollowUpPriorities().trim();
+    const atmosphere = weddingFollowUpAtmosphere().trim();
+    const focus = labels.length > 0
+      ? labels.slice(0, 3).join(" or ")
+      : "wedding vendors";
+    return [
+      focus,
+      location ? `in ${location}` : null,
+      priorities ? `for ${priorities}` : null,
+      atmosphere ? `with ${atmosphere}` : null,
+    ].filter(Boolean).join(" ");
+  }
+
+  async function searchWeddingVendorsFromIntake() {
+    await generateWeddingFollowUp();
+    if (!weddingVendorSearchQuery().trim() && weddingFollowUpVendorIds().length === 0) {
+      setWeddingVendorSearchQuery(defaultWeddingVendorSearchQueryFromIntake());
+    }
+    setWeddingWorkspaceMenu("home");
+    await runLiveWeddingVendorSearch({ stayOnHome: true });
   }
 
   async function saveWeddingDate(date: string) {
@@ -1445,7 +1477,7 @@ export function ResponseQueueView(props: {
     input.value = "";
   }
 
-  async function runLiveWeddingVendorSearch() {
+  async function runLiveWeddingVendorSearch(options?: { stayOnHome?: boolean }) {
     const intent = weddingNavigationIntent();
     const workspace = weddingWorkspace();
     if (!intent || intent.surface !== "planning_files" || !workspace || weddingVendorSearchRunning()) return;
@@ -1598,7 +1630,7 @@ export function ResponseQueueView(props: {
       }
       setWeddingImportRefreshKey((value) => value + 1);
       setActiveWeddingArtifactId(comparisonArtifact.summary?.id ?? generatedArtifact.summary.id);
-      setWeddingWorkspaceMenu("documents");
+      setWeddingWorkspaceMenu(options?.stayOnHome ? "home" : "documents");
       setWeddingVendorSearchCategoryScope(null);
       setWeddingVendorSearchNotice(comparisonArtifact.status === "created"
         ? `${execution.message} Saved source-backed vendor notes and a top-${comparisonArtifact.topChoiceCount} comparison.`
@@ -1936,6 +1968,9 @@ export function ResponseQueueView(props: {
             weddingFollowUpCelebrant={weddingFollowUpCelebrant}
             onWeddingFollowUpCelebrantChange={setWeddingFollowUpCelebrant}
             onGenerateFollowUp={generateWeddingFollowUp}
+            onSearchVendors={searchWeddingVendorsFromIntake}
+            vendorSearchRunning={weddingVendorSearchRunning()}
+            vendorSearchNotice={weddingVendorSearchNotice()}
             weddingTemplateFollowUp={weddingTemplateFollowUp}
           />
         )}

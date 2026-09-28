@@ -5,6 +5,7 @@
 // component only changes how those fields are presented, never what they do.
 import { createSignal, For, Show } from "solid-js";
 
+import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import type { WeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchState";
 import type { WeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
 import { weddingVendorSelectionLabels } from "@/lib/weddingVendorChecklistState";
@@ -52,9 +53,14 @@ export function WeddingSiteIntakeWizard(props: {
   weddingFollowUpCelebrant: () => string;
   onWeddingFollowUpCelebrantChange: (value: string) => void;
   onGenerateFollowUp: () => void;
+  onSearchVendors?: () => Promise<void> | void;
+  vendorSearchRunning?: boolean;
+  vendorSearchNotice?: string | null;
   weddingTemplateFollowUp: () => WeddingTemplateFollowUpState | null;
 }) {
   const [step, setStep] = createSignal(0);
+  const [searchSubmitting, setSearchSubmitting] = createSignal(false);
+  let datePickerInput: HTMLInputElement | undefined;
   const atLastStep = () => step() === LAST_STEP;
   const atFirstStep = () => step() === 0;
   const goNext = () => setStep((current) => Math.min(LAST_STEP, current + 1));
@@ -63,6 +69,15 @@ export function WeddingSiteIntakeWizard(props: {
 
   const inputClass = "w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2";
   const labelClass = "space-y-1 text-xs font-semibold text-on-surface";
+  async function searchVendorsFromIntake() {
+    if (!props.onSearchVendors || props.vendorSearchRunning || searchSubmitting()) return;
+    setSearchSubmitting(true);
+    try {
+      await props.onSearchVendors();
+    } finally {
+      setSearchSubmitting(false);
+    }
+  }
 
   return (
     <section class="min-w-0 rounded-[24px] border border-rose-100/80 bg-[linear-gradient(135deg,rgba(255,241,242,0.96),rgba(255,251,235,0.94))] p-3 shadow-card sm:rounded-[28px] sm:p-4">
@@ -132,12 +147,37 @@ export function WeddingSiteIntakeWizard(props: {
           </div>
           <label class={labelClass}>
             Date or season
-            <input
-              class={inputClass}
-              value={props.weddingFollowUpDate()}
-              onInput={(event) => props.onWeddingFollowUpDateInput(event.currentTarget.value)}
-              placeholder="October 2027"
-            />
+            <div class="relative">
+              <input
+                class={`${inputClass} pr-11`}
+                value={props.weddingFollowUpDate()}
+                onInput={(event) => props.onWeddingFollowUpDateInput(event.currentTarget.value)}
+                placeholder="October 2027"
+              />
+              <button
+                type="button"
+                class="absolute inset-y-1 right-1 inline-flex w-9 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-800 transition hover:border-rose-200 hover:bg-rose-100"
+                title="Pick date"
+                aria-label="Pick date"
+                onClick={() => {
+                  if (typeof datePickerInput?.showPicker === "function") {
+                    datePickerInput.showPicker();
+                    return;
+                  }
+                  datePickerInput?.click();
+                }}
+              >
+                <WeddingDashboardIcon id="calendar-days" class="h-4 w-4" />
+              </button>
+              <input
+                ref={datePickerInput}
+                type="date"
+                class="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0"
+                tabIndex={-1}
+                aria-hidden="true"
+                onInput={(event) => props.onWeddingFollowUpDateInput(event.currentTarget.value)}
+              />
+            </div>
           </label>
           <label class={labelClass}>
             Location
@@ -397,11 +437,28 @@ export function WeddingSiteIntakeWizard(props: {
             >
               Make follow-up documents
             </button>
+            <Show when={props.onSearchVendors}>
+              <button
+                class="mt-2 w-full rounded-full border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-950 shadow-card transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 sm:ml-2 sm:mt-0 sm:w-auto sm:py-2"
+                type="button"
+                disabled={props.vendorSearchRunning || searchSubmitting()}
+                onClick={() => void searchVendorsFromIntake()}
+              >
+                {props.vendorSearchRunning || searchSubmitting() ? "Searching vendors..." : "Search vendors"}
+              </button>
+            </Show>
             <Show when={props.weddingTemplateFollowUp()}>
               {(followUp) => (
                 <p class="mt-2 break-words text-xs leading-5 text-rose-950">
                   Follow-up files are ready from {followUp().answeredLabels.length} captured answer{followUp().answeredLabels.length === 1 ? "" : "s"}.
                   Approve planning outputs to keep them in your wedding documents.
+                </p>
+              )}
+            </Show>
+            <Show when={props.vendorSearchNotice}>
+              {(notice) => (
+                <p class="mt-2 break-words text-xs leading-5 text-rose-950">
+                  {notice()}
                 </p>
               )}
             </Show>
