@@ -32,3 +32,32 @@ export function weddingConfiguredVendorSearchProviderLabel(
     .filter(Boolean);
   return labels.length > 0 ? labels.join(", ") : "connected providers";
 }
+
+export function weddingVendorSearchProviderBlockedReason(
+  capabilities: WeddingProviderCapabilitiesResponse | null | undefined,
+): string | null {
+  if (!capabilities) return "Checking admin-funded vendor search providers...";
+  const providers = (capabilities.providers ?? []).filter((provider) =>
+    WEDDING_LIVE_VENDOR_SEARCH_PROVIDER_KINDS.has(provider.kind as WeddingVendorSearchProviderKind),
+  );
+  if (providers.some((provider) => provider.configured)) return null;
+  if (providers.length === 0) return "Vendor search provider status is unavailable.";
+
+  const keyedButDisabled = providers
+    .filter((provider) => provider.credentialConfigured && !provider.sharedCreditEnabled)
+    .map((provider) => provider.label.trim())
+    .filter(Boolean);
+  if (keyedButDisabled.length > 0) {
+    return `${keyedButDisabled.join(", ")} ${keyedButDisabled.length === 1 ? "has" : "have"} an admin key, but wedding shared-credit access is off. Enable the wedding-template toggle in admin settings.`;
+  }
+
+  const enabledButMissingKey = providers
+    .filter((provider) => provider.sharedCreditEnabled && provider.credentialRequired && !provider.credentialConfigured)
+    .map((provider) => provider.label.trim())
+    .filter(Boolean);
+  if (enabledButMissingKey.length > 0) {
+    return `${enabledButMissingKey.join(", ")} ${enabledButMissingKey.length === 1 ? "is" : "are"} enabled for wedding use, but the admin API key is missing.`;
+  }
+
+  return "Vendor search needs an admin-configured search provider. No API key is required from this user.";
+}

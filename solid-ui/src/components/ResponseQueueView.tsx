@@ -131,6 +131,7 @@ import { buildWeddingVendorSearchReadinessState } from "@/lib/weddingVendorSearc
 import {
   weddingConfiguredVendorSearchProviderKinds,
   weddingConfiguredVendorSearchProviderLabel,
+  weddingVendorSearchProviderBlockedReason,
 } from "@/lib/weddingVendorProviderCapabilityState";
 import {
   loadWeddingTemplateFollowUpDraft,
@@ -993,7 +994,9 @@ export function ResponseQueueView(props: {
     });
   });
   const weddingVendorSearchBlockedReason = createMemo(() =>
-    weddingVendorSmokeCleanupGate().status === "blocked" ? weddingVendorSmokeCleanupGate().blockerLabel : null,
+    weddingVendorSmokeCleanupGate().status === "blocked"
+      ? weddingVendorSmokeCleanupGate().blockerLabel
+      : weddingVendorSearchProviderBlockedReason(weddingProviderCapabilities()),
   );
 
   createEffect(() => {
