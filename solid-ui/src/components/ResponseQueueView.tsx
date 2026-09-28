@@ -119,7 +119,10 @@ import { buildWeddingLiveWorkflowReadinessState } from "@/lib/weddingLiveWorkflo
 import { buildWeddingVendorEndToEndValidationState } from "@/lib/weddingVendorEndToEndValidationState";
 import { buildWeddingVendorSearchProviderPlanState } from "@/lib/weddingVendorSearchProviderPlanState";
 import { buildWeddingVendorSearchReadinessState } from "@/lib/weddingVendorSearchReadinessState";
-import type { WeddingVendorSearchProviderKind } from "@/lib/weddingVendorSearchProviderEnvState";
+import {
+  weddingConfiguredVendorSearchProviderKinds,
+  weddingConfiguredVendorSearchProviderLabel,
+} from "@/lib/weddingVendorProviderCapabilityState";
 import {
   loadWeddingTemplateFollowUpDraft,
   saveWeddingTemplateFollowUpDraft,
@@ -160,32 +163,6 @@ const RESPONSE_QUEUE_VIEW_CLASS =
   "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm sm:rounded-[32px] sm:p-5";
 const RESPONSE_QUEUE_VIEW_HEADER_CLASS = "flex min-w-0 flex-wrap items-center justify-end gap-3";
 const RESPONSE_QUEUE_VIEW_TITLE_TAG = "h1" as const;
-const WEDDING_LIVE_VENDOR_SEARCH_PROVIDER_KINDS = new Set<WeddingVendorSearchProviderKind>([
-  "google_places",
-  "brave_search",
-  "overpass",
-]);
-function weddingConfiguredVendorSearchProviderKinds(
-  capabilities: WeddingProviderCapabilitiesResponse | null | undefined,
-): WeddingVendorSearchProviderKind[] {
-  return (capabilities?.providers ?? [])
-    .filter((provider) => provider.configured)
-    .map((provider) => provider.kind)
-    .filter((kind): kind is WeddingVendorSearchProviderKind =>
-      WEDDING_LIVE_VENDOR_SEARCH_PROVIDER_KINDS.has(kind as WeddingVendorSearchProviderKind),
-    );
-}
-
-function weddingConfiguredVendorSearchProviderLabel(
-  capabilities: WeddingProviderCapabilitiesResponse | null | undefined,
-  kinds: readonly WeddingVendorSearchProviderKind[],
-): string {
-  const labels = (capabilities?.providers ?? [])
-    .filter((provider) => provider.configured && kinds.includes(provider.kind as WeddingVendorSearchProviderKind))
-    .map((provider) => provider.label.trim())
-    .filter(Boolean);
-  return labels.length > 0 ? labels.join(", ") : "connected providers";
-}
 const WEDDING_WORKSPACE_MENU_ITEMS: Array<{
   id: WeddingWorkspaceMenuId;
   icon: IconId;
