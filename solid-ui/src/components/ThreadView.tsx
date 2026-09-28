@@ -65,9 +65,9 @@ import {
 import {
   FEDERATION_BODY_MAX_CHARS,
   FEDERATION_SUBJECT_MAX_CHARS,
-  acceptedFederationAttemptIds,
   federatedComposerValidationError,
   federatedTextCharCount,
+  federationDeliveryReceiptSummary,
   federationDeliveryStatus,
   senderColorClassForThreadView,
   threadViewAtSuggestions,
@@ -566,7 +566,7 @@ export function ThreadView(props: {
   type RenderEntry = ThreadViewRenderEntry;
 
   const renderUnits = createMemo<RenderUnit[]>(() => threadViewBuildRenderUnits(messages()));
-  const acceptedFederationAttempts = createMemo(() => acceptedFederationAttemptIds(messages()));
+  const federationReceiptSummary = createMemo(() => federationDeliveryReceiptSummary(messages()));
 
   const rawMessageById = createMemo(() => {
     return threadViewBuildRawMessageById(renderUnits());
@@ -1264,7 +1264,7 @@ export function ThreadView(props: {
                 const isUser = role === "user" || role === "workspace";
                 const name = senderLabel(msg.from ?? "agent");
                 const mentionsCurrentUser = !isUser && messageMentionsCurrentUser(msg);
-                const federationStatus = federationDeliveryStatus(msg);
+                const federationStatus = federationDeliveryStatus(msg, federationReceiptSummary());
                 return (
                   <div
                     class={`group space-y-1.5 rounded-2xl transition ${
@@ -1457,7 +1457,7 @@ export function ThreadView(props: {
                                   </button>
                                   <Show when={status().tone === "failed"}>
                                     <Show
-                                      when={!acceptedFederationAttempts().has(attemptedMessageId())}
+                                      when={!federationReceiptSummary().acceptedAttemptIds.has(attemptedMessageId())}
                                       fallback={
                                         <span class="rounded-full border border-current/20 bg-white/60 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em]">
                                           Accepted

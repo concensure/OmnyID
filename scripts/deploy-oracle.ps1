@@ -459,25 +459,31 @@ docker exec omnyid-caddy-1 grep -q 'handle /wedding/\*' /etc/caddy/Caddyfile || 
   echo 'workspace smoke check failed: running Caddyfile is missing the /wedding/* route' >&2
   exit 1
 }
-workspace_headers=`$(curl --http1.1 -sSI --resolve "`$domain:443:127.0.0.1" -k "https://`$domain/workspace/" | tr -d '\r')
-printf '%s\n' "`$workspace_headers"
-printf '%s' "`$workspace_headers" | grep -qi '^www-authenticate: basic' && {
+workspace_headers_file=`$(mktemp)
+curl --http1.1 -sSI --resolve "`$domain:443:127.0.0.1" -k "https://`$domain/workspace/" | tr -d '\r' > "`$workspace_headers_file"
+cat "`$workspace_headers_file"
+grep -qi '^www-authenticate: basic' "`$workspace_headers_file" && {
   preview_hash=`$(grep '^OMNYID_PREVIEW_PASSWORD_HASH=' .env.oracle | head -n 1 | cut -d= -f2- | tr -d '\r')
   if [ -n "`$preview_hash" ]; then
     echo 'workspace header-only checks skipped: /workspace/ is protected by configured preview Basic auth'
+    rm -f "`$workspace_headers_file"
     exit 0
   fi
   echo 'workspace smoke check failed: /workspace/ is still behind Basic auth and no preview auth hash is configured' >&2
+  rm -f "`$workspace_headers_file"
   exit 1
 }
-printf '%s' "`$workspace_headers" | grep -Eqi '^[[:space:]]*content-security-policy[[:space:]]*:' || {
+grep -Eqi '^[[:space:]]*content-security-policy[[:space:]]*:' "`$workspace_headers_file" || {
   echo 'workspace smoke check failed: workspace CSP header is missing' >&2
+  rm -f "`$workspace_headers_file"
   exit 1
 }
-printf '%s' "`$workspace_headers" | grep -qi 'https://static.cloudflareinsights.com' || {
+grep -qi 'https://static.cloudflareinsights.com' "`$workspace_headers_file" || {
   echo 'workspace smoke check failed: workspace CSP is missing Cloudflare Insights allowance' >&2
+  rm -f "`$workspace_headers_file"
   exit 1
 }
+rm -f "`$workspace_headers_file"
 "@
 
     Invoke-CheckedRemoteCommand -Context "running workspace smoke check" -Command $workspaceSmokeScript

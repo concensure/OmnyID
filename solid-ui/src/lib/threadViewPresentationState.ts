@@ -199,10 +199,52 @@ export type FederationDeliveryStatus = {
   attemptedMessageId?: string;
 };
 
-export function federationDeliveryStatus(message: AfpMessage): FederationDeliveryStatus | null {
+export type FederationDeliveryReceiptSummary = {
+  acceptedAttemptIds: Set<string>;
+  failedAttemptErrors: Map<string, string>;
+};
+
+export function federationDeliveryReceiptSummary(messages: AfpMessage[]): FederationDeliveryReceiptSummary {
+  const acceptedAttemptIds = new Set<string>();
+  const failedAttemptErrors = new Map<string, string>();
+  for (const message of messages) {
+    const status = federationDeliveryStatus(message);
+    if (!status?.attemptedMessageId) continue;
+    if (status.tone === "sent") {
+      acceptedAttemptIds.add(status.attemptedMessageId);
+      failedAttemptErrors.delete(status.attemptedMessageId);
+    } else if (status.tone === "failed") {
+      if (acceptedAttemptIds.has(status.attemptedMessageId)) continue;
+      failedAttemptErrors.set(status.attemptedMessageId, status.detail);
+    }
+  }
+  return { acceptedAttemptIds, failedAttemptErrors };
+}
+
+export function federationDeliveryStatus(
+  message: AfpMessage,
+  receiptSummary?: FederationDeliveryReceiptSummary,
+): FederationDeliveryStatus | null {
   const content = afpRecord(message.content);
   const metadata = afpRecord(message.metadata);
   if (message.subtype === "federated_outbound") {
+    if (receiptSummary?.acceptedAttemptIds.has(message.id)) {
+      return {
+        label: "Federation accepted",
+        detail: "Peer homeserver accepted the relay request.",
+        tone: "sent",
+        attemptedMessageId: message.id,
+      };
+    }
+    const failureDetail = receiptSummary?.failedAttemptErrors.get(message.id);
+    if (failureDetail) {
+      return {
+        label: "Federation failed",
+        detail: failureDetail,
+        tone: "failed",
+        attemptedMessageId: message.id,
+      };
+    }
     const recipient = typeof content["recipient_agent_id"] === "string"
       ? content["recipient_agent_id"]
       : "peer agent";
@@ -246,14 +288,7 @@ export function federationDeliveryStatus(message: AfpMessage): FederationDeliver
 }
 
 export function acceptedFederationAttemptIds(messages: AfpMessage[]): Set<string> {
-  const accepted = new Set<string>();
-  for (const message of messages) {
-    const status = federationDeliveryStatus(message);
-    if (status?.tone === "sent" && status.attemptedMessageId) {
-      accepted.add(status.attemptedMessageId);
-    }
-  }
-  return accepted;
+  return federationDeliveryReceiptSummary(messages).acceptedAttemptIds;
 }
 
 export function threadViewRecentTitles(messages: AfpMessage[]): string[] {

@@ -8,6 +8,7 @@ import {
   acceptedFederationAttemptIds,
   federatedComposerValidationError,
   federatedTextCharCount,
+  federationDeliveryReceiptSummary,
   federationDeliveryStatus,
   isFederatedAgentId,
   senderColorClassForThreadView,
@@ -233,6 +234,67 @@ test("thread view presentation derives federation delivery status", () => {
     attemptedMessageId: "attempt-1",
   });
   assert.deepEqual([...acceptedFederationAttemptIds([outbound, failed, sent])], ["attempt-1"]);
+});
+
+test("thread view presentation resolves outbound federation status from receipts", () => {
+  const outbound = message({
+    id: "attempt-effective",
+    thread_id: "thread-fed",
+    type: "agent_message",
+    subtype: "federated_outbound",
+    content: {
+      recipient_agent_id: "agent:casey@example.net",
+      delivery_status: "pending_relay",
+    },
+  });
+  const failed = message({
+    id: "failure-effective",
+    thread_id: "thread-fed",
+    type: "agent_message",
+    subtype: "federated_delivery_failed",
+    content: {
+      attempted_message_id: "attempt-effective",
+      error: "remote rejected relay: 503 unavailable",
+    },
+  });
+  const sent = message({
+    id: "sent-effective",
+    thread_id: "thread-fed",
+    type: "agent_message",
+    subtype: "federated_delivery_sent",
+    content: {
+      attempted_message_id: "attempt-effective",
+    },
+  });
+
+  assert.equal(federationDeliveryStatus(outbound)?.tone, "pending");
+  assert.deepEqual(
+    federationDeliveryStatus(outbound, federationDeliveryReceiptSummary([outbound, failed])),
+    {
+      label: "Federation failed",
+      detail: "remote rejected relay: 503 unavailable",
+      tone: "failed",
+      attemptedMessageId: "attempt-effective",
+    },
+  );
+  assert.deepEqual(
+    federationDeliveryStatus(outbound, federationDeliveryReceiptSummary([outbound, failed, sent])),
+    {
+      label: "Federation accepted",
+      detail: "Peer homeserver accepted the relay request.",
+      tone: "sent",
+      attemptedMessageId: "attempt-effective",
+    },
+  );
+  assert.deepEqual(
+    federationDeliveryStatus(outbound, federationDeliveryReceiptSummary([sent, failed, outbound])),
+    {
+      label: "Federation accepted",
+      detail: "Peer homeserver accepted the relay request.",
+      tone: "sent",
+      attemptedMessageId: "attempt-effective",
+    },
+  );
 });
 
 test("thread view presentation detects accepted federation attempts from metadata fallback", () => {
