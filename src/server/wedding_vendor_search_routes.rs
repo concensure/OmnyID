@@ -88,6 +88,10 @@ async fn wedding_provider_capabilities_http(
     )
     .await?;
     let _user = authenticated_user(&state.db, &headers).await?;
+    Ok(Json(wedding_provider_capabilities_payload()))
+}
+
+fn wedding_provider_capabilities_payload() -> serde_json::Value {
     let brave = admin_tool_secret_status(BRAVE_SEARCH_SPEC);
     let places = admin_tool_secret_status(GOOGLE_PLACES_SPEC);
     let maps = admin_tool_secret_status(GOOGLE_MAPS_SPEC);
@@ -155,7 +159,7 @@ async fn wedding_provider_capabilities_http(
         .filter(|provider| provider["configured"].as_bool().unwrap_or(false))
         .filter_map(|provider| provider["connectedAppId"].as_str().map(str::to_string))
         .collect::<Vec<_>>();
-    Ok(Json(json!({
+    json!({
         "providers": providers,
         "connectedAppIds": connected_app_ids,
         "guardrails": [
@@ -163,7 +167,7 @@ async fn wedding_provider_capabilities_http(
             "The browser receives redacted provider readiness and source receipts, never raw keys.",
             "Each admin-funded provider call is metered as wedding planner shared-tool usage."
         ],
-    })))
+    })
 }
 
 async fn wedding_live_evidence_http(
@@ -812,12 +816,94 @@ mod tests {
             .expect("env lock")
     }
 
+    fn clear_provider_capability_env() {
+        for key in [
+            "OMNYID_ADMIN_THIRD_PARTY_TOOL_POLICY_FILE",
+            "OMNYID_ADMIN_BRAVE_SEARCH_API_KEY",
+            "OMNYID_BRAVE_SEARCH_API_KEY",
+            "BRAVE_SEARCH_API_KEY",
+            "OMNYID_ADMIN_BRAVE_SEARCH_API_KEY_FILE",
+            "OMNYID_BRAVE_SEARCH_API_KEY_FILE",
+            "BRAVE_SEARCH_API_KEY_FILE",
+            "OMNYID_ADMIN_GOOGLE_PLACES_API_KEY",
+            "OMNYID_GOOGLE_PLACES_API_KEY",
+            "GOOGLE_PLACES_API_KEY",
+            "OMNYID_GOOGLE_MAPS_KEY",
+            "OMNYID_ADMIN_GOOGLE_PLACES_API_KEY_FILE",
+            "OMNYID_GOOGLE_PLACES_API_KEY_FILE",
+            "GOOGLE_PLACES_API_KEY_FILE",
+            "OMNYID_GOOGLE_MAPS_KEY_FILE",
+            "OMNYID_ADMIN_GOOGLE_MAPS_KEY",
+            "OMNYID_ADMIN_GOOGLE_MAPS_KEY_FILE",
+            "OMNYID_GOOGLE_MAPS_KEY_FILE",
+            "OMNYID_ADMIN_WEATHERAPI_KEY",
+            "OMNYID_WEATHERAPI_KEY",
+            "WEATHERAPI_KEY",
+            "OMNYID_ADMIN_WEATHERAPI_KEY_FILE",
+            "OMNYID_WEATHERAPI_KEY_FILE",
+            "WEATHERAPI_KEY_FILE",
+            "OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_ALL_USERS_ENABLED",
+            "OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_WEDDING_TEMPLATE_ENABLED",
+            "OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_ALL_USERS_ENABLED",
+            "OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED",
+            "OMNYID_ADMIN_TOOL_GOOGLE_MAPS_PLATFORM_ALL_USERS_ENABLED",
+            "OMNYID_ADMIN_TOOL_GOOGLE_MAPS_PLATFORM_WEDDING_TEMPLATE_ENABLED",
+            "OMNYID_ADMIN_TOOL_WEATHERAPI_ALL_USERS_ENABLED",
+            "OMNYID_ADMIN_TOOL_WEATHERAPI_WEDDING_TEMPLATE_ENABLED",
+            "OMNYID_OVERPASS_API_URL",
+        ] {
+            unsafe {
+                std::env::remove_var(key);
+            }
+        }
+    }
+
+    #[test]
+    fn wedding_provider_capabilities_payload_redacts_admin_keys() {
+        let _env = env_lock();
+        clear_provider_capability_env();
+        unsafe {
+            std::env::set_var("OMNYID_BRAVE_SEARCH_API_KEY", "secret-brave-search-key");
+            std::env::set_var("OMNYID_GOOGLE_PLACES_API_KEY", "secret-google-places-key");
+            std::env::set_var(
+                "OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_WEDDING_TEMPLATE_ENABLED",
+                "true",
+            );
+            std::env::set_var(
+                "OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED",
+                "true",
+            );
+        }
+
+        let payload = wedding_provider_capabilities_payload();
+        let payload_text = payload.to_string();
+        assert!(!payload_text.contains("secret-brave-search-key"));
+        assert!(!payload_text.contains("secret-google-places-key"));
+        assert!(payload_text.contains("env:OMNYID_BRAVE_SEARCH_API_KEY"));
+        assert!(payload_text.contains("env:OMNYID_GOOGLE_PLACES_API_KEY"));
+
+        let providers = payload["providers"].as_array().expect("providers");
+        let brave = providers
+            .iter()
+            .find(|provider| provider["kind"].as_str() == Some("brave_search"))
+            .expect("brave provider");
+        assert_eq!(brave["credentialConfigured"].as_bool(), Some(true));
+        assert_eq!(brave["sharedCreditEnabled"].as_bool(), Some(true));
+        assert_eq!(brave["configured"].as_bool(), Some(true));
+        assert!(payload["connectedAppIds"]
+            .as_array()
+            .expect("connected ids")
+            .iter()
+            .any(|id| id.as_str() == Some("brave-search-api")));
+
+        clear_provider_capability_env();
+    }
+
     #[test]
     fn admin_shared_tool_policy_enabled_reads_wedding_template_env_flag() {
         let _env = env_lock();
+        clear_provider_capability_env();
         unsafe {
-            std::env::remove_var("OMNYID_ADMIN_THIRD_PARTY_TOOL_POLICY_FILE");
-            std::env::remove_var("OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_ALL_USERS_ENABLED");
             std::env::set_var(
                 "OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_WEDDING_TEMPLATE_ENABLED",
                 "true",
@@ -827,9 +913,7 @@ mod tests {
         assert!(admin_shared_tool_policy_enabled("brave-search-api"));
         assert!(!admin_shared_tool_policy_enabled("google-places-api"));
 
-        unsafe {
-            std::env::remove_var("OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_WEDDING_TEMPLATE_ENABLED");
-        }
+        clear_provider_capability_env();
     }
 
     #[test]
@@ -862,18 +946,15 @@ mod tests {
 
         assert!(!admin_shared_tool_policy_enabled("google-places-api"));
 
-        unsafe {
-            std::env::remove_var("OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED");
-            std::env::remove_var("OMNYID_ADMIN_THIRD_PARTY_TOOL_POLICY_FILE");
-        }
+        clear_provider_capability_env();
         let _ = std::fs::remove_file(policy_path);
     }
 
     #[test]
     fn admin_shared_tool_policy_enabled_covers_live_evidence_providers() {
         let _env = env_lock();
+        clear_provider_capability_env();
         unsafe {
-            std::env::remove_var("OMNYID_ADMIN_THIRD_PARTY_TOOL_POLICY_FILE");
             std::env::set_var(
                 "OMNYID_ADMIN_TOOL_GOOGLE_MAPS_PLATFORM_ALL_USERS_ENABLED",
                 "yes",
@@ -887,9 +968,6 @@ mod tests {
         assert!(admin_shared_tool_policy_enabled("google-maps-platform"));
         assert!(admin_shared_tool_policy_enabled("weatherapi"));
 
-        unsafe {
-            std::env::remove_var("OMNYID_ADMIN_TOOL_GOOGLE_MAPS_PLATFORM_ALL_USERS_ENABLED");
-            std::env::remove_var("OMNYID_ADMIN_TOOL_WEATHERAPI_WEDDING_TEMPLATE_ENABLED");
-        }
+        clear_provider_capability_env();
     }
 }
