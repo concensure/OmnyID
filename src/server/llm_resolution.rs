@@ -114,7 +114,7 @@ fn resolve_user_inference_backend_from_config(
     })
 }
 
-fn read_hosted_anthropic_api_key() -> Option<String> {
+pub(super) fn read_hosted_anthropic_api_key() -> Option<String> {
     read_process_secret_trimmed("OMNYID_ANTHROPIC_KEY")
         .or_else(|| read_process_secret_trimmed("ANTHROPIC_API_KEY"))
 }

@@ -63,6 +63,12 @@ import {
   relativeMessageTime,
 } from "@/lib/messageTimestampPresentation";
 import {
+  FEDERATION_BODY_MAX_CHARS,
+  FEDERATION_SUBJECT_MAX_CHARS,
+  acceptedFederationAttemptIds,
+  federatedComposerValidationError,
+  federatedTextCharCount,
+  federationDeliveryStatus,
   senderColorClassForThreadView,
   threadViewAtSuggestions,
   threadViewMentionAliases,
@@ -130,8 +136,6 @@ const TYPING_FALLBACK_LABELS = [
   "Drafting...",
   "Reviewing...",
 ] as const;
-const FEDERATION_SUBJECT_MAX_CHARS = 200;
-const FEDERATION_BODY_MAX_CHARS = 8000;
 
 const SENDER_COLORS = [
   "border-l-2 border-l-sky-400/50",
@@ -205,75 +209,6 @@ function messageSmtpId(message: AfpMessage): string | null {
 
 function messageMentionsCurrentUser(message: AfpMessage): boolean {
   return threadViewMessageMentionsCurrentUser(message, mentionAliasesFromProfile());
-}
-
-function isFederatedAgentId(value: string): boolean {
-  const trimmed = value.trim();
-  const match = /^agent:([A-Za-z0-9._+\-]+)@([A-Za-z0-9.-]+)$/.exec(trimmed);
-  if (!match) return false;
-  const local = match[1] ?? "";
-  const domain = match[2] ?? "";
-  if (!local || local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
-  if (!domain || domain.startsWith(".") || domain.endsWith(".") || domain.includes("..")) return false;
-  return domain.split(".").every((label) =>
-    Boolean(label)
-    && !label.startsWith("-")
-    && !label.endsWith("-")
-    && /^[A-Za-z0-9-]+$/.test(label)
-  );
-}
-
-type FederationDeliveryStatus = {
-  label: string;
-  detail: string;
-  tone: "pending" | "sent" | "failed";
-  attemptedMessageId?: string;
-};
-
-function federationDeliveryStatus(message: AfpMessage): FederationDeliveryStatus | null {
-  const content = afpRecord(message.content);
-  const metadata = afpRecord(message.metadata);
-  if (message.subtype === "federated_outbound") {
-    const recipient = typeof content["recipient_agent_id"] === "string"
-      ? content["recipient_agent_id"]
-      : "peer agent";
-    const status = typeof content["delivery_status"] === "string"
-      ? content["delivery_status"].replace(/_/g, " ")
-      : "pending relay";
-    return {
-      label: "Federation pending",
-      detail: `Queued for ${recipient}; ${status}.`,
-      tone: "pending",
-    };
-  }
-  if (message.subtype === "federated_delivery_sent") {
-    const attemptedMessageId = typeof content["attempted_message_id"] === "string"
-      ? content["attempted_message_id"]
-      : typeof metadata["attempted_message_id"] === "string"
-        ? metadata["attempted_message_id"]
-        : undefined;
-    return {
-      label: "Federation accepted",
-      detail: "Peer homeserver accepted the relay request.",
-      tone: "sent",
-      attemptedMessageId,
-    };
-  }
-  if (message.subtype === "federated_delivery_failed") {
-    const attemptedMessageId = typeof content["attempted_message_id"] === "string"
-      ? content["attempted_message_id"]
-      : typeof metadata["attempted_message_id"] === "string"
-        ? metadata["attempted_message_id"]
-        : undefined;
-    const error = typeof content["error"] === "string" ? content["error"] : "Delivery failed.";
-    return {
-      label: "Federation failed",
-      detail: error,
-      tone: "failed",
-      attemptedMessageId,
-    };
-  }
-  return null;
 }
 
 /**
@@ -388,6 +323,15 @@ export function ThreadView(props: {
   const [federationSending, setFederationSending] = createSignal(false);
   const [federationError, setFederationError] = createSignal("");
   const [retryingFederationAttemptId, setRetryingFederationAttemptId] = createSignal<string | null>(null);
+  const federationComposerValidation = createMemo(() =>
+    federatedComposerValidationError({
+      recipientAgentId: federationRecipientAgentId(),
+      subject: federationSubject(),
+      body: federationBody(),
+    })
+  );
+  const federationSubjectCharCount = createMemo(() => federatedTextCharCount(federationSubject()));
+  const federationBodyCharCount = createMemo(() => federatedTextCharCount(federationBody()));
   let appliedInitialReplyDraft: string | null = null;
   createEffect(() => {
     const draft = props.initialReplyDraft?.trim() ?? "";
@@ -461,16 +405,9 @@ export function ThreadView(props: {
     const recipient = federationRecipientAgentId().trim();
     const body = federationBody().trim();
     if (!recipient || !body || federationSending()) return;
-    if (!isFederatedAgentId(recipient)) {
-      setFederationError("Enter an agent id like agent:name@example.com.");
-      return;
-    }
-    if (federationSubject().trim().length > FEDERATION_SUBJECT_MAX_CHARS) {
-      setFederationError(`Subject must be ${FEDERATION_SUBJECT_MAX_CHARS} characters or fewer.`);
-      return;
-    }
-    if (body.length > FEDERATION_BODY_MAX_CHARS) {
-      setFederationError(`Message must be ${FEDERATION_BODY_MAX_CHARS.toLocaleString()} characters or fewer.`);
+    const validationError = federationComposerValidation();
+    if (validationError) {
+      setFederationError(validationError);
       return;
     }
     setFederationSending(true);
@@ -629,6 +566,7 @@ export function ThreadView(props: {
   type RenderEntry = ThreadViewRenderEntry;
 
   const renderUnits = createMemo<RenderUnit[]>(() => threadViewBuildRenderUnits(messages()));
+  const acceptedFederationAttempts = createMemo(() => acceptedFederationAttemptIds(messages()));
 
   const rawMessageById = createMemo(() => {
     return threadViewBuildRawMessageById(renderUnits());
@@ -1518,14 +1456,23 @@ export function ThreadView(props: {
                                     Attempt
                                   </button>
                                   <Show when={status().tone === "failed"}>
-                                    <button
-                                      type="button"
-                                      class="rounded-full border border-current/20 bg-white/70 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                                      disabled={retryingFederationAttemptId() === attemptedMessageId()}
-                                      onClick={() => void retryFederatedMessage(attemptedMessageId())}
+                                    <Show
+                                      when={!acceptedFederationAttempts().has(attemptedMessageId())}
+                                      fallback={
+                                        <span class="rounded-full border border-current/20 bg-white/60 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em]">
+                                          Accepted
+                                        </span>
+                                      }
                                     >
-                                      {retryingFederationAttemptId() === attemptedMessageId() ? "Retrying" : "Retry"}
-                                    </button>
+                                      <button
+                                        type="button"
+                                        class="rounded-full border border-current/20 bg-white/70 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                                        disabled={retryingFederationAttemptId() === attemptedMessageId()}
+                                        onClick={() => void retryFederatedMessage(attemptedMessageId())}
+                                      >
+                                        {retryingFederationAttemptId() === attemptedMessageId() ? "Retrying" : "Retry"}
+                                      </button>
+                                    </Show>
                                   </Show>
                                 </div>
                               )}
@@ -1755,12 +1702,23 @@ export function ThreadView(props: {
                 </span>
                 <input
                   value={federationSubject()}
-                  onInput={(event) => setFederationSubject(event.currentTarget.value)}
+                  onInput={(event) => {
+                    setFederationSubject(event.currentTarget.value);
+                    if (federationError()) setFederationError("");
+                  }}
                   placeholder="Optional"
-                  maxLength={FEDERATION_SUBJECT_MAX_CHARS}
                   class="mt-1 w-full rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/35 focus:border-teal-500/40"
                 />
               </label>
+              <div
+                class={`mt-1 flex justify-end font-mono text-[10px] ${
+                  federationSubjectCharCount() > FEDERATION_SUBJECT_MAX_CHARS
+                    ? "text-red-600"
+                    : "text-on-surface-variant/45"
+                }`}
+              >
+                {federationSubjectCharCount().toLocaleString()} / {FEDERATION_SUBJECT_MAX_CHARS.toLocaleString()}
+              </div>
 
               <label class="mt-3 block">
                 <span class="font-mono text-[10px] uppercase tracking-[0.16em] text-on-surface-variant/60">
@@ -1768,15 +1726,23 @@ export function ThreadView(props: {
                 </span>
                 <textarea
                   value={federationBody()}
-                  onInput={(event) => setFederationBody(event.currentTarget.value)}
+                  onInput={(event) => {
+                    setFederationBody(event.currentTarget.value);
+                    if (federationError()) setFederationError("");
+                  }}
                   placeholder="Compose the message this agent should receive."
-                  maxLength={FEDERATION_BODY_MAX_CHARS}
                   class="mt-1 min-h-36 w-full resize-y rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-sm leading-6 text-on-surface outline-none placeholder:text-on-surface-variant/35 focus:border-teal-500/40"
                   required
                 />
               </label>
-              <div class="mt-1 flex justify-end font-mono text-[10px] text-on-surface-variant/45">
-                {federationBody().length.toLocaleString()} / {FEDERATION_BODY_MAX_CHARS.toLocaleString()}
+              <div
+                class={`mt-1 flex justify-end font-mono text-[10px] ${
+                  federationBodyCharCount() > FEDERATION_BODY_MAX_CHARS
+                    ? "text-red-600"
+                    : "text-on-surface-variant/45"
+                }`}
+              >
+                {federationBodyCharCount().toLocaleString()} / {FEDERATION_BODY_MAX_CHARS.toLocaleString()}
               </div>
 
               <Show when={federationError()}>
@@ -1796,11 +1762,7 @@ export function ThreadView(props: {
                 </button>
                 <button
                   type="submit"
-                  disabled={
-                    federationSending()
-                    || !isFederatedAgentId(federationRecipientAgentId())
-                    || !federationBody().trim()
-                  }
+                  disabled={federationSending() || Boolean(federationComposerValidation())}
                   class="rounded-full bg-teal-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-teal-700 disabled:opacity-40"
                 >
                   {federationSending() ? "Sending..." : "Send message"}

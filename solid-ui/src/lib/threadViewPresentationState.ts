@@ -12,6 +12,9 @@ const DEFAULT_SENDER_COLOR_CLASSES = [
   "border-l-2 border-l-amber-400/50",
 ] as const;
 
+export const FEDERATION_SUBJECT_MAX_CHARS = 200;
+export const FEDERATION_BODY_MAX_CHARS = 8_000;
+
 export function senderColorClassForThreadView(
   senderName: string,
   senderColors = DEFAULT_SENDER_COLOR_CLASSES,
@@ -189,6 +192,70 @@ export function threadViewMessageDates(messages: AfpMessage[]): string[] {
   return dates;
 }
 
+export type FederationDeliveryStatus = {
+  label: string;
+  detail: string;
+  tone: "pending" | "sent" | "failed";
+  attemptedMessageId?: string;
+};
+
+export function federationDeliveryStatus(message: AfpMessage): FederationDeliveryStatus | null {
+  const content = afpRecord(message.content);
+  const metadata = afpRecord(message.metadata);
+  if (message.subtype === "federated_outbound") {
+    const recipient = typeof content["recipient_agent_id"] === "string"
+      ? content["recipient_agent_id"]
+      : "peer agent";
+    const status = typeof content["delivery_status"] === "string"
+      ? content["delivery_status"].replace(/_/g, " ")
+      : "pending relay";
+    return {
+      label: "Federation pending",
+      detail: `Queued for ${recipient}; ${status}.`,
+      tone: "pending",
+    };
+  }
+  if (message.subtype === "federated_delivery_sent") {
+    const attemptedMessageId = typeof content["attempted_message_id"] === "string"
+      ? content["attempted_message_id"]
+      : typeof metadata["attempted_message_id"] === "string"
+        ? metadata["attempted_message_id"]
+        : undefined;
+    return {
+      label: "Federation accepted",
+      detail: "Peer homeserver accepted the relay request.",
+      tone: "sent",
+      attemptedMessageId,
+    };
+  }
+  if (message.subtype === "federated_delivery_failed") {
+    const attemptedMessageId = typeof content["attempted_message_id"] === "string"
+      ? content["attempted_message_id"]
+      : typeof metadata["attempted_message_id"] === "string"
+        ? metadata["attempted_message_id"]
+        : undefined;
+    const error = typeof content["error"] === "string" ? content["error"] : "Delivery failed.";
+    return {
+      label: "Federation failed",
+      detail: error,
+      tone: "failed",
+      attemptedMessageId,
+    };
+  }
+  return null;
+}
+
+export function acceptedFederationAttemptIds(messages: AfpMessage[]): Set<string> {
+  const accepted = new Set<string>();
+  for (const message of messages) {
+    const status = federationDeliveryStatus(message);
+    if (status?.tone === "sent" && status.attemptedMessageId) {
+      accepted.add(status.attemptedMessageId);
+    }
+  }
+  return accepted;
+}
+
 export function threadViewRecentTitles(messages: AfpMessage[]): string[] {
   return messages
     .map((message) => {
@@ -198,4 +265,44 @@ export function threadViewRecentTitles(messages: AfpMessage[]): string[] {
     })
     .filter((value): value is string => Boolean(value))
     .slice(-5);
+}
+
+export function isFederatedAgentId(value: string): boolean {
+  const trimmed = value.trim();
+  const match = /^agent:([A-Za-z0-9._+\-]+)@([A-Za-z0-9.-]+)$/.exec(trimmed);
+  if (!match) return false;
+  const local = match[1] ?? "";
+  const domain = match[2] ?? "";
+  if (!local || local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
+  if (!domain || domain.startsWith(".") || domain.endsWith(".") || domain.includes("..")) return false;
+  return domain.split(".").every((label) =>
+    Boolean(label)
+    && !label.startsWith("-")
+    && !label.endsWith("-")
+    && /^[A-Za-z0-9-]+$/.test(label)
+  );
+}
+
+export function federatedTextCharCount(value: string): number {
+  return Array.from(value).length;
+}
+
+export function federatedComposerValidationError(input: {
+  recipientAgentId: string;
+  subject?: string | null;
+  body: string;
+}): string | null {
+  if (!isFederatedAgentId(input.recipientAgentId)) {
+    return "Enter an agent id like agent:name@example.com.";
+  }
+  if (federatedTextCharCount((input.subject ?? "").trim()) > FEDERATION_SUBJECT_MAX_CHARS) {
+    return `Subject must be ${FEDERATION_SUBJECT_MAX_CHARS} characters or fewer.`;
+  }
+  if (federatedTextCharCount(input.body.trim()) > FEDERATION_BODY_MAX_CHARS) {
+    return `Message must be ${FEDERATION_BODY_MAX_CHARS.toLocaleString()} characters or fewer.`;
+  }
+  if (!input.body.trim()) {
+    return "Message body is required.";
+  }
+  return null;
 }
