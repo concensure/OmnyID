@@ -1,5 +1,5 @@
 // OmnyID Service Worker - offline shell + update notification
-const SHELL_CACHE = "omnyid-shell-v14";
+const SHELL_CACHE = "omnyid-shell-v15";
 const API_CACHE = "omnyid-api-v1";
 
 const SHELL_ASSETS = [
@@ -46,7 +46,8 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/agent/") ||
     url.pathname.startsWith("/dashboard/") ||
     url.pathname.startsWith("/relay/") ||
-    url.pathname.startsWith("/files/")
+    url.pathname.startsWith("/files/") ||
+    url.pathname === "/wedding/provider-capabilities"
   ) {
     event.respondWith(networkFirstWithCache(event.request, API_CACHE));
     return;
