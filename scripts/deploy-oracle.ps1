@@ -362,10 +362,16 @@ try {
         $remotePruneExit = $LASTEXITCODE
     }
 
-    $scpOutput = & scp.exe -i $KeyPath $archivePath "${User}@${RemoteHost}:$RemoteDir/omnyid.tar" 2>&1
+    $archiveSizeMiB = [math]::Round(((Get-Item -LiteralPath $archivePath).Length / 1MB), 2)
+    Write-Host ("[deploy-oracle] uploading runtime archive ({0} MiB) to {1}:{2}/omnyid.tar" -f $archiveSizeMiB, $RemoteHost, $RemoteDir)
+    $scpOutput = & scp.exe -q -o BatchMode=yes -o ConnectTimeout=20 -i $KeyPath $archivePath "${User}@${RemoteHost}:$RemoteDir/omnyid.tar" 2>&1
     if ($scpOutput) { $scpOutput | ForEach-Object { Write-Host $_ } }
     $scpExit = $LASTEXITCODE
+    if ($scpExit -eq 0) {
+        Write-Host "[deploy-oracle] runtime archive upload complete"
+    }
     $extractCommand = "cd $RemoteDir && (tar --warning=no-unknown-keyword -xf omnyid.tar 2>/tmp/omnyid-tar-extract.err || tar -xf omnyid.tar) && rm -f omnyid.tar"
+    Write-Host "[deploy-oracle] extracting runtime archive on remote host"
     $extractOutput = & ssh.exe -i $KeyPath "$User@$RemoteHost" $extractCommand 2>&1
     if ($extractOutput) { $extractOutput | ForEach-Object { Write-Host $_ } }
     $extractExit = $LASTEXITCODE
