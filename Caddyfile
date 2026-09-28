@@ -225,6 +225,18 @@
         import omnyid_proxy
     }
 
+    handle /wedding/provider-capabilities {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendor-search {
+        import omnyid_proxy
+    }
+
+    handle /wedding/live-evidence {
+        import omnyid_proxy
+    }
+
     handle /wedding {
         redir * /wedding/ 308
     }
