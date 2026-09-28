@@ -115,6 +115,12 @@ import {
   buildWeddingVendorComparisonArtifactState,
   buildWeddingVendorSearchArtifactState,
 } from "@/lib/weddingVendorSearchArtifactState";
+import {
+  consumeWeddingVendorSearchLaunch,
+  WEDDING_VENDOR_SEARCH_LAUNCH_EVENT,
+  weddingVendorSearchLaunchFromEvent,
+  type WeddingVendorSearchLaunchState,
+} from "@/lib/weddingVendorSearchLaunchState";
 import { buildWeddingLiveEvidenceArtifactState } from "@/lib/weddingLiveEvidenceArtifactState";
 import { buildWeddingLiveWorkflowReadinessState } from "@/lib/weddingLiveWorkflowReadinessState";
 import { buildWeddingVendorEndToEndValidationState } from "@/lib/weddingVendorEndToEndValidationState";
@@ -429,6 +435,16 @@ export function ResponseQueueView(props: {
   const [weddingExtractionNotice, setWeddingExtractionNotice] = createSignal("");
   const [weddingImportNotice, setWeddingImportNotice] = createSignal("");
   const [weddingImportRunning, setWeddingImportRunning] = createSignal(false);
+
+  function applyWeddingVendorSearchLaunch(launch: WeddingVendorSearchLaunchState | null) {
+    const query = launch?.query.trim();
+    if (!query) return;
+    setWeddingVendorSearchQuery(query);
+    setWeddingVendorSearchCategoryScope(null);
+    setWeddingWorkspaceMenu("home");
+    setWeddingVendorSearchNotice("Vendor search is ready. Review the query, then run live search when you are ready.");
+  }
+
   const weddingStorageUserId = createMemo(() => bootstrap()?.user?.id ?? null);
   const weddingStorageUserEmail = createMemo(() => bootstrap()?.user?.email ?? "");
   const weddingSignedIn = createMemo(() => Boolean(bootstrap()?.user && bootstrap()?.user.auth_provider !== "guest"));
@@ -991,6 +1007,13 @@ export function ResponseQueueView(props: {
     };
     window.addEventListener(WEDDING_WORKSPACE_MENU_EVENT, menuHandler);
     onCleanup(() => window.removeEventListener(WEDDING_WORKSPACE_MENU_EVENT, menuHandler));
+
+    const vendorSearchLaunchHandler = (event: Event) => {
+      applyWeddingVendorSearchLaunch(weddingVendorSearchLaunchFromEvent(event));
+    };
+    window.addEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_EVENT, vendorSearchLaunchHandler);
+    onCleanup(() => window.removeEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_EVENT, vendorSearchLaunchHandler));
+    applyWeddingVendorSearchLaunch(consumeWeddingVendorSearchLaunch());
 
     const intent = consumeWeddingNavigationIntent();
     if (intent?.view === "response_queue") {

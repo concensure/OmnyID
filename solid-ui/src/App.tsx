@@ -156,6 +156,12 @@ import { weddingNavigationCalendarTarget } from "@/lib/weddingNavigationCalendar
 import { consumeWeddingNavigationIntent } from "@/lib/weddingNavigationLocalState";
 import { loadWeddingEntrySource, saveWeddingEntrySource } from "@/lib/weddingEntrySourceState";
 import {
+  dispatchWeddingVendorSearchLaunch,
+  isWeddingVendorSearchIntent,
+  normalizeWeddingVendorSearchLaunchQuery,
+  saveWeddingVendorSearchLaunch,
+} from "@/lib/weddingVendorSearchLaunchState";
+import {
   buildWeddingNavigationArrivalBannerState,
   weddingArrivalActionDestinationView,
   type WeddingArrivalAction,
@@ -2114,6 +2120,33 @@ function App() {
     const skippedUnsupportedFiles = attachmentSupport.unsupportedFiles;
     const priorQuery = lastQuery();
     const currentLaunchContext = objectSearchLaunchContext();
+    if (
+      attachedFiles.length === 0
+      && !overrides?.focusObjectId
+      && !overrides?.focusThreadId
+      && !overrides?.launchContext
+      && isWeddingVendorSearchIntent(query)
+    ) {
+      const savedLaunch = saveWeddingVendorSearchLaunch(query, { source: "master_search" }) ?? {
+        query: normalizeWeddingVendorSearchLaunchQuery(query),
+        source: "master_search" as const,
+        savedAt: new Date().toISOString(),
+      };
+      dispatchWeddingVendorSearchLaunch(savedLaunch);
+      saveWeddingEntrySource("generic");
+      void savePrimaryUseCase("wedding_planning", "explicit").catch(() => {});
+      void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
+        const launch = buildWeddingTemplateDeepLinkLaunch();
+        dispatchWeddingTemplateDeepLinkLaunch(launch);
+        selectView(launch.viewTarget);
+      });
+      setLastQuery(query);
+      setLastEngine(resolvedEngine);
+      setLastOptMode(resolvedOptimizationMode);
+      setSearchFeedback("Opening Wedding Planner with this vendor search ready to review.");
+      setIsSearchError(false);
+      return;
+    }
     setSearchBusy(true);
     setSearchFeedback("");
     setIsSearchError(false);
