@@ -14,6 +14,8 @@ export type WeddingVendorSearchSource = {
   url: string;
   snippet?: string | null;
   provider?: string | null;
+  website_url?: string | null;
+  map_url?: string | null;
 };
 
 export type WeddingVendorSearchPortResult = {
@@ -63,6 +65,8 @@ function normalizedSources(values: readonly WeddingVendorSearchSource[] | null |
       url,
       snippet: clean(value.snippet) || null,
       provider: clean(value.provider) || null,
+      website_url: clean(value.website_url) || null,
+      map_url: clean(value.map_url) || null,
     });
   }
   return sources;

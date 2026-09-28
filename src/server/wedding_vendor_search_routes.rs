@@ -40,6 +40,8 @@ struct WeddingVendorSearchSource {
     url: String,
     snippet: Option<String>,
     provider: String,
+    website_url: Option<String>,
+    map_url: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -583,6 +585,8 @@ async fn search_brave(
                 url: item["url"].as_str()?.to_string(),
                 snippet: item["description"].as_str().map(ToOwned::to_owned),
                 provider: "Brave Search".to_string(),
+                website_url: item["url"].as_str().map(ToOwned::to_owned),
+                map_url: None,
             })
         })
         .collect();
@@ -661,22 +665,24 @@ fn google_places_sources_from_response(
                 .unwrap_or_default();
             let maps_url = item["googleMapsUri"].as_str().map(str::to_string);
             let website_url = item["websiteUri"].as_str().map(str::to_string);
+            let fallback_url = if place_id.is_empty() {
+                format!(
+                    "https://www.google.com/maps/search/?api=1&query={}",
+                    urlencoding::encode(&query.query)
+                )
+            } else {
+                format!(
+                    "https://www.google.com/maps/search/?api=1&query={}&query_place_id={}",
+                    urlencoding::encode(&query.query),
+                    place_id
+                )
+            };
             Some(WeddingVendorSearchSource {
                 title: name,
-                url: maps_url.or(website_url).unwrap_or_else(|| {
-                    if place_id.is_empty() {
-                        format!(
-                            "https://www.google.com/maps/search/?api=1&query={}",
-                            urlencoding::encode(&query.query)
-                        )
-                    } else {
-                        format!(
-                            "https://www.google.com/maps/search/?api=1&query={}&query_place_id={}",
-                            urlencoding::encode(&query.query),
-                            place_id
-                        )
-                    }
-                }),
+                url: website_url
+                    .clone()
+                    .or_else(|| maps_url.clone())
+                    .unwrap_or(fallback_url),
                 snippet: Some(format!(
                     "{}{}{}",
                     vicinity,
@@ -688,6 +694,8 @@ fn google_places_sources_from_response(
                     }
                 )),
                 provider: "Google Places API".to_string(),
+                website_url,
+                map_url: maps_url,
             })
         })
         .collect()
@@ -738,11 +746,14 @@ async fn search_overpass(
             let name = tags.get("name")?.as_str()?.to_string();
             let id = item["id"].as_i64().unwrap_or_default();
             let item_type = item["type"].as_str().unwrap_or("node");
+            let map_url = format!("https://www.openstreetmap.org/{item_type}/{id}");
             Some(WeddingVendorSearchSource {
                 title: name,
-                url: format!("https://www.openstreetmap.org/{item_type}/{id}"),
+                url: map_url.clone(),
                 snippet: Some(format!("OSM tags matched for {}", query.query)),
                 provider: "OSM / Overpass API".to_string(),
+                website_url: None,
+                map_url: Some(map_url),
             })
         })
         .collect();
@@ -1031,7 +1042,12 @@ mod tests {
 
         assert_eq!(sources.len(), 1);
         assert_eq!(sources[0].title, "Chloe's Florals");
-        assert_eq!(sources[0].url, "https://maps.google.com/?cid=example");
+        assert_eq!(sources[0].url, "https://example.test");
+        assert_eq!(sources[0].website_url.as_deref(), Some("https://example.test"));
+        assert_eq!(
+            sources[0].map_url.as_deref(),
+            Some("https://maps.google.com/?cid=example")
+        );
         assert!(
             sources[0]
                 .snippet

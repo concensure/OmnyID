@@ -238,6 +238,60 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).parentSourceUrlCount, 4);
 });
 
+test("vendor search artifacts preserve website and map actions from live source packets", async () => {
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Google Places API",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        {
+          title: "Chloe's Florals",
+          url: "https://chloes-florals.example",
+          website_url: "https://chloes-florals.example",
+          map_url: "https://maps.google.com/?cid=chloe",
+          snippet: "Sydney florist rating 4.9 across 63 reviews with floral packages.",
+          provider: "Google Places API",
+        },
+      ],
+    }),
+  });
+
+  const artifact = buildWeddingVendorSearchArtifactState({ metadata, execution });
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "romantic flowers with reliable reviews",
+    location: "Sydney",
+    vendorCategories: ["florist"],
+  });
+
+  assert.equal(artifact.status, "created");
+  assert.deepEqual(artifact.summary?.sourceLinks.map((source) => source.url), [
+    "https://chloes-florals.example",
+    "https://maps.google.com/?cid=chloe",
+  ]);
+  assert.equal(artifact.artifactInput?.metadata.sourceWebsiteUrlCount, 1);
+  assert.equal(artifact.artifactInput?.metadata.sourceMapUrlCount, 1);
+  assert.equal(comparison.status, "created");
+  assert.deepEqual(comparison.summary?.sourceLinks.map((source) => source.url), [
+    "https://chloes-florals.example",
+    "https://maps.google.com/?cid=chloe",
+  ]);
+  const actions = ((comparison.artifactInput?.metadata as Record<string, unknown>).topChoiceActionRows as Array<Record<string, unknown>>)[0]?.actions as Array<Record<string, unknown>>;
+  assert.deepEqual(actions.map((action) => action.kind), [
+    "select_vendor_for_follow_up",
+    "open_vendor_website",
+    "open_vendor_map",
+    "prepare_approval_gated_outreach",
+  ]);
+  assert.equal(actions.find((action) => action.kind === "open_vendor_website")?.href, "https://chloes-florals.example");
+  assert.equal(actions.find((action) => action.kind === "open_vendor_map")?.href, "https://maps.google.com/?cid=chloe");
+});
+
 test("buildWeddingVendorComparisonArtifactState uses structured intake atmosphere and inspiration signals", async () => {
   const execution = await runWeddingVendorSearchExecution({
     readiness,
@@ -314,7 +368,7 @@ test("buildWeddingVendorSearchArtifactState does not create artifacts from dry-r
 
   assert.equal(dryRunArtifact.status, "not_created");
   assert.equal(failedArtifact.status, "not_created");
-  assert.match(dryRunArtifact.reason ?? "", /did not run live/i);
+  assert.match(dryRunArtifact.reason ?? "", /No live vendor sources were returned yet/i);
   assert.equal(dryRunArtifact.artifactInput, null);
   assert.equal(failedArtifact.artifactInput, null);
 });
@@ -332,7 +386,7 @@ test("buildWeddingVendorSearchArtifactState blocks live searches with no usable 
   assert.equal(execution.status, "executed");
   assert.equal(execution.sourceCount, 0);
   assert.equal(artifact.status, "not_created");
-  assert.match(artifact.reason ?? "", /no usable HTTP\(S\) source URLs/i);
+  assert.match(artifact.reason ?? "", /no usable vendor source URLs/i);
 });
 
 test("buildWeddingVendorSearchArtifactState blocks malformed source URLs before artifact creation", async () => {
@@ -356,7 +410,7 @@ test("buildWeddingVendorSearchArtifactState blocks malformed source URLs before 
   assert.equal(execution.sourceCount, 2);
   assert.equal(artifact.status, "not_created");
   assert.equal(artifact.sourceCount, 0);
-  assert.match(artifact.reason ?? "", /no usable HTTP\(S\) source URLs/i);
+  assert.match(artifact.reason ?? "", /no usable vendor source URLs/i);
   assert.equal(artifact.artifactInput, null);
 });
 
@@ -381,7 +435,7 @@ test("buildWeddingVendorSearchArtifactState blocks local source URLs before arti
   assert.equal(execution.sourceCount, 2);
   assert.equal(artifact.status, "not_created");
   assert.equal(artifact.sourceCount, 0);
-  assert.match(artifact.reason ?? "", /no usable HTTP\(S\) source URLs/i);
+  assert.match(artifact.reason ?? "", /no usable vendor source URLs/i);
   assert.equal(artifact.artifactInput, null);
 });
 

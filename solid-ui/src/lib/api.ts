@@ -190,6 +190,8 @@ export type WeddingVendorSearchApiSource = {
   url: string;
   snippet?: string | null;
   provider?: string | null;
+  website_url?: string | null;
+  map_url?: string | null;
 };
 
 export type WeddingVendorSearchApiResponse = {
@@ -4406,6 +4408,8 @@ function normalizeWeddingVendorSearchApiResponse(value: unknown): WeddingVendorS
         url,
         snippet: typeof source.snippet === "string" ? source.snippet : null,
         provider: typeof source.provider === "string" ? source.provider : null,
+        website_url: typeof source.website_url === "string" ? source.website_url : null,
+        map_url: typeof source.map_url === "string" ? source.map_url : null,
       }];
     })
     : [];

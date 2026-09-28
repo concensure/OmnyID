@@ -60,6 +60,8 @@ type RankedVendorSource = {
   title: string;
   provider: string;
   url: string;
+  websiteUrl: string | null;
+  mapUrl: string | null;
   snippet: string;
   score: number;
   preferenceMatchLabel: string;
@@ -69,13 +71,8 @@ type RankedVendorSource = {
 };
 
 function vendorChoiceActionRows(choices: readonly RankedVendorSource[]): Array<Record<string, unknown>> {
-  return choices.map((choice) => ({
-    choice_id: choice.id,
-    rank: choice.rank,
-    vendor_label: choice.title,
-    source_url: choice.url,
-    source_provider: choice.provider,
-    actions: [
+  return choices.map((choice) => {
+    const actions: Array<Record<string, unknown>> = [
       {
         kind: "select_vendor_for_follow_up",
         label: `Select ${choice.title}`,
@@ -83,13 +80,23 @@ function vendorChoiceActionRows(choices: readonly RankedVendorSource[]): Array<R
         requires_user_confirmation: true,
         selection_value: choice.id,
       },
-      {
-        kind: "open_vendor_source",
-        label: "Open source",
+    ];
+    const addLinkAction = (kind: string, label: string, href: string | null) => {
+      const url = clean(href);
+      if (!url || !usableSourceUrl({ url })) return;
+      if (actions.some((action) => clean(action.href).toLowerCase() === url.toLowerCase())) return;
+      actions.push({
+        kind,
+        label,
         enabled: true,
-        href: choice.url,
+        href: url,
         external: true,
-      },
+      });
+    };
+    addLinkAction("open_vendor_website", "Open website", choice.websiteUrl);
+    addLinkAction("open_vendor_map", "Open map/reviews", choice.mapUrl);
+    addLinkAction("open_vendor_source", choice.websiteUrl || choice.mapUrl ? "Open source" : "Open source", choice.url);
+    actions.push(
       {
         kind: "prepare_approval_gated_outreach",
         label: "Prepare follow-up",
@@ -98,8 +105,38 @@ function vendorChoiceActionRows(choices: readonly RankedVendorSource[]): Array<R
         approval_required_before_outreach: true,
         no_external_send_without_approval: true,
       },
-    ],
-  }));
+    );
+    return {
+      choice_id: choice.id,
+      rank: choice.rank,
+      vendor_label: choice.title,
+      source_url: choice.url,
+      website_url: choice.websiteUrl,
+      map_url: choice.mapUrl,
+      source_provider: choice.provider,
+      actions,
+    };
+  });
+}
+
+function sourceUrlLinks(
+  source: { title?: string | null; url?: string | null; website_url?: string | null; map_url?: string | null },
+  labelPrefix = "",
+): Array<{ label: string; url: string }> {
+  const title = clean(source.title) || "Vendor source";
+  const entries = [
+    { label: `${labelPrefix}${title}`, url: clean(source.url) },
+    { label: `${labelPrefix}${title} website`, url: clean(source.website_url) },
+    { label: `${labelPrefix}${title} map/reviews`, url: clean(source.map_url) },
+  ];
+  const seen = new Set<string>();
+  return entries.flatMap((entry) => {
+    if (!usableSourceUrl({ url: entry.url })) return [];
+    const key = entry.url.toLowerCase();
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [entry];
+  });
 }
 
 function clean(value: unknown): string {
@@ -372,6 +409,8 @@ function rankedVendorSources(input: WeddingVendorComparisonInput): RankedVendorS
     .flatMap((source, index): RankedVendorSource[] => {
       const title = clean(source.title) || sourceHostname(clean(source.url)) || `Vendor ${index + 1}`;
       const url = clean(source.url);
+      const websiteUrl = clean(source.website_url) || null;
+      const mapUrl = clean(source.map_url) || null;
       const provider = clean(source.provider) || clean(execution.providerLabel) || "Search";
       const snippet = clean(source.snippet);
       const key = `${title.toLowerCase()}|${sourceHostname(url).toLowerCase()}`;
@@ -408,6 +447,8 @@ function rankedVendorSources(input: WeddingVendorComparisonInput): RankedVendorS
         title,
         provider,
         url,
+        websiteUrl,
+        mapUrl,
         snippet,
         score,
         preferenceMatchLabel: preferenceMatches.length > 0
@@ -653,10 +694,7 @@ export function buildWeddingVendorSearchArtifactState(input: {
 
   const unusableSourceCount = Math.max(0, execution.sources.length - usableSources.length);
   const markdown = markdownFor(execution, usableSources);
-  const sourceLinks = usableSources.map((source) => ({
-    label: source.title,
-    url: source.url,
-  }));
+  const sourceLinks = usableSources.flatMap((source) => sourceUrlLinks(source));
   const sourceLabels = uniqueStrings([
     execution.providerLabel,
     ...metadataStrings(execution, "provider_kinds"),
@@ -682,7 +720,9 @@ export function buildWeddingVendorSearchArtifactState(input: {
       vendorCategories: metadataStrings(execution, "vendor_categories"),
       googlePlaceTypes: metadataStrings(execution, "google_place_types"),
       overpassTags: metadataStrings(execution, "overpass_tags"),
-      sourceUrlCount: usableSources.length,
+      sourceUrlCount: sourceLinks.length,
+      sourceWebsiteUrlCount: usableSources.filter((source) => usableSourceUrl({ url: source.website_url })).length,
+      sourceMapUrlCount: usableSources.filter((source) => usableSourceUrl({ url: source.map_url })).length,
       unusableSourceUrlCount: unusableSourceCount,
     },
     sourceLabels,
@@ -738,10 +778,12 @@ export function buildWeddingVendorComparisonArtifactState(
     : choices.length >= 3
       ? "Top three source-backed vendor choices are ready for user comparison."
     : `${choices.length} source-backed vendor choice${choices.length === 1 ? "" : "s"} ready for user comparison.`;
-  const sourceLinks = choices.map((choice) => ({
-    label: `#${choice.rank} ${choice.title}`,
+  const sourceLinks = choices.flatMap((choice) => sourceUrlLinks({
+    title: choice.title,
     url: choice.url,
-  }));
+    website_url: choice.websiteUrl,
+    map_url: choice.mapUrl,
+  }, `#${choice.rank} `));
   const topChoiceActionRows = vendorChoiceActionRows(choices);
   const preferenceSignals = comparisonPreferenceSignals(input);
   const recommendationHandoff = comparisonRecommendationHandoff({
@@ -782,6 +824,8 @@ export function buildWeddingVendorComparisonArtifactState(
         confirmAction: "confirm_vendor_choices",
         followUpAction: "prepare_follow_up_for_selected_vendors",
         openSourceAction: "open_vendor_source",
+        openWebsiteAction: "open_vendor_website",
+        openMapAction: "open_vendor_map",
         approvalRequiredBeforeOutreach: true,
         noExternalSendWithoutApproval: true,
         selectedVendorsContinueToFollowUp: true,
