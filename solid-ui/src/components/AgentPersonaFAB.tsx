@@ -86,12 +86,12 @@ export function AgentPersonaFAB(props: {
     installingTemplateId: installingTemplateId(),
   }));
 
-  const animState = createMemo<AnimState>(() => {
+  function currentAvatarAnimationState(): AnimState {
     if (props.hasError) return "error";
     if (props.justCompleted) return "success";
     if (props.activeCount > 0) return "busy";
     return "idle";
-  });
+  }
 
   // ── Avatar mood ──────────────────────────────────────────────────────────────
   const avatarMood = createMemo<AvatarMood>(() => {
@@ -274,7 +274,7 @@ export function AgentPersonaFAB(props: {
   }
 
   const dotColor = () => {
-    switch (animState()) {
+    switch (currentAvatarAnimationState()) {
       case "busy":    return "bg-blue-400 animate-pulse";
       case "error":   return "bg-red-400";
       case "success": return "bg-green-400";
@@ -283,7 +283,7 @@ export function AgentPersonaFAB(props: {
   };
 
   const fabAnim = () => {
-    switch (animState()) {
+    switch (currentAvatarAnimationState()) {
       case "busy":    return "animate-persona-busy";
       case "error":   return "animate-persona-error";
       case "success": return "animate-persona-success";
