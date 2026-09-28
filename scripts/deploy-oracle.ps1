@@ -364,7 +364,8 @@ try {
     $scpOutput = & scp.exe -i $KeyPath $archivePath "${User}@${RemoteHost}:$RemoteDir/omnyid.tar" 2>&1
     if ($scpOutput) { $scpOutput | ForEach-Object { Write-Host $_ } }
     $scpExit = $LASTEXITCODE
-    $extractOutput = & ssh.exe -i $KeyPath "$User@$RemoteHost" "cd $RemoteDir && tar -xf omnyid.tar && rm -f omnyid.tar" 2>&1
+    $extractCommand = "cd $RemoteDir && (tar --warning=no-unknown-keyword -xf omnyid.tar 2>/tmp/omnyid-tar-extract.err || tar -xf omnyid.tar) && rm -f omnyid.tar"
+    $extractOutput = & ssh.exe -i $KeyPath "$User@$RemoteHost" $extractCommand 2>&1
     if ($extractOutput) { $extractOutput | ForEach-Object { Write-Host $_ } }
     $extractExit = $LASTEXITCODE
 } finally {
