@@ -1,5 +1,5 @@
 // @locs-version: 2.0
-export type WeddingVendorSearchProviderKind = "brave_search" | "google_places" | "overpass";
+export type WeddingVendorSearchProviderKind = "brave_search" | "exa_search" | "google_places" | "overpass";
 
 export type WeddingVendorSearchProviderEnvState = {
   providers: WeddingVendorSearchProviderEnvStatus[];
@@ -32,6 +32,22 @@ const PROVIDERS: readonly {
   detail: string;
   policyEnvPrefixes: readonly string[];
 }[] = [
+  {
+    kind: "exa_search",
+    connectedAppId: "exa-search-api",
+    label: "EXA Search API",
+    keyNames: [
+      "OMNYID_ADMIN_EXA_SEARCH_API_KEY",
+      "OMNYID_ADMIN_EXA_SEARCH_API_KEY_FILE",
+      "OMNYID_EXA_SEARCH_API_KEY",
+      "OMNYID_EXA_SEARCH_API_KEY_FILE",
+      "EXA_API_KEY",
+      "EXA_API_KEY_FILE",
+    ],
+    credentialRequired: true,
+    detail: "Semantic web-search fallback for vendor websites, packages, and niche style fit.",
+    policyEnvPrefixes: ["OMNYID_ADMIN_TOOL_EXA_SEARCH_API"],
+  },
   {
     kind: "brave_search",
     connectedAppId: "brave-search-api",
@@ -149,7 +165,7 @@ export function buildWeddingVendorSearchProviderEnvState(env: EnvLike): WeddingV
     missingLabels: providers.flatMap((provider) => provider.missingLabel ? [provider.missingLabel] : []),
     guardrails: [
       "Keep provider keys server-side; the client receives only readiness and source receipts.",
-      "Prefer Google Places for live place facts, Brave for broader web discovery, and Overpass as an open fallback.",
+      "Prefer Google Places for live place facts, Brave for broad discovery, EXA for semantic web fallback, and Overpass as an open fallback.",
       "Every live search result must become a source-cited wedding research artifact or audit receipt.",
       "Vendor search remains scoped to wedding-template work and must not reroute unrelated Master Agent queries.",
     ],

@@ -6,6 +6,7 @@ use crate::db::{Db, UserExternalToolUsageEventInsert, UserExternalToolUsageEvent
 pub enum WeddingSharedToolProvider {
     BraveSearch,
     GooglePlaces,
+    ExaSearch,
     GoogleMapsPlatform,
     WeatherApi,
     TwilioMessaging,
@@ -62,6 +63,14 @@ fn provider_descriptor(provider: WeddingSharedToolProvider) -> WeddingSharedTool
             tool_name: "Google Places API",
             provider_key: "google-places-api",
             provider_category: "places",
+            billing_category: "vendor_discovery",
+            default_usage_unit: "requests",
+        },
+        WeddingSharedToolProvider::ExaSearch => WeddingSharedToolDescriptor {
+            tool_slug: "exa-search-api",
+            tool_name: "EXA Search API",
+            provider_key: "exa-search-api",
+            provider_category: "search_api",
             billing_category: "vendor_discovery",
             default_usage_unit: "requests",
         },

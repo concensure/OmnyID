@@ -8,6 +8,7 @@ import type { WeddingVendorSearchProviderKind } from "@/lib/weddingVendorSearchP
 const WEDDING_LIVE_VENDOR_SEARCH_PROVIDER_KINDS = new Set<WeddingVendorSearchProviderKind>([
   "google_places",
   "brave_search",
+  "exa_search",
   "overpass",
 ]);
 

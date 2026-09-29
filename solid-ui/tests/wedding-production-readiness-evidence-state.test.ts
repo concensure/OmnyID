@@ -643,7 +643,7 @@ test("buildWeddingProductionReadinessEvidenceState requires all external provide
     providerExecutors: [
       { capability: "email", requiredProvider: "Gmail or email provider", credentialStatus: "connected", executorStatus: "available", productionReady: true } as any,
       { capability: "calendar", requiredProvider: "Google Calendar or calendar provider", credentialStatus: "connected", executorStatus: "missing", productionReady: false } as any,
-      { capability: "vendor_search", requiredProvider: "Brave Search, Google Places, or OSM/Overpass provider", credentialStatus: "connected", executorStatus: "available", productionReady: true } as any,
+      { capability: "vendor_search", requiredProvider: "Brave Search, EXA Search, Google Places, or OSM/Overpass provider", credentialStatus: "connected", executorStatus: "available", productionReady: true } as any,
       { capability: "none", requiredProvider: null, productionReady: true } as any,
     ],
   });
@@ -667,7 +667,7 @@ test("buildWeddingProductionReadinessEvidenceState accepts explicit provider sui
         "Gmail or email provider executor proof: email-smoke:ok",
         "Google Calendar or calendar provider executor proof: calendar-smoke:ok",
         "Registry provider executor proof: registry-smoke:ok",
-        "Brave Search, Google Places, or OSM/Overpass provider executor proof: vendor-search-smoke:ok",
+        "Brave Search, EXA Search, Google Places, or OSM/Overpass provider executor proof: vendor-search-smoke:ok",
       ],
     } as any,
   });
@@ -694,7 +694,7 @@ test("buildWeddingProductionReadinessEvidenceState can require provider executor
         "Gmail or email provider executor proof: email-smoke:ok",
         "Google Calendar or calendar provider executor proof: calendar-smoke:ok",
         "Registry provider executor proof: registry-smoke:ok",
-        "Brave Search, Google Places, or OSM/Overpass provider executor proof: vendor-search-smoke:ok",
+        "Brave Search, EXA Search, Google Places, or OSM/Overpass provider executor proof: vendor-search-smoke:ok",
       ],
     } as any,
   });
@@ -714,7 +714,7 @@ test("buildWeddingProductionReadinessEvidenceState follows provider proof packet
         "Gmail or email provider executor proof: https://audit.omnyid.example/email",
         "Google Calendar or calendar provider executor proof: data:application/json,{}",
         "Registry provider executor proof: registry-smoke:fake:latest",
-        "Brave Search, Google Places, or OSM/Overpass provider executor proof: vendor-search-smoke:ok",
+        "Brave Search, EXA Search, Google Places, or OSM/Overpass provider executor proof: vendor-search-smoke:ok",
       ],
     } as any,
   });

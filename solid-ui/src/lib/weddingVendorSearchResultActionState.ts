@@ -39,7 +39,7 @@ function artifactSearchText(artifact: WeddingArtifactSummary): string {
 
 function isVendorSearchSummary(artifact: WeddingArtifactSummary): boolean {
   return artifact.kind === "vendor_table"
-    && /vendor_search_executor|source-backed vendor-search|vendor search source packet|vendor shortlist|google_places|brave search|overpass/.test(
+    && /vendor_search_executor|source-backed vendor-search|vendor search source packet|vendor shortlist|google_places|brave search|exa_search|exa search|overpass/.test(
       artifactSearchText(artifact),
     );
 }

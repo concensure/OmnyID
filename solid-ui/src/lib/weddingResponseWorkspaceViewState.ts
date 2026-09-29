@@ -281,6 +281,9 @@ export type WeddingVendorContactWorkspaceCard = {
   lastContactLabel: string | null;
   followUpDueLabel: string | null;
   replyLabel: string | null;
+  rationaleLabel: string;
+  draftSubjectLabel: string | null;
+  draftBodyPreview: string[];
   metadataLabels: string[];
 };
 export type WeddingExpectedBehaviorAuditCard = {
@@ -313,6 +316,7 @@ export type WeddingResponseWorkspaceViewState = {
   afpMessages: readonly AfpMessage[];
   categoryRail: Array<{ id: WeddingArtifactKind; label: string; count: number; active: boolean }>;
   filterChips: WeddingWorkspaceFilterChip[];
+  artifactPreviews: WeddingWorkspaceArtifactPreview[];
   activePreview: WeddingWorkspaceArtifactPreview | null;
   bundleExportPayload: WeddingWorkspaceBundleExportPayload;
   htmlBundleExportPayload: WeddingWorkspaceBundleExportPayload;
@@ -939,6 +943,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
       active: category.artifacts.some((artifact) => artifact.id === workspace.activeArtifact?.id),
     })),
     filterChips: buildFilterChips(workspace.results),
+    artifactPreviews,
     activePreview,
     bundleExportPayload,
     htmlBundleExportPayload,

@@ -8,7 +8,7 @@
 
 use super::*;
 use crate::admin_tool_secrets::{
-    BRAVE_SEARCH_SPEC, GOOGLE_MAPS_SPEC, GOOGLE_PLACES_SPEC, WEATHER_API_SPEC,
+    BRAVE_SEARCH_SPEC, EXA_SEARCH_SPEC, GOOGLE_MAPS_SPEC, GOOGLE_PLACES_SPEC, WEATHER_API_SPEC,
     admin_tool_secret_status, resolve_admin_tool_secret,
 };
 use crate::db::{
@@ -198,10 +198,12 @@ async fn wedding_provider_capabilities_http(
 
 fn wedding_provider_capabilities_payload() -> serde_json::Value {
     let brave = admin_tool_secret_status(BRAVE_SEARCH_SPEC);
+    let exa = admin_tool_secret_status(EXA_SEARCH_SPEC);
     let places = admin_tool_secret_status(GOOGLE_PLACES_SPEC);
     let maps = admin_tool_secret_status(GOOGLE_MAPS_SPEC);
     let weatherapi = admin_tool_secret_status(WEATHER_API_SPEC);
     let brave_policy_enabled = admin_shared_tool_policy_enabled("brave-search-api");
+    let exa_policy_enabled = admin_shared_tool_policy_enabled("exa-search-api");
     let places_policy_enabled = admin_shared_tool_policy_enabled("google-places-api");
     let maps_policy_enabled = admin_shared_tool_policy_enabled("google-maps-platform");
     let weatherapi_policy_enabled = admin_shared_tool_policy_enabled("weatherapi");
@@ -221,6 +223,18 @@ fn wedding_provider_capabilities_payload() -> serde_json::Value {
             "verificationStatus": if brave.configured && brave_policy_enabled { "unverified" } else { "not_configured" },
             "diagnosticLabel": if brave.configured && brave_policy_enabled { Some("Configured server-side; verified when a live search runs.") } else { None },
             "sourceLabel": brave.source_label,
+        }),
+        json!({
+            "kind": "exa_search",
+            "connectedAppId": "exa-search-api",
+            "label": exa.label,
+            "credentialRequired": true,
+            "credentialConfigured": exa.configured,
+            "sharedCreditEnabled": exa_policy_enabled,
+            "configured": exa.configured && exa_policy_enabled,
+            "verificationStatus": if exa.configured && exa_policy_enabled { "unverified" } else { "not_configured" },
+            "diagnosticLabel": if exa.configured && exa_policy_enabled { Some("Configured server-side as a semantic web-search fallback; verified when a live search runs.") } else { None },
+            "sourceLabel": exa.source_label,
         }),
         json!({
             "kind": "google_places",
@@ -589,6 +603,19 @@ async fn wedding_vendor_search_http(
                                     }
                                 }
                             }
+                            run_exa_vendor_search_fallback(
+                                &client,
+                                query,
+                                limit,
+                                &mut attempted_provider_queries,
+                                &mut provider_kinds,
+                                &mut provider_labels,
+                                &mut metered_providers,
+                                &mut sources,
+                                &mut failed_messages,
+                                "empty Google Places results",
+                            )
+                            .await;
                             run_overpass_vendor_search_fallback(
                                 &client,
                                 query,
@@ -631,6 +658,19 @@ async fn wedding_vendor_search_http(
                                 }
                             }
                         }
+                        run_exa_vendor_search_fallback(
+                            &client,
+                            query,
+                            limit,
+                            &mut attempted_provider_queries,
+                            &mut provider_kinds,
+                            &mut provider_labels,
+                            &mut metered_providers,
+                            &mut sources,
+                            &mut failed_messages,
+                            "Google Places failure",
+                        )
+                        .await;
                         run_overpass_vendor_search_fallback(
                             &client,
                             query,
@@ -657,6 +697,19 @@ async fn wedding_vendor_search_http(
                         provider_labels.insert("Brave Search".to_string());
                         metered_providers.insert("brave_search");
                         if items.is_empty() && sources.len() < limit {
+                            run_exa_vendor_search_fallback(
+                                &client,
+                                query,
+                                limit,
+                                &mut attempted_provider_queries,
+                                &mut provider_kinds,
+                                &mut provider_labels,
+                                &mut metered_providers,
+                                &mut sources,
+                                &mut failed_messages,
+                                "empty Brave Search results",
+                            )
+                            .await;
                             run_overpass_vendor_search_fallback(
                                 &client,
                                 query,
@@ -677,6 +730,19 @@ async fn wedding_vendor_search_http(
                             provider_kinds_blocked_for_run.insert(query.provider_kind.clone());
                         }
                         failed_messages.push(message);
+                        run_exa_vendor_search_fallback(
+                            &client,
+                            query,
+                            limit,
+                            &mut attempted_provider_queries,
+                            &mut provider_kinds,
+                            &mut provider_labels,
+                            &mut metered_providers,
+                            &mut sources,
+                            &mut failed_messages,
+                            "Brave Search failure",
+                        )
+                        .await;
                         run_overpass_vendor_search_fallback(
                             &client,
                             query,
@@ -694,6 +760,51 @@ async fn wedding_vendor_search_http(
             }
             "brave_search" => failed_messages.push(
                 "Brave Search API is not enabled for admin-funded wedding planner use.".to_string(),
+            ),
+            "exa_search" if admin_shared_tool_policy_enabled("exa-search-api") => {
+                external_search_performed = true;
+                match search_exa(&client, query, limit).await {
+                    Ok(items) => {
+                        provider_labels.insert("EXA Search API".to_string());
+                        metered_providers.insert("exa_search");
+                        if items.is_empty() && sources.len() < limit {
+                            run_overpass_vendor_search_fallback(
+                                &client,
+                                query,
+                                limit,
+                                &mut attempted_provider_queries,
+                                &mut provider_kinds,
+                                &mut provider_labels,
+                                &mut sources,
+                                &mut failed_messages,
+                                "empty EXA Search results",
+                            )
+                            .await;
+                        }
+                        sources.extend(items);
+                    }
+                    Err(message) => {
+                        if provider_error_blocks_remaining_run_queries(&message) {
+                            provider_kinds_blocked_for_run.insert(query.provider_kind.clone());
+                        }
+                        failed_messages.push(message);
+                        run_overpass_vendor_search_fallback(
+                            &client,
+                            query,
+                            limit,
+                            &mut attempted_provider_queries,
+                            &mut provider_kinds,
+                            &mut provider_labels,
+                            &mut sources,
+                            &mut failed_messages,
+                            "EXA Search failure",
+                        )
+                        .await;
+                    }
+                }
+            }
+            "exa_search" => failed_messages.push(
+                "EXA Search API is not enabled for admin-funded wedding planner use.".to_string(),
             ),
             "overpass" => {
                 external_search_performed = true;
@@ -755,6 +866,7 @@ async fn wedding_vendor_search_http(
         let shared_provider = match provider {
             "google_places" => WeddingSharedToolProvider::GooglePlaces,
             "brave_search" => WeddingSharedToolProvider::BraveSearch,
+            "exa_search" => WeddingSharedToolProvider::ExaSearch,
             _ => continue,
         };
         let quantity = planned_queries
@@ -1014,9 +1126,9 @@ async fn persist_live_vendor_sources(
             source_url: Some(source.map_url.clone().unwrap_or_else(|| source.url.clone())),
             source_label: Some(source.provider.clone()),
             source_checked_at: Some(checked_at.clone()),
-            status: "active".to_string(),
+            status: "hidden".to_string(),
             notes: Some(
-                "Discovered from a live wedding vendor search and cached for reuse.".to_string(),
+                "Discovered from a live wedding vendor search and cached as a candidate for reuse.".to_string(),
             ),
             evidence: json!({
                 "source": "live_vendor_search",
@@ -1175,7 +1287,7 @@ fn google_place_photo_proxy_url(photo_name: &str) -> Option<String> {
 }
 
 fn is_paid_vendor_search_provider(provider_kind: &str) -> bool {
-    matches!(provider_kind, "brave_search" | "google_places")
+    matches!(provider_kind, "brave_search" | "google_places" | "exa_search")
 }
 
 fn infer_vendor_service_area(query: &str) -> Option<String> {
@@ -1408,6 +1520,44 @@ async fn run_overpass_vendor_search_fallback(
     }
 }
 
+async fn run_exa_vendor_search_fallback(
+    client: &reqwest::Client,
+    query: &WeddingVendorSearchQueryRequest,
+    limit: usize,
+    attempted_provider_queries: &mut BTreeSet<String>,
+    provider_kinds: &mut BTreeSet<String>,
+    provider_labels: &mut BTreeSet<String>,
+    metered_providers: &mut BTreeSet<&'static str>,
+    sources: &mut Vec<WeddingVendorSearchSource>,
+    failed_messages: &mut Vec<String>,
+    reason: &str,
+) {
+    if sources.len() >= limit || !admin_shared_tool_policy_enabled("exa-search-api") {
+        return;
+    }
+    let mut fallback_query = query.clone();
+    fallback_query.provider_kind = "exa_search".to_string();
+    if !attempted_provider_queries.insert(provider_query_attempt_key(
+        &fallback_query.provider_kind,
+        &fallback_query.query,
+    )) {
+        return;
+    }
+    provider_kinds.insert(fallback_query.provider_kind.clone());
+    match search_exa(client, &fallback_query, limit).await {
+        Ok(items) => {
+            if !items.is_empty() {
+                provider_labels.insert("EXA Search API".to_string());
+                metered_providers.insert("exa_search");
+                sources.extend(items);
+            }
+        }
+        Err(message) => failed_messages.push(format!(
+            "EXA Search fallback after {reason} failed: {message}"
+        )),
+    }
+}
+
 fn overpass_fallback_query(
     query: &WeddingVendorSearchQueryRequest,
 ) -> WeddingVendorSearchQueryRequest {
@@ -1498,6 +1648,82 @@ async fn search_brave(
                     .as_str()
                     .filter(|url| url.to_ascii_lowercase().contains("instagram.com"))
                     .map(ToOwned::to_owned),
+            })
+        })
+        .collect();
+    Ok(results)
+}
+
+async fn search_exa(
+    client: &reqwest::Client,
+    query: &WeddingVendorSearchQueryRequest,
+    limit: usize,
+) -> Result<Vec<WeddingVendorSearchSource>, String> {
+    let key = resolve_admin_tool_secret(EXA_SEARCH_SPEC)
+        .map(|secret| secret.secret)
+        .ok_or_else(|| "EXA Search API key is not configured.".to_string())?;
+    let response = client
+        .post("https://api.exa.ai/search")
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .header("x-api-key", key)
+        .json(&json!({
+            "query": query.query,
+            "numResults": limit.clamp(1, 10),
+            "type": "auto",
+            "contents": {
+                "highlights": {
+                    "numSentences": 2,
+                    "highlightsPerUrl": 1,
+                    "query": query.query,
+                },
+            },
+        }))
+        .send()
+        .await
+        .map_err(|err| format!("EXA Search request failed: {err}"))?;
+    if !response.status().is_success() {
+        return Err(vendor_provider_http_error("EXA Search", response).await);
+    }
+    let json = response
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|err| format!("EXA Search response parse failed: {err}"))?;
+    let results = json["results"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .take(limit)
+        .filter_map(|item| {
+            let url = item["url"].as_str()?;
+            let title = item["title"]
+                .as_str()
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or(url)
+                .to_string();
+            let snippet = item["highlights"]
+                .as_array()
+                .and_then(|values| values.first())
+                .and_then(Value::as_str)
+                .or_else(|| item["text"].as_str())
+                .or_else(|| item["summary"].as_str())
+                .map(|value| value.chars().take(420).collect::<String>());
+            Some(WeddingVendorSearchSource {
+                title,
+                url: url.to_string(),
+                snippet: snippet.clone(),
+                provider: "EXA Search API".to_string(),
+                website_url: Some(url.to_string()),
+                map_url: None,
+                photo_url: item["image"].as_str().map(ToOwned::to_owned),
+                address: None,
+                phone: None,
+                email: infer_email_from_text(snippet.as_deref().unwrap_or_default()),
+                instagram_url: url
+                    .to_ascii_lowercase()
+                    .contains("instagram.com")
+                    .then(|| url.to_string()),
             })
         })
         .collect();
@@ -1779,13 +2005,18 @@ fn admin_shared_tool_policy_enabled(tool_id: &str) -> bool {
 fn admin_shared_tool_policy_default_wedding_enabled(tool_id: &str) -> bool {
     matches!(
         tool_id,
-        "brave-search-api" | "google-places-api" | "google-maps-platform" | "weatherapi"
+        "brave-search-api"
+            | "exa-search-api"
+            | "google-places-api"
+            | "google-maps-platform"
+            | "weatherapi"
     )
 }
 
 fn admin_shared_tool_policy_env_prefix(tool_id: &str) -> Option<&'static str> {
     match tool_id {
         "brave-search-api" => Some("OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API"),
+        "exa-search-api" => Some("OMNYID_ADMIN_TOOL_EXA_SEARCH_API"),
         "google-places-api" => Some("OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API"),
         "google-maps-platform" => Some("OMNYID_ADMIN_TOOL_GOOGLE_MAPS_PLATFORM"),
         "weatherapi" => Some("OMNYID_ADMIN_TOOL_WEATHERAPI"),

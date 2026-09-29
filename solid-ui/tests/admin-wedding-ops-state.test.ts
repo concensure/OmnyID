@@ -124,7 +124,7 @@ test("buildAdminWeddingOpsPanelState surfaces connected app proof packet status"
       providers: [
         {
           capability: "vendor_search",
-          requiredProvider: "Brave Search, Google Places, or OSM/Overpass provider",
+          requiredProvider: "Brave Search, EXA Search, Google Places, or OSM/Overpass provider",
           credentialStatus: "connected",
           executorStatus: "available",
           productionReady: true,

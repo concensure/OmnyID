@@ -42,7 +42,7 @@ test("provider setup presentation routes vendor search to connected provider set
   } as any);
 
   assert.equal(state.buttonLabel, "Connect vendor search");
-  assert.equal(state.destinationLabel, "Connected Apps - Brave, Google Places, or OSM/Overpass");
+  assert.equal(state.destinationLabel, "Connected Apps - Brave, EXA Search, Google Places, or OSM/Overpass");
 });
 
 test("provider setup presentation hides setup when no external route exists", () => {

@@ -70,6 +70,21 @@ pub const GOOGLE_PLACES_SPEC: AdminToolSecretSpec = AdminToolSecretSpec {
     ],
 };
 
+pub const EXA_SEARCH_SPEC: AdminToolSecretSpec = AdminToolSecretSpec {
+    provider_id: "exa_search",
+    label: "EXA Search API",
+    value_env: &[
+        "OMNYID_ADMIN_EXA_SEARCH_API_KEY",
+        "OMNYID_EXA_SEARCH_API_KEY",
+        "EXA_API_KEY",
+    ],
+    file_env: &[
+        "OMNYID_ADMIN_EXA_SEARCH_API_KEY_FILE",
+        "OMNYID_EXA_SEARCH_API_KEY_FILE",
+        "EXA_API_KEY_FILE",
+    ],
+};
+
 pub const GOOGLE_MAPS_SPEC: AdminToolSecretSpec = AdminToolSecretSpec {
     provider_id: "google_maps",
     label: "Google Maps Platform",
@@ -220,6 +235,7 @@ pub const CLOUDINARY_SPEC: AdminToolSecretSpec = AdminToolSecretSpec {
 pub const WEDDING_ADMIN_TOOL_SPECS: &[AdminToolSecretSpec] = &[
     BRAVE_SEARCH_SPEC,
     GOOGLE_PLACES_SPEC,
+    EXA_SEARCH_SPEC,
     GOOGLE_MAPS_SPEC,
     GOOGLE_CALENDAR_SPEC,
     WEATHER_API_SPEC,

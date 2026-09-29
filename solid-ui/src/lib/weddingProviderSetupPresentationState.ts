@@ -36,7 +36,7 @@ export function buildWeddingProviderSetupPresentationState(
   if (readiness.capability === "vendor_search") {
     return {
       buttonLabel: "Connect vendor search",
-      destinationLabel: "Connected Apps - Brave, Google Places, or OSM/Overpass",
+      destinationLabel: "Connected Apps - Brave, EXA Search, Google Places, or OSM/Overpass",
     };
   }
   return {

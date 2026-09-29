@@ -95,7 +95,7 @@ function nextActionFor(stepId: string, detail: string): string {
     case "onboarding_search_query":
       return "Generate a concrete vendor-search query from the approved onboarding context before running Search Vendors.";
     case "provider_search":
-      return "Confirm admin-configured Brave Search, Google Places, or Overpass provider status.";
+      return "Confirm admin-configured Brave Search, EXA Search, Google Places, or Overpass provider status.";
     case "vendor_artifact":
       return "Run live vendor search and save the generated vendor-search artifact into the workspace.";
     case "vendor_comparison":

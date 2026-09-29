@@ -325,7 +325,7 @@ function artifactStrings(artifact: WeddingArtifactInput, key: string): string[] 
 function isVendorSearchArtifact(artifact: WeddingArtifactInput): boolean {
   const metadata = record(artifact.metadata);
   return artifact.kind === "vendor_table"
-    && /vendor search source packet|vendor_search_executor|source-backed vendor-search|vendor shortlist|google_places|overpass|brave search/i.test([
+    && /vendor search source packet|vendor_search_executor|source-backed vendor-search|vendor shortlist|google_places|overpass|brave search|exa_search|exa search/i.test([
       clean(artifact.id),
       clean(artifact.title),
       clean(artifact.bodyText),
@@ -542,7 +542,8 @@ function rankedVendorSources(input: WeddingVendorComparisonInput): RankedVendorS
         + (availabilitySignal ? 2 : 0)
         + (imageUrl ? 2 : 0)
         + (/google_places|google/i.test(provider) ? 2 : 0)
-        - (directorySignal && !/google_places|admin vendor database/i.test(provider) ? 2 : 0)
+        + (/exa_search|exa search/i.test(provider) ? 1 : 0)
+        - (directorySignal && !/google_places|admin vendor database|exa_search|exa search/i.test(provider) ? 2 : 0)
         + Math.max(0, 4 - index);
       const rationaleLabels = [
         preferenceMatches.length > 0 ? `Matches ${preferenceMatches.slice(0, 3).join(", ")}` : null,

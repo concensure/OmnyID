@@ -28,6 +28,7 @@ export type WeddingProviderExecutorReadinessInput = {
 
 export const WEDDING_VENDOR_SEARCH_CONNECTED_APP_IDS = [
   "brave-search-api",
+  "exa-search-api",
   "google-places-api",
   "overpass-api",
 ] as const;
@@ -50,7 +51,7 @@ function providerFor(capability: WeddingProviderCapability): string | null {
   if (capability === "email") return "Gmail or email provider";
   if (capability === "calendar") return "Google Calendar or calendar provider";
   if (capability === "registry") return "Registry provider";
-  if (capability === "vendor_search") return "Brave Search, Google Places, or OSM/Overpass provider";
+  if (capability === "vendor_search") return "Brave Search, EXA Search, Google Places, or OSM/Overpass provider";
   return null;
 }
 

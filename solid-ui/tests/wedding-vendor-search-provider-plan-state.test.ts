@@ -85,7 +85,7 @@ test("provider plan creates Overpass tag queries as open fallback", () => {
   assert.ok(plan.providerPlans[0]?.guardrails.some((guardrail) => /rate limit/i.test(guardrail)));
 });
 
-test("provider plan orders Google Places, Brave, then Overpass by default", () => {
+test("provider plan orders Google Places, Brave, EXA, then Overpass by default", () => {
   const plan = buildWeddingVendorSearchProviderPlanState({
     readiness,
     maxCategories: 1,
@@ -94,10 +94,11 @@ test("provider plan orders Google Places, Brave, then Overpass by default", () =
   assert.deepEqual(plan.providerPlans.map((provider) => provider.providerKind), [
     "google_places",
     "brave_search",
+    "exa_search",
     "overpass",
   ]);
-  assert.equal(plan.queryCount, 3);
-  assert.match(plan.summary, /3 provider-specific/i);
+  assert.equal(plan.queryCount, 4);
+  assert.match(plan.summary, /4 provider-specific/i);
 });
 
 test("provider plan preserves explicit backend capability order", () => {

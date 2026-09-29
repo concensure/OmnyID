@@ -27,7 +27,21 @@ module.exports = {
         ember: "#d96b39",
         "atelier-lime": "#cef264",
         "atelier-mint": "#a8f0c6",
-        "surface-cool": "#f2f3f8"
+        "surface-cool": "#f2f3f8",
+        // Wedding theme exception: sampled from Documents/images/decisionOS response flow.png.
+        // Wedding-surface components intentionally use these named tokens instead of
+        // the main primary/on-surface/outline palette.
+        "wedding-accent": "#A6335A",
+        "wedding-accent-hover": "#8F294D",
+        "wedding-accent-dark": "#241A2C",
+        "wedding-cta": "#241A2C",
+        "wedding-cta-hover": "#34263F",
+        "wedding-surface": "#FBF6F4",
+        "wedding-surface-blush": "#FCEEF1",
+        "wedding-surface-muted": "#F6F0EC",
+        "wedding-text": "#241A2C",
+        "wedding-muted": "#6B5C70",
+        "wedding-warm-note": "#FBF0DA"
       },
       boxShadow: {
         panel:   "0 24px 80px rgba(15, 23, 42, 0.14)",

@@ -109,7 +109,7 @@ test("connected app proof packet independently rejects forged weak proof refs", 
       },
       {
         capability: "vendor_search",
-        requiredProvider: "Brave Search, Google Places, or OSM/Overpass provider",
+        requiredProvider: "Brave Search, EXA Search, Google Places, or OSM/Overpass provider",
         status: "ready",
         blockerLabels: [],
         proofRef: "vendor-search:test:latest",
@@ -130,7 +130,7 @@ test("connected app proof packet independently rejects forged weak proof refs", 
   assert.equal(packet.capabilityPackets.find((capability) => capability.capability === "vendor_search")?.proofRef, null);
   assert.ok(packet.missingProofRefs.includes("Gmail or email provider: proof receipt required"));
   assert.ok(packet.missingProofRefs.includes("Google Calendar or calendar provider: proof receipt required"));
-  assert.ok(packet.missingProofRefs.includes("Brave Search, Google Places, or OSM/Overpass provider: proof receipt required"));
+  assert.ok(packet.missingProofRefs.includes("Brave Search, EXA Search, Google Places, or OSM/Overpass provider: proof receipt required"));
   assert.ok(packet.capabilityPackets.some((capability) =>
     capability.blockers.some((label) => /browser-only, or HTTP link/i.test(label)),
   ));
@@ -207,7 +207,7 @@ test("connected app proof packet clears gate only with ready suite proof referen
     providers: [
       {
         capability: "vendor_search",
-        requiredProvider: "Brave Search, Google Places, or OSM/Overpass provider",
+        requiredProvider: "Brave Search, EXA Search, Google Places, or OSM/Overpass provider",
         credentialStatus: "connected",
         executorStatus: "available",
         productionReady: true,

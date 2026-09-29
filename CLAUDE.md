@@ -7,7 +7,7 @@ It overrides any generic Claude defaults and is read at the start of every sessi
 
 ## Project Overview
 
-OmnyID is a privacy-first, local-first, agent-first personal workspace built on AFP v1.
+OmnyID is a privacy-first, local-first, agent-native personal workspace built on AFP v1.
 Three active sub-projects live in this monorepo:
 
 | Sub-project | Path | Language | Role |
@@ -26,7 +26,7 @@ These 12 principles govern every technical decision. Violating them is never acc
 
 1. **E2EE-First** — Encryption on sender device before transmission. Homeserver sees only ciphertext.
 2. **Local-First** — ElectricSQL (PGlite) is the primary store. No unnecessary network round-trips.
-3. **Agent-First** — Design from the autonomous agent perspective. Humans are secondary users.
+3. **Agent-Native** — Design from the autonomous agent perspective. Humans are secondary users.
 4. **Immutable / Append-Only** — The message log is never mutated. Use references, backlinks, or new messages.
 5. **Atomic** — Every piece of data is a self-contained AFP message. No fragmented records.
 6. **Declarative** — Agents express intent via AFP; the UI decides rendering.
@@ -108,6 +108,7 @@ cargo build --release                        # full build (slow, use only when n
 - Shared types live in `solid-ui/src/lib/` — `api.ts` for API types, `workflowGraphTypes.ts` for canvas types
 - Use existing CSS tokens from `tailwind.config.cjs` and `index.css` — do not invent new color values
 - Design system tokens: `primary` (#31568e), `on-surface` (#1a1c1b), `outline` (#737781) — see `docs/DESIGN_SYSTEM.md`
+- Wedding-surface components (WeddingVendorQuoteReplyCard and siblings) are exempt from CLAUDE.md's primary/on-surface/outline token restriction — they use a separate wedding palette defined in `tailwind.config.cjs`. Do not revert wedding colors back toward the blue primary tokens.
 - Animations: use `view-enter`, `card-hover`, `glass-button`, `animate-fade-in`, `animate-slide-down`
 - Glass surfaces: `.glass-surface` (main panels), `.glass-card` (inner cards)
 
@@ -164,7 +165,7 @@ Background daemons (Knowledge Curator, Email Gateway, etc.) follow strict rules:
 **Production host:** `152.67.110.187` (omnyid.com), SSH user `ubuntu`, key `~/.ssh/oracle-omnyid.key`
 **Remote dir:** `/home/ubuntu/omnyid/`
 **Compose file:** `docker-compose.oracle.minimal.yml`
-**Env file:** `.env.oracle` (on server) — source of truth is `oracle-cloud.local.env` in local project root
+**Env file:** `.env.oracle` (on server) — source of truth is `oracle-cloud.local.env` plus local `.secrets/` file-backed secret material in the project root
 
 ### Deploy checklist (always run in this order)
 1. `cd solid-ui && npm run build` — build UI assets
@@ -192,7 +193,7 @@ docker compose --env-file .env.oracle -f docker-compose.oracle.minimal.yml logs 
 - Conventional commits: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`
 - Max 50 chars for subject line
 - One logical change per commit — no "misc fixes"
-- Never commit `.env*`, `oracle-cloud.local.env`, `*.key`, or `secrets/`
+- Never commit `.env*`, `oracle-cloud.local.env`, `runpod.env`, `*.key`, or `.secrets/`
 - Branch from `main`, PR back to `main`, squash merge
 
 ---

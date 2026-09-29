@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildWeddingResponseWorkspaceViewState } from "../src/lib/weddingResponseWorkspaceViewState.ts";
+import { vendorContactCards } from "../src/lib/weddingResponseWorkspacePresentationState.ts";
 import {
   weddingArtifact as artifact,
   weddingMemoryStorage as memoryStorage,
@@ -412,6 +413,32 @@ test("buildWeddingResponseWorkspaceViewState exposes editable-vendor contact car
   assert.equal(state.vendorContactCards[2]?.primaryActionLabel, "View response");
   assert.equal(state.vendorContactCards[2]?.replyLabel, "2026-09-10");
   assert.match(state.vendorContactCards[2]?.detailLabel ?? "", /Continue from the response/i);
+});
+
+test("vendorContactCards keeps discovery candidates out of active outreach until promoted", () => {
+  const cards = vendorContactCards({
+    metadata,
+    nowIso: "2026-09-14T00:00:00.000Z",
+    vendors: [{
+      vendorId: "candidate:peerspace",
+      vendorName: "36 Best Event Venues for Hire in Sydney, NSW | Peerspace",
+      category: "custom_vendor_search",
+      sourceLabel: "Brave Search",
+      userContact: null,
+    }, {
+      vendorId: "vendor:harbour-hall",
+      vendorName: "Harbour Hall",
+      category: "Venue",
+      contactEmail: "events@harbour.example",
+      sourceLabel: "Google Places API",
+      userContact: null,
+    }],
+  });
+
+  assert.deepEqual(cards.map((card) => card.vendorName), ["Harbour Hall"]);
+  assert.match(cards[0]?.rationaleLabel ?? "", /matches your venue priority/i);
+  assert.equal(cards[0]?.draftSubjectLabel, "Wedding venue enquiry");
+  assert.ok((cards[0]?.draftBodyPreview ?? []).some((line) => /quote or package/i.test(line)));
 });
 
 test("buildWeddingResponseWorkspaceViewState turns commitment timing gaps into task projections", () => {

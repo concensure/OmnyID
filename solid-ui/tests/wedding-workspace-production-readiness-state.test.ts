@@ -257,7 +257,7 @@ test("buildWeddingWorkspaceProductionReadinessState defaults supplied evidence t
         { capability: "email", requiredProvider: "Gmail or email provider", productionReady: true } as any,
         { capability: "calendar", requiredProvider: "Google Calendar or calendar provider", productionReady: true } as any,
         { capability: "registry", requiredProvider: "Registry provider", productionReady: true } as any,
-        { capability: "vendor_search", requiredProvider: "Brave Search, Google Places, or OSM/Overpass provider", productionReady: true } as any,
+        { capability: "vendor_search", requiredProvider: "Brave Search, EXA Search, Google Places, or OSM/Overpass provider", productionReady: true } as any,
       ],
       oracleReleaseGate: { productionEvidenceReady: true } as any,
     },

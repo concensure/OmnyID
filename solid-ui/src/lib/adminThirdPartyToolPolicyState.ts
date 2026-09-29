@@ -53,6 +53,7 @@ const ADMIN_THIRD_PARTY_TOOL_POLICY_KEY = "omnyid.admin_third_party_tool_policy.
 
 const DEFAULT_SHARED_TOOL_USES: Record<string, string> = {
   "brave-search-api": "Live browser search for source-backed vendor discovery, website checks, reviews, and availability clues.",
+  "exa-search-api": "Semantic web-search fallback for source-backed vendor discovery, highlights, and vendor-fit evidence.",
   "google-places-api": "Venue and vendor discovery with place IDs, contact details, ratings, locations, and websites.",
   "google-maps-platform": "Maps, travel time, route checks, and venue logistics.",
   gcal: "Calendar appointments, payment reminders, tastings, deadlines, and follow-up dates.",
@@ -64,6 +65,7 @@ const DEFAULT_SHARED_TOOL_USES: Record<string, string> = {
 
 const TOOL_BILLING_ALIASES: Record<string, string[]> = {
   "brave-search-api": ["brave_search", "brave-search", "brave search api", "browser search", "web search"],
+  "exa-search-api": ["exa_search", "exa-search", "exa search api", "exa", "semantic search", "web search"],
   "google-places-api": ["google_places", "google-places", "places-api", "google places api", "places"],
   "google-maps-platform": ["google_maps", "google-maps", "maps", "google maps platform", "google maps"],
   gcal: ["google_calendar", "google-calendar", "google-calendar-api", "google calendar api", "calendar"],
@@ -269,6 +271,7 @@ export function buildAdminThirdPartyToolPolicyState(
   const providerIds = new Set([
     ...apiProviders.map((provider) => provider.connectedAppId),
     "brave-search-api",
+    "exa-search-api",
     "google-places-api",
     "google-maps-platform",
     "weatherapi",

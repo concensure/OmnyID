@@ -73,6 +73,8 @@ export type WeddingVendorContactOutreachVendor = {
   vendorName?: string | null;
   category?: string | null;
   contactPhone?: string | null;
+  contactEmail?: string | null;
+  websiteUrl?: string | null;
   sourceLabel?: string | null;
   userContact?: WeddingVendorContactOutreachRecord | null;
 };

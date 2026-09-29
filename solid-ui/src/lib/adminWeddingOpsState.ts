@@ -129,7 +129,7 @@ export function buildAdminWeddingOpsPanelState(args: {
           : "Provider config needed",
         detail: args.vendorSearchProviders?.productionReady
           ? "Server-side provider config is present for wedding vendor research."
-          : "Configure Brave Search, Google Places, or OSM/Overpass env before live vendor research.",
+          : "Configure Brave Search, EXA Search, Google Places, or OSM/Overpass env before live vendor research.",
         status: args.vendorSearchProviders?.productionReady ? "ready" : "needs_backend",
       },
       {

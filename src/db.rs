@@ -4188,6 +4188,11 @@ impl Db {
                 AND c.user_id = $1
             WHERE v.status = 'active'
                 AND (
+                    c.contact_id IS NOT NULL
+                    OR NULLIF(btrim(COALESCE(v.contact_phone, '')), '') IS NOT NULL
+                    OR NULLIF(btrim(COALESCE(v.contact_email, '')), '') IS NOT NULL
+                )
+                AND (
                     $2::text IS NULL
                     OR lower(v.vendor_name) LIKE '%' || lower($2) || '%'
                     OR lower(v.category) LIKE '%' || lower($2) || '%'

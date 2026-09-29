@@ -22,6 +22,9 @@ const baseCard: WeddingVendorContactWorkspaceCard = {
   lastContactLabel: "2026-09-20",
   followUpDueLabel: "2026-09-25",
   replyLabel: null,
+  rationaleLabel: "Why this is worth pursuing: Harbour View Venue matches your venue priority.",
+  draftSubjectLabel: null,
+  draftBodyPreview: [],
   metadataLabels: ["Venue", "personal email"],
 };
 
@@ -56,9 +59,12 @@ test("weddingVendorFollowUpPrimaryAction keeps follow-up sends approval gated", 
   assert.equal((metadata?.draft_request as Record<string, unknown> | undefined)?.kind, "vendor_follow_up_email_draft");
   assert.equal((metadata?.draft_request as Record<string, unknown> | undefined)?.user_must_review_before_send, true);
   assert.equal((metadata?.draft_request as Record<string, unknown> | undefined)?.external_send_performed, false);
+  assert.equal((metadata?.draft_request as Record<string, unknown> | undefined)?.rationale, "Why this is worth pursuing: Harbour View Venue matches your venue priority.");
+  assert.deepEqual((metadata?.draft_request as Record<string, unknown> | undefined)?.body_preview, []);
   assert.match(String((metadata?.draft_request as Record<string, unknown> | undefined)?.suggested_subject), /availability/i);
   assert.deepEqual((metadata?.draft_request as Record<string, unknown> | undefined)?.context, [
     "You contacted this vendor recently. Wait before nudging.",
+    "Why this is worth pursuing: Harbour View Venue matches your venue priority.",
     "Last contact: 2026-09-20",
     "Follow-up due: 2026-09-25",
   ]);
@@ -75,6 +81,8 @@ test("weddingVendorFollowUpPrimaryAction carries an initial outreach draft reque
     actionMode: "follow_up",
     lastContactLabel: null,
     followUpDueLabel: null,
+    draftSubjectLabel: "Wedding venue enquiry",
+    draftBodyPreview: ["Hi Harbour View Venue,", "Could you share package details?"],
   });
   const metadata = action.metadata?.wedding_vendor_follow_up as Record<string, unknown> | undefined;
   const draft = metadata?.draft_request as Record<string, unknown> | undefined;
@@ -84,6 +92,7 @@ test("weddingVendorFollowUpPrimaryAction carries an initial outreach draft reque
   assert.equal(draft?.channel, "email");
   assert.equal(draft?.user_must_review_before_send, true);
   assert.equal(draft?.external_send_performed, false);
+  assert.deepEqual(draft?.body_preview, ["Hi Harbour View Venue,", "Could you share package details?"]);
   assert.match(String(draft?.suggested_subject), /wedding venue enquiry/i);
 });
 

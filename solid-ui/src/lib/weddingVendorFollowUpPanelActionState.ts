@@ -22,8 +22,11 @@ function vendorDraftRequest(card: WeddingVendorContactWorkspaceCard): Record<str
       ? `Following up about ${card.categoryLabel.toLowerCase()} availability`
       : `Wedding ${card.categoryLabel.toLowerCase()} enquiry`,
     brief: card.nextActionLabel,
+    rationale: card.rationaleLabel,
+    body_preview: card.draftBodyPreview,
     context: [
       card.detailLabel,
+      card.rationaleLabel,
       card.lastContactLabel ? `Last contact: ${card.lastContactLabel}` : null,
       card.followUpDueLabel ? `Follow-up due: ${card.followUpDueLabel}` : null,
     ].filter((label): label is string => Boolean(label)),
@@ -64,6 +67,7 @@ export function weddingVendorFollowUpPrimaryAction(card: WeddingVendorContactWor
         next_step: card.nextActionLabel,
         last_contact: card.lastContactLabel,
         follow_up_due: card.followUpDueLabel,
+        rationale: card.rationaleLabel,
         approval_required: card.actionMode === "follow_up",
         no_spam_policy: true,
         draft_request: vendorDraftRequest(card),

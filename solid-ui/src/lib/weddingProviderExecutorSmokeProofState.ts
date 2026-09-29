@@ -49,7 +49,7 @@ const CAPABILITY_LABELS: Record<WeddingProviderExecutorSuiteCapability, string> 
   email: "Gmail or email provider",
   calendar: "Google Calendar or calendar provider",
   registry: "Registry provider",
-  vendor_search: "Brave Search, Google Places, or OSM/Overpass provider",
+  vendor_search: "Brave Search, EXA Search, Google Places, or OSM/Overpass provider",
 };
 
 function clean(value: unknown): string {

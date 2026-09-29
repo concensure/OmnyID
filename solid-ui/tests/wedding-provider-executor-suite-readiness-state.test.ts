@@ -34,7 +34,7 @@ test("provider executor suite readiness blocks partial provider proof", () => {
   assert.deepEqual(state.missingCapabilityLabels, [
     "Google Calendar or calendar provider readiness proof is missing.",
     "Registry provider readiness proof is missing.",
-    "Brave Search, Google Places, or OSM/Overpass provider readiness proof is missing.",
+    "Brave Search, EXA Search, Google Places, or OSM/Overpass provider readiness proof is missing.",
   ]);
 });
 
@@ -82,7 +82,7 @@ test("connected app suite readiness can require durable proof references", () =>
   });
 
   assert.equal(blocked.productionEvidenceReady, false);
-  assert.ok(blocked.blockerLabels.some((label) => /Brave Search, Google Places, or OSM\/Overpass provider.*durable connected app proof reference/i.test(label)));
+  assert.ok(blocked.blockerLabels.some((label) => /Brave Search, EXA Search, Google Places, or OSM\/Overpass provider.*durable connected app proof reference/i.test(label)));
   assert.ok(blocked.nextActionLabels.some((label) => /Attach a durable connected app proof/i.test(label)));
   assert.equal(ready.productionEvidenceReady, true);
   assert.ok(ready.proofReferenceLabels.some((label) => /vendor-search-smoke:ok/i.test(label)));
@@ -204,7 +204,7 @@ test("provider executor suite readiness ignores OmnyID-only sharing for external
     "Gmail or email provider readiness proof is missing.",
     "Google Calendar or calendar provider readiness proof is missing.",
     "Registry provider readiness proof is missing.",
-    "Brave Search, Google Places, or OSM/Overpass provider readiness proof is missing.",
+    "Brave Search, EXA Search, Google Places, or OSM/Overpass provider readiness proof is missing.",
   ]);
 });
 
@@ -222,12 +222,12 @@ test("provider executor readiness can represent multi-provider vendor research p
     vendorSearchExecutorAvailable: true,
   });
 
-  assert.equal(blocked.requiredProvider, "Brave Search, Google Places, or OSM/Overpass provider");
+  assert.equal(blocked.requiredProvider, "Brave Search, EXA Search, Google Places, or OSM/Overpass provider");
   assert.equal(blocked.productionReady, false);
   assert.equal(blocked.setupView, "connected_apps");
   assert.match(blocked.detail, /needs a connected app/i);
   assert.equal(ready.productionReady, true);
-  assert.match(ready.summary, /Google Places, or OSM\/Overpass provider ready/i);
+  assert.match(ready.summary, /EXA Search, Google Places, or OSM\/Overpass provider ready/i);
 });
 
 test("provider executor suite readiness bounds durable proof labels", () => {

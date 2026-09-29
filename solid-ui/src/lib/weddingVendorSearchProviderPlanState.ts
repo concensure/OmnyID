@@ -30,6 +30,7 @@ export type WeddingVendorSearchProviderPlanState = {
 
 const LABELS: Record<WeddingVendorSearchProviderKind, string> = {
   brave_search: "Brave Search",
+  exa_search: "EXA Search API",
   google_places: "Google Places API",
   overpass: "OSM / Overpass API",
 };
@@ -110,6 +111,9 @@ function expectedFieldsFor(providerKind: WeddingVendorSearchProviderKind): strin
   if (providerKind === "overpass") {
     return ["name", "OSM id", "coordinates", "tags", "website or phone when present"];
   }
+  if (providerKind === "exa_search") {
+    return ["title", "url", "semantic highlight", "source domain", "wedding/style fit signal"];
+  }
   return ["title", "url", "snippet", "source domain", "publish/update signal when available"];
 }
 
@@ -137,6 +141,9 @@ function queryFor(input: {
     return `${areaPhrase} ${label}${contextPart}`.replace(/\s+/g, " ").trim();
   }
   const areaConnector = input.category === "venue" ? `near ${areaPhrase}` : `in ${areaPhrase}`;
+  if (input.providerKind === "exa_search") {
+    return `source-backed wedding ${label} ${areaConnector} ${input.preferences || "packages reviews"} official website instagram contact${contextPart}`.replace(/\s+/g, " ").trim();
+  }
   return `wedding ${label} ${areaConnector} services packages price reviews${input.preferences ? ` ${input.preferences}` : ""}${contextPart}`.replace(/\s+/g, " ").trim();
 }
 
@@ -153,6 +160,12 @@ function guardrailsFor(providerKind: WeddingVendorSearchProviderKind): string[] 
       "Respect the configured Overpass rate limit and contact policy.",
     ];
   }
+  if (providerKind === "exa_search") {
+    return [
+      "Use EXA Search as a semantic web fallback for vendor websites and niche style fit.",
+      "Keep recommendations source-cited; do not treat EXA highlights as confirmed availability or pricing.",
+    ];
+  }
   return [
     "Use Brave Search for broad web discovery and package/review pages.",
     "Cross-check vendor facts against official vendor pages before recommending booking action.",
@@ -167,7 +180,8 @@ function priorityFor(
   if (preserveInputOrder) return index + 1;
   if (providerKind === "google_places") return 1;
   if (providerKind === "brave_search") return 2;
-  return 3;
+  if (providerKind === "exa_search") return 3;
+  return 4;
 }
 
 export function buildWeddingVendorSearchProviderPlanState(input: {
@@ -196,7 +210,7 @@ export function buildWeddingVendorSearchProviderPlanState(input: {
   const preserveInputOrder = Boolean(explicitProviders);
   const providers: readonly WeddingVendorSearchProviderKind[] = explicitProviders
     ? explicitProviders
-    : (["google_places", "brave_search", "overpass"] as const);
+    : (["google_places", "brave_search", "exa_search", "overpass"] as const);
   const categoryLimit = Math.max(1, input.maxCategories ?? 8);
   const providerPlans = providers.map((providerKind, index): WeddingVendorSearchProviderPlan => {
     const queries = categories.slice(0, categoryLimit).map((category): WeddingVendorSearchProviderQuery => ({
