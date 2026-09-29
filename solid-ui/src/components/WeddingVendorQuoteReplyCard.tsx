@@ -14,6 +14,7 @@ import {
   weddingVendorQuoteReplyDraftSyncState,
   weddingVendorQuoteReplyDraftPersistenceState,
   weddingVendorQuoteReplyEditorDirtyState,
+  weddingVendorQuoteReplyHomeSurfaceState,
   weddingVendorQuoteReplyPresentationState,
   weddingVendorQuoteReplyProofPersistenceState,
   weddingVendorQuoteReplySendGateState,
@@ -37,6 +38,7 @@ function safeHttpUrl(value: string | null | undefined): string | null {
 
 export function WeddingVendorQuoteReplyCard(props: {
   flow: WeddingVendorQuoteReplyFlowState;
+  surface?: "home" | "workspace";
   recipient: string;
   subject: string;
   draftBody: string;
@@ -61,6 +63,7 @@ export function WeddingVendorQuoteReplyCard(props: {
   const [draft, setDraft] = createSignal(props.draftBody);
   const [syncedDraftBody, setSyncedDraftBody] = createSignal(props.draftBody);
   const [forceReplyEditorOpen, setForceReplyEditorOpen] = createSignal(false);
+  const [homeExpanded, setHomeExpanded] = createSignal(false);
   const [quoteDetailsOpen, setQuoteDetailsOpen] = createSignal(false);
   const [wordingChecked, setWordingChecked] = createSignal(props.flow.approvedWording);
   const [budgetChecked, setBudgetChecked] = createSignal(props.flow.budgetImpactAcknowledged);
@@ -81,6 +84,7 @@ export function WeddingVendorQuoteReplyCard(props: {
     props.flow.id;
     props.flow.stage;
     setForceReplyEditorOpen(false);
+    setHomeExpanded(false);
     setQuoteDetailsOpen(false);
     setDraftSaveFeedback(null);
     setDraftSaveRequested(false);
@@ -143,6 +147,16 @@ export function WeddingVendorQuoteReplyCard(props: {
     draftPersistence: draftPersistence(),
   });
   const showReplyEditor = () => presentation().showReplyEditor || forceReplyEditorOpen();
+  const compactHome = () => (
+    props.surface === "home"
+    && !homeExpanded()
+    && props.flow.stage !== "sent"
+    && props.flow.stage !== "sending_undo_window"
+  );
+  const homeSurface = () => weddingVendorQuoteReplyHomeSurfaceState({
+    flow: props.flow,
+    presentation: presentation(),
+  });
   const budgetAcknowledgementBlocked = () => props.busy || !quote().budgetDeltaLabel;
   const primaryActionDisabled = () => {
     if (props.busy) return true;
@@ -246,6 +260,19 @@ export function WeddingVendorQuoteReplyCard(props: {
     }
     if (action === "edit_reply") setForceReplyEditorOpen(true);
   };
+  const handleHomeQuoteAction = () => {
+    const attachmentUrl = quoteAttachmentUrl();
+    if (attachmentUrl) {
+      window.open(attachmentUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setHomeExpanded(true);
+    setQuoteDetailsOpen(true);
+  };
+  const handleHomeReplyAction = () => {
+    setHomeExpanded(true);
+    setForceReplyEditorOpen(true);
+  };
   onMount(() => {
     const unsubscribe = subscribeMagicActionEvent((detail) => {
       if (detail.msgId !== `wedding:quote-reply:${props.flow.id}:primary`) return;
@@ -303,56 +330,107 @@ export function WeddingVendorQuoteReplyCard(props: {
   const quoteDetailsId = () => `${headingId()}-quote-details`;
 
   return (
-    <section class="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm" aria-labelledby={headingId()}>
+    <section class="min-w-0 rounded-[28px] border border-rose-200 bg-white p-5 shadow-sm sm:p-7" aria-labelledby={headingId()}>
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="text-xs font-semibold uppercase text-emerald-800/70">{presentation().eyebrowLabel}</p>
-          <h3 id={headingId()} class="mt-1 break-words text-lg font-semibold text-emerald-950">{props.flow.title}</h3>
-          <p class="mt-1 max-w-3xl break-words text-sm leading-6 text-emerald-900/75">{props.flow.summary}</p>
+          <p class="text-xs font-bold uppercase tracking-[0.12em] text-rose-700">{presentation().eyebrowLabel}</p>
+          <h3 id={headingId()} class="mt-2 break-words font-serif text-2xl font-semibold leading-8 text-stone-950">{props.flow.title}</h3>
+          <p class="mt-2 max-w-3xl break-words text-base leading-7 text-stone-900">{props.flow.summary}</p>
         </div>
-        <span class="max-w-full break-words rounded-full bg-white/85 px-3 py-1 text-sm font-semibold text-emerald-950">
+        <span class="max-w-full break-words rounded-full bg-rose-50 px-3 py-1 text-sm font-semibold text-rose-900">
           {props.flow.semanticObject.stateLabel}
         </span>
       </div>
 
-      <div class={`mt-4 rounded-xl border p-3 ${
+      <div class={`mt-5 rounded-2xl border p-4 ${
         contextualSurface().surfaceWeight === "receipt"
-          ? "border-emerald-200 bg-white/85"
-          : "border-emerald-100 bg-white/80"
+          ? "border-rose-200 bg-rose-50/55"
+          : "border-stone-100 bg-stone-100/75"
       }`}>
-        <div class="grid gap-3 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div class="grid gap-3 md:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
           <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase text-emerald-800/60">Status</p>
-            <p class="mt-1 break-words text-sm font-semibold text-emerald-950">
+            <p class="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Status</p>
+            <p class="mt-1 break-words text-sm font-semibold text-stone-950">
               {contextualSurface().statusLabel}
             </p>
           </div>
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
-              <p class="text-xs font-semibold uppercase text-emerald-800/60">Recommendation</p>
-              <span class="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-950">
+              <p class="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Recommendation</p>
+              <span class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-stone-900">
                 {contextualSurface().confidenceLabel}
               </span>
             </div>
-            <p class="mt-1 break-words text-sm font-semibold text-emerald-950">
+            <p class="mt-1 break-words text-sm font-semibold text-stone-950">
               {contextualSurface().recommendationLabel}
             </p>
-            <p class="mt-1 break-words text-sm leading-6 text-emerald-900/75">
+            <p class="mt-1 break-words text-sm leading-6 text-stone-700">
               {contextualSurface().rationaleLabel}
             </p>
           </div>
         </div>
         <Show when={contextualSurface().whyLabels.length > 0}>
-          <div class="mt-3 rounded-lg bg-emerald-50/75 p-2">
-            <p class="text-xs font-semibold uppercase text-emerald-800/60">Why</p>
+          <div class="mt-4 rounded-2xl bg-white/80 p-3">
+            <p class="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Why</p>
             <ul class="mt-1 grid gap-1 sm:grid-cols-2">
               <For each={contextualSurface().whyLabels.slice(0, 4)}>
-                {(label) => <li class="break-words text-xs leading-5 text-emerald-900/75">{label}</li>}
+                {(label) => <li class="break-words text-xs leading-5 text-stone-700">{label}</li>}
               </For>
             </ul>
           </div>
         </Show>
       </div>
+
+      <Show when={compactHome()}>
+        <div class="mt-5 border-t border-dashed border-rose-100 pt-4">
+          <p class="text-sm font-bold uppercase tracking-[0.12em] text-stone-500">Quote summary</p>
+          <dl class="mt-3 grid gap-3 text-sm text-stone-700 sm:grid-cols-3">
+            <div class="rounded-2xl bg-stone-100/80 p-4">
+              <dt class="text-xs font-bold uppercase tracking-[0.08em] text-stone-500">Total</dt>
+              <dd class="mt-1 break-words text-lg font-bold text-stone-950">{quote().amountLabel}</dd>
+            </div>
+            <div class="rounded-2xl bg-stone-100/80 p-4">
+              <dt class="text-xs font-bold uppercase tracking-[0.08em] text-stone-500">Valid until</dt>
+              <dd class="mt-1 break-words text-lg font-bold text-stone-950">{quote().validUntil ?? "Not stated"}</dd>
+            </div>
+            <div class="rounded-2xl bg-stone-100/80 p-4">
+              <dt class="text-xs font-bold uppercase tracking-[0.08em] text-stone-500">Vendor</dt>
+              <dd class="mt-1 break-words text-lg font-bold text-stone-950">{quote().vendorName}</dd>
+            </div>
+          </dl>
+          <Show when={homeSurface().budgetImpactLabel}>
+            {(budgetImpact) => (
+              <p class="mt-3 break-words rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-stone-950">
+                {budgetImpact()}
+              </p>
+            )}
+          </Show>
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={handleHomeQuoteAction}
+              data-magic-action="open"
+              data-magic-icon="quote"
+              data-magic-label={homeSurface().quoteActionKind === "open_attachment" ? "Open quote file" : "See quote"}
+              data-magic-id={`wedding:quote-reply:${props.flow.id}:home-quote`}
+              class="rounded-2xl bg-rose-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-rose-800 focus:outline-none focus:ring-2 focus:ring-rose-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {homeSurface().quoteActionLabel}
+            </button>
+            <button
+              type="button"
+              onClick={handleHomeReplyAction}
+              data-magic-action="open"
+              data-magic-icon="edit"
+              data-magic-label={homeSurface().replyActionLabel}
+              data-magic-id={`wedding:quote-reply:${props.flow.id}:home-reply`}
+              class="rounded-2xl bg-stone-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-700 focus:ring-offset-2"
+            >
+              {homeSurface().replyActionLabel}
+            </button>
+          </div>
+        </div>
+      </Show>
 
       <Show when={props.flow.stage === "sent"}>
         <div class="mt-4 rounded-xl border border-emerald-200 bg-white/85 p-3" role="status" aria-live="polite">
@@ -404,29 +482,36 @@ export function WeddingVendorQuoteReplyCard(props: {
         </div>
       </Show>
 
-      <Show when={props.flow.stage !== "sent" && props.flow.stage !== "sending_undo_window"}>
-        <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-          <div class="rounded-xl border border-emerald-100 bg-white/85 p-3">
+      <Show when={!compactHome() && props.flow.stage !== "sent" && props.flow.stage !== "sending_undo_window"}>
+        <div class="mt-5 grid gap-4">
+          <div class="border-t border-dashed border-rose-100 pt-4">
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="text-sm font-semibold text-emerald-950">Quote</p>
-              <span class="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-950">
+              <p class="text-sm font-bold uppercase tracking-[0.12em] text-stone-500">Quote summary</p>
+              <span class="rounded-full bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-950">
                 {quote().amountLabel}
               </span>
             </div>
-            <dl class="mt-3 grid gap-2 text-sm text-emerald-900/80">
-              <div>
-                <dt class="text-xs font-semibold uppercase text-emerald-800/60">Vendor</dt>
-                <dd class="break-words font-semibold text-emerald-950">{quote().vendorName}</dd>
+            <dl class="mt-3 grid gap-3 text-sm text-stone-700 sm:grid-cols-3">
+              <div class="rounded-2xl bg-stone-100/80 p-4">
+                <dt class="text-xs font-bold uppercase tracking-[0.08em] text-stone-500">Total</dt>
+                <dd class="mt-1 break-words text-lg font-bold text-stone-950">{quote().amountLabel}</dd>
               </div>
-              <div>
-                <dt class="text-xs font-semibold uppercase text-emerald-800/60">Budget impact</dt>
-                <dd class="break-words font-semibold text-emerald-950">{quote().budgetDeltaLabel ?? "Not measured yet"}</dd>
+              <div class="rounded-2xl bg-stone-100/80 p-4">
+                <dt class="text-xs font-bold uppercase tracking-[0.08em] text-stone-500">Valid until</dt>
+                <dd class="mt-1 break-words text-lg font-bold text-stone-950">{quote().validUntil ?? "Not stated"}</dd>
               </div>
-              <div>
-                <dt class="text-xs font-semibold uppercase text-emerald-800/60">Valid until</dt>
-                <dd class="break-words">{quote().validUntil ?? "Not stated"}</dd>
+              <div class="rounded-2xl bg-stone-100/80 p-4">
+                <dt class="text-xs font-bold uppercase tracking-[0.08em] text-stone-500">Vendor</dt>
+                <dd class="mt-1 break-words text-lg font-bold text-stone-950">{quote().vendorName}</dd>
               </div>
             </dl>
+            <Show when={quote().budgetDeltaLabel}>
+              {(budgetDelta) => (
+                <p class="mt-3 break-words text-sm font-semibold text-stone-800">
+                  Budget impact: {budgetDelta()}
+                </p>
+              )}
+            </Show>
             <Show
               when={quoteAttachmentUrl()}
               fallback={(
@@ -439,7 +524,7 @@ export function WeddingVendorQuoteReplyCard(props: {
                   data-magic-icon="quote"
                   data-magic-label={quoteDetailsOpen() ? "Hide quote details" : "Show quote details"}
                   data-magic-id={`wedding:quote-reply:${props.flow.id}:quote-details`}
-                  class="mt-3 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2"
+                  class="mt-3 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-sm font-semibold text-rose-950 transition hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-700 focus:ring-offset-2"
                 >
                   {quoteDetailsOpen() ? "Hide quote details" : "Show quote details"}
                 </button>
@@ -454,52 +539,28 @@ export function WeddingVendorQuoteReplyCard(props: {
                   data-magic-icon="quote"
                   data-magic-label="Open quote file"
                   data-magic-id={`wedding:quote-reply:${props.flow.id}:quote-file`}
-                  class="mt-3 inline-flex rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2"
+                  class="mt-3 inline-flex rounded-full border border-rose-200 bg-white px-3 py-1.5 text-sm font-semibold text-rose-950 transition hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-700 focus:ring-offset-2"
                 >
                   Open quote file
                 </a>
               )}
             </Show>
-            <div class="mt-3 rounded-xl border border-emerald-100 bg-white/80 p-3">
-              <p class="text-sm font-semibold text-emerald-950">Recommendation</p>
-              <div class="mt-2 flex flex-wrap items-center gap-2">
-                <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-950">
-                  {props.flow.recommendationLabel}
-                </span>
-                <span class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-emerald-900">
-                  {props.flow.recommendationConfidenceLabel}
-                </span>
-              </div>
-              <p class="mt-1 break-words text-sm leading-6 text-emerald-900/75">
-                {props.flow.recommendationRationale}
-              </p>
-              <Show when={props.flow.recommendationWhyLabels.length > 0}>
-                <div class="mt-3 rounded-lg bg-emerald-50/75 p-2">
-                  <p class="text-xs font-semibold uppercase text-emerald-800/60">Why</p>
-                  <ul class="mt-1 space-y-1">
-                    <For each={props.flow.recommendationWhyLabels.slice(0, 5)}>
-                      {(label) => <li class="break-words text-xs leading-5 text-emerald-900/75">{label}</li>}
-                    </For>
-                  </ul>
-                </div>
-              </Show>
-            </div>
             <Show when={quoteDetailsOpen()}>
               <div id={quoteDetailsId()} class="mt-3">
                 <Show when={quote().inclusions.length > 0}>
-                  <div class="rounded-lg bg-emerald-50/75 p-2">
-                    <p class="text-xs font-semibold uppercase text-emerald-800/60">Included</p>
+                  <div class="rounded-xl bg-stone-100/75 p-3">
+                    <p class="text-xs font-bold uppercase tracking-[0.08em] text-stone-500">Included</p>
                     <ul class="mt-1 space-y-1">
                       <For each={quote().inclusions}>
-                        {(item) => <li class="break-words text-sm leading-5 text-emerald-900/75">{item}</li>}
+                        {(item) => <li class="break-words text-sm leading-5 text-stone-700">{item}</li>}
                       </For>
                     </ul>
                   </div>
                 </Show>
                 <Show when={quoteAttachmentMessage()}>
                   {(message) => (
-                    <div class="mt-3 rounded-xl border border-emerald-100 bg-white/80 p-3">
-                      <p class="mb-2 text-sm font-semibold text-emerald-950">Original file</p>
+                    <div class="mt-3 rounded-xl border border-stone-200 bg-white p-3">
+                      <p class="mb-2 text-sm font-semibold text-stone-950">Original file</p>
                       <AttachmentsRenderer message={message()} />
                       <Show when={props.attachmentParserState}>
                         {(parser) => (
@@ -542,17 +603,17 @@ export function WeddingVendorQuoteReplyCard(props: {
             </Show>
           </div>
 
-          <div class="min-w-0 rounded-xl border border-emerald-100 bg-white/85 p-3">
-            <p class="text-sm font-semibold text-emerald-950">{presentation().replySectionLabel}</p>
-            <p class="mt-1 text-sm leading-6 text-emerald-900/75">
+          <div class="min-w-0 border-t border-dashed border-rose-100 pt-4">
+            <p class="text-sm font-bold uppercase tracking-[0.12em] text-stone-500">{presentation().replySectionLabel}</p>
+            <p class="mt-1 text-sm leading-6 text-stone-700">
               {presentation().decisionPromptLabel}
             </p>
             <Show
               when={showReplyEditor()}
               fallback={(
-                <div class="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
+                <div class="mt-3 rounded-2xl border border-stone-200 bg-white p-3">
                   <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="break-words text-sm font-semibold text-emerald-950">
+                    <p class="break-words text-sm font-semibold text-stone-950">
                       {presentation().readOnlyReplyLabel ?? "Reply wording is approved."}
                     </p>
                     <button
@@ -563,12 +624,12 @@ export function WeddingVendorQuoteReplyCard(props: {
                       data-magic-icon="edit"
                       data-magic-label="Edit reply"
                       data-magic-id={`wedding:quote-reply:${props.flow.id}:edit-reply`}
-                      class="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                      class="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-sm font-semibold text-rose-950 transition hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Edit reply
                     </button>
                   </div>
-                  <p class="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-white/80 p-3 text-sm leading-6 text-emerald-900/75">
+                  <p class="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-white p-3 text-sm leading-6 text-stone-800">
                     {props.flow.draftBody}
                   </p>
                 </div>
@@ -625,8 +686,8 @@ export function WeddingVendorQuoteReplyCard(props: {
               </div>
             </Show>
 
-            <div class="mt-3 grid gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
-              <label class="flex items-start gap-2 text-sm leading-5 text-emerald-950">
+            <div class="mt-4 grid gap-3">
+              <label class="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold leading-5 text-emerald-950">
                 <input
                   type="checkbox"
                   checked={wordingChecked()}
@@ -649,7 +710,7 @@ export function WeddingVendorQuoteReplyCard(props: {
                 <span>I have reviewed the wording.</span>
               </label>
               <Show when={quote().budgetDeltaLabel}>
-                <label class="flex items-start gap-2 text-sm leading-5 text-emerald-950">
+                <label class="flex items-start gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold leading-5 text-stone-950">
                   <input
                     type="checkbox"
                     checked={budgetChecked()}
@@ -716,7 +777,7 @@ export function WeddingVendorQuoteReplyCard(props: {
             </Show>
 
             <div class="mt-3 flex flex-wrap gap-2">
-              <p class="basis-full break-words text-sm leading-6 text-emerald-900/75">
+              <p class="basis-full break-words text-sm leading-6 text-stone-700">
                 {uiCopy().sendStatusCopy}
               </p>
               <button
@@ -731,7 +792,7 @@ export function WeddingVendorQuoteReplyCard(props: {
                 data-magic-alt-icon={presentation().secondaryActionKind === "edit_reply" ? "edit" : "quote"}
                 data-magic-alt-label={presentation().secondaryActionLabel ?? undefined}
                 data-magic-id={`wedding:quote-reply:${props.flow.id}:primary`}
-                class="rounded-full bg-emerald-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                class="rounded-2xl bg-stone-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-stone-300 sm:flex-1"
               >
                 {props.busy ? props.busyLabel ?? "Working..." : presentation().primaryActionLabel}
               </button>
@@ -746,7 +807,7 @@ export function WeddingVendorQuoteReplyCard(props: {
                     data-magic-icon={presentation().secondaryActionKind === "edit_reply" ? "edit" : "quote"}
                     data-magic-label={label()}
                     data-magic-id={`wedding:quote-reply:${props.flow.id}:secondary`}
-                    class="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    class="rounded-2xl bg-rose-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-rose-800 focus:outline-none focus:ring-2 focus:ring-rose-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
                   >
                     {label()}
                   </button>

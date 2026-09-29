@@ -18,6 +18,25 @@ export function weddingWorkspaceMenuForArrival(
   return null;
 }
 
+export function weddingWorkspaceArrivalMenuApplyKey(
+  intent: WeddingNavigationIntent | null | undefined,
+  arrivalMenu: WeddingWorkspaceMenuId | null | undefined,
+): string | null {
+  if (!intent || !arrivalMenu) return null;
+  const savedAtValue = (intent as unknown as Record<string, unknown>)["savedAt"];
+  const savedAt = typeof savedAtValue === "string" ? savedAtValue : "";
+  return [
+    savedAt,
+    intent.view,
+    intent.surface,
+    intent.weddingPlanId,
+    intent.responseWorkspaceId,
+    intent.sourceResponseId ?? "",
+    intent.artifactId ?? "",
+    arrivalMenu,
+  ].join("|");
+}
+
 export function weddingTemplateHomeResetKey(
   intent: WeddingNavigationIntent | null | undefined,
 ): string | null {

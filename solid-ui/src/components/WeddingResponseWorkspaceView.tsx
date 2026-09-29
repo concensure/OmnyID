@@ -39,6 +39,12 @@ import {
   weddingApprovalReceiptToVendorThreadAfpSendInput,
 } from "@/lib/weddingApprovalReceiptAfpProjectionState";
 import type { WeddingExportManifestEntry } from "@/lib/weddingExportState";
+import {
+  normalizeWeddingHomeSectionOrder,
+  shouldShowWeddingHomeSection,
+  WEDDING_HOME_SECTION_IDS,
+  type WeddingHomeSectionId,
+} from "@/lib/weddingHomeSectionPolicyState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import { buildWeddingResearchPromptAction } from "@/lib/weddingRecommendationGenerationActionState";
 import { buildWeddingSelectedVendorFollowUpCtaState } from "@/lib/weddingSelectedVendorFollowUpCtaState";
@@ -72,22 +78,6 @@ import { weddingVendorQuoteReceiptPersistenceNotice } from "@/lib/weddingVendorQ
 import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
 
-const WEDDING_HOME_SECTION_IDS = [
-  "next_step",
-  "vendor_search",
-  "planning_basics",
-  "notice",
-  "overview",
-  "status",
-  "threads",
-  "quote_replies",
-  "decision_focus",
-  "resilience",
-  "approval",
-] as const;
-
-type WeddingHomeSectionId = typeof WEDDING_HOME_SECTION_IDS[number];
-
 type WeddingHomeSection = {
   id: WeddingHomeSectionId;
   title: string;
@@ -95,27 +85,8 @@ type WeddingHomeSection = {
   render: () => JSX.Element;
 };
 
-const WEDDING_HOME_SECTION_SET = new Set<string>(WEDDING_HOME_SECTION_IDS);
-
 function weddingHomeLayoutStorageKey(scope: string): string {
   return `omnyid:wedding_home_card_order:${scope}`;
-}
-
-function normalizeWeddingHomeSectionOrder(value: unknown): WeddingHomeSectionId[] {
-  const raw = Array.isArray(value) ? value : [];
-  const seen = new Set<WeddingHomeSectionId>();
-  const order: WeddingHomeSectionId[] = [];
-  for (const candidate of raw) {
-    if (typeof candidate !== "string" || !WEDDING_HOME_SECTION_SET.has(candidate)) continue;
-    const id = candidate as WeddingHomeSectionId;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    order.push(id);
-  }
-  for (const id of WEDDING_HOME_SECTION_IDS) {
-    if (!seen.has(id)) order.push(id);
-  }
-  return order;
 }
 
 function loadWeddingHomeSectionOrder(scope: string): WeddingHomeSectionId[] {
@@ -1020,6 +991,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
               return (
                 <WeddingVendorQuoteReplyCard
                   flow={flow()}
+                  surface="home"
                   recipient={flow().recipient}
                   subject={flow().subject}
                   draftBody={flow().draftBody}
@@ -1078,7 +1050,9 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   ]);
 
   const orderedHomeSections = createMemo(() => {
-    const sections = homeSections().filter((section) => section.visible);
+    const sections = homeSections().filter((section) =>
+      section.visible && shouldShowWeddingHomeSection(section.id)
+    );
     const order = normalizeWeddingHomeSectionOrder(homeSectionOrder());
     const orderById = new Map(order.map((id, index) => [id, index]));
     return sections.slice().sort((left, right) =>

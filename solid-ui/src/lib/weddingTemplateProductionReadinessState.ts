@@ -78,12 +78,12 @@ function launchGuardrailsReady(launch: WeddingTemplateLaunchState | null | undef
     .map((artifact) => artifact.markdown)
     .join("\n") ?? "";
   const firstResponsePrompt = launch?.firstResponsePrompt ?? "";
-  const labels = launch?.launchLabels ?? [];
+  const guardrailText = `${artifactMarkdown}\n${firstResponsePrompt}`;
   return /No live vendor availability/i.test(artifactMarkdown)
     && /Ask first:/i.test(firstResponsePrompt)
-    && labels.includes("No demo vendor claims")
-    && labels.includes("Need-To-Know first")
-    && labels.includes("Real workspace");
+    && /Need-To-Know/i.test(guardrailText)
+    && /private|approval-gated|approves sharing/i.test(guardrailText)
+    && /Do not claim live availability|No live vendor availability/i.test(guardrailText);
 }
 
 export function buildWeddingTemplateProductionReadinessState(

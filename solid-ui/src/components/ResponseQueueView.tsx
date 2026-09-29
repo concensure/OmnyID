@@ -27,7 +27,11 @@ import {
   WEDDING_WORKSPACE_MENU_EVENT,
   type WeddingWorkspaceMenuId,
 } from "@/lib/weddingWorkspaceMenuState";
-import { weddingTemplateHomeResetKey, weddingWorkspaceMenuForArrival } from "@/lib/weddingWorkspaceMenuArrivalState";
+import {
+  weddingTemplateHomeResetKey,
+  weddingWorkspaceArrivalMenuApplyKey,
+  weddingWorkspaceMenuForArrival,
+} from "@/lib/weddingWorkspaceMenuArrivalState";
 import { saveWeddingReturnIntent } from "@/lib/weddingReturnIntentState";
 import {
   loadWeddingEntrySource,
@@ -570,6 +574,7 @@ export function ResponseQueueView(props: {
       weddingUploadFilesControlRef?.focus({ preventScroll: true });
     }, 0);
   }
+  const [weddingArrivalMenuAppliedKey, setWeddingArrivalMenuAppliedKey] = createSignal<string | null>(null);
   createEffect(() => {
     const intent = weddingNavigationIntent();
     const userId = weddingStorageUserId();
@@ -626,7 +631,11 @@ export function ResponseQueueView(props: {
   createEffect(() => {
     const intent = weddingNavigationIntent();
     const arrivalMenu = weddingWorkspaceMenuForArrival(intent);
-    if (arrivalMenu && weddingWorkspaceMenu() !== arrivalMenu) setWeddingWorkspaceMenu(arrivalMenu);
+    const arrivalKey = weddingWorkspaceArrivalMenuApplyKey(intent, arrivalMenu);
+    if (!arrivalKey || !arrivalMenu) return;
+    if (weddingArrivalMenuAppliedKey() === arrivalKey) return;
+    setWeddingArrivalMenuAppliedKey(arrivalKey);
+    if (weddingWorkspaceMenu() !== arrivalMenu) setWeddingWorkspaceMenu(arrivalMenu);
   });
   const [weddingTemplateHomeLaunchKey, setWeddingTemplateHomeLaunchKey] = createSignal<string | null>(null);
   createEffect(() => {

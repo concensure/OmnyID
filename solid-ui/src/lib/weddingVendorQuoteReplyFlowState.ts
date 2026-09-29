@@ -191,6 +191,14 @@ export type WeddingVendorQuoteReplyContextualSurfaceState = {
   } | null;
 };
 
+export type WeddingVendorQuoteReplyHomeSurfaceState = {
+  quoteActionLabel: string;
+  quoteActionKind: "open_attachment" | "show_quote_details";
+  replyActionLabel: string;
+  replyActionKind: "open_reply_editor" | "review_send" | "review_budget" | "resolve_blocker";
+  budgetImpactLabel: string | null;
+};
+
 export type WeddingVendorQuoteReplyPendingSendTokenState = {
   stillCurrent: boolean;
 };
@@ -613,6 +621,39 @@ export function weddingVendorQuoteReplyPresentationState(input: {
     readOnlyReplyLabel: showReplyEditor
       ? null
       : `Reply wording is approved for ${vendorName}.`,
+  };
+}
+
+export function weddingVendorQuoteReplyHomeSurfaceState(input: {
+  flow: Pick<WeddingVendorQuoteReplyFlowState, "quote" | "stage" | "failureMessage" | "canSend">;
+  presentation?: Pick<WeddingVendorQuoteReplyPresentationState, "budgetAcknowledgementLabel"> | null;
+}): WeddingVendorQuoteReplyHomeSurfaceState {
+  const hasAttachment = Boolean(clean(input.flow.quote.attachmentUrl));
+  const budgetImpact = clean(input.presentation?.budgetAcknowledgementLabel)
+    || (clean(input.flow.quote.budgetDeltaLabel)
+      ? `Budget impact: ${clean(input.flow.quote.budgetDeltaLabel)}`
+      : null);
+  const replyActionKind: WeddingVendorQuoteReplyHomeSurfaceState["replyActionKind"] =
+    input.flow.stage === "ready_to_send"
+      ? "review_send"
+      : input.flow.stage === "needs_budget_acknowledgement"
+        ? "review_budget"
+        : input.flow.stage === "blocked" && !input.flow.canSend
+          ? "resolve_blocker"
+          : "open_reply_editor";
+  const replyActionLabel = replyActionKind === "review_send"
+    ? "Review and send"
+    : replyActionKind === "review_budget"
+      ? "Review reply"
+      : replyActionKind === "resolve_blocker"
+        ? "Resolve setup"
+        : "Suggest a reply";
+  return {
+    quoteActionLabel: "See the quote",
+    quoteActionKind: hasAttachment ? "open_attachment" : "show_quote_details",
+    replyActionLabel,
+    replyActionKind,
+    budgetImpactLabel: budgetImpact,
   };
 }
 

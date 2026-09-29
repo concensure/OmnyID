@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { buildWeddingApprovalReceiptState } from "@/lib/weddingApprovalState";
 import type { WeddingArtifactQuotePreview } from "@/lib/weddingArtifactPreviewState";
 import {
   buildWeddingVendorQuoteReplyFlowState,
@@ -10,6 +11,7 @@ import {
   weddingVendorQuoteReplyDraftSyncState,
   weddingVendorQuoteReplyEditorDirtyState,
   weddingVendorQuoteReplyExecutionSelectionState,
+  weddingVendorQuoteReplyHomeSurfaceState,
   weddingVendorQuoteReplyRequestMatchState,
   weddingVendorQuoteReplyBusyLabelState,
   weddingVendorQuoteReplyContextualSurfaceState,
@@ -95,6 +97,96 @@ test("vendor quote reply contextual surface exposes status recommendation why an
     kind: "edit_reply",
     label: "Edit reply",
   });
+});
+
+test("vendor quote reply home surface stays compact while preserving dynamic actions", () => {
+  const flow = buildWeddingVendorQuoteReplyFlowState({
+    quote,
+    metadata,
+    recipient: "hello@chloes.example",
+    subject: "Floral quote",
+    draftBody: "Thanks Chloe, we would like to proceed.",
+    approvedWording: true,
+    budgetImpactAcknowledged: true,
+  });
+
+  const surface = weddingVendorQuoteReplyHomeSurfaceState({
+    flow,
+    presentation: weddingVendorQuoteReplyPresentationState({ flow }),
+  });
+
+  assert.equal(surface.quoteActionLabel, "See the quote");
+  assert.equal(surface.quoteActionKind, "open_attachment");
+  assert.equal(surface.replyActionLabel, "Review and send");
+  assert.equal(surface.replyActionKind, "review_send");
+  assert.match(surface.budgetImpactLabel ?? "", /\$200 over budget/);
+});
+
+test("vendor quote reply home surface exposes budget and setup review states", () => {
+  const budgetFlow = buildWeddingVendorQuoteReplyFlowState({
+    quote: { ...quote, attachmentUrl: null },
+    metadata,
+    recipient: "hello@chloes.example",
+    subject: "Floral quote",
+    draftBody: "Thanks Chloe, we would like to proceed.",
+    approvedWording: true,
+    budgetImpactAcknowledged: false,
+  });
+  const readyForSetupFlow = buildWeddingVendorQuoteReplyFlowState({
+    quote,
+    metadata,
+    recipient: "hello@chloes.example",
+    subject: "Floral quote",
+    draftBody: "Thanks Chloe, we would like to proceed.",
+    approvedWording: true,
+    budgetImpactAcknowledged: true,
+  });
+  const setupFlow = buildWeddingVendorQuoteReplyFlowState({
+    quote,
+    metadata,
+    recipient: "hello@chloes.example",
+    subject: "Floral quote",
+    draftBody: "Thanks Chloe, we would like to proceed.",
+    approvedWording: true,
+    budgetImpactAcknowledged: true,
+    execution: {
+      requestId: "approval-1",
+      actionKind: "send_email",
+      status: "blocked",
+      canRetry: false,
+      receipt: {
+        ...buildWeddingApprovalReceiptState(
+          readyForSetupFlow.approvalRequest,
+          "2026-09-27T03:30:00.000Z",
+        ),
+        status: "blocked",
+        metadata: {
+          ...buildWeddingApprovalReceiptState(
+            readyForSetupFlow.approvalRequest,
+            "2026-09-27T03:30:00.000Z",
+          ).metadata,
+          blocked_reason: "Gmail connection required before sending.",
+        },
+      },
+      externalId: null,
+      message: "Gmail connection required before sending.",
+    },
+  });
+
+  const budgetSurface = weddingVendorQuoteReplyHomeSurfaceState({
+    flow: budgetFlow,
+    presentation: weddingVendorQuoteReplyPresentationState({ flow: budgetFlow }),
+  });
+  const setupSurface = weddingVendorQuoteReplyHomeSurfaceState({
+    flow: setupFlow,
+    presentation: weddingVendorQuoteReplyPresentationState({ flow: setupFlow }),
+  });
+
+  assert.equal(budgetSurface.quoteActionKind, "show_quote_details");
+  assert.equal(budgetSurface.replyActionLabel, "Review reply");
+  assert.equal(budgetSurface.replyActionKind, "review_budget");
+  assert.equal(setupSurface.replyActionLabel, "Resolve setup");
+  assert.equal(setupSurface.replyActionKind, "resolve_blocker");
 });
 
 test("vendor quote reply contextual surface collapses sent flow to receipt semantics", () => {

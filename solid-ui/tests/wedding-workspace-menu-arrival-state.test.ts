@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  weddingWorkspaceArrivalMenuApplyKey,
   weddingTemplateHomeResetKey,
   weddingWorkspaceMenuForArrival,
 } from "../src/lib/weddingWorkspaceMenuArrivalState.ts";
@@ -29,6 +30,31 @@ function intent(overrides: Partial<WeddingNavigationIntent> = {}): WeddingNaviga
 
 test("weddingWorkspaceMenuForArrival opens Documents for document arrivals", () => {
   assert.equal(weddingWorkspaceMenuForArrival(intent()), "documents");
+});
+
+test("weddingWorkspaceArrivalMenuApplyKey scopes automatic menu selection to one arrival", () => {
+  const base = intent({
+    savedAt: "2026-09-29T00:00:00.000Z",
+    artifactId: "artifact:quote",
+  });
+
+  assert.equal(
+    weddingWorkspaceArrivalMenuApplyKey(base, "documents"),
+    "2026-09-29T00:00:00.000Z|response_queue|planning_files|wedding_plan:arrival|response_workspace:arrival|response:arrival|artifact:quote|documents",
+  );
+  assert.notEqual(
+    weddingWorkspaceArrivalMenuApplyKey(base, "documents"),
+    weddingWorkspaceArrivalMenuApplyKey({ ...base, artifactId: "artifact:budget" }, "documents"),
+  );
+  assert.notEqual(
+    weddingWorkspaceArrivalMenuApplyKey(base, "documents"),
+    weddingWorkspaceArrivalMenuApplyKey(base, "budget"),
+  );
+});
+
+test("weddingWorkspaceArrivalMenuApplyKey stays null without an intent or arrival menu", () => {
+  assert.equal(weddingWorkspaceArrivalMenuApplyKey(null, "documents"), null);
+  assert.equal(weddingWorkspaceArrivalMenuApplyKey(intent(), null), null);
 });
 
 test("weddingWorkspaceMenuForArrival keeps intake launches on the current home flow", () => {
