@@ -16,6 +16,18 @@ $script:OracleRemoteSecretFileNames = @{
     "OMNYID_NVIDIA_API_KEY_FILE"      = "omnyid_nvidia_api_key"
     "OMNYID_RUNPOD_API_KEY_FILE"      = "omnyid_runpod_api_key"
     "OMNYID_OPENAI_API_KEY_FILE"      = "omnyid_openai_api_key"
+    "OMNYID_ADMIN_BRAVE_SEARCH_API_KEY_FILE" = "omnyid_brave_search_api_key"
+    "OMNYID_BRAVE_SEARCH_API_KEY_FILE"       = "omnyid_brave_search_api_key"
+    "BRAVE_SEARCH_API_KEY_FILE"              = "omnyid_brave_search_api_key"
+    "OMNYID_ADMIN_GOOGLE_PLACES_API_KEY_FILE" = "omnyid_google_places_api_key"
+    "OMNYID_GOOGLE_PLACES_API_KEY_FILE"       = "omnyid_google_places_api_key"
+    "GOOGLE_PLACES_API_KEY_FILE"              = "omnyid_google_places_api_key"
+    "GOOGLE_MAPS_API_KEY_FILE"                = "omnyid_google_places_api_key"
+    "OMNYID_ADMIN_GOOGLE_MAPS_KEY_FILE"       = "omnyid_google_maps_key"
+    "OMNYID_GOOGLE_MAPS_KEY_FILE"             = "omnyid_google_maps_key"
+    "OMNYID_ADMIN_WEATHERAPI_KEY_FILE"        = "omnyid_weatherapi_key"
+    "OMNYID_WEATHERAPI_KEY_FILE"              = "omnyid_weatherapi_key"
+    "WEATHERAPI_KEY_FILE"                     = "omnyid_weatherapi_key"
 }
 
 function Remove-OracleEnvMatchingQuotes {

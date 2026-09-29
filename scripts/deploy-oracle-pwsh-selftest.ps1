@@ -194,11 +194,7 @@ param([string]`$EnvFile)
     $deployScriptBody = $deployScriptBody -replace [regex]::Escape("& scp.exe"), "Invoke-FakeScp"
     $deployScriptHelpers = @"
 function Invoke-FakeSsh {
-    param(
-        [string]`$i,
-        [Parameter(ValueFromRemainingArguments = `$true)] [object[]]`$Remaining
-    )
-    `$line = ((@('-i', `$i) + (`$Remaining | ForEach-Object { [string]`$_ })) -join " ")
+    `$line = ((`$args | ForEach-Object { [string]`$_ }) -join " ")
     Add-Content -Path "$tmpRoot\ssh.log" -Value `$line
     if (`$line -like "*echo present; else echo missing; fi*") {
         "present"
@@ -206,11 +202,7 @@ function Invoke-FakeSsh {
 }
 
 function Invoke-FakeScp {
-    param(
-        [string]`$i,
-        [Parameter(ValueFromRemainingArguments = `$true)] [object[]]`$Remaining
-    )
-    Add-Content -Path "$tmpRoot\scp.log" -Value ((@('-i', `$i) + (`$Remaining | ForEach-Object { [string]`$_ })) -join " ")
+    Add-Content -Path "$tmpRoot\scp.log" -Value (((`$args | ForEach-Object { [string]`$_ })) -join " ")
 }
 
 "@
