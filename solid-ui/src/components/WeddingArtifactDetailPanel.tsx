@@ -23,6 +23,7 @@ import {
   loadWeddingDecisionSelections,
   toggleWeddingDecisionSelectionValue,
 } from "@/lib/weddingDecisionSelectionState";
+import { weddingVendorPhotoPlaceholder } from "@/lib/weddingVendorPhotoPlaceholderState";
 
 function uniqueStrings(values: readonly string[]): string[] {
   const seen = new Set<string>();
@@ -393,22 +394,26 @@ function ArtifactPreviewCard(props: {
                   card.mapUrl ? { label: "Map", value: card.mapUrl, href: card.mapUrl } : null,
                   card.sourceUrl ? { label: "Source", value: card.sourceUrl, href: card.sourceUrl } : null,
                 ].filter((item): item is { label: string; value: string; href: string | null } => item !== null);
+                const [imageFailed, setImageFailed] = createSignal(false);
+                const placeholder = () => weddingVendorPhotoPlaceholder({ vendorName: card.title, category: null });
                 return (
                 <article class="min-w-0 overflow-hidden rounded-xl border border-teal-100 bg-white/85">
                   <Show
-                    when={card.imageUrl}
+                    when={card.imageUrl && !imageFailed()}
                     fallback={
-                      <div class="flex aspect-[4/3] items-center justify-center bg-teal-50 px-3 text-center text-xs font-semibold text-teal-900/65">
-                        Image pending from source
+                      <div class={`flex aspect-[4/3] flex-col items-center justify-center gap-1 px-3 text-center ${placeholder().toneClass}`}>
+                        <span class="text-lg font-semibold">{placeholder().initials}</span>
+                        <span class="text-xs font-medium">{placeholder().label}</span>
                       </div>
                     }
                   >
-                    {(imageUrl) => (
+                    {(_shown) => (
                       <img
-                        src={imageUrl()}
+                        src={card.imageUrl as string}
                         alt={card.imageAlt ?? `${card.title} venue image`}
                         loading="lazy"
                         referrerPolicy="no-referrer"
+                        onError={() => setImageFailed(true)}
                         class="aspect-[4/3] w-full object-cover"
                       />
                     )}
