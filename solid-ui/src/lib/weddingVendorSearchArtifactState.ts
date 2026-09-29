@@ -62,6 +62,11 @@ type RankedVendorSource = {
   url: string;
   websiteUrl: string | null;
   mapUrl: string | null;
+  imageUrl: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  instagramUrl: string | null;
   snippet: string;
   score: number;
   preferenceMatchLabel: string;
@@ -113,20 +118,76 @@ function vendorChoiceActionRows(choices: readonly RankedVendorSource[]): Array<R
       source_url: choice.url,
       website_url: choice.websiteUrl,
       map_url: choice.mapUrl,
+      address: choice.address,
+      phone: choice.phone,
+      email: choice.email,
+      instagram_url: choice.instagramUrl,
       source_provider: choice.provider,
       actions,
     };
   });
 }
 
+function vendorChoiceCards(choices: readonly RankedVendorSource[]): Array<Record<string, unknown>> {
+  return choices.map((choice) => ({
+    choice_id: choice.id,
+    rank: choice.rank,
+    title: choice.title,
+    image_url: choice.imageUrl,
+    image_alt: choice.imageUrl ? `${choice.title} venue image` : null,
+    provider: choice.provider,
+    source_url: choice.url,
+    website_url: choice.websiteUrl,
+    map_url: choice.mapUrl,
+    address: choice.address,
+    phone: choice.phone,
+    email: choice.email,
+    instagram_url: choice.instagramUrl,
+    score: choice.score,
+    score_label: `Fit score ${choice.score}`,
+    preference_match: choice.preferenceMatchLabel,
+    situation_fit: choice.situationFitLabel,
+    rationale_labels: choice.rationaleLabels.slice(0, 5),
+    verification_label: choice.verificationLabel,
+  }));
+}
+
+function vendorChoiceContactDetails(choice: RankedVendorSource): Record<string, unknown> {
+  return {
+    choice_id: choice.id,
+    vendor_label: choice.title,
+    website_url: choice.websiteUrl,
+    map_url: choice.mapUrl,
+    instagram_url: choice.instagramUrl,
+    email: choice.email,
+    phone: choice.phone,
+    address: choice.address,
+    source_url: choice.url,
+    source_provider: choice.provider,
+  };
+}
+
+function contactSummaryLabel(choice: RankedVendorSource): string {
+  const labels = [
+    choice.websiteUrl ? "website" : null,
+    choice.instagramUrl ? "Instagram" : null,
+    choice.email ? "email" : null,
+    choice.phone ? "phone" : null,
+    choice.address ? "address" : null,
+    choice.mapUrl ? "map" : null,
+  ].filter(Boolean);
+  return labels.length > 0 ? labels.join(", ") : "Open source to verify contact details";
+}
+
 function sourceUrlLinks(
-  source: { title?: string | null; url?: string | null; website_url?: string | null; map_url?: string | null },
+  source: { title?: string | null; url?: string | null; website_url?: string | null; map_url?: string | null; instagram_url?: string | null },
   labelPrefix = "",
 ): Array<{ label: string; url: string }> {
   const title = clean(source.title) || "Vendor source";
   const entries = [
     { label: `${labelPrefix}${title}`, url: clean(source.url) },
     { label: `${labelPrefix}${title} website`, url: clean(source.website_url) },
+    { label: `${labelPrefix}${title} Instagram`, url: clean(source.instagram_url) },
     { label: `${labelPrefix}${title} map/reviews`, url: clean(source.map_url) },
   ];
   const seen = new Set<string>();
@@ -166,6 +227,27 @@ function tokenize(value: unknown): string[] {
     .toLowerCase()
     .split(/[^a-z0-9]+/i)
     .filter((token) => token.length >= 4 && !/^(wedding|vendor|vendors|with|from|that|this|have|need|needs|style)$/i.test(token)), 32);
+}
+
+function decodeSnippetText(value: string): string {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function stripSnippetHtml(value: string): string {
+  return decodeSnippetText(value).replace(/<\/?[^>]+>/g, "").replace(/\s+/g, " ").trim();
+}
+
+function vendorNameFromHighlightedSnippet(value: string): string | null {
+  const decoded = decodeSnippetText(value);
+  const match = decoded.match(/<strong>([^<]{3,90})<\/strong>/i);
+  const candidate = stripSnippetHtml(match?.[1] ?? "");
+  if (!candidate || /\b(?:best|top|venues?|locations?|packages?|pricing|request pricing)\b/i.test(candidate)) return null;
+  return candidate;
 }
 
 function comparisonPreferenceText(input: WeddingVendorComparisonInput): string {
@@ -390,6 +472,15 @@ function usableSourceUrl(source: { url?: string | null }): boolean {
   }
 }
 
+function publicImageUrl(value: unknown): string | null {
+  const url = clean(value);
+  if (/^\/wedding\/vendor-photo\/google\?name=/i.test(url)) return url;
+  if (!usableSourceUrl({ url })) return null;
+  return /\.(?:avif|gif|jpe?g|png|webp)(?:$|[?#])/i.test(url) || /(?:images|img|thumb|photo|media|cdn|cloudinary|unsplash|brave)/i.test(url)
+    ? url
+    : null;
+}
+
 function sourceHostname(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./i, "");
@@ -403,16 +494,26 @@ function rankedVendorSources(input: WeddingVendorComparisonInput): RankedVendorS
   const preferenceTokens = tokenize(comparisonPreferenceText(input));
   const locationTokens = tokenize(input.location);
   const categoryTokens = tokenize((input.vendorCategories ?? []).join(" "));
+  const venueSearchIntent = /\b(venue|venues|reception|ceremony|location|locations|beachfront|waterfront)\b/i.test(
+    `${comparisonPreferenceText(input)} ${(input.vendorCategories ?? []).join(" ")}`,
+  );
   const seen = new Set<string>();
   const ranked = execution.sources
     .filter(usableSourceUrl)
     .flatMap((source, index): RankedVendorSource[] => {
-      const title = clean(source.title) || sourceHostname(clean(source.url)) || `Vendor ${index + 1}`;
+      const rawSnippet = clean(source.snippet);
+      const inferredTitle = vendorNameFromHighlightedSnippet(rawSnippet);
+      const title = inferredTitle || clean(source.title) || sourceHostname(clean(source.url)) || `Vendor ${index + 1}`;
       const url = clean(source.url);
       const websiteUrl = clean(source.website_url) || null;
       const mapUrl = clean(source.map_url) || null;
+      const imageUrl = publicImageUrl(source.photo_url);
+      const address = clean(source.address) || null;
+      const phone = clean(source.phone) || null;
+      const email = clean(source.email) || null;
+      const instagramUrl = clean(source.instagram_url) || null;
       const provider = clean(source.provider) || clean(execution.providerLabel) || "Search";
-      const snippet = clean(source.snippet);
+      const snippet = stripSnippetHtml(rawSnippet);
       const key = `${title.toLowerCase()}|${sourceHostname(url).toLowerCase()}`;
       if (!url || seen.has(key)) return [];
       seen.add(key);
@@ -420,25 +521,42 @@ function rankedVendorSources(input: WeddingVendorComparisonInput): RankedVendorS
       const preferenceMatches = preferenceTokens.filter((token) => haystack.includes(token));
       const locationMatches = locationTokens.filter((token) => haystack.includes(token));
       const categoryMatches = categoryTokens.filter((token) => haystack.includes(token));
+      const venueSignal = venueSearchIntent && /\b(venue|venues|reception|ceremony|estate|guesthouse|ballroom|function|events?|weddings?)\b/i.test(haystack);
+      const beachfrontSignal = venueSearchIntent && /\b(beachfront|beach|waterfront|ocean|coastal|seaside|harbou?r|shore|shelly|palm beach|manly|bondi)\b/i.test(haystack);
+      const gothicSignal = venueSearchIntent && /\b(gothic|heritage|historic|sandstone|castle|church|chapel|cathedral|victorian|revival|convict)\b/i.test(haystack);
+      const capacitySignal = venueSearchIntent && /\b(?:60|sixty|guests?|50\s*(?:-|to)\s*80|40\s*(?:-|to)\s*80|intimate|small wedding)\b/i.test(haystack);
       const transparentPricing = /\b(package|packages|pricing|price|investment|quote|rates?)\b/i.test(haystack);
       const portfolioSignal = /\b(portfolio|gallery|review|reviews|testimonial|instagram|award)\b/i.test(haystack);
       const availabilitySignal = /\b(available|availability|booking|bookings|calendar|date)\b/i.test(haystack);
+      const directorySignal = /\b(best|top|guide|directory|list|venues in|wedding venues)\b/i.test(`${title} ${sourceHostname(url)}`);
       const score = 10
         + preferenceMatches.length * 5
         + categoryMatches.length * 4
         + locationMatches.length * 3
+        + (venueSignal ? 4 : 0)
+        + (beachfrontSignal ? 6 : 0)
+        + (gothicSignal ? 6 : 0)
+        + (capacitySignal ? 4 : 0)
         + (transparentPricing ? 3 : 0)
         + (portfolioSignal ? 2 : 0)
         + (availabilitySignal ? 2 : 0)
+        + (imageUrl ? 2 : 0)
         + (/google_places|google/i.test(provider) ? 2 : 0)
+        - (directorySignal && !/google_places|admin vendor database/i.test(provider) ? 2 : 0)
         + Math.max(0, 4 - index);
       const rationaleLabels = [
         preferenceMatches.length > 0 ? `Matches ${preferenceMatches.slice(0, 3).join(", ")}` : null,
         categoryMatches.length > 0 ? `Category signal: ${categoryMatches.slice(0, 2).join(", ")}` : null,
         locationMatches.length > 0 ? `Location signal: ${locationMatches.slice(0, 2).join(", ")}` : null,
+        venueSignal ? "Venue/reception signal found" : null,
+        beachfrontSignal ? "Beachfront/coastal signal found" : null,
+        gothicSignal ? "Gothic/heritage atmosphere signal found" : null,
+        capacitySignal ? "Capacity clue fits around 60 guests" : null,
         transparentPricing ? "Pricing/package language found" : null,
         portfolioSignal ? "Portfolio/review signal found" : null,
         availabilitySignal ? "Availability/booking signal found" : null,
+        imageUrl ? "Image available for card display" : null,
+        inferredTitle ? "Venue name inferred from source snippet" : null,
         `Source provider: ${provider}`,
       ].filter((item): item is string => Boolean(item));
       return [{
@@ -449,6 +567,11 @@ function rankedVendorSources(input: WeddingVendorComparisonInput): RankedVendorS
         url,
         websiteUrl,
         mapUrl,
+        imageUrl,
+        address,
+        phone,
+        email,
+        instagramUrl,
         snippet,
         score,
         preferenceMatchLabel: preferenceMatches.length > 0
@@ -457,6 +580,10 @@ function rankedVendorSources(input: WeddingVendorComparisonInput): RankedVendorS
         situationFitLabel: [
           categoryMatches.length > 0 ? `Category: ${categoryMatches.slice(0, 2).join(", ")}` : null,
           locationMatches.length > 0 ? `Location: ${locationMatches.slice(0, 2).join(", ")}` : null,
+          venueSignal ? "Venue/reception clue" : null,
+          beachfrontSignal ? "Beachfront/coastal clue" : null,
+          gothicSignal ? "Gothic/heritage clue" : null,
+          capacitySignal ? "Capacity around 60 clue" : null,
           transparentPricing ? "Package/pricing clue" : null,
           portfolioSignal ? "Portfolio/review clue" : null,
         ].filter(Boolean).join("; ") || "Fit requires source-page review.",
@@ -472,54 +599,66 @@ function rankedVendorSources(input: WeddingVendorComparisonInput): RankedVendorS
 function a2uiForComparison(choices: readonly RankedVendorSource[], summary: string): Record<string, unknown> {
   const columns = choices.map((choice) => `#${choice.rank} ${choice.title}`);
   const choiceActions = vendorChoiceActionRows(choices);
+  const cards = vendorChoiceCards(choices);
   return {
     schema_version: "a2ui.v1",
     kind: "panel",
     title: "Top vendor comparison",
     description: summary,
-    components: [{
-      type: "comparison_table",
-      props: {
-        title: choices.length > 3 ? "Top vendor choices" : "Top three vendor choices",
-        description: summary,
-        columns,
-        rows: [
-          { label: "Why surfaced", values: choices.map((choice) => choice.rationaleLabels.slice(0, 2).join("; ")) },
-          { label: "Preference match", values: choices.map((choice) => choice.preferenceMatchLabel) },
-          { label: "Situation fit", values: choices.map((choice) => choice.situationFitLabel) },
-          { label: "Verify before action", values: choices.map((choice) => choice.verificationLabel) },
-          { label: "Source", values: choices.map((choice) => choice.url) },
-        ],
-        selection: {
-          mode: "multi",
-          id_field: "choice_id",
-          min_selected: 1,
-          confirm_action: {
-            kind: "confirm_vendor_choices",
-            label: "Confirm selected vendors",
-            requires_user_confirmation: true,
-            approval_required_before_outreach: true,
-          },
+    components: [
+      {
+        type: "vendor_recommendation_cards",
+        props: {
+          title: choices.length > 3 ? "Recommended venue shortlist" : "Recommended top three",
+          description: "Images appear only when a safe public image URL is available from a provider or the admin vendor database.",
+          cards,
         },
-        column_actions: choiceActions,
-        footer_actions: [
-          {
-            kind: "confirm_vendor_choices",
-            label: "Confirm selected vendors",
-            enabled: true,
-            requires_user_confirmation: true,
-          },
-          {
-            kind: "prepare_follow_up_for_selected_vendors",
-            label: "Prepare follow-up for selected",
-            enabled: true,
-            requires_user_confirmation: true,
-            approval_required_before_outreach: true,
-            no_external_send_without_approval: true,
-          },
-        ],
       },
-    }],
+      {
+        type: "comparison_table",
+        props: {
+          title: choices.length > 3 ? "Top vendor choices" : "Top three vendor choices",
+          description: summary,
+          columns,
+          rows: [
+            { label: "Why surfaced", values: choices.map((choice) => choice.rationaleLabels.slice(0, 2).join("; ")) },
+            { label: "Preference match", values: choices.map((choice) => choice.preferenceMatchLabel) },
+            { label: "Situation fit", values: choices.map((choice) => choice.situationFitLabel) },
+            { label: "Contact details", values: choices.map((choice) => contactSummaryLabel(choice)) },
+            { label: "Verify before action", values: choices.map((choice) => choice.verificationLabel) },
+            { label: "Source", values: choices.map((choice) => choice.url) },
+          ],
+          selection: {
+            mode: "multi",
+            id_field: "choice_id",
+            min_selected: 1,
+            confirm_action: {
+              kind: "confirm_vendor_choices",
+              label: "Confirm selected vendors",
+              requires_user_confirmation: true,
+              approval_required_before_outreach: true,
+            },
+          },
+          column_actions: choiceActions,
+          footer_actions: [
+            {
+              kind: "confirm_vendor_choices",
+              label: "Confirm selected vendors",
+              enabled: true,
+              requires_user_confirmation: true,
+            },
+            {
+              kind: "prepare_follow_up_for_selected_vendors",
+              label: "Prepare follow-up for selected",
+              enabled: true,
+              requires_user_confirmation: true,
+              approval_required_before_outreach: true,
+              no_external_send_without_approval: true,
+            },
+          ],
+        },
+      },
+    ],
     actions: [
       {
         kind: "confirm_vendor_choices",
@@ -594,14 +733,15 @@ function comparisonMarkdown(input: WeddingVendorComparisonInput, choices: readon
     "",
     choices.length > 3 ? "## Top five candidates" : "## Top three",
     "",
-    "| Rank | Vendor | Why this surfaced | Preference match | Situation fit | Verify next | Source |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
+    "| Rank | Vendor | Why this surfaced | Preference match | Situation fit | Contact details | Verify next | Source |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ...choices.map((choice) => [
       `| ${choice.rank}`,
       choice.title,
       choice.rationaleLabels.slice(0, 3).join("; "),
       choice.preferenceMatchLabel,
       choice.situationFitLabel,
+      contactSummaryLabel(choice),
       choice.verificationLabel,
       choice.url,
     ].join(" | ") + " |"),
@@ -662,16 +802,20 @@ function markdownFor(
   ].filter((line): line is string => line !== null).join("\n");
 }
 
+function vendorSearchResultsCanCreateArtifacts(execution: WeddingVendorSearchExecutionState): boolean {
+  return execution.status === "executed" || execution.status === "cached";
+}
+
 export function buildWeddingVendorSearchArtifactState(input: {
   metadata?: unknown;
   execution: WeddingVendorSearchExecutionState;
 }): WeddingVendorSearchArtifactState {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
   const execution = input.execution;
-  if (execution.status !== "executed" || !execution.externalSearchPerformed) {
+  if (!vendorSearchResultsCanCreateArtifacts(execution)) {
     return {
       status: "not_created",
-      reason: "No live vendor sources were returned yet. Check that admin search/place provider keys are configured, then run the search again.",
+      reason: "No source-backed vendor results were returned yet. Check admin directory coverage or provider keys, then run the search again.",
       metadata,
       artifactInput: null,
       summary: null,
@@ -726,7 +870,7 @@ export function buildWeddingVendorSearchArtifactState(input: {
       unusableSourceUrlCount: unusableSourceCount,
     },
     sourceLabels,
-    sourceLinks,
+      sourceLinks,
     vendorLabels,
     bodyText: markdown,
     exportTargets: ["csv", "html", "browser_pdf"],
@@ -749,10 +893,10 @@ export function buildWeddingVendorComparisonArtifactState(
 ): WeddingVendorComparisonArtifactState {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
   const execution = input.execution;
-  if (execution.status !== "executed" || !execution.externalSearchPerformed) {
+  if (!vendorSearchResultsCanCreateArtifacts(execution)) {
     return {
       status: "not_created",
-      reason: "Vendor comparison was not created because live vendor search did not execute.",
+      reason: "Vendor comparison was not created because no source-backed vendor results were available.",
       metadata,
       artifactInput: null,
       summary: null,
@@ -782,9 +926,11 @@ export function buildWeddingVendorComparisonArtifactState(
     title: choice.title,
     url: choice.url,
     website_url: choice.websiteUrl,
+    instagram_url: choice.instagramUrl,
     map_url: choice.mapUrl,
   }, `#${choice.rank} `));
   const topChoiceActionRows = vendorChoiceActionRows(choices);
+  const topChoiceCards = vendorChoiceCards(choices);
   const preferenceSignals = comparisonPreferenceSignals(input);
   const recommendationHandoff = comparisonRecommendationHandoff({
     choices,
@@ -816,6 +962,8 @@ export function buildWeddingVendorComparisonArtifactState(
       topChoiceCount: choices.length,
       topChoiceLabels: choices.map((choice) => choice.title),
       topChoiceActionRows,
+      topChoiceCards,
+      topChoiceContactDetails: choices.map((choice) => vendorChoiceContactDetails(choice)),
       vendorComparisonPreferenceSignals: preferenceSignals,
       vendorComparisonHandoff: recommendationHandoff,
       vendorComparisonSelection: {

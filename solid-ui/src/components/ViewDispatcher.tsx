@@ -1,4 +1,4 @@
-import { Show, Suspense, lazy } from "solid-js";
+import { ErrorBoundary, Show, Suspense, lazy } from "solid-js";
 import type { AfpMessage, AfpView } from "@/lib/api";
 import { navigateToView } from "@/lib/decisionosNavigation";
 import { resolveViewDispatcherRouting } from "@/lib/viewDispatcherRouting";
@@ -93,6 +93,9 @@ export function ViewDispatcher(props: {
   const effectiveFormat = () => routing().effectiveFormat;
 
   return (
+    <ErrorBoundary fallback={(err, reset) => (
+      <RendererErrorFallback error={err} compact={props.compact} onReset={reset} />
+    )}>
     <article class="glass-surface rounded-xl border border-white/35 p-5 shadow-panel">
       <Show when={!props.compact}>
         <FormatBadge format={effectiveFormat()} agentDriven={routing().agentDriven} />
@@ -233,6 +236,37 @@ export function ViewDispatcher(props: {
           <BlueprintRenderer message={props.message} view={chosenView() ?? undefined} />
         </Show>
       </div>
+    </article>
+    </ErrorBoundary>
+  );
+}
+
+function RendererErrorFallback(props: { error: unknown; compact?: boolean; onReset: () => void }) {
+  const errorMessage = () => props.error instanceof Error ? props.error.message : String(props.error);
+  return (
+    <article
+      class={
+        props.compact
+          ? "rounded-xl border border-amber-300/25 bg-amber-50/80 px-3 py-2 text-[11px] text-amber-950"
+          : "glass-surface rounded-xl border border-amber-300/35 bg-amber-50/85 p-5 text-sm text-amber-950 shadow-panel"
+      }
+    >
+      <p class="font-semibold">This result could not render.</p>
+      <p class={props.compact ? "mt-1 leading-4" : "mt-2 leading-6"}>
+        The workspace kept the card contained so the rest of the page can continue working.
+      </p>
+      <p class={props.compact ? "mt-1 font-mono text-[10px] opacity-75" : "mt-3 rounded-xl border border-amber-200/70 bg-white/65 px-3 py-2 font-mono text-xs text-amber-900"}>
+        {errorMessage()}
+      </p>
+      <button
+        type="button"
+        class={props.compact
+          ? "mt-2 rounded-full border border-amber-400/40 px-2 py-1 text-[10px] font-semibold"
+          : "mt-4 rounded-full border border-amber-400/50 px-4 py-2 text-xs font-semibold transition hover:bg-amber-100"}
+        onClick={props.onReset}
+      >
+        Try rendering again
+      </button>
     </article>
   );
 }

@@ -24,6 +24,7 @@ import { normalizeWeddingPlanningMetadata, type WeddingPlanningMetadata } from "
 
 export type WeddingTemplateLaunchStarterCard = {
   id: string;
+  intent: WeddingTemplateStarterPrompt["intent"];
   label: string;
   prompt: string;
   recommended: boolean;
@@ -49,6 +50,7 @@ function clean(value: unknown): string {
 function starterCard(prompt: WeddingTemplateStarterPrompt): WeddingTemplateLaunchStarterCard {
   return {
     id: `wedding_starter:${prompt.intent}`,
+    intent: prompt.intent,
     label: prompt.label,
     prompt: prompt.prompt,
     recommended: prompt.recommended,
@@ -121,12 +123,6 @@ export function buildWeddingTemplateLaunchState(input: {
       nextQuestion ? `Ask first: ${nextQuestion.question}` : "Proceed with the selected starter prompt.",
       "Keep the response tied to this wedding plan and selected documents.",
     ].join(" "),
-    launchLabels: [
-      "Real workspace",
-      "No demo vendor claims",
-      "Need-To-Know first",
-      metadata.weddingPlanId,
-      metadata.responseWorkspaceId,
-    ],
+    launchLabels: [],
   };
 }

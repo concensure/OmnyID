@@ -62,6 +62,9 @@ type GmailAction = "label" | "reply" | "unsubscribe" | "summary";
 type ActionState = "idle" | "pending" | "done" | "error";
 type ComposerTone = "short" | "thoughtful" | "direct";
 
+const GMAIL_CONNECT_TOOLTIP =
+  "Connect Gmail so inbox actions can use your account. This list shows saved OmnyID email records and synced AFP events.";
+
 const GMAIL_ACTIONS: Array<{
   id: GmailAction;
   label: string;
@@ -125,7 +128,9 @@ function senderAvatarColor(sender: string, senderDetail?: string | null): string
 export function EmailView(props: {
   bootstrap: DashboardBootstrap | null;
   signedIn?: boolean;
+  focusConnectTick?: number;
 }) {
+  let connectGmailButtonRef: HTMLButtonElement | undefined;
   const sessionUserId = readSession()?.user?.id ?? null;
   const [gmailStatus, setGmailStatus] = createSignal<GmailConnectionStatus | null>(null);
   const [connecting, setConnecting] = createSignal(false);
@@ -152,6 +157,7 @@ export function EmailView(props: {
   const [gmailInboxSummary, setGmailInboxSummary] = createSignal<InboxSummary | null>(null);
   const [gmailInboxSummaryLoading, setGmailInboxSummaryLoading] = createSignal(false);
   const [gmailInboxSummaryError, setGmailInboxSummaryError] = createSignal<string | null>(null);
+  const [connectButtonHighlighted, setConnectButtonHighlighted] = createSignal(false);
   const [composerFeedback, setComposerFeedback] = createSignal<string | null>(null);
   const [expandedQuotedThreads, setExpandedQuotedThreads] = createSignal<Record<string, boolean>>({});
   const [lastActionFailureReceipt, setLastActionFailureReceipt] = createSignal<{
@@ -207,6 +213,17 @@ export function EmailView(props: {
       return;
     }
     setConnectError(signedInGmailRedirectFallbackMessage(gmailRedirectState));
+  });
+
+  createEffect(() => {
+    const tick = props.focusConnectTick ?? 0;
+    if (tick <= 0 || gmailStatus()?.connected) return;
+    queueMicrotask(() => {
+      connectGmailButtonRef?.scrollIntoView({ behavior: "smooth", block: "center", inline: "end" });
+      connectGmailButtonRef?.focus({ preventScroll: true });
+      setConnectButtonHighlighted(true);
+      window.setTimeout(() => setConnectButtonHighlighted(false), 2200);
+    });
   });
 
   function setAction(id: GmailAction, state: ActionState) {
@@ -603,6 +620,23 @@ export function EmailView(props: {
             {isDemo() ? "New draft" : "New email"}
           </button>
         </div>
+        <Show when={!gmailStatus()?.connected}>
+          <button
+            ref={connectGmailButtonRef}
+            type="button"
+            disabled={connecting() || gmailStatus()?.configured === false}
+            onClick={connectGmail}
+            title={isDemo()
+              ? "Sign in and connect Gmail so inbox actions can use your account. Messages appear here once OmnyID has saved or synced them as email records."
+              : GMAIL_CONNECT_TOOLTIP}
+            aria-label={props.signedIn ? "Connect Gmail" : "Sign in to connect Gmail"}
+            class={`inline-flex min-h-11 shrink-0 items-center rounded-full bg-[#ff6b35] px-4 text-sm font-semibold text-white transition hover:bg-[#ef5a25] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffb69b] disabled:cursor-not-allowed disabled:opacity-60 ${
+              connectButtonHighlighted() ? "ring-4 ring-[#ffb69b]/70" : ""
+            }`}
+          >
+            {connecting() ? "Connecting..." : props.signedIn ? "Connect Gmail" : "Sign in to connect Gmail"}
+          </button>
+        </Show>
       </div>
 
       <Show when={isDemo()}>
@@ -1155,23 +1189,13 @@ export function EmailView(props: {
                         when={gmailStatus()?.connected}
                         fallback={
                           <div class="mt-3 space-y-3">
-                            <p class="text-sm leading-6 text-[#6d6158]">
-                              {isDemo()
-                                ? "Sign in and connect Gmail so inbox actions can use your account. Messages appear here once OmnyID has saved or synced them as email records."
-                                : "Connect Gmail so inbox actions can use your account. This list shows saved OmnyID email records and synced AFP events."}
-                            </p>
                             <Show
                               when={gmailStatus()?.configured !== false}
                               fallback={<p class="text-xs text-[#b2644b]">Gmail OAuth is not configured on this server.</p>}
                             >
-                              <button
-                                type="button"
-                                disabled={connecting()}
-                                onClick={connectGmail}
-                                class="inline-flex min-h-11 items-center rounded-full bg-[#ff6b35] px-4 text-sm font-semibold text-white transition hover:bg-[#ef5a25] disabled:opacity-60"
-                              >
-                                {connecting() ? "Connecting..." : props.signedIn ? "Connect Gmail" : "Sign in to connect Gmail"}
-                              </button>
+                              <p class="text-sm leading-6 text-[#6d6158]">
+                                Gmail is not connected yet. Use the Connect Gmail button at the top of this view.
+                              </p>
                             </Show>
                             <Show when={statusLoadError() && !gmailStatus()}>
                               <button

@@ -11,12 +11,21 @@ use crate::admin_tool_secrets::{
     BRAVE_SEARCH_SPEC, GOOGLE_MAPS_SPEC, GOOGLE_PLACES_SPEC, WEATHER_API_SPEC,
     admin_tool_secret_status, resolve_admin_tool_secret,
 };
+use crate::db::{
+    Db, WeddingVendorPhotoUpsertRecord, WeddingVendorRecord, WeddingVendorUpsertRecord,
+};
 use crate::map_service::{MapService, PROVIDER_GOOGLE_MAPS, PROVIDER_OSM};
 use crate::wedding_shared_tool_metering::{
     WeddingSharedToolFeature, WeddingSharedToolProvider, WeddingSharedToolUsageInput,
     record_wedding_shared_tool_usage,
 };
 use serde_json::Value;
+
+#[derive(serde::Deserialize)]
+struct GooglePlacePhotoProxyQuery {
+    name: String,
+    max_width_px: Option<u16>,
+}
 
 #[derive(serde::Deserialize)]
 struct WeddingVendorSearchRequest {
@@ -42,6 +51,11 @@ struct WeddingVendorSearchSource {
     provider: String,
     website_url: Option<String>,
     map_url: Option<String>,
+    photo_url: Option<String>,
+    address: Option<String>,
+    phone: Option<String>,
+    email: Option<String>,
+    instagram_url: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -69,11 +83,100 @@ struct WeddingLiveEvidenceRequest {
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/wedding/vendor-search", post(wedding_vendor_search_http))
+        .route(
+            "/wedding/vendor-photo/google",
+            get(wedding_google_place_photo_http),
+        )
         .route("/wedding/live-evidence", post(wedding_live_evidence_http))
         .route(
             "/wedding/provider-capabilities",
             get(wedding_provider_capabilities_http),
         )
+}
+
+async fn wedding_google_place_photo_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<GooglePlacePhotoProxyQuery>,
+) -> Result<axum::response::Response, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("wedding_google_place_photo", &headers),
+        RateLimitPolicy {
+            max_requests: 120,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let _user = authenticated_user(&state.db, &headers).await?;
+    if !admin_shared_tool_policy_enabled("google-places-api") {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Google Places shared wedding-template access is not enabled.".to_string(),
+        ));
+    }
+    let photo_name = clean_google_place_photo_name(&query.name).ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "Invalid Google Places photo name.".to_string(),
+        )
+    })?;
+    let key = resolve_admin_tool_secret(GOOGLE_PLACES_SPEC)
+        .map(|secret| secret.secret)
+        .ok_or_else(|| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Google Places API key is not configured.".to_string(),
+            )
+        })?;
+    let max_width = query.max_width_px.unwrap_or(720).clamp(120, 1200);
+    let max_width_string = max_width.to_string();
+    let media_url = format!("https://places.googleapis.com/v1/{photo_name}/media");
+    let response = reqwest::Client::new()
+        .get(media_url)
+        .query(&[
+            ("key", key.as_str()),
+            ("maxWidthPx", max_width_string.as_str()),
+        ])
+        .send()
+        .await
+        .map_err(|err| {
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("Google Places photo request failed: {err}"),
+            )
+        })?;
+    if !response.status().is_success() {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            vendor_provider_http_error("Google Places photo", response).await,
+        ));
+    }
+    let content_type = response
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .cloned()
+        .unwrap_or_else(|| axum::http::HeaderValue::from_static("image/jpeg"));
+    let bytes = response.bytes().await.map_err(|err| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("Google Places photo response read failed: {err}"),
+        )
+    })?;
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, content_type)
+        .header(
+            axum::http::header::CACHE_CONTROL,
+            axum::http::HeaderValue::from_static("private, max-age=86400"),
+        )
+        .body(axum::body::Body::from(bytes))
+        .map_err(|err| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Could not build photo response: {err}"),
+            )
+        })
 }
 
 async fn wedding_provider_capabilities_http(
@@ -115,6 +218,8 @@ fn wedding_provider_capabilities_payload() -> serde_json::Value {
             "credentialConfigured": brave.configured,
             "sharedCreditEnabled": brave_policy_enabled,
             "configured": brave.configured && brave_policy_enabled,
+            "verificationStatus": if brave.configured && brave_policy_enabled { "unverified" } else { "not_configured" },
+            "diagnosticLabel": if brave.configured && brave_policy_enabled { Some("Configured server-side; verified when a live search runs.") } else { None },
             "sourceLabel": brave.source_label,
         }),
         json!({
@@ -125,6 +230,8 @@ fn wedding_provider_capabilities_payload() -> serde_json::Value {
             "credentialConfigured": places.configured,
             "sharedCreditEnabled": places_policy_enabled,
             "configured": places.configured && places_policy_enabled,
+            "verificationStatus": if places.configured && places_policy_enabled { "unverified" } else { "not_configured" },
+            "diagnosticLabel": if places.configured && places_policy_enabled { Some("Configured server-side; if Google reports referer blocking, use a server-compatible Places key.") } else { None },
             "sourceLabel": places.source_label,
         }),
         json!({
@@ -135,6 +242,8 @@ fn wedding_provider_capabilities_payload() -> serde_json::Value {
             "credentialConfigured": maps.configured,
             "sharedCreditEnabled": maps_policy_enabled,
             "configured": maps.configured && maps_policy_enabled,
+            "verificationStatus": if maps.configured && maps_policy_enabled { "unverified" } else { "not_configured" },
+            "diagnosticLabel": if maps.configured && maps_policy_enabled { Some("Configured server-side; verified when live evidence or map actions run.") } else { None },
             "sourceLabel": maps.source_label,
         }),
         json!({
@@ -145,6 +254,8 @@ fn wedding_provider_capabilities_payload() -> serde_json::Value {
             "credentialConfigured": weatherapi.configured,
             "sharedCreditEnabled": weatherapi_policy_enabled,
             "configured": weatherapi.configured && weatherapi_policy_enabled,
+            "verificationStatus": if weatherapi.configured && weatherapi_policy_enabled { "unverified" } else { "not_configured" },
+            "diagnosticLabel": if weatherapi.configured && weatherapi_policy_enabled { Some("Configured server-side; verified when weather evidence runs.") } else { None },
             "sourceLabel": weatherapi.source_label,
         }),
         json!({
@@ -153,6 +264,9 @@ fn wedding_provider_capabilities_payload() -> serde_json::Value {
             "label": "OSM / Overpass API",
             "credentialRequired": false,
             "configured": overpass_configured,
+            "sharedCreditEnabled": true,
+            "verificationStatus": if overpass_configured { "unverified" } else { "not_configured" },
+            "diagnosticLabel": if overpass_configured { Some("Open fallback configured; records may be sparse and are verified when search runs.") } else { None },
             "sourceLabel": if overpass_configured { Some("server-configured-or-public-default") } else { None },
         }),
     ];
@@ -410,6 +524,18 @@ async fn wedding_vendor_search_http(
     let mut failed_messages = Vec::new();
     let mut provider_labels = BTreeSet::new();
     let mut metered_providers = BTreeSet::new();
+    let mut external_search_performed = false;
+    let mut paid_provider_queries_skipped_due_to_cache = 0usize;
+    let mut attempted_provider_queries = BTreeSet::new();
+
+    match search_wedding_vendor_directory(&state.db, &user.id, &planned_queries, limit).await {
+        Ok(items) if !items.is_empty() => {
+            provider_labels.insert("Admin vendor database".to_string());
+            sources.extend(items);
+        }
+        Ok(_) => {}
+        Err(err) => failed_messages.push(format!("Admin vendor database lookup failed: {err}")),
+    }
 
     for query in &planned_queries {
         provider_kinds.insert(query.provider_kind.clone());
@@ -421,15 +547,96 @@ async fn wedding_vendor_search_http(
         {
             categories.insert(category.to_string());
         }
+        if is_paid_vendor_search_provider(&query.provider_kind) && sources.len() >= limit {
+            paid_provider_queries_skipped_due_to_cache += 1;
+            continue;
+        }
+        if !attempted_provider_queries.insert(provider_query_attempt_key(
+            &query.provider_kind,
+            &query.query,
+        )) {
+            continue;
+        }
         match query.provider_kind.as_str() {
             "google_places" if admin_shared_tool_policy_enabled("google-places-api") => {
+                external_search_performed = true;
                 match search_google_places(&client, query, limit).await {
                     Ok(items) => {
                         provider_labels.insert("Google Places API".to_string());
                         metered_providers.insert("google_places");
+                        if items.is_empty() && sources.len() < limit {
+                            if admin_shared_tool_policy_enabled("brave-search-api") {
+                                let mut fallback_query = query.clone();
+                                fallback_query.provider_kind = "brave_search".to_string();
+                                if attempted_provider_queries.insert(provider_query_attempt_key(
+                                    &fallback_query.provider_kind,
+                                    &fallback_query.query,
+                                )) {
+                                    provider_kinds.insert(fallback_query.provider_kind.clone());
+                                    match search_brave(&client, &fallback_query, limit).await {
+                                        Ok(fallback_items) => {
+                                            provider_labels.insert("Brave Search".to_string());
+                                            metered_providers.insert("brave_search");
+                                            sources.extend(fallback_items);
+                                        }
+                                        Err(message) => failed_messages.push(format!(
+                                            "Brave Search fallback after empty Google Places results failed: {message}"
+                                        )),
+                                    }
+                                }
+                            }
+                            run_overpass_vendor_search_fallback(
+                                &client,
+                                query,
+                                limit,
+                                &mut attempted_provider_queries,
+                                &mut provider_kinds,
+                                &mut provider_labels,
+                                &mut sources,
+                                &mut failed_messages,
+                                "empty Google Places results",
+                            )
+                            .await;
+                        }
                         sources.extend(items);
                     }
-                    Err(message) => failed_messages.push(message),
+                    Err(message) => {
+                        failed_messages.push(message);
+                        if sources.len() < limit
+                            && admin_shared_tool_policy_enabled("brave-search-api")
+                        {
+                            let mut fallback_query = query.clone();
+                            fallback_query.provider_kind = "brave_search".to_string();
+                            if attempted_provider_queries.insert(provider_query_attempt_key(
+                                &fallback_query.provider_kind,
+                                &fallback_query.query,
+                            )) {
+                                provider_kinds.insert(fallback_query.provider_kind.clone());
+                                match search_brave(&client, &fallback_query, limit).await {
+                                    Ok(items) => {
+                                        provider_labels.insert("Brave Search".to_string());
+                                        metered_providers.insert("brave_search");
+                                        sources.extend(items);
+                                    }
+                                    Err(message) => failed_messages.push(format!(
+                                        "Brave Search fallback also failed: {message}"
+                                    )),
+                                }
+                            }
+                        }
+                        run_overpass_vendor_search_fallback(
+                            &client,
+                            query,
+                            limit,
+                            &mut attempted_provider_queries,
+                            &mut provider_kinds,
+                            &mut provider_labels,
+                            &mut sources,
+                            &mut failed_messages,
+                            "Google Places failure",
+                        )
+                        .await;
+                    }
                 }
             }
             "google_places" => failed_messages.push(
@@ -437,30 +644,64 @@ async fn wedding_vendor_search_http(
                     .to_string(),
             ),
             "brave_search" if admin_shared_tool_policy_enabled("brave-search-api") => {
+                external_search_performed = true;
                 match search_brave(&client, query, limit).await {
                     Ok(items) => {
                         provider_labels.insert("Brave Search".to_string());
                         metered_providers.insert("brave_search");
+                        if items.is_empty() && sources.len() < limit {
+                            run_overpass_vendor_search_fallback(
+                                &client,
+                                query,
+                                limit,
+                                &mut attempted_provider_queries,
+                                &mut provider_kinds,
+                                &mut provider_labels,
+                                &mut sources,
+                                &mut failed_messages,
+                                "empty Brave Search results",
+                            )
+                            .await;
+                        }
                         sources.extend(items);
                     }
-                    Err(message) => failed_messages.push(message),
+                    Err(message) => {
+                        failed_messages.push(message);
+                        run_overpass_vendor_search_fallback(
+                            &client,
+                            query,
+                            limit,
+                            &mut attempted_provider_queries,
+                            &mut provider_kinds,
+                            &mut provider_labels,
+                            &mut sources,
+                            &mut failed_messages,
+                            "Brave Search failure",
+                        )
+                        .await;
+                    }
                 }
             }
             "brave_search" => failed_messages.push(
                 "Brave Search API is not enabled for admin-funded wedding planner use.".to_string(),
             ),
-            "overpass" => match search_overpass(&client, query, limit).await {
-                Ok(items) => {
-                    provider_labels.insert("OSM / Overpass API".to_string());
-                    sources.extend(items);
+            "overpass" => {
+                external_search_performed = true;
+                match search_overpass(&client, query, limit).await {
+                    Ok(items) => {
+                        provider_labels.insert("OSM / Overpass API".to_string());
+                        sources.extend(items);
+                    }
+                    Err(message) => failed_messages.push(message),
                 }
-                Err(message) => failed_messages.push(message),
-            },
+            }
             other => failed_messages.push(format!("Unsupported vendor-search provider: {other}")),
         }
     }
 
     let sources = dedupe_sources(sources);
+    let persisted_source_count =
+        persist_live_vendor_sources(&state.db, &user.id, &planned_queries, &sources).await;
     let provider_label = if provider_labels.is_empty() {
         None
     } else {
@@ -474,17 +715,27 @@ async fn wedding_vendor_search_http(
     };
     let status = if sources.is_empty() {
         "failed"
-    } else {
+    } else if external_search_performed {
         "executed"
+    } else {
+        "cached"
     };
     let message = if sources.is_empty() {
-        failed_messages
-            .first()
-            .cloned()
-            .unwrap_or_else(|| "Live vendor search returned no usable sources.".to_string())
+        vendor_search_empty_result_message(
+            &failed_messages,
+            &provider_labels,
+            &planned_queries,
+            external_search_performed,
+        )
+    } else if !external_search_performed && paid_provider_queries_skipped_due_to_cache > 0 {
+        format!(
+            "Admin vendor database returned {} reusable source{}; paid live search was skipped to save admin API credits.",
+            sources.len(),
+            if sources.len() == 1 { "" } else { "s" }
+        )
     } else {
         format!(
-            "Live vendor search completed with {} source{}.",
+            "Vendor search completed with {} source{}.",
             sources.len(),
             if sources.len() == 1 { "" } else { "s" }
         )
@@ -522,7 +773,7 @@ async fn wedding_vendor_search_http(
     Ok(Json(WeddingVendorSearchResponse {
         ok: !sources.is_empty(),
         status: status.to_string(),
-        external_search_performed: true,
+        external_search_performed,
         provider_label,
         query_count: planned_queries.len(),
         source_count: sources.len(),
@@ -542,7 +793,10 @@ async fn wedding_vendor_search_http(
             "vendor_search_status": status,
             "provider_kinds": provider_kinds.iter().cloned().collect::<Vec<_>>(),
             "vendor_categories": categories.iter().cloned().collect::<Vec<_>>(),
-            "external_search_performed": true,
+            "external_search_performed": external_search_performed,
+            "admin_vendor_database_used": sources.iter().any(|source| source.provider == "Admin vendor database"),
+            "admin_vendor_database_persisted_source_count": persisted_source_count,
+            "paid_provider_queries_skipped_due_to_admin_cache": paid_provider_queries_skipped_due_to_cache,
             "query_count": planned_queries.len(),
             "source_count": sources.len(),
             "source_urls": sources.iter().map(|source| source.url.clone()).take(20).collect::<Vec<_>>(),
@@ -550,6 +804,621 @@ async fn wedding_vendor_search_http(
             "failed_messages": failed_messages,
         }),
     }))
+}
+
+fn provider_query_attempt_key(provider_kind: &str, query: &str) -> String {
+    format!(
+        "{}|{}",
+        provider_kind.trim().to_ascii_lowercase(),
+        query
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_ascii_lowercase()
+    )
+}
+
+fn vendor_search_empty_result_message(
+    failed_messages: &[String],
+    provider_labels: &BTreeSet<String>,
+    planned_queries: &[WeddingVendorSearchQueryRequest],
+    external_search_performed: bool,
+) -> String {
+    if !failed_messages.is_empty() {
+        let details = failed_messages
+            .iter()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" ");
+        return format!("No live vendor sources were returned. {details}");
+    }
+    if external_search_performed {
+        let providers = if provider_labels.is_empty() {
+            "the configured vendor-search provider".to_string()
+        } else {
+            provider_labels
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" + ")
+        };
+        let query_count = planned_queries.len();
+        return format!(
+            "{providers} ran {query_count} vendor-search quer{} but returned no usable source URLs. Try a more specific category and location, or check the provider dashboard for quota and regional availability.",
+            if query_count == 1 { "y" } else { "ies" }
+        );
+    }
+    "No live vendor sources were returned. Try a more specific vendor type and location, or review the provider receipt for setup, quota, or regional availability details.".to_string()
+}
+
+async fn search_wedding_vendor_directory(
+    db: &Db,
+    user_id: &str,
+    queries: &[WeddingVendorSearchQueryRequest],
+    limit: usize,
+) -> Result<Vec<WeddingVendorSearchSource>, sqlx::Error> {
+    let mut sources = Vec::new();
+    let mut seen_queries = BTreeSet::new();
+    for query in queries {
+        for candidate in wedding_vendor_directory_search_terms(query) {
+            if !seen_queries.insert(candidate.clone()) {
+                continue;
+            }
+            let records = db
+                .list_active_wedding_vendors_for_user(
+                    user_id,
+                    limit.clamp(1, 8) as i64,
+                    Some(&candidate),
+                )
+                .await?;
+            sources.extend(
+                records
+                    .into_iter()
+                    .map(wedding_vendor_record_to_search_source),
+            );
+        }
+    }
+    Ok(dedupe_sources(sources)
+        .into_iter()
+        .take(limit * queries.len().max(1))
+        .collect())
+}
+
+fn wedding_vendor_directory_search_terms(query: &WeddingVendorSearchQueryRequest) -> Vec<String> {
+    let mut terms = Vec::new();
+    if let Some(category) = query
+        .category
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        terms.push(category.to_string());
+    }
+    terms.push(query.query.trim().to_string());
+    if let Some(location) = infer_vendor_service_area(&query.query) {
+        terms.push(location);
+    }
+    dedupe_strings(terms)
+}
+
+fn wedding_vendor_record_to_search_source(
+    record: WeddingVendorRecord,
+) -> WeddingVendorSearchSource {
+    let url = record
+        .website_url
+        .clone()
+        .or(record.source_url.clone())
+        .unwrap_or_else(|| {
+            format!(
+                "https://www.google.com/maps/search/?api=1&query={}",
+                urlencoding::encode(&format!("{} {}", record.vendor_name, record.service_area))
+            )
+        });
+    let snippet = [
+        Some(record.category),
+        Some(record.service_area),
+        record.address.clone(),
+        record.notes,
+    ]
+    .into_iter()
+    .flatten()
+    .map(|value| value.trim().to_string())
+    .filter(|value| !value.is_empty())
+    .collect::<Vec<_>>()
+    .join(" - ");
+    WeddingVendorSearchSource {
+        title: record.vendor_name,
+        url,
+        snippet: if snippet.is_empty() {
+            Some("Saved in OmnyID's shared wedding vendor database.".to_string())
+        } else {
+            Some(format!(
+                "{snippet} - saved in OmnyID's shared wedding vendor database."
+            ))
+        },
+        provider: "Admin vendor database".to_string(),
+        website_url: record.website_url.clone(),
+        map_url: record
+            .source_url
+            .filter(|url| url.contains("maps") || url.contains("openstreetmap")),
+        photo_url: record.photos.first().map(|photo| photo.photo_url.clone()),
+        address: record.address,
+        phone: record.contact_phone,
+        email: record.contact_email,
+        instagram_url: record
+            .website_url
+            .filter(|url| url.to_ascii_lowercase().contains("instagram.com")),
+    }
+}
+
+async fn persist_live_vendor_sources(
+    db: &Db,
+    user_id: &str,
+    queries: &[WeddingVendorSearchQueryRequest],
+    sources: &[WeddingVendorSearchSource],
+) -> usize {
+    let Some(primary_query) = queries.first() else {
+        return 0;
+    };
+    let category = primary_query
+        .category
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("wedding vendor")
+        .to_string();
+    let service_area = infer_vendor_service_area(&primary_query.query)
+        .unwrap_or_else(|| primary_query.query.trim().to_string())
+        .chars()
+        .take(180)
+        .collect::<String>();
+    let checked_at = chrono::Utc::now().date_naive().to_string();
+    let mut persisted = 0;
+    for source in sources {
+        if source.provider == "Admin vendor database"
+            || source.title.trim().is_empty()
+            || source.url.trim().is_empty()
+        {
+            continue;
+        }
+        let slug = wedding_vendor_slug(&source.title, &category, &service_area);
+        let input = WeddingVendorUpsertRecord {
+            vendor_slug: slug,
+            vendor_name: source.title.trim().chars().take(180).collect(),
+            category: category.clone(),
+            service_area: service_area.clone(),
+            address: source
+                .snippet
+                .clone()
+                .map(|snippet| snippet.chars().take(260).collect()),
+            website_url: source.website_url.clone().or_else(|| {
+                if looks_like_vendor_website(&source.url) {
+                    Some(source.url.clone())
+                } else {
+                    None
+                }
+            }),
+            contact_phone: None,
+            contact_email: None,
+            source_url: Some(source.map_url.clone().unwrap_or_else(|| source.url.clone())),
+            source_label: Some(source.provider.clone()),
+            source_checked_at: Some(checked_at.clone()),
+            status: "active".to_string(),
+            notes: Some(
+                "Discovered from a live wedding vendor search and cached for reuse.".to_string(),
+            ),
+            evidence: json!({
+                "source": "live_vendor_search",
+                "provider": source.provider,
+                "query": primary_query.query,
+                "category": category,
+                "service_area": service_area,
+                "url": source.url,
+                "website_url": source.website_url,
+                "map_url": source.map_url,
+                "photo_url": source.photo_url,
+                "address": source.address,
+                "phone": source.phone,
+                "email": source.email,
+                "instagram_url": source.instagram_url,
+                "snippet": source.snippet,
+                "cached_at": chrono::Utc::now().to_rfc3339(),
+            }),
+            caveat_labels: vec![
+                "live-search-cached".to_string(),
+                "verify-before-booking".to_string(),
+            ],
+            photos: source
+                .photo_url
+                .as_deref()
+                .filter(|url| looks_like_public_http_url(url))
+                .map(|url| WeddingVendorPhotoUpsertRecord {
+                    slot: 1,
+                    photo_url: url.to_string(),
+                    alt_text: Some(format!("{} venue image", source.title.trim())),
+                    source_label: Some(source.provider.clone()),
+                })
+                .into_iter()
+                .collect(),
+        };
+        if db
+            .upsert_discovered_wedding_vendor(&input, user_id)
+            .await
+            .is_ok()
+        {
+            persisted += 1;
+        }
+    }
+    persisted
+}
+
+fn looks_like_vendor_website(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    lower.starts_with("http")
+        && !lower.contains("google.com/maps")
+        && !lower.contains("openstreetmap.org/")
+}
+
+fn looks_like_public_http_url(url: &str) -> bool {
+    let parsed = match reqwest::Url::parse(url) {
+        Ok(parsed) => parsed,
+        Err(_) => return false,
+    };
+    if parsed.scheme() != "https" && parsed.scheme() != "http" {
+        return false;
+    }
+    let Some(hostname) = parsed.host_str().map(str::to_ascii_lowercase) else {
+        return false;
+    };
+    !matches!(
+        hostname.as_str(),
+        "localhost" | "127.0.0.1" | "0.0.0.0" | "::1"
+    )
+}
+
+fn infer_email_from_text(text: &str) -> Option<String> {
+    text.split_whitespace()
+        .map(|part| {
+            part.trim_matches(|ch: char| {
+                matches!(
+                    ch,
+                    '<' | '>' | '(' | ')' | '[' | ']' | ',' | ';' | ':' | '.'
+                )
+            })
+        })
+        .find(|part| {
+            part.len() <= 254
+                && part.contains('@')
+                && part.contains('.')
+                && part.chars().all(|ch| {
+                    ch.is_ascii_alphanumeric() || matches!(ch, '@' | '.' | '_' | '-' | '+')
+                })
+        })
+        .map(str::to_string)
+}
+
+fn osm_address_from_tags(tags: &serde_json::Map<String, serde_json::Value>) -> Option<String> {
+    let house_number = tags
+        .get("addr:housenumber")
+        .and_then(|value| value.as_str());
+    let street = tags.get("addr:street").and_then(|value| value.as_str());
+    let suburb = tags.get("addr:suburb").and_then(|value| value.as_str());
+    let city = tags.get("addr:city").and_then(|value| value.as_str());
+    let state = tags.get("addr:state").and_then(|value| value.as_str());
+    let postcode = tags.get("addr:postcode").and_then(|value| value.as_str());
+    let first_line = [house_number, street]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let address = [
+        if first_line.trim().is_empty() {
+            None
+        } else {
+            Some(first_line)
+        },
+        suburb.map(str::to_string),
+        city.map(str::to_string),
+        state.map(str::to_string),
+        postcode.map(str::to_string),
+    ]
+    .into_iter()
+    .flatten()
+    .map(|value| value.trim().to_string())
+    .filter(|value| !value.is_empty())
+    .collect::<Vec<_>>()
+    .join(", ");
+    if address.is_empty() {
+        None
+    } else {
+        Some(address)
+    }
+}
+
+fn clean_google_place_photo_name(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.len() > 260
+        || !trimmed.starts_with("places/")
+        || !trimmed.contains("/photos/")
+        || trimmed.contains('?')
+        || trimmed.contains('#')
+        || trimmed.contains("..")
+    {
+        return None;
+    }
+    if !trimmed
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '_' | '-' | '.'))
+    {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
+fn google_place_photo_proxy_url(photo_name: &str) -> Option<String> {
+    let clean_name = clean_google_place_photo_name(photo_name)?;
+    Some(format!(
+        "/wedding/vendor-photo/google?name={}&max_width_px=720",
+        urlencoding::encode(&clean_name)
+    ))
+}
+
+fn is_paid_vendor_search_provider(provider_kind: &str) -> bool {
+    matches!(provider_kind, "brave_search" | "google_places")
+}
+
+fn infer_vendor_service_area(query: &str) -> Option<String> {
+    let lower = query.to_ascii_lowercase();
+    let markers = [" near ", " in ", " around ", " at "];
+    markers
+        .iter()
+        .flat_map(|marker| {
+            lower
+                .match_indices(marker)
+                .map(move |(index, _)| (index, marker.len()))
+        })
+        .filter_map(|(index, marker_len)| {
+            service_area_candidate_after_marker(query, index + marker_len)
+                .map(|candidate| (index, candidate))
+        })
+        .max_by_key(|(index, _)| *index)
+        .map(|(_, candidate)| candidate)
+}
+
+fn service_area_candidate_after_marker(query: &str, start_index: usize) -> Option<String> {
+    let raw = query[start_index..]
+        .split([',', ';', '.', '\n'])
+        .next()
+        .unwrap_or_default();
+    let mut candidate = raw.trim().to_string();
+    let candidate_lower = candidate.to_ascii_lowercase();
+    for stop in [
+        " with ",
+        " for ",
+        " specialising ",
+        " specializing ",
+        " services ",
+        " packages ",
+        " price ",
+        " reviews ",
+        " budget ",
+    ] {
+        if let Some(index) = candidate_lower.find(stop) {
+            candidate = candidate[..index].trim().to_string();
+            break;
+        }
+    }
+    let words = candidate
+        .trim_start_matches("the ")
+        .trim_start_matches("a ")
+        .split_whitespace()
+        .take(4)
+        .collect::<Vec<_>>();
+    let area = words.join(" ");
+    let lower_area = area.to_ascii_lowercase();
+    if area.is_empty()
+        || matches!(
+            lower_area.as_str(),
+            "wedding" | "weddings" | "wedding style" | "wedding services"
+        )
+    {
+        None
+    } else {
+        Some(area.chars().take(120).collect())
+    }
+}
+
+fn overpass_area_pattern(query: &WeddingVendorSearchQueryRequest) -> Option<String> {
+    infer_vendor_service_area(&query.query)
+        .map(|area| area.replace(['"', '\\'], " "))
+        .map(|area| area.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|area| !area.is_empty())
+}
+
+fn overpass_tag_filter(tag: &str) -> String {
+    let trimmed = tag.trim();
+    if let Some((key, value)) = trimmed.split_once('=') {
+        return format!(
+            "[\"{}\"=\"{}\"]",
+            overpass_escape_token(key),
+            overpass_escape_token(value)
+        );
+    }
+    if let Some((key, value)) = trimmed.split_once('~') {
+        return format!(
+            "[\"{}\"~\"{}\",i]",
+            overpass_escape_token(key),
+            overpass_escape_token(value)
+        );
+    }
+    if trimmed.is_empty() {
+        "[\"name\"~\"wedding\",i]".to_string()
+    } else {
+        format!("[\"{}\"]", overpass_escape_token(trimmed))
+    }
+}
+
+fn overpass_escape_token(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | ':' | ' '))
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+fn wedding_vendor_slug(name: &str, category: &str, service_area: &str) -> String {
+    let base = format!("{name} {category} {service_area}");
+    let mut slug = String::new();
+    let mut previous_dash = false;
+    for ch in base.chars().flat_map(char::to_lowercase) {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch);
+            previous_dash = false;
+        } else if !previous_dash && !slug.is_empty() {
+            slug.push('-');
+            previous_dash = true;
+        }
+        if slug.len() >= 120 {
+            break;
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    if slug.is_empty() {
+        format!("vendor-{}", Ulid::new().to_string().to_ascii_lowercase())
+    } else {
+        slug
+    }
+}
+
+fn dedupe_strings(values: Vec<String>) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    let mut deduped = Vec::new();
+    for value in values {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let key = trimmed.to_ascii_lowercase();
+        if seen.insert(key) {
+            deduped.push(trimmed.to_string());
+        }
+    }
+    deduped
+}
+
+fn bounded_provider_error_body(body: &str) -> String {
+    body.split_whitespace()
+        .take(36)
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(320)
+        .collect()
+}
+
+async fn vendor_provider_http_error(provider: &str, response: reqwest::Response) -> String {
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    let detail = bounded_provider_error_body(&body);
+    let guidance = provider_http_error_guidance(provider, &body);
+    if detail.is_empty() {
+        format!("{provider} returned {status}.{guidance}")
+    } else {
+        format!("{provider} returned {status}: {detail}{guidance}")
+    }
+}
+
+fn provider_http_error_guidance(provider: &str, body: &str) -> &'static str {
+    let lower_provider = provider.to_ascii_lowercase();
+    let lower_body = body.to_ascii_lowercase();
+    if lower_provider.contains("google places")
+        && lower_body.contains("referer")
+        && lower_body.contains("blocked")
+    {
+        " Google Places key is restricted by HTTP referrer; for server-side wedding search, configure a server-compatible Google Places key such as IP/API-restricted server key, or update Google Cloud API key restrictions."
+    } else {
+        ""
+    }
+}
+
+async fn run_overpass_vendor_search_fallback(
+    client: &reqwest::Client,
+    query: &WeddingVendorSearchQueryRequest,
+    limit: usize,
+    attempted_provider_queries: &mut BTreeSet<String>,
+    provider_kinds: &mut BTreeSet<String>,
+    provider_labels: &mut BTreeSet<String>,
+    sources: &mut Vec<WeddingVendorSearchSource>,
+    failed_messages: &mut Vec<String>,
+    reason: &str,
+) {
+    if sources.len() >= limit {
+        return;
+    }
+    let fallback_query = overpass_fallback_query(query);
+    if !attempted_provider_queries.insert(provider_query_attempt_key(
+        &fallback_query.provider_kind,
+        &fallback_query.query,
+    )) {
+        return;
+    }
+    provider_kinds.insert(fallback_query.provider_kind.clone());
+    match search_overpass(client, &fallback_query, limit).await {
+        Ok(items) => {
+            if !items.is_empty() {
+                provider_labels.insert("OSM / Overpass API".to_string());
+                sources.extend(items);
+            }
+        }
+        Err(message) => failed_messages.push(format!(
+            "OSM / Overpass fallback after {reason} failed: {message}"
+        )),
+    }
+}
+
+fn overpass_fallback_query(
+    query: &WeddingVendorSearchQueryRequest,
+) -> WeddingVendorSearchQueryRequest {
+    let mut fallback = query.clone();
+    fallback.provider_kind = "overpass".to_string();
+    if fallback
+        .overpass_tags
+        .as_ref()
+        .map(|tags| tags.is_empty())
+        .unwrap_or(true)
+    {
+        fallback.overpass_tags = Some(overpass_tags_for_category(fallback.category.as_deref()));
+    }
+    fallback
+}
+
+fn overpass_tags_for_category(category: Option<&str>) -> Vec<String> {
+    match category
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase()
+        .replace('-', "_")
+        .as_str()
+    {
+        "venue" => vec![
+            "amenity=events_venue".to_string(),
+            "amenity=community_centre".to_string(),
+            "tourism=hotel".to_string(),
+        ],
+        "floral_designer" | "florist" => vec!["shop=florist".to_string()],
+        "hair_stylist" | "hair" => vec!["shop=hairdresser".to_string()],
+        "makeup_artist" | "makeup" => vec!["shop=beauty".to_string()],
+        "cake_baker" | "cake" => vec!["shop=bakery".to_string()],
+        "jeweler" | "jeweller" | "rings" => vec!["shop=jewelry".to_string()],
+        "accommodations" | "accommodation" => vec!["tourism=hotel".to_string()],
+        "caterer" | "catering" => vec!["amenity=restaurant".to_string()],
+        "photographer" | "photography" => vec!["craft=photographer".to_string()],
+        _ => vec!["name~wedding".to_string()],
+    }
 }
 
 async fn search_brave(
@@ -569,6 +1438,9 @@ async fn search_brave(
         .send()
         .await
         .map_err(|err| format!("Brave Search request failed: {err}"))?;
+    if !response.status().is_success() {
+        return Err(vendor_provider_http_error("Brave Search", response).await);
+    }
     let json = response
         .json::<serde_json::Value>()
         .await
@@ -587,6 +1459,17 @@ async fn search_brave(
                 provider: "Brave Search".to_string(),
                 website_url: item["url"].as_str().map(ToOwned::to_owned),
                 map_url: None,
+                photo_url: item["thumbnail"]["src"]
+                    .as_str()
+                    .filter(|url| looks_like_public_http_url(url))
+                    .map(ToOwned::to_owned),
+                address: None,
+                phone: None,
+                email: infer_email_from_text(item["description"].as_str().unwrap_or_default()),
+                instagram_url: item["url"]
+                    .as_str()
+                    .filter(|url| url.to_ascii_lowercase().contains("instagram.com"))
+                    .map(ToOwned::to_owned),
             })
         })
         .collect();
@@ -606,7 +1489,7 @@ async fn search_google_places(
         .header("X-Goog-Api-Key", key)
         .header(
             "X-Goog-FieldMask",
-            "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.googleMapsUri,places.websiteUri",
+            "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.internationalPhoneNumber,places.rating,places.userRatingCount,places.googleMapsUri,places.websiteUri,places.photos",
         )
         .json(&json!({
             "textQuery": query.query,
@@ -616,7 +1499,7 @@ async fn search_google_places(
         .await
         .map_err(|err| format!("Google Places request failed: {err}"))?;
     if !response.status().is_success() {
-        return Err(format!("Google Places returned {}", response.status()));
+        return Err(vendor_provider_http_error("Google Places", response).await);
     }
     let json = response
         .json::<serde_json::Value>()
@@ -665,6 +1548,15 @@ fn google_places_sources_from_response(
                 .unwrap_or_default();
             let maps_url = item["googleMapsUri"].as_str().map(str::to_string);
             let website_url = item["websiteUri"].as_str().map(str::to_string);
+            let phone = item["internationalPhoneNumber"]
+                .as_str()
+                .or_else(|| item["nationalPhoneNumber"].as_str())
+                .map(str::to_string);
+            let photo_url = item["photos"]
+                .as_array()
+                .and_then(|photos| photos.first())
+                .and_then(|photo| photo["name"].as_str())
+                .and_then(google_place_photo_proxy_url);
             let fallback_url = if place_id.is_empty() {
                 format!(
                     "https://www.google.com/maps/search/?api=1&query={}",
@@ -696,6 +1588,15 @@ fn google_places_sources_from_response(
                 provider: "Google Places API".to_string(),
                 website_url,
                 map_url: maps_url,
+                photo_url,
+                address: if vicinity.is_empty() {
+                    None
+                } else {
+                    Some(vicinity.to_string())
+                },
+                phone,
+                email: None,
+                instagram_url: None,
             })
         })
         .collect()
@@ -717,20 +1618,25 @@ async fn search_overpass(
         .and_then(|tags| tags.first())
         .cloned()
         .unwrap_or_else(|| "name~wedding".to_string());
+    let tag_filter = overpass_tag_filter(&tag);
+    let area_pattern =
+        overpass_area_pattern(query).unwrap_or_else(|| query.query.replace(['"', '\\'], " "));
     let overpass_query = format!(
-        "[out:json][timeout:15];nwr[{}](area.searchArea);out center {};",
-        tag, limit
+        "[out:json][timeout:15];nwr{}(area.searchArea);out center {};",
+        tag_filter, limit
     );
     let response = client
         .post(endpoint)
         .body(format!(
             "[out:json][timeout:15];area[name~\"{}\"][admin_level~\"6|8\"]->.searchArea;{}",
-            query.query.replace('"', ""),
-            overpass_query,
+            area_pattern, overpass_query,
         ))
         .send()
         .await
         .map_err(|err| format!("Overpass request failed: {err}"))?;
+    if !response.status().is_success() {
+        return Err(vendor_provider_http_error("Overpass", response).await);
+    }
     let json = response
         .json::<serde_json::Value>()
         .await
@@ -752,8 +1658,29 @@ async fn search_overpass(
                 url: map_url.clone(),
                 snippet: Some(format!("OSM tags matched for {}", query.query)),
                 provider: "OSM / Overpass API".to_string(),
-                website_url: None,
+                website_url: tags
+                    .get("website")
+                    .or_else(|| tags.get("contact:website"))
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string),
                 map_url: Some(map_url),
+                photo_url: None,
+                address: osm_address_from_tags(tags),
+                phone: tags
+                    .get("phone")
+                    .or_else(|| tags.get("contact:phone"))
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string),
+                email: tags
+                    .get("email")
+                    .or_else(|| tags.get("contact:email"))
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string),
+                instagram_url: tags
+                    .get("contact:instagram")
+                    .or_else(|| tags.get("instagram"))
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string),
             })
         })
         .collect();
@@ -783,9 +1710,11 @@ fn admin_shared_tool_policy_enabled(tool_id: &str) -> bool {
     let Some(prefix) = admin_shared_tool_policy_env_prefix(tool_id) else {
         return false;
     };
-    let mut enabled_for_all_users = env_flag_enabled_local(&format!("{prefix}_ALL_USERS_ENABLED"));
+    let mut enabled_for_all_users =
+        env_flag_value_local(&format!("{prefix}_ALL_USERS_ENABLED")).unwrap_or(false);
     let mut enabled_for_wedding_template =
-        env_flag_enabled_local(&format!("{prefix}_WEDDING_TEMPLATE_ENABLED"));
+        env_flag_value_local(&format!("{prefix}_WEDDING_TEMPLATE_ENABLED"))
+            .unwrap_or_else(|| admin_shared_tool_policy_default_wedding_enabled(tool_id));
 
     if let Some(policy_file) =
         env_optional_trimmed_local("OMNYID_ADMIN_THIRD_PARTY_TOOL_POLICY_FILE")
@@ -819,6 +1748,13 @@ fn admin_shared_tool_policy_enabled(tool_id: &str) -> bool {
     enabled_for_all_users || enabled_for_wedding_template
 }
 
+fn admin_shared_tool_policy_default_wedding_enabled(tool_id: &str) -> bool {
+    matches!(
+        tool_id,
+        "brave-search-api" | "google-places-api" | "google-maps-platform" | "weatherapi"
+    )
+}
+
 fn admin_shared_tool_policy_env_prefix(tool_id: &str) -> Option<&'static str> {
     match tool_id {
         "brave-search-api" => Some("OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API"),
@@ -829,16 +1765,15 @@ fn admin_shared_tool_policy_env_prefix(tool_id: &str) -> Option<&'static str> {
     }
 }
 
-fn env_flag_enabled_local(key: &str) -> bool {
+fn env_flag_value_local(key: &str) -> Option<bool> {
     std::env::var(key)
         .ok()
-        .map(|value| {
-            matches!(
-                value.trim().to_ascii_lowercase().as_str(),
-                "1" | "true" | "yes" | "on"
-            )
+        .map(|value| match value.trim().to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => Some(true),
+            "0" | "false" | "no" | "off" => Some(false),
+            _ => None,
         })
-        .unwrap_or(false)
+        .flatten()
 }
 
 fn env_optional_trimmed_local(key: &str) -> Option<String> {
@@ -903,6 +1838,70 @@ mod tests {
     }
 
     #[test]
+    fn provider_query_attempt_key_normalizes_spacing_and_case() {
+        assert_eq!(
+            provider_query_attempt_key("Brave_Search", "  Wedding   venue near   Sydney  "),
+            provider_query_attempt_key("brave_search", "wedding venue near sydney")
+        );
+        assert_ne!(
+            provider_query_attempt_key("google_places", "wedding venue near sydney"),
+            provider_query_attempt_key("brave_search", "wedding venue near sydney")
+        );
+    }
+
+    #[test]
+    fn vendor_service_area_inference_prefers_specific_late_location_phrase() {
+        assert_eq!(
+            infer_vendor_service_area(
+                "a 60 people wedding at a beachfront location, in Gothic style in Sydney"
+            )
+            .as_deref(),
+            Some("Sydney")
+        );
+        assert_eq!(
+            infer_vendor_service_area("wedding florist near Northern Beaches with relaxed style")
+                .as_deref(),
+            Some("Northern Beaches")
+        );
+    }
+
+    #[test]
+    fn overpass_filter_serializes_compact_vendor_tags() {
+        assert_eq!(
+            overpass_tag_filter("shop=florist"),
+            "[\"shop\"=\"florist\"]"
+        );
+        assert_eq!(
+            overpass_tag_filter("name~wedding"),
+            "[\"name\"~\"wedding\",i]"
+        );
+        assert_eq!(overpass_tag_filter("website"), "[\"website\"]");
+    }
+
+    #[test]
+    fn overpass_fallback_query_adds_category_specific_tags() {
+        let query = WeddingVendorSearchQueryRequest {
+            provider_kind: "google_places".to_string(),
+            category: Some("venue".to_string()),
+            query: "wedding venue near Sydney".to_string(),
+            google_place_types: Some(vec!["event_venue".to_string()]),
+            overpass_tags: None,
+        };
+
+        let fallback = overpass_fallback_query(&query);
+
+        assert_eq!(fallback.provider_kind, "overpass");
+        assert_eq!(
+            fallback.overpass_tags.unwrap_or_default(),
+            vec![
+                "amenity=events_venue".to_string(),
+                "amenity=community_centre".to_string(),
+                "tourism=hotel".to_string(),
+            ]
+        );
+    }
+
+    #[test]
     fn wedding_provider_capabilities_payload_redacts_admin_keys() {
         let _env = env_lock();
         clear_provider_capability_env();
@@ -934,6 +1933,13 @@ mod tests {
         assert_eq!(brave["credentialConfigured"].as_bool(), Some(true));
         assert_eq!(brave["sharedCreditEnabled"].as_bool(), Some(true));
         assert_eq!(brave["configured"].as_bool(), Some(true));
+        assert_eq!(brave["verificationStatus"].as_str(), Some("unverified"));
+        assert!(
+            brave["diagnosticLabel"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("verified when a live search runs")
+        );
         assert!(
             payload["connectedAppIds"]
                 .as_array()
@@ -957,7 +1963,27 @@ mod tests {
         }
 
         assert!(admin_shared_tool_policy_enabled("brave-search-api"));
-        assert!(!admin_shared_tool_policy_enabled("google-places-api"));
+        assert!(admin_shared_tool_policy_enabled("google-places-api"));
+
+        clear_provider_capability_env();
+    }
+
+    #[test]
+    fn admin_shared_tool_policy_enabled_defaults_wedding_providers_on_until_disabled() {
+        let _env = env_lock();
+        clear_provider_capability_env();
+
+        assert!(admin_shared_tool_policy_enabled("google-places-api"));
+        assert!(admin_shared_tool_policy_enabled("google-maps-platform"));
+        assert!(admin_shared_tool_policy_enabled("weatherapi"));
+
+        unsafe {
+            std::env::set_var(
+                "OMNYID_ADMIN_TOOL_WEATHERAPI_WEDDING_TEMPLATE_ENABLED",
+                "false",
+            );
+        }
+        assert!(!admin_shared_tool_policy_enabled("weatherapi"));
 
         clear_provider_capability_env();
     }
@@ -1034,7 +2060,8 @@ mod tests {
                 "rating": 4.9,
                 "userRatingCount": 63,
                 "googleMapsUri": "https://maps.google.com/?cid=example",
-                "websiteUri": "https://example.test"
+                "websiteUri": "https://example.test",
+                "photos": [{ "name": "places/example/photos/photo_abc-123" }]
             }]
         });
 
@@ -1043,10 +2070,26 @@ mod tests {
         assert_eq!(sources.len(), 1);
         assert_eq!(sources[0].title, "Chloe's Florals");
         assert_eq!(sources[0].url, "https://example.test");
-        assert_eq!(sources[0].website_url.as_deref(), Some("https://example.test"));
+        assert_eq!(
+            sources[0].website_url.as_deref(),
+            Some("https://example.test")
+        );
         assert_eq!(
             sources[0].map_url.as_deref(),
             Some("https://maps.google.com/?cid=example")
+        );
+        assert_eq!(
+            sources[0].photo_url.as_deref(),
+            Some(
+                "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc-123&max_width_px=720"
+            )
+        );
+        assert!(
+            !sources[0]
+                .photo_url
+                .as_deref()
+                .unwrap_or_default()
+                .contains("key=")
         );
         assert!(
             sources[0]
@@ -1056,5 +2099,176 @@ mod tests {
                 .contains("rating 4.9 across 63 reviews")
         );
         assert_eq!(sources[0].provider, "Google Places API");
+    }
+
+    #[test]
+    fn google_place_photo_proxy_url_accepts_only_places_photo_names() {
+        assert_eq!(
+            google_place_photo_proxy_url("places/example/photos/photo_abc-123").as_deref(),
+            Some(
+                "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc-123&max_width_px=720"
+            )
+        );
+        assert!(google_place_photo_proxy_url("https://example.com/photo.jpg").is_none());
+        assert!(google_place_photo_proxy_url("places/example/photos/photo?key=secret").is_none());
+        assert!(google_place_photo_proxy_url("../places/example/photos/photo").is_none());
+    }
+
+    #[test]
+    fn vendor_directory_search_terms_prioritize_category_location_and_query() {
+        let query = WeddingVendorSearchQueryRequest {
+            provider_kind: "brave_search".to_string(),
+            category: Some(" florist ".to_string()),
+            query: "florist in Sydney specialising in wedding".to_string(),
+            google_place_types: None,
+            overpass_tags: None,
+        };
+
+        let terms = wedding_vendor_directory_search_terms(&query);
+
+        assert_eq!(
+            terms,
+            vec![
+                "florist".to_string(),
+                "florist in Sydney specialising in wedding".to_string(),
+                "Sydney".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn vendor_search_empty_result_message_surfaces_provider_failures() {
+        let failures = vec![
+            "Google Places returned 403: API key not authorized for Places API.".to_string(),
+            "Brave Search returned 429: quota exceeded.".to_string(),
+        ];
+        let query = WeddingVendorSearchQueryRequest {
+            provider_kind: "google_places".to_string(),
+            category: Some("venue".to_string()),
+            query: "wedding venue in Sydney".to_string(),
+            google_place_types: None,
+            overpass_tags: None,
+        };
+
+        let message =
+            vendor_search_empty_result_message(&failures, &BTreeSet::new(), &[query], true);
+
+        assert!(message.contains("No live vendor sources were returned."));
+        assert!(message.contains("Google Places returned 403"));
+        assert!(message.contains("Brave Search returned 429"));
+    }
+
+    #[test]
+    fn vendor_search_empty_result_message_explains_empty_successful_provider_run() {
+        let query = WeddingVendorSearchQueryRequest {
+            provider_kind: "google_places".to_string(),
+            category: Some("florist".to_string()),
+            query: "florist in Sydney specialising in wedding".to_string(),
+            google_place_types: None,
+            overpass_tags: None,
+        };
+        let mut providers = BTreeSet::new();
+        providers.insert("Google Places API".to_string());
+
+        let message = vendor_search_empty_result_message(&[], &providers, &[query], true);
+
+        assert!(message.contains("Google Places API ran 1 vendor-search query"));
+        assert!(message.contains("returned no usable source URLs"));
+    }
+
+    #[test]
+    fn bounded_provider_error_body_limits_noisy_provider_payloads() {
+        let body = (0..80)
+            .map(|index| format!("provider-error-field-{index}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let bounded = bounded_provider_error_body(&body);
+
+        assert!(bounded.len() <= 320);
+        assert!(bounded.contains("provider-error-field-0"));
+        assert!(!bounded.contains("provider-error-field-79"));
+    }
+
+    #[test]
+    fn provider_http_error_guidance_explains_google_places_referrer_restriction() {
+        let guidance = provider_http_error_guidance(
+            "Google Places",
+            r#"{"error":{"message":"Requests from referer <empty> are blocked."}}"#,
+        );
+
+        assert!(guidance.contains("HTTP referrer"));
+        assert!(guidance.contains("server-side wedding search"));
+    }
+
+    #[test]
+    fn wedding_vendor_record_maps_to_admin_database_source() {
+        let source = wedding_vendor_record_to_search_source(WeddingVendorRecord {
+            vendor_id: "vendor-1".to_string(),
+            vendor_slug: "chloes-florals-sydney".to_string(),
+            vendor_name: "Chloe's Florals".to_string(),
+            category: "florist".to_string(),
+            service_area: "Sydney".to_string(),
+            address: Some("12 Test Street, Sydney NSW".to_string()),
+            website_url: Some("https://chloes.example".to_string()),
+            contact_phone: None,
+            contact_email: None,
+            source_url: Some("https://maps.google.com/?cid=example".to_string()),
+            source_label: Some("Google Places API".to_string()),
+            source_checked_at: Some("2026-09-29".to_string()),
+            status: "active".to_string(),
+            notes: Some("Cached from search".to_string()),
+            evidence: json!({}),
+            caveat_labels: vec!["verify-before-booking".to_string()],
+            created_by_user_id: None,
+            updated_by_user_id: None,
+            created_at: "2026-09-29T00:00:00Z".to_string(),
+            updated_at: "2026-09-29T00:00:00Z".to_string(),
+            photos: vec![crate::db::WeddingVendorPhotoRecord {
+                photo_id: "photo-1".to_string(),
+                vendor_id: "vendor-1".to_string(),
+                slot: 1,
+                photo_url: "https://cdn.example/chloes.jpg".to_string(),
+                alt_text: Some("Chloe's Florals storefront".to_string()),
+                source_label: Some("Admin vendor database".to_string()),
+                created_at: "2026-09-29T00:00:00Z".to_string(),
+            }],
+            user_contact: None,
+        });
+
+        assert_eq!(source.title, "Chloe's Florals");
+        assert_eq!(source.url, "https://chloes.example");
+        assert_eq!(source.provider, "Admin vendor database");
+        assert_eq!(
+            source.map_url.as_deref(),
+            Some("https://maps.google.com/?cid=example")
+        );
+        assert_eq!(
+            source.photo_url.as_deref(),
+            Some("https://cdn.example/chloes.jpg")
+        );
+        assert!(
+            source
+                .snippet
+                .as_deref()
+                .unwrap_or_default()
+                .contains("saved in OmnyID's shared wedding vendor database")
+        );
+    }
+
+    #[test]
+    fn wedding_vendor_slug_is_stable_lowercase_and_ascii() {
+        assert_eq!(
+            wedding_vendor_slug("Chloe's Florals", "Florist", "Sydney CBD"),
+            "chloe-s-florals-florist-sydney-cbd"
+        );
+    }
+
+    #[test]
+    fn paid_vendor_search_provider_only_flags_metered_live_apis() {
+        assert!(is_paid_vendor_search_provider("brave_search"));
+        assert!(is_paid_vendor_search_provider("google_places"));
+        assert!(!is_paid_vendor_search_provider("overpass"));
+        assert!(!is_paid_vendor_search_provider("manual_review"));
     }
 }

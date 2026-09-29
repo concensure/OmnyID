@@ -156,17 +156,23 @@ fn derive_workspace_base_url_from_homeserver() -> Option<String> {
 }
 
 fn gmail_oauth_redirect_uri() -> Result<String, (StatusCode, String)> {
+    if let Ok(explicit_uri) = std::env::var("OMNYID_GMAIL_REDIRECT_URI") {
+        let trimmed = explicit_uri.trim();
+        if !trimmed.is_empty() {
+            return Ok(trimmed.to_string());
+        }
+    }
     let base_url = std::env::var("OMNYID_HOMESERVER_URL").map_err(|_| {
         (
             StatusCode::SERVICE_UNAVAILABLE,
-            "Gmail OAuth not configured on this server. Set OMNYID_HOMESERVER_URL.".to_string(),
+            "Gmail OAuth not configured on this server. Set OMNYID_GMAIL_REDIRECT_URI or OMNYID_HOMESERVER_URL.".to_string(),
         )
     })?;
     let trimmed = base_url.trim().trim_end_matches('/');
     if trimmed.is_empty() {
         return Err((
             StatusCode::SERVICE_UNAVAILABLE,
-            "Gmail OAuth not configured on this server. Set OMNYID_HOMESERVER_URL.".to_string(),
+            "Gmail OAuth not configured on this server. Set OMNYID_GMAIL_REDIRECT_URI or OMNYID_HOMESERVER_URL.".to_string(),
         ));
     }
     Ok(format!("{trimmed}/gmail/callback"))
@@ -187,31 +193,88 @@ fn google_oauth_authorization_url(
     )
 }
 
-fn gmail_oauth_client_id_configured() -> Result<String, (StatusCode, String)> {
-    let client_id = std::env::var("OMNYID_GMAIL_CLIENT_ID").map_err(|_| {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Gmail OAuth not configured on this server. Set OMNYID_GMAIL_CLIENT_ID.".to_string(),
-        )
-    })?;
-    let trimmed = client_id.trim();
-    if trimmed.is_empty() {
-        return Err((
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Gmail OAuth not configured on this server. Set OMNYID_GMAIL_CLIENT_ID.".to_string(),
-        ));
+fn gmail_oauth_google_error_status(error: &str) -> &'static str {
+    match error.trim() {
+        "access_denied" => "access_denied",
+        "redirect_uri_mismatch" => "redirect_mismatch",
+        "invalid_request" => "invalid_request",
+        "unauthorized_client" => "unauthorized_client",
+        _ => "error",
     }
-    Ok(trimmed.to_string())
+}
+
+fn gmail_oauth_token_exchange_failure_status(status_code: u16, body: &str) -> &'static str {
+    let lower = body.to_ascii_lowercase();
+    if lower.contains("redirect_uri_mismatch") {
+        return "redirect_mismatch";
+    }
+    if lower.contains("invalid_client")
+        || lower.contains("unauthorized_client")
+        || lower.contains("client_secret")
+    {
+        return "invalid_client";
+    }
+    if lower.contains("invalid_grant") {
+        return "invalid_grant";
+    }
+    if status_code == 401 {
+        return "invalid_client";
+    }
+    "token_exchange_failed"
+}
+
+fn gmail_oauth_client_id_configured() -> Result<String, (StatusCode, String)> {
+    for env_key in [
+        "OMNYID_GMAIL_CLIENT_ID",
+        "OMNYID_ADMIN_GMAIL_CLIENT_ID",
+        "OMNYID_GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_ID",
+    ] {
+        if let Ok(client_id) = std::env::var(env_key) {
+            let trimmed = client_id.trim();
+            if !trimmed.is_empty() {
+                return Ok(trimmed.to_string());
+            }
+        }
+    }
+    Err((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "Gmail OAuth not configured on this server. Set OMNYID_GMAIL_CLIENT_ID or OMNYID_GOOGLE_CLIENT_ID.".to_string(),
+    ))
 }
 
 fn gmail_oauth_client_secret_configured() -> Result<String, (StatusCode, String)> {
-    read_process_secret_trimmed("OMNYID_GMAIL_CLIENT_SECRET").ok_or_else(|| {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Gmail OAuth not configured on this server. Set OMNYID_GMAIL_CLIENT_SECRET."
-                .to_string(),
-        )
-    })
+    for env_key in [
+        "OMNYID_GMAIL_CLIENT_SECRET",
+        "OMNYID_ADMIN_GMAIL_CLIENT_SECRET",
+        "OMNYID_GOOGLE_CLIENT_SECRET",
+        "GOOGLE_CLIENT_SECRET",
+    ] {
+        if let Some(secret) = read_process_secret_trimmed(env_key) {
+            return Ok(secret);
+        }
+    }
+    Err((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "Gmail OAuth not configured on this server. Set OMNYID_GMAIL_CLIENT_SECRET or OMNYID_GOOGLE_CLIENT_SECRET.".to_string(),
+    ))
+}
+
+fn gmail_oauth_client_source() -> &'static str {
+    for (env_key, source) in [
+        ("OMNYID_GMAIL_CLIENT_ID", "gmail"),
+        ("OMNYID_ADMIN_GMAIL_CLIENT_ID", "admin_gmail"),
+        ("OMNYID_GOOGLE_CLIENT_ID", "google_fallback"),
+        ("GOOGLE_CLIENT_ID", "legacy_google_fallback"),
+    ] {
+        if std::env::var(env_key)
+            .ok()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            return source;
+        }
+    }
+    "missing"
 }
 
 fn gmail_oauth_is_fully_configured() -> bool {
@@ -231,6 +294,7 @@ fn gmail_oauth_config_payload() -> Value {
         "homeserver_url_configured": redirect_uri.is_some(),
         "redirect_uri": redirect_uri,
         "required_authorized_redirect_uri": redirect_uri,
+        "oauth_client_source": gmail_oauth_client_source(),
         "required_scopes": GMAIL_OAUTH_SCOPES.split_whitespace().collect::<Vec<_>>(),
     })
 }
@@ -556,6 +620,12 @@ async fn gmail_callback_http(
     Query(params): Query<HashMap<String, String>>,
 ) -> impl IntoResponse {
     let Some(code) = params.get("code").cloned() else {
+        if let Some(error) = params.get("error") {
+            return axum::response::Redirect::temporary(&gmail_oauth_redirect_target(
+                gmail_oauth_google_error_status(error),
+            ))
+            .into_response();
+        }
         return axum::response::Redirect::temporary(&gmail_oauth_redirect_target("error"))
             .into_response();
     };
@@ -618,9 +688,13 @@ async fn gmail_callback_http(
             return axum::response::Redirect::temporary(&gmail_oauth_redirect_target("error"))
                 .into_response();
         }
-        Ok(_) => {
-            return axum::response::Redirect::temporary(&gmail_oauth_redirect_target("error"))
-                .into_response();
+        Ok(r) => {
+            let status_code = r.status().as_u16();
+            let body = r.text().await.unwrap_or_default();
+            return axum::response::Redirect::temporary(&gmail_oauth_redirect_target(
+                gmail_oauth_token_exchange_failure_status(status_code, &body),
+            ))
+            .into_response();
         }
     };
 
@@ -669,7 +743,7 @@ async fn gmail_callback_http(
         .await
         .is_err()
     {
-        return axum::response::Redirect::temporary(&gmail_oauth_redirect_target("error"))
+        return axum::response::Redirect::temporary(&gmail_oauth_redirect_target("store_failed"))
             .into_response();
     }
 
@@ -679,8 +753,10 @@ async fn gmail_callback_http(
         .await
         .is_err()
     {
-        return axum::response::Redirect::temporary(&gmail_oauth_redirect_target("error"))
-            .into_response();
+        return axum::response::Redirect::temporary(&gmail_oauth_redirect_target(
+            "capability_sync_failed",
+        ))
+        .into_response();
     }
 
     axum::response::Redirect::temporary(&gmail_oauth_redirect_target("connected")).into_response()

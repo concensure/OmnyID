@@ -24,12 +24,18 @@ export type WeddingVendorEndToEndValidationInput = {
   selectedVendorDraftsApprovalGated?: boolean | null;
   quoteReplyFlowCount?: number | null;
   emailProviderReady?: boolean | null;
+  quoteAttachmentRequiresExtraction?: boolean | null;
+  quoteAttachmentExtractionReady?: boolean | null;
   draftReplyContextual?: boolean | null;
   durableSendReceiptRecorded?: boolean | null;
   sentQuoteReplyLeavesLiveQueue?: boolean | null;
   sentQuoteReplyHistoryVisible?: boolean | null;
   followUpTaskProjected?: boolean | null;
   responseEvidenceRecorded?: boolean | null;
+  adminCredentialPolicyReady?: boolean | null;
+  liveProviderServerProbePassed?: boolean | null;
+  gmailOAuthRedirectVerified?: boolean | null;
+  deployedWorkspaceSmokeTestPassed?: boolean | null;
 };
 
 export type WeddingVendorEndToEndValidationStep = {
@@ -41,10 +47,14 @@ export type WeddingVendorEndToEndValidationStep = {
 
 export type WeddingVendorEndToEndValidationState = {
   status: "ready_for_usage_validation" | "blocked";
+  productionStatus: "production_ready" | "production_blocked";
+  productionReady: boolean;
   passedCount: number;
   blockedCount: number;
   steps: WeddingVendorEndToEndValidationStep[];
   blockerLabels: string[];
+  productionBlockerLabels: string[];
+  productionNextActionLabels: string[];
   nextActionLabels: string[];
   estimatedPassesToUsage: number;
 };
@@ -110,6 +120,8 @@ function nextActionFor(stepId: string, detail: string): string {
       return "Import or receive at least one vendor quote so the threaded quote-reply card appears.";
     case "email_provider":
       return "Connect the Gmail/email executor before testing external reply send.";
+    case "quote_attachment_evidence":
+      return "Parse the vendor quote attachment and save the extracted text as threaded AFP evidence before relying on the recommendation.";
     case "draft":
       return "Verify the suggested reply includes amount, inclusions, budget stance, validity, and requested terms.";
     case "send_receipt":
@@ -125,6 +137,42 @@ function nextActionFor(stepId: string, detail: string): string {
     default:
       return detail;
   }
+}
+
+function productionBlockerLabelsFor(input: WeddingVendorEndToEndValidationInput, usageBlocked: boolean): string[] {
+  const labels: string[] = [];
+  if (usageBlocked) {
+    labels.push("Usage workflow is still blocked, so the vendor response path cannot be production-ready yet.");
+  }
+  if (input.adminCredentialPolicyReady !== true) {
+    labels.push("Admin credential policy has not been verified for server-side provider keys and shared-credit controls.");
+  }
+  if (input.liveProviderServerProbePassed !== true) {
+    labels.push("Live vendor-search provider has not passed a deployed server-side probe with real source results.");
+  }
+  if (input.gmailOAuthRedirectVerified !== true) {
+    labels.push("Gmail OAuth redirect and consent flow have not been verified on the deployed domain for ordinary users.");
+  }
+  if (input.deployedWorkspaceSmokeTestPassed !== true) {
+    labels.push("A deployed new-user smoke test has not completed onboarding, vendor search, comparison, quote reply, and history proof.");
+  }
+  return labels;
+}
+
+function productionNextActionFor(label: string): string {
+  if (/credential policy/i.test(label)) {
+    return "Verify admin-managed wedding API keys are only used server-side, gated by admin toggles, and never exposed to clients.";
+  }
+  if (/provider/i.test(label)) {
+    return "Run a deployed vendor search provider probe and confirm it returns source-backed vendors instead of an empty provider response.";
+  }
+  if (/Gmail OAuth/i.test(label)) {
+    return "Confirm the deployed Gmail redirect URI and scopes in Google Cloud, then connect Gmail as a normal user.";
+  }
+  if (/new-user smoke test/i.test(label)) {
+    return "Run the full deployed smoke test with a newly registered user and save the resulting workflow proof.";
+  }
+  return "Clear the usage workflow blockers, then rerun production readiness validation.";
 }
 
 export function buildWeddingVendorEndToEndValidationState(
@@ -271,6 +319,15 @@ export function buildWeddingVendorEndToEndValidationState(
       "Email executor is not ready.",
     ),
     step(
+      "quote_attachment_evidence",
+      "Quote attachment evidence",
+      input.quoteAttachmentRequiresExtraction !== true || input.quoteAttachmentExtractionReady === true,
+      input.quoteAttachmentRequiresExtraction === true
+        ? "Quote attachment text is extracted and available as threaded evidence."
+        : "No quote attachment extraction is required for this validation.",
+      "A vendor quote attachment is linked, but extracted text evidence has not been confirmed.",
+    ),
+    step(
       "draft",
       "Contextual reply draft",
       input.draftReplyContextual === true,
@@ -326,12 +383,17 @@ export function buildWeddingVendorEndToEndValidationState(
   ];
   const blocked = steps.filter((item) => item.status === "blocked");
   const blockerLabels = blocked.map((item) => `${item.label}: ${item.detail}`);
+  const productionBlockerLabels = productionBlockerLabelsFor(input, blocked.length > 0);
   return {
     status: blocked.length === 0 ? "ready_for_usage_validation" : "blocked",
+    productionStatus: productionBlockerLabels.length === 0 ? "production_ready" : "production_blocked",
+    productionReady: productionBlockerLabels.length === 0,
     passedCount: steps.length - blocked.length,
     blockedCount: blocked.length,
     steps,
     blockerLabels,
+    productionBlockerLabels,
+    productionNextActionLabels: productionBlockerLabels.map(productionNextActionFor),
     nextActionLabels: blocked.map((item) => nextActionFor(item.id, item.detail)),
     estimatedPassesToUsage: Math.max(1, Math.ceil(blocked.length / 2)),
   };

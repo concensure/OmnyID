@@ -2,13 +2,13 @@
 // @module-id: ui.queue-density-toggle
 // @primary-capability: queue-density-controls
 // @stability: beta
-import { For } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import type { QueueDensity } from "@/lib/queueDensityLocalState";
 
 export const QUEUE_DENSITY_MODES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] as const;
 const QUEUE_DENSITY_LABEL = "Density";
 const QUEUE_DENSITY_BUTTON_BASE_CLASS =
-  "inline-flex min-h-8 min-w-7 items-center justify-center rounded-full border font-semibold transition";
+  "inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border font-semibold transition";
 
 const DENSITY_TONE_STYLES = {
   indigo: {
@@ -39,6 +39,7 @@ export function QueueDensityToggle(props: {
   tone: "indigo" | "sky";
 }) {
   const tone = () => props.tone;
+  const [expanded, setExpanded] = createSignal(false);
   const density = () => props.density;
   const onSelect = () => props.onSelect;
   const selectedDensity = () => density();
@@ -76,22 +77,52 @@ export function QueueDensityToggle(props: {
   });
 
   return (
-    <div class={toggleState().shellClass}>
+    <div
+      class={toggleState().shellClass}
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
+    >
       <span class={toggleState().labelClass}>{QUEUE_DENSITY_LABEL}</span>
-      <For each={toggleState().modeItems}>
-        {(item) => (
-          <button
-            type="button"
-            onClick={() => selectMode(item.mode)}
-            aria-pressed={item.active}
-            aria-label={item.title}
-            class={item.buttonClass}
-            title={item.title}
-          >
-            <span class={item.labelClass}>{item.label}</span>
-          </button>
-        )}
-      </For>
+      <Show
+        when={expanded()}
+        fallback={
+          <>
+            <button
+              type="button"
+              onClick={() => selectMode("1")}
+              aria-label="Text density 1 of 10"
+              class={`${QUEUE_DENSITY_BUTTON_BASE_CLASS} ${buttonStateClass("1")}`}
+              title="Text density 1 of 10"
+            >
+              <span class={modeLabelClass("1")}>A</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => selectMode("10")}
+              aria-label="Text density 10 of 10"
+              class={`${QUEUE_DENSITY_BUTTON_BASE_CLASS} ${buttonStateClass("10")}`}
+              title="Text density 10 of 10"
+            >
+              <span class={modeLabelClass("10")}>A</span>
+            </button>
+          </>
+        }
+      >
+        <For each={toggleState().modeItems}>
+          {(item) => (
+            <button
+              type="button"
+              onClick={() => selectMode(item.mode)}
+              aria-pressed={item.active}
+              aria-label={item.title}
+              class={item.buttonClass}
+              title={item.title}
+            >
+              <span class={item.labelClass}>{item.label}</span>
+            </button>
+          )}
+        </For>
+      </Show>
     </div>
   );
 }

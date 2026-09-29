@@ -75,6 +75,8 @@ export type WeddingArtifactQuotePreview = {
   inclusions: string[];
   validUntil: string | null;
   attachmentUrl: string | null;
+  attachmentTextStatus?: "none" | "linked_unverified" | "extracted";
+  attachmentEvidenceLabels?: string[];
 };
 
 export type WeddingArtifactPreviewState =
@@ -352,6 +354,35 @@ function urlFrom(value: string): string | null {
   }
 }
 
+function attachmentTextStatusFrom(body: string, attachmentUrl: string | null): WeddingArtifactQuotePreview["attachmentTextStatus"] {
+  if (!attachmentUrl) return "none";
+  const status = labeledValue(body, [
+    "Attachment text status",
+    "Attachment extraction",
+    "Attachment parsed",
+    "Attachment text extracted",
+  ]);
+  if (/\b(extracted|parsed|read|yes|server parsed|ocr)\b/i.test(status)) return "extracted";
+  if (/^##\s+Attachment text\b/im.test(body) && sectionLines(body, "Attachment text", 3).length > 0) return "extracted";
+  return "linked_unverified";
+}
+
+function attachmentEvidenceLabelsFrom(
+  body: string,
+  attachmentUrl: string | null,
+  status: WeddingArtifactQuotePreview["attachmentTextStatus"],
+): string[] {
+  if (!attachmentUrl) return ["No original quote attachment linked"];
+  const labels = [
+    status === "extracted"
+      ? "Original quote attachment text was extracted"
+      : "Original quote attachment is linked but text extraction is not verified",
+    labeledValue(body, ["Attachment name", "Original file name", "File name"]),
+    labeledValue(body, ["Attachment parser", "Parser", "Extraction provider"]),
+  ].map(clean).filter(Boolean);
+  return [...new Set(labels)];
+}
+
 function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
   const vendorName = labeledValue(body, ["Vendor", "Supplier", "Venue", "Quote from"]);
   const amountLabel = labeledValue(body, ["Quote amount", "Quoted amount", "Total quote", "Total", "Amount"]);
@@ -359,7 +390,20 @@ function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
   const budgetDeltaLabel = labeledValue(body, ["Budget delta", "Budget impact", "Over budget", "Difference"]);
   const inclusionLines = sectionLines(body, "Inclusions", 8);
   const validUntil = labeledValue(body, ["Valid until", "Quote valid until", "Expires"]);
-  const attachmentRaw = labeledValue(body, ["Attachment", "Original PDF", "Quote PDF", "Source"]);
+  const attachmentRaw = labeledValue(body, [
+    "Attachment",
+    "Original file",
+    "Quote file",
+    "Original PDF",
+    "Quote PDF",
+    "Original Word",
+    "Quote Word",
+    "Original DOC",
+    "Quote DOC",
+    "Source",
+  ]);
+  const attachmentUrl = urlFrom(attachmentRaw);
+  const attachmentTextStatus = attachmentTextStatusFrom(body, attachmentUrl);
   return {
     kind: "quote",
     vendorName,
@@ -370,7 +414,9 @@ function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
     budgetDeltaLabel: budgetDeltaLabel || null,
     inclusions: inclusionLines,
     validUntil: validUntil || null,
-    attachmentUrl: urlFrom(attachmentRaw),
+    attachmentUrl,
+    attachmentTextStatus,
+    attachmentEvidenceLabels: attachmentEvidenceLabelsFrom(body, attachmentUrl, attachmentTextStatus),
   };
 }
 

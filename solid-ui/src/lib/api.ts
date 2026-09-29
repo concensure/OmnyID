@@ -145,6 +145,14 @@ export type SessionChangedEventDetail = {
   reason: SessionEndReason | null;
 };
 
+export function apiUrlForPath(path: unknown, base: string = API_BASE): string {
+  if (typeof path !== "string" || !path.trim()) return "";
+  const trimmedPath = path.trim();
+  if (!/^\/[^/]/.test(trimmedPath)) return "";
+  const trimmedBase = base.trim().replace(/\/+$/, "");
+  return trimmedBase ? `${trimmedBase}${trimmedPath}` : trimmedPath;
+}
+
 export type FocusItem = {
   id: string;
   title: string;
@@ -192,6 +200,11 @@ export type WeddingVendorSearchApiSource = {
   provider?: string | null;
   website_url?: string | null;
   map_url?: string | null;
+  photo_url?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  instagram_url?: string | null;
 };
 
 export type WeddingVendorSearchApiResponse = {
@@ -215,6 +228,8 @@ export type WeddingProviderCapabilityStatus = {
   credentialConfigured: boolean;
   sharedCreditEnabled: boolean;
   configured: boolean;
+  verificationStatus?: string | null;
+  diagnosticLabel?: string | null;
   sourceLabel: string | null;
 };
 
@@ -4410,6 +4425,11 @@ function normalizeWeddingVendorSearchApiResponse(value: unknown): WeddingVendorS
         provider: typeof source.provider === "string" ? source.provider : null,
         website_url: typeof source.website_url === "string" ? source.website_url : null,
         map_url: typeof source.map_url === "string" ? source.map_url : null,
+        photo_url: typeof source.photo_url === "string" ? source.photo_url : null,
+        address: typeof source.address === "string" ? source.address : null,
+        phone: typeof source.phone === "string" ? source.phone : null,
+        email: typeof source.email === "string" ? source.email : null,
+        instagram_url: typeof source.instagram_url === "string" ? source.instagram_url : null,
       }];
     })
     : [];
@@ -4497,6 +4517,16 @@ function normalizeWeddingProviderCapabilitiesResponse(value: unknown): WeddingPr
         credentialConfigured: provider.credentialConfigured === true,
         sharedCreditEnabled: provider.sharedCreditEnabled === true,
         configured: provider.configured === true,
+        verificationStatus: typeof provider.verificationStatus === "string"
+          ? provider.verificationStatus
+          : typeof provider.verification_status === "string"
+            ? provider.verification_status
+            : null,
+        diagnosticLabel: typeof provider.diagnosticLabel === "string"
+          ? provider.diagnosticLabel
+          : typeof provider.diagnostic_label === "string"
+            ? provider.diagnostic_label
+            : null,
         sourceLabel: typeof provider.sourceLabel === "string"
           ? provider.sourceLabel
           : typeof provider.source_label === "string"

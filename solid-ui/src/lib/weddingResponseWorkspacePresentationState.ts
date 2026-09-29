@@ -1,4 +1,5 @@
 // @locs-version: 1.0
+import { apiUrlForPath } from "@/lib/api";
 import {
   weddingArtifactEvidenceStatus,
   type WeddingArtifactInput,
@@ -511,6 +512,96 @@ function vendorComparisonHandoffForArtifact(metadata: Record<string, unknown>): 
   };
 }
 
+function safeExternalUrl(value: unknown): string | null {
+  const url = clean(value);
+  if (/^\/wedding\/vendor-photo\/google\?name=/i.test(url)) return apiUrlForPath(url) || null;
+  if (!/^https?:\/\//i.test(url)) return null;
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "::1") return null;
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+function vendorComparisonCardsForArtifact(metadata: Record<string, unknown>): WeddingWorkspaceArtifactPreview["vendorComparisonCards"] {
+  const rawCards = Array.isArray(metadata.topChoiceCards) ? metadata.topChoiceCards : [];
+  return rawCards.flatMap((item): WeddingWorkspaceArtifactPreview["vendorComparisonCards"] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const record = item as Record<string, unknown>;
+    const title = clean(record.title);
+    if (!title) return [];
+    const rank = typeof record.rank === "number" && Number.isFinite(record.rank) ? record.rank : 0;
+    return [{
+      choiceId: clean(record.choice_id) || `${rank}:${title}`,
+      rank,
+      title,
+      imageUrl: safeExternalUrl(record.image_url),
+      imageAlt: clean(record.image_alt) || `${title} venue image`,
+      scoreLabel: clean(record.score_label) || "Ranked source-backed option",
+      provider: clean(record.provider) || "Search",
+      sourceUrl: safeExternalUrl(record.source_url),
+      websiteUrl: safeExternalUrl(record.website_url),
+      mapUrl: safeExternalUrl(record.map_url),
+      instagramUrl: safeExternalUrl(record.instagram_url),
+      email: clean(record.email) || null,
+      phone: clean(record.phone) || null,
+      address: clean(record.address) || null,
+      rationaleLabels: stringArray(record.rationale_labels).slice(0, 5),
+      preferenceMatch: clean(record.preference_match) || "Review manually",
+      situationFit: clean(record.situation_fit) || "Fit requires source-page review.",
+      verificationLabel: clean(record.verification_label) || "Confirm availability, inclusions, and quote before outreach.",
+    }];
+  }).sort((left, right) => left.rank - right.rank).slice(0, 5);
+}
+
+function persistedSelectedVendorChoicesForArtifact(
+  artifact: WeddingArtifactSummary,
+  decisionRecords?: readonly WeddingPersistedDecisionRecord[] | null,
+): WeddingWorkspaceArtifactPreview["persistedSelectedVendorChoices"] {
+  return (decisionRecords ?? [])
+    .filter((record) => record.artifactId === artifact.id)
+    .flatMap((record): WeddingWorkspaceArtifactPreview["persistedSelectedVendorChoices"] => {
+      const optionId = clean(record.selectedOptionId);
+      const label = clean(record.selectedOptionLabel);
+      return optionId && label ? [{ optionId, label }] : [];
+    });
+}
+
+function a2uiContentForArtifact(metadata: Record<string, unknown>): Record<string, unknown> | null {
+  const raw = metadata.a2ui;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  const rawNodes = Array.isArray(record.nodes) ? record.nodes : Array.isArray(record.components) ? record.components : [];
+  const nodes = rawNodes.flatMap((item, index): Record<string, unknown>[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const component = item as Record<string, unknown>;
+    const type = clean(component.type);
+    if (!type) return [];
+    const props = component.props && typeof component.props === "object" && !Array.isArray(component.props)
+      ? component.props as Record<string, unknown>
+      : {};
+    return [{
+      id: clean(component.id) || `${type}-${index + 1}`,
+      type,
+      props,
+    }];
+  });
+  if (nodes.length === 0) return null;
+  return {
+    schema_version: clean(record.schema_version) || "a2ui.v1",
+    kind: clean(record.kind) || "panel",
+    title: clean(record.title),
+    description: clean(record.description),
+    layout: record.layout && typeof record.layout === "object" && !Array.isArray(record.layout)
+      ? record.layout
+      : { type: "stack", gap: "md" },
+    nodes,
+  };
+}
+
 function uniqueLabels(labels: readonly string[]): string[] {
   return Array.from(new Set(labels.map(clean).filter(Boolean)));
 }
@@ -628,6 +719,9 @@ export function previewForArtifact(
     sourceLabels: sourceLabelsForDisplay(artifact),
     sourceLinks: sourceLinksForDisplay(artifact),
     vendorComparisonHandoff: vendorComparisonHandoffForArtifact(inputMetadata),
+    vendorComparisonCards: vendorComparisonCardsForArtifact(inputMetadata),
+    persistedSelectedVendorChoices: persistedSelectedVendorChoicesForArtifact(artifact, decisionRecords),
+    a2uiContent: a2uiContentForArtifact(inputMetadata),
     evidenceSummary: evidenceSummaryForArtifact(artifact),
     bodyText,
     preview: buildWeddingArtifactPreviewState({

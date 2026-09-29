@@ -7,6 +7,8 @@ import {
   weddingCustomSurfaceItemToAfpSendInput,
   type WeddingCustomSurfaceItem,
 } from "@/lib/weddingCustomSurfaceState";
+import { weddingVisionPreferenceToAfpSendInput } from "@/lib/weddingVisionPreferenceAfpState";
+import { buildWeddingVisionTagButtonState } from "@/lib/weddingVisionTagButtonState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 
@@ -28,6 +30,8 @@ export function WeddingVisionPanel(props: {
   const [rulesDraft, setRulesDraft] = createSignal("");
   const [agentNote, setAgentNote] = createSignal("");
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
+  const [savingFeelTag, setSavingFeelTag] = createSignal<string | null>(null);
+  const [localFeelTagActions, setLocalFeelTagActions] = createSignal<Record<string, "affirm" | "remove">>({});
   const [overrideRefresh, setOverrideRefresh] = createSignal(0);
   const workspaceId = () => props.state.workspace.metadata.responseWorkspaceId;
   const storageKey = () => `omnyid:wedding_vision_override:${workspaceId()}`;
@@ -42,6 +46,14 @@ export function WeddingVisionPanel(props: {
   };
   const overrides = createMemo(storedOverride);
   const feelTags = () => splitLines(overrides().feelTags) ?? vision().feelTags;
+  const confirmedFeelTagKeys = createMemo(() => {
+    const keys = new Set(vision().confirmedFeelTags.map((tag) => tag.toLowerCase()));
+    for (const [key, action] of Object.entries(localFeelTagActions())) {
+      if (action === "affirm") keys.add(key);
+      if (action === "remove") keys.delete(key);
+    }
+    return keys;
+  });
   const priorityRows = () => splitLines(overrides().priorityRows)?.map((label, index) => ({
     label,
     rating: vision().priorityRows[index]?.rating ?? 3,
@@ -125,6 +137,34 @@ export function WeddingVisionPanel(props: {
     }
   }
 
+  async function confirmFeelTag(tag: string) {
+    const label = tag.trim();
+    if (!label || savingFeelTag()) return;
+    if (!props.saveProjection) {
+      setSaveNotice("Could not save to your account yet. Try again after workspace sync is available.");
+      return;
+    }
+    const isSaved = confirmedFeelTagKeys().has(label.toLowerCase());
+    setSavingFeelTag(label);
+    try {
+      await props.saveProjection(weddingVisionPreferenceToAfpSendInput({
+        metadata: props.state.workspace.metadata,
+        label,
+        action: isSaved ? "remove_feel_tag" : "affirm_feel_tag",
+      }));
+      props.onRefreshWorkspace?.();
+      setLocalFeelTagActions((current) => ({
+        ...current,
+        [label.toLowerCase()]: isSaved ? "remove" : "affirm",
+      }));
+      setSaveNotice(isSaved ? `${label} removed from the saved vision.` : `${label} added to the wedding vision.`);
+    } catch {
+      setSaveNotice("Could not update that preference right now. Try again in a moment.");
+    } finally {
+      setSavingFeelTag(null);
+    }
+  }
+
   return (
     <section class="min-w-0 rounded-[24px] border border-rose-100/80 bg-[linear-gradient(135deg,rgba(255,241,242,0.95),rgba(255,255,255,0.94))] p-4 shadow-card sm:rounded-[28px]">
       <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -144,7 +184,36 @@ export function WeddingVisionPanel(props: {
           <p class="text-sm font-semibold text-rose-950">How it should feel</p>
           <div class="mt-2 flex flex-wrap gap-1.5">
             <For each={feelTags()}>
-              {(tag) => <span class="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-950">{tag}</span>}
+              {(tag) => {
+                const saved = () => confirmedFeelTagKeys().has(tag.toLowerCase());
+                const saving = () => savingFeelTag()?.toLowerCase() === tag.toLowerCase();
+                const buttonState = () => buildWeddingVisionTagButtonState({
+                  tag,
+                  saved: saved(),
+                  saving: saving(),
+                });
+                return (
+                  <button
+                    type="button"
+                    class={`rounded-full px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${
+                      saved()
+                        ? "bg-emerald-50 text-emerald-800"
+                        : "bg-rose-50 text-rose-950 hover:bg-rose-100"
+                    } disabled:cursor-wait disabled:opacity-60`}
+                    aria-pressed={buttonState().ariaPressed}
+                    aria-label={buttonState().actionLabel}
+                    disabled={buttonState().disabled}
+                    title={buttonState().title}
+                    data-magic-action={buttonState().magicAction}
+                    data-magic-icon="tag"
+                    data-magic-label={buttonState().actionLabel}
+                    data-magic-id={buttonState().magicId}
+                    onClick={() => void confirmFeelTag(tag)}
+                  >
+                    {buttonState().displayLabel}
+                  </button>
+                );
+              }}
             </For>
           </div>
         </div>

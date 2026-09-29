@@ -217,16 +217,6 @@ export function WeddingWorkspaceContextPanels(props: {
         <WeddingBackgroundAutomationCard state={props.state.backgroundAutomationCoverage} />
       </Show>
 
-      <Show when={activeMenu() !== "advanced"}>
-        <WeddingCustomSurfaceTools
-          activeMenu={activeMenu()}
-          storageKey={props.state.workspace.metadata.responseWorkspaceId}
-          metadata={props.state.workspace.metadata}
-          saveProjection={props.saveProjection}
-          onRefreshWorkspace={props.onRefreshWorkspace}
-        />
-      </Show>
-
       <Show when={(props.showHomeOverview ?? true) && activeMenu() === "home"}>
         <WeddingPanelSection
           label="Planning snapshot"
@@ -274,7 +264,8 @@ export function WeddingWorkspaceContextPanels(props: {
         />
       </div>
 
-      <div hidden={activeMenu() !== "people"} class="grid gap-3 xl:grid-cols-2">
+      <Show when={activeMenu() === "people"}>
+      <div class="grid gap-3 xl:grid-cols-2">
         <section class="rounded-[24px] border border-amber-100/80 bg-amber-50/75 p-4 shadow-card sm:rounded-[28px]">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -323,7 +314,17 @@ export function WeddingWorkspaceContextPanels(props: {
             contactUserId={props.contactUserId}
           />
         </div>
+        <div class="xl:col-span-2">
+          <WeddingCustomSurfaceTools
+            activeMenu={activeMenu()}
+            storageKey={props.state.workspace.metadata.responseWorkspaceId}
+            metadata={props.state.workspace.metadata}
+            saveProjection={props.saveProjection}
+            onRefreshWorkspace={props.onRefreshWorkspace}
+          />
+        </div>
       </div>
+      </Show>
 
       <div hidden={activeMenu() !== "plan"}>
         <section class="rounded-[24px] border border-indigo-100/80 bg-indigo-50/75 p-4 shadow-card sm:rounded-[28px]">

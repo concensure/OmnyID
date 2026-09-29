@@ -461,6 +461,20 @@ export function AgentSettingsView(props: {
   let runtimeBackupManifestTriggerRef: HTMLButtonElement | undefined;
   let runtimeRecoveryPreviewTriggerRef: HTMLButtonElement | undefined;
   let runtimeRecoveryDownloadTriggerRef: HTMLButtonElement | undefined;
+
+  // Active tab for the API management section. Keep these signals above any
+  // memos/effects that read them; production bundling otherwise exposes TDZ
+  // failures as "Cannot access before initialization" route crashes.
+  const [settingsTab, setSettingsTab] = createSignal<"llm" | "mcp" | "skills" | "runtime">("llm");
+  const SETTINGS_TABS = ["llm", "mcp", "skills", "runtime"] as const;
+  const LLM_BACKEND_OPTIONS = ["byok", "ollama", "runpod"] as const;
+  const [devicePolicies, setDevicePolicies] = createSignal<DeviceSyncPolicyEntry[]>(
+    props.deviceSyncPolicies ?? [],
+  );
+  const [devicePolicyUpdatingId, setDevicePolicyUpdatingId] = createSignal<string | null>(null);
+  const [devicePolicyFeedback, setDevicePolicyFeedback] = createSignal<string | null>(null);
+  const [devicePolicyActionError, setDevicePolicyActionError] = createSignal<AgentSettingsDevicePolicyFailureReceipt | null>(null);
+
   const runtimeBackupEntries = createMemo(() => runtimeBackupsEntries(runtimeBackupsState()));
   const runtimeRestoreDrillEntries = createMemo(() => selectRuntimeRestoreDrillEntries(runtimeRestoreDrillsState()));
   const runtimeUpdateEntriesState = createMemo(() => runtimeUpdatesEntries(runtimeUpdatesState()));
@@ -772,17 +786,6 @@ export function AgentSettingsView(props: {
       setLoraHistory(next);
     }
   });
-
-  // Active tab for the API management section
-  const [settingsTab, setSettingsTab] = createSignal<"llm" | "mcp" | "skills" | "runtime">("llm");
-  const SETTINGS_TABS = ["llm", "mcp", "skills", "runtime"] as const;
-  const LLM_BACKEND_OPTIONS = ["byok", "ollama", "runpod"] as const;
-  const [devicePolicies, setDevicePolicies] = createSignal<DeviceSyncPolicyEntry[]>(
-    props.deviceSyncPolicies ?? [],
-  );
-  const [devicePolicyUpdatingId, setDevicePolicyUpdatingId] = createSignal<string | null>(null);
-  const [devicePolicyFeedback, setDevicePolicyFeedback] = createSignal<string | null>(null);
-  const [devicePolicyActionError, setDevicePolicyActionError] = createSignal<AgentSettingsDevicePolicyFailureReceipt | null>(null);
 
   createEffect(() => {
     setDevicePolicies(props.deviceSyncPolicies ?? []);

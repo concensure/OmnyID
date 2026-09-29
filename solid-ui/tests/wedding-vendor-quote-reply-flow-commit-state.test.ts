@@ -318,6 +318,33 @@ test("vendor quote AFP messages use one durable thread for quote and draft", () 
   assert.equal(incoming.attachments[0]?.storage.url, "https://example.com/chloe-quote.pdf");
 });
 
+test("vendor quote AFP messages preserve Word quote attachment mime types", () => {
+  const incomingDocx = weddingVendorQuoteIncomingAfpMessage({
+    quote: {
+      ...quote,
+      attachmentUrl: "https://example.com/chloe-quote.docx",
+    },
+    metadata,
+    subject: "Floral quote",
+    createdAt: "2026-09-27T00:00:00.000Z",
+  });
+  const incomingDoc = weddingVendorQuoteIncomingAfpMessage({
+    quote: {
+      ...quote,
+      attachmentUrl: "https://example.com/chloe-quote.doc",
+    },
+    metadata,
+    subject: "Floral quote",
+    createdAt: "2026-09-27T00:00:00.000Z",
+  });
+
+  assert.equal(
+    incomingDocx.attachments[0]?.mime_type,
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  );
+  assert.equal(incomingDoc.attachments[0]?.mime_type, "application/msword");
+});
+
 test("vendor quote AFP messages reject unsafe attachment urls and malformed timestamps", () => {
   const unsafeQuote: WeddingArtifactQuotePreview = {
     ...quote,

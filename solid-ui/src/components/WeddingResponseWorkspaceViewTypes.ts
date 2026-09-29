@@ -58,15 +58,7 @@ export type WeddingResponseWorkspaceViewProps = {
   onVendorSearchQueryChange?: (query: string) => void;
   vendorSearchReadiness?: WeddingLiveWorkflowReadinessState | null;
   vendorSearchBlockedReason?: string | null;
-  onRunLiveEvidenceCheck?: () => void;
-  liveEvidenceRunning?: boolean;
-  liveEvidenceNotice?: string | null;
-  liveEvidenceReadiness?: WeddingLiveWorkflowReadinessState | null;
-  vendorSmokeTestAvailable?: boolean;
-  vendorSmokeTestVendorEmail?: string | null;
   vendorEndToEndValidation?: WeddingVendorEndToEndValidationState | null;
-  onInstallVendorSmokeFixture?: () => void;
-  onRemoveVendorSmokeFixture?: () => void;
   onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
   onSaveWeddingDate?: (date: string) => Promise<void> | void;
   richResponse?: WeddingRichResponseRendererState | null;

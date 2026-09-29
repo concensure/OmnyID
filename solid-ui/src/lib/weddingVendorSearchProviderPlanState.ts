@@ -99,6 +99,10 @@ function termsFrom(readiness: WeddingVendorSearchReadinessState): {
   };
 }
 
+function searchLocationFor(input: { location: string; approximateLocation?: string | null }): string {
+  return clean(input.location) || clean(input.approximateLocation);
+}
+
 function expectedFieldsFor(providerKind: WeddingVendorSearchProviderKind): string[] {
   if (providerKind === "google_places") {
     return ["name", "website", "phone", "address", "rating", "review count", "opening hours", "place id"];
@@ -125,13 +129,15 @@ function queryFor(input: {
     ? ` ${input.musicDirection}`
     : "";
   const contextPart = `${scopePart}${musicPart}`;
+  const areaPhrase = input.location || "the wedding area";
   if (input.providerKind === "google_places") {
-    return `wedding ${label} near ${input.location}${input.preferences ? ` ${input.preferences}` : ""}${contextPart}`.replace(/\s+/g, " ").trim();
+    return `wedding ${label} near ${areaPhrase}${input.preferences ? ` ${input.preferences}` : ""}${contextPart}`.replace(/\s+/g, " ").trim();
   }
   if (input.providerKind === "overpass") {
-    return `${input.location} ${label}${contextPart}`.replace(/\s+/g, " ").trim();
+    return `${areaPhrase} ${label}${contextPart}`.replace(/\s+/g, " ").trim();
   }
-  return `wedding ${label} ${input.location} services packages price reviews${input.preferences ? ` ${input.preferences}` : ""}${contextPart}`.replace(/\s+/g, " ").trim();
+  const areaConnector = input.category === "venue" ? `near ${areaPhrase}` : `in ${areaPhrase}`;
+  return `wedding ${label} ${areaConnector} services packages price reviews${input.preferences ? ` ${input.preferences}` : ""}${contextPart}`.replace(/\s+/g, " ").trim();
 }
 
 function guardrailsFor(providerKind: WeddingVendorSearchProviderKind): string[] {
@@ -163,6 +169,7 @@ export function buildWeddingVendorSearchProviderPlanState(input: {
   readiness: WeddingVendorSearchReadinessState;
   providerKinds?: readonly WeddingVendorSearchProviderKind[] | null;
   maxCategories?: number | null;
+  approximateLocation?: string | null;
 }): WeddingVendorSearchProviderPlanState {
   if (input.readiness.status === "blocked") {
     return {
@@ -174,7 +181,12 @@ export function buildWeddingVendorSearchProviderPlanState(input: {
     };
   }
 
-  const { location, preferences, photographyScope, musicDirection, categories } = termsFrom(input.readiness);
+  const terms = termsFrom(input.readiness);
+  const location = searchLocationFor({
+    location: terms.location,
+    approximateLocation: input.approximateLocation,
+  });
+  const { preferences, photographyScope, musicDirection, categories } = terms;
   const providers = input.providerKinds?.length
     ? input.providerKinds
     : (["google_places", "brave_search", "overpass"] as const);

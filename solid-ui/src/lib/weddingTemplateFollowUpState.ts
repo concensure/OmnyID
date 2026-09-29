@@ -25,6 +25,7 @@ import {
 } from "@/lib/weddingResponseWorkspaceViewState";
 import { weddingVendorSearchTerms, weddingVendorSelectionLabels } from "@/lib/weddingVendorChecklistState";
 import { weddingVendorSearchQueryFromIntake } from "@/lib/weddingVendorSearchLaunchState";
+import type { WeddingTemplateStarterIntent } from "@/lib/weddingTemplateEntryState";
 import {
   buildWeddingVendorSearchReadinessState,
   type WeddingVendorSearchReadinessState,
@@ -70,6 +71,7 @@ export type WeddingTemplateFollowUpInput = WeddingPlanningContext & {
   responseWorkspaceId?: string | null;
   sourceResponseId?: string | null;
   weddingDateIso?: string | null;
+  starterIntents?: readonly WeddingTemplateStarterIntent[] | null;
   projectionStorage?: Storage | null;
 };
 
@@ -216,6 +218,19 @@ function researchNotes(context: WeddingPlanningContext, labels: readonly string[
   ].filter((value): value is string => Boolean(clean(value)));
 }
 
+const STARTER_INTENT_LABELS: Record<WeddingTemplateStarterIntent, string> = {
+  venue_search: "Find venues",
+  budget_plan: "Build budget",
+  guest_list: "Organize guests",
+  vendor_emails: "Draft vendor emails",
+  run_sheet: "Make run sheet",
+  registry: "Draft registry",
+};
+
+function starterIntentLabels(values: readonly WeddingTemplateStarterIntent[] | null | undefined): string[] {
+  return uniqueStrings((values ?? []).map((value) => STARTER_INTENT_LABELS[value] ?? ""), 6);
+}
+
 function verificationActions(context: WeddingPlanningContext): string[] {
   const vendorSearch = vendorSearchReadinessFor(context);
   return [
@@ -283,6 +298,7 @@ function exactIsoDate(value: unknown): string | null {
 export function buildWeddingTemplateFollowUpState(input: WeddingTemplateFollowUpInput): WeddingTemplateFollowUpState {
   const planningContext = normalizeContext(input);
   const labels = answeredLabels(planningContext);
+  const selectedStarterLabels = starterIntentLabels(input.starterIntents);
   const metadata = normalizeWeddingPlanningMetadata({
     weddingPlanId: input.weddingPlanId,
     responseWorkspaceId: input.responseWorkspaceId,
@@ -303,7 +319,12 @@ export function buildWeddingTemplateFollowUpState(input: WeddingTemplateFollowUp
     metadata,
     title: "Wedding planning follow-up brief",
     researchNotes: labels.length > 0
-      ? researchNotes(planningContext, labels)
+      ? [
+        ...researchNotes(planningContext, labels),
+        ...(selectedStarterLabels.length > 0
+          ? [`User selected starter focus: ${selectedStarterLabels.join(", ")}.`]
+          : []),
+      ]
       : ["No answered Need-To-Know prompts have been captured yet."],
     assumptions: [
       "This is a private planning file generated from user-provided context, not a vendor quote or booking.",

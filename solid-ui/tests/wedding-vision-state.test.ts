@@ -6,6 +6,15 @@ import type { WeddingResponseWorkspaceViewState } from "../src/lib/weddingRespon
 
 function state(overrides: Partial<WeddingResponseWorkspaceViewState> = {}): WeddingResponseWorkspaceViewState {
   return {
+    workspace: {
+      metadata: {
+        weddingPlanId: "wedding_plan:vision",
+        responseWorkspaceId: "response_workspace:vision",
+        sourceResponseId: null,
+        supertags: ["template:wedding_planning", "event:wedding"],
+      },
+    },
+    afpMessages: [],
     contextCards: [{
       title: "Wedding basics",
       statusLabel: "Saved context",
@@ -62,6 +71,37 @@ test("buildWeddingVisionState creates a traceable wedding compass from current p
     const record = section as { title?: string };
     return record.title === "Still learning";
   }));
+});
+
+test("buildWeddingVisionState projects confirmed feel tags from AFP preference messages", () => {
+  const vision = buildWeddingVisionState(state({
+    afpMessages: [{
+      id: "afp-vision-calm",
+      thread_id: "wedding_vision:response_workspace:vision",
+      from: "system://wedding-planning",
+      to: ["agent://wedding-planning"],
+      timestamp: "2026-09-29T01:00:00.000Z",
+      type: "ledger",
+      kind: "wedding_vision_preference",
+      subtype: "wedding_vision_preference",
+      content: {
+        action: "affirm_feel_tag",
+        label: "Calm",
+        response_workspace_id: "response_workspace:vision",
+      },
+      metadata: {
+        responseWorkspaceId: "response_workspace:vision",
+        wedding_vision_action: "affirm_feel_tag",
+        wedding_vision_label: "Calm",
+      },
+      supertags: ["wedding_vision_preference"],
+    }],
+  } as Partial<WeddingResponseWorkspaceViewState>));
+
+  assert.equal(vision.confirmedFeelTags[0], "Calm");
+  assert.equal(vision.feelTags[0], "Calm");
+  assert.ok(vision.evidenceLabels.some((label) => /confirmed "Calm"/i.test(label)));
+  assert.ok(vision.sourceMixLabels.some((label) => /confirmed vision preference/i.test(label)));
 });
 
 test("buildWeddingVisionState stays useful before the couple has added much detail", () => {

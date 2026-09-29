@@ -13,6 +13,7 @@ import {
 test("wedding vendor search env state detects Google Places without exposing keys", () => {
   const state = buildWeddingVendorSearchProviderEnvState({
     OMNYID_GOOGLE_PLACES_API_KEY: "secret-google-key",
+    OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED: "true",
   });
 
   assert.equal(state.productionReady, true);
@@ -27,6 +28,8 @@ test("wedding vendor search env state accepts file-backed Oracle secrets", () =>
   const state = buildWeddingVendorSearchProviderEnvState({
     OMNYID_BRAVE_SEARCH_API_KEY_FILE: ".secrets/omnyid_brave_search_api_key",
     OMNYID_GOOGLE_PLACES_API_KEY_FILE: ".secrets/omnyid_google_places_api_key",
+    OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_ALL_USERS_ENABLED: "true",
+    OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED: "true",
   });
 
   assert.equal(state.productionReady, true);
@@ -55,6 +58,8 @@ test("wedding vendor search env connected app ids feed existing readiness gate",
   const connectedAppIds = weddingVendorSearchConnectedAppIdsFromEnv({
     BRAVE_SEARCH_API_KEY: "secret-brave-key",
     OMNYID_GOOGLE_PLACES_API_KEY: "secret-google-key",
+    OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_WEDDING_TEMPLATE_ENABLED: "true",
+    OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED: "true",
   });
   const readiness = buildWeddingVendorSearchProviderReadinessFromConnectedApps({
     connectedAppIds,
@@ -67,4 +72,21 @@ test("wedding vendor search env connected app ids feed existing readiness gate",
   assert.equal(readiness.executorStatus, "available");
   assert.equal(readiness.productionReady, true);
   assert.match(readiness.requiredProvider ?? "", /Google Places/);
+});
+
+test("wedding vendor search env state funds paid wedding providers unless explicitly disabled", () => {
+  const state = buildWeddingVendorSearchProviderEnvState({
+    OMNYID_GOOGLE_PLACES_API_KEY: "secret-google-key",
+  });
+  const disabled = buildWeddingVendorSearchProviderEnvState({
+    OMNYID_GOOGLE_PLACES_API_KEY: "secret-google-key",
+    OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED: "false",
+  });
+
+  assert.equal(state.productionReady, true);
+  assert.deepEqual(state.connectedAppIds, ["google-places-api"]);
+  assert.equal(disabled.productionReady, false);
+  assert.deepEqual(disabled.connectedAppIds, []);
+  assert.ok(disabled.missingLabels.some((label) => /admin sharing toggle is off/i.test(label)));
+  assert.doesNotMatch(JSON.stringify(state), /secret-google-key/);
 });

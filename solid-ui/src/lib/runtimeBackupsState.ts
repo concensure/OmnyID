@@ -1,11 +1,10 @@
 ﻿// @locs-version: 1.0
-import type { RuntimeBackupsResponse } from "./api";
+import type { RuntimeBackupsResponse, RuntimeRestoreDrillsResponse } from "./api";
 import { compactSummaryLines } from "./agentSettingsSummaryFormat";
 import { byteCountLabel, dateTimeLabel, relativeTimeLabel } from "./agentSettingsRuntimeFormat";
-import type { RuntimeRecoveryMetrics } from "./runtimeRecoveryMetricsState";
 
 type RuntimeBackupsCarrier = RuntimeBackupsResponse | null | undefined;
-type RuntimeLatestCompletedRestoreDrillByBackupId = RuntimeRecoveryMetrics["latestCompletedRestoreDrillByBackupId"];
+type RuntimeLatestCompletedRestoreDrillByBackupId = Map<string, RuntimeRestoreDrillsResponse["entries"][number]>;
 
 export type RuntimeBackupPreviewCard = {
   title: string;

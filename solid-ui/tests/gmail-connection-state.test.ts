@@ -73,11 +73,13 @@ test("normalizeGmailOAuthConfig accepts redacted OAuth diagnostics", () => {
     homeserver_url_configured: true,
     redirect_uri: "https://api.omnyid.com/gmail/callback",
     required_authorized_redirect_uri: "https://api.omnyid.com/gmail/callback",
+    oauth_client_source: "google_fallback",
     required_scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
 
   assert.equal(config.configured, true);
   assert.equal(config.requiredAuthorizedRedirectUri, "https://api.omnyid.com/gmail/callback");
+  assert.equal(config.oauthClientSource, "google_fallback");
   assert.deepEqual(config.requiredScopes, ["https://www.googleapis.com/auth/gmail.modify"]);
 });
 

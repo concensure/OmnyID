@@ -10,9 +10,10 @@ use super::calendar::{
 use super::{
     gmail_access_token_from_token_response, gmail_connection_change_requires_recent_session,
     gmail_oauth_client_id_configured, gmail_oauth_client_secret_configured,
-    gmail_oauth_config_payload, gmail_oauth_is_fully_configured, gmail_oauth_redirect_target,
-    gmail_oauth_redirect_uri, gmail_oauth_state_sign_at, gmail_oauth_state_verify_at,
-    oauth_csrf_secret, validate_alias_agent_id,
+    gmail_oauth_client_source, gmail_oauth_config_payload, gmail_oauth_google_error_status,
+    gmail_oauth_is_fully_configured, gmail_oauth_redirect_target, gmail_oauth_redirect_uri,
+    gmail_oauth_state_sign_at, gmail_oauth_state_verify_at,
+    gmail_oauth_token_exchange_failure_status, oauth_csrf_secret, validate_alias_agent_id,
 };
 use axum::http::StatusCode;
 use std::sync::{Mutex, OnceLock};
@@ -117,11 +118,13 @@ fn gmail_oauth_redirect_target_derives_workspace_origin_from_api_homeserver_url(
 fn gmail_oauth_redirect_uri_requires_homeserver_base_url() {
     let _guard = env_lock().lock().expect("env lock");
     unsafe {
+        std::env::remove_var("OMNYID_GMAIL_REDIRECT_URI");
         std::env::remove_var("OMNYID_HOMESERVER_URL");
     }
 
     let err = gmail_oauth_redirect_uri().expect_err("missing homeserver url should fail");
     assert_eq!(err.0, StatusCode::SERVICE_UNAVAILABLE);
+    assert!(err.1.contains("OMNYID_GMAIL_REDIRECT_URI"));
     assert!(err.1.contains("OMNYID_HOMESERVER_URL"));
 }
 
@@ -129,6 +132,7 @@ fn gmail_oauth_redirect_uri_requires_homeserver_base_url() {
 fn gmail_oauth_redirect_uri_builds_callback_from_homeserver_base_url() {
     let _guard = env_lock().lock().expect("env lock");
     unsafe {
+        std::env::remove_var("OMNYID_GMAIL_REDIRECT_URI");
         std::env::set_var("OMNYID_HOMESERVER_URL", "https://api.omnyid.com/");
     }
 
@@ -138,6 +142,29 @@ fn gmail_oauth_redirect_uri_builds_callback_from_homeserver_base_url() {
     );
 
     unsafe {
+        std::env::remove_var("OMNYID_GMAIL_REDIRECT_URI");
+        std::env::remove_var("OMNYID_HOMESERVER_URL");
+    }
+}
+
+#[test]
+fn gmail_oauth_redirect_uri_prefers_explicit_redirect_uri() {
+    let _guard = env_lock().lock().expect("env lock");
+    unsafe {
+        std::env::set_var(
+            "OMNYID_GMAIL_REDIRECT_URI",
+            "https://api.omnyid.com/gmail/callback",
+        );
+        std::env::set_var("OMNYID_HOMESERVER_URL", "https://wrong.example.test");
+    }
+
+    assert_eq!(
+        gmail_oauth_redirect_uri().expect("redirect uri"),
+        "https://api.omnyid.com/gmail/callback"
+    );
+
+    unsafe {
+        std::env::remove_var("OMNYID_GMAIL_REDIRECT_URI");
         std::env::remove_var("OMNYID_HOMESERVER_URL");
     }
 }
@@ -176,11 +203,47 @@ fn gmail_oauth_client_secret_requires_non_blank_value() {
 }
 
 #[test]
+fn gmail_oauth_client_config_falls_back_to_general_google_keys() {
+    let _guard = env_lock().lock().expect("env lock");
+    unsafe {
+        std::env::set_var("OMNYID_GMAIL_CLIENT_ID", "   ");
+        std::env::set_var("OMNYID_GOOGLE_CLIENT_ID", "google-client-id");
+        std::env::set_var("OMNYID_GMAIL_CLIENT_SECRET", "   ");
+        std::env::set_var("OMNYID_GOOGLE_CLIENT_SECRET", "google-client-secret");
+    }
+
+    assert_eq!(
+        gmail_oauth_client_id_configured().expect("fallback client id"),
+        "google-client-id"
+    );
+    assert_eq!(
+        gmail_oauth_client_secret_configured().expect("fallback client secret"),
+        "google-client-secret"
+    );
+    assert_eq!(gmail_oauth_client_source(), "google_fallback");
+    let payload = gmail_oauth_config_payload();
+    assert_eq!(payload["client_id_configured"].as_bool(), Some(true));
+    assert_eq!(payload["client_secret_configured"].as_bool(), Some(true));
+    assert_eq!(
+        payload["oauth_client_source"].as_str(),
+        Some("google_fallback")
+    );
+
+    unsafe {
+        std::env::remove_var("OMNYID_GMAIL_CLIENT_ID");
+        std::env::remove_var("OMNYID_GOOGLE_CLIENT_ID");
+        std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET");
+        std::env::remove_var("OMNYID_GOOGLE_CLIENT_SECRET");
+    }
+}
+
+#[test]
 fn gmail_oauth_full_config_requires_all_runtime_inputs() {
     let _guard = env_lock().lock().expect("env lock");
     unsafe {
         std::env::set_var("OMNYID_GMAIL_CLIENT_ID", "gmail-client-id");
         std::env::set_var("OMNYID_GMAIL_CLIENT_SECRET", "gmail-client-secret");
+        std::env::remove_var("OMNYID_GMAIL_REDIRECT_URI");
         std::env::set_var("OMNYID_HOMESERVER_URL", "https://api.omnyid.com");
         std::env::set_var("OMNYID_SESSION_SECRET", "session-secret");
     }
@@ -195,6 +258,7 @@ fn gmail_oauth_full_config_requires_all_runtime_inputs() {
     unsafe {
         std::env::remove_var("OMNYID_GMAIL_CLIENT_ID");
         std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET");
+        std::env::remove_var("OMNYID_GMAIL_REDIRECT_URI");
         std::env::remove_var("OMNYID_HOMESERVER_URL");
         std::env::remove_var("OMNYID_SESSION_SECRET");
     }
@@ -206,6 +270,10 @@ fn gmail_oauth_config_payload_returns_redacted_diagnostics() {
     unsafe {
         std::env::set_var("OMNYID_GMAIL_CLIENT_ID", "gmail-client-id");
         std::env::set_var("OMNYID_GMAIL_CLIENT_SECRET", "gmail-client-secret");
+        std::env::set_var(
+            "OMNYID_GMAIL_REDIRECT_URI",
+            "https://api.omnyid.com/gmail/callback",
+        );
         std::env::set_var("OMNYID_HOMESERVER_URL", "https://api.omnyid.com");
         std::env::set_var("OMNYID_SESSION_SECRET", "session-secret");
     }
@@ -216,6 +284,7 @@ fn gmail_oauth_config_payload_returns_redacted_diagnostics() {
         payload["required_authorized_redirect_uri"].as_str(),
         Some("https://api.omnyid.com/gmail/callback")
     );
+    assert_eq!(payload["oauth_client_source"].as_str(), Some("gmail"));
     assert!(
         payload["required_scopes"]
             .as_array()
@@ -229,9 +298,49 @@ fn gmail_oauth_config_payload_returns_redacted_diagnostics() {
     unsafe {
         std::env::remove_var("OMNYID_GMAIL_CLIENT_ID");
         std::env::remove_var("OMNYID_GMAIL_CLIENT_SECRET");
+        std::env::remove_var("OMNYID_GMAIL_REDIRECT_URI");
         std::env::remove_var("OMNYID_HOMESERVER_URL");
         std::env::remove_var("OMNYID_SESSION_SECRET");
     }
+}
+
+#[test]
+fn gmail_oauth_failure_statuses_are_actionable_without_secrets() {
+    assert_eq!(
+        gmail_oauth_google_error_status("redirect_uri_mismatch"),
+        "redirect_mismatch"
+    );
+    assert_eq!(
+        gmail_oauth_google_error_status("access_denied"),
+        "access_denied"
+    );
+    assert_eq!(gmail_oauth_google_error_status("unknown"), "error");
+
+    assert_eq!(
+        gmail_oauth_token_exchange_failure_status(
+            400,
+            r#"{"error":"redirect_uri_mismatch","error_description":"Bad redirect"}"#,
+        ),
+        "redirect_mismatch"
+    );
+    assert_eq!(
+        gmail_oauth_token_exchange_failure_status(
+            401,
+            r#"{"error":"invalid_client","error_description":"Unauthorized"}"#,
+        ),
+        "invalid_client"
+    );
+    assert_eq!(
+        gmail_oauth_token_exchange_failure_status(
+            400,
+            r#"{"error":"invalid_grant","error_description":"Bad code"}"#,
+        ),
+        "invalid_grant"
+    );
+    assert_eq!(
+        gmail_oauth_token_exchange_failure_status(500, "upstream unavailable"),
+        "token_exchange_failed"
+    );
 }
 
 #[test]

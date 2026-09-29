@@ -7,6 +7,7 @@ import {
   isWorkspaceLlmSetupComplete,
   workspaceCalendarSetupPendingReason,
   workspaceGmailSetupPendingReason,
+  workspaceLlmSetupErrorPendingReason,
   workspaceLlmSetupPendingReason,
 } from "../src/lib/workspaceSetupState.ts";
 import type { LlmConfig } from "../src/lib/api";
@@ -64,6 +65,18 @@ test("isWorkspaceLlmSetupComplete accepts non-hosted backends without a hosted b
   assert.equal(isWorkspaceLlmSetupComplete(ollama), true);
   assert.equal(workspaceLlmSetupPendingReason(byok), null);
   assert.equal(workspaceLlmSetupPendingReason(ollama), null);
+});
+
+test("workspaceLlmSetupPendingReason treats missing config as setup work, not verification failure", () => {
+  assert.match(
+    workspaceLlmSetupPendingReason(null) ?? "",
+    /No AI model is connected/i,
+  );
+  assert.match(
+    workspaceLlmSetupErrorPendingReason(new Error("no LLM config; call POST /agent/provision first")) ?? "",
+    /No AI model is connected/i,
+  );
+  assert.equal(workspaceLlmSetupErrorPendingReason(new Error("service unavailable")), null);
 });
 
 test("isWorkspaceGmailSetupComplete requires a healthy non-expiring connection", () => {

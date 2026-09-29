@@ -1,21 +1,13 @@
 // @locs-version: 2.0
-import type { WeddingCollaboratorRole } from "./weddingCollaborationState";
-
-export type WeddingCollaborationSurfaceId =
-  | "planning_files"
-  | "budget_guest_timeline"
-  | "assigned_tasks"
-  | "sensitive_decisions";
-
-export type WeddingCollaborationAction =
-  | "view"
-  | "edit"
-  | "approve"
-  | "invite"
-  | "revoke"
-  | "export"
-  | "contact_vendor"
-  | "change_sensitive_setting";
+import type {
+  WeddingCollaborationAction,
+  WeddingCollaborationSurfaceId,
+  WeddingCollaboratorRole,
+} from "./weddingCollaborationTypes";
+export type {
+  WeddingCollaborationAction,
+  WeddingCollaborationSurfaceId,
+} from "./weddingCollaborationTypes";
 
 export type WeddingCollaborationPermissionDecision = {
   allowed: boolean;

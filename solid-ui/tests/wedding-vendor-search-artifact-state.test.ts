@@ -86,6 +86,64 @@ test("vendor search source packet feeds existing wedding response workspace", as
   assert.equal(workspace.results[0]?.sourceLinks.length, 1);
 });
 
+test("cached admin vendor database results still create source-backed artifacts", () => {
+  const execution = {
+    status: "cached" as const,
+    externalSearchPerformed: false,
+    providerLabel: "Admin vendor database",
+    queryCount: 2,
+    sourceCount: 2,
+    queries: [
+      "florist in Sydney specialising in wedding",
+      "wedding florist Sydney reviews packages",
+    ],
+    sources: [
+      {
+        title: "Chloe's Florals",
+        url: "https://chloes-florals.example",
+        website_url: "https://chloes-florals.example",
+        map_url: "https://maps.google.com/?cid=chloe",
+        snippet: "florist - Sydney - saved in OmnyID's shared wedding vendor database.",
+        provider: "Admin vendor database",
+      },
+      {
+        title: "Harbour Blooms",
+        url: "https://harbour-blooms.example",
+        snippet: "florist - Sydney - package language and reliable reviews.",
+        provider: "Admin vendor database",
+      },
+    ],
+    message: "Admin vendor database returned 2 reusable sources; paid live search was skipped to save admin API credits.",
+    receiptMetadata: {
+      vendor_search_mode: "live",
+      vendor_search_status: "cached",
+      external_search_performed: false,
+      admin_vendor_database_used: true,
+      paid_provider_queries_skipped_due_to_admin_cache: 2,
+      provider_kinds: ["google_places", "brave_search"],
+      vendor_categories: ["florist"],
+      source_provider_labels: ["Admin vendor database"],
+      source_counts_by_provider: { "Admin vendor database": 2 },
+    },
+  };
+
+  const artifact = buildWeddingVendorSearchArtifactState({ metadata, execution });
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "romantic flowers with reliable reviews",
+    location: "Sydney",
+    vendorCategories: ["florist"],
+  });
+
+  assert.equal(artifact.status, "created");
+  assert.equal(comparison.status, "created");
+  assert.match(artifact.markdown ?? "", /Admin vendor database/i);
+  assert.deepEqual(artifact.artifactInput?.metadata.sourceProviderLabels, ["Admin vendor database"]);
+  assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).sourceUrlCount, 3);
+  assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).sourceProviderLabels, ["Admin vendor database"]);
+});
+
 test("planned vendor search source packet preserves provider-specific search context", async () => {
   const providerPlan = buildWeddingVendorSearchProviderPlanState({
     readiness,
@@ -187,7 +245,11 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   assert.match(comparison.markdown ?? "", /Confirm service area, date availability/i);
   assert.equal(a2ui?.schema_version, "a2ui.v1");
   assert.equal(Array.isArray(a2ui?.components), true);
-  const comparisonTable = (a2ui?.components as Array<Record<string, unknown>>)[0] as Record<string, unknown> | undefined;
+  const recommendationCards = (a2ui?.components as Array<Record<string, unknown>>)[0] as Record<string, unknown> | undefined;
+  const recommendationCardProps = recommendationCards?.props as Record<string, unknown> | undefined;
+  assert.equal(recommendationCards?.type, "vendor_recommendation_cards");
+  assert.equal((recommendationCardProps?.cards as Array<Record<string, unknown>>).length, 4);
+  const comparisonTable = (a2ui?.components as Array<Record<string, unknown>>)[1] as Record<string, unknown> | undefined;
   const comparisonProps = comparisonTable?.props as Record<string, unknown> | undefined;
   assert.equal(comparisonTable?.type, "comparison_table");
   assert.equal((comparisonProps?.selection as Record<string, unknown> | undefined)?.mode, "multi");
@@ -236,6 +298,86 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).sourceCountsByProvider, { "Brave Search": 4 });
   assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).sourceUrlCount, 4);
   assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).parentSourceUrlCount, 4);
+});
+
+test("buildWeddingVendorComparisonArtifactState ranks beachfront gothic venue fit and emits image cards", async () => {
+  const venueReadiness = buildWeddingVendorSearchReadinessState({
+    location: "Sydney",
+    vendorCategories: ["venue"],
+    vendorPreferences: "60 people wedding at a beachfront location in Gothic style",
+    liveSearchProviderReady: true,
+  });
+  const execution = await runWeddingVendorSearchExecution({
+    readiness: venueReadiness,
+    mode: "live",
+    providerLabel: "Brave Search",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        {
+          title: "Generic Sydney Venue Directory",
+          url: "https://directory.example/sydney-venues",
+          snippet: "List of event suppliers and function spaces.",
+          provider: "Brave Search",
+        },
+        {
+          title: "St Josephs Guesthouse",
+          url: "https://st-josephs.example",
+          website_url: "https://st-josephs.example",
+          map_url: "https://maps.google.com/?cid=stjosephs",
+          photo_url: "https://cdn.example/st-josephs.jpg",
+          snippet: "Beautifully restored Gothic sandstone church wedding venue near Sydney for intimate weddings.",
+          provider: "Admin vendor database",
+        },
+        {
+          title: "Palm Beach Estate",
+          url: "https://palm-beach-estate.example",
+          photo_url: "https://cdn.example/palm-beach-estate.webp",
+          snippet: "Private beachfront wedding venue in Sydney with harbour views and capacity for 60 guests.",
+          provider: "Brave Search",
+        },
+        {
+          title: "Paperlust venue guide",
+          url: "https://paperlust.example/sydney-venues",
+          snippet: "Heritage venue with Gothic Revival sandstone castle atmosphere. Capacity: 60 to 400 plus.",
+          provider: "Brave Search",
+        },
+      ],
+    }),
+  });
+
+  const comparison = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution,
+    preferences: "60 people wedding at a beachfront location in Gothic style",
+    location: "Sydney",
+    guestCount: "60",
+    atmosphereDescription: "Gothic, dramatic, historic, by the water",
+    vendorCategories: ["venue"],
+  });
+
+  const comparisonMetadata = comparison.artifactInput?.metadata as Record<string, unknown>;
+  const cards = comparisonMetadata.topChoiceCards as Array<Record<string, unknown>>;
+  const a2ui = comparisonMetadata.a2ui as Record<string, unknown>;
+  const cardComponent = (a2ui.components as Array<Record<string, unknown>>)[0] as Record<string, unknown>;
+
+  assert.equal(comparison.status, "created");
+  assert.deepEqual(new Set(comparison.summary?.vendorLabels.slice(0, 3)), new Set([
+    "Palm Beach Estate",
+    "St Josephs Guesthouse",
+    "Paperlust venue guide",
+  ]));
+  const palmCard = cards.find((card) => card.title === "Palm Beach Estate");
+  const gothicCard = cards.find((card) => card.title === "St Josephs Guesthouse");
+  assert.equal(palmCard?.image_url, "https://cdn.example/palm-beach-estate.webp");
+  assert.equal(gothicCard?.image_url, "https://cdn.example/st-josephs.jpg");
+  assert.match(String(palmCard?.situation_fit), /Beachfront\/coastal clue/i);
+  assert.match(String(gothicCard?.situation_fit), /Gothic\/heritage clue/i);
+  assert.equal(cardComponent.type, "vendor_recommendation_cards");
+  assert.ok(((cardComponent.props as Record<string, unknown>).cards as Array<Record<string, unknown>>).some((card) => card.title === "Palm Beach Estate"));
+  assert.ok((comparisonMetadata.vendorComparisonRankingSignals as string[]).includes("atmosphere_description"));
 });
 
 test("vendor search artifacts preserve website and map actions from live source packets", async () => {
@@ -368,7 +510,7 @@ test("buildWeddingVendorSearchArtifactState does not create artifacts from dry-r
 
   assert.equal(dryRunArtifact.status, "not_created");
   assert.equal(failedArtifact.status, "not_created");
-  assert.match(dryRunArtifact.reason ?? "", /No live vendor sources were returned yet/i);
+  assert.match(dryRunArtifact.reason ?? "", /No source-backed vendor results were returned yet/i);
   assert.equal(dryRunArtifact.artifactInput, null);
   assert.equal(failedArtifact.artifactInput, null);
 });

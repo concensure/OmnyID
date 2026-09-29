@@ -29,6 +29,24 @@ test("provider plan creates Google Places place-type queries from wedding intake
   assert.ok(plan.providerPlans[0]?.queries[0]?.expectedFields.includes("place id"));
 });
 
+test("provider plan uses approximate location for venue search when venue area is not specified", () => {
+  const approximateReadiness = buildWeddingVendorSearchReadinessState({
+    location: "Sydney, Australia",
+    vendorCategories: ["venue"],
+    vendorPreferences: "waterfront ceremony",
+    liveSearchProviderReady: true,
+  });
+  const plan = buildWeddingVendorSearchProviderPlanState({
+    readiness: approximateReadiness,
+    providerKinds: ["google_places", "brave_search"],
+    maxCategories: 1,
+    approximateLocation: "Sydney, Australia",
+  });
+
+  assert.match(plan.providerPlans[0]?.queries[0]?.query ?? "", /wedding venue near Sydney, Australia/i);
+  assert.match(plan.providerPlans[1]?.queries[0]?.query ?? "", /wedding venue near Sydney, Australia services packages/i);
+});
+
 test("provider plan carries photography scope and music direction into live-search queries", () => {
   const scopedReadiness = buildWeddingVendorSearchReadinessState({
     location: "Sydney",

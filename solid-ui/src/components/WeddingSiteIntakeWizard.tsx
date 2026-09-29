@@ -3,10 +3,11 @@
 // marketing site (omnyid.com/wedding). Same underlying signals and generation
 // logic as the generic in-app intake form in ResponseQueueView.tsx — this
 // component only changes how those fields are presented, never what they do.
-import { createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import type { WeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchState";
+import type { WeddingTemplateStarterIntent } from "@/lib/weddingTemplateEntryState";
 import type { WeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
 import { weddingVendorSelectionLabels } from "@/lib/weddingVendorChecklistState";
 import { weddingVendorMustDecideFirstCategories } from "@/lib/weddingVendorLeadTimeState";
@@ -15,6 +16,32 @@ import { WEDDING_VOW_STYLE_OPTIONS } from "@/lib/weddingVowPlanningState";
 
 const STEP_LABELS = ["The basics", "Vendors", "Legal & vows", "Review"] as const;
 const LAST_STEP = STEP_LABELS.length - 1;
+const MONTH_INDEX_BY_NAME: Record<string, number> = {
+  january: 0,
+  jan: 0,
+  february: 1,
+  feb: 1,
+  march: 2,
+  mar: 2,
+  april: 3,
+  apr: 3,
+  may: 4,
+  june: 5,
+  jun: 5,
+  july: 6,
+  jul: 6,
+  august: 7,
+  aug: 7,
+  september: 8,
+  sep: 8,
+  sept: 8,
+  october: 9,
+  oct: 9,
+  november: 10,
+  nov: 10,
+  december: 11,
+  dec: 11,
+};
 
 export function WeddingSiteIntakeWizard(props: {
   launch: WeddingTemplateLaunchState;
@@ -53,17 +80,21 @@ export function WeddingSiteIntakeWizard(props: {
   onWeddingFollowUpNoimChange: (value: string) => void;
   weddingFollowUpCelebrant: () => string;
   onWeddingFollowUpCelebrantChange: (value: string) => void;
-  onGenerateFollowUp: () => void;
-  onSearchVendors?: () => Promise<void> | void;
+  onGenerateFollowUp: (starterIntents?: WeddingTemplateStarterIntent[]) => void;
   vendorSearchResultAction?: WeddingVendorSearchResultAction | null;
   onOpenVendorSearchResult?: (action: WeddingVendorSearchResultAction) => void;
-  vendorSearchRunning?: boolean;
   vendorSearchNotice?: string | null;
   weddingTemplateFollowUp: () => WeddingTemplateFollowUpState | null;
 }) {
   const [step, setStep] = createSignal(0);
-  const [searchSubmitting, setSearchSubmitting] = createSignal(false);
-  let datePickerInput: HTMLInputElement | undefined;
+  const [dateCalendarOpen, setDateCalendarOpen] = createSignal(false);
+  const [calendarMonth, setCalendarMonth] = createSignal(new Date().getMonth());
+  const [calendarYear, setCalendarYear] = createSignal(new Date().getFullYear());
+  const [selectedStarterIntents, setSelectedStarterIntents] = createSignal<WeddingTemplateStarterIntent[]>(
+    props.launch.starterCards
+      .filter((card) => card.recommended)
+      .map((card) => card.intent),
+  );
   const atLastStep = () => step() === LAST_STEP;
   const atFirstStep = () => step() === 0;
   const goNext = () => setStep((current) => Math.min(LAST_STEP, current + 1));
@@ -72,23 +103,63 @@ export function WeddingSiteIntakeWizard(props: {
 
   const inputClass = "w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2";
   const labelClass = "space-y-1 text-xs font-semibold text-on-surface";
-  async function searchVendorsFromIntake() {
-    if (!props.onSearchVendors || props.vendorSearchRunning || searchSubmitting()) return;
-    setSearchSubmitting(true);
-    try {
-      await props.onSearchVendors();
-    } finally {
-      setSearchSubmitting(false);
+  const headerHint = () => step() === 1 ? "Research before you decide." : props.launch.nextQuestionLabel;
+  const monthFormatter = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const calendarCells = createMemo(() => {
+    const year = calendarYear();
+    const month = calendarMonth();
+    const first = new Date(year, month, 1);
+    const total = new Date(year, month + 1, 0).getDate();
+    const cells: Array<{ key: string; day: number | null; iso: string | null }> = [];
+    for (let i = 0; i < first.getDay(); i += 1) cells.push({ key: `blank-${i}`, day: null, iso: null });
+    for (let day = 1; day <= total; day += 1) {
+      const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      cells.push({ key: iso, day, iso });
+    }
+    return cells;
+  });
+  function shiftCalendarMonth(offset: number) {
+    const next = new Date(calendarYear(), calendarMonth() + offset, 1);
+    setCalendarYear(next.getFullYear());
+    setCalendarMonth(next.getMonth());
+  }
+  function selectCalendarDate(iso: string) {
+    props.onWeddingFollowUpDateInput(iso);
+    setDateCalendarOpen(false);
+  }
+  function syncCalendarToDateField() {
+    const value = props.weddingFollowUpDate().trim();
+    const iso = value.match(/^(\d{4})-(\d{2})-\d{2}$/);
+    if (iso?.[1] && iso[2]) {
+      setCalendarYear(Number(iso[1]));
+      setCalendarMonth(Math.max(0, Math.min(11, Number(iso[2]) - 1)));
+      return;
+    }
+    const monthYear = value.match(/\b([A-Za-z]+)\s+(20\d{2})\b/);
+    const month = monthYear?.[1] ? MONTH_INDEX_BY_NAME[monthYear[1].toLowerCase()] : undefined;
+    if (typeof month === "number" && monthYear?.[2]) {
+      setCalendarYear(Number(monthYear[2]));
+      setCalendarMonth(month);
     }
   }
-
+  function toggleStarterIntent(intent: WeddingTemplateStarterIntent, selected: boolean) {
+    setSelectedStarterIntents((current) => {
+      const set = new Set(current);
+      if (selected) set.add(intent);
+      else set.delete(intent);
+      return props.launch.starterCards
+        .map((card) => card.intent)
+        .filter((id) => set.has(id));
+    });
+  }
   return (
     <section class="min-w-0 rounded-[24px] border border-rose-100/80 bg-[linear-gradient(135deg,rgba(255,241,242,0.96),rgba(255,251,235,0.94))] p-3 shadow-card sm:rounded-[28px] sm:p-4">
       <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-rose-700/70">
         Let's set up your wedding
       </p>
       <h2 class="mt-1 break-words text-lg font-semibold text-on-surface">{props.launch.presentation.title}</h2>
-      <p class="mt-1 break-words text-sm leading-6 text-on-surface-variant">{props.launch.nextQuestionLabel}</p>
+      <p class="mt-1 break-words text-sm leading-6 text-on-surface-variant">{headerHint()}</p>
       <div class="mt-3 inline-flex max-w-full items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-950">
         Draft - not saved to your account yet
       </div>
@@ -163,23 +234,64 @@ export function WeddingSiteIntakeWizard(props: {
                 title="Pick date"
                 aria-label="Pick date"
                 onClick={() => {
-                  if (typeof datePickerInput?.showPicker === "function") {
-                    datePickerInput.showPicker();
-                    return;
-                  }
-                  datePickerInput?.click();
+                  syncCalendarToDateField();
+                  setDateCalendarOpen((open) => !open);
                 }}
               >
                 <WeddingDashboardIcon id="calendar-days" class="h-4 w-4" />
               </button>
-              <input
-                ref={datePickerInput}
-                type="date"
-                class="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0"
-                tabIndex={-1}
-                aria-hidden="true"
-                onInput={(event) => props.onWeddingFollowUpDateInput(event.currentTarget.value)}
-              />
+              <Show when={dateCalendarOpen()}>
+                <div class="absolute left-0 top-full z-30 mt-2 w-72 rounded-2xl border border-rose-100 bg-white p-3 shadow-card">
+                  <div class="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      class="rounded-full border border-rose-100 px-2 py-1 text-xs font-semibold text-rose-950"
+                      onClick={() => shiftCalendarMonth(-1)}
+                      aria-label="Previous month"
+                    >
+                      &lt;
+                    </button>
+                    <p class="text-xs font-semibold text-rose-950">
+                      {monthFormatter.format(new Date(calendarYear(), calendarMonth(), 1))}
+                    </p>
+                    <button
+                      type="button"
+                      class="rounded-full border border-rose-100 px-2 py-1 text-xs font-semibold text-rose-950"
+                      onClick={() => shiftCalendarMonth(1)}
+                      aria-label="Next month"
+                    >
+                      &gt;
+                    </button>
+                  </div>
+                  <div class="mt-3 grid grid-cols-7 gap-1 text-center">
+                    <For each={weekDays}>
+                      {(day) => <span class="text-[10px] font-semibold text-rose-900/60">{day}</span>}
+                    </For>
+                    <For each={calendarCells()}>
+                      {(cell) => (
+                        <Show
+                          when={cell.iso}
+                          fallback={<span class="h-8 rounded-lg" />}
+                        >
+                          {(iso) => (
+                            <button
+                              type="button"
+                              class={`h-8 rounded-lg text-xs font-semibold transition ${
+                                props.weddingFollowUpDate() === iso()
+                                  ? "bg-rose-900 text-white"
+                                  : "bg-rose-50 text-rose-950 hover:bg-rose-100"
+                              }`}
+                              onClick={() => selectCalendarDate(iso())}
+                            >
+                              {cell.day}
+                            </button>
+                          )}
+                        </Show>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
             </div>
           </label>
           <label class={labelClass}>
@@ -244,6 +356,9 @@ export function WeddingSiteIntakeWizard(props: {
               onInput={(event) => props.onWeddingFollowUpImageLinksInput(event.currentTarget.value)}
               placeholder="Paste direct image or inspiration links, one per line."
             />
+            <span class="block text-[11px] font-medium leading-5 text-on-surface-variant">
+              Links are saved as references. Visual style is only used after an approved agent fetches or inspects them.
+            </span>
           </label>
         </div>
       </Show>
@@ -411,24 +526,22 @@ export function WeddingSiteIntakeWizard(props: {
           <p class="text-xs leading-5 text-on-surface-variant">
             A starter brief has been created as the first planning file. Approve planning outputs to keep it in Files before adding private details.
           </p>
-          <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-            <For each={props.launch.launchLabels.slice(0, 5)}>
-              {(label) => (
-                <span class="shrink-0 rounded-full border border-rose-100 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-rose-950">
-                  {label}
-                </span>
-              )}
-            </For>
-          </div>
+          <p class="text-xs font-semibold text-on-surface">Choose what OmnyID should prepare first.</p>
           <div class="grid gap-2 md:grid-cols-3">
             <For each={props.launch.starterCards.slice(0, 6)}>
               {(starter) => (
-                <article class={`min-w-0 rounded-2xl border p-3 ${
-                  starter.recommended ? "border-rose-200 bg-white/85" : "border-white/70 bg-white/55"
+                <label class={`min-w-0 rounded-2xl border p-3 transition ${
+                  selectedStarterIntents().includes(starter.intent) ? "border-rose-300 bg-white" : "border-white/70 bg-white/55"
                 }`}>
+                  <input
+                    type="checkbox"
+                    class="mb-2 h-4 w-4 accent-rose-700"
+                    checked={selectedStarterIntents().includes(starter.intent)}
+                    onChange={(event) => toggleStarterIntent(starter.intent, event.currentTarget.checked)}
+                  />
                   <p class="break-words text-xs font-semibold text-on-surface">{starter.label}</p>
                   <p class="mt-1 break-words text-[11px] leading-5 text-on-surface-variant">{starter.prompt}</p>
-                </article>
+                </label>
               )}
             </For>
           </div>
@@ -436,20 +549,10 @@ export function WeddingSiteIntakeWizard(props: {
             <button
               class="w-full rounded-full bg-rose-900 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-rose-800 sm:w-auto sm:py-2"
               type="button"
-              onClick={props.onGenerateFollowUp}
+              onClick={() => props.onGenerateFollowUp(selectedStarterIntents())}
             >
               Make follow-up documents
             </button>
-            <Show when={props.onSearchVendors}>
-              <button
-                class="mt-2 w-full rounded-full border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-950 shadow-card transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 sm:ml-2 sm:mt-0 sm:w-auto sm:py-2"
-                type="button"
-                disabled={props.vendorSearchRunning || searchSubmitting()}
-                onClick={() => void searchVendorsFromIntake()}
-              >
-                {props.vendorSearchRunning || searchSubmitting() ? "Searching vendors..." : "Search vendors"}
-              </button>
-            </Show>
             <Show when={props.weddingTemplateFollowUp()}>
               {(followUp) => (
                 <p class="mt-2 break-words text-xs leading-5 text-rose-950">

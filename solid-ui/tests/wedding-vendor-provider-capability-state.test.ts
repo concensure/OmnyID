@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   weddingConfiguredVendorSearchProviderKinds,
   weddingConfiguredVendorSearchProviderLabel,
+  weddingVendorSearchProviderCautionReason,
   weddingVendorSearchProviderBlockedReason,
 } from "../src/lib/weddingVendorProviderCapabilityState.ts";
 import type { WeddingProviderCapabilitiesResponse } from "../src/lib/api.ts";
@@ -43,6 +44,26 @@ test("wedding provider capability state selects configured admin-funded vendor s
   assert.equal(weddingConfiguredVendorSearchProviderLabel(state, kinds), "Brave Search, Google Places API");
   assert.equal(weddingVendorSearchProviderBlockedReason(state), null);
   assert.doesNotMatch(JSON.stringify(state), /api[-_]?key|secret|token/i);
+});
+
+test("wedding provider capability state reports configured-but-unverified providers as caution only", () => {
+  const state = capabilities([
+    {
+      kind: "google_places",
+      connectedAppId: "google-places-api",
+      label: "Google Places API",
+      credentialRequired: true,
+      credentialConfigured: true,
+      sharedCreditEnabled: true,
+      configured: true,
+      verificationStatus: "unverified",
+      diagnosticLabel: "Configured server-side; verified when a live search runs.",
+      sourceLabel: "env:GOOGLE_PLACES_API_KEY",
+    },
+  ]);
+
+  assert.equal(weddingVendorSearchProviderBlockedReason(state), null);
+  assert.match(weddingVendorSearchProviderCautionReason(state) ?? "", /verified when a live search runs/i);
 });
 
 test("wedding provider capability state excludes disabled providers and unrelated capabilities", () => {

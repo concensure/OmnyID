@@ -19,6 +19,7 @@ export type GmailOAuthConfig = {
   homeserverUrlConfigured: boolean;
   redirectUri: string | null;
   requiredAuthorizedRedirectUri: string | null;
+  oauthClientSource: string | null;
   requiredScopes: string[];
 };
 
@@ -96,6 +97,7 @@ export function normalizeGmailOAuthConfig(payload: unknown): GmailOAuthConfig {
       "required_authorized_redirect_uri",
       "requiredAuthorizedRedirectUri",
     ) ?? null,
+    oauthClientSource: optionalStringAlias(record, "oauth_client_source", "oauthClientSource") ?? null,
     requiredScopes: stringListAlias(record, "required_scopes", "requiredScopes"),
   };
 }

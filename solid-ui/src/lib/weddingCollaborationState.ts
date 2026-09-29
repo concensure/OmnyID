@@ -10,15 +10,15 @@ import {
   cleanWeddingProductionLabels,
   durableWeddingProductionProofLabels,
 } from "./weddingProductionLabelState";
+import type {
+  WeddingCollaboratorInviteStatus,
+  WeddingCollaboratorRole,
+} from "./weddingCollaborationTypes";
 
-export type WeddingCollaboratorRole = "co_owner" | "planner" | "contributor" | "viewer";
-
-export type WeddingCollaboratorInviteStatus =
-  | "draft"
-  | "invited"
-  | "accepted"
-  | "revoked"
-  | "expired";
+export type {
+  WeddingCollaboratorInviteStatus,
+  WeddingCollaboratorRole,
+} from "./weddingCollaborationTypes";
 
 export type WeddingCollaboratorInviteInput = {
   email?: string | null;

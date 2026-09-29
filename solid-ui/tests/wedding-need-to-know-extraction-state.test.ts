@@ -49,6 +49,43 @@ test("wedding need-to-know extraction captures season, range, and budget comfort
   assert.ok(state.needsReviewLabels.some((label) => label.includes("approximate")));
 });
 
+test("wedding need-to-know extraction handles relative month without leaking it into location", () => {
+  const state = buildWeddingNeedToKnowExtractionState({
+    responseWorkspaceId: "response_workspace:relative-date",
+    nowIso: "2026-09-29T00:00:00.000Z",
+    text: "October next year. Expect about 60 people in Sydney with a relaxed intimate feeling and budget 30000.",
+  });
+
+  assert.equal(state.draft.dateOrSeason, "October 2027");
+  assert.equal(state.draft.location, "Sydney");
+  assert.equal(state.draft.guestCount, "60");
+  assert.equal(state.draft.budgetComfort, "Budget 30000");
+  assert.notEqual(state.draft.location, "October next year. expect");
+});
+
+test("wedding need-to-know extraction handles relative season labels", () => {
+  const state = buildWeddingNeedToKnowExtractionState({
+    responseWorkspaceId: "response_workspace:relative-season",
+    nowIso: "2026-09-29T00:00:00.000Z",
+    text: "We are thinking autumn next year around Melbourne for 70 guests.",
+  });
+
+  assert.equal(state.draft.dateOrSeason, "Autumn 2027");
+  assert.equal(state.draft.location, "Melbourne");
+});
+
+test("wedding need-to-know extraction keeps style phrases out of location", () => {
+  const state = buildWeddingNeedToKnowExtractionState({
+    responseWorkspaceId: "response_workspace:gothic-beachfront",
+    text: "We want a 60 people wedding at a beachfront location, in Gothic style in Sydney. Budget 30000 and relaxed but dramatic.",
+  });
+
+  assert.equal(state.draft.location, "Sydney");
+  assert.equal(state.draft.guestCount, "60");
+  assert.equal(state.draft.budgetComfort, "Budget 30000");
+  assert.notEqual(state.draft.location, "Gothic style in Sydney");
+});
+
 test("wedding need-to-know extraction merges existing draft and does not blank missing fields", () => {
   const state = buildWeddingNeedToKnowExtractionState({
     responseWorkspaceId: "response_workspace:merge",

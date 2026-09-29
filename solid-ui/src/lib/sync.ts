@@ -7,7 +7,6 @@
  */
 
 import { readSession } from "@/lib/api";
-import type { Extension } from "@electric-sql/pglite";
 import localRouterSchemaSql from "@/lib/local-router-schema.sql?raw";
 import {
   refreshLocalRouterDerivedStateIfStale,
@@ -54,34 +53,22 @@ let _initGeneration = 0;
 const SYNC_DEVICE_STORAGE_PREFIX = "omnyid.sync.device";
 
 type LocalReplicaSchemaDb = Pick<QueryableDb, "exec">;
-type PgliteExtension = Extension;
-type ElectricPgliteDb = QueryableDb & {
-  close(): Promise<void>;
-  electric: {
-    syncShapeToTable(args: {
-      shape: { url: string; params: Record<string, string> };
-      table: string;
-      primaryKey: string[];
-    }): Promise<void>;
-  };
-};
 
 function localReplicaDb(value: QueryableDb): LocalReplicaSchemaDb {
   return value;
-}
-
-function electricPgliteDb(value: QueryableDb & { close(): Promise<void> }): ElectricPgliteDb {
-  return value as ElectricPgliteDb;
-}
-
-function pgliteExtension(value: unknown): PgliteExtension {
-  return value as PgliteExtension;
 }
 
 async function ensureLocalRouterSchema(db: LocalReplicaSchemaDb): Promise<void> {
   for (const statement of splitSqlStatements(localRouterSchemaSql)) {
     await db.exec(statement);
   }
+}
+
+function pgliteElectricExtensionAvailable(): boolean {
+  // @electric-sql/pglite@0.2.x does not export the Electric sync subpath.
+  // Keep sync opportunistic until the client package with the Electric extension
+  // is installed; attempting the missing bare import breaks production browsers.
+  return false;
 }
 
 function detectSyncDeviceClass(): "desktop" | "mobile" | "watch" {
@@ -203,6 +190,10 @@ export async function initSync(apiBase: string, token: string | null): Promise<v
       console.debug("[omnyid-sync] no sync endpoint in bootstrap, skipping PGLite init");
       return;
     }
+    if (!pgliteElectricExtensionAvailable()) {
+      console.info("[omnyid-sync] Electric PGLite extension is unavailable in this client bundle; skipping local-first sync.");
+      return;
+    }
     const nextPgliteLocation = resolvePgliteLocation(boot);
     if (
       _activeDb &&
@@ -211,13 +202,10 @@ export async function initSync(apiBase: string, token: string | null): Promise<v
       await disposeActiveSyncDb();
       _initialized = false;
     }
-    // Dynamically import PGLite only when Electric is available to avoid
-    // adding the ~2 MB bundle to the initial load for users without sync.
-    const { PGlite } = await import(/* @vite-ignore */ "@electric-sql/pglite");
-    const { electricSync } = await import(/* @vite-ignore */ "@electric-sql/pglite/electric");
-    const db = await PGlite.create(nextPgliteLocation, {
-      extensions: { electric: pgliteExtension(electricSync()) },
-    });
+    // This branch is intentionally unreachable until a compatible Electric
+    // extension package is available; see pgliteElectricExtensionAvailable().
+    const { PGlite } = await import("@electric-sql/pglite");
+    const db = await PGlite.create(nextPgliteLocation);
     if (generation !== _initGeneration) {
       await db.close();
       return;
@@ -226,19 +214,6 @@ export async function initSync(apiBase: string, token: string | null): Promise<v
     _activePgliteLocation = nextPgliteLocation;
     _activeDeviceClass = deviceClass;
     await ensureLocalRouterSchema(localReplicaDb(db));
-    const electricDb = electricPgliteDb(db);
-    // Subscribe to each server-provided shape
-    for (const shape of boot.shapes) {
-      const url = `${boot.sync_endpoint}/${shape.table}`;
-      const params: Record<string, string> = {};
-      if (shape.schema) params.schema = shape.schema;
-      if (shape.where_clause) params.where = shape.where_clause;
-      await electricDb.electric.syncShapeToTable({
-        shape: { url, params },
-        table: shape.local_table,
-        primaryKey: ["id"],
-      });
-    }
     await refreshLocalRouterDerivedStateIfStale(db);
     if (generation !== _initGeneration) {
       await disposeActiveSyncDb();

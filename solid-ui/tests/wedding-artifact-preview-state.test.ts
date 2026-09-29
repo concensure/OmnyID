@@ -119,7 +119,7 @@ test("buildWeddingArtifactPreviewState creates structured quote previews before 
       "Quote amount: AUD $799",
       "Budget delta: $200 over budget",
       "Valid until: 2026-10-15",
-      "Original PDF: https://example.com/chloe-quote.pdf",
+      "Original file: https://example.com/chloe-quote.docx",
       "",
       "## Inclusions",
       "",
@@ -135,8 +135,35 @@ test("buildWeddingArtifactPreviewState creates structured quote previews before 
   assert.equal(preview.currency, "AUD");
   assert.equal(preview.budgetDeltaAmount, 200);
   assert.equal(preview.validUntil, "2026-10-15");
-  assert.equal(preview.attachmentUrl, "https://example.com/chloe-quote.pdf");
+  assert.equal(preview.attachmentUrl, "https://example.com/chloe-quote.docx");
+  assert.equal(preview.attachmentTextStatus, "linked_unverified");
+  assert.ok(preview.attachmentEvidenceLabels?.includes("Original quote attachment is linked but text extraction is not verified"));
   assert.deepEqual(preview.inclusions, ["Bridal bouquet", "Ceremony arrangements"]);
+});
+
+test("buildWeddingArtifactPreviewState records extracted quote attachment evidence", () => {
+  const preview = buildWeddingArtifactPreviewState({
+    artifactKind: "vendor_table",
+    bodyText: [
+      "# Chloe's Florals quote",
+      "",
+      "Vendor: Chloe's Florals",
+      "Quote amount: AUD $799",
+      "Original PDF: https://example.com/chloe-quote.pdf",
+      "Attachment text status: extracted",
+      "Attachment parser: server document parser",
+      "",
+      "## Attachment text",
+      "",
+      "Total package AUD $799 including ceremony arrangements.",
+    ].join("\n"),
+  });
+
+  assert.equal(preview?.kind, "quote");
+  if (preview?.kind !== "quote") return;
+  assert.equal(preview.attachmentTextStatus, "extracted");
+  assert.ok(preview.attachmentEvidenceLabels?.includes("Original quote attachment text was extracted"));
+  assert.ok(preview.attachmentEvidenceLabels?.includes("server document parser"));
 });
 
 test("buildWeddingArtifactPreviewState keeps explicit quote currencies distinct from dollar fallback", () => {

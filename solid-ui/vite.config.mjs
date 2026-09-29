@@ -52,7 +52,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ["@electric-sql/pglite", "@electric-sql/pglite/electric"],
+    exclude: ["@electric-sql/pglite"],
   },
   build: {
     target: "es2022",
@@ -62,7 +62,6 @@ export default defineConfig({
         main: resolve(import.meta.dirname, "index.html"),
         dashboard: resolve(import.meta.dirname, "dashboard.html"),
       },
-      external: (id) => id === "@electric-sql/pglite/electric",
       onwarn(warning, warn) {
         const message = typeof warning === "string" ? warning : warning.message ?? "";
         const sourceId = typeof warning === "string" ? "" : warning.id ?? "";

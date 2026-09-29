@@ -30,6 +30,7 @@ const PROVIDERS: readonly {
   keyNames: readonly string[];
   credentialRequired: boolean;
   detail: string;
+  policyEnvPrefixes: readonly string[];
 }[] = [
   {
     kind: "brave_search",
@@ -47,6 +48,7 @@ const PROVIDERS: readonly {
     ],
     credentialRequired: true,
     detail: "Broad web/vendor discovery for source-cited shortlist research.",
+    policyEnvPrefixes: ["OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API"],
   },
   {
     kind: "google_places",
@@ -64,6 +66,7 @@ const PROVIDERS: readonly {
     ],
     credentialRequired: true,
     detail: "Near-live place details, phone numbers, websites, opening hours, and review metadata.",
+    policyEnvPrefixes: ["OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API"],
   },
   {
     kind: "overpass",
@@ -72,6 +75,7 @@ const PROVIDERS: readonly {
     keyNames: ["OMNYID_OVERPASS_API_URL"],
     credentialRequired: false,
     detail: "Open fallback for venue, florist, photographer, and amenity discovery; requires endpoint and contact/rate-limit policy.",
+    policyEnvPrefixes: [],
   },
 ];
 
@@ -89,9 +93,36 @@ function overpassPolicyReady(env: EnvLike): boolean {
     && Boolean(clean(env.OMNYID_OVERPASS_RATE_LIMIT_PER_MINUTE));
 }
 
+function flagEnabled(value: string | undefined): boolean {
+  return matchesTruthy(clean(value).toLowerCase());
+}
+
+function flagDisabled(value: string | undefined): boolean {
+  const normalized = clean(value).toLowerCase();
+  return normalized === "0" || normalized === "false" || normalized === "no" || normalized === "off";
+}
+
+function matchesTruthy(value: string): boolean {
+  return value === "1" || value === "true" || value === "yes" || value === "on";
+}
+
+function adminSharingPolicyReady(env: EnvLike, prefixes: readonly string[]): boolean {
+  if (prefixes.length === 0) return true;
+  let sawExplicitDisable = false;
+  for (const prefix of prefixes) {
+    const allUsers = env[`${prefix}_ALL_USERS_ENABLED`];
+    const weddingTemplate = env[`${prefix}_WEDDING_TEMPLATE_ENABLED`];
+    if (flagEnabled(allUsers) || flagEnabled(weddingTemplate)) return true;
+    sawExplicitDisable = sawExplicitDisable || flagDisabled(allUsers) || flagDisabled(weddingTemplate);
+  }
+  return !sawExplicitDisable;
+}
+
 export function buildWeddingVendorSearchProviderEnvState(env: EnvLike): WeddingVendorSearchProviderEnvState {
   const providers = PROVIDERS.map((provider): WeddingVendorSearchProviderEnvStatus => {
-    const configured = provider.kind === "overpass" ? overpassPolicyReady(env) : hasAny(env, provider.keyNames);
+    const credentialConfigured = provider.kind === "overpass" ? overpassPolicyReady(env) : hasAny(env, provider.keyNames);
+    const sharedCreditEnabled = adminSharingPolicyReady(env, provider.policyEnvPrefixes);
+    const configured = credentialConfigured && sharedCreditEnabled;
     return {
       kind: provider.kind,
       connectedAppId: provider.connectedAppId,
@@ -103,7 +134,9 @@ export function buildWeddingVendorSearchProviderEnvState(env: EnvLike): WeddingV
         ? null
         : provider.kind === "overpass"
           ? "Overpass endpoint, contact email, and rate-limit config are required."
-          : `${provider.label} API key is missing.`,
+          : !credentialConfigured
+            ? `${provider.label} API key is missing.`
+            : `${provider.label} admin sharing toggle is off for wedding-template use.`,
       detail: provider.detail,
     };
   });

@@ -1,6 +1,7 @@
 // @locs-version: 1.0
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
+import { weddingVisionPreferenceRecordsFromAfpMessages } from "@/lib/weddingVisionPreferenceAfpState";
 
 export type WeddingVisionAction = {
   label: string;
@@ -12,6 +13,7 @@ export type WeddingVisionState = {
   title: string;
   intro: string;
   feelTags: string[];
+  confirmedFeelTags: string[];
   priorityRows: Array<{ label: string; rating: number; reason: string }>;
   avoidLabels: string[];
   importantPeopleLabels: string[];
@@ -217,11 +219,16 @@ export function buildWeddingVisionState(state: WeddingResponseWorkspaceViewState
   const text = contextText(state);
   const people = importantPeople(state);
   const linkCount = inspirationLinkCount(state);
+  const confirmedFeelTags = weddingVisionPreferenceRecordsFromAfpMessages({
+    messages: state.afpMessages,
+    metadata: state.workspace.metadata,
+  }).map((record) => record.label);
   const atmosphereLabels = unique(state.contextCards
     .map((card) => optionalString((card as { planningContext?: Record<string, unknown> | null }).planningContext?.atmosphereDescription))
     .filter((value): value is string => Boolean(value))
     .map((value) => `Atmosphere: ${value}`), 2);
   const evidenceLabels = unique([
+    ...confirmedFeelTags.map((tag) => `You confirmed "${tag}" as part of how the day should feel.`),
     ...state.contextCards.flatMap((card) => card.answeredLabels),
     ...atmosphereLabels,
     state.inspiration.items.length > 0 ? `${state.inspiration.items.length} inspiration item${state.inspiration.items.length === 1 ? "" : "s"}` : "",
@@ -230,11 +237,16 @@ export function buildWeddingVisionState(state: WeddingResponseWorkspaceViewState
     state.guestTracking.guestRowCount > 0 ? `${state.guestTracking.guestRowCount} guests in the guest list.` : "",
   ], 8);
   const sourceMix = sourceMixLabels(state);
+  const sourceMixWithPreferences = unique([
+    ...sourceMix,
+    confirmedFeelTags.length > 0 ? `${confirmedFeelTags.length} confirmed vision preference${confirmedFeelTags.length === 1 ? "" : "s"}` : "",
+  ], 6);
   const learning = learningLabels(state);
   const vision = {
     title: "Our Wedding Compass",
     intro: "A living summary of what OmnyID thinks matters for this wedding. Correct it whenever it feels off.",
-    feelTags: buildFeelTags(text),
+    feelTags: unique([...confirmedFeelTags, ...buildFeelTags(text)], 7),
+    confirmedFeelTags,
     priorityRows: priorityRows(state, text),
     avoidLabels: avoidLabels(text),
     importantPeopleLabels: people.length ? people : ["Add important people from Guests or Who helps."],
@@ -245,7 +257,7 @@ export function buildWeddingVisionState(state: WeddingResponseWorkspaceViewState
     ],
     evidenceLabels: evidenceLabels.length ? evidenceLabels : ["Add a date, budget, guests, inspiration, or planning note to teach OmnyID what matters."],
     confidenceLabel: confidenceLabel(state, evidenceLabels.length),
-    sourceMixLabels: sourceMix.length ? sourceMix : ["No saved wedding evidence yet."],
+    sourceMixLabels: sourceMixWithPreferences.length ? sourceMixWithPreferences : ["No saved wedding evidence yet."],
     learningLabels: learning.length ? learning : ["Keep adding choices, uploads, and corrections. OmnyID will adjust this summary as the plan changes."],
     actionLabels: actionLabels(state),
     correctionPrompt: "Does this sound right?",

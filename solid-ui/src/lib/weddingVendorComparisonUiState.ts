@@ -27,6 +27,13 @@ export type WeddingVendorComparisonFooterActionState = {
   actionKind: "review_follow_up_queue";
 };
 
+export type WeddingVendorComparisonResolutionState = {
+  resolved: boolean;
+  statusLabel: string;
+  detailLabel: string;
+  selectedVendorLabels: string[];
+};
+
 export type WeddingVendorComparisonExpansionState = {
   defaultVisibleCount: number;
   totalCount: number;
@@ -41,6 +48,7 @@ export type WeddingVendorComparisonUiState = {
   dynamic: boolean;
   rowActions: WeddingVendorComparisonRowActionState[];
   visibleOptions: WeddingDecisionSelectionOption[];
+  resolution: WeddingVendorComparisonResolutionState;
   expansion: WeddingVendorComparisonExpansionState;
   footer: WeddingVendorComparisonFooterActionState;
 };
@@ -104,10 +112,19 @@ export function buildWeddingVendorComparisonUiState(input: {
     : [];
   const selectedCount = input.decision.selectedOptions.length;
   const unselectedCount = Math.max(0, input.decision.options.length - selectedCount);
+  const selectedVendorLabels = input.decision.selectedOptions.map((option) => option.label);
   return {
     dynamic,
     rowActions,
     visibleOptions,
+    resolution: {
+      resolved: selectedCount > 0,
+      statusLabel: selectedCount > 0 ? "Resolved comparison" : "Needs vendor choice",
+      detailLabel: selectedCount > 0
+        ? `${selectedCount} vendor${selectedCount === 1 ? "" : "s"} selected: ${selectedVendorLabels.join(", ")}. This artifact stays here as the decision log; active follow-up continues only for selected vendors.`
+        : "Choose one or more vendors before this comparison leaves the active decision queue.",
+      selectedVendorLabels,
+    },
     expansion: {
       defaultVisibleCount,
       totalCount: input.decision.visibleOptions.length,

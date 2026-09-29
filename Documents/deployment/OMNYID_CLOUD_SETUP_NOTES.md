@@ -25,8 +25,9 @@ Keep these outside git:
 - AFP encryption keys
 - provider token key-encryption keys
 - user LLM secret references and exports
-- MinIO access key and secret key (`MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`)
+- SeaweedFS access key and secret key (`SEAWEEDFS_ACCESS_KEY`, `SEAWEEDFS_SECRET_KEY`)
 - image generation API keys (`XAI_API_KEY`, `FLUX_API_KEY`)
+- Gmail OAuth client secret (`OMNYID_GMAIL_CLIENT_SECRET`) should be injected from a host secret file such as `OMNYID_GMAIL_CLIENT_SECRET_FILE=.secrets/omnyid_gmail_client_secret`; the public redirect URI is non-secret and should be `OMNYID_GMAIL_REDIRECT_URI=https://api.omnyid.com/gmail/callback`
 - Google Calendar refresh token (`OMNYID_GCAL_REFRESH_TOKEN`) and client secret (`OMNYID_GCAL_CLIENT_SECRET`)
 - Outlook Calendar refresh token (`OMNYID_OUTLOOK_REFRESH_TOKEN`) and client secret (`OMNYID_OUTLOOK_CLIENT_SECRET`)
 
@@ -51,17 +52,17 @@ These domains must stay separate so that:
 - BYO-LLM does not share cryptographic material with mail-provider auth
 - token compromise does not imply message compromise
 
-## MinIO Object Storage
+## SeaweedFS Object Storage
 
-Omnyid uses MinIO for storing user-generated media (images, QR codes, generated documents).
+Omnyid uses SeaweedFS for storing user-generated media (images, QR codes, generated documents).
 
-- Default endpoint: `minio.omnyid.cloud:9000`
-- Default public URL: `https://minio.omnyid.cloud`
+- Default endpoint: `seaweedfs.omnyid.cloud:9000`
+- Default public URL: `https://seaweedfs.omnyid.cloud`
 - Default bucket: `omnyid-user-media`
 - Object path pattern: `{user_id}/{subfolder}/{prefix}-{date}-{uuid}.{ext}`
-- Credentials are injected via `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` only — never present in AFP messages or agent-visible surfaces.
+- Credentials are injected via `SEAWEEDFS_ACCESS_KEY` and `SEAWEEDFS_SECRET_KEY` only — never present in AFP messages or agent-visible surfaces.
 
-On Oracle Cloud, MinIO should run as a Docker service on the same host or a dedicated storage node. The service account credentials go in the gitignored `.env` file only.
+On Oracle Cloud, SeaweedFS should run as a Docker service on the same host or a dedicated storage node. The service account credentials go in the gitignored `.env` file only.
 
 ## Oracle Cloud Setup Inputs Needed Later
 
@@ -71,7 +72,7 @@ Current Oracle input now known:
 - hostname: `vnic-syd-prod`
 - SSH username: `ubuntu`
 - private key path:
-  - `C:\Users\ozans\Documents\cloud\Oracle Cloud\private key\ssh-key-2026-03-16.key`
+  - machine-local operator secret, intentionally not pinned to a repo-specific user path
 - Docker version:
   - `29.3.0`
 - Docker Compose version:
@@ -93,12 +94,13 @@ That means Omnyid's default bundled Caddy deployment is still not suitable for t
 
 Use:
 
-- [docker-compose.oracle.yml](/c:/Users/ozans/Desktop/projects/Agenton/docker-compose.oracle.yml)
-- [oracle-cloud.env.example](/c:/Users/ozans/Desktop/projects/Agenton/oracle-cloud.env.example)
-- [OMNYID_ORACLE_DEPLOYMENT.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_ORACLE_DEPLOYMENT.md)
-- [docker-compose.oracle.quic.yml](/c:/Users/ozans/Desktop/projects/Agenton/docker-compose.oracle.quic.yml)
-- [oracle-cloud.quic.env.example](/c:/Users/ozans/Desktop/projects/Agenton/oracle-cloud.quic.env.example)
-- [OMNYID_WEBTRANSPORT_DEPLOYMENT.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_WEBTRANSPORT_DEPLOYMENT.md)
+- [docker-compose.oracle.yml](/c:/Users/ozans/Desktop/projects/OmnyID/docker-compose.oracle.yml)
+- [oracle-cloud.env.example](/c:/Users/ozans/Desktop/projects/OmnyID/oracle-cloud.env.example)
+- [OMNYID_ORACLE_DEPLOYMENT.md](/c:/Users/ozans/Desktop/projects/OmnyID/OMNYID_ORACLE_DEPLOYMENT.md)
+- [docker-compose.oracle.quic.yml](/c:/Users/ozans/Desktop/projects/OmnyID/docker-compose.oracle.quic.yml)
+- [oracle-cloud.quic.env.example](/c:/Users/ozans/Desktop/projects/OmnyID/oracle-cloud.quic.env.example)
+- [OMNYID_WEBTRANSPORT_DEPLOYMENT.md](/c:/Users/ozans/Desktop/projects/OmnyID/OMNYID_WEBTRANSPORT_DEPLOYMENT.md)
+- [OMNYID Cloud user capacity.md](</c:/Users/ozans/Desktop/projects/OmnyID/Documents/deployment/OMNYID Cloud user capacity.md>)
 
 ## OVHcloud Setup Inputs Needed Later
 

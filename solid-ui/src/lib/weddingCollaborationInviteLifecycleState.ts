@@ -1,5 +1,5 @@
 // @locs-version: 2.0
-import type { WeddingCollaboratorInviteStatus } from "./weddingCollaborationState";
+import type { WeddingCollaboratorInviteStatus } from "./weddingCollaborationTypes";
 
 export type WeddingCollaboratorInviteLifecycleInput = {
   status: WeddingCollaboratorInviteStatus;

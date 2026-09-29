@@ -3,7 +3,7 @@ import {
   watcherMessageSummary,
 } from "afp-ts/continuity";
 import type { AfpMessage, AfpView } from "@/lib/api";
-import { safeHref, saveThreadMessage } from "@/lib/api";
+import { apiUrlForPath, safeHref, saveThreadMessage } from "@/lib/api";
 import type { EditorPayload } from "@/lib/editorPayload";
 import { useViewport } from "@/context/ViewportContext";
 import { renderMarkdown } from "@/lib/markdownRenderer";
@@ -82,6 +82,10 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => asString(item)).filter(Boolean) : [];
 }
 
+function asRecordArray(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
 function normalizeA2UILayout(value: unknown): A2UILayout {
   if (!isRecord(value)) return { type: "stack", gap: "md" };
   const gap = value.gap === "sm" || value.gap === "md" || value.gap === "lg" ? value.gap : "md";
@@ -96,6 +100,20 @@ type TableColumnView = { label: string };
 type TableCellView = { text: string };
 type TableRowView = { cells: TableCellView[] };
 type ComparisonTableRowView = { label: string; cells: TableCellView[] };
+type ComparisonActionView = {
+  key: string;
+  label: string;
+  href: string;
+  enabled: boolean;
+  external: boolean;
+  advisory: boolean;
+};
+type ComparisonSelectionView = {
+  modeLabel: string;
+  minimumLabel: string;
+  confirmLabel: string;
+  showSelection: boolean;
+};
 type TablePairView = { label: string; value: string };
 type TableCompactRowView = { keyText: string; valueText: string };
 
@@ -109,6 +127,37 @@ type LinkListItemView = {
   safeUrl: string;
   showSubtitle: boolean;
   showUrl: boolean;
+};
+type VendorRecommendationCardView = {
+  choiceId: string;
+  rank: number;
+  title: string;
+  imageUrl: string;
+  imageAlt: string;
+  scoreLabel: string;
+  provider: string;
+  sourceUrl: string;
+  websiteUrl: string;
+  mapUrl: string;
+  rationaleLabels: string[];
+  preferenceMatch: string;
+  situationFit: string;
+  verificationLabel: string;
+  showImage: boolean;
+  showWebsite: boolean;
+  showMap: boolean;
+};
+type VendorRecommendationCardsNodeState = {
+  renderMode: RenderMode;
+  title: string;
+  description: string;
+  cards: VendorRecommendationCardView[];
+  visibleCards: VendorRecommendationCardView[];
+  firstCard: VendorRecommendationCardView | null;
+  showTitle: boolean;
+  showDescription: boolean;
+  showCards: boolean;
+  gridClass: string;
 };
 type ConstraintBadgeItem = { kind: string; label: string };
 type InsightChipViewItem = { label: string };
@@ -148,11 +197,15 @@ type ComparisonTableNodeState = {
   description: string;
   headerColumns: TableColumnView[];
   rows: ComparisonTableRowView[];
+  columnActions: Array<{ vendorLabel: string; actions: ComparisonActionView[] }>;
+  footerActions: ComparisonActionView[];
+  selection: ComparisonSelectionView;
   glanceTitle: string;
   glanceSummaryLines: string[];
   trustSummary: TrustSummaryState;
   showTitle: boolean;
   showDescription: boolean;
+  showActions: boolean;
 };
 type BulletListNodeState = {
   renderMode: RenderMode;
@@ -367,6 +420,55 @@ function normalizeComparisonTableRowViews(value: unknown): ComparisonTableRowVie
   }));
 }
 
+function normalizeComparisonActionViews(value: unknown, keyPrefix: string): ComparisonActionView[] {
+  return normalizeRecordArray(value).flatMap((action, index): ComparisonActionView[] => {
+    const label = asString(action.label).trim();
+    const kind = asString(action.kind, "action").trim();
+    if (!label && !kind) return [];
+    const href = safeExternalHref(action.href);
+    return [{
+      key: `${keyPrefix}:${kind || "action"}:${index}`,
+      label: label || kind.replaceAll("_", " "),
+      href,
+      enabled: action.enabled !== false,
+      external: action.external === true || Boolean(href),
+      advisory: !href,
+    }];
+  });
+}
+
+function normalizeComparisonColumnActionViews(value: unknown): Array<{ vendorLabel: string; actions: ComparisonActionView[] }> {
+  return normalizeRecordArray(value).flatMap((entry, index): Array<{ vendorLabel: string; actions: ComparisonActionView[] }> => {
+    const vendorLabel = asString(entry.vendor_label, asString(entry.choice_id, `Choice ${index + 1}`));
+    const actions = normalizeComparisonActionViews(entry.actions, `column:${index}`);
+    return actions.length > 0 ? [{ vendorLabel, actions }] : [];
+  });
+}
+
+function normalizeComparisonSelectionView(value: unknown): ComparisonSelectionView {
+  if (!isRecord(value)) {
+    return { modeLabel: "", minimumLabel: "", confirmLabel: "", showSelection: false };
+  }
+  const mode = asString(value.mode).trim().toLowerCase();
+  const minSelected = Math.max(0, Math.floor(asNumber(value.min_selected, 0)));
+  const confirmAction = isRecord(value.confirm_action) ? value.confirm_action : {};
+  const confirmLabel = asString(confirmAction.label).trim();
+  const modeLabel = mode === "multi"
+    ? "Choose one or more vendors"
+    : mode === "single"
+      ? "Choose one vendor"
+      : "";
+  const minimumLabel = minSelected > 0
+    ? `Minimum ${minSelected} selection${minSelected === 1 ? "" : "s"}`
+    : "";
+  return {
+    modeLabel,
+    minimumLabel,
+    confirmLabel,
+    showSelection: Boolean(modeLabel || minimumLabel || confirmLabel),
+  };
+}
+
 function normalizeTableState(props: Record<string, unknown>): TableState {
   const rawColumns = props["columns"];
   const rawRows = props["rows"];
@@ -471,6 +573,64 @@ function normalizeA2UI(
     description: asString(raw.description) || undefined,
     layout: normalizeA2UILayout(raw.layout),
     nodes,
+  };
+}
+
+function safeExternalHref(value: unknown): string {
+  const href = safeHref(value);
+  if (/^\/wedding\/vendor-photo\/google\?name=/i.test(href)) return apiUrlForPath(href);
+  if (!/^https?:\/\//i.test(href)) return "";
+  return href;
+}
+
+function normalizeVendorRecommendationCards(value: unknown): VendorRecommendationCardView[] {
+  return asRecordArray(value).flatMap((card): VendorRecommendationCardView[] => {
+    const title = asString(card.title).trim();
+    if (!title) return [];
+    const sourceUrl = safeExternalHref(card.source_url);
+    const websiteUrl = safeExternalHref(card.website_url);
+    const mapUrl = safeExternalHref(card.map_url);
+    const imageUrl = safeExternalHref(card.image_url);
+    const rank = Math.max(1, asNumber(card.rank, 1));
+    return [{
+      choiceId: asString(card.choice_id, `${rank}:${title}`),
+      rank,
+      title,
+      imageUrl,
+      imageAlt: asString(card.image_alt, `${title} venue image`),
+      scoreLabel: asString(card.score_label, "Ranked option"),
+      provider: asString(card.provider, "Search"),
+      sourceUrl,
+      websiteUrl,
+      mapUrl,
+      rationaleLabels: asStringArray(card.rationale_labels).slice(0, 5),
+      preferenceMatch: asString(card.preference_match, "Review manually"),
+      situationFit: asString(card.situation_fit, "Fit requires source-page review."),
+      verificationLabel: asString(card.verification_label, "Confirm availability, inclusions, and quote before outreach."),
+      showImage: Boolean(imageUrl),
+      showWebsite: Boolean(websiteUrl || sourceUrl),
+      showMap: Boolean(mapUrl),
+    }];
+  }).sort((left, right) => left.rank - right.rank).slice(0, 5);
+}
+
+function resolveVendorRecommendationCardsNodeState(
+  props: Record<string, unknown>,
+  renderMode: RenderMode,
+): VendorRecommendationCardsNodeState {
+  const cards = normalizeVendorRecommendationCards(props.cards);
+  const visibleCards = renderMode === "glance" ? cards.slice(0, 1) : renderMode === "compact" ? cards.slice(0, 3) : cards;
+  return {
+    renderMode,
+    title: asString(props.title, "Recommended vendors"),
+    description: asString(props.description),
+    cards,
+    visibleCards,
+    firstCard: cards[0] ?? null,
+    showTitle: Boolean(asString(props.title, "Recommended vendors")) && renderMode !== "glance",
+    showDescription: Boolean(asString(props.description)) && renderMode !== "glance",
+    showCards: visibleCards.length > 0,
+    gridClass: renderMode === "compact" ? "grid gap-3" : "grid gap-3 lg:grid-cols-3",
   };
 }
 
@@ -727,6 +887,9 @@ function resolveComparisonTableNodeState(
   const title = asString(props.title);
   const description = asString(props.description);
   const trustSummary = resolveTrustSummaryState(props);
+  const columnActions = normalizeComparisonColumnActionViews(props.column_actions);
+  const footerActions = normalizeComparisonActionViews(props.footer_actions, "footer");
+  const selection = normalizeComparisonSelectionView(props.selection);
   const headerColumns = [
     { label: "Option" },
     ...normalizeTableColumnViews(props.columns),
@@ -737,11 +900,15 @@ function resolveComparisonTableNodeState(
     description,
     headerColumns,
     rows: normalizeComparisonTableRowViews(props.rows),
+    columnActions,
+    footerActions,
+    selection,
     glanceTitle: title || "Comparison",
     glanceSummaryLines: resolveGlanceSummaryLines(trustSummary),
     trustSummary,
     showTitle: Boolean(title),
     showDescription: Boolean(description),
+    showActions: renderMode !== "glance" && (columnActions.length > 0 || footerActions.length > 0),
   };
 }
 
@@ -1221,6 +1388,25 @@ function A2UINodeRenderer(props: {
             provenanceCue={state.trustSummary.provenanceCue}
             sourceSummary={state.trustSummary.sourceSummary}
           />
+          <Show when={state.selection.showSelection}>
+            <div class="flex flex-wrap items-center gap-1.5 rounded-lg border border-primary/15 bg-primary/8 px-3 py-2">
+              <Show when={state.selection.modeLabel}>
+                <span class="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-on-surface">
+                  {state.selection.modeLabel}
+                </span>
+              </Show>
+              <Show when={state.selection.minimumLabel}>
+                <span class="rounded-full border border-white/12 bg-white/8 px-2.5 py-1 text-xs font-semibold text-on-surface-variant">
+                  {state.selection.minimumLabel}
+                </span>
+              </Show>
+              <Show when={state.selection.confirmLabel}>
+                <span class="max-w-full break-words text-xs font-medium text-on-surface-variant">
+                  {state.selection.confirmLabel}
+                </span>
+              </Show>
+            </div>
+          </Show>
           <div class="overflow-auto rounded-lg border border-white/12 bg-white/6 p-3">
             <table class="w-full text-left text-sm">
               <thead class="text-xs uppercase tracking-[0.14em] text-outline">
@@ -1243,6 +1429,183 @@ function A2UINodeRenderer(props: {
                 </For>
               </tbody>
             </table>
+          </div>
+          <Show when={state.showActions}>
+            <div class="space-y-3 rounded-lg border border-white/12 bg-white/6 p-3">
+              <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-on-surface-variant/70">
+                Actions
+              </p>
+              <For each={state.columnActions}>
+                {(group) => (
+                  <div class="space-y-1.5">
+                    <p class="break-words text-xs font-semibold text-on-surface">{group.vendorLabel}</p>
+                    <div class="flex flex-wrap gap-1.5">
+                      <For each={group.actions}>
+                        {(action) => (
+                          <Show
+                            when={action.href && action.enabled}
+                            fallback={
+                              <span class={`max-w-full break-words rounded-full border px-2.5 py-1.5 text-xs font-semibold ${
+                                action.enabled
+                                  ? "border-white/12 bg-white/8 text-on-surface-variant"
+                                  : "border-white/8 bg-white/4 text-on-surface-variant/55"
+                              }`}>
+                                {action.label}
+                              </span>
+                            }
+                          >
+                            <a
+                              href={action.href}
+                              target={action.external ? "_blank" : undefined}
+                              rel={action.external ? "noreferrer noopener" : undefined}
+                              class="max-w-full break-words rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-on-surface transition hover:border-primary/30 hover:bg-primary/10"
+                            >
+                              {action.label}
+                            </a>
+                          </Show>
+                        )}
+                      </For>
+                    </div>
+                  </div>
+                )}
+              </For>
+              <Show when={state.footerActions.length > 0}>
+                <div class="flex flex-wrap gap-1.5 border-t border-white/10 pt-3">
+                  <For each={state.footerActions}>
+                    {(action) => (
+                      <Show
+                        when={action.href && action.enabled}
+                        fallback={
+                          <span class={`max-w-full break-words rounded-full border px-2.5 py-1.5 text-xs font-semibold ${
+                            action.enabled
+                              ? "border-white/12 bg-white/8 text-on-surface-variant"
+                              : "border-white/8 bg-white/4 text-on-surface-variant/55"
+                          }`}>
+                            {action.label}
+                          </span>
+                        }
+                      >
+                        <a
+                          href={action.href}
+                          target={action.external ? "_blank" : undefined}
+                          rel={action.external ? "noreferrer noopener" : undefined}
+                          class="max-w-full break-words rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-on-surface transition hover:border-primary/30 hover:bg-primary/10"
+                        >
+                          {action.label}
+                        </a>
+                      </Show>
+                    )}
+                  </For>
+                </div>
+              </Show>
+            </div>
+          </Show>
+        </div>
+      );
+    }
+
+    case "vendor_recommendation_cards": {
+      const state = resolveVendorRecommendationCardsNodeState(p(), rm());
+      if (!state.showCards) return <></>;
+
+      if (state.renderMode === "glance") {
+        return (
+          <Show when={state.firstCard}>
+            {(card) => (
+              <div class="rounded-lg border border-white/15 bg-white/8 px-3 py-2">
+                <p class="line-clamp-1 text-xs font-semibold text-on-surface">
+                  #{card().rank} {card().title}
+                </p>
+                <p class="line-clamp-2 text-[10px] text-primary/85">{card().situationFit}</p>
+              </div>
+            )}
+          </Show>
+        );
+      }
+
+      return (
+        <div class="space-y-3 rounded-lg border border-white/15 bg-white/8 p-4">
+          <div class="space-y-1">
+            <Show when={state.showTitle}>
+              <h3 class="text-sm font-semibold text-on-surface">{state.title}</h3>
+            </Show>
+            <Show when={state.showDescription}>
+              <p class="text-sm leading-6 text-on-surface-variant">{state.description}</p>
+            </Show>
+          </div>
+          <div class={state.gridClass}>
+            <For each={state.visibleCards}>
+              {(card) => (
+                <article class="min-w-0 overflow-hidden rounded-xl border border-white/12 bg-white/8">
+                  <Show
+                    when={card.showImage}
+                    fallback={
+                      <div class="flex aspect-[4/3] items-center justify-center bg-white/8 px-3 text-center text-xs font-semibold text-on-surface-variant">
+                        Image pending from source
+                      </div>
+                    }
+                  >
+                    <img
+                      src={card.imageUrl}
+                      alt={card.imageAlt}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      class="aspect-[4/3] w-full object-cover"
+                    />
+                  </Show>
+                  <div class="space-y-2 p-3">
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/80">
+                          #{card.rank} recommendation
+                        </p>
+                        <h4 class="mt-0.5 break-words text-sm font-semibold text-on-surface">{card.title}</h4>
+                      </div>
+                      <span class="shrink-0 rounded-full border border-white/12 bg-white/10 px-2 py-1 text-[10px] font-semibold text-on-surface-variant">
+                        {card.scoreLabel}
+                      </span>
+                    </div>
+                    <p class="break-words text-xs leading-5 text-on-surface-variant">{card.situationFit}</p>
+                    <Show when={card.rationaleLabels.length > 0}>
+                      <div class="flex flex-wrap gap-1">
+                        <For each={card.rationaleLabels.slice(0, 3)}>
+                          {(label) => (
+                            <span class="max-w-full break-words rounded-full border border-white/12 bg-white/10 px-2 py-1 text-[10px] font-medium text-on-surface-variant">
+                              {label}
+                            </span>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
+                    <p class="break-words text-[11px] leading-4 text-on-surface-variant/85">
+                      {card.verificationLabel}
+                    </p>
+                    <div class="flex flex-wrap gap-1.5">
+                      <Show when={card.showWebsite}>
+                        <a
+                          href={card.websiteUrl || card.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          class="rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-on-surface transition hover:border-primary/30 hover:bg-primary/10"
+                        >
+                          Open website
+                        </a>
+                      </Show>
+                      <Show when={card.showMap}>
+                        <a
+                          href={card.mapUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          class="rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-on-surface transition hover:border-primary/30 hover:bg-primary/10"
+                        >
+                          Open map
+                        </a>
+                      </Show>
+                    </div>
+                  </div>
+                </article>
+              )}
+            </For>
           </div>
         </div>
       );

@@ -22,6 +22,7 @@ test("buildAdminWeddingOpsPanelState shows exact users live Oracle metrics and e
     },
     vendorSearchProviders: buildWeddingVendorSearchProviderEnvState({
       OMNYID_GOOGLE_PLACES_API_KEY: "secret-google-key",
+      OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED: "true",
       OMNYID_OVERPASS_API_URL: "https://overpass-api.de/api/interpreter",
       OMNYID_OVERPASS_CONTACT_EMAIL: "ops@example.com",
       OMNYID_OVERPASS_RATE_LIMIT_PER_MINUTE: "30",

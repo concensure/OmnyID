@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildWeddingArtifactGenerationState } from "@/lib/weddingArtifactGenerationState";
+import { buildWeddingArtifactPreviewState } from "@/lib/weddingArtifactPreviewState";
 import { buildWeddingApprovalRequestState, buildWeddingApprovalReceiptState } from "@/lib/weddingApprovalState";
 import { weddingApprovalReceiptToAfpMessage } from "@/lib/weddingApprovalReceiptAfpProjectionState";
 import { weddingGeneratedArtifactsToAfpMessages } from "@/lib/weddingArtifactAfpProjectionState";
@@ -273,6 +274,10 @@ test("buildWeddingPersistedWorkspaceState recovers vendor quote thread artifacts
     inclusions: ["Bridal bouquet", "Ceremony arrangements"],
     validUntil: "2026-10-15",
     attachmentUrl: "https://example.com/chloe-quote.pdf",
+    attachmentTextStatus: "extracted" as const,
+    attachmentEvidenceLabels: ["Original quote attachment text was extracted"],
+    attachmentParser: "server document parser",
+    attachmentText: "Total AUD $799. Package includes bridal bouquet and ceremony arrangements.",
   };
   const incoming = weddingVendorQuoteIncomingAfpMessage({
     quote,
@@ -280,6 +285,8 @@ test("buildWeddingPersistedWorkspaceState recovers vendor quote thread artifacts
     subject: "Floral quote",
     createdAt: "2026-09-27T00:00:00.000Z",
   });
+  assert.equal((incoming.content.quote as Record<string, unknown>).source_attachment_id, incoming.attachments[0]?.id);
+  assert.equal(incoming.metadata?.source_attachment_id, incoming.attachments[0]?.id);
   const flow = buildWeddingVendorQuoteReplyFlowState({
     quote,
     metadata,
@@ -321,12 +328,94 @@ test("buildWeddingPersistedWorkspaceState recovers vendor quote thread artifacts
   assert.equal(quoteArtifact?.id, incoming.id);
   assert.equal(quoteArtifact?.title, "Chloe's Florals quote");
   assert.match(quoteArtifact?.bodyText ?? "", /Quote amount: AUD \$799/);
-  assert.match(quoteArtifact?.bodyText ?? "", /Original PDF: https:\/\/example.com\/chloe-quote.pdf/);
+  assert.match(quoteArtifact?.bodyText ?? "", /Original file: https:\/\/example.com\/chloe-quote.pdf/);
+  assert.match(quoteArtifact?.bodyText ?? "", /Attachment text status: extracted/);
+  assert.match(quoteArtifact?.bodyText ?? "", /Attachment parser: server document parser/);
+  assert.match(quoteArtifact?.bodyText ?? "", /## Attachment text/);
+  assert.match(quoteArtifact?.bodyText ?? "", /Package includes bridal bouquet/);
+  const quotePreview = buildWeddingArtifactPreviewState({
+    artifactKind: "vendor_table",
+    bodyText: quoteArtifact?.bodyText ?? "",
+  });
+  assert.equal(quotePreview?.kind, "quote");
+  if (quotePreview?.kind === "quote") {
+    assert.equal(quotePreview.attachmentTextStatus, "extracted");
+    assert.ok(quotePreview.attachmentEvidenceLabels?.includes("Original quote attachment text was extracted"));
+    assert.ok(quotePreview.attachmentEvidenceLabels?.includes("server document parser"));
+  }
   assert.ok(quoteArtifact?.sourceLabels?.includes("Vendor quote thread"));
   assert.equal(draftArtifact?.id, draft.metadata?.id);
   assert.equal(draftArtifact?.title, "Floral quote");
   assert.match(draftArtifact?.bodyText ?? "", /Recipient: hello@chloes.example/);
   assert.match(draftArtifact?.bodyText ?? "", /Thanks Chloe, we would like to proceed/);
+});
+
+test("buildWeddingPersistedWorkspaceState joins parsed quote attachments by source attachment id", () => {
+  const quote = {
+    kind: "quote" as const,
+    vendorName: "Chloe's Florals",
+    amount: 799,
+    amountLabel: "AUD $799",
+    currency: "AUD",
+    budgetDeltaAmount: 200,
+    budgetDeltaLabel: "$200 over budget",
+    inclusions: ["Bridal bouquet"],
+    validUntil: "2026-10-15",
+    attachmentUrl: "https://example.com/chloe-quote.pdf",
+  };
+  const incoming = weddingVendorQuoteIncomingAfpMessage({
+    quote,
+    metadata,
+    subject: "Floral quote",
+    createdAt: "2026-09-27T00:00:00.000Z",
+  });
+  const sourceAttachmentId = incoming.attachments[0]?.id ?? "quote-attachment";
+  const parsedDocument = {
+    id: "parsed-chloe-quote",
+    thread_id: incoming.thread_id,
+    from: "agent://ingest",
+    to: ["user://couple"],
+    timestamp: "2026-09-27T00:00:30.000Z",
+    type: "parsed_document",
+    kind: "parsed_document",
+    subtype: "parsed_document",
+    supertags: ["pipeline:document_parser"],
+    content: {
+      content_type: "markdown",
+      parser_used: "server document parser",
+      source_attachment_id: sourceAttachmentId,
+      content_text: "Total AUD $799. Includes ceremony arrangements and setup.",
+      title: "chloe-quote.pdf",
+    },
+    metadata: {
+      source_attachment_id: sourceAttachmentId,
+      source_file_name: "chloe-quote.pdf",
+      extraction_mode: "server document parser",
+    },
+    views: [],
+    attachments: [],
+  };
+  const state = buildWeddingPersistedWorkspaceState({
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    sourceResponseId: metadata.sourceResponseId,
+    messages: [incoming, parsedDocument],
+  });
+
+  const quoteArtifact = state.artifacts.find((artifact) => artifact.kind === "vendor_table");
+  assert.match(quoteArtifact?.bodyText ?? "", /Attachment text status: extracted/);
+  assert.match(quoteArtifact?.bodyText ?? "", /Attachment name: chloe-quote.pdf/);
+  assert.match(quoteArtifact?.bodyText ?? "", /Attachment parser: server document parser/);
+  assert.match(quoteArtifact?.bodyText ?? "", /Includes ceremony arrangements/);
+  const quotePreview = buildWeddingArtifactPreviewState({
+    artifactKind: "vendor_table",
+    bodyText: quoteArtifact?.bodyText ?? "",
+  });
+  assert.equal(quotePreview?.kind, "quote");
+  if (quotePreview?.kind === "quote") {
+    assert.equal(quotePreview.attachmentTextStatus, "extracted");
+    assert.ok(quotePreview.attachmentEvidenceLabels?.includes("server document parser"));
+  }
 });
 
 test("buildWeddingPersistedWorkspaceState prefers explicit artifacts over recovered vendor thread fallbacks", () => {

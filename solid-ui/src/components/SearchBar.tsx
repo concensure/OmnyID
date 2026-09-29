@@ -181,6 +181,7 @@ export function SearchBar(props: {
   const [placeholderIdx, setPlaceholderIdx] = createSignal(0);
   const [focused, setFocused] = createSignal(false);
   const [showDropdown, setShowDropdown] = createSignal(false);
+  const [suppressNextFocusDropdown, setSuppressNextFocusDropdown] = createSignal(false);
   const [recentQueries, setRecentQueries] = createSignal<string[]>(loadRecentSearchQueries(rKey()));
   const [submitted, setSubmitted] = createSignal(false);
   const [submitFailed, setSubmitFailed] = createSignal(false);
@@ -667,7 +668,10 @@ export function SearchBar(props: {
 
   createEffect(() => {
     const t = props.focusTrigger;
-    if (t && t > 0) editorHandle?.focus();
+    if (t && t > 0) {
+      setSuppressNextFocusDropdown(true);
+      editorHandle?.focus();
+    }
   });
 
   createEffect(() => {
@@ -676,6 +680,7 @@ export function SearchBar(props: {
     setAppliedComposerSeedId(seed.id);
     applyQuickStartSeed(seed, false);
     setShowDropdown(false);
+    setSuppressNextFocusDropdown(true);
     requestAnimationFrame(() => editorHandle?.focus());
   });
 
@@ -3063,7 +3068,13 @@ export function SearchBar(props: {
             style={`width: ${Math.min(100, (query().length / 16384) * 100)}%`}
           />
         </Show>
-        <div class="flex flex-1 items-start gap-3 pt-0.5">
+        <div
+          class="flex flex-1 items-start gap-3 pt-0.5"
+          onPointerDown={() => {
+            setSuppressNextFocusDropdown(false);
+            setShowDropdown(true);
+          }}
+        >
           <span class="mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-[#cef264] shadow-[0_0_12px_rgba(206,242,100,0.8)]" />
           <TiptapEditor
             mode="compact"
@@ -3092,7 +3103,12 @@ export function SearchBar(props: {
             }}
             onFocus={() => {
               setFocused(true);
-              setShowDropdown(true);
+              if (suppressNextFocusDropdown()) {
+                setSuppressNextFocusDropdown(false);
+                setShowDropdown(false);
+              } else {
+                setShowDropdown(true);
+              }
               document.body.setAttribute("data-search-open", "1");
             }}
             onBlur={() => {

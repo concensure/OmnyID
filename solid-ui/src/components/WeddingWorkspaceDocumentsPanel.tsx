@@ -1,7 +1,11 @@
 // @locs-version: 1.0
 import { For, Show, type Setter } from "solid-js";
 
-import { WeddingArtifactDetailPanel, weddingApprovalStateLabel } from "@/components/WeddingArtifactDetailPanel";
+import {
+  WeddingArtifactDetailPanel,
+  weddingApprovalStateLabel,
+  type WeddingVendorChoiceSelectionSaveInput,
+} from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
@@ -45,6 +49,7 @@ type WeddingWorkspaceDocumentsPanelProps = {
   onResearch: (action: WeddingWorkspaceSidebarAction) => void;
   onOpenFollowUpQueue: () => void;
   onOpenVendorQuoteReplySurface: () => void;
+  onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
 };
 
 export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsPanelProps) {
@@ -291,6 +296,7 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
               onResearch={props.onResearch}
               onOpenFollowUpQueue={props.onOpenFollowUpQueue}
               onOpenVendorQuoteReplySurface={props.onOpenVendorQuoteReplySurface}
+              onVendorChoiceSelected={props.onVendorChoiceSelected}
               researchAction={props.researchAction}
             />
           </div>

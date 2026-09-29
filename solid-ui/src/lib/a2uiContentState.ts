@@ -23,6 +23,7 @@ export const ROOT_A2UI_NODE_KINDS = new Set([
   "stats_grid",
   "table",
   "comparison_table",
+  "vendor_recommendation_cards",
   "bullet_list",
   "code",
   "link_list",

@@ -49,6 +49,10 @@ test("buildWeddingVendorComparisonUiState exposes row actions and enabled follow
   assert.equal(state.footer.consequenceLabel, "1 unselected vendor will leave active queues; selected vendors continue to follow-up.");
   assert.equal(state.footer.confirmationLabel, "Your selected vendors become the active follow-up set after this decision is projected; unselected vendors remain in the log only.");
   assert.equal(state.footer.unselectedCount, 1);
+  assert.equal(state.resolution.resolved, true);
+  assert.equal(state.resolution.statusLabel, "Resolved comparison");
+  assert.deepEqual(state.resolution.selectedVendorLabels, ["Harbour Studio", "Budget Lens"]);
+  assert.match(state.resolution.detailLabel, /decision log/i);
   assert.equal(state.footer.targetMenu, "response_queue");
   assert.deepEqual(state.rowActions.map((action) => action.selectLabel), [
     "Selected for follow-up",
@@ -77,6 +81,9 @@ test("buildWeddingVendorComparisonUiState keeps footer disabled before selection
   assert.equal(state.footer.consequenceLabel, "No vendor follow-up will be prepared until at least one row is selected.");
   assert.equal(state.footer.confirmationLabel, "Choose at least one vendor before OmnyID prepares outreach or follow-up work.");
   assert.equal(state.footer.unselectedCount, 3);
+  assert.equal(state.resolution.resolved, false);
+  assert.equal(state.resolution.statusLabel, "Needs vendor choice");
+  assert.match(state.resolution.detailLabel, /active decision queue/i);
 });
 
 test("weddingVendorComparisonSourceUrl rejects malformed and local source URLs", () => {

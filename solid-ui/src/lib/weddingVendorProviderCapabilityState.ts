@@ -61,3 +61,21 @@ export function weddingVendorSearchProviderBlockedReason(
 
   return "Vendor search needs an admin-configured search provider. No API key is required from this user.";
 }
+
+export function weddingVendorSearchProviderCautionReason(
+  capabilities: WeddingProviderCapabilitiesResponse | null | undefined,
+): string | null {
+  const providers = (capabilities?.providers ?? []).filter((provider) =>
+    provider.configured
+      && WEDDING_LIVE_VENDOR_SEARCH_PROVIDER_KINDS.has(provider.kind as WeddingVendorSearchProviderKind),
+  );
+  const cautionLabels = providers
+    .filter((provider) => {
+      const status = provider.verificationStatus?.trim().toLowerCase();
+      return status === "unverified" || status === "needs_attention";
+    })
+    .map((provider) => provider.diagnosticLabel?.trim() || `${provider.label.trim()} is configured but not live-verified yet.`)
+    .filter(Boolean);
+  if (cautionLabels.length === 0) return null;
+  return cautionLabels.slice(0, 2).join(" ");
+}

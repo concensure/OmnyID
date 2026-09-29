@@ -238,10 +238,18 @@ fn oracle_metrics_source_label() -> String {
 }
 
 fn env_flag_enabled(key: &str) -> bool {
+    env_flag_value(key).unwrap_or(false)
+}
+
+fn env_flag_value(key: &str) -> Option<bool> {
     std::env::var(key)
         .ok()
-        .map(|value| value.trim().to_ascii_lowercase())
-        .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "yes" | "on"))
+        .map(|value| match value.trim().to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => Some(true),
+            "0" | "false" | "no" | "off" => Some(false),
+            _ => None,
+        })
+        .flatten()
 }
 
 fn env_positive_number(key: &str) -> bool {
@@ -359,8 +367,9 @@ pub(super) fn admin_third_party_tool_policy_json_with_file(
         .map(|(tool_id, prefix)| {
             serde_json::json!({
                 "toolId": tool_id,
-                "enabledForAllUsers": env_flag_enabled(&format!("{prefix}_ALL_USERS_ENABLED")),
-                "enabledForWeddingTemplate": env_flag_enabled(&format!("{prefix}_WEDDING_TEMPLATE_ENABLED")),
+                "enabledForAllUsers": env_flag_value(&format!("{prefix}_ALL_USERS_ENABLED")).unwrap_or(false),
+                "enabledForWeddingTemplate": env_flag_value(&format!("{prefix}_WEDDING_TEMPLATE_ENABLED"))
+                    .unwrap_or_else(|| admin_third_party_tool_default_wedding_enabled(tool_id)),
                 "monthlyFreeQuotaLabel": env_optional_trimmed(&format!("{prefix}_MONTHLY_FREE_QUOTA_LABEL")),
                 "quotaUsedLabel": env_optional_trimmed(&format!("{prefix}_QUOTA_USED_LABEL")),
             })
@@ -378,6 +387,13 @@ pub(super) fn admin_third_party_tool_policy_json_with_file(
         "updatedAt": chrono::Utc::now().to_rfc3339(),
         "sourceLabel": "admin-third-party-tool-policy-env",
     })
+}
+
+fn admin_third_party_tool_default_wedding_enabled(tool_id: &str) -> bool {
+    matches!(
+        tool_id,
+        "brave-search-api" | "google-places-api" | "google-maps-platform" | "weatherapi"
+    )
 }
 
 fn merge_admin_third_party_tool_file_policy(policies: &mut [Value], file_policy: &Value) {

@@ -12,9 +12,10 @@ import { WeddingProjectionApprovalCard } from "@/components/WeddingProjectionApp
 import { WeddingResilienceCardList } from "@/components/WeddingResilienceCardList";
 import { WeddingVendorQuoteProofDrawer } from "@/components/WeddingVendorQuoteProofDrawer";
 import { WeddingVendorQuoteReplyCard } from "@/components/WeddingVendorQuoteReplyCard";
+import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { WeddingWorkspaceDocumentsPanel } from "@/components/WeddingWorkspaceDocumentsPanel";
-import { fetchThread, type AfpMessage } from "@/lib/api";
+import { fetchThread, ingestAttachmentBatch, type AfpMessage } from "@/lib/api";
 import type { EditorPayload } from "@/lib/editorPayload";
 import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
 import {
@@ -59,6 +60,8 @@ import {
   type WeddingVendorQuoteReplyDraftPersistenceStatus,
   type WeddingVendorQuoteReplyFlowState,
 } from "@/lib/weddingVendorQuoteReplyFlowState";
+import type { WeddingVendorQuoteAttachmentParserState } from "@/lib/weddingVendorQuoteAttachmentParserState";
+import { buildWeddingVendorQuoteAttachmentIngestState } from "@/lib/weddingVendorQuoteAttachmentIngestState";
 import {
   buildWeddingVendorQuoteThreadProofState,
   mergeWeddingVendorQuoteThreadProofMessages,
@@ -67,12 +70,12 @@ import {
 } from "@/lib/weddingVendorQuoteThreadProofState";
 import { weddingVendorQuoteReceiptPersistenceNotice } from "@/lib/weddingVendorQuoteReceiptPersistenceState";
 import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
+import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
 
 const WEDDING_HOME_SECTION_IDS = [
   "next_step",
-  "planning_basics",
   "vendor_search",
-  "vendor_smoke",
+  "planning_basics",
   "notice",
   "overview",
   "status",
@@ -81,7 +84,6 @@ const WEDDING_HOME_SECTION_IDS = [
   "decision_focus",
   "resilience",
   "approval",
-  "rich_response",
 ] as const;
 
 type WeddingHomeSectionId = typeof WEDDING_HOME_SECTION_IDS[number];
@@ -169,6 +171,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const [quoteReplyProofMessages, setQuoteReplyProofMessages] = createSignal<AfpMessage[]>([]);
   const [quoteReplyProofLoading, setQuoteReplyProofLoading] = createSignal(false);
   const [quoteReplyProofError, setQuoteReplyProofError] = createSignal<string | null>(null);
+  const [quoteAttachmentParsing, setQuoteAttachmentParsing] = createSignal<Record<string, true>>({});
   const [homeLayoutScope, setHomeLayoutScope] = createSignal("");
   const [homeSectionOrder, setHomeSectionOrder] = createSignal<WeddingHomeSectionId[]>([...WEDDING_HOME_SECTION_IDS]);
   const [draggingHomeSectionId, setDraggingHomeSectionId] = createSignal<WeddingHomeSectionId | null>(null);
@@ -299,6 +302,29 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       includeSensitive: includeSensitiveBundle(),
     });
     setExportNotice(runWeddingBundleBrowserExport(payload));
+  }
+
+  function saveVendorChoiceSelection(input: WeddingVendorChoiceSelectionSaveInput) {
+    if (!props.saveProjection) {
+      setExportNotice("Vendor selected. Account saving is not connected yet, so contact details are only local for now.");
+      return;
+    }
+    setExportNotice(`Saving ${input.optionLabel}'s contact details to the wedding record...`);
+    void props.saveProjection(weddingVendorContactReferenceToAfpSendInput({
+      metadata: state().workspace.metadata,
+      artifactId: input.artifact.artifactId,
+      artifactTitle: input.artifact.title,
+      optionId: input.optionId,
+      optionLabel: input.optionLabel,
+      contact: input.contact,
+    }))
+      .then(() => {
+        setExportNotice(`${input.optionLabel} saved for vendor follow-up.`);
+        props.onRefreshWorkspace?.();
+      })
+      .catch(() => {
+        setExportNotice(`${input.optionLabel} was selected, but the contact details could not be saved yet.`);
+      });
   }
 
   function handleSidebarAction(action: WeddingWorkspaceSidebarAction) {
@@ -617,6 +643,11 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     setQuoteReplyApprovedWording((current) => ({ ...current, [base.id]: true }));
   }
 
+  function unapproveQuoteReplyWording(base: WeddingVendorQuoteReplyFlowState) {
+    if (approvalRunning()) return;
+    setQuoteReplyApprovedWording((current) => ({ ...current, [base.id]: false }));
+  }
+
   function acknowledgeQuoteReplyBudgetImpact(base: WeddingVendorQuoteReplyFlowState) {
     const flow = quoteReplyFlow(base);
     const consent = weddingVendorQuoteReplyConsentChangeState({
@@ -626,6 +657,15 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     });
     if (!consent.shouldRecord) return;
     setQuoteReplyBudgetAck((current) => ({ ...current, [base.id]: true }));
+  }
+
+  function unacknowledgeQuoteReplyBudgetImpact(base: WeddingVendorQuoteReplyFlowState) {
+    if (approvalRunning()) return;
+    setQuoteReplyBudgetAck((current) => {
+      const next = { ...current };
+      delete next[base.id];
+      return next;
+    });
   }
 
   function startQuoteReplySend(base: WeddingVendorQuoteReplyFlowState) {
@@ -745,6 +785,48 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     });
   }
 
+  function quoteAttachmentParserStateForFlow(
+    flow: WeddingVendorQuoteReplyFlowState,
+  ): WeddingVendorQuoteAttachmentParserState | null {
+    const attachmentUrl = flow.quote.attachmentUrl?.trim();
+    return state().vendorQuoteAttachmentParserStates.find((parser) => {
+      if (parser.parserInput?.["thread_id"] !== flow.threadId) return false;
+      const rawParserUrl = parser.parserInput["source_url"];
+      const parserUrl = typeof rawParserUrl === "string" ? rawParserUrl.trim() : "";
+      return !attachmentUrl || !parserUrl || parserUrl === attachmentUrl;
+    }) ?? null;
+  }
+
+  async function parseQuoteAttachment(base: WeddingVendorQuoteReplyFlowState) {
+    const flow = quoteReplyFlow(base);
+    const parser = quoteAttachmentParserStateForFlow(flow);
+    const ingest = buildWeddingVendorQuoteAttachmentIngestState(parser);
+    if (!ingest.ready || !ingest.request) {
+      setExportNotice(ingest.blockerLabels[0] ?? "This quote attachment cannot be extracted yet.");
+      return;
+    }
+    setQuoteAttachmentParsing((current) => ({ ...current, [base.id]: true }));
+    setExportNotice(`Extracting the quote attachment for ${flow.quote.vendorName}.`);
+    try {
+      const result = await ingestAttachmentBatch(ingest.request);
+      const failed = result.items.filter((item) => item.ingested === false);
+      if (failed.length > 0) {
+        setExportNotice(failed[0]?.error ?? "The quote attachment could not be extracted yet.");
+      } else {
+        setExportNotice("Quote attachment extracted. Refreshing the vendor thread evidence.");
+        props.onRefreshWorkspace?.();
+      }
+    } catch (error: unknown) {
+      setExportNotice(error instanceof Error ? error.message : "The quote attachment could not be extracted yet.");
+    } finally {
+      setQuoteAttachmentParsing((current) => {
+        const next = { ...current };
+        delete next[base.id];
+        return next;
+      });
+    }
+  }
+
   const homeSections = createMemo<WeddingHomeSection[]>(() => [
     {
       id: "next_step",
@@ -782,6 +864,21 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
                 <p class="mt-1 break-words text-sm leading-6 text-amber-950">
                   Needs {props.vendorSearchReadiness?.missing.join(", ")}.
                 </p>
+                <Show when={props.vendorSearchReadiness?.missing.some((item) => /priorities|fit preferences/i.test(item))}>
+                  <label class="mt-3 block text-xs font-semibold text-amber-950">
+                    Vendor fit preferences
+                    <input
+                      type="text"
+                      value={props.vendorSearchQuery ?? ""}
+                      onInput={(event) => props.onVendorSearchQueryChange?.(event.currentTarget.value)}
+                      placeholder="beachfront venue in Sydney with Gothic style for 60 guests"
+                      class="mt-1 w-full rounded-xl border border-amber-100 bg-white px-3 py-2 text-sm font-normal text-amber-950 outline-none transition placeholder:text-amber-950/35 focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
+                    />
+                  </label>
+                  <p class="mt-2 break-words text-[11px] leading-5 text-amber-900/75">
+                    A specific search query here can unblock vendor fit preferences for live search.
+                  </p>
+                </Show>
               </div>
             </Show>
           </div>
@@ -793,19 +890,19 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       title: "Live vendor search",
       visible: true,
       render: () => (
-        <div class="rounded-2xl border border-rose-100 bg-white/85 p-3 shadow-sm">
-          <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="rounded-2xl border border-rose-100 bg-white/85 px-4 py-5 shadow-sm sm:px-5 sm:py-6">
+          <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
-              <p class="text-sm font-semibold text-rose-950">Live vendor search</p>
+              <p class="text-lg font-bold leading-6 text-rose-950">Live vendor search</p>
               <p class="mt-1 break-words text-xs leading-5 text-rose-950/65">
-                Uses connected online search providers and saves cited vendor notes into documents.
+                Compare and enquire.
               </p>
             </div>
             <button
               type="button"
               class="shrink-0 rounded-full bg-rose-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-rose-300"
               title={props.vendorSearchBlockedReason ?? undefined}
-              disabled={props.vendorSearchRunning || !props.onRunLiveVendorSearch || props.vendorSearchReadiness?.status === "blocked" || Boolean(props.vendorSearchBlockedReason)}
+              disabled={props.vendorSearchRunning || !props.onRunLiveVendorSearch || Boolean(props.vendorSearchBlockedReason)}
               onClick={() => props.onRunLiveVendorSearch?.()}
               data-magic-action="open"
               data-magic-icon="search"
@@ -815,7 +912,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
               {props.vendorSearchRunning ? "Searching..." : "Search vendors"}
             </button>
           </div>
-          <label class="mt-3 block">
+          <label class="mt-5 block">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <span class="text-xs font-semibold text-rose-950/75">Search query</span>
               <Show when={props.vendorSearchQuerySourceLabel}>
@@ -831,12 +928,12 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
               value={props.vendorSearchQuery ?? ""}
               onInput={(event) => props.onVendorSearchQueryChange?.(event.currentTarget.value)}
               placeholder="florist in Sydney specialising in wedding"
-              class="mt-1 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm text-rose-950 outline-none transition placeholder:text-rose-950/35 focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+              class="mt-1 w-full rounded-2xl border-2 border-rose-300 bg-white px-3 py-2 text-sm text-rose-950 shadow-sm outline-none transition placeholder:text-rose-950/35 hover:border-rose-400 focus:border-rose-600 focus:ring-4 focus:ring-rose-100"
             />
           </label>
           <Show when={props.vendorSearchNotice}>
             {(notice) => (
-              <p class="mt-2 break-words text-xs leading-5 text-rose-950/70">
+              <p class="mt-4 break-words text-xs leading-5 text-rose-950/70">
                 {notice()}
               </p>
             )}
@@ -867,47 +964,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
               </p>
             )}
           </Show>
-        </div>
-      ),
-    },
-    {
-      id: "vendor_smoke",
-      title: "Disposable vendor smoke test",
-      visible: Boolean(props.vendorSmokeTestAvailable),
-      render: () => (
-        <div class="rounded-2xl border border-slate-200 bg-white/85 p-3 shadow-sm">
-          <div class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-slate-950">Disposable vendor smoke test</p>
-              <p class="mt-1 break-words text-xs leading-5 text-slate-700">
-                Creates a temporary quote and reply draft for {props.vendorSmokeTestVendorEmail}. Remove it after validation before running real vendor search.
-              </p>
-            </div>
-            <div class="flex shrink-0 flex-wrap gap-2">
-              <button
-                type="button"
-                class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-                onClick={() => props.onInstallVendorSmokeFixture?.()}
-                data-magic-action="open"
-                data-magic-icon="test"
-                data-magic-label="Install vendor smoke fixture"
-                data-magic-id="wedding:vendor-smoke:install"
-              >
-                Install fixture
-              </button>
-              <button
-                type="button"
-                class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-                onClick={() => props.onRemoveVendorSmokeFixture?.()}
-                data-magic-action="dismiss"
-                data-magic-icon="clear"
-                data-magic-label="Remove vendor smoke fixture"
-                data-magic-id="wedding:vendor-smoke:remove"
-              >
-                Remove fixture
-              </button>
-            </div>
-          </div>
         </div>
       ),
     },
@@ -974,12 +1030,17 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
                     quoteReplyProofSaveNotice(flow().approvalRequest.id)
                   }
                   providerReadiness={quoteReplyProviderReadiness(flow())}
+                  attachmentParserState={quoteAttachmentParserStateForFlow(flow())}
+                  attachmentParsing={quoteAttachmentParsing()[baseFlow.id] === true}
                   onSaveDraft={(payload) => saveQuoteReplyDraft(baseFlow, payload)}
                   onApproveWording={() => approveQuoteReplyWording(baseFlow)}
+                  onUnapproveWording={() => unapproveQuoteReplyWording(baseFlow)}
                   onAcknowledgeBudgetImpact={() => acknowledgeQuoteReplyBudgetImpact(baseFlow)}
+                  onUnacknowledgeBudgetImpact={() => unacknowledgeQuoteReplyBudgetImpact(baseFlow)}
                   onSend={() => startQuoteReplySend(baseFlow)}
                   onUndo={() => undoQuoteReplySend(baseFlow)}
                   onViewSentThread={() => void viewQuoteReplyThread(baseFlow)}
+                  onParseAttachment={() => void parseQuoteAttachment(baseFlow)}
                   onProviderSetup={props.onProviderSetup}
                 />
               );
@@ -1013,32 +1074,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onReviewBlocked={props.onReviewBlockedOutputs}
         />
       ),
-    },
-    {
-      id: "rich_response",
-      title: "Wedding documents",
-      visible: Boolean(props.richResponse),
-      render: () => {
-        const richResponse = props.richResponse;
-        if (!richResponse) return <></>;
-        return (
-          <div class="flex flex-col gap-3 rounded-[20px] border border-rose-100 bg-white/70 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-on-surface">Private wedding operations room</p>
-              <p class="mt-1 text-sm leading-6 text-on-surface-variant">
-                Open the wedding documents and saved planning outputs for this workspace.
-              </p>
-            </div>
-            <button
-              type="button"
-              class="w-full rounded-full bg-rose-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:w-auto"
-              onClick={() => props.onRichResponseAction?.(richResponse.primaryAction)}
-            >
-              Open documents
-            </button>
-          </div>
-        );
-      },
     },
   ]);
 
@@ -1189,7 +1224,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           state={state()}
           activePreview={activePreview()}
           cardClass={cardClass()}
-          hidden={activeMenu() !== "home" && activeMenu() !== "documents"}
+          hidden={activeMenu() !== "documents"}
           query={props.query}
           importRunning={props.importRunning}
           showPlanningFiles={showPlanningFiles()}
@@ -1221,6 +1256,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onResearch={handleSidebarAction}
           onOpenFollowUpQueue={openSelectedVendorFollowUpQueue}
           onOpenVendorQuoteReplySurface={openVendorQuoteReplySurface}
+          onVendorChoiceSelected={saveVendorChoiceSelection}
         />
 
         <Show when={showTechnicalDetails() && state().projectionQueue}>

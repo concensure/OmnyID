@@ -44,6 +44,18 @@ function titleCase(value: string): string {
     .join(" ");
 }
 
+function yearForRelativeLabel(label: string, nowIso?: string | null): string | null {
+  const cleaned = clean(label).toLowerCase();
+  const currentYear = (() => {
+    const raw = clean(nowIso);
+    const parsed = raw ? new Date(raw) : new Date();
+    return Number.isFinite(parsed.getTime()) ? parsed.getFullYear() : new Date().getFullYear();
+  })();
+  if (/\bnext year\b/.test(cleaned)) return String(currentYear + 1);
+  if (/\bthis year\b/.test(cleaned)) return String(currentYear);
+  return null;
+}
+
 function unique<T extends string>(values: readonly T[]): T[] {
   return [...new Set(values)];
 }
@@ -76,7 +88,7 @@ function baseDraft(input: WeddingNeedToKnowExtractionInput): WeddingTemplateFoll
   };
 }
 
-function extractDateOrSeason(text: string): string | null {
+function extractDateOrSeason(text: string, nowIso?: string | null): string | null {
   const iso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
   if (iso?.[1]) return iso[1];
 
@@ -88,19 +100,38 @@ function extractDateOrSeason(text: string): string | null {
   const monthYear = text.match(new RegExp(`\\b(${MONTHS})\\s+(20\\d{2})\\b`, "i"));
   if (monthYear?.[1] && monthYear[2]) return `${titleCase(monthYear[1])} ${monthYear[2]}`;
 
+  const relativeMonth = text.match(new RegExp(`\\b(${MONTHS})\\s+((?:next|this)\\s+year)\\b`, "i"));
+  if (relativeMonth?.[1] && relativeMonth[2]) {
+    const year = yearForRelativeLabel(relativeMonth[2], nowIso);
+    if (year) return `${titleCase(relativeMonth[1])} ${year}`;
+  }
+
   const season = text.match(new RegExp(`\\b(${SEASONS})\\s+(20\\d{2})\\b`, "i"));
   if (season?.[1] && season[2]) return `${titleCase(season[1] === "fall" ? "autumn" : season[1])} ${season[2]}`;
+
+  const relativeSeason = text.match(new RegExp(`\\b(${SEASONS})\\s+((?:next|this)\\s+year)\\b`, "i"));
+  if (relativeSeason?.[1] && relativeSeason[2]) {
+    const year = yearForRelativeLabel(relativeSeason[2], nowIso);
+    if (year) return `${titleCase(relativeSeason[1] === "fall" ? "autumn" : relativeSeason[1])} ${year}`;
+  }
 
   return null;
 }
 
 function extractLocation(text: string): string | null {
-  const match = text.match(/\b(?:in|at|around|near|location is|venue is)\s+([A-Z][A-Za-z .'-]+(?:\s+(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT|Australia))?)\b/);
-  if (!match?.[1]) return null;
-  const value = clean(match[1]
-    .replace(/\s+\b(?:for|with|and|on|from|budget|priorities)\b.*$/i, "")
-    .replace(/\b(?:for|with|and|on|in|at)$/i, ""));
-  return value.length >= 3 ? value : null;
+  const matches = [...text.matchAll(/\b(?:in|at|around|near|location is|venue is)\s+([A-Z][A-Za-z .'-]+(?:\s+(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT|Australia))?)\b/g)];
+  for (const match of matches.reverse()) {
+    if (!match[1]) continue;
+    const nested = match[1].split(/\s+\b(?:in|at|around|near)\s+(?=[A-Z])/i).at(-1) ?? match[1];
+    const value = clean(nested
+      .replace(/\s+\b(?:for|with|and|on|from|expect|budget|priorities|guests?|people|attendees)\b.*$/i, "")
+      .replace(/\b(?:for|with|and|on|in|at)$/i, "")
+      .replace(/[.,;:]+$/g, ""));
+    if (value.length < 3) continue;
+    if (/\b(?:style|vibe|atmosphere|feeling|mood|theme|aesthetic)\b/i.test(value)) continue;
+    return value;
+  }
+  return null;
 }
 
 function extractGuestCount(text: string): string | null {
@@ -188,7 +219,7 @@ export function buildWeddingNeedToKnowExtractionState(
   const capturedSlots: WeddingNeedToKnowExtractedSlot[] = [];
   const needsReviewLabels: string[] = [];
 
-  const dateOrSeason = extractDateOrSeason(text);
+  const dateOrSeason = extractDateOrSeason(text, input.nowIso);
   if (dateOrSeason) {
     draft.dateOrSeason = dateOrSeason;
     capturedSlots.push("date_or_season");

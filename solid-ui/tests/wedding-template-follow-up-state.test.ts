@@ -76,7 +76,7 @@ test("buildWeddingTemplateFollowUpState turns answered prompts into saveable pla
   assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /OSM \/ Overpass API/i);
   assert.equal(
     state.vendorSearchLaunchQuery,
-    "Photographer or Band or Cake Baker in Sydney NSW for low stress, food, photos with garden ceremony with relaxed dinner energy",
+    "Photographer, Band, Cake Baker searches in Sydney NSW for low stress, food, photos with garden ceremony with relaxed dinner energy",
   );
   assert.deepEqual(state.artifactGeneration.artifacts[0]?.summary.vendorLabels.slice(0, 3), ["Photographer", "Band", "Cake Baker"]);
   assert.ok(state.workspaceView.workspace.results.some((artifact) => /Wedding lifecycle brief/i.test(artifact.title)));
@@ -97,6 +97,19 @@ test("buildWeddingTemplateFollowUpState turns answered prompts into saveable pla
   assert.ok(state.workspaceView.projectionQueue?.groups.some((group) => group.label === "Tasks"));
   assert.ok(state.workspaceView.projectionQueue?.groups.some((group) => group.label === "Calendar"));
   assert.ok(state.workspaceView.projectionQueue?.queue.blockedItems.some((item) => /date review/i.test(item.blockedReason ?? "")));
+});
+
+test("buildWeddingTemplateFollowUpState records selected starter focus without requiring every starter", () => {
+  const state = buildWeddingTemplateFollowUpState({
+    dateOrSeason: "October 2027",
+    location: "Sydney NSW",
+    guestCount: 60,
+    budgetComfort: "$30000",
+    starterIntents: ["venue_search", "budget_plan", "registry"],
+    projectionStorage: memoryStorage(),
+  });
+
+  assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /User selected starter focus: Find venues, Build budget, Draft registry/i);
 });
 
 test("buildWeddingTemplateFollowUpState creates budget rows without inventing amounts", () => {

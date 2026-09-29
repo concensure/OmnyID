@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runWeddingPlannedVendorSearchExecution } from "../src/lib/weddingVendorSearchExecutorState.ts";
+import {
+  runWeddingPlannedVendorSearchExecution,
+  weddingVendorSearchApiQueriesFromProviderQueries,
+  weddingVendorSearchBatchPortFromApiSearch,
+  weddingVendorSearchBatchResultFromApiResponse,
+} from "../src/lib/weddingVendorSearchExecutorState.ts";
 import { buildWeddingVendorSearchProviderPlanState } from "../src/lib/weddingVendorSearchProviderPlanState.ts";
 import { buildWeddingVendorSearchReadinessState } from "../src/lib/weddingVendorSearchReadinessState.ts";
 
@@ -69,6 +74,144 @@ test("planned vendor search live port receives structured query intent", async (
   ]);
   assert.deepEqual(state.receiptMetadata.source_provider_labels, ["google_places"]);
   assert.deepEqual(state.receiptMetadata.source_counts_by_provider, { google_places: 2 });
+});
+
+test("planned vendor search batch port normalizes backend batch responses", async () => {
+  let receivedQueryCount = 0;
+  const state = await runWeddingPlannedVendorSearchExecution({
+    providerPlans: plan.providerPlans,
+    mode: "live",
+    providerLabel: "Admin wedding search stack",
+    workspaceId: "response_workspace:vendors",
+    maxQueries: 2,
+    batchPort: (queries) => {
+      receivedQueryCount = queries.length;
+      return {
+        ok: true,
+        status: "cached",
+        externalSearchPerformed: false,
+        providerLabel: "Admin vendor database",
+        queryCount: queries.length,
+        sourceCount: 1,
+        queries: queries.map((query) => query.query),
+        sources: [{
+          title: "Harbour Studio",
+          url: "https://example.test/harbour-studio",
+          provider: "Admin vendor database",
+        }],
+        message: "Admin vendor database returned 1 reusable source.",
+        metadata: {
+          admin_vendor_database_used: true,
+        },
+      };
+    },
+  });
+
+  assert.equal(receivedQueryCount, 2);
+  assert.equal(state.status, "cached");
+  assert.equal(state.externalSearchPerformed, false);
+  assert.equal(state.providerLabel, "Admin vendor database");
+  assert.equal(state.sourceCount, 1);
+  assert.equal(state.receiptMetadata.admin_vendor_database_used, true);
+  assert.deepEqual(state.receiptMetadata.provider_kinds, ["google_places"]);
+  assert.deepEqual(state.receiptMetadata.source_provider_labels, ["Admin vendor database"]);
+});
+
+test("planned vendor search API adapter keeps backend mapping out of the view", () => {
+  const queries = plan.providerPlans.flatMap((providerPlan) => providerPlan.queries).slice(0, 2);
+  const result = weddingVendorSearchBatchResultFromApiResponse({
+    queries,
+    response: {
+      ok: true,
+      status: "executed",
+      external_search_performed: true,
+      provider_label: "Google Places",
+      query_count: 2,
+      source_count: 1,
+      queries: queries.map((query) => query.query),
+      sources: [{
+        title: "Harbour Venue",
+        url: "https://example.com/harbour-venue",
+        provider: "Google Places",
+      }],
+      message: "Live vendor search completed.",
+      receipt_metadata: {
+        admin_vendor_database_used: true,
+      },
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "executed");
+  assert.equal(result.externalSearchPerformed, true);
+  assert.equal(result.providerLabel, "Google Places");
+  assert.equal(result.sourceCount, 1);
+  assert.equal(result.metadata?.admin_vendor_database_used, true);
+  assert.ok((result.metadata?.expected_fields as string[]).includes("place id"));
+  assert.ok((result.metadata?.provider_guardrails as string[]).length > 0);
+});
+
+test("planned vendor search API query adapter preserves provider-specific fields", () => {
+  const queries = plan.providerPlans.flatMap((providerPlan) => providerPlan.queries).slice(0, 3);
+  const apiQueries = weddingVendorSearchApiQueriesFromProviderQueries(queries);
+
+  assert.equal(apiQueries.length, 3);
+  assert.equal(apiQueries[0]?.provider_kind, "google_places");
+  assert.equal(apiQueries[0]?.category, "venue");
+  assert.ok(apiQueries[0]?.query.includes("Sydney"));
+  assert.deepEqual(apiQueries[0]?.google_place_types, ["event_venue", "restaurant", "lodging"]);
+  assert.deepEqual(apiQueries[0]?.overpass_tags, []);
+  assert.equal(apiQueries[2]?.provider_kind, "overpass");
+  assert.ok((apiQueries[2]?.overpass_tags ?? []).length > 0);
+});
+
+test("planned vendor search batch port factory calls backend search and normalizes response", async () => {
+  const queries = plan.providerPlans.flatMap((providerPlan) => providerPlan.queries).slice(0, 2);
+  let observedWorkspaceId = "";
+  let observedMaxResults = 0;
+  let observedQueryCount = 0;
+  let observedNoticeProvider = "";
+  const port = weddingVendorSearchBatchPortFromApiSearch({
+    workspaceId: "response_workspace:vendors",
+    maxResultsPerQuery: 5,
+    onResponse: (response) => {
+      observedNoticeProvider = response.provider_label ?? "";
+    },
+    search: (body) => {
+      observedWorkspaceId = body.workspace_id ?? "";
+      observedMaxResults = body.max_results_per_query ?? 0;
+      observedQueryCount = body.queries.length;
+      return {
+        ok: true,
+        status: "executed",
+        external_search_performed: true,
+        provider_label: "Google Places",
+        query_count: body.queries.length,
+        source_count: 1,
+        queries: body.queries.map((query) => query.query),
+        sources: [{
+          title: "Harbour Venue",
+          url: "https://example.com/harbour-venue",
+          provider: "Google Places",
+        }],
+        message: "Live vendor search completed.",
+        receipt_metadata: {
+          admin_vendor_database_used: false,
+        },
+      };
+    },
+  });
+
+  const result = await port(queries);
+
+  assert.equal(observedWorkspaceId, "response_workspace:vendors");
+  assert.equal(observedMaxResults, 5);
+  assert.equal(observedQueryCount, 2);
+  assert.equal(observedNoticeProvider, "Google Places");
+  assert.equal(result.ok, true);
+  assert.equal(result.providerLabel, "Google Places");
+  assert.equal(result.sourceCount, 1);
+  assert.ok((result.metadata?.expected_fields as string[]).includes("place id"));
 });
 
 test("planned vendor search fails safely for missing executor and provider failure", async () => {

@@ -47,11 +47,12 @@ test("buildWeddingTemplateLaunchState carries starter prompts without demo claim
   const state = buildWeddingTemplateLaunchState({ projectionStorage: memoryStorage() });
 
   assert.ok(state.starterCards.some((card) => card.id === "wedding_starter:venue_search" && card.recommended));
+  assert.ok(state.starterCards.some((card) => card.intent === "venue_search"));
   assert.ok(state.starterCards.some((card) => /run sheet/i.test(card.label)));
   assert.equal(state.artifactGeneration.artifacts.length, 1);
   assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /No live vendor availability/i);
   assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /Ask for wedding date/i);
-  assert.ok(state.launchLabels.includes("No demo vendor claims"));
+  assert.deepEqual(state.launchLabels, []);
   assert.doesNotMatch(state.firstResponsePrompt, /sample vendor availability/i);
   assert.match(state.firstResponsePrompt, /one simple question/i);
 });

@@ -27,7 +27,7 @@ test("runtime recovery metrics provide stable empty fallbacks", () => {
 });
 
 test("runtime recovery metrics aggregate backup and drill posture consistently", () => {
-  const future = "2026-08-20T07:00:00Z";
+  const future = "2027-08-20T07:00:00Z";
   const past = "2026-08-10T07:00:00Z";
   const backups = {
     policy: {
@@ -44,7 +44,7 @@ test("runtime recovery metrics aggregate backup and drill posture consistently",
         file_count: 12,
         total_workspace_bytes: 120,
         artifact_size_bytes: 80,
-        created_at: "2026-08-14T07:00:00Z",
+        created_at: "2027-08-14T07:00:00Z",
         expires_at: future,
         manifest_summary: null,
       },

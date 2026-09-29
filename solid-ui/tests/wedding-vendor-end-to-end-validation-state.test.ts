@@ -33,6 +33,8 @@ test("vendor end-to-end validation lists blockers across search response and fol
     selectedVendorDraftsApprovalGated: false,
     quoteReplyFlowCount: 0,
     emailProviderReady: false,
+    quoteAttachmentRequiresExtraction: true,
+    quoteAttachmentExtractionReady: false,
     draftReplyContextual: true,
     durableSendReceiptRecorded: false,
     sentQuoteReplyLeavesLiveQueue: false,
@@ -42,7 +44,9 @@ test("vendor end-to-end validation lists blockers across search response and fol
   });
 
   assert.equal(state.status, "blocked");
-  assert.equal(state.blockedCount, 20);
+  assert.equal(state.productionReady, false);
+  assert.equal(state.productionStatus, "production_blocked");
+  assert.equal(state.blockedCount, 21);
   assert.ok(state.blockerLabels.some((label) => /date or season, budget comfort/i.test(label)));
   assert.ok(state.blockerLabels.some((label) => /concensure\+omnyidtest@gmail\.com/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /Run live vendor search/i.test(label)));
@@ -59,12 +63,15 @@ test("vendor end-to-end validation lists blockers across search response and fol
   assert.ok(state.nextActionLabels.some((label) => /leaves the live decision queue/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /history\/proof/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /Connect the Gmail\/email executor/i.test(label)));
+  assert.ok(state.nextActionLabels.some((label) => /Parse the vendor quote attachment/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /Record or refresh the vendor thread/i.test(label)));
   assert.ok(state.nextActionLabels.some((label) => /Remove the disposable test vendor/i.test(label)));
-  assert.equal(state.estimatedPassesToUsage, 10);
+  assert.ok(state.productionBlockerLabels.some((label) => /Usage workflow is still blocked/i.test(label)));
+  assert.ok(state.productionNextActionLabels.some((label) => /Clear the usage workflow blockers/i.test(label)));
+  assert.equal(state.estimatedPassesToUsage, 11);
 });
 
-test("vendor end-to-end validation passes when the usage path has proof", () => {
+test("vendor end-to-end validation can pass usage validation while production proof is still missing", () => {
   const state = buildWeddingVendorEndToEndValidationState({
     expectedPlannerEmail: "concensure@gmail.com",
     actualPlannerEmail: "concensure@gmail.com",
@@ -94,6 +101,8 @@ test("vendor end-to-end validation passes when the usage path has proof", () => 
     selectedVendorDraftsApprovalGated: true,
     quoteReplyFlowCount: 1,
     emailProviderReady: true,
+    quoteAttachmentRequiresExtraction: true,
+    quoteAttachmentExtractionReady: true,
     draftReplyContextual: true,
     durableSendReceiptRecorded: true,
     sentQuoteReplyLeavesLiveQueue: true,
@@ -103,10 +112,61 @@ test("vendor end-to-end validation passes when the usage path has proof", () => 
   });
 
   assert.equal(state.status, "ready_for_usage_validation");
-  assert.equal(state.passedCount, 24);
+  assert.equal(state.productionReady, false);
+  assert.equal(state.productionStatus, "production_blocked");
+  assert.equal(state.passedCount, 25);
   assert.equal(state.blockedCount, 0);
   assert.deepEqual(state.blockerLabels, []);
+  assert.ok(state.productionBlockerLabels.some((label) => /Admin credential policy/i.test(label)));
+  assert.ok(state.productionBlockerLabels.some((label) => /deployed server-side probe/i.test(label)));
+  assert.ok(state.productionBlockerLabels.some((label) => /Gmail OAuth redirect/i.test(label)));
+  assert.ok(state.productionBlockerLabels.some((label) => /deployed new-user smoke test/i.test(label)));
   assert.equal(state.estimatedPassesToUsage, 1);
+});
+
+test("vendor end-to-end validation only marks production ready with deployed provider OAuth and smoke proof", () => {
+  const state = buildWeddingVendorEndToEndValidationState({
+    vendorSearchReadiness: {
+      status: "ready",
+      label: "Ready for live vendor search",
+      missing: [],
+      searchBrief: [],
+      searchQueries: ["Sydney wedding florist packages"],
+      guardrails: [],
+    },
+    vendorSearchLaunchQuery: "Sydney wedding florist packages",
+    vendorProviderConfigured: true,
+    liveVendorArtifactSaved: true,
+    liveVendorComparisonSaved: true,
+    topFiveComparisonExpansionAvailable: true,
+    selectedComparisonVendorsConfirmed: true,
+    unselectedVendorQueueSuppressed: true,
+    dynamicVendorDecisionSurfaceVisible: true,
+    vendorApprovalCardModeled: true,
+    vendorApprovalCardCtaCopy: "Save 2 vendor follow-up items",
+    selectedVendorDraftTasksProjected: true,
+    selectedVendorDraftsApprovalGated: true,
+    quoteReplyFlowCount: 1,
+    emailProviderReady: true,
+    quoteAttachmentRequiresExtraction: true,
+    quoteAttachmentExtractionReady: true,
+    draftReplyContextual: true,
+    durableSendReceiptRecorded: true,
+    sentQuoteReplyLeavesLiveQueue: true,
+    sentQuoteReplyHistoryVisible: true,
+    followUpTaskProjected: true,
+    responseEvidenceRecorded: true,
+    adminCredentialPolicyReady: true,
+    liveProviderServerProbePassed: true,
+    gmailOAuthRedirectVerified: true,
+    deployedWorkspaceSmokeTestPassed: true,
+  });
+
+  assert.equal(state.status, "ready_for_usage_validation");
+  assert.equal(state.productionReady, true);
+  assert.equal(state.productionStatus, "production_ready");
+  assert.deepEqual(state.productionBlockerLabels, []);
+  assert.deepEqual(state.productionNextActionLabels, []);
 });
 
 test("vendor end-to-end validation distinguishes comparison from selected-vendor confirmation", () => {

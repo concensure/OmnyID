@@ -17,3 +17,11 @@ export function weddingWorkspaceMenuForArrival(
   if (intent.surface === "planning_files" && intent.sourceResponseId) return "documents";
   return null;
 }
+
+export function weddingTemplateHomeResetKey(
+  intent: WeddingNavigationIntent | null | undefined,
+): string | null {
+  if (!intent || intent.view !== "response_queue") return null;
+  if (intent.surface !== "planning_files" || intent.sourceResponseId) return null;
+  return `${intent.weddingPlanId}:${intent.responseWorkspaceId}`;
+}

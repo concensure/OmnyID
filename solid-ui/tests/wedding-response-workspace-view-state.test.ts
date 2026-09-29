@@ -18,6 +18,7 @@ import {
 } from "../src/lib/weddingDecisionSelectionState.ts";
 import { buildWeddingResponseWorkspaceViewState } from "../src/lib/weddingResponseWorkspaceViewState.ts";
 import { buildWeddingTemplateFollowUpState } from "../src/lib/weddingTemplateFollowUpState.ts";
+import { weddingVendorQuoteIncomingAfpMessage } from "../src/lib/weddingVendorQuoteReplyFlowState.ts";
 import { buildWeddingVendorComparisonArtifactState } from "../src/lib/weddingVendorSearchArtifactState.ts";
 import { runWeddingVendorSearchExecution } from "../src/lib/weddingVendorSearchExecutorState.ts";
 import { buildWeddingVendorSearchReadinessState } from "../src/lib/weddingVendorSearchReadinessState.ts";
@@ -403,9 +404,27 @@ test("buildWeddingResponseWorkspaceViewState exposes vendor quote reply flows fr
       ].join("\n"),
     }),
   ];
+  const incomingQuote = weddingVendorQuoteIncomingAfpMessage({
+    quote: {
+      kind: "quote",
+      vendorName: "Chloe's Florals",
+      amount: 799,
+      amountLabel: "AUD $799",
+      currency: "AUD",
+      budgetDeltaAmount: 200,
+      budgetDeltaLabel: "$200 over budget",
+      inclusions: ["Bridal bouquet", "Ceremony arrangements"],
+      validUntil: "2026-10-15",
+      attachmentUrl: "https://example.com/chloe-quote.pdf",
+    },
+    metadata,
+    subject: "Floral quote",
+    createdAt: "2026-09-27T00:00:00.000Z",
+  });
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,
     artifacts: quoteArtifacts,
+    afpMessages: [incomingQuote],
   });
 
   assert.equal(state.vendorQuoteReplyFlows.length, 1);
@@ -417,6 +436,51 @@ test("buildWeddingResponseWorkspaceViewState exposes vendor quote reply flows fr
   assert.equal(flow?.semanticObject.kind, "wedding_approval_required");
   assert.match(flow?.draftBody ?? "", /latest wording/);
   assert.equal(flow?.draftMessageId, "artifact:latest-reply-to-chloe-s-florals");
+  assert.equal(state.vendorQuoteAttachmentParserStates.length, 1);
+  assert.equal(state.vendorQuoteAttachmentParserStates[0]?.status, "request_ready");
+  assert.equal(state.vendorQuoteAttachmentParserStates[0]?.parserInput?.source_attachment_id, incomingQuote.attachments[0]?.id);
+
+  const extractedState = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    artifacts: quoteArtifacts,
+    afpMessages: [
+      incomingQuote,
+      {
+        id: "msg:parsed-chloe-quote",
+        type: "parsed_document",
+        kind: "parsed_document",
+        subtype: "parsed_document",
+        thread_id: incomingQuote.thread_id,
+        content: {
+          source_attachment_id: incomingQuote.attachments[0]?.id,
+          parser_used: "pdf_parser",
+          title: "chloe-quote.pdf",
+          content_text: "Total AUD $799. Bridal bouquet and ceremony arrangements.",
+        },
+        metadata: {
+          ...metadata,
+          source_attachment_id: incomingQuote.attachments[0]?.id,
+          extraction_mode: "pdf_parser",
+        },
+        created_at: "2026-09-27T00:01:00.000Z",
+        updated_at: "2026-09-27T00:01:00.000Z",
+        version: 1,
+        parents: [],
+        links: [],
+        attachments: [],
+        visibility: "private",
+        priority: null,
+        expires_at: null,
+        ttl: null,
+        tags: [],
+        supertags: ["parsed_document"],
+        confidence: null,
+      },
+    ],
+  });
+  assert.equal(extractedState.vendorQuoteAttachmentParserStates[0]?.status, "already_extracted");
+  assert.equal(extractedState.vendorQuoteAttachmentParserStates[0]?.parserInput, null);
+  assert.ok(extractedState.vendorQuoteAttachmentParserStates[0]?.evidenceLabels.some((label) => /pdf_parser/i.test(label)));
 
   const localReceiptOnly = buildWeddingResponseWorkspaceViewState({
     metadata,
@@ -963,6 +1027,7 @@ test("buildWeddingResponseWorkspaceViewState projects selected top-three vendor 
         {
           title: "Harbour Studio",
           url: "https://harbour-studio.example",
+          photo_url: "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc&max_width_px=720",
           snippet: "Sydney documentary wedding photographer with transparent packages, portfolio, and date availability.",
           provider: "Brave Search",
         },
@@ -1009,9 +1074,28 @@ test("buildWeddingResponseWorkspaceViewState projects selected top-three vendor 
   const decisionInputs = state.projectionQueue?.dispatchPayload?.sendInputs.filter((input) => input.type === "decision") ?? [];
 
   assert.equal(state.activePreview?.preview?.kind, "table");
+  assert.equal(state.activePreview?.a2uiContent?.schema_version, "a2ui.v1");
+  assert.equal(state.activePreview?.a2uiContent?.kind, "panel");
+  assert.ok((state.activePreview?.a2uiContent?.nodes as Array<Record<string, unknown>> | undefined)?.some((node) =>
+    node.type === "vendor_recommendation_cards"
+  ));
+  assert.ok((state.activePreview?.a2uiContent?.nodes as Array<Record<string, unknown>> | undefined)?.some((node) =>
+    node.type === "comparison_table"
+  ));
+  const comparisonNode = (state.activePreview?.a2uiContent?.nodes as Array<Record<string, unknown>> | undefined)
+    ?.find((node) => node.type === "comparison_table");
+  const comparisonNodeProps = comparisonNode?.props as Record<string, unknown> | undefined;
+  assert.ok(Array.isArray(comparisonNodeProps?.column_actions));
+  assert.ok(JSON.stringify(comparisonNodeProps?.column_actions).includes("open_vendor_source"));
+  assert.ok(Array.isArray(comparisonNodeProps?.footer_actions));
+  assert.equal((comparisonNodeProps?.selection as Record<string, unknown> | undefined)?.mode, "multi");
   assert.match(state.activePreview?.vendorComparisonHandoff?.recommendationLabel ?? "", /Harbour Studio/i);
   assert.equal(state.activePreview?.vendorComparisonHandoff?.confidenceLabel, "Confidence: strong");
   assert.ok(state.activePreview?.vendorComparisonHandoff?.whyLabels.some((label) => /source-backed choices/i.test(label)));
+  assert.equal(
+    state.activePreview?.vendorComparisonCards.find((card) => card.title === "Harbour Studio")?.imageUrl,
+    "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc&max_width_px=720",
+  );
   assert.equal(decisionGroup?.pendingCount, 2);
   assert.deepEqual(decisionInputs.map((input) => input.metadata?.selected_option_label), ["Harbour Studio", "Budget Lens"]);
   assert.deepEqual(decisionInputs[0]?.metadata?.source_provider_labels, ["Brave Search"]);
@@ -1424,6 +1508,10 @@ test("buildWeddingResponseWorkspaceViewState sanitizes selected decision source 
   const continueAction = state.sidebarActions.find((action) => action.kind === "continue_chat");
   const scopes = continueAction?.metadata?.decision_scopes as Array<Record<string, unknown>> | undefined;
 
+  assert.deepEqual(state.activePreview?.persistedSelectedVendorChoices, [{
+    optionId: "0:harbour-hall",
+    label: "Harbour Hall",
+  }]);
   assert.deepEqual(scopes?.[0]?.source_urls, ["https://example.com/venue"]);
   assert.match(state.bundleExportPayload.content, /1 source web link/);
   assert.doesNotMatch(state.bundleExportPayload.content, /javascript:alert/);

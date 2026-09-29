@@ -60,7 +60,9 @@ test("vendor quote reply flow separates wording approval from budget acknowledge
   assert.match(flow.recommendationRationale, /\$200 over budget/);
   assert.ok(flow.recommendationWhyLabels.includes("Budget impact: $200 over budget"));
   assert.ok(flow.recommendationWhyLabels.some((label) => /Quote includes Bridal bouquet/i.test(label)));
-  assert.equal(flow.recommendationConfidenceLabel, "Confidence: strong");
+  assert.ok(flow.recommendationWhyLabels.includes("Original quote attachment is linked but text extraction is not verified"));
+  assert.match(flow.recommendationRationale, /has not been verified by OmnyID/i);
+  assert.equal(flow.recommendationConfidenceLabel, "Confidence: developing");
   assert.equal(flow.semanticObject.stateLabel, "Confirm budget impact");
   assert.ok(flow.semanticObject.comparison?.rows.some((row) => row.id === "recommendation_rationale"));
 });
@@ -82,7 +84,7 @@ test("vendor quote reply contextual surface exposes status recommendation why an
   assert.equal(surface.statusLabel, "Chloe's Florals sent a quote.");
   assert.equal(surface.recommendationLabel, "Ask for trade-offs before approving");
   assert.match(surface.rationaleLabel, /\$200 over budget/);
-  assert.equal(surface.confidenceLabel, "Confidence: strong");
+  assert.equal(surface.confidenceLabel, "Confidence: developing");
   assert.ok(surface.whyLabels.includes("Budget impact: $200 over budget"));
   assert.deepEqual(surface.primaryAction, {
     kind: "acknowledge_budget",
@@ -147,6 +149,7 @@ test("vendor quote reply recommendation handoff lowers confidence when evidence 
       budgetDeltaLabel: null,
       inclusions: [],
       validUntil: null,
+      attachmentUrl: null,
     },
     metadata,
     recipient: "",
@@ -159,9 +162,30 @@ test("vendor quote reply recommendation handoff lowers confidence when evidence 
   assert.equal(flow.recommendationLabel, "Complete the reply details before sending");
   assert.ok(flow.recommendationWhyLabels.includes("Budget impact not measured yet"));
   assert.ok(flow.recommendationWhyLabels.includes("Inclusions need confirmation"));
+  assert.ok(flow.recommendationWhyLabels.includes("No original quote attachment linked"));
   assert.ok(flow.recommendationWhyLabels.includes("Vendor email is missing"));
   assert.ok(flow.recommendationWhyLabels.includes("Reply wording is missing"));
   assert.equal(flow.recommendationConfidenceLabel, "Confidence: early");
+});
+
+test("vendor quote reply confidence is strong when original attachment text was extracted", () => {
+  const flow = buildWeddingVendorQuoteReplyFlowState({
+    quote: {
+      ...quote,
+      attachmentTextStatus: "extracted",
+      attachmentEvidenceLabels: ["Original quote attachment text was extracted", "server document parser"],
+    },
+    metadata,
+    recipient: "hello@chloes.example",
+    subject: "Floral quote",
+    draftBody: "Thanks Chloe, we would like to proceed.",
+    approvedWording: true,
+    budgetImpactAcknowledged: false,
+  });
+
+  assert.equal(flow.recommendationConfidenceLabel, "Confidence: strong");
+  assert.ok(flow.recommendationWhyLabels.includes("Original quote attachment text was extracted; verify final terms in the file"));
+  assert.match(flow.recommendationRationale, /attachment text was extracted/i);
 });
 
 test("vendor quote reply flow becomes send-ready only after both confirmations", () => {
@@ -231,10 +255,10 @@ test("vendor quote reply presentation only opens editor when wording work is req
   assert.equal(draftPresentation.primaryActionKind, "approve_wording");
   assert.equal(draftPresentation.primaryActionLabel, "Approve wording");
   assert.equal(draftPresentation.secondaryActionKind, "view_quote");
-  assert.equal(draftPresentation.secondaryActionLabel, "See the quote");
+  assert.equal(draftPresentation.secondaryActionLabel, "Open quote file");
   assert.equal(draftReady.semanticObject.actions[0]?.label, "Approve wording");
   assert.equal(draftReady.semanticObject.actions[0]?.kind, "approve_vendor_quote_reply_wording");
-  assert.equal(draftReady.semanticObject.actions[1]?.label, "See the quote");
+  assert.equal(draftReady.semanticObject.actions[1]?.label, "Open quote file");
   assert.equal(draftReady.semanticObject.actions[1]?.kind, "view_vendor_quote");
   assert.equal(draftPresentation.replySectionLabel, "Suggested reply - edit or send as-is");
   assert.match(draftPresentation.decisionPromptLabel, /Review the wording/i);
@@ -259,6 +283,26 @@ test("vendor quote reply presentation only opens editor when wording work is req
   assert.equal(sendPresentation.secondaryActionKind, "edit_reply");
   assert.equal(sendPresentation.sendButtonLabel, "Send to Chloe's Florals");
   assert.match(sendPresentation.decisionPromptLabel, /send this reply now/i);
+});
+
+test("vendor quote reply presentation distinguishes inline quote details from attached quote files", () => {
+  const inlineOnly = buildWeddingVendorQuoteReplyFlowState({
+    quote: {
+      ...quote,
+      attachmentUrl: null,
+    },
+    metadata,
+    recipient: "hello@chloes.example",
+    subject: "Floral quote",
+    draftBody: "Thanks Chloe, we would like to proceed.",
+    approvedWording: false,
+    budgetImpactAcknowledged: false,
+  });
+
+  const presentation = weddingVendorQuoteReplyPresentationState({ flow: inlineOnly });
+  assert.equal(presentation.secondaryActionKind, "view_quote");
+  assert.equal(presentation.secondaryActionLabel, "Show quote details");
+  assert.equal(inlineOnly.semanticObject.actions[1]?.label, "Show quote details");
 });
 
 test("vendor quote reply flow fails closed when stale approval lacks email delivery details", () => {

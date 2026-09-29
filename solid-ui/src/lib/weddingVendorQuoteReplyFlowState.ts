@@ -506,6 +506,7 @@ export function weddingVendorQuoteReplyPresentationState(input: {
 }): WeddingVendorQuoteReplyPresentationState {
   const vendorName = clean(input.flow.quote.vendorName) || "vendor";
   const budgetDelta = clean(input.flow.quote.budgetDeltaLabel);
+  const attachmentUrl = clean(input.flow.quote.attachmentUrl);
   const undoUntil = clean(input.flow.undoUntilIso);
   const dirty = input.dirtyState?.dirty === true;
   const draftPersistenceBlocksSend = input.draftPersistence?.blocksExternalSend === true;
@@ -588,7 +589,9 @@ export function weddingVendorQuoteReplyPresentationState(input: {
     secondaryActionLabel: input.flow.stage === "sent"
       ? null
       : showReplyEditor
-        ? "See the quote"
+        ? attachmentUrl
+          ? "Open quote file"
+          : "Show quote details"
         : "Edit reply",
     budgetAcknowledgementLabel: budgetDelta
       ? `I understand this is ${budgetDelta}, and I'm okay with that.`
@@ -945,6 +948,8 @@ export function weddingVendorQuoteRecommendationRationale(input: {
   const appearsUnderBudget = labelSaysUnderBudget || (!labelSaysOverBudget && budgetDeltaAmount !== null && budgetDeltaAmount < 0);
   const appearsOverBudget = labelSaysOverBudget || (!labelSaysUnderBudget && budgetDeltaAmount !== null && budgetDeltaAmount > 0);
   const validUntil = clean(input.quote.validUntil);
+  const attachmentUrl = clean(input.quote.attachmentUrl);
+  const attachmentTextStatus = input.quote.attachmentTextStatus ?? (attachmentUrl ? "linked_unverified" : "none");
   const hasReplyTarget = Boolean(clean(input.recipient));
   const hasDraft = Boolean(clean(input.draftBody));
 
@@ -968,6 +973,11 @@ export function weddingVendorQuoteRecommendationRationale(input: {
   }
 
   if (validUntil) reasons.push(`The offer is valid until ${validUntil}.`);
+  if (attachmentTextStatus === "extracted") {
+    reasons.push("Original quote attachment text was extracted; still open the file before relying on final terms.");
+  } else if (attachmentUrl) {
+    reasons.push("An original quote attachment is linked, but its PDF or document text has not been verified by OmnyID.");
+  }
   if (!hasReplyTarget) reasons.push("Add the vendor email before OmnyID can send the reply.");
   if (!hasDraft) reasons.push("Add reply wording before approval.");
   return reasons.join(" ");
@@ -986,6 +996,9 @@ export function weddingVendorQuoteRecommendationHandoff(input: {
   const budgetDeltaAmount = typeof input.quote.budgetDeltaAmount === "number" ? input.quote.budgetDeltaAmount : null;
   const hasInclusions = input.quote.inclusions.length > 0;
   const hasValidUntil = Boolean(clean(input.quote.validUntil));
+  const hasAttachment = Boolean(clean(input.quote.attachmentUrl));
+  const attachmentTextStatus = input.quote.attachmentTextStatus ?? (hasAttachment ? "linked_unverified" : "none");
+  const attachmentTextExtracted = attachmentTextStatus === "extracted";
   const hasReplyTarget = Boolean(clean(input.recipient));
   const hasDraft = Boolean(clean(input.draftBody));
   const appearsOverBudget = /\bover budget|above budget|exceeds budget|higher than budget\b/i.test(budgetDelta)
@@ -1007,6 +1020,12 @@ export function weddingVendorQuoteRecommendationHandoff(input: {
       ? `Quote includes ${input.quote.inclusions.slice(0, 2).join(", ")}${input.quote.inclusions.length > 2 ? ", and more" : ""}`
       : "Inclusions need confirmation",
     hasValidUntil ? `Offer valid until ${clean(input.quote.validUntil)}` : "No validity date found",
+    attachmentTextExtracted
+      ? "Original quote attachment text was extracted; verify final terms in the file"
+      : hasAttachment
+        ? "Original quote attachment is linked but text extraction is not verified"
+        : "No original quote attachment linked",
+    ...(input.quote.attachmentEvidenceLabels ?? []).filter((label) => clean(label)).slice(0, 2),
     hasReplyTarget ? "Vendor email is present" : "Vendor email is missing",
     hasDraft ? "Reply draft is present" : "Reply wording is missing",
   ];
@@ -1015,12 +1034,13 @@ export function weddingVendorQuoteRecommendationHandoff(input: {
     Boolean(budgetDelta),
     hasInclusions,
     hasValidUntil,
+    !hasAttachment || attachmentTextExtracted,
     hasReplyTarget,
     hasDraft,
   ].filter(Boolean).length;
-  const confidenceLabel = evidenceCount >= 5
+  const confidenceLabel = evidenceCount >= 6
     ? "Confidence: strong"
-    : evidenceCount >= 3
+    : evidenceCount >= 4
       ? "Confidence: developing"
       : "Confidence: early";
 

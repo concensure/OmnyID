@@ -43,10 +43,20 @@ function durableExternalUrl(value: unknown): string | null {
   if (!raw) return null;
   try {
     const url = new URL(raw);
-    return url.protocol === "http:" || url.protocol === "https:" ? raw : null;
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
   } catch {
     return null;
   }
+}
+
+function mimeTypeForQuoteAttachment(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.includes(".pdf")) return "application/pdf";
+  if (lower.includes(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (lower.includes(".doc")) return "application/msword";
+  if (lower.includes(".csv")) return "text/csv";
+  if (lower.includes(".txt")) return "text/plain";
+  return "text/uri-list";
 }
 
 function emailDraftCompleteness(input: {
@@ -82,6 +92,17 @@ export function weddingVendorQuoteIncomingAfpMessage(input: {
   const id = clean(input.sourceId)
     || `afp-${safeWeddingLabel(threadId)}-${safeWeddingLabel(timestamp)}`;
   const attachmentUrl = durableExternalUrl(input.quote.attachmentUrl);
+  const attachmentId = attachmentUrl ? `${id}:quote` : null;
+  const quoteRecord = input.quote as typeof input.quote & Record<string, unknown>;
+  const quote = attachmentId
+    ? {
+      ...input.quote,
+      sourceAttachmentId: quoteRecord.sourceAttachmentId ?? quoteRecord.source_attachment_id ?? attachmentId,
+      source_attachment_id: quoteRecord.source_attachment_id ?? quoteRecord.sourceAttachmentId ?? attachmentId,
+      attachmentId: quoteRecord.attachmentId ?? quoteRecord.attachment_id ?? attachmentId,
+      attachment_id: quoteRecord.attachment_id ?? quoteRecord.attachmentId ?? attachmentId,
+    }
+    : input.quote;
   return {
     id,
     thread_id: threadId,
@@ -99,7 +120,7 @@ export function weddingVendorQuoteIncomingAfpMessage(input: {
     ]),
     content: {
       ledger_kind: "wedding_vendor_quote_received",
-      quote: input.quote,
+      quote,
       markdown: `# ${input.quote.vendorName} quote\n\nQuote amount: ${input.quote.amountLabel}`,
     },
     metadata: {
@@ -108,6 +129,10 @@ export function weddingVendorQuoteIncomingAfpMessage(input: {
       quote_amount: input.quote.amount,
       quote_currency: input.quote.currency,
       budget_delta_amount: input.quote.budgetDeltaAmount,
+      source_attachment_id: attachmentId,
+      attachment_id: attachmentId,
+      attachment_text_status: input.quote.attachmentTextStatus ?? (attachmentUrl ? "linked_unverified" : "none"),
+      attachment_evidence_labels: input.quote.attachmentEvidenceLabels ?? [],
       e2ee_required: true,
     },
     views: [{
@@ -122,9 +147,9 @@ export function weddingVendorQuoteIncomingAfpMessage(input: {
     }],
     attachments: attachmentUrl
       ? [{
-        id: `${id}:quote`,
+        id: attachmentId ?? `${id}:quote`,
         name: `${input.quote.vendorName} quote`,
-        mime_type: attachmentUrl.toLowerCase().includes(".pdf") ? "application/pdf" : "text/uri-list",
+        mime_type: mimeTypeForQuoteAttachment(attachmentUrl),
         size_bytes: 0,
         storage: {
           mode: "external_url",

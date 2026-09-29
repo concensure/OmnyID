@@ -3,9 +3,10 @@ import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid
 
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { AttachmentsRenderer } from "@/components/renderers/AttachmentsRenderer";
+import { fetchGmailOAuthConfig, fetchGmailOAuthUrl } from "@/lib/api";
 import type { EditorPayload } from "@/lib/editorPayload";
+import { gmailOAuthConfigFailureMessage } from "@/lib/gmailConnectionState";
 import type { WeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
-import { buildWeddingProviderSetupPresentationState } from "@/lib/weddingProviderSetupPresentationState";
 import { weddingQuoteAttachmentMessageState } from "@/lib/weddingQuoteAttachmentMessageState";
 import {
   weddingVendorQuoteReplyConsentChangeState,
@@ -19,9 +20,20 @@ import {
   type WeddingVendorQuoteReplyDraftPersistenceStatus,
   type WeddingVendorQuoteReplyFlowState,
 } from "@/lib/weddingVendorQuoteReplyFlowState";
+import type { WeddingVendorQuoteAttachmentParserState } from "@/lib/weddingVendorQuoteAttachmentParserState";
 import { buildWeddingVendorQuoteReplyUiCopyState } from "@/lib/weddingVendorQuoteReplyUiState";
 import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
 import type { ViewName } from "@/lib/viewNames";
+
+function safeHttpUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
 
 export function WeddingVendorQuoteReplyCard(props: {
   flow: WeddingVendorQuoteReplyFlowState;
@@ -33,18 +45,29 @@ export function WeddingVendorQuoteReplyCard(props: {
   draftPersistenceStatus?: WeddingVendorQuoteReplyDraftPersistenceStatus | null;
   proofSaveNotice?: string | null;
   providerReadiness?: WeddingProviderExecutorReadinessState | null;
+  attachmentParserState?: WeddingVendorQuoteAttachmentParserState | null;
+  attachmentParsing?: boolean;
   onSaveDraft: (payload: EditorPayload) => Promise<void> | void;
   onApproveWording: () => void;
+  onUnapproveWording?: () => void;
   onAcknowledgeBudgetImpact: () => void;
+  onUnacknowledgeBudgetImpact?: () => void;
   onSend: () => void;
   onUndo: () => void;
   onViewSentThread: () => void;
+  onParseAttachment?: () => void;
   onProviderSetup?: (view: ViewName) => void;
 }) {
   const [draft, setDraft] = createSignal(props.draftBody);
   const [syncedDraftBody, setSyncedDraftBody] = createSignal(props.draftBody);
   const [forceReplyEditorOpen, setForceReplyEditorOpen] = createSignal(false);
   const [quoteDetailsOpen, setQuoteDetailsOpen] = createSignal(false);
+  const [wordingChecked, setWordingChecked] = createSignal(props.flow.approvedWording);
+  const [budgetChecked, setBudgetChecked] = createSignal(props.flow.budgetImpactAcknowledged);
+  const [draftSaveFeedback, setDraftSaveFeedback] = createSignal<string | null>(null);
+  const [draftSaveRequested, setDraftSaveRequested] = createSignal(false);
+  const [gmailConnecting, setGmailConnecting] = createSignal(false);
+  const [gmailSetupError, setGmailSetupError] = createSignal<string | null>(null);
   createEffect(() => {
     const next = weddingVendorQuoteReplyDraftSyncState({
       currentDraft: draft(),
@@ -59,17 +82,19 @@ export function WeddingVendorQuoteReplyCard(props: {
     props.flow.stage;
     setForceReplyEditorOpen(false);
     setQuoteDetailsOpen(false);
+    setDraftSaveFeedback(null);
+    setDraftSaveRequested(false);
+    setGmailSetupError(null);
   });
+  createEffect(() => setWordingChecked(props.flow.approvedWording));
+  createEffect(() => setBudgetChecked(props.flow.budgetImpactAcknowledged));
   const quote = () => props.flow.quote;
+  const quoteAttachmentUrl = () => safeHttpUrl(quote().attachmentUrl);
   const quoteAttachmentMessage = () => weddingQuoteAttachmentMessageState({
     quote: quote(),
     threadId: props.flow.threadId,
   });
   const providerReadiness = () => props.providerReadiness ?? null;
-  const providerSetup = () => {
-    const readiness = providerReadiness();
-    return readiness ? buildWeddingProviderSetupPresentationState(readiness) : null;
-  };
   const proofPersistence = () => weddingVendorQuoteReplyProofPersistenceState({
     notice: props.proofSaveNotice,
   });
@@ -80,6 +105,21 @@ export function WeddingVendorQuoteReplyCard(props: {
   });
   const draftPersistence = () => weddingVendorQuoteReplyDraftPersistenceState({
     status: props.draftPersistenceStatus,
+  });
+  createEffect(() => {
+    if (!draftSaveRequested()) return;
+    if (dirtyState().dirty) return;
+    if (props.draftPersistenceStatus === "saving") {
+      setDraftSaveFeedback("Saving this reply to the wedding...");
+      return;
+    }
+    if (props.draftPersistenceStatus === "saved") {
+      setDraftSaveFeedback("Saved to this wedding. You can approve and send when ready.");
+      return;
+    }
+    if (props.draftPersistenceStatus === "local_only") {
+      setDraftSaveFeedback("Saved only on this device. Try saving again before approving or sending.");
+    }
   });
   const canApproveWording = () => (
     !dirtyState().dirty
@@ -103,7 +143,7 @@ export function WeddingVendorQuoteReplyCard(props: {
     draftPersistence: draftPersistence(),
   });
   const showReplyEditor = () => presentation().showReplyEditor || forceReplyEditorOpen();
-  const budgetAcknowledgementBlocked = () => props.busy || props.flow.budgetImpactAcknowledged;
+  const budgetAcknowledgementBlocked = () => props.busy || !quote().budgetDeltaLabel;
   const primaryActionDisabled = () => {
     if (props.busy) return true;
     const action = presentation().primaryActionKind;
@@ -112,6 +152,62 @@ export function WeddingVendorQuoteReplyCard(props: {
     if (action === "send") return !canSendNow();
     if (action === "undo_send" || action === "view_sent_log" || action === "save_reply") return false;
     return true;
+  };
+  const draftPayload = (): EditorPayload => ({
+    markdown: draft(),
+    text: draft(),
+    afpMessage: {
+      thread_id: props.flow.threadId,
+      parent_id: props.flow.quoteMessageId,
+      type: "email_draft",
+      kind: "wedding_vendor_quote_reply_draft",
+      subtype: "wedding_vendor_quote_reply_draft",
+      content: {
+        text: draft(),
+        to: props.recipient,
+        subject: props.subject,
+        semantic_object: props.flow.semanticObject,
+      },
+      views: [{
+        format: "email",
+        content: {
+          text: draft(),
+          to: props.recipient,
+          subject: props.subject,
+          semantic_object: props.flow.semanticObject,
+        },
+      }],
+      attachments: [],
+      references: props.flow.quoteMessageId
+        ? [{ type: "wedding_vendor_quote", target: props.flow.quoteMessageId, label: "Vendor quote" }]
+        : [],
+    },
+  });
+  const saveCurrentDraft = async () => {
+    setDraftSaveRequested(true);
+    setDraftSaveFeedback("Saving this reply to the wedding...");
+    try {
+      await props.onSaveDraft(draftPayload());
+    } catch {
+      setDraftSaveFeedback("Could not confirm the save. The reply is still here; try saving again.");
+    }
+  };
+  const connectGmailDirectly = async () => {
+    if (gmailConnecting()) return;
+    setGmailConnecting(true);
+    setGmailSetupError(null);
+    try {
+      const url = await fetchGmailOAuthUrl();
+      window.location.href = url;
+    } catch {
+      try {
+        const config = await fetchGmailOAuthConfig();
+        setGmailSetupError(gmailOAuthConfigFailureMessage(config));
+      } catch {
+        setGmailSetupError(gmailOAuthConfigFailureMessage(null));
+      }
+      setGmailConnecting(false);
+    }
   };
   const handlePrimaryAction = () => {
     const action = presentation().primaryActionKind;
@@ -135,11 +231,16 @@ export function WeddingVendorQuoteReplyCard(props: {
       props.onViewSentThread();
       return;
     }
-    if (action === "save_reply") setForceReplyEditorOpen(true);
+    if (action === "save_reply") void saveCurrentDraft();
   };
   const handleSecondaryAction = () => {
     const action = presentation().secondaryActionKind;
     if (action === "view_quote") {
+      const attachmentUrl = quoteAttachmentUrl();
+      if (attachmentUrl) {
+        window.open(attachmentUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
       setQuoteDetailsOpen(true);
       return;
     }
@@ -181,6 +282,23 @@ export function WeddingVendorQuoteReplyCard(props: {
       ? "border-amber-200 bg-amber-50/90 text-amber-950"
       : "border-emerald-200 bg-emerald-50/90 text-emerald-950"
   );
+  const attachmentEvidenceClass = () => {
+    const status = props.attachmentParserState?.status;
+    if (status === "already_extracted") return "border-emerald-200 bg-emerald-50/80 text-emerald-950";
+    if (status === "request_ready") return "border-amber-200 bg-amber-50/90 text-amber-950";
+    return "border-slate-200 bg-slate-50/90 text-slate-950";
+  };
+  const attachmentEvidenceDetail = () => {
+    const parser = props.attachmentParserState;
+    if (!parser) return null;
+    if (parser.status === "request_ready") {
+      return "The original file is saved, but its text still needs parser extraction before the recommendation can fully rely on the attachment.";
+    }
+    if (parser.status === "already_extracted") {
+      return "The quote attachment text has been extracted and can be used as response evidence.";
+    }
+    return parser.blockerLabels[0] ?? "Attachment evidence is not available for parser extraction.";
+  };
   const headingId = () => `vendor-quote-reply-${props.flow.threadId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const quoteDetailsId = () => `${headingId()}-quote-details`;
 
@@ -309,19 +427,39 @@ export function WeddingVendorQuoteReplyCard(props: {
                 <dd class="break-words">{quote().validUntil ?? "Not stated"}</dd>
               </div>
             </dl>
-            <button
-              type="button"
-              onClick={() => setQuoteDetailsOpen((open) => !open)}
-              aria-expanded={quoteDetailsOpen()}
-              aria-controls={quoteDetailsId()}
-              data-magic-action="open"
-              data-magic-icon="quote"
-              data-magic-label={quoteDetailsOpen() ? "Hide quote details" : "See the quote"}
-              data-magic-id={`wedding:quote-reply:${props.flow.id}:quote-details`}
-              class="mt-3 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2"
+            <Show
+              when={quoteAttachmentUrl()}
+              fallback={(
+                <button
+                  type="button"
+                  onClick={() => setQuoteDetailsOpen((open) => !open)}
+                  aria-expanded={quoteDetailsOpen()}
+                  aria-controls={quoteDetailsId()}
+                  data-magic-action="open"
+                  data-magic-icon="quote"
+                  data-magic-label={quoteDetailsOpen() ? "Hide quote details" : "Show quote details"}
+                  data-magic-id={`wedding:quote-reply:${props.flow.id}:quote-details`}
+                  class="mt-3 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2"
+                >
+                  {quoteDetailsOpen() ? "Hide quote details" : "Show quote details"}
+                </button>
+              )}
             >
-              {quoteDetailsOpen() ? "Hide quote details" : "See the quote"}
-            </button>
+              {(attachmentUrl) => (
+                <a
+                  href={attachmentUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-magic-action="open"
+                  data-magic-icon="quote"
+                  data-magic-label="Open quote file"
+                  data-magic-id={`wedding:quote-reply:${props.flow.id}:quote-file`}
+                  class="mt-3 inline-flex rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2"
+                >
+                  Open quote file
+                </a>
+              )}
+            </Show>
             <div class="mt-3 rounded-xl border border-emerald-100 bg-white/80 p-3">
               <p class="text-sm font-semibold text-emerald-950">Recommendation</p>
               <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -363,6 +501,40 @@ export function WeddingVendorQuoteReplyCard(props: {
                     <div class="mt-3 rounded-xl border border-emerald-100 bg-white/80 p-3">
                       <p class="mb-2 text-sm font-semibold text-emerald-950">Original file</p>
                       <AttachmentsRenderer message={message()} />
+                      <Show when={props.attachmentParserState}>
+                        {(parser) => (
+                          <div class={`mt-3 rounded-xl border p-3 ${attachmentEvidenceClass()}`} role="status" aria-live="polite">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                              <p class="break-words text-sm font-semibold">{parser().statusLabel}</p>
+                              <span class="rounded-full bg-white/75 px-2 py-1 text-xs font-semibold">
+                                {parser().ready ? "Parser ready" : parser().status === "already_extracted" ? "Extracted" : "Needs source"}
+                              </span>
+                            </div>
+                            <Show when={attachmentEvidenceDetail()}>
+                              {(detail) => <p class="mt-1 break-words text-sm leading-6 opacity-80">{detail()}</p>}
+                            </Show>
+                            <Show when={parser().fileName || parser().mimeType}>
+                              <p class="mt-2 break-words text-xs leading-5 opacity-70">
+                                {[parser().fileName, parser().mimeType].filter(Boolean).join(" - ")}
+                              </p>
+                            </Show>
+                            <Show when={parser().ready && props.onParseAttachment}>
+                              <button
+                                type="button"
+                                disabled={props.attachmentParsing}
+                                onClick={() => props.onParseAttachment?.()}
+                                data-magic-action="extract"
+                                data-magic-icon="file-text"
+                                data-magic-label="Extract quote text"
+                                data-magic-id={`wedding:quote-reply:${props.flow.id}:extract-attachment`}
+                                class="mt-3 rounded-full border border-amber-200 bg-white px-3 py-1.5 text-sm font-semibold text-amber-950 transition hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {props.attachmentParsing ? "Extracting..." : "Extract quote text"}
+                              </button>
+                            </Show>
+                          </div>
+                        )}
+                      </Show>
                     </div>
                   )}
                 </Show>
@@ -416,11 +588,25 @@ export function WeddingVendorQuoteReplyCard(props: {
                   class="content-font-body"
                   onChange={(_text, markdown) => setDraft(markdown)}
                   onSend={async (payload) => {
+                    setDraftSaveRequested(true);
+                    setDraftSaveFeedback("Saving this reply to the wedding...");
                     setDraft(payload.markdown || payload.text);
-                    await props.onSaveDraft(payload);
+                    try {
+                      await props.onSaveDraft(payload);
+                    } catch {
+                      setDraftSaveFeedback("Could not confirm the save. The reply is still here; try saving again.");
+                    }
                   }}
                 />
               </div>
+            </Show>
+
+            <Show when={draftSaveFeedback()}>
+              {(message) => (
+                <div class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/90 p-3 text-emerald-950" role="status" aria-live="polite">
+                  <p class="text-sm font-semibold">{message()}</p>
+                </div>
+              )}
             </Show>
 
             <Show when={dirtyState().dirty}>
@@ -443,9 +629,14 @@ export function WeddingVendorQuoteReplyCard(props: {
               <label class="flex items-start gap-2 text-sm leading-5 text-emerald-950">
                 <input
                   type="checkbox"
-                  checked={props.flow.approvedWording}
-                  disabled={!canApproveWording()}
+                  checked={wordingChecked()}
+                  disabled={props.busy || dirtyState().dirty || draftPersistence().blocksApproval || draft().trim().length === 0}
                   onChange={(event) => {
+                    setWordingChecked(event.currentTarget.checked);
+                    if (!event.currentTarget.checked) {
+                      props.onUnapproveWording?.();
+                      return;
+                    }
                     const consent = weddingVendorQuoteReplyConsentChangeState({
                       checked: event.currentTarget.checked,
                       blocked: !canApproveWording(),
@@ -461,9 +652,14 @@ export function WeddingVendorQuoteReplyCard(props: {
                 <label class="flex items-start gap-2 text-sm leading-5 text-emerald-950">
                   <input
                     type="checkbox"
-                    checked={props.flow.budgetImpactAcknowledged}
+                    checked={budgetChecked()}
                     disabled={budgetAcknowledgementBlocked()}
                     onChange={(event) => {
+                      setBudgetChecked(event.currentTarget.checked);
+                      if (!event.currentTarget.checked) {
+                        props.onUnacknowledgeBudgetImpact?.();
+                        return;
+                      }
                       const consent = weddingVendorQuoteReplyConsentChangeState({
                         checked: event.currentTarget.checked,
                         blocked: budgetAcknowledgementBlocked(),
@@ -498,20 +694,22 @@ export function WeddingVendorQuoteReplyCard(props: {
                   </div>
                   <p class="mt-1 break-words text-sm leading-6 opacity-80">{readiness().detail}</p>
                   <Show when={!readiness().productionReady && readiness().setupView}>
-                    {(view) => (
-                      <button
-                        type="button"
-                        onClick={() => props.onProviderSetup?.(view())}
-                        aria-label={`Open setup for ${readiness().requiredProvider ?? "connected app"}`}
-                        data-magic-action="open"
-                        data-magic-icon="setup"
-                        data-magic-label={providerSetup()?.buttonLabel ?? "Open setup"}
-                        data-magic-id={`wedding:quote-reply:${props.flow.id}:provider-setup`}
-                        class="mt-3 rounded-full border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
-                      >
-                        {providerSetup()?.buttonLabel ?? "Open setup"}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      disabled={gmailConnecting()}
+                      onClick={() => void connectGmailDirectly()}
+                      aria-label="Connect Gmail"
+                      data-magic-action="open"
+                      data-magic-icon="setup"
+                      data-magic-label="Connect Gmail"
+                      data-magic-id={`wedding:quote-reply:${props.flow.id}:provider-setup`}
+                      class="mt-3 rounded-full border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {gmailConnecting() ? "Connecting Gmail..." : "Connect Gmail"}
+                    </button>
+                  </Show>
+                  <Show when={gmailSetupError()}>
+                    {(message) => <p class="mt-2 break-words text-xs leading-5 text-amber-950/80">{message()}</p>}
                   </Show>
                 </div>
               )}

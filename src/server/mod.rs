@@ -879,7 +879,83 @@ fn apply_default_body_limit(router: Router) -> Router {
     ))
 }
 
+fn load_dotenv_defaults() {
+    if dotenv_flag_enabled("OMNYID_DISABLE_DOTENV_AUTOLOAD") {
+        return;
+    }
+    let _ = load_env_file_defaults(std::path::Path::new(".env"));
+}
+
+fn dotenv_flag_enabled(name: &str) -> bool {
+    std::env::var(name)
+        .ok()
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn load_env_file_defaults(path: &std::path::Path) -> usize {
+    let Ok(contents) = std::fs::read_to_string(path) else {
+        return 0;
+    };
+    let mut loaded = 0usize;
+    for line in contents.lines() {
+        let Some((key, value)) = parse_dotenv_line(line) else {
+            continue;
+        };
+        if std::env::var_os(&key).is_some() {
+            continue;
+        }
+        unsafe {
+            std::env::set_var(key, value);
+        }
+        loaded += 1;
+    }
+    loaded
+}
+
+fn parse_dotenv_line(line: &str) -> Option<(String, String)> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.starts_with('#') {
+        return None;
+    }
+    let assignment = trimmed.strip_prefix("export ").unwrap_or(trimmed);
+    let (raw_key, raw_value) = assignment.split_once('=')?;
+    let key = raw_key.trim();
+    if key.is_empty()
+        || key
+            .chars()
+            .any(|ch| !(ch == '_' || ch.is_ascii_alphanumeric()))
+        || key.chars().next()?.is_ascii_digit()
+    {
+        return None;
+    }
+    Some((key.to_string(), clean_dotenv_value(raw_value)))
+}
+
+fn clean_dotenv_value(raw: &str) -> String {
+    let value = raw.trim();
+    if value.len() >= 2 {
+        let bytes = value.as_bytes();
+        if (bytes[0] == b'"' && bytes[value.len() - 1] == b'"')
+            || (bytes[0] == b'\'' && bytes[value.len() - 1] == b'\'')
+        {
+            return value[1..value.len() - 1].to_string();
+        }
+    }
+    value
+        .split_once(" #")
+        .map(|(prefix, _)| prefix.trim_end())
+        .unwrap_or(value)
+        .to_string()
+}
+
 pub async fn run() {
+    load_dotenv_defaults();
     if let Err(message) = validate_startup_deployment_policy() {
         panic!("startup policy validation failed: {message}");
     }
@@ -29483,6 +29559,67 @@ mod tests {
     use std::sync::{Arc, Mutex, OnceLock};
     use tower::ServiceExt;
     use ulid::Ulid;
+
+    fn server_env_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .expect("server env lock")
+    }
+
+    #[test]
+    fn dotenv_parser_accepts_export_quotes_and_inline_comments() {
+        assert_eq!(
+            super::parse_dotenv_line("export GOOGLE_PLACES_API_KEY=\"secret value\""),
+            Some((
+                "GOOGLE_PLACES_API_KEY".to_string(),
+                "secret value".to_string()
+            ))
+        );
+        assert_eq!(
+            super::parse_dotenv_line(
+                "OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED=true # local"
+            ),
+            Some((
+                "OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED".to_string(),
+                "true".to_string()
+            ))
+        );
+        assert_eq!(super::parse_dotenv_line("# comment"), None);
+        assert_eq!(super::parse_dotenv_line("1_BAD=value"), None);
+    }
+
+    #[test]
+    fn dotenv_loader_fills_missing_values_without_overriding_environment() {
+        let _env = server_env_lock();
+        let path = std::env::temp_dir().join(format!("omnyid-dotenv-loader-{}.env", Ulid::new()));
+        std::fs::write(
+            &path,
+            "GOOGLE_PLACES_API_KEY=from-file\nOMNYID_DOTENV_EXISTING=from-file\n",
+        )
+        .expect("write dotenv fixture");
+        unsafe {
+            std::env::remove_var("GOOGLE_PLACES_API_KEY");
+            std::env::set_var("OMNYID_DOTENV_EXISTING", "from-env");
+        }
+
+        let loaded = super::load_env_file_defaults(&path);
+
+        assert_eq!(loaded, 1);
+        assert_eq!(
+            std::env::var("GOOGLE_PLACES_API_KEY").as_deref(),
+            Ok("from-file")
+        );
+        assert_eq!(
+            std::env::var("OMNYID_DOTENV_EXISTING").as_deref(),
+            Ok("from-env")
+        );
+        unsafe {
+            std::env::remove_var("GOOGLE_PLACES_API_KEY");
+            std::env::remove_var("OMNYID_DOTENV_EXISTING");
+        }
+        let _ = std::fs::remove_file(path);
+    }
 
     #[test]
     fn llm_config_save_response_reports_backend_and_provider_separately() {

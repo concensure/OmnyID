@@ -12,9 +12,17 @@ export function isWorkspaceLlmSetupComplete(config: LlmConfig | null | undefined
 }
 
 export function workspaceLlmSetupPendingReason(config: LlmConfig | null | undefined): string | null {
-  if (!config) return null;
+  if (!config) return "No AI model is connected yet. Connect an AI model or enable hosted AI for this account.";
   if (config.backend === "hosted" && config.monthly_budget_cents <= 0) {
     return "Hosted AI is still disabled. Set a hosted budget or switch to BYOK/Ollama.";
+  }
+  return null;
+}
+
+export function workspaceLlmSetupErrorPendingReason(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  if (/\bno LLM config\b/i.test(message) || /\/user\/llm-config/i.test(message) || /POST \/agent\/provision/i.test(message)) {
+    return workspaceLlmSetupPendingReason(null);
   }
   return null;
 }

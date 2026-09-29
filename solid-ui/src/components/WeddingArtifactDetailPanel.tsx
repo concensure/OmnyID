@@ -2,9 +2,11 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 import { AttachmentsRenderer } from "@/components/renderers/AttachmentsRenderer";
+import { A2UIRenderer } from "@/components/renderers/A2UIRenderer";
 import { WeddingApprovalPreviewPanel } from "@/components/WeddingApprovalPreviewPanel";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
+import type { AfpMessage, AfpView } from "@/lib/api";
 import {
   buildWeddingComparisonColumns,
   type WeddingComparisonColumnState,
@@ -21,6 +23,19 @@ import {
   loadWeddingDecisionSelections,
   toggleWeddingDecisionSelectionValue,
 } from "@/lib/weddingDecisionSelectionState";
+
+function uniqueStrings(values: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const cleanValue = value.trim();
+    const key = cleanValue.toLowerCase();
+    if (!cleanValue || seen.has(key)) continue;
+    seen.add(key);
+    result.push(cleanValue);
+  }
+  return result;
+}
 
 function approvalTagClass(state: string): string {
   if (/approved|ready/i.test(state)) return "border-emerald-100 bg-emerald-50 text-emerald-900";
@@ -76,11 +91,45 @@ function comparisonCellClass(column: WeddingComparisonColumnState, value: string
   return `${base} text-teal-950/80`;
 }
 
+function artifactA2UIView(artifact: WeddingWorkspaceArtifactPreview): { message: AfpMessage; view: AfpView } | null {
+  if (!artifact.a2uiContent) return null;
+  const view: AfpView = {
+    format: "a2ui",
+    content: artifact.a2uiContent,
+    priority: 1,
+  };
+  const message: AfpMessage = {
+    id: `${artifact.artifactId}:a2ui-preview`,
+    thread_id: artifact.artifactId,
+    from: "omnyid:wedding",
+    to: [],
+    timestamp: new Date(artifact.createdAt).toISOString(),
+    type: "wedding_artifact_preview",
+    kind: "wedding_artifact",
+    subtype: artifact.kind,
+    content: artifact.a2uiContent,
+    metadata: { artifact_id: artifact.artifactId },
+    views: [view],
+    attachments: [],
+    references: [],
+    encryption: null,
+  };
+  return { message, view };
+}
+
+export type WeddingVendorChoiceSelectionSaveInput = {
+  artifact: WeddingWorkspaceArtifactPreview;
+  optionId: string;
+  optionLabel: string;
+  contact: WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number] | null;
+};
+
 function ArtifactPreviewCard(props: {
   artifact: WeddingWorkspaceArtifactPreview;
   preview: WeddingArtifactPreviewState;
   onOpenFollowUpQueue?: () => void;
   onOpenVendorQuoteReplySurface?: () => void;
+  onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
 }) {
   const preview = props.preview;
   const [selectedOptionIds, setSelectedOptionIds] = createSignal<string[]>([]);
@@ -91,16 +140,40 @@ function ArtifactPreviewCard(props: {
     setComparisonExpanded(false);
   });
 
+  const persistedSelectedOptionIds = createMemo(() =>
+    props.artifact.persistedSelectedVendorChoices.map((choice) => choice.optionId)
+  );
+  const effectiveSelectedOptionIds = createMemo(() =>
+    uniqueStrings([...persistedSelectedOptionIds(), ...selectedOptionIds()])
+  );
+
   const decisionState = createMemo(() => buildWeddingDecisionSelectionState({
     artifactId: props.artifact.artifactId,
     artifactKind: props.artifact.kind,
     table: preview.kind === "table" ? preview : null,
-    selectedOptionIds: selectedOptionIds(),
+    selectedOptionIds: effectiveSelectedOptionIds(),
     preferenceText: props.artifact.bodyText,
   }));
 
   function toggleOption(optionId: string): void {
-    setSelectedOptionIds(toggleWeddingDecisionSelectionValue(props.artifact.artifactId, optionId));
+    const next = toggleWeddingDecisionSelectionValue(props.artifact.artifactId, optionId);
+    setSelectedOptionIds(next);
+    if (!next.includes(optionId)) return;
+    const option = decisionState().options.find((candidate) =>
+      candidate.id === optionId || candidate.alternateIds?.includes(optionId)
+    );
+    if (!option) return;
+    const optionLabel = option.label.trim().toLowerCase();
+    const contact = props.artifact.vendorComparisonCards.find((card) => {
+      const title = card.title.trim().toLowerCase();
+      return title === optionLabel || optionLabel.includes(title) || title.includes(optionLabel);
+    }) ?? null;
+    props.onVendorChoiceSelected?.({
+      artifact: props.artifact,
+      optionId: option.id,
+      optionLabel: option.label,
+      contact,
+    });
   }
 
   if (preview.kind === "email") {
@@ -188,6 +261,7 @@ function ArtifactPreviewCard(props: {
   }
 
   if (preview.kind === "table") {
+    const a2uiPreview = createMemo(() => artifactA2UIView(props.artifact));
     const comparisonColumns = createMemo(() => preview.columns ?? buildWeddingComparisonColumns(preview.headers));
     const comparisonUi = createMemo(() => buildWeddingVendorComparisonUiState({
       decision: decisionState(),
@@ -196,6 +270,67 @@ function ArtifactPreviewCard(props: {
       expanded: comparisonExpanded(),
     }));
     const rowActionFor = (optionId: string) => comparisonUi().rowActions.find((action) => action.optionId === optionId) ?? null;
+    const resolutionBanner = () => (
+      <div class={`mt-3 rounded-xl border p-3 ${
+        comparisonUi().resolution.resolved
+          ? "border-emerald-100 bg-emerald-50/85"
+          : "border-amber-100 bg-amber-50/85"
+      }`}>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+            comparisonUi().resolution.resolved
+              ? "bg-emerald-100 text-emerald-950"
+              : "bg-amber-100 text-amber-950"
+          }`}>
+            {comparisonUi().resolution.statusLabel}
+          </span>
+          <p class={`break-words text-xs leading-5 ${
+            comparisonUi().resolution.resolved ? "text-emerald-950/80" : "text-amber-950/80"
+          }`}>
+            {comparisonUi().resolution.detailLabel}
+          </p>
+        </div>
+      </div>
+    );
+    if (a2uiPreview()) {
+      return (
+        <div class="min-w-0 rounded-2xl border border-teal-100 bg-teal-50/75 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs font-semibold text-teal-950">A2UI comparison surface</p>
+            <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-medium text-teal-900">
+              {preview.rowCountLabel}
+            </span>
+          </div>
+          <div class="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-3 text-white">
+            <A2UIRenderer message={a2uiPreview()!.message} view={a2uiPreview()!.view} />
+          </div>
+          {resolutionBanner()}
+          <Show when={decisionState().eligible && decisionState().options.length > 1}>
+            <div class="mt-3 rounded-xl border border-teal-100 bg-white/85 p-3">
+              <p class="text-sm font-semibold text-teal-950">Follow-up selection</p>
+              <p class="mt-1 text-sm leading-6 text-teal-900/75">{decisionState().instructionLabel}</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <For each={decisionState().options}>
+                  {(option) => (
+                    <button
+                      type="button"
+                      onClick={() => toggleOption(option.id)}
+                      class={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                        effectiveSelectedOptionIds().includes(option.id)
+                          ? "border-teal-800 bg-teal-900 text-white"
+                          : "border-teal-100 bg-white text-teal-900 hover:border-teal-300"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
+        </div>
+      );
+    }
     return (
       <div class="min-w-0 rounded-2xl border border-teal-100 bg-teal-50/75 p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -204,6 +339,7 @@ function ArtifactPreviewCard(props: {
             {preview.rowCountLabel}
           </span>
         </div>
+        {resolutionBanner()}
         <Show when={decisionState().eligible && decisionState().options.length > 1}>
           <div class="mt-3 rounded-xl border border-teal-100 bg-white/75 p-3">
             <p class="text-sm font-semibold text-teal-950">What needs your yes/no</p>
@@ -242,6 +378,128 @@ function ArtifactPreviewCard(props: {
               <p class="mt-2 text-xs font-semibold text-teal-950">{handoff().nextActionLabel}</p>
             </div>
           )}
+        </Show>
+        <Show when={props.artifact.vendorComparisonCards.length > 0}>
+          <div class="mt-3 grid gap-3 lg:grid-cols-3">
+            <For each={comparisonUi().expansion.expanded ? props.artifact.vendorComparisonCards : props.artifact.vendorComparisonCards.slice(0, 3)}>
+              {(card) => {
+                const [contactOpen, setContactOpen] = createSignal(false);
+                const contactRows = () => [
+                  card.websiteUrl ? { label: "Website", value: card.websiteUrl, href: card.websiteUrl } : null,
+                  card.instagramUrl ? { label: "Instagram", value: card.instagramUrl, href: card.instagramUrl } : null,
+                  card.email ? { label: "Email", value: card.email, href: `mailto:${card.email}` } : null,
+                  card.phone ? { label: "Phone", value: card.phone, href: `tel:${card.phone.replace(/\s+/g, "")}` } : null,
+                  card.address ? { label: "Address", value: card.address, href: null } : null,
+                  card.mapUrl ? { label: "Map", value: card.mapUrl, href: card.mapUrl } : null,
+                  card.sourceUrl ? { label: "Source", value: card.sourceUrl, href: card.sourceUrl } : null,
+                ].filter((item): item is { label: string; value: string; href: string | null } => item !== null);
+                return (
+                <article class="min-w-0 overflow-hidden rounded-xl border border-teal-100 bg-white/85">
+                  <Show
+                    when={card.imageUrl}
+                    fallback={
+                      <div class="flex aspect-[4/3] items-center justify-center bg-teal-50 px-3 text-center text-xs font-semibold text-teal-900/65">
+                        Image pending from source
+                      </div>
+                    }
+                  >
+                    {(imageUrl) => (
+                      <img
+                        src={imageUrl()}
+                        alt={card.imageAlt ?? `${card.title} venue image`}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        class="aspect-[4/3] w-full object-cover"
+                      />
+                    )}
+                  </Show>
+                  <div class="space-y-2 p-3">
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase text-teal-700/70">#{card.rank} recommendation</p>
+                        <h4 class="mt-0.5 break-words text-sm font-semibold text-teal-950">{card.title}</h4>
+                      </div>
+                      <span class="shrink-0 rounded-full bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-900">
+                        {card.scoreLabel}
+                      </span>
+                    </div>
+                    <p class="break-words text-xs leading-5 text-teal-900/75">{card.situationFit}</p>
+                    <div class="flex flex-wrap gap-1">
+                      <For each={card.rationaleLabels.slice(0, 3)}>
+                        {(label) => (
+                          <span class="max-w-full break-words rounded-full bg-teal-50 px-2 py-1 text-[11px] font-medium text-teal-900">
+                            {label}
+                          </span>
+                        )}
+                      </For>
+                    </div>
+                    <p class="break-words text-[11px] leading-4 text-teal-900/65">
+                      {card.verificationLabel}
+                    </p>
+                    <Show when={contactRows().length > 0}>
+                      <div class="rounded-lg border border-teal-100 bg-teal-50/60 p-2">
+                        <button
+                          type="button"
+                          class="text-xs font-semibold text-teal-950 underline decoration-teal-300 underline-offset-2"
+                          onClick={() => setContactOpen((current) => !current)}
+                          aria-expanded={contactOpen()}
+                        >
+                          {contactOpen() ? "Hide contact details" : "Show contact details"}
+                        </button>
+                        <Show when={contactOpen()}>
+                          <dl class="mt-2 space-y-1">
+                            <For each={contactRows()}>
+                              {(row) => (
+                                <div class="grid gap-1 text-[11px] sm:grid-cols-[4.5rem_1fr]">
+                                  <dt class="font-semibold text-teal-900/70">{row.label}</dt>
+                                  <dd class="min-w-0 break-words text-teal-950">
+                                    <Show when={row.href} fallback={row.value}>
+                                      {(href) => (
+                                        <a href={href()} target={row.label === "Email" || row.label === "Phone" ? undefined : "_blank"} rel="noreferrer" class="underline decoration-teal-300 underline-offset-2">
+                                          {row.value}
+                                        </a>
+                                      )}
+                                    </Show>
+                                  </dd>
+                                </div>
+                              )}
+                            </For>
+                          </dl>
+                        </Show>
+                      </div>
+                    </Show>
+                    <div class="flex flex-wrap gap-1.5">
+                      <Show when={card.websiteUrl ?? card.sourceUrl}>
+                        {(url) => (
+                          <a
+                            href={url()}
+                            target="_blank"
+                            rel="noreferrer"
+                            class="rounded-full border border-teal-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-teal-950 transition hover:bg-teal-50"
+                          >
+                            Open website
+                          </a>
+                        )}
+                      </Show>
+                      <Show when={card.mapUrl}>
+                        {(url) => (
+                          <a
+                            href={url()}
+                            target="_blank"
+                            rel="noreferrer"
+                            class="rounded-full border border-teal-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-teal-950 transition hover:bg-teal-50"
+                          >
+                            Open map
+                          </a>
+                        )}
+                      </Show>
+                    </div>
+                  </div>
+                </article>
+                );
+              }}
+            </For>
+          </div>
         </Show>
         <Show when={preview.budgetSummary}>
           {(summary) => (
@@ -606,6 +864,7 @@ export function WeddingArtifactDetailPanel(props: {
   onResearch?: (action: WeddingWorkspaceSidebarAction) => void;
   onOpenFollowUpQueue?: () => void;
   onOpenVendorQuoteReplySurface?: () => void;
+  onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   researchAction?: WeddingWorkspaceSidebarAction | null;
 }) {
   const [showDocumentDetails, setShowDocumentDetails] = createSignal(false);
@@ -725,6 +984,7 @@ export function WeddingArtifactDetailPanel(props: {
                         preview={previewState()}
                         onOpenFollowUpQueue={props.onOpenFollowUpQueue}
                         onOpenVendorQuoteReplySurface={props.onOpenVendorQuoteReplySurface}
+                        onVendorChoiceSelected={props.onVendorChoiceSelected}
                       />
                     )}
                   </Show>

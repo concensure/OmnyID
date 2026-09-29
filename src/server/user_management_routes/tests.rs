@@ -197,7 +197,7 @@ fn admin_third_party_tool_policy_reads_shared_tool_env_flags() {
     assert_eq!(maps["enabledForAllUsers"], false);
     assert_eq!(maps["enabledForWeddingTemplate"], true);
     assert_eq!(weather["enabledForAllUsers"], true);
-    assert_eq!(weather["enabledForWeddingTemplate"], false);
+    assert_eq!(weather["enabledForWeddingTemplate"], true);
     assert_eq!(weather["monthlyFreeQuotaLabel"], "1m calls/month");
     assert_eq!(cloudinary["enabledForAllUsers"], false);
     assert_eq!(cloudinary["enabledForWeddingTemplate"], false);

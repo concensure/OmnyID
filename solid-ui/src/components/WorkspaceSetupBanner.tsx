@@ -7,6 +7,7 @@ import {
   isWorkspaceLlmSetupComplete,
   workspaceCalendarSetupPendingReason,
   workspaceGmailSetupPendingReason,
+  workspaceLlmSetupErrorPendingReason,
   workspaceLlmSetupPendingReason,
 } from "@/lib/workspaceSetupState";
 import {
@@ -97,7 +98,17 @@ export function WorkspaceSetupBanner(props: {
   const [checkErrorsByItem, setCheckErrorsByItem] = createSignal<SetupCheckErrors>({});
 
   async function verifyLlm() {
-    const cfg = await fetchLlmConfig();
+    let cfg = null;
+    try {
+      cfg = await fetchLlmConfig();
+    } catch (error) {
+      const pendingReason = workspaceLlmSetupErrorPendingReason(error);
+      if (!pendingReason) throw error;
+      saveWorkspaceSetupLlmOk(false);
+      setLlmOk(false);
+      setLlmPendingReason(pendingReason);
+      return;
+    }
     if (isWorkspaceLlmSetupComplete(cfg)) {
       setLlmOk(true);
       setLlmPendingReason(null);

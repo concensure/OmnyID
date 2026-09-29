@@ -297,6 +297,26 @@ pub fn admin_tool_secret_status(spec: AdminToolSecretSpec) -> AdminToolSecretSta
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .expect("env lock")
+    }
+
+    fn clear_google_places_secret_env() {
+        for key in GOOGLE_PLACES_SPEC
+            .value_env
+            .iter()
+            .chain(GOOGLE_PLACES_SPEC.file_env.iter())
+        {
+            unsafe {
+                std::env::remove_var(key);
+            }
+        }
+    }
 
     #[test]
     fn secret_status_does_not_expose_value() {
@@ -316,5 +336,55 @@ mod tests {
         assert!(GOOGLE_PLACES_SPEC.file_env[0].contains("ADMIN"));
         assert!(GOOGLE_PLACES_SPEC.value_env[0].contains("ADMIN"));
         assert_eq!(GOOGLE_PLACES_SPEC.provider_id, "google_places");
+    }
+
+    #[test]
+    fn resolver_accepts_provider_native_google_places_key_env() {
+        let _env = env_lock();
+        clear_google_places_secret_env();
+        unsafe {
+            std::env::set_var("GOOGLE_PLACES_API_KEY", "secret-google-places-key");
+        }
+
+        let resolved = resolve_admin_tool_secret(GOOGLE_PLACES_SPEC).expect("google places key");
+
+        assert_eq!(resolved.secret, "secret-google-places-key");
+        assert_eq!(
+            resolved.source,
+            AdminToolSecretSource::EnvVar("GOOGLE_PLACES_API_KEY")
+        );
+        unsafe {
+            std::env::remove_var("GOOGLE_PLACES_API_KEY");
+        }
+    }
+
+    #[test]
+    fn resolver_accepts_provider_native_google_places_key_file_env() {
+        let _env = env_lock();
+        clear_google_places_secret_env();
+        let path = std::env::temp_dir().join(format!(
+            "omnyid-google-places-secret-{}.txt",
+            std::process::id()
+        ));
+        std::fs::write(&path, "secret-google-places-file-key\n").expect("write secret file");
+        unsafe {
+            std::env::set_var("GOOGLE_PLACES_API_KEY_FILE", path.display().to_string());
+        }
+
+        let resolved =
+            resolve_admin_tool_secret(GOOGLE_PLACES_SPEC).expect("google places file key");
+
+        assert_eq!(resolved.secret, "secret-google-places-file-key");
+        assert!(matches!(
+            resolved.source,
+            AdminToolSecretSource::File {
+                env_var: "GOOGLE_PLACES_API_KEY_FILE",
+                ..
+            }
+        ));
+        unsafe {
+            std::env::remove_var("GOOGLE_PLACES_API_KEY_FILE");
+        }
+        let _ = std::fs::remove_file(path);
     }
 }

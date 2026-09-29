@@ -54,6 +54,8 @@ const WEDDING_PLANNER_WALKTHROUGH_STEPS: WeddingPlannerWalkthroughStep[] = [
 
 export function WeddingPlannerWalkthrough(props: {
   onClose: () => void;
+  inline?: boolean;
+  onFocusUploadFiles?: () => void;
   onOpenSharePlan?: () => void;
   onSelectMenu: (menuId: WeddingWorkspaceMenuId) => void;
 }) {
@@ -85,8 +87,16 @@ export function WeddingPlannerWalkthrough(props: {
     close();
   }
 
+  function runPrimaryFinalAction() {
+    if (currentStep().shareLabel) {
+      openSharePlan();
+      return;
+    }
+    close();
+  }
+
   onMount(() => {
-    closeButtonRef?.focus();
+    if (!props.inline) closeButtonRef?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
@@ -103,17 +113,16 @@ export function WeddingPlannerWalkthrough(props: {
     const step = currentStep();
     const targetMenuId = step.menuId ?? step.sectionLinks?.[0]?.menuId;
     if (targetMenuId) props.onSelectMenu(targetMenuId);
-    else if (step.shareLabel) props.onOpenSharePlan?.();
+    else if (step.title === "Bring in what you already have") props.onFocusUploadFiles?.();
   });
 
-  return (
-    <div class="pointer-events-none fixed inset-0 z-50 flex items-end justify-center p-4 sm:justify-end sm:p-6">
+  const content = (
       <section
         role="dialog"
-        aria-modal="true"
+        aria-modal={props.inline ? "false" : "true"}
         aria-labelledby="wedding-walkthrough-title"
         aria-describedby="wedding-walkthrough-body"
-        class="pointer-events-auto relative w-full max-w-md rounded-[28px] border border-rose-100 bg-white p-5 shadow-2xl sm:p-6"
+        class={`${props.inline ? "w-full" : "pointer-events-auto relative w-full max-w-md"} rounded-[28px] border border-rose-100 bg-white p-5 shadow-2xl sm:p-6`}
       >
         <button
           ref={closeButtonRef}
@@ -210,9 +219,9 @@ export function WeddingPlannerWalkthrough(props: {
                 <button
                   type="button"
                   class="rounded-full border border-rose-500 bg-rose-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-rose-600"
-                  onClick={close}
+                  onClick={runPrimaryFinalAction}
                 >
-                  Start planning
+                  {currentStep().shareLabel ?? "Start planning"}
                 </button>
               }
             >
@@ -227,6 +236,13 @@ export function WeddingPlannerWalkthrough(props: {
           </div>
         </div>
       </section>
+  );
+
+  if (props.inline) return <div class="w-full">{content}</div>;
+
+  return (
+    <div class="pointer-events-none fixed inset-0 z-50 flex items-end justify-center p-4 sm:justify-end sm:p-6">
+      {content}
     </div>
   );
 }

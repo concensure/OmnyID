@@ -47,7 +47,7 @@ Then:
 
 - point `wt.omnyid.com` to that dedicated QUIC endpoint
 - keep `api.omnyid.com` on the regular HTTP/WebSocket path
-- run [docker-compose.oracle.quic.yml](/c:/Users/ozans/Desktop/projects/Agenton/docker-compose.oracle.quic.yml) there
+- run [docker-compose.oracle.quic.yml](/c:/Users/ozans/Desktop/projects/OmnyID/docker-compose.oracle.quic.yml) there
 
 Why this is the best option:
 
@@ -100,10 +100,10 @@ This path has now been partially applied in the safer form:
 
 Do this:
 
-1. keep [docker-compose.oracle.yml](/c:/Users/ozans/Desktop/projects/Agenton/docker-compose.oracle.yml) for the shared host
+1. keep [docker-compose.oracle.yml](/c:/Users/ozans/Desktop/projects/OmnyID/docker-compose.oracle.yml) for the shared host
 2. keep WebTransport disabled there
 3. create a dedicated QUIC endpoint for `wt.omnyid.com`
-4. deploy [docker-compose.oracle.quic.yml](/c:/Users/ozans/Desktop/projects/Agenton/docker-compose.oracle.quic.yml) on that QUIC-capable endpoint
+4. deploy [docker-compose.oracle.quic.yml](/c:/Users/ozans/Desktop/projects/OmnyID/docker-compose.oracle.quic.yml) on that QUIC-capable endpoint
 
 ### If you create a dedicated Oracle Omnyid host
 
@@ -111,7 +111,7 @@ Do this:
 
 1. open `443/udp` and `443/tcp`
 2. mount the QUIC certificate and key
-3. use [oracle-cloud.quic.env.example](/c:/Users/ozans/Desktop/projects/Agenton/oracle-cloud.quic.env.example)
+3. use [oracle-cloud.quic.env.example](/c:/Users/ozans/Desktop/projects/OmnyID/oracle-cloud.quic.env.example)
 4. start with:
 
 ```bash
@@ -122,13 +122,13 @@ docker compose --env-file .env.oracle-quic -f docker-compose.oracle.quic.yml up 
 
 Already added:
 
-- [docker-compose.oracle.yml](/c:/Users/ozans/Desktop/projects/Agenton/docker-compose.oracle.yml)
+- [docker-compose.oracle.yml](/c:/Users/ozans/Desktop/projects/OmnyID/docker-compose.oracle.yml)
   - safe shared-host Oracle profile
-- [docker-compose.oracle.quic.yml](/c:/Users/ozans/Desktop/projects/Agenton/docker-compose.oracle.quic.yml)
+- [docker-compose.oracle.quic.yml](/c:/Users/ozans/Desktop/projects/OmnyID/docker-compose.oracle.quic.yml)
   - dedicated QUIC/WebTransport Oracle profile
-- [oracle-cloud.env.example](/c:/Users/ozans/Desktop/projects/Agenton/oracle-cloud.env.example)
+- [oracle-cloud.env.example](/c:/Users/ozans/Desktop/projects/OmnyID/oracle-cloud.env.example)
   - shared-host env baseline
-- [oracle-cloud.quic.env.example](/c:/Users/ozans/Desktop/projects/Agenton/oracle-cloud.quic.env.example)
+- [oracle-cloud.quic.env.example](/c:/Users/ozans/Desktop/projects/OmnyID/oracle-cloud.quic.env.example)
   - dedicated QUIC env baseline
 
 This means the repo now supports both:

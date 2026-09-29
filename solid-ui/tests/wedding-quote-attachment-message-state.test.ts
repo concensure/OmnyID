@@ -15,6 +15,8 @@ const quote: WeddingArtifactQuotePreview = {
   inclusions: ["Bridal bouquet", "Ceremony arrangements"],
   validUntil: "2026-10-15",
   attachmentUrl: "https://example.com/chloe-quote.pdf",
+  attachmentTextStatus: "linked_unverified",
+  attachmentEvidenceLabels: ["Original quote attachment is linked but text extraction is not verified"],
 };
 
 test("weddingQuoteAttachmentMessageState turns a quote attachment into a standard AFP attachment message", () => {
@@ -35,6 +37,14 @@ test("weddingQuoteAttachmentMessageState turns a quote attachment into a standar
   assert.equal(message.attachments[0]?.encryption.mode, "not_stored_by_omnyid");
   assert.equal(message.content.vendor_name, "Chloe's Florals");
   assert.equal(message.content.quote_amount, "AUD $799");
+  assert.equal(message.content.attachment_text_status, "linked_unverified");
+  assert.deepEqual(message.content.attachment_evidence_labels, [
+    "Original quote attachment is linked but text extraction is not verified",
+  ]);
+  assert.equal(message.metadata.attachment_text_status, "linked_unverified");
+  assert.deepEqual(message.metadata.attachment_evidence_labels, [
+    "Original quote attachment is linked but text extraction is not verified",
+  ]);
 });
 
 test("weddingQuoteAttachmentMessageState returns null when the quote has no original file", () => {
@@ -43,14 +53,28 @@ test("weddingQuoteAttachmentMessageState returns null when the quote has no orig
   }), null);
 });
 
+test("weddingQuoteAttachmentMessageState rejects unsafe original file urls", () => {
+  assert.equal(weddingQuoteAttachmentMessageState({
+    quote: { ...quote, attachmentUrl: "javascript:alert(1)" },
+  }), null);
+});
+
 test("weddingQuoteAttachmentMessageState uses file extension mime fallbacks", () => {
   const csvMessage = weddingQuoteAttachmentMessageState({
     quote: { ...quote, attachmentUrl: "https://example.com/chloe-quote.csv" },
+  });
+  const docMessage = weddingQuoteAttachmentMessageState({
+    quote: { ...quote, attachmentUrl: "https://example.com/chloe-quote.doc" },
+  });
+  const docxMessage = weddingQuoteAttachmentMessageState({
+    quote: { ...quote, attachmentUrl: "https://example.com/chloe-quote.docx" },
   });
   const unknownMessage = weddingQuoteAttachmentMessageState({
     quote: { ...quote, attachmentUrl: "https://example.com/chloe-quote" },
   });
 
   assert.equal(csvMessage?.attachments[0]?.mime_type, "text/csv");
+  assert.equal(docMessage?.attachments[0]?.mime_type, "application/msword");
+  assert.equal(docxMessage?.attachments[0]?.mime_type, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
   assert.equal(unknownMessage?.attachments[0]?.mime_type, "text/uri-list");
 });

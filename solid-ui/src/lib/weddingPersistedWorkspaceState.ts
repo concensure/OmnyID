@@ -356,13 +356,92 @@ function messageToArtifactInput(message: AfpMessage, fallback: WeddingPlanningMe
   };
 }
 
-function quoteBodyFromMessage(message: AfpMessage): string | null {
+type ParsedQuoteAttachmentEvidence = {
+  text: string;
+  parserLabel: string | null;
+  fileName: string | null;
+};
+
+function parsedAttachmentEvidenceFromMessages(
+  messages: readonly AfpMessage[],
+  responseWorkspaceId: string,
+): Map<string, ParsedQuoteAttachmentEvidence> {
+  const byAttachmentId = new Map<string, ParsedQuoteAttachmentEvidence>();
+  for (const message of messages) {
+    const inWorkspace = workspaceIdFrom(message) === responseWorkspaceId
+      || message.thread_id.includes(responseWorkspaceId);
+    if (!inWorkspace) continue;
+    const tokens = [
+      message.type,
+      message.kind,
+      message.subtype,
+      ...strings(message.supertags),
+    ].map((value) => clean(value)?.toLowerCase() ?? "").join(" ");
+    if (!tokens.includes("parsed_document")) continue;
+    const attachmentId = clean(contentValue(message, "source_attachment_id"));
+    if (!attachmentId) continue;
+    const text = boundedClean(
+      contentValue(message, "content_text")
+        ?? contentValue(message, "text")
+        ?? record(contentValue(message, "parsed_document"))?.content_text
+        ?? record(contentValue(message, "document"))?.content_text,
+      5000,
+    );
+    if (!text) continue;
+    byAttachmentId.set(attachmentId, {
+      text,
+      parserLabel: clean(contentValue(message, "parser_used") ?? message.metadata?.extraction_mode),
+      fileName: clean(message.metadata?.source_file_name ?? contentValue(message, "title")),
+    });
+  }
+  return byAttachmentId;
+}
+
+function attachmentEvidenceForQuoteMessage(
+  message: AfpMessage,
+  parsedAttachmentEvidence: Map<string, ParsedQuoteAttachmentEvidence>,
+): ParsedQuoteAttachmentEvidence | null {
+  const quote = record(contentValue(message, "quote"));
+  const candidateIds = [
+    clean(quote?.sourceAttachmentId ?? quote?.source_attachment_id),
+    clean(quote?.attachmentId ?? quote?.attachment_id),
+    ...message.attachments.map((attachment) => clean(attachment.id)),
+  ].filter((id): id is string => Boolean(id));
+  for (const candidateId of candidateIds) {
+    const evidence = parsedAttachmentEvidence.get(candidateId);
+    if (evidence) return evidence;
+  }
+  return null;
+}
+
+function quoteBodyFromMessage(
+  message: AfpMessage,
+  parsedAttachmentEvidence: Map<string, ParsedQuoteAttachmentEvidence>,
+): string | null {
   const quote = record(contentValue(message, "quote"));
   if (!quote) return null;
   const vendorName = clean(quote.vendorName ?? quote.vendor_name);
   const amountLabel = clean(quote.amountLabel ?? quote.amount_label);
   if (!vendorName || !amountLabel) return null;
   const inclusions = strings(quote.inclusions);
+  const parsedAttachment = attachmentEvidenceForQuoteMessage(message, parsedAttachmentEvidence);
+  const attachmentText = boundedClean(
+    quote.attachmentText
+      ?? quote.attachment_text
+      ?? quote.attachmentMarkdown
+      ?? quote.attachment_markdown
+      ?? quote.extractedAttachmentText
+      ?? quote.extracted_attachment_text
+      ?? quote.parsedAttachmentText
+      ?? quote.parsed_attachment_text
+      ?? parsedAttachment?.text,
+    5000,
+  );
+  const attachmentTextStatus = clean(quote.attachmentTextStatus ?? quote.attachment_text_status)
+    ?? (attachmentText ? "extracted" : null);
+  const attachmentParser = clean(quote.attachmentParser ?? quote.attachment_parser ?? quote.parser_used)
+    ?? parsedAttachment?.parserLabel
+    ?? null;
   return [
     `# ${vendorName} quote`,
     "",
@@ -370,11 +449,19 @@ function quoteBodyFromMessage(message: AfpMessage): string | null {
     `Quote amount: ${amountLabel}`,
     clean(quote.budgetDeltaLabel ?? quote.budget_delta_label) ? `Budget delta: ${clean(quote.budgetDeltaLabel ?? quote.budget_delta_label)}` : null,
     clean(quote.validUntil ?? quote.valid_until) ? `Valid until: ${clean(quote.validUntil ?? quote.valid_until)}` : null,
-    clean(quote.attachmentUrl ?? quote.attachment_url) ? `Original PDF: ${clean(quote.attachmentUrl ?? quote.attachment_url)}` : null,
+    clean(quote.attachmentUrl ?? quote.attachment_url) ? `Original file: ${clean(quote.attachmentUrl ?? quote.attachment_url)}` : null,
+    attachmentTextStatus ? `Attachment text status: ${attachmentTextStatus}` : null,
+    ...strings(quote.attachmentEvidenceLabels ?? quote.attachment_evidence_labels).map((label) => `Attachment evidence: ${label}`),
+    parsedAttachment?.fileName ? `Attachment name: ${parsedAttachment.fileName}` : null,
+    attachmentParser ? `Attachment parser: ${attachmentParser}` : null,
     inclusions.length > 0 ? "" : null,
     inclusions.length > 0 ? "## Inclusions" : null,
     inclusions.length > 0 ? "" : null,
     ...inclusions.map((item) => `- ${item}`),
+    attachmentText ? "" : null,
+    attachmentText ? "## Attachment text" : null,
+    attachmentText ? "" : null,
+    attachmentText,
   ].filter((line): line is string => line !== null).join("\n");
 }
 
@@ -396,6 +483,7 @@ function emailDraftBodyFromMessage(message: AfpMessage): string | null {
 function messageToVendorQuoteThreadArtifactInput(
   message: AfpMessage,
   fallback: WeddingPlanningMetadata,
+  parsedAttachmentEvidence: Map<string, ParsedQuoteAttachmentEvidence>,
 ): WeddingArtifactInput | null {
   const workspaceId = workspaceIdFrom(message);
   if (!workspaceId) return null;
@@ -408,7 +496,7 @@ function messageToVendorQuoteThreadArtifactInput(
     ...strings(message.supertags),
   ].map((value) => clean(value)?.toLowerCase() ?? "").join(" ");
   if (tokens.includes("wedding_vendor_quote_received")) {
-    const bodyText = quoteBodyFromMessage(message);
+    const bodyText = quoteBodyFromMessage(message, parsedAttachmentEvidence);
     const title = clean(contentValue(message, "title"))
       ?? clean(message.metadata?.vendor_name)
       ?? clean(record(contentValue(message, "quote"))?.vendorName)
@@ -751,9 +839,10 @@ export function buildWeddingPersistedWorkspaceState(input: {
     supertags: ["template:wedding_planning", "event:wedding", "response_workspace"],
   });
   const scopedMessages = (input.messages ?? []).filter((message) => workspaceIdFrom(message) === metadata.responseWorkspaceId);
+  const parsedAttachmentEvidence = parsedAttachmentEvidenceFromMessages(input.messages ?? [], metadata.responseWorkspaceId);
   const artifacts = coalescePersistedArtifactInputs(scopedMessages.flatMap((message) => {
     const artifact = messageToArtifactInput(message, metadata)
-      ?? messageToVendorQuoteThreadArtifactInput(message, metadata);
+      ?? messageToVendorQuoteThreadArtifactInput(message, metadata, parsedAttachmentEvidence);
     return artifact ? [artifact] : [];
   }));
   const contextItems = scopedMessages.flatMap((message) => {

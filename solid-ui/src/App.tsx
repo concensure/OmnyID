@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, lazy, onCleanup, onMount, Show, Suspense } from "solid-js";
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, lazy, onCleanup, onMount, Show, Suspense } from "solid-js";
 import { GlassPanel } from "@/components/GlassPanel";
 import { LoraStatusWidget } from "@/components/LoraStatusWidget";
 import { MaskSwitcher } from "@/components/MaskSwitcher";
@@ -75,6 +75,7 @@ import {
 } from "@/lib/api";
 import { fleetStatusSummary } from "@/lib/agentFleetResponseState";
 import { buildSessionEndedNotice } from "@/lib/sessionRecoveryState";
+import { dispatchWeddingWorkspaceMenuSelection } from "@/lib/weddingWorkspaceMenuState";
 import {
   type AuthApiResponse,
 } from "@/lib/authResponseState";
@@ -1055,6 +1056,64 @@ function commandResponseToPreviewMessage(
   }) as AfpMessage;
 }
 
+function buildCommandPreviewRenderFailureMessage(
+  command: UiCommandResponse,
+  query: string,
+  error: unknown,
+): AfpMessage {
+  const timestamp = new Date().toISOString();
+  const intent = typeof command.intent === "string" && command.intent.trim()
+    ? command.intent
+    : "command";
+  const summary = typeof command.summary === "string" && command.summary.trim()
+    ? command.summary
+    : "The agent returned an answer, but this client could not render the interactive preview.";
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const content = {
+    kind: "workspace_panel",
+    title: "Master Agent result could not render",
+    summary,
+    query,
+    sections: [
+      {
+        title: "What happened",
+        body: "The workspace kept the session open and replaced the broken preview with this safe summary.",
+      },
+      {
+        title: "Error",
+        body: errorMessage,
+      },
+    ],
+  };
+
+  return {
+    id: `preview.${intent}.render_failure.${timestamp}`,
+    thread_id: `preview.thread.${intent}`,
+    from: "omnyid://workspace/command-bar",
+    to: ["omnyid://workspace/user"],
+    timestamp,
+    type: "agent",
+    subtype: "workspace_panel",
+    content,
+    metadata: {
+      origin: "workspace_command_preview",
+      intent,
+      render_failure: true,
+      error_message: errorMessage,
+    },
+    views: [
+      {
+        format: "a2ui.v1",
+        priority: 100,
+        content,
+      },
+    ],
+    attachments: [],
+    references: [],
+    encryption: null,
+  };
+}
+
 function App() {
   const [session, setSession] = createSignal(readSession());
   // Declared early: userId/workspaceBootstrap are read synchronously by several
@@ -1137,6 +1196,7 @@ function App() {
   // Agent settings focus: scroll to AI Model Config when opening from pill link
   const [agentSettingsFocusLlm, setAgentSettingsFocusLlm] = createSignal(false);
   const [agentSettingsFocusTab, setAgentSettingsFocusTab] = createSignal<"llm" | "mcp" | "skills" | "runtime" | null>(null);
+  const [emailConnectFocusTick, setEmailConnectFocusTick] = createSignal(0);
   const [connectedAppsInitialFilter, setConnectedAppsInitialFilter] = createSignal<string | undefined>(undefined);
 
   // UI state
@@ -2088,6 +2148,11 @@ function App() {
     selectView(normalizeViewName(view) ?? "home");
   }
 
+  function returnToWeddingPlannerHome() {
+    dispatchWeddingWorkspaceMenuSelection("home");
+    selectView("response_queue");
+  }
+
   async function handleSearch(
     queryOrPayload: string | SearchSubmitPayload,
     engine?: string,
@@ -2595,24 +2660,29 @@ function App() {
   const commandPreviewMessage = createMemo(() => {
     const result = commandResult();
     if (!result) return null;
-    const preview = result.preview_message
-      ?? commandResponseToPreviewMessage(
-        result,
-        lastQuery(),
+    try {
+      const preview = result.preview_message
+        ?? commandResponseToPreviewMessage(
+          result,
+          lastQuery(),
+          workspaceSearchRouterPreview.result(),
+          workspaceSearchRouterPreview.capabilities(),
+        );
+      const attachmentGrounding = searchAttachmentGrounding();
+      const groundedPreview = attachmentGrounding
+        ? decoratePreviewMessageWithAttachmentGrounding(preview, attachmentGrounding)
+        : preview;
+      const studyStructuredPreview = decorateSearchPreviewMessageWithStudyStructure(groundedPreview);
+      const routedPreview = decorateSearchPreviewMessageWithLocalRouter(
+        studyStructuredPreview,
         workspaceSearchRouterPreview.result(),
         workspaceSearchRouterPreview.capabilities(),
       );
-    const attachmentGrounding = searchAttachmentGrounding();
-    const groundedPreview = attachmentGrounding
-      ? decoratePreviewMessageWithAttachmentGrounding(preview, attachmentGrounding)
-      : preview;
-    const studyStructuredPreview = decorateSearchPreviewMessageWithStudyStructure(groundedPreview);
-    const routedPreview = decorateSearchPreviewMessageWithLocalRouter(
-      studyStructuredPreview,
-      workspaceSearchRouterPreview.result(),
-      workspaceSearchRouterPreview.capabilities(),
-    );
-    return decoratePreviewMessageWithStudyLaunchMetadata(routedPreview, lastStudyLaunchMetadata());
+      return decoratePreviewMessageWithStudyLaunchMetadata(routedPreview, lastStudyLaunchMetadata());
+    } catch (error) {
+      console.error("[command-preview] failed to render preview", error);
+      return buildCommandPreviewRenderFailureMessage(result, lastQuery(), error);
+    }
   });
   const commandFallbackNotice = createMemo(() => readUiCommandFallbackNotice(commandResult()));
   const commandWorkflowHandoffVisible = createMemo(() => {
@@ -3159,7 +3229,7 @@ function App() {
           <Show when={weddingReturnContextActive() && activeView() !== "response_queue"}>
             <button
               type="button"
-              onClick={() => selectView("response_queue")}
+              onClick={returnToWeddingPlannerHome}
               class="mb-2 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-white/85 px-3 py-1.5 text-xs font-semibold text-rose-950 shadow-sm transition hover:border-rose-300 hover:bg-rose-50"
             >
               <span aria-hidden="true">&lt;</span>
@@ -3482,6 +3552,21 @@ function App() {
 
             {/* Chat / search view */}
             <Show when={activeView() === "search"}>
+              <ErrorBoundary
+                fallback={(err, reset) => (
+                  <SearchRouteFallback
+                    error={err}
+                    onBack={() => selectView("home")}
+                    onClear={() => {
+                      setCommandResult(null);
+                      setObjectSearchResult(null);
+                      workspaceSearchRouterPreview.clear();
+                      objectSearchRouterPreview.clear();
+                      reset();
+                    }}
+                  />
+                )}
+              >
               <div class="view-enter space-y-5">
                 <WeddingNavigationArrivalBanner
                   state={weddingArrivalBannerFor("search")}
@@ -3609,11 +3694,15 @@ function App() {
                         setAgentSettingsFocusLlm(true);
                         setAgentSettingsFocusTab("llm");
                       }
+                      if (view === "email" && hint === "gmail") {
+                        setEmailConnectFocusTick((value) => value + 1);
+                      }
                       selectKnownView(view);
                     }}
                   />
                 </Suspense>
               </div>
+              </ErrorBoundary>
             </Show>
 
             {/* Threads view */}
@@ -3717,10 +3806,11 @@ function App() {
               <Show when={activeView() === "email"}>
                 <Suspense fallback={<LazyViewFallback label="Email" />}>
                   <div class="view-enter">
-                    <WeddingReturnBanner onReturn={() => selectView("response_queue")} />
+                    <WeddingReturnBanner onReturn={returnToWeddingPlannerHome} />
                     <LazyEmailView
                       bootstrap={workspaceBootstrap()}
                       signedIn={Boolean(session()?.token)}
+                      focusConnectTick={emailConnectFocusTick()}
                     />
                   </div>
                 </Suspense>
@@ -3742,7 +3832,7 @@ function App() {
             <Show when={activeView() === "calendar"}>
               <Suspense fallback={<LazyViewFallback label="Calendar" />}>
                 <div class="view-enter">
-                  <WeddingReturnBanner onReturn={() => selectView("response_queue")} />
+                  <WeddingReturnBanner onReturn={returnToWeddingPlannerHome} />
                   <LazyMonthlyCalendarView
                     initialDate={calendarNavigationDate()}
                     initialEventId={calendarNavigationEventId()}
@@ -3825,20 +3915,33 @@ function App() {
               <GuestGate label="Response Queue" onSignIn={() => openAuthModalIfSignedOut()} />
             </Show>
             <Show when={activeView() === "response_queue" && (Boolean(session()?.token) || guestUsesSampleWorkspace())}>
-              <Suspense fallback={<LazyViewFallback label="Response Queue" />}>
-                <div class="view-enter">
-                  <LazyResponseQueueView
-                    bootstrap={workspaceBootstrap()}
-                    onNavigate={(view, hint) => {
-                      if (view === "agent_settings" && hint === "llm") {
-                        setAgentSettingsFocusLlm(true);
-                        setAgentSettingsFocusTab("llm");
-                      }
-                      selectView(view);
-                    }}
+              <ErrorBoundary
+                fallback={(err, reset) => (
+                  <ResponseQueueRouteFallback
+                    error={err}
+                    onBack={() => selectView("home")}
+                    onRetry={reset}
                   />
-                </div>
-              </Suspense>
+                )}
+              >
+                <Suspense fallback={<LazyViewFallback label="Response Queue" />}>
+                  <div class="view-enter">
+                    <LazyResponseQueueView
+                      bootstrap={workspaceBootstrap()}
+                      onNavigate={(view, hint) => {
+                        if (view === "agent_settings" && hint === "llm") {
+                          setAgentSettingsFocusLlm(true);
+                          setAgentSettingsFocusTab("llm");
+                        }
+                        if (view === "email" && hint === "gmail") {
+                          setEmailConnectFocusTick((value) => value + 1);
+                        }
+                        selectView(view);
+                      }}
+                    />
+                  </div>
+                </Suspense>
+              </ErrorBoundary>
             </Show>
 
             {/* Cost Dashboard — cost oracle budgeting, tracking, and analysis */}
@@ -3916,28 +4019,38 @@ function App() {
               <GuestGate label="Agent Settings" onSignIn={() => openAuthModalIfSignedOut()} />
             </Show>
             <Show when={activeView() === "agent_settings" && Boolean(session()?.token)}>
-              <Suspense fallback={<LazyViewFallback label="Agent Settings" />}>
-                <div class="view-enter">
-                  <WeddingReturnBanner onReturn={() => selectView("response_queue")} />
-                  <LazyAgentSettingsView
-                    browserAiLabel={browserAiLabel()}
-                    focusLlm={agentSettingsFocusLlm()}
-                    onFocusDone={() => setAgentSettingsFocusLlm(false)}
-                    onViewWorkflows={() => selectView("workflows")}
-                    focusSettingsTab={agentSettingsFocusTab() ?? undefined}
-                    onSettingsTabFocusDone={() => setAgentSettingsFocusTab(null)}
-                    deviceSyncPolicies={dashboardBootstrapDeviceSyncPolicyEntries(workspaceBootstrap())}
-                    deviceSyncRuntimeSummary={dashboardBootstrapDeviceSyncRuntimeSummary(workspaceBootstrap())}
-                    simulatorRuntimeSummary={dashboardBootstrapSimulatorRuntimeSummary(workspaceBootstrap())}
-                    runtimeUpdates={dashboardBootstrapRuntimeUpdates(workspaceBootstrap())}
-                    runtimeDeployment={dashboardBootstrapRuntimeDeployment(workspaceBootstrap())}
-                    runtimeBackups={dashboardBootstrapRuntimeBackups(workspaceBootstrap())}
-                    runtimeRestoreDrills={dashboardBootstrapRuntimeRestoreDrills(workspaceBootstrap())}
-                    supportAccess={dashboardBootstrapSupportAccess(workspaceBootstrap())}
-                    supportAccessHistory={dashboardBootstrapSupportAccessHistory(workspaceBootstrap())}
+              <ErrorBoundary
+                fallback={(err, reset) => (
+                  <AgentSettingsRouteFallback
+                    error={err}
+                    onBack={() => selectView("home")}
+                    onRetry={reset}
                   />
-                </div>
-              </Suspense>
+                )}
+              >
+                <Suspense fallback={<LazyViewFallback label="Agent Settings" />}>
+                  <div class="view-enter">
+                    <WeddingReturnBanner onReturn={returnToWeddingPlannerHome} />
+                    <LazyAgentSettingsView
+                      browserAiLabel={browserAiLabel()}
+                      focusLlm={agentSettingsFocusLlm()}
+                      onFocusDone={() => setAgentSettingsFocusLlm(false)}
+                      onViewWorkflows={() => selectView("workflows")}
+                      focusSettingsTab={agentSettingsFocusTab() ?? undefined}
+                      onSettingsTabFocusDone={() => setAgentSettingsFocusTab(null)}
+                      deviceSyncPolicies={dashboardBootstrapDeviceSyncPolicyEntries(workspaceBootstrap())}
+                      deviceSyncRuntimeSummary={dashboardBootstrapDeviceSyncRuntimeSummary(workspaceBootstrap())}
+                      simulatorRuntimeSummary={dashboardBootstrapSimulatorRuntimeSummary(workspaceBootstrap())}
+                      runtimeUpdates={dashboardBootstrapRuntimeUpdates(workspaceBootstrap())}
+                      runtimeDeployment={dashboardBootstrapRuntimeDeployment(workspaceBootstrap())}
+                      runtimeBackups={dashboardBootstrapRuntimeBackups(workspaceBootstrap())}
+                      runtimeRestoreDrills={dashboardBootstrapRuntimeRestoreDrills(workspaceBootstrap())}
+                      supportAccess={dashboardBootstrapSupportAccess(workspaceBootstrap())}
+                      supportAccessHistory={dashboardBootstrapSupportAccessHistory(workspaceBootstrap())}
+                    />
+                  </div>
+                </Suspense>
+              </ErrorBoundary>
             </Show>
 
             {/* Diary view */}
@@ -3994,7 +4107,7 @@ function App() {
             <Show when={activeView() === "connected_apps" && Boolean(session()?.token)}>
               <Suspense fallback={<LazyViewFallback label="Connected Apps" />}>
                 <div class="view-enter">
-                  <WeddingReturnBanner onReturn={() => selectView("response_queue")} />
+                  <WeddingReturnBanner onReturn={returnToWeddingPlannerHome} />
                   <LazyConnectedAppsView initialFilter={connectedAppsInitialFilter()} />
                 </div>
               </Suspense>
@@ -4324,6 +4437,117 @@ function DemoPreviewCallout(props: { title: string; body: string }) {
     <div class="rounded-2xl border border-amber-200/70 bg-amber-50/80 px-5 py-4 text-sm text-amber-900 shadow-soft animate-fade-in">
       <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-700">{props.title}</p>
       <p class="mt-1 leading-6">{props.body}</p>
+    </div>
+  );
+}
+
+function AgentSettingsRouteFallback(props: {
+  error: unknown;
+  onBack: () => void;
+  onRetry: () => void;
+}) {
+  const message = () => (props.error instanceof Error ? props.error.message : String(props.error || "Unknown error"));
+
+  return (
+    <div class="view-enter rounded-3xl border border-amber-200/70 bg-amber-50/85 p-6 text-amber-950 shadow-card animate-fade-in">
+      <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-700">Agent Settings</p>
+      <h2 class="mt-2 text-xl font-semibold text-amber-950">AI settings could not open</h2>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-amber-900/85">
+        The workspace is still available. This looks like an Agent Settings route error, so you can retry the panel or go back while we keep the rest of the planner stable.
+      </p>
+      <p class="mt-4 max-w-2xl rounded-2xl border border-amber-200/70 bg-white/70 px-3 py-2 font-mono text-xs leading-5 text-amber-900">
+        {message()}
+      </p>
+      <div class="mt-5 flex flex-wrap gap-3">
+        <button
+          type="button"
+          class="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
+          onClick={props.onRetry}
+        >
+          Retry Agent Settings
+        </button>
+        <button
+          type="button"
+          class="rounded-full border border-amber-700 bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-800"
+          onClick={props.onBack}
+        >
+          Back to Home
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SearchRouteFallback(props: {
+  error: unknown;
+  onBack: () => void;
+  onClear: () => void;
+}) {
+  const message = () => (props.error instanceof Error ? props.error.message : String(props.error || "Unknown error"));
+
+  return (
+    <div class="view-enter rounded-3xl border border-rose-200/70 bg-rose-50/85 p-6 text-rose-950 shadow-card animate-fade-in">
+      <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-rose-700">Master Agent</p>
+      <h2 class="mt-2 text-xl font-semibold text-rose-950">Search result could not render</h2>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-rose-900/85">
+        The workspace is still available. Clear the current result to keep working, or go back home and ask again.
+      </p>
+      <p class="mt-4 max-w-2xl rounded-2xl border border-rose-200/70 bg-white/70 px-3 py-2 font-mono text-xs leading-5 text-rose-900">
+        {message()}
+      </p>
+      <div class="mt-5 flex flex-wrap gap-3">
+        <button
+          type="button"
+          class="rounded-full border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-950 transition hover:bg-rose-100"
+          onClick={props.onClear}
+        >
+          Clear result
+        </button>
+        <button
+          type="button"
+          class="rounded-full border border-rose-800 bg-rose-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-900"
+          onClick={props.onBack}
+        >
+          Back to Home
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ResponseQueueRouteFallback(props: {
+  error: unknown;
+  onBack: () => void;
+  onRetry: () => void;
+}) {
+  const message = () => (props.error instanceof Error ? props.error.message : String(props.error || "Unknown error"));
+
+  return (
+    <div class="view-enter rounded-3xl border border-fuchsia-200/70 bg-fuchsia-50/85 p-6 text-fuchsia-950 shadow-card animate-fade-in">
+      <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-fuchsia-700">Wedding Planner</p>
+      <h2 class="mt-2 text-xl font-semibold text-fuchsia-950">Planner view could not open</h2>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-fuchsia-900/85">
+        The workspace stayed open, but the wedding planner surface hit a render error. Retry the planner, or return home and use the Master Agent while the saved wedding data remains intact.
+      </p>
+      <p class="mt-4 max-w-2xl rounded-2xl border border-fuchsia-200/70 bg-white/70 px-3 py-2 font-mono text-xs leading-5 text-fuchsia-900">
+        {message()}
+      </p>
+      <div class="mt-5 flex flex-wrap gap-3">
+        <button
+          type="button"
+          class="rounded-full border border-fuchsia-300 bg-white px-4 py-2 text-sm font-semibold text-fuchsia-950 transition hover:bg-fuchsia-100"
+          onClick={props.onRetry}
+        >
+          Retry Wedding Planner
+        </button>
+        <button
+          type="button"
+          class="rounded-full border border-fuchsia-800 bg-fuchsia-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-900"
+          onClick={props.onBack}
+        >
+          Back to Home
+        </button>
+      </div>
     </div>
   );
 }

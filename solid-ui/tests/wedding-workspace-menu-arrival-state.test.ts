@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { weddingWorkspaceMenuForArrival } from "../src/lib/weddingWorkspaceMenuArrivalState.ts";
+import {
+  weddingTemplateHomeResetKey,
+  weddingWorkspaceMenuForArrival,
+} from "../src/lib/weddingWorkspaceMenuArrivalState.ts";
 import type { WeddingNavigationIntent } from "../src/lib/weddingNavigationState.ts";
 
 function intent(overrides: Partial<WeddingNavigationIntent> = {}): WeddingNavigationIntent {
@@ -30,6 +33,16 @@ test("weddingWorkspaceMenuForArrival opens Documents for document arrivals", () 
 
 test("weddingWorkspaceMenuForArrival keeps intake launches on the current home flow", () => {
   assert.equal(weddingWorkspaceMenuForArrival(intent({ sourceResponseId: null })), null);
+});
+
+test("weddingTemplateHomeResetKey only resets fresh template launches", () => {
+  assert.equal(
+    weddingTemplateHomeResetKey(intent({ sourceResponseId: null })),
+    "wedding_plan:arrival:response_workspace:arrival",
+  );
+  assert.equal(weddingTemplateHomeResetKey(intent()), null);
+  assert.equal(weddingTemplateHomeResetKey(intent({ surface: "budget", sourceResponseId: null })), null);
+  assert.equal(weddingTemplateHomeResetKey({ ...intent({ sourceResponseId: null }), view: "home" }), null);
 });
 
 test("weddingWorkspaceMenuForArrival opens Budget for budget arrivals", () => {

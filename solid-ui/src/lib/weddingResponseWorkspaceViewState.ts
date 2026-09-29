@@ -153,6 +153,11 @@ import {
 import { buildWeddingResilienceLedgerState } from "@/lib/weddingResilienceLedgerState";
 import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
 import {
+  buildWeddingVendorQuoteAttachmentParserState,
+  weddingVendorQuoteAttachmentParserStateWithExtractedEvidence,
+  type WeddingVendorQuoteAttachmentParserState,
+} from "@/lib/weddingVendorQuoteAttachmentParserState";
+import {
   buildWeddingVendorPursuitLogCards,
   type WeddingVendorPursuitLogCard,
 } from "@/lib/weddingVendorPursuitLogPresentationState";
@@ -204,6 +209,31 @@ export type WeddingWorkspaceArtifactPreview = {
     confidenceLabel: string;
     nextActionLabel: string;
   } | null;
+  vendorComparisonCards: Array<{
+    choiceId: string;
+    rank: number;
+    title: string;
+    imageUrl: string | null;
+    imageAlt: string | null;
+    scoreLabel: string;
+    provider: string;
+    sourceUrl: string | null;
+    websiteUrl: string | null;
+    mapUrl: string | null;
+    instagramUrl: string | null;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    rationaleLabels: string[];
+    preferenceMatch: string;
+    situationFit: string;
+    verificationLabel: string;
+  }>;
+  persistedSelectedVendorChoices: Array<{
+    optionId: string;
+    label: string;
+  }>;
+  a2uiContent: Record<string, unknown> | null;
   evidenceSummary: WeddingArtifactEvidenceSummary;
   bodyText: string | null;
   preview: WeddingArtifactPreviewState | null;
@@ -280,6 +310,7 @@ export type WeddingWorkspaceRecommendationCard = WeddingRecommendationExplanatio
 };
 export type WeddingResponseWorkspaceViewState = {
   workspace: WeddingResponseWorkspaceState;
+  afpMessages: readonly AfpMessage[];
   categoryRail: Array<{ id: WeddingArtifactKind; label: string; count: number; active: boolean }>;
   filterChips: WeddingWorkspaceFilterChip[];
   activePreview: WeddingWorkspaceArtifactPreview | null;
@@ -296,6 +327,7 @@ export type WeddingResponseWorkspaceViewState = {
   vendorQuoteReplyFlows: WeddingVendorQuoteReplyFlowState[];
   activeVendorQuoteReplyFlows: WeddingVendorQuoteReplyFlowState[];
   vendorQuoteReplyLogFlows: WeddingVendorQuoteReplyFlowState[];
+  vendorQuoteAttachmentParserStates: WeddingVendorQuoteAttachmentParserState[];
   providerHandoffAuditCard: WeddingProviderHandoffAuditCard | null;
   expectedBehaviorAuditCard: WeddingExpectedBehaviorAuditCard;
   decisionRecordCards: WeddingDecisionRecordCard[];
@@ -399,6 +431,39 @@ function weddingHelperContactNamesFromAfpMessages(messages: readonly AfpMessage[
       metadata.contact_name,
     ];
   }));
+}
+
+function parsedDocumentAttachmentEvidenceFromAfpMessages(
+  messages: readonly AfpMessage[] | null | undefined,
+): Map<string, string[]> {
+  const evidence = new Map<string, string[]>();
+  for (const message of messages ?? []) {
+    const content = record(message.content);
+    const metadata = record(message.metadata);
+    const tokens = [
+      message.type,
+      message.kind,
+      message.subtype,
+      ...(Array.isArray(message.supertags) ? message.supertags : []),
+    ].map((value) => clean(value).toLowerCase()).join(" ");
+    if (!tokens.includes("parsed_document")) continue;
+    const parsed = record(content.parsed_document);
+    const attachmentId = clean(content.source_attachment_id)
+      || clean(parsed.source_attachment_id)
+      || clean(metadata.source_attachment_id);
+    if (!attachmentId) continue;
+    const parserLabel = clean(content.parser_used)
+      || clean(parsed.parser_used)
+      || clean(metadata.extraction_mode)
+      || "document parser";
+    const title = clean(content.title) || clean(parsed.title) || clean(metadata.source_file_name);
+    const labels = [
+      `Extracted by ${parserLabel}.`,
+      title ? `Parsed source: ${title}.` : null,
+    ].filter((label): label is string => Boolean(label));
+    evidence.set(attachmentId, [...(evidence.get(attachmentId) ?? []), ...labels]);
+  }
+  return evidence;
 }
 
 function guestNamesFromArtifacts(artifacts: readonly WeddingArtifactInput[]): string[] {
@@ -612,6 +677,30 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
   });
   const activeVendorQuoteReplyFlows = vendorQuoteReplyFlows.filter((flow) => flow.stage !== "sent");
   const vendorQuoteReplyLogFlows = vendorQuoteReplyFlows.filter((flow) => flow.stage === "sent");
+  const responseWorkspaceId = normalizeWeddingPlanningMetadata(input.metadata ?? artifacts[0]?.metadata).responseWorkspaceId;
+  const parsedDocumentAttachmentEvidence = parsedDocumentAttachmentEvidenceFromAfpMessages(input.afpMessages);
+  const vendorQuoteAttachmentParserStates = (input.afpMessages ?? [])
+    .filter((message) => {
+      const scopedToWorkspace = message.thread_id.includes(responseWorkspaceId)
+        || message.metadata?.response_workspace_id === responseWorkspaceId
+        || message.metadata?.responseWorkspaceId === responseWorkspaceId
+        || record(message.content).response_workspace_id === responseWorkspaceId;
+      const tokens = [
+        message.type,
+        message.kind,
+        message.subtype,
+        ...(Array.isArray(message.supertags) ? message.supertags : []),
+      ].map((value) => clean(value).toLowerCase()).join(" ");
+      return scopedToWorkspace && tokens.includes("wedding_vendor_quote_received");
+    })
+    .map(buildWeddingVendorQuoteAttachmentParserState)
+    .map((parser) => {
+      const attachmentId = parser.attachmentId ?? "";
+      const evidenceLabels = attachmentId ? parsedDocumentAttachmentEvidence.get(attachmentId) : null;
+      return evidenceLabels
+        ? weddingVendorQuoteAttachmentParserStateWithExtractedEvidence(parser, evidenceLabels)
+        : parser;
+    });
   const decisionScopes = decisionBundleScopes(input.decisionRecords);
   const packetExportCapability = buildWeddingPacketExportCapabilityState({
     title: "Wedding planning bundle",
@@ -842,6 +931,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
 
   return {
     workspace,
+    afpMessages: input.afpMessages ?? [],
     categoryRail: workspace.categories.map((category) => ({
       id: category.id,
       label: category.label,
@@ -867,6 +957,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     vendorQuoteReplyFlows,
     activeVendorQuoteReplyFlows,
     vendorQuoteReplyLogFlows,
+    vendorQuoteAttachmentParserStates,
     providerHandoffAuditCard: buildWeddingProviderHandoffAuditCard(input.approvalReceipts),
     expectedBehaviorAuditCard: auditCard,
     decisionRecordCards: decisionRecordCards(input.decisionRecords),

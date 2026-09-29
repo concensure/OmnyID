@@ -38,3 +38,22 @@ test("signedInGmailRedirectFallbackMessage reflects stored-connection failure an
     "Gmail connection failed. Try again.",
   );
 });
+
+test("signedInGmailRedirectFallbackMessage explains actionable Gmail OAuth callback failures", () => {
+  assert.match(
+    signedInGmailRedirectFallbackMessage("redirect_mismatch"),
+    /same OMNYID_GMAIL_REDIRECT_URI/i,
+  );
+  assert.match(
+    signedInGmailRedirectFallbackMessage("invalid_client"),
+    /client ID and client secret/i,
+  );
+  assert.match(
+    signedInGmailRedirectFallbackMessage("token_exchange_failed"),
+    /authorization code/i,
+  );
+  assert.match(
+    signedInGmailRedirectFallbackMessage("store_failed"),
+    /could not save the Gmail token/i,
+  );
+});

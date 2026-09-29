@@ -12,6 +12,7 @@ export type WeddingVendorSearchLaunchState = {
 
 export type WeddingVendorSearchIntakeQueryInput = {
   location?: string | null;
+  approximateLocation?: string | null;
   vendorLabels?: readonly string[] | null;
   priorities?: string | null;
   atmosphere?: string | null;
@@ -49,15 +50,32 @@ export function weddingVendorSearchQueryFromIntake(input: WeddingVendorSearchInt
   const labels = (input.vendorLabels ?? [])
     .map((label) => normalizeWeddingVendorSearchLaunchQuery(label))
     .filter(Boolean);
+  const location = normalizeWeddingVendorSearchLaunchQuery(input.location)
+    || normalizeWeddingVendorSearchLaunchQuery(input.approximateLocation);
   const focus = labels.length > 0
-    ? labels.slice(0, 3).join(" or ")
+    ? labels.length === 1
+      ? labels[0]
+      : `${labels.slice(0, 3).join(", ")} searches`
     : "wedding vendors";
+  const hasVenueFocus = labels.some((label) => /\bvenue|venues|reception|ceremony location\b/i.test(label));
   return normalizeWeddingVendorSearchLaunchQuery([
     focus,
-    normalizeWeddingVendorSearchLaunchQuery(input.location) ? `in ${normalizeWeddingVendorSearchLaunchQuery(input.location)}` : null,
+    location ? `${hasVenueFocus ? "near" : "in"} ${location}` : null,
     normalizeWeddingVendorSearchLaunchQuery(input.priorities) ? `for ${normalizeWeddingVendorSearchLaunchQuery(input.priorities)}` : null,
     normalizeWeddingVendorSearchLaunchQuery(input.atmosphere) ? `with ${normalizeWeddingVendorSearchLaunchQuery(input.atmosphere)}` : null,
   ].filter(Boolean).join(" "));
+}
+
+export function weddingVendorSearchApproximateLocationFromTimezone(timezone?: string | null): string {
+  const value = normalizeWeddingVendorSearchLaunchQuery(timezone);
+  if (!value) return "";
+  const [region, city] = value.split("/");
+  if (!city) return value.replace(/_/g, " ");
+  const cityLabel = city.replace(/_/g, " ");
+  if (region === "Australia") return `${cityLabel}, Australia`;
+  if (region === "America") return cityLabel;
+  if (region === "Europe") return cityLabel;
+  return cityLabel;
 }
 
 export function weddingVendorSearchEffectiveQuery(

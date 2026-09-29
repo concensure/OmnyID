@@ -35,6 +35,24 @@ test("normalizeA2UIRootNodes synthesizes mounted diff_view roots from format pay
   ]);
 });
 
+test("normalizeA2UIRootNodes synthesizes mounted vendor recommendation card roots", () => {
+  const nodes = normalizeA2UIRootNodes({
+    kind: "vendor_recommendation_cards",
+    props: {
+      cards: [{ title: "Palm Beach Estate", rank: 1 }],
+    },
+  });
+
+  assert.deepEqual(nodes, [
+    {
+      id: "root",
+      type: "vendor_recommendation_cards",
+      props: { cards: [{ title: "Palm Beach Estate", rank: 1 }] },
+      children: [],
+    },
+  ]);
+});
+
 test("normalizeA2UIRootNodes does not synthesize unsupported conceptual roots", () => {
   const nodes = normalizeA2UIRootNodes({
     kind: "chart_view",

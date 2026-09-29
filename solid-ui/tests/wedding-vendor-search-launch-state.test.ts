@@ -11,6 +11,7 @@ import {
   WEDDING_VENDOR_SEARCH_LAUNCH_KEY,
   weddingVendorSearchEffectiveQuery,
   weddingVendorSearchEffectiveQueryState,
+  weddingVendorSearchApproximateLocationFromTimezone,
   weddingVendorSearchQueryFromIntake,
   weddingVendorSearchLaunchFromEvent,
 } from "../src/lib/weddingVendorSearchLaunchState.ts";
@@ -74,8 +75,37 @@ test("weddingVendorSearchQueryFromIntake builds a concrete query from selected i
       priorities: "low budget, reliable reviews",
       atmosphere: "garden ceremony",
     }),
-    "Florist or Photographer or Venue in Sydney for low budget, reliable reviews with garden ceremony",
+    "Florist, Photographer, Venue searches near Sydney for low budget, reliable reviews with garden ceremony",
   );
+});
+
+test("weddingVendorSearchQueryFromIntake biases venue searches to the venue area or approximate location", () => {
+  assert.equal(
+    weddingVendorSearchQueryFromIntake({
+      location: "Southern Highlands",
+      vendorLabels: ["Venue"],
+      priorities: "low budget",
+      atmosphere: "",
+    }),
+    "Venue near Southern Highlands for low budget",
+  );
+
+  assert.equal(
+    weddingVendorSearchQueryFromIntake({
+      location: "",
+      approximateLocation: "Sydney, Australia",
+      vendorLabels: ["Venue"],
+      priorities: "",
+      atmosphere: "garden ceremony",
+    }),
+    "Venue near Sydney, Australia with garden ceremony",
+  );
+});
+
+test("weddingVendorSearchApproximateLocationFromTimezone creates coarse area labels", () => {
+  assert.equal(weddingVendorSearchApproximateLocationFromTimezone("Australia/Sydney"), "Sydney, Australia");
+  assert.equal(weddingVendorSearchApproximateLocationFromTimezone("Europe/London"), "London");
+  assert.equal(weddingVendorSearchApproximateLocationFromTimezone(""), "");
 });
 
 test("weddingVendorSearchQueryFromIntake still searches when no vendor category was selected", () => {

@@ -7,9 +7,22 @@ function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function durableExternalUrl(value: unknown): string | null {
+  const raw = clean(value);
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function mimeTypeFor(url: string): string {
   const lower = url.toLowerCase();
   if (lower.includes(".pdf")) return "application/pdf";
+  if (lower.includes(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (lower.includes(".doc")) return "application/msword";
   if (lower.includes(".csv")) return "text/csv";
   if (lower.includes(".txt")) return "text/plain";
   return "text/uri-list";
@@ -20,7 +33,7 @@ export function weddingQuoteAttachmentMessageState(input: {
   threadId?: string | null;
   timestamp?: string | null;
 }): AfpMessage | null {
-  const url = clean(input.quote.attachmentUrl);
+  const url = durableExternalUrl(input.quote.attachmentUrl);
   if (!url) return null;
   const threadId = clean(input.threadId) || `wedding_quote_attachment:${safeWeddingLabel(input.quote.vendorName)}`;
   const timestamp = clean(input.timestamp) || new Date(0).toISOString();
@@ -46,12 +59,16 @@ export function weddingQuoteAttachmentMessageState(input: {
       quote_amount: input.quote.amountLabel,
       budget_delta: input.quote.budgetDeltaLabel,
       attachment_url: url,
+      attachment_text_status: input.quote.attachmentTextStatus ?? "linked_unverified",
+      attachment_evidence_labels: input.quote.attachmentEvidenceLabels ?? [],
     },
     metadata: {
       vendor_name: input.quote.vendorName,
       quote_amount: input.quote.amount,
       quote_currency: input.quote.currency,
       budget_delta_amount: input.quote.budgetDeltaAmount,
+      attachment_text_status: input.quote.attachmentTextStatus ?? "linked_unverified",
+      attachment_evidence_labels: input.quote.attachmentEvidenceLabels ?? [],
     },
     views: [{ format: "attachments", content: { title: name }, priority: 1 }],
     attachments: [{
