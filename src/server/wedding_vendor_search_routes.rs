@@ -527,6 +527,7 @@ async fn wedding_vendor_search_http(
     let mut external_search_performed = false;
     let mut paid_provider_queries_skipped_due_to_cache = 0usize;
     let mut attempted_provider_queries = BTreeSet::new();
+    let mut provider_kinds_blocked_for_run = BTreeSet::new();
 
     match search_wedding_vendor_directory(&state.db, &user.id, &planned_queries, limit).await {
         Ok(items) if !items.is_empty() => {
@@ -549,6 +550,9 @@ async fn wedding_vendor_search_http(
         }
         if is_paid_vendor_search_provider(&query.provider_kind) && sources.len() >= limit {
             paid_provider_queries_skipped_due_to_cache += 1;
+            continue;
+        }
+        if provider_kinds_blocked_for_run.contains(&query.provider_kind) {
             continue;
         }
         if !attempted_provider_queries.insert(provider_query_attempt_key(
@@ -601,6 +605,9 @@ async fn wedding_vendor_search_http(
                         sources.extend(items);
                     }
                     Err(message) => {
+                        if provider_error_blocks_remaining_run_queries(&message) {
+                            provider_kinds_blocked_for_run.insert(query.provider_kind.clone());
+                        }
                         failed_messages.push(message);
                         if sources.len() < limit
                             && admin_shared_tool_policy_enabled("brave-search-api")
@@ -666,6 +673,9 @@ async fn wedding_vendor_search_http(
                         sources.extend(items);
                     }
                     Err(message) => {
+                        if provider_error_blocks_remaining_run_queries(&message) {
+                            provider_kinds_blocked_for_run.insert(query.provider_kind.clone());
+                        }
                         failed_messages.push(message);
                         run_overpass_vendor_search_fallback(
                             &client,
@@ -1349,6 +1359,18 @@ fn provider_http_error_guidance(provider: &str, body: &str) -> &'static str {
         }
     }
     ""
+}
+
+fn provider_error_blocks_remaining_run_queries(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    lower.contains("permission_denied")
+        || lower.contains("permission denied")
+        || lower.contains("api key not authorized")
+        || lower.contains("api key not valid")
+        || (lower.contains("referer") && lower.contains("blocked"))
+        || lower.contains("quota exceeded")
+        || lower.contains("rate limit")
+        || lower.contains("too many requests")
 }
 
 async fn run_overpass_vendor_search_fallback(
@@ -2217,6 +2239,22 @@ mod tests {
         assert!(guidance.contains("Places API (New)"));
         assert!(guidance.contains("billing"));
         assert!(guidance.contains("Oracle server"));
+    }
+
+    #[test]
+    fn provider_error_blocks_remaining_run_queries_for_provider_config_failures() {
+        assert!(provider_error_blocks_remaining_run_queries(
+            "Google Places returned 403: {\"error\":{\"status\":\"PERMISSION_DENIED\"}}",
+        ));
+        assert!(provider_error_blocks_remaining_run_queries(
+            "Brave Search returned 429: quota exceeded.",
+        ));
+        assert!(provider_error_blocks_remaining_run_queries(
+            "Requests from referer <empty> are blocked.",
+        ));
+        assert!(!provider_error_blocks_remaining_run_queries(
+            "Google Places request failed: connection reset by peer",
+        ));
     }
 
     #[test]
