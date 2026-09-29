@@ -100,6 +100,22 @@ test("provider plan orders Google Places, Brave, then Overpass by default", () =
   assert.match(plan.summary, /3 provider-specific/i);
 });
 
+test("provider plan preserves explicit backend capability order", () => {
+  const plan = buildWeddingVendorSearchProviderPlanState({
+    readiness,
+    providerKinds: ["brave_search", "google_places", "overpass"],
+    maxCategories: 1,
+  });
+
+  assert.deepEqual(plan.providerPlans.map((provider) => provider.providerKind), [
+    "brave_search",
+    "google_places",
+    "overpass",
+  ]);
+  assert.equal(plan.providerPlans[0]?.priority, 1);
+  assert.equal(plan.providerPlans[1]?.priority, 2);
+});
+
 test("provider plan stays blocked when intake is incomplete", () => {
   const blocked = buildWeddingVendorSearchReadinessState({});
   const plan = buildWeddingVendorSearchProviderPlanState({ readiness: blocked });

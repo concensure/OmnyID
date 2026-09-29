@@ -159,7 +159,12 @@ function guardrailsFor(providerKind: WeddingVendorSearchProviderKind): string[] 
   ];
 }
 
-function priorityFor(providerKind: WeddingVendorSearchProviderKind): number {
+function priorityFor(
+  providerKind: WeddingVendorSearchProviderKind,
+  index: number,
+  preserveInputOrder: boolean,
+): number {
+  if (preserveInputOrder) return index + 1;
   if (providerKind === "google_places") return 1;
   if (providerKind === "brave_search") return 2;
   return 3;
@@ -187,11 +192,13 @@ export function buildWeddingVendorSearchProviderPlanState(input: {
     approximateLocation: input.approximateLocation,
   });
   const { preferences, photographyScope, musicDirection, categories } = terms;
-  const providers = input.providerKinds?.length
-    ? input.providerKinds
+  const explicitProviders = input.providerKinds?.length ? input.providerKinds : null;
+  const preserveInputOrder = Boolean(explicitProviders);
+  const providers: readonly WeddingVendorSearchProviderKind[] = explicitProviders
+    ? explicitProviders
     : (["google_places", "brave_search", "overpass"] as const);
   const categoryLimit = Math.max(1, input.maxCategories ?? 8);
-  const providerPlans = providers.map((providerKind): WeddingVendorSearchProviderPlan => {
+  const providerPlans = providers.map((providerKind, index): WeddingVendorSearchProviderPlan => {
     const queries = categories.slice(0, categoryLimit).map((category): WeddingVendorSearchProviderQuery => ({
       providerKind,
       category,
@@ -204,7 +211,7 @@ export function buildWeddingVendorSearchProviderPlanState(input: {
     return {
       providerKind,
       label: LABELS[providerKind],
-      priority: priorityFor(providerKind),
+      priority: priorityFor(providerKind, index, preserveInputOrder),
       queries,
       guardrails: guardrailsFor(providerKind),
     };
