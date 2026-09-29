@@ -1335,14 +1335,20 @@ async fn vendor_provider_http_error(provider: &str, response: reqwest::Response)
 fn provider_http_error_guidance(provider: &str, body: &str) -> &'static str {
     let lower_provider = provider.to_ascii_lowercase();
     let lower_body = body.to_ascii_lowercase();
-    if lower_provider.contains("google places")
-        && lower_body.contains("referer")
-        && lower_body.contains("blocked")
-    {
-        " Google Places key is restricted by HTTP referrer; for server-side wedding search, configure a server-compatible Google Places key such as IP/API-restricted server key, or update Google Cloud API key restrictions."
-    } else {
-        ""
+    if lower_provider.contains("google places") {
+        if lower_body.contains("referer") && lower_body.contains("blocked") {
+            return " Google Places key is restricted by HTTP referrer; for server-side wedding search, configure a server-compatible Google Places key such as IP/API-restricted server key, or update Google Cloud API key restrictions.";
+        }
+        if lower_body.contains("permission_denied")
+            || lower_body.contains("permission denied")
+            || lower_body.contains("api key not authorized")
+            || lower_body.contains("places api")
+                && (lower_body.contains("disabled") || lower_body.contains("not enabled"))
+        {
+            return " Google Places rejected the server-side request; confirm Places API (New) is enabled, billing is active, and the API key restrictions allow calls from the Oracle server.";
+        }
     }
+    ""
 }
 
 async fn run_overpass_vendor_search_fallback(
@@ -2199,6 +2205,18 @@ mod tests {
 
         assert!(guidance.contains("HTTP referrer"));
         assert!(guidance.contains("server-side wedding search"));
+    }
+
+    #[test]
+    fn provider_http_error_guidance_explains_google_places_permission_denied() {
+        let guidance = provider_http_error_guidance(
+            "Google Places",
+            r#"{"error":{"code":403,"message":"API key not valid. Please pass a valid API key.","status":"PERMISSION_DENIED"}}"#,
+        );
+
+        assert!(guidance.contains("Places API (New)"));
+        assert!(guidance.contains("billing"));
+        assert!(guidance.contains("Oracle server"));
     }
 
     #[test]
