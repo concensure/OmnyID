@@ -14601,6 +14601,7 @@ fn capability_json_from_row(row: &sqlx::postgres::PgRow) -> Value {
 
 fn llm_config_json_from_row(row: &sqlx::postgres::PgRow) -> Value {
     json!({
+        "id": row.get::<String, _>("id"),
         "backend": row.get::<String, _>("backend"),
         "provider": row.get::<String, _>("provider"),
         "model": row.get::<String, _>("model"),
