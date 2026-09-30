@@ -23,7 +23,8 @@ import {
   loadWeddingDecisionSelections,
   toggleWeddingDecisionSelectionValue,
 } from "@/lib/weddingDecisionSelectionState";
-import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
+import { WeddingVendorChoiceCard, type WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
+import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 
 function uniqueStrings(values: readonly string[]): string[] {
   const seen = new Set<string>();
@@ -131,6 +132,13 @@ function ArtifactPreviewCard(props: {
   onOpenFollowUpQueue?: () => void;
   onOpenVendorQuoteReplySurface?: () => void;
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
+  outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
+  gmailConnected?: boolean;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string) => void;
+  onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onSendOutreach?: (choiceId: string) => void;
+  onCancelOutreach?: (choiceId: string) => void;
+  onConnectGmailForOutreach?: () => void;
 }) {
   const preview = props.preview;
   const [selectedOptionIds, setSelectedOptionIds] = createSignal<string[]>([]);
@@ -383,7 +391,18 @@ function ArtifactPreviewCard(props: {
         <Show when={props.artifact.vendorComparisonCards.length > 0}>
           <div class="mt-3 grid gap-3 lg:grid-cols-3">
             <For each={comparisonUi().expansion.expanded ? props.artifact.vendorComparisonCards : props.artifact.vendorComparisonCards.slice(0, 3)}>
-              {(card) => <WeddingVendorChoiceCard card={card} />}
+              {(card) => (
+                <WeddingVendorChoiceCard
+                  card={card}
+                  outreachFlow={props.outreachFlows?.[card.choiceId] ?? null}
+                  gmailConnected={props.gmailConnected}
+                  onContactVendor={(selectedCard) => props.onContactVendor?.(selectedCard, props.artifact.artifactId)}
+                  onOutreachBodyChange={props.onOutreachBodyChange}
+                  onSendOutreach={props.onSendOutreach}
+                  onCancelOutreach={props.onCancelOutreach}
+                  onConnectGmailForOutreach={props.onConnectGmailForOutreach}
+                />
+              )}
             </For>
           </div>
         </Show>
@@ -752,6 +771,13 @@ export function WeddingArtifactDetailPanel(props: {
   onOpenVendorQuoteReplySurface?: () => void;
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   researchAction?: WeddingWorkspaceSidebarAction | null;
+  outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
+  gmailConnected?: boolean;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string) => void;
+  onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onSendOutreach?: (choiceId: string) => void;
+  onCancelOutreach?: (choiceId: string) => void;
+  onConnectGmailForOutreach?: () => void;
 }) {
   const [showDocumentDetails, setShowDocumentDetails] = createSignal(false);
   createEffect(() => {
@@ -871,6 +897,13 @@ export function WeddingArtifactDetailPanel(props: {
                         onOpenFollowUpQueue={props.onOpenFollowUpQueue}
                         onOpenVendorQuoteReplySurface={props.onOpenVendorQuoteReplySurface}
                         onVendorChoiceSelected={props.onVendorChoiceSelected}
+                        outreachFlows={props.outreachFlows}
+                        gmailConnected={props.gmailConnected}
+                        onContactVendor={props.onContactVendor}
+                        onOutreachBodyChange={props.onOutreachBodyChange}
+                        onSendOutreach={props.onSendOutreach}
+                        onCancelOutreach={props.onCancelOutreach}
+                        onConnectGmailForOutreach={props.onConnectGmailForOutreach}
                       />
                     )}
                   </Show>

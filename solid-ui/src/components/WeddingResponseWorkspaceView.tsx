@@ -77,6 +77,7 @@ import {
 import { weddingVendorQuoteReceiptPersistenceNotice } from "@/lib/weddingVendorQuoteReceiptPersistenceState";
 import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
+import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 
 type WeddingHomeSection = {
   id: WeddingHomeSectionId;
@@ -756,6 +757,15 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     });
   }
 
+  const vendorOutreach = useWeddingVendorOutreachOwner({
+    state,
+    weddingVendorDirectory: () => props.weddingVendorDirectory,
+    gmailStatus: () => props.gmailStatus,
+    saveProjection: () => props.saveProjection,
+    onRefreshWorkspace: () => props.onRefreshWorkspace,
+    setNotice: setExportNotice,
+  });
+
   function quoteAttachmentParserStateForFlow(
     flow: WeddingVendorQuoteReplyFlowState,
   ): WeddingVendorQuoteAttachmentParserState | null {
@@ -1231,6 +1241,13 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onOpenFollowUpQueue={openSelectedVendorFollowUpQueue}
           onOpenVendorQuoteReplySurface={openVendorQuoteReplySurface}
           onVendorChoiceSelected={saveVendorChoiceSelection}
+          outreachFlows={vendorOutreach.flows()}
+          gmailConnected={Boolean(props.gmailStatus?.connected)}
+          onContactVendor={(card, artifactId) => void vendorOutreach.onContactVendor(card, artifactId)}
+          onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
+          onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)}
+          onCancelOutreach={vendorOutreach.onCancelOutreach}
+          onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
         />
 
         <Show when={showTechnicalDetails() && state().projectionQueue}>

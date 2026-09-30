@@ -1,0 +1,214 @@
+// @locs-version: 2.0
+import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
+import type { WeddingVendor } from "@/lib/api";
+
+export type WeddingVendorOutreachStage =
+  | "idle"
+  | "drafting"
+  | "draft_ready"
+  | "draft_failed"
+  | "sending"
+  | "send_failed"
+  | "sent";
+
+export type WeddingVendorOutreachFlowState = {
+  choiceId: string;
+  vendorName: string;
+  recipientEmail: string | null;
+  stage: WeddingVendorOutreachStage;
+  subject: string;
+  bodyMarkdown: string;
+  groundedOnLabels: string[];
+  sentAtIso: string | null;
+  receiptRef: string | null;
+  threadId: string | null;
+  blockedReason: string | null;
+};
+
+function normalizedVendorLabel(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function hostnameOf(url: string): string | null {
+  try {
+    const withScheme = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    return new URL(withScheme).hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export function weddingVendorOutreachRecipient(
+  card: Pick<WeddingVendorChoiceCardData, "email" | "title" | "websiteUrl">,
+  directoryVendors: readonly WeddingVendor[],
+): string | null {
+  if (card.email) return card.email;
+
+  const cardNameKey = normalizedVendorLabel(card.title);
+  const byName = directoryVendors.find(
+    (vendor) => vendor.contactEmail && normalizedVendorLabel(vendor.vendorName) === cardNameKey,
+  );
+  if (byName?.contactEmail) return byName.contactEmail;
+
+  const cardHostname = card.websiteUrl ? hostnameOf(card.websiteUrl) : null;
+  if (cardHostname) {
+    const byHostname = directoryVendors.find(
+      (vendor) => vendor.contactEmail && vendor.websiteUrl && hostnameOf(vendor.websiteUrl) === cardHostname,
+    );
+    if (byHostname?.contactEmail) return byHostname.contactEmail;
+  }
+
+  return null;
+}
+
+export function weddingVendorOutreachSendGate(
+  flow: Pick<WeddingVendorOutreachFlowState, "vendorName" | "recipientEmail" | "bodyMarkdown">,
+  gate: { gmailConnected: boolean },
+): { canSend: boolean; reason: string | null } {
+  if (!flow.recipientEmail) {
+    return {
+      canSend: false,
+      reason: `No email address found for ${flow.vendorName}. Open their website to use their contact form, or add an email in the vendor directory.`,
+    };
+  }
+  if (!gate.gmailConnected) {
+    return {
+      canSend: false,
+      reason: "Connect Gmail to send this enquiry. Nothing is sent until you press Send.",
+    };
+  }
+  if (!flow.bodyMarkdown.trim()) {
+    return { canSend: false, reason: "Add a message before sending." };
+  }
+  return { canSend: true, reason: null };
+}
+
+export function weddingVendorOutreachSentLabel(flow: Pick<WeddingVendorOutreachFlowState, "sentAtIso">): string {
+  if (!flow.sentAtIso) return "Enquiry sent";
+  const date = new Date(flow.sentAtIso);
+  if (Number.isNaN(date.getTime())) return "Enquiry sent";
+  return `Enquiry sent ${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+}
+
+export function weddingVendorOutreachIdleFlow(input: {
+  choiceId: string;
+  vendorName: string;
+  recipientEmail: string | null;
+}): WeddingVendorOutreachFlowState {
+  return {
+    choiceId: input.choiceId,
+    vendorName: input.vendorName,
+    recipientEmail: input.recipientEmail,
+    stage: "idle",
+    subject: "",
+    bodyMarkdown: "",
+    groundedOnLabels: [],
+    sentAtIso: null,
+    receiptRef: null,
+    threadId: null,
+    blockedReason: null,
+  };
+}
+
+export function weddingVendorOutreachStartDrafting(
+  flow: WeddingVendorOutreachFlowState,
+): WeddingVendorOutreachFlowState {
+  return { ...flow, stage: "drafting", blockedReason: null };
+}
+
+export function weddingVendorOutreachDraftSucceeded(
+  flow: WeddingVendorOutreachFlowState,
+  draft: { subject: string; bodyMarkdown: string; groundedOnLabels: string[] },
+): WeddingVendorOutreachFlowState {
+  return {
+    ...flow,
+    stage: "draft_ready",
+    subject: draft.subject,
+    bodyMarkdown: draft.bodyMarkdown,
+    groundedOnLabels: draft.groundedOnLabels,
+    blockedReason: null,
+  };
+}
+
+export function weddingVendorOutreachDraftFailed(
+  flow: WeddingVendorOutreachFlowState,
+  reason: string,
+): WeddingVendorOutreachFlowState {
+  return { ...flow, stage: "draft_failed", blockedReason: reason };
+}
+
+export function weddingVendorOutreachBodyChanged(
+  flow: WeddingVendorOutreachFlowState,
+  bodyMarkdown: string,
+): WeddingVendorOutreachFlowState {
+  return { ...flow, bodyMarkdown };
+}
+
+export function weddingVendorOutreachStartSending(
+  flow: WeddingVendorOutreachFlowState,
+): WeddingVendorOutreachFlowState {
+  return { ...flow, stage: "sending", blockedReason: null };
+}
+
+export function weddingVendorOutreachSendSucceeded(
+  flow: WeddingVendorOutreachFlowState,
+  result: { sentAtIso: string; receiptRef: string | null; threadId: string | null },
+): WeddingVendorOutreachFlowState {
+  return {
+    ...flow,
+    stage: "sent",
+    sentAtIso: result.sentAtIso,
+    receiptRef: result.receiptRef,
+    threadId: result.threadId,
+    blockedReason: null,
+  };
+}
+
+export function weddingVendorOutreachSendFailed(
+  flow: WeddingVendorOutreachFlowState,
+  reason: string,
+): WeddingVendorOutreachFlowState {
+  return { ...flow, stage: "send_failed", blockedReason: reason };
+}
+
+export type WeddingVendorOutreachCoupleContext = {
+  date_or_season?: string | null;
+  location?: string | null;
+  guest_count?: string | null;
+  budget_comfort?: string | null;
+  top_priorities?: string[];
+  atmosphere_description?: string | null;
+  vendor_preferences?: string | null;
+  couple_names?: string | null;
+};
+
+// Translates the model's raw grounded_on field names (e.g. "top_priorities")
+// into plain-language phrases naming the couple's actual value, so the
+// composer never shows a machine field name to the user. Unmapped or
+// unavailable fields are skipped rather than fabricated.
+export function weddingVendorOutreachGroundedOnLabels(
+  groundedOn: readonly string[],
+  couple: WeddingVendorOutreachCoupleContext,
+): string[] {
+  const labels: string[] = [];
+  for (const field of groundedOn) {
+    if (field === "top_priorities" && couple.top_priorities?.length) {
+      labels.push(`you mentioned ${couple.top_priorities.join(", ")} as a priority`);
+    } else if (field === "location" && couple.location) {
+      labels.push(`your wedding is in ${couple.location}`);
+    } else if (field === "date_or_season" && couple.date_or_season) {
+      labels.push(`your date is in ${couple.date_or_season}`);
+    } else if (field === "guest_count" && couple.guest_count) {
+      labels.push(`you're planning for ${couple.guest_count} guests`);
+    } else if (field === "budget_comfort" && couple.budget_comfort) {
+      labels.push("you shared your budget comfort level");
+    } else if (field === "atmosphere_description" && couple.atmosphere_description) {
+      labels.push("you described the atmosphere you want");
+    } else if (field === "vendor_preferences" && couple.vendor_preferences) {
+      labels.push("you shared what you're looking for in a vendor");
+    } else if (field === "couple_names" && couple.couple_names) {
+      labels.push("we used your names");
+    }
+  }
+  return labels;
+}

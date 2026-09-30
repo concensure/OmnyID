@@ -2130,6 +2130,7 @@ export function ResponseQueueView(props: {
             saveProjection={sendAfpMessage}
             approvalHandlers={weddingApprovalHandlers()}
             gmailStatus={weddingGmailStatus()}
+            weddingVendorDirectory={weddingVendorDirectory()}
             projectionStorage={localStorage}
             contactUserId={weddingStorageUserId()}
             importNotice={weddingImportNotice()}

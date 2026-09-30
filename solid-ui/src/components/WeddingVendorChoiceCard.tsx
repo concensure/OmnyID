@@ -1,12 +1,26 @@
 // @locs-version: 2.0
 import { createSignal, For, Show } from "solid-js";
 
+import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreachComposer";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import { weddingVendorPhotoPlaceholder } from "@/lib/weddingVendorPhotoPlaceholderState";
+import {
+  weddingVendorOutreachSentLabel,
+  type WeddingVendorOutreachFlowState,
+} from "@/lib/weddingVendorOutreachFlowState";
 
 export type WeddingVendorChoiceCardData = WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number];
 
-export function WeddingVendorChoiceCard(props: { card: WeddingVendorChoiceCardData }) {
+export function WeddingVendorChoiceCard(props: {
+  card: WeddingVendorChoiceCardData;
+  outreachFlow?: WeddingVendorOutreachFlowState | null;
+  gmailConnected?: boolean;
+  onContactVendor?: (card: WeddingVendorChoiceCardData) => void;
+  onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onSendOutreach?: (choiceId: string) => void;
+  onCancelOutreach?: (choiceId: string) => void;
+  onConnectGmailForOutreach?: () => void;
+}) {
   const card = props.card;
   const [contactOpen, setContactOpen] = createSignal(false);
   const contactRows = () => [
@@ -122,7 +136,40 @@ export function WeddingVendorChoiceCard(props: { card: WeddingVendorChoiceCardDa
               </a>
             )}
           </Show>
+          <Show
+            when={props.outreachFlow?.stage === "sent"}
+            fallback={
+              <button
+                type="button"
+                onClick={() => props.onContactVendor?.(card)}
+                data-magic-action="contact"
+                data-magic-icon="send"
+                data-magic-id={`wedding:vendor-choice:${card.choiceId}:contact`}
+                class="rounded-full bg-wedding-accent px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-wedding-accent-hover"
+              >
+                Contact
+              </button>
+            }
+          >
+            <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900">
+              {"✓ "}
+              {weddingVendorOutreachSentLabel({ sentAtIso: props.outreachFlow?.sentAtIso ?? null })}
+            </span>
+          </Show>
         </div>
+        <Show when={props.outreachFlow}>
+          {(flow) => (
+            <WeddingVendorOutreachComposer
+              flow={flow()}
+              busy={flow().stage === "drafting" || flow().stage === "sending"}
+              gmailConnected={Boolean(props.gmailConnected)}
+              onBodyChange={(bodyMarkdown) => props.onOutreachBodyChange?.(card.choiceId, bodyMarkdown)}
+              onSend={() => props.onSendOutreach?.(card.choiceId)}
+              onCancel={() => props.onCancelOutreach?.(card.choiceId)}
+              onConnectGmail={() => props.onConnectGmailForOutreach?.()}
+            />
+          )}
+        </Show>
       </div>
     </article>
   );

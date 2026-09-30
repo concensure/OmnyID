@@ -6,12 +6,14 @@ import {
   weddingApprovalStateLabel,
   type WeddingVendorChoiceSelectionSaveInput,
 } from "@/components/WeddingArtifactDetailPanel";
+import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
 import type { WeddingExportManifestEntry } from "@/lib/weddingExportState";
 import type { WeddingBundleExportFormat } from "@/lib/weddingBrowserExportActions";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
+import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 
 type WeddingWorkspaceDocumentsPanelProps = {
   state: WeddingResponseWorkspaceViewProps["state"];
@@ -50,6 +52,13 @@ type WeddingWorkspaceDocumentsPanelProps = {
   onOpenFollowUpQueue: () => void;
   onOpenVendorQuoteReplySurface: () => void;
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
+  outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
+  gmailConnected?: boolean;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string) => void;
+  onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onSendOutreach?: (choiceId: string) => void;
+  onCancelOutreach?: (choiceId: string) => void;
+  onConnectGmailForOutreach?: () => void;
 };
 
 export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsPanelProps) {
@@ -298,6 +307,13 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
               onOpenVendorQuoteReplySurface={props.onOpenVendorQuoteReplySurface}
               onVendorChoiceSelected={props.onVendorChoiceSelected}
               researchAction={props.researchAction}
+              outreachFlows={props.outreachFlows}
+              gmailConnected={props.gmailConnected}
+              onContactVendor={props.onContactVendor}
+              onOutreachBodyChange={props.onOutreachBodyChange}
+              onSendOutreach={props.onSendOutreach}
+              onCancelOutreach={props.onCancelOutreach}
+              onConnectGmailForOutreach={props.onConnectGmailForOutreach}
             />
           </div>
         </div>

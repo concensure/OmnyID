@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import type { SendAfpMessageInput } from "@/lib/api";
+import type { SendAfpMessageInput, WeddingVendor } from "@/lib/api";
 import type { GmailConnectionStatus } from "@/lib/gmailConnectionState";
 import type { WeddingApprovalExecutionHandlers } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingProjectionDispatchReceiptState } from "@/lib/weddingProjectionDispatchState";
@@ -30,6 +30,7 @@ export type WeddingResponseWorkspaceViewProps = {
   saveProjection?: WeddingProjectionSaveFn | null;
   approvalHandlers?: WeddingApprovalExecutionHandlers | null;
   gmailStatus?: GmailConnectionStatus | null;
+  weddingVendorDirectory?: WeddingVendor[];
   projectionStorage?: Storage | null;
   contactUserId?: string | null;
   importNotice?: string | null;
