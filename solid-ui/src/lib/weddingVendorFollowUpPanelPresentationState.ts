@@ -1,53 +1,28 @@
 // @locs-version: 1.0
+import type { WeddingVendorContactWorkspaceCard } from "@/lib/weddingResponseWorkspaceViewState";
 
-export type WeddingVendorFollowUpPanelPresentationState = {
-  title: string;
-  badgeLabel: string;
-  descriptionLabel: string;
-  showFollowUpTip: boolean;
-};
+export function weddingVendorFollowUpAlertLabel(activeCount: number): string | null {
+  if (activeCount <= 0) return null;
+  return activeCount === 1 ? "One thing needs you today." : `${activeCount} things need you today.`;
+}
 
-export function buildWeddingVendorFollowUpPanelPresentationState(input: {
-  activeCount?: number | null;
-  closedCount?: number | null;
-  sentQuoteReplyCount?: number | null;
-}): WeddingVendorFollowUpPanelPresentationState {
-  const activeCount = Math.max(0, input.activeCount ?? 0);
-  const closedCount = Math.max(0, input.closedCount ?? 0);
-  const sentQuoteReplyCount = Math.max(0, input.sentQuoteReplyCount ?? 0);
-  const historyCount = closedCount + sentQuoteReplyCount;
+export function weddingVendorFollowUpCardHeadline(card: WeddingVendorContactWorkspaceCard): string {
+  if (card.stage === "closed") return `${card.vendorName} replied to your enquiry.`;
+  if (card.stage === "escalate_to_user") return `${card.vendorName} hasn't replied yet — time to decide.`;
+  if (card.stage === "mark_unresponsive") return `${card.vendorName} may be unresponsive.`;
+  if (card.stage === "follow_up_due") return `${card.vendorName} is due a follow-up.`;
+  if (card.stage === "waiting_for_reply") return `Waiting on ${card.vendorName} to reply.`;
+  return `Ready to reach out to ${card.vendorName}.`;
+}
 
-  if (activeCount > 0 && historyCount > 0) {
-    return {
-      title: "Vendor follow-ups and history",
-      badgeLabel: `${activeCount} active, ${historyCount} history`,
-      descriptionLabel: "Active vendors stay in follow-up; sent replies and closed vendor paths remain available as history.",
-      showFollowUpTip: true,
-    };
-  }
-
-  if (activeCount > 0) {
-    return {
-      title: "Vendors to follow up",
-      badgeLabel: `${activeCount} active`,
-      descriptionLabel: "Active vendor outreach that may need a reply, next check, or recorded response.",
-      showFollowUpTip: true,
-    };
-  }
-
-  if (historyCount > 0) {
-    return {
-      title: "Vendor history",
-      badgeLabel: `${historyCount} history`,
-      descriptionLabel: "Resolved or stopped vendor paths are out of the live queue and kept here for review.",
-      showFollowUpTip: false,
-    };
-  }
-
-  return {
-    title: "Vendor follow-ups",
-    badgeLabel: "None active",
-    descriptionLabel: "Selected vendors will appear here after outreach or reply tracking starts.",
-    showFollowUpTip: false,
-  };
+// "Why we suggest this" strip content — built only from facts actually recorded
+// on the contact row. Returns null (an honest "still reviewing" state) rather
+// than fabricating a reason when nothing is known yet.
+export function weddingVendorFollowUpCardRationale(card: WeddingVendorContactWorkspaceCard): string | null {
+  const facts: string[] = [];
+  if (card.lastContactLabel) facts.push(`you contacted them on ${card.lastContactLabel}`);
+  if (card.followUpDueLabel && card.stage !== "closed") facts.push(`a follow-up was due ${card.followUpDueLabel}`);
+  if (card.replyLabel) facts.push(`they replied on ${card.replyLabel}`);
+  if (facts.length === 0) return null;
+  return `Why we suggest this: ${facts.join("; ")}.`;
 }
