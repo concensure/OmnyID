@@ -6,7 +6,10 @@ import { weddingVendorOutreachIdleFlow, weddingVendorOutreachDraftSucceeded } fr
 import {
   weddingVendorOutreachDraftAfpSendInput,
   weddingVendorOutreachSentAfpSendInput,
+  weddingVendorOutreachThreadId,
 } from "../src/lib/weddingVendorOutreachAfpState.ts";
+
+const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 function sampleMetadata() {
   return normalizeWeddingPlanningMetadata({
@@ -28,6 +31,32 @@ function sampleFlow() {
   });
   return flow;
 }
+
+test("thread_id and message id are valid ULID-shaped strings, since the homeserver rejects anything else", () => {
+  const threadId = weddingVendorOutreachThreadId({
+    responseWorkspaceId: "response_workspace:sample",
+    choiceId: "choice-1",
+  });
+  assert.match(threadId, ULID_PATTERN);
+  assert.equal(
+    threadId,
+    weddingVendorOutreachThreadId({ responseWorkspaceId: "response_workspace:sample", choiceId: "choice-1" }),
+    "thread id must be stable for the same vendor choice",
+  );
+
+  const draft = weddingVendorOutreachDraftAfpSendInput({ flow: sampleFlow(), metadata: sampleMetadata() });
+  assert.match(draft.id ?? "", ULID_PATTERN);
+  assert.match(draft.thread_id, ULID_PATTERN);
+
+  const sent = weddingVendorOutreachSentAfpSendInput({
+    flow: sampleFlow(),
+    metadata: sampleMetadata(),
+    draftMessageId: "draft-message-1",
+    providerReceipt: { providerMessageId: null, clientMessageId: null },
+  });
+  assert.match(sent.id ?? "", ULID_PATTERN);
+  assert.match(sent.thread_id, ULID_PATTERN);
+});
 
 test("draft message carries both wedding supertags required for reload", () => {
   const input = weddingVendorOutreachDraftAfpSendInput({

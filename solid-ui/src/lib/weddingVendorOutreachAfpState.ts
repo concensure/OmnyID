@@ -26,11 +26,48 @@ function timestampOrNow(value: string | null | undefined): string {
   return Number.isFinite(Date.parse(raw)) ? raw : new Date().toISOString();
 }
 
+const CROCKFORD_BASE32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+// The homeserver's validate_proto_message (GAP-098, src/server/mod.rs) requires
+// thread_id to be a bare 26-char Crockford base32 ULID — a human-readable label
+// is rejected outright. This deterministically maps an arbitrary seed string onto
+// a valid-format pseudo-ULID (same input -> same output), mirroring the server's
+// own deterministic_ulid() (src/server/auth.rs) used for the same reason.
+function deterministicPseudoUlid(seed: string): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  let h3 = 0x9e3779b9;
+  let h4 = 0x85ebca6b;
+  for (let i = 0; i < seed.length; i += 1) {
+    const c = seed.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+    h2 = Math.imul(h2 ^ c, 2654435761) >>> 0;
+    h3 = Math.imul((h3 ^ c) + h1, 2246822519) >>> 0;
+    h4 = Math.imul((h4 ^ c) + h2, 3266489917) >>> 0;
+  }
+  const bytes = new Uint8Array(16);
+  [h1, h2, h3, h4].forEach((word, index) => {
+    bytes[index * 4] = (word >>> 24) & 0xff;
+    bytes[index * 4 + 1] = (word >>> 16) & 0xff;
+    bytes[index * 4 + 2] = (word >>> 8) & 0xff;
+    bytes[index * 4 + 3] = word & 0xff;
+  });
+  let bits = "";
+  for (const byte of bytes) bits += byte.toString(2).padStart(8, "0");
+  bits = bits.padEnd(130, "0");
+  let out = "";
+  for (let i = 0; i < 26; i += 1) {
+    out += CROCKFORD_BASE32[parseInt(bits.slice(i * 5, i * 5 + 5), 2)];
+  }
+  return out;
+}
+
 export function weddingVendorOutreachThreadId(input: {
   responseWorkspaceId: string;
   choiceId: string;
 }): string {
-  return `wedding_vendor_outreach:${safeWeddingLabel(input.responseWorkspaceId)}:${safeWeddingLabel(input.choiceId)}`;
+  const seed = `wedding_vendor_outreach:${safeWeddingLabel(input.responseWorkspaceId)}:${safeWeddingLabel(input.choiceId)}`;
+  return deterministicPseudoUlid(seed);
 }
 
 export function weddingVendorOutreachDraftAfpSendInput(input: {
@@ -50,8 +87,9 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
   const subject = clean(input.flow.subject);
   const text = clean(input.flow.bodyMarkdown);
   const html = clean(input.editorHtml ?? "");
-  const id = `afp-${safeWeddingLabel(threadId)}-draft-${safeWeddingLabel(timestamp)}`;
+  const metadataId = `afp-${safeWeddingLabel(threadId)}-draft-${safeWeddingLabel(timestamp)}`;
   return {
+    id: deterministicPseudoUlid(metadataId),
     thread_id: threadId,
     from: "agent://wedding-planning",
     to: ["user://couple", "agent://decision-queue", "agent://knowledge-graph"],
@@ -86,7 +124,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       "wedding_email_draft",
     ]),
     metadata: {
-      id,
+      id: metadataId,
       wedding_plan_id: input.metadata.weddingPlanId,
       response_workspace_id: input.metadata.responseWorkspaceId,
       choice_id: input.flow.choiceId,
@@ -114,6 +152,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
   const subject = clean(input.flow.subject);
   const text = clean(input.flow.bodyMarkdown);
   return {
+    id: deterministicPseudoUlid(`${threadId}:sent:${input.draftMessageId}:${timestamp}`),
     thread_id: threadId,
     parent_id: input.draftMessageId,
     from: "agent://wedding-planning",

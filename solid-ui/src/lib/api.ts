@@ -478,6 +478,7 @@ export function memoryScopeFromMetadata(
 }
 
 export type SendAfpMessageInput = {
+  id?: string;
   thread_id: string;
   from: string;
   to: string[];
@@ -503,6 +504,7 @@ export function sendAfpMessage<T = { success: boolean; message_id: string }>(
   return apiFetch<T>("/send", {
     method: "POST",
     bodyJson: {
+      id: body.id ?? undefined,
       thread_id: body.thread_id,
       parent_id: body.parent_id ?? null,
       from: body.from,
