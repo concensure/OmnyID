@@ -436,9 +436,8 @@ test("vendorContactCards keeps discovery candidates out of active outreach until
   });
 
   assert.deepEqual(cards.map((card) => card.vendorName), ["Harbour Hall"]);
-  assert.match(cards[0]?.rationaleLabel ?? "", /matches your venue priority/i);
-  assert.equal(cards[0]?.draftSubjectLabel, "Wedding venue enquiry");
-  assert.ok((cards[0]?.draftBodyPreview ?? []).some((line) => /quote or package/i.test(line)));
+  assert.equal(cards[0]?.categoryLabel, "Venue");
+  assert.match(cards[0]?.detailLabel ?? "", /Draft initial outreach/i);
 });
 
 test("buildWeddingResponseWorkspaceViewState turns commitment timing gaps into task projections", () => {

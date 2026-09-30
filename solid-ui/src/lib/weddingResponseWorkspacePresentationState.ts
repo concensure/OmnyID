@@ -237,49 +237,6 @@ function hasPromotedVendorEvidence(vendor: WeddingVendorContactOutreachVendor): 
   );
 }
 
-function vendorContactRationaleLabel(input: {
-  vendorName: string;
-  categoryLabel: string;
-  sourceLabel?: string | null;
-}): string {
-  const category = clean(input.categoryLabel) || "vendor";
-  const source = clean(input.sourceLabel);
-  return source
-    ? `Why this is worth pursuing: ${input.vendorName} matches your ${category.toLowerCase()} priority and has been promoted from ${source} into active outreach.`
-    : `Why this is worth pursuing: ${input.vendorName} matches your ${category.toLowerCase()} priority and has enough contact context for an approval-gated outreach step.`;
-}
-
-function vendorContactDraftPreview(input: {
-  stage: WeddingOutreachEscalationStage;
-  vendorName: string;
-  categoryLabel: string;
-  rationaleLabel: string;
-  followUpDueLabel: string | null;
-}): { subject: string | null; body: string[] } {
-  if (input.stage === "waiting_for_reply" || input.stage === "closed") {
-    return { subject: null, body: [] };
-  }
-  const category = clean(input.categoryLabel).toLowerCase() || "wedding";
-  const isInitial = input.stage === "initial_outreach";
-  const subject = isInitial
-    ? `Wedding ${category} enquiry`
-    : `Following up about ${category} availability`;
-  const body = isInitial
-    ? [
-      `Hi ${input.vendorName},`,
-      `We are planning our wedding and would like to ask about your ${category} availability, packages, and next steps.`,
-      input.rationaleLabel,
-      "If you are available, could you please share a quote or package details?",
-    ]
-    : [
-      `Hi ${input.vendorName},`,
-      `Just following up on our wedding ${category} enquiry${input.followUpDueLabel ? ` planned for ${input.followUpDueLabel}` : ""}.`,
-      input.rationaleLabel,
-      "Could you please let us know availability and any quote details when convenient?",
-    ];
-  return { subject, body };
-}
-
 export function vendorContactCards(input: {
   metadata?: unknown;
   vendors?: readonly WeddingVendorContactOutreachVendor[] | null;
@@ -299,18 +256,6 @@ export function vendorContactCards(input: {
       const replyLabel = shortDateLabel(contact?.responseReceivedAt);
       const categoryLabel = clean(vendor.category) || "Vendor";
       const vendorName = clean(vendor.vendorName) || state.vendorLabel;
-      const rationaleLabel = vendorContactRationaleLabel({
-        vendorName,
-        categoryLabel,
-        sourceLabel: vendor.sourceLabel,
-      });
-      const draftPreview = vendorContactDraftPreview({
-        stage: state.stage,
-        vendorName,
-        categoryLabel,
-        rationaleLabel,
-        followUpDueLabel: followUpLabel,
-      });
       const metadataLabels = [
         categoryLabel,
         vendor.contactEmail ? "email available" : null,
@@ -341,9 +286,6 @@ export function vendorContactCards(input: {
         lastContactLabel,
         followUpDueLabel: followUpLabel,
         replyLabel,
-        rationaleLabel,
-        draftSubjectLabel: draftPreview.subject,
-        draftBodyPreview: draftPreview.body,
         metadataLabels,
       };
     })

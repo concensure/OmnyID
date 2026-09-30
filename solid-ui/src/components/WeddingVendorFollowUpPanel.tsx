@@ -108,9 +108,6 @@ export function WeddingVendorFollowUpPanel(props: {
                   </span>
                 </div>
                 <p class="mt-2 text-sm leading-6 text-stone-800/75">{card.detailLabel}</p>
-                <p class="mt-2 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-2 text-xs leading-5 text-amber-950">
-                  {card.rationaleLabel}
-                </p>
                 <div class="mt-2 grid gap-2 sm:grid-cols-2">
                   <div class="rounded-xl border border-stone-200 bg-stone-50/80 px-2.5 py-2">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-600">Last contact</p>
@@ -141,21 +138,6 @@ export function WeddingVendorFollowUpPanel(props: {
                   <p class="mt-2 rounded-xl border border-stone-200 bg-white/70 px-2.5 py-2 text-xs leading-5 text-stone-800/80">
                     Next step: {card.nextActionLabel}
                   </p>
-                  <Show when={card.draftSubjectLabel && card.draftBodyPreview.length > 0}>
-                    <div class="mt-2 rounded-xl border border-amber-100 bg-white/80 px-2.5 py-2">
-                      <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-900/75">
-                        Draft to review
-                      </p>
-                      <p class="mt-1 break-words text-xs font-semibold leading-5 text-stone-950">
-                        Subject: {card.draftSubjectLabel}
-                      </p>
-                      <div class="mt-2 space-y-1">
-                        <For each={card.draftBodyPreview.slice(0, 4)}>
-                          {(line) => <p class="break-words text-xs leading-5 text-stone-800/80">{line}</p>}
-                        </For>
-                      </div>
-                    </div>
-                  </Show>
                   <div class="mt-3 flex flex-wrap gap-2">
                     <Show when={card.actionMode === "follow_up" || card.actionMode === "waiting"}>
                       <button

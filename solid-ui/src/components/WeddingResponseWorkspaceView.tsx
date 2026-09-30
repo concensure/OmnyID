@@ -12,6 +12,7 @@ import { WeddingProjectionApprovalCard } from "@/components/WeddingProjectionApp
 import { WeddingResilienceCardList } from "@/components/WeddingResilienceCardList";
 import { WeddingVendorQuoteProofDrawer } from "@/components/WeddingVendorQuoteProofDrawer";
 import { WeddingVendorQuoteReplyCard } from "@/components/WeddingVendorQuoteReplyCard";
+import { WeddingVendorFollowUpPanel } from "@/components/WeddingVendorFollowUpPanel";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { WeddingWorkspaceDocumentsPanel } from "@/components/WeddingWorkspaceDocumentsPanel";
@@ -1032,6 +1033,20 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       ),
     },
     {
+      id: "vendor_follow_up",
+      title: "Vendor follow-ups",
+      visible: state().vendorContactCards.length > 0
+        || state().vendorPursuitLogCards.length > 0
+        || state().vendorQuoteReplyLogFlows.length > 0,
+      render: () => (
+        <WeddingVendorFollowUpPanel
+          state={state()}
+          onSidebarAction={handleSidebarAction}
+          onViewQuoteReplyProof={(flow) => void viewQuoteReplyThread(flow)}
+        />
+      ),
+    },
+    {
       id: "decision_focus",
       title: "Decision focus",
       visible: true,
@@ -1280,7 +1295,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onOpenArtifact={openArtifactFromContext}
           onOpenSavedOutputs={props.onOpenSavedOutputs}
           onSaveWeddingDate={props.onSaveWeddingDate}
-          onViewQuoteReplyProof={(flow) => void viewQuoteReplyThread(flow)}
           onSidebarAction={handleSidebarAction}
         />
       </aside>

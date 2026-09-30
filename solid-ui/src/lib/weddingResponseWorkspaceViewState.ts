@@ -281,9 +281,6 @@ export type WeddingVendorContactWorkspaceCard = {
   lastContactLabel: string | null;
   followUpDueLabel: string | null;
   replyLabel: string | null;
-  rationaleLabel: string;
-  draftSubjectLabel: string | null;
-  draftBodyPreview: string[];
   metadataLabels: string[];
 };
 export type WeddingExpectedBehaviorAuditCard = {

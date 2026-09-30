@@ -5,7 +5,6 @@ import type { SendAfpMessageInput } from "@/lib/api";
 import type {
   WeddingResponseWorkspaceViewState,
 } from "@/lib/weddingResponseWorkspaceViewState";
-import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
 import type {
   WeddingBoundaryChangeType,
   WeddingBoundaryPolicyRuleType,
@@ -29,7 +28,6 @@ import { WeddingProductionGateCard } from "@/components/WeddingProductionGateCar
 import { WeddingProductionRemainingWorkCard } from "@/components/WeddingProductionRemainingWorkCard";
 import { WeddingSeatingPanel } from "@/components/WeddingSeatingPanel";
 import { WeddingTimelinePanel } from "@/components/WeddingTimelinePanel";
-import { WeddingVendorFollowUpPanel } from "@/components/WeddingVendorFollowUpPanel";
 import { WeddingVisionPanel } from "@/components/WeddingVisionPanel";
 import {
   buildWeddingBoundaryRequestDecision,
@@ -90,7 +88,6 @@ export function WeddingWorkspaceContextPanels(props: {
   onOpenArtifact?: (artifactId: string) => void;
   onOpenSavedOutputs?: () => void;
   onSaveWeddingDate?: (date: string) => Promise<void> | void;
-  onViewQuoteReplyProof?: (flow: WeddingVendorQuoteReplyFlowState) => void;
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
 }) {
   const activeMenu = () => props.activeMenu ?? "home";
@@ -428,17 +425,6 @@ export function WeddingWorkspaceContextPanels(props: {
         />
       </div>
 
-      <div hidden={activeMenu() !== "response_queue" || (
-        props.state.vendorContactCards.length === 0
-        && props.state.vendorPursuitLogCards.length === 0
-        && props.state.vendorQuoteReplyLogFlows.length === 0
-      )}>
-        <WeddingVendorFollowUpPanel
-          state={props.state}
-          onSidebarAction={props.onSidebarAction}
-          onViewQuoteReplyProof={props.onViewQuoteReplyProof}
-        />
-      </div>
     </>
   );
 }
