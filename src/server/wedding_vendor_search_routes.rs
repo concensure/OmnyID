@@ -1260,7 +1260,7 @@ fn osm_address_from_tags(tags: &serde_json::Map<String, serde_json::Value>) -> O
 
 fn clean_google_place_photo_name(value: &str) -> Option<String> {
     let trimmed = value.trim();
-    if trimmed.len() > 260
+    if trimmed.len() > 600
         || !trimmed.starts_with("places/")
         || !trimmed.contains("/photos/")
         || trimmed.contains('?')

@@ -121,6 +121,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const [approvalRunningRequestId, setApprovalRunningRequestId] = createSignal<string | null>(null);
   const [approvalReceipt, setApprovalReceipt] = createSignal<WeddingApprovalExecutionState | null>(null);
   const [approvalReceiptSaveNotice, setApprovalReceiptSaveNotice] = createSignal<string | null>(null);
+  const [dismissedVendorSearchResultArtifactId, setDismissedVendorSearchResultArtifactId] = createSignal<string | null>(null);
   const [quoteReplyProofSaveNotices, setQuoteReplyProofSaveNotices] = createSignal<Record<string, string>>({});
   const [showPlanningFiles, setShowPlanningFiles] = createSignal(false);
   const [quoteReplyDrafts, setQuoteReplyDrafts] = createSignal<Record<string, string>>({});
@@ -186,7 +187,9 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const primaryColumnClass = () => {
     const spacing = compactMode() ? "space-y-3" : "space-y-4";
     if (contextOnlyMenu()) return "hidden";
-    return activeMenu() === "home" ? `min-w-0 ${spacing} xl:col-span-2` : `min-w-0 ${spacing}`;
+    return activeMenu() === "home" || activeMenu() === "documents"
+      ? `min-w-0 ${spacing} xl:col-span-2`
+      : `min-w-0 ${spacing}`;
   };
   const sidebarClass = () => {
     const spacing = compactMode() ? "space-y-3" : "space-y-4";
@@ -195,6 +198,14 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const cardClass = () => compactMode()
     ? "rounded-[20px] border border-white/60 bg-white/75 p-0 shadow-card backdrop-blur sm:rounded-[24px] sm:p-3"
     : "rounded-[24px] border border-white/60 bg-white/75 p-0 shadow-card backdrop-blur sm:rounded-[28px] sm:p-4";
+  const documentsCardClass = () => `${cardClass()} xl:col-span-2`;
+  const inlineVendorSearchPreview = createMemo(() => {
+    const action = props.vendorSearchResultAction;
+    if (!action || dismissedVendorSearchResultArtifactId() === action.artifactId) return null;
+    const preview = state().artifactPreviews.find((artifact) => artifact.artifactId === action.artifactId)
+      ?? (state().activePreview?.artifactId === action.artifactId ? state().activePreview : null);
+    return { action, preview };
+  });
   const homeLayoutStorageScope = () =>
     state().workspace.metadata.weddingPlanId
     || state().workspace.metadata.responseWorkspaceId
@@ -923,21 +934,112 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           </Show>
           <Show when={props.vendorSearchResultAction}>
             {(action) => (
-              <button
-                type="button"
-                class="mt-3 inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-950 transition hover:border-rose-300 hover:bg-rose-100"
-                title={action().detail ?? undefined}
-                onClick={() => {
-                  props.onSelectMenu?.(action().menu ?? "documents");
-                  props.onSelectArtifact?.(action().artifactId);
-                }}
-                data-magic-action="open"
-                data-magic-icon="file"
-                data-magic-label={action().label}
-                data-magic-id="wedding:vendor-search:open-result"
-              >
-                {action().label}
-              </button>
+              <Show when={inlineVendorSearchPreview()}>
+                {(result) => (
+                  <div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50/80 p-3">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <p class="break-words text-sm font-semibold text-rose-950">
+                          {result().preview?.title ?? action().label}
+                        </p>
+                        <p class="mt-1 break-words text-xs leading-5 text-rose-950/70">
+                          {action().detail}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        class="rounded-full border border-rose-200 bg-white/85 px-3 py-1.5 text-xs font-semibold text-rose-950 transition hover:border-rose-300 hover:bg-white"
+                        onClick={() => setDismissedVendorSearchResultArtifactId(action().artifactId)}
+                      >
+                        Done
+                      </button>
+                    </div>
+                    <Show when={result().preview}>
+                      {(preview) => (
+                        <>
+                          <div class="mt-3 grid gap-2 sm:grid-cols-3">
+                            <For each={[
+                              preview().category,
+                              preview().evidenceSummary.sourceCountLabel,
+                              preview().vendorComparisonHandoff?.confidenceLabel ?? preview().evidenceSummary.statusLabel,
+                            ].filter(Boolean)}>
+                              {(label) => (
+                                <span class="rounded-xl border border-rose-100 bg-white/85 px-3 py-2 text-xs font-medium text-rose-950/75">
+                                  {label}
+                                </span>
+                              )}
+                            </For>
+                          </div>
+                          <Show when={preview().vendorComparisonCards.length > 0}>
+                            <div class="mt-3 grid gap-2 lg:grid-cols-3">
+                              <For each={preview().vendorComparisonCards.slice(0, 3)}>
+                                {(vendor) => (
+                                  <article class="min-w-0 rounded-xl border border-rose-100 bg-white/90 p-3">
+                                    <div class="flex items-start justify-between gap-2">
+                                      <p class="min-w-0 break-words text-sm font-semibold text-rose-950">
+                                        {vendor.rank}. {vendor.title}
+                                      </p>
+                                      <span class="shrink-0 rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-900">
+                                        {vendor.scoreLabel}
+                                      </span>
+                                    </div>
+                                    <p class="mt-2 break-words text-xs leading-5 text-rose-950/70">
+                                      {vendor.preferenceMatch || vendor.situationFit || vendor.verificationLabel}
+                                    </p>
+                                    <div class="mt-3 flex flex-wrap gap-2">
+                                      <Show when={vendor.websiteUrl ?? vendor.sourceUrl}>
+                                        {(url) => (
+                                          <a
+                                            class="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-950 transition hover:bg-rose-100"
+                                            href={url()}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
+                                            Website
+                                          </a>
+                                        )}
+                                      </Show>
+                                      <Show when={vendor.mapUrl}>
+                                        {(url) => (
+                                          <a
+                                            class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                                            href={url()}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
+                                            Map
+                                          </a>
+                                        )}
+                                      </Show>
+                                    </div>
+                                  </article>
+                                )}
+                              </For>
+                            </div>
+                          </Show>
+                        </>
+                      )}
+                    </Show>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-full bg-rose-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-800"
+                        title={action().detail ?? undefined}
+                        onClick={() => {
+                          props.onSelectMenu?.(action().menu ?? "documents");
+                          props.onSelectArtifact?.(action().artifactId);
+                        }}
+                        data-magic-action="open"
+                        data-magic-icon="file"
+                        data-magic-label={action().label}
+                        data-magic-id="wedding:vendor-search:open-result"
+                      >
+                        Open in Documents
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </Show>
             )}
           </Show>
           <Show when={props.vendorSearchBlockedReason}>
@@ -1230,7 +1332,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
         <WeddingWorkspaceDocumentsPanel
           state={state()}
           activePreview={activePreview()}
-          cardClass={cardClass()}
+          cardClass={documentsCardClass()}
           hidden={activeMenu() !== "documents"}
           query={props.query}
           importRunning={props.importRunning}

@@ -1830,7 +1830,7 @@ export function ResponseQueueView(props: {
         topChoiceCount: comparisonArtifact.topChoiceCount,
       });
       setActiveWeddingArtifactId(resultAction?.artifactId ?? generatedArtifact.summary.id);
-      setWeddingWorkspaceMenu(options?.stayOnHome ? "home" : "documents");
+      setWeddingWorkspaceMenu(options?.stayOnHome === false ? "documents" : "home");
       setWeddingVendorSearchCategoryScope(null);
       setWeddingVendorSearchResultAction(resultAction);
       setWeddingVendorSearchResultActionSuppressed(false);
@@ -2159,7 +2159,7 @@ export function ResponseQueueView(props: {
             onRunLiveVendorSearch={runLiveWeddingVendorSearch}
             vendorSearchRunning={weddingVendorSearchRunning()}
             vendorSearchNotice={weddingVendorSearchNotice()}
-            vendorSearchQuery={currentWeddingVendorSearchQuery()}
+            vendorSearchQuery={weddingVendorSearchQuery() || currentWeddingVendorSearchQuery()}
             vendorSearchQuerySourceLabel={currentWeddingVendorSearchQueryState().sourceLabel}
             vendorSearchResultAction={currentWeddingVendorSearchResultAction()}
             onVendorSearchQueryChange={updateWeddingVendorSearchQueryFromInput}
