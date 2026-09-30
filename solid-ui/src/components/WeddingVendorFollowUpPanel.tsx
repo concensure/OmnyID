@@ -1,6 +1,7 @@
 // @locs-version: 2.1
-import { For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 
+import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreachComposer";
 import type {
   WeddingResponseWorkspaceViewState,
   WeddingVendorContactWorkspaceCard,
@@ -13,10 +14,58 @@ import {
   weddingVendorFollowUpCardRationale,
 } from "@/lib/weddingVendorFollowUpPanelPresentationState";
 import {
+  weddingVendorFollowUpOutreachChoiceId,
   weddingVendorFollowUpPrimaryAction,
   weddingVendorRecordReplyAction,
 } from "@/lib/weddingVendorFollowUpPanelActionState";
+import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
+import { weddingVendorOutreachSentLabel } from "@/lib/weddingVendorOutreachFlowState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
+
+function VendorContactChip(props: { label: string; value: string | null; kind: "address" | "email" | "phone" }) {
+  const [open, setOpen] = createSignal(false);
+  const [copied, setCopied] = createSignal(false);
+
+  function copyValue() {
+    const value = props.value;
+    if (!value || typeof navigator === "undefined" || !navigator.clipboard) return;
+    navigator.clipboard.writeText(value)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => {});
+  }
+
+  return (
+    <div class="inline-flex flex-col items-start">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open()}
+        class="max-w-full break-words rounded-full border border-wedding-muted/50 bg-white px-2.5 py-1 text-xs font-semibold text-wedding-accent-dark transition hover:border-wedding-accent hover:bg-wedding-surface-blush"
+      >
+        {props.label}
+      </button>
+      <Show when={open()}>
+        <div class="mt-1 flex max-w-full flex-wrap items-center gap-1.5 rounded-lg border border-wedding-muted/30 bg-wedding-surface-muted px-2 py-1.5">
+          <span class="break-words text-xs leading-5 text-wedding-text">
+            {props.value ?? `No ${props.kind === "address" ? "address" : props.kind} on file`}
+          </span>
+          <Show when={props.value}>
+            <button
+              type="button"
+              onClick={copyValue}
+              class="shrink-0 rounded-full bg-wedding-accent px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-wedding-accent-hover"
+            >
+              {copied() ? "Copied" : "Copy"}
+            </button>
+          </Show>
+        </div>
+      </Show>
+    </div>
+  );
+}
 
 function followUpTasksAction(card: WeddingVendorContactWorkspaceCard): WeddingWorkspaceSidebarAction {
   return {
@@ -56,6 +105,13 @@ export function WeddingVendorFollowUpPanel(props: {
   state: WeddingResponseWorkspaceViewState;
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
   onViewQuoteReplyProof?: (flow: WeddingVendorQuoteReplyFlowState) => void;
+  vendorOutreachFlows: Record<string, WeddingVendorOutreachFlowState>;
+  gmailConnected: boolean;
+  onOpenOutreachComposer: (card: WeddingVendorContactWorkspaceCard) => void;
+  onOutreachBodyChange: (choiceId: string, bodyMarkdown: string) => void;
+  onSendOutreach: (choiceId: string) => void;
+  onCancelOutreach: (choiceId: string) => void;
+  onConnectGmailForOutreach: () => void;
 }) {
   const activeCards = () => props.state.vendorContactCards;
   const alertLabel = () => weddingVendorFollowUpAlertLabel(activeCards().length);
@@ -82,14 +138,16 @@ export function WeddingVendorFollowUpPanel(props: {
           </Show>
         }
       >
-        <div class="divide-y divide-wedding-surface-muted sm:space-y-4 sm:divide-y-0">
+        <div class="space-y-3 sm:space-y-4">
           <For each={activeCards()}>
             {(card) => {
               const rationale = () => weddingVendorFollowUpCardRationale(card);
+              const outreachChoiceId = () => weddingVendorFollowUpOutreachChoiceId(card);
+              const outreachFlow = () => props.vendorOutreachFlows[outreachChoiceId()] ?? null;
               return (
-                <article class="border-0 bg-transparent p-0 py-3 first:pt-0 sm:rounded-2xl sm:border sm:border-wedding-surface-muted sm:bg-white/70 sm:p-4 sm:py-4">
+                <article class="rounded-2xl border border-wedding-muted/25 bg-white p-3 py-3 sm:p-4 sm:py-4">
                   <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-wedding-accent">
-                    Needs your decision
+                    Needs your response
                   </p>
                   <h3 class="mt-1 break-words font-serif text-xl font-bold leading-7 text-wedding-text sm:text-2xl">
                     {weddingVendorFollowUpCardHeadline(card)}
@@ -97,13 +155,13 @@ export function WeddingVendorFollowUpPanel(props: {
                   <p class="mt-2 break-words text-sm leading-6 text-wedding-text/85">{card.detailLabel}</p>
 
                   <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                    <div class="rounded-xl border border-wedding-surface-muted bg-wedding-surface-muted/60 px-2.5 py-2">
+                    <div class="rounded-xl border border-wedding-muted/20 bg-wedding-surface-muted px-2.5 py-2">
                       <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-wedding-muted">Last contact</p>
                       <p class="mt-1 text-xs leading-5 text-wedding-text">
                         <strong>{card.lastContactLabel ?? "Not recorded"}</strong>
                       </p>
                     </div>
-                    <div class="rounded-xl border border-wedding-surface-muted bg-wedding-surface-muted/60 px-2.5 py-2">
+                    <div class="rounded-xl border border-wedding-muted/20 bg-wedding-surface-muted px-2.5 py-2">
                       <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-wedding-muted">Follow-up date</p>
                       <p class="mt-1 text-xs leading-5 text-wedding-text">
                         <strong>{card.followUpDueLabel ?? "No date set"}</strong>
@@ -111,18 +169,21 @@ export function WeddingVendorFollowUpPanel(props: {
                     </div>
                   </div>
 
-                  <div class="mt-3 rounded-xl bg-wedding-surface-muted px-3 py-2">
+                  <div class="mt-3 rounded-xl border border-wedding-muted/15 bg-wedding-surface-muted px-3 py-2">
                     <p class="text-xs leading-5 text-wedding-text">
                       <span class="font-semibold">{rationale() ? "" : "Why we suggest this: "}</span>
                       {rationale() ?? "still reviewing — nothing concrete recorded for this vendor yet."}
                     </p>
                   </div>
 
-                  <Show when={card.metadataLabels.length > 0}>
-                    <div class="mt-2 flex flex-wrap gap-1.5">
+                  <Show when={card.contactChips.length > 0 || card.metadataLabels.length > 0}>
+                    <div class="mt-3 flex flex-wrap items-start gap-1.5">
+                      <For each={card.contactChips}>
+                        {(chip) => <VendorContactChip label={chip.label} value={chip.value} kind={chip.kind} />}
+                      </For>
                       <For each={card.metadataLabels.slice(0, 4)}>
                         {(label) => (
-                          <span class="max-w-full break-words rounded-full border border-wedding-surface-muted bg-white px-2 py-1 text-xs text-wedding-muted">
+                          <span class="max-w-full break-words rounded-full border border-wedding-muted/25 bg-white px-2 py-1 text-xs text-wedding-muted">
                             {label}
                           </span>
                         )}
@@ -138,17 +199,56 @@ export function WeddingVendorFollowUpPanel(props: {
                       </p>
                     }
                   >
-                    <button
-                      type="button"
-                      class="mt-3 w-full rounded-2xl bg-wedding-cta px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-cta-hover focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2"
-                      data-magic-action="follow-up"
-                      data-magic-icon="send"
-                      data-magic-label={card.primaryActionLabel}
-                      data-magic-id={`wedding:vendor-follow-up:${card.id}:primary`}
-                      onClick={() => props.onSidebarAction(weddingVendorFollowUpPrimaryAction(card))}
+                    <Show
+                      when={card.actionMode === "follow_up"}
+                      fallback={
+                        <button
+                          type="button"
+                          class="mt-3 w-full rounded-2xl bg-wedding-cta px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-cta-hover focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2"
+                          data-magic-action="follow-up"
+                          data-magic-icon="send"
+                          data-magic-label={card.primaryActionLabel}
+                          data-magic-id={`wedding:vendor-follow-up:${card.id}:primary`}
+                          onClick={() => props.onSidebarAction(weddingVendorFollowUpPrimaryAction(card))}
+                        >
+                          {card.primaryActionLabel}
+                        </button>
+                      }
                     >
-                      {card.primaryActionLabel}
-                    </button>
+                      <Show
+                        when={outreachFlow()?.stage === "sent"}
+                        fallback={
+                          <button
+                            type="button"
+                            class="mt-3 w-full rounded-2xl bg-wedding-cta px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-cta-hover focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2"
+                            data-magic-action="follow-up"
+                            data-magic-icon="send"
+                            data-magic-label={card.primaryActionLabel}
+                            data-magic-id={`wedding:vendor-follow-up:${card.id}:primary`}
+                            onClick={() => props.onOpenOutreachComposer(card)}
+                          >
+                            {card.primaryActionLabel}
+                          </button>
+                        }
+                      >
+                        <p class="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/80 px-2.5 py-2 text-xs leading-5 text-emerald-950">
+                          {`✓ ${weddingVendorOutreachSentLabel({ sentAtIso: outreachFlow()?.sentAtIso ?? null })}`}
+                        </p>
+                      </Show>
+                      <Show when={outreachFlow()}>
+                        {(flow) => (
+                          <WeddingVendorOutreachComposer
+                            flow={flow()}
+                            busy={flow().stage === "drafting" || flow().stage === "sending"}
+                            gmailConnected={props.gmailConnected}
+                            onBodyChange={(bodyMarkdown) => props.onOutreachBodyChange(outreachChoiceId(), bodyMarkdown)}
+                            onSend={() => props.onSendOutreach(outreachChoiceId())}
+                            onCancel={() => props.onCancelOutreach(outreachChoiceId())}
+                            onConnectGmail={() => props.onConnectGmailForOutreach()}
+                          />
+                        )}
+                      </Show>
+                    </Show>
                     <div class="mt-2 flex flex-col gap-2 sm:flex-row">
                       <Show when={card.actionMode === "waiting"}>
                         <button
@@ -274,10 +374,6 @@ export function WeddingVendorFollowUpPanel(props: {
           </div>
         </details>
       </Show>
-
-      <p class="mt-4 text-xs text-wedding-muted">
-        One thread. One decision. Nothing sends until you approve it.
-      </p>
     </div>
   );
 }

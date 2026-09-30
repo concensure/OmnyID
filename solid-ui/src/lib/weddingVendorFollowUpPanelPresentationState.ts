@@ -3,7 +3,7 @@ import type { WeddingVendorContactWorkspaceCard } from "@/lib/weddingResponseWor
 
 export function weddingVendorFollowUpAlertLabel(activeCount: number): string | null {
   if (activeCount <= 0) return null;
-  return activeCount === 1 ? "One thing needs you today." : `${activeCount} things need you today.`;
+  return activeCount === 1 ? "1 thing to follow up" : `${activeCount} things to follow up`;
 }
 
 export function weddingVendorFollowUpCardHeadline(card: WeddingVendorContactWorkspaceCard): string {

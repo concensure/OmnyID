@@ -282,6 +282,7 @@ export type WeddingVendorContactWorkspaceCard = {
   followUpDueLabel: string | null;
   replyLabel: string | null;
   metadataLabels: string[];
+  contactChips: Array<{ kind: "address" | "email" | "phone"; label: string; value: string | null }>;
 };
 export type WeddingExpectedBehaviorAuditCard = {
   id: string;

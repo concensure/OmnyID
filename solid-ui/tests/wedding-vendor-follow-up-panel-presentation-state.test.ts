@@ -25,6 +25,7 @@ function baseCard(overrides: Partial<WeddingVendorContactWorkspaceCard> = {}): W
     followUpDueLabel: null,
     replyLabel: null,
     metadataLabels: [],
+    contactChips: [],
     ...overrides,
   };
 }
@@ -34,11 +35,11 @@ test("weddingVendorFollowUpAlertLabel is suppressed when nothing is due", () => 
 });
 
 test("weddingVendorFollowUpAlertLabel uses singular phrasing for exactly one", () => {
-  assert.equal(weddingVendorFollowUpAlertLabel(1), "One thing needs you today.");
+  assert.equal(weddingVendorFollowUpAlertLabel(1), "1 thing to follow up");
 });
 
 test("weddingVendorFollowUpAlertLabel uses a count for more than one", () => {
-  assert.equal(weddingVendorFollowUpAlertLabel(3), "3 things need you today.");
+  assert.equal(weddingVendorFollowUpAlertLabel(3), "3 things to follow up");
 });
 
 test("weddingVendorFollowUpCardHeadline names the vendor and the concrete status per stage", () => {

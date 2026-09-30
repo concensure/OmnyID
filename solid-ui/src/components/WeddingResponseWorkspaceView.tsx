@@ -13,6 +13,7 @@ import { WeddingResilienceCardList } from "@/components/WeddingResilienceCardLis
 import { WeddingVendorQuoteProofDrawer } from "@/components/WeddingVendorQuoteProofDrawer";
 import { WeddingVendorQuoteReplyCard } from "@/components/WeddingVendorQuoteReplyCard";
 import { WeddingVendorFollowUpPanel } from "@/components/WeddingVendorFollowUpPanel";
+import { weddingVendorFollowUpOutreachCardData } from "@/lib/weddingVendorFollowUpPanelActionState";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { WeddingWorkspaceDocumentsPanel } from "@/components/WeddingWorkspaceDocumentsPanel";
@@ -1043,6 +1044,13 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           state={state()}
           onSidebarAction={handleSidebarAction}
           onViewQuoteReplyProof={(flow) => void viewQuoteReplyThread(flow)}
+          vendorOutreachFlows={vendorOutreach.flows()}
+          gmailConnected={Boolean(props.gmailStatus?.connected)}
+          onOpenOutreachComposer={(card) => void vendorOutreach.onContactVendor(weddingVendorFollowUpOutreachCardData(card), "")}
+          onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
+          onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)}
+          onCancelOutreach={vendorOutreach.onCancelOutreach}
+          onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
         />
       ),
     },

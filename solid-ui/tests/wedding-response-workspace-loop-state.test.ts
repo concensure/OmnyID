@@ -375,6 +375,9 @@ test("buildWeddingResponseWorkspaceViewState exposes editable-vendor contact car
         vendorId: "vendor:due-caterer",
         vendorName: "Due Caterer",
         category: "Caterer",
+        contactEmail: "hello@duecaterer.test",
+        contactPhone: "+61 2 5555 1111",
+        address: "12 Bistro Lane, Sydney",
         userContact: {
           contactMethod: "personal_email",
           lastContactAt: "2026-09-09T00:00:00.000Z",
@@ -403,6 +406,11 @@ test("buildWeddingResponseWorkspaceViewState exposes editable-vendor contact car
   assert.equal(state.vendorContactCards[0]?.lastContactLabel, "2026-09-09");
   assert.equal(state.vendorContactCards[0]?.followUpDueLabel, "2026-09-14");
   assert.ok(state.vendorContactCards[0]?.metadataLabels.includes("personal email"));
+  assert.deepEqual(state.vendorContactCards[0]?.contactChips, [
+    { kind: "address", label: "Caterer", value: "12 Bistro Lane, Sydney" },
+    { kind: "email", label: "email", value: "hello@duecaterer.test" },
+    { kind: "phone", label: "phone", value: "+61 2 5555 1111" },
+  ]);
   assert.equal(state.vendorContactCards[1]?.statusLabel, "Waiting for reply");
   assert.equal(state.vendorContactCards[1]?.tone, "waiting");
   assert.equal(state.vendorContactCards[1]?.actionMode, "waiting");

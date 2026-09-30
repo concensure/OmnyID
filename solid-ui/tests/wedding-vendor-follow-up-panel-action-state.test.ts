@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  weddingVendorFollowUpOutreachCardData,
+  weddingVendorFollowUpOutreachChoiceId,
   weddingVendorFollowUpPrimaryAction,
   weddingVendorRecordReplyAction,
 } from "@/lib/weddingVendorFollowUpPanelActionState";
@@ -23,6 +25,11 @@ const baseCard: WeddingVendorContactWorkspaceCard = {
   followUpDueLabel: "2026-09-25",
   replyLabel: null,
   metadataLabels: ["Venue", "personal email"],
+  contactChips: [
+    { kind: "address", label: "Venue", value: "1 Harbour St, Sydney" },
+    { kind: "email", label: "email", value: "hello@harbourview.test" },
+    { kind: "phone", label: "phone", value: "+61 2 5555 0000" },
+  ],
 };
 
 test("weddingVendorFollowUpPrimaryAction opens tasks for waiting vendors", () => {
@@ -96,4 +103,21 @@ test("weddingVendorRecordReplyAction creates a no-send close-loop action", () =>
   assert.equal(metadata?.vendor_name, "Harbour View Venue");
   assert.equal(metadata?.clears_follow_up, true);
   assert.equal(metadata?.external_send, false);
+});
+
+test("weddingVendorFollowUpOutreachChoiceId is stable per vendor", () => {
+  assert.equal(weddingVendorFollowUpOutreachChoiceId(baseCard), "follow-up:vendor:venue");
+  assert.equal(
+    weddingVendorFollowUpOutreachChoiceId({ ...baseCard, vendorId: null, id: "fallback-id" }),
+    "follow-up:fallback-id",
+  );
+});
+
+test("weddingVendorFollowUpOutreachCardData carries the vendor's contact chips into the composer card", () => {
+  const card = weddingVendorFollowUpOutreachCardData(baseCard);
+  assert.equal(card.choiceId, "follow-up:vendor:venue");
+  assert.equal(card.title, "Harbour View Venue");
+  assert.equal(card.email, "hello@harbourview.test");
+  assert.equal(card.phone, "+61 2 5555 0000");
+  assert.equal(card.address, "1 Harbour St, Sydney");
 });

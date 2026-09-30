@@ -257,15 +257,17 @@ export function vendorContactCards(input: {
       const categoryLabel = clean(vendor.category) || "Vendor";
       const vendorName = clean(vendor.vendorName) || state.vendorLabel;
       const metadataLabels = [
-        categoryLabel,
-        vendor.contactEmail ? "email available" : null,
-        vendor.contactPhone ? "phone available" : null,
         contact?.contactMethod ? contact.contactMethod.replace(/_/g, " ") : null,
         lastContactLabel ? `last contacted ${lastContactLabel}` : null,
         followUpLabel && state.stage !== "closed" ? `follow-up ${followUpLabel}` : null,
         replyLabel ? `reply ${replyLabel}` : null,
         contact?.threadId ? `thread ${contact.threadId}` : null,
       ].filter((label): label is string => Boolean(label)).slice(0, 5);
+      const contactChips: WeddingVendorContactWorkspaceCard["contactChips"] = [
+        { kind: "address", label: categoryLabel, value: clean(vendor.address) || null },
+        vendor.contactEmail ? { kind: "email", label: "email", value: clean(vendor.contactEmail) || null } : null,
+        vendor.contactPhone ? { kind: "phone", label: "phone", value: clean(vendor.contactPhone) || null } : null,
+      ].filter((chip): chip is WeddingVendorContactWorkspaceCard["contactChips"][number] => chip !== null);
 
       return {
         id: clean(vendor.vendorId) || `vendor-contact:${index}:${vendorName.toLowerCase()}`,
@@ -287,6 +289,7 @@ export function vendorContactCards(input: {
         followUpDueLabel: followUpLabel,
         replyLabel,
         metadataLabels,
+        contactChips,
       };
     })
     .sort((left, right) => {

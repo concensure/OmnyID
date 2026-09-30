@@ -74,6 +74,7 @@ export type WeddingVendorContactOutreachVendor = {
   category?: string | null;
   contactPhone?: string | null;
   contactEmail?: string | null;
+  address?: string | null;
   websiteUrl?: string | null;
   sourceLabel?: string | null;
   userContact?: WeddingVendorContactOutreachRecord | null;
