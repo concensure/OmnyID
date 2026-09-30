@@ -389,7 +389,7 @@ function ArtifactPreviewCard(props: {
           )}
         </Show>
         <Show when={props.artifact.vendorComparisonCards.length > 0}>
-          <div class="mt-3 grid gap-3 lg:grid-cols-3">
+          <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <For each={comparisonUi().expansion.expanded ? props.artifact.vendorComparisonCards : props.artifact.vendorComparisonCards.slice(0, 3)}>
               {(card) => (
                 <WeddingVendorChoiceCard

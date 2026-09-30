@@ -192,8 +192,8 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     return contextOnlyMenu() ? `min-w-0 ${spacing}` : `min-w-0 ${spacing} xl:sticky xl:top-4 xl:self-start`;
   };
   const cardClass = () => compactMode()
-    ? "rounded-[20px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[24px]"
-    : "rounded-[24px] border border-white/60 bg-white/75 p-3 shadow-card backdrop-blur sm:rounded-[28px] sm:p-4";
+    ? "rounded-[20px] border border-white/60 bg-white/75 p-0 shadow-card backdrop-blur sm:rounded-[24px] sm:p-3"
+    : "rounded-[24px] border border-white/60 bg-white/75 p-0 shadow-card backdrop-blur sm:rounded-[28px] sm:p-4";
   const homeLayoutStorageScope = () =>
     state().workspace.metadata.weddingPlanId
     || state().workspace.metadata.responseWorkspaceId
@@ -1161,7 +1161,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           <For each={orderedHomeSections()}>
             {(section, index) => (
               <div
-                class="rounded-[24px] border border-white/55 bg-white/45 p-2 shadow-sm backdrop-blur"
+                class="rounded-none border-0 bg-transparent p-0 shadow-none backdrop-blur-none sm:rounded-[24px] sm:border sm:border-white/55 sm:bg-white/45 sm:p-2 sm:shadow-sm sm:backdrop-blur"
                 data-wedding-home-section={section.id}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => dropHomeSection(section.id)}

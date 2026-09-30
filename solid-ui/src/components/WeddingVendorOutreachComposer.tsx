@@ -104,7 +104,7 @@ export function WeddingVendorOutreachComposer(props: {
             <button
               type="button"
               onClick={props.onConnectGmail}
-              class="mt-2 w-full rounded-2xl border border-wedding-surface-muted bg-white px-5 py-2.5 text-sm font-semibold text-wedding-accent-dark transition hover:bg-wedding-surface-blush"
+              class="mt-2 w-full rounded-2xl border border-wedding-surface-muted bg-white min-h-[44px] px-5 py-3 text-sm font-semibold text-wedding-accent-dark transition hover:bg-wedding-surface-blush"
             >
               Connect Gmail
             </button>

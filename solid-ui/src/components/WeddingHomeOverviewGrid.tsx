@@ -50,8 +50,8 @@ export function WeddingHomeOverviewGrid(props: {
   }
 
   return (
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <div class="col-span-2 min-w-0 rounded-[24px] border border-indigo-100/80 bg-[linear-gradient(135deg,rgba(238,242,255,0.95),rgba(255,255,255,0.9))] p-4 shadow-card">
+    <div class="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3">
+      <div class="col-span-full min-w-0 rounded-[24px] border border-indigo-100/80 bg-[linear-gradient(135deg,rgba(238,242,255,0.95),rgba(255,255,255,0.9))] p-4 shadow-card">
         <div class="flex items-start justify-between gap-2">
           <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #334155" aria-hidden="true">
             <WeddingDashboardIcon id="calendar-days" class="h-5 w-5" />

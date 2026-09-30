@@ -82,12 +82,12 @@ export function WeddingVendorFollowUpPanel(props: {
           </Show>
         }
       >
-        <div class="space-y-4">
+        <div class="divide-y divide-wedding-surface-muted sm:space-y-4 sm:divide-y-0">
           <For each={activeCards()}>
             {(card) => {
               const rationale = () => weddingVendorFollowUpCardRationale(card);
               return (
-                <article class="rounded-2xl border border-wedding-surface-muted bg-white/70 p-3 sm:p-4">
+                <article class="border-0 bg-transparent p-0 py-3 first:pt-0 sm:rounded-2xl sm:border sm:border-wedding-surface-muted sm:bg-white/70 sm:p-4 sm:py-4">
                   <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-wedding-accent">
                     Needs your decision
                   </p>
@@ -153,7 +153,7 @@ export function WeddingVendorFollowUpPanel(props: {
                       <Show when={card.actionMode === "waiting"}>
                         <button
                           type="button"
-                          class="w-full rounded-2xl bg-wedding-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-wedding-accent-hover sm:w-auto sm:flex-1"
+                          class="w-full rounded-2xl bg-wedding-accent min-h-[44px] px-4 py-3 text-sm font-semibold text-white transition hover:bg-wedding-accent-hover sm:w-auto sm:flex-1"
                           data-magic-action="record-reply"
                           data-magic-icon="reply"
                           data-magic-label="Record reply"
@@ -165,7 +165,7 @@ export function WeddingVendorFollowUpPanel(props: {
                       </Show>
                       <button
                         type="button"
-                        class="w-full rounded-2xl bg-wedding-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-wedding-accent-hover sm:w-auto sm:flex-1"
+                        class="w-full rounded-2xl bg-wedding-accent min-h-[44px] px-4 py-3 text-sm font-semibold text-white transition hover:bg-wedding-accent-hover sm:w-auto sm:flex-1"
                         data-magic-action="open"
                         data-magic-icon="tasks"
                         data-magic-label="Open follow-up tasks"
@@ -194,10 +194,10 @@ export function WeddingVendorFollowUpPanel(props: {
                 <p class="text-xs font-semibold uppercase tracking-[0.12em] text-wedding-muted">
                   Vendor history — {props.state.vendorPursuitLogCards.length} closed
                 </p>
-                <div class="mt-2 space-y-2">
+                <div class="mt-2 divide-y divide-wedding-surface-muted sm:space-y-2 sm:divide-y-0">
                   <For each={props.state.vendorPursuitLogCards}>
                     {(card) => (
-                      <article class="rounded-xl border border-wedding-surface-muted bg-wedding-surface-muted/40 px-2.5 py-2">
+                      <article class="border-0 bg-transparent px-0 py-2 first:pt-0 sm:rounded-xl sm:border sm:border-wedding-surface-muted sm:bg-wedding-surface-muted/40 sm:px-2.5">
                         <div class="flex items-start justify-between gap-2">
                           <div class="min-w-0">
                             <p class="break-words text-sm font-semibold text-wedding-text">{card.vendorLabel}</p>
@@ -237,10 +237,10 @@ export function WeddingVendorFollowUpPanel(props: {
                 <p class="text-xs font-semibold uppercase tracking-[0.12em] text-wedding-muted">
                   Sent quote replies — {props.state.vendorQuoteReplyLogFlows.length} sent
                 </p>
-                <div class="mt-2 space-y-2">
+                <div class="mt-2 divide-y divide-wedding-surface-muted sm:space-y-2 sm:divide-y-0">
                   <For each={props.state.vendorQuoteReplyLogFlows}>
                     {(flow) => (
-                      <article class="rounded-xl border border-wedding-surface-muted bg-wedding-surface-muted/40 px-2.5 py-2">
+                      <article class="border-0 bg-transparent px-0 py-2 first:pt-0 sm:rounded-xl sm:border sm:border-wedding-surface-muted sm:bg-wedding-surface-muted/40 sm:px-2.5">
                         <div class="flex flex-wrap items-start justify-between gap-2">
                           <div class="min-w-0">
                             <p class="break-words text-sm font-semibold text-wedding-text">{flow.quote.vendorName}</p>
