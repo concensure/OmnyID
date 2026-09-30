@@ -6229,6 +6229,53 @@ export const deleteAdminWeddingVendor = (vendorId: string) =>
   apiFetch<unknown>(`/admin/wedding/vendors/${encodeURIComponent(vendorId)}`, { method: "DELETE" })
     .then(normalizeOkResponse);
 
+export type WeddingVendorOutreachDraftVendorInput = {
+  name: string;
+  category?: string | null;
+  website_url?: string | null;
+  address?: string | null;
+  source_url?: string | null;
+  snippet?: string | null;
+};
+
+export type WeddingVendorOutreachDraftCoupleInput = {
+  date_or_season?: string | null;
+  location?: string | null;
+  guest_count?: string | null;
+  budget_comfort?: string | null;
+  top_priorities?: string[];
+  atmosphere_description?: string | null;
+  vendor_preferences?: string | null;
+  couple_names?: string | null;
+};
+
+export type WeddingVendorOutreachDraftResult = {
+  subject: string;
+  bodyMarkdown: string;
+  groundedOn: string[];
+  model: string;
+};
+
+function normalizeWeddingVendorOutreachDraftResponse(value: unknown): WeddingVendorOutreachDraftResult {
+  const record = isRecord(value) ? value : {};
+  return {
+    subject: typeof record.subject === "string" ? record.subject : "",
+    bodyMarkdown: typeof record.body_markdown === "string" ? record.body_markdown : "",
+    groundedOn: Array.isArray(record.grounded_on)
+      ? record.grounded_on.filter((entry): entry is string => typeof entry === "string")
+      : [],
+    model: typeof record.model === "string" ? record.model : "",
+  };
+}
+
+export const requestWeddingVendorOutreachDraft = (body: {
+  vendor: WeddingVendorOutreachDraftVendorInput;
+  couple: WeddingVendorOutreachDraftCoupleInput;
+  wedding_plan_id: string;
+}) =>
+  apiFetch<unknown>("/wedding/vendor-outreach-draft", { method: "POST", bodyJson: body })
+    .then(normalizeWeddingVendorOutreachDraftResponse);
+
 export const recordWeddingVendorContact = (
   vendorId: string,
   body: {
