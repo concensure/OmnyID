@@ -237,6 +237,30 @@
         import omnyid_proxy
     }
 
+    # Wedding planner workspace API routes (vendor directory, outreach drafting,
+    # onboarding state, vendor photos). The SolidJS app at /workspace/ calls
+    # these same-origin, so — like the routes above — they must be handled
+    # before the static /wedding/* file-server block below.
+    handle /wedding/onboarding-state {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendor-outreach-draft {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendor-photo/google {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendors {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendors/* {
+        import omnyid_proxy
+    }
+
     handle /wedding {
         redir * /wedding/ 308
     }
