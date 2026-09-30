@@ -4081,7 +4081,7 @@ export const fetchGoogleAuthClientId = async (): Promise<string> => {
 export const getPublicFeed = (limit = 20): Promise<PublicArticle[]> =>
   apiFetch<unknown>(`/feed/public?limit=${limit}`).then(normalizePublicFeedResponse);
 export const signOut = () =>
-  apiFetch<unknown>("/auth/signout", { method: "POST" }).then(normalizeOkResponse);
+  apiFetch<unknown>("/auth/session", { method: "DELETE" }).then(normalizeOkResponse);
 export const updateAgentMask = (mask: "private" | "team" | "public") =>
   apiFetch<unknown>("/agent/mask", { method: "PATCH", bodyJson: { mask } }).then(normalizeOkResponse);
 export const listFocusItems = () =>
