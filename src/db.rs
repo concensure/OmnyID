@@ -4557,9 +4557,14 @@ impl Db {
                 response_received_at,
                 thread_id,
                 receipt_ref,
-                notes
+                notes,
+                outbound_message_id,
+                vendor_email
             )
-            VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8, $9)
+            VALUES (
+                $1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8, $9,
+                $8, (SELECT contact_email FROM wedding_vendors WHERE vendor_id = $3)
+            )
             ON CONFLICT (user_id, vendor_id) DO UPDATE SET
                 contact_method = EXCLUDED.contact_method,
                 last_contact_at = NOW(),
@@ -4568,6 +4573,8 @@ impl Db {
                 thread_id = COALESCE(EXCLUDED.thread_id, wedding_vendor_user_contacts.thread_id),
                 receipt_ref = COALESCE(EXCLUDED.receipt_ref, wedding_vendor_user_contacts.receipt_ref),
                 notes = COALESCE(EXCLUDED.notes, wedding_vendor_user_contacts.notes),
+                outbound_message_id = COALESCE(EXCLUDED.outbound_message_id, wedding_vendor_user_contacts.outbound_message_id),
+                vendor_email = COALESCE(EXCLUDED.vendor_email, wedding_vendor_user_contacts.vendor_email),
                 updated_at = NOW()
             RETURNING
                 contact_id,
@@ -4610,6 +4617,65 @@ impl Db {
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         })
+    }
+
+    /// Matches an inbound Gmail reply back to the vendor outreach it belongs to,
+    /// scoped to one Gmail-connected user. Tries thread headers first (the
+    /// stronger signal), then falls back to the vendor's known email address.
+    /// Returns `None` on no match — callers must not fail the sync tick for this.
+    pub async fn find_wedding_vendor_contact_for_reply(
+        &self,
+        owner_user_id: &str,
+        reply_candidate_message_ids: &[String],
+        sender_email: &str,
+    ) -> Result<Option<WeddingVendorReplyMatch>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            SELECT c.vendor_id, v.vendor_name, c.thread_id, c.receipt_ref
+            FROM wedding_vendor_user_contacts c
+            JOIN wedding_vendors v ON v.vendor_id = c.vendor_id
+            WHERE c.user_id = $1
+              AND (
+                c.outbound_message_id = ANY($2)
+                OR (c.vendor_email IS NOT NULL AND lower(c.vendor_email) = lower($3))
+              )
+            ORDER BY (c.outbound_message_id = ANY($2)) DESC, c.last_contact_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(owner_user_id)
+        .bind(reply_candidate_message_ids)
+        .bind(sender_email.trim())
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|row| WeddingVendorReplyMatch {
+            vendor_id: row.get("vendor_id"),
+            vendor_label: row.get("vendor_name"),
+            thread_id: row.get("thread_id"),
+            receipt_ref: row.get("receipt_ref"),
+        }))
+    }
+
+    pub async fn mark_wedding_vendor_contact_response_received(
+        &self,
+        owner_user_id: &str,
+        vendor_id: &str,
+        response_received_at: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE wedding_vendor_user_contacts
+            SET response_received_at = $3::timestamptz, updated_at = NOW()
+            WHERE user_id = $1 AND vendor_id = $2
+            "#,
+        )
+        .bind(owner_user_id)
+        .bind(vendor_id)
+        .bind(response_received_at)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     pub async fn user_account_status(
@@ -13367,6 +13433,14 @@ pub struct WeddingVendorUserContactRecord {
     pub notes: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WeddingVendorReplyMatch {
+    pub vendor_id: String,
+    pub vendor_label: String,
+    pub thread_id: Option<String>,
+    pub receipt_ref: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

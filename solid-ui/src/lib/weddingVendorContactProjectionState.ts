@@ -155,6 +155,10 @@ function knownContactMatchesMessage(
 
 function messageLooksLikeVendorReply(message: AfpMessage, knownMatch: WeddingVendorReplyKnownContact | null): boolean {
   if (knownMatch) return true;
+  // The homeserver's derived reply message (src/gateway/imap_sync.rs) always sets this
+  // kind explicitly — an exact check here is cheaper than the regex below and cannot
+  // drift if the regex's wording changes.
+  if (message.kind === "wedding_vendor_reply_received") return true;
   const metadata = record(message.metadata);
   const content = record(message.content);
   const tags = strings(message.supertags);

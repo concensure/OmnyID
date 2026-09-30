@@ -472,4 +472,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Public daemon AFP message store used by authenticated workspace summaries",
         include_str!("../../postgres/migrations/0091_afp_daemon_messages.sql"),
     ),
+    (
+        "0093_wedding_vendor_outreach_thread_keys",
+        "Outbound message id and vendor email columns on wedding_vendor_user_contacts, used to match inbound Gmail replies back to the vendor they came from",
+        include_str!("../../postgres/migrations/0093_wedding_vendor_outreach_thread_keys.sql"),
+    ),
 ];

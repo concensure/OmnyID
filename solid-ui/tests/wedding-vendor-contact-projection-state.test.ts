@@ -261,6 +261,36 @@ test("weddingVendorReplyInputsFromAfpMessages can match known contact threads wi
   assert.equal(replies[0]?.threadId, "gmail:thread-photo");
 });
 
+test("weddingVendorReplyInputsFromAfpMessages recognises the homeserver's derived reply kind explicitly", () => {
+  const replies = weddingVendorReplyInputsFromAfpMessages({
+    messages: [{
+      id: "afp-derived-reply-1",
+      thread_id: "01JQ0YQ2X3E2G7M8N9P0QRSTUV",
+      from: "agent://wedding-gateway",
+      to: ["user_123"],
+      timestamp: "2026-09-20T03:00:00.000Z",
+      type: "email",
+      kind: "wedding_vendor_reply_received",
+      subtype: "wedding_vendor_reply_received",
+      supertags: ["template:wedding_planning", "event:wedding", "needs_follow_up"],
+      content: {
+        subject: "ok",
+        snippet: "ok",
+      },
+      metadata: {
+        vendor_id: "vendor:harbour-hall",
+        vendor_label: "Harbour Hall",
+        vendor_contact_thread_id: "01JQ0YQ2X3E2G7M8N9P0QRSTUV",
+      },
+      views: [],
+      attachments: [],
+    }],
+  });
+
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0]?.vendorId, "vendor:harbour-hall");
+});
+
 test("weddingVendorReplyProjectionRequests matches replies by thread receipt or vendor label", () => {
   const requests = weddingVendorReplyProjectionRequests({
     nowIso: "2026-09-20T00:00:00.000Z",

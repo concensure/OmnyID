@@ -7,7 +7,8 @@ use sqlx;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tonic::Response;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
+use ulid::Ulid;
 
 use crate::{
     afp::Ack,
@@ -32,7 +33,7 @@ use crate::{
     server::{
         app_to_proto,
         auth::{new_server_message, store_private_app_message},
-        store_proto_message,
+        env_hex_32, sign_server_generated_message, store_proto_message,
     },
 };
 
@@ -231,6 +232,7 @@ async fn gmail_sync_tick(
         for message_id in pending_ids {
             let raw_email = fetch_gmail_raw_message(&target.config, &message_id).await?;
             let message = handle_incoming_email(&raw_email).await?;
+            let raw_gateway_message_id = message.id.clone();
             persist_gateway_message(db, metrics, relay_tx, message)
                 .await
                 .map_err(|err| err.to_string())?;
@@ -245,6 +247,15 @@ async fn gmail_sync_tick(
                     &raw_email,
                 )
                 .await?;
+                try_emit_wedding_vendor_reply(
+                    db,
+                    metrics,
+                    relay_tx,
+                    owner_user_id,
+                    &raw_gateway_message_id,
+                    &raw_email,
+                )
+                .await;
             }
             newest_processed = Some(message_id);
         }
@@ -308,6 +319,178 @@ async fn persist_gateway_message(
     message: crate::message::AFPMessage,
 ) -> Result<Response<Ack>, tonic::Status> {
     store_proto_message(db, metrics, relay_tx, app_to_proto(message)).await
+}
+
+/// The In-Reply-To header plus every References entry, deduplicated — the set
+/// of message ids that, if one of them is a vendor outreach's outbound
+/// message id, means this email is a reply to that outreach.
+fn wedding_vendor_reply_candidates(
+    summary: &crate::gateway::smtp_in::IncomingEmailSummary,
+) -> Vec<String> {
+    let mut candidates: Vec<String> = Vec::new();
+    if let Some(in_reply_to) = summary.in_reply_to.as_deref() {
+        let trimmed = in_reply_to.trim();
+        if !trimmed.is_empty() {
+            candidates.push(trimmed.to_string());
+        }
+    }
+    for reference in &summary.reference_targets {
+        let trimmed = reference.trim();
+        if !trimmed.is_empty() && !candidates.iter().any(|existing| existing == trimmed) {
+            candidates.push(trimmed.to_string());
+        }
+    }
+    candidates
+}
+
+/// Matches an inbound Gmail reply back to a wedding vendor outreach and, on a
+/// hit, stores a derived "wedding_vendor_reply_received" AFP message so the
+/// follow-up card can show it. This must never fail the sync tick — a lookup
+/// or persist error here is logged at debug and swallowed, same as "no match".
+async fn try_emit_wedding_vendor_reply(
+    db: &Db,
+    metrics: &Arc<Metrics>,
+    relay_tx: &broadcast::Sender<String>,
+    owner_user_id: &str,
+    raw_gateway_message_id: &str,
+    raw_email: &[u8],
+) {
+    let summary = summarize_incoming_email(raw_email);
+    let sender = summary.smtp_from.trim();
+    let candidates = wedding_vendor_reply_candidates(&summary);
+
+    if candidates.is_empty() && sender.is_empty() {
+        return;
+    }
+
+    let matched = match db
+        .find_wedding_vendor_contact_for_reply(owner_user_id, &candidates, sender)
+        .await
+    {
+        Ok(Some(matched)) => matched,
+        Ok(None) => return,
+        Err(err) => {
+            debug!(%err, owner_user_id, "wedding vendor reply match lookup failed");
+            return;
+        }
+    };
+
+    let received_at = chrono::Utc::now().to_rfc3339();
+    if let Err(err) = db
+        .mark_wedding_vendor_contact_response_received(owner_user_id, &matched.vendor_id, &received_at)
+        .await
+    {
+        debug!(%err, owner_user_id, vendor_id = %matched.vendor_id, "failed to mark wedding vendor response_received_at");
+    }
+
+    let Some(thread_id) = matched.thread_id.clone().filter(|value| !value.trim().is_empty()) else {
+        debug!(
+            owner_user_id,
+            vendor_id = %matched.vendor_id,
+            "matched wedding vendor contact has no outreach thread_id; skipping derived reply message"
+        );
+        return;
+    };
+
+    let subject = summary.subject.trim();
+    let snippet: String = summary.body_preview.chars().take(500).collect();
+    let content = serde_json::json!({
+        "subject": subject,
+        "snippet": snippet,
+        "from": sender,
+        "received_at": received_at,
+    });
+    let metadata = serde_json::json!({
+        "vendor_id": matched.vendor_id,
+        "vendor_label": matched.vendor_label,
+        "vendor_contact_thread_id": thread_id,
+        "vendor_contact_receipt_ref": matched.receipt_ref,
+        "response_received_at": received_at,
+        "provider": "gmail",
+    });
+
+    let message = match build_wedding_vendor_reply_message(
+        owner_user_id,
+        &thread_id,
+        raw_gateway_message_id,
+        content,
+        metadata,
+    ) {
+        Ok(message) => message,
+        Err(err) => {
+            debug!(%err, owner_user_id, "failed to build wedding vendor reply AFP message");
+            return;
+        }
+    };
+
+    if let Err(err) = store_private_app_message(db, metrics, relay_tx, owner_user_id, message).await {
+        debug!(%err, owner_user_id, "failed to store wedding vendor reply AFP message");
+    }
+}
+
+/// Builds the derived "a vendor replied" AFP message directly (rather than via
+/// `new_server_message`, whose fixed type taxonomy has no room for a custom
+/// parent_id/supertags combination) so `parent_id` and `supertags` can be baked
+/// into the encryption AAD before the content is sealed.
+fn build_wedding_vendor_reply_message(
+    owner_user_id: &str,
+    thread_id: &str,
+    parent_id: &str,
+    content: Value,
+    metadata: Value,
+) -> Result<crate::message::AFPMessage, String> {
+    let encryption_key = env_hex_32("OMNYID_ENCRYPTION_KEY_HEX")?.ok_or_else(|| {
+        "OMNYID_ENCRYPTION_KEY_HEX must be configured for server-generated messages".to_string()
+    })?;
+    let message_id = Ulid::new().to_string();
+    let timestamp = chrono::Utc::now().to_rfc3339();
+    let from = "agent://wedding-gateway".to_string();
+    let to = vec![owner_user_id.to_string()];
+    let message_type = "email";
+    let subtype = "wedding_vendor_reply_received";
+    let aad = serde_json::json!({
+        "protocol": "afp-v1",
+        "id": message_id,
+        "thread_id": thread_id,
+        "parent_id": parent_id,
+        "from": from,
+        "to": to,
+        "timestamp": timestamp,
+        "type": message_type,
+        "subtype": subtype,
+        "metadata": metadata.clone(),
+    });
+    let encryption = crate::crypto::encrypt_content(&content, &aad, &encryption_key);
+    let mut message = crate::message::AFPMessage {
+        protocol: "afp-v1".to_string(),
+        id: message_id,
+        thread_id: thread_id.to_string(),
+        parent_id: Some(parent_id.to_string()),
+        from,
+        to,
+        timestamp,
+        r#type: message_type.to_string(),
+        kind: Some(subtype.to_string()),
+        supertags: vec![
+            "template:wedding_planning".to_string(),
+            "event:wedding".to_string(),
+            "wedding_vendor_reply".to_string(),
+            "needs_follow_up".to_string(),
+        ],
+        subtype: Some(subtype.to_string()),
+        content,
+        metadata: Some(metadata),
+        signature: String::new(),
+        encryption: Some(encryption),
+        views: vec![],
+        references: vec![],
+        typed_refs: vec![],
+        attachments: vec![],
+        store_in_relational: false,
+        prev_hash: None,
+    };
+    sign_server_generated_message(&mut message)?;
+    Ok(message)
 }
 
 fn gmail_config_from_env(config: &MailGatewayConfig) -> Result<GmailOAuthConfig, String> {
@@ -898,12 +1081,133 @@ async fn db_checkpoint_last_message_id(db: &Db, provider: &str, account: &str) -
 mod tests {
     use super::{
         GmailSyncTarget, InboundAuthMode, MailGatewayConfig, MailProvider,
-        build_gmail_passive_event_content, classify_mail_sync_error, gmail_sync_target_from_record,
-        parse_mail_sync_batch_size, thread_reference_targets,
+        build_gmail_passive_event_content, build_wedding_vendor_reply_message,
+        classify_mail_sync_error, gmail_sync_target_from_record, parse_mail_sync_batch_size,
+        thread_reference_targets, wedding_vendor_reply_candidates,
     };
     use crate::db::GmailTokenRecord;
     use crate::gateway::gmail_api::GmailOAuthConfig;
     use crate::gateway::smtp_in::IncomingEmailSummary;
+    use std::sync::{Mutex, OnceLock};
+
+    fn encryption_key_env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn sample_reply_summary(
+        in_reply_to: Option<&str>,
+        reference_targets: Vec<String>,
+        smtp_from: &str,
+    ) -> IncomingEmailSummary {
+        IncomingEmailSummary {
+            subject: "Re: Enquiry about your florals".to_string(),
+            smtp_from: smtp_from.to_string(),
+            smtp_to: "couple@example.com".to_string(),
+            body_preview: "Yes, we have availability that weekend!".to_string(),
+            smtp_message_id: "reply-msg-1@vendor.example.com".to_string(),
+            in_reply_to: in_reply_to.map(str::to_string),
+            reference_targets,
+            external_conversation_key: "conv-1".to_string(),
+        }
+    }
+
+    #[test]
+    fn wedding_vendor_reply_candidates_matches_by_in_reply_to() {
+        let summary = sample_reply_summary(
+            Some("outbound-msg-1@omnyid.mail"),
+            vec![],
+            "hello@chloesflorals.example.com",
+        );
+        let candidates = wedding_vendor_reply_candidates(&summary);
+        assert_eq!(candidates, vec!["outbound-msg-1@omnyid.mail".to_string()]);
+    }
+
+    #[test]
+    fn wedding_vendor_reply_candidates_includes_references_and_dedupes() {
+        let summary = sample_reply_summary(
+            Some("outbound-msg-1@omnyid.mail"),
+            vec![
+                "outbound-msg-1@omnyid.mail".to_string(),
+                "earlier-msg@omnyid.mail".to_string(),
+            ],
+            "hello@chloesflorals.example.com",
+        );
+        let candidates = wedding_vendor_reply_candidates(&summary);
+        assert_eq!(
+            candidates,
+            vec![
+                "outbound-msg-1@omnyid.mail".to_string(),
+                "earlier-msg@omnyid.mail".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn wedding_vendor_reply_candidates_is_empty_when_threading_headers_are_absent() {
+        // The sender-address fallback match (§3.7 of the outreach doc) does not need
+        // any candidate ids — the caller matches on sender address instead.
+        let summary = sample_reply_summary(None, vec![], "hello@chloesflorals.example.com");
+        assert!(wedding_vendor_reply_candidates(&summary).is_empty());
+    }
+
+    #[test]
+    fn wedding_vendor_reply_candidates_is_empty_for_an_unrelated_email_with_no_threading() {
+        let summary = sample_reply_summary(None, vec![], "newsletter@unrelated.example.com");
+        assert!(wedding_vendor_reply_candidates(&summary).is_empty());
+    }
+
+    #[test]
+    fn build_wedding_vendor_reply_message_carries_wedding_supertags_and_parent_id() {
+        let _guard = encryption_key_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        unsafe {
+            // 32 bytes (64 hex chars): a 16-byte pattern repeated twice.
+            let key = "00112233445566778899aabbccddeeff".repeat(2);
+            std::env::set_var("OMNYID_ENCRYPTION_KEY_HEX", &key);
+            std::env::set_var("OMNYID_SIGNING_KEY_HEX", &key);
+        }
+        let message = build_wedding_vendor_reply_message(
+            "user_123",
+            "01JQ0YQ2X3E2G7M8N9P0QRSTUV",
+            "raw-gateway-message-id",
+            serde_json::json!({"subject": "Re: Enquiry", "snippet": "Yes we're available"}),
+            serde_json::json!({"vendor_id": "vendor:chloes-florals"}),
+        );
+        unsafe {
+            std::env::remove_var("OMNYID_ENCRYPTION_KEY_HEX");
+            std::env::remove_var("OMNYID_SIGNING_KEY_HEX");
+        }
+        let message = message.expect("message should build with a configured encryption key");
+
+        assert_eq!(message.parent_id.as_deref(), Some("raw-gateway-message-id"));
+        assert!(message.supertags.contains(&"template:wedding_planning".to_string()));
+        assert!(message.supertags.contains(&"event:wedding".to_string()));
+        assert!(message.supertags.contains(&"wedding_vendor_reply".to_string()));
+        assert!(message.supertags.contains(&"needs_follow_up".to_string()));
+        assert_eq!(message.kind.as_deref(), Some("wedding_vendor_reply_received"));
+        assert_eq!(message.subtype.as_deref(), Some("wedding_vendor_reply_received"));
+    }
+
+    #[test]
+    fn build_wedding_vendor_reply_message_fails_closed_without_an_encryption_key() {
+        let _guard = encryption_key_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        unsafe {
+            std::env::remove_var("OMNYID_ENCRYPTION_KEY_HEX");
+            std::env::remove_var("OMNYID_SIGNING_KEY_HEX");
+        }
+        let result = build_wedding_vendor_reply_message(
+            "user_123",
+            "01JQ0YQ2X3E2G7M8N9P0QRSTUV",
+            "raw-gateway-message-id",
+            serde_json::json!({}),
+            serde_json::json!({}),
+        );
+        assert!(result.is_err());
+    }
 
     #[test]
     fn scheduler_uses_shared_gateway_config() {
