@@ -7,6 +7,10 @@
  */
 
 use super::*;
+use super::super::wedding_vendor_search_routes::attribute_catalog::{
+    AdminAttributeInput, admin_attribute_write, attribute_catalog_json, attributes_with_unknowns,
+};
+use crate::db::{WeddingVendorRecord, wedding_vendor_evidence::VendorAttributeWrite};
 use crate::admin_tool_secrets::{
     AdminToolSecretSpec, BRAVE_SEARCH_SPEC, CLOUDINARY_SPEC, GOOGLE_CALENDAR_SPEC,
     GOOGLE_MAPS_SPEC, GOOGLE_PLACES_SPEC, STRIPE_SPEC, TWILIO_SPEC, WEATHER_API_SPEC,
@@ -101,6 +105,73 @@ fn validate_wedding_intake_source(
 
 pub(super) fn wedding_vendor_list_limit(limit: Option<i64>) -> i64 {
     limit.unwrap_or(200).clamp(1, 200)
+}
+
+const MAX_VENDOR_ATTRIBUTE_WRITES: usize = 80;
+
+/// Operator-entered attributes are validated against the catalog before anything is written,
+/// so a typo in one key cannot leave the vendor half-updated.
+pub(super) fn wedding_vendor_attribute_writes(
+    attributes: Option<Vec<WeddingVendorAttributeRequest>>,
+) -> Result<Vec<VendorAttributeWrite>, (StatusCode, String)> {
+    let attributes = attributes.unwrap_or_default();
+    if attributes.len() > MAX_VENDOR_ATTRIBUTE_WRITES {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "at most {MAX_VENDOR_ATTRIBUTE_WRITES} attributes can be saved at once; send only the changed rows"
+            ),
+        ));
+    }
+    let mut seen = std::collections::HashSet::new();
+    attributes
+        .into_iter()
+        .map(|attribute| {
+            if !seen.insert(attribute.key.clone()) {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    format!("attribute '{}' appears more than once; send each key once", attribute.key),
+                ));
+            }
+            admin_attribute_write(AdminAttributeInput {
+                key: attribute.key,
+                value: attribute.value,
+                status: attribute.status,
+                confidence: attribute.confidence,
+                source_url: attribute.source_url,
+                notes: attribute.notes,
+            })
+            .map_err(|message| (StatusCode::BAD_REQUEST, message))
+        })
+        .collect()
+}
+
+/// Each vendor gains an `attributes` object covering every applicable catalog key (unknowns
+/// explicit), so the admin editor can render a row per key without a second request.
+async fn wedding_vendors_with_attributes(
+    db: &crate::db::Db,
+    vendors: Vec<WeddingVendorRecord>,
+) -> Result<Vec<Value>, (StatusCode, String)> {
+    let vendor_ids = vendors
+        .iter()
+        .map(|vendor| vendor.vendor_id.clone())
+        .collect::<Vec<_>>();
+    let mut attributes = db
+        .list_wedding_vendor_attributes(&vendor_ids)
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(vendors
+        .into_iter()
+        .map(|vendor| {
+            let rows = attributes.remove(&vendor.vendor_id).unwrap_or_default();
+            let materialised = attributes_with_unknowns(&vendor.category, &rows);
+            let mut value = serde_json::to_value(&vendor).unwrap_or(Value::Null);
+            if let Some(object) = value.as_object_mut() {
+                object.insert("attributes".to_string(), materialised);
+            }
+            value
+        })
+        .collect())
 }
 
 pub(super) fn wedding_vendor_write_input(
@@ -610,13 +681,17 @@ pub(super) async fn admin_wedding_vendors_list_http(
         )
         .await
         .map_err(readiness_error_to_http)?;
-    Ok(Json(serde_json::json!({ "vendors": vendors })))
+    let vendors = wedding_vendors_with_attributes(&state.db, vendors).await?;
+    Ok(Json(serde_json::json!({
+        "vendors": vendors,
+        "attribute_catalog": attribute_catalog_json(),
+    })))
 }
 
 pub(super) async fn admin_wedding_vendor_create_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(body): Json<WeddingVendorWriteRequest>,
+    Json(mut body): Json<WeddingVendorWriteRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let operator_user = authenticated_user(&state.db, &headers).await?;
     if !super::cost_controls::operator_access_allowed(&operator_user.email) {
@@ -625,12 +700,15 @@ pub(super) async fn admin_wedding_vendor_create_http(
             "operator access required".to_string(),
         ));
     }
+    let attribute_writes = wedding_vendor_attribute_writes(body.attributes.take())?;
     let input = wedding_vendor_write_input(body)?;
     let vendor = state
         .db
         .upsert_wedding_vendor(None, &input, &operator_user.id)
         .await
         .map_err(readiness_error_to_http)?;
+    write_operator_attributes(&state.db, &vendor.vendor_id, &attribute_writes, &operator_user.id)
+        .await?;
     Ok(Json(serde_json::json!({ "vendor": vendor })))
 }
 
@@ -638,7 +716,7 @@ pub(super) async fn admin_wedding_vendor_update_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(vendor_id): Path<String>,
-    Json(body): Json<WeddingVendorWriteRequest>,
+    Json(mut body): Json<WeddingVendorWriteRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let operator_user = authenticated_user(&state.db, &headers).await?;
     if !super::cost_controls::operator_access_allowed(&operator_user.email) {
@@ -647,13 +725,30 @@ pub(super) async fn admin_wedding_vendor_update_http(
             "operator access required".to_string(),
         ));
     }
+    let attribute_writes = wedding_vendor_attribute_writes(body.attributes.take())?;
     let input = wedding_vendor_write_input(body)?;
     let vendor = state
         .db
         .upsert_wedding_vendor(Some(vendor_id.trim()), &input, &operator_user.id)
         .await
         .map_err(readiness_error_to_http)?;
+    write_operator_attributes(&state.db, &vendor.vendor_id, &attribute_writes, &operator_user.id)
+        .await?;
     Ok(Json(serde_json::json!({ "vendor": vendor })))
+}
+
+async fn write_operator_attributes(
+    db: &crate::db::Db,
+    vendor_id: &str,
+    writes: &[VendorAttributeWrite],
+    operator_user_id: &str,
+) -> Result<(), (StatusCode, String)> {
+    for write in writes {
+        db.upsert_wedding_vendor_attribute(vendor_id, write, Some(operator_user_id))
+            .await
+            .map_err(readiness_error_to_http)?;
+    }
+    Ok(())
 }
 
 pub(super) async fn admin_wedding_vendor_delete_http(
@@ -721,7 +816,11 @@ pub(super) async fn wedding_vendors_list_http(
         )
         .await
         .map_err(readiness_error_to_http)?;
-    Ok(Json(serde_json::json!({ "vendors": vendors })))
+    let vendors = wedding_vendors_with_attributes(&state.db, vendors).await?;
+    Ok(Json(serde_json::json!({
+        "vendors": vendors,
+        "attribute_catalog": attribute_catalog_json(),
+    })))
 }
 
 pub(super) async fn wedding_onboarding_state_get_http(

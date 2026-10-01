@@ -19,12 +19,14 @@ use std::{sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
-    extract::State,
+    extract::{Path, State},
     http::{HeaderMap, StatusCode},
     routing::post,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+use crate::db::wedding_vendor_evidence::{VENDOR_AVAILABILITY_STATES, VendorAvailabilityInput};
 
 use super::{
     AppState, RateLimitPolicy,
@@ -57,10 +59,140 @@ Field meaning:
 - grounded_on: the couple-detail field names you actually used (for example "top_priorities", "location", "guest_count") — never an empty list, and never a field you did not actually reference."#;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
-    Router::new().route(
-        "/wedding/vendor-outreach-draft",
-        post(wedding_vendor_outreach_draft_http),
+    Router::new()
+        .route(
+            "/wedding/vendor-outreach-draft",
+            post(wedding_vendor_outreach_draft_http),
+        )
+        .route(
+            "/wedding/vendors/{vendor_id}/availability",
+            post(wedding_vendor_availability_http),
+        )
+}
+
+#[derive(Deserialize)]
+struct WeddingVendorAvailabilityRequest {
+    wedding_plan_id: String,
+    state: String,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    confidence: Option<f32>,
+    valid_until: Option<String>,
+    notes: Option<String>,
+    source_ref: Option<String>,
+}
+
+const MAX_AVAILABILITY_NOTES_CHARS: usize = 1000;
+const MAX_AVAILABILITY_REF_CHARS: usize = 200;
+
+fn bad_request(message: String) -> (StatusCode, String) {
+    (StatusCode::BAD_REQUEST, message)
+}
+
+fn parse_availability_date(
+    label: &str,
+    value: &Option<String>,
+) -> Result<Option<chrono::NaiveDate>, (StatusCode, String)> {
+    let Some(raw) = value.as_deref().map(str::trim).filter(|raw| !raw.is_empty()) else {
+        return Ok(None);
+    };
+    chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+        .map(Some)
+        .map_err(|_| bad_request(format!("{label} must use YYYY-MM-DD; got '{raw}'")))
+}
+
+/// `source` is always "user" here: only the signed-in couple can assert their own state through
+/// this route. Operator and outreach-derived states are written by other paths.
+fn availability_input_from_request(
+    user_id: &str,
+    vendor_id: &str,
+    body: WeddingVendorAvailabilityRequest,
+) -> Result<VendorAvailabilityInput, (StatusCode, String)> {
+    let wedding_plan_id = body.wedding_plan_id.trim().to_string();
+    if wedding_plan_id.is_empty() || wedding_plan_id.chars().count() > 200 {
+        return Err(bad_request(
+            "wedding_plan_id is required (at most 200 characters)".to_string(),
+        ));
+    }
+    let state = body.state.trim().to_string();
+    if !VENDOR_AVAILABILITY_STATES.contains(&state.as_str()) {
+        return Err(bad_request(format!(
+            "state '{state}' is not valid; use one of {VENDOR_AVAILABILITY_STATES:?}"
+        )));
+    }
+    let date_from = parse_availability_date("date_from", &body.date_from)?;
+    let date_to = parse_availability_date("date_to", &body.date_to)?;
+    if let (Some(from), Some(to)) = (date_from, date_to) {
+        if to < from {
+            return Err(bad_request("date_to must not be before date_from".to_string()));
+        }
+    }
+    if body.confidence.is_some_and(|value| !(0.0..=1.0).contains(&value)) {
+        return Err(bad_request("confidence must be between 0 and 1".to_string()));
+    }
+    let valid_until = body
+        .valid_until
+        .as_deref()
+        .map(str::trim)
+        .filter(|raw| !raw.is_empty())
+        .map(|raw| {
+            chrono::DateTime::parse_from_rfc3339(raw)
+                .map(|_| raw.to_string())
+                .map_err(|_| bad_request(format!("valid_until must be an RFC3339 timestamp; got '{raw}'")))
+        })
+        .transpose()?;
+    reject_if_over_length("notes", &body.notes, MAX_AVAILABILITY_NOTES_CHARS)?;
+    reject_if_over_length("source_ref", &body.source_ref, MAX_AVAILABILITY_REF_CHARS)?;
+    Ok(VendorAvailabilityInput {
+        user_id: user_id.to_string(),
+        vendor_id: vendor_id.to_string(),
+        wedding_plan_id,
+        state,
+        date_from: date_from.map(|date| date.to_string()),
+        date_to: date_to.map(|date| date.to_string()),
+        source: "user".to_string(),
+        source_ref: capped(&body.source_ref, MAX_AVAILABILITY_REF_CHARS),
+        confidence: body.confidence,
+        valid_until,
+        notes: capped(&body.notes, MAX_AVAILABILITY_NOTES_CHARS),
+    })
+}
+
+async fn wedding_vendor_availability_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(vendor_id): Path<String>,
+    Json(body): Json<WeddingVendorAvailabilityRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("wedding_vendor_availability", &headers),
+        RateLimitPolicy {
+            max_requests: 60,
+            window: Duration::from_secs(60),
+        },
     )
+    .await?;
+    let user = authenticated_user(&state.db, &headers).await?;
+    let input = availability_input_from_request(&user.id, vendor_id.trim(), body)?;
+    let record = state
+        .db
+        .record_wedding_vendor_availability(&input)
+        .await
+        .map_err(|err| match &err {
+            sqlx::Error::Database(db_err) if db_err.is_foreign_key_violation() => (
+                StatusCode::NOT_FOUND,
+                format!("vendor '{}' was not found; refresh the vendor list and try again", input.vendor_id),
+            ),
+            _ => {
+                tracing::warn!(%err, "wedding_vendor_availability: insert failed");
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "couldn't save the availability update right now — please try again".to_string(),
+                )
+            }
+        })?;
+    Ok(Json(serde_json::json!({ "availability": record })))
 }
 
 #[derive(Deserialize)]
@@ -350,6 +482,59 @@ mod tests {
             vendor_preferences: None,
             couple_names: None,
         }
+    }
+
+    fn availability_request(state: &str) -> WeddingVendorAvailabilityRequest {
+        WeddingVendorAvailabilityRequest {
+            wedding_plan_id: "wp_1".to_string(),
+            state: state.to_string(),
+            date_from: Some("2027-03-20".to_string()),
+            date_to: None,
+            confidence: Some(0.9),
+            valid_until: None,
+            notes: Some("  Spoke to events manager  ".to_string()),
+            source_ref: None,
+        }
+    }
+
+    #[test]
+    fn availability_accepts_every_documented_state_and_forces_user_source() {
+        for state in VENDOR_AVAILABILITY_STATES {
+            let input = availability_input_from_request("u1", "v1", availability_request(state))
+                .expect("valid state");
+            assert_eq!(input.state, state);
+            assert_eq!(input.source, "user");
+            assert_eq!(input.notes.as_deref(), Some("Spoke to events manager"));
+        }
+    }
+
+    #[test]
+    fn availability_rejects_junk_state_dates_and_confidence() {
+        let err = availability_input_from_request("u1", "v1", availability_request("maybe"))
+            .err()
+            .expect("junk state rejected");
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+        assert!(err.1.contains("maybe"));
+
+        let mut bad_date = availability_request("booked");
+        bad_date.date_from = Some("20/03/2027".to_string());
+        assert!(availability_input_from_request("u1", "v1", bad_date).is_err());
+
+        let mut inverted = availability_request("booked");
+        inverted.date_to = Some("2027-03-01".to_string());
+        assert!(availability_input_from_request("u1", "v1", inverted).is_err());
+
+        let mut confidence = availability_request("booked");
+        confidence.confidence = Some(2.0);
+        assert!(availability_input_from_request("u1", "v1", confidence).is_err());
+
+        let mut valid_until = availability_request("booked");
+        valid_until.valid_until = Some("tomorrow".to_string());
+        assert!(availability_input_from_request("u1", "v1", valid_until).is_err());
+
+        let mut no_plan = availability_request("booked");
+        no_plan.wedding_plan_id = "  ".to_string();
+        assert!(availability_input_from_request("u1", "v1", no_plan).is_err());
     }
 
     #[test]

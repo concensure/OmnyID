@@ -131,6 +131,17 @@ struct WeddingVendorWriteRequest {
     evidence: Option<Value>,
     caveat_labels: Option<Vec<String>>,
     photos: Option<Vec<WeddingVendorPhotoRequest>>,
+    attributes: Option<Vec<WeddingVendorAttributeRequest>>,
+}
+
+#[derive(serde::Deserialize)]
+struct WeddingVendorAttributeRequest {
+    key: String,
+    value: Option<Value>,
+    status: String,
+    confidence: Option<f32>,
+    source_url: Option<String>,
+    notes: Option<String>,
 }
 
 #[derive(serde::Deserialize)]

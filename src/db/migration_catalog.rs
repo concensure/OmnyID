@@ -477,4 +477,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Outbound message id and vendor email columns on wedding_vendor_user_contacts, used to match inbound Gmail replies back to the vendor they came from",
         include_str!("../../postgres/migrations/0093_wedding_vendor_outreach_thread_keys.sql"),
     ),
+    (
+        "0094_wedding_vendor_ranking_evidence",
+        "Per-attribute wedding vendor evidence with authority and confidence, plus append-only per-couple vendor availability state, with a seed backfill of officially stated venue capacities",
+        include_str!("../../postgres/migrations/0094_wedding_vendor_ranking_evidence.sql"),
+    ),
 ];

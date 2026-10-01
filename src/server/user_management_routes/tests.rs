@@ -348,6 +348,7 @@ fn admin_third_party_tool_policy_save_path_sanitizes_internal_errors() {
 #[test]
 fn wedding_vendor_write_input_validates_urls_dates_and_photo_slots() {
     let invalid = super::wedding_vendor_write_input(super::WeddingVendorWriteRequest {
+        attributes: None,
         vendor_slug: "harbour-house".to_string(),
         vendor_name: "Harbour House".to_string(),
         category: "Venue".to_string(),
@@ -374,6 +375,7 @@ fn wedding_vendor_write_input_validates_urls_dates_and_photo_slots() {
     assert!(invalid.is_err());
 
     let duplicate_slots = super::wedding_vendor_write_input(super::WeddingVendorWriteRequest {
+        attributes: None,
         vendor_slug: "harbour-house".to_string(),
         vendor_name: "Harbour House".to_string(),
         category: "Venue".to_string(),
@@ -420,6 +422,7 @@ fn wedding_vendor_list_limit_is_bounded_for_public_and_admin_routes() {
 #[test]
 fn wedding_vendor_write_input_accepts_clean_vendor_payload() {
     let input = super::wedding_vendor_write_input(super::WeddingVendorWriteRequest {
+        attributes: None,
         vendor_slug: "harbour-house".to_string(),
         vendor_name: "Harbour House".to_string(),
         category: "Venue".to_string(),

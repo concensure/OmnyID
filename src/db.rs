@@ -22,6 +22,7 @@ use ulid::Ulid;
 mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
 mod wedding_onboarding_state;
+pub mod wedding_vendor_evidence;
 
 const TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES: &[&str] = &[
     "messages",
@@ -4448,82 +4449,6 @@ impl Db {
             photos: Vec::new(),
             user_contact: None,
         }))
-    }
-
-    pub async fn upsert_discovered_wedding_vendor(
-        &self,
-        input: &WeddingVendorUpsertRecord,
-        discovered_by_user_id: &str,
-    ) -> Result<(), sqlx::Error> {
-        let vendor_id = Ulid::new().to_string();
-        sqlx::query(
-            r#"
-            INSERT INTO wedding_vendors (
-                vendor_id,
-                vendor_slug,
-                vendor_name,
-                category,
-                service_area,
-                address,
-                website_url,
-                contact_phone,
-                contact_email,
-                source_url,
-                source_label,
-                source_checked_at,
-                status,
-                notes,
-                evidence,
-                caveat_labels,
-                created_by_user_id,
-                updated_by_user_id
-            )
-            VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::date,
-                $13, $14, $15, $16, $17, $17
-            )
-            ON CONFLICT (vendor_slug) DO UPDATE SET
-                address = COALESCE(wedding_vendors.address, EXCLUDED.address),
-                website_url = COALESCE(wedding_vendors.website_url, EXCLUDED.website_url),
-                contact_phone = COALESCE(wedding_vendors.contact_phone, EXCLUDED.contact_phone),
-                contact_email = COALESCE(wedding_vendors.contact_email, EXCLUDED.contact_email),
-                source_url = COALESCE(wedding_vendors.source_url, EXCLUDED.source_url),
-                source_label = COALESCE(wedding_vendors.source_label, EXCLUDED.source_label),
-                source_checked_at = COALESCE(EXCLUDED.source_checked_at, wedding_vendors.source_checked_at),
-                notes = COALESCE(wedding_vendors.notes, EXCLUDED.notes),
-                evidence = COALESCE(wedding_vendors.evidence, '{}'::jsonb) || EXCLUDED.evidence,
-                caveat_labels = (
-                    SELECT ARRAY(
-                        SELECT DISTINCT label
-                        FROM unnest(wedding_vendors.caveat_labels || EXCLUDED.caveat_labels) AS label
-                        WHERE label IS NOT NULL AND btrim(label) <> ''
-                        ORDER BY label
-                    )
-                ),
-                updated_by_user_id = EXCLUDED.updated_by_user_id,
-                updated_at = NOW()
-            "#,
-        )
-        .bind(&vendor_id)
-        .bind(&input.vendor_slug)
-        .bind(&input.vendor_name)
-        .bind(&input.category)
-        .bind(&input.service_area)
-        .bind(&input.address)
-        .bind(&input.website_url)
-        .bind(&input.contact_phone)
-        .bind(&input.contact_email)
-        .bind(&input.source_url)
-        .bind(&input.source_label)
-        .bind(&input.source_checked_at)
-        .bind(&input.status)
-        .bind(&input.notes)
-        .bind(&input.evidence)
-        .bind(&input.caveat_labels)
-        .bind(discovered_by_user_id)
-        .execute(&self.pool)
-        .await?;
-        Ok(())
     }
 
     pub async fn delete_wedding_vendor(&self, vendor_id: &str) -> Result<bool, sqlx::Error> {
