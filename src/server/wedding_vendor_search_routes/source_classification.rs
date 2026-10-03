@@ -3,7 +3,6 @@
 //! Search engines rank pages, not businesses, so a result is never a vendor until it has been
 //! classified and folded into an entity with a verified identity.
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum SourceKind {
     Official,
