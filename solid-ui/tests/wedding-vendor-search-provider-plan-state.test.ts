@@ -25,7 +25,7 @@ test("provider plan creates Google Places place-type queries from wedding intake
   assert.equal(plan.providerPlans[0]?.queries.length, 2);
   assert.deepEqual(plan.providerPlans[0]?.queries[0]?.googlePlaceTypes, ["event_venue", "restaurant", "lodging"]);
   assert.deepEqual(plan.providerPlans[0]?.queries[1]?.googlePlaceTypes, ["florist"]);
-  assert.match(plan.providerPlans[0]?.queries[0]?.query ?? "", /wedding venue near Sydney/i);
+  assert.match(plan.providerPlans[0]?.queries[0]?.query ?? "", /^wedding venue Sydney$/i);
   assert.ok(plan.providerPlans[0]?.queries[0]?.expectedFields.includes("place id"));
 });
 
@@ -43,8 +43,12 @@ test("provider plan uses approximate location for venue search when venue area i
     approximateLocation: "Sydney, Australia",
   });
 
-  assert.match(plan.providerPlans[0]?.queries[0]?.query ?? "", /wedding venue near Sydney, Australia/i);
-  assert.match(plan.providerPlans[1]?.queries[0]?.query ?? "", /wedding venue near Sydney, Australia services packages/i);
+  const placesQuery = plan.providerPlans[0]?.queries[0]?.query ?? "";
+  const braveQuery = plan.providerPlans[1]?.queries[0]?.query ?? "";
+  assert.equal(placesQuery, "wedding venue Sydney, Australia");
+  assert.doesNotMatch(placesQuery, /waterfront/i);
+  assert.match(braveQuery, /^wedding venue near Sydney, Australia waterfront ceremony/i);
+  assert.doesNotMatch(braveQuery, /packages|price|reviews/i);
 });
 
 test("provider plan carries photography scope and music direction into live-search queries", () => {

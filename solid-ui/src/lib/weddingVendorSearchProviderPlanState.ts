@@ -135,7 +135,8 @@ function queryFor(input: {
   const contextPart = `${scopePart}${musicPart}`;
   const areaPhrase = input.location || "the wedding area";
   if (input.providerKind === "google_places") {
-    return `wedding ${label} near ${areaPhrase}${input.preferences ? ` ${input.preferences}` : ""}${contextPart}`.replace(/\s+/g, " ").trim();
+    // Places discovers entities; preference matching belongs to the ranker, and long preference text dilutes the match.
+    return `wedding ${label} ${areaPhrase}`.replace(/\s+/g, " ").trim();
   }
   if (input.providerKind === "overpass") {
     return `${areaPhrase} ${label}${contextPart}`.replace(/\s+/g, " ").trim();
@@ -144,7 +145,8 @@ function queryFor(input: {
   if (input.providerKind === "exa_search") {
     return `source-backed wedding ${label} ${areaConnector} ${input.preferences || "packages reviews"} official website instagram contact${contextPart}`.replace(/\s+/g, " ").trim();
   }
-  return `wedding ${label} ${areaConnector} services packages price reviews${input.preferences ? ` ${input.preferences}` : ""}${contextPart}`.replace(/\s+/g, " ").trim();
+  // Words like "packages price reviews" attract directory pages rather than the vendor's own site.
+  return `wedding ${label} ${areaConnector}${input.preferences ? ` ${input.preferences}` : ""}${contextPart}`.replace(/\s+/g, " ").trim();
 }
 
 function guardrailsFor(providerKind: WeddingVendorSearchProviderKind): string[] {
