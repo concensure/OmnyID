@@ -5,6 +5,7 @@ import {
   type WeddingArtifactSummary,
 } from "@/lib/weddingArtifactState";
 import type { AfpMessage } from "@/lib/api";
+import type { WeddingVendorRankingCardFields } from "@/lib/weddingVendorRankingState";
 import type { WeddingIntegrationReadinessState, WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
 import {
   buildWeddingPacketExportCapabilityState,
@@ -228,7 +229,7 @@ export type WeddingWorkspaceArtifactPreview = {
     preferenceMatch: string;
     situationFit: string;
     verificationLabel: string;
-  }>;
+  } & WeddingVendorRankingCardFields>;
   persistedSelectedVendorChoices: Array<{
     optionId: string;
     label: string;

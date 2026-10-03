@@ -237,10 +237,14 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
     : null;
 
   assert.equal(comparison.status, "created");
-  assert.equal(comparison.topChoiceCount, 4);
+  assert.equal(comparison.topChoiceCount, 3, "cards show at most three vendors still to verify");
   assert.equal(comparison.summary?.title, "Top vendor comparison");
   assert.equal(comparison.summary?.vendorLabels[0], "Harbour Studio");
-  assert.match(comparison.markdown ?? "", /Top five candidates/i);
+  assert.match(comparison.markdown ?? "", /## Bookable candidates/);
+  assert.match(comparison.markdown ?? "", /## High-potential — availability needs confirmation/);
+  assert.match(comparison.markdown ?? "", /## Excluded/);
+  assert.match(comparison.markdown ?? "", /## Suggested next actions/);
+  assert.match(comparison.markdown ?? "", /Unknown facts are never treated as negatives/);
   assert.match(comparison.markdown ?? "", /documentary/i);
   assert.match(comparison.markdown ?? "", /Confirm service area, date availability/i);
   assert.equal(a2ui?.schema_version, "a2ui.v1");
@@ -248,14 +252,14 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   const recommendationCards = (a2ui?.components as Array<Record<string, unknown>>)[0] as Record<string, unknown> | undefined;
   const recommendationCardProps = recommendationCards?.props as Record<string, unknown> | undefined;
   assert.equal(recommendationCards?.type, "vendor_recommendation_cards");
-  assert.equal((recommendationCardProps?.cards as Array<Record<string, unknown>>).length, 4);
+  assert.equal((recommendationCardProps?.cards as Array<Record<string, unknown>>).length, 3);
   const comparisonTable = (a2ui?.components as Array<Record<string, unknown>>)[1] as Record<string, unknown> | undefined;
   const comparisonProps = comparisonTable?.props as Record<string, unknown> | undefined;
   assert.equal(comparisonTable?.type, "comparison_table");
   assert.equal((comparisonProps?.selection as Record<string, unknown> | undefined)?.mode, "multi");
   assert.equal(((comparisonProps?.selection as Record<string, unknown> | undefined)?.confirm_action as Record<string, unknown> | undefined)?.kind, "confirm_vendor_choices");
   const columnActions = comparisonProps?.column_actions as Array<Record<string, unknown>>;
-  assert.equal(columnActions.length, 4);
+  assert.equal(columnActions.length, 3);
   assert.equal(columnActions[0]?.vendor_label, "Harbour Studio");
   assert.equal(columnActions[0]?.source_url, "https://harbour-studio.example");
   assert.equal((columnActions[0]?.actions as Array<Record<string, unknown>>)[0]?.kind, "select_vendor_for_follow_up");
@@ -264,28 +268,35 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).topChoiceLabels, [
     "Harbour Studio",
     "Budget Lens",
-    "Portrait Hall",
     "Generic Events",
   ]);
   const comparisonMetadata = comparison.artifactInput?.metadata as Record<string, unknown>;
   const recommendationHandoff = comparisonMetadata.vendorComparisonHandoff as Record<string, unknown>;
   assert.match(String(recommendationHandoff.recommendationLabel), /Harbour Studio/i);
   assert.deepEqual(recommendationHandoff.whyLabels as string[], [
-    "4 source-backed choices ranked from live search results",
-    "2 choices matched stated preferences",
-    "2 choices surfaced package/pricing language",
+    "4 source-backed vendors found: 0 booked, 0 bookable, 4 awaiting availability confirmation",
+    "1 choice matched stated preferences",
+    "Price evidence is not clear yet",
     "Intake signals used: Preferences: documentary style and transparent...; Budget comfort: balanced budget",
     "Location context: Sydney",
     "Provider evidence: Brave Search",
   ]);
-  assert.equal(recommendationHandoff.confidenceLabel, "Confidence: strong");
-  assert.match(String(recommendationHandoff.nextActionLabel), /approval-gated follow-up/i);
+  assert.equal(recommendationHandoff.confidenceLabel, "Confidence: low");
+  assert.match(String(recommendationHandoff.nextActionLabel), /Check availability with Harbour Studio/i);
+  assert.deepEqual(
+    (comparisonMetadata.vendorComparisonNextActions as Array<Record<string, unknown>>)[0]?.kind,
+    "check_availability",
+  );
   assert.equal(((comparisonMetadata.vendorComparisonSelection as Record<string, unknown>).confirmAction), "confirm_vendor_choices");
   assert.equal(((comparisonMetadata.vendorComparisonSelection as Record<string, unknown>).approvalRequiredBeforeOutreach), true);
   assert.equal(((comparisonMetadata.vendorComparisonSelection as Record<string, unknown>).selectedVendorsContinueToFollowUp), true);
   assert.equal(((comparisonMetadata.vendorComparisonSelection as Record<string, unknown>).unselectedVendorsLeaveActiveQueues), true);
   assert.equal(((comparisonMetadata.vendorComparisonSelection as Record<string, unknown>).closedVendorHistoryRetained), true);
-  assert.equal((comparisonMetadata.topChoiceActionRows as Array<Record<string, unknown>>).length, 4);
+  assert.equal((comparisonMetadata.topChoiceActionRows as Array<Record<string, unknown>>).length, 3);
+  const firstCard = (comparisonMetadata.topChoiceCards as Array<Record<string, unknown>>)[0] ?? {};
+  assert.equal(firstCard.group, "verify");
+  assert.equal(firstCard.availability_state, "unknown");
+  assert.match(String(firstCard.score_label), /^\d+ fit · (low|medium|high) confidence$/);
   const semanticObject = comparisonMetadata.semantic_object as Record<string, unknown>;
   const semanticActions = semanticObject.actions as Array<Record<string, unknown>>;
   assert.deepEqual(semanticActions.map((action) => action.kind), [
@@ -296,7 +307,7 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   assert.equal(semanticActions.find((action) => action.kind === "prepare_follow_up_for_selected_vendors")?.targetMenu, "response_queue");
   assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).sourceProviderLabels, ["Brave Search"]);
   assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).sourceCountsByProvider, { "Brave Search": 4 });
-  assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).sourceUrlCount, 4);
+  assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).sourceUrlCount, 3);
   assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).parentSourceUrlCount, 4);
 });
 
@@ -373,11 +384,14 @@ test("buildWeddingVendorComparisonArtifactState ranks beachfront gothic venue fi
   const gothicCard = cards.find((card) => card.title === "St Josephs Guesthouse");
   assert.equal(palmCard?.image_url, "https://cdn.example/palm-beach-estate.webp");
   assert.equal(gothicCard?.image_url, "https://cdn.example/st-josephs.jpg");
-  assert.match(String(palmCard?.situation_fit), /Beachfront\/coastal clue/i);
-  assert.match(String(gothicCard?.situation_fit), /Gothic\/heritage clue/i);
+  assert.match(String(palmCard?.preference_match), /beachfront/i);
+  assert.match(String(gothicCard?.preference_match), /gothic/i);
+  assert.match(String(gothicCard?.situation_fit), /Strong on: Style and preferences|Fit requires source-page review/);
+  assert.deepEqual(gothicCard?.unknown_constraints, ["capacity"]);
+  assert.equal(gothicCard?.group, "verify");
   assert.equal(cardComponent.type, "vendor_recommendation_cards");
   assert.ok(((cardComponent.props as Record<string, unknown>).cards as Array<Record<string, unknown>>).some((card) => card.title === "Palm Beach Estate"));
-  assert.ok((comparisonMetadata.vendorComparisonRankingSignals as string[]).includes("atmosphere_description"));
+  assert.ok((comparisonMetadata.vendorComparisonRankingSignals as string[]).includes("personal_utility"));
 });
 
 test("vendor search artifacts preserve website and map actions from live source packets", async () => {
@@ -489,8 +503,13 @@ test("buildWeddingVendorComparisonArtifactState uses structured intake atmospher
   assert.ok((recommendationHandoff.whyLabels as string[]).some((label) =>
     /Intake signals used: Preferences: transparent pricing; Atmosphere: Relaxed candlelit garden dinner/i.test(label)
   ));
-  assert.ok((comparisonMetadata.vendorComparisonRankingSignals as string[]).includes("atmosphere_description"));
-  assert.ok((comparisonMetadata.vendorComparisonRankingSignals as string[]).includes("inspiration_links"));
+  assert.deepEqual(comparisonMetadata.vendorComparisonRankingSignals, [
+    "eligibility_hard_constraints",
+    "availability_state",
+    "personal_utility",
+    "evidence_confidence",
+    "next_action_value",
+  ]);
 });
 
 test("buildWeddingVendorSearchArtifactState does not create artifacts from dry-run or failed search", async () => {
@@ -705,8 +724,8 @@ test("buildWeddingVendorSearchTaskItems projects top-three comparison as a decis
   assert.equal(comparisonTask?.kind, "decision");
   assert.match(comparisonTask?.title ?? "", /top-three comparison/i);
   assert.deepEqual((comparisonTask?.metadata as Record<string, unknown>).vendor_comparison_top_choice_labels, [
-    "Harbour Studio",
     "Budget Lens",
+    "Harbour Studio",
     "Portrait Hall",
   ]);
   assert.equal((comparisonTask?.metadata as Record<string, unknown>).a2ui_primary_action, "open_vendor_comparison");

@@ -12,6 +12,25 @@ import {
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 import type { WeddingVendorSearchExecutionState } from "@/lib/weddingVendorSearchExecutorState";
+import {
+  a2uiForComparison,
+  comparisonMarkdown,
+  comparisonRecommendationHandoff,
+  comparisonSearchLabels,
+  comparisonSummaryLabel,
+  sourceUrlLinks,
+  usableSourceUrl,
+  vendorChoiceActionRows,
+  vendorChoiceCards,
+  vendorChoiceContactDetails,
+} from "@/lib/weddingVendorComparisonPresentationState";
+import {
+  normalizeWeddingVendorSourceEvidence,
+  rankWeddingVendorCandidates,
+  type WeddingVendorRankedCandidate,
+  type WeddingVendorRankingResult,
+  type WeddingVendorRankingSource,
+} from "@/lib/weddingVendorRankingState";
 
 export type WeddingVendorSearchArtifactState = {
   status: "created" | "not_created";
@@ -54,152 +73,6 @@ export type WeddingVendorComparisonInput = {
   vendorCategories?: readonly string[] | null;
 };
 
-type RankedVendorSource = {
-  id: string;
-  rank: number;
-  title: string;
-  provider: string;
-  url: string;
-  websiteUrl: string | null;
-  mapUrl: string | null;
-  imageUrl: string | null;
-  address: string | null;
-  phone: string | null;
-  email: string | null;
-  instagramUrl: string | null;
-  snippet: string;
-  score: number;
-  preferenceMatchLabel: string;
-  situationFitLabel: string;
-  verificationLabel: string;
-  rationaleLabels: string[];
-};
-
-function vendorChoiceActionRows(choices: readonly RankedVendorSource[]): Array<Record<string, unknown>> {
-  return choices.map((choice) => {
-    const actions: Array<Record<string, unknown>> = [
-      {
-        kind: "select_vendor_for_follow_up",
-        label: `Select ${choice.title}`,
-        enabled: true,
-        requires_user_confirmation: true,
-        selection_value: choice.id,
-      },
-    ];
-    const addLinkAction = (kind: string, label: string, href: string | null) => {
-      const url = clean(href);
-      if (!url || !usableSourceUrl({ url })) return;
-      if (actions.some((action) => clean(action.href).toLowerCase() === url.toLowerCase())) return;
-      actions.push({
-        kind,
-        label,
-        enabled: true,
-        href: url,
-        external: true,
-      });
-    };
-    addLinkAction("open_vendor_website", "Open website", choice.websiteUrl);
-    addLinkAction("open_vendor_map", "Open map/reviews", choice.mapUrl);
-    addLinkAction("open_vendor_source", choice.websiteUrl || choice.mapUrl ? "Open source" : "Open source", choice.url);
-    actions.push(
-      {
-        kind: "prepare_approval_gated_outreach",
-        label: "Prepare follow-up",
-        enabled: true,
-        requires_user_confirmation: true,
-        approval_required_before_outreach: true,
-        no_external_send_without_approval: true,
-      },
-    );
-    return {
-      choice_id: choice.id,
-      rank: choice.rank,
-      vendor_label: choice.title,
-      source_url: choice.url,
-      website_url: choice.websiteUrl,
-      map_url: choice.mapUrl,
-      address: choice.address,
-      phone: choice.phone,
-      email: choice.email,
-      instagram_url: choice.instagramUrl,
-      source_provider: choice.provider,
-      actions,
-    };
-  });
-}
-
-function vendorChoiceCards(choices: readonly RankedVendorSource[]): Array<Record<string, unknown>> {
-  return choices.map((choice) => ({
-    choice_id: choice.id,
-    rank: choice.rank,
-    title: choice.title,
-    image_url: choice.imageUrl,
-    image_alt: choice.imageUrl ? `${choice.title} venue image` : null,
-    provider: choice.provider,
-    source_url: choice.url,
-    website_url: choice.websiteUrl,
-    map_url: choice.mapUrl,
-    address: choice.address,
-    phone: choice.phone,
-    email: choice.email,
-    instagram_url: choice.instagramUrl,
-    score: choice.score,
-    score_label: `Fit score ${choice.score}`,
-    preference_match: choice.preferenceMatchLabel,
-    situation_fit: choice.situationFitLabel,
-    rationale_labels: choice.rationaleLabels.slice(0, 5),
-    verification_label: choice.verificationLabel,
-  }));
-}
-
-function vendorChoiceContactDetails(choice: RankedVendorSource): Record<string, unknown> {
-  return {
-    choice_id: choice.id,
-    vendor_label: choice.title,
-    website_url: choice.websiteUrl,
-    map_url: choice.mapUrl,
-    instagram_url: choice.instagramUrl,
-    email: choice.email,
-    phone: choice.phone,
-    address: choice.address,
-    source_url: choice.url,
-    source_provider: choice.provider,
-  };
-}
-
-function contactSummaryLabel(choice: RankedVendorSource): string {
-  const labels = [
-    choice.websiteUrl ? "website" : null,
-    choice.instagramUrl ? "Instagram" : null,
-    choice.email ? "email" : null,
-    choice.phone ? "phone" : null,
-    choice.address ? "address" : null,
-    choice.mapUrl ? "map" : null,
-  ].filter(Boolean);
-  return labels.length > 0 ? labels.join(", ") : "Open source to verify contact details";
-}
-
-function sourceUrlLinks(
-  source: { title?: string | null; url?: string | null; website_url?: string | null; map_url?: string | null; instagram_url?: string | null },
-  labelPrefix = "",
-): Array<{ label: string; url: string }> {
-  const title = clean(source.title) || "Vendor source";
-  const entries = [
-    { label: `${labelPrefix}${title}`, url: clean(source.url) },
-    { label: `${labelPrefix}${title} website`, url: clean(source.website_url) },
-    { label: `${labelPrefix}${title} Instagram`, url: clean(source.instagram_url) },
-    { label: `${labelPrefix}${title} map/reviews`, url: clean(source.map_url) },
-  ];
-  const seen = new Set<string>();
-  return entries.flatMap((entry) => {
-    if (!usableSourceUrl({ url: entry.url })) return [];
-    const key = entry.url.toLowerCase();
-    if (seen.has(key)) return [];
-    seen.add(key);
-    return [entry];
-  });
-}
-
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -220,13 +93,6 @@ function uniqueStrings(values: readonly unknown[], limit = 24): string[] {
     if (result.length >= limit) break;
   }
   return result;
-}
-
-function tokenize(value: unknown): string[] {
-  return uniqueStrings(clean(value)
-    .toLowerCase()
-    .split(/[^a-z0-9]+/i)
-    .filter((token) => token.length >= 4 && !/^(wedding|vendor|vendors|with|from|that|this|have|need|needs|style)$/i.test(token)), 32);
 }
 
 function decodeSnippetText(value: string): string {
@@ -250,19 +116,6 @@ function vendorNameFromHighlightedSnippet(value: string): string | null {
   return candidate;
 }
 
-function comparisonPreferenceText(input: WeddingVendorComparisonInput): string {
-  return [
-    input.preferences,
-    input.atmosphereDescription,
-    input.budgetComfort,
-    input.guestCount,
-    input.dateOrSeason,
-    ...(input.topPriorities ?? []),
-    ...(input.vendorCategories ?? []),
-    ...(input.inspirationImageUrls ?? []),
-  ].filter(Boolean).join(" ");
-}
-
 function comparisonPreferenceSignals(input: WeddingVendorComparisonInput): string[] {
   return uniqueStrings([
     clean(input.preferences) ? `Preferences: ${clean(input.preferences)}` : null,
@@ -271,20 +124,6 @@ function comparisonPreferenceSignals(input: WeddingVendorComparisonInput): strin
     ...(input.topPriorities ?? []).map((priority) => `Priority: ${priority}`),
     ...(input.inspirationImageUrls ?? []).map((url) => `Inspiration link: ${url}`),
   ], 12);
-}
-
-function compactPreferenceSignalLabel(signals: readonly string[]): string | null {
-  const labels = signals
-    .map((signal) => {
-      const [label, ...rest] = clean(signal).split(":");
-      const detail = clean(rest.join(":"));
-      if (!label || !detail) return clean(signal);
-      const boundedDetail = detail.length > 36 ? `${detail.slice(0, 33).trim()}...` : detail;
-      return `${label}: ${boundedDetail}`;
-    })
-    .filter(Boolean)
-    .slice(0, 3);
-  return labels.length > 0 ? `Intake signals used: ${labels.join("; ")}` : null;
 }
 
 function artifactId(metadata: WeddingPlanningMetadata, execution: WeddingVendorSearchExecutionState): string {
@@ -456,22 +295,6 @@ function vendorComparisonTask(
   );
 }
 
-function usableSourceUrl(source: { url?: string | null }): boolean {
-  const value = clean(source.url);
-  if (!/^https?:\/\//i.test(value)) return false;
-  try {
-    const url = new URL(value);
-    const hostname = url.hostname.toLowerCase();
-    return hostname !== "localhost"
-      && hostname !== "127.0.0.1"
-      && hostname !== "0.0.0.0"
-      && hostname !== "::1"
-      && hostname !== "[::1]";
-  } catch {
-    return false;
-  }
-}
-
 function publicImageUrl(value: unknown): string | null {
   const url = clean(value);
   if (/^\/wedding\/vendor-photo\/google\?name=/i.test(url)) return url;
@@ -489,270 +312,64 @@ function sourceHostname(url: string): string {
   }
 }
 
-function rankedVendorSources(input: WeddingVendorComparisonInput): RankedVendorSource[] {
+const MAX_BOOKABLE_CARDS = 3;
+const MAX_VERIFY_CARDS = 3;
+
+function rankingSourcesFor(input: WeddingVendorComparisonInput): WeddingVendorRankingSource[] {
   const execution = input.execution;
-  const preferenceTokens = tokenize(comparisonPreferenceText(input));
-  const locationTokens = tokenize(input.location);
-  const categoryTokens = tokenize((input.vendorCategories ?? []).join(" "));
-  const venueSearchIntent = /\b(venue|venues|reception|ceremony|location|locations|beachfront|waterfront)\b/i.test(
-    `${comparisonPreferenceText(input)} ${(input.vendorCategories ?? []).join(" ")}`,
-  );
   const seen = new Set<string>();
-  const ranked = execution.sources
-    .filter(usableSourceUrl)
-    .flatMap((source, index): RankedVendorSource[] => {
-      const rawSnippet = clean(source.snippet);
-      const inferredTitle = vendorNameFromHighlightedSnippet(rawSnippet);
-      const title = inferredTitle || clean(source.title) || sourceHostname(clean(source.url)) || `Vendor ${index + 1}`;
-      const url = clean(source.url);
-      const websiteUrl = clean(source.website_url) || null;
-      const mapUrl = clean(source.map_url) || null;
-      const imageUrl = publicImageUrl(source.photo_url);
-      const address = clean(source.address) || null;
-      const phone = clean(source.phone) || null;
-      const email = clean(source.email) || null;
-      const instagramUrl = clean(source.instagram_url) || null;
-      const provider = clean(source.provider) || clean(execution.providerLabel) || "Search";
-      const snippet = stripSnippetHtml(rawSnippet);
-      const key = `${title.toLowerCase()}|${sourceHostname(url).toLowerCase()}`;
-      if (!url || seen.has(key)) return [];
-      seen.add(key);
-      const haystack = `${title} ${snippet} ${provider} ${url}`.toLowerCase();
-      const preferenceMatches = preferenceTokens.filter((token) => haystack.includes(token));
-      const locationMatches = locationTokens.filter((token) => haystack.includes(token));
-      const categoryMatches = categoryTokens.filter((token) => haystack.includes(token));
-      const venueSignal = venueSearchIntent && /\b(venue|venues|reception|ceremony|estate|guesthouse|ballroom|function|events?|weddings?)\b/i.test(haystack);
-      const beachfrontSignal = venueSearchIntent && /\b(beachfront|beach|waterfront|ocean|coastal|seaside|harbou?r|shore|shelly|palm beach|manly|bondi)\b/i.test(haystack);
-      const gothicSignal = venueSearchIntent && /\b(gothic|heritage|historic|sandstone|castle|church|chapel|cathedral|victorian|revival|convict)\b/i.test(haystack);
-      const capacitySignal = venueSearchIntent && /\b(?:60|sixty|guests?|50\s*(?:-|to)\s*80|40\s*(?:-|to)\s*80|intimate|small wedding)\b/i.test(haystack);
-      const transparentPricing = /\b(package|packages|pricing|price|investment|quote|rates?)\b/i.test(haystack);
-      const portfolioSignal = /\b(portfolio|gallery|review|reviews|testimonial|instagram|award)\b/i.test(haystack);
-      const availabilitySignal = /\b(available|availability|booking|bookings|calendar|date)\b/i.test(haystack);
-      const directorySignal = /\b(best|top|guide|directory|list|venues in|wedding venues)\b/i.test(`${title} ${sourceHostname(url)}`);
-      const score = 10
-        + preferenceMatches.length * 5
-        + categoryMatches.length * 4
-        + locationMatches.length * 3
-        + (venueSignal ? 4 : 0)
-        + (beachfrontSignal ? 6 : 0)
-        + (gothicSignal ? 6 : 0)
-        + (capacitySignal ? 4 : 0)
-        + (transparentPricing ? 3 : 0)
-        + (portfolioSignal ? 2 : 0)
-        + (availabilitySignal ? 2 : 0)
-        + (imageUrl ? 2 : 0)
-        + (/google_places|google/i.test(provider) ? 2 : 0)
-        + (/exa_search|exa search/i.test(provider) ? 1 : 0)
-        - (directorySignal && !/google_places|admin vendor database|exa_search|exa search/i.test(provider) ? 2 : 0)
-        + Math.max(0, 4 - index);
-      const rationaleLabels = [
-        preferenceMatches.length > 0 ? `Matches ${preferenceMatches.slice(0, 3).join(", ")}` : null,
-        categoryMatches.length > 0 ? `Category signal: ${categoryMatches.slice(0, 2).join(", ")}` : null,
-        locationMatches.length > 0 ? `Location signal: ${locationMatches.slice(0, 2).join(", ")}` : null,
-        venueSignal ? "Venue/reception signal found" : null,
-        beachfrontSignal ? "Beachfront/coastal signal found" : null,
-        gothicSignal ? "Gothic/heritage atmosphere signal found" : null,
-        capacitySignal ? "Capacity clue fits around 60 guests" : null,
-        transparentPricing ? "Pricing/package language found" : null,
-        portfolioSignal ? "Portfolio/review signal found" : null,
-        availabilitySignal ? "Availability/booking signal found" : null,
-        imageUrl ? "Image available for card display" : null,
-        inferredTitle ? "Venue name inferred from source snippet" : null,
-        `Source provider: ${provider}`,
-      ].filter((item): item is string => Boolean(item));
-      return [{
-        id: `vendor_choice:${safeWeddingLabel(title)}:${index + 1}`,
-        rank: 0,
-        title,
-        provider,
-        url,
-        websiteUrl,
-        mapUrl,
-        imageUrl,
-        address,
-        phone,
-        email,
-        instagramUrl,
-        snippet,
-        score,
-        preferenceMatchLabel: preferenceMatches.length > 0
-          ? preferenceMatches.slice(0, 4).join(", ")
-          : "No direct preference keyword match; review manually.",
-        situationFitLabel: [
-          categoryMatches.length > 0 ? `Category: ${categoryMatches.slice(0, 2).join(", ")}` : null,
-          locationMatches.length > 0 ? `Location: ${locationMatches.slice(0, 2).join(", ")}` : null,
-          venueSignal ? "Venue/reception clue" : null,
-          beachfrontSignal ? "Beachfront/coastal clue" : null,
-          gothicSignal ? "Gothic/heritage clue" : null,
-          capacitySignal ? "Capacity around 60 clue" : null,
-          transparentPricing ? "Package/pricing clue" : null,
-          portfolioSignal ? "Portfolio/review clue" : null,
-        ].filter(Boolean).join("; ") || "Fit requires source-page review.",
-        verificationLabel: "Confirm service area, date availability, package inclusions, travel, overtime, cancellation, and final quote before outreach.",
-        rationaleLabels,
-      }];
-    })
-    .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title))
-    .slice(0, 5);
-  return ranked.map((item, index) => ({ ...item, rank: index + 1 }));
+  return execution.sources.filter(usableSourceUrl).flatMap((source, index): WeddingVendorRankingSource[] => {
+    const rawSnippet = clean(source.snippet);
+    const title = vendorNameFromHighlightedSnippet(rawSnippet)
+      || clean(source.title)
+      || sourceHostname(clean(source.url))
+      || `Vendor ${index + 1}`;
+    const url = clean(source.url);
+    const key = `${title.toLowerCase()}|${sourceHostname(url).toLowerCase()}`;
+    if (!url || seen.has(key)) return [];
+    seen.add(key);
+    return [{
+      ...normalizeWeddingVendorSourceEvidence(source as unknown as Record<string, unknown>),
+      id: `vendor_choice:${safeWeddingLabel(title)}:${index + 1}`,
+      title,
+      provider: clean(source.provider) || clean(execution.providerLabel) || "Search",
+      url,
+      websiteUrl: clean(source.website_url) || null,
+      mapUrl: clean(source.map_url) || null,
+      imageUrl: publicImageUrl(source.photo_url),
+      address: clean(source.address) || null,
+      phone: clean(source.phone) || null,
+      email: clean(source.email) || null,
+      instagramUrl: clean(source.instagram_url) || null,
+      snippet: stripSnippetHtml(rawSnippet),
+    }];
+  });
 }
 
-function a2uiForComparison(choices: readonly RankedVendorSource[], summary: string): Record<string, unknown> {
-  const columns = choices.map((choice) => `#${choice.rank} ${choice.title}`);
-  const choiceActions = vendorChoiceActionRows(choices);
-  const cards = vendorChoiceCards(choices);
-  return {
-    schema_version: "a2ui.v1",
-    kind: "panel",
-    title: "Top vendor comparison",
-    description: summary,
-    components: [
-      {
-        type: "vendor_recommendation_cards",
-        props: {
-          title: choices.length > 3 ? "Recommended venue shortlist" : "Recommended top three",
-          description: "Images appear only when a safe public image URL is available from a provider or the admin vendor database.",
-          cards,
-        },
-      },
-      {
-        type: "comparison_table",
-        props: {
-          title: choices.length > 3 ? "Top vendor choices" : "Top three vendor choices",
-          description: summary,
-          columns,
-          rows: [
-            { label: "Why surfaced", values: choices.map((choice) => choice.rationaleLabels.slice(0, 2).join("; ")) },
-            { label: "Preference match", values: choices.map((choice) => choice.preferenceMatchLabel) },
-            { label: "Situation fit", values: choices.map((choice) => choice.situationFitLabel) },
-            { label: "Contact details", values: choices.map((choice) => contactSummaryLabel(choice)) },
-            { label: "Verify before action", values: choices.map((choice) => choice.verificationLabel) },
-            { label: "Source", values: choices.map((choice) => choice.url) },
-          ],
-          selection: {
-            mode: "multi",
-            id_field: "choice_id",
-            min_selected: 1,
-            confirm_action: {
-              kind: "confirm_vendor_choices",
-              label: "Confirm selected vendors",
-              requires_user_confirmation: true,
-              approval_required_before_outreach: true,
-            },
-          },
-          column_actions: choiceActions,
-          footer_actions: [
-            {
-              kind: "confirm_vendor_choices",
-              label: "Confirm selected vendors",
-              enabled: true,
-              requires_user_confirmation: true,
-            },
-            {
-              kind: "prepare_follow_up_for_selected_vendors",
-              label: "Prepare follow-up for selected",
-              enabled: true,
-              requires_user_confirmation: true,
-              approval_required_before_outreach: true,
-              no_external_send_without_approval: true,
-            },
-          ],
-        },
-      },
-    ],
-    actions: [
-      {
-        kind: "confirm_vendor_choices",
-        label: "Confirm selected vendors",
-        enabled: true,
-        requires_user_confirmation: true,
-      },
-      {
-        kind: "prepare_follow_up_for_selected_vendors",
-        label: "Prepare follow-up for selected",
-        enabled: true,
-        requires_user_confirmation: true,
-        approval_required_before_outreach: true,
-      },
-    ],
-  };
-}
-
-function comparisonRecommendationHandoff(input: {
-  choices: readonly RankedVendorSource[];
-  execution: WeddingVendorSearchExecutionState;
-  preferenceSignals?: readonly string[] | null;
-  preferences?: string | null;
-  location?: string | null;
-}): Record<string, unknown> {
-  const topChoice = input.choices[0] ?? null;
-  const liveSourceCount = input.execution.sources.filter(usableSourceUrl).length;
-  const preferenceBackedCount = input.choices.filter((choice) =>
-    !/No direct preference keyword match/i.test(choice.preferenceMatchLabel)
-  ).length;
-  const pricingSignalCount = input.choices.filter((choice) => /pricing|package/i.test(choice.situationFitLabel)).length;
-  const confidenceLabel = liveSourceCount >= 3 && preferenceBackedCount >= 2
-    ? "Confidence: strong"
-    : liveSourceCount >= 2 && (preferenceBackedCount > 0 || pricingSignalCount > 0)
-      ? "Confidence: developing"
-      : "Confidence: early";
-  return {
-    recommendationLabel: topChoice
-      ? `Start by reviewing ${topChoice.title}, then select every vendor you want OmnyID to pursue.`
-      : "Review source-backed vendor options before outreach.",
-    whyLabels: [
-      `${input.choices.length} source-backed choice${input.choices.length === 1 ? "" : "s"} ranked from live search results`,
-      preferenceBackedCount > 0
-        ? `${preferenceBackedCount} choice${preferenceBackedCount === 1 ? "" : "s"} matched stated preferences`
-        : "Preference fit needs manual review",
-      pricingSignalCount > 0
-        ? `${pricingSignalCount} choice${pricingSignalCount === 1 ? "" : "s"} surfaced package/pricing language`
-        : "Pricing/package evidence is not clear yet",
-      compactPreferenceSignalLabel(input.preferenceSignals ?? []),
-      clean(input.location) ? `Location context: ${clean(input.location)}` : null,
-      `Provider evidence: ${clean(input.execution.providerLabel) || "live search"}`,
-    ].filter(Boolean),
-    confidenceLabel,
-    nextActionLabel: "Select one or more vendors for approval-gated follow-up.",
-  };
-}
-
-function comparisonMarkdown(input: WeddingVendorComparisonInput, choices: readonly RankedVendorSource[]): string {
-  const summary = "Ranked from live source results using preference, category, location, package/pricing, portfolio/review, and availability signals. This is not a booking or endorsement.";
-  return [
-    "# Top vendor comparison",
-    "",
-    summary,
-    "",
-    clean(input.preferences) ? `User preferences: ${clean(input.preferences)}` : null,
-    clean(input.atmosphereDescription) ? `Desired atmosphere: ${clean(input.atmosphereDescription)}` : null,
-    clean(input.location) ? `Planning location: ${clean(input.location)}` : null,
-    clean(input.budgetComfort) ? `Budget comfort: ${clean(input.budgetComfort)}` : null,
-    (input.topPriorities ?? []).length > 0 ? `Top priorities: ${(input.topPriorities ?? []).join(", ")}` : null,
-    (input.inspirationImageUrls ?? []).length > 0 ? `Inspiration links: ${(input.inspirationImageUrls ?? []).join(", ")}` : null,
-    (input.vendorCategories ?? []).length > 0 ? `Vendor categories: ${(input.vendorCategories ?? []).join(", ")}` : null,
-    "",
-    choices.length > 3 ? "## Top five candidates" : "## Top three",
-    "",
-    "| Rank | Vendor | Why this surfaced | Preference match | Situation fit | Contact details | Verify next | Source |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- |",
-    ...choices.map((choice) => [
-      `| ${choice.rank}`,
-      choice.title,
-      choice.rationaleLabels.slice(0, 3).join("; "),
-      choice.preferenceMatchLabel,
-      choice.situationFitLabel,
-      contactSummaryLabel(choice),
-      choice.verificationLabel,
-      choice.url,
-    ].join(" | ") + " |"),
-    "",
-    "## Guardrails",
-    "",
-    "- Treat this as a comparison starting point, not a recommendation to book.",
-    "- Ask the user to tick preferred vendors before drafting outreach.",
-    "- Reconfirm current pricing, date availability, inclusions, hidden fees, travel, overtime, cancellation, and deposit terms.",
-  ].filter((line): line is string => line !== null).join("\n");
+/** Cards and the table show what the couple can act on: booked, then bookable, then the best to verify. */
+function rankedVendorChoices(input: WeddingVendorComparisonInput): {
+  result: WeddingVendorRankingResult;
+  choices: WeddingVendorRankedCandidate[];
+} {
+  const result = rankWeddingVendorCandidates({
+    sources: rankingSourcesFor(input),
+    requirements: {
+      guestCount: input.guestCount,
+      budgetComfort: input.budgetComfort,
+      dateOrSeason: input.dateOrSeason,
+      location: input.location,
+      preferences: input.preferences,
+      topPriorities: input.topPriorities,
+      atmosphereDescription: input.atmosphereDescription,
+      vendorCategories: input.vendorCategories,
+    },
+  });
+  const choices = [
+    ...result.booked,
+    ...result.bookable.slice(0, MAX_BOOKABLE_CARDS),
+    ...result.verify.slice(0, MAX_VERIFY_CARDS),
+  ].map((choice, index) => ({ ...choice, rank: index + 1 }));
+  return { result, choices };
 }
 
 function markdownFor(
@@ -905,7 +522,7 @@ export function buildWeddingVendorComparisonArtifactState(
       topChoiceCount: 0,
     };
   }
-  const choices = rankedVendorSources(input);
+  const { result, choices } = rankedVendorChoices(input);
   if (choices.length === 0) {
     return {
       status: "not_created",
@@ -917,12 +534,8 @@ export function buildWeddingVendorComparisonArtifactState(
       topChoiceCount: 0,
     };
   }
-  const markdown = comparisonMarkdown(input, choices);
-  const summaryLabel = choices.length > 3
-    ? `Top ${Math.min(3, choices.length)} of ${choices.length} source-backed vendor choices are ready; expand for the rest.`
-    : choices.length >= 3
-      ? "Top three source-backed vendor choices are ready for user comparison."
-    : `${choices.length} source-backed vendor choice${choices.length === 1 ? "" : "s"} ready for user comparison.`;
+  const markdown = comparisonMarkdown({ context: input, result, choices });
+  const summaryLabel = comparisonSummaryLabel(choices, result);
   const sourceLinks = choices.flatMap((choice) => sourceUrlLinks({
     title: choice.title,
     url: choice.url,
@@ -931,13 +544,13 @@ export function buildWeddingVendorComparisonArtifactState(
     map_url: choice.mapUrl,
   }, `#${choice.rank} `));
   const topChoiceActionRows = vendorChoiceActionRows(choices);
-  const topChoiceCards = vendorChoiceCards(choices);
+  const topChoiceCards = vendorChoiceCards(choices, metadata.weddingPlanId || null);
   const preferenceSignals = comparisonPreferenceSignals(input);
   const recommendationHandoff = comparisonRecommendationHandoff({
     choices,
-    execution,
+    result,
+    providerLabel: execution.providerLabel,
     preferenceSignals,
-    preferences: input.preferences,
     location: input.location,
   });
   const providerKinds = metadataStrings(execution, "provider_kinds");
@@ -966,6 +579,7 @@ export function buildWeddingVendorComparisonArtifactState(
       topChoiceCards,
       topChoiceContactDetails: choices.map((choice) => vendorChoiceContactDetails(choice)),
       vendorComparisonPreferenceSignals: preferenceSignals,
+      vendorComparisonNextActions: result.nextActions,
       vendorComparisonHandoff: recommendationHandoff,
       vendorComparisonSelection: {
         mode: "multi",
@@ -982,15 +596,11 @@ export function buildWeddingVendorComparisonArtifactState(
         closedVendorHistoryRetained: true,
       },
       vendorComparisonRankingSignals: [
-        "user_preferences",
-        "location",
-        "vendor_category",
-        "atmosphere_description",
-        "top_priorities",
-        "inspiration_links",
-        "package_pricing_language",
-        "portfolio_review_language",
-        "availability_language",
+        "eligibility_hard_constraints",
+        "availability_state",
+        "personal_utility",
+        "evidence_confidence",
+        "next_action_value",
       ],
       semantic_object: {
         id: `wedding_vendor_comparison:${safeWeddingLabel(metadata.responseWorkspaceId)}`,
@@ -1004,7 +614,8 @@ export function buildWeddingVendorComparisonArtifactState(
           columns: [
             { label: "Vendor", kind: "option" },
             { label: "Why surfaced", kind: "text" },
-            { label: "Preference match", kind: "text" },
+            { label: "Fit and confidence", kind: "text" },
+            { label: "Availability", kind: "text" },
             { label: "Verify next", kind: "action" },
           ],
           rows: choices.map((choice) => ({
@@ -1012,8 +623,9 @@ export function buildWeddingVendorComparisonArtifactState(
             cells: [
               `#${choice.rank} ${choice.title}`,
               choice.rationaleLabels.slice(0, 2).join("; "),
-              choice.preferenceMatchLabel,
-              "Verify and select",
+              `${choice.fitLabel} · ${choice.confidenceLabel}`,
+              choice.availabilityLabel,
+              choice.group === "verify" ? "Check availability and select" : "Verify and select",
             ],
           })),
         },
@@ -1039,7 +651,7 @@ export function buildWeddingVendorComparisonArtifactState(
         ],
         semanticTags: ["wedding_comparison", "wedding_decision", "wedding_approval_required"],
       },
-      a2ui: a2uiForComparison(choices, summaryLabel),
+      a2ui: a2uiForComparison(choices, summaryLabel, metadata.weddingPlanId || null),
     },
     sourceLabels: uniqueStrings([
       "Top vendor comparison",
@@ -1049,15 +661,7 @@ export function buildWeddingVendorComparisonArtifactState(
       ...vendorCategories,
     ]),
     sourceLinks,
-    searchLabels: uniqueStrings([
-      "vendor comparison",
-      "top three vendors",
-      "top five vendors",
-      "top vendor choices",
-      "vendor shortlist",
-      ...choices.flatMap((choice) => [choice.title, choice.preferenceMatchLabel, choice.situationFitLabel]),
-      ...preferenceSignals,
-    ]),
+    searchLabels: comparisonSearchLabels(choices, preferenceSignals),
     vendorLabels: choices.map((choice) => choice.title),
     bodyText: markdown,
     exportTargets: ["markdown", "html", "browser_pdf"],

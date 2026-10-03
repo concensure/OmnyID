@@ -2,6 +2,7 @@
 import type { WeddingVendorContactWorkspaceCard } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
+import { weddingVendorRankingCardFieldsFromRecord } from "@/lib/weddingVendorRankingState";
 
 function contactChipValue(
   card: WeddingVendorContactWorkspaceCard,
@@ -37,6 +38,7 @@ export function weddingVendorFollowUpOutreachCardData(card: WeddingVendorContact
     preferenceMatch: "",
     situationFit: "",
     verificationLabel: "",
+    ...weddingVendorRankingCardFieldsFromRecord({ vendor_id: card.vendorId }),
   };
 }
 

@@ -1090,8 +1090,8 @@ test("buildWeddingResponseWorkspaceViewState projects selected top-three vendor 
   assert.ok(Array.isArray(comparisonNodeProps?.footer_actions));
   assert.equal((comparisonNodeProps?.selection as Record<string, unknown> | undefined)?.mode, "multi");
   assert.match(state.activePreview?.vendorComparisonHandoff?.recommendationLabel ?? "", /Harbour Studio/i);
-  assert.equal(state.activePreview?.vendorComparisonHandoff?.confidenceLabel, "Confidence: strong");
-  assert.ok(state.activePreview?.vendorComparisonHandoff?.whyLabels.some((label) => /source-backed choices/i.test(label)));
+  assert.equal(state.activePreview?.vendorComparisonHandoff?.confidenceLabel, "Confidence: low");
+  assert.ok(state.activePreview?.vendorComparisonHandoff?.whyLabels.some((label) => /source-backed vendors found/i.test(label)));
   assert.equal(
     state.activePreview?.vendorComparisonCards.find((card) => card.title === "Harbour Studio")?.imageUrl,
     "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc&max_width_px=720",

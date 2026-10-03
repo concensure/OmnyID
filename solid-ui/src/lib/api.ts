@@ -1,4 +1,5 @@
 import { customEventDetail, isRecord } from "./eventDetail";
+import { normalizeWeddingVendorSourceEvidence, type WeddingVendorAvailabilityUpdate, type WeddingVendorSourceEvidence } from "./weddingVendorRankingState";
 import { normalizeInboxSummary, type InboxSummary } from "./firstRunExperienceResponseState";
 import {
   fleetMasterInstance,
@@ -205,7 +206,7 @@ export type WeddingVendorSearchApiSource = {
   phone?: string | null;
   email?: string | null;
   instagram_url?: string | null;
-};
+} & WeddingVendorSourceEvidence;
 
 export type WeddingVendorSearchApiResponse = {
   ok: boolean;
@@ -4432,6 +4433,7 @@ function normalizeWeddingVendorSearchApiResponse(value: unknown): WeddingVendorS
         phone: typeof source.phone === "string" ? source.phone : null,
         email: typeof source.email === "string" ? source.email : null,
         instagram_url: typeof source.instagram_url === "string" ? source.instagram_url : null,
+        ...normalizeWeddingVendorSourceEvidence(source),
       }];
     })
     : [];
@@ -4452,6 +4454,7 @@ function normalizeWeddingVendorSearchApiResponse(value: unknown): WeddingVendorS
 }
 export const searchWeddingVendors = (body: {
   workspace_id?: string | null;
+  wedding_plan_id?: string | null;
   queries: WeddingVendorSearchApiQuery[];
   max_results_per_query?: number;
 }): Promise<WeddingVendorSearchApiResponse> =>
@@ -4459,6 +4462,9 @@ export const searchWeddingVendors = (body: {
     method: "POST",
     bodyJson: body,
   }).then(normalizeWeddingVendorSearchApiResponse);
+
+export const recordWeddingVendorAvailability = (vendorId: string, body: WeddingVendorAvailabilityUpdate) =>
+  apiFetch<unknown>(`/wedding/vendors/${encodeURIComponent(vendorId)}/availability`, { method: "POST", bodyJson: body });
 
 function redactedRecordArray(value: unknown): Record<string, unknown>[] {
   if (!Array.isArray(value)) return [];

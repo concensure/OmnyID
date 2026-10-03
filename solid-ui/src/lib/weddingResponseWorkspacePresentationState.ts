@@ -1,5 +1,6 @@
 // @locs-version: 1.0
 import { apiUrlForPath } from "@/lib/api";
+import { weddingVendorRankingCardFieldsFromRecord } from "@/lib/weddingVendorRankingState";
 import {
   weddingArtifactEvidenceStatus,
   type WeddingArtifactInput,
@@ -11,10 +12,7 @@ import {
   buildWeddingIntegrationReadinessState,
   type WeddingApprovalRequestState,
 } from "@/lib/weddingApprovalState";
-import {
-  buildWeddingArtifactExportManifest,
-  type WeddingArtifactExportManifest,
-} from "@/lib/weddingExportState";
+import { buildWeddingArtifactExportManifest, type WeddingArtifactExportManifest } from "@/lib/weddingExportState";
 import {
   buildWeddingArtifactPreviewState,
   type WeddingArtifactQuotePreview,
@@ -571,8 +569,9 @@ function vendorComparisonCardsForArtifact(metadata: Record<string, unknown>): We
       preferenceMatch: clean(record.preference_match) || "Review manually",
       situationFit: clean(record.situation_fit) || "Fit requires source-page review.",
       verificationLabel: clean(record.verification_label) || "Confirm availability, inclusions, and quote before outreach.",
+      ...weddingVendorRankingCardFieldsFromRecord(record),
     }];
-  }).sort((left, right) => left.rank - right.rank).slice(0, 5);
+  }).sort((left, right) => left.rank - right.rank).slice(0, 7);
 }
 
 function persistedSelectedVendorChoicesForArtifact(

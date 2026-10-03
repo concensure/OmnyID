@@ -6,6 +6,10 @@ import type {
   WeddingVendorSearchProviderQuery,
 } from "@/lib/weddingVendorSearchProviderPlanState";
 import { safeWeddingLabel } from "@/lib/weddingPlanningTemplateState";
+import {
+  normalizeWeddingVendorSourceEvidence,
+  type WeddingVendorSourceEvidence,
+} from "@/lib/weddingVendorRankingState";
 
 export type WeddingVendorSearchExecutorMode = "dry_run" | "live";
 
@@ -21,7 +25,7 @@ export type WeddingVendorSearchSource = {
   phone?: string | null;
   email?: string | null;
   instagram_url?: string | null;
-};
+} & WeddingVendorSourceEvidence;
 
 export type WeddingVendorSearchPortResult = {
   ok: boolean;
@@ -79,6 +83,7 @@ export type WeddingVendorSearchApiQueryLike = {
 
 export type WeddingVendorSearchApiBatchRequestLike = {
   workspace_id?: string | null;
+  wedding_plan_id?: string | null;
   queries: WeddingVendorSearchApiQueryLike[];
   max_results_per_query?: number;
 };
@@ -125,6 +130,7 @@ function normalizedSources(values: readonly WeddingVendorSearchSource[] | null |
       phone: clean(value.phone) || null,
       email: clean(value.email) || null,
       instagram_url: clean(value.instagram_url) || null,
+      ...normalizeWeddingVendorSourceEvidence(value as unknown as Record<string, unknown>),
     });
   }
   return sources;
@@ -235,6 +241,7 @@ export function weddingVendorSearchApiQueriesFromProviderQueries(
 export function weddingVendorSearchBatchPortFromApiSearch(input: {
   search: WeddingVendorSearchApiBatchSearchPort;
   workspaceId?: string | null;
+  weddingPlanId?: string | null;
   maxResultsPerQuery?: number | null;
   onResponse?: (response: WeddingVendorSearchApiBatchResponseLike) => void;
 }): WeddingVendorSearchPlannedBatchPort {
@@ -242,6 +249,7 @@ export function weddingVendorSearchBatchPortFromApiSearch(input: {
     const maxResultsPerQuery = input.maxResultsPerQuery ?? null;
     const response = await input.search({
       workspace_id: input.workspaceId ?? null,
+      ...(input.weddingPlanId ? { wedding_plan_id: input.weddingPlanId } : {}),
       ...(maxResultsPerQuery && maxResultsPerQuery > 0 ? { max_results_per_query: maxResultsPerQuery } : {}),
       queries: weddingVendorSearchApiQueriesFromProviderQueries(queries),
     });

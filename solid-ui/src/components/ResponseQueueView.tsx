@@ -1762,6 +1762,7 @@ export function ResponseQueueView(props: {
         batchPort: weddingVendorSearchBatchPortFromApiSearch({
           search: searchWeddingVendors,
           workspaceId: metadata.responseWorkspaceId,
+          weddingPlanId: metadata.weddingPlanId,
           maxResultsPerQuery: 5,
           onResponse: (response) => {
             responseNotice = buildWeddingVendorSearchNoticeState({
