@@ -1,5 +1,6 @@
 import { customEventDetail, isRecord } from "./eventDetail";
 import { normalizeWeddingVendorSourceEvidence, type WeddingVendorAvailabilityUpdate, type WeddingVendorSourceEvidence } from "./weddingVendorRankingState";
+import { normalizeWeddingVendorAttributeCatalogFields, normalizeWeddingVendorAttributeFields, type WeddingVendorAttributeCatalogFields, type WeddingVendorAttributeFields, type WeddingVendorAttributeWriteFields } from "./weddingVendorAttributeCatalogState";
 import { normalizeInboxSummary, type InboxSummary } from "./firstRunExperienceResponseState";
 import {
   fleetMasterInstance,
@@ -5530,7 +5531,7 @@ export type WeddingVendor = {
   updatedAt: string;
   photos: WeddingVendorPhoto[];
   userContact: WeddingVendorContactRecord | null;
-};
+} & WeddingVendorAttributeFields;
 
 export type WeddingVendorWritePayload = {
   vendor_slug: string;
@@ -5554,11 +5555,11 @@ export type WeddingVendorWritePayload = {
     alt_text?: string | null;
     source_label?: string | null;
   }[];
-};
+} & WeddingVendorAttributeWriteFields;
 
 export type AdminWeddingVendorsResponse = {
   vendors: WeddingVendor[];
-};
+} & WeddingVendorAttributeCatalogFields;
 
 export type WeddingVendorContactRecord = {
   contactId: string;
@@ -5988,6 +5989,7 @@ function normalizeWeddingVendor(value: unknown): WeddingVendor | null {
         })
       : [],
     userContact: normalizeWeddingVendorContactRecord(value.user_contact),
+    ...normalizeWeddingVendorAttributeFields(value),
   };
 }
 
@@ -6000,6 +6002,7 @@ export function normalizeAdminWeddingVendorsResponse(value: unknown): AdminWeddi
           return normalized ? [normalized] : [];
         })
       : [],
+    ...normalizeWeddingVendorAttributeCatalogFields(record),
   };
 }
 

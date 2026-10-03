@@ -1,5 +1,5 @@
 // @locs-version: 2.0
-import { For, Show, createResource, createSignal } from "solid-js";
+import { For, Show, createMemo, createResource, createSignal } from "solid-js";
 import {
   createAdminWeddingVendor,
   deleteAdminWeddingVendor,
@@ -13,6 +13,14 @@ import {
   emptyAdminWeddingVendorDraft,
   type AdminWeddingVendorDraft,
 } from "@/lib/adminWeddingVendorFormState";
+import UsageAdminWeddingVendorAttributesEditor from "@/components/UsageAdminWeddingVendorAttributesEditor";
+import {
+  buildWeddingVendorAttributeWrites,
+  weddingVendorAttributeRows,
+  type WeddingVendorAttributeCatalogEntry,
+  type WeddingVendorAttributeEdit,
+} from "@/lib/weddingVendorAttributeCatalogState";
+import type { WeddingVendorAttributeEvidence } from "@/lib/weddingVendorRankingState";
 
 export default function UsageAdminWeddingVendorsPanel() {
   const [query, setQuery] = createSignal("");
@@ -22,9 +30,25 @@ export default function UsageAdminWeddingVendorsPanel() {
   const [notice, setNotice] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [validationErrors, setValidationErrors] = createSignal<string[]>([]);
-  const [vendors, { refetch }] = createResource(appliedQuery, async (nextQuery) =>
-    fetchAdminWeddingVendors({ limit: 200, query: nextQuery || undefined }).then((response) => response.vendors),
+  const [attributeCatalog, setAttributeCatalog] = createSignal<WeddingVendorAttributeCatalogEntry[]>([]);
+  const [attributeBaseline, setAttributeBaseline] = createSignal<Record<string, WeddingVendorAttributeEvidence>>({});
+  const [attributeEdits, setAttributeEdits] = createSignal<Record<string, WeddingVendorAttributeEdit | undefined>>({});
+  const attributeRows = createMemo(() =>
+    weddingVendorAttributeRows({ catalog: attributeCatalog(), attributes: attributeBaseline(), category: draft().category }),
   );
+  const [vendors, { refetch }] = createResource(appliedQuery, async (nextQuery) =>
+    fetchAdminWeddingVendors({ limit: 200, query: nextQuery || undefined }).then((response) => {
+      setAttributeCatalog(response.attributeCatalog ?? []);
+      return response.vendors;
+    }),
+  );
+
+  function selectVendorForEdit(vendor: WeddingVendor | null) {
+    setValidationErrors([]);
+    setDraft(vendor ? adminWeddingVendorDraftFromVendor(vendor) : emptyAdminWeddingVendorDraft());
+    setAttributeBaseline(vendor?.attributes ?? {});
+    setAttributeEdits({});
+  }
 
   function updateDraft<K extends keyof AdminWeddingVendorDraft>(key: K, value: AdminWeddingVendorDraft[K]) {
     setValidationErrors([]);
@@ -40,16 +64,18 @@ export default function UsageAdminWeddingVendorsPanel() {
     try {
       const current = draft();
       const { payload, errors } = buildAdminWeddingVendorPayload(current);
-      if (!payload) {
-        setValidationErrors(errors);
+      const { writes, errors: attributeErrors } = buildWeddingVendorAttributeWrites({ rows: attributeRows(), edits: attributeEdits() });
+      if (!payload || attributeErrors.length > 0) {
+        setValidationErrors([...errors, ...attributeErrors]);
         return;
       }
+      const body = writes.length > 0 ? { ...payload, attributes: writes } : payload;
       const response = current.vendorId
-        ? await updateAdminWeddingVendor(current.vendorId, payload)
-        : await createAdminWeddingVendor(payload);
-      setDraft(response.vendor ? adminWeddingVendorDraftFromVendor(response.vendor) : emptyAdminWeddingVendorDraft());
+        ? await updateAdminWeddingVendor(current.vendorId, body)
+        : await createAdminWeddingVendor(body);
       setNotice(current.vendorId ? "Vendor updated." : "Vendor created.");
-      await refetch();
+      const refreshed = await refetch();
+      selectVendorForEdit(refreshed?.find((vendor) => vendor.vendorId === response.vendor?.vendorId) ?? response.vendor);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Vendor save failed.");
     } finally {
@@ -67,7 +93,7 @@ export default function UsageAdminWeddingVendorsPanel() {
     setValidationErrors([]);
     try {
       await deleteAdminWeddingVendor(vendor.vendorId);
-      if (draft().vendorId === vendor.vendorId) setDraft(emptyAdminWeddingVendorDraft());
+      if (draft().vendorId === vendor.vendorId) selectVendorForEdit(null);
       setNotice("Vendor deleted.");
       await refetch();
     } catch (err) {
@@ -135,10 +161,7 @@ export default function UsageAdminWeddingVendorsPanel() {
                         <button
                           type="button"
                           class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
-                          onClick={() => {
-                            setValidationErrors([]);
-                            setDraft(adminWeddingVendorDraftFromVendor(vendor));
-                          }}
+                          onClick={() => selectVendorForEdit(vendor)}
                         >
                           Edit
                         </button>
@@ -179,10 +202,7 @@ export default function UsageAdminWeddingVendorsPanel() {
             <button
               type="button"
               class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
-              onClick={() => {
-                setValidationErrors([]);
-                setDraft(emptyAdminWeddingVendorDraft());
-              }}
+              onClick={() => selectVendorForEdit(null)}
             >
               New
             </button>
@@ -226,6 +246,13 @@ export default function UsageAdminWeddingVendorsPanel() {
               )}
             </For>
           </div>
+
+          <UsageAdminWeddingVendorAttributesEditor
+            groups={attributeRows()}
+            edits={attributeEdits()}
+            disabled={busy()}
+            onEdit={(key, edit) => setAttributeEdits((current) => ({ ...current, [key]: edit }))}
+          />
 
           <textarea class="mt-3 min-h-20 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Notes" value={draft().notes} onInput={(event) => updateDraft("notes", event.currentTarget.value)} />
           <textarea class="mt-2 min-h-20 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Caveat labels, one per line" value={draft().caveatLabels} onInput={(event) => updateDraft("caveatLabels", event.currentTarget.value)} />
