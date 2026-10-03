@@ -84,7 +84,7 @@ struct WeddingVendorSearchSource {
     availability: Option<Value>,
     #[serde(skip)]
     vendor_slug: Option<String>,
-    #[serde(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     category: Option<String>,
     #[serde(skip)]
     service_area: Option<String>,
