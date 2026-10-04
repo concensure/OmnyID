@@ -91,9 +91,19 @@ fn missing_system_daemon_kinds(existing_kinds: &HashSet<DaemonKind>) -> Vec<Daem
 
 #[cfg(test)]
 mod tests {
-    use super::{missing_system_daemon_kinds, system_daemon_kinds};
+    use super::{missing_system_daemon_kinds, positive_limit, system_daemon_kinds};
     use crate::knowledge_curator::DaemonKind;
     use std::collections::HashSet;
+
+    #[test]
+    fn positive_limit_uses_valid_override_and_falls_back_otherwise() {
+        assert_eq!(positive_limit(Some("24"), 48), 24);
+        assert_eq!(positive_limit(Some(" 24 "), 48), 24);
+        assert_eq!(positive_limit(Some("0"), 48), 48);
+        assert_eq!(positive_limit(Some("-5"), 48), 48);
+        assert_eq!(positive_limit(Some("abc"), 48), 48);
+        assert_eq!(positive_limit(None, 48), 48);
+    }
 
     #[test]
     fn missing_system_daemon_kinds_skips_already_registered_daemons() {
@@ -308,6 +318,77 @@ pub async fn get_latest_heartbeat(db: &Db, daemon_id: &str) -> Result<Option<Val
             "created_at": row.get::<String, _>("created_at"),
         })
     }))
+}
+
+const HEARTBEAT_RETENTION_HOURS_ENV: &str = "OMNYID_DAEMON_HEARTBEAT_RETENTION_HOURS";
+const HEARTBEAT_MAX_ROWS_ENV: &str = "OMNYID_DAEMON_HEARTBEAT_MAX_ROWS";
+const HEARTBEAT_RETENTION_HOURS_DEFAULT: i64 = 48;
+// ~480 bytes per row including indexes, so the default cap is roughly 240 MB.
+const HEARTBEAT_MAX_ROWS_DEFAULT: i64 = 500_000;
+const HEARTBEAT_PRUNE_BATCH: i64 = 10_000;
+// Bounds WAL growth and lock time; a large backlog drains over several passes.
+const HEARTBEAT_PRUNE_MAX_BATCHES_PER_PASS: u32 = 100;
+
+fn positive_limit(raw: Option<&str>, default: i64) -> i64 {
+    raw.and_then(|value| value.trim().parse::<i64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(default)
+}
+
+fn heartbeat_limit(key: &str, default: i64) -> i64 {
+    positive_limit(std::env::var(key).ok().as_deref(), default)
+}
+
+/// Keeps `daemon_heartbeats` a rolling log: rows older than the retention window are
+/// dropped, and if the table still exceeds the row cap the oldest rows go first.
+/// Returns the number of rows deleted in this pass.
+pub async fn prune_heartbeats(db: &Db) -> Result<u64, sqlx::Error> {
+    let retention_hours =
+        heartbeat_limit(HEARTBEAT_RETENTION_HOURS_ENV, HEARTBEAT_RETENTION_HOURS_DEFAULT);
+    let max_rows = heartbeat_limit(HEARTBEAT_MAX_ROWS_ENV, HEARTBEAT_MAX_ROWS_DEFAULT);
+
+    // The cutoff is computed once so each delete batch is a plain index range scan.
+    let cutoff: String = sqlx::query_scalar(
+        r#"
+        SELECT GREATEST(
+            now() - make_interval(hours => $1::int),
+            COALESCE(
+                (SELECT created_at FROM daemon_heartbeats
+                 ORDER BY created_at DESC OFFSET $2 LIMIT 1),
+                '-infinity'::timestamptz
+            )
+        )::text
+        "#,
+    )
+    .bind(retention_hours)
+    .bind(max_rows)
+    .fetch_one(&db.pool)
+    .await?;
+
+    let mut deleted_total = 0u64;
+    for _ in 0..HEARTBEAT_PRUNE_MAX_BATCHES_PER_PASS {
+        let deleted = sqlx::query(
+            r#"
+            DELETE FROM daemon_heartbeats
+            WHERE heartbeat_id IN (
+                SELECT heartbeat_id FROM daemon_heartbeats
+                WHERE created_at < $1::timestamptz
+                ORDER BY created_at
+                LIMIT $2
+            )
+            "#,
+        )
+        .bind(&cutoff)
+        .bind(HEARTBEAT_PRUNE_BATCH)
+        .execute(&db.pool)
+        .await?
+        .rows_affected();
+        deleted_total += deleted;
+        if deleted < HEARTBEAT_PRUNE_BATCH as u64 {
+            break;
+        }
+    }
+    Ok(deleted_total)
 }
 
 /// Returns stale-heartbeat warnings for active daemons.
