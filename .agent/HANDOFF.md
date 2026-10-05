@@ -224,6 +224,8 @@ What changed:
   from stable photo slots rather than stored as a stale duplicate.
 - Updated photo-provenance Rust fixtures that the full test compilation found
   incomplete.
+- Extracted wedding-vendor record DTOs into `src/db/wedding_vendor_directory.rs`
+  so the existing database monolith is smaller than it was before this work.
 
 Evidence:
 
