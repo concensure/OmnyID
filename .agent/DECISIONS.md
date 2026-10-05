@@ -121,6 +121,19 @@ separate `decision_result` AFP successor. Active and resolved messages have
 different stable idempotency keys, so closure never mutates quote history and
 reloads cannot append either projection twice.
 
+## 2026-10-05: Saved Model State Is Not Inference Health
+
+The Master Agent model pill identifies a saved workspace configuration only; it
+is not a connectivity or provider-health claim. When a command falls back after
+a saved configuration cannot yield a usable response, the server sends explicit
+`model_configured` fallback metadata and the UI directs the user to test that
+model instead of saying no model is connected.
+
+Platform-funded wedding AI remains separate from user BYOK and direct Master
+Agent queries. Wedding vendor outreach requires an explicit server policy,
+enforceable daily request limit, and a tenant-scoped shared-tool usage receipt;
+the route fails closed if any are unavailable.
+
 ## 2026-10-05: Oracle Vendor CSV Has a Stable Normalized Export Contract
 
 The Oracle vendor CSV uses the persisted `wedding_vendors` fields

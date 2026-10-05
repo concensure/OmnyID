@@ -346,3 +346,42 @@ Coordination note:
 - WED-146 was expanded concurrently with separate AI-routing acceptance
   criteria. Its task remains `in_progress`; this handoff covers only the
   completed production-recovery and planner-polish slice.
+# 2026-10-05 - WED-146 model-status and wedding-AI production repair
+
+What changed:
+
+- Renamed the search-bar pill to `Saved model` and distinguished a saved BYOK
+  preference from a missing model and from a model that did not return a usable
+  Master Agent response.
+- Added an explicit, fail-closed policy for platform-funded wedding vendor
+  outreach: routing and audit flags, an enforced 60-request/day production
+  cap, and a persisted tenant-scoped usage receipt for each successful draft.
+- Added the three policy variables to the homeserver compose environment; they
+  were previously present in the production env file but not passed into the
+  container.
+
+Production evidence:
+
+- Deployed commits `82b5911` and `808bf73` to Oracle.
+- Live container inspection: routing=`true`, audit receipts=`true`, daily
+  request limit=`60`; protected `/healthz` returned HTTP 401, confirming the
+  running endpoint was reachable without exposing the operational token.
+- `scripts/oracle-production-proof.ps1 -SkipRestoreDrill` wrote
+  `artifacts/oracle-production-proof-wed146-ai-routing-final/` with
+  homeserver and backup service running plus `backup_verify_status=pass`.
+
+Tests performed:
+
+- `cargo check --quiet`
+- focused wedding policy, outreach, shared-tool metering, and command-route
+  Rust tests (20 passing)
+- `solid-ui: npm run typecheck`
+- `solid-ui: ui-command-fallback-state.test.ts` (5 passing)
+- `solid-ui: npm run build`
+
+Unresolved problems:
+
+- The full restore drill was intentionally not repeated in the final proof;
+  its machine result remains separate from this targeted deployment.
+- WED-146 remains in progress for its pre-existing planner recovery and polish
+  acceptance criteria.
