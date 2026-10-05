@@ -36,7 +36,7 @@ import { RailIcon, type IconId } from "@/components/RailIcons";
 
 export type { ViewName } from "@/lib/viewNames";
 
-const CORE_ITEMS: Array<{ id: ViewName; label: string; icon: string; shortcut: string }> = [
+export const CORE_ITEMS: Array<{ id: ViewName; label: string; icon: string; shortcut: string }> = [
   { id: "search",    label: "Chat",      icon: "💬", shortcut: "Ctrl+1" },
   { id: "threads",   label: "Threads",   icon: "🗂", shortcut: "Ctrl+2" },
   { id: "workflows", label: "Workflows", icon: "⚡", shortcut: "Ctrl+3" },
@@ -935,7 +935,7 @@ export function NavBar(props: {
 
       {/* ── Left navigation rail ─────────────────────────────────────── */}
       <Show when={!isWatch()}>
-        <aside class="fixed left-0 top-0 bottom-0 z-40 flex w-16 flex-col items-center border-r border-white/20 bg-white/75 py-3 backdrop-blur-2xl">
+        <aside class="fixed left-0 top-0 bottom-0 z-40 flex w-16 flex-col items-center border-r border-white/20 bg-white/75 py-3 backdrop-blur-2xl phone:hidden">
 
           {/* OmnyID logo — navigates to home workspace grid */}
           <div class="group relative mb-2 flex w-full justify-center">

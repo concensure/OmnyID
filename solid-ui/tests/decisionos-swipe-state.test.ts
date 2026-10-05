@@ -7,6 +7,8 @@ import {
   decisionOsSwipeMovePlan,
   decisionOsSwipeOpacity,
   decisionOsSwipeOutcome,
+  decisionOsSwipeAxisLock,
+  decisionOsSwipeDirection,
 } from "../src/lib/decisionOsSwipeState.ts";
 
 test("decisionos swipe state derives approve and dismiss outcomes", () => {
@@ -96,4 +98,13 @@ test("decisionos swipe state resolves action plans with optional chosen option i
       optionId: "option-a",
     },
   );
+});
+
+test("four-way focus deck swipe keeps approval distance-only", () => {
+  assert.equal(decisionOsSwipeAxisLock({ dx: 4, dy: 3 }), null);
+  assert.equal(decisionOsSwipeAxisLock({ dx: 12, dy: 4 }), "horizontal");
+  assert.equal(decisionOsSwipeDirection({ dx: 100, dy: 0, elapsedMs: 300, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), "next");
+  assert.equal(decisionOsSwipeDirection({ dx: -100, dy: 0, elapsedMs: 300, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), "prev");
+  assert.equal(decisionOsSwipeDirection({ dx: 0, dy: 40, elapsedMs: 10, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), null);
+  assert.equal(decisionOsSwipeDirection({ dx: 0, dy: 130, elapsedMs: 300, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), "approve");
 });

@@ -15,6 +15,42 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: UX-MFH-01
+    title: Local Master Agent output and mobile focus home
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-146
+    depends_on:
+      - WED-146
+    files:
+      - solid-ui/src/App.tsx
+      - solid-ui/src/components/MobileFocusDeck.tsx
+      - solid-ui/src/components/MobileFocusHome.tsx
+      - solid-ui/src/components/MobileHomeMenuSheet.tsx
+      - solid-ui/src/components/WeddingMobileFocusHome.tsx
+      - solid-ui/src/components/QueueClearedZenState.tsx
+      - solid-ui/src/components/ContextSourcePreview.tsx
+      - solid-ui/src/components/WeddingHomeOverviewGrid.tsx
+      - solid-ui/src/components/WeddingDecisionFocusCard.tsx
+      - solid-ui/src/components/HomeQueuesSection.tsx
+      - solid-ui/src/components/ContextPackSurface.tsx
+      - solid-ui/src/components/WeddingResponseWorkspaceView.tsx
+      - solid-ui/src/components/ResponseQueueView.tsx
+      - solid-ui/src/components/NavBar.tsx
+      - solid-ui/src/lib/decisionOsSwipeState.ts
+      - solid-ui/src/lib/decisionOsHomeState.ts
+      - solid-ui/src/lib/mobileFocusHomeState.ts
+      - solid-ui/src/lib/decisionTriageAfpState.ts
+      - solid-ui/tests/**
+      - .agent/**
+    acceptance:
+      - command preview AFP content is decrypted only in browser memory before rendering
+      - Master Agent always shows a readable local result or an explicit local decryption failure state
+      - phone wedding home has a one-card focus deck, accessible actions, and a single Menu entry point
+      - deck commits emit append-only privacy-minimised decision_triage AFP messages
+      - desktop layout remains unchanged apart from specified contrast and Zen-state changes
+      - focused UI tests, typecheck, and build evidence are recorded
+
   - id: WED-146
     title: Wedding planner production recovery, AI routing, and interaction polish
     status: in_progress

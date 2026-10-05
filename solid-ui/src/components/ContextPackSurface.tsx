@@ -18,6 +18,7 @@ import {
   navigateToView,
 } from "@/lib/decisionosNavigation";
 import { decisionOsContextPackTrustState } from "@/lib/decisionOsContextPackPresentationState";
+import { ContextSourcePreview } from "@/components/ContextSourcePreview";
 import { hasThreadRetrievalState, threadRetrievalState } from "@/lib/threadRetrievalState";
 import { openThreadSearch } from "@/lib/threadSearchNavigation";
 import { openObjectSearch } from "@/lib/objectSearchNavigation";
@@ -289,6 +290,13 @@ export function ContextPackSurface(props: ContextPackSurfaceProps) {
               return (
                 <div class={packCardState.cardClass}>
                   <div class={`flex flex-wrap items-start justify-between ${surfaceState().compact ? "gap-2" : "gap-3"}`}>
+                    <ContextSourcePreview source={{
+                      title: item.title,
+                      summary: item.summary,
+                      confidence: packCardState.confidenceSummaryText,
+                      why_surfaced: packCardState.distinctWhySurfacedText,
+                      thread_retrieval_state: item.thread_retrieval_state,
+                    }} onOpenSource={openContextPack}>
                     <button
                       type="button"
                       onClick={openContextPack}
@@ -405,6 +413,7 @@ export function ContextPackSurface(props: ContextPackSurfaceProps) {
                         </div>
                       </Show>
                     </button>
+                    </ContextSourcePreview>
                     <button
                       type="button"
                       onClick={openRelatedObjects}

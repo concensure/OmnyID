@@ -13,6 +13,7 @@ import { WeddingResilienceCardList } from "@/components/WeddingResilienceCardLis
 import { WeddingVendorQuoteProofDrawer } from "@/components/WeddingVendorQuoteProofDrawer";
 import { WeddingVendorQuoteReplyCard } from "@/components/WeddingVendorQuoteReplyCard";
 import { WeddingVendorFollowUpPanel } from "@/components/WeddingVendorFollowUpPanel";
+import { WeddingMobileFocusHome } from "@/components/WeddingMobileFocusHome";
 import { weddingVendorFollowUpOutreachCardData } from "@/lib/weddingVendorFollowUpPanelActionState";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
@@ -81,6 +82,7 @@ import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProvide
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
 import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import { useWeddingVendorQuoteDecisionProjection } from "@/lib/useWeddingVendorQuoteDecisionProjection";
+import { isMobileFocusViewport } from "@/lib/mobileFocusHomeState";
 
 type WeddingHomeSection = {
   id: WeddingHomeSectionId;
@@ -1268,6 +1270,15 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     >
       <div class={primaryColumnClass()}>
         <Show when={activeMenu() === "home"}>
+          <Show when={!isMobileFocusViewport()} fallback={<WeddingMobileFocusHome
+            state={state()}
+            homeSections={orderedHomeSections()}
+            onSidebarAction={handleSidebarAction}
+            saveProjection={props.saveProjection}
+            onSelectMenu={props.onSelectMenu}
+            onApproveQuoteReply={approveQuoteReplyWording}
+            onAcknowledgeQuoteReply={acknowledgeQuoteReplyBudgetImpact}
+          />}>
           <For each={orderedHomeSections()}>
             {(section, index) => (
               <div
@@ -1327,6 +1338,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
               </div>
             )}
           </For>
+          </Show>
         </Show>
 
         <WeddingWorkspaceDocumentsPanel

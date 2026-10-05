@@ -45,10 +45,10 @@ const WORKSPACE_ACTION_LABEL = "Open workspace";
 const HOME_QUEUES_SECTION_CLASS = "view-enter space-y-3";
 const HOME_QUEUES_HEADER_CLASS = "flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between";
 const HOME_QUEUES_KICKER_CLASS =
-  "font-mono text-[10px] uppercase tracking-[0.18em] text-on-surface-variant/55";
+  "font-mono text-[11px] uppercase tracking-[0.18em] text-on-surface-variant";
 const HOME_QUEUES_TITLE_CLASS = "mt-1 text-sm font-semibold text-on-surface";
 const HOME_QUEUES_WATCHER_SUMMARY_CLASS =
-  "mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant/75";
+  "mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant";
 const HOME_QUEUES_WATCHER_CHIPS_CLASS = "mt-2 flex flex-wrap gap-2";
 const HOME_QUEUES_TREND_ROW_CLASS = "mt-2 grid max-w-xl gap-2 sm:grid-cols-3";
 const HOME_QUEUES_TREND_BAR_CLASS = "h-1.5 overflow-hidden rounded-full bg-black/10";
@@ -58,9 +58,9 @@ const HOME_QUEUES_TREND_TONE_CLASS = {
   low: "bg-emerald-500/70",
 } as const;
 const HOME_QUEUES_OVERFLOW_NOTE_CLASS =
-  "mt-2 max-w-3xl text-[11px] leading-5 text-on-surface-variant/65";
+  "mt-2 max-w-3xl text-[11px] leading-5 text-on-surface-variant";
 const HOME_QUEUES_SUMMARY_BADGE_CLASS =
-  "rounded-full border border-black/10 bg-white/60 px-3 py-1 text-[10px] text-on-surface-variant/70";
+  "rounded-full border border-black/10 bg-white/60 px-3 py-1 text-[11px] text-on-surface-variant";
 const HOME_QUEUES_SAMPLE_BANNER_CLASS =
   "rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 shadow-sm";
 const HOME_QUEUES_SURFACES_GRID_CLASS =
@@ -69,7 +69,7 @@ const WATCHER_CHIP_TONE_CLASS = {
   urgent: "border-rose-300/40 bg-rose-100/70 text-rose-900",
   warning: "border-amber-300/50 bg-amber-100/70 text-amber-900",
   quiet: "border-emerald-300/45 bg-emerald-100/65 text-emerald-900",
-  muted: "border-black/10 bg-white/55 text-on-surface-variant/70",
+  muted: "border-black/10 bg-white/55 text-on-surface-variant",
 } as const;
 const HOME_QUEUES_COMPACT = true;
 

@@ -346,6 +346,33 @@ Coordination note:
 - WED-146 was expanded concurrently with separate AI-routing acceptance
   criteria. Its task remains `in_progress`; this handoff covers only the
   completed production-recovery and planner-polish slice.
+# 2026-10-05 - UX-MFH-01 local output and mobile focus home
+
+Changed:
+- Direct `/ui/command` preview messages now use the same in-memory local
+  decryption path as dashboard AFP messages before the Master Agent renderer
+  receives them. Plaintext is not persisted.
+- Added the phone (<640px) wedding focus deck, menu sheet, overview density,
+  safe gesture/button/keyboard triage controls, AFP triage builder, source
+  previews, and the requested contrast improvements.
+- The adapter reads existing wedding DecisionOS/quote projections and leaves
+  vendor search, ranking, three-choice comparison, outreach approval, and
+  quote projection ownership unchanged per the governing architecture.
+
+Verification:
+- `npm run typecheck` passed.
+- Focused Node tests passed: 23/23, including swipe thresholds, privacy
+  minimisation, ordering, daily streak compatibility, and palette contrast.
+- `npm run build` passed. It emitted the pre-existing Browserslist freshness
+  warning and the repository-wide Tailwind min/max-variant configuration
+  warning; the new mobile rules use the configured `phone:` breakpoint.
+- `git diff --check` passed.
+
+Open follow-up:
+- The task remains in progress pending device/browser smoke testing and a
+  production rollout. Historic GitHub CI runs visible at session start are
+  failed and do not correspond to this unpushed local SHA.
+
 # 2026-10-05 - WED-146 model-status and wedding-AI production repair
 
 What changed:

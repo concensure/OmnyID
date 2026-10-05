@@ -3,6 +3,24 @@
 This file records project architecture and coordination decisions. It is
 project truth, not a running diary.
 
+## 2026-10-05: Command Previews Decrypt at the Client Render Boundary
+
+An encrypted `preview_message` returned directly by the Master Agent command
+endpoint is decrypted in browser memory before it enters the command-result
+render signal. This uses the existing per-account E2EE key and never writes
+plaintext to local storage or sends it back to the server. If the device cannot
+obtain or use its key, the renderer retains its explicit unlock placeholder.
+
+## 2026-10-05: Mobile Wedding Triage Is an AFP Projection, Not a Queue Store
+
+The phone focus deck is a view over the existing wedding decision and quote
+reply projections. Navigation is local view state; approve/defer creates a
+privacy-minimised append-only `decision_triage` AFP event. Wedding deferral
+also continues to use the existing `wedding_decision_deferral` path, so the
+existing resurfacing policy remains authoritative. The deck cannot directly
+send a vendor email: ready-to-send replies require the established confirmation
+and send workflow.
+
 ## 2026-10-05: Agent Sessions Begin With Synchronisation
 
 Every Claude or Codex session must start by reading `AGENTS.md` and the

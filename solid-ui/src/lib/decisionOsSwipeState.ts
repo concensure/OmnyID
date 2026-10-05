@@ -1,5 +1,8 @@
 // @locs-version: 1.0
 export type DecisionOsSwipeOutcome = "approve" | "dismiss" | null;
+export type FocusDeckSwipe = "prev" | "next" | "defer" | "approve" | null;
+export type FocusDeckAxis = "horizontal" | "vertical" | null;
+export type FocusDeckHorizontalMapping = "left_is_prev" | "left_is_next";
 export type DecisionOsSwipeActionPlan = {
   action: DecisionOsSwipeOutcome;
   optionId?: string | undefined;
@@ -65,4 +68,60 @@ export function decisionOsSwipeActionPlan(args: {
     action: decisionOsSwipeOutcome(args),
     optionId: args.optionId ?? undefined,
   };
+}
+
+/** Locks a pointer interaction after a small intentional movement. */
+export function decisionOsSwipeAxisLock(args: {
+  dx: number;
+  dy: number;
+  lockedAxis?: FocusDeckAxis;
+}): FocusDeckAxis {
+  if (args.lockedAxis) return args.lockedAxis;
+  if (Math.max(Math.abs(args.dx), Math.abs(args.dy)) < 10) return null;
+  return Math.abs(args.dx) >= Math.abs(args.dy) ? "horizontal" : "vertical";
+}
+
+export function decisionOsSwipeDirection(args: {
+  dx: number;
+  dy: number;
+  elapsedMs: number;
+  cardWidth: number;
+  cardHeight: number;
+  mapping: FocusDeckHorizontalMapping;
+}): FocusDeckSwipe {
+  const axis = decisionOsSwipeAxisLock(args);
+  const elapsedMs = Math.max(1, args.elapsedMs);
+  if (axis === "horizontal") {
+    const distance = Math.abs(args.dx);
+    const fastEnough = distance >= 24 && distance / elapsedMs >= 0.6;
+    if (distance < Math.max(72, args.cardWidth * 0.22) && !fastEnough) return null;
+    const left = args.dx < 0;
+    const leftIsPrevious = args.mapping === "left_is_prev";
+    return left === leftIsPrevious ? "prev" : "next";
+  }
+  if (axis === "vertical") {
+    const distance = Math.abs(args.dy);
+    if (args.dy < 0) {
+      const fastEnough = distance >= 24 && distance / elapsedMs >= 0.6;
+      return distance >= Math.max(80, args.cardHeight * 0.18) || fastEnough ? "defer" : null;
+    }
+    return distance >= Math.max(96, args.cardHeight * 0.24) ? "approve" : null;
+  }
+  return null;
+}
+
+export function decisionOsSwipeProgress(args: {
+  dx: number;
+  dy: number;
+  cardWidth: number;
+  cardHeight: number;
+}): number {
+  const axis = decisionOsSwipeAxisLock(args);
+  const distance = axis === "horizontal" ? Math.abs(args.dx) : Math.abs(args.dy);
+  const threshold = axis === "horizontal"
+    ? Math.max(72, args.cardWidth * 0.22)
+    : args.dy > 0
+      ? Math.max(96, args.cardHeight * 0.24)
+      : Math.max(80, args.cardHeight * 0.18);
+  return axis ? Math.min(1, distance / threshold) : 0;
 }

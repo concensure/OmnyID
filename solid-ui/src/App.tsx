@@ -3,6 +3,7 @@ import { GlassPanel } from "@/components/GlassPanel";
 import { LoraStatusWidget } from "@/components/LoraStatusWidget";
 import { MaskSwitcher } from "@/components/MaskSwitcher";
 import { NavBar } from "@/components/NavBar";
+import { MobileHomeMenuSheet } from "@/components/MobileHomeMenuSheet";
 import { SearchBar } from "@/components/SearchBar";
 import { ThreadDiscoveryLens } from "@/components/ThreadDiscoveryLens";
 import { ThreadDiscoveryStateSummary } from "@/components/ThreadDiscoveryStateSummary";
@@ -301,6 +302,12 @@ import {
 import { readUiCommandFallbackNotice } from "@/lib/uiCommandFallbackState";
 import { isRecord } from "@/lib/eventDetail";
 import { decryptedDisplayContent } from "@/lib/decryptedDisplayState";
+import {
+  installMobileFocusViewportListener,
+  isMobileFocusViewport,
+  mobileFocusAskOpen,
+  setMobileFocusAskOpen,
+} from "@/lib/mobileFocusHomeState";
 import { isWorkspaceLlmSetupComplete, workspaceLlmSetupPendingReason } from "@/lib/workspaceSetupState";
 import {
   buildCommandSearchFailureReceipt,
@@ -1909,6 +1916,23 @@ function App() {
     }
   }
 
+  async function decryptCommandPreviewForDisplay(response: UiCommandResponse): Promise<UiCommandResponse> {
+    const preview = response.preview_message;
+    if (!preview?.encryption) return response;
+    try {
+      const decrypt = await loadDecryptModule();
+      if (!decrypt.isDecryptReady() && session()?.token) {
+        const keys = await fetchEncKey();
+        await decrypt.initDecrypt(keys.enc_key_hex);
+      }
+      // The plaintext lives only in this response signal; it is never persisted by the client.
+      return { ...response, preview_message: decrypt.tryDecryptMessage(preview) };
+    } catch {
+      // ViewDispatcher renders its explicit local-unlock placeholder when the device key is unavailable.
+      return response;
+    }
+  }
+
   async function loadRunnerFiles() {
     if (!session()?.token) { setRunnerFiles([]); setActiveFile(null); setEditorValue(""); return; }
     const seq = ++runnerFilesFetchSeq;
@@ -2450,30 +2474,31 @@ function App() {
         payload,
         attachmentGroundingEvidence,
       );
+      const displayReadyPayload = await decryptCommandPreviewForDisplay(enrichedPayload);
       setObjectSearchResult(null);
       objectSearchRouterPreview.clear();
       setObjectSearchFocusObjectId(null);
       setObjectSearchFocusThreadId(null);
       setObjectSearchLaunchContext(null);
       workspaceSearchRouterPreview.set(localPreview);
-      setCommandResult(enrichedPayload);
+      setCommandResult(displayReadyPayload);
       // Reload dashboard to pick up any new AFP messages the agent created
       void loadDashboard();
       const suggested = commandPreviewSelectableSuggestedView({
-        suggestedView: enrichedPayload.suggested_view ?? null,
+        suggestedView: displayReadyPayload.suggested_view ?? null,
         viewNames: VIEW_NAMES,
         blockedViewNames: [...NAV_BLOCKLIST],
       });
       const suggestedWorkflowSeed = commandPreviewSuggestedWorkflowPendingIntentSeed({
-        intent: enrichedPayload.intent,
-        preferredView: enrichedPayload.preferred_view ?? null,
+        intent: displayReadyPayload.intent,
+        preferredView: displayReadyPayload.preferred_view ?? null,
         query,
-        summary: enrichedPayload.summary ?? null,
+        summary: displayReadyPayload.summary ?? null,
         suggestedView: suggested ?? null,
         travelPrefersComparison: travelPreviewPrefersComparison(
           query,
-          enrichedPayload.preferred_view,
-          enrichedPayload.bullets ?? [],
+          displayReadyPayload.preferred_view,
+          displayReadyPayload.bullets ?? [],
         ),
       });
       if (suggestedWorkflowSeed) {
@@ -2735,6 +2760,7 @@ function App() {
   });
 
   onMount(async () => {
+    installMobileFocusViewportListener();
     // U-01: listen for service worker update-ready events fired by main.tsx
     const unsubscribeSwUpdateReady = subscribeSwUpdateReadyEvent((detail) => {
       // CGAP-014: suppress toast when the search pipeline or any agent in the fleet
@@ -3214,7 +3240,11 @@ function App() {
         userId={userId()}
       />
 
-      <GlassPanel id="workspace-shell" class="mx-auto max-w-[1700px] p-5 pl-[76px] lg:p-8 lg:pl-[80px]">
+      <Show when={isMobileFocusViewport()}>
+        <MobileHomeMenuSheet userId={userId()} onSelectApp={selectKnownView} />
+      </Show>
+
+      <GlassPanel id="workspace-shell" class="mx-auto max-w-[1700px] p-0 sm:p-5 sm:pl-[76px] lg:p-8 lg:pl-[80px]">
 
         {/* Fleet pane — slides in below nav when user clicks active/idle badge */}
         <Show when={fleetOpen()}>
@@ -3231,7 +3261,10 @@ function App() {
         </Show>
 
         {/* Chat bar — always visible */}
-        <div class="mt-7">
+        <div class={`mt-7 ${mobileFocusAskOpen() ? "phone:fixed phone:inset-0 phone:z-50 phone:overflow-auto phone:bg-wedding-surface phone:p-4" : "phone:hidden"}`}>
+          <Show when={mobileFocusAskOpen()}>
+            <button type="button" class="mb-3 min-h-12 rounded-xl border border-wedding-muted bg-white px-4 text-sm font-semibold text-wedding-text" onClick={() => setMobileFocusAskOpen(false)}>Close</button>
+          </Show>
           <Show when={weddingReturnContextActive() && activeView() !== "response_queue"}>
             <button
               type="button"

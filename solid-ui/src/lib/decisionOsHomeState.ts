@@ -14,7 +14,7 @@ const OUTCOME_CHECKS_KEY = "omnyid.pending-outcome-checks";
 const OPTION_CHOICE_KEY = "omnyid.decision-choices";
 const SNOOZE_HISTORY_KEY = "omnyid.decisionos.snooze-history";
 
-type ClearStreakState = { dates: string[] };
+export type ClearStreakState = { dates: string[]; today?: { date: string; count: number } };
 type SnoozeHistoryEntry = { id: string; count: number; lastUsedAt: string };
 
 function scopedDecisionOsStorageKey(baseKey: string, userId: string | null | undefined): string {
@@ -111,7 +111,14 @@ function normalizeClearStreakState(parsed: unknown): ClearStreakState {
   const dates = Array.isArray(parsed.dates)
     ? parsed.dates.filter((value): value is string => typeof value === "string")
     : [];
-  return { dates };
+  const today = isRecord(parsed.today)
+    && typeof parsed.today.date === "string"
+    && typeof parsed.today.count === "number"
+    && Number.isFinite(parsed.today.count)
+    && parsed.today.count >= 0
+    ? { date: parsed.today.date, count: parsed.today.count }
+    : undefined;
+  return { dates, ...(today ? { today } : {}) };
 }
 
 function loadClearStreakState(userId?: string | null): ClearStreakState {
@@ -196,6 +203,20 @@ export function recordClearStreak(date = new Date(), userId?: string | null): vo
   data.dates.push(today);
   data.dates = data.dates.slice(-7);
   saveClearStreakState(data, userId);
+}
+
+export function recordTriageCleared(userId?: string | null, date = new Date()): number {
+  const dateLabel = date.toISOString().slice(0, 10);
+  const data = loadClearStreak(userId);
+  const count = data.today?.date === dateLabel ? data.today.count + 1 : 1;
+  data.today = { date: dateLabel, count };
+  saveClearStreakState(data, userId);
+  return count;
+}
+
+export function loadTodayClearedCount(userId?: string | null, date = new Date()): number {
+  const today = loadClearStreak(userId).today;
+  return today?.date === date.toISOString().slice(0, 10) ? today.count : 0;
 }
 
 export function computeCurrentStreak(today = new Date(), userId?: string | null): number {

@@ -1887,7 +1887,7 @@ export function ResponseQueueView(props: {
   return (
     <div class={RESPONSE_QUEUE_VIEW_CLASS}>
       <Show when={weddingWorkspace()}>
-        <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+        <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 phone:hidden sm:flex-wrap sm:overflow-visible sm:pb-0">
           <div role="tablist" aria-label="Wedding planner sections" class="flex shrink-0 gap-2">
             <For each={WEDDING_WORKSPACE_MENU_ITEMS}>
               {(item, index) => {
@@ -2011,17 +2011,17 @@ export function ResponseQueueView(props: {
       </Show>
 
       <Show when={weddingWorkspace() && weddingWorkspaceMenu() === "home"}>
-        <WorkspaceSetupBanner
-          signedIn={weddingSignedIn()}
-          onNavigate={(view, hint) => {
-            saveWeddingReturnIntent();
-            props.onNavigate?.(view as ViewName, hint);
-          }}
-        />
+        <div class="phone:hidden"><WorkspaceSetupBanner
+            signedIn={weddingSignedIn()}
+            onNavigate={(view, hint) => {
+              saveWeddingReturnIntent();
+              props.onNavigate?.(view as ViewName, hint);
+            }}
+          /></div>
       </Show>
 
       <Show when={weddingWorkspace() && weddingWorkspaceMenu() === "home" && !weddingFirstIntakeComplete() && incompleteWeddingSetupChecklist().length > 0}>
-        <section class="rounded-[24px] border border-rose-100/80 bg-white/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
+        <section class="rounded-[24px] border border-rose-100/80 bg-white/80 p-3 shadow-card phone:hidden sm:rounded-[28px] sm:p-4">
           <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p class="text-sm font-semibold text-rose-950">Then add your wedding details</p>
