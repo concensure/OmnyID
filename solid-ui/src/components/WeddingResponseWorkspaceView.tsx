@@ -80,6 +80,7 @@ import { weddingVendorQuoteReceiptPersistenceNotice } from "@/lib/weddingVendorQ
 import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
 import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
+import { useWeddingVendorQuoteDecisionProjection } from "@/lib/useWeddingVendorQuoteDecisionProjection";
 
 type WeddingHomeSection = {
   id: WeddingHomeSectionId;
@@ -100,7 +101,6 @@ function loadWeddingHomeSectionOrder(scope: string): WeddingHomeSectionId[] {
     return [...WEDDING_HOME_SECTION_IDS];
   }
 }
-
 function saveWeddingHomeSectionOrder(scope: string, order: readonly WeddingHomeSectionId[]): void {
   if (typeof localStorage === "undefined") return;
   try {
@@ -721,7 +721,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       void executeRequest(resolution.request);
     }, delayMs);
   }
-
   function undoQuoteReplySend(base: WeddingVendorQuoteReplyFlowState) {
     setQuoteReplyUndoUntil((current) => {
       const next = { ...current };
@@ -778,6 +777,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     onRefreshWorkspace: () => props.onRefreshWorkspace,
     setNotice: setExportNotice,
   });
+  useWeddingVendorQuoteDecisionProjection({ state, saveProjection: () => props.saveProjection, onRefreshWorkspace: () => props.onRefreshWorkspace?.() });
 
   function quoteAttachmentParserStateForFlow(
     flow: WeddingVendorQuoteReplyFlowState,

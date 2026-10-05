@@ -21,6 +21,7 @@ import {
   weddingVendorOutreachDraftAfpSendInput,
   weddingVendorOutreachSentAfpSendInput,
 } from "@/lib/weddingVendorOutreachAfpState";
+import { persistWeddingVendorOutreachDraftBeforeDisplay } from "@/lib/weddingVendorOutreachDraftPersistenceState";
 import {
   weddingVendorOutreachBodyChanged,
   weddingVendorOutreachDraftFailed,
@@ -106,17 +107,34 @@ export function useWeddingVendorOutreachOwner(input: {
         wedding_plan_id: metadata.weddingPlanId,
       });
       const groundedOnLabels = weddingVendorOutreachGroundedOnLabels(result.groundedOn, couple);
-      setVendorOutreachFlows((current) => {
-        const flow = current[card.choiceId];
-        if (!flow || flow.stage !== "drafting") return current;
-        return {
-          ...current,
-          [card.choiceId]: weddingVendorOutreachDraftSucceeded(flow, {
-            subject: result.subject,
-            bodyMarkdown: result.bodyMarkdown,
-            groundedOnLabels,
-          }),
-        };
+      const flow = vendorOutreachFlows()[card.choiceId];
+      const saveProjection = input.saveProjection();
+      if (!flow || flow.stage !== "drafting") return;
+      if (!saveProjection) throw new Error("Could not save the draft yet. Reconnect the wedding workspace and try again.");
+      const persistedFlow = weddingVendorOutreachDraftSucceeded(flow, {
+        subject: result.subject,
+        bodyMarkdown: result.bodyMarkdown,
+        groundedOnLabels,
+      });
+      const directoryVendor = outreachDirectoryVendorMatch(card.title);
+      const draftProjection = weddingVendorOutreachDraftAfpSendInput({
+        flow: persistedFlow,
+        metadata,
+        sourceArtifactId: vendorOutreachArtifactIds()[card.choiceId] ?? null,
+        vendorId: directoryVendor?.vendorId ?? null,
+        editorHtml: renderMarkdown(persistedFlow.bodyMarkdown),
+      });
+      await persistWeddingVendorOutreachDraftBeforeDisplay({
+        draft: persistedFlow,
+        persist: () => saveProjection(draftProjection),
+        display: (savedFlow) => setVendorOutreachFlows((current) => {
+          const currentFlow = current[card.choiceId];
+          if (!currentFlow || currentFlow.stage !== "drafting") return current;
+          return {
+            ...current,
+            [card.choiceId]: savedFlow,
+          };
+        }),
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "couldn't write an outreach draft right now — please try again in a moment";

@@ -4,7 +4,7 @@
 import type { WeddingVendorRankedCandidate } from "@/lib/weddingVendorRankingState";
 
 export type WeddingVendorShortlistCandidate = Pick<WeddingVendorRankedCandidate,
-  "id" | "title" | "vendorId" | "group" | "websiteUrl" | "email" | "phone" | "imageUrl" | "availabilityState"
+  "id" | "title" | "vendorId" | "group" | "url" | "websiteUrl" | "email" | "phone" | "imageUrl" | "availabilityState"
 > & {
   canonicalId?: string | null;
   category?: string | null;
@@ -70,7 +70,7 @@ function candidateIdentity(candidate: WeddingVendorShortlistCandidate): string {
 }
 
 function hasRequestRoute(candidate: WeddingVendorShortlistCandidate): boolean {
-  return Boolean(clean(candidate.email) || clean(candidate.phone) || httpUrl(candidate.websiteUrl));
+  return Boolean(clean(candidate.email) || clean(candidate.phone) || httpUrl(candidate.websiteUrl) || httpUrl(candidate.url));
 }
 
 /** Select an explicit intent first, then priority, then the first unbooked checklist category. */

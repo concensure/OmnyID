@@ -113,3 +113,42 @@ Recommended next action:
 - Extract the current ResponseQueue vendor orchestration into a focused owner,
   call `directory_only`, apply this policy, then make one `online_capable`
   retry only for a suitable-candidate shortfall.
+
+## 2026-10-05 - WED-145 continuation
+
+What changed:
+
+- Wired strict exactly-three comparison rendering and truthful media states
+  into the existing live vendor-search path.
+- Added an instrumented directory-first executor: it calls `directory_only`,
+  ranks the result, and makes at most one online-capable retry only for a
+  suitable-candidate shortfall. When paid providers are unavailable it still
+  makes the directory request and reports the shortfall without an online call.
+- Added a fingerprinted onboarding coordinator which selects one category and
+  launches the existing search while preserving the home surface. It records
+  a browser-storage run claim to avoid reload/second-tab duplicates.
+- Made vendor outreach durable-first: the generated AFP draft is appended
+  before the composer moves to its sendable state.
+- Wired unresolved quote flows to the existing AFP save/refresh path using a
+  stable quote decision idempotency key and persisted-message dedupe.
+
+Tests performed:
+
+- `solid-ui: npm run typecheck` (pass)
+- focused MVP policy/search/outreach/quote suite: 36 passing tests
+- `git diff --check` (pass; CRLF conversion warnings only)
+
+Unresolved problems:
+
+- M3 photo-admin add/replace/provenance lifecycle has not yet been proven in
+  this pass; the comparison renderer has the truthful fallback only.
+- M6 still needs durable resolution/deferral successor wiring so a resolved
+  quote deterministically leaves DecisionOS.
+- Full build, complete wedding suite, full Rust suite, CI/deployment checks,
+  and Oracle production smoke remain outstanding. Do not deploy this checkpoint.
+- Existing line-budget failures remain baseline defects; neither cap was raised.
+
+Recommended next action:
+
+- Complete the existing photo-admin lifecycle and quote resolution successor,
+  then run M7's full verification matrix before an Oracle deployment.

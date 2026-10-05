@@ -791,3 +791,41 @@ test("buildWeddingVendorSearchTaskItems hides comparison queue work after vendor
 
   assert.deepEqual(tasks, []);
 });
+
+test("strict MVP comparison requires exactly three suitable cards and records honest media states", async () => {
+  const execution = await runWeddingVendorSearchExecution({
+    readiness,
+    mode: "live",
+    providerLabel: "Directory",
+    maxQueries: 1,
+    port: (query) => ({
+      ok: true,
+      query,
+      sources: [
+        { title: "One", url: "https://one.example", provider: "Directory" },
+        { title: "Two", url: "https://two.example", photo_url: "https://images.example/two.jpg", provider: "Directory" },
+        { title: "Three", url: "https://three.example", provider: "Directory" },
+      ],
+    }),
+  });
+  const complete = buildWeddingVendorComparisonArtifactState({
+    metadata, execution, location: "Sydney", vendorCategories: ["photographer"],
+    targetCategory: "photographer", requireExactlyThree: true,
+  });
+  const cards = (complete.artifactInput?.metadata as Record<string, unknown>).topChoiceCards as Array<Record<string, unknown>>;
+
+  assert.equal(complete.status, "created");
+  assert.equal(complete.topChoiceCount, 3);
+  assert.equal(new Set(cards.map((card) => card.title)).size, 3);
+  assert.ok(cards.some((card) => card.media_kind === "verified_photo"));
+  assert.ok(cards.some((card) => card.media_kind === "placeholder"));
+  assert.ok(cards.filter((card) => card.media_kind === "placeholder").every((card) => /placeholder/i.test(String(card.media_label))));
+
+  const shortfall = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution: { ...execution, sources: execution.sources.slice(0, 2), sourceCount: 2 },
+    location: "Sydney", vendorCategories: ["photographer"], targetCategory: "photographer", requireExactlyThree: true,
+  });
+  assert.equal(shortfall.status, "not_created");
+  assert.match(shortfall.reason ?? "", /search for 1 more/i);
+});

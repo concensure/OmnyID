@@ -31,6 +31,10 @@ import {
   type WeddingVendorRankingResult,
   type WeddingVendorRankingSource,
 } from "@/lib/weddingVendorRankingState";
+import {
+  selectWeddingVendorShortlist,
+  type WeddingVendorShortlistOutcome,
+} from "@/lib/weddingVendorShortlistPolicyState";
 
 export type WeddingVendorSearchArtifactState = {
   status: "created" | "not_created";
@@ -71,6 +75,9 @@ export type WeddingVendorComparisonInput = {
   inspirationImageUrls?: readonly string[] | null;
   topPriorities?: readonly string[] | null;
   vendorCategories?: readonly string[] | null;
+  targetCategory?: string | null;
+  requireExactlyThree?: boolean;
+  canRunOnlineFallback?: boolean;
 };
 
 function clean(value: unknown): string {
@@ -312,9 +319,6 @@ function sourceHostname(url: string): string {
   }
 }
 
-const MAX_BOOKABLE_CARDS = 3;
-const MAX_VERIFY_CARDS = 3;
-
 function rankingSourcesFor(input: WeddingVendorComparisonInput): WeddingVendorRankingSource[] {
   const execution = input.execution;
   const seen = new Set<string>();
@@ -350,6 +354,7 @@ function rankingSourcesFor(input: WeddingVendorComparisonInput): WeddingVendorRa
 function rankedVendorChoices(input: WeddingVendorComparisonInput): {
   result: WeddingVendorRankingResult;
   choices: WeddingVendorRankedCandidate[];
+  shortlist: WeddingVendorShortlistOutcome | null;
 } {
   const result = rankWeddingVendorCandidates({
     sources: rankingSourcesFor(input),
@@ -364,12 +369,28 @@ function rankedVendorChoices(input: WeddingVendorComparisonInput): {
       vendorCategories: input.vendorCategories,
     },
   });
-  const choices = [
+  const legacyChoices = [
     ...result.booked,
-    ...result.bookable.slice(0, MAX_BOOKABLE_CARDS),
-    ...result.verify.slice(0, MAX_VERIFY_CARDS),
+    ...result.bookable.slice(0, 3),
+    ...result.verify.slice(0, 3),
   ].map((choice, index) => ({ ...choice, rank: index + 1 }));
-  return { result, choices };
+  if (!input.requireExactlyThree) return { result, choices: legacyChoices, shortlist: null };
+
+  const targetCategory = clean(input.targetCategory) || clean(input.vendorCategories?.[0]);
+  const shortlist = selectWeddingVendorShortlist({
+    targetCategory,
+    bookable: result.bookable,
+    verify: result.verify,
+    canRunOnlineFallback: input.canRunOnlineFallback,
+  });
+  const rankedById = new Map([...result.bookable, ...result.verify].map((choice) => [choice.id, choice]));
+  const choices = shortlist.status === "complete"
+    ? shortlist.candidates.flatMap((choice, index) => {
+      const ranked = rankedById.get(choice.id);
+      return ranked ? [{ ...ranked, rank: index + 1 }] : [];
+    })
+    : [];
+  return { result, choices, shortlist };
 }
 
 function markdownFor(
@@ -522,11 +543,11 @@ export function buildWeddingVendorComparisonArtifactState(
       topChoiceCount: 0,
     };
   }
-  const { result, choices } = rankedVendorChoices(input);
+  const { result, choices, shortlist } = rankedVendorChoices(input);
   if (choices.length === 0) {
     return {
       status: "not_created",
-      reason: "Vendor comparison needs at least one usable source-backed vendor result.",
+      reason: shortlist?.reason ?? "Vendor comparison needs at least one usable source-backed vendor result.",
       metadata,
       artifactInput: null,
       summary: null,

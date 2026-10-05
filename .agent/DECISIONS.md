@@ -105,3 +105,13 @@ The shortlist policy is pure and consumes the existing ranking output; it does
 not introduce another fit score. It uses a stable material fingerprint,
 canonical identity de-duplication, bookable-then-verify ordering, and explicit
 verified-photo versus placeholder presentation semantics.
+
+## 2026-10-05: Wedding MVP Uses Durable-First Projection Boundaries
+
+Vendor outreach draft UI becomes editable only after its existing AFP draft
+builder has been successfully appended. The active workspace receives quote
+DecisionOS requests through the existing AFP save/refresh path; stable quote
+identity and the persisted `idempotency_key` suppress duplicate projection on
+refresh or reload. The temporary onboarding launch guard uses a
+fingerprinted browser-storage record until comparison artifact fingerprints
+are available as a first-class persisted projection field.

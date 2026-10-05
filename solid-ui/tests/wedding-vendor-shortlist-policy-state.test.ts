@@ -13,7 +13,7 @@ import {
 function candidate(id: string, group: "bookable" | "verify" = "bookable", overrides: Partial<WeddingVendorShortlistCandidate> = {}): WeddingVendorShortlistCandidate {
   return {
     id, vendorId: id, canonicalId: id, title: `Vendor ${id}`, group, category: "Venue",
-    websiteUrl: `https://${id}.example`, email: null, phone: null, imageUrl: null, availabilityState: "unknown", ...overrides,
+    url: `https://${id}.example`, websiteUrl: `https://${id}.example`, email: null, phone: null, imageUrl: null, availabilityState: "unknown", ...overrides,
   };
 }
 
@@ -32,7 +32,7 @@ test("shortlist removes canonical duplicates and unsuitable booked, excluded, ca
   const duplicate = candidate("second", "bookable", { canonicalId: "one" });
   const result = selectWeddingVendorShortlist({
     targetCategory: "Venue",
-    bookable: [candidate("one"), duplicate, candidate("booked", "bookable", { group: "booked" }), candidate("wrong", "bookable", { category: "Florist" }), candidate("no-route", "bookable", { websiteUrl: null })],
+    bookable: [candidate("one"), duplicate, candidate("booked", "bookable", { group: "booked" }), candidate("wrong", "bookable", { category: "Florist" }), candidate("no-route", "bookable", { url: "", websiteUrl: null })],
     verify: [candidate("three", "verify"), candidate("four", "verify")],
   });
   assert.equal(result.status, "complete");

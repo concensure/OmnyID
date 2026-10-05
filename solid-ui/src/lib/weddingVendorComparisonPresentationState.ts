@@ -6,6 +6,7 @@ import type {
   WeddingVendorRankedCandidate,
   WeddingVendorRankingResult,
 } from "@/lib/weddingVendorRankingState";
+import { weddingVendorShortlistMedia } from "@/lib/weddingVendorShortlistPolicyState";
 
 export type WeddingVendorComparisonContext = {
   preferences?: string | null;
@@ -127,12 +128,16 @@ export function vendorChoiceCards(
   choices: readonly WeddingVendorRankedCandidate[],
   weddingPlanId: string | null = null,
 ): Array<Record<string, unknown>> {
-  return choices.map((choice) => ({
+  return choices.map((choice) => {
+    const media = weddingVendorShortlistMedia({ vendorName: choice.title, imageUrl: choice.imageUrl });
+    return {
     choice_id: choice.id,
     rank: choice.rank,
     title: choice.title,
-    image_url: choice.imageUrl,
-    image_alt: choice.imageUrl ? `${choice.title} venue image` : null,
+    image_url: media.url,
+    image_alt: media.alt,
+    media_kind: media.kind,
+    media_label: media.label,
     provider: choice.provider,
     source_url: choice.url,
     website_url: choice.websiteUrl,
@@ -154,7 +159,8 @@ export function vendorChoiceCards(
     vendor_id: choice.vendorId,
     wedding_plan_id: weddingPlanId,
     unknown_constraints: choice.unknownHardConstraints,
-  }));
+    };
+  });
 }
 
 export function vendorChoiceContactDetails(choice: WeddingVendorRankedCandidate): Record<string, unknown> {
