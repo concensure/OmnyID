@@ -226,6 +226,9 @@ What changed:
   incomplete.
 - Extracted wedding-vendor record DTOs into `src/db/wedding_vendor_directory.rs`
   so the existing database monolith is smaller than it was before this work.
+- Preserved the existing backend-validated Google Places photo proxy as a
+  verified provider photo in the exactly-three card policy; it is not a
+  placeholder merely because it is a same-origin relative URL.
 
 Evidence:
 
@@ -243,6 +246,7 @@ Evidence:
 - focused Rust vendor write and source-mapping tests (3 passing tests)
 - `solid-ui: npm run typecheck` (pass)
 - `solid-ui: wedding-admin-vendor-form-state.test.ts` (4 passing tests)
+- `solid-ui: npm run test:wedding` (1,757 passing tests)
 
 Recommended next action:
 

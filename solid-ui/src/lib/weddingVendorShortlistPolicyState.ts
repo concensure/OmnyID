@@ -53,6 +53,11 @@ function unique(values: readonly string[]): string[] {
 function httpUrl(value: string | null | undefined): string | null {
   const candidate = clean(value);
   if (!candidate) return null;
+  // Google Places photos are served through this same-origin, backend-validated
+  // proxy. It is a real provider photo, not a presentation placeholder.
+  if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(candidate)) {
+    return candidate;
+  }
   try {
     const url = new URL(candidate);
     return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;

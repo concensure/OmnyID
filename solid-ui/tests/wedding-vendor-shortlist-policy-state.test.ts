@@ -44,6 +44,13 @@ test("media is always verified photo or an honest placeholder", () => {
   assert.deepEqual(weddingVendorShortlistMedia({ vendorName: "Harbour House", imageUrl: "https://images.example/harbour.jpg" }), {
     kind: "verified_photo", url: "https://images.example/harbour.jpg", alt: "Harbour House vendor photo", label: "Vendor photo",
   });
+  assert.equal(
+    weddingVendorShortlistMedia({
+      vendorName: "Harbour House",
+      imageUrl: "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc&max_width_px=720",
+    }).kind,
+    "verified_photo",
+  );
   const placeholder = weddingVendorShortlistMedia({ vendorName: "Harbour House", imageUrl: "javascript:bad" });
   assert.equal(placeholder.kind, "placeholder");
   assert.match(placeholder.label, /placeholder/i);
