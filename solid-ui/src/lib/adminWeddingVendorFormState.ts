@@ -19,10 +19,19 @@ export type AdminWeddingVendorDraft = {
   caveatLabels: string;
   photo1Url: string;
   photo1Alt: string;
+  photo1SourceUrl: string;
+  photo1RetrievedAt: string;
+  photo1LicenceMetadata: string;
   photo2Url: string;
   photo2Alt: string;
+  photo2SourceUrl: string;
+  photo2RetrievedAt: string;
+  photo2LicenceMetadata: string;
   photo3Url: string;
   photo3Alt: string;
+  photo3SourceUrl: string;
+  photo3RetrievedAt: string;
+  photo3LicenceMetadata: string;
 };
 
 export type AdminWeddingVendorPayloadResult = {
@@ -48,10 +57,13 @@ export const emptyAdminWeddingVendorDraft = (): AdminWeddingVendorDraft => ({
   caveatLabels: "User approval required before outreach",
   photo1Url: "",
   photo1Alt: "",
+  photo1SourceUrl: "", photo1RetrievedAt: "", photo1LicenceMetadata: "{}",
   photo2Url: "",
   photo2Alt: "",
+  photo2SourceUrl: "", photo2RetrievedAt: "", photo2LicenceMetadata: "{}",
   photo3Url: "",
   photo3Alt: "",
+  photo3SourceUrl: "", photo3RetrievedAt: "", photo3LicenceMetadata: "{}",
 });
 
 function clean(value: string): string | null {
@@ -110,10 +122,13 @@ export function adminWeddingVendorDraftFromVendor(vendor: WeddingVendor): AdminW
     caveatLabels: vendor.caveatLabels.join("\n"),
     photo1Url: photo(1)?.photoUrl ?? "",
     photo1Alt: photo(1)?.altText ?? "",
+    photo1SourceUrl: photo(1)?.sourceUrl ?? "", photo1RetrievedAt: photo(1)?.retrievedAt?.slice(0, 10) ?? "", photo1LicenceMetadata: JSON.stringify(photo(1)?.licenceMetadata ?? {}),
     photo2Url: photo(2)?.photoUrl ?? "",
     photo2Alt: photo(2)?.altText ?? "",
+    photo2SourceUrl: photo(2)?.sourceUrl ?? "", photo2RetrievedAt: photo(2)?.retrievedAt?.slice(0, 10) ?? "", photo2LicenceMetadata: JSON.stringify(photo(2)?.licenceMetadata ?? {}),
     photo3Url: photo(3)?.photoUrl ?? "",
     photo3Alt: photo(3)?.altText ?? "",
+    photo3SourceUrl: photo(3)?.sourceUrl ?? "", photo3RetrievedAt: photo(3)?.retrievedAt?.slice(0, 10) ?? "", photo3LicenceMetadata: JSON.stringify(photo(3)?.licenceMetadata ?? {}),
   };
 }
 
@@ -137,12 +152,15 @@ export function buildAdminWeddingVendorPayload(draft: AdminWeddingVendorDraft): 
   }
 
   const photoPairs = [
-    { slot: 1, url: draft.photo1Url, alt: draft.photo1Alt },
-    { slot: 2, url: draft.photo2Url, alt: draft.photo2Alt },
-    { slot: 3, url: draft.photo3Url, alt: draft.photo3Alt },
+    { slot: 1, url: draft.photo1Url, alt: draft.photo1Alt, sourceUrl: draft.photo1SourceUrl, retrievedAt: draft.photo1RetrievedAt, licence: draft.photo1LicenceMetadata },
+    { slot: 2, url: draft.photo2Url, alt: draft.photo2Alt, sourceUrl: draft.photo2SourceUrl, retrievedAt: draft.photo2RetrievedAt, licence: draft.photo2LicenceMetadata },
+    { slot: 3, url: draft.photo3Url, alt: draft.photo3Alt, sourceUrl: draft.photo3SourceUrl, retrievedAt: draft.photo3RetrievedAt, licence: draft.photo3LicenceMetadata },
   ];
   for (const photo of photoPairs) {
     validateOptionalUrl(photo.url, `Photo ${photo.slot} URL`, errors);
+    validateOptionalUrl(photo.sourceUrl, `Photo ${photo.slot} source URL`, errors);
+    if (photo.retrievedAt.trim() && !validDateOnly(photo.retrievedAt.trim())) errors.push(`Photo ${photo.slot} retrieval date must be YYYY-MM-DD.`);
+    try { if (photo.licence.trim() && (typeof JSON.parse(photo.licence) !== "object" || Array.isArray(JSON.parse(photo.licence)))) throw new Error(); } catch { errors.push(`Photo ${photo.slot} licence metadata must be a JSON object.`); }
   }
   if (errors.length > 0) return { payload: null, errors };
 
@@ -176,10 +194,8 @@ export function buildAdminWeddingVendorPayload(draft: AdminWeddingVendorDraft): 
           slot: photo.slot,
           photo_url: photo.url.trim(),
           alt_text: clean(photo.alt),
-          source_label: clean(draft.sourceLabel),
-          source_url: clean(draft.sourceUrl),
-          retrieved_at: clean(draft.sourceCheckedAt),
-          licence_metadata: {},
+          source_label: clean(draft.sourceLabel), source_url: clean(photo.sourceUrl), retrieved_at: clean(photo.retrievedAt),
+          licence_metadata: photo.licence.trim() ? JSON.parse(photo.licence) as Record<string, unknown> : {},
         })),
     },
     errors: [],

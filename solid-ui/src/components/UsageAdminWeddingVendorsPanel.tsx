@@ -242,6 +242,11 @@ export default function UsageAdminWeddingVendorsPanel() {
                   <p class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">Photo {slot}</p>
                   <input class="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Photo URL" type="url" value={draft()[`photo${slot}Url` as keyof AdminWeddingVendorDraft] as string} onInput={(event) => updateDraft(`photo${slot}Url` as keyof AdminWeddingVendorDraft, event.currentTarget.value as never)} />
                   <input class="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Alt text" value={draft()[`photo${slot}Alt` as keyof AdminWeddingVendorDraft] as string} onInput={(event) => updateDraft(`photo${slot}Alt` as keyof AdminWeddingVendorDraft, event.currentTarget.value as never)} />
+                  <span aria-hidden="true" />
+                  <input class="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Photo source URL" type="url" value={draft()[`photo${slot}SourceUrl` as keyof AdminWeddingVendorDraft] as string} onInput={(event) => updateDraft(`photo${slot}SourceUrl` as keyof AdminWeddingVendorDraft, event.currentTarget.value as never)} />
+                  <input class="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Retrieved date" type="date" value={draft()[`photo${slot}RetrievedAt` as keyof AdminWeddingVendorDraft] as string} onInput={(event) => updateDraft(`photo${slot}RetrievedAt` as keyof AdminWeddingVendorDraft, event.currentTarget.value as never)} />
+                  <span aria-hidden="true" />
+                  <input class="rounded-lg border border-slate-200 px-3 py-2 text-sm sm:col-span-2" placeholder='Licence metadata JSON, e.g. {"use":"editorial"}' value={draft()[`photo${slot}LicenceMetadata` as keyof AdminWeddingVendorDraft] as string} onInput={(event) => updateDraft(`photo${slot}LicenceMetadata` as keyof AdminWeddingVendorDraft, event.currentTarget.value as never)} />
                 </div>
               )}
             </For>

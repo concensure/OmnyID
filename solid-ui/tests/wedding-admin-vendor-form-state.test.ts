@@ -26,6 +26,9 @@ test("buildAdminWeddingVendorPayload creates conservative editable vendor payloa
     caveatLabels: "Request quote\nConfirm availability",
     photo1Url: "https://cdn.example.test/venue.jpg",
     photo1Alt: "Harbour ballroom",
+    photo1SourceUrl: "https://source.example.test/photo",
+    photo1RetrievedAt: "2026-09-20",
+    photo1LicenceMetadata: '{"use":"editorial"}',
   };
 
   const result = buildAdminWeddingVendorPayload(draft);
@@ -37,6 +40,8 @@ test("buildAdminWeddingVendorPayload creates conservative editable vendor payloa
   assert.deepEqual(result.payload?.caveat_labels, ["Request quote", "Confirm availability"]);
   assert.equal(result.payload?.photos?.length, 1);
   assert.equal(result.payload?.photos?.[0]?.slot, 1);
+  assert.equal(result.payload?.photos?.[0]?.source_url, "https://source.example.test/photo");
+  assert.deepEqual(result.payload?.photos?.[0]?.licence_metadata, { use: "editorial" });
 });
 
 test("buildAdminWeddingVendorPayload blocks malformed operator input before API calls", () => {
@@ -49,6 +54,7 @@ test("buildAdminWeddingVendorPayload blocks malformed operator input before API 
     websiteUrl: "venue.example.test",
     sourceCheckedAt: "2026-99-99",
     photo1Url: "not-a-url",
+    photo1LicenceMetadata: "not-json",
   });
 
   assert.equal(result.payload, null);
@@ -58,6 +64,7 @@ test("buildAdminWeddingVendorPayload blocks malformed operator input before API 
   assert.ok(result.errors.some((error) => /Website URL/i.test(error)));
   assert.ok(result.errors.some((error) => /Source checked date/i.test(error)));
   assert.ok(result.errors.some((error) => /Photo 1 URL/i.test(error)));
+  assert.ok(result.errors.some((error) => /licence metadata/i.test(error)));
 });
 
 test("adminWeddingVendorDraftFromVendor preserves three photo slots for editing", () => {
@@ -88,6 +95,9 @@ test("adminWeddingVendorDraftFromVendor preserves three photo slots for editing"
         photoUrl: "https://cdn.example.test/second.jpg",
         altText: "Second view",
         sourceLabel: null,
+        sourceUrl: "https://source.example.test/second.jpg",
+        retrievedAt: "2026-09-20T00:00:00Z",
+        licenceMetadata: { use: "editorial" },
         createdAt: "2026-09-19T00:00:00Z",
       },
     ],
@@ -99,4 +109,7 @@ test("adminWeddingVendorDraftFromVendor preserves three photo slots for editing"
   assert.equal(draft.photo1Url, "");
   assert.equal(draft.photo2Url, "https://cdn.example.test/second.jpg");
   assert.equal(draft.photo2Alt, "Second view");
+  assert.equal(draft.photo2SourceUrl, "https://source.example.test/second.jpg");
+  assert.equal(draft.photo2RetrievedAt, "2026-09-20");
+  assert.equal(draft.photo2LicenceMetadata, '{"use":"editorial"}');
 });

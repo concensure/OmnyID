@@ -219,3 +219,18 @@ Unresolved problems:
   inheriting vendor-level source fields.
 - Focused Rust admin-route tests were started but did not finish before the
   local command runner's 30-second cutoff.
+
+## 2026-10-05 - WED-145 per-photo provenance editor
+
+What changed:
+
+- Added independent source URL, retrieval date, and licence JSON fields for
+  each existing photo slot in the operator vendor editor.
+- The form round-trips those fields through the existing vendor/slot write
+  contract and rejects malformed source URLs, dates, or licence JSON before
+  any API call.
+
+Tests performed:
+
+- `solid-ui: npm run typecheck` (pass)
+- `solid-ui: wedding-admin-vendor-form-state.test.ts` (4 passing tests)
