@@ -136,6 +136,9 @@ Tests performed:
 
 - `solid-ui: npm run typecheck` (pass)
 - focused MVP policy/search/outreach/quote suite: 36 passing tests
+- `cargo check` (pass)
+- `solid-ui: npm run test:line-budget` (baseline failure: the three existing
+  Rust monoliths and seven pre-existing wedding files remain over cap)
 - `git diff --check` (pass; CRLF conversion warnings only)
 
 Unresolved problems:
@@ -145,7 +148,9 @@ Unresolved problems:
 - M6 still needs durable resolution/deferral successor wiring so a resolved
   quote deterministically leaves DecisionOS.
 - Full build, complete wedding suite, full Rust suite, CI/deployment checks,
-  and Oracle production smoke remain outstanding. Do not deploy this checkpoint.
+  and Oracle production smoke remain outstanding. The Vite build began but the
+  local command runner cut it off before an exit status; do not treat it as a
+  passing build or deploy this checkpoint.
 - Existing line-budget failures remain baseline defects; neither cap was raised.
 
 Recommended next action:
