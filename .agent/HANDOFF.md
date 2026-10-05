@@ -5,6 +5,40 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-05 - UX-MFH-01 decision confirmation and home return
+
+What changed:
+
+- A downward mobile-deck swipe now opens an explicit confirmation rather than
+  routing straight into a vendor response workflow. Confirmation appends the
+  existing `decision_triage` projection and removes the resolved decision so
+  the next unresolved card becomes visible.
+- The response/deck and compact quote card now expose an explicit **Open agent
+  draft** entry point for the existing Tiptap reply editor. Opening it is
+  review-only; the existing send confirmation remains the only send path.
+- Deferring remains on Wedding Home, and every non-home wedding workspace page
+  now has a **Wedding Home** return control.
+
+Tests performed:
+
+- `solid-ui: npm run typecheck` (pass)
+- focused swipe/mobile/quote-reply suite (38 passing)
+- `solid-ui: npm run build` (pass; existing Browserslist freshness and
+  Tailwind min/max screen-variant warnings)
+- `solid-ui: npm run test:line-budget` (baseline failure: existing oversized
+  Rust and wedding files; no changed file is a new violation)
+
+Deployment:
+
+- Committed as `af9e93b fix(UX-MFH-01): confirm wedding deck decisions`.
+- The normal all-services Oracle deployment was stopped before container
+  replacement when the root disk filled while exporting a rebuilt homeserver
+  image. Docker build cache was safely pruned (98% to 87% root use), then the
+  completed frontend image was deployed directly to `omnyid-ui-1`. Caddy and
+  homeserver remained running; the local proxy returned the expected HTTPS 308.
+- No database or Docker volume was removed. The host needs a capacity/retention
+  remediation before a future full all-services rebuild.
+
 ## 2026-10-05 - UX-MFH-01 Master Agent result visibility repair
 
 What changed:
