@@ -36,6 +36,7 @@ tasks:
       - src/server/wedding_vendor_outreach_routes.rs
       - src/server/user_management_routes/wedding_admin.rs
       - src/wedding_shared_tool_metering.rs
+      - docker-compose.oracle.minimal.yml
       - solid-ui/tests/**
       - .agent/**
     acceptance:
