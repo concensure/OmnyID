@@ -5508,6 +5508,9 @@ export type WeddingVendorPhoto = {
   photoUrl: string;
   altText: string | null;
   sourceLabel: string | null;
+  sourceUrl: string | null;
+  retrievedAt: string | null;
+  licenceMetadata: Record<string, unknown>;
   createdAt: string;
 };
 
@@ -5555,6 +5558,9 @@ export type WeddingVendorWritePayload = {
     photo_url: string;
     alt_text?: string | null;
     source_label?: string | null;
+    source_url?: string | null;
+    retrieved_at?: string | null;
+    licence_metadata?: Record<string, unknown>;
   }[];
 } & WeddingVendorAttributeWriteFields;
 
@@ -5940,6 +5946,9 @@ function normalizeWeddingVendorPhoto(value: unknown): WeddingVendorPhoto | null 
     photoUrl: apiString(value.photo_url),
     altText: apiNullableString(value.alt_text) ?? null,
     sourceLabel: apiNullableString(value.source_label) ?? null,
+    sourceUrl: apiNullableString(value.source_url) ?? null,
+    retrievedAt: apiNullableString(value.retrieved_at) ?? null,
+    licenceMetadata: isRecord(value.licence_metadata) ? value.licence_metadata : {},
     createdAt: apiString(value.created_at),
   };
 }

@@ -195,3 +195,27 @@ Next action:
 
 - Thread these optional fields through the existing admin DTO, DB read/write
   path, and form, then add migration-backed API tests before deployment.
+
+## 2026-10-05 - WED-145 photo provenance DTO continuation
+
+What changed:
+
+- Extended the existing photo request, database records/upserts, list queries,
+  and write transaction for optional source URL, retrieval time, and licence
+  metadata.
+- Existing operator form writes preserve a vendor's already-entered source
+  label/URL/check date for each photo without changing the stable vendor/slot
+  identity or adding a media store.
+
+Tests performed:
+
+- `solid-ui: npm run typecheck` (pass)
+- `solid-ui: wedding-admin-vendor-form-state.test.ts` (4 passing tests)
+- `cargo check` (pass)
+
+Unresolved problems:
+
+- The operator UI still needs separate per-photo provenance inputs instead of
+  inheriting vendor-level source fields.
+- Focused Rust admin-route tests were started but did not finish before the
+  local command runner's 30-second cutoff.

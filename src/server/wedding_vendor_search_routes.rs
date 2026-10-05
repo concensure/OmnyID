@@ -1323,6 +1323,9 @@ async fn persist_live_vendor_sources(
                     photo_url: url.to_string(),
                     alt_text: Some(format!("{} venue image", source.title.trim())),
                     source_label: Some(source.provider.clone()),
+                    source_url: Some(source.url.clone()),
+                    retrieved_at: None,
+                    licence_metadata: serde_json::json!({}),
                 })
                 .into_iter()
                 .collect(),

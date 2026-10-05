@@ -4084,6 +4084,9 @@ impl Db {
                     photo_url,
                     alt_text,
                     source_label,
+                    source_url,
+                    retrieved_at::text AS retrieved_at,
+                    licence_metadata,
                     created_at::text AS created_at
                 FROM wedding_vendor_photos
                 WHERE vendor_id = ANY($1)
@@ -4104,6 +4107,9 @@ impl Db {
                         photo_url: row.get("photo_url"),
                         alt_text: row.get("alt_text"),
                         source_label: row.get("source_label"),
+                        source_url: row.get("source_url"),
+                        retrieved_at: row.get("retrieved_at"),
+                        licence_metadata: row.get("licence_metadata"),
                         created_at: row.get("created_at"),
                     });
             }
@@ -4225,6 +4231,9 @@ impl Db {
                     photo_url,
                     alt_text,
                     source_label,
+                    source_url,
+                    retrieved_at::text AS retrieved_at,
+                    licence_metadata,
                     created_at::text AS created_at
                 FROM wedding_vendor_photos
                 WHERE vendor_id = ANY($1)
@@ -4245,6 +4254,9 @@ impl Db {
                         photo_url: row.get("photo_url"),
                         alt_text: row.get("alt_text"),
                         source_label: row.get("source_label"),
+                        source_url: row.get("source_url"),
+                        retrieved_at: row.get("retrieved_at"),
+                        licence_metadata: row.get("licence_metadata"),
                         created_at: row.get("created_at"),
                     });
             }
@@ -4406,9 +4418,12 @@ impl Db {
                     slot,
                     photo_url,
                     alt_text,
-                    source_label
+                    source_label,
+                    source_url,
+                    retrieved_at,
+                    licence_metadata
                 )
-                VALUES ($1, $2, $3, $4, $5, $6)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9)
                 "#,
             )
             .bind(Ulid::new().to_string())
@@ -4417,6 +4432,9 @@ impl Db {
             .bind(&photo.photo_url)
             .bind(&photo.alt_text)
             .bind(&photo.source_label)
+            .bind(&photo.source_url)
+            .bind(&photo.retrieved_at)
+            .bind(&photo.licence_metadata)
             .execute(&mut *tx)
             .await?;
         }
@@ -13287,6 +13305,9 @@ pub struct WeddingVendorPhotoRecord {
     pub photo_url: String,
     pub alt_text: Option<String>,
     pub source_label: Option<String>,
+    pub source_url: Option<String>,
+    pub retrieved_at: Option<String>,
+    pub licence_metadata: Value,
     pub created_at: String,
 }
 
@@ -13342,6 +13363,9 @@ pub struct WeddingVendorPhotoUpsertRecord {
     pub photo_url: String,
     pub alt_text: Option<String>,
     pub source_label: Option<String>,
+    pub source_url: Option<String>,
+    pub retrieved_at: Option<String>,
+    pub licence_metadata: Value,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

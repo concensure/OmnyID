@@ -111,6 +111,9 @@ struct WeddingVendorPhotoRequest {
     photo_url: String,
     alt_text: Option<String>,
     source_label: Option<String>,
+    source_url: Option<String>,
+    retrieved_at: Option<String>,
+    licence_metadata: Option<Value>,
 }
 
 #[derive(serde::Deserialize)]

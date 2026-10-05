@@ -207,6 +207,9 @@ pub(super) fn wedding_vendor_write_input(
                 photo_url,
                 alt_text: clean_optional_string(photo.alt_text),
                 source_label: clean_optional_string(photo.source_label),
+                source_url: validate_optional_http_url(photo.source_url, "photo source_url")?,
+                retrieved_at: clean_optional_string(photo.retrieved_at),
+                licence_metadata: photo.licence_metadata.unwrap_or_else(|| serde_json::json!({})),
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
