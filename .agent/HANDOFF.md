@@ -39,6 +39,31 @@ Deployment:
 - No database or Docker volume was removed. The host needs a capacity/retention
   remediation before a future full all-services rebuild.
 
+## 2026-10-06 - SEC-001 Caddy-only Oracle rollout
+
+What changed:
+
+- Deployed Caddyfile from clean detached commit `7e1880d` only. No application
+  image was rebuilt and no application service was recreated.
+- Validated the candidate inside the running Caddy image, then recreated only
+  the Caddy service after detecting its file bind mount held an old inode.
+
+Machine-derived verification:
+
+- External HTTPS: `/privacy.html` and `/.well-known/security.txt` returned
+  200; the known internal Markdown and TypeScript paths at both `/` and
+  `/docs/` returned 404.
+- Remote loopback checks returned `local_public=200` and `local_blocked=404`.
+- Postgres, homeserver, backup, Electric, and SeaweedFS remained running;
+  Caddy is running with the mounted guard configuration. Root disk remained
+  70% used with 14 GB available.
+
+Operational note:
+
+- A normal deployment from a working tree without `7e1880d` would overwrite
+  the Caddyfile and remove this guard. Merge/cherry-pick this branch before
+  such a deployment.
+
 ## 2026-10-05 - UX-MFH-01 Master Agent result visibility repair
 
 What changed:
@@ -307,6 +332,38 @@ Evidence:
   CSV-compatible normalized projection hashes identically to
   `Documents/design/wedding planner/wedding-vendor-database-oracle.csv`
   (`f3cd92e4e975f3952d69aa924c97a345`).
+# 2026-10-05 - SEC-001 static docs exposure remediation
+
+What changed:
+
+- Added a Caddy rejection handler for Markdown, TypeScript, SQL, review, and
+  CSV files before either `/` or `/docs/` static resolution.
+- Versioned the existing Oracle legal-page assets, public security contact,
+  Genesis logo script, OmnyID logo, wedding images, and the historical
+  production-applied venue-photo seed migration.
+
+Validation:
+
+- `caddy validate` passed in the pinned Caddy 2 container with placeholder
+  domain and ACME-email values.
+- An isolated Caddy route check returned 200 for `/privacy.html` and
+  `/.well-known/security.txt`, and 404 for the previously exposed root and
+  `/docs/` Markdown paths plus both TypeScript paths.
+- The `0092b` SQL file has one terminating venue-photo `INSERT` statement and
+  no migration-catalog entry, so it remains recoverable source history without
+  becoming a new automatic migration.
+- The untracked Python SDK capability/prototype paths remain deliberately
+  unstaged: production uses `runtime-templates/python-runner-chat`; the new
+  SDK modules are neither registered nor tested as a shipped runner feature.
+
+Deployment note:
+
+- Do not rely on the normal archive deploy to remove old `docs/` files: it
+  intentionally preserves the live bind-mounted directory. Remove the named
+  internal files on Oracle after this Caddy change is deployed.
+
+---
+
 - Snapshot validation: 130 unique vendor IDs; all statuses valid; no missing
   required values; `photo_count` values are non-negative (36 zero, 94 three).
 - Oracle is currently at migrations through `0094`; `0095` and `0096` are
