@@ -273,6 +273,38 @@ Evidence:
   CSV-compatible normalized projection hashes identically to
   `Documents/design/wedding planner/wedding-vendor-database-oracle.csv`
   (`f3cd92e4e975f3952d69aa924c97a345`).
+# 2026-10-05 - SEC-001 static docs exposure remediation
+
+What changed:
+
+- Added a Caddy rejection handler for Markdown, TypeScript, SQL, review, and
+  CSV files before either `/` or `/docs/` static resolution.
+- Versioned the existing Oracle legal-page assets, public security contact,
+  Genesis logo script, OmnyID logo, wedding images, and the historical
+  production-applied venue-photo seed migration.
+
+Validation:
+
+- `caddy validate` passed in the pinned Caddy 2 container with placeholder
+  domain and ACME-email values.
+- An isolated Caddy route check returned 200 for `/privacy.html` and
+  `/.well-known/security.txt`, and 404 for the previously exposed root and
+  `/docs/` Markdown paths plus both TypeScript paths.
+- The `0092b` SQL file has one terminating venue-photo `INSERT` statement and
+  no migration-catalog entry, so it remains recoverable source history without
+  becoming a new automatic migration.
+- The untracked Python SDK capability/prototype paths remain deliberately
+  unstaged: production uses `runtime-templates/python-runner-chat`; the new
+  SDK modules are neither registered nor tested as a shipped runner feature.
+
+Deployment note:
+
+- Do not rely on the normal archive deploy to remove old `docs/` files: it
+  intentionally preserves the live bind-mounted directory. Remove the named
+  internal files on Oracle after this Caddy change is deployed.
+
+---
+
 - Snapshot validation: 130 unique vendor IDs; all statuses valid; no missing
   required values; `photo_count` values are non-negative (36 zero, 94 three).
 - Oracle is currently at migrations through `0094`; `0095` and `0096` are

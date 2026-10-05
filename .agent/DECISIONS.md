@@ -186,3 +186,13 @@ Google proxy path via the existing authenticated API base, renders a temporary
 object URL, and revokes it on cleanup. This preserves the server-side Places
 credential boundary while retaining the existing truthful placeholder for a
 failed image response.
+
+## 2026-10-05: Static Docs Mount Is Deny-by-Format for Internal Sources
+
+The Oracle Caddy container bind-mounts `docs/` for a small public static site.
+That mount is also a deployment input and must not make operational Markdown,
+TypeScript, SQL, review, or CSV files downloadable. Caddy rejects those
+formats before static resolution at both the root and `/docs/` aliases.
+Public HTML legal pages, static assets, and `/.well-known/security.txt` remain
+available. Internal documents should be kept outside `docs/`; the deny rule is
+defence in depth for an accidental staged file.

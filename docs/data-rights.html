@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OmnyID Data Rights &amp; Deletion Policy</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-stone-950 text-stone-100">
+  <main class="mx-auto max-w-4xl px-6 py-16">
+    <a href="./index.html" class="text-sm uppercase tracking-[0.2em] text-cyan-300 hover:text-cyan-200">Back to OmnyID</a>
+    <h1 class="mt-6 text-4xl font-semibold">Data Rights &amp; Deletion Policy</h1>
+    <p class="mt-3 text-sm text-stone-400">Effective date: July 5, 2026</p>
+
+    <div class="mt-10 space-y-8 text-sm leading-7 text-stone-200">
+      <section>
+        <h2 class="text-xl font-semibold text-white">1. Self-serve capabilities currently available</h2>
+        <ul class="mt-2 list-disc space-y-2 pl-6">
+          <li>The hosted dashboard can export current dashboard/workspace state through the mounted export flow.</li>
+          <li>The hosted dashboard can request account deletion through the mounted account-deletion flow.</li>
+          <li>The hosted dashboard can grant and revoke temporary support access explicitly.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">2. What current export covers</h2>
+        <p class="mt-2">
+          The current export flow is a bounded product export, not a universal full-fidelity dump of every internal store,
+          third-party provider record, or historical backup artifact. It is intended to give you a local copy of currently
+          exposed workspace/dashboard state and recent AFP-visible activity where available.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">3. How to request broader portability help</h2>
+        <p class="mt-2">
+          If the self-serve export does not satisfy your portability need, email
+          <a class="text-cyan-300 hover:text-cyan-200" href="mailto:hello@omnyid.com">hello@omnyid.com</a> from the account email address
+          with the subject line <span class="rounded bg-stone-800 px-2 py-1 text-stone-100">Data export request</span>.
+          We will confirm the scope, identity, and delivery method before fulfilling the request.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">4. How deletion works</h2>
+        <p class="mt-2">
+          The mounted hosted account-deletion flow is intended to remove the hosted OmnyID account, hosted runtime, and
+          associated server-side agent-scoped data for that account. Some billing, fraud-prevention, or security records may
+          be retained for a limited period where legally or operationally required.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">5. Erasure timing</h2>
+        <ul class="mt-2 list-disc space-y-2 pl-6">
+          <li>Interactive account-deletion requests are processed as soon as the hosted delete workflow completes successfully.</li>
+          <li>Associated support follow-up, backups, or provider records may take additional time to age out or be cleared from retention systems.</li>
+          <li>Where a manual follow-up is required, OmnyID targets acknowledgment within 7 calendar days and completion or status update within 30 calendar days.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">6. Requesting privacy rights</h2>
+        <p class="mt-2">
+          For access, correction, deletion, or portability requests that are not fully handled by the current self-serve
+          flows, contact <a class="text-cyan-300 hover:text-cyan-200" href="mailto:hello@omnyid.com">hello@omnyid.com</a>.
+        </p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

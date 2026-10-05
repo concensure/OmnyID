@@ -255,3 +255,19 @@ tasks:
       - outreach drafts persist before they can be sent
       - unresolved vendor quotes project once into DecisionOS
       - MVP checks, build, and deployment proof are recorded from their machine authorities
+
+  - id: SEC-001
+    title: Restrict public docs delivery and recover production-only static assets
+    status: review
+    owner: codex
+    branch: agent/codex/SEC-001
+    depends_on: []
+    files:
+      - Caddyfile
+      - docs/**
+      - postgres/migrations/0092b_wedding_venue_photos_applied.sql
+      - .agent/**
+    acceptance:
+      - internal Markdown, TypeScript, SQL, review, and CSV files in the static docs mount return 404
+      - intended public legal pages, security contact, logo, and wedding images are versioned
+      - production-applied venue photo seed migration is recoverable from a fresh clone without being rerun by the migration runner

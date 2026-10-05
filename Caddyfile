@@ -146,6 +146,13 @@
     handle /readyz {
         import omnyid_proxy
     }
+    # Contact details for vulnerability reports are a static public document;
+    # keep this exception ahead of the homeserver's AFP discovery namespace.
+    handle /.well-known/security.txt {
+        root * /srv/docs
+        file_server
+        header Content-Type "text/plain; charset=utf-8"
+    }
     handle /.well-known/* {
         import omnyid_proxy
     }
@@ -276,9 +283,26 @@
         header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https:; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
     }
 
+    # `/srv/docs` is a deployment input, not a public-document repository.
+    # Only the static site assets and legal pages belong at this origin.  The
+    # deploy archive can also contain engineering notes, so reject internal
+    # document formats before either static docs handler can resolve them.
+    # `security.txt` remains a deliberate public text exception under
+    # `/.well-known/`.
+    @nonpublic_docs {
+        path *.md *.tsx *.sql *.review *.csv
+    }
+    handle @nonpublic_docs {
+        respond "Not found" 404
+    }
+
     # Alias so the wedding site's relative "../docs/index.html" links resolve.
     # The catch-all handle{} below already serves the same /srv/docs content at "/".
-    handle /docs/* {
+    @public_docs_alias {
+        path /docs/*
+        not path /docs/*.md /docs/*.tsx /docs/*.sql /docs/*.review /docs/*.csv
+    }
+    handle @public_docs_alias {
         uri strip_prefix /docs
         root * /srv/docs
         try_files {path} /index.html
