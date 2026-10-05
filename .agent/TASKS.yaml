@@ -258,7 +258,7 @@ tasks:
 
   - id: SEC-001
     title: Restrict public docs delivery and recover production-only static assets
-    status: review
+    status: done
     owner: codex
     branch: agent/codex/SEC-001
     depends_on: []

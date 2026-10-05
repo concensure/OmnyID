@@ -5,6 +5,31 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-06 - SEC-001 Caddy-only Oracle rollout
+
+What changed:
+
+- Deployed Caddyfile from clean detached commit `7e1880d` only. No application
+  image was rebuilt and no application service was recreated.
+- Validated the candidate inside the running Caddy image, then recreated only
+  the Caddy service after detecting its file bind mount held an old inode.
+
+Machine-derived verification:
+
+- External HTTPS: `/privacy.html` and `/.well-known/security.txt` returned
+  200; the known internal Markdown and TypeScript paths at both `/` and
+  `/docs/` returned 404.
+- Remote loopback checks returned `local_public=200` and `local_blocked=404`.
+- Postgres, homeserver, backup, Electric, and SeaweedFS remained running;
+  Caddy is running with the mounted guard configuration. Root disk remained
+  70% used with 14 GB available.
+
+Operational note:
+
+- A normal deployment from a working tree without `7e1880d` would overwrite
+  the Caddyfile and remove this guard. Merge/cherry-pick this branch before
+  such a deployment.
+
 ## 2026-10-05 - UX-MFH-01 Master Agent result visibility repair
 
 What changed:
