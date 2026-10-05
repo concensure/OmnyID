@@ -115,3 +115,8 @@ identity and the persisted `idempotency_key` suppress duplicate projection on
 refresh or reload. The temporary onboarding launch guard uses a
 fingerprinted browser-storage record until comparison artifact fingerprints
 are available as a first-class persisted projection field.
+
+Sent wedding quote replies close their DecisionOS request by appending a
+separate `decision_result` AFP successor. Active and resolved messages have
+different stable idempotency keys, so closure never mutates quote history and
+reloads cannot append either projection twice.

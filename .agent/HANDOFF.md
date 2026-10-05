@@ -157,3 +157,23 @@ Recommended next action:
 
 - Complete the existing photo-admin lifecycle and quote resolution successor,
   then run M7's full verification matrix before an Oracle deployment.
+
+## 2026-10-05 - WED-145 quote closure continuation
+
+What changed:
+
+- A reply which reaches the existing sent/log flow now projects an append-only
+  `decision_result` successor for the same stable quote decision id.
+- The dispatcher deduplicates both `decision_request` and `decision_result`
+  records using their persisted idempotency keys.
+
+Tests performed:
+
+- focused quote DecisionOS projector/dispatcher tests: 5 passing tests.
+
+Unresolved problems:
+
+- Photo provenance fields (source URL, retrieval time, and licence/use data)
+  still need an additive record/migration path; current stable photo slots only
+  retain URL, alt text, and source label.
+- Full M7 verification and deployment remain outstanding.

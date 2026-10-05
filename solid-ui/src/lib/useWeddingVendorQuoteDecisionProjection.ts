@@ -16,7 +16,8 @@ export function useWeddingVendorQuoteDecisionProjection(input: {
     const saveProjection = input.saveProjection();
     if (!saveProjection) return;
     const dispatches = weddingVendorQuoteDecisionDispatches({
-      flows: input.state().activeVendorQuoteReplyFlows,
+      activeFlows: input.state().activeVendorQuoteReplyFlows,
+      resolvedFlows: input.state().vendorQuoteReplyLogFlows,
       messages: input.state().afpMessages,
       attemptedKeys: attemptedKeys(),
     });

@@ -21,6 +21,8 @@ test("minimal quotes remain actionable, while resolved quotes do not remain acti
   const minimal = buildWeddingVendorQuoteDecisionOsProjection({ ...base, quote: { ...quote, amount: null, amountLabel: "Amount not extracted", validUntil: null } });
   assert.equal(minimal.status, "active");
   assert.deepEqual(((minimal.sendInput?.content as Record<string, unknown>).quote_summary as Record<string, unknown>).unknown_fields, ["amount", "validity deadline"]);
-  assert.equal(buildWeddingVendorQuoteDecisionOsProjection({ ...base, lifecycle: "resolved" }).status, "not_projected");
+  const resolved = buildWeddingVendorQuoteDecisionOsProjection({ ...base, lifecycle: "resolved" });
+  assert.equal(resolved.status, "resolved");
+  assert.equal(resolved.sendInput?.type, "decision_result");
   assert.notEqual(buildWeddingVendorQuoteDecisionOsProjection({ ...base, quoteMessageId: "afp:quote-2" }).decisionId, minimal.decisionId);
 });
