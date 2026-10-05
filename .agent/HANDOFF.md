@@ -5,6 +5,43 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-05 - UX-MFH-01 Master Agent result visibility repair
+
+What changed:
+
+- Direct Master Agent commands now remain on the Search surface after the
+  response arrives. A `suggested_view` can still seed a workflow handoff, but
+  no longer clears the just-finished command result before it renders.
+- Rich previews continue to decrypt only in browser memory. If the device
+  cannot unlock one, the renderer now shows the response's safe summary and an
+  explicit local unlock notice instead of a blank/locked-only result area.
+- Added focused unit coverage for decrypted and locked-preview selection.
+
+Why:
+
+- A working BYOK provider could still appear to return nothing because the UI
+  immediately followed a model navigation suggestion and cleared search state.
+
+Tests performed:
+
+- `solid-ui: npm run typecheck` (pass)
+- focused command preview tests (19 passing)
+- `solid-ui: npm run build` (pass; pre-existing Browserslist freshness and
+  Tailwind min/max screen-variant warnings)
+- `git diff --check` (pass)
+
+Deployment:
+
+- Committed as `4445f38 fix(UX-MFH-01): keep master agent results visible`.
+- Oracle deployment completed with the existing production environment; UI,
+  homeserver, backup, and Caddy were recreated and the workspace HTTP smoke
+  returned `200`.
+
+Remaining verification:
+
+- An authenticated browser smoke with the user's BYOK account is still needed
+  to exercise a real provider response end-to-end. The UI repair is deployed.
+
 ## 2026-10-05 - DEV-001
 
 What changed:
