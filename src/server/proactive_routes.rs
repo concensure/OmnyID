@@ -11723,10 +11723,21 @@ async fn ingest_passive_event_http(
         }
     }
 
+    let automation_source_ref = req
+        .metadata
+        .get("message_id")
+        .and_then(Value::as_str)
+        .or_else(|| req.metadata.get("smtp_message_id").and_then(Value::as_str))
+        .or(req.entity_id.as_deref())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("{}:{value}", req.source.trim()))
+        .unwrap_or_else(|| event_afp_id.clone());
+
     if let Some(automation_artifact_json) = plan_passive_event_background_artifact(
         &user.id,
         &thread_id,
-        &event_afp_id,
+        &automation_source_ref,
         &event_content,
         &req.event_type,
         &connected_capabilities,

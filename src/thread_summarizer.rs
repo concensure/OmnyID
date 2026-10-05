@@ -225,13 +225,10 @@ pub async fn auto_summarize_threads_async(
     let mut base = auto_summarize_threads(messages);
 
     // Attempt Ollama embedding for richer semantic representation.
-    let embedding =
-        crate::summarizer::generate_embedding_with_ollama(ollama_url, None, &base.condensed_text)
-            .await;
-
-    // If we got a real embedding (non-uniform), signal the richer model.
-    let is_real = embedding.iter().any(|&v| (v - 0.1).abs() > f32::EPSILON);
-    if is_real {
+    if crate::summarizer::generate_embedding_with_ollama(ollama_url, None, &base.condensed_text)
+        .await
+        .is_some()
+    {
         base.model_used = Some("nomic-embed-text".to_string());
     }
 

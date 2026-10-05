@@ -22,7 +22,7 @@ use crate::{
         },
         smtp_in::{handle_incoming_email, summarize_incoming_email},
     },
-    message::{AFP_TYPE_PASSIVE_EVENT, AFPMessage, AfpPassiveEventContent},
+    message::{AFPMessage, AfpPassiveEventContent},
     metrics::Metrics,
     personal_event_ingestion::{
         enrich_mail_passive_event_with_recent_contact_context,
@@ -31,9 +31,8 @@ use crate::{
         enrich_mail_passive_event_with_reply_policy, plan_passive_event_background_artifact,
     },
     server::{
-        app_to_proto,
-        auth::{new_server_message, store_private_app_message},
-        env_hex_32, sign_server_generated_message, store_proto_message,
+        app_to_proto, auth::store_private_app_message, env_hex_32, sign_server_generated_message,
+        store_proto_message,
     },
 };
 
@@ -377,13 +376,21 @@ async fn try_emit_wedding_vendor_reply(
 
     let received_at = chrono::Utc::now().to_rfc3339();
     if let Err(err) = db
-        .mark_wedding_vendor_contact_response_received(owner_user_id, &matched.vendor_id, &received_at)
+        .mark_wedding_vendor_contact_response_received(
+            owner_user_id,
+            &matched.vendor_id,
+            &received_at,
+        )
         .await
     {
         debug!(%err, owner_user_id, vendor_id = %matched.vendor_id, "failed to mark wedding vendor response_received_at");
     }
 
-    let Some(thread_id) = matched.thread_id.clone().filter(|value| !value.trim().is_empty()) else {
+    let Some(thread_id) = matched
+        .thread_id
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+    else {
         debug!(
             owner_user_id,
             vendor_id = %matched.vendor_id,
@@ -423,7 +430,8 @@ async fn try_emit_wedding_vendor_reply(
         }
     };
 
-    if let Err(err) = store_private_app_message(db, metrics, relay_tx, owner_user_id, message).await {
+    if let Err(err) = store_private_app_message(db, metrics, relay_tx, owner_user_id, message).await
+    {
         debug!(%err, owner_user_id, "failed to store wedding vendor reply AFP message");
     }
 }
@@ -633,22 +641,7 @@ async fn emit_gmail_personal_automation(
     // derive a stable, ULID-shaped id from it instead so all passive events for
     // a user keep landing in the same synthetic thread.
     let thread_id = deterministic_pseudo_ulid(&format!("passive:{owner_user_id}"));
-    let event_message = new_server_message(
-        "background_watcher".to_string(),
-        vec![owner_user_id.to_string()],
-        thread_id.clone(),
-        AFP_TYPE_PASSIVE_EVENT,
-        serde_json::to_value(&event_content).unwrap_or_default(),
-        vec![],
-        vec![],
-        vec![],
-        false,
-    )
-    .map_err(|err| format!("failed to build passive Gmail event: {err}"))?;
-    let event_afp_id = event_message.id.clone();
-    store_private_app_message(db, metrics, relay_tx, owner_user_id, event_message)
-        .await
-        .map_err(|err| err.message().to_string())?;
+    let event_afp_id = format!("gmail:{gmail_email}:{external_message_id}");
 
     let connected_capabilities = db
         .list_user_connected_capabilities(owner_user_id)
@@ -1182,12 +1175,26 @@ mod tests {
         let message = message.expect("message should build with a configured encryption key");
 
         assert_eq!(message.parent_id.as_deref(), Some("raw-gateway-message-id"));
-        assert!(message.supertags.contains(&"template:wedding_planning".to_string()));
+        assert!(
+            message
+                .supertags
+                .contains(&"template:wedding_planning".to_string())
+        );
         assert!(message.supertags.contains(&"event:wedding".to_string()));
-        assert!(message.supertags.contains(&"wedding_vendor_reply".to_string()));
+        assert!(
+            message
+                .supertags
+                .contains(&"wedding_vendor_reply".to_string())
+        );
         assert!(message.supertags.contains(&"needs_follow_up".to_string()));
-        assert_eq!(message.kind.as_deref(), Some("wedding_vendor_reply_received"));
-        assert_eq!(message.subtype.as_deref(), Some("wedding_vendor_reply_received"));
+        assert_eq!(
+            message.kind.as_deref(),
+            Some("wedding_vendor_reply_received")
+        );
+        assert_eq!(
+            message.subtype.as_deref(),
+            Some("wedding_vendor_reply_received")
+        );
     }
 
     #[test]

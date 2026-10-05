@@ -1,4 +1,5 @@
 use serde_json::{Map, Value, json};
+use sha2::{Digest, Sha256};
 use ulid::Ulid;
 
 use crate::{
@@ -708,7 +709,12 @@ fn prepared_draft_afp_from_event(
     let reply_subject = reply_subject(subject);
     let reply_context = build_reply_context(event, decision, sender, snippet, priority_rules);
     let draft = PreparedDraftArtifact {
-        draft_id: format!("draft:personal-automation:{}", Ulid::new()),
+        draft_id: stable_personal_automation_draft_id(
+            owner_user_id,
+            &event.source_ref,
+            PREPARED_DRAFT_CLASS_COMMUNICATION_REPLY,
+            &reply_context.body,
+        ),
         draft_class: PREPARED_DRAFT_CLASS_COMMUNICATION_REPLY.to_string(),
         label: format!("Prepared reply to {subject}"),
         channel: event.provider.clone(),
@@ -737,6 +743,12 @@ fn prepared_draft_afp_from_event(
 
     let mut afp =
         build_prepared_draft_ledger_afp(owner_user_id, thread_id, Some(&event.source_ref), &draft);
+    afp["id"] = Value::String(stable_personal_automation_message_id(
+        owner_user_id,
+        &event.source_ref,
+        &draft.draft_class,
+        &draft.body,
+    ));
     afp["type"] = Value::String(AFP_TYPE_LEDGER.to_string());
     afp["kind"] = Value::String(AFP_KIND_RICH_NOTE.to_string());
     afp["subtype"] = Value::String("prepared_draft".to_string());
@@ -783,6 +795,44 @@ fn prepared_draft_afp_from_event(
             .collect(),
     );
     afp
+}
+
+fn stable_personal_automation_draft_id(
+    owner_user_id: &str,
+    source_ref: &str,
+    draft_class: &str,
+    body: &str,
+) -> String {
+    format!(
+        "draft:personal-automation:{}",
+        personal_automation_hash(owner_user_id, source_ref, draft_class, body)
+    )
+}
+
+fn stable_personal_automation_message_id(
+    owner_user_id: &str,
+    source_ref: &str,
+    draft_class: &str,
+    body: &str,
+) -> String {
+    format!(
+        "personal-automation.{}",
+        personal_automation_hash(owner_user_id, source_ref, draft_class, body)
+    )
+}
+
+fn personal_automation_hash(
+    owner_user_id: &str,
+    source_ref: &str,
+    draft_class: &str,
+    body: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    for part in [owner_user_id, source_ref, draft_class, body] {
+        hasher.update([0x1f]);
+        hasher.update(part.as_bytes());
+    }
+    hex::encode(hasher.finalize())
 }
 
 #[derive(Debug, Clone)]
@@ -2060,6 +2110,62 @@ mod tests {
         assert_eq!(
             afp["content"]["delivery"]["subject"].as_str(),
             Some("Re: Quick follow up")
+        );
+    }
+
+    #[test]
+    fn prepared_draft_artifact_id_is_stable_for_same_source_and_body() {
+        let event = AfpPassiveEventContent {
+            event_type: "passive_event".to_string(),
+            confidence: 0.9,
+            metadata: json!({
+                "provider": "gmail",
+                "subject": "Quick follow up",
+                "snippet": "Can you reply when you have a moment?"
+            }),
+            source: "gmail_watch".to_string(),
+            payload: None,
+            context: None,
+            entity_id: None,
+            event_at: "2026-07-17T10:00:00Z".to_string(),
+        };
+
+        let first = plan_passive_event_background_artifact(
+            "user_1",
+            "watcher:user_1",
+            "gmail:me:msg-1",
+            &event,
+            "email_incoming",
+            &[gmail_capability("gmail.draft")],
+            &default_priority_rules(),
+        )
+        .expect("first artifact");
+        let second = plan_passive_event_background_artifact(
+            "user_1",
+            "watcher:user_1",
+            "gmail:me:msg-1",
+            &event,
+            "email_incoming",
+            &[gmail_capability("gmail.draft")],
+            &default_priority_rules(),
+        )
+        .expect("second artifact");
+        let changed_source = plan_passive_event_background_artifact(
+            "user_1",
+            "watcher:user_1",
+            "gmail:me:msg-2",
+            &event,
+            "email_incoming",
+            &[gmail_capability("gmail.draft")],
+            &default_priority_rules(),
+        )
+        .expect("changed-source artifact");
+
+        assert_eq!(first["id"], second["id"]);
+        assert_ne!(first["id"], changed_source["id"]);
+        assert_eq!(
+            first["metadata"]["searchable_metadata"]["source_message_id"].as_str(),
+            Some("gmail:me:msg-1")
         );
     }
 

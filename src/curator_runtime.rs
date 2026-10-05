@@ -272,8 +272,11 @@ async fn process_user_queue(
               'system_health',
               'folder_rule',
               'area_rules',
+              'passive_event',
               'tag_update'
           )
+          AND COALESCE(m.content->'omnyid_storage'->>'mode', '') <> 'ciphertext_only'
+          AND COALESCE(m.metadata->>'branch_id', m.content->>'branch_id', '') = ''
         ORDER BY m.timestamp ASC
         LIMIT $2
         "#,
@@ -341,6 +344,29 @@ async fn process_source_message(
     let message_type: String = row.get("type");
     let content: Value = row.try_get("content").unwrap_or_else(|_| json!({}));
     let metadata = row.try_get::<Option<Value>, _>("metadata").ok().flatten();
+    if let Some(skip_reason) = curator_ineligible_reason(&message_type, &content, metadata.as_ref())
+    {
+        record_curator_audit(
+            db,
+            &CuratorRunAudit {
+                run_id: Ulid::new().to_string(),
+                user_id: user_id.to_string(),
+                daemon_id: daemon_id.to_string(),
+                source_message_id: Some(source_id),
+                trigger_kind: CuratorTriggerKind::NewMessage,
+                backlinks_created: 0,
+                cards_created: 0,
+                insights_created: 0,
+                tokens_used: 0,
+                duration_ms: Some((Utc::now() - started_at).num_milliseconds().max(0) as u32),
+                status: CuratorRunStatus::Skipped,
+                error_message: Some(skip_reason.to_string()),
+                created_at: Utc::now().to_rfc3339(),
+            },
+        )
+        .await?;
+        return Ok(1);
+    }
     let refs = row
         .try_get::<Value, _>("references")
         .unwrap_or_else(|_| Value::Array(vec![]));
@@ -455,16 +481,20 @@ async fn process_source_message(
         0
     };
 
-    let candidates = find_similarity_candidates(
-        db,
-        user_id,
-        &source_id,
-        &embedding,
-        &scope.search_scope,
-        scope.folder_id.as_deref(),
-        10,
-    )
-    .await?;
+    let candidates = if let Some(embedding) = embedding.as_deref() {
+        find_similarity_candidates(
+            db,
+            user_id,
+            &source_id,
+            embedding,
+            &scope.search_scope,
+            scope.folder_id.as_deref(),
+            10,
+        )
+        .await?
+    } else {
+        Vec::new()
+    };
 
     let mut backlinks_created = 0u32;
     if !scope.suppress_backlinks {
@@ -690,7 +720,7 @@ async fn find_similarity_candidates(
             summary,
             metadata,
             supertags,
-            1 - (embedding <=> $2) AS similarity
+            1 - (embedding <=> ($2::real[])::vector) AS similarity
         FROM {}
         WHERE id <> $1
           AND embedding IS NOT NULL
@@ -701,7 +731,7 @@ async fn find_similarity_candidates(
     );
     let rows = match (search_scope, folder_id) {
         (BacklinkSearchScope::AllFolders, _) | (_, None) => {
-            sql.push_str(" ORDER BY embedding <=> $2 LIMIT $3");
+            sql.push_str(" ORDER BY embedding <=> ($2::real[])::vector LIMIT $3");
             sqlx::query(&sql)
                 .bind(source_id)
                 .bind(embedding)
@@ -711,7 +741,7 @@ async fn find_similarity_candidates(
         }
         (BacklinkSearchScope::SameFolder, Some(folder_id)) => {
             sql.push_str(" AND (thread_id = $3 OR content->>'folder_id' = $4)");
-            sql.push_str(" ORDER BY embedding <=> $2 LIMIT $5");
+            sql.push_str(" ORDER BY embedding <=> ($2::real[])::vector LIMIT $5");
             sqlx::query(&sql)
                 .bind(source_id)
                 .bind(embedding)
@@ -725,7 +755,7 @@ async fn find_similarity_candidates(
             sql.push_str(
                 " AND (thread_id = $3 OR content->>'folder_id' = $4 OR thread_id = $5 OR content->>'folder_id' = 'global')",
             );
-            sql.push_str(" ORDER BY embedding <=> $2 LIMIT $6");
+            sql.push_str(" ORDER BY embedding <=> ($2::real[])::vector LIMIT $6");
             sqlx::query(&sql)
                 .bind(source_id)
                 .bind(embedding)
@@ -760,6 +790,45 @@ async fn find_similarity_candidates(
             }
         })
         .collect())
+}
+
+fn curator_ineligible_reason(
+    message_type: &str,
+    content: &Value,
+    metadata: Option<&Value>,
+) -> Option<&'static str> {
+    if message_type == "passive_event" {
+        return Some("passive_event");
+    }
+    if json_path_str(content, &["omnyid_storage", "mode"]) == Some("ciphertext_only")
+        || json_path_str(content, &["mode"]) == Some("ciphertext_only")
+    {
+        return Some("ciphertext_only");
+    }
+    if metadata
+        .and_then(|value| json_path_str(value, &["branch_id"]))
+        .or_else(|| json_path_str(content, &["branch_id"]))
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+    {
+        return Some("branch_message");
+    }
+    if metadata
+        .and_then(|value| value.get("store"))
+        .and_then(Value::as_bool)
+        == Some(false)
+    {
+        return Some("metadata_store_false");
+    }
+    None
+}
+
+fn json_path_str<'a>(value: &'a Value, path: &[&str]) -> Option<&'a str> {
+    let mut cursor = value;
+    for part in path {
+        cursor = cursor.get(*part)?;
+    }
+    cursor.as_str()
 }
 
 fn stable_knowledge_card_id(user_id: &str, source_id: &str) -> String {
@@ -1729,9 +1798,10 @@ fn parse_backlink_rules(rules: &str) -> ParsedBacklinkRules {
 mod tests {
     use super::{
         BacklinkSearchScope, CURATOR_DEFAULT_IDLE_SECS, CURATOR_MAX_IDLE_SECS, ParsedBacklinkRules,
-        afp_message_reference, dedupe_semantic_entities, dedupe_semantic_relationships,
-        is_noise_message, next_curator_idle_secs, parse_backlink_rules, poison_skip_knowledge_card,
-        run_curator_backfill_pass, semantic_entity_relationship_id, semantic_relationship_id,
+        afp_message_reference, curator_ineligible_reason, dedupe_semantic_entities,
+        dedupe_semantic_relationships, is_noise_message, next_curator_idle_secs,
+        parse_backlink_rules, poison_skip_knowledge_card, run_curator_backfill_pass,
+        semantic_entity_relationship_id, semantic_relationship_id,
         should_emit_semantic_topology_links, slugify_semantic_token,
     };
     use crate::{
@@ -1817,6 +1887,34 @@ mod tests {
             "I decided to unsubscribe from the conference mailing list — let me know if you need the contact.",
             "email_incoming"
         ));
+    }
+
+    #[test]
+    fn curator_ineligible_reason_blocks_unusable_inputs() {
+        assert_eq!(
+            curator_ineligible_reason("passive_event", &json!({}), None),
+            Some("passive_event")
+        );
+        assert_eq!(
+            curator_ineligible_reason(
+                "note",
+                &json!({ "omnyid_storage": { "mode": "ciphertext_only" } }),
+                None,
+            ),
+            Some("ciphertext_only")
+        );
+        assert_eq!(
+            curator_ineligible_reason("note", &json!({}), Some(&json!({ "branch_id": "br_1" }))),
+            Some("branch_message")
+        );
+        assert_eq!(
+            curator_ineligible_reason("note", &json!({}), Some(&json!({ "store": false }))),
+            Some("metadata_store_false")
+        );
+        assert_eq!(
+            curator_ineligible_reason("note", &json!({ "body": "keep" }), None),
+            None
+        );
     }
 
     #[test]

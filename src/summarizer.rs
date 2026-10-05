@@ -13,16 +13,16 @@ pub fn generate_summary_and_embedding(content: &Value) -> (String, Vec<f32>) {
 }
 
 /// Async variant that calls Ollama's `/api/embeddings` endpoint with the
-/// `nomic-embed-text` model (768-dim).  On any failure the function falls back
-/// silently to the uniform placeholder so that the rest of the curator pipeline
-/// is never blocked by an unavailable embedding service.
+/// `nomic-embed-text` model (768-dim). Returns `None` when Ollama is unavailable
+/// or returns an unusable response; callers must not treat the sync placeholder
+/// as semantic signal.
 ///
 /// `ollama_url` defaults to `http://127.0.0.1:11434` when `None`.
 pub async fn generate_embedding_with_ollama(
     ollama_url: Option<&str>,
     model: Option<&str>,
     text: &str,
-) -> Vec<f32> {
+) -> Option<Vec<f32>> {
     let base = ollama_url.unwrap_or("http://127.0.0.1:11434");
     let embedding_model = model.unwrap_or("nomic-embed-text");
     let url = format!("{}/api/embeddings", base.trim_end_matches('/'));
@@ -44,14 +44,14 @@ pub async fn generate_embedding_with_ollama(
                         .filter_map(|v| v.as_f64().map(|f| f as f32))
                         .collect();
                     if !floats.is_empty() {
-                        return floats;
+                        return Some(floats);
                     }
                 }
-                vec![0.1_f32; 768]
+                None
             }
-            Err(_) => vec![0.1_f32; 768],
+            Err(_) => None,
         },
-        Err(_) => vec![0.1_f32; 768],
+        Err(_) => None,
     }
 }
 
