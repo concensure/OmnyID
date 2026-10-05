@@ -10,10 +10,10 @@ Purpose: make Omnyid identities and well-known discovery surfaces trustworthy en
 
 ### Agent ID Parsing Baseline
 
-- [src/agent_id.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/agent_id.rs) now defines the first explicit Agent ID parser.
-- [python-sdk/afp/client.py](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/afp/client.py) now validates Agent IDs before recipient caching, recipient selection, domain derivation, and AgentCard acceptance.
-- [typescript-sdk/src/index.ts](/c:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/index.ts) now validates Agent IDs before recipient caching, recipient selection, domain derivation, and AgentCard acceptance.
-- [OMNYID_AGENT_ID_SPEC.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_AGENT_ID_SPEC.md) now captures the working Agent ID contract in one repo-level spec artifact.
+- [src/agent_id.rs](/c:/Users/joes/Desktop/projects/Agenton/src/agent_id.rs) now defines the first explicit Agent ID parser.
+- [python-sdk/afp/client.py](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/afp/client.py) now validates Agent IDs before recipient caching, recipient selection, domain derivation, and AgentCard acceptance.
+- [typescript-sdk/src/index.ts](/c:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/index.ts) now validates Agent IDs before recipient caching, recipient selection, domain derivation, and AgentCard acceptance.
+- [OMNYID_AGENT_ID_SPEC.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_AGENT_ID_SPEC.md) now captures the working Agent ID contract in one repo-level spec artifact.
 - The current parser accepts the `agent:<localpart>@<domain>` shape and validates:
   - required `agent:` prefix
   - non-empty localpart
@@ -25,7 +25,7 @@ This turns Agent ID handling from an informal string convention into a real code
 
 ### AgentCard Validation Tightening
 
-- [src/agentcard.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/agentcard.rs) now rejects malformed `agent_id` values during verification.
+- [src/agentcard.rs](/c:/Users/joes/Desktop/projects/Agenton/src/agentcard.rs) now rejects malformed `agent_id` values during verification.
 - `AgentCard::from_env()` now normalizes `OMNYID_AGENT_ID` through the parser instead of trusting arbitrary input.
 - AgentCards now carry:
   - `key_id`
@@ -37,12 +37,12 @@ This means signed discovery is now anchored to a minimally validated identity fo
 
 ### Env-Backed Delegation Surface
 
-- [src/server.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/server.rs) now serves `/.well-known/afp-delegation` from `OMNYID_AFP_DELEGATION` instead of a hardcoded placeholder.
-- [.env.example](/c:/Users/ozans/Desktop/projects/Agenton/.env.example) now documents that delegation setting for deployers.
-- [Caddyfile](/c:/Users/ozans/Desktop/projects/Agenton/Caddyfile) is now templated around `OMNYID_DOMAIN` and `ACME_EMAIL` instead of static placeholder domains.
-- [OMNYID_DISCOVERY_DEPLOYMENT.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_DISCOVERY_DEPLOYMENT.md) now captures the current reverse-proxy and hosted discovery assumptions.
-- [python-sdk/afp/client.py](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/afp/client.py) now resolves delegated discovery before fetching `/.well-known/agent-card`.
-- [typescript-sdk/src/index.ts](/c:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/index.ts) now resolves delegated discovery before fetching `/.well-known/agent-card`.
+- [src/server.rs](/c:/Users/joes/Desktop/projects/Agenton/src/server.rs) now serves `/.well-known/afp-delegation` from `OMNYID_AFP_DELEGATION` instead of a hardcoded placeholder.
+- [.env.example](/c:/Users/joes/Desktop/projects/Agenton/.env.example) now documents that delegation setting for deployers.
+- [Caddyfile](/c:/Users/joes/Desktop/projects/Agenton/Caddyfile) is now templated around `OMNYID_DOMAIN` and `ACME_EMAIL` instead of static placeholder domains.
+- [OMNYID_DISCOVERY_DEPLOYMENT.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_DISCOVERY_DEPLOYMENT.md) now captures the current reverse-proxy and hosted discovery assumptions.
+- [python-sdk/afp/client.py](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/afp/client.py) now resolves delegated discovery before fetching `/.well-known/agent-card`.
+- [typescript-sdk/src/index.ts](/c:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/index.ts) now resolves delegated discovery before fetching `/.well-known/agent-card`.
 - Both SDKs now enforce a stricter delegated discovery baseline:
   - non-local delegation targets must resolve to `https://...`
   - localhost development can still use `http://...`
@@ -50,7 +50,7 @@ This means signed discovery is now anchored to a minimally validated identity fo
 - Both SDKs now expose explicit discovery trust modes:
   - `strict` by default
   - `tofu` for trust-on-first-use behavior with key pinning after first discovery
-- [.env.example](/c:/Users/ozans/Desktop/projects/Agenton/.env.example) now documents `OMNYID_DISCOVERY_TRUST_MODE`.
+- [.env.example](/c:/Users/joes/Desktop/projects/Agenton/.env.example) now documents `OMNYID_DISCOVERY_TRUST_MODE`.
 
 This is a small but important step toward deployable cross-domain discovery rather than repo-only demo behavior.
 

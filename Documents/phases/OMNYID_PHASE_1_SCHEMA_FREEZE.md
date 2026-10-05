@@ -198,16 +198,16 @@ Every implementation must follow these rules:
 
 ## Progress Completed
 
-- [template.json](/c:/Users/ozans/Desktop/projects/Agenton/template.json) now reflects the frozen JSON schema baseline.
-- [proto/afp.proto](/c:/Users/ozans/Desktop/projects/Agenton/proto/afp.proto) now includes `parent_id`, `views`, `references`, `attachments`, and `store_in_relational`.
-- [src/message.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/message.rs) now reflects the same optional AFP fields on the Rust application model.
-- [typescript-sdk/src/index.ts](/c:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/index.ts) now matches the Python SDK’s low-level message plus high-level action model.
-- [postgres/init.sql](/c:/Users/ozans/Desktop/projects/Agenton/postgres/init.sql) now persists `parent_id`, `views`, `references`, `attachments`, and `store_in_relational`.
-- [src/db.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/db.rs) and [src/sync_worker.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/sync_worker.rs) now follow the frozen message shape more closely.
-- [src/server.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/server.rs) now has a coherent HTTP plus gRPC runtime path against the converged AFP contract.
+- [template.json](/c:/Users/joes/Desktop/projects/Agenton/template.json) now reflects the frozen JSON schema baseline.
+- [proto/afp.proto](/c:/Users/joes/Desktop/projects/Agenton/proto/afp.proto) now includes `parent_id`, `views`, `references`, `attachments`, and `store_in_relational`.
+- [src/message.rs](/c:/Users/joes/Desktop/projects/Agenton/src/message.rs) now reflects the same optional AFP fields on the Rust application model.
+- [typescript-sdk/src/index.ts](/c:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/index.ts) now matches the Python SDK’s low-level message plus high-level action model.
+- [postgres/init.sql](/c:/Users/joes/Desktop/projects/Agenton/postgres/init.sql) now persists `parent_id`, `views`, `references`, `attachments`, and `store_in_relational`.
+- [src/db.rs](/c:/Users/joes/Desktop/projects/Agenton/src/db.rs) and [src/sync_worker.rs](/c:/Users/joes/Desktop/projects/Agenton/src/sync_worker.rs) now follow the frozen message shape more closely.
+- [src/server.rs](/c:/Users/joes/Desktop/projects/Agenton/src/server.rs) now has a coherent HTTP plus gRPC runtime path against the converged AFP contract.
 - `cargo check` now passes for the Rust backend after build script, crate-structure, server, DB, and gateway cleanup.
-- stale protocol-facing docs and examples have been updated in [README.md](/c:/Users/ozans/Desktop/projects/Agenton/README.md), [sdk.py](/c:/Users/ozans/Desktop/projects/Agenton/sdk.py), and [ui/index.html](/c:/Users/ozans/Desktop/projects/Agenton/ui/index.html).
-- `cargo test --lib` now passes with AFP contract round-trip coverage in [src/server.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/server.rs).
+- stale protocol-facing docs and examples have been updated in [README.md](/c:/Users/joes/Desktop/projects/Agenton/README.md), [sdk.py](/c:/Users/joes/Desktop/projects/Agenton/sdk.py), and [ui/index.html](/c:/Users/joes/Desktop/projects/Agenton/ui/index.html).
+- `cargo test --lib` now passes with AFP contract round-trip coverage in [src/server.rs](/c:/Users/joes/Desktop/projects/Agenton/src/server.rs).
 
 ## Phase 1 Exit Notes
 

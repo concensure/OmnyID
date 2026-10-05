@@ -11,6 +11,7 @@ mod canonical_resolution;
 mod entity_merge;
 mod providers;
 mod source_classification;
+mod source_policy;
 
 use super::*;
 use crate::admin_tool_secrets::{
@@ -29,6 +30,7 @@ use attribute_catalog::PendingAttribute;
 use canonical_resolution::{EnrichInput, enrich_vendor_sources, write_pending_attributes};
 use providers::{search_brave, search_exa, search_google_places};
 use serde_json::Value;
+use source_policy::WeddingVendorSourcePolicy;
 
 #[derive(serde::Deserialize)]
 struct GooglePlacePhotoProxyQuery {
@@ -42,6 +44,7 @@ struct WeddingVendorSearchRequest {
     wedding_plan_id: Option<String>,
     queries: Vec<WeddingVendorSearchQueryRequest>,
     max_results_per_query: Option<usize>,
+    source_policy: Option<String>,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -546,11 +549,8 @@ async fn wedding_vendor_search_http(
     )
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(12))
-        .user_agent("OmnyID-WeddingPlanner/1.0")
-        .build()
-        .map_err(internal_http_error)?;
+    let source_policy = WeddingVendorSourcePolicy::parse(req.source_policy.as_deref())
+        .map_err(|message| (StatusCode::BAD_REQUEST, message.to_string()))?;
     let limit = req.max_results_per_query.unwrap_or(5).clamp(1, 8);
     let planned_queries = req
         .queries
@@ -566,9 +566,14 @@ async fn wedding_vendor_search_http(
         ));
     }
 
+    let categories = planned_queries
+        .iter()
+        .filter_map(|query| query.category.as_deref().map(str::trim).filter(|value| !value.is_empty()))
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+
     let mut sources = Vec::new();
     let mut provider_kinds = BTreeSet::new();
-    let mut categories = BTreeSet::new();
     let mut failed_messages = Vec::new();
     let mut provider_labels = BTreeSet::new();
     let mut metered_providers = BTreeSet::new();
@@ -587,20 +592,45 @@ async fn wedding_vendor_search_http(
         Err(err) => failed_messages.push(format!("Admin vendor database lookup failed: {err}")),
     }
 
+    if source_policy == WeddingVendorSourcePolicy::DirectoryOnly {
+        let directory_count = sources.len();
+        return Ok(Json(WeddingVendorSearchResponse {
+            ok: directory_count > 0,
+            status: "cached".to_string(),
+            external_search_performed: false,
+            provider_label: if directory_count > 0 { Some("Admin vendor database".to_string()) } else { None },
+            query_count: planned_queries.len(),
+            source_count: directory_count,
+            queries: planned_queries.iter().map(|query| query.query.clone()).collect(),
+            sources,
+            message: format!("Directory-only vendor search returned {directory_count} source{}; online providers were not called.", if directory_count == 1 { "" } else { "s" }),
+            receipt_metadata: json!({
+                "receipt_id": format!("wedding_vendor_search:directory:{}:{}", req.workspace_id.as_deref().unwrap_or("workspace"), Ulid::new()),
+                "vendor_search_mode": "live",
+                "vendor_search_status": "cached",
+                "source_policy": source_policy.receipt_label(),
+                "directory_count": directory_count,
+                "paid_calls_skipped": true,
+                "fallback_reason": if directory_count >= 3 { "directory_pass_complete_or_requires_client_suitability_check" } else { "directory_shortfall_requires_client_orchestrated_online_pass" },
+                "vendor_categories": categories.iter().cloned().collect::<Vec<_>>(),
+                "external_search_performed": false,
+                "failed_messages": failed_messages,
+            }),
+        }));
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(12))
+        .user_agent("OmnyID-WeddingPlanner/1.0")
+        .build()
+        .map_err(internal_http_error)?;
+
     let mut tagged_upto = sources.len();
     let mut previous_query = None;
     for query in &planned_queries {
         tag_new_sources(&mut sources, &mut tagged_upto, previous_query);
         previous_query = Some(query);
         provider_kinds.insert(query.provider_kind.clone());
-        if let Some(category) = query
-            .category
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            categories.insert(category.to_string());
-        }
         if is_paid_vendor_search_provider(&query.provider_kind) && sources.len() >= limit {
             paid_provider_queries_skipped_due_to_cache += 1;
             continue;

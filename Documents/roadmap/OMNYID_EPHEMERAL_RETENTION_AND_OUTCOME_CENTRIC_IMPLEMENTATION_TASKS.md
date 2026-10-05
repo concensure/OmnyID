@@ -30,7 +30,7 @@ It is dependency ordered. Earlier steps unblock later steps.
 ### Partially implemented
 
 - `metadata.store: false` exists as a persistence mechanism, but there is not yet a codified policy that automatically classifies low-value Master Agent messages as ephemeral
-- archive export and MinIO backup exist, but there is no user-approved curator cleanup flow for low-value internal messages
+- archive export and SeaweedFS backup exist, but there is no user-approved curator cleanup flow for low-value internal messages
 - workflow supervisor/runtime nodes exist, but the system is not yet fully wired so the Master Agent consistently executes through an outcome-centric planner/reflection loop instead of older responsibility-shaped paths
 
 ### Not yet implemented

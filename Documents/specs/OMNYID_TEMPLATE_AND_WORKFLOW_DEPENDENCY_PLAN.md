@@ -8,7 +8,7 @@ This document decides the best implementation order between:
 - the new subagent template layer
 - the efficiency recommendations such as bounded parallelism, model routing, context slicing, caching, and deterministic pruning
 - the broader MasterAgent upgrade plan already tracked in:
-  - `C:\Users\ozans\.claude\plans\elegant-inventing-goose.md`
+  - `C:\Users\joes\.claude\plans\elegant-inventing-goose.md`
 
 It is designed to make the two planning tracks work together cleanly.
 
@@ -68,13 +68,13 @@ This keeps the builder, runtime, and protocol aligned.
 
 ### Current workflow-builder plan
 
-- [OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md](C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md)
+- [OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md](C:/Users/joes/Desktop/projects/Agenton/Documents/specs/OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md)
 
 This remains the primary product plan for the builder UX, graph model, persistence, compile flow, deployment flow, and workflow page.
 
 ### Broader MasterAgent plan
 
-- `C:\Users\ozans\.claude\plans\elegant-inventing-goose.md`
+- `C:\Users\joes\.claude\plans\elegant-inventing-goose.md`
 
 This remains the broader execution/runtime plan for:
 

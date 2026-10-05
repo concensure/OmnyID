@@ -42,3 +42,30 @@ src/db.rs — Added list_tool_connections, upsert_tool_connection, delete_tool_c
 src/server/mod.rs — Added GET /tools/connections, POST /tools/connections, DELETE /tools/connections/{slug} route handlers using authenticated_user gating.
 
 solid-ui/src/lib/api.ts — Added McpToolConnection type, fetchToolConnections, connectTool, disconnectTool API functions.
+
+
+TASK-001 — SpamAssassin
+
+src/gateway/spam_filter.rs — async SPAMC/1.5 TCP client, configurable threshold, graceful no-op when SPAMASSASSIN_HOST unset
+src/gateway/smtp_in.rs — spam gate runs first in handle_incoming_email()
+TASK-002 — ClamAV
+
+src/gateway/clamav.rs — async clamd INSTREAM TCP client, scans full raw email in one pass
+src/gateway/smtp_in.rs — AV gate runs after spam gate
+src/gateway/mod.rs — both modules registered
+TASK-003 — Noise Protocol
+
+Cargo.toml — snow = "0.9" added
+src/noise_channel.rs — Noise_XX_25519_ChaChaPoly_BLAKE2s handshake + transport, 2 tests (round-trip + tamper rejection)
+src/lib.rs — module registered
+TASK-004 — E2E test
+
+src/server/mod.rs — handle_gateway_email now returns thread_id in response
+tests/api_flows.rs — email_ingested_message_is_fetchable_as_thread: ingest → fetch thread → assert message present
+TASK-005 — Architecture doc
+
+docs/architecture.md — full ASCII flow diagram, AFP field table, encryption model, discovery, relay, infra table, source file index
+TASK-006 — Containerise UI
+
+solid-ui/Dockerfile — node:22 build → alpine seed stage (init container pattern)
+docker-compose.yml — spamassassin, clamav, ui services added; env vars wired; ui-dist shared volume; Caddy depends on ui: service_completed_successfully

@@ -1,5 +1,7 @@
 # OmnyID Landing Page — Content
 
+> Status note as of Wednesday, August 26, 2026: this is a historical identity-first landing draft. For the current landing hierarchy, defer to `Documents/marketing/OMNYID_PRODUCT_MARKET_FIT_ANALYSIS.md` and `Documents/marketing/OMNYID_LANDING_CONTENT_PROMPT.md`.
+
 This markdown file contains all the content for the OmnyID landing page, organized by section to match the design in `code.html`.
 
 ---
@@ -18,19 +20,19 @@ This markdown file contains all the content for the OmnyID landing page, organiz
 
 ### Pill Badge
 ```
-Local-First Architecture
+Portable Memory · Owned Identity
 ```
 
 ### Headline
 ```
-The internet's 
-*missing* 
-identity layer.
+Your AI context
+should not reset
+every time you switch tools.
 ```
 
 ### Subline
 ```
-OmnyID replaces centralized logins with a sovereign agent mesh. Own your keys, control your data, and navigate the digital world without permission.
+OmnyID gives you cross-tool AI memory tied to an identity you own, with private runtime control instead of context trapped inside one vendor's product.
 ```
 
 ### Primary CTA
@@ -63,12 +65,12 @@ THE CURRENT STATE
 
 ### Headline
 ```
-Your digital identity is currently a leased asset.
+Your AI context is trapped in separate tools.
 ```
 
 ### Body
 ```
-SaaS giants hold your credentials in silos. When they change terms, you lose access. When they leak data, you pay the price. The current web is built on a foundation of fragile, centralized gatekeepers.
+Every time you switch between ChatGPT, Claude, Cursor, email, notes, and calendar tools, your context fractures. You either re-explain yourself or accept generic output. OmnyID exists to make that context portable, durable, and under your control.
 ```
 
 ---

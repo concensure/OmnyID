@@ -15,7 +15,7 @@ This work is a new track.
 
 The current MasterAgent upgrade plan we are already implementing is here:
 
-- `C:\Users\ozans\.claude\plans\elegant-inventing-goose.md`
+- `C:\Users\joes\.claude\plans\elegant-inventing-goose.md`
 
 After the visual workflow builder is implemented, we should return to that plan and continue from the next unfinished phase item there.
 

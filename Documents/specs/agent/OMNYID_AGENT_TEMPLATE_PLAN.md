@@ -196,7 +196,7 @@ where F: FnOnce(sqlx::pool::PoolConnection<sqlx::Postgres>) -> Fut,
 }
 ```
 
-In practice, since SET LOCAL requires a transaction, the new agent endpoints wrap their DB calls in an explicit `BEGIN ... COMMIT` with the context set inside.
+In practice, since SET LOCAL requires a transaction, the agent-task endpoints wrap their DB calls in an explicit `BEGIN ... COMMIT` with the context set inside.
 
 ---
 

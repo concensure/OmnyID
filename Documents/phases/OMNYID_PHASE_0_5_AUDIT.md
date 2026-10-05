@@ -28,29 +28,29 @@ The core conclusion is:
 
 ### Production Candidate
 
-- [python-sdk/afp/client.py](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/afp/client.py)
+- [python-sdk/afp/client.py](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/afp/client.py)
   Notes: now has a coherent transport plus declarative action layer and is one of the strongest foundations in the repo.
 
-- [ui/App.tsx](/c:/Users/ozans/Desktop/projects/Agenton/ui/App.tsx)
+- [ui/App.tsx](/c:/Users/joes/Desktop/projects/Agenton/ui/App.tsx)
   Notes: still early, but structurally points in the right direction for a config-driven multi-view workspace.
 
 ### Partial / Needs Hardening
 
-- [proto/afp.proto](/c:/Users/ozans/Desktop/projects/Agenton/proto/afp.proto)
-- [src/message.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/message.rs)
-- [src/db.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/db.rs)
-- [typescript-sdk/src/index.ts](/c:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/index.ts)
-- [docker-compose.yml](/c:/Users/ozans/Desktop/projects/Agenton/docker-compose.yml)
-- [Caddyfile](/c:/Users/ozans/Desktop/projects/Agenton/Caddyfile)
+- [proto/afp.proto](/c:/Users/joes/Desktop/projects/Agenton/proto/afp.proto)
+- [src/message.rs](/c:/Users/joes/Desktop/projects/Agenton/src/message.rs)
+- [src/db.rs](/c:/Users/joes/Desktop/projects/Agenton/src/db.rs)
+- [typescript-sdk/src/index.ts](/c:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/index.ts)
+- [docker-compose.yml](/c:/Users/joes/Desktop/projects/Agenton/docker-compose.yml)
+- [Caddyfile](/c:/Users/joes/Desktop/projects/Agenton/Caddyfile)
 
 ### Placeholder / Illustrative
 
-- [src/server.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/server.rs)
-- [src/gateway/smtp_in.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/gateway/smtp_in.rs)
-- [src/gateway/imap_sync.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/gateway/imap_sync.rs)
-- [src/crypto.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/crypto.rs)
-- [ui/index.html](/c:/Users/ozans/Desktop/projects/Agenton/ui/index.html)
-- [template.json](/c:/Users/ozans/Desktop/projects/Agenton/template.json)
+- [src/server.rs](/c:/Users/joes/Desktop/projects/Agenton/src/server.rs)
+- [src/gateway/smtp_in.rs](/c:/Users/joes/Desktop/projects/Agenton/src/gateway/smtp_in.rs)
+- [src/gateway/imap_sync.rs](/c:/Users/joes/Desktop/projects/Agenton/src/gateway/imap_sync.rs)
+- [src/crypto.rs](/c:/Users/joes/Desktop/projects/Agenton/src/crypto.rs)
+- [ui/index.html](/c:/Users/joes/Desktop/projects/Agenton/ui/index.html)
+- [template.json](/c:/Users/joes/Desktop/projects/Agenton/template.json)
 
 ## What Exists Today
 
@@ -59,7 +59,7 @@ The core conclusion is:
 - A Rust service stack is selected correctly.
 - Tonic, Axum, SQLx, and crypto crates are already declared.
 - The DB layer already expresses the intended append-only thread store direction.
-- Docker includes Postgres, MinIO, homeserver, and Caddy.
+- Docker includes Postgres, SeaweedFS, homeserver, and Caddy.
 
 ### SDKs
 
@@ -84,11 +84,11 @@ The protocol is not represented consistently across the stack.
 
 Examples:
 
-- [proto/afp.proto](/c:/Users/ozans/Desktop/projects/Agenton/proto/afp.proto) does not include `views`, `references`, attachments, or richer encryption metadata.
-- [src/message.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/message.rs) also lacks those fields.
-- [src/gateway/smtp_in.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/gateway/smtp_in.rs) tries to construct `views`, which do not exist on the current Rust message struct.
-- [template.json](/c:/Users/ozans/Desktop/projects/Agenton/template.json) expects fields like `attachments` and `parent_id` that are not represented in the proto.
-- [python-sdk/afp/client.py](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/afp/client.py) already models `views`, while [typescript-sdk/src/index.ts](/c:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/index.ts) does not.
+- [proto/afp.proto](/c:/Users/joes/Desktop/projects/Agenton/proto/afp.proto) does not include `views`, `references`, attachments, or richer encryption metadata.
+- [src/message.rs](/c:/Users/joes/Desktop/projects/Agenton/src/message.rs) also lacks those fields.
+- [src/gateway/smtp_in.rs](/c:/Users/joes/Desktop/projects/Agenton/src/gateway/smtp_in.rs) tries to construct `views`, which do not exist on the current Rust message struct.
+- [template.json](/c:/Users/joes/Desktop/projects/Agenton/template.json) expects fields like `attachments` and `parent_id` that are not represented in the proto.
+- [python-sdk/afp/client.py](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/afp/client.py) already models `views`, while [typescript-sdk/src/index.ts](/c:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/index.ts) does not.
 
 Impact:
 
@@ -103,9 +103,9 @@ The repo says privacy-first and E2EE-first, but the implementation still contain
 
 Examples:
 
-- [src/crypto.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/crypto.rs) explicitly describes demo encryption and returns JSON-wrapped base64 instead of a real encrypted envelope.
-- [src/db.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/db.rs) stores parsed `content_json` and generates summaries and embeddings server-side, which conflicts with the desired ciphertext-only homeserver boundary.
-- [docker-compose.yml](/c:/Users/ozans/Desktop/projects/Agenton/docker-compose.yml) contains demo credentials and plaintext service assumptions.
+- [src/crypto.rs](/c:/Users/joes/Desktop/projects/Agenton/src/crypto.rs) explicitly describes demo encryption and returns JSON-wrapped base64 instead of a real encrypted envelope.
+- [src/db.rs](/c:/Users/joes/Desktop/projects/Agenton/src/db.rs) stores parsed `content_json` and generates summaries and embeddings server-side, which conflicts with the desired ciphertext-only homeserver boundary.
+- [docker-compose.yml](/c:/Users/joes/Desktop/projects/Agenton/docker-compose.yml) contains demo credentials and plaintext service assumptions.
 
 Impact:
 
@@ -114,7 +114,7 @@ Impact:
 
 ### 3. The Rust Homeserver Is Architectural Scaffolding, Not Yet a Reliable Service
 
-[src/server.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/server.rs) is a design sketch more than production code.
+[src/server.rs](/c:/Users/joes/Desktop/projects/Agenton/src/server.rs) is a design sketch more than production code.
 
 Observed issues:
 
@@ -134,8 +134,8 @@ The email bridge direction is excellent, but current files are mostly illustrati
 
 Examples:
 
-- [src/gateway/smtp_in.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/gateway/smtp_in.rs) mixes parsing, summarization, action logic, and reply logic in a single demo path.
-- [src/gateway/imap_sync.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/gateway/imap_sync.rs) is hardcoded to Gmail and lacks login, checkpointing, and dedupe.
+- [src/gateway/smtp_in.rs](/c:/Users/joes/Desktop/projects/Agenton/src/gateway/smtp_in.rs) mixes parsing, summarization, action logic, and reply logic in a single demo path.
+- [src/gateway/imap_sync.rs](/c:/Users/joes/Desktop/projects/Agenton/src/gateway/imap_sync.rs) is hardcoded to Gmail and lacks login, checkpointing, and dedupe.
 
 Impact:
 
@@ -162,10 +162,10 @@ The UI is appropriately split between landing-page positioning and workspace exp
 
 Current state:
 
-- [ui/App.tsx](/c:/Users/ozans/Desktop/projects/Agenton/ui/App.tsx) expresses the right config-driven layout idea
+- [ui/App.tsx](/c:/Users/joes/Desktop/projects/Agenton/ui/App.tsx) expresses the right config-driven layout idea
 - renderer depth is not yet there
 - no real backend-connected thread flow is present
-- [ui/index.html](/c:/Users/ozans/Desktop/projects/Agenton/ui/index.html) is still a simple fetch-and-dump prototype
+- [ui/index.html](/c:/Users/joes/Desktop/projects/Agenton/ui/index.html) is still a simple fetch-and-dump prototype
 
 Impact:
 

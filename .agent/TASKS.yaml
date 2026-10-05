@@ -1,0 +1,189 @@
+version: 1
+updated: 2026-10-05
+
+lifecycle:
+  allowed_statuses:
+    - proposed
+    - ready
+    - in_progress
+    - blocked
+    - review
+    - done
+  ownership_rule: "Exactly one owner may hold an in_progress task at a time."
+  branch_rule: "Agent-owned implementation work should happen on the task branch unless the user directs otherwise."
+  pr_rule: "Use PRs as cross-agent review boundaries before merging task branches to main."
+  file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
+
+tasks:
+  - id: DEV-001
+    title: Shared agent synchronisation protocol
+    status: in_progress
+    owner: codex
+    branch: agent/codex/DEV-001
+    depends_on: []
+    files:
+      - AGENTS.md
+      - .agent/**
+      - PROJECT_STATE.md
+      - TASKS.yaml
+      - DECISIONS.md
+      - HANDOFF.md
+      - README.md
+      - CLAUDE.md
+      - Documents/README.md
+    acceptance:
+      - every agent session starts by reading AGENTS.md and .agent state files
+      - start-of-session sync includes git status, recent log, CI/build status, and overlap checks
+      - finish-of-session protocol covers tests, builds, task updates, decisions, handoff, and commits
+      - root compatibility files point to .agent canonical files
+
+  - id: DEV-002
+    title: Machine-readable project operations state
+    status: proposed
+    owner: unassigned
+    branch: null
+    depends_on:
+      - DEV-001
+    files:
+      - .github/workflows/**
+      - scripts/**
+      - .agent/**
+    acceptance:
+      - agents can query CI status for the current SHA
+      - agents can query deployment state for staging and production
+      - project state distinguishes local HEAD from deployed SHA
+      - documentation names the command or tool used for each authority
+
+  - id: DEV-003
+    title: Runtime version and health endpoints
+    status: proposed
+    owner: unassigned
+    branch: null
+    depends_on:
+      - DEV-002
+    files:
+      - src/server/**
+      - src/server/health*.rs
+      - tests/**
+    acceptance:
+      - /api/version returns version, git_sha, build_time, environment, and schema_version
+      - /api/health returns service health plus dependency health
+      - existing /healthz and /readyz behavior remains backward compatible
+      - tests cover healthy and degraded responses
+
+  - id: DEV-004
+    title: Project coordination MCP surface
+    status: proposed
+    owner: unassigned
+    branch: null
+    depends_on:
+      - DEV-001
+      - DEV-002
+    files:
+      - mcp-servers/**
+      - .agent/**
+      - docs/**
+    acceptance:
+      - project.get_state reads canonical project state
+      - project.get_tasks reads and validates .agent/TASKS.yaml
+      - project.claim_task records owner and branch
+      - project.get_ci_status and project.get_deployment read machine authorities
+      - project.write_handoff appends structured handoff notes
+
+  - id: DEV-005
+    title: AFP development event ledger
+    status: proposed
+    owner: unassigned
+    branch: null
+    depends_on:
+      - DEV-004
+    files:
+      - proto/**
+      - src/**
+      - typescript-sdk/src/**
+      - docs/**
+    acceptance:
+      - development events use an AFP-compatible schema subset
+      - task, actor, commit, evidence, timestamp, and next action are captured
+      - agent handoff can be projected from events instead of conversation logs
+      - conflict, ownership, stale state, approval, and provenance semantics are documented
+
+  - id: WED-142
+    title: Vendor ranking engine
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-142
+    depends_on: []
+    files:
+      - src/db/wedding_vendor_evidence.rs
+      - solid-ui/src/lib/weddingVendorRankingState.ts
+      - solid-ui/tests/wedding-vendor-ranking-state.test.ts
+    acceptance:
+      - ranking is deterministic for identical inputs
+      - ranking contract is documented for UI consumers
+      - tests cover ranking evidence ordering
+      - no UI layout changes
+
+  - id: WED-143
+    title: Vendor recommendation UI
+    status: in_progress
+    owner: claude
+    branch: agent/claude/WED-143
+    depends_on:
+      - WED-142
+    files:
+      - solid-ui/src/components/Wedding*
+      - solid-ui/src/lib/wedding*State.ts
+      - solid-ui/tests/wedding-*.test.ts
+    acceptance:
+      - consumes the WED-142 ranking interface without rewriting it
+      - shows recommendation rationale from ranking evidence
+      - preserves existing wedding workspace navigation
+      - typecheck and local UI tests pass in GitHub Checks
+
+  - id: WED-144
+    title: Approval to enquiry workflow
+    status: proposed
+    owner: unassigned
+    branch: null
+    depends_on:
+      - WED-142
+      - WED-143
+    files:
+      - src/server/**
+      - solid-ui/src/components/Wedding*
+      - solid-ui/src/lib/wedding*State.ts
+    acceptance:
+      - approval creates a durable enquiry intent
+      - retry path is idempotent
+      - user-visible state is projected from persisted workflow state
+      - deployment status is read from machine authority, not hand-entered
+
+  - id: WED-145
+    title: Wedding vendor MVP vertical slice
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-145
+    depends_on:
+      - WED-142
+      - WED-143
+    files:
+      - solid-ui/src/lib/weddingVendorShortlistPolicyState.ts
+      - solid-ui/src/lib/weddingVendorSearchArtifactState.ts
+      - solid-ui/src/lib/weddingVendorQuoteDecisionOsProjectionState.ts
+      - solid-ui/src/lib/weddingVendorSearchLaunchState.ts
+      - solid-ui/src/lib/api.ts
+      - solid-ui/src/components/WeddingVendorChoiceCard.tsx
+      - solid-ui/tests/wedding-vendor-shortlist-policy-state.test.ts
+      - solid-ui/tests/wedding-vendor-*.test.ts
+      - src/server/wedding_vendor_search_routes/**
+      - src/server/wedding_vendor_outreach_routes.rs
+      - src/db/wedding_vendor_evidence.rs
+      - migrations/**
+      - .agent/**
+    acceptance:
+      - directory-first search returns an exactly-three, unique and suitable active shortlist
+      - each choice has verified media or an honest labelled placeholder
+      - outreach drafts persist before they can be sent
+      - unresolved vendor quotes project once into DecisionOS
+      - MVP checks, build, and deployment proof are recorded from their machine authorities

@@ -1,5 +1,7 @@
 # OmnyID Consumer Privacy Strategy
 
+> Status note as of Wednesday, August 26, 2026: this document should be read through the lens of `Documents/marketing/OMNYID_PRODUCT_MARKET_FIT_ANALYSIS.md`. Privacy remains a major trust and segmentation advantage, but it should not be treated as OmnyID's primary broad-market top-of-funnel pain claim.
+
 ## Why "Get an Agent ID" is weak for non-technical users
 
 For technical users, `Get an Agent ID` is understandable because they already think in terms of protocols, SDKs, and agent infrastructure.
@@ -19,12 +21,21 @@ That means OmnyID should not lead with identity plumbing, even though Agent ID i
 
 Lead with outcomes, not infrastructure.
 
+Lead with the strongest outcome first:
+
+- `Stop restarting every AI conversation from zero`
+- `Bring your context across tools`
+- `Get a private assistant that remembers`
+
+Then use privacy as the trust amplifier that makes the outcome believable.
+
 Recommended primary CTA:
 
 - `Start my private assistant`
 
 Recommended supporting lines:
 
+- `Portable memory across your tools`
 - `Runs in a dedicated private environment`
 - `No shared runtime with other customers`
 - `Encrypted storage and isolated secrets`
@@ -71,6 +82,14 @@ Best convenience for users who want one-click hosting.
 ## What the website should actually say
 
 Do not ask users to understand AFP or Agent IDs first.
+
+Do not make privacy the whole pitch either.
+
+The recommended message order is:
+
+1. `Your assistant remembers across tools`
+2. `It belongs to you, not one vendor`
+3. `It runs privately by default`
 
 Instead, the first experience should be:
 
@@ -179,10 +198,11 @@ Advanced mode can reveal:
 
 OmnyID should position itself as:
 
-- a privacy-first assistant launcher
+- a private assistant launcher for people whose AI context is fragmented across tools
 - a control plane for isolated private runtimes
 - a simple setup wizard for Local Private, BYOC, and Managed Private
 - a downloadable onboarding bundle with direct installer handoff after setup is saved
 - provider-specific private-cloud bundle guidance for Oracle Cloud, UpCloud, and OVHcloud instead of a single generic hosted path
 
 The Agent ID remains central technically, but it should appear later in the journey, after the user already understands what they are getting.
+Privacy remains central to trust, but it should validate the value proposition rather than replace it.

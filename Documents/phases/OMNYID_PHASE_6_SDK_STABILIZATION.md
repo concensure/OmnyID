@@ -22,19 +22,19 @@ Purpose: keep the SDKs ergonomic while making the secure shared-thread model obv
 
 ### Updated Examples
 
-- [python-sdk/example.py](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/example.py) now demonstrates:
+- [python-sdk/example.py](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/example.py) now demonstrates:
   - raw AFP message send
   - declarative label action
   - threaded reply action
-- [python-sdk/example_phase2.py](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/example_phase2.py) now demonstrates reading the same shared thread after a summary request.
-- [python-sdk/example_discovery.py](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/example_discovery.py) now uses verified discovery instead of unsigned lookup.
-- [typescript-sdk/example.ts](/c:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/example.ts) now mirrors the threaded reply flow.
+- [python-sdk/example_phase2.py](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/example_phase2.py) now demonstrates reading the same shared thread after a summary request.
+- [python-sdk/example_discovery.py](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/example_discovery.py) now uses verified discovery instead of unsigned lookup.
+- [typescript-sdk/example.ts](/c:/Users/joes/Desktop/projects/Agenton/typescript-sdk/example.ts) now mirrors the threaded reply flow.
 
 ### Reliable Python Environment Baseline
 
 - Python 3.14.3 is now installed and usable on the development machine.
-- [scripts/setup-python-sdk.ps1](/c:/Users/ozans/Desktop/projects/Agenton/scripts/setup-python-sdk.ps1) now bootstraps a project-local virtual environment and editable install.
-- [python-sdk/.venv](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/.venv) is now the expected local SDK runtime path.
+- [scripts/setup-python-sdk.ps1](/c:/Users/joes/Desktop/projects/Agenton/scripts/setup-python-sdk.ps1) now bootstraps a project-local virtual environment and editable install.
+- [python-sdk/.venv](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/.venv) is now the expected local SDK runtime path.
 - The SDK has been validated by:
   - editable install
   - import smoke check
@@ -42,22 +42,22 @@ Purpose: keep the SDKs ergonomic while making the secure shared-thread model obv
 
 ### Security Baseline Remains Visible
 
-- [python-sdk/afp/client.py](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/afp/client.py) and [typescript-sdk/src/index.ts](/c:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/index.ts) still keep signing, encryption, discovery trust mode, and transport preference as explicit inputs or env-backed defaults.
+- [python-sdk/afp/client.py](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/afp/client.py) and [typescript-sdk/src/index.ts](/c:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/index.ts) still keep signing, encryption, discovery trust mode, and transport preference as explicit inputs or env-backed defaults.
 - The SDKs still model the agent inbox as AFP thread access, not a separate inbox abstraction.
 
 ### Transport Rollout Baseline
 
-- [typescript-sdk/src/index.ts](/c:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/index.ts) now supports:
+- [typescript-sdk/src/index.ts](/c:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/index.ts) now supports:
   - `webtransport`
   - `websocket`
   - `http`
   - `auto`
-- The TypeScript SDK now fetches [transport capabilities](/c:/Users/ozans/Desktop/projects/Agenton/src/server.rs) and prefers WebTransport first when policy says it should.
+- The TypeScript SDK now fetches [transport capabilities](/c:/Users/joes/Desktop/projects/Agenton/src/server.rs) and prefers WebTransport first when policy says it should.
 - If WebTransport is unavailable or the server rollout is not ready, it falls back to WebSocket and then HTTP.
 - This makes the public SDK transport story match the chosen production direction without breaking current compatibility.
 - The homeserver now has a real QUIC relay listener, so the TypeScript SDK’s WebTransport send path is no longer targeting a placeholder rollout state.
 - The TypeScript SDK now also exposes `openThreadSubscription(...)`, which prefers WebTransport for live thread watching and falls back to WebSocket when QUIC is unavailable.
-- [python-sdk/afp/client.py](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/afp/client.py) now follows the same rollout policy:
+- [python-sdk/afp/client.py](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/afp/client.py) now follows the same rollout policy:
   - `auto`
   - `webtransport`
   - `websocket`

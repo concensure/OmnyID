@@ -75,7 +75,11 @@ import {
 } from "@/lib/api";
 import { fleetStatusSummary } from "@/lib/agentFleetResponseState";
 import { buildSessionEndedNotice } from "@/lib/sessionRecoveryState";
-import { dispatchWeddingWorkspaceMenuSelection } from "@/lib/weddingWorkspaceMenuState";
+import {
+  dispatchWeddingWorkspaceMenuSelection,
+  replaceWeddingWorkspaceMenuInUrl,
+  saveWeddingWorkspaceMenu,
+} from "@/lib/weddingWorkspaceMenuState";
 import {
   type AuthApiResponse,
 } from "@/lib/authResponseState";
@@ -2149,8 +2153,10 @@ function App() {
   }
 
   function returnToWeddingPlannerHome() {
+    saveWeddingWorkspaceMenu("home");
     dispatchWeddingWorkspaceMenuSelection("home");
     selectView("response_queue");
+    if (typeof window !== "undefined") replaceWeddingWorkspaceMenuInUrl("home");
   }
 
   async function handleSearch(

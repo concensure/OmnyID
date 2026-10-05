@@ -4458,6 +4458,7 @@ export const searchWeddingVendors = (body: {
   wedding_plan_id?: string | null;
   queries: WeddingVendorSearchApiQuery[];
   max_results_per_query?: number;
+  source_policy?: "directory_only" | "online_capable";
 }): Promise<WeddingVendorSearchApiResponse> =>
   apiFetch<unknown>("/wedding/vendor-search", {
     method: "POST",

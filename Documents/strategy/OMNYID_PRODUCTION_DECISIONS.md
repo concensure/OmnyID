@@ -1,5 +1,7 @@
 # Omnyid Production Decisions
 
+> Status note as of Wednesday, August 26, 2026: this document defines production posture defaults, not the live operator verdict. For current audited readiness and promotion state, defer to `docs/COMMERCIAL_READINESS_STATUS.md` and the `artifacts/*-current` readiness artifacts. The current audited commercial status is `ready` with promotion gate `go`.
+
 ## Production Profile
 
 These decisions are now the default production posture for Omnyid unless explicitly revised.
@@ -59,7 +61,7 @@ This token decision must not weaken:
 
 ## Attachments
 
-- MinIO is the attachment storage baseline.
+- SeaweedFS is the attachment storage baseline.
 - Default production attachment limit: 25 MB
 
 ## Launch Product Priorities
@@ -88,7 +90,7 @@ Three backends are supported per-user via `POST /user/llm-config`:
 | `ollama` | Local Ollama instance | Free | No external calls |
 | `runpod` | QWEN 3.5 on RunPod (platform-hosted) | Pro | `Qwen/Qwen3.5-35B-A3B`; endpoint `sdr11n90qjwjy2` |
 
-Agent-to-agent communication always uses AFP over WebTransport/WebSocket — LLM backend is only for inference. Gmail/IMAP is only for human inbox ingestion (user's own OAuth token, not server-level SMTP).
+Agent-to-agent communication always uses AFP over WebTransport/WebSocket. LLM backend selection is only for inference. Gmail/IMAP is only for human inbox ingestion using the user's own OAuth token, not server-level SMTP.
 
 ## Approval Defaults
 

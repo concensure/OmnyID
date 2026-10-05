@@ -454,7 +454,7 @@ DELETE /backlinks/{backlink_id}              → soft-delete (sets status=remove
 ## Still Remaining After Phase 12 (Phase 13 Scope)
 
 - LoRA personalisation from accept/reject feedback on `tag_update` messages
-- Archive daemon (`src/archive_daemon.rs`) with MinIO integration
+- Archive daemon (`src/archive_daemon.rs`) with SeaweedFS integration
 - Health daemon (`src/health_daemon.rs`) with idle detection
 - Relational sync daemon promotion (`src/sync_worker.rs`)
 - Deep maintenance insight generation (sliding 30-day window, `type: insight` messages)

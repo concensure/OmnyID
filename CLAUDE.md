@@ -5,6 +5,28 @@ It overrides any generic Claude defaults and is read at the start of every sessi
 
 ---
 
+## Shared Project State (Claude + Codex)
+
+Claude and Codex work from the same agent session protocol and `.agent/`
+project ledger. Before doing any non-trivial work:
+
+1. Read `AGENTS.md`.
+2. Read `.agent/PROJECT_STATE.md` for concise current facts and the authority map.
+3. Read `.agent/TASKS.yaml` for task lifecycle, owner, branch, dependencies,
+   file scope, and acceptance criteria.
+4. Read `.agent/DECISIONS.md` for durable architecture and coordination decisions.
+5. Read `.agent/HANDOFF.md` for agent commentary and session handoff notes.
+6. Inspect git status, recent git log, relevant other-agent commits,
+   CI/build/deployment status where available, and file ownership overlap.
+
+Build, test, staging, deployment, and production health status are
+machine-owned. Do not manually write `Build: PASS`, `Tests: PASS`,
+`Staging: PASS`, or `Production: HEALTHY` into project-state docs; read those
+from GitHub Actions, GitHub Checks, GitHub Deployments/environments, or runtime
+monitoring.
+
+---
+
 ## Project Overview
 
 OmnyID is a privacy-first, local-first, agent-native personal workspace built on AFP v1.

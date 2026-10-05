@@ -21,8 +21,8 @@ This plan assumes:
 - Python and TypeScript SDKs remain thin and ergonomic
 - Oracle Cloud is the first self-hosting target
 - OVHcloud is the second cloud target for hosted rollout
-- the stack baseline is pinned in [OMNYID_STACK_VERSIONS.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_STACK_VERSIONS.md)
-- the production launch profile is captured in [OMNYID_PRODUCTION_DECISIONS.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PRODUCTION_DECISIONS.md)
+- the stack baseline is pinned in [OMNYID_STACK_VERSIONS.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_STACK_VERSIONS.md)
+- the production launch profile is captured in [OMNYID_PRODUCTION_DECISIONS.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PRODUCTION_DECISIONS.md)
 
 ## Current Repo Baseline
 
@@ -31,7 +31,7 @@ Omnyid is not a blank-slate project. The repo already contains the first pass of
 - a Rust homeserver with Tokio, Tonic, Axum, SQLx, and crypto dependencies
 - an AFP proto definition and early message models
 - Postgres bootstrap SQL and a Docker Compose environment
-- MinIO and Caddy integration points
+- SeaweedFS and Caddy integration points
 - inbound gateway and IMAP sync starter modules
 - Python and TypeScript SDK skeletons
 - a landing page plus an early config-driven workspace UI
@@ -161,7 +161,7 @@ Exit criteria:
 
 Phase output:
 
-- [OMNYID_PHASE_0_5_AUDIT.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_0_5_AUDIT.md)
+- [OMNYID_PHASE_0_5_AUDIT.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_0_5_AUDIT.md)
 
 ## Dependency-Ordered Master Plan
 
@@ -223,8 +223,8 @@ Exit criteria:
 
 Phase output so far:
 
-- [OMNYID_PHASE_1_SCHEMA_FREEZE.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_1_SCHEMA_FREEZE.md)
-- [template.json](/c:/Users/ozans/Desktop/projects/Agenton/template.json) updated to the frozen JSON schema baseline
+- [OMNYID_PHASE_1_SCHEMA_FREEZE.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_1_SCHEMA_FREEZE.md)
+- [template.json](/c:/Users/joes/Desktop/projects/Agenton/template.json) updated to the frozen JSON schema baseline
 - `proto/afp.proto`, `src/message.rs`, and `typescript-sdk/src/index.ts` partially converged to the frozen schema
 - `postgres/init.sql`, `src/db.rs`, and `src/sync_worker.rs` updated toward the frozen persistence model
 - `src/server.rs`, `build.rs`, `Cargo.toml`, and crate module wiring refactored so the Rust backend now passes `cargo check`
@@ -253,7 +253,7 @@ Tasks:
 - Separate ciphertext storage from render hints and metadata carefully.
 - Make sure homeserver never requires plaintext to function.
 - Ensure summaries and embeddings are generated only from plaintext on trusted user-side runtimes, unless explicitly configured otherwise.
-- Design encrypted attachment references for MinIO.
+- Design encrypted attachment references for SeaweedFS.
 - Add audit-safe structured logging that excludes plaintext and secrets.
 
 Deliverables:
@@ -271,7 +271,7 @@ Exit criteria:
 
 Phase output so far:
 
-- [OMNYID_PHASE_2_CRYPTO.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_2_CRYPTO.md)
+- [OMNYID_PHASE_2_CRYPTO.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_2_CRYPTO.md)
 - deterministic Ed25519 signing and verification added in `src/crypto.rs`
 - signed-ingress enforcement added in `src/server.rs`
 - Python SDK signing and client-side encryption support added in `python-sdk/afp/client.py`
@@ -320,7 +320,7 @@ Tasks:
 - Define append-only persistence guarantees.
 - Add idempotency and deduplication for repeated message delivery.
 - Add retry-safe ACK semantics.
-- Implement attachment metadata storage and MinIO object references.
+- Implement attachment metadata storage and SeaweedFS object references.
 - Add health endpoints and readiness checks.
 - Add structured tracing and metrics.
 - Prepare the storage model for ElectricSQL replication without changing the core AFP record semantics later.
@@ -341,7 +341,7 @@ Exit criteria:
 
 Phase output so far:
 
-- [OMNYID_PHASE_3_HOMESERVER_STORAGE.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_3_HOMESERVER_STORAGE.md)
+- [OMNYID_PHASE_3_HOMESERVER_STORAGE.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_3_HOMESERVER_STORAGE.md)
 - health and readiness endpoints added in `src/server.rs`
 - WebSocket relay endpoint added in `src/server.rs` as the first realtime transport step, now with bidirectional send/ack support
 - WebTransport QUIC relay listener added in `src/server.rs` for AFP send operations on `/relay/wt` when PEM identity material is configured
@@ -392,7 +392,7 @@ Exit criteria:
 
 Phase output:
 
-- [OMNYID_PHASE_4_IDENTITY_DISCOVERY.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_4_IDENTITY_DISCOVERY.md)
+- [OMNYID_PHASE_4_IDENTITY_DISCOVERY.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_4_IDENTITY_DISCOVERY.md)
 - Agent ID parsing baseline added in `src/agent_id.rs`
 - Agent ID validation logic added to both SDKs for recipient handling and AgentCard acceptance
 - AgentCard verification now rejects malformed Agent IDs in `src/agentcard.rs`
@@ -462,7 +462,7 @@ Exit criteria:
 
 Phase output so far:
 
-- [OMNYID_PHASE_5_EMAIL_GATEWAY.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_5_EMAIL_GATEWAY.md)
+- [OMNYID_PHASE_5_EMAIL_GATEWAY.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_5_EMAIL_GATEWAY.md)
 - shared-thread reply normalization added in `src/gateway/smtp_out.rs`
 - threaded reply helpers added in both SDKs and examples
 - RFC-aware inbound parsing and outbound delivery receipts added across `src/gateway/smtp_in.rs`, `src/server.rs`, `src/db.rs`, and `postgres/migrations/0002_workflow_state.sql`
@@ -519,7 +519,7 @@ Exit criteria:
 
 Phase output so far:
 
-- [OMNYID_PHASE_6_SDK_STABILIZATION.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_6_SDK_STABILIZATION.md)
+- [OMNYID_PHASE_6_SDK_STABILIZATION.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_6_SDK_STABILIZATION.md)
 - Python and TypeScript examples now demonstrate reply, thread fetch, and verified discovery
 - `python-sdk/pyproject.toml` upgraded with build-system, description, readme, license, and package-data for PyPI publishing
 - `typescript-sdk/package.json` upgraded with `main`, `exports`, `files`, and `prepublishOnly` build script for npm publishing
@@ -527,7 +527,7 @@ Phase output so far:
 
 ### Phase 7: UI Foundation
 
-Goal: turn the current landing page plus workspace prototype into an agent-first workspace where AFP message `views[].format` drives what the workspace renders. One AFP thread history is the single data source; email, canvas, table, calendar, attachment, and approval surfaces are all renderers over that shared append-only history.
+Goal: turn the current landing page plus workspace prototype into an agent-native workspace where AFP message `views[].format` drives what the workspace renders. One AFP thread history is the single data source; email, canvas, table, calendar, attachment, and approval surfaces are all renderers over that shared append-only history.
 
 Status: completed
 
@@ -574,7 +574,7 @@ Still remaining:
 
 Phase output:
 
-- [OMNYID_PHASE_7_UI_FOUNDATION.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_7_UI_FOUNDATION.md)
+- [OMNYID_PHASE_7_UI_FOUNDATION.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_7_UI_FOUNDATION.md)
 - `AfpMessage`, `AfpView`, `AfpAttachment`, `AfpReference` types added in `solid-ui/src/lib/api.ts`
 - `fetchThread`, `pickView`, `KNOWN_VIEW_FORMATS` added in `solid-ui/src/lib/api.ts`
 - six renderer components added in `solid-ui/src/components/renderers/`
@@ -631,7 +631,7 @@ Exit criteria:
 
 Phase output so far:
 
-- [OMNYID_PHASE_8_ACTION_FRAMEWORK.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_8_ACTION_FRAMEWORK.md)
+- [OMNYID_PHASE_8_ACTION_FRAMEWORK.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_8_ACTION_FRAMEWORK.md)
 - integration capability and action intent/result contract added in `src/integration.rs`
 - durable capability and action audit persistence added in `src/db.rs` and `postgres/migrations/0002_workflow_state.sql`
 - workspace now includes a first in-product approval queue for risky agent actions, backed by AFP thread messages and local review state
@@ -657,7 +657,7 @@ Phase output so far:
 - the Python runner IDE policy panel now also controls starter-template defaults and model-budget caps, with those changes syncing back into the generated hosted runtime files instead of only the dashboard state
 - the hosted Python runner now records metadata-only policy save events in the control plane and surfaces recent policy history in the dashboard
 - the Python runner web tool now has a dashboard-managed hostname allowlist so generic outbound HTTP stays default-deny unless explicitly enabled per workspace
-- a new Solid-based unified app shell now exists under [solid-ui](/C:/Users/ozans/Desktop/projects/Agenton/solid-ui), with a glass-panel search, dashboard, and Python runner surface intended to replace the fragmented UI path over time
+- a new Solid-based unified app shell now exists under [solid-ui](/C:/Users/joes/Desktop/projects/Agenton/solid-ui), with a glass-panel search, dashboard, and Python runner surface intended to replace the fragmented UI path over time
 - the homeserver now also exposes safe Python runner file-edit APIs:
   - `GET /runtime/workspace-files`
   - `GET /runtime/workspace-file`
@@ -714,7 +714,7 @@ Exit criteria:
 
 Phase output so far:
 
-- [OMNYID_PHASE_9_ELECTRICSQL_SYNC.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_9_ELECTRICSQL_SYNC.md)
+- [OMNYID_PHASE_9_ELECTRICSQL_SYNC.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_9_ELECTRICSQL_SYNC.md)
 - sync slice and device bootstrap contract added in `src/local_sync.rs`
 - sync device persistence added in `src/db.rs` and `postgres/migrations/0002_workflow_state.sql`
 - the dashboard can now generate device bootstrap bundles for desktop, mobile, and watch clients through `src/server.rs`, `docs/index.html`, and `docs/app.js`, and those bundles now materialize the sync-slice plan, device-scoped bootstrap identity, PGlite target path, and local-key-material expectations
@@ -762,7 +762,7 @@ Exit criteria:
 
 Phase output so far:
 
-- [OMNYID_PHASE_10_PERSONALIZATION.md](/c:/Users/ozans/Desktop/projects/Agenton/OMNYID_PHASE_10_PERSONALIZATION.md)
+- [OMNYID_PHASE_10_PERSONALIZATION.md](/c:/Users/joes/Desktop/projects/Agenton/OMNYID_PHASE_10_PERSONALIZATION.md)
 - personalization event, LoRA artifact, and weekly local training contract added in `src/personalization.rs`
 - personalization event and LoRA artifact persistence added in `src/db.rs` and `postgres/migrations/0002_workflow_state.sql`
 - `POST /personalization/event` and `GET /personalization/stats` endpoints added in `src/server.rs`; stats response surfaces per-signal counts and active LoRA artifact ID for training-readiness checks
@@ -776,8 +776,8 @@ Status: complete
 
 Phase output:
 
-- `scripts/omnyid-backup.sh`: pg_dump + gzip + MinIO mirror + manifest + 30-day prune
-- `scripts/omnyid-restore.sh`: drop/recreate DB + pg_restore from MinIO archive
+- `scripts/omnyid-backup.sh`: pg_dump + gzip + SeaweedFS mirror + manifest + 30-day prune
+- `scripts/omnyid-restore.sh`: drop/recreate DB + pg_restore from SeaweedFS archive
 - `scripts/omnyid-upgrade.sh`: backup → pull → build → restart → healthcheck loop
 - `docker-compose.oracle.minimal.yml` updated with a `backup` service running the backup script on a daily cron schedule at 02:00 UTC
 
@@ -789,7 +789,7 @@ Tasks:
 - Add install docs for:
   - domain setup
   - SMTP and IMAP credentials
-  - MinIO
+  - SeaweedFS
   - Postgres
   - TLS
 - Add backup and restore workflows.
@@ -1009,7 +1009,7 @@ These are the next highest-leverage tasks to execute first given the partially c
 
 - `docker-compose.yml`
 - `Caddyfile`
-- MinIO and Postgres provisioning
+- SeaweedFS and Postgres provisioning
 
 ## Milestone Plan
 
@@ -1120,7 +1120,7 @@ Why: env vars in a compose file are convenient but not auditable and are exposed
 
 Key steps:
 - implement `VaultSecretBackend` and `OracleVaultBackend` in Rust behind a `SecretBackend` trait
-- use it for `OMNYID_SIGNING_KEY_HEX`, `OMNYID_ENCRYPTION_KEY_HEX`, `OMNYID_GMAIL_CLIENT_SECRET`, `MINIO_ROOT_PASSWORD`
+- use it for `OMNYID_SIGNING_KEY_HEX`, `OMNYID_ENCRYPTION_KEY_HEX`, `OMNYID_GMAIL_CLIENT_SECRET`, `SEAWEEDFS_ROOT_PASSWORD`
 - add `OMNYID_PROVIDER_TOKEN_KEK_REF` wrapping so Gmail/Outlook OAuth tokens are envelope-encrypted before DB storage
 - document the self-host Vault path using the existing Oracle Cloud setup
 
@@ -1304,7 +1304,7 @@ Key steps, in dependency order:
 
 7. **Tasks and Decisions board**: a structured task-tracking surface inside a Space. Tasks are AFP messages of type `task_item` with `status`, `assignee_agent_id`, `due_date`, and `approval_required` fields. The existing `ApprovalsRenderer` (Phase 7) handles the decision/approval queue. A new `TaskBoardRenderer` renders the kanban state derived from `task_item` message history.
 
-8. **Files and Media panel**: surfaces all AFP messages within the Space that carry attachment descriptors. Uses the existing `AttachmentsRenderer` (Phase 7) extended with MinIO-backed rich previews (thumbnail generation for images, first-page preview for PDFs via the P16-A parser pipeline). Files are E2EE — previews are generated client-side from decrypted attachment content.
+8. **Files and Media panel**: surfaces all AFP messages within the Space that carry attachment descriptors. Uses the existing `AttachmentsRenderer` (Phase 7) extended with SeaweedFS-backed rich previews (thumbnail generation for images, first-page preview for PDFs via the P16-A parser pipeline). Files are E2EE — previews are generated client-side from decrypted attachment content.
 
 9. **Agent roles within Spaces**: three role tiers enforced by the Space policy and Master Orchestrator:
    - `passive` — agents may read Space messages and post summarization outputs (`agent:workflow_summary` messages)
@@ -1467,7 +1467,7 @@ Phase 11 runtime closure update as of 2026-04-14:
 
 - `src/daemon_registry.rs` now boots and tracks system daemons per user
 - `src/curator_runtime.rs` now runs the curator continuously with pgvector-backed candidate search and folder-rule-aware scope
-- `src/daemon_runtime.rs` now archives AFP payloads to MinIO when configured and uses health passes for backlog re-indexing, duplicate detection, and backlink repair
+- `src/daemon_runtime.rs` now archives AFP payloads to SeaweedFS when configured and uses health passes for backlog re-indexing, duplicate detection, and backlink repair
 - Dashboard supertag browsing is now surfaced in `solid-ui/src/components/DashboardFeed.tsx`
 
 Phase 11 + 12 (Knowledge Curator Enhanced) closure update as of 2026-04-15:

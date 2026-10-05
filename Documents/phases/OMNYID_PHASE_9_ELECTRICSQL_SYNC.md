@@ -10,7 +10,7 @@ Purpose: define the local-first sync slices before wiring ElectricSQL into the r
 
 ### Sync Slice Contract
 
-- [src/local_sync.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/local_sync.rs) now defines:
+- [src/local_sync.rs](/c:/Users/joes/Desktop/projects/Agenton/src/local_sync.rs) now defines:
   - sync slice names
   - conflict modes
   - default sync slice specs
@@ -26,17 +26,17 @@ Purpose: define the local-first sync slices before wiring ElectricSQL into the r
 ### Encryption-Aware Local Sync Baseline
 
 - `requires_local_key_material(...)` now keeps the future ElectricSQL plan honest: ciphertext-bearing slices imply local key material on the client side.
-- The tests in [src/local_sync.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/local_sync.rs) lock in the expectation that synced thread state includes both inbox and ciphertext slices.
+- The tests in [src/local_sync.rs](/c:/Users/joes/Desktop/projects/Agenton/src/local_sync.rs) lock in the expectation that synced thread state includes both inbox and ciphertext slices.
 
 ### Durable Device Bootstrap Table
 
-- [postgres/migrations/0002_workflow_state.sql](/c:/Users/ozans/Desktop/projects/Agenton/postgres/migrations/0002_workflow_state.sql) now adds `sync_devices`.
-- [src/db.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/db.rs) now includes `upsert_sync_device(...)`.
+- [postgres/migrations/0002_workflow_state.sql](/c:/Users/joes/Desktop/projects/Agenton/postgres/migrations/0002_workflow_state.sql) now adds `sync_devices`.
+- [src/db.rs](/c:/Users/joes/Desktop/projects/Agenton/src/db.rs) now includes `upsert_sync_device(...)`.
 
 ### Dashboard Device Bootstrap Bundles
 
-- [src/server.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/server.rs) now exposes `POST /dashboard/device-bootstrap-bundle`.
-- The hosted dashboard in [docs/index.html](/c:/Users/ozans/Desktop/projects/Agenton/docs/index.html) and [docs/app.js](/c:/Users/ozans/Desktop/projects/Agenton/docs/app.js) can now generate bootstrap bundles for:
+- [src/server.rs](/c:/Users/joes/Desktop/projects/Agenton/src/server.rs) now exposes `POST /dashboard/device-bootstrap-bundle`.
+- The hosted dashboard in [docs/index.html](/c:/Users/joes/Desktop/projects/Agenton/docs/index.html) and [docs/app.js](/c:/Users/joes/Desktop/projects/Agenton/docs/app.js) can now generate bootstrap bundles for:
   - desktop
   - mobile
   - watch
@@ -53,13 +53,13 @@ Purpose: define the local-first sync slices before wiring ElectricSQL into the r
 
 ### Device Sync Policy Registry
 
-- [postgres/migrations/0012_sync_device_policies.sql](/c:/Users/ozans/Desktop/projects/Agenton/postgres/migrations/0012_sync_device_policies.sql) now persists a per-device local-first policy registry.
-- [src/db.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/db.rs) now supports:
+- [postgres/migrations/0012_sync_device_policies.sql](/c:/Users/joes/Desktop/projects/Agenton/postgres/migrations/0012_sync_device_policies.sql) now persists a per-device local-first policy registry.
+- [src/db.rs](/c:/Users/joes/Desktop/projects/Agenton/src/db.rs) now supports:
   - `upsert_sync_device_policy(...)`
   - `list_sync_device_policies_by_user(...)`
   - `find_sync_device_policy_by_user(...)`
   - `update_sync_device_policy(...)`
-- [src/local_sync.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/local_sync.rs) now defines device-aware sync profiles instead of one universal plan:
+- [src/local_sync.rs](/c:/Users/joes/Desktop/projects/Agenton/src/local_sync.rs) now defines device-aware sync profiles instead of one universal plan:
   - desktop defaults to `full`
   - mobile defaults to `balanced`
   - watch defaults to `lightweight`

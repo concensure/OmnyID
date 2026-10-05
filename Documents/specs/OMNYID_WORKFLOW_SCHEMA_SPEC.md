@@ -6,14 +6,14 @@ This document defines the first shared contract for the visual workflow builder.
 
 It complements:
 
-- [OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md)
-- [OMNYID_SUBAGENT_TEMPLATE_SPEC.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_SUBAGENT_TEMPLATE_SPEC.md)
-- [OMNYID_A2UI_V1_SPEC.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_A2UI_V1_SPEC.md)
-- [OMNYID_CANONICAL_MESSAGE_SHAPES.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_CANONICAL_MESSAGE_SHAPES.md)
+- [OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md](/C:/Users/joes/Desktop/projects/Agenton/Documents/specs/OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md)
+- [OMNYID_SUBAGENT_TEMPLATE_SPEC.md](/C:/Users/joes/Desktop/projects/Agenton/Documents/specs/OMNYID_SUBAGENT_TEMPLATE_SPEC.md)
+- [OMNYID_A2UI_V1_SPEC.md](/C:/Users/joes/Desktop/projects/Agenton/Documents/specs/OMNYID_A2UI_V1_SPEC.md)
+- [OMNYID_CANONICAL_MESSAGE_SHAPES.md](/C:/Users/joes/Desktop/projects/Agenton/Documents/specs/OMNYID_CANONICAL_MESSAGE_SHAPES.md)
 
 The executable TypeScript schema for this spec lives in:
 
-- [workflows.ts](/C:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/workflows.ts)
+- [workflows.ts](/C:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/workflows.ts)
 
 ## Layering
 
@@ -266,7 +266,7 @@ The user can inspect and modify:
 
 Before building a full canvas UI, all services should share the same schema definitions from:
 
-- [workflows.ts](/C:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/workflows.ts)
+- [workflows.ts](/C:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/workflows.ts)
 
 That file is the first source of truth for:
 

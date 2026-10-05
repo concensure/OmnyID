@@ -10,7 +10,7 @@ Purpose: prepare the personalization layer without leaking user data or obscurin
 
 ### Personalization Event Contract
 
-- [src/personalization.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/personalization.rs) now defines:
+- [src/personalization.rs](/c:/Users/joes/Desktop/projects/Agenton/src/personalization.rs) now defines:
   - `FeedbackSignal`
   - `PersonalizationEvent`
   - `LoraArtifact`
@@ -20,14 +20,14 @@ Purpose: prepare the personalization layer without leaking user data or obscurin
 ### Local Training Baseline
 
 - `TrainingSchedule::weekly_default()` encodes the intended weekly cadence and requires device-local execution by default.
-- The tests in [src/personalization.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/personalization.rs) keep the initial contract focused on local capture plus versioned artifact lifecycle.
+- The tests in [src/personalization.rs](/c:/Users/joes/Desktop/projects/Agenton/src/personalization.rs) keep the initial contract focused on local capture plus versioned artifact lifecycle.
 
 ### Durable Personalization Tables
 
-- [postgres/migrations/0002_workflow_state.sql](/c:/Users/ozans/Desktop/projects/Agenton/postgres/migrations/0002_workflow_state.sql) now adds:
+- [postgres/migrations/0002_workflow_state.sql](/c:/Users/joes/Desktop/projects/Agenton/postgres/migrations/0002_workflow_state.sql) now adds:
   - `personalization_events`
   - `lora_artifacts`
-- [src/db.rs](/c:/Users/ozans/Desktop/projects/Agenton/src/db.rs) now includes:
+- [src/db.rs](/c:/Users/joes/Desktop/projects/Agenton/src/db.rs) now includes:
   - `record_personalization_event(...)`
   - `upsert_lora_artifact(...)`
 

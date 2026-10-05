@@ -1359,14 +1359,6 @@ extreme UV conditions
 THEN:
 surface outdoor safety reminders
 
-158
-
-IF:
-high wind warning
-
-THEN:
-flag crane/scaffold risk
-
 159
 
 IF:

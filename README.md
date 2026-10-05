@@ -9,6 +9,21 @@ Omnyid is a private, self-hosted, agent-native personal workspace built around A
 - Python and TypeScript SDKs with 1 to 3 line agent flows
 - a config-driven UI that renders AFP threads as multiple views
 
+## Coordination
+
+Every agent session starts with [AGENTS.md](AGENTS.md), then reads the
+canonical `.agent/` project ledger:
+
+- [.agent/PROJECT_STATE.md](.agent/PROJECT_STATE.md) keeps concise current facts and the authority map.
+- [.agent/TASKS.yaml](.agent/TASKS.yaml) owns task lifecycle, owners, branches, dependencies, and file scopes.
+- [.agent/DECISIONS.md](.agent/DECISIONS.md) records durable architecture decisions.
+- [.agent/HANDOFF.md](.agent/HANDOFF.md) is for agent commentary and session handoff notes.
+
+Build, test, deployment, and production health verdicts are machine-owned by
+GitHub Actions, GitHub Checks, GitHub Deployments/environments, and runtime
+monitoring. Agents should not hand-enter PASS or HEALTHY claims in project
+state.
+
 Design & Technical Principles of the OmnyID Project
 
 Zero-Trust / E2EE-First
@@ -135,20 +150,9 @@ Important product boundary:
 
 ## Current Status
 
-OmnyID is commercially ready in the current audited lane as of Tuesday, August 25, 2026.
-
-Current audited state:
-
-- Default commercial lane: `ready` with promotion gate `go`.
-- Strict commercial lane: `ready` with promotion gate `go`.
-- Oracle production proof is passing; the current host root filesystem is at `77%` use with about `11G` free.
-- The newest audited Oracle backup is `/var/backups/omnyid/20260825T050754Z`.
-- Backup verification is `pass`.
-- Restore-drill status is `pass`.
-- The local staged runtime manifest includes all required runtime scripts.
-- The `personalOS` implementation plan is complete in the latest audit: `13` implemented phases, `0` partial phases, `0` not-started phases, and `0` open tasks.
-
-Use the checked artifacts instead of this README for the operator verdict:
+This README is not the authority for release, deployment, or production-health
+verdicts. Use the root coordination files for human-readable project state and
+the checked artifacts or external systems for operator verdicts:
 
 - `artifacts/production-go-no-go-current/production-go-no-go.json`
 - `artifacts/commercial-readiness-snapshot-current/commercial-readiness-snapshot.json`
@@ -165,7 +169,6 @@ Implemented areas already present in the repo include:
 
 - `.github/workflows/ci.yml`: four-job CI pipeline — `rust` (fmt + clippy + test), `typescript-sdk` (typecheck), `solid-ui` (build), `audit` (cargo-audit)
 - 8 exhaustive property-style parse tests for the relay protocol in `src/relay.rs`
-- 112 unit tests passing across all modules
 
 Knowledge Curator additions already present in the repo include:
 

@@ -1,11 +1,13 @@
 # OmnyID Landing Page — Content Prompt
 
+> Status note as of Wednesday, August 26, 2026: this prompt predates the latest PMF analysis. For claim priority, defer to `Documents/marketing/OMNYID_PRODUCT_MARKET_FIT_ANALYSIS.md`. The landing page should lead with cross-tool memory plus owned identity, with privacy as the trust amplifier rather than the sole headline.
+
 ## Purpose of This Document
 
 This document defines every word, headline, body paragraph, label, CTA, and piece of microcopy that should appear on the OmnyID landing page. It is structured section by section, matching the layout defined in the Design Prompt. The content is crafted to:
 
 1. Speak directly to the pain of two distinct audiences: **everyday people overwhelmed by the digital world**, and **developers and AI power users** who live inside agent frameworks day-to-day
-2. Position OmnyID as the **first infrastructure layer** built from the ground up for the agentic era — not another AI feature bolted onto old architecture
+2. Position OmnyID as the **memory and identity layer** built from the ground up for the agentic era — not another AI feature bolted onto old architecture
 3. Build enough trust to convert visitors to the waitlist
 4. Be optimized for SEO without sacrificing the calm, elegant tone
 
@@ -25,22 +27,22 @@ This document defines every word, headline, body paragraph, label, CTA, and piec
 
 ### Browser Title
 ```
-OmnyID — Your Agent Identity. Your Rules.
+OmnyID — Cross-Tool AI Memory You Own
 ```
 
 ### Meta Description (≤160 characters)
 ```
-OmnyID gives every AI agent a cryptographic identity, a real email address, and a private workspace. Open source. Local-first. Built for the agentic era.
+OmnyID gives you cross-tool AI memory tied to an identity you own, with private runtime control and agent-ready infrastructure.
 ```
 
 ### Open Graph Title
 ```
-OmnyID — The Gateway to the Agentic Era
+OmnyID — Cross-Tool AI Memory, Identity, and Control
 ```
 
 ### Open Graph Description
 ```
-The first privacy-first, local-first, open-source Agent ID platform. Give your agents an identity that works — without giving up your data.
+Portable AI memory, owned identity, and private runtime control for the agentic era.
 ```
 
 ---
@@ -66,28 +68,30 @@ Open Source  ·  Privacy-First  ·  Built for the Agentic Era
 
 ### Hero Headline
 ```
-Your agents need
-an identity they own.
+Your AI context
+should not reset
+every time you switch tools.
 ```
 
 **Alternative A** (punchier):
 ```
-The internet wasn't built
-for agents.
-OmnyID is.
+Stop re-explaining
+yourself to every
+AI tool you use.
 ```
 
 **Alternative B** (more human):
 ```
-Every agent you run
-deserves a home.
+One memory layer.
+Every tool.
+Under your control.
 ```
 
-*Recommendation: Use Alternative A for its contrast and clarity.*
+*Recommendation: Use Alternative B for the clearest alignment with the current PMF wedge.*
 
 ### Hero Subline
 ```
-OmnyID is the first open-source, privacy-first platform that gives every AI agent a permanent, cryptographic identity — complete with a real email address, encrypted storage, and a personal workspace. All under your control.
+OmnyID gives you portable, cross-tool AI memory tied to an identity you own. It carries context across tools, keeps history in an auditable substrate, and runs with privacy-first control instead of trapping your memory inside one vendor's product.
 ```
 
 ### Primary CTA Button
@@ -102,7 +106,7 @@ View on GitHub ↗
 
 ### Trust Line (below CTAs)
 ```
-Open source. Self-hostable. Your data, always yours.
+Portable memory. Owned identity. Privacy by default.
 ```
 
 ---
@@ -117,22 +121,22 @@ THE PROBLEM
 ### Pullquote Statement
 ```
 AI is getting powerful.
-But your agents have nowhere to live.
+But your context still keeps starting over.
 ```
 
 ### Supporting Context Paragraph
 ```
-Every day, millions of AI agents are spun up, run a task, and disappear — leaving no record, no identity, no continuity. They can't receive replies. They can't act on real email. They don't know who you are. And every workspace tool claiming to be "AI-powered" is just a database with a chat box stapled to the side.
+Every day, people bounce between ChatGPT, Claude, Cursor, email, notes, and calendars — and keep re-establishing the same context from zero. Memory is trapped inside separate products. History is fragmented. AI gets more powerful, but your context stays brittle.
 
-The agentic era needs new infrastructure. It needs it to be private by default. It needs it to be yours.
+The next layer needs to unify memory, identity, and action. It also needs to be private by default and under your control.
 ```
 
 ### Pain Point 1: Privacy
 **Icon**: a lock with a slash, or an eye with a line through it
 
-**Label**: Your email is being read — right now.
+**Label**: Your context is trapped in separate tools.
 
-**Body**: Google, Microsoft, and every "AI workspace" you use has full access to your messages, your notes, your documents. Their AI gets smarter. You get a product update.
+**Body**: Every AI product remembers a different sliver of you. None of them carry full context across tools, so you keep repeating the same preferences, projects, and decisions from scratch.
 
 ---
 
@@ -170,7 +174,7 @@ A permanent home for every agent you run.
 
 **Paragraph 1:**
 ```
-OmnyID is the first open-source, privacy-first Agent Framework built from the ground up for the way AI actually works — not the way legacy software hoped it would.
+OmnyID is the cross-tool AI memory and identity layer built for the way AI actually works — not another assistant that forgets everything when you switch products.
 ```
 
 **Paragraph 2:**
@@ -424,7 +428,7 @@ When Milestone D is complete: OmnyID is a product, not just a framework.
 ```
 
 **Key deliverables**:
-- Production-ready Docker Compose with Caddy, Postgres, MinIO, and homeserver
+- Production-ready Docker Compose with Caddy, Postgres, SeaweedFS, and homeserver
 - Oracle Cloud and secondary cloud one-click deploy templates
 - One-click hosted onboarding: claim Agent ID, connect email, open workspace
 - Documented security model for hosted-mode trust
@@ -513,7 +517,7 @@ Join [X] people already waiting.
 
 ### Tagline
 ```
-OmnyID — Your Agent Identity. Your Rules.
+OmnyID — Cross-Tool AI Memory You Own.
 ```
 
 ### Footer Navigation

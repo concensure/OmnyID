@@ -19,10 +19,10 @@ As of March 20, 2026, Omnyid should use this stable baseline across the project.
 
 ## Repo Enforcement
 
-- Rust is pinned in [rust-toolchain.toml](/c:/Users/ozans/Desktop/projects/Agenton/rust-toolchain.toml)
-- Docker uses Rust `1.94-slim` in [Dockerfile](/c:/Users/ozans/Desktop/projects/Agenton/Dockerfile)
-- Python is documented in [.python-version](/c:/Users/ozans/Desktop/projects/Agenton/.python-version) and constrained in [python-sdk/pyproject.toml](/c:/Users/ozans/Desktop/projects/Agenton/python-sdk/pyproject.toml)
-- Node is documented in [.nvmrc](/c:/Users/ozans/Desktop/projects/Agenton/.nvmrc) and constrained in [typescript-sdk/package.json](/c:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/package.json)
+- Rust is pinned in [rust-toolchain.toml](/c:/Users/joes/Desktop/projects/Agenton/rust-toolchain.toml)
+- Docker uses Rust `1.94-slim` in [Dockerfile](/c:/Users/joes/Desktop/projects/Agenton/Dockerfile)
+- Python is documented in [.python-version](/c:/Users/joes/Desktop/projects/Agenton/.python-version) and constrained in [python-sdk/pyproject.toml](/c:/Users/joes/Desktop/projects/Agenton/python-sdk/pyproject.toml)
+- Node is documented in [.nvmrc](/c:/Users/joes/Desktop/projects/Agenton/.nvmrc) and constrained in [typescript-sdk/package.json](/c:/Users/joes/Desktop/projects/Agenton/typescript-sdk/package.json)
 
 ## Task Rule
 

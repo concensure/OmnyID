@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runWeddingVendorSearchExecution, weddingVendorSearchPortAvailable } from "@/lib/weddingVendorSearchExecutorState";
+import {
+  runWeddingVendorSearchExecution,
+  weddingVendorSearchBatchPortFromApiSearch,
+  weddingVendorSearchPortAvailable,
+} from "@/lib/weddingVendorSearchExecutorState";
 import { buildWeddingVendorSearchReadinessState } from "@/lib/weddingVendorSearchReadinessState";
 
 const readyBrief = buildWeddingVendorSearchReadinessState({
@@ -115,4 +119,26 @@ test("runWeddingVendorSearchExecution normalizes live source results", async () 
 test("weddingVendorSearchPortAvailable exposes whether live search can be registered", () => {
   assert.equal(weddingVendorSearchPortAvailable(null), false);
   assert.equal(weddingVendorSearchPortAvailable(() => ({ ok: true, query: "x" })), true);
+});
+
+test("directory-only batch ports forward the explicit source policy without changing queries", async () => {
+  let request: Record<string, unknown> | null = null;
+  const port = weddingVendorSearchBatchPortFromApiSearch({
+    sourcePolicy: "directory_only",
+    search: async (body) => {
+      request = body as unknown as Record<string, unknown>;
+      return {
+        ok: true, status: "cached", external_search_performed: false, provider_label: "Admin vendor database",
+        query_count: body.queries.length, source_count: 1, queries: body.queries.map((query) => query.query),
+        sources: [{ title: "Harbour Studio", url: "https://studio.example", provider: "Admin vendor database" }],
+        message: "Directory-only vendor search returned 1 source; online providers were not called.", receipt_metadata: { source_policy: "directory_only" },
+      };
+    },
+  });
+  const result = await port([{ providerKind: "google_places", category: "photographer", query: "photographer Sydney", googlePlaceTypes: [], overpassTags: [], expectedFields: [], guardrails: [] }]);
+
+  assert.equal(request?.source_policy, "directory_only");
+  assert.equal(result.externalSearchPerformed, false);
+  assert.equal(result.status, "cached");
+  assert.equal(result.sources.length, 1);
 });

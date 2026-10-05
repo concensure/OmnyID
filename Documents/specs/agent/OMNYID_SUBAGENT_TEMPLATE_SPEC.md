@@ -10,13 +10,13 @@ This document defines the missing template layer that sits between:
 
 It complements:
 
-- [OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md)
-- [OMNYID_TEMPLATE_AND_WORKFLOW_DEPENDENCY_PLAN.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_TEMPLATE_AND_WORKFLOW_DEPENDENCY_PLAN.md)
-- [OMNYID_WORKFLOW_SCHEMA_SPEC.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_WORKFLOW_SCHEMA_SPEC.md)
+- [OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md](/C:/Users/joes/Desktop/projects/Agenton/Documents/specs/OMNYID_VISUAL_WORKFLOW_BUILDER_PLAN.md)
+- [OMNYID_TEMPLATE_AND_WORKFLOW_DEPENDENCY_PLAN.md](/C:/Users/joes/Desktop/projects/Agenton/Documents/specs/OMNYID_TEMPLATE_AND_WORKFLOW_DEPENDENCY_PLAN.md)
+- [OMNYID_WORKFLOW_SCHEMA_SPEC.md](/C:/Users/joes/Desktop/projects/Agenton/Documents/specs/OMNYID_WORKFLOW_SCHEMA_SPEC.md)
 
 The executable schema lives in:
 
-- [workflows.ts](/C:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/workflows.ts)
+- [workflows.ts](/C:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/workflows.ts)
 
 ## Why Templates Exist
 

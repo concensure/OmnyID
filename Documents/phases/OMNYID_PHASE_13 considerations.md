@@ -52,10 +52,10 @@ Let agents propose new supertag types or metadata fields.
 Store schema suggestions as AFP messages (type: "schema_proposal").
 Master Agent reviews and applies them by creating new structured message types.
 
-MinIO is great for raw object storage, but naive usage (just throwing files in and indexing by filename or basic metadata) is fragile, hard to search, and doesn’t align with OmnyID’s agent-first, immutable, E2EE philosophy.
+SeaweedFS is great for raw object storage, but naive usage (just throwing files in and indexing by filename or basic metadata) is fragile, hard to search, and doesn’t align with OmnyID’s agent-native, immutable, E2EE philosophy.
 Here’s a much stronger, 10× better design that stays fully compatible with all core principles.
 Core Idea: File Ledger — Treat Files as First-Class AFP Citizens
-Instead of MinIO being the source of truth, make AFP the source of truth for every file. MinIO becomes a dumb, encrypted blob store.
+Instead of SeaweedFS being the source of truth, make AFP the source of truth for every file. SeaweedFS becomes a dumb, encrypted blob store.
 How It Works
 
 Every file upload creates a rich AFP message (type: "file_ledger")JSON{
@@ -68,7 +68,7 @@ Every file upload creates a rich AFP message (type: "file_ledger")JSON{
     "mime_type": "application/pdf",
     "size_bytes": 2456789,
     "sha256": "...",
-    "minio_path": "user_01j8k9xyz/files/invoice_march_v2.pdf",
+    "seaweedfs_path": "user_01j8k9xyz/files/invoice_march_v2.pdf",
     "supertags": ["#Receipts", "#Tax2026", "#CompanyX"],
     "description": "March electricity invoice for Office",
     "extracted_text": "..."          // OCR result if applicable
@@ -88,7 +88,7 @@ Indexing & Retrieval Strategy (The 10× improvement)
 Primary Index: ElectricSQL (per-user schema) — extremely fast, real-time, supports full-text + vector search.
 Secondary Index: Optional Tantivy (Rust) or pgvector embeddings for semantic search across file content.
 Discovery: Agents and UI query ElectricSQL first (SELECT * FROM file_ledger WHERE supertags @> ARRAY['#Receipts'] or semantic search).
-Access: Once found, the AFP message gives the MinIO path + decryption key (stored encrypted in the AFP message itself).
+Access: Once found, the AFP message gives the SeaweedFS path + decryption key (stored encrypted in the AFP message itself).
 
 
 This design gives you:

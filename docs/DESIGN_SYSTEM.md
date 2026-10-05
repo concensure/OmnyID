@@ -1,5 +1,7 @@
 # OmnyID Design System
 
+> Status note as of Wednesday, August 26, 2026: this document still contains older brand-system material. For market-entry claim priority, defer to `Documents/marketing/OMNYID_PRODUCT_MARKET_FIT_ANALYSIS.md`. OmnyID should be presented first as cross-tool AI memory plus owned identity, with privacy as the trust amplifier.
+
 ## Brand Identity & Visual Language
 
 This document defines the visual design system for OmnyID. All website pages, documentation, marketing materials, and product interfaces should follow these guidelines to ensure consistency across the brand.
@@ -8,9 +10,9 @@ This document defines the visual design system for OmnyID. All website pages, do
 
 ## 1. Brand Positioning
 
-**Tagline**: "Your Agent Identity. Your Rules."
+**Tagline**: "Cross-tool AI memory you own."
 
-**Positioning Statement**: OmnyID is the first privacy-first, local-first, open-source Agent ID platform. We provide the foundational infrastructure for the agentic era—cryptographic identity, real email, and sovereign workspaces.
+**Positioning Statement**: OmnyID is the cross-tool AI memory and identity layer for the agentic era. It gives users portable context, owned identity, and private runtime control instead of trapping memory inside one vendor's product.
 
 **Voice & Tone**:
 - Calm, confident, technical

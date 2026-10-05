@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { For, Show, type Setter } from "solid-js";
+import { createMemo, For, Show, type Setter } from "solid-js";
 
 import {
   WeddingArtifactDetailPanel,
@@ -62,6 +62,18 @@ type WeddingWorkspaceDocumentsPanelProps = {
 };
 
 export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsPanelProps) {
+  const visiblePreview = createMemo(() => {
+    const activePreview = props.activePreview;
+    const activeIsVisible = activePreview
+      ? props.state.workspace.results.some((artifact) => artifact.id === activePreview.artifactId)
+      : false;
+    if (activePreview && activeIsVisible) return activePreview;
+    const firstVisibleArtifactId = props.state.workspace.results[0]?.id ?? null;
+    return firstVisibleArtifactId
+      ? props.state.artifactPreviews.find((preview) => preview.artifactId === firstVisibleArtifactId) ?? null
+      : null;
+  });
+
   return (
     <div class={props.cardClass} hidden={props.hidden}>
       <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
@@ -274,7 +286,7 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
                     data-magic-id={`wedding:document:${artifact.id}:open`}
                     onClick={() => props.onSelectArtifact?.(artifact.id)}
                     class={`w-full rounded-2xl border px-3 py-3 text-left transition ${
-                      artifact.id === props.activePreview?.artifactId
+                      artifact.id === visiblePreview()?.artifactId
                         ? "border-rose-200 bg-rose-50/90"
                         : "border-slate-200/80 bg-white/75 hover:border-sky-200 hover:bg-sky-50/70"
                     }`}
@@ -291,7 +303,7 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
 
           <div class="mt-4">
             <WeddingArtifactDetailPanel
-              preview={props.activePreview}
+              preview={visiblePreview()}
               exportNotice={props.exportNotice}
               approvalRunning={props.approvalRunning}
               approvalReceipt={props.approvalReceipt}

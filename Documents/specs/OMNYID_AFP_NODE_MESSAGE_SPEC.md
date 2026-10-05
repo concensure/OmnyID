@@ -13,9 +13,9 @@ It is designed to:
 
 This spec works with:
 
-- [afp.proto](/C:/Users/ozans/Desktop/projects/Agenton/proto/afp.proto)
-- [OMNYID_CANONICAL_MESSAGE_SHAPES.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_CANONICAL_MESSAGE_SHAPES.md)
-- [workflows.ts](/C:/Users/ozans/Desktop/projects/Agenton/typescript-sdk/src/workflows.ts)
+- [afp.proto](/C:/Users/joes/Desktop/projects/Agenton/proto/afp.proto)
+- [OMNYID_CANONICAL_MESSAGE_SHAPES.md](/C:/Users/joes/Desktop/projects/Agenton/Documents/specs/OMNYID_CANONICAL_MESSAGE_SHAPES.md)
+- [workflows.ts](/C:/Users/joes/Desktop/projects/Agenton/typescript-sdk/src/workflows.ts)
 
 ## Rule
 
@@ -361,7 +361,7 @@ If the message is public/shared infrastructure traffic:
 
 See:
 
-- [OMNYID_MESSAGE_STORAGE_BOUNDARY.md](/C:/Users/ozans/Desktop/projects/Agenton/Documents/specs/OMNYID_MESSAGE_STORAGE_BOUNDARY.md)
+- [OMNYID_MESSAGE_STORAGE_BOUNDARY.md](/C:/Users/joes/Desktop/projects/Agenton/Documents/specs/OMNYID_MESSAGE_STORAGE_BOUNDARY.md)
 
 ## First Implementation Rule
 

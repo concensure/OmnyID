@@ -2,7 +2,7 @@
 
 ## Scope
 
-This review assesses the sample use cases in [agent use case.md](C:/Users/ozans/Desktop/projects/OmnyID/Documents/design/agent/consumer%20agent%20use%20case/agent%20use%20case.md) against the current OmnyID implementation, with emphasis on:
+This review assesses the sample use cases in [agent use case.md](C:/Users/joes/Desktop/projects/OmnyID/Documents/design/agent/consumer%20agent%20use%20case/agent%20use%20case.md) against the current OmnyID implementation, with emphasis on:
 
 - the existing `route_ui_command()` intent-routing layer
 - the current `MasterOrchestrator`

@@ -1,8 +1,10 @@
 # OmnyID Landing Page — Design Prompt
 
+> Status note as of Wednesday, August 26, 2026: this design prompt predates the current PMF source of truth. For claim hierarchy and headline priority, defer to `Documents/marketing/OMNYID_PRODUCT_MARKET_FIT_ANALYSIS.md` and `Documents/marketing/OMNYID_LANDING_CONTENT_PROMPT.md`. The landing page should lead with cross-tool AI memory plus owned identity, with privacy as the trust amplifier.
+
 ## Project Name
 
-**OmnyID** — the first privacy-first, local-first, decentralized Agent Framework and personal workspace layer built for the agentic era.
+**OmnyID** — the cross-tool AI memory and identity layer built for the agentic era.
 
 ---
 
@@ -343,8 +345,8 @@ Use `IntersectionObserver` with CSS classes toggled on entry.
 
 ## 10. SEO and Meta
 
-- `<title>`: `OmnyID — Your Agent Identity. Your Rules.`
-- `<meta name="description">`: 140–160 character description covering: privacy-first, local-first, open-source Agent ID platform
+- `<title>`: `OmnyID — Cross-Tool AI Memory You Own`
+- `<meta name="description">`: 140–160 character description covering: cross-tool AI memory, owned identity, and private runtime control
 - Open Graph tags: `og:title`, `og:description`, `og:image` (a 1200×630 social card using the hero design — the wordmark over the agent mesh on a light background)
 - Twitter Card: `summary_large_image`
 - Canonical URL

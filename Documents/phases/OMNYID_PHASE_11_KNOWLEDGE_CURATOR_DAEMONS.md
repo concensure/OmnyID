@@ -211,7 +211,7 @@ RelationalSyncWorker
 ## 4. Archive & Cold Storage Daemon
 
 ### Purpose
-Checks `archive_after` or `expires_at` metadata flags on AFP messages and moves aged messages to MinIO cold storage, keeping lightweight index rows in Postgres for search.
+Checks `archive_after` or `expires_at` metadata flags on AFP messages and moves aged messages to SeaweedFS cold storage, keeping lightweight index rows in Postgres for search.
 
 ### Behavior
 
@@ -220,17 +220,17 @@ ArchiveDaemon
   ├── Periodic scan (runs every 6 hours) for AFP messages WHERE:
   │     metadata->>'archive_after' < NOW()  OR  metadata->>'expires_at' < NOW()
   ├── For each qualifying message:
-  │     └── upload encrypted ciphertext blob to MinIO (preserves E2EE — never decrypts)
+  │     └── upload encrypted ciphertext blob to SeaweedFS (preserves E2EE — never decrypts)
   │     └── replace Postgres row with an archive index stub (keeps id, thread_id, type, timestamps, embedding vector)
   │     └── create AFP message type: archived_notice with reference to stub
-  └── Cold retrieval: on user access to archived message, streaming download from MinIO, decrypt client-side
+  └── Cold retrieval: on user access to archived message, streaming download from SeaweedFS, decrypt client-side
 ```
 
 **Delegated scope:**
 ```
 allowed_message_types: ["archived_notice", "daemon_heartbeat"]
 ```
-Read access to AFP messages; write access to MinIO bucket only (scoped by tenant).
+Read access to AFP messages; write access to SeaweedFS bucket only (scoped by tenant).
 
 **Policy guardrail:** archived messages are never deleted without explicit user confirmation. The daemon only moves, never destroys.
 
@@ -295,7 +295,7 @@ The Visual Workflow Builder in `solid-ui/src/components/WorkflowsView.tsx` is ex
 | `knowledge_curator` | `daemon_loop` | Auto-curates backlinks, summaries, supertags |
 | `email_gateway` | `daemon_loop` | IMAP/SMTP email gateway daemon |
 | `relational_sync` | `daemon_loop` | Syncs AFP flags to Postgres tables |
-| `archive_cold_storage` | `daemon_loop` | Moves aged messages to MinIO |
+| `archive_cold_storage` | `daemon_loop` | Moves aged messages to SeaweedFS |
 | `health_maintenance` | `daemon_loop` | Idle-period embedding and graph cleanup |
 
 ### New Subagent Template
@@ -428,7 +428,7 @@ CREATE TABLE afp_archive_index (
   thread_id    TEXT NOT NULL,
   message_type TEXT NOT NULL,
   archived_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  minio_key    TEXT NOT NULL,
+  seaweedfs_key    TEXT NOT NULL,
   embedding    VECTOR(1536),
   metadata_stub JSONB NOT NULL DEFAULT '{}'
 );
@@ -469,7 +469,7 @@ Implemented in the 2026-04-14 runtime pass:
 
 - `src/daemon_registry.rs` now handles daemon registration bootstrap, lookup, revoke, and heartbeat inspection
 - `src/curator_runtime.rs` now runs a live Knowledge Curator loop that backfills missing `knowledge_card` rows, performs pgvector similarity lookups on tenant AFP messages, and persists backlink updates plus curator audit rows
-- `src/daemon_runtime.rs` now performs MinIO-backed archival when object storage is configured, with local filesystem fallback only when MinIO env is absent
+- `src/daemon_runtime.rs` now performs SeaweedFS-backed archival when object storage is configured, with local filesystem fallback only when SeaweedFS env is absent
 - Health maintenance now performs real backlog re-index/backfill work, reciprocal backlink repair, pgvector duplicate detection, and emits maintenance insight AFP messages
 - `solid-ui/src/components/DashboardFeed.tsx` now exposes a supertag filter for browsing `knowledge_card` output by tag
 - `solid-ui/src/components/DaemonPanel.tsx` now exposes daemon inspection and revoke controls in Agent Settings

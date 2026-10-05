@@ -243,6 +243,7 @@ export function weddingVendorSearchBatchPortFromApiSearch(input: {
   workspaceId?: string | null;
   weddingPlanId?: string | null;
   maxResultsPerQuery?: number | null;
+  sourcePolicy?: "directory_only" | "online_capable";
   onResponse?: (response: WeddingVendorSearchApiBatchResponseLike) => void;
 }): WeddingVendorSearchPlannedBatchPort {
   return async (queries) => {
@@ -251,6 +252,7 @@ export function weddingVendorSearchBatchPortFromApiSearch(input: {
       workspace_id: input.workspaceId ?? null,
       ...(input.weddingPlanId ? { wedding_plan_id: input.weddingPlanId } : {}),
       ...(maxResultsPerQuery && maxResultsPerQuery > 0 ? { max_results_per_query: maxResultsPerQuery } : {}),
+      ...(input.sourcePolicy ? { source_policy: input.sourcePolicy } : {}),
       queries: weddingVendorSearchApiQueriesFromProviderQueries(queries),
     });
     input.onResponse?.(response);

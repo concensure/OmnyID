@@ -1,3 +1,49 @@
+0. OmnyID Evolved Design Addendum
+These principles supersede the generic guidance below anywhere they conflict. They reflect the current OmnyID product shape and should be treated as the primary design constraints for new agent work.
+
+A. Product Shape
+
+- OmnyID is not a chatbot-first assistant. It is a calm Decision OS that compresses cognitive load into a guided next step, bounded trust cues, and a reversible action path.
+- The default experience should be: one surfaced priority, one recommended path, optional reasoning on demand, and one clear next action.
+- The product should prefer cards, lanes, and prepared artifacts over long chat paragraphs. Complexity should be inspectable, not forced.
+- The user should feel in control while the system does the coordination, retrieval, drafting, comparison, and preparation work underneath.
+
+B. Architecture Rules
+
+- AFP v1 remains the single atomic unit. Do not invent side channels or parallel memory systems for cognition, trust, or continuity.
+- Ledger remains append-only, message-first, local-first, and privacy-preserving. Extend existing message families before creating new ones.
+- A2UI remains the only user-facing rendering path. New agent logic should improve existing DecisionOS, continuity, retrieval, and proactive surfaces instead of creating separate UI classes.
+- Master Agent remains the orchestrator. Do not create a second durable control plane beside the existing watcher, synthesizer, projection, and master flow.
+
+C. State and Reasoning
+
+- Prefer state monitoring over brittle rule bundles. The main substrate is watcher signals -> synthesized state -> proactive/DecisionOS surfacing, not isolated one-off heuristics.
+- Prefer metadata-first, heuristics-first activation. Decrypt, embed, simulate, or escalate only when the cheap signals indicate that deeper work is justified.
+- Reuse the current continuity substrate (`state_snapshot`, continuity metrics, prepared artifacts, proactive suggestions) instead of inventing a second snapshot or planning family.
+- Use topology and relationship continuity as first-class context. Retrieval and surfacing should lean on `relation_link`, legacy-compatible `knowledge_link`, shared object references, and thread continuity before adding new memory silos.
+- Use Bohm field pressure, continuity metrics, and prepared artifacts as bounded ranking inputs. They should shape prioritization and explanation, not replace the rest of the state model.
+
+D. Initiative and Trust
+
+- Background initiative must feel calm, preference-bounded, and reversible. If the system is uncertain, it should narrow, defer, or ask rather than bluff.
+- Trust should be progressive and legible: why now, why this, confidence, consequence, provenance, and undo should be available without forcing the user through a wall of detail.
+- The system should prefer prepared help over generic nudges. Finished context packs, prepared drafts, and bounded review items should usually outrank low-value reminders when both are available.
+- Reversibility is not just a safety feature; it is a core UX principle for reducing regret and making delegation feel comfortable.
+
+E. Memory and Relationship Principles
+
+- Avoid proliferating parallel ledgers for every relationship or context. Prefer stable identifiers, metadata, relation links, and evolving topology over silo creation.
+- Relationship continuity should evolve through stable `relationship_id`-style grouping and additive metadata updates rather than creating replacement ledgers when the relationship changes shape.
+- Memory should distinguish raw evidence from agent interpretation where it materially improves trust, but this should be implemented as additive structure inside the existing ledger/message substrate rather than as a second memory system.
+- Follow-up timing, resurfacing, and memory promotion should stay heuristics-first and user-respectful. Persistent proactive surfacing should be traceable to real continuity, topology, or prepared-artifact state.
+
+F. Decision UX Principles
+
+- The product should optimize for decision + confidence + reversibility + action, not just recommendation quality.
+- The UX should reduce four common failures at once: loss of control, information overload, regret risk, and identity misalignment.
+- One primary action per surface remains the default. Alternative paths, expert detail, and deeper evidence should be available through progressive disclosure.
+- The best agent work often looks like compression: fewer surfaced choices, better prepared context, clearer trade-offs, and lower switching cost.
+
 1. Core Design Principles
 These are the non-negotiable rules your agent should obey to feel proactive without being intrusive or unpredictable.
 A. User-Centric Principles

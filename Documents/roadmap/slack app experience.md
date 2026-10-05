@@ -1,5 +1,5 @@
 Best Way to Integrate a Slack-app-like Experience in OmnyID
-The goal is not to copy Slack, but to achieve superior team collaboration — real-time communication, organized discussion, shared context, discoverability, and action-taking — while staying true to OmnyID’s core principles (E2EE, AFP as the atomic unit, agent-first, append-only, local-first).
+The goal is not to copy Slack, but to achieve superior team collaboration — real-time communication, organized discussion, shared context, discoverability, and action-taking — while staying true to OmnyID’s core principles (E2EE, AFP as the atomic unit, agent-native, append-only, local-first).
 Core Concept: Agentic Spaces
 Instead of “Channels”, build Agentic Spaces — persistent, structured, multi-agent collaboration rooms built on top of AFP threads and ElectricSQL.
 This is significantly more powerful than Slack because:
@@ -15,7 +15,7 @@ How It Should Work
 	▪️	Topics (supertag or keyword-based channels)
 	▪️	Live Ledgers (shared memory for projects)
 	▪️	Tasks & Decisions (structured task_board + approvals)
-	▪️	Files & Media (MinIO + rich previews)
+	▪️	Files & Media (SeaweedFS + rich previews)
 	2	Key Collaboration Features (OmnyID-native)
 	3	Feature
 	4	How OmnyID Implements It Better

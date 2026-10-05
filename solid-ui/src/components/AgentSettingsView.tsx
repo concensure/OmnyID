@@ -391,13 +391,16 @@ export function AgentSettingsView(props: {
     "llama3.1-70b": "balanced",
     "llama3.2": "fast",
     "Qwen/Qwen3.5-35B-A3B": "balanced",
+    "openrouter/free": "fast",
+    "nvidia/nemotron-3.5-lightning:free": "fast",
+    "dots-studio/dots-3-note-preview:free": "fast",
   };
   const modelTier = () => MODEL_TIER[llmModel()] ?? null;
 
   const PROVIDER_MODELS: Record<string, string[]> = {
     anthropic:   ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-8"],
     openai:      ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"],
-    openrouter:  ["openai/gpt-4o-mini", "anthropic/claude-sonnet-4-6", "meta-llama/llama-3.1-8b-instruct"],
+    openrouter:  ["openai/gpt-4o-mini", "anthropic/claude-sonnet-4-6", "meta-llama/llama-3.1-8b-instruct", "openrouter/free", "nvidia/nemotron-3.5-lightning:free", "dots-studio/dots-3-note-preview:free"],
     cerebras:    ["llama3.1-70b", "llama3.1-8b"],
     together_ai: ["meta-llama/Llama-3-8b-hf", "meta-llama/Llama-3-70b-hf"],
     mistral:     ["mistral-small-latest", "mistral-large-latest", "open-mixtral-8x22b"],

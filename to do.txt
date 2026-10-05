@@ -9,10 +9,10 @@ This exact combination is what top 2026 agent teams are converging on
 Humans never see JSON. A tiny React/Vue dashboard (we can add in one file) turns the thread into a live editable page, exactly like Notion.
 
 
-Recommendation: Add MinIO (S3-compatible) to your docker-compose.yml in one line. When sending a message with attachment, the SDK uploads to MinIO and puts only the signed, time-limited URL in the AFP message. Perfect, cheap, self-hosted, and works at petabyte scale.
+Recommendation: Add SeaweedFS (S3-compatible) to your docker-compose.yml in one line. When sending a message with attachment, the SDK uploads to SeaweedFS and puts only the signed, time-limited URL in the AFP message. Perfect, cheap, self-hosted, and works at petabyte scale.
 
 
-Reply “Add Caddy + delegation + MinIO” → I give you the updated docker-compose.yml + 2 files (5-minute upgrade).
+Reply “Add Caddy + delegation + SeaweedFS” → I give you the updated docker-compose.yml + 2 files (5-minute upgrade).
 Reply “Add relational sync worker” → SQL layer with ACID + per-message flag.
 Reply “Phase 3” → sender-controlled rendering + full Notion-style UI.
 
@@ -26,7 +26,7 @@ You can (and should) add one tiny sidecar in docker-compose.yml:YAMLspamassassin
 
 
 Viruses / malicious attachments
-Attachments are uploaded to MinIO (signed URL only). Add ClamAV (one-line Docker service) before upload:Rust// in smtp_in.rs, before storing
+Attachments are uploaded to SeaweedFS (signed URL only). Add ClamAV (one-line Docker service) before upload:Rust// in smtp_in.rs, before storing
 if clamav_scan(&attachment_bytes).is_infected() {
     quarantine_and_notify_user();
 }
