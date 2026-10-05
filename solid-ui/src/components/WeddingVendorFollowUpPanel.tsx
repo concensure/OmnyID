@@ -146,7 +146,7 @@ export function WeddingVendorFollowUpPanel(props: {
               const outreachFlow = () => props.vendorOutreachFlows[outreachChoiceId()] ?? null;
               return (
                 <article class="rounded-2xl border border-wedding-muted/25 bg-white p-3 py-3 sm:p-4 sm:py-4">
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-wedding-accent">
+                  <p class="inline-flex rounded-full border border-wedding-accent bg-wedding-accent px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-sm">
                     Needs your response
                   </p>
                   <h3 class="mt-1 break-words font-serif text-xl font-bold leading-7 text-wedding-text sm:text-2xl">
@@ -204,7 +204,7 @@ export function WeddingVendorFollowUpPanel(props: {
                       fallback={
                         <button
                           type="button"
-                          class="mt-3 w-full rounded-2xl bg-wedding-cta px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-cta-hover focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2"
+                          class="mt-3 w-full rounded-2xl border-2 border-wedding-cta bg-wedding-cta px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-wedding-cta-hover focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2"
                           data-magic-action="follow-up"
                           data-magic-icon="send"
                           data-magic-label={card.primaryActionLabel}
@@ -220,7 +220,7 @@ export function WeddingVendorFollowUpPanel(props: {
                         fallback={
                           <button
                             type="button"
-                            class="mt-3 w-full rounded-2xl bg-wedding-cta px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-cta-hover focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2"
+                            class="mt-3 w-full rounded-2xl border-2 border-wedding-cta bg-wedding-cta px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-wedding-cta-hover focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2"
                             data-magic-action="follow-up"
                             data-magic-icon="send"
                             data-magic-label={card.primaryActionLabel}
@@ -253,7 +253,7 @@ export function WeddingVendorFollowUpPanel(props: {
                       <Show when={card.actionMode === "waiting"}>
                         <button
                           type="button"
-                          class="w-full rounded-2xl bg-wedding-accent min-h-[44px] px-4 py-3 text-sm font-semibold text-white transition hover:bg-wedding-accent-hover sm:w-auto sm:flex-1"
+                          class="min-h-[44px] w-full rounded-2xl border-2 border-wedding-accent bg-wedding-accent px-4 py-3 text-sm font-bold text-white shadow-md transition hover:bg-wedding-accent-hover focus:outline-none focus:ring-2 focus:ring-wedding-accent focus:ring-offset-2 sm:w-auto sm:flex-1"
                           data-magic-action="record-reply"
                           data-magic-icon="reply"
                           data-magic-label="Record reply"
@@ -265,7 +265,7 @@ export function WeddingVendorFollowUpPanel(props: {
                       </Show>
                       <button
                         type="button"
-                        class="w-full rounded-2xl bg-wedding-accent min-h-[44px] px-4 py-3 text-sm font-semibold text-white transition hover:bg-wedding-accent-hover sm:w-auto sm:flex-1"
+                        class="min-h-[44px] w-full rounded-2xl border-2 border-wedding-accent bg-wedding-accent px-4 py-3 text-sm font-bold text-white shadow-md transition hover:bg-wedding-accent-hover focus:outline-none focus:ring-2 focus:ring-wedding-accent focus:ring-offset-2 sm:w-auto sm:flex-1"
                         data-magic-action="open"
                         data-magic-icon="tasks"
                         data-magic-label="Open follow-up tasks"

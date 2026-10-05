@@ -1,8 +1,12 @@
 // @locs-version: 2.0
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 
 import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreachComposer";
-import { recordWeddingVendorAvailability } from "@/lib/api";
+import {
+  fetchGoogleWeddingVendorPhoto,
+  isGoogleWeddingVendorPhotoPath,
+  recordWeddingVendorAvailability,
+} from "@/lib/api";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import {
   weddingVendorAvailabilityLabel,
@@ -54,6 +58,35 @@ export function WeddingVendorChoiceCard(props: {
     card.sourceUrl ? { label: "Source", value: card.sourceUrl, href: card.sourceUrl } : null,
   ].filter((item): item is { label: string; value: string; href: string | null } => item !== null);
   const [imageFailed, setImageFailed] = createSignal(false);
+  const [resolvedImageUrl, setResolvedImageUrl] = createSignal<string | null>(card.imageUrl);
+  createEffect(() => {
+    const sourceUrl = card.imageUrl;
+    if (!isGoogleWeddingVendorPhotoPath(sourceUrl)) {
+      setResolvedImageUrl(sourceUrl ?? null);
+      return;
+    }
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
+    let disposed = false;
+    setResolvedImageUrl(null);
+    setImageFailed(false);
+    void fetchGoogleWeddingVendorPhoto(sourceUrl, controller.signal)
+      .then((photo) => {
+        if (disposed || typeof URL === "undefined" || typeof URL.createObjectURL !== "function") return;
+        objectUrl = URL.createObjectURL(photo);
+        setResolvedImageUrl(objectUrl);
+      })
+      .catch((error: unknown) => {
+        if (!disposed && !(error instanceof Error && error.name === "AbortError")) {
+          setImageFailed(true);
+        }
+      });
+    onCleanup(() => {
+      disposed = true;
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    });
+  });
   // Optimistic: the saved state shows on the next search, so the card reflects the couple's update now.
   const [availabilityOverride, setAvailabilityOverride] = createSignal<WeddingVendorAvailabilityState | null>(null);
   const [availabilityError, setAvailabilityError] = createSignal<string | null>(null);
@@ -81,7 +114,7 @@ export function WeddingVendorChoiceCard(props: {
   return (
     <article class="min-w-0 overflow-hidden rounded-xl border border-teal-100 bg-white/85">
       <Show
-        when={card.imageUrl && !imageFailed()}
+        when={resolvedImageUrl() && !imageFailed()}
         fallback={
           <div class={`flex aspect-[4/3] flex-col items-center justify-center gap-1 px-3 text-center ${placeholder().toneClass}`}>
             <span class="text-lg font-semibold">{placeholder().initials}</span>
@@ -92,7 +125,7 @@ export function WeddingVendorChoiceCard(props: {
       >
         {(_shown) => (
           <img
-            src={card.imageUrl as string}
+            src={resolvedImageUrl() as string}
             alt={card.imageAlt ?? `${card.title} vendor photo`}
             loading="lazy"
             referrerPolicy="no-referrer"

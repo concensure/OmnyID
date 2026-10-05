@@ -38,3 +38,35 @@ test("wedding response queue route has a local recovery boundary", () => {
   assert.match(appSource, /function ResponseQueueRouteFallback/);
   assert.match(appSource, /Retry Wedding Planner/);
 });
+
+test("home operational lanes tolerate an absent projection during route recovery", () => {
+  const laneSource = read("src/components/OperationalLanesSurface.tsx");
+
+  assert.match(laneSource, /operationalLaneSurfaceState\(\)\?\.showLanesSurface === true/);
+  assert.match(laneSource, /operationalLaneSurfaceState\(\)\?\.visibleDigest \?\? \[\]/);
+  assert.match(laneSource, /operationalLaneSurfaceState\(\)\?\.laneViewItems \?\? \[\]/);
+});
+
+test("wedding proxy photos use the authenticated API loader instead of a bare image request", () => {
+  const cardSource = read("src/components/WeddingVendorChoiceCard.tsx");
+  const apiSource = read("src/lib/api.ts");
+
+  assert.match(cardSource, /fetchGoogleWeddingVendorPhoto/);
+  assert.match(cardSource, /URL\.createObjectURL/);
+  assert.match(apiSource, /export async function fetchGoogleWeddingVendorPhoto/);
+  assert.match(apiSource, /headers\.set\("Authorization", `Bearer \$\{token\}`\)/);
+});
+
+test("wedding planner controls follow Setup checks and response cards preserve visual contrast", () => {
+  const responseQueueSource = read("src/components/ResponseQueueView.tsx");
+  const focusSource = read("src/components/WeddingDecisionFocusCard.tsx");
+  const followUpSource = read("src/components/WeddingVendorFollowUpPanel.tsx");
+
+  assert.ok(responseQueueSource.indexOf('label: "Setup checks"') < responseQueueSource.indexOf('aria-label="Wedding planner controls"'));
+  assert.match(responseQueueSource, /Show guide/);
+  assert.match(responseQueueSource, /Upload files/);
+  assert.match(responseQueueSource, /<QueueDensityToggle/);
+  assert.doesNotMatch(focusSource, /\{card\.checkedLabel\}/);
+  assert.match(followUpSource, /border-2 border-wedding-cta/);
+  assert.match(followUpSource, /border-2 border-wedding-accent/);
+});

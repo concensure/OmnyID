@@ -1887,102 +1887,111 @@ export function ResponseQueueView(props: {
   return (
     <div class={RESPONSE_QUEUE_VIEW_CLASS}>
       <Show when={weddingWorkspace()}>
-        <div role="tablist" aria-label="Wedding planner sections" class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-          <For each={WEDDING_WORKSPACE_MENU_ITEMS}>
-            {(item, index) => {
-              const selected = () => {
-                const active = weddingWorkspaceMenu();
-                if (item.id === "people") return active === "people" || active === "guests" || active === "seating";
-                if (item.id === "plan") return active === "plan" || active === "response_queue" || active === "timeline";
-                if (item.id === "documents") return active === "documents";
-                return active === item.id;
-              };
-              const badge = () => weddingWorkspaceMenuBadge(item.id, weddingWorkspace());
-              const hint = () => badge() ? null : weddingWorkspaceMenuHint(item.id, weddingWorkspace());
-              return (
-                <button
-                  type="button"
-                  id={`wedding-tab-${item.id}`}
-                  role="tab"
-                  title={item.title}
-                  aria-selected={selected()}
-                  aria-controls="wedding-tabpanel"
-                  tabIndex={selected() ? 0 : -1}
-                  onClick={() => setWeddingWorkspaceMenu(item.id)}
-                  onKeyDown={(event) => handleWeddingMenuTabKeyDown(event, index())}
-                  class={`relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${
-                    selected() ? item.activeClassName : item.className
-                  }`}
-                >
-                  <span class="relative inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/80">
-                    <RailIcon id={item.icon} />
-                    <Show when={badge()}>
-                      {(activeBadge) => (
-                        <span
-                          class={`absolute -right-1 -top-1 inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold leading-4 text-white ${
-                            activeBadge().tone === "urgent" ? "bg-rose-600" : "bg-slate-900"
-                          }`}
-                        >
-                          {activeBadge().label}
+        <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+          <div role="tablist" aria-label="Wedding planner sections" class="flex shrink-0 gap-2">
+            <For each={WEDDING_WORKSPACE_MENU_ITEMS}>
+              {(item, index) => {
+                const selected = () => {
+                  const active = weddingWorkspaceMenu();
+                  if (item.id === "people") return active === "people" || active === "guests" || active === "seating";
+                  if (item.id === "plan") return active === "plan" || active === "response_queue" || active === "timeline";
+                  if (item.id === "documents") return active === "documents";
+                  return active === item.id;
+                };
+                const badge = () => weddingWorkspaceMenuBadge(item.id, weddingWorkspace());
+                const hint = () => badge() ? null : weddingWorkspaceMenuHint(item.id, weddingWorkspace());
+                return (
+                  <button
+                    type="button"
+                    id={`wedding-tab-${item.id}`}
+                    role="tab"
+                    title={item.title}
+                    aria-selected={selected()}
+                    aria-controls="wedding-tabpanel"
+                    tabIndex={selected() ? 0 : -1}
+                    onClick={() => setWeddingWorkspaceMenu(item.id)}
+                    onKeyDown={(event) => handleWeddingMenuTabKeyDown(event, index())}
+                    class={`relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${
+                      selected() ? item.activeClassName : item.className
+                    }`}
+                  >
+                    <span class="relative inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/80">
+                      <RailIcon id={item.icon} />
+                      <Show when={badge()}>
+                        {(activeBadge) => (
+                          <span
+                            class={`absolute -right-1 -top-1 inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold leading-4 text-white ${
+                              activeBadge().tone === "urgent" ? "bg-rose-600" : "bg-slate-900"
+                            }`}
+                          >
+                            {activeBadge().label}
+                          </span>
+                        )}
+                      </Show>
+                    </span>
+                    <span>{item.label}</span>
+                    <Show when={hint()}>
+                      {(activeHint) => (
+                        <span class="rounded-full bg-white/75 px-1.5 py-0.5 text-[10px] font-semibold opacity-80">
+                          {activeHint()}
                         </span>
                       )}
                     </Show>
-                  </span>
-                  <span>{item.label}</span>
-                  <Show when={hint()}>
-                    {(activeHint) => (
-                      <span class="rounded-full bg-white/75 px-1.5 py-0.5 text-[10px] font-semibold opacity-80">
-                        {activeHint()}
-                      </span>
-                    )}
-                  </Show>
-                </button>
-              );
-            }}
-          </For>
+                  </button>
+                );
+              }}
+            </For>
+          </div>
+          <div aria-label="Wedding planner controls" class="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              title="Open a short guide to the wedding planner."
+              onClick={() => setShowWeddingWalkthrough(true)}
+              class="min-h-10 rounded-full border border-rose-100 bg-rose-50/80 px-4 text-xs font-semibold text-rose-950 transition hover:border-rose-200 hover:bg-rose-50"
+            >
+              Show guide
+            </button>
+            <label
+              ref={weddingUploadFilesControlRef}
+              tabIndex={0}
+              class={`group relative z-[1000] inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border px-4 text-xs font-semibold shadow-sm transition ${
+              weddingImportRunning()
+                ? "cursor-wait border-teal-100 bg-white/50 text-teal-900/50"
+                : "border-teal-200 bg-white/85 text-teal-950 hover:border-teal-300 hover:bg-white"
+            }`}
+            >
+              {weddingImportRunning() ? "Importing..." : "Upload files"}
+              <input
+                type="file"
+                class="sr-only"
+                multiple
+                accept=".csv,.tsv,.txt,.xls,.xlsx,.pdf,.doc,.docx,text/csv,text/tab-separated-values,text/plain,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                disabled={weddingImportRunning()}
+                onChange={importWeddingFilesFromHeader}
+              />
+              <span class="pointer-events-none absolute right-0 top-[calc(100%+0.5rem)] z-[1001] w-72 rounded-2xl border border-teal-100 bg-white px-3 py-2 text-left text-xs font-normal leading-5 text-teal-950 opacity-0 shadow-xl transition group-hover:opacity-100 group-focus-within:opacity-100">
+                <span class="block font-semibold">Bring in your existing lists</span>
+                <span class="mt-1 block">
+                  Upload guest lists, budgets, spreadsheets, vendor quotes, contracts, Google Sheets exports, or The Knot exports. OmnyID will organize what it can and keep the original files for later.
+                </span>
+              </span>
+            </label>
+            <QueueDensityToggle
+              density={viewState().density}
+              onSelect={selectDensityMode}
+              tone={viewState().densityTone}
+            />
+          </div>
         </div>
       </Show>
       <div class={RESPONSE_QUEUE_VIEW_HEADER_CLASS}>
-        <Show when={weddingWorkspace()}>
-          <button
-            type="button"
-            title="Open a short guide to the wedding planner."
-            onClick={() => setShowWeddingWalkthrough(true)}
-            class="min-h-10 rounded-full border border-rose-100 bg-rose-50/80 px-4 text-xs font-semibold text-rose-950 transition hover:border-rose-200 hover:bg-rose-50"
-          >
-            Show guide
-          </button>
-          <label
-            ref={weddingUploadFilesControlRef}
-            tabIndex={0}
-            class={`group relative z-[1000] inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border px-4 text-xs font-semibold shadow-sm transition ${
-            weddingImportRunning()
-              ? "cursor-wait border-teal-100 bg-white/50 text-teal-900/50"
-              : "border-teal-200 bg-white/85 text-teal-950 hover:border-teal-300 hover:bg-white"
-          }`}
-          >
-            {weddingImportRunning() ? "Importing..." : "Upload files"}
-            <input
-              type="file"
-              class="sr-only"
-              multiple
-              accept=".csv,.tsv,.txt,.xls,.xlsx,.pdf,.doc,.docx,text/csv,text/tab-separated-values,text/plain,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              disabled={weddingImportRunning()}
-              onChange={importWeddingFilesFromHeader}
-            />
-            <span class="pointer-events-none absolute right-0 top-[calc(100%+0.5rem)] z-[1001] w-72 rounded-2xl border border-teal-100 bg-white px-3 py-2 text-left text-xs font-normal leading-5 text-teal-950 opacity-0 shadow-xl transition group-hover:opacity-100 group-focus-within:opacity-100">
-              <span class="block font-semibold">Bring in your existing lists</span>
-              <span class="mt-1 block">
-                Upload guest lists, budgets, spreadsheets, vendor quotes, contracts, Google Sheets exports, or The Knot exports. OmnyID will organize what it can and keep the original files for later.
-              </span>
-            </span>
-          </label>
+        <Show when={!weddingWorkspace()}>
+          <QueueDensityToggle
+            density={viewState().density}
+            onSelect={selectDensityMode}
+            tone={viewState().densityTone}
+          />
         </Show>
-        <QueueDensityToggle
-          density={viewState().density}
-          onSelect={selectDensityMode}
-          tone={viewState().densityTone}
-        />
       </div>
       <Show when={weddingWorkspace() && showWeddingWalkthrough()}>
         <WeddingPlannerWalkthrough

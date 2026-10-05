@@ -15,6 +15,27 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-146
+    title: Wedding planner production recovery and interaction polish
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-146
+    depends_on:
+      - WED-145
+    files:
+      - solid-ui/src/App.tsx
+      - solid-ui/src/components/OperationalLanesSurface.tsx
+      - solid-ui/src/components/ResponseQueueView.tsx
+      - solid-ui/src/components/WeddingDecisionFocusCard.tsx
+      - solid-ui/src/components/WeddingVendorFollowUpPanel.tsx
+      - solid-ui/tests/**
+      - .agent/**
+    acceptance:
+      - planner render and home recovery tolerate absent lane-state projections
+      - vendor-photo availability is diagnosed against the live persisted record path
+      - requested planner toolbar, copy, and response-action contrast changes are covered
+      - focused checks, build, and production verification are recorded from machine authorities
+
   - id: DEV-001
     title: Shared agent synchronisation protocol
     status: in_progress

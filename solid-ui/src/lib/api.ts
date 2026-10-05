@@ -3504,6 +3504,43 @@ export async function apiFetch<T>(
   return (await response.json()) as T;
 }
 
+const GOOGLE_WEDDING_VENDOR_PHOTO_PATH = /^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i;
+
+/**
+ * Browser image elements cannot send the bearer session header used by the
+ * workspace API. Keep the Places proxy authenticated by loading its bytes via
+ * fetch, then let the caller render a short-lived object URL instead.
+ */
+export function isGoogleWeddingVendorPhotoPath(path: unknown): path is string {
+  return typeof path === "string" && GOOGLE_WEDDING_VENDOR_PHOTO_PATH.test(path.trim());
+}
+
+export async function fetchGoogleWeddingVendorPhoto(
+  path: string,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  if (!isGoogleWeddingVendorPhotoPath(path)) {
+    throw new Error("Invalid Google wedding vendor photo path.");
+  }
+  const token = readSession()?.token ?? null;
+  const headers = new Headers({ Accept: "image/*" });
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const response = await fetch(apiUrlForPath(path), {
+    headers,
+    credentials: "include",
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Vendor photo request failed with ${response.status}.`);
+  }
+  const contentType = response.headers.get("Content-Type")?.toLowerCase() ?? "";
+  if (!contentType.startsWith("image/")) {
+    throw new Error("Vendor photo response was not an image.");
+  }
+  return response.blob();
+}
+
 function normalizeAttachmentIngestCapabilities(value: unknown): AttachmentIngestCapabilities {
   const record = isRecord(value) ? value : {};
   return {

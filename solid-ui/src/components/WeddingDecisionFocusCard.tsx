@@ -106,7 +106,6 @@ export function WeddingDecisionFocusCard(props: {
                     </div>
                   </div>
                   <p class="mt-2 text-xs leading-5 text-pink-950/70">{card.whyNowLabel}</p>
-                  <p class="mt-1 text-xs leading-5 text-pink-950/60">{card.checkedLabel}</p>
                   <div class="mt-2 flex flex-wrap gap-1.5">
                     <For each={item.evidenceLabels.slice(0, 3)}>
                       {(label) => <span class="max-w-full break-words rounded-full border border-pink-100 bg-pink-50/70 px-2 py-1 text-xs text-pink-900/80">{label}</span>}

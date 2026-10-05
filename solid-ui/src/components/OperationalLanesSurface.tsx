@@ -1962,7 +1962,7 @@ export function OperationalLanesSurface(props: {
   }
 
   return (
-    <Show when={operationalLaneSurfaceState().showLanesSurface}>
+    <Show when={operationalLaneSurfaceState()?.showLanesSurface === true}>
       <section class={OPERATIONAL_LANES_SECTION_CLASS}>
         <div class="flex items-center justify-between gap-3">
           <div>
@@ -1978,9 +1978,9 @@ export function OperationalLanesSurface(props: {
           </span>
         </div>
 
-        <Show when={operationalLaneSurfaceState().showDigest}>
+        <Show when={operationalLaneSurfaceState()?.showDigest === true}>
           <div class="mt-3 grid gap-2 lg:grid-cols-4">
-            <For each={operationalLaneSurfaceState().visibleDigest}>
+            <For each={operationalLaneSurfaceState()?.visibleDigest ?? []}>
               {(item) => (
                 <div class={`${DIGEST_CARD_CLASS} ${item.tone}`}>
                   <div class="flex items-center justify-between gap-2">
@@ -1997,7 +1997,7 @@ export function OperationalLanesSurface(props: {
         </Show>
 
         <div class="mt-3 grid gap-3 lg:grid-cols-3">
-          <For each={operationalLaneSurfaceState().laneViewItems}>
+          <For each={operationalLaneSurfaceState()?.laneViewItems ?? []}>
             {(laneView) => {
               const lane = laneView.lane;
               return (
