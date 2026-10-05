@@ -367,6 +367,10 @@ Verification:
   warning and the repository-wide Tailwind min/max-variant configuration
   warning; the new mobile rules use the configured `phone:` breakpoint.
 - `git diff --check` passed.
+- Deployed commit `cc12b86` to the Oracle host with the existing production
+  environment. Docker rebuilt the UI, homeserver, and backup images; the UI and
+  homeserver containers were recreated; the post-deploy workspace HTTP check
+  returned `200`.
 
 Open follow-up:
 - The task remains in progress pending device/browser smoke testing and a
