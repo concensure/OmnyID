@@ -177,3 +177,21 @@ Unresolved problems:
   still need an additive record/migration path; current stable photo slots only
   retain URL, alt text, and source label.
 - Full M7 verification and deployment remain outstanding.
+
+## 2026-10-05 - WED-145 photo provenance foundation
+
+What changed:
+
+- Added migration `0095_wedding_vendor_photo_provenance.sql`. It extends the
+  existing stable `(vendor_id, slot)` photo rows with nullable `source_url`,
+  `retrieved_at`, and JSONB `licence_metadata`; it does not create a second
+  photo table or rewrite current rows.
+
+Tests performed:
+
+- `git diff --check` (pass).
+
+Next action:
+
+- Thread these optional fields through the existing admin DTO, DB read/write
+  path, and form, then add migration-backed API tests before deployment.
