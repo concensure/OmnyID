@@ -300,6 +300,10 @@ import {
   type CommandPreviewWorkflowPendingIntentSeed,
 } from "@/lib/commandPreviewRouting.js";
 import { readUiCommandFallbackNotice } from "@/lib/uiCommandFallbackState";
+import {
+  commandPreviewUnlockNotice,
+  readableCommandPreview,
+} from "@/lib/commandPreviewVisibilityState.js";
 import { isRecord } from "@/lib/eventDetail";
 import { decryptedDisplayContent } from "@/lib/decryptedDisplayState";
 import {
@@ -2504,11 +2508,10 @@ function App() {
       if (suggestedWorkflowSeed) {
         setWorkflowPendingIntent(suggestedWorkflowSeed);
       }
-      if (suggested) {
-        selectView(suggested);
-      } else {
-        selectView("search");
-      }
+      // A model suggestion is a navigation option, not a reason to discard the
+      // just-completed answer. Leaving Search clears commandResult, which made
+      // successful Master Agent responses look blank before they could render.
+      selectView("search");
     } catch (error) {
       objectSearchRouterPreview.clear();
       workspaceSearchRouterPreview.clear();
@@ -2692,13 +2695,13 @@ function App() {
     const result = commandResult();
     if (!result) return null;
     try {
-      const preview = result.preview_message
-        ?? commandResponseToPreviewMessage(
-          result,
-          lastQuery(),
-          workspaceSearchRouterPreview.result(),
-          workspaceSearchRouterPreview.capabilities(),
-        );
+      const generatedPreview = commandResponseToPreviewMessage(
+        result,
+        lastQuery(),
+        workspaceSearchRouterPreview.result(),
+        workspaceSearchRouterPreview.capabilities(),
+      );
+      const preview = readableCommandPreview(result.preview_message, generatedPreview);
       const attachmentGrounding = searchAttachmentGrounding();
       const groundedPreview = attachmentGrounding
         ? decoratePreviewMessageWithAttachmentGrounding(preview, attachmentGrounding)
@@ -2716,6 +2719,9 @@ function App() {
     }
   });
   const commandFallbackNotice = createMemo(() => readUiCommandFallbackNotice(commandResult()));
+  const commandPreviewUnlockNoticeState = createMemo(() =>
+    commandPreviewUnlockNotice(commandResult()?.preview_message),
+  );
   const commandWorkflowHandoffVisible = createMemo(() => {
     const result = commandResult();
     if (!result) return false;
@@ -3654,6 +3660,14 @@ function App() {
                 <Show when={commandPreviewMessage()}>
                   {(preview) => (
                     <div class="space-y-3">
+                      <Show when={commandPreviewUnlockNoticeState()}>
+                        {(notice) => (
+                          <div class="rounded-2xl border border-amber-300/60 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
+                            <p class="font-semibold">{notice().label}</p>
+                            <p class="mt-1 text-xs leading-5 text-amber-800/90">{notice().detail}</p>
+                          </div>
+                        )}
+                      </Show>
                       <Show when={commandFallbackNotice()}>
                         {(notice) => (
                           <div class={`rounded-2xl px-4 py-3 text-sm ${

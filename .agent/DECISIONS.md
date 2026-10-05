@@ -3,6 +3,15 @@
 This file records project architecture and coordination decisions. It is
 project truth, not a running diary.
 
+## 2026-10-05: Master Agent Suggestions Do Not Preempt Their Result
+
+The Master Agent always remains on the Search result after a direct command.
+`suggested_view` may seed an available workflow handoff, but it does not
+navigate away before the locally rendered result is visible. A rich encrypted
+preview is decrypted in browser memory; if it cannot unlock, the UI renders the
+response's safe summary and explicitly tells the user that the detailed view is
+still locked.
+
 ## 2026-10-05: Command Previews Decrypt at the Client Render Boundary
 
 An encrypted `preview_message` returned directly by the Master Agent command
