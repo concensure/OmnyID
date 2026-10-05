@@ -369,6 +369,9 @@ fn wedding_vendor_write_input_validates_urls_dates_and_photo_slots() {
             photo_url: "https://cdn.example.test/venue.jpg".to_string(),
             alt_text: None,
             source_label: None,
+            source_url: None,
+            retrieved_at: None,
+            licence_metadata: None,
         }]),
     });
 
@@ -397,12 +400,18 @@ fn wedding_vendor_write_input_validates_urls_dates_and_photo_slots() {
                 photo_url: "https://cdn.example.test/one.jpg".to_string(),
                 alt_text: None,
                 source_label: None,
+                source_url: None,
+                retrieved_at: None,
+                licence_metadata: None,
             },
             super::WeddingVendorPhotoRequest {
                 slot: 1,
                 photo_url: "https://cdn.example.test/two.jpg".to_string(),
                 alt_text: None,
                 source_label: None,
+                source_url: None,
+                retrieved_at: None,
+                licence_metadata: None,
             },
         ]),
     });
@@ -443,6 +452,9 @@ fn wedding_vendor_write_input_accepts_clean_vendor_payload() {
             photo_url: "https://cdn.example.test/venue.jpg".to_string(),
             alt_text: Some("Ballroom".to_string()),
             source_label: None,
+            source_url: Some("https://source.example.test/photo".to_string()),
+            retrieved_at: Some("2026-09-20".to_string()),
+            licence_metadata: Some(json!({ "use": "editorial" })),
         }]),
     })
     .expect("valid vendor input");
@@ -455,6 +467,11 @@ fn wedding_vendor_write_input_accepts_clean_vendor_payload() {
     assert_eq!(input.source_checked_at.as_deref(), Some("2026-09-19"));
     assert_eq!(input.photos.len(), 1);
     assert_eq!(input.photos[0].slot, 1);
+    assert_eq!(
+        input.photos[0].source_url.as_deref(),
+        Some("https://source.example.test/photo")
+    );
+    assert_eq!(input.photos[0].licence_metadata, json!({ "use": "editorial" }));
 }
 
 #[test]

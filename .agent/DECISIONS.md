@@ -120,3 +120,18 @@ Sent wedding quote replies close their DecisionOS request by appending a
 separate `decision_result` AFP successor. Active and resolved messages have
 different stable idempotency keys, so closure never mutates quote history and
 reloads cannot append either projection twice.
+
+## 2026-10-05: Oracle Vendor CSV Has a Stable Normalized Export Contract
+
+The Oracle vendor CSV uses the persisted `wedding_vendors` fields
+`vendor_id`, `vendor_name`, `category`, `service_area`, `website_url`,
+`source_url`, and `status`. Its `photo_count` is intentionally derived from
+the existing stable `(vendor_id, slot)` `wedding_vendor_photos` rows, rather
+than duplicated on the vendor record. Migration `0096` creates
+`wedding_vendor_directory_export` with those exact eight columns, preserving
+the CSV contract without count drift.
+
+The 2026-10-05 snapshot has no unrepresented source fields: 130 unique rows,
+valid status values, and non-negative photo counts. Any future source fields
+must be retained as evidence/provenance before an import is accepted; they
+must not be silently discarded by a schema reshape.

@@ -211,6 +211,42 @@ Tests performed:
 
 - `solid-ui: npm run typecheck` (pass)
 - `solid-ui: wedding-admin-vendor-form-state.test.ts` (4 passing tests)
+
+## 2026-10-05 - WED-145 Oracle vendor directory compatibility
+
+What changed:
+
+- Registered the existing `0095_wedding_vendor_photo_provenance` migration in
+  the embedded startup catalog, so source URL, retrieval time, and licence
+  metadata reach Oracle on the next application deployment.
+- Added migration `0096_wedding_vendor_directory_export.sql`, exposing the
+  downloaded Oracle CSV's exact eight-column shape. `photo_count` is computed
+  from stable photo slots rather than stored as a stale duplicate.
+- Updated photo-provenance Rust fixtures that the full test compilation found
+  incomplete.
+
+Evidence:
+
+- Read-only Oracle query: production currently has 130 vendor rows and the
+  CSV-compatible normalized projection hashes identically to
+  `Documents/design/wedding planner/wedding-vendor-database-oracle.csv`
+  (`f3cd92e4e975f3952d69aa924c97a345`).
+- Snapshot validation: 130 unique vendor IDs; all statuses valid; no missing
+  required values; `photo_count` values are non-negative (36 zero, 94 three).
+- Oracle is currently at migrations through `0094`; `0095` and `0096` are
+  pending and the export view is absent until deployment. This is expected and
+  has not been papered over in project state.
+- `cargo check` (pass)
+- focused migration-catalog test (pass)
+- focused Rust vendor write and source-mapping tests (3 passing tests)
+- `solid-ui: npm run typecheck` (pass)
+- `solid-ui: wedding-admin-vendor-form-state.test.ts` (4 passing tests)
+
+Recommended next action:
+
+- Finish M7 verification, then deploy the task branch's application image to
+  Oracle. Startup will apply `0095` and `0096`; re-run the read-only shape and
+  hash query afterward before declaring production current.
 - `cargo check` (pass)
 
 Unresolved problems:

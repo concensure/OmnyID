@@ -13217,6 +13217,11 @@ mod db_pool_settings_tests {
                     .and_then(|stem| stem.to_str())
                     .map(|stem| stem.to_string())
             })
+            // A historical manual data patch is retained for auditability, but was
+            // applied before the embedded migration ledger existed. Re-running it
+            // would duplicate immutable photo slots, so it intentionally remains
+            // outside the startup catalog.
+            .filter(|version| !version.ends_with("_applied"))
             .collect::<Vec<_>>();
         let mut expected_versions = expected_versions;
         expected_versions.sort();

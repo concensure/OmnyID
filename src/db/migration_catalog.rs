@@ -482,4 +482,14 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Per-attribute wedding vendor evidence with authority and confidence, plus append-only per-couple vendor availability state, with a seed backfill of officially stated venue capacities",
         include_str!("../../postgres/migrations/0094_wedding_vendor_ranking_evidence.sql"),
     ),
+    (
+        "0095_wedding_vendor_photo_provenance",
+        "Source URL, retrieval time, and licence metadata for editable wedding vendor photo slots",
+        include_str!("../../postgres/migrations/0095_wedding_vendor_photo_provenance.sql"),
+    ),
+    (
+        "0096_wedding_vendor_directory_export",
+        "Stable Oracle-compatible wedding vendor directory export, including the derived photo count",
+        include_str!("../../postgres/migrations/0096_wedding_vendor_directory_export.sql"),
+    ),
 ];
