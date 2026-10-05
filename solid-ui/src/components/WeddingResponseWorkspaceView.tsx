@@ -332,6 +332,9 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             setExportNotice("Moved out of the top three for now, but the save record could not be stored.");
           });
       }
+      // Deferring from the Wedding Home is a local queue action. It should not
+      // route the couple away from the next decision card.
+      return;
     }
     if (action.kind === "export_bundle") runBundleExport();
     props.onSidebarAction?.(action);
@@ -1269,6 +1272,15 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       aria-labelledby={`wedding-tab-${activeMenu()}`}
     >
       <div class={primaryColumnClass()}>
+        <Show when={activeMenu() !== "home"}>
+          <button
+            type="button"
+            class="mb-3 inline-flex min-h-11 items-center rounded-xl border border-wedding-muted bg-white px-3 text-sm font-semibold text-wedding-accent transition hover:bg-wedding-surface-blush"
+            onClick={() => props.onSelectMenu?.("home")}
+          >
+            ← Wedding Home
+          </button>
+        </Show>
         <Show when={activeMenu() === "home"}>
           <Show when={!isMobileFocusViewport()} fallback={<WeddingMobileFocusHome
             state={state()}

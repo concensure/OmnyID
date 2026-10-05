@@ -3,6 +3,15 @@
 This file records project architecture and coordination decisions. It is
 project truth, not a running diary.
 
+## 2026-10-05: Mobile Wedding Decisions Require Explicit Confirmation
+
+A phone-deck swipe only requests approval; it does not open the vendor
+response workflow or execute an action. The couple must confirm in the deck,
+which appends the existing privacy-minimised `decision_triage` event and moves
+to the next unresolved card. Opening an agent reply draft remains review-only;
+the established quote-reply send confirmation is the only path that can send a
+vendor message.
+
 ## 2026-10-05: Master Agent Suggestions Do Not Preempt Their Result
 
 The Master Agent always remains on the Search result after a direct command.

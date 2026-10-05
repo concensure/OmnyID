@@ -625,7 +625,7 @@ export function weddingVendorQuoteReplyPresentationState(input: {
 }
 
 export function weddingVendorQuoteReplyHomeSurfaceState(input: {
-  flow: Pick<WeddingVendorQuoteReplyFlowState, "quote" | "stage" | "failureMessage" | "canSend">;
+  flow: Pick<WeddingVendorQuoteReplyFlowState, "quote" | "stage" | "failureMessage" | "canSend" | "draftBody">;
   presentation?: Pick<WeddingVendorQuoteReplyPresentationState, "budgetAcknowledgementLabel"> | null;
 }): WeddingVendorQuoteReplyHomeSurfaceState {
   const hasAttachment = Boolean(clean(input.flow.quote.attachmentUrl));
@@ -647,7 +647,9 @@ export function weddingVendorQuoteReplyHomeSurfaceState(input: {
       ? "Review reply"
       : replyActionKind === "resolve_blocker"
         ? "Resolve setup"
-        : "Suggest a reply";
+        : clean(input.flow.draftBody)
+          ? "Open agent draft"
+          : "Draft a reply";
   return {
     quoteActionLabel: "See the quote",
     quoteActionKind: hasAttachment ? "open_attachment" : "show_quote_details",

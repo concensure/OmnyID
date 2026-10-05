@@ -51,7 +51,9 @@ export function MobileFocusDeck(props: {
     if (!direction) return;
     if (direction === "prev") navigate(-1);
     if (direction === "next") navigate(1);
-    if (direction === "approve" && active) { props.onApprove(active, method); navigate(1); navigator.vibrate?.(8); }
+    // Approval is deliberately two-step. The parent opens a confirmation and
+    // advances only after the person has explicitly confirmed that decision.
+    if (direction === "approve" && active) { props.onApprove(active, method); navigator.vibrate?.(8); }
     if (direction === "defer" && active) { props.onDefer(active, method); navigate(1); navigator.vibrate?.(8); }
   };
   function pointerDown(event: PointerEvent & { currentTarget: HTMLDivElement }) {

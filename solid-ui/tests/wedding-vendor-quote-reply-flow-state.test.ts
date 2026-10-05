@@ -122,6 +122,21 @@ test("vendor quote reply home surface stays compact while preserving dynamic act
   assert.match(surface.budgetImpactLabel ?? "", /\$200 over budget/);
 });
 
+test("vendor quote reply home surface labels an existing suggested reply as the agent draft", () => {
+  const flow = buildWeddingVendorQuoteReplyFlowState({
+    quote,
+    metadata,
+    recipient: "hello@chloes.example",
+    subject: "Floral quote",
+    draftBody: "Thanks Chloe, we would like to proceed.",
+  });
+
+  const surface = weddingVendorQuoteReplyHomeSurfaceState({ flow });
+
+  assert.equal(surface.replyActionKind, "open_reply_editor");
+  assert.equal(surface.replyActionLabel, "Open agent draft");
+});
+
 test("vendor quote reply home surface exposes budget and setup review states", () => {
   const budgetFlow = buildWeddingVendorQuoteReplyFlowState({
     quote: { ...quote, attachmentUrl: null },
