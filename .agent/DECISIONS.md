@@ -205,3 +205,32 @@ formats before static resolution at both the root and `/docs/` aliases.
 Public HTML legal pages, static assets, and `/.well-known/security.txt` remain
 available. Internal documents should be kept outside `docs/`; the deny rule is
 defence in depth for an accidental staged file.
+
+## 2026-10-06: Wedding Quote Decisions Are Pattern-Governed Server Projections
+
+Wedding quote ingestion projects `wedding.vendor_quote_response@1` on the server at insert time and
+repairs missed projections with a bounded five-minute reconciliation loop. Stable source and
+decision identities, four explicit safety dates, append-only deferral/resurface events, and
+supersession keep replay deterministic. A projection cannot reach DecisionOS unless the controlled
+pattern verifier returns `VALID` or `VALID_WITH_OPTIONAL_GAPS`; malformed, stale, conflicting, or
+unknown-pattern inputs append diagnostics rather than complete-looking cards.
+
+The AFP ledger remains authoritative. Wedding Home and global DecisionOS are projections of the
+same decision identity, and approval/send events must bind to the same immutable payload hash.
+
+## 2026-10-06: Base Hosted Storage Is 1 GiB Free And 2 GiB Paid
+
+New free accounts receive 1 GiB of hosted storage. An upgraded account receives a 2 GiB base quota.
+The existing explicit storage add-on remains a separate 10 GiB increment. This is account storage,
+not Oracle VM RAM allocation, and the server billing policy is authoritative over UI copy.
+
+## 2026-10-06: Dependency Exceptions Must Be Unreachable And Explicit
+
+Rust CI ignores `RUSTSEC-2023-0071` only while `rsa` remains lockfile-only through disabled
+`sqlx-mysql`; neither crate is in the resolved build graph and upstream has no fixed release. The
+exception must be removed if MySQL is enabled or a fixed RSA version becomes available.
+
+JavaScript audit findings without compatible upstream fixes remain visible release risks rather than
+being hidden by force-downgrades or blanket audit ignores. The current TipTap moderate advisory and
+`image-size` high parser denial-of-service advisory require security disposition before GA, even
+though the wedding path does not invoke PPTX image parsing.

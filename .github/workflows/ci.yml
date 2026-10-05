@@ -399,4 +399,7 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: Audit Rust dependencies
-        run: cargo audit
+        # RSA is lockfile-only through sqlx-mysql; MySQL is disabled and the
+        # package is absent from the resolved build graph. There is no fixed
+        # upstream release yet, so keep the scoped exception visible here.
+        run: cargo audit --ignore RUSTSEC-2023-0071

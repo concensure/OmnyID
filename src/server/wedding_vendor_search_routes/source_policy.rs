@@ -35,13 +35,22 @@ mod tests {
 
     #[test]
     fn defaults_to_online_capable_for_backward_compatibility() {
-        assert_eq!(WeddingVendorSourcePolicy::parse(None), Ok(WeddingVendorSourcePolicy::OnlineCapable));
-        assert_eq!(WeddingVendorSourcePolicy::parse(Some("online_capable")), Ok(WeddingVendorSourcePolicy::OnlineCapable));
+        assert_eq!(
+            WeddingVendorSourcePolicy::parse(None),
+            Ok(WeddingVendorSourcePolicy::OnlineCapable)
+        );
+        assert_eq!(
+            WeddingVendorSourcePolicy::parse(Some("online_capable")),
+            Ok(WeddingVendorSourcePolicy::OnlineCapable)
+        );
     }
 
     #[test]
     fn accepts_only_the_explicit_directory_first_policy() {
-        assert_eq!(WeddingVendorSourcePolicy::parse(Some(" directory_only ")), Ok(WeddingVendorSourcePolicy::DirectoryOnly));
+        assert_eq!(
+            WeddingVendorSourcePolicy::parse(Some(" directory_only ")),
+            Ok(WeddingVendorSourcePolicy::DirectoryOnly)
+        );
         assert!(WeddingVendorSourcePolicy::parse(Some("all_sources")).is_err());
     }
 }

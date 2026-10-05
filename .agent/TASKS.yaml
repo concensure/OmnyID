@@ -271,3 +271,34 @@ tasks:
       - internal Markdown, TypeScript, SQL, review, and CSV files in the static docs mount return 404
       - intended public legal pages, security contact, logo, and wedding images are versioned
       - production-applied venue photo seed migration is recoverable from a fresh clone without being rerun by the migration runner
+
+  - id: WED-147
+    title: Wedding vendor production contract and Oracle account storage policy
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-146
+    depends_on:
+      - WED-145
+      - SEC-001
+    files:
+      - Documents/design/wedding planner/wedding-vendor-production-task-list.md
+      - Documents/design/wedding planner/wedding-vendor-decisionos-mvp-to-production-spec.md
+      - src/wedding_vendor_*.rs
+      - src/server/**
+      - src/db.rs
+      - src/metrics.rs
+      - solid-ui/src/lib/weddingVendor*.ts
+      - solid-ui/src/lib/pricing.ts
+      - solid-ui/src/lib/billingUpgradeState.ts
+      - solid-ui/tests/wedding-vendor-*.test.ts
+      - solid-ui/tests/billing-*.test.ts
+      - scripts/**wedding*.ps1
+      - docs/**wedding*.md
+      - .agent/**
+    acceptance:
+      - production checklist items have executable contracts or honest machine/external gates with evidence
+      - quote decisions are pattern-verified, idempotent, event-driven, and replay-safe
+      - deferral safety dates and lifecycle state remain durable and deterministic
+      - provider, ranking, replay, security, observability, and rollout gates are machine-readable
+      - new free accounts receive 1 GiB hosted storage and upgraded accounts receive 2 GiB
+      - relevant Rust, UI, SDK, line-budget, build, and focused production checks are recorded

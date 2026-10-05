@@ -343,8 +343,10 @@ fn heartbeat_limit(key: &str, default: i64) -> i64 {
 /// dropped, and if the table still exceeds the row cap the oldest rows go first.
 /// Returns the number of rows deleted in this pass.
 pub async fn prune_heartbeats(db: &Db) -> Result<u64, sqlx::Error> {
-    let retention_hours =
-        heartbeat_limit(HEARTBEAT_RETENTION_HOURS_ENV, HEARTBEAT_RETENTION_HOURS_DEFAULT);
+    let retention_hours = heartbeat_limit(
+        HEARTBEAT_RETENTION_HOURS_ENV,
+        HEARTBEAT_RETENTION_HOURS_DEFAULT,
+    );
     let max_rows = heartbeat_limit(HEARTBEAT_MAX_ROWS_ENV, HEARTBEAT_MAX_ROWS_DEFAULT);
 
     // The cutoff is computed once so each delete batch is a plain index range scan.

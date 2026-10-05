@@ -13,8 +13,16 @@ import {
   weddingVendorSearchEffectiveQueryState,
   weddingVendorSearchApproximateLocationFromTimezone,
   weddingVendorSearchQueryFromIntake,
+  weddingAutomaticShortlistEnabled,
   weddingVendorSearchLaunchFromEvent,
 } from "../src/lib/weddingVendorSearchLaunchState.ts";
+
+test("automatic shortlist kill switch defaults on and accepts explicit off values", () => {
+  assert.equal(weddingAutomaticShortlistEnabled(undefined), true);
+  assert.equal(weddingAutomaticShortlistEnabled("true"), true);
+  assert.equal(weddingAutomaticShortlistEnabled(" FALSE "), false);
+  assert.equal(weddingAutomaticShortlistEnabled("off"), false);
+});
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();

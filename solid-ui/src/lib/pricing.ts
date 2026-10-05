@@ -14,14 +14,14 @@ export const STORAGE_PLANS: Record<PlanId, StoragePlan> = {
     id: "free",
     label: "Free",
     monthlyPriceUsd: 0,
-    storageQuotaGb: 5,
+    storageQuotaGb: 1,
     maxUploadMb: 25,
   },
   paid: {
     id: "paid",
     label: "Paid",
     monthlyPriceUsd: 20,
-    storageQuotaGb: 15,
+    storageQuotaGb: 2,
     maxUploadMb: 100,
   },
 };

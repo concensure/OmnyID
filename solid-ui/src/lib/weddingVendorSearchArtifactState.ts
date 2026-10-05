@@ -35,6 +35,14 @@ import {
   selectWeddingVendorShortlist,
   type WeddingVendorShortlistOutcome,
 } from "@/lib/weddingVendorShortlistPolicyState";
+import {
+  WEDDING_VENDOR_PATTERN_VERSION,
+  WEDDING_VENDOR_SELECTION_ACTIONS,
+  WEDDING_VENDOR_SELECTION_PATTERN_ID,
+  verifyWeddingDecisionPattern,
+  weddingDecisionPattern,
+  weddingDecisionPatternAllowsProjection,
+} from "@/lib/weddingVendorDecisionPatternState";
 
 export type WeddingVendorSearchArtifactState = {
   status: "created" | "not_created";
@@ -555,6 +563,48 @@ export function buildWeddingVendorComparisonArtifactState(
       topChoiceCount: 0,
     };
   }
+  const selectionPattern = weddingDecisionPattern(
+    WEDDING_VENDOR_SELECTION_PATTERN_ID,
+    WEDDING_VENDOR_PATTERN_VERSION,
+  );
+  const targetCategory = clean(input.targetCategory) || clean(input.vendorCategories?.[0]);
+  const patternVerification = verifyWeddingDecisionPattern({
+    patternId: WEDDING_VENDOR_SELECTION_PATTERN_ID,
+    patternVersion: WEDDING_VENDOR_PATTERN_VERSION,
+    situationType: "vendor_shortlist_ready",
+    presentInputs: [
+      metadata.weddingPlanId ? "wedding_plan_id" : "",
+      targetCategory ? "category" : "",
+      choices.length ? "candidate_count" : "",
+    ],
+    presentEvidence: [
+      choices.every((choice) => Boolean(clean(choice.vendorId) || clean(choice.id))) ? "candidate_identities" : "",
+      choices.every((choice) => Boolean(clean(choice.url))) ? "candidate_sources" : "",
+      choices.every((choice) => Boolean(clean(choice.email) || clean(choice.phone) || clean(choice.websiteUrl) || clean(choice.url)))
+        ? "request_routes"
+        : "",
+    ],
+    allowedActions: WEDDING_VENDOR_SELECTION_ACTIONS,
+    executionContracts: ["wedding.vendor_outreach@1"],
+    optionalGaps: [
+      clean(input.budgetComfort) ? null : "budget_context",
+      clean(input.guestCount) ? null : "guest_count",
+      clean(input.dateOrSeason) ? null : "date_or_season",
+      comparisonPreferenceSignals(input).length ? null : "preferences",
+      input.requireExactlyThree || choices.length === 3 ? null : "legacy_exact_three_not_enforced",
+    ].filter((value): value is string => Boolean(value)),
+  });
+  if (!weddingDecisionPatternAllowsProjection(patternVerification)) {
+    return {
+      status: "not_created",
+      reason: `Vendor comparison blocked by ${patternVerification.outcome.toLowerCase().replaceAll("_", " ")}.`,
+      metadata,
+      artifactInput: null,
+      summary: null,
+      markdown: null,
+      topChoiceCount: 0,
+    };
+  }
   const markdown = comparisonMarkdown({ context: input, result, choices });
   const summaryLabel = comparisonSummaryLabel(choices, result);
   const sourceLinks = choices.flatMap((choice) => sourceUrlLinks({
@@ -595,6 +645,12 @@ export function buildWeddingVendorComparisonArtifactState(
       sourceUrlCount: sourceLinks.length,
       parentSourceUrlCount: execution.sources.filter(usableSourceUrl).length,
       topChoiceCount: choices.length,
+      patternId: WEDDING_VENDOR_SELECTION_PATTERN_ID,
+      patternVersion: WEDDING_VENDOR_PATTERN_VERSION,
+      situationType: "vendor_shortlist_ready",
+      projectionRecipe: selectionPattern?.projectionRecipe,
+      executionContract: selectionPattern?.executionContracts[0],
+      patternVerification,
       topChoiceLabels: choices.map((choice) => choice.title),
       topChoiceActionRows,
       topChoiceCards,

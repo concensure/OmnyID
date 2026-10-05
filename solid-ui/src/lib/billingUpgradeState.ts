@@ -38,7 +38,7 @@ function normalizePlanId(plan: string | null | undefined): "free" | "paid" {
 function nextStorageUpgradeLabel(plan: string | null | undefined): string {
   const normalized = normalizePlanId(plan);
   if (normalized === "free") {
-    return "Paid - 15 GB for $20/mo";
+    return "Paid - 2 GB for $20/mo";
   }
   return "Additional storage - +10 GB for $10/mo";
 }

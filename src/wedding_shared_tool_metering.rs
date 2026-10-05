@@ -293,8 +293,14 @@ mod tests {
 
         assert_eq!(event.tool_slug, "anthropic-llm");
         assert_eq!(event.billing_category, "wedding_ai");
-        assert_eq!(event.metadata_json.as_ref().unwrap()["template_scope"], "wedding_planner");
-        assert_eq!(event.metadata_json.as_ref().unwrap()["feature"], "vendor_outreach_draft");
+        assert_eq!(
+            event.metadata_json.as_ref().unwrap()["template_scope"],
+            "wedding_planner"
+        );
+        assert_eq!(
+            event.metadata_json.as_ref().unwrap()["feature"],
+            "vendor_outreach_draft"
+        );
     }
 
     #[test]

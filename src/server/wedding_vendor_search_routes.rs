@@ -549,8 +549,21 @@ async fn wedding_vendor_search_http(
     )
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
-    let source_policy = WeddingVendorSourcePolicy::parse(req.source_policy.as_deref())
+    let requested_source_policy = WeddingVendorSourcePolicy::parse(req.source_policy.as_deref())
         .map_err(|message| (StatusCode::BAD_REQUEST, message.to_string()))?;
+    let online_fallback_enabled = std::env::var("OMNYID_WEDDING_ONLINE_FALLBACK_ENABLED")
+        .map(|value| {
+            !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "0" | "false" | "no" | "off"
+            )
+        })
+        .unwrap_or(true);
+    let source_policy = if online_fallback_enabled {
+        requested_source_policy
+    } else {
+        WeddingVendorSourcePolicy::DirectoryOnly
+    };
     let limit = req.max_results_per_query.unwrap_or(5).clamp(1, 8);
     let planned_queries = req
         .queries
@@ -568,7 +581,13 @@ async fn wedding_vendor_search_http(
 
     let categories = planned_queries
         .iter()
-        .filter_map(|query| query.category.as_deref().map(str::trim).filter(|value| !value.is_empty()))
+        .filter_map(|query| {
+            query
+                .category
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        })
         .map(str::to_string)
         .collect::<BTreeSet<_>>();
 
@@ -598,17 +617,29 @@ async fn wedding_vendor_search_http(
             ok: directory_count > 0,
             status: "cached".to_string(),
             external_search_performed: false,
-            provider_label: if directory_count > 0 { Some("Admin vendor database".to_string()) } else { None },
+            provider_label: if directory_count > 0 {
+                Some("Admin vendor database".to_string())
+            } else {
+                None
+            },
             query_count: planned_queries.len(),
             source_count: directory_count,
-            queries: planned_queries.iter().map(|query| query.query.clone()).collect(),
+            queries: planned_queries
+                .iter()
+                .map(|query| query.query.clone())
+                .collect(),
             sources,
-            message: format!("Directory-only vendor search returned {directory_count} source{}; online providers were not called.", if directory_count == 1 { "" } else { "s" }),
+            message: format!(
+                "Directory-only vendor search returned {directory_count} source{}; online providers were not called.",
+                if directory_count == 1 { "" } else { "s" }
+            ),
             receipt_metadata: json!({
                 "receipt_id": format!("wedding_vendor_search:directory:{}:{}", req.workspace_id.as_deref().unwrap_or("workspace"), Ulid::new()),
                 "vendor_search_mode": "live",
                 "vendor_search_status": "cached",
                 "source_policy": source_policy.receipt_label(),
+                "requested_source_policy": requested_source_policy.receipt_label(),
+                "online_fallback_enabled": online_fallback_enabled,
                 "directory_count": directory_count,
                 "paid_calls_skipped": true,
                 "fallback_reason": if directory_count >= 3 { "directory_pass_complete_or_requires_client_suitability_check" } else { "directory_shortfall_requires_client_orchestrated_online_pass" },

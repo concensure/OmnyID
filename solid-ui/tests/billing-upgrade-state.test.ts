@@ -12,9 +12,9 @@ test("buildBillingUpgradeRequestBody includes account and storage context", () =
     {
       plan: "free",
       status: "active",
-      storage_used_bytes: 4 * 1024 * 1024 * 1024,
-      storage_quota_bytes: 5 * 1024 * 1024 * 1024,
-      storage_remaining_bytes: 1 * 1024 * 1024 * 1024,
+      storage_used_bytes: 0.5 * 1024 * 1024 * 1024,
+      storage_quota_bytes: 1 * 1024 * 1024 * 1024,
+      storage_remaining_bytes: 0.5 * 1024 * 1024 * 1024,
       quota_state: "ok",
     },
     "owner@example.com",
@@ -22,9 +22,9 @@ test("buildBillingUpgradeRequestBody includes account and storage context", () =
 
   assert.match(body, /Account email: owner@example\.com/);
   assert.match(body, /Current plan: Free/);
-  assert.match(body, /Suggested next upgrade: Paid - 15 GB for \$20\/mo/);
-  assert.match(body, /Storage used: 4\.0 GB/);
-  assert.match(body, /Storage remaining: 1\.0 GB of 5\.0 GB/);
+  assert.match(body, /Suggested next upgrade: Paid - 2 GB for \$20\/mo/);
+  assert.match(body, /Storage used: 512 MB/);
+  assert.match(body, /Storage remaining: 512 MB of 1\.0 GB/);
 });
 
 test("buildBillingUpgradeMailtoHref targets the support inbox and encodes the body", () => {
@@ -87,7 +87,7 @@ test("buildBillingUpgradeRequestBody does not treat blank plan metadata as a con
   assert.match(body, /Current plan: Plan metadata unavailable/);
   assert.match(body, /Suggested next upgrade: Retry billing status to confirm a supported plan id before inferring the next storage upgrade path\./);
   assert.doesNotMatch(body, /Current plan: Free/);
-  assert.doesNotMatch(body, /Suggested next upgrade: Paid - 15 GB for \$20\/mo/);
+  assert.doesNotMatch(body, /Suggested next upgrade: Paid - 2 GB for \$20\/mo/);
 });
 
 test("buildBillingUpgradeRequestBody does not invent fallback storage capacity from unsupported plan metadata", () => {

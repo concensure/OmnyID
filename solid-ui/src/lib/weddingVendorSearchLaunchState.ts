@@ -28,6 +28,10 @@ export type WeddingVendorSearchEffectiveQueryState = {
 
 const MAX_QUERY_LENGTH = 280;
 
+export function weddingAutomaticShortlistEnabled(value: string | null | undefined): boolean {
+  return !["0", "false", "no", "off"].includes(String(value ?? "true").trim().toLowerCase());
+}
+
 function storageOrNull(storage?: Storage | null): Storage | null {
   return storage ?? globalThis.localStorage ?? globalThis.window?.localStorage ?? null;
 }

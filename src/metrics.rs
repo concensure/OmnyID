@@ -16,6 +16,14 @@ pub struct Metrics {
     gateway_outbound_attempts_total: AtomicU64,
     gateway_outbound_failures_total: AtomicU64,
     rate_limited_requests_total: AtomicU64,
+    wedding_quote_events_seen_total: AtomicU64,
+    wedding_quote_decisions_projected_total: AtomicU64,
+    wedding_quote_projection_blocked_total: AtomicU64,
+    wedding_quote_decisions_resurfaced_total: AtomicU64,
+    wedding_quote_projection_latency_ms_sum: AtomicU64,
+    wedding_quote_projection_latency_ms_count: AtomicU64,
+    wedding_quote_projection_latency_ms_max: AtomicU64,
+    wedding_quote_missed_critical_deadlines_total: AtomicU64,
 }
 
 impl Metrics {
@@ -75,6 +83,40 @@ impl Metrics {
             .fetch_add(1, Ordering::Relaxed);
     }
 
+    pub fn inc_wedding_quote_events_seen(&self) {
+        self.wedding_quote_events_seen_total
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn inc_wedding_quote_decisions_projected(&self) {
+        self.wedding_quote_decisions_projected_total
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn inc_wedding_quote_projection_blocked(&self) {
+        self.wedding_quote_projection_blocked_total
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn inc_wedding_quote_decisions_resurfaced(&self) {
+        self.wedding_quote_decisions_resurfaced_total
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn observe_wedding_quote_projection_latency_ms(&self, latency_ms: u64) {
+        self.wedding_quote_projection_latency_ms_sum
+            .fetch_add(latency_ms, Ordering::Relaxed);
+        self.wedding_quote_projection_latency_ms_count
+            .fetch_add(1, Ordering::Relaxed);
+        self.wedding_quote_projection_latency_ms_max
+            .fetch_max(latency_ms, Ordering::Relaxed);
+    }
+
+    pub fn inc_wedding_quote_missed_critical_deadlines(&self) {
+        self.wedding_quote_missed_critical_deadlines_total
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
     pub fn snapshot(&self) -> MetricsSnapshot {
         MetricsSnapshot {
             messages_stored_total: self.messages_stored_total.load(Ordering::Relaxed),
@@ -99,6 +141,30 @@ impl Metrics {
                 .gateway_outbound_failures_total
                 .load(Ordering::Relaxed),
             rate_limited_requests_total: self.rate_limited_requests_total.load(Ordering::Relaxed),
+            wedding_quote_events_seen_total: self
+                .wedding_quote_events_seen_total
+                .load(Ordering::Relaxed),
+            wedding_quote_decisions_projected_total: self
+                .wedding_quote_decisions_projected_total
+                .load(Ordering::Relaxed),
+            wedding_quote_projection_blocked_total: self
+                .wedding_quote_projection_blocked_total
+                .load(Ordering::Relaxed),
+            wedding_quote_decisions_resurfaced_total: self
+                .wedding_quote_decisions_resurfaced_total
+                .load(Ordering::Relaxed),
+            wedding_quote_projection_latency_ms_sum: self
+                .wedding_quote_projection_latency_ms_sum
+                .load(Ordering::Relaxed),
+            wedding_quote_projection_latency_ms_count: self
+                .wedding_quote_projection_latency_ms_count
+                .load(Ordering::Relaxed),
+            wedding_quote_projection_latency_ms_max: self
+                .wedding_quote_projection_latency_ms_max
+                .load(Ordering::Relaxed),
+            wedding_quote_missed_critical_deadlines_total: self
+                .wedding_quote_missed_critical_deadlines_total
+                .load(Ordering::Relaxed),
         }
     }
 }
@@ -117,6 +183,14 @@ pub struct MetricsSnapshot {
     pub gateway_outbound_attempts_total: u64,
     pub gateway_outbound_failures_total: u64,
     pub rate_limited_requests_total: u64,
+    pub wedding_quote_events_seen_total: u64,
+    pub wedding_quote_decisions_projected_total: u64,
+    pub wedding_quote_projection_blocked_total: u64,
+    pub wedding_quote_decisions_resurfaced_total: u64,
+    pub wedding_quote_projection_latency_ms_sum: u64,
+    pub wedding_quote_projection_latency_ms_count: u64,
+    pub wedding_quote_projection_latency_ms_max: u64,
+    pub wedding_quote_missed_critical_deadlines_total: u64,
 }
 
 impl MetricsSnapshot {
@@ -184,12 +258,51 @@ impl MetricsSnapshot {
                 "Requests rejected by rate limiter",
                 self.rate_limited_requests_total,
             ),
+            (
+                "omnyid_wedding_quote_events_seen_total",
+                "Wedding vendor quote events observed by the server projector",
+                self.wedding_quote_events_seen_total,
+            ),
+            (
+                "omnyid_wedding_quote_decisions_projected_total",
+                "Wedding quote DecisionOS requests inserted",
+                self.wedding_quote_decisions_projected_total,
+            ),
+            (
+                "omnyid_wedding_quote_projection_blocked_total",
+                "Wedding quote projections blocked by ownership, pattern, or persistence checks",
+                self.wedding_quote_projection_blocked_total,
+            ),
+            (
+                "omnyid_wedding_quote_decisions_resurfaced_total",
+                "Due wedding quote decisions resurfaced by reconciliation",
+                self.wedding_quote_decisions_resurfaced_total,
+            ),
+            (
+                "omnyid_wedding_quote_projection_latency_ms_sum",
+                "Total wedding quote-to-DecisionOS projection latency in milliseconds",
+                self.wedding_quote_projection_latency_ms_sum,
+            ),
+            (
+                "omnyid_wedding_quote_projection_latency_ms_count",
+                "Wedding quote projection latency observations",
+                self.wedding_quote_projection_latency_ms_count,
+            ),
+            (
+                "omnyid_wedding_quote_missed_critical_deadlines_total",
+                "Wedding quote deferrals first resurfaced after the critical boundary",
+                self.wedding_quote_missed_critical_deadlines_total,
+            ),
         ];
         for (name, help, value) in fields {
             out.push_str(&format!(
                 "# HELP {name} {help}\n# TYPE {name} counter\n{name} {value}\n"
             ));
         }
+        out.push_str(&format!(
+            "# HELP omnyid_wedding_quote_projection_latency_ms_max Maximum observed wedding quote projection latency in milliseconds\n# TYPE omnyid_wedding_quote_projection_latency_ms_max gauge\nomnyid_wedding_quote_projection_latency_ms_max {}\n",
+            self.wedding_quote_projection_latency_ms_max
+        ));
         out
     }
 }
@@ -207,6 +320,13 @@ mod tests {
         metrics.inc_relay_webtransport_sessions();
         metrics.inc_gateway_outbound_failures();
         metrics.inc_rate_limited_requests();
+        metrics.inc_wedding_quote_events_seen();
+        metrics.inc_wedding_quote_decisions_projected();
+        metrics.inc_wedding_quote_projection_blocked();
+        metrics.inc_wedding_quote_decisions_resurfaced();
+        metrics.observe_wedding_quote_projection_latency_ms(120);
+        metrics.observe_wedding_quote_projection_latency_ms(30);
+        metrics.inc_wedding_quote_missed_critical_deadlines();
 
         assert_eq!(
             metrics.snapshot(),
@@ -223,6 +343,14 @@ mod tests {
                 gateway_outbound_attempts_total: 0,
                 gateway_outbound_failures_total: 1,
                 rate_limited_requests_total: 1,
+                wedding_quote_events_seen_total: 1,
+                wedding_quote_decisions_projected_total: 1,
+                wedding_quote_projection_blocked_total: 1,
+                wedding_quote_decisions_resurfaced_total: 1,
+                wedding_quote_projection_latency_ms_sum: 150,
+                wedding_quote_projection_latency_ms_count: 2,
+                wedding_quote_projection_latency_ms_max: 120,
+                wedding_quote_missed_critical_deadlines_total: 1,
             }
         );
     }

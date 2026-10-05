@@ -159,6 +159,7 @@ mod value_signal_helpers;
 mod wedding_admin_ai_policy;
 mod wedding_understanding_routes;
 mod wedding_vendor_outreach_routes;
+mod wedding_vendor_production;
 mod wedding_vendor_search_routes;
 mod workflow_connector_bindings;
 mod workflow_skill_capsule_runtime;
@@ -1398,6 +1399,14 @@ pub async fn run() {
     let internal_event_state = app_state.clone();
     tokio::spawn(async move {
         internal_event_dispatcher_loop(internal_event_state).await;
+    });
+
+    // Wedding quote decisions are projected at insert time. This bounded
+    // reconciliation loop repairs missed work after crashes and resurfaces
+    // due deferrals without requiring the wedding UI to be open.
+    let wedding_quote_state = app_state.clone();
+    tokio::spawn(async move {
+        wedding_vendor_production::wedding_quote_reconciliation_loop(wedding_quote_state).await;
     });
 
     let listener = tokio::net::TcpListener::bind(http_addr)
@@ -5971,6 +5980,15 @@ pub(super) async fn handle_inserted_message_effects(
     app_message: &AFPMessage,
     owner_user_id: Option<&str>,
 ) {
+    wedding_vendor_production::project_inserted_wedding_quote(
+        db,
+        metrics,
+        _relay_tx,
+        owner_user_id,
+        app_message,
+    )
+    .await;
+
     if message_requires_human_approval(app_message) {
         let capability_id = action_capability_id(app_message);
         let approval_review = build_action_approval_review_payload(app_message, &capability_id);
@@ -6011,7 +6029,12 @@ pub(super) async fn execute_approved_action(
 ) {
     let capability_id = action_capability_id(app_message);
     let approval_review = build_action_approval_review_payload(app_message, &capability_id);
-    match dispatch_outgoing_message(app_message).await {
+    let dispatch_result = if wedding_vendor_production::external_send_allowed(app_message) {
+        dispatch_outgoing_message(app_message).await
+    } else {
+        Err("Wedding vendor external send is disabled by the production kill switch".to_string())
+    };
+    match dispatch_result {
         Ok(true) => {
             metrics.inc_gateway_outbound_attempts();
             if let Err(err) = db

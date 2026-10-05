@@ -6,16 +6,16 @@
  * @owner: omnyid
  */
 
-use super::*;
 use super::super::wedding_vendor_search_routes::attribute_catalog::{
     AdminAttributeInput, admin_attribute_write, attribute_catalog_json, attributes_with_unknowns,
 };
-use crate::db::{WeddingVendorRecord, wedding_vendor_evidence::VendorAttributeWrite};
+use super::*;
 use crate::admin_tool_secrets::{
-    AdminToolSecretSpec, ANTHROPIC_LLM_SPEC, BRAVE_SEARCH_SPEC, CLOUDINARY_SPEC, GOOGLE_CALENDAR_SPEC,
-    GOOGLE_MAPS_SPEC, GOOGLE_PLACES_SPEC, STRIPE_SPEC, TWILIO_SPEC, WEATHER_API_SPEC,
-    admin_tool_secret_status,
+    ANTHROPIC_LLM_SPEC, AdminToolSecretSpec, BRAVE_SEARCH_SPEC, CLOUDINARY_SPEC,
+    GOOGLE_CALENDAR_SPEC, GOOGLE_MAPS_SPEC, GOOGLE_PLACES_SPEC, STRIPE_SPEC, TWILIO_SPEC,
+    WEATHER_API_SPEC, admin_tool_secret_status,
 };
+use crate::db::{WeddingVendorRecord, wedding_vendor_evidence::VendorAttributeWrite};
 use crate::server::{llm_resolution::read_hosted_anthropic_api_key, wedding_admin_ai_policy};
 fn validate_optional_http_url(
     value: Option<String>,
@@ -131,7 +131,10 @@ pub(super) fn wedding_vendor_attribute_writes(
             if !seen.insert(attribute.key.clone()) {
                 return Err((
                     StatusCode::BAD_REQUEST,
-                    format!("attribute '{}' appears more than once; send each key once", attribute.key),
+                    format!(
+                        "attribute '{}' appears more than once; send each key once",
+                        attribute.key
+                    ),
                 ));
             }
             admin_attribute_write(AdminAttributeInput {
@@ -210,7 +213,9 @@ pub(super) fn wedding_vendor_write_input(
                 source_label: clean_optional_string(photo.source_label),
                 source_url: validate_optional_http_url(photo.source_url, "photo source_url")?,
                 retrieved_at: clean_optional_string(photo.retrieved_at),
-                licence_metadata: photo.licence_metadata.unwrap_or_else(|| serde_json::json!({})),
+                licence_metadata: photo
+                    .licence_metadata
+                    .unwrap_or_else(|| serde_json::json!({})),
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -715,8 +720,13 @@ pub(super) async fn admin_wedding_vendor_create_http(
         .upsert_wedding_vendor(None, &input, &operator_user.id)
         .await
         .map_err(readiness_error_to_http)?;
-    write_operator_attributes(&state.db, &vendor.vendor_id, &attribute_writes, &operator_user.id)
-        .await?;
+    write_operator_attributes(
+        &state.db,
+        &vendor.vendor_id,
+        &attribute_writes,
+        &operator_user.id,
+    )
+    .await?;
     Ok(Json(serde_json::json!({ "vendor": vendor })))
 }
 
@@ -740,8 +750,13 @@ pub(super) async fn admin_wedding_vendor_update_http(
         .upsert_wedding_vendor(Some(vendor_id.trim()), &input, &operator_user.id)
         .await
         .map_err(readiness_error_to_http)?;
-    write_operator_attributes(&state.db, &vendor.vendor_id, &attribute_writes, &operator_user.id)
-        .await?;
+    write_operator_attributes(
+        &state.db,
+        &vendor.vendor_id,
+        &attribute_writes,
+        &operator_user.id,
+    )
+    .await?;
     Ok(Json(serde_json::json!({ "vendor": vendor })))
 }
 

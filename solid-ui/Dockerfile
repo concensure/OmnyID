@@ -4,6 +4,8 @@ FROM node:24-alpine AS build
 # Defaults to empty (same-origin) which is correct for the production Caddy setup.
 ARG VITE_API_BASE=""
 ENV VITE_API_BASE=$VITE_API_BASE
+ARG VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED="true"
+ENV VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED=$VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED
 WORKDIR /app
 COPY typescript-sdk/package.json ../typescript-sdk/package.json
 COPY typescript-sdk/package-lock.json ../typescript-sdk/package-lock.json

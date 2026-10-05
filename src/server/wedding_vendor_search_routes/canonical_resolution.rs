@@ -25,6 +25,21 @@ const ENRICHMENT_TOP_ENTITIES: usize = 3;
 const SNIPPET_CAPACITY_CONFIDENCE: f32 = 0.6;
 const IDENTITY_TTL_DAYS: i64 = 365;
 
+fn online_catalog_enrichment_value_enabled(value: Option<&str>) -> bool {
+    !matches!(
+        value.map(str::trim).map(str::to_ascii_lowercase).as_deref(),
+        Some("0" | "false" | "no" | "off")
+    )
+}
+
+fn online_catalog_enrichment_enabled() -> bool {
+    online_catalog_enrichment_value_enabled(
+        std::env::var("OMNYID_WEDDING_ONLINE_CATALOG_ENRICHMENT_ENABLED")
+            .ok()
+            .as_deref(),
+    )
+}
+
 fn resolution_max_calls() -> usize {
     std::env::var("OMNYID_WEDDING_RESOLUTION_MAX_CALLS")
         .ok()
@@ -627,8 +642,11 @@ pub(super) async fn enrich_vendor_sources(
     let merged = classify_and_merge_sources(raw_sources);
     let mut sources = merged.sources;
     let mut stats = ResolutionStats::default();
-    resolve_official_sites(&input, &mut sources, &mut stats, failed_messages).await;
-    enrich_top_entities(&input, &mut sources, &mut stats, failed_messages).await;
+    let online_enrichment_enabled = online_catalog_enrichment_enabled();
+    if online_enrichment_enabled {
+        resolve_official_sites(&input, &mut sources, &mut stats, failed_messages).await;
+        enrich_top_entities(&input, &mut sources, &mut stats, failed_messages).await;
+    }
     let mut sources = dedupe_sources(merge_entities_sharing_websites(sources));
     let persisted_count =
         persist_live_vendor_sources(input.db, input.user_id, input.queries, &mut sources).await;
@@ -643,6 +661,7 @@ pub(super) async fn enrich_vendor_sources(
             "canonical_resolution_resolved": stats.resolved,
             "canonical_resolution_cache_hits": stats.cache_hits,
             "official_site_enrichment_attempted": stats.enrichment_attempted,
+            "online_catalog_enrichment_enabled": online_enrichment_enabled,
         }),
     }
 }
@@ -660,6 +679,14 @@ mod tests {
             website_url: website.map(str::to_string),
             ..WeddingVendorSearchSource::default()
         }
+    }
+
+    #[test]
+    fn online_enrichment_kill_switch_defaults_on_and_accepts_explicit_off_values() {
+        assert!(online_catalog_enrichment_value_enabled(None));
+        assert!(online_catalog_enrichment_value_enabled(Some("true")));
+        assert!(!online_catalog_enrichment_value_enabled(Some(" FALSE ")));
+        assert!(!online_catalog_enrichment_value_enabled(Some("0")));
     }
 
     #[test]

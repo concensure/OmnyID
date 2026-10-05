@@ -118,7 +118,7 @@ Filesystem     1B-blocks       Used Available Use% Mounted on
 
 #[test]
 fn admin_wedding_ai_routing_policy_requires_explicit_audit_and_budget_flags() {
-    let _env = env_lock();
+    let _env = crate::server::wedding_admin_ai_policy::test_env_lock();
     unsafe {
         std::env::remove_var("OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED");
         std::env::remove_var("OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED");
@@ -140,11 +140,12 @@ fn admin_wedding_ai_routing_policy_requires_explicit_audit_and_budget_flags() {
 
 #[test]
 fn admin_wedding_ai_routing_policy_passes_with_explicit_production_flags() {
-    let _env = env_lock();
+    let _env = crate::server::wedding_admin_ai_policy::test_env_lock();
     unsafe {
         std::env::set_var("OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED", "true");
         std::env::set_var("OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED", "true");
         std::env::set_var("OMNYID_WEDDING_ADMIN_AI_DAILY_USD_LIMIT", "5");
+        std::env::set_var("OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT", "60");
     }
 
     let policy = super::admin_wedding_ai_routing_policy_json();
@@ -161,6 +162,7 @@ fn admin_wedding_ai_routing_policy_passes_with_explicit_production_flags() {
         std::env::remove_var("OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED");
         std::env::remove_var("OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED");
         std::env::remove_var("OMNYID_WEDDING_ADMIN_AI_DAILY_USD_LIMIT");
+        std::env::remove_var("OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT");
     }
 }
 
@@ -471,7 +473,10 @@ fn wedding_vendor_write_input_accepts_clean_vendor_payload() {
         input.photos[0].source_url.as_deref(),
         Some("https://source.example.test/photo")
     );
-    assert_eq!(input.photos[0].licence_metadata, json!({ "use": "editorial" }));
+    assert_eq!(
+        input.photos[0].licence_metadata,
+        json!({ "use": "editorial" })
+    );
 }
 
 #[test]

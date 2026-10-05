@@ -42,18 +42,21 @@ pub(super) fn execution_enabled() -> bool {
 }
 
 #[cfg(test)]
+pub(super) fn test_env_lock() -> std::sync::MutexGuard<'static, ()> {
+    use std::sync::{Mutex, OnceLock};
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, OnceLock};
-
-    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(())).lock().expect("env lock")
-    }
 
     #[test]
     fn execution_requires_routing_audit_and_an_enforceable_request_limit() {
-        let _guard = env_lock();
+        let _guard = test_env_lock();
         unsafe {
             std::env::remove_var("OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED");
             std::env::remove_var("OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED");

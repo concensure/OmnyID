@@ -427,8 +427,8 @@ export function buildSampleDashboardBootstrap(
       minutesAgo: 82,
       content: {
         subject: "Hosted storage pricing rollout draft",
-        preview: "Ops circulated the 5GB free / 15GB paid / +10GB add-on pricing language for hosted rollout.",
-        body: "Ops circulated the 5GB free, 15GB paid, and +10GB add-on pricing language for hosted rollout. The note asks for clear archive-only warning text so users understand workflow performance tradeoffs.",
+        preview: "Ops circulated the 1GB free / 2GB paid / +10GB add-on pricing language for hosted rollout.",
+        body: "Ops circulated the 1GB free, 2GB paid, and +10GB add-on pricing language for hosted rollout. The note asks for clear archive-only warning text so users understand workflow performance tradeoffs.",
         sender: "Ops Desk",
         sender_detail: "OmnyID Operations",
         labels: ["pricing", "storage"],

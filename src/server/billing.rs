@@ -22,8 +22,10 @@ pub(crate) struct StoragePolicy {
 }
 
 const GIB_BYTES: i64 = 1024 * 1024 * 1024;
-const FREE_STORAGE_BYTES: i64 = 5 * GIB_BYTES;
-const PAID_STORAGE_BYTES: i64 = 15 * GIB_BYTES;
+// Oracle-hosted account policy: new/free accounts receive 1 GiB and the base
+// paid upgrade receives 2 GiB. Additional storage remains an explicit add-on.
+const FREE_STORAGE_BYTES: i64 = GIB_BYTES;
+const PAID_STORAGE_BYTES: i64 = 2 * GIB_BYTES;
 const STORAGE_ADDON_BYTES: i64 = 10 * GIB_BYTES;
 const FREE_MAX_UPLOAD_BYTES: i64 = 25 * 1024 * 1024;
 const PAID_MAX_UPLOAD_BYTES: i64 = 100 * 1024 * 1024;

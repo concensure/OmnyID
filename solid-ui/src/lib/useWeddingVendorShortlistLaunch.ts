@@ -32,12 +32,14 @@ function saveRun(storage: Storage | null | undefined, planId: string, value: Sto
 /** Runs a single category successor after intake is ready, with reload/tab fingerprint guards. */
 export function useWeddingVendorShortlistLaunch(input: {
   coordinatorInput: () => CoordinatorInput;
+  enabled?: () => boolean;
   storage?: Storage | null;
   searchRunning: () => boolean;
   run: (category: string) => Promise<boolean>;
 }): void {
   const [attempted, setAttempted] = createSignal<ReadonlySet<string>>(new Set());
   createEffect(() => {
+    if (input.enabled?.() === false) return;
     const raw = input.coordinatorInput();
     const planId = typeof raw.weddingPlanId === "string" ? raw.weddingPlanId.trim() : "";
     const stored = storedRun(input.storage, planId);

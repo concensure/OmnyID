@@ -4,10 +4,18 @@
 import type { SendAfpMessageInput } from "@/lib/api";
 import type { WeddingArtifactQuotePreview } from "@/lib/weddingArtifactPreviewState";
 import { normalizeWeddingPlanningMetadata, safeWeddingLabel } from "@/lib/weddingPlanningTemplateState";
+import {
+  WEDDING_VENDOR_PATTERN_VERSION,
+  WEDDING_VENDOR_QUOTE_ACTIONS,
+  WEDDING_VENDOR_QUOTE_RESPONSE_PATTERN_ID,
+  verifyWeddingDecisionPattern,
+  weddingDecisionPattern,
+  weddingDecisionPatternAllowsProjection,
+  weddingQuoteSafetyEnvelope,
+  type WeddingDecisionPatternVerification,
+} from "@/lib/weddingVendorDecisionPatternState";
 
-export const WEDDING_VENDOR_QUOTE_DECISION_ACTIONS = [
-  "ACCEPT_VENDOR", "NEGOTIATE_QUOTE", "EXPLORE_ALTERNATIVE", "DEFER_DECISION",
-] as const;
+export const WEDDING_VENDOR_QUOTE_DECISION_ACTIONS = WEDDING_VENDOR_QUOTE_ACTIONS;
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -33,23 +41,62 @@ export function buildWeddingVendorQuoteDecisionOsProjection(input: {
   preferenceRefs?: readonly string[] | null;
   lifecycle?: "unresolved" | "resolved" | "deferred";
   createdAt?: string | null;
-}): { status: "active" | "resolved" | "not_projected"; decisionId: string; idempotencyKey: string; sendInput: SendAfpMessageInput | null } {
+}): {
+  status: "active" | "resolved" | "not_projected";
+  decisionId: string;
+  idempotencyKey: string;
+  sendInput: SendAfpMessageInput | null;
+  patternVerification: WeddingDecisionPatternVerification;
+} {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
   const quoteMessageId = clean(input.quoteMessageId);
   const quoteThreadId = clean(input.quoteThreadId);
   const decisionId = weddingVendorQuoteDecisionId({ weddingPlanId: metadata.weddingPlanId, quoteMessageId });
   const resolved = input.lifecycle === "resolved";
   const idempotencyKey = `${decisionId}:${resolved ? "resolved" : "active"}:v1`;
+  const optionalGaps = [
+    input.quote.amount === null ? "amount" : null,
+    clean(input.quote.currency) ? null : "currency",
+    input.quote.inclusions.length ? null : "scope",
+    input.quote.validUntil ? null : "valid_until",
+    input.quote.budgetDeltaAmount === null ? "budget_context" : null,
+    (input.preferenceRefs ?? []).length ? null : "preference_refs",
+  ].filter((value): value is string => Boolean(value));
+  const patternVerification = verifyWeddingDecisionPattern({
+    patternId: WEDDING_VENDOR_QUOTE_RESPONSE_PATTERN_ID,
+    patternVersion: WEDDING_VENDOR_PATTERN_VERSION,
+    situationType: "vendor_quote_received",
+    presentInputs: [
+      decisionId ? "decision_id" : "",
+      quoteMessageId ? "quote_message_id" : "",
+      quoteThreadId ? "quote_thread_id" : "",
+      clean(input.quote.vendorName) ? "vendor_identity" : "",
+    ],
+    presentEvidence: [quoteMessageId ? "source_quote" : "", quoteThreadId ? "vendor_thread" : ""],
+    allowedActions: WEDDING_VENDOR_QUOTE_DECISION_ACTIONS,
+    executionContracts: ["wedding.vendor_quote_reply@1"],
+    optionalGaps,
+  });
   if (!quoteMessageId || !quoteThreadId) {
-    return { status: "not_projected", decisionId, idempotencyKey, sendInput: null };
+    return { status: "not_projected", decisionId, idempotencyKey, sendInput: null, patternVerification };
+  }
+  if (!weddingDecisionPatternAllowsProjection(patternVerification)) {
+    return { status: "not_projected", decisionId, idempotencyKey, sendInput: null, patternVerification };
   }
   const deferred = input.lifecycle === "deferred";
   const title = `${input.quote.vendorName || "Vendor"} quote decision`;
   const sourceRefs = unique([quoteMessageId, metadata.sourceResponseId, metadata.responseWorkspaceId]);
+  const pattern = weddingDecisionPattern(WEDDING_VENDOR_QUOTE_RESPONSE_PATTERN_ID, WEDDING_VENDOR_PATTERN_VERSION);
+  const createdAt = clean(input.createdAt);
+  const safetyEnvelope = weddingQuoteSafetyEnvelope({
+    validUntil: input.quote.validUntil,
+    now: createdAt ? new Date(createdAt) : new Date(),
+  });
   return {
     status: resolved ? "resolved" : "active",
     decisionId,
     idempotencyKey,
+    patternVerification,
     sendInput: {
       thread_id: quoteThreadId,
       from: "system://wedding-planning",
@@ -61,7 +108,13 @@ export function buildWeddingVendorQuoteDecisionOsProjection(input: {
       content: {
         decision_id: decisionId,
         title,
-        source_refs: sourceRefs, ...(resolved ? { resolution: "vendor_reply_sent", active: false } : { allowed_actions: WEDDING_VENDOR_QUOTE_DECISION_ACTIONS, approval_required: true }),
+        source_refs: sourceRefs, ...(resolved ? { resolution: "vendor_reply_sent", active: false } : {
+          allowed_actions: WEDDING_VENDOR_QUOTE_DECISION_ACTIONS,
+          approval_required: true,
+          execution_contract: pattern?.executionContracts[0],
+          safety_envelope: safetyEnvelope,
+          pattern_verification: patternVerification,
+        }),
         open_intent: { kind: "open_wedding_vendor_quote", thread_id: quoteThreadId, quote_message_id: quoteMessageId },
         quote_summary: {
           vendor_name: input.quote.vendorName,
@@ -82,7 +135,11 @@ export function buildWeddingVendorQuoteDecisionOsProjection(input: {
       supertags: unique(["wedding", "wedding_vendor_quote", "decisionos", `vendor:${safeWeddingLabel(input.quote.vendorName)}`, resolved ? "decision:resolved" : deferred ? "decision:deferred" : "decision:active"]),
       metadata: {
         origin: "wedding_vendor_quote_projection", projection: "wedding_quote_to_decisionos", decision_id: decisionId,
-        idempotency_key: idempotencyKey, pattern_id: "wedding.vendor_quote_response", pattern_version: 1,
+        idempotency_key: idempotencyKey,
+        pattern_id: WEDDING_VENDOR_QUOTE_RESPONSE_PATTERN_ID,
+        pattern_version: WEDDING_VENDOR_PATTERN_VERSION,
+        projection_recipe: pattern?.projectionRecipe,
+        verification_outcome: patternVerification.outcome,
         situation_type: "vendor_quote_received", wedding_plan_id: metadata.weddingPlanId,
         response_workspace_id: metadata.responseWorkspaceId, quote_message_id: quoteMessageId, quote_thread_id: quoteThreadId,
         category: clean(input.category) || null, preference_refs: unique(input.preferenceRefs ?? []), lifecycle: resolved ? "resolved" : deferred ? "deferred" : "unresolved",

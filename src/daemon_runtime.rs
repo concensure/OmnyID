@@ -110,7 +110,9 @@ pub fn start_health_maintenance_daemon(db: Db, mut shutdown: ShutdownRx) -> Join
             match daemon_registry::prune_heartbeats(&db).await {
                 Ok(0) => {}
                 Ok(deleted) => info!(deleted, "Pruned old daemon heartbeats"),
-                Err(err) => warn!(%err, "Failed to prune daemon heartbeats; check DB connectivity and the daemon_heartbeats table"),
+                Err(err) => {
+                    warn!(%err, "Failed to prune daemon heartbeats; check DB connectivity and the daemon_heartbeats table")
+                }
             }
             emit_daemon_heartbeats(&db, DaemonKind::HealthMaintenance, processed, errors).await;
             if processed > 0 {

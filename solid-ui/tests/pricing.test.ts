@@ -39,7 +39,7 @@ test("formatUsdPerMonth renders whole-dollar monthly pricing", () => {
 test("nextStorageUpgradeLabel reflects the free-to-paid upgrade path", () => {
   assert.equal(
     nextStorageUpgradeLabel("free"),
-    "Paid - 15 GB for $20/mo",
+    "Paid - 2 GB for $20/mo",
   );
 });
 

@@ -16061,7 +16061,7 @@ mod tests {
 
     #[test]
     fn db_source_uses_explicit_owner_scoping_for_agent_preferences_queries() {
-        let source = include_str!("db.rs");
+        let source = include_str!("db.rs").replace("\r\n", "\n");
         assert!(
             source.contains("FROM user_agent_preferences\n            WHERE owner_user_id = $1")
         );

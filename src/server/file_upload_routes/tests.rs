@@ -12,8 +12,8 @@ use axum::{
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-const TEST_FREE_STORAGE_BYTES: i64 = 5 * 1024 * 1024 * 1024;
-const TEST_PAID_STORAGE_BYTES: i64 = 15 * 1024 * 1024 * 1024;
+const TEST_FREE_STORAGE_BYTES: i64 = 1024 * 1024 * 1024;
+const TEST_PAID_STORAGE_BYTES: i64 = 2 * 1024 * 1024 * 1024;
 const TEST_PAID_MAX_UPLOAD_BYTES: i64 = 100 * 1024 * 1024;
 
 #[test]

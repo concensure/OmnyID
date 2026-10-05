@@ -98,7 +98,11 @@ fn parse_availability_date(
     label: &str,
     value: &Option<String>,
 ) -> Result<Option<chrono::NaiveDate>, (StatusCode, String)> {
-    let Some(raw) = value.as_deref().map(str::trim).filter(|raw| !raw.is_empty()) else {
+    let Some(raw) = value
+        .as_deref()
+        .map(str::trim)
+        .filter(|raw| !raw.is_empty())
+    else {
         return Ok(None);
     };
     chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d")
@@ -129,11 +133,18 @@ fn availability_input_from_request(
     let date_to = parse_availability_date("date_to", &body.date_to)?;
     if let (Some(from), Some(to)) = (date_from, date_to) {
         if to < from {
-            return Err(bad_request("date_to must not be before date_from".to_string()));
+            return Err(bad_request(
+                "date_to must not be before date_from".to_string(),
+            ));
         }
     }
-    if body.confidence.is_some_and(|value| !(0.0..=1.0).contains(&value)) {
-        return Err(bad_request("confidence must be between 0 and 1".to_string()));
+    if body
+        .confidence
+        .is_some_and(|value| !(0.0..=1.0).contains(&value))
+    {
+        return Err(bad_request(
+            "confidence must be between 0 and 1".to_string(),
+        ));
     }
     let valid_until = body
         .valid_until
@@ -143,7 +154,11 @@ fn availability_input_from_request(
         .map(|raw| {
             chrono::DateTime::parse_from_rfc3339(raw)
                 .map(|_| raw.to_string())
-                .map_err(|_| bad_request(format!("valid_until must be an RFC3339 timestamp; got '{raw}'")))
+                .map_err(|_| {
+                    bad_request(format!(
+                        "valid_until must be an RFC3339 timestamp; got '{raw}'"
+                    ))
+                })
         })
         .transpose()?;
     reject_if_over_length("notes", &body.notes, MAX_AVAILABILITY_NOTES_CHARS)?;
@@ -187,13 +202,17 @@ async fn wedding_vendor_availability_http(
         .map_err(|err| match &err {
             sqlx::Error::Database(db_err) if db_err.is_foreign_key_violation() => (
                 StatusCode::NOT_FOUND,
-                format!("vendor '{}' was not found; refresh the vendor list and try again", input.vendor_id),
+                format!(
+                    "vendor '{}' was not found; refresh the vendor list and try again",
+                    input.vendor_id
+                ),
             ),
             _ => {
                 tracing::warn!(%err, "wedding_vendor_availability: insert failed");
                 (
                     StatusCode::SERVICE_UNAVAILABLE,
-                    "couldn't save the availability update right now — please try again".to_string(),
+                    "couldn't save the availability update right now — please try again"
+                        .to_string(),
                 )
             }
         })?;
@@ -248,16 +267,24 @@ struct WeddingVendorOutreachDraftResponse {
 }
 
 fn capped(value: &Option<String>, max_chars: usize) -> Option<String> {
-    value.as_ref().map(|raw| raw.trim().to_string()).filter(|s| !s.is_empty()).map(|s| {
-        if s.chars().count() > max_chars {
-            s.chars().take(max_chars).collect()
-        } else {
-            s
-        }
-    })
+    value
+        .as_ref()
+        .map(|raw| raw.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            if s.chars().count() > max_chars {
+                s.chars().take(max_chars).collect()
+            } else {
+                s
+            }
+        })
 }
 
-fn reject_if_over_length(label: &str, value: &Option<String>, max_chars: usize) -> Result<(), (StatusCode, String)> {
+fn reject_if_over_length(
+    label: &str,
+    value: &Option<String>,
+    max_chars: usize,
+) -> Result<(), (StatusCode, String)> {
     if let Some(raw) = value {
         if raw.trim().chars().count() > max_chars {
             return Err((
@@ -316,21 +343,76 @@ async fn wedding_vendor_outreach_draft_http(
     .await?;
 
     if request.vendor.name.trim().is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "vendor.name is required".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "vendor.name is required".to_string(),
+        ));
     }
-    reject_if_over_length("vendor.name", &Some(request.vendor.name.clone()), MAX_VENDOR_FIELD_CHARS)?;
-    reject_if_over_length("vendor.category", &request.vendor.category, MAX_VENDOR_FIELD_CHARS)?;
-    reject_if_over_length("vendor.website_url", &request.vendor.website_url, MAX_VENDOR_FIELD_CHARS)?;
-    reject_if_over_length("vendor.address", &request.vendor.address, MAX_VENDOR_FIELD_CHARS)?;
-    reject_if_over_length("vendor.source_url", &request.vendor.source_url, MAX_VENDOR_FIELD_CHARS)?;
-    reject_if_over_length("vendor.snippet", &request.vendor.snippet, MAX_VENDOR_SNIPPET_CHARS)?;
-    reject_if_over_length("couple.date_or_season", &request.couple.date_or_season, MAX_COUPLE_FIELD_CHARS)?;
-    reject_if_over_length("couple.location", &request.couple.location, MAX_COUPLE_FIELD_CHARS)?;
-    reject_if_over_length("couple.guest_count", &request.couple.guest_count, MAX_COUPLE_FIELD_CHARS)?;
-    reject_if_over_length("couple.budget_comfort", &request.couple.budget_comfort, MAX_COUPLE_FIELD_CHARS)?;
-    reject_if_over_length("couple.atmosphere_description", &request.couple.atmosphere_description, MAX_COUPLE_FIELD_CHARS)?;
-    reject_if_over_length("couple.vendor_preferences", &request.couple.vendor_preferences, MAX_COUPLE_FIELD_CHARS)?;
-    reject_if_over_length("couple.couple_names", &request.couple.couple_names, MAX_COUPLE_FIELD_CHARS)?;
+    reject_if_over_length(
+        "vendor.name",
+        &Some(request.vendor.name.clone()),
+        MAX_VENDOR_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "vendor.category",
+        &request.vendor.category,
+        MAX_VENDOR_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "vendor.website_url",
+        &request.vendor.website_url,
+        MAX_VENDOR_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "vendor.address",
+        &request.vendor.address,
+        MAX_VENDOR_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "vendor.source_url",
+        &request.vendor.source_url,
+        MAX_VENDOR_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "vendor.snippet",
+        &request.vendor.snippet,
+        MAX_VENDOR_SNIPPET_CHARS,
+    )?;
+    reject_if_over_length(
+        "couple.date_or_season",
+        &request.couple.date_or_season,
+        MAX_COUPLE_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "couple.location",
+        &request.couple.location,
+        MAX_COUPLE_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "couple.guest_count",
+        &request.couple.guest_count,
+        MAX_COUPLE_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "couple.budget_comfort",
+        &request.couple.budget_comfort,
+        MAX_COUPLE_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "couple.atmosphere_description",
+        &request.couple.atmosphere_description,
+        MAX_COUPLE_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "couple.vendor_preferences",
+        &request.couple.vendor_preferences,
+        MAX_COUPLE_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "couple.couple_names",
+        &request.couple.couple_names,
+        MAX_COUPLE_FIELD_CHARS,
+    )?;
     if request.couple.top_priorities.len() > MAX_TOP_PRIORITIES {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -338,7 +420,11 @@ async fn wedding_vendor_outreach_draft_http(
         ));
     }
     for priority in &request.couple.top_priorities {
-        reject_if_over_length("couple.top_priorities[]", &Some(priority.clone()), MAX_COUPLE_FIELD_CHARS)?;
+        reject_if_over_length(
+            "couple.top_priorities[]",
+            &Some(priority.clone()),
+            MAX_COUPLE_FIELD_CHARS,
+        )?;
     }
     request.couple.top_priorities.truncate(MAX_TOP_PRIORITIES);
 
@@ -370,14 +456,18 @@ async fn wedding_vendor_outreach_draft_http(
     .join("\n");
 
     let couple_lines = [
-        capped(&couple.date_or_season, MAX_COUPLE_FIELD_CHARS).map(|v| format!("date_or_season: {v}")),
+        capped(&couple.date_or_season, MAX_COUPLE_FIELD_CHARS)
+            .map(|v| format!("date_or_season: {v}")),
         capped(&couple.location, MAX_COUPLE_FIELD_CHARS).map(|v| format!("location: {v}")),
         capped(&couple.guest_count, MAX_COUPLE_FIELD_CHARS).map(|v| format!("guest_count: {v}")),
-        capped(&couple.budget_comfort, MAX_COUPLE_FIELD_CHARS).map(|v| format!("budget_comfort: {v}")),
+        capped(&couple.budget_comfort, MAX_COUPLE_FIELD_CHARS)
+            .map(|v| format!("budget_comfort: {v}")),
         (!couple.top_priorities.is_empty())
             .then(|| format!("top_priorities: {}", couple.top_priorities.join(", "))),
-        capped(&couple.atmosphere_description, MAX_COUPLE_FIELD_CHARS).map(|v| format!("atmosphere_description: {v}")),
-        capped(&couple.vendor_preferences, MAX_COUPLE_FIELD_CHARS).map(|v| format!("vendor_preferences: {v}")),
+        capped(&couple.atmosphere_description, MAX_COUPLE_FIELD_CHARS)
+            .map(|v| format!("atmosphere_description: {v}")),
+        capped(&couple.vendor_preferences, MAX_COUPLE_FIELD_CHARS)
+            .map(|v| format!("vendor_preferences: {v}")),
         capped(&couple.couple_names, MAX_COUPLE_FIELD_CHARS).map(|v| format!("couple_names: {v}")),
     ]
     .into_iter()
@@ -607,7 +697,9 @@ mod tests {
     #[test]
     fn within_length_field_is_accepted() {
         let ok = "Sydney".to_string();
-        assert!(reject_if_over_length("couple.location", &Some(ok), MAX_COUPLE_FIELD_CHARS).is_ok());
+        assert!(
+            reject_if_over_length("couple.location", &Some(ok), MAX_COUPLE_FIELD_CHARS).is_ok()
+        );
     }
 
     #[test]
@@ -636,7 +728,8 @@ mod tests {
 
     #[test]
     fn rejects_empty_grounded_on() {
-        let raw = "{\"subject\": \"Enquiry\", \"body_markdown\": \"Hello there\", \"grounded_on\": []}";
+        let raw =
+            "{\"subject\": \"Enquiry\", \"body_markdown\": \"Hello there\", \"grounded_on\": []}";
         let err = parse_outreach_model_payload(raw).expect_err("expected rejection");
         assert!(err.contains("grounded_on"));
     }

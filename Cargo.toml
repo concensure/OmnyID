@@ -8,7 +8,7 @@ tokio = { version = "1.50", features = ["full"] }
 tonic = "0.14.5"
 prost = "0.14"
 axum = { version = "0.8", features = ["http2", "ws", "multipart"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-native-tls", "postgres", "json", "chrono"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-native-tls", "postgres", "json", "chrono", "derive"] }
 urlencoding = "2"
 anyhow = "1"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
@@ -24,7 +24,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 chrono = { version = "0.4", features = ["serde"] }
 cron = "0.12"
-aws-sdk-s3 = "1"
+aws-sdk-s3 = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
 base64 = "0.22"
 hex = "0.4"
 imap = "3.0.0-alpha.15"
