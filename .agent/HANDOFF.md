@@ -68,6 +68,8 @@ Recommended next action:
 
 What changed:
 
+- Committed the tracked implementation and coordination changes as
+  `42304ae feat(WED-145): begin directory-first wedding vendor MVP`.
 - Created `agent/codex/WED-145` and added the WED-145 task to the canonical task ledger.
 - Added the pure `weddingVendorShortlistPolicyState` contract and table-driven tests.
   It chooses a single category, fingerprints material intake, filters/uniquely
@@ -99,8 +101,10 @@ Unresolved problems:
 - M4–M6 (onboarding coordinator, persisted-before-visible outreach drafts, and
   quote-to-DecisionOS projection) remain unimplemented.
 - The worktree contains 48 modified, 11 deleted, and 414 untracked top-level
-  paths (over 12,000 untracked files). Many are editor/session artifacts,
-  transient outputs, or unrelated documentation; do not blindly stage them.
+  paths (over 12,000 untracked files) before the commit. The tracked work and
+  the required `.agent/` protocol files are in `42304ae`; the remaining
+  untracked paths are editor/session artifacts, transient outputs, or unrelated
+  documentation and were deliberately not staged blindly.
 - No deploy has been attempted: the end-to-end MVP and required production
   verification are not complete.
 
