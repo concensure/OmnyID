@@ -35,6 +35,27 @@ test("readUiCommandFallbackNotice returns normalized fallback copy", () => {
   );
 });
 
+test("readUiCommandFallbackNotice distinguishes a saved model from a missing model", () => {
+  assert.deepEqual(
+    readUiCommandFallbackNotice({
+      boundary: {
+        kind: "command_fallback",
+        label: "Saved AI model could not complete this request",
+        detail: "The provider did not return a usable response.",
+        llm_connected: false,
+        model_configured: true,
+      },
+    }),
+    {
+      label: "Saved AI model could not complete this request",
+      detail: "The provider did not return a usable response.",
+      actionLabel: "Test AI model",
+      actionView: "agent_settings",
+      tone: "amber",
+    },
+  );
+});
+
 test("readUiCommandFallbackNotice uses defaults when boundary copy is blank", () => {
   assert.deepEqual(
     readUiCommandFallbackNotice({

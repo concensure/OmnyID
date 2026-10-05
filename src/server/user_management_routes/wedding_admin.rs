@@ -12,10 +12,11 @@ use super::super::wedding_vendor_search_routes::attribute_catalog::{
 };
 use crate::db::{WeddingVendorRecord, wedding_vendor_evidence::VendorAttributeWrite};
 use crate::admin_tool_secrets::{
-    AdminToolSecretSpec, BRAVE_SEARCH_SPEC, CLOUDINARY_SPEC, GOOGLE_CALENDAR_SPEC,
+    AdminToolSecretSpec, ANTHROPIC_LLM_SPEC, BRAVE_SEARCH_SPEC, CLOUDINARY_SPEC, GOOGLE_CALENDAR_SPEC,
     GOOGLE_MAPS_SPEC, GOOGLE_PLACES_SPEC, STRIPE_SPEC, TWILIO_SPEC, WEATHER_API_SPEC,
     admin_tool_secret_status,
 };
+use crate::server::{llm_resolution::read_hosted_anthropic_api_key, wedding_admin_ai_policy};
 fn validate_optional_http_url(
     value: Option<String>,
     label: &str,
@@ -334,18 +335,21 @@ fn env_positive_number(key: &str) -> bool {
 }
 
 pub(super) fn admin_wedding_ai_routing_policy_json() -> Value {
-    let routing_enabled = env_flag_enabled("OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED");
-    let audit_receipts_enabled = env_flag_enabled("OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED");
-    let budget_guardrails_ready = env_positive_number("OMNYID_WEDDING_ADMIN_AI_DAILY_USD_LIMIT")
-        || env_positive_number("OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT")
-        || env_positive_number("OMNYID_WEDDING_ADMIN_AI_DAILY_TOKEN_LIMIT");
+    let routing_enabled = wedding_admin_ai_policy::routing_enabled();
+    let audit_receipts_enabled = wedding_admin_ai_policy::audit_receipts_enabled();
+    let daily_request_limit = wedding_admin_ai_policy::daily_request_limit();
+    let model_configured = read_hosted_anthropic_api_key().is_some();
+    let execution_enabled = wedding_admin_ai_policy::execution_enabled() && model_configured;
     serde_json::json!({
         "backendPolicyEndpointMounted": true,
         "auditReceiptProjectionReady": routing_enabled && audit_receipts_enabled,
         "tenantBoundaryEnforced": true,
-        "budgetGuardrailsReady": routing_enabled && budget_guardrails_ready,
+        "budgetGuardrailsReady": routing_enabled && daily_request_limit.is_some(),
         "weddingTemplateScopeOnly": true,
         "masterAgentQueryExcluded": true,
+        "adminModelConfigured": model_configured,
+        "dailyRequestLimit": daily_request_limit,
+        "executionEnabled": execution_enabled,
         "lastVerifiedAt": chrono::Utc::now().to_rfc3339(),
         "policySourceLabel": "admin-wedding-ai-routing-policy",
         "routingEnabled": routing_enabled,
@@ -371,6 +375,7 @@ fn admin_wedding_api_provider_status_json(
 
 pub(super) fn admin_wedding_api_stack_json() -> Value {
     let providers = vec![
+        admin_wedding_api_provider_status_json(ANTHROPIC_LLM_SPEC, "anthropic-llm", true),
         admin_wedding_api_provider_status_json(BRAVE_SEARCH_SPEC, "brave-search-api", false),
         admin_wedding_api_provider_status_json(GOOGLE_PLACES_SPEC, "google-places-api", true),
         admin_wedding_api_provider_status_json(GOOGLE_MAPS_SPEC, "google-maps-platform", true),

@@ -16,7 +16,7 @@ lifecycle:
 
 tasks:
   - id: WED-146
-    title: Wedding planner production recovery and interaction polish
+    title: Wedding planner production recovery, AI routing, and interaction polish
     status: in_progress
     owner: codex
     branch: agent/codex/WED-146
@@ -28,12 +28,22 @@ tasks:
       - solid-ui/src/components/ResponseQueueView.tsx
       - solid-ui/src/components/WeddingDecisionFocusCard.tsx
       - solid-ui/src/components/WeddingVendorFollowUpPanel.tsx
+      - solid-ui/src/lib/commandSearchFailureState.ts
+      - solid-ui/src/lib/uiCommandFallbackState.ts
+      - solid-ui/tests/command-search-failure-state.test.ts
+      - solid-ui/tests/ui-command-fallback-state.test.ts
+      - src/server/ui_command_routes.rs
+      - src/server/wedding_vendor_outreach_routes.rs
+      - src/server/user_management_routes/wedding_admin.rs
+      - src/wedding_shared_tool_metering.rs
       - solid-ui/tests/**
       - .agent/**
     acceptance:
       - planner render and home recovery tolerate absent lane-state projections
       - vendor-photo availability is diagnosed against the live persisted record path
       - requested planner toolbar, copy, and response-action contrast changes are covered
+      - saved BYOK configuration and usable Master Agent inference are not presented as the same state
+      - admin-funded wedding outreach is explicitly enabled, bounded, and auditable without routing direct Master Agent queries through it
       - focused checks, build, and production verification are recorded from machine authorities
 
   - id: DEV-001

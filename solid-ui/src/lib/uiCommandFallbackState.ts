@@ -28,6 +28,17 @@ export function readUiCommandFallbackNotice(
   if (kind !== "command_fallback") {
     return null;
   }
+  if (boundary.model_configured === true) {
+    return {
+      label: asNonEmptyString(boundary.label) ?? "Saved AI model needs attention",
+      detail:
+        asNonEmptyString(boundary.detail)
+        ?? "A model setting is saved, but the Master Agent could not get a usable response and used a deterministic fallback instead.",
+      actionLabel: "Test AI model",
+      actionView: "agent_settings",
+      tone: "amber",
+    };
+  }
   const llmConnected = boundary.llm_connected;
   if (llmConnected === false) {
     return {

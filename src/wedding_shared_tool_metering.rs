@@ -4,6 +4,7 @@ use crate::db::{Db, UserExternalToolUsageEventInsert, UserExternalToolUsageEvent
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WeddingSharedToolProvider {
+    AnthropicLlm,
     BraveSearch,
     GooglePlaces,
     ExaSearch,
@@ -16,6 +17,7 @@ pub enum WeddingSharedToolProvider {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WeddingSharedToolFeature {
+    VendorOutreachDraft,
     VendorDiscovery,
     MapsTravel,
     WeatherContingency,
@@ -50,6 +52,14 @@ struct WeddingSharedToolDescriptor {
 
 fn provider_descriptor(provider: WeddingSharedToolProvider) -> WeddingSharedToolDescriptor {
     match provider {
+        WeddingSharedToolProvider::AnthropicLlm => WeddingSharedToolDescriptor {
+            tool_slug: "anthropic-llm",
+            tool_name: "Anthropic hosted LLM",
+            provider_key: "anthropic-llm",
+            provider_category: "llm",
+            billing_category: "wedding_ai",
+            default_usage_unit: "requests",
+        },
         WeddingSharedToolProvider::BraveSearch => WeddingSharedToolDescriptor {
             tool_slug: "brave-search-api",
             tool_name: "Brave Search API",
@@ -119,6 +129,7 @@ fn provider_descriptor(provider: WeddingSharedToolProvider) -> WeddingSharedTool
 
 fn feature_label(feature: WeddingSharedToolFeature) -> &'static str {
     match feature {
+        WeddingSharedToolFeature::VendorOutreachDraft => "vendor_outreach_draft",
         WeddingSharedToolFeature::VendorDiscovery => "vendor_discovery",
         WeddingSharedToolFeature::MapsTravel => "maps_travel",
         WeddingSharedToolFeature::WeatherContingency => "weather_contingency",
@@ -262,6 +273,28 @@ mod tests {
             event.metadata_json.as_ref().unwrap()["wedding_plan_id"],
             "plan-123"
         );
+    }
+
+    #[test]
+    fn wedding_outreach_ai_usage_is_tenant_scoped_and_metered() {
+        let event = wedding_shared_tool_usage_event(WeddingSharedToolUsageInput {
+            user_id: "couple-1".to_string(),
+            provider: WeddingSharedToolProvider::AnthropicLlm,
+            feature: WeddingSharedToolFeature::VendorOutreachDraft,
+            quantity: 1.0,
+            estimated_cost_usd: 0.0,
+            usage_unit: None,
+            wedding_plan_id: Some("plan-1".to_string()),
+            operation: Some("vendor_outreach_draft".to_string()),
+            provider_request_id: None,
+            occurred_at: Some("2026-10-05T09:00:00Z".to_string()),
+        })
+        .expect("event");
+
+        assert_eq!(event.tool_slug, "anthropic-llm");
+        assert_eq!(event.billing_category, "wedding_ai");
+        assert_eq!(event.metadata_json.as_ref().unwrap()["template_scope"], "wedding_planner");
+        assert_eq!(event.metadata_json.as_ref().unwrap()["feature"], "vendor_outreach_draft");
     }
 
     #[test]

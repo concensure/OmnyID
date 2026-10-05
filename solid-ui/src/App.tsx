@@ -4591,7 +4591,7 @@ function AgentStatusPill(props: {
         hosted: "Hosted",
       };
       const be = backendLabel[cfg.backend] ?? cfg.backend;
-      return `Agent · ${cfg.model} via ${be}`;
+      return `Saved model · ${cfg.model} via ${be}`;
     }
     if (props.browserAiLabel) return `Agent · ${props.browserAiLabel}`;
     return null;

@@ -47,6 +47,36 @@ fn style_ui_command_response(
     response
 }
 
+/// A saved provider preference is not the same thing as a successful model response.
+/// Keep that distinction in the response boundary so the command-bar UI does not tell
+/// a user with a saved BYOK configuration that they have no model at all.
+fn saved_model_fallback_response(mut response: UiCommandResponse) -> UiCommandResponse {
+    let is_command_fallback = response
+        .boundary
+        .as_ref()
+        .and_then(|boundary| boundary.get("kind"))
+        .and_then(Value::as_str)
+        == Some("command_fallback");
+    if !is_command_fallback {
+        return response;
+    }
+
+    response.boundary = Some(serde_json::json!({
+        "kind": "command_fallback",
+        "label": "Saved AI model could not complete this request",
+        "detail": "A model setting is saved for this workspace, but the Master Agent did not receive a usable model response. OmnyID returned a deterministic fallback instead.",
+        "llm_connected": false,
+        "model_configured": true,
+    }));
+    response.execution_explanation = Some(serde_json::json!({
+        "mode": "deterministic_fallback",
+        "reason": "A saved model configuration could not produce a usable command response.",
+        "model_inference_ran": true,
+        "executed_agent_work": false,
+    }));
+    response
+}
+
 fn command_router_system_prompt_with_skill_guidance(
     base_prompt: &str,
     reasoning_guidance: &[String],
@@ -989,5 +1019,22 @@ pub(super) async fn ui_command_http(
         return Ok(Json(finalize_response(response)));
     }
 
-    Ok(Json(finalize_response(base)))
+    // The model resolver deliberately fails closed when a saved configuration has
+    // no usable key, budget, or endpoint. Preserve the useful deterministic result,
+    // but accurately describe this as a saved-model availability problem rather than
+    // claiming that no model was configured.
+    let has_saved_model_config = state
+        .db
+        .get_llm_config(&user.id)
+        .await
+        .ok()
+        .flatten()
+        .is_some();
+    let response = if has_saved_model_config {
+        saved_model_fallback_response(base)
+    } else {
+        base
+    };
+
+    Ok(Json(finalize_response(response)))
 }

@@ -27,11 +27,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::db::wedding_vendor_evidence::{VENDOR_AVAILABILITY_STATES, VendorAvailabilityInput};
+use crate::wedding_shared_tool_metering::{
+    WeddingSharedToolFeature, WeddingSharedToolProvider, WeddingSharedToolUsageInput,
+    record_wedding_shared_tool_usage,
+};
 
 use super::{
     AppState, RateLimitPolicy,
     auth::{authenticated_rate_limit_key, authenticated_user, enforce_rate_limit},
     llm_resolution::read_hosted_anthropic_api_key,
+    wedding_admin_ai_policy,
 };
 
 const MODEL: &str = "claude-haiku-4-5-20251001";
@@ -283,6 +288,14 @@ async fn wedding_vendor_outreach_draft_http(
 ) -> Result<Json<WeddingVendorOutreachDraftResponse>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
 
+    if !wedding_admin_ai_policy::execution_enabled() {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Admin-funded wedding AI is not enabled for this workspace yet. Please try again later."
+                .to_string(),
+        ));
+    }
+
     enforce_rate_limit(
         &state,
         authenticated_rate_limit_key("wedding_vendor_outreach_draft_burst", &headers),
@@ -296,7 +309,7 @@ async fn wedding_vendor_outreach_draft_http(
         &state,
         authenticated_rate_limit_key("wedding_vendor_outreach_draft_daily", &headers),
         RateLimitPolicy {
-            max_requests: 60,
+            max_requests: wedding_admin_ai_policy::daily_request_limit().unwrap_or(1),
             window: Duration::from_secs(86_400),
         },
     )
@@ -397,6 +410,34 @@ async fn wedding_vendor_outreach_draft_http(
         (
             StatusCode::BAD_GATEWAY,
             "couldn't write an outreach draft right now — please try again in a moment".to_string(),
+        )
+    })?;
+
+    // Fail closed if the platform-funded call cannot be written to the shared
+    // wedding usage ledger. This provides a durable, tenant-scoped audit receipt
+    // without exposing an admin key or rerouting a direct Master Agent request.
+    record_wedding_shared_tool_usage(
+        &state.db,
+        WeddingSharedToolUsageInput {
+            user_id: user.id.clone(),
+            provider: WeddingSharedToolProvider::AnthropicLlm,
+            feature: WeddingSharedToolFeature::VendorOutreachDraft,
+            quantity: 1.0,
+            estimated_cost_usd: 0.0,
+            usage_unit: Some("requests".to_string()),
+            wedding_plan_id: Some(request.wedding_plan_id.clone()),
+            operation: Some("vendor_outreach_draft".to_string()),
+            provider_request_id: None,
+            occurred_at: Some(chrono::Utc::now().to_rfc3339()),
+        },
+    )
+    .await
+    .map_err(|err| {
+        tracing::error!(%err, user_id = %user.id, "wedding_vendor_outreach_draft: audit receipt failed");
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "couldn't save the admin-funded AI usage receipt; the draft was not returned. Please try again."
+                .to_string(),
         )
     })?;
 
