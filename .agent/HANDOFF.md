@@ -306,3 +306,43 @@ Tests performed:
 
 - `solid-ui: npm run typecheck` (pass)
 - `solid-ui: wedding-admin-vendor-form-state.test.ts` (4 passing tests)
+
+## 2026-10-05 - WED-146 planner recovery and visibility polish
+
+What changed:
+
+- Guarded the home Operational Lanes projection so an absent memo value cannot
+  make the wedding planner error screen's Back to Home recovery route throw.
+- Google Places vendor photos now load through the authenticated API fetch path
+  and a temporary browser object URL rather than a bare image request that
+  cannot attach the workspace Bearer token.
+- Moved Show guide, Upload files, and the density control immediately after
+  Setup checks in the planner toolbar; removed duplicated decision-copy; and
+  strengthened the response-card action and label contrast.
+
+Evidence and checks:
+
+- Production read-only database check: 282 non-empty photo rows, all Google
+  proxy URLs; 94 vendors have three photos. Seaweed FS is not the source of
+  these provider photos.
+- Focused UI guard/photo tests: 10 passing.
+- Wedding test suite: 1,757 passing.
+- TypeScript compiler check completed without diagnostics.
+- Oracle deploy of `d16a552` completed from a clean detached worktree.
+  `artifacts/oracle-production-proof-wed146-postdeploy/` reports passed with
+  homeserver and backup services running and backup verification passed;
+  restore drill was deliberately skipped for the direct non-invasive proof.
+  The remote staged source contains `fetchGoogleWeddingVendorPhoto`, and the
+  workspace HTTP smoke returned `200`.
+
+Deployment-wrapper note:
+
+- After remote build/recreation, the local deploy wrapper became inert with no
+  child process. It was stopped only after the services and deployed source
+  marker were verified, then replaced with the successful direct proof above.
+
+Coordination note:
+
+- WED-146 was expanded concurrently with separate AI-routing acceptance
+  criteria. Its task remains `in_progress`; this handoff covers only the
+  completed production-recovery and planner-polish slice.

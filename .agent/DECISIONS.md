@@ -135,3 +135,14 @@ The 2026-10-05 snapshot has no unrepresented source fields: 130 unique rows,
 valid status values, and non-negative photo counts. Any future source fields
 must be retained as evidence/provenance before an import is accepted; they
 must not be silently discarded by a schema reshape.
+
+## 2026-10-05: Google Vendor Photos Use the Authenticated API Fetch Path
+
+Google Places photo URLs remain same-purpose, server-side proxies; they are
+not copied into Seaweed FS. Browser image elements cannot attach the workspace
+Bearer token, especially when the API host differs from the static workspace
+host. The comparison card therefore retrieves only the narrow, validated
+Google proxy path via the existing authenticated API base, renders a temporary
+object URL, and revokes it on cleanup. This preserves the server-side Places
+credential boundary while retaining the existing truthful placeholder for a
+failed image response.
