@@ -253,6 +253,36 @@ Recommended next action:
 - Finish M7 verification, then deploy the task branch's application image to
   Oracle. Startup will apply `0095` and `0096`; re-run the read-only shape and
   hash query afterward before declaring production current.
+
+## 2026-10-05 - WED-145 production deployment
+
+What changed:
+
+- Deployed the clean, committed WED-145 checkout at `608bd6a` to Oracle. The
+  release bundle was staged from the explicit runtime contract, excluding the
+  dirty workspace's unrelated `Documents/`, artifacts, build outputs, and Git
+  metadata.
+- Application startup applied migrations `0095_wedding_vendor_photo_provenance`
+  and `0096_wedding_vendor_directory_export`.
+
+Machine-derived evidence:
+
+- Oracle post-deploy proof at
+  `artifacts/oracle-production-proof-wed145-postdeploy/` passed with
+  `homeserver_running=true` and `backup_verify_status=pass` (restore drill
+  deliberately skipped for the direct non-invasive proof).
+- External workspace smoke check during deployment returned HTTP 200.
+- The live directory export has 130 rows and still hashes to
+  `f3cd92e4e975f3952d69aa924c97a345`, exactly matching the supplied Oracle
+  CSV snapshot. The export view exists and all three photo-provenance columns
+  are present.
+
+Deployment-wrapper note:
+
+- The original background deploy wrapper completed the remote build, service
+  recreation, and workspace smoke check but became locally inert before
+  emitting its post-deploy receipt. With no child or remote audit process, it
+  was stopped and replaced by the successful direct post-deploy proof above.
 - `cargo check` (pass)
 
 Unresolved problems:
