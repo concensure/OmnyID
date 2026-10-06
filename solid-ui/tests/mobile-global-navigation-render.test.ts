@@ -27,3 +27,11 @@ test("mobile route selection closes the menu and focuses the destination", () =>
   assert.match(componentSource, /document\.getElementById\("workspace-shell"\)/);
   assert.match(appSource, /id="workspace-shell" tabindex="-1"/);
 });
+
+test("wedding destinations preserve their intended inner card", () => {
+  assert.match(componentSource, /label: "Wedding Home", mode: "overview"/);
+  assert.match(componentSource, /label: "Live vendor research", sectionId: "vendor_search"/);
+  assert.match(componentSource, /setMobileFocusSingleCardSectionId\(destination\.sectionId \?\? null\)/);
+  assert.match(componentSource, /selectWeddingMenu\(\{ id: "home", label: section\.title, sectionId: section\.id, mode: "overview" \}\)/);
+  assert.doesNotMatch(componentSource, /props\.activeView === "response_queue" && mobileFocusHomeSections/);
+});

@@ -24,8 +24,11 @@ import {
 
 const DIALOG_ID = "mobile-global-navigation";
 const FOCUSABLE = "button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex='-1'])";
-const WEDDING_MENU: Array<{ id: WeddingWorkspaceMenuId; label: string }> = [
-  { id: "home", label: "Home" }, { id: "people", label: "People" }, { id: "plan", label: "Plan" },
+type WeddingMenuDestination = { id: WeddingWorkspaceMenuId; label: string; sectionId?: string; mode?: "overview" };
+const WEDDING_MENU: WeddingMenuDestination[] = [
+  { id: "home", label: "Wedding Home", mode: "overview" },
+  { id: "home", label: "Live vendor research", sectionId: "vendor_search", mode: "overview" },
+  { id: "people", label: "People" }, { id: "plan", label: "Plan" },
   { id: "budget", label: "Budget" }, { id: "documents", label: "Documents" },
   { id: "inspiration", label: "Inspiration" }, { id: "timeline", label: "Timeline" },
 ];
@@ -62,10 +65,12 @@ export function MobileHomeMenuSheet(props: {
       window.scrollTo({ top: 0, behavior: "instant" });
     });
   };
-  const selectWeddingMenu = (menu: WeddingWorkspaceMenuId) => {
-    saveWeddingWorkspaceMenu(menu);
-    replaceWeddingWorkspaceMenuInUrl(menu);
-    dispatchWeddingWorkspaceMenuSelection(menu);
+  const selectWeddingMenu = (destination: WeddingMenuDestination) => {
+    if (destination.mode) setMobileFocusMode(destination.mode, props.userId);
+    setMobileFocusSingleCardSectionId(destination.sectionId ?? null);
+    saveWeddingWorkspaceMenu(destination.id);
+    replaceWeddingWorkspaceMenuInUrl(destination.id);
+    dispatchWeddingWorkspaceMenuSelection(destination.id);
     selectApp("response_queue");
   };
 
@@ -154,16 +159,16 @@ export function MobileHomeMenuSheet(props: {
             <fieldset class="mt-4">
               <legend class="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Wedding focus</legend>
               <div class="mt-2 grid gap-2" style={{ "grid-template-columns": "repeat(auto-fit, minmax(min(100%, 7rem), 1fr))" }}>
-                <For each={["decisions", "responses", "overview"] as const}>{(entry) => <button type="button" aria-pressed={mobileFocusMode() === entry} class={`min-h-12 rounded-xl border px-2 text-xs font-semibold ${mobileFocusMode() === entry ? "border-primary bg-primary/10 text-primary" : "border-outline/20 bg-white text-on-surface"}`} onClick={() => { setMobileFocusMode(entry, props.userId); selectWeddingMenu("home"); }}>{entry[0].toUpperCase() + entry.slice(1)}</button>}</For>
+                <For each={["decisions", "responses", "overview"] as const}>{(entry) => <button type="button" aria-pressed={mobileFocusMode() === entry} class={`min-h-12 rounded-xl border px-2 text-xs font-semibold ${mobileFocusMode() === entry ? "border-primary bg-primary/10 text-primary" : "border-outline/20 bg-white text-on-surface"}`} onClick={() => { setMobileFocusMode(entry, props.userId); selectWeddingMenu({ id: "home", label: entry }); }}>{entry[0].toUpperCase() + entry.slice(1)}</button>}</For>
               </div>
             </fieldset>
 
             <MenuHeading title="Wedding planner"/>
-            <div class="grid gap-2" style={{ "grid-template-columns": "repeat(auto-fit, minmax(min(100%, 9rem), 1fr))" }}><For each={WEDDING_MENU}>{(item) => <MenuRow label={item.label} onClick={() => selectWeddingMenu(item.id)}/>}</For></div>
+            <div class="grid gap-2" style={{ "grid-template-columns": "repeat(auto-fit, minmax(min(100%, 9rem), 1fr))" }}><For each={WEDDING_MENU}>{(item) => <MenuRow label={item.label} onClick={() => selectWeddingMenu(item)}/>}</For></div>
 
-            <Show when={props.activeView === "response_queue" && mobileFocusHomeSections().length > 0}>
+            <Show when={mobileFocusHomeSections().length > 0}>
               <MenuHeading title="Home cards"/>
-              <div class="grid gap-2"><For each={mobileFocusHomeSections()}>{(section) => <MenuRow label={section.title} detail={section.summary} onClick={() => { setMobileFocusSingleCardSectionId(section.id); close(); }}/>}</For></div>
+              <div class="grid gap-2"><For each={mobileFocusHomeSections()}>{(section) => <MenuRow label={section.title} detail={section.summary} onClick={() => selectWeddingMenu({ id: "home", label: section.title, sectionId: section.id, mode: "overview" })}/>}</For></div>
             </Show>
 
             <Show when={groups().length > 0} fallback={<p class="py-8 text-center text-sm text-on-surface-variant" role="status">No pages match “{query()}”.</p>}>

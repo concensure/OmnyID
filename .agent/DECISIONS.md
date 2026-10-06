@@ -246,3 +246,17 @@ route mounts, so cross-page navigation cannot lose the requested section.
 The drawer owns focus trapping/restoration, Escape and backdrop dismissal, background scroll lock,
 safe-area spacing, current-page semantics, and zoom-safe auto-fitting controls. Page selection closes
 the drawer, moves focus to the workspace shell, and returns the viewport to the top.
+
+## 2026-10-06: Decision Cards Share One Typed Native Contract
+
+Wedding Planner and general DecisionOS decision surfaces use the `content.decision_card` model with
+one of eight explicit patterns: Choose, Approve/Act, Compare, Notice/Decide, Clarify, Coordinate,
+Review, or Record. Every card has exactly one primary action, evidence references, verification
+state, honest unknowns, and optional recommendations only when reasons and evidence are present.
+
+The native Solid renderer owns the shared anatomy and wedding/general theme variants. Surface
+adapters retain domain-specific actions: wedding deferral continues to append its existing durable
+AFP event, general queue actions open the source workflow, and mobile deck actions remain guarded by
+the existing confirmation bar. Vendor comparison is a Choose card whose desktop hero reuses
+`WeddingVendorChoiceCard`; this avoids a second comparison implementation and preserves the
+authenticated Google-photo, availability, evidence, and approval-gated outreach behavior.

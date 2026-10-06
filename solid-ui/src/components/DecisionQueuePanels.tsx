@@ -1,5 +1,6 @@
 ﻿// @locs-version: 1.0
 import { createSignal, For, Show } from "solid-js";
+import { DecisionCard } from "@/components/DecisionCard";
 import {
   ContextPanelEmptyState,
   WhyMattersSection,
@@ -10,15 +11,12 @@ import {
 } from "@/lib/decisionQueueModel";
 import { decisionQueueEntryDestinationLabel } from "@/lib/decisionQueueNavigation";
 import {
-  queueEntryAutonomySummary,
-  queueEntryConfidenceLabel,
   queueEntryConfidenceReason,
   queueEntryTrustState,
 } from "@/lib/decisionQueuePresentationState";
+import { decisionCardFromQueueEntry } from "@/lib/decisionCardState";
 
 const BUTTON_TYPE = "button" as const;
-const SEPARATOR_LABEL = "\u00b7";
-const PRIORITY_BADGE_LABEL = "priority";
 const QUEUE_CONTEXT_TITLE = "Decision details";
 const QUEUE_CONTEXT_DETAIL = "Select a decision to review its source, options, and next action.";
 const CLOSE_PANEL_ARIA_LABEL = "Close context panel";
@@ -68,48 +66,6 @@ const QUEUE_PANEL_CONTEXT_ITEM_BODY_CLASS = "min-w-0 flex-1";
 const QUEUE_PANEL_CONTEXT_ITEM_HEADER_CLASS = "flex items-center justify-between gap-2";
 const QUEUE_PANEL_CONTEXT_ITEM_TITLE_CLASS = "break-words text-[11px] font-medium text-on-surface";
 const QUEUE_PANEL_HEADER_CONTENT_CLASS = "min-w-0";
-const QUEUE_CARD_URGENCY_BADGE_BASE_CLASS =
-  "rounded-md border px-1.5 py-1 font-mono text-[9px] font-bold uppercase tracking-wide";
-const QUEUE_CARD_CONFIDENCE_CHIP_CLASS =
-  "max-w-full break-words rounded-full border border-black/10 px-2 py-1 text-[10px] text-on-surface-variant/60";
-const QUEUE_CARD_OPEN_CHIP_CLASS =
-  "rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[10px] font-medium text-primary";
-const QUEUE_CARD_WHY_SUMMARY_CLASS = "text-[10px] text-on-surface-variant/60";
-const QUEUE_CARD_BADGE_ROW_CLASS = "flex flex-wrap items-center gap-2";
-const QUEUE_CARD_HEADER_CLASS = "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between";
-const QUEUE_CARD_PRIORITY_BADGE_CLASS =
-  "rounded-full border border-indigo-200/60 bg-indigo-50/80 px-2 py-1 text-[8px] font-medium uppercase tracking-wide text-indigo-700";
-const QUEUE_CARD_TITLE_CONTAINER_CLASS = "min-w-0";
-const QUEUE_CARD_CLASS = {
-  compact:
-    "w-full rounded-2xl border bg-white/80 p-3.5 text-left shadow-card backdrop-blur-sm transition hover:shadow-md",
-  comfortable:
-    "w-full rounded-2xl border bg-white/80 p-4 text-left shadow-card backdrop-blur-sm transition hover:shadow-md",
-} as const;
-const QUEUE_CARD_TITLE_CLASS = {
-  compact: "mt-2 break-words text-[14px] font-semibold text-on-surface",
-  comfortable: "mt-2 break-words text-sm font-semibold text-on-surface",
-} as const;
-const QUEUE_CARD_CONTEXT_SUMMARY_CLASS = {
-  compact: "mt-2 break-words text-[11px] leading-[1.35rem] text-on-surface-variant",
-  comfortable: "mt-2 break-words text-xs leading-relaxed text-on-surface-variant",
-} as const;
-const QUEUE_CARD_METADATA_ROW_CLASS = {
-  compact: "mt-2.5 flex flex-wrap items-center gap-2 text-[9px] text-on-surface-variant/70",
-  comfortable: "mt-3 flex flex-wrap items-center gap-2 text-[10px] text-on-surface-variant/70",
-} as const;
-const QUEUE_CARD_PRIORITY_RATIONALE_CLASS = {
-  compact: "mt-2 break-words text-[9px] text-indigo-900/75",
-  comfortable: "mt-2 break-words text-[10px] text-indigo-900/75",
-} as const;
-const QUEUE_CARD_SECONDARY_SUMMARY_CLASS = {
-  compact: "mt-1 break-words text-[9px] text-on-surface-variant/65",
-  comfortable: "mt-1 break-words text-[10px] text-on-surface-variant/65",
-} as const;
-const QUEUE_CARD_FOOTER_CLASS = {
-  compact: "mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3",
-  comfortable: "mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3",
-} as const;
 
 function queueEntrySourceReferences(entry: QueueEntry) {
   return entry.source === "priority"
@@ -127,10 +83,6 @@ function queueEntryOpenLabel(entry: QueueEntry) {
   return `Open ${queueEntryDestinationLabel(entry)}`;
 }
 
-function queueEntryReviewLabel(entry: QueueEntry) {
-  return entry.decision.options.length > 0 ? "Review options" : "Review details";
-}
-
 export function DecisionQueueCard(props: {
   entry: QueueEntry;
   selected: boolean;
@@ -138,145 +90,17 @@ export function DecisionQueueCard(props: {
   onOpen: () => void;
   compact?: boolean;
 }) {
-  const entry = () => props.entry;
-  const compact = () => props.compact ?? false;
-  const onSelect = () => props.onSelect;
-  const onOpen = () => props.onOpen;
-  const selected = () => props.selected;
-  const compactMode = () => (compact() ? "compact" : "comfortable");
-  const cardClass = (borderClass: string, selectedClass: string) =>
-    `${QUEUE_CARD_CLASS[compactMode()]} ${borderClass} ${selectedClass}`;
-  const titleClass = () => QUEUE_CARD_TITLE_CLASS[compactMode()];
-  const contextSummaryClass = () => QUEUE_CARD_CONTEXT_SUMMARY_CLASS[compactMode()];
-  const metadataRowClass = () => QUEUE_CARD_METADATA_ROW_CLASS[compactMode()];
-  const priorityRationaleClass = () => QUEUE_CARD_PRIORITY_RATIONALE_CLASS[compactMode()];
-  const secondarySummaryClass = () => QUEUE_CARD_SECONDARY_SUMMARY_CLASS[compactMode()];
-  const footerClass = () => QUEUE_CARD_FOOTER_CLASS[compactMode()];
-  const cardState = () => {
-    const currentEntry = entry();
-    const decision = currentEntry.decision;
-    const trustState = queueEntryTrustState(currentEntry);
-    const urgency = decision.urgency;
-    const style = decisionQueueUrgencyStyle(urgency);
-    const whyBullets = decision.whyBullets ?? [];
-    const optionCount = decision.options.length;
-    const confidenceLabel = queueEntryConfidenceLabel(currentEntry);
-    const sourceReferences = queueEntrySourceReferences(currentEntry);
-    const hasSourceReferences = sourceReferences.length > 0;
-    const destinationLabel = queueEntryDestinationLabel(currentEntry);
-    const sourceSummaryText = hasSourceReferences
-      ? trustState.sourceSummary ?? "Traceable to continuity sources"
-      : null;
-    const provenanceCue = trustState.provenanceCue;
-    const provenanceSummary =
-      provenanceCue ?? (hasSourceReferences ? `Anchored in the ${destinationLabel}.` : null);
-    const priorityRationale = trustState.priorityRationale;
-    const boundedReason = trustState.boundedReason;
-    const consequencePreview = trustState.consequencePreview;
-    const autonomySummary = queueEntryAutonomySummary(currentEntry);
-
-    return {
-      decision,
-      urgencyBadgeClass: style.badge,
-      urgencyBadgeLabel: style.label,
-      selectedStateClass: selected() ? "ring-2 ring-primary/30" : "",
-      showConfidenceLabel: Boolean(confidenceLabel),
-      confidenceSummaryText: confidenceLabel,
-      isPriorityEntry: currentEntry.source === "priority",
-      metadataItems: [decision.effort, `${optionCount} option${optionCount === 1 ? "" : "s"}`].filter(
-        (item): item is string => Boolean(item),
-      ),
-      sourceSummaryText,
-      showPriorityRationale: Boolean(priorityRationale),
-      priorityRationale,
-      showBoundedReason: Boolean(boundedReason),
-      boundedReason,
-      showConsequencePreview: Boolean(consequencePreview),
-      consequencePreview,
-      showAutonomySummary: Boolean(autonomySummary),
-      autonomySummary,
-      showProvenanceSummary: Boolean(provenanceSummary),
-      provenanceSummary,
-      whySummaryText: whyBullets[0]?.text ?? decision.whyMatters,
-      openLabel: queueEntryReviewLabel(currentEntry),
-    };
-  };
-  const selectQueueEntry = () => onSelect()();
-  const openQueueEntry = () => onOpen()();
-  const handleCardKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    selectQueueEntry();
-  };
-
   return (
-    <article
-      role="button"
-      tabIndex={0}
-      onClick={selectQueueEntry}
-      onKeyDown={handleCardKeyDown}
-      class={cardClass(decisionQueueUrgencyStyle(cardState().decision.urgency).border, cardState().selectedStateClass)}
-      data-magic-action="open"
-      data-magic-icon="continuity"
-      data-magic-label={cardState().openLabel}
-      data-magic-id={props.entry.id}
-    >
-      <div class={QUEUE_CARD_HEADER_CLASS}>
-        <div class={QUEUE_CARD_TITLE_CONTAINER_CLASS}>
-          <div class={QUEUE_CARD_BADGE_ROW_CLASS}>
-            <span class={`${QUEUE_CARD_URGENCY_BADGE_BASE_CLASS} ${cardState().urgencyBadgeClass}`}>
-              {cardState().urgencyBadgeLabel}
-            </span>
-            <Show when={cardState().isPriorityEntry}>
-              <span class={QUEUE_CARD_PRIORITY_BADGE_CLASS}>
-                {PRIORITY_BADGE_LABEL}
-              </span>
-            </Show>
-          </div>
-          <h2 class={titleClass()}>{cardState().decision.title}</h2>
-        </div>
-      </div>
-
-      <p class={contextSummaryClass()}>{cardState().decision.context}</p>
-
-      <div class={metadataRowClass()}>
-        <For each={cardState().metadataItems}>
-          {(item, index) => (
-            <>
-              <Show when={index() > 0}>
-                <span>{SEPARATOR_LABEL}</span>
-              </Show>
-              <span>{item}</span>
-            </>
-          )}
-        </For>
-      </div>
-      <Show when={cardState().showPriorityRationale}>
-        <p class={priorityRationaleClass()}>
-          {cardState().priorityRationale}
-        </p>
-      </Show>
-      <Show when={cardState().showAutonomySummary}>
-        <p class={secondarySummaryClass()}>
-          {cardState().autonomySummary}
-        </p>
-      </Show>
-      <div class={footerClass()}>
-        <span class={QUEUE_CARD_WHY_SUMMARY_CLASS}>
-          {cardState().whySummaryText}
-        </span>
-        <button
-          type={BUTTON_TYPE}
-          class={`${QUEUE_CARD_OPEN_CHIP_CLASS} transition hover:border-primary/35 hover:bg-primary/10`}
-          onClick={(event) => {
-            event.stopPropagation();
-            openQueueEntry();
-          }}
-        >
-          {cardState().openLabel}
-        </button>
-      </div>
-    </article>
+    <DecisionCard
+      card={decisionCardFromQueueEntry(props.entry)}
+      mode={props.compact ? "compact" : "standard"}
+      selected={props.selected}
+      onSelect={props.onSelect}
+      onAction={(action) => {
+        if (action.id === "open") props.onOpen();
+      }}
+      class={decisionQueueUrgencyStyle(props.entry.decision.urgency).border}
+    />
   );
 }
 

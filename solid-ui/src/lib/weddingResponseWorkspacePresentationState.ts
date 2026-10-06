@@ -1,5 +1,4 @@
 // @locs-version: 1.0
-import { apiUrlForPath } from "@/lib/api";
 import { weddingVendorRankingCardFieldsFromRecord } from "@/lib/weddingVendorRankingState";
 import {
   weddingArtifactEvidenceStatus,
@@ -530,7 +529,9 @@ function vendorComparisonHandoffForArtifact(metadata: Record<string, unknown>): 
 
 function safeExternalUrl(value: unknown): string | null {
   const url = clean(value);
-  if (/^\/wedding\/vendor-photo\/google\?name=/i.test(url)) return apiUrlForPath(url) || null;
+  // Keep this authenticated proxy path relative so WeddingVendorChoiceCard can
+  // fetch it with the current bearer token before creating a safe object URL.
+  if (/^\/wedding\/vendor-photo\/google\?name=/i.test(url)) return url;
   if (!/^https?:\/\//i.test(url)) return null;
   try {
     const parsed = new URL(url);

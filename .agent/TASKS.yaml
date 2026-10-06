@@ -329,3 +329,31 @@ tasks:
       - desktop navigation and page-specific mobile controls remain behaviorally unchanged
       - focused tests, full typecheck, production build, and relevant regression suites pass
       - required Caddy guard remains in deployment ancestry and Oracle post-deploy proof passes
+
+  - id: WED-149
+    title: Wedding route continuity, vendor comparison parity, and shared decision cards
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-149
+    depends_on:
+      - WED-143
+      - WED-148
+    files:
+      - solid-ui/src/components/MobileHomeMenuSheet.tsx
+      - solid-ui/src/components/ResponseQueueView.tsx
+      - solid-ui/src/components/WeddingVendorChoiceCard.tsx
+      - solid-ui/src/components/WeddingMobileFocusHome.tsx
+      - solid-ui/src/components/Decision*.tsx
+      - solid-ui/src/lib/mobileGlobalNavigationState.ts
+      - solid-ui/src/lib/wedding*State.ts
+      - solid-ui/src/lib/decision*State.ts
+      - solid-ui/tests/**decision*.test.ts
+      - solid-ui/tests/**wedding*.test.ts
+      - .agent/**
+    acceptance:
+      - each mobile wedding menu entry opens its named wedding section instead of a generic response route
+      - vendor research opens the live-research surface while Wedding Home opens the focus home
+      - persisted exactly-three vendor comparisons render on laptop and mobile from the same artifact state
+      - verified vendor photos render through the authenticated image path and missing images show an honest placeholder
+      - wedding and general DecisionOS use the shared decision-card contract and native accessible renderer
+      - focused tests, typecheck, build, guarded Oracle deployment, and production proof are recorded

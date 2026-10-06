@@ -3,10 +3,12 @@ import { createEffect, createMemo, createSignal, onCleanup, Show, type JSX } fro
 
 import { MobileFocusDeck } from "@/components/MobileFocusDeck";
 import { MobileFocusHome } from "@/components/MobileFocusHome";
+import { DecisionCard } from "@/components/DecisionCard";
 import { QueueClearedZenState } from "@/components/QueueClearedZenState";
 import { WeddingHomeOverviewGrid } from "@/components/WeddingHomeOverviewGrid";
 import type { SendAfpMessageInput } from "@/lib/api";
 import { decisionTriageToAfpSendInput } from "@/lib/decisionTriageAfpState";
+import { decisionCardFromFocusDeckItem } from "@/lib/decisionCardState";
 import { buildWeddingDecisionFocusDisplayState } from "@/lib/weddingDecisionFocusDisplayState";
 import { buildWeddingDecisionDeferSidebarAction } from "@/lib/weddingDecisionFocusActionState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
@@ -228,25 +230,15 @@ export function WeddingMobileFocusHome(props: {
 
 function DeckCard(props: { item: FocusDeckItem; onOpenAgentDraft: () => void }) {
   return (
-    <article class="flex min-h-0 flex-1 flex-col">
-      <span class="w-fit rounded-full bg-wedding-surface-blush px-2 py-1 text-xs font-semibold text-wedding-accent">{props.item.kind === "decision" ? "Decision" : "Response"}</span>
-      <h2 class="mt-4 line-clamp-3 text-xl font-semibold text-wedding-text">{props.item.title}</h2>
-      <p class="mt-4 text-sm font-semibold text-wedding-text">Recommended: {props.item.recommendedActionLabel}</p>
-      <p class="mt-3 line-clamp-3 text-sm leading-6 text-wedding-muted">{props.item.whyNowLabel}</p>
-      <div class="mt-4 flex flex-wrap gap-2">
-        {props.item.evidenceLabels.slice(0, 3).map((label) => <span class="rounded-full border border-wedding-muted bg-wedding-surface-muted px-2 py-1 text-xs text-wedding-text">{label}</span>)}
-      </div>
-      <Show when={props.item.kind === "response"}>
-        <button
-          type="button"
-          class="mt-4 min-h-11 w-fit rounded-xl border border-wedding-accent bg-white px-3 text-sm font-semibold text-wedding-accent"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={props.onOpenAgentDraft}
-        >
-          Open agent draft
-        </button>
-      </Show>
+    <div class="flex min-h-0 flex-1 flex-col">
+      <DecisionCard
+        card={decisionCardFromFocusDeckItem(props.item)}
+        mode="standard"
+        showActions={props.item.kind === "response"}
+        onAction={() => props.onOpenAgentDraft()}
+        class="shadow-none"
+      />
       <p class="mt-auto pt-4 text-xs text-wedding-muted">Use the action bar or swipe. Sending a vendor message always needs a separate confirmation.</p>
-    </article>
+    </div>
   );
 }

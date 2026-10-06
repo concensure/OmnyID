@@ -13,6 +13,8 @@ import { WeddingResilienceCardList } from "@/components/WeddingResilienceCardLis
 import { WeddingVendorQuoteProofDrawer } from "@/components/WeddingVendorQuoteProofDrawer";
 import { WeddingVendorQuoteReplyCard } from "@/components/WeddingVendorQuoteReplyCard";
 import { WeddingVendorFollowUpPanel } from "@/components/WeddingVendorFollowUpPanel";
+import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
+import { DecisionCard } from "@/components/DecisionCard";
 import { WeddingMobileFocusHome } from "@/components/WeddingMobileFocusHome";
 import { weddingVendorFollowUpOutreachCardData } from "@/lib/weddingVendorFollowUpPanelActionState";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
@@ -29,6 +31,7 @@ import {
   type WeddingBundleExportFormat,
 } from "@/lib/weddingBrowserExportActions";
 import { weddingDecisionDeferralActionToAfpSendInput } from "@/lib/weddingDecisionDeferralAfpState";
+import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
 import {
   approveWeddingApprovalRequestState,
   type WeddingApprovalRequestState,
@@ -976,51 +979,30 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
                             </For>
                           </div>
                           <Show when={preview().vendorComparisonCards.length > 0}>
-                            <div class="mt-3 grid gap-2 lg:grid-cols-3">
-                              <For each={preview().vendorComparisonCards.slice(0, 3)}>
-                                {(vendor) => (
-                                  <article class="min-w-0 rounded-xl border border-rose-100 bg-white/90 p-3">
-                                    <div class="flex items-start justify-between gap-2">
-                                      <p class="min-w-0 break-words text-sm font-semibold text-rose-950">
-                                        {vendor.rank}. {vendor.title}
-                                      </p>
-                                      <span class="shrink-0 rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-900">
-                                        {vendor.scoreLabel}
-                                      </span>
-                                    </div>
-                                    <p class="mt-2 break-words text-xs leading-5 text-rose-950/70">
-                                      {vendor.preferenceMatch || vendor.situationFit || vendor.verificationLabel}
-                                    </p>
-                                    <div class="mt-3 flex flex-wrap gap-2">
-                                      <Show when={vendor.websiteUrl ?? vendor.sourceUrl}>
-                                        {(url) => (
-                                          <a
-                                            class="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-950 transition hover:bg-rose-100"
-                                            href={url()}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                          >
-                                            Website
-                                          </a>
-                                        )}
-                                      </Show>
-                                      <Show when={vendor.mapUrl}>
-                                        {(url) => (
-                                          <a
-                                            class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                                            href={url()}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                          >
-                                            Map
-                                          </a>
-                                        )}
-                                      </Show>
-                                    </div>
-                                  </article>
-                                )}
-                              </For>
-                            </div>
+                            <DecisionCard
+                              card={decisionCardFromWeddingVendorComparison(preview())}
+                              mode="standard"
+                              showActions={false}
+                              class="mt-3 shadow-none"
+                              hero={(
+                                <div class="grid gap-2 lg:grid-cols-3">
+                                  <For each={preview().vendorComparisonCards.slice(0, 3)}>
+                                    {(vendor) => (
+                                      <WeddingVendorChoiceCard
+                                        card={vendor}
+                                        outreachFlow={vendorOutreach.flows()[vendor.choiceId] ?? null}
+                                        gmailConnected={Boolean(props.gmailStatus?.connected)}
+                                        onContactVendor={(card) => void vendorOutreach.onContactVendor(card, action().artifactId)}
+                                        onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
+                                        onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)}
+                                        onCancelOutreach={vendorOutreach.onCancelOutreach}
+                                        onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
+                                      />
+                                    )}
+                                  </For>
+                                </div>
+                              )}
+                            />
                           </Show>
                         </>
                       )}
