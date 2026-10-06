@@ -435,7 +435,7 @@ tasks:
 
   - id: WED-152
     title: Wedding vendor search interaction and navigation reliability
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-150
     depends_on:
@@ -464,3 +464,4 @@ tasks:
     progress:
       - implementation, 1793-test wedding regression suite, typecheck, line budget, and production build pass locally
       - Oracle cleanup reclaimed build cache and restored disk headroom from 18 percent to 29 percent free
+      - implementation commit db6d2c6 deployed through the guarded Oracle UI path; synchronous post-deploy proof passed

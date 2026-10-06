@@ -830,3 +830,48 @@ Remaining external gates and next action:
   evidence-aware cleanup procedure until at least 25% is free; do not bypass the preflight gate.
 - Perform one authenticated phone/laptop acceptance pass using real wedding data and a real Master
   Agent query, then continue the documented canary evidence collection.
+
+# 2026-10-06 - WED-152 vendor-search and browser-navigation reliability
+
+What changed:
+
+- Vendor search is a native form, so Enter and **Search vendors** execute the same guarded action.
+- Strict directory-first search still attempts the one permitted online fallback, but a remaining
+  shortfall no longer discards suitable evidence. One or two source-backed vendors are persisted and
+  rendered immediately, with explicit shortlist status, shortfall, and reason metadata.
+- **Show full search result** now expands the saved Vendor search notes body directly below the
+  result and can be hidden or closed without switching to Documents.
+- Primary application views now push typed browser-history entries and restore them on Back/Forward.
+  Existing query/hash context remains intact.
+- Template launch waits for the destination chunk before changing view; the wedding intent is then
+  dispatched against the mounted planner, removing the observed transient render/retry race.
+
+Tests performed:
+
+- focused vendor-search/history tests: 30 passing, plus the final 24-test interaction regression run
+- `npm run test:wedding`: 1,793 passing
+- `npm run typecheck`: pass
+- `npm run test:line-budget`: pass
+- `npm run build`: pass locally and in the Oracle UI image
+- `git diff --check` and LOCS commit guard: pass
+
+Deployment evidence:
+
+- Implementation commit `db6d2c6` includes required guard ancestor `a95514e` (and `7e1880d`).
+- Read-only inventory measured 82% root use. The evidence-aware cleanup removed 5.36 GB of Docker
+  build cache only; no containers, volumes, backups, or shared review targets were deleted. Its
+  optional journal vacuum failed, but fresh inventory measured 71% use / 13 GB free before deploy.
+- Guarded UI deployment used the existing remote environment, rebuilt only `ui`, and force-recreated
+  Caddy from the staged guarded configuration. Root, `/workspace/`, and `/wedding/` return HTTP 200.
+- Live workspace assets contain the browser-history marker, **Show full search result**, and the
+  honest partial-shortlist copy; the former **Open in Documents** result action is absent.
+- `artifacts/oracle-production-proof-wed152-deploy/postdeploy/` reports `status=pass`, homeserver and
+  backup running, manifest/backup verification pass, restore drill pass, runtime integrity pass,
+  and root plus `/var` usage at 73%.
+
+Remaining external gates:
+
+- WED-150 human ranking judges, named accessibility/usability sessions, security disposition,
+  14-day SLO window, and staged rollout approvals remain external and intentionally open.
+- An authenticated human acceptance pass should verify the exact provider result and browser history
+  on the target phone/laptop, because the automated and public checks do not use the user's account.
