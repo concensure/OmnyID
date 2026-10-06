@@ -661,3 +661,56 @@ Recommended next action:
 
 - Perform the named mobile WCAG/device review against the live build, then collect canary SLO and
   provider evidence before advancing beyond the documented developer-canary stage.
+
+# 2026-10-06 - WED-149 wedding routing, vendor comparison, and Decision Cards
+
+What changed:
+
+- Mobile wedding destinations now preserve inner intent: **Wedding Home** opens overview,
+  **Live vendor research** opens the `vendor_search` home card, every other wedding destination
+  clears stale card selection, and published home cards route correctly from any application page.
+- The inline laptop vendor-search result now renders the persisted top-three comparison through
+  `WeddingVendorChoiceCard`, matching the mobile artifact state and retaining photos, truthful
+  placeholders, evidence, availability, contact details, and approval-gated outreach.
+- Fixed Google Places photos by preserving the validated relative proxy path until the choice card
+  performs its authenticated fetch and creates a temporary object URL.
+- Added the typed `content.decision_card` contract, eight pattern identifiers, validation, and one
+  native Solid renderer with wedding/general themes and glance/compact/standard/full modes.
+  General DecisionOS queue cards, wedding focus cards, mobile focus cards, and vendor comparison
+  now consume that shared primitive while retaining their existing durable/safe action flows.
+
+Tests performed:
+
+- `npm run typecheck` (pass)
+- `npm run test:wedding` (1,766 passing)
+- `npm run test:decisionos-navigation` (7 passing)
+- decision-card, live-vendor rendering, and mobile destination focused tests (9 passing)
+- `npm run build` locally and in the Oracle UI image build (pass)
+- `git diff --check` (pass)
+- `npm run test:line-budget` remains red only on the recorded pre-existing oversized baseline
+  files; the already-large wedding workspace component is 18 lines smaller than at task start.
+
+Deployment evidence:
+
+- Implementation commit `f326068` was deployed through the scoped Oracle UI build; Caddy was
+  force-recreated from the guarded configuration. Required guard commit `a95514e` (including
+  `7e1880d`) is an ancestor of the deployed commit.
+- Public root returned HTTP 200 and `/docs/PRODUCTION_ROLLOUT_RUNBOOK.md` returned HTTP 404.
+- The initial detached audit completed remotely with status/exit 0, but its local deploy wrapper
+  did not collect the finished report and was stopped only after the remote job had completed.
+- A clean synchronous proof at `artifacts/oracle-production-proof-wed149-postdeploy-retry/` reports
+  `status=pass`, homeserver and backup running, manifest/runtime integrity pass, backup verification
+  pass, restore drill pass, and root plus `/var` usage at 82%.
+- Live staged source preserves the relative authenticated Google photo proxy and the authoritative
+  `FREE_STORAGE_BYTES = GIB_BYTES` / `PAID_STORAGE_BYTES = 2 * GIB_BYTES` policy.
+
+Unresolved production/GA gates:
+
+- The pre-existing manual WCAG/device/usability sign-off, JavaScript advisory disposition,
+  hosted canary/SLO windows, and named rollout approvals remain external gates; none were
+  represented as complete by this UI rollout.
+
+Recommended next action:
+
+- Perform an authenticated phone/laptop acceptance pass on real wedding data, then continue the
+  documented canary evidence collection before broadening rollout.

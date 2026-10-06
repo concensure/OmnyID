@@ -332,7 +332,7 @@ tasks:
 
   - id: WED-149
     title: Wedding route continuity, vendor comparison parity, and shared decision cards
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-149
     depends_on:
