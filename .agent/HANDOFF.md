@@ -773,3 +773,60 @@ Recommended next action:
 
 - Perform an authenticated phone/laptop acceptance pass on real wedding data, then continue the
   documented canary evidence collection before broadening rollout.
+
+# 2026-10-06 - WED-150/WED-151 closure rollout and production visibility repair
+
+What changed:
+
+- Completed the agent-closable wedding production closure work: durable shortlist claims,
+  persisted outreach/reply projections, deterministic three-card mobile deck, ranking-v2 policy
+  modules and fail-closed evaluation gate, shared decision triage, source splits, operational
+  evidence contracts, and four Playwright/axe scenarios at 360px and 1280px.
+- Fixed the production-only invisible text regression. Oracle runtime staging now includes
+  `solid-ui/tailwind.config.cjs` and `solid-ui/postcss.config.cjs`, so the deployed build generates
+  the wedding text/background/border utilities used by buttons and follow-up tags.
+- Removed the internal **Update availability** selector from vendor recommendation cards. The card
+  still shows the provider-derived availability status and routes the primary action appropriately.
+- Reduced seeded demo messages to one clearly labelled item. New accounts receive one signed Demo
+  welcome message; migration 0099 removes redundant legacy seeds, while the UI labels and supplies
+  exactly one fallback without rewriting a retained signed payload.
+- Added a plain, always-visible Master Agent response panel before the enhanced AFP preview so a
+  completed search cannot disappear because a rich renderer returns no visible surface.
+
+Tests performed:
+
+- `npm run test:wedding`: 1,791 passing
+- `npm run test:wedding:e2e`: 4 passing at mobile and desktop widths
+- focused Master Agent/demo tests: 11 passing
+- `npm run typecheck`, `npm run build`, `npm run test:line-budget`: passing
+- `scripts/stage-oracle-runtime-pwsh-selftest.ps1`: passing with 52/51 expected staged paths
+- `cargo check` and full `cargo test --quiet`: 2,320 core tests plus integration/doctests passing
+- `git diff --check` and LOCS commit guard: passing
+
+Deployment evidence:
+
+- Deployed implementation commit `b8fee60` using the existing Oracle production environment with
+  scoped UI and homeserver rebuilds and guarded Caddy recreation. Required commit `a95514e`
+  (including `7e1880d`) is an ancestor.
+- Public `/`, `/workspace/`, and `/wedding/` return HTTP 200. Live CSS contains
+  `.text-wedding-text`, `.bg-wedding-accent`, and `.border-wedding-muted`; live JavaScript contains
+  the Master Agent response and Demo welcome, retains **Check availability**, and does not contain
+  **Update availability**.
+- Migrations `0098_wedding_vendor_shortlist_run_claims` and `0099_single_demo_seed_message` are
+  applied. Existing tenant schemas contain no redundant server demo seeds.
+- `artifacts/oracle-production-proof-wed151-postdeploy-sync/` reports `status=pass`, homeserver and
+  backup running, runtime integrity pass, backup verification pass, restore drill pass, and no
+  failure step.
+- The deploy wrapper's detached proof completed remotely with status/exit 0 but left a literal `$!`
+  PID and continued polling. Only the local polling wrapper was interrupted; the synchronous proof
+  was then run to completion and is the authoritative local artifact.
+
+Remaining external gates and next action:
+
+- WED-150's human judging/NDCG corpus, named accessibility/usability sessions, security-owner
+  disposition, 14-day SLO window, and rollout approvals remain intentionally open; local code does
+  not fabricate those results.
+- Oracle is now 82% used (about 8.7 GB free). Before another normal deployment, perform the existing
+  evidence-aware cleanup procedure until at least 25% is free; do not bypass the preflight gate.
+- Perform one authenticated phone/laptop acceptance pass using real wedding data and a real Master
+  Agent query, then continue the documented canary evidence collection.

@@ -401,7 +401,7 @@ tasks:
 
   - id: WED-151
     title: Production wedding visibility, demo-seed cleanup, and Master Agent response recovery
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-150
     depends_on:
@@ -426,3 +426,8 @@ tasks:
       - new and existing accounts retain at most one clearly labelled demo seed message
       - every completed Master Agent command renders a plain visible response before enhanced preview content
       - guarded deployment and external production verification are recorded
+    progress:
+      - implementation commit b8fee60 deployed to Oracle with required guard commit a95514e in ancestry
+      - production CSS and JavaScript asset inspection confirms the wedding tokens, Master Agent response panel, one-demo copy, and removed availability editor
+      - migrations 0098 and 0099 are applied; all existing tenant schemas report zero redundant server demo seeds and the UI supplies one labelled fallback
+      - synchronous Oracle production proof passed with backup verification and restore drill evidence
