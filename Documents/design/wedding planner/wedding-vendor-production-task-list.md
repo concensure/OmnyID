@@ -6,7 +6,8 @@ refactors and test expansion after Sol defines the contract
 Governing spec: `wedding-vendor-decisionos-mvp-to-production-spec.md`
 
 Implementation status (2026-10-06): release-candidate contracts and local machine gates are
-implemented under WED-147. Hosted canary, restore/rollback drill, measured SLO windows, accessibility
+implemented under WED-147 and commit `f0eeb43` is deployed to the Oracle developer canary with a
+passing backup/restore production proof. Measured SLO windows, accessibility
 manual checks, staged cohorts, and accountable GA sign-offs remain external release gates and must
 not be marked complete without their real evidence. Machine-readable policy:
 `config/wedding_vendor_production_v1.json`; operator/security runbook:
@@ -389,7 +390,7 @@ real hosted rollout. "Implemented" does not mean that a later hosted or human ga
 | P3 | Complete for the release candidate: the versioned deterministic ranker/provenance policy passes the synthetic consent-safe corpus for three categories and geographies with precision 1.0, recall 1.0, duplicate rate 0, photo identity 1.0, top-three relevance 1.0, and unknown-label precision 1.0. | Measure directory/fallback/selection/request outcomes and photo lifecycle on the controlled beta cohort. |
 | P4 | Complete for code and policy: provider calls remain directory-first, server-bounded, metered, rate-limited, timeout-bounded, feature-flagged, and honestly degraded. | Run provider outage, quota exhaustion, regional fault, and sustained load tests against hosted configuration. |
 | P5 | Complete for deterministic lifecycle/projection contracts: semantic actions, immutable approval boundary, one decision identity, one active category, and history/supersession behavior are contract-tested. | Complete WCAG 2.2 AA manual keyboard/screen-reader, device, zoom, localization, and moderated usability acceptance. |
-| P6 | Complete for replay/reconciliation/approval and the documented threat model. Rust dependency audit has no reachable known vulnerability; tracked secret-pattern scan has no match. | Resolve or formally accept the recorded upstream JavaScript audit risks, then run authorized SAST/DAST and the hosted restore/rollback drill. |
+| P6 | Complete for replay/reconciliation/approval and the documented threat model. Rust dependency audit has no reachable known vulnerability; tracked secret-pattern scan has no match; the Oracle backup/restore proof passes. | Resolve or formally accept the recorded upstream JavaScript audit risks, then run authorized SAST/DAST and the hosted rollback drill. |
 | P7 | Complete for metric emission, zero-tolerance counters, numerical SLO policy, alerts/runbooks, and deterministic eval fixtures. | Collect stable canary SLO/error-budget windows and a hosted synthetic-canary proof packet. |
 | P8 | Complete for kill switches, degradation order, rollout stages, rollback procedure, evidence template, and ownership roles. | Execute each cohort and obtain named product, engineering, security/privacy, and operations approvals. |
 

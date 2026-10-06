@@ -544,3 +544,69 @@ Unresolved problems:
   its machine result remains separate from this targeted deployment.
 - WED-146 remains in progress for its pre-existing planner recovery and polish
   acceptance criteria.
+
+# 2026-10-06 - WED-147 wedding vendor production release candidate
+
+What changed:
+
+- Merged required security/Caddy guard commit `a95514e` (including `7e1880d`) through merge commit
+  `6cc32e7` before deployment. The deployed release commit is `f0eeb43`.
+- Added controlled `wedding.vendor_selection@1` and `wedding.vendor_quote_response@1` patterns,
+  deterministic verification, server insert-time quote projection, five-minute reconciliation,
+  stable identities, four safety dates, deferral/resurface, supersession, replay, and approval/send
+  payload-hash binding.
+- Added provider/enrichment/shortlist/send/projection kill switches, deterministic quality corpus,
+  metrics, SLO policy, threat model, rollout gates, and operator runbooks.
+- Changed authoritative account storage policy and all affected product copy/tests from 5/15 GB to
+  1 GiB for new/free accounts and 2 GiB for upgraded accounts. The explicit 10 GiB add-on remains.
+- Refreshed Rust and JavaScript dependency locks. Reachable Rust advisories were removed; CI retains
+  one documented unreachable lockfile-only RSA exception.
+
+Deployment evidence:
+
+- Oracle runtime inventory: root filesystem 70% before build with 14 GiB free; runtime script
+  integrity passed. Its synthetic-message and operational-history subqueries returned unavailable
+  because of existing shell/`psql` quoting defects and were not represented as passing.
+- The normal deployment used the existing remote production env and explicit 50-path runtime
+  manifest. UI, homeserver, backup, and Caddy were rebuilt/recreated. Public workspace smoke is HTTP
+  200; an internal Markdown URL is HTTP 404, proving the Caddy guard remained active.
+- `artifacts/oracle-production-proof-wed147-deploy/postdeploy/` reports `status=pass`, homeserver and
+  backup running, backup verification pass, restore drill pass, and root `/var` use at 82%.
+- Live staged source contains `FREE_STORAGE_BYTES = GIB_BYTES` and
+  `PAID_STORAGE_BYTES = 2 * GIB_BYTES`; the running homeserver image is the release image built at
+  deployment time.
+- The deploy and detached-proof wrappers both reached their known inert local post-remote state with
+  no child/remote process. Only those inert local wrappers were stopped; the authoritative proof was
+  rerun synchronously and passed.
+
+Tests and gates:
+
+- `cargo check` passed after the dependency refresh.
+- Full `cargo test` passed: 2,321 library, 12 API-flow, 3 taxonomy, and 1 doctest; 11 doctests ignored.
+- `cargo audit --ignore RUSTSEC-2023-0071` passed with one allowed `lru` warning. `rsa` and
+  `sqlx-mysql` are absent from the resolved build graph.
+- Fresh-lock UI install, `npm run typecheck`, `npm run build`, `npm run test:wedding` (1,766), and
+  `npm run test:decisionos-navigation` (7) passed. TypeScript SDK `npx tsc --noEmit` passed.
+- The first fresh-lock wedding run hit a one-millisecond pre-existing outreach timestamp assertion
+  and a deliberately incomplete temporary config copy; both focused tests and the complete rerun
+  passed after the policy fixture was present.
+- Tracked secret-pattern scan returned no matches.
+- `npm run test:line-budget` remains red on committed/pre-existing oversized files; no cap was
+  raised and every new WED-147 source/test module is below 999 lines.
+
+Unresolved production/GA gates:
+
+- Manual WCAG 2.2 AA/device/usability acceptance, controlled Gmail/provider canaries, stable hosted
+  SLO windows, later rollout cohorts, and named product/engineering/security/privacy/operations
+  approvals remain required. The task list deliberately leaves those boxes unchecked.
+- JavaScript audit still reports the upstream TipTap 2 moderate advisory and high `image-size`
+  JXL/HEIF/ICNS denial-of-service advisories inherited through `pptxgenjs`. The wedding path does not
+  invoke that parser, but security must formally accept reachability or adopt patched upstream
+  packages before GA.
+- Oracle inventory synthetic/operational-history queries need a separate quoting repair.
+
+Recommended next action:
+
+- Hold at developer canary. Collect quote-projection/provider/SLO evidence, complete the manual
+  accessibility and security reviews, repair the line-budget baseline and inventory queries, then
+  advance through the documented internal/beta/percentage stages only with named approvals.

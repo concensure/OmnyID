@@ -274,7 +274,7 @@ tasks:
 
   - id: WED-147
     title: Wedding vendor production contract and Oracle account storage policy
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-146
     depends_on:
