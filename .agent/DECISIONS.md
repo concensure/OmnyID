@@ -234,3 +234,15 @@ JavaScript audit findings without compatible upstream fixes remain visible relea
 being hidden by force-downgrades or blanket audit ignores. The current TipTap moderate advisory and
 `image-size` high parser denial-of-service advisory require security disposition before GA, even
 though the wedding path does not invoke PPTX image parsing.
+
+## 2026-10-06: Mobile Navigation Is A Global Application Control
+
+The phone navigation trigger is mounted at the application shell rather than inside an individual
+view. It opens one modal drawer with the same supported destinations as the desktop rail, preserves
+feature-gated Study, PARA, and Runner visibility, and keeps wedding workspace navigation available
+from every page. Wedding submenu intent is written to storage and the URL before the lazy wedding
+route mounts, so cross-page navigation cannot lose the requested section.
+
+The drawer owns focus trapping/restoration, Escape and backdrop dismissal, background scroll lock,
+safe-area spacing, current-page semantics, and zoom-safe auto-fitting controls. Page selection closes
+the drawer, moves focus to the workspace shell, and returns the viewport to the top.

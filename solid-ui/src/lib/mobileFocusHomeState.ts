@@ -22,6 +22,7 @@ export const FOCUS_DECK_HORIZONTAL_MAPPING = "left_is_prev" as const;
 const [viewport, setViewport] = createSignal(false);
 const [mode, setMode] = createSignal<FocusMode>("decisions");
 const [menuOpen, setMenuOpen] = createSignal(false);
+const [menuAttentionCount, setMenuAttentionCountSignal] = createSignal(0);
 const [mobileAskOpen, setMobileAskOpen] = createSignal(false);
 const [singleCardSectionId, setSingleCardSectionId] = createSignal<string | null>(null);
 const [homeSections, setHomeSections] = createSignal<MobileHomeSection[]>([]);
@@ -47,6 +48,7 @@ export function installMobileFocusViewportListener(): () => void {
 export const isMobileFocusViewport: Accessor<boolean> = viewport;
 export const mobileFocusMode: Accessor<FocusMode> = mode;
 export const mobileFocusMenuOpen: Accessor<boolean> = menuOpen;
+export const mobileFocusMenuAttentionCount: Accessor<number> = menuAttentionCount;
 export const mobileFocusAskOpen: Accessor<boolean> = mobileAskOpen;
 export const mobileFocusSingleCardSectionId: Accessor<string | null> = singleCardSectionId;
 export const mobileFocusHomeSections: Accessor<MobileHomeSection[]> = homeSections;
@@ -63,6 +65,9 @@ export function loadMobileFocusMode(userId?: string | null): FocusMode {
   return mode();
 }
 export function setMobileFocusMenuOpen(open: boolean): void { setMenuOpen(open); }
+export function setMobileFocusMenuAttentionCount(count: number): void {
+  setMenuAttentionCountSignal(Math.max(0, Math.floor(count)));
+}
 export function setMobileFocusAskOpen(open: boolean): void { setMobileAskOpen(open); }
 export function setMobileFocusSingleCardSectionId(id: string | null): void { setSingleCardSectionId(id); }
 export function publishMobileFocusHomeSections(sections: MobileHomeSection[]): void { setHomeSections(sections); }

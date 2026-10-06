@@ -302,3 +302,30 @@ tasks:
       - provider, ranking, replay, security, observability, and rollout gates are machine-readable
       - new free accounts receive 1 GiB hosted storage and upgraded accounts receive 2 GiB
       - relevant Rust, UI, SDK, line-budget, build, and focused production checks are recorded
+
+  - id: WED-148
+    title: Global mobile navigation and Oracle production rollout
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-148
+    depends_on:
+      - UX-MFH-01
+      - WED-147
+      - SEC-001
+    files:
+      - solid-ui/src/App.tsx
+      - solid-ui/src/components/NavBar.tsx
+      - solid-ui/src/components/MobileHomeMenuSheet.tsx
+      - solid-ui/src/components/**Navigation*.tsx
+      - solid-ui/src/lib/**navigation*.ts
+      - solid-ui/src/index.css
+      - solid-ui/tests/**navigation*.test.ts
+      - solid-ui/tests/**mobile*.test.ts
+      - .agent/**
+    acceptance:
+      - every authenticated application page exposes one consistent mobile menu trigger
+      - the menu can navigate to every supported primary destination and closes after navigation
+      - keyboard, screen-reader, focus restoration, scroll lock, safe-area, and 200-percent zoom behavior are covered
+      - desktop navigation and page-specific mobile controls remain behaviorally unchanged
+      - focused tests, full typecheck, production build, and relevant regression suites pass
+      - required Caddy guard remains in deployment ancestry and Oracle post-deploy proof passes

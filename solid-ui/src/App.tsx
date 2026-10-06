@@ -3247,10 +3247,17 @@ function App() {
       />
 
       <Show when={isMobileFocusViewport()}>
-        <MobileHomeMenuSheet userId={userId()} onSelectApp={selectKnownView} />
+        <MobileHomeMenuSheet
+          activeView={activeView()}
+          advanced={advanced()}
+          paraViewEnabled={paraViewEnabled()}
+          studyLensEnabled={studyLensEnabled()}
+          userId={userId()}
+          onSelectApp={selectKnownView}
+        />
       </Show>
 
-      <GlassPanel id="workspace-shell" class="mx-auto max-w-[1700px] p-0 sm:p-5 sm:pl-[76px] lg:p-8 lg:pl-[80px]">
+      <GlassPanel id="workspace-shell" tabindex="-1" class="mx-auto max-w-[1700px] p-0 sm:p-5 sm:pl-[76px] lg:p-8 lg:pl-[80px]">
 
         {/* Fleet pane — slides in below nav when user clicks active/idle badge */}
         <Show when={fleetOpen()}>
