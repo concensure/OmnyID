@@ -305,7 +305,7 @@ tasks:
 
   - id: WED-148
     title: Global mobile navigation and Oracle production rollout
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-148
     depends_on:

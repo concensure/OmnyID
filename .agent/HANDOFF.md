@@ -610,3 +610,54 @@ Recommended next action:
 - Hold at developer canary. Collect quote-projection/provider/SLO evidence, complete the manual
   accessibility and security reviews, repair the line-budget baseline and inventory queries, then
   advance through the documented internal/beta/percentage stages only with named approvals.
+
+# 2026-10-06 - WED-148 global mobile navigation and Oracle rollout
+
+What changed:
+
+- Added one application-shell mobile menu trigger that remains reachable from every phone view,
+  retains the wedding attention badge, and replaces the duplicate wedding-home-only control.
+- Expanded the drawer to the supported desktop destinations, including feature-gated Study, PARA,
+  and Runner entries, searchable groups, current-page state, and persisted cross-page wedding menu
+  intent.
+- Added Escape/backdrop dismissal, a keyboard focus trap, trigger focus restoration, background
+  scroll lock, safe-area spacing, 48px targets, auto-fitting controls for 200% zoom, and destination
+  focus/scroll reset.
+
+Deployment evidence:
+
+- Deployed implementation commit `9b609c9` to Oracle with the existing remote production env and a
+  UI-scoped image build; Caddy was recreated from the guarded configuration.
+- Required guard commit `a95514e` (including `7e1880d`) is an ancestor of the deployed commit.
+- Public workspace probe returned HTTP 200. The internal
+  `/docs/PRODUCTION_ROLLOUT_RUNBOOK.md` probe returned HTTP 404.
+- `artifacts/oracle-production-proof-wed148-postdeploy-retry/` reports `status=pass`, homeserver and
+  backup running, manifest and runtime-script integrity pass, backup verification pass, and restore
+  drill pass. Root and `/var` usage were 86% after proof.
+- The first proof attempt ended on an SSH connection reset before producing evidence. A clean SSH
+  check and synchronous retry completed successfully; no failed attempt was represented as passing.
+
+Tests performed:
+
+- mobile navigation/focus/wedding-menu focused suites: 21 passing
+- `npm run test:decisionos-navigation`: 7 passing
+- `npm run test:wedding`: 1,766 passing
+- `npm run typecheck`
+- `npm run build`, locally and in the Oracle UI image build
+- `npm run test:line-budget` remains red only on the previously recorded oversized baseline files;
+  both new WED-148 source modules and tests are below 999 lines and no cap changed.
+
+Unresolved production/GA gates:
+
+- The vendor production checklist still correctly leaves manual WCAG/device/usability review,
+  security disposition of upstream JavaScript advisories, hosted canary/SLO windows, legacy file
+  decomposition, and named rollout approvals open. Those external/human gates were not fabricated.
+- Oracle inventory still emits the known synthetic/operational-history shell/`psql` quoting errors;
+  runtime-script integrity passes, but those two unavailable query results need a separate repair.
+- Oracle root usage is 86%; schedule evidence-aware backup/build-cache retention work before the next
+  full rebuild rather than deleting shared-host data ad hoc.
+
+Recommended next action:
+
+- Perform the named mobile WCAG/device review against the live build, then collect canary SLO and
+  provider evidence before advancing beyond the documented developer-canary stage.
