@@ -1258,11 +1258,12 @@ function App() {
   function launchWeddingTemplateFromDeepLink() {
     saveWeddingEntrySource("wedding_site");
     void savePrimaryUseCase("wedding_planning", "inferred").catch(() => {});
-    void import("@/lib/weddingTemplateDeepLinkLaunchState").then(async ({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
+    void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
       const launch = buildWeddingTemplateDeepLinkLaunch();
-      await preloadViewModule(launch.viewTarget);
       dispatchWeddingTemplateDeepLinkLaunch(launch);
-      selectView(launch.viewTarget);
+      // The navigation bridge persists the intent before it selects the view. The
+      // mounted planner can therefore consume the intended wedding surface.
+      void preloadViewModule(launch.viewTarget);
     });
   }
 
@@ -2277,7 +2278,7 @@ function App() {
       void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
         const launch = buildWeddingTemplateDeepLinkLaunch();
         dispatchWeddingTemplateDeepLinkLaunch(launch);
-        selectView(launch.viewTarget);
+        void preloadViewModule(launch.viewTarget);
       });
       setLastQuery(query);
       setLastEngine(resolvedEngine);

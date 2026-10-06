@@ -17,6 +17,7 @@ export function DecisionCard(props: {
   onAction?: (action: DecisionCardAction) => void;
   hero?: JSX.Element;
   showActions?: boolean;
+  showWhyItMatters?: boolean;
   class?: string;
 }) {
   const card = () => props.card;
@@ -58,7 +59,7 @@ export function DecisionCard(props: {
         </Show>
       </div>
       <h3 class={`${mode() === "glance" || mode() === "compact" ? "mt-2 text-sm" : "mt-3 text-base"} break-words font-semibold`}>{card().title}</h3>
-      <Show when={mode() !== "glance"}>
+      <Show when={mode() !== "glance" && props.showWhyItMatters !== false}>
         <p class={`mt-2 break-words text-xs leading-5 ${muted()}`}>{card().whyItMatters}</p>
       </Show>
       <Show when={props.hero}>

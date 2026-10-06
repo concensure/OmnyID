@@ -43,13 +43,22 @@ export function TemplatesView(props: { onLaunch: (view: ViewName) => void | Prom
   }
 
   async function launchTemplate(template: TemplateCatalogItem) {
+    // Wedding launch intents are consumed by the Response Queue when it mounts.
+    // Dispatching the intent after selecting the view races that mount and can leave
+    // the user on the generic response queue rather than the planner surface.
+    if (template.launchIntent) {
+      dispatchWeddingNavigationIntent(template.launchIntent);
+      return;
+    }
     await props.onLaunch(template.viewTarget);
-    if (template.launchIntent) dispatchWeddingNavigationIntent(template.launchIntent);
   }
 
   async function launchTemplateAction(action: TemplateCatalogAction) {
+    if (action.launchIntent) {
+      dispatchWeddingNavigationIntent(action.launchIntent);
+      return;
+    }
     await props.onLaunch(action.viewTarget);
-    if (action.launchIntent) dispatchWeddingNavigationIntent(action.launchIntent);
   }
 
   return (

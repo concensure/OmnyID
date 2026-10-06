@@ -87,6 +87,7 @@ export function WeddingDecisionFocusCard(props: {
                 <DecisionCard
                   card={decisionCardFromWeddingFocus(card)}
                   mode="standard"
+                  showWhyItMatters={false}
                   onAction={(action) => {
                     if (action.id === "later") deferItem(item);
                     else props.onSidebarAction(buildWeddingDecisionFocusSidebarAction(

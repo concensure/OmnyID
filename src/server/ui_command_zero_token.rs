@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.ui-command-zero-token
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -6,7 +6,7 @@
  * @owner: omnyid
  */
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 #[derive(Debug, Clone)]
 pub(super) struct ZeroTokenRouteHint {
@@ -187,7 +187,8 @@ fn classify_travel(query: &str) -> Option<ZeroTokenRouteHint> {
                 "summary": "Prepared a route comparison.",
                 "bullets": [],
             }),
-            route_reason: "A zero-token travel comparison command matched a direct route-comparison phrase.",
+            route_reason:
+                "A zero-token travel comparison command matched a direct route-comparison phrase.",
             heuristics_used: vec![
                 "zero_token_command_signal".to_string(),
                 "zero_token_travel_compare_signal".to_string(),
@@ -197,31 +198,144 @@ fn classify_travel(query: &str) -> Option<ZeroTokenRouteHint> {
 
     let route_prefixes = ["/travel ", "/route ", "route: ", "directions to "];
     let subject = strip_prefixes(query, &route_prefixes)
-        .or_else(|| lowered.strip_prefix("how do i get to ").map(str::to_string))?;
-    let description = subject.trim().to_string();
+        .or_else(|| lowered.strip_prefix("how do i get to ").map(str::to_string));
+    if let Some(subject) = subject {
+        let description = subject.trim().to_string();
+        return Some(ZeroTokenRouteHint {
+            intent: "travel",
+            preferred_view: "route_card",
+            suggested_view: "search",
+            summary: format!("Prepared a route lookup for {description}."),
+            bullets: vec![
+                "Travel shortcut matched without model routing.".to_string(),
+                "The route card can be upgraded to comparison mode if needed.".to_string(),
+            ],
+            payload: json!({
+                "intent": "travel",
+                "preferred_view": "route_card",
+                "title": compact_title(&description, "Route"),
+                "description": description,
+                "summary": "Prepared a route lookup.",
+                "bullets": [],
+            }),
+            route_reason: "A zero-token travel signal matched a direct directions request.",
+            heuristics_used: vec![
+                "zero_token_command_signal".to_string(),
+                "zero_token_travel_signal".to_string(),
+            ],
+        });
+    }
+
+    classify_trip_planning(query)
+}
+
+fn classify_trip_planning(query: &str) -> Option<ZeroTokenRouteHint> {
+    let lowered = query.to_ascii_lowercase();
+    let travel_noun = ["trip", "travel", "holiday", "vacation", "itinerary"]
+        .iter()
+        .any(|term| lowered.contains(term));
+    let planning_verb = ["plan", "planning", "organise", "organize", "visit"]
+        .iter()
+        .any(|term| lowered.contains(term));
+    if !travel_noun || !planning_verb {
+        return None;
+    }
+
+    let destination = travel_segment_after(&lowered, query, " to ")
+        .and_then(|value| travel_segment_before(&value, " from "))
+        .unwrap_or_else(|| "your destination".to_string());
+    let origin = travel_segment_after(&lowered, query, " to ")
+        .and_then(|value| travel_segment_after(&value.to_ascii_lowercase(), &value, " from "))
+        .and_then(|value| travel_segment_before(&value, " for "))
+        .unwrap_or_else(|| "your departure city".to_string());
+    let days =
+        travel_duration_label(&lowered).unwrap_or_else(|| "a flexible number of days".to_string());
+    let start = travel_start_label(&lowered, query);
+    let travellers = if lowered.contains("toddler") || lowered.contains("under 2") {
+        "Family pace: 2 adults and a toddler"
+    } else if lowered.contains("family") {
+        "Family-friendly pace"
+    } else {
+        "Traveller details can be refined before booking"
+    };
+    let timing = start
+        .as_deref()
+        .map(|date| format!("{days}, starting {date}"))
+        .unwrap_or_else(|| days.clone());
+    let title = format!("Family trip: {origin} to {destination}");
+    let summary =
+        format!("Prepared a practical {days} travel plan from {origin} to {destination}.");
+    let bullets = vec![
+        format!("Trip: {origin} to {destination}"),
+        format!("Timing: {timing}"),
+        travellers.to_string(),
+        "Day 1: arrive, check in, and keep the first outing short and close to the hotel.".to_string(),
+        "Middle days: group nearby sights into one area each day, with a stroller-friendly rest break after lunch.".to_string(),
+        "Final day: keep one flexible activity, then allow a generous airport-transfer buffer.".to_string(),
+        "Before booking: compare flights with bassinet/seat policies, confirm cot or crib availability, and check entry requirements and travel insurance.".to_string(),
+    ];
     Some(ZeroTokenRouteHint {
         intent: "travel",
         preferred_view: "route_card",
         suggested_view: "search",
-        summary: format!("Prepared a route lookup for {description}."),
-        bullets: vec![
-            "Travel shortcut matched without model routing.".to_string(),
-            "The route card can be upgraded to comparison mode if needed.".to_string(),
-        ],
+        summary: summary.clone(),
+        bullets: bullets.clone(),
         payload: json!({
             "intent": "travel",
             "preferred_view": "route_card",
-            "title": compact_title(&description, "Route"),
-            "description": description,
-            "summary": "Prepared a route lookup.",
-            "bullets": [],
+            "title": title,
+            "description": summary,
+            "summary": summary,
+            "bullets": bullets,
         }),
-        route_reason: "A zero-token travel signal matched a direct directions request.",
+        route_reason: "A natural-language trip-planning request matched the travel planner before web-search fallback.",
         heuristics_used: vec![
-            "zero_token_command_signal".to_string(),
-            "zero_token_travel_signal".to_string(),
+            "zero_token_travel_planning_signal".to_string(),
+            "travel_intent_before_web_search".to_string(),
         ],
     })
+}
+
+fn travel_segment_after(lowered: &str, original: &str, marker: &str) -> Option<String> {
+    let index = lowered.find(marker)? + marker.len();
+    Some(original[index..].trim().to_string())
+}
+
+fn travel_segment_before(value: &str, marker: &str) -> Option<String> {
+    let lowered = value.to_ascii_lowercase();
+    let end = lowered.find(marker).unwrap_or(value.len());
+    let candidate = value[..end]
+        .split([',', ';', '.'])
+        .next()
+        .unwrap_or("")
+        .trim();
+    (!candidate.is_empty()).then(|| candidate.to_string())
+}
+
+fn travel_duration_label(lowered: &str) -> Option<String> {
+    let words = lowered.split_whitespace().collect::<Vec<_>>();
+    words.windows(2).find_map(|pair| {
+        let count = pair[0].trim_matches(|character: char| !character.is_ascii_digit());
+        (pair[1].starts_with("day") && !count.is_empty()).then(|| format!("{count} days"))
+    })
+}
+
+fn travel_start_label(lowered: &str, original: &str) -> Option<String> {
+    let marker = " from ";
+    let index = lowered.rfind(marker)? + marker.len();
+    let candidate = original[index..]
+        .split([',', ';', '.'])
+        .next()
+        .unwrap_or("")
+        .trim();
+    if candidate
+        .chars()
+        .any(|character| character.is_ascii_digit())
+    {
+        Some(candidate.to_string())
+    } else {
+        None
+    }
 }
 
 fn classify_social(query: &str) -> Option<ZeroTokenRouteHint> {
@@ -345,14 +459,30 @@ mod tests {
     }
 
     #[test]
+    fn turns_natural_language_family_trip_planning_into_a_travel_plan() {
+        let hint = classify_zero_token_signal(
+            "plan a family trip (2 adults, 1 toddler under 2 years old) to Tokyo from Sydney, for 5 days, from 12th Oct 2026",
+        )
+        .expect("travel planning hint");
+
+        assert_eq!(hint.intent, "travel");
+        assert_eq!(hint.preferred_view, "route_card");
+        assert!(hint.summary.contains("Sydney to Tokyo"));
+        assert!(hint
+            .bullets
+            .iter()
+            .any(|item| item.contains("12th Oct 2026")));
+        assert!(hint.bullets.iter().any(|item| item.starts_with("Day 1:")));
+    }
+
+    #[test]
     fn classifies_schedule_planning_phrase() {
         let hint = classify_zero_token_signal("plan my day").expect("schedule hint");
         assert_eq!(hint.intent, "schedule");
         assert_eq!(hint.preferred_view, "draggable_calendar");
-        assert!(
-            hint.heuristics_used
-                .contains(&"zero_token_schedule_signal".to_string())
-        );
+        assert!(hint
+            .heuristics_used
+            .contains(&"zero_token_schedule_signal".to_string()));
     }
 
     #[test]
@@ -369,10 +499,9 @@ mod tests {
         let hint = classify_zero_token_signal("open a space for launch prep").expect("spaces hint");
         assert_eq!(hint.intent, "spaces");
         assert_eq!(hint.preferred_view, "spaces");
-        assert!(
-            hint.heuristics_used
-                .contains(&"zero_token_space_signal".to_string())
-        );
+        assert!(hint
+            .heuristics_used
+            .contains(&"zero_token_space_signal".to_string()));
     }
 
     #[test]

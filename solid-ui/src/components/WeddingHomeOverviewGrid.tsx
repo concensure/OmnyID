@@ -11,7 +11,6 @@ import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceAction
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import {
   calendarActionLabel,
-  weddingBudgetSidebarAction,
   weddingDayCountdownDetail,
   weddingDayCountdownLabel,
   weddingTimelinePrimarySidebarAction,
@@ -35,8 +34,10 @@ export function WeddingHomeOverviewGrid(props: {
   const seatingTile = () => actionTiles().find((tile) => tile.id === "seating");
   const vendorTile = () => actionTiles().find((tile) => tile.id === "vendors");
   function openBudget() {
+    // This is an in-planner tab change. Sending the sidebar action afterwards
+    // also emits a global navigation event, which can overwrite the local tab
+    // with the generic Response Queue surface.
     props.onSelectMenu?.("budget");
-    props.onSidebarAction?.(weddingBudgetSidebarAction(props.state));
   }
   function openCalendar() {
     props.onSelectMenu?.("timeline");

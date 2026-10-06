@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.ui-command-preview-surfaces
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -126,24 +126,52 @@ pub fn build_route_card_preview_message(
     } else {
         query.to_string()
     };
-    let metrics = vec![
-        json!({"label": "Duration", "value": bullets.first().cloned().unwrap_or_else(|| "18 mins".to_string())}),
-        json!({"label": "Distance", "value": bullets.get(1).cloned().unwrap_or_else(|| "6.2 km".to_string())}),
-        json!({"label": "Transfers", "value": bullets.get(2).cloned().unwrap_or_else(|| "Direct".to_string())}),
-    ];
+    let itinerary = bullets
+        .first()
+        .is_some_and(|item| item.starts_with("Trip: "))
+        && bullets
+            .get(1)
+            .is_some_and(|item| item.starts_with("Timing: "));
+    let metrics = if itinerary {
+        vec![
+            json!({"label": "Trip", "value": bullets[0].trim_start_matches("Trip: ")}),
+            json!({"label": "Timing", "value": bullets[1].trim_start_matches("Timing: ")}),
+            json!({"label": "Travellers", "value": bullets.get(2).cloned().unwrap_or_else(|| "Traveller details to confirm".to_string())}),
+        ]
+    } else {
+        vec![
+            json!({"label": "Duration", "value": bullets.first().cloned().unwrap_or_else(|| "18 mins".to_string())}),
+            json!({"label": "Distance", "value": bullets.get(1).cloned().unwrap_or_else(|| "6.2 km".to_string())}),
+            json!({"label": "Transfers", "value": bullets.get(2).cloned().unwrap_or_else(|| "Direct".to_string())}),
+        ]
+    };
     let tradeoffs = bullets
         .iter()
         .skip(3)
-        .take(2)
+        .take(if itinerary { 4 } else { 2 })
         .map(|item| {
             json!({
-                "title": "Trade-off",
+                "title": if itinerary { "Plan" } else { "Trade-off" },
                 "body": item,
             })
         })
         .collect::<Vec<_>>();
-    let assumptions = vec!["Live traffic may change.".to_string()];
-    let notes = vec!["Preview generated from command intent.".to_string()];
+    let assumptions = if itinerary {
+        vec![
+            "This is a draft itinerary, not live flight, hotel, or entry-requirement advice."
+                .to_string(),
+        ]
+    } else {
+        vec!["Live traffic may change.".to_string()]
+    };
+    let notes = if itinerary {
+        vec![
+            "Confirm availability, child-travel requirements, and bookings before committing."
+                .to_string(),
+        ]
+    } else {
+        vec!["Preview generated from command intent.".to_string()]
+    };
     let actions = vec!["copy".to_string(), "share".to_string()];
     ui_surface_messages::build_route_card_surface_message(
         "workspace_command_preview",

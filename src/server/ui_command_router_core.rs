@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.ui-command-router-core
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -487,11 +487,9 @@ mod tests {
                 .and_then(|value| value["model_inference_ran"].as_bool()),
             Some(false)
         );
-        assert!(
-            response.links[0]
-                .url
-                .contains("google.com/search?q=what+is+rust")
-        );
+        assert!(response.links[0]
+            .url
+            .contains("google.com/search?q=what+is+rust"));
     }
 
     #[test]
@@ -579,6 +577,25 @@ mod tests {
                 .and_then(|meta| meta["audit"]["route_reason"].as_str()),
             Some("A zero-token schedule signal matched a direct calendar planning command.")
         );
+    }
+
+    #[test]
+    fn route_ui_command_builds_a_family_travel_plan_before_web_search_fallback() {
+        let response = route_ui_command(
+            "plan a family trip (2 adults, 1 toddler under 2 years old) to Tokyo from Sydney, for 5 days, from 12th Oct 2026",
+            "duckduckgo".to_string(),
+            None,
+            None,
+        );
+
+        assert_eq!(response.intent, "travel");
+        assert_eq!(response.preferred_view, "route_card");
+        assert!(response.links.is_empty());
+        assert!(response
+            .bullets
+            .iter()
+            .any(|item| item.starts_with("Day 1:")));
+        assert!(response.summary.contains("Sydney to Tokyo"));
     }
 
     #[test]
