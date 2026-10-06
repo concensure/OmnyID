@@ -1659,7 +1659,7 @@ export function ResponseQueueView(props: {
     input.value = "";
   }
 
-  async function runLiveWeddingVendorSearch(options?: { stayOnHome?: boolean; category?: string }): Promise<boolean> {
+  async function runLiveWeddingVendorSearch(options?: { stayOnHome?: boolean; category?: string; materialFingerprint?: string }): Promise<boolean> {
     const intent = weddingNavigationIntent();
     const workspace = weddingWorkspace();
     if (!intent || intent.surface !== "planning_files" || !workspace || weddingVendorSearchRunning()) return false;
@@ -1769,7 +1769,7 @@ export function ResponseQueueView(props: {
           workspaceId: metadata.responseWorkspaceId, maxQueries: 8,
           batchPort: weddingVendorSearchBatchPortFromApiSearch({
             search: searchWeddingVendors, workspaceId: metadata.responseWorkspaceId, weddingPlanId: metadata.weddingPlanId,
-            maxResultsPerQuery: 5, sourcePolicy,
+            maxResultsPerQuery: 5, sourcePolicy, materialFingerprint: options?.materialFingerprint, rankingPolicyVersion: "1",
             onResponse: (response) => { responseNotice = buildWeddingVendorSearchNoticeState({
               ok: response.ok, message: response.message, sourceCount: response.source_count,
               providerLabel: response.provider_label, receiptMetadata: response.receipt_metadata,
@@ -1838,7 +1838,7 @@ export function ResponseQueueView(props: {
     }
   }
 
-  useWeddingVendorShortlistLaunch({ enabled: () => weddingAutomaticShortlistEnabled(import.meta.env.VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED), coordinatorInput: () => ({ weddingPlanId: weddingWorkspace()?.workspace.metadata.weddingPlanId, location: weddingVendorSearchServiceArea(), onboardingPriorities: linesFromText(weddingFollowUpPriorities()), unbookedCategories: weddingVendorSelectionLabels(weddingFollowUpVendorIds()), guestCount: weddingFollowUpGuests(), budgetComfort: weddingFollowUpBudget(), dateOrSeason: weddingFollowUpDate(), preferences: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; ") }), storage: localStorage, searchRunning: weddingVendorSearchRunning, run: (category) => runLiveWeddingVendorSearch({ stayOnHome: true, category }) });
+  useWeddingVendorShortlistLaunch({ enabled: () => weddingAutomaticShortlistEnabled(import.meta.env.VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED), coordinatorInput: () => ({ weddingPlanId: weddingWorkspace()?.workspace.metadata.weddingPlanId, location: weddingVendorSearchServiceArea(), onboardingPriorities: linesFromText(weddingFollowUpPriorities()), unbookedCategories: weddingVendorSelectionLabels(weddingFollowUpVendorIds()), guestCount: weddingFollowUpGuests(), budgetComfort: weddingFollowUpBudget(), dateOrSeason: weddingFollowUpDate(), preferences: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "), rankingPolicyVersion: "1" }), storage: localStorage, searchRunning: weddingVendorSearchRunning, run: (category, materialFingerprint) => runLiveWeddingVendorSearch({ stayOnHome: true, category, materialFingerprint }) });
 
   function installWeddingVendorSmokeFixture() {
     const intent = weddingNavigationIntent();

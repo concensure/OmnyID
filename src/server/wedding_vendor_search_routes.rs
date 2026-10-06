@@ -8,8 +8,10 @@
 
 pub(super) mod attribute_catalog;
 mod canonical_resolution;
+mod directory;
 mod entity_merge;
 mod providers;
+mod receipt;
 mod source_classification;
 mod source_policy;
 
@@ -18,9 +20,7 @@ use crate::admin_tool_secrets::{
     BRAVE_SEARCH_SPEC, EXA_SEARCH_SPEC, GOOGLE_MAPS_SPEC, GOOGLE_PLACES_SPEC, WEATHER_API_SPEC,
     admin_tool_secret_status, resolve_admin_tool_secret,
 };
-use crate::db::{
-    Db, WeddingVendorPhotoUpsertRecord, WeddingVendorRecord, WeddingVendorUpsertRecord,
-};
+use crate::db::{Db, WeddingVendorPhotoUpsertRecord, WeddingVendorUpsertRecord};
 use crate::map_service::{MapService, PROVIDER_GOOGLE_MAPS, PROVIDER_OSM};
 use crate::wedding_shared_tool_metering::{
     WeddingSharedToolFeature, WeddingSharedToolProvider, WeddingSharedToolUsageInput,
@@ -28,7 +28,9 @@ use crate::wedding_shared_tool_metering::{
 };
 use attribute_catalog::PendingAttribute;
 use canonical_resolution::{EnrichInput, enrich_vendor_sources, write_pending_attributes};
+use directory::search_wedding_vendor_directory;
 use providers::{search_brave, search_exa, search_google_places};
+use receipt::merge_receipt;
 use serde_json::Value;
 use source_policy::WeddingVendorSourcePolicy;
 
@@ -45,6 +47,8 @@ struct WeddingVendorSearchRequest {
     queries: Vec<WeddingVendorSearchQueryRequest>,
     max_results_per_query: Option<usize>,
     source_policy: Option<String>,
+    material_fingerprint: Option<String>,
+    ranking_policy_version: Option<String>,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -590,6 +594,23 @@ async fn wedding_vendor_search_http(
         })
         .map(str::to_string)
         .collect::<BTreeSet<_>>();
+    let claim = req.material_fingerprint.as_deref().map(str::trim).filter(|value| !value.is_empty())
+        .map(|fingerprint| (
+            req.wedding_plan_id.as_deref().map(str::trim).unwrap_or(""),
+            categories.iter().next().map(String::as_str).unwrap_or("uncategorised"),
+            fingerprint,
+            req.ranking_policy_version.as_deref().map(str::trim).filter(|value| !value.is_empty()).unwrap_or("1"),
+        ));
+    if let Some((plan_id, category, fingerprint, policy_version)) = claim {
+        if plan_id.is_empty() {
+            return Err((StatusCode::BAD_REQUEST, "wedding_plan_id is required with material_fingerprint".to_string()));
+        }
+        let acquired = state.db.claim_wedding_vendor_shortlist_run(&user.id, plan_id, category, fingerprint, policy_version)
+            .await.map_err(internal_error).map_err(status_to_http)?;
+        if !acquired {
+            return Err((StatusCode::CONFLICT, "This wedding vendor shortlist is already running or complete for the same material inputs.".to_string()));
+        }
+    }
 
     let mut sources = Vec::new();
     let mut provider_kinds = BTreeSet::new();
@@ -613,6 +634,19 @@ async fn wedding_vendor_search_http(
 
     if source_policy == WeddingVendorSourcePolicy::DirectoryOnly {
         let directory_count = sources.len();
+        if let Some((plan_id, category, fingerprint, policy_version)) = claim {
+            state.db.complete_wedding_vendor_shortlist_run(
+                &user.id,
+                plan_id,
+                category,
+                fingerprint,
+                policy_version,
+                directory_count > 0,
+            )
+            .await
+            .map_err(internal_error)
+            .map_err(status_to_http)?;
+        }
         return Ok(Json(WeddingVendorSearchResponse {
             ok: directory_count > 0,
             status: "cached".to_string(),
@@ -1014,7 +1048,7 @@ async fn wedding_vendor_search_http(
         .await;
     }
 
-    Ok(Json(WeddingVendorSearchResponse {
+    let response = WeddingVendorSearchResponse {
         ok: !sources.is_empty(),
         status: status.to_string(),
         external_search_performed,
@@ -1051,15 +1085,14 @@ async fn wedding_vendor_search_http(
             }),
             enrichment_receipt,
         ),
-    }))
+    };
+    if let Some((plan_id, category, fingerprint, policy_version)) = claim {
+        state.db.complete_wedding_vendor_shortlist_run(&user.id, plan_id, category, fingerprint, policy_version, response.ok)
+            .await.map_err(internal_error).map_err(status_to_http)?;
+    }
+    Ok(Json(response))
 }
 
-fn merge_receipt(mut base: Value, extra: Value) -> Value {
-    if let (Some(base), Value::Object(extra)) = (base.as_object_mut(), extra) {
-        base.extend(extra);
-    }
-    base
-}
 
 /// Sources collected since the last call came from `query`, so they inherit its category and
 /// service area; persistence and per-category attributes then stay correct in mixed searches.
@@ -1130,112 +1163,6 @@ fn vendor_search_empty_result_message(
     "No live vendor sources were returned. Try a more specific vendor type and location, or review the provider receipt for setup, quota, or regional availability details.".to_string()
 }
 
-async fn search_wedding_vendor_directory(
-    db: &Db,
-    user_id: &str,
-    queries: &[WeddingVendorSearchQueryRequest],
-    limit: usize,
-) -> Result<Vec<WeddingVendorSearchSource>, sqlx::Error> {
-    let mut sources = Vec::new();
-    let mut seen_queries = BTreeSet::new();
-    for query in queries {
-        for candidate in wedding_vendor_directory_search_terms(query) {
-            if !seen_queries.insert(candidate.clone()) {
-                continue;
-            }
-            let records = db
-                .list_active_wedding_vendors_for_user(
-                    user_id,
-                    limit.clamp(1, 8) as i64,
-                    Some(&candidate),
-                )
-                .await?;
-            sources.extend(
-                records
-                    .into_iter()
-                    .map(wedding_vendor_record_to_search_source),
-            );
-        }
-    }
-    Ok(dedupe_sources(sources)
-        .into_iter()
-        .take(limit * queries.len().max(1))
-        .collect())
-}
-
-fn wedding_vendor_directory_search_terms(query: &WeddingVendorSearchQueryRequest) -> Vec<String> {
-    let mut terms = Vec::new();
-    if let Some(category) = query
-        .category
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        terms.push(category.to_string());
-    }
-    terms.push(query.query.trim().to_string());
-    if let Some(location) = infer_vendor_service_area(&query.query) {
-        terms.push(location);
-    }
-    dedupe_strings(terms)
-}
-
-fn wedding_vendor_record_to_search_source(
-    record: WeddingVendorRecord,
-) -> WeddingVendorSearchSource {
-    let url = record
-        .website_url
-        .clone()
-        .or(record.source_url.clone())
-        .unwrap_or_else(|| {
-            format!(
-                "https://www.google.com/maps/search/?api=1&query={}",
-                urlencoding::encode(&format!("{} {}", record.vendor_name, record.service_area))
-            )
-        });
-    let snippet = [
-        Some(record.category.clone()),
-        Some(record.service_area.clone()),
-        record.address.clone(),
-        record.notes,
-    ]
-    .into_iter()
-    .flatten()
-    .map(|value| value.trim().to_string())
-    .filter(|value| !value.is_empty())
-    .collect::<Vec<_>>()
-    .join(" - ");
-    WeddingVendorSearchSource {
-        title: record.vendor_name,
-        url,
-        snippet: if snippet.is_empty() {
-            Some("Saved in OmnyID's shared wedding vendor database.".to_string())
-        } else {
-            Some(format!(
-                "{snippet} - saved in OmnyID's shared wedding vendor database."
-            ))
-        },
-        provider: "Admin vendor database".to_string(),
-        website_url: record.website_url.clone(),
-        map_url: record
-            .source_url
-            .filter(|url| url.contains("maps") || url.contains("openstreetmap")),
-        photo_url: record.photos.first().map(|photo| photo.photo_url.clone()),
-        address: record.address,
-        phone: record.contact_phone,
-        email: record.contact_email,
-        instagram_url: record
-            .website_url
-            .filter(|url| url.to_ascii_lowercase().contains("instagram.com")),
-        vendor_id: Some(record.vendor_id),
-        vendor_slug: Some(record.vendor_slug),
-        category: Some(record.category),
-        service_area: Some(record.service_area),
-        ..WeddingVendorSearchSource::default()
-    }
-}
-
-/// The category and service area a search was run for, used where a source carries none.
 fn discovery_context(queries: &[WeddingVendorSearchQueryRequest]) -> (String, String) {
     let Some(primary_query) = queries.first() else {
         return ("wedding vendor".to_string(), String::new());
@@ -2006,6 +1933,10 @@ fn env_lock() -> std::sync::MutexGuard<'static, ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::directory::{
+        wedding_vendor_directory_search_terms, wedding_vendor_record_to_search_source,
+    };
+    use crate::db::WeddingVendorRecord;
 
     fn clear_provider_capability_env() {
         for key in [

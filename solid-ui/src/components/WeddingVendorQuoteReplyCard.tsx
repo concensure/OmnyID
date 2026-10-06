@@ -413,7 +413,7 @@ export function WeddingVendorQuoteReplyCard(props: {
               data-magic-icon="quote"
               data-magic-label={homeSurface().quoteActionKind === "open_attachment" ? "Open quote file" : "See quote"}
               data-magic-id={`wedding:quote-reply:${props.flow.id}:home-quote`}
-              class="rounded-2xl bg-wedding-accent px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-accent-hover focus:outline-none focus:ring-2 focus:ring-wedding-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              class="min-h-[44px] rounded-2xl border-2 border-wedding-accent bg-white px-5 py-3 text-sm font-bold text-wedding-text transition hover:bg-wedding-surface-blush focus:outline-none focus:ring-2 focus:ring-wedding-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {homeSurface().quoteActionLabel}
             </button>
@@ -424,7 +424,7 @@ export function WeddingVendorQuoteReplyCard(props: {
               data-magic-icon="edit"
               data-magic-label={homeSurface().replyActionLabel}
               data-magic-id={`wedding:quote-reply:${props.flow.id}:home-reply`}
-              class="rounded-2xl bg-wedding-cta px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-cta-hover focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2"
+              class="min-h-[44px] rounded-2xl border-2 border-wedding-cta bg-white px-5 py-3 text-sm font-bold text-wedding-text transition hover:bg-wedding-surface-blush focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2"
             >
               {homeSurface().replyActionLabel}
             </button>
@@ -792,7 +792,7 @@ export function WeddingVendorQuoteReplyCard(props: {
                 data-magic-alt-icon={presentation().secondaryActionKind === "edit_reply" ? "edit" : "quote"}
                 data-magic-alt-label={presentation().secondaryActionLabel ?? undefined}
                 data-magic-id={`wedding:quote-reply:${props.flow.id}:primary`}
-                class="rounded-2xl bg-wedding-cta px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-cta-hover focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-wedding-muted/35 sm:flex-1"
+                class="min-h-[44px] rounded-2xl border-2 border-wedding-cta bg-white px-5 py-3 text-sm font-bold text-wedding-text transition hover:bg-wedding-surface-blush focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-wedding-muted/20 sm:flex-1"
               >
                 {props.busy ? props.busyLabel ?? "Working..." : presentation().primaryActionLabel}
               </button>
@@ -807,7 +807,7 @@ export function WeddingVendorQuoteReplyCard(props: {
                     data-magic-icon={presentation().secondaryActionKind === "edit_reply" ? "edit" : "quote"}
                     data-magic-label={label()}
                     data-magic-id={`wedding:quote-reply:${props.flow.id}:secondary`}
-                    class="rounded-2xl bg-wedding-accent px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-accent-hover focus:outline-none focus:ring-2 focus:ring-wedding-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
+                    class="min-h-[44px] rounded-2xl border-2 border-wedding-accent bg-white px-5 py-3 text-sm font-bold text-wedding-text transition hover:bg-wedding-surface-blush focus:outline-none focus:ring-2 focus:ring-wedding-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
                   >
                     {label()}
                   </button>

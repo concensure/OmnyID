@@ -7,6 +7,7 @@ import {
   type WeddingVendorChoiceSelectionSaveInput,
 } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
+import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
@@ -54,7 +55,7 @@ type WeddingWorkspaceDocumentsPanelProps = {
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
   gmailConnected?: boolean;
-  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string) => void;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;

@@ -4496,6 +4496,8 @@ export const searchWeddingVendors = (body: {
   queries: WeddingVendorSearchApiQuery[];
   max_results_per_query?: number;
   source_policy?: "directory_only" | "online_capable";
+  material_fingerprint?: string | null;
+  ranking_policy_version?: string | null;
 }): Promise<WeddingVendorSearchApiResponse> =>
   apiFetch<unknown>("/wedding/vendor-search", {
     method: "POST",

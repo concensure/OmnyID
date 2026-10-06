@@ -4027,6 +4027,59 @@ impl Db {
             .collect())
     }
 
+    pub async fn claim_wedding_vendor_shortlist_run(
+        &self,
+        user_id: &str,
+        wedding_plan_id: &str,
+        category: &str,
+        material_fingerprint: &str,
+        ranking_policy_version: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let claim_id = format!("wedding_vendor_shortlist:{}", ulid::Ulid::new());
+        let result = sqlx::query(
+            r#"INSERT INTO wedding_vendor_shortlist_run_claims
+               (claim_id, user_id, wedding_plan_id, category, material_fingerprint, ranking_policy_version, status)
+               VALUES ($1, $2, $3, $4, $5, $6, 'running')
+               ON CONFLICT (user_id, wedding_plan_id, category, material_fingerprint, ranking_policy_version)
+               DO UPDATE SET status = 'running', updated_at = NOW()
+               WHERE wedding_vendor_shortlist_run_claims.status = 'failed'
+                  OR wedding_vendor_shortlist_run_claims.updated_at < NOW() - INTERVAL '10 minutes'"#,
+        )
+        .bind(claim_id)
+        .bind(user_id)
+        .bind(wedding_plan_id)
+        .bind(category)
+        .bind(material_fingerprint)
+        .bind(ranking_policy_version)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
+    }
+    pub async fn complete_wedding_vendor_shortlist_run(
+        &self,
+        user_id: &str,
+        wedding_plan_id: &str,
+        category: &str,
+        material_fingerprint: &str,
+        ranking_policy_version: &str,
+        succeeded: bool,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"UPDATE wedding_vendor_shortlist_run_claims
+               SET status = $6, updated_at = NOW()
+               WHERE user_id = $1 AND wedding_plan_id = $2 AND category = $3
+                 AND material_fingerprint = $4 AND ranking_policy_version = $5"#,
+        )
+        .bind(user_id)
+        .bind(wedding_plan_id)
+        .bind(category)
+        .bind(material_fingerprint)
+        .bind(ranking_policy_version)
+        .bind(if succeeded { "complete" } else { "failed" })
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
     pub async fn list_wedding_vendors(
         &self,
         limit: i64,
@@ -17924,89 +17977,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn reversible_action_audit_summary_reads_undo_metadata_from_output() {
-        let summary = super::reversible_action_audit_summary_from_output(&json!({
-            "status": "file_bundle_staged",
-            "reversible": true,
-            "undo_label": "Discard staged file bundle",
-            "artifact_refs": {
-                "action_message_id": "action_1",
-                "rollback_checkpoint_id": "checkpoint_1",
-                "provenance_record_id": "prov_1"
-            },
-            "side_effect_boundary": "internal_only"
-        }))
-        .expect("summary");
-
-        assert!(summary.reversible);
-        assert_eq!(
-            summary.undo_label.as_deref(),
-            Some("Discard staged file bundle")
-        );
-        assert_eq!(summary.action_message_id.as_deref(), Some("action_1"));
-        assert_eq!(
-            summary.rollback_checkpoint_id.as_deref(),
-            Some("checkpoint_1")
-        );
-        assert_eq!(summary.provenance_record_id.as_deref(), Some("prov_1"));
-        assert_eq!(
-            summary.side_effect_boundary.as_deref(),
-            Some("internal_only")
-        );
-    }
-
-    #[test]
-    fn reversible_action_audit_summary_returns_none_for_plain_outputs() {
-        assert!(
-            super::reversible_action_audit_summary_from_output(&json!({
-                "dispatch": "queued"
-            }))
-            .is_none()
-        );
-    }
-
-    #[test]
-    fn daemon_operational_afp_retention_policy_targets_only_audit_types() {
-        assert!(super::daemon_operational_afp_retention_applies(
-            "watcher_resolution_event"
-        ));
-        assert!(super::daemon_operational_afp_retention_applies(
-            "synthesis_invalidation_event"
-        ));
-        assert!(super::daemon_operational_afp_retention_applies(
-            "reflection_trace"
-        ));
-        assert!(super::daemon_operational_afp_retention_applies(
-            "minimal_context_packet"
-        ));
-        assert!(super::daemon_operational_afp_retention_applies(
-            "proactive_trigger"
-        ));
-        assert!(super::daemon_operational_afp_retention_applies(
-            "token_budget_log"
-        ));
-        assert!(!super::daemon_operational_afp_retention_applies(
-            "behavior_pattern"
-        ));
-        assert!(!super::daemon_operational_afp_retention_applies("ledger"));
-    }
-
-    #[test]
-    fn bounded_operational_history_limits_remain_above_recent_query_windows() {
-        assert!(super::TRAINING_REFLECTION_TRACE_MAX_ROWS_PER_USER >= 100);
-        assert!(super::PROACTIVE_TOKEN_USAGE_MAX_ROWS_PER_USER >= 1_000);
-        assert!(super::TRAINING_REFLECTION_TRACE_RETENTION_DAYS >= 7);
-        assert!(super::PROACTIVE_TOKEN_USAGE_RETENTION_DAYS >= 7);
-        assert!(super::TENANT_LLM_USAGE_LOG_RETENTION_DAYS >= 90);
-        assert!(super::TENANT_LLM_USAGE_LOG_MAX_ROWS_PER_USER >= 1_000);
-        assert!(super::WORKFLOW_TRIGGER_OBSERVATION_RETENTION_DAYS >= 30);
-        assert!(super::WORKFLOW_TRIGGER_OBSERVATION_MAX_ROWS_PER_WORKFLOW >= 100);
-        assert!(super::TENANT_ACTION_AUDIT_LOG_RETENTION_DAYS >= 90);
-        assert!(super::TENANT_ACTION_AUDIT_LOG_MAX_ROWS_PER_USER >= 500);
-        assert!(super::TRIGGER_REPLAY_NONCE_RETENTION_DAYS >= 30);
-        assert!(super::TRIGGER_REPLAY_NONCE_MAX_ROWS_PER_USER >= 1_000);
-    }
+    #[path = "audit_retention_tests.rs"]
+    mod audit_retention_tests;
 }
 
 #[cfg(test)]

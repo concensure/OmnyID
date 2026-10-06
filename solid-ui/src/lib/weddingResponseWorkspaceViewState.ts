@@ -1,9 +1,5 @@
 // @locs-version: 2.0
-import {
-  type WeddingArtifactInput,
-  type WeddingArtifactSourceLink,
-  type WeddingArtifactSummary,
-} from "@/lib/weddingArtifactState";
+import type { WeddingArtifactInput, WeddingArtifactSourceLink, WeddingArtifactSummary } from "@/lib/weddingArtifactState";
 import type { AfpMessage } from "@/lib/api";
 import type { WeddingVendorRankingCardFields } from "@/lib/weddingVendorRankingState";
 import type { WeddingIntegrationReadinessState, WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
@@ -12,20 +8,14 @@ import {
   type WeddingArtifactExportManifest,
   type WeddingPacketExportCapabilityState,
 } from "@/lib/weddingExportState";
-import type {
-  WeddingRecommendationExplanation,
-  WeddingRecommendationExplanationState,
-} from "@/lib/weddingRecommendationExplanationState";
+import type { WeddingRecommendationExplanation, WeddingRecommendationExplanationState } from "@/lib/weddingRecommendationExplanationState";
 import type { WeddingGeneratedArtifact } from "@/lib/weddingArtifactGenerationState";
 import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 import {
   buildWeddingDecisionSelectionState,
   loadWeddingDecisionSelections,
 } from "@/lib/weddingDecisionSelectionState";
-import type {
-  WeddingPlanningScheduleItem,
-  WeddingPlanningTaskItem,
-} from "@/lib/weddingCalendarProjectionState";
+import type { WeddingPlanningScheduleItem, WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import type { WeddingNeedToKnowProjectionContext } from "@/lib/weddingNeedToKnowAfpProjectionState";
 import type {
   WeddingPersistedApprovalReceipt,

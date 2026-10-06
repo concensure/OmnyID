@@ -1,20 +1,9 @@
 // @locs-version: 2.1
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
 
 import { WeddingProjectionQueuePanel } from "@/components/WeddingProjectionQueuePanel";
 import { WeddingWorkspaceContextPanels } from "@/components/WeddingWorkspaceContextPanels";
-import { WeddingDecisionFocusCard } from "@/components/WeddingDecisionFocusCard";
-import { WeddingHomeOverviewGrid } from "@/components/WeddingHomeOverviewGrid";
-import { WeddingHomeStatusStrip } from "@/components/WeddingHomeStatusStrip";
-import { WeddingNextStepCard } from "@/components/WeddingNextStepCard";
-import { WeddingPlanningThreadsCard } from "@/components/WeddingPlanningThreadsCard";
-import { WeddingProjectionApprovalCard } from "@/components/WeddingProjectionApprovalCard";
-import { WeddingResilienceCardList } from "@/components/WeddingResilienceCardList";
 import { WeddingVendorQuoteProofDrawer } from "@/components/WeddingVendorQuoteProofDrawer";
-import { WeddingVendorQuoteReplyCard } from "@/components/WeddingVendorQuoteReplyCard";
-import { WeddingVendorFollowUpPanel } from "@/components/WeddingVendorFollowUpPanel";
-import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
-import { DecisionCard } from "@/components/DecisionCard";
 import { WeddingMobileFocusHome } from "@/components/WeddingMobileFocusHome";
 import { weddingVendorFollowUpOutreachCardData } from "@/lib/weddingVendorFollowUpPanelActionState";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
@@ -23,76 +12,36 @@ import { WeddingWorkspaceDocumentsPanel } from "@/components/WeddingWorkspaceDoc
 import { fetchThread, ingestAttachmentBatch, type AfpMessage } from "@/lib/api";
 import type { EditorPayload } from "@/lib/editorPayload";
 import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
-import {
-  runWeddingArtifactBrowserExport,
-  runWeddingBundleBrowserExport,
-  selectWeddingBundleExportPayload,
-  weddingProjectionMetadataId,
-  type WeddingBundleExportFormat,
-} from "@/lib/weddingBrowserExportActions";
+import { runWeddingArtifactBrowserExport, runWeddingBundleBrowserExport, selectWeddingBundleExportPayload, weddingProjectionMetadataId, type WeddingBundleExportFormat } from "@/lib/weddingBrowserExportActions";
 import { weddingDecisionDeferralActionToAfpSendInput } from "@/lib/weddingDecisionDeferralAfpState";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
-import {
-  approveWeddingApprovalRequestState,
-  type WeddingApprovalRequestState,
-} from "@/lib/weddingApprovalState";
-import {
-  runWeddingApprovalExecution,
-  type WeddingApprovalExecutionState,
-} from "@/lib/weddingApprovalExecutionState";
-import {
-  weddingApprovalReceiptToAfpSendInput,
-  weddingApprovalReceiptToVendorThreadAfpSendInput,
-} from "@/lib/weddingApprovalReceiptAfpProjectionState";
+import { approveWeddingApprovalRequestState, type WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
+import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingExportManifestEntry } from "@/lib/weddingExportState";
-import {
-  normalizeWeddingHomeSectionOrder,
-  shouldShowWeddingHomeSection,
-  WEDDING_HOME_SECTION_IDS,
-  type WeddingHomeSectionId,
-} from "@/lib/weddingHomeSectionPolicyState";
+import { normalizeWeddingHomeSectionOrder, shouldShowWeddingHomeSection, WEDDING_HOME_SECTION_IDS, type WeddingHomeSectionId } from "@/lib/weddingHomeSectionPolicyState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import { buildWeddingResearchPromptAction } from "@/lib/weddingRecommendationGenerationActionState";
 import { buildWeddingSelectedVendorFollowUpCtaState } from "@/lib/weddingSelectedVendorFollowUpCtaState";
 import {
-  buildWeddingVendorQuoteReplyFlowState,
-  weddingVendorQuoteReplyConsentChangeState,
-  weddingVendorQuoteReplyDraftEditEffect,
-  weddingVendorQuoteReplyDraftPersistenceState,
-  weddingVendorQuoteReplyDraftSaveCompletionState,
-  weddingVendorQuoteReplyExecutionSelectionState,
-  weddingVendorQuoteReplyRequestMatchState,
-  weddingVendorQuoteReplyBusyLabelState,
-  weddingVendorQuoteReplyPendingSendTokenState,
-  weddingVendorQuoteReplyPendingSendRetryState,
-  weddingVendorQuoteReplyScheduledSendResolutionState,
-  weddingVendorQuoteReplyScheduledSendGateFlowState,
-  weddingVendorQuoteReplySendGateState,
-  weddingVendorQuoteDraftAfpSendInput,
-  type WeddingVendorQuoteReplyDraftPersistenceStatus,
-  type WeddingVendorQuoteReplyFlowState,
+  buildWeddingVendorQuoteReplyFlowState, weddingVendorQuoteReplyConsentChangeState, weddingVendorQuoteReplyDraftEditEffect,
+  weddingVendorQuoteReplyDraftPersistenceState, weddingVendorQuoteReplyDraftSaveCompletionState,
+  weddingVendorQuoteReplyExecutionSelectionState, weddingVendorQuoteReplyRequestMatchState, weddingVendorQuoteReplyBusyLabelState,
+  weddingVendorQuoteReplyPendingSendTokenState, weddingVendorQuoteReplyPendingSendRetryState,
+  weddingVendorQuoteReplyScheduledSendResolutionState, weddingVendorQuoteReplyScheduledSendGateFlowState,
+  weddingVendorQuoteReplySendGateState, weddingVendorQuoteDraftAfpSendInput,
+  type WeddingVendorQuoteReplyDraftPersistenceStatus, type WeddingVendorQuoteReplyFlowState,
 } from "@/lib/weddingVendorQuoteReplyFlowState";
 import type { WeddingVendorQuoteAttachmentParserState } from "@/lib/weddingVendorQuoteAttachmentParserState";
 import { buildWeddingVendorQuoteAttachmentIngestState } from "@/lib/weddingVendorQuoteAttachmentIngestState";
-import {
-  buildWeddingVendorQuoteThreadProofState,
-  mergeWeddingVendorQuoteThreadProofMessages,
-  weddingVendorQuoteLocalReceiptProofMessage,
-  weddingVendorQuoteReceiptParentId,
-} from "@/lib/weddingVendorQuoteThreadProofState";
+import { buildWeddingVendorQuoteThreadProofState, mergeWeddingVendorQuoteThreadProofMessages, weddingVendorQuoteLocalReceiptProofMessage, weddingVendorQuoteReceiptParentId } from "@/lib/weddingVendorQuoteThreadProofState";
 import { weddingVendorQuoteReceiptPersistenceNotice } from "@/lib/weddingVendorQuoteReceiptPersistenceState";
 import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
 import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import { useWeddingVendorQuoteDecisionProjection } from "@/lib/useWeddingVendorQuoteDecisionProjection";
 import { isMobileFocusViewport } from "@/lib/mobileFocusHomeState";
-
-type WeddingHomeSection = {
-  id: WeddingHomeSectionId;
-  title: string;
-  visible: boolean;
-  render: () => JSX.Element;
-};
+import { useWeddingApprovalExecution } from "@/lib/useWeddingApprovalExecution";
+import { buildWeddingHomeSections, WeddingHomeSectionRegistry } from "@/lib/weddingHomeSectionRegistry";
 
 function weddingHomeLayoutStorageKey(scope: string): string {
   return `omnyid:wedding_home_card_order:${scope}`;
@@ -829,347 +778,54 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     }
   }
 
-  const homeSections = createMemo<WeddingHomeSection[]>(() => [
-    {
-      id: "next_step",
-      title: "Next step",
-      visible: true,
-      render: () => (
-        <WeddingNextStepCard
-          state={state()}
-          onSelectMenu={props.onSelectMenu}
-          onSaveWeddingDate={props.onSaveWeddingDate}
-        />
-      ),
+  const homeSections = createMemo(() => buildWeddingHomeSections({
+    state,
+    workspace: props,
+    exportNotice,
+    handleSidebarAction,
+    searchResult: inlineVendorSearchPreview(),
+    onDismissSearchResult: setDismissedVendorSearchResultArtifactId,
+    vendorOutreach,
+    quoteCardProps: (baseFlow) => {
+      const flow = quoteReplyFlow(baseFlow);
+      return {
+        flow,
+        surface: "home",
+        recipient: flow.recipient,
+        subject: flow.subject,
+        draftBody: flow.draftBody,
+        busy: approvalRunning(),
+        busyLabel: quoteReplyBusyLabel(flow.approvalRequest.id),
+        draftPersistenceStatus: quoteReplyDraftPersistence()[baseFlow.id] ?? null,
+        proofSaveNotice: quoteReplyProofSaveNotice(flow.approvalRequest.id),
+        providerReadiness: quoteReplyProviderReadiness(flow),
+        attachmentParserState: quoteAttachmentParserStateForFlow(flow),
+        attachmentParsing: quoteAttachmentParsing()[baseFlow.id] === true,
+        onSaveDraft: (payload) => saveQuoteReplyDraft(baseFlow, payload),
+        onApproveWording: () => approveQuoteReplyWording(baseFlow),
+        onUnapproveWording: () => unapproveQuoteReplyWording(baseFlow),
+        onAcknowledgeBudgetImpact: () => acknowledgeQuoteReplyBudgetImpact(baseFlow),
+        onUnacknowledgeBudgetImpact: () => unacknowledgeQuoteReplyBudgetImpact(baseFlow),
+        onSend: () => startQuoteReplySend(baseFlow),
+        onUndo: () => undoQuoteReplySend(baseFlow),
+        onViewSentThread: () => void viewQuoteReplyThread(baseFlow),
+        onParseAttachment: () => void parseQuoteAttachment(baseFlow),
+        onProviderSetup: props.onProviderSetup,
+      };
     },
-    {
-      id: "planning_basics",
-      title: "Planning basics needed",
-      visible: props.vendorSearchReadiness?.status === "blocked",
-      render: () => (
-        <div class="rounded-2xl border border-amber-200 bg-amber-50/90 p-3 shadow-sm">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-amber-950">Planning basics needed</p>
-              <p class="mt-1 break-words text-xs leading-5 text-amber-900/75">
-                Live wedding workflows stay blocked until the required planning context is captured.
-              </p>
-            </div>
-            <span class="rounded-full border border-amber-200 bg-white/75 px-2 py-1 text-xs font-semibold text-amber-950">
-              Intake checkpoint
-            </span>
-          </div>
-          <div class="mt-3 grid gap-2 sm:grid-cols-2">
-            <Show when={props.vendorSearchReadiness?.status === "blocked"}>
-              <div class="rounded-xl border border-amber-100 bg-white/75 p-3">
-                <p class="text-xs font-semibold uppercase text-amber-800/70">Vendor search</p>
-                <p class="mt-1 break-words text-sm leading-6 text-amber-950">
-                  Needs {props.vendorSearchReadiness?.missing.join(", ")}.
-                </p>
-                <Show when={props.vendorSearchReadiness?.missing.some((item) => /priorities|fit preferences/i.test(item))}>
-                  <label class="mt-3 block text-xs font-semibold text-amber-950">
-                    Vendor fit preferences
-                    <input
-                      type="text"
-                      value={props.vendorSearchQuery ?? ""}
-                      onInput={(event) => props.onVendorSearchQueryChange?.(event.currentTarget.value)}
-                      placeholder="beachfront venue in Sydney with Gothic style for 60 guests"
-                      class="mt-1 w-full rounded-xl border border-amber-100 bg-white px-3 py-2 text-sm font-normal text-amber-950 outline-none transition placeholder:text-amber-950/35 focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
-                    />
-                  </label>
-                  <p class="mt-2 break-words text-[11px] leading-5 text-amber-900/75">
-                    A specific search query here can unblock vendor fit preferences for live search.
-                  </p>
-                </Show>
-              </div>
-            </Show>
-          </div>
-        </div>
-      ),
+    followUpProps: {
+      state: state(),
+      onSidebarAction: handleSidebarAction,
+      onViewQuoteReplyProof: (flow) => void viewQuoteReplyThread(flow),
+      vendorOutreachFlows: vendorOutreach.flows(),
+      gmailConnected: Boolean(props.gmailStatus?.connected),
+      onOpenOutreachComposer: (card) => void vendorOutreach.onContactVendor(weddingVendorFollowUpOutreachCardData(card), ""),
+      onOutreachBodyChange: vendorOutreach.onOutreachBodyChange,
+      onSendOutreach: (choiceId) => void vendorOutreach.onSendOutreach(choiceId),
+      onCancelOutreach: vendorOutreach.onCancelOutreach,
+      onConnectGmailForOutreach: () => void vendorOutreach.onConnectGmailForOutreach(),
     },
-    {
-      id: "vendor_search",
-      title: "Live vendor search",
-      visible: true,
-      render: () => (
-        <div class="rounded-2xl border border-rose-100 bg-white/85 px-4 py-5 shadow-sm sm:px-5 sm:py-6">
-          <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0">
-              <p class="text-lg font-bold leading-6 text-rose-950">Live vendor search</p>
-              <p class="mt-1 break-words text-xs leading-5 text-rose-950/65">
-                Compare and enquire.
-              </p>
-            </div>
-            <button
-              type="button"
-              class="shrink-0 rounded-full bg-rose-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-rose-300"
-              title={props.vendorSearchBlockedReason ?? undefined}
-              disabled={props.vendorSearchRunning || !props.onRunLiveVendorSearch || Boolean(props.vendorSearchBlockedReason)}
-              onClick={() => props.onRunLiveVendorSearch?.()}
-              data-magic-action="open"
-              data-magic-icon="search"
-              data-magic-label={props.vendorSearchRunning ? "Vendor search running" : "Search wedding vendors"}
-              data-magic-id="wedding:vendor-search:run"
-            >
-              {props.vendorSearchRunning ? "Searching..." : "Search vendors"}
-            </button>
-          </div>
-          <label class="mt-5 block">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-xs font-semibold text-rose-950/75">Search query</span>
-              <Show when={props.vendorSearchQuerySourceLabel}>
-                {(label) => (
-                  <span class="rounded-full border border-rose-100 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-900">
-                    {label()}
-                  </span>
-                )}
-              </Show>
-            </div>
-            <input
-              type="text"
-              value={props.vendorSearchQuery ?? ""}
-              onInput={(event) => props.onVendorSearchQueryChange?.(event.currentTarget.value)}
-              placeholder="florist in Sydney specialising in wedding"
-              class="mt-1 w-full rounded-2xl border-2 border-rose-300 bg-white px-3 py-2 text-sm text-rose-950 shadow-sm outline-none transition placeholder:text-rose-950/35 hover:border-rose-400 focus:border-rose-600 focus:ring-4 focus:ring-rose-100"
-            />
-          </label>
-          <Show when={props.vendorSearchNotice}>
-            {(notice) => (
-              <p class="mt-4 break-words text-xs leading-5 text-rose-950/70">
-                {notice()}
-              </p>
-            )}
-          </Show>
-          <Show when={props.vendorSearchResultAction}>
-            {(action) => (
-              <Show when={inlineVendorSearchPreview()}>
-                {(result) => (
-                  <div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50/80 p-3">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                      <div class="min-w-0">
-                        <p class="break-words text-sm font-semibold text-rose-950">
-                          {result().preview?.title ?? action().label}
-                        </p>
-                        <p class="mt-1 break-words text-xs leading-5 text-rose-950/70">
-                          {action().detail}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        class="rounded-full border border-rose-200 bg-white/85 px-3 py-1.5 text-xs font-semibold text-rose-950 transition hover:border-rose-300 hover:bg-white"
-                        onClick={() => setDismissedVendorSearchResultArtifactId(action().artifactId)}
-                      >
-                        Done
-                      </button>
-                    </div>
-                    <Show when={result().preview}>
-                      {(preview) => (
-                        <>
-                          <div class="mt-3 grid gap-2 sm:grid-cols-3">
-                            <For each={[
-                              preview().category,
-                              preview().evidenceSummary.sourceCountLabel,
-                              preview().vendorComparisonHandoff?.confidenceLabel ?? preview().evidenceSummary.statusLabel,
-                            ].filter(Boolean)}>
-                              {(label) => (
-                                <span class="rounded-xl border border-rose-100 bg-white/85 px-3 py-2 text-xs font-medium text-rose-950/75">
-                                  {label}
-                                </span>
-                              )}
-                            </For>
-                          </div>
-                          <Show when={preview().vendorComparisonCards.length > 0}>
-                            <DecisionCard
-                              card={decisionCardFromWeddingVendorComparison(preview())}
-                              mode="standard"
-                              showActions={false}
-                              class="mt-3 shadow-none"
-                              hero={(
-                                <div class="grid gap-2 lg:grid-cols-3">
-                                  <For each={preview().vendorComparisonCards.slice(0, 3)}>
-                                    {(vendor) => (
-                                      <WeddingVendorChoiceCard
-                                        card={vendor}
-                                        outreachFlow={vendorOutreach.flows()[vendor.choiceId] ?? null}
-                                        gmailConnected={Boolean(props.gmailStatus?.connected)}
-                                        onContactVendor={(card) => void vendorOutreach.onContactVendor(card, action().artifactId)}
-                                        onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
-                                        onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)}
-                                        onCancelOutreach={vendorOutreach.onCancelOutreach}
-                                        onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
-                                      />
-                                    )}
-                                  </For>
-                                </div>
-                              )}
-                            />
-                          </Show>
-                        </>
-                      )}
-                    </Show>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        class="inline-flex items-center justify-center rounded-full bg-rose-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-800"
-                        title={action().detail ?? undefined}
-                        onClick={() => {
-                          props.onSelectMenu?.(action().menu ?? "documents");
-                          props.onSelectArtifact?.(action().artifactId);
-                        }}
-                        data-magic-action="open"
-                        data-magic-icon="file"
-                        data-magic-label={action().label}
-                        data-magic-id="wedding:vendor-search:open-result"
-                      >
-                        Open in Documents
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Show>
-            )}
-          </Show>
-          <Show when={props.vendorSearchBlockedReason}>
-            {(reason) => (
-              <p class="mt-2 break-words text-xs leading-5 text-rose-950/70">
-                {reason()}
-              </p>
-            )}
-          </Show>
-        </div>
-      ),
-    },
-    {
-      id: "notice",
-      title: "Planner notice",
-      visible: Boolean(exportNotice()),
-      render: () => (
-        <p class="rounded-2xl border border-sky-100 bg-sky-50/80 px-3 py-2 text-sm leading-6 text-sky-950/75">
-          {exportNotice()}
-        </p>
-      ),
-    },
-    {
-      id: "overview",
-      title: "Wedding overview",
-      visible: true,
-      render: () => (
-        <WeddingHomeOverviewGrid
-          state={state()}
-          onSelectMenu={props.onSelectMenu}
-          onSidebarAction={handleSidebarAction}
-          onSaveWeddingDate={props.onSaveWeddingDate}
-        />
-      ),
-    },
-    {
-      id: "status",
-      title: "Wedding status",
-      visible: true,
-      render: () => <WeddingHomeStatusStrip state={state()} onSelectMenu={props.onSelectMenu} />,
-    },
-    {
-      id: "threads",
-      title: "Planning threads",
-      visible: true,
-      render: () => (
-        <WeddingPlanningThreadsCard
-          state={state()}
-          onSelectMenu={props.onSelectMenu}
-          onSelectArtifact={props.onSelectArtifact}
-        />
-      ),
-    },
-    {
-      id: "quote_replies",
-      title: "Vendor quote replies",
-      visible: state().activeVendorQuoteReplyFlows.length > 0,
-      render: () => (
-        <div class="space-y-3">
-          <For each={state().activeVendorQuoteReplyFlows}>
-            {(baseFlow) => {
-              const flow = () => quoteReplyFlow(baseFlow);
-              return (
-                <WeddingVendorQuoteReplyCard
-                  flow={flow()}
-                  surface="home"
-                  recipient={flow().recipient}
-                  subject={flow().subject}
-                  draftBody={flow().draftBody}
-                  busy={approvalRunning()}
-                  busyLabel={quoteReplyBusyLabel(flow().approvalRequest.id)}
-                  draftPersistenceStatus={quoteReplyDraftPersistence()[baseFlow.id] ?? null}
-                  proofSaveNotice={
-                    quoteReplyProofSaveNotice(flow().approvalRequest.id)
-                  }
-                  providerReadiness={quoteReplyProviderReadiness(flow())}
-                  attachmentParserState={quoteAttachmentParserStateForFlow(flow())}
-                  attachmentParsing={quoteAttachmentParsing()[baseFlow.id] === true}
-                  onSaveDraft={(payload) => saveQuoteReplyDraft(baseFlow, payload)}
-                  onApproveWording={() => approveQuoteReplyWording(baseFlow)}
-                  onUnapproveWording={() => unapproveQuoteReplyWording(baseFlow)}
-                  onAcknowledgeBudgetImpact={() => acknowledgeQuoteReplyBudgetImpact(baseFlow)}
-                  onUnacknowledgeBudgetImpact={() => unacknowledgeQuoteReplyBudgetImpact(baseFlow)}
-                  onSend={() => startQuoteReplySend(baseFlow)}
-                  onUndo={() => undoQuoteReplySend(baseFlow)}
-                  onViewSentThread={() => void viewQuoteReplyThread(baseFlow)}
-                  onParseAttachment={() => void parseQuoteAttachment(baseFlow)}
-                  onProviderSetup={props.onProviderSetup}
-                />
-              );
-            }}
-          </For>
-        </div>
-      ),
-    },
-    {
-      id: "vendor_follow_up",
-      title: "Vendor follow-ups",
-      visible: state().vendorContactCards.length > 0
-        || state().vendorPursuitLogCards.length > 0
-        || state().vendorQuoteReplyLogFlows.length > 0,
-      render: () => (
-        <WeddingVendorFollowUpPanel
-          state={state()}
-          onSidebarAction={handleSidebarAction}
-          onViewQuoteReplyProof={(flow) => void viewQuoteReplyThread(flow)}
-          vendorOutreachFlows={vendorOutreach.flows()}
-          gmailConnected={Boolean(props.gmailStatus?.connected)}
-          onOpenOutreachComposer={(card) => void vendorOutreach.onContactVendor(weddingVendorFollowUpOutreachCardData(card), "")}
-          onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
-          onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)}
-          onCancelOutreach={vendorOutreach.onCancelOutreach}
-          onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
-        />
-      ),
-    },
-    {
-      id: "decision_focus",
-      title: "Decision focus",
-      visible: true,
-      render: () => <WeddingDecisionFocusCard state={state()} onSidebarAction={handleSidebarAction} />,
-    },
-    {
-      id: "resilience",
-      title: "Plan resilience",
-      visible: true,
-      render: () => <WeddingResilienceCardList state={state().resilience} onSidebarAction={handleSidebarAction} />,
-    },
-    {
-      id: "approval",
-      title: "Approval queue",
-      visible: Boolean(state().projectionQueue),
-      render: () => (
-        <WeddingProjectionApprovalCard
-          state={state().projectionQueue}
-          save={props.saveProjection}
-          storage={props.projectionStorage}
-          onDispatched={props.onProjectionDispatched}
-          onReviewBlocked={props.onReviewBlockedOutputs}
-        />
-      ),
-    },
-  ]);
+  }));
 
   const orderedHomeSections = createMemo(() => {
     const sections = homeSections().filter((section) =>
@@ -1183,68 +839,22 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     );
   });
 
-  async function executeRequest(request: WeddingApprovalRequestState) {
-    if (approvalRunning()) return;
-    setApprovalRunning(true);
-    setApprovalRunningRequestId(request.id);
-    try {
-      const result = await runWeddingApprovalExecution({
-        request: approvedApprovalRequest(request),
-        handlers: props.approvalHandlers,
-      });
-      setApprovalReceipt(result);
-      if (request.delivery?.threadId) {
-        setQuoteReplyLocalExecutions((current) => ({ ...current, [request.id]: result }));
-        setQuoteReplyClearedExecutionRequests((current) => {
-          const next = { ...current };
-          delete next[request.id];
-          return next;
-        });
-      }
-      if (!props.saveProjection) {
-        setApprovalSaveNoticeForRequest(request, weddingVendorQuoteReceiptPersistenceNotice("account_save_unavailable"));
-        return;
-      }
-      try {
-        await props.saveProjection(weddingApprovalReceiptToAfpSendInput(result.receipt));
-        const vendorThreadId = request.delivery?.threadId ?? null;
-        let vendorThreadParentId: string | null = null;
-        if (vendorThreadId && result.status === "executed") {
-          try {
-            vendorThreadParentId = weddingVendorQuoteReceiptParentId(
-              await fetchThread(vendorThreadId),
-              request.id,
-            );
-          } catch {
-            vendorThreadParentId = null;
-          }
-        }
-        const vendorThreadReceipt = vendorThreadId && result.status === "executed"
-          ? weddingApprovalReceiptToVendorThreadAfpSendInput(result.receipt, {
-            threadId: vendorThreadId,
-            parentId: vendorThreadParentId,
-          })
-          : null;
-        if (vendorThreadReceipt) {
-          try {
-            await props.saveProjection(vendorThreadReceipt);
-            setApprovalSaveNoticeForRequest(request, weddingVendorQuoteReceiptPersistenceNotice("approval_saved_vendor_thread_saved"));
-          } catch {
-            setApprovalSaveNoticeForRequest(request, weddingVendorQuoteReceiptPersistenceNotice("approval_saved_vendor_thread_failed"));
-          }
-        } else if (vendorThreadId && result.status === "executed") {
-          setApprovalSaveNoticeForRequest(request, weddingVendorQuoteReceiptPersistenceNotice("approval_saved_vendor_thread_skipped"));
-        } else {
-          setApprovalSaveNoticeForRequest(request, weddingVendorQuoteReceiptPersistenceNotice("approval_saved"));
-        }
-      } catch {
-        setApprovalSaveNoticeForRequest(request, weddingVendorQuoteReceiptPersistenceNotice("approval_save_failed"));
-      }
-    } finally {
-      setApprovalRunning(false);
-      setApprovalRunningRequestId(null);
-    }
-  }
+  const executeRequest = useWeddingApprovalExecution({
+    isRunning: approvalRunning,
+    setRunning: setApprovalRunning,
+    setRunningRequestId: setApprovalRunningRequestId,
+    approvedRequest: approvedApprovalRequest,
+    handlers: props.approvalHandlers,
+    setReceipt: setApprovalReceipt,
+    rememberQuoteExecution: (requestId, result) => setQuoteReplyLocalExecutions((current) => ({ ...current, [requestId]: result })),
+    clearQuoteExecutionTombstone: (requestId) => setQuoteReplyClearedExecutionRequests((current) => {
+      const next = { ...current };
+      delete next[requestId];
+      return next;
+    }),
+    saveProjection: props.saveProjection,
+    setSaveNotice: setApprovalSaveNoticeForRequest,
+  });
 
   return (
     <section
@@ -1272,66 +882,21 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             onSelectMenu={props.onSelectMenu}
             onApproveQuoteReply={approveQuoteReplyWording}
             onAcknowledgeQuoteReply={acknowledgeQuoteReplyBudgetImpact}
+            vendorOutreachFlows={Object.values(vendorOutreach.flows())} gmailConnected={Boolean(props.gmailStatus?.connected)}
+            onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)} onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
+            onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)} onCancelOutreach={vendorOutreach.onCancelOutreach} onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
           />}>
-          <For each={orderedHomeSections()}>
-            {(section, index) => (
-              <div
-                class="rounded-none border-0 bg-transparent p-0 shadow-none backdrop-blur-none sm:rounded-[24px] sm:border sm:border-white/55 sm:bg-white/45 sm:p-2 sm:shadow-sm sm:backdrop-blur"
-                data-wedding-home-section={section.id}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={() => dropHomeSection(section.id)}
-                onMouseMove={(event) => updateHomeSectionControlsFromPointer(section.id, event)}
-                onMouseLeave={() => scheduleHideHomeSectionControls(section.id)}
-              >
-                <div
-                  class={`mb-2 flex flex-wrap items-center justify-between gap-2 transition duration-200 ${
-                    homeSectionControlsVisible(section.id)
-                      ? "opacity-100"
-                      : "pointer-events-none h-0 overflow-hidden opacity-0"
-                  }`}
-                  onMouseEnter={() => showHomeSectionControls(section.id)}
-                  onMouseLeave={() => scheduleHideHomeSectionControls(section.id)}
-                >
-                  <button
-                    type="button"
-                    class="inline-flex cursor-grab items-center gap-2 rounded-full border border-stone-200 bg-white/85 px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-sm active:cursor-grabbing"
-                    title={`Drag to move ${section.title}`}
-                    aria-label={`Move ${section.title}`}
-                    draggable={orderedHomeSections().length > 1}
-                    onDragStart={(event) => {
-                      setDraggingHomeSectionId(section.id);
-                      event.dataTransfer?.setData("text/plain", section.id);
-                    }}
-                    onDragEnd={() => setDraggingHomeSectionId(null)}
-                  >
-                    ::
-                    <span>{section.title}</span>
-                  </button>
-                  <div class="flex flex-wrap gap-1">
-                    <button
-                      type="button"
-                      class="rounded-full border border-stone-200 bg-white/85 px-2.5 py-1 text-xs font-semibold text-stone-700 disabled:opacity-40"
-                      disabled={index() === 0}
-                      title="Move this card up"
-                      onClick={() => moveHomeSectionToIndex(section.id, index() - 1)}
-                    >
-                      Up
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-stone-200 bg-white/85 px-2.5 py-1 text-xs font-semibold text-stone-700 disabled:opacity-40"
-                      disabled={index() === orderedHomeSections().length - 1}
-                      title="Move this card down"
-                      onClick={() => moveHomeSectionToIndex(section.id, index() + 1)}
-                    >
-                      Down
-                    </button>
-                  </div>
-                </div>
-                {section.render()}
-              </div>
-            )}
-          </For>
+          <WeddingHomeSectionRegistry
+            sections={orderedHomeSections()}
+            controlsVisible={homeSectionControlsVisible}
+            onDrop={dropHomeSection}
+            onPointerMove={updateHomeSectionControlsFromPointer}
+            onPointerLeave={scheduleHideHomeSectionControls}
+            onShowControls={showHomeSectionControls}
+            onDragStart={setDraggingHomeSectionId}
+            onDragEnd={() => setDraggingHomeSectionId(null)}
+            onMove={moveHomeSectionToIndex}
+          />
           </Show>
         </Show>
 
@@ -1374,7 +939,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onVendorChoiceSelected={saveVendorChoiceSelection}
           outreachFlows={vendorOutreach.flows()}
           gmailConnected={Boolean(props.gmailStatus?.connected)}
-          onContactVendor={(card, artifactId) => void vendorOutreach.onContactVendor(card, artifactId)}
+          onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)}
           onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
           onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)}
           onCancelOutreach={vendorOutreach.onCancelOutreach}

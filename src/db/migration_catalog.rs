@@ -492,4 +492,14 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Stable Oracle-compatible wedding vendor directory export, including the derived photo count",
         include_str!("../../postgres/migrations/0096_wedding_vendor_directory_export.sql"),
     ),
+    (
+        "0098_wedding_vendor_shortlist_run_claims",
+        "Server-side idempotency claims for one wedding vendor shortlist run per material fingerprint and ranking policy",
+        include_str!("../../postgres/migrations/0098_wedding_vendor_shortlist_run_claims.sql"),
+    ),
+    (
+        "0099_single_demo_seed_message",
+        "Retain one clearly labelled demo seed message per tenant and remove the legacy synthetic seed graph",
+        include_str!("../../postgres/migrations/0099_single_demo_seed_message.sql"),
+    ),
 ];

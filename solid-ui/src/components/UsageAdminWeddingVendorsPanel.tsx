@@ -16,6 +16,7 @@ import {
 import UsageAdminWeddingVendorAttributesEditor from "@/components/UsageAdminWeddingVendorAttributesEditor";
 import {
   buildWeddingVendorAttributeWrites,
+  weddingVendorAttributeCoverage,
   weddingVendorAttributeRows,
   type WeddingVendorAttributeCatalogEntry,
   type WeddingVendorAttributeEdit,
@@ -42,6 +43,10 @@ export default function UsageAdminWeddingVendorsPanel() {
       return response.vendors;
     }),
   );
+  const attributeCoverage = createMemo(() => weddingVendorAttributeCoverage({
+    catalog: attributeCatalog(),
+    vendors: vendors() ?? [],
+  }));
 
   function selectVendorForEdit(vendor: WeddingVendor | null) {
     setValidationErrors([]);
@@ -271,6 +276,19 @@ export default function UsageAdminWeddingVendorsPanel() {
           </button>
         </form>
       </div>
+      <details class="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+        <summary class="cursor-pointer text-sm font-semibold text-slate-950">Active vendor attribute coverage</summary>
+        <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <For each={attributeCoverage()}>
+            {(row) => (
+              <div class="rounded-lg border border-slate-100 bg-slate-50 p-2">
+                <div class="flex items-center justify-between gap-2"><span class="text-xs font-semibold text-slate-900">{row.label}</span><span class="text-xs font-bold text-rose-800">{row.percentage}%</span></div>
+                <p class="mt-1 text-[11px] text-slate-600">{row.covered} of {row.total} · {Object.entries(row.authorities).map(([authority, count]) => `${authority.replace(/_/g, " ")} ${count}`).join(", ") || "no sourced values"}</p>
+              </div>
+            )}
+          </For>
+        </div>
+      </details>
     </section>
   );
 }

@@ -5,6 +5,65 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-06 - WED-150 wedding vendor production-closure implementation
+
+What changed:
+
+- Reworked wedding action styling to outlined, readable 44px controls and added a real-browser
+  contrast/target-size plus axe gate at 360×740 and 1280×800. The fixture covers the full comparison,
+  persisted draft, explicit send, receipt, inbound reply/quote, durable defer/reload/resolve,
+  category replacement from both entry points, blocked shortfall/retry, and second-context bounds.
+- Split every reported oversized wedding/Rust module without raising caps. Added durable AFP triage,
+  honest save failure/retry, comparison reopen, a database-backed shortlist run claim, semantic vendor
+  action intents in AFP, and an in-deck mobile comparison/draft/send/receipt flow. Saved outreach drafts
+  and receipts now reconstruct from AFP after reload.
+- Added attribute-catalog v2 keys, validation (including 1–5 operator scores and coordinates), grouped
+  admin editing, provenance-aware coverage reporting, ranking-v2 pure helpers, deterministic
+  interleaving/MMR, Q/S/Value and seasonal/location models, and a fail-closed NDCG gate evaluator.
+  Ranking v2 remains default-off; cards show honest placeholders until the real-catalog gate passes.
+- Added the guarded operational worksheets for monthly catalog benchmarks, hosted canary/provider
+  drills, 14-day SLO evidence, manual WCAG acceptance, moderated usability, staged rollout, and the
+  release proof packet. CI installs Playwright Chromium and runs the wedding browser gate.
+
+Tests performed from the working tree:
+
+- `npm run typecheck` (pass)
+- `npm run test:line-budget` (2 passing; no cap change)
+- `npm run test:wedding` (1,791 passing)
+- `npm run test:decisionos-navigation` (7 passing)
+- `npm run test:wedding:e2e` (4 passing across both viewports)
+- `npm run build` (pass)
+- `cd typescript-sdk && npx tsc --noEmit` (pass)
+- `cargo check` (pass after the Rust module split)
+- `cargo test --quiet` (pass: 2,322 library tests, 3 taxonomy tests, 12 API-flow tests,
+  and 1 doctest; 11 doctests ignored)
+- `git diff --check` (pass; line-ending warnings only)
+
+Open production gates:
+
+- C6/C13: no real Oracle corpus or two independent judges were supplied. The required 40-case NDCG
+  report, calibration review, and canary-only activation therefore remain open; no synthetic fixture
+  was represented as human relevance evidence.
+- C8: bulk catalog geocoding/enrichment needs explicit approval for each write batch. Coverage has not
+  been asserted against Oracle.
+- C15: no deployment was performed. It needs fresh authorisation, ≥25% Oracle disk headroom, guarded
+  ancestry containing `a95514e`/`7e1880d`, controlled-mailbox hosted lineage, replay, and provider
+  drills. The last recorded proof had only 18% free disk.
+- C16/C17: security-owner disposition of residual JS advisories, authorised hosted scans and
+  rollback/restore drills, 14 consecutive SLO days, human WCAG/usability sessions, rollout decisions,
+  and named approvals cannot be agent-closed.
+- CI has been updated but this uncommitted working tree has no release-candidate GitHub Check; local
+  Playwright success is not described as CI success.
+
+Assumptions and next action:
+
+- The supplied closure spec is authoritative, AFP remains append-only, external send stays
+  user-triggered, ranking v1 remains active, and the existing 1 GiB free / 2 GiB paid account-storage
+  policy is unchanged. Do not deploy this working tree merely to collect evidence.
+- Review and commit the agent-closable slice, obtain approval for a sanitised read-only Oracle catalog
+  export and the first enrichment batch, arrange two human judges, then run C6/C13. Only after those
+  gates and disk remediation should an authorised guarded canary begin C15.
+
 ## 2026-10-05 - UX-MFH-01 decision confirmation and home return
 
 What changed:

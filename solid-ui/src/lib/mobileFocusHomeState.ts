@@ -1,11 +1,13 @@
 // @locs-version: 1.0
 import { createSignal, type Accessor } from "solid-js";
 import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
+import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 
 export type FocusMode = "decisions" | "responses" | "overview";
 export type FocusDeckItem = {
   id: string;
-  kind: "decision" | "response";
+  kind: "decision" | "response" | "vendor_comparison" | "vendor_draft" | "vendor_receipt" | "vendor_blocked";
   sourceSurface: string;
   title: string;
   recommendedActionLabel: string;
@@ -15,6 +17,11 @@ export type FocusDeckItem = {
   deferCount: number;
   returnedFromLater: boolean;
   external: boolean;
+  vendorComparison?: {
+    artifactId: string;
+    cards: WeddingWorkspaceArtifactPreview["vendorComparisonCards"];
+  } | null;
+  vendorOutreachFlow?: WeddingVendorOutreachFlowState | null;
 };
 export type MobileHomeSection = { id: string; title: string; summary: string };
 

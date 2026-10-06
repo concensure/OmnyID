@@ -5,6 +5,11 @@
 // Two rules shape every stage. Unknown is never treated as bad (it lowers confidence and
 // raises a next action, never a penalty), and fit is never multiplied by confidence, so a
 // strong match with thin evidence is still surfaced and shown with its confidence.
+export * from "@/lib/weddingVendorRankingV2State";
+export * from "@/lib/weddingVendorQualityModelState";
+export * from "@/lib/weddingVendorSeasonalCostState";
+export * from "@/lib/weddingVendorLocationUtilityState";
+export * from "@/lib/weddingVendorRankingEvaluationState";
 
 export type WeddingVendorAttributeStatus = "known" | "estimated" | "unknown" | "not_applicable";
 
@@ -156,6 +161,10 @@ export type WeddingVendorRankingCardFields = {
   vendorId: string | null;
   unknownConstraints: string[];
   weddingPlanId: string | null;
+  qualityScoreLabel: string | null;
+  sentimentScoreLabel: string | null;
+  valueScoreLabel: string | null;
+  seasonalNote: string | null;
 };
 
 export type WeddingVendorAvailabilityUpdate = {
@@ -264,6 +273,10 @@ export function weddingVendorRankingCardFieldsFromRecord(record: Record<string, 
       ? record.unknown_constraints.map(clean).filter(Boolean).slice(0, 6)
       : [],
     weddingPlanId: clean(record.wedding_plan_id) || null,
+    qualityScoreLabel: clean(record.quality_score_label) || null,
+    sentimentScoreLabel: clean(record.sentiment_score_label) || null,
+    valueScoreLabel: clean(record.value_score_label) || null,
+    seasonalNote: clean(record.seasonal_note) || null,
   };
 }
 

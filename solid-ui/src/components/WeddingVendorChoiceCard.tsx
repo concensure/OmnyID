@@ -5,14 +5,11 @@ import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreac
 import {
   fetchGoogleWeddingVendorPhoto,
   isGoogleWeddingVendorPhotoPath,
-  recordWeddingVendorAvailability,
 } from "@/lib/api";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
-import {
-  weddingVendorAvailabilityLabel,
-  type WeddingVendorAvailabilityState,
-} from "@/lib/weddingVendorRankingState";
+import type { WeddingVendorAvailabilityState } from "@/lib/weddingVendorRankingState";
 import { weddingVendorPhotoPlaceholder } from "@/lib/weddingVendorPhotoPlaceholderState";
+import { weddingVendorChoiceActionState, type WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import {
   weddingVendorOutreachSentLabel,
   type WeddingVendorOutreachFlowState,
@@ -20,27 +17,24 @@ import {
 
 export type WeddingVendorChoiceCardData = WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number];
 
-const AVAILABILITY_OPTIONS: ReadonlyArray<{ state: WeddingVendorAvailabilityState; label: string }> = [
-  { state: "confirmed_available", label: "Available" },
-  { state: "temporary_hold", label: "On hold" },
-  { state: "confirmed_unavailable", label: "Unavailable" },
-  { state: "booked", label: "Booked" },
-];
-
 function availabilityChipClass(state: WeddingVendorAvailabilityState): string {
   if (["confirmed_available", "likely_available", "temporary_hold", "booked"].includes(state)) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-900";
+    return "border-wedding-muted bg-wedding-surface-blush text-wedding-accent";
   }
-  if (state === "unknown" || state === "confirmed_unavailable") return "border-slate-200 bg-slate-50 text-slate-700";
-  return "border-amber-200 bg-amber-50 text-amber-900";
+  if (state === "unknown" || state === "confirmed_unavailable") return "border-wedding-muted bg-wedding-surface-blush text-wedding-muted";
+  return "border-wedding-muted bg-wedding-surface-blush text-wedding-accent";
 }
 
 export function WeddingVendorChoiceCard(props: {
   card: WeddingVendorChoiceCardData;
   outreachFlow?: WeddingVendorOutreachFlowState | null;
   gmailConnected?: boolean;
-  onContactVendor?: (card: WeddingVendorChoiceCardData) => void;
-  onUpdateAvailability?: (card: WeddingVendorChoiceCardData, state: WeddingVendorAvailabilityState) => Promise<void>;
+  quoteExists?: boolean;
+  bookingContractExists?: boolean;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, intent: WeddingVendorChoiceIntent) => void;
+  onReviewQuote?: (card: WeddingVendorChoiceCardData) => void;
+  onReviewBooking?: (card: WeddingVendorChoiceCardData) => void;
+  onViewEvidence?: (card: WeddingVendorChoiceCardData) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
@@ -87,32 +81,16 @@ export function WeddingVendorChoiceCard(props: {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     });
   });
-  // Optimistic: the saved state shows on the next search, so the card reflects the couple's update now.
-  const [availabilityOverride, setAvailabilityOverride] = createSignal<WeddingVendorAvailabilityState | null>(null);
-  const [availabilityError, setAvailabilityError] = createSignal<string | null>(null);
-  const availabilityState = () => availabilityOverride() ?? card.availabilityState;
-  const needsAvailabilityCheck = () =>
-    ["unknown", "enquiry_sent", "awaiting_response"].includes(availabilityState());
-  const canUpdateAvailability = () => Boolean(card.vendorId && (card.weddingPlanId || props.onUpdateAvailability));
-  async function updateAvailability(state: WeddingVendorAvailabilityState) {
-    if (!card.vendorId) return;
-    const previous = availabilityOverride();
-    setAvailabilityOverride(state);
-    setAvailabilityError(null);
-    try {
-      if (props.onUpdateAvailability) {
-        await props.onUpdateAvailability(card, state);
-      } else if (card.weddingPlanId) {
-        await recordWeddingVendorAvailability(card.vendorId, { wedding_plan_id: card.weddingPlanId, state });
-      }
-    } catch (error) {
-      setAvailabilityOverride(previous);
-      setAvailabilityError(error instanceof Error ? error.message : "Could not save availability. Check your connection and try again.");
-    }
-  }
+  const availabilityState = () => card.availabilityState;
+  const primaryAction = () => weddingVendorChoiceActionState({
+    availabilityState: availabilityState(),
+    outreachStage: props.outreachFlow?.stage,
+    quoteExists: props.quoteExists,
+    bookingContractExists: props.bookingContractExists,
+  });
   const placeholder = () => weddingVendorPhotoPlaceholder({ vendorName: card.title, category: null });
   return (
-    <article class="min-w-0 overflow-hidden rounded-xl border border-teal-100 bg-white/85">
+    <article class="min-w-0 overflow-hidden rounded-xl border border-wedding-muted bg-white/85">
       <Show
         when={resolvedImageUrl() && !imageFailed()}
         fallback={
@@ -137,10 +115,10 @@ export function WeddingVendorChoiceCard(props: {
       <div class="space-y-2 p-3">
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase text-teal-700/70">#{card.rank} recommendation</p>
-            <h4 class="mt-0.5 break-words text-sm font-semibold text-teal-950">{card.title}</h4>
+            <p class="text-[11px] font-semibold uppercase text-wedding-text">#{card.rank} recommendation</p>
+            <h4 class="mt-0.5 break-words text-sm font-semibold text-wedding-text">{card.title}</h4>
           </div>
-          <span class="shrink-0 rounded-full bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-900">
+          <span class="shrink-0 rounded-full bg-wedding-surface-blush px-2 py-1 text-[11px] font-semibold text-wedding-accent">
             {card.scoreLabel}
           </span>
         </div>
@@ -148,31 +126,37 @@ export function WeddingVendorChoiceCard(props: {
           class={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-semibold ${availabilityChipClass(availabilityState())}`}
           data-testid="vendor-availability-chip"
         >
-          {availabilityOverride() ? weddingVendorAvailabilityLabel(availabilityState()) : card.availabilityLabel}
+          {card.availabilityLabel}
         </span>
-        <p class="break-words text-xs leading-5 text-teal-900/75">{card.situationFit}</p>
+        <p class="break-words text-xs leading-5 text-wedding-muted">{card.situationFit}</p>
         <div class="flex flex-wrap gap-1">
           <For each={card.rationaleLabels.slice(0, 3)}>
             {(label) => (
-              <span class="max-w-full break-words rounded-full bg-teal-50 px-2 py-1 text-[11px] font-medium text-teal-900">
+              <span class="max-w-full break-words rounded-full bg-wedding-surface-blush px-2 py-1 text-[11px] font-medium text-wedding-accent">
                 {label}
               </span>
             )}
           </For>
         </div>
-        <p class="break-words text-[11px] leading-4 text-teal-900/65">
+        <p class="break-words text-[11px] leading-4 text-wedding-muted">
           {card.verificationLabel}
         </p>
+        <div class="grid grid-cols-3 gap-1" aria-label="Vendor score summary">
+          <span class="rounded-lg border border-wedding-muted bg-wedding-surface-blush px-2 py-1 text-[10px] font-semibold text-wedding-accent">{card.qualityScoreLabel || "Q not yet assessed"}</span>
+          <span class="rounded-lg border border-wedding-muted bg-wedding-surface-blush px-2 py-1 text-[10px] font-semibold text-wedding-accent">{card.sentimentScoreLabel || "S not yet assessed"}</span>
+          <span class="rounded-lg border border-wedding-muted bg-wedding-surface-blush px-2 py-1 text-[10px] font-semibold text-wedding-accent">{card.valueScoreLabel || "Value not yet assessed"}</span>
+        </div>
+        <p class="text-[10px] leading-4 text-wedding-muted">{card.seasonalNote || "Seasonal cost not yet assessed."}</p>
         <Show when={card.unknownConstraints.length > 0}>
-          <p class="break-words text-[11px] leading-4 text-slate-600">
+          <p class="break-words text-[11px] leading-4 text-wedding-muted">
             Unconfirmed: {card.unknownConstraints.join(", ")}
           </p>
         </Show>
         <Show when={contactRows().length > 0}>
-          <div class="rounded-lg border border-teal-100 bg-teal-50/60 p-2">
+          <div class="rounded-lg border border-wedding-muted bg-wedding-surface-blush p-2">
             <button
               type="button"
-              class="text-xs font-semibold text-teal-950 underline decoration-teal-300 underline-offset-2"
+              class="min-h-11 text-xs font-semibold text-wedding-text underline decoration-wedding-muted underline-offset-2"
               onClick={() => setContactOpen((current) => !current)}
               aria-expanded={contactOpen()}
             >
@@ -183,11 +167,11 @@ export function WeddingVendorChoiceCard(props: {
                 <For each={contactRows()}>
                   {(row) => (
                     <div class="grid gap-1 text-[11px] sm:grid-cols-[4.5rem_1fr]">
-                      <dt class="font-semibold text-teal-900/70">{row.label}</dt>
-                      <dd class="min-w-0 break-words text-teal-950">
+                      <dt class="font-semibold text-wedding-muted">{row.label}</dt>
+                      <dd class="min-w-0 break-words text-wedding-text">
                         <Show when={row.href} fallback={row.value}>
                           {(href) => (
-                            <a href={href()} target={row.label === "Email" || row.label === "Phone" ? undefined : "_blank"} rel="noreferrer" class="underline decoration-teal-300 underline-offset-2">
+                            <a href={href()} target={row.label === "Email" || row.label === "Phone" ? undefined : "_blank"} rel="noreferrer" class="underline decoration-wedding-muted underline-offset-2">
                               {row.value}
                             </a>
                           )}
@@ -207,7 +191,7 @@ export function WeddingVendorChoiceCard(props: {
                 href={url()}
                 target="_blank"
                 rel="noreferrer"
-                class="rounded-full border border-teal-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-teal-950 transition hover:bg-teal-50"
+                class="inline-flex min-h-11 items-center rounded-full border border-wedding-muted bg-white px-2.5 py-1.5 text-xs font-semibold text-wedding-text transition hover:bg-wedding-surface-blush"
               >
                 Open website
               </a>
@@ -219,7 +203,7 @@ export function WeddingVendorChoiceCard(props: {
                 href={url()}
                 target="_blank"
                 rel="noreferrer"
-                class="rounded-full border border-teal-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-teal-950 transition hover:bg-teal-50"
+                class="inline-flex min-h-11 items-center rounded-full border border-wedding-muted bg-white px-2.5 py-1.5 text-xs font-semibold text-wedding-text transition hover:bg-wedding-surface-blush"
               >
                 Open map
               </a>
@@ -230,42 +214,30 @@ export function WeddingVendorChoiceCard(props: {
             fallback={
               <button
                 type="button"
-                onClick={() => props.onContactVendor?.(card)}
+                onClick={() => {
+                  const action = primaryAction();
+                  if (action.intent === "REVIEW_QUOTE") props.onReviewQuote?.(card);
+                  else if (action.intent === "START_PURCHASE_OR_BOOKING") props.onReviewBooking?.(card);
+                  else if (action.intent === "VIEW_EVIDENCE") props.onViewEvidence?.(card);
+                  else props.onContactVendor?.(card, action.intent);
+                }}
+                data-wedding-vendor-intent={primaryAction().intent}
                 data-magic-action="contact"
                 data-magic-icon="send"
                 data-magic-id={`wedding:vendor-choice:${card.choiceId}:contact`}
-                class="rounded-full bg-wedding-accent px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-wedding-accent-hover"
+                class="min-h-11 rounded-full border border-wedding-muted bg-white px-2.5 py-1.5 text-xs font-bold text-wedding-text transition hover:bg-wedding-surface-blush"
               >
-                {needsAvailabilityCheck() ? "Check availability" : "Contact"}
+                <span aria-hidden="true">→ </span>
+                {primaryAction().label}
               </button>
             }
           >
-            <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900">
+            <span class="rounded-full border border-wedding-muted bg-wedding-surface-blush px-2.5 py-1.5 text-xs font-semibold text-wedding-accent">
               {"✓ "}
               {weddingVendorOutreachSentLabel({ sentAtIso: props.outreachFlow?.sentAtIso ?? null })}
             </span>
           </Show>
         </div>
-        <Show when={canUpdateAvailability()}>
-          <label class="flex items-center gap-2 text-[11px] font-semibold text-teal-900/70">
-            Update availability
-            <select
-              class="min-w-0 rounded-lg border border-teal-200 bg-white px-1.5 py-1 text-[11px] text-teal-950"
-              value=""
-              onChange={(event) => {
-                const state = event.currentTarget.value as WeddingVendorAvailabilityState;
-                event.currentTarget.value = "";
-                if (state) void updateAvailability(state);
-              }}
-            >
-              <option value="">Choose…</option>
-              <For each={AVAILABILITY_OPTIONS}>{(option) => <option value={option.state}>{option.label}</option>}</For>
-            </select>
-          </label>
-          <Show when={availabilityError()}>
-            {(message) => <p class="text-[11px] leading-4 text-rose-700" role="alert">{message()}</p>}
-          </Show>
-        </Show>
         <Show when={props.outreachFlow}>
           {(flow) => (
             <WeddingVendorOutreachComposer

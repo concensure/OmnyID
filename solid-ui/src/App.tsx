@@ -3663,6 +3663,30 @@ function App() {
                     </div>
                   )}
                 </Show>
+                <Show when={commandResult()}>
+                  {(result) => (
+                    <section
+                      class="rounded-3xl border border-primary/30 bg-white px-5 py-4 text-on-surface shadow-card"
+                      aria-live="polite"
+                      aria-atomic="true"
+                      data-testid="master-agent-visible-response"
+                    >
+                      <p class="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                        Master Agent response
+                      </p>
+                      <p class="mt-2 text-sm leading-6 text-on-surface">
+                        {result().summary?.trim() || "The Master Agent completed the request."}
+                      </p>
+                      <Show when={(result().bullets?.length ?? 0) > 0}>
+                        <ul class="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-on-surface-variant">
+                          <For each={(result().bullets ?? []).slice(0, 4)}>
+                            {(bullet) => <li>{bullet}</li>}
+                          </For>
+                        </ul>
+                      </Show>
+                    </section>
+                  )}
+                </Show>
                 {/* Search result card — shown when a command has been run */}
                 <Show when={commandPreviewMessage()}>
                   {(preview) => (

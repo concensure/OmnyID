@@ -17,6 +17,17 @@ test("master agent preview conversion falls back instead of crashing the workspa
   assert.match(appSource, /return buildCommandPreviewRenderFailureMessage\(result, lastQuery\(\), error\)/);
 });
 
+test("every completed master agent command has a plain visible response before enhanced rendering", () => {
+  const appSource = read("src/App.tsx");
+  const plainResponse = appSource.indexOf('data-testid="master-agent-visible-response"');
+  const enhancedPreview = appSource.indexOf("<Show when={commandPreviewMessage()}>");
+
+  assert.ok(plainResponse >= 0);
+  assert.ok(enhancedPreview > plainResponse);
+  assert.match(appSource, /Master Agent response/);
+  assert.match(appSource, /result\(\)\.summary\?\.trim\(\)/);
+});
+
 test("dynamic AFP renderer failures are contained inside the result card", () => {
   const dispatcherSource = read("src/components/ViewDispatcher.tsx");
 
@@ -69,4 +80,12 @@ test("wedding planner controls follow Setup checks and response cards preserve v
   assert.doesNotMatch(focusSource, /\{card\.checkedLabel\}/);
   assert.match(followUpSource, /border-2 border-wedding-cta/);
   assert.match(followUpSource, /border-2 border-wedding-accent/);
+});
+
+test("vendor recommendation cards do not expose the internal availability editor", () => {
+  const cardSource = read("src/components/WeddingVendorChoiceCard.tsx");
+
+  assert.doesNotMatch(cardSource, /Update availability/);
+  assert.doesNotMatch(cardSource, /AVAILABILITY_OPTIONS/);
+  assert.doesNotMatch(cardSource, /recordWeddingVendorAvailability/);
 });

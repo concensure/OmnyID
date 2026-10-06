@@ -260,3 +260,33 @@ AFP event, general queue actions open the source workflow, and mobile deck actio
 the existing confirmation bar. Vendor comparison is a Choose card whose desktop hero reuses
 `WeddingVendorChoiceCard`; this avoids a second comparison implementation and preserves the
 authenticated Google-photo, availability, evidence, and approval-gated outreach behavior.
+
+## 2026-10-06: Wedding Production Closure Fails Closed At Human And Hosted Gates
+
+Ranking policy v2 is additive and default-off behind `WEDDING_VENDOR_RANKING_POLICY_V2`. Its pure
+quality, sentiment, value, seasonal-cost, location, confidence, interleaving, and diversity helpers
+may be exercised locally, but v2 must not become an active production policy until a sanitised active
+Oracle corpus has at least 40 cases, two independent human judges, deterministic replay, all probes,
+aggregate NDCG@3 improvement of at least 0.05, and no case regression greater than 0.15. The gate
+evaluator enforces those conditions rather than treating synthetic tests as release evidence.
+
+Automatic shortlist launches use a database uniqueness claim over tenant, plan, category, material
+fingerprint, and ranking-policy version. Failed or stale claims are retryable; browser storage is only
+a latency optimisation. Outreach draft and delivery cards rebuild from append-only AFP messages, and
+the mobile vendor deck uses those persisted projections rather than inventing a second local truth.
+
+Hosted canary, provider resilience, bulk catalog writes, the 14-day SLO window, accessibility and
+usability sessions, staged rollout, and named sign-offs remain external or human gates. Local code and
+fixtures cannot close them. Any future Oracle deployment must retain guard commit `a95514e` (including
+`7e1880d`) in ancestry and meet the documented disk-headroom precondition.
+
+## 2026-10-06: Oracle UI Builds Must Stage Their CSS Toolchain Configuration
+
+`solid-ui/tailwind.config.cjs` and `solid-ui/postcss.config.cjs` are production runtime-build inputs,
+not development-only files. Oracle staging must copy both alongside the UI source. A deployment that
+updates component class names without the matching Tailwind configuration can ship correct markup
+with no generated utility rules, making text and controls appear missing in production.
+
+Seeded demo messages are bounded to one per tenant. Existing signed messages are not rewritten by a
+database migration: redundant seeds are removed, while the retained seed is clearly labelled as Demo
+in the presentation projection. New accounts receive one explicitly labelled seed from the server.

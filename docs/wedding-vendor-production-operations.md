@@ -193,3 +193,86 @@ to this repository.
 Open a data incident immediately for suspected cross-tenant exposure, leaked credentials, forged
 receipts, or unauthorized external contact. Disable affected execution paths, preserve audit evidence,
 follow the organizational incident process, and notify affected users according to applicable policy.
+
+## Monthly Sydney benchmark procedure
+
+This is an operator-controlled write task. Use 20–30 comparable active venues and repeat the same
+sample monthly for at least 12 months. Each batch needs explicit approval before it changes catalog
+attributes.
+
+1. Export the selected vendor ids and current attribute provenance without user or couple data.
+2. From primary official sources, record advertised package price, hire fee, catering price per head,
+   minimum spend, inclusions, the date the price applies to, and the retrieval timestamp. Record
+   availability and enquiry outcomes only from the controlled mailbox.
+3. Keep Google/Easy Weddings observations as independent aggregates and operator classifications as
+   operator evidence. Never promote an inferred value to a quote.
+4. Preview the batch diff, coverage change, provider calls, and estimated spend. Obtain operator
+   approval for that exact batch, then write through the admin attribute API.
+5. Export the post-write coverage report by key and authority. Preserve prior evidence through normal
+   supersession; do not delete AFP history.
+
+Monthly evidence row: `month | sample fingerprint | vendor count | source snapshot ref | approved by |
+batch receipt | provider calls/spend | required coverage | target coverage | anomalies/fixes`.
+
+## Hosted canary and 14-day SLO worksheet
+
+Do not start this worksheet until deployment is authorised, the guarded source commit contains
+`a95514e` (and therefore `7e1880d`), and Oracle disk headroom is at least 25%. Record the release SHA,
+deployed SHA, configuration fingerprint, migration state, controlled account id, and controlled
+mailbox id without secrets.
+
+The hosted run must capture AFP ids, elapsed time, and provider-call receipts for: directory-only
+exactly-three; one online shortfall; real photo plus placeholder; draft, explicit send, reply, quote;
+DecisionOS projection while the client is closed; defer, reload/resurface, and resolve. Replay the
+captured lineage into empty projections and compare stable identities and ordering. Then repeat with
+provider disabled, quota exhausted, timeout, and simulated regional failure; each must degrade
+honestly and remain metered.
+
+For each of 14 consecutive days record:
+`UTC date | RC SHA | directory P95 | online P95 | quote projection P95 | duplicate sends | missed
+critical deadlines | provider error ratio | spend vs budget | canary result | evidence ref | operator`.
+Any SLO breach resets day 1 and opens a repair task. Empty rows are not evidence.
+
+## Manual WCAG 2.2 AA acceptance script
+
+Run against the authorised canary at 360×740 and desktop width with a real test account and controlled
+data. Record device, OS, browser/assistive-technology version, tester, result, and evidence reference.
+
+- VoiceOver on iOS and TalkBack on Android: reach the global menu from every page; hear the current
+  destination; open the wedding comparison; announce rank, photo/placeholder, availability, Fit,
+  Q/S/Value unknowns, carousel position, primary action, draft state, send consequence, and receipt.
+- Keyboard only: visible focus, logical order, Escape/backdrop close, carousel previous/next, no focus
+  trap leaks, and no action triggered by carousel paging or deck swipe.
+- Browser zoom at 200% and large text: no clipped action, horizontal page scroll, hidden menu, or
+  obscured confirmation. Test long vendor/couple names and en-AU dates/currency.
+- Reduced motion and forced-colour/high-contrast modes: content and state remain understandable
+  without animation or colour alone. Recheck all errors, retry actions, badges, and disabled controls.
+
+Automated axe/contrast output is supporting evidence only; it does not close this manual gate.
+
+## Moderated usability script
+
+Recruit at least five representative couples under the approved research/privacy process. Give each
+participant a fresh controlled workspace and ask them to: find a vendor category, explain why the
+three are ordered, identify unknown or indicative facts, request a quote, explain exactly what Send
+will do, find the receipt, defer a quote decision, reload, and resolve it later. Do not coach beyond
+the written prompt.
+
+Success requires every participant to distinguish Fit from Q/S/Value, identify estimates versus
+quotes, explain unknown availability, and understand that no external message is sent before their
+explicit action. Record task completion, errors, quotes/observations under the research consent, and
+severity-ranked findings. Each product fix re-enters its automated and manual gate.
+
+## Release proof packet and staged flags
+
+The packet must contain the release/deployed SHA pair, guard ancestry proof, configuration fingerprint,
+migrations, CI/check links, line-budget output, ranking corpus and NDCG/calibration report, catalog
+coverage by authority, hosted lineage/replay/provider drills, security disposition, rollback/restore
+proof, 14-day SLO worksheet, known risks, and named product, engineering, security/privacy, and
+operations approvals.
+
+Keep ranking v2 disabled outside the developer canary until the two-judge real-catalog gate passes.
+Advance `developer_canary → internal_accounts → controlled_beta → percentage_rollout →
+general_availability` only while provider resilience and the SLO window remain green. Record cohort,
+start/end time, flag values, approver, monitoring link, abort threshold, and rollback result for every
+stage.

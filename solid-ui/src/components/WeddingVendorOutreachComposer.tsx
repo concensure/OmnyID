@@ -95,7 +95,7 @@ export function WeddingVendorOutreachComposer(props: {
             disabled={!gate().canSend || props.busy}
             title={gate().reason ?? undefined}
             onClick={props.onSend}
-            class="mt-3 w-full rounded-2xl bg-wedding-cta px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-cta-hover focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            class="mt-3 min-h-[44px] w-full rounded-2xl border-2 border-wedding-cta bg-white px-5 py-3 text-sm font-bold text-wedding-text transition hover:bg-wedding-surface-blush focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {props.flow.stage === "sending" ? "Sending…" : `Send to ${props.flow.vendorName}`}
           </button>

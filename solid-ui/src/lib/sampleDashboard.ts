@@ -99,6 +99,40 @@ function messageCoverageKind(message: AfpMessage): string {
   return String(message.kind ?? message.type ?? "").trim().toLowerCase();
 }
 
+function isSeededDemoMessage(message: AfpMessage): boolean {
+  const content = afpRecord(message.content);
+  const metadata = afpRecord(message.metadata);
+  const kind = sampleScalarString(content["kind"]).trim().toLowerCase();
+  return kind === "demo_seed"
+    || kind === "demo_seed_note"
+    || metadata["source"] === "sample_bootstrap"
+    || metadata["is_sample"] === true;
+}
+
+function clearlyLabelSeededDemoMessage(message: AfpMessage): AfpMessage {
+  const content = afpRecord(message.content);
+  const existingTitle = sampleScalarString(content["title"])
+    || sampleScalarString(content["subject"])
+    || "welcome to OmnyID";
+  const title = /^demo\s*:/i.test(existingTitle)
+    ? existingTitle
+    : `Demo: ${existingTitle}`;
+  const tags = Array.isArray(content["tags"])
+    ? content["tags"].filter((tag): tag is string => typeof tag === "string")
+    : [];
+
+  return {
+    ...message,
+    supertags: [...new Set([...(message.supertags ?? []), "Demo"])],
+    content: {
+      ...content,
+      title,
+      is_demo: true,
+      tags: [...new Set([...tags, "demo"])],
+    },
+  };
+}
+
 function hasConnectedSampleCoverage(messages: AfpMessage[]): boolean {
   if (messages.length === 0) return false;
   const kinds = new Set(messages.map(messageCoverageKind));
@@ -137,20 +171,19 @@ export function buildSampleDashboardBootstrap(
 
   const messages: AfpMessage[] = [
     buildMessage({
-      id: "sample-email-1",
-      threadId: "thread-product-launch",
-      from: "alex@northstar-systems.com",
-      type: "email",
-      kind: "email",
-      supertags: ["Launch Ops", "Vendor:Northstar"],
+      id: "sample-demo-welcome",
+      threadId: "thread-demo-welcome",
+      from: "agent:master@omnyid.com",
+      type: "note",
+      kind: "note",
+      supertags: ["Demo"],
       minutesAgo: 18,
       content: {
-        subject: "Northstar onboarding assets due Friday",
-        preview: "Supplier confirmed the onboarding deck and pricing sheet will be ready by Friday afternoon.",
-        body: "Supplier confirmed the onboarding deck and pricing sheet will be ready by Friday afternoon. They need final approval on the launch narrative by Thursday.",
-        sender: "Alex L.",
-        sender_detail: "Northstar Systems",
-        labels: ["supplier", "launch"],
+        title: "Demo: welcome to OmnyID",
+        preview: "This is the only demo message. Ask the Master Agent a real question to begin.",
+        body: "This is demo content. Ask the Master Agent a real question to replace the sample with your own workspace activity.",
+        tags: ["demo"],
+        is_demo: true,
       },
     }),
     buildMessage({
@@ -558,11 +591,13 @@ export function buildSampleDashboardBootstrap(
     }),
   ];
 
+  const visibleDemoMessages = messages.slice(0, 1);
+
   return {
     user: resolvedUser,
     agents: [{ agent_id: "agent:master@omnyid.com", label: "Master Agent" }],
-    messages,
-    thread_summaries: buildThreadSummaries(messages),
+    messages: visibleDemoMessages,
+    thread_summaries: buildThreadSummaries(visibleDemoMessages),
     proactive_suggestions: [
       {
         id: "sample-suggestion-1",
@@ -748,14 +783,22 @@ export function mergeDashboardBootstrapWithSample(
 
   const liveMessages = live.messages ?? [];
   const needsConnectedSample = !hasConnectedSampleCoverage(liveMessages);
-  const mergedMessages = needsConnectedSample
-    ? mergeUniqueById(liveMessages, sample.messages)
-    : liveMessages;
-  const mergedThreadSummaries = needsConnectedSample
-    ? mergeUniqueThreadSummaries(live.thread_summaries ?? [], sample.thread_summaries ?? [])
-    : ((live.thread_summaries?.length ?? 0) > 0
-      ? live.thread_summaries
-      : sample.thread_summaries);
+  const liveDemoMessages = liveMessages.filter(isSeededDemoMessage);
+  const retainedDemoMessageSource = liveDemoMessages[0] ?? sample.messages[0] ?? null;
+  const retainedDemoMessage = retainedDemoMessageSource
+    ? clearlyLabelSeededDemoMessage(retainedDemoMessageSource)
+    : null;
+  const mergedMessages = [
+    ...liveMessages.filter((message) => !isSeededDemoMessage(message)),
+    ...(retainedDemoMessage ? [retainedDemoMessage] : []),
+  ];
+  const demoThreadIds = new Set(liveDemoMessages.map((message) => message.thread_id));
+  const liveThreadSummaries = (live.thread_summaries ?? [])
+    .filter((thread) => !demoThreadIds.has(thread.thread_id));
+  const retainedDemoSummary = retainedDemoMessage
+    ? buildThreadSummaries([retainedDemoMessage])
+    : [];
+  const mergedThreadSummaries = mergeUniqueThreadSummaries(liveThreadSummaries, retainedDemoSummary);
   const mergedProactiveSuggestions = needsConnectedSample
     ? mergeUniqueById(live.proactive_suggestions ?? [], sample.proactive_suggestions ?? [])
     : ((live.proactive_suggestions?.length ?? 0) > 0

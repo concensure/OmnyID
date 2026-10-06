@@ -3,7 +3,7 @@
 // editable rows for one vendor, and turning only the changed rows into a write payload.
 import type { WeddingVendorAttributeEvidence, WeddingVendorAttributeStatus } from "@/lib/weddingVendorRankingState";
 
-export type WeddingVendorAttributeKind = "bool" | "number" | "money" | "text" | "tags" | "enum" | "url" | "time";
+export type WeddingVendorAttributeKind = "bool" | "number" | "money" | "text" | "tags" | "enum" | "url" | "time" | "coordinate" | "json";
 
 export type WeddingVendorAttributeCatalogEntry = {
   key: string;
@@ -34,6 +34,41 @@ export type WeddingVendorAttributeWriteFields = {
   attributes?: WeddingVendorAttributeWrite[];
 };
 
+export type WeddingVendorAttributeCoverageRow = {
+  key: string;
+  label: string;
+  covered: number;
+  total: number;
+  percentage: number;
+  authorities: Record<string, number>;
+};
+
+export function weddingVendorAttributeCoverage(input: {
+  catalog: readonly WeddingVendorAttributeCatalogEntry[];
+  vendors: ReadonlyArray<{ status: string; attributes?: Record<string, WeddingVendorAttributeEvidence> }>;
+}): WeddingVendorAttributeCoverageRow[] {
+  const active = input.vendors.filter((vendor) => vendor.status === "active");
+  return input.catalog.map((entry) => {
+    const evidence = active.flatMap((vendor) => {
+      const value = vendor.attributes?.[entry.key];
+      return value && (value.status === "known" || value.status === "estimated") ? [value] : [];
+    });
+    const authorities: Record<string, number> = {};
+    for (const value of evidence) {
+      const authority = value.authority ?? "unspecified";
+      authorities[authority] = (authorities[authority] ?? 0) + 1;
+    }
+    return {
+      key: entry.key,
+      label: entry.label,
+      covered: evidence.length,
+      total: active.length,
+      percentage: active.length === 0 ? 0 : Math.round((evidence.length / active.length) * 1000) / 10,
+      authorities,
+    };
+  });
+}
+
 /** What the operator has typed for one attribute; strings because they come from form inputs. */
 export type WeddingVendorAttributeEdit = {
   status: WeddingVendorAttributeStatus;
@@ -48,7 +83,7 @@ export type WeddingVendorAttributeRow = {
   confidence: number | null;
 };
 
-const KINDS = new Set<string>(["bool", "number", "money", "text", "tags", "enum", "url", "time"]);
+const KINDS = new Set<string>(["bool", "number", "money", "text", "tags", "enum", "url", "time", "coordinate", "json"]);
 const STATUSES = new Set<string>(["known", "estimated", "unknown", "not_applicable"]);
 const GROUP_ORDER = ["feasibility", "commercial", "quality", "fit", "risk", "identity"];
 
@@ -122,6 +157,7 @@ function valueTextFromEvidence(entry: WeddingVendorAttributeCatalogEntry, value:
   if (value === null || value === undefined) return "";
   if (entry.kind === "tags") return Array.isArray(value) ? value.join(", ") : "";
   if (entry.kind === "bool") return value === true ? "true" : value === false ? "false" : "";
+  if (entry.kind === "json") return JSON.stringify(value);
   return String(value);
 }
 
@@ -181,8 +217,24 @@ export function parseWeddingVendorAttributeValue(
     case "number":
     case "money": {
       const number = Number(text);
+      if (["condition_score", "food_score", "service_score"].includes(entry.key)) {
+        return text !== "" && Number.isFinite(number) && number >= 1 && number <= 5
+          ? { ok: true, value: number }
+          : fail("a score from 1 to 5");
+      }
       return text !== "" && Number.isFinite(number) && number >= 0 ? { ok: true, value: number } : fail("a non-negative number");
     }
+    case "coordinate": {
+      const number = Number(text);
+      return text !== "" && Number.isFinite(number) && number >= -180 && number <= 180 ? { ok: true, value: number } : fail("a coordinate between -180 and 180");
+    }
+    case "json":
+      try {
+        const value: unknown = JSON.parse(text);
+        return value && typeof value === "object" ? { ok: true, value } : fail("a JSON object or array");
+      } catch {
+        return fail("valid JSON");
+      }
     case "tags": {
       const tags = text.split(",").map((tag) => tag.trim()).filter(Boolean);
       return tags.length > 0 ? { ok: true, value: tags } : fail("at least one comma-separated tag");

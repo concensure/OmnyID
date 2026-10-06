@@ -6,8 +6,10 @@ import { MobileFocusHome } from "@/components/MobileFocusHome";
 import { DecisionCard } from "@/components/DecisionCard";
 import { QueueClearedZenState } from "@/components/QueueClearedZenState";
 import { WeddingHomeOverviewGrid } from "@/components/WeddingHomeOverviewGrid";
+import { WeddingVendorDeckCard } from "@/components/WeddingVendorDeckCard";
 import type { SendAfpMessageInput } from "@/lib/api";
 import { decisionTriageToAfpSendInput } from "@/lib/decisionTriageAfpState";
+import { buildDecisionTriageProjectionState } from "@/lib/decisionTriageProjectionState";
 import { decisionCardFromFocusDeckItem } from "@/lib/decisionCardState";
 import { buildWeddingDecisionFocusDisplayState } from "@/lib/weddingDecisionFocusDisplayState";
 import { buildWeddingDecisionDeferSidebarAction } from "@/lib/weddingDecisionFocusActionState";
@@ -26,10 +28,15 @@ import {
   type FocusDeckItem,
 } from "@/lib/mobileFocusHomeState";
 import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
+import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
+import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
+import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
+import { buildWeddingVendorDeckProjectionState } from "@/lib/weddingVendorDeckProjectionState";
 
 type HomeSection = { id: string; title: string; render: () => JSX.Element };
 type InputMethod = "swipe" | "button" | "keyboard";
 type PendingApproval = { item: FocusDeckItem; method: InputMethod };
+type PendingTriage = { input: SendAfpMessageInput; onSaved: () => void };
 
 export function WeddingMobileFocusHome(props: {
   state: WeddingResponseWorkspaceViewState;
@@ -39,15 +46,30 @@ export function WeddingMobileFocusHome(props: {
   onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
   onApproveQuoteReply?: (flow: WeddingVendorQuoteReplyFlowState) => void;
   onAcknowledgeQuoteReply?: (flow: WeddingVendorQuoteReplyFlowState) => void;
+  vendorOutreachFlows?: readonly WeddingVendorOutreachFlowState[];
+  gmailConnected?: boolean;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
+  onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onSendOutreach?: (choiceId: string) => void;
+  onCancelOutreach?: (choiceId: string) => void;
+  onConnectGmailForOutreach?: () => void;
 }) {
   const [position, setPosition] = createSignal(0);
   const [deferredIds, setDeferredIds] = createSignal<Set<string>>(new Set());
   const [resolvedIds, setResolvedIds] = createSignal<Set<string>>(new Set());
   const [pendingApproval, setPendingApproval] = createSignal<PendingApproval | null>(null);
+  const [pendingTriage, setPendingTriage] = createSignal<PendingTriage | null>(null);
   const [notice, setNotice] = createSignal<string | null>(null);
+  const persistedTriage = createMemo(() => buildDecisionTriageProjectionState(props.state.afpMessages));
+  const hiddenIds = createMemo(() => new Set([
+    ...persistedTriage().deferredIds,
+    ...persistedTriage().resolvedIds,
+    ...deferredIds(),
+    ...resolvedIds(),
+  ]));
   const display = createMemo(() => buildWeddingDecisionFocusDisplayState({
     relief: props.state.personalOsProjection.decisionLoadRelief,
-    locallyDeferredIds: new Set([...deferredIds(), ...resolvedIds()]),
+    locallyDeferredIds: hiddenIds(),
   }));
   const decisions = createMemo(() => rankFocusDeckItems(display().itemCards.map((card) => ({
     id: card.id,
@@ -63,7 +85,7 @@ export function WeddingMobileFocusHome(props: {
     external: false,
   }))));
   const responses = createMemo(() => rankFocusDeckItems(props.state.activeVendorQuoteReplyFlows
-    .filter((flow) => !deferredIds().has(flow.id))
+    .filter((flow) => !hiddenIds().has(flow.id))
     .map((flow) => ({
       id: flow.id,
       kind: "response" as const,
@@ -77,7 +99,12 @@ export function WeddingMobileFocusHome(props: {
       returnedFromLater: false,
       external: flow.stage === "ready_to_send",
     }))));
-  const items = () => mobileFocusMode() === "responses" ? responses() : decisions();
+  const vendorItems = createMemo(() => buildWeddingVendorDeckProjectionState({
+    artifactPreviews: props.state.artifactPreviews,
+    outreachFlows: props.vendorOutreachFlows,
+  }).filter((item) => !hiddenIds().has(item.id))
+    .filter((item) => item.kind !== "vendor_comparison" || props.state.vendorContactCards.length === 0));
+  const items = () => mobileFocusMode() === "responses" ? responses() : [...vendorItems(), ...decisions()];
 
   createEffect(() => {
     publishMobileFocusHomeSections(props.homeSections.map((section) => ({
@@ -94,29 +121,56 @@ export function WeddingMobileFocusHome(props: {
   const cleanup = installMobileFocusViewportListener();
   onCleanup(cleanup);
 
-  const save = async (input: SendAfpMessageInput) => {
+  const save = async (input: SendAfpMessageInput): Promise<{ ok: true } | { ok: false; reason: string }> => {
     if (!props.saveProjection) {
-      setNotice("Saved on this device. Will sync when you're back online.");
-      return;
+      return { ok: false, reason: "account sync is unavailable" };
     }
     try {
       await props.saveProjection(input);
-    } catch {
-      setNotice("Saved on this device. Will sync when you're back online.");
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : "the account save failed" };
     }
   };
-  const triage = (action: "approve" | "defer", item: FocusDeckItem, method: InputMethod) => {
-    void save(decisionTriageToAfpSendInput({
+  const triage = async (action: "approve" | "defer", item: FocusDeckItem, method: InputMethod, onSaved: () => void): Promise<boolean> => {
+    const input = decisionTriageToAfpSendInput({
       action,
       item,
       deckPosition: position(),
       deckSize: items().length,
       inputMethod: method,
-    }));
+    });
+    const result = await save(input);
+    if (result.ok) {
+      setPendingTriage(null);
+      setNotice(null);
+      onSaved();
+      return true;
+    }
+    setPendingTriage({ input, onSaved });
+    setNotice(`Couldn't save your decision — ${result.reason}. Your choice is not recorded yet.`);
+    return false;
+  };
+  const retryTriage = async () => {
+    const pending = pendingTriage();
+    if (!pending) return;
+    const result = await save(pending.input);
+    if (!result.ok) {
+      setNotice(`Couldn't save your decision — ${result.reason}. Your choice is not recorded yet.`);
+      return;
+    }
+    setPendingTriage(null);
+    setNotice(null);
+    pending.onSaved();
   };
   const decisionItemFor = (id: string) => display().itemCards.find((card) => card.id === id)?.item;
 
   function requestApproval(item: FocusDeckItem, method: InputMethod) {
+    if (item.kind.startsWith("vendor_")) {
+      setMobileFocusMode("overview");
+      setMobileFocusSingleCardSectionId(item.kind === "vendor_draft" || item.kind === "vendor_receipt" ? "quote_replies" : "vendor_search");
+      return;
+    }
     setPendingApproval({ item, method });
   }
 
@@ -128,35 +182,47 @@ export function WeddingMobileFocusHome(props: {
 
     if (item.kind === "response") {
       const flow = props.state.activeVendorQuoteReplyFlows.find((candidate) => candidate.id === item.id);
-      if (flow?.stage === "draft_ready") props.onApproveQuoteReply?.(flow);
-      else if (flow?.stage === "needs_budget_acknowledgement") props.onAcknowledgeQuoteReply?.(flow);
-      else setNotice(flow?.stage === "ready_to_send"
-        ? "The reply is ready. Opening its draft never sends it; sending still needs its own confirmation."
-        : "This response needs one more safe review step.");
-      triage("approve", item, method);
-      setPosition((current) => current + 1);
+      void triage("approve", item, method, () => {
+        if (flow?.stage === "draft_ready") props.onApproveQuoteReply?.(flow);
+        else if (flow?.stage === "needs_budget_acknowledgement") props.onAcknowledgeQuoteReply?.(flow);
+        else setNotice(flow?.stage === "ready_to_send"
+          ? "The reply is ready. Opening its draft never sends it; sending still needs its own confirmation."
+          : "This response needs one more safe review step.");
+        setResolvedIds((current) => new Set([...current, item.id]));
+      });
       return;
     }
 
     const decision = decisionItemFor(item.id);
     if (!decision) return;
-    triage("approve", item, method);
-    setResolvedIds((current) => new Set([...current, decision.id]));
-    setNotice("Decision approved. Here is the next one that still needs you.");
+    void triage("approve", item, method, () => {
+      setResolvedIds((current) => new Set([...current, decision.id]));
+      setNotice("Decision approved. Here is the next one that still needs you.");
+    });
   }
 
-  function defer(item: FocusDeckItem, method: InputMethod) {
-    if (item.kind === "decision") {
-      const decision = decisionItemFor(item.id);
-      if (decision) props.onSidebarAction(buildWeddingDecisionDeferSidebarAction(decision));
-    }
-    setDeferredIds((current) => new Set([...current, item.id]));
-    triage("defer", item, method);
+  async function defer(item: FocusDeckItem, method: InputMethod): Promise<boolean> {
+    return triage("defer", item, method, () => {
+      if (item.kind === "decision") {
+        const decision = decisionItemFor(item.id);
+        if (decision) props.onSidebarAction(buildWeddingDecisionDeferSidebarAction(decision));
+      }
+      setDeferredIds((current) => new Set([...current, item.id]));
+    });
   }
 
   function openAgentDraft() {
     setMobileFocusMode("overview");
     setMobileFocusSingleCardSectionId("quote_replies");
+  }
+
+  function completeVendorItem(item: FocusDeckItem) {
+    if (item.kind === "vendor_receipt") {
+      setResolvedIds((current) => new Set([...current, item.id]));
+      setNotice("Receipt saved. Here is the next item that needs you.");
+      return;
+    }
+    requestApproval(item, "button");
   }
 
   const currentTitle = () => mobileFocusMode() === "overview"
@@ -173,7 +239,14 @@ export function WeddingMobileFocusHome(props: {
       })}
     >
       <Show when={notice()}>
-        {(message) => <p class="mb-2 rounded-xl border border-wedding-muted bg-white px-3 py-2 text-xs text-wedding-text" role="status">{message()}</p>}
+        {(message) => (
+          <div class="mb-2 flex items-center justify-between gap-2 rounded-xl border border-wedding-muted bg-white px-3 py-2" role="status">
+            <p class="text-xs text-wedding-text">{message()}</p>
+            <Show when={pendingTriage()}>
+              <button type="button" class="min-h-11 shrink-0 rounded-lg border border-wedding-accent bg-white px-3 text-xs font-bold text-wedding-accent" onClick={() => void retryTriage()}>Retry</button>
+            </Show>
+          </div>
+        )}
       </Show>
       <Show when={pendingApproval()}>
         {(pending) => (
@@ -183,7 +256,7 @@ export function WeddingMobileFocusHome(props: {
             <p class="mt-2 text-xs leading-5 text-wedding-muted">This records your decision. Vendor messages still require their own send confirmation.</p>
             <div class="mt-3 grid grid-cols-2 gap-2">
               <button type="button" class="min-h-12 rounded-xl border border-wedding-muted bg-white px-3 text-sm font-semibold text-wedding-text" onClick={() => setPendingApproval(null)}>Keep reviewing</button>
-              <button type="button" class="min-h-12 rounded-xl bg-wedding-cta px-3 text-sm font-semibold text-white" onClick={confirmApproval}>Approve decision</button>
+              <button type="button" class="min-h-12 rounded-xl border-2 border-wedding-cta bg-white px-3 text-sm font-bold text-wedding-text hover:bg-wedding-surface-blush" onClick={confirmApproval}>Approve decision</button>
             </div>
           </section>
         )}
@@ -201,7 +274,18 @@ export function WeddingMobileFocusHome(props: {
                 onApprove={requestApproval}
                 onDefer={defer}
                 label={mobileFocusMode() === "responses" ? "Response" : "Decision"}
-                renderCard={(item) => <DeckCard item={item} onOpenAgentDraft={openAgentDraft} />}
+                renderCard={(item) => item.kind.startsWith("vendor_")
+                  ? <WeddingVendorDeckCard
+                    item={item}
+                    gmailConnected={props.gmailConnected}
+                    onContactVendor={(card, artifactId, intent) => props.onContactVendor?.(card, artifactId, intent)}
+                    onOutreachBodyChange={props.onOutreachBodyChange}
+                    onSendOutreach={props.onSendOutreach}
+                    onCancelOutreach={props.onCancelOutreach}
+                    onConnectGmail={props.onConnectGmailForOutreach}
+                    onDone={() => completeVendorItem(item)}
+                  />
+                  : <DeckCard item={item} onOpenAgentDraft={openAgentDraft} />}
                 renderEnd={() => (
                   <QueueClearedZenState
                     variant="wedding"

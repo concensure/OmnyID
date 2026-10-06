@@ -25,7 +25,9 @@ export function DecisionCard(props: {
   const palette = () => wedding()
     ? "border-pink-100 bg-white/85 text-pink-950"
     : "border-black/10 bg-white/85 text-on-surface";
-  const accent = () => wedding() ? "bg-wedding-accent text-white" : "bg-primary text-white";
+  const accent = () => wedding()
+    ? "border-2 border-wedding-accent bg-white font-bold text-wedding-text hover:bg-wedding-surface-blush"
+    : "bg-primary text-white";
   const muted = () => wedding() ? "text-pink-950/70" : "text-on-surface-variant";
   const handleKeyDown = (event: KeyboardEvent) => {
     if (!props.onSelect || (event.key !== "Enter" && event.key !== " ")) return;

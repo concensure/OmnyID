@@ -24,6 +24,7 @@ import {
   toggleWeddingDecisionSelectionValue,
 } from "@/lib/weddingDecisionSelectionState";
 import { WeddingVendorChoiceCard, type WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
+import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 
 function uniqueStrings(values: readonly string[]): string[] {
@@ -134,7 +135,7 @@ function ArtifactPreviewCard(props: {
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
   gmailConnected?: boolean;
-  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string) => void;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
@@ -396,7 +397,7 @@ function ArtifactPreviewCard(props: {
                   card={card}
                   outreachFlow={props.outreachFlows?.[card.choiceId] ?? null}
                   gmailConnected={props.gmailConnected}
-                  onContactVendor={(selectedCard) => props.onContactVendor?.(selectedCard, props.artifact.artifactId)}
+                  onContactVendor={(selectedCard, intent) => props.onContactVendor?.(selectedCard, props.artifact.artifactId, intent)}
                   onOutreachBodyChange={props.onOutreachBodyChange}
                   onSendOutreach={props.onSendOutreach}
                   onCancelOutreach={props.onCancelOutreach}
@@ -773,7 +774,7 @@ export function WeddingArtifactDetailPanel(props: {
   researchAction?: WeddingWorkspaceSidebarAction | null;
   outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
   gmailConnected?: boolean;
-  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string) => void;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;

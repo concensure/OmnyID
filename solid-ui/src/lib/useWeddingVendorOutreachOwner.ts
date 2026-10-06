@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createSignal } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 
 import {
   fetchGmailOAuthConfig,
@@ -11,6 +11,7 @@ import {
   type WeddingVendor,
 } from "@/lib/api";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
+import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { GmailConnectionStatus } from "@/lib/gmailConnectionState";
 import { gmailOAuthConfigFailureMessage } from "@/lib/gmailConnectionState";
 import { renderMarkdown } from "@/lib/markdownRenderer";
@@ -22,6 +23,7 @@ import {
   weddingVendorOutreachSentAfpSendInput,
 } from "@/lib/weddingVendorOutreachAfpState";
 import { persistWeddingVendorOutreachDraftBeforeDisplay } from "@/lib/weddingVendorOutreachDraftPersistenceState";
+import { projectWeddingVendorOutreachFlows } from "@/lib/weddingVendorOutreachProjectionState";
 import {
   weddingVendorOutreachBodyChanged,
   weddingVendorOutreachDraftFailed,
@@ -47,6 +49,20 @@ export function useWeddingVendorOutreachOwner(input: {
 }) {
   const [vendorOutreachFlows, setVendorOutreachFlows] = createSignal<Record<string, WeddingVendorOutreachFlowState>>({});
   const [vendorOutreachArtifactIds, setVendorOutreachArtifactIds] = createSignal<Record<string, string>>({});
+  const [vendorOutreachIntents, setVendorOutreachIntents] = createSignal<Record<string, WeddingVendorChoiceIntent>>({});
+
+  createEffect(() => {
+    const persisted = projectWeddingVendorOutreachFlows(input.state().afpMessages);
+    if (persisted.length === 0) return;
+    setVendorOutreachFlows((current) => {
+      const next = { ...current };
+      for (const flow of persisted) {
+        const live = next[flow.choiceId];
+        if (!live || flow.stage === "sent" || live.stage === "idle") next[flow.choiceId] = flow;
+      }
+      return next;
+    });
+  });
 
   function outreachDirectoryVendorMatch(vendorName: string) {
     const key = vendorName.trim().toLowerCase();
@@ -55,8 +71,9 @@ export function useWeddingVendorOutreachOwner(input: {
     ) ?? null;
   }
 
-  async function onContactVendor(card: WeddingVendorChoiceCardData, artifactId: string) {
+  async function onContactVendor(card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent = "CHECK_AVAILABILITY_AND_REQUEST_QUOTE") {
     setVendorOutreachArtifactIds((current) => ({ ...current, [card.choiceId]: artifactId }));
+    setVendorOutreachIntents((current) => ({ ...current, [card.choiceId]: intent }));
     const metadata = input.state().workspace.metadata;
     const recipientEmail = weddingVendorOutreachRecipient(card, input.weddingVendorDirectory() ?? []);
     const existing = vendorOutreachFlows()[card.choiceId]
@@ -123,6 +140,7 @@ export function useWeddingVendorOutreachOwner(input: {
         sourceArtifactId: vendorOutreachArtifactIds()[card.choiceId] ?? null,
         vendorId: directoryVendor?.vendorId ?? null,
         editorHtml: renderMarkdown(persistedFlow.bodyMarkdown),
+        actionIntent: intent,
       });
       await persistWeddingVendorOutreachDraftBeforeDisplay({
         draft: persistedFlow,
@@ -200,6 +218,7 @@ export function useWeddingVendorOutreachOwner(input: {
         sourceArtifactId: vendorOutreachArtifactIds()[choiceId] ?? null,
         vendorId: directoryVendor?.vendorId ?? null,
         editorHtml: html,
+        actionIntent: vendorOutreachIntents()[choiceId],
       });
       await saveProjection(draftProjection);
       const draftMessageId = weddingProjectionMetadataId(draftProjection);
@@ -216,6 +235,7 @@ export function useWeddingVendorOutreachOwner(input: {
         draftMessageId: draftMessageId ?? draftProjection.thread_id,
         providerReceipt: { providerMessageId: sendResult.messageId, clientMessageId: sendResult.clientMessageId },
         vendorId: directoryVendor?.vendorId ?? null,
+        actionIntent: vendorOutreachIntents()[choiceId],
       });
       await saveProjection(sentProjection);
       if (directoryVendor) {

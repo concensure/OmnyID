@@ -19,6 +19,8 @@ const expectedPages = [
   'blog/budgeting-without-losing-the-joy.html',
   'blog/the-first-five-decisions.html',
   'blog/why-ai-wedding-planners-fall-short.html',
+  'blog/wedding-favours-guests-actually-keep.html',
+  'blog/personalised-wedding-favour-ideas.html',
 ];
 
 function htmlFiles(dir) {

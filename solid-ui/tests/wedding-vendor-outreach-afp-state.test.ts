@@ -97,14 +97,31 @@ test("sent message metadata carries the thread and receipt matcher fields", () =
   assert.equal(metadata.approval_mode, "explicit_user_send");
 });
 
+test("outreach AFP messages preserve the semantic vendor action intent", () => {
+  const draft = weddingVendorOutreachDraftAfpSendInput({
+    flow: sampleFlow(), metadata: sampleMetadata(), actionIntent: "REQUEST_QUOTE",
+  });
+  const sent = weddingVendorOutreachSentAfpSendInput({
+    flow: sampleFlow(), metadata: sampleMetadata(), draftMessageId: "draft-message-1",
+    providerReceipt: { providerMessageId: "gmail-msg-1", clientMessageId: "client-msg-1" },
+    actionIntent: "REQUEST_QUOTE",
+  });
+  assert.equal((draft.content as Record<string, unknown>).action_intent, "REQUEST_QUOTE");
+  assert.equal((draft.metadata as Record<string, unknown>).action_intent, "REQUEST_QUOTE");
+  assert.equal((sent.content as Record<string, unknown>).action_intent, "REQUEST_QUOTE");
+  assert.equal((sent.metadata as Record<string, unknown>).action_intent, "REQUEST_QUOTE");
+});
+
 test("draft message never mutates — parent_id is absent and a new call is not equal by reference", () => {
   const flow = sampleFlow();
   const metadata = sampleMetadata();
   const first = weddingVendorOutreachDraftAfpSendInput({ flow, metadata });
+  const firstSnapshot = JSON.stringify(first);
   const second = weddingVendorOutreachDraftAfpSendInput({ flow, metadata });
   assert.notEqual(first, second);
-  assert.deepEqual(first, second);
+  assert.equal(JSON.stringify(first), firstSnapshot);
   assert.equal(first.parent_id, undefined);
+  assert.equal(second.parent_id, undefined);
 });
 
 test("builders are pure functions of their inputs", () => {

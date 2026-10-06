@@ -2,6 +2,7 @@
 // Pure policy for the one active, exactly-three wedding vendor comparison.
 
 import type { WeddingVendorRankedCandidate } from "@/lib/weddingVendorRankingState";
+import { selectWeddingVendorSlots } from "@/lib/weddingVendorSlotSelectionState";
 
 export type WeddingVendorShortlistCandidate = Pick<WeddingVendorRankedCandidate,
   "id" | "title" | "vendorId" | "group" | "url" | "websiteUrl" | "email" | "phone" | "imageUrl" | "availabilityState"
@@ -9,6 +10,13 @@ export type WeddingVendorShortlistCandidate = Pick<WeddingVendorRankedCandidate,
   canonicalId?: string | null;
   category?: string | null;
   sourceUrl?: string | null;
+  fit?: number | null;
+  fitUpper?: number | null;
+  availabilityProbability?: number | null;
+  verificationCost?: number | null;
+  styleTags?: string[];
+  locationSettingClass?: string | null;
+  suburb?: string | null;
 };
 
 export type WeddingVendorShortlistMedia = {
@@ -144,6 +152,7 @@ export function selectWeddingVendorShortlist(input: {
   bookable?: readonly WeddingVendorShortlistCandidate[] | null;
   verify?: readonly WeddingVendorShortlistCandidate[] | null;
   canRunOnlineFallback?: boolean;
+  rankingPolicyV2?: boolean;
 }): WeddingVendorShortlistOutcome {
   const targetCategory = clean(input.targetCategory);
   if (!targetCategory) {
@@ -153,15 +162,27 @@ export function selectWeddingVendorShortlist(input: {
     };
   }
   const seen = new Set<string>();
-  const candidates = [...(input.bookable ?? []), ...(input.verify ?? [])]
+  const eligible = [...(input.bookable ?? []), ...(input.verify ?? [])]
     .filter((candidate) => isWeddingVendorMvpSuitable(candidate, targetCategory))
     .filter((candidate) => {
       const identity = candidateIdentity(candidate);
       if (seen.has(identity)) return false;
       seen.add(identity);
       return true;
-    })
-    .slice(0, 3);
+    });
+  const candidates = input.rankingPolicyV2
+    ? selectWeddingVendorSlots(eligible.map((candidate) => ({
+      id: candidateIdentity(candidate),
+      group: candidate.group === "bookable" ? "bookable" as const : "verify" as const,
+      fit: candidate.fit ?? 50,
+      fitUpper: candidate.fitUpper ?? candidate.fit ?? 50,
+      availabilityProbability: candidate.availabilityProbability ?? 0.5,
+      verificationCost: candidate.verificationCost ?? 0,
+      styleTags: candidate.styleTags,
+      locationSettingClass: candidate.locationSettingClass,
+      suburb: candidate.suburb,
+    })), 3).map((slot) => eligible.find((candidate) => candidateIdentity(candidate) === slot.id)!).filter(Boolean)
+    : eligible.slice(0, 3);
   const shortfall = 3 - candidates.length;
   if (shortfall === 0) return { status: "complete", candidates, shortfall, reason: null, retryAction: null };
   if (input.canRunOnlineFallback === false) {

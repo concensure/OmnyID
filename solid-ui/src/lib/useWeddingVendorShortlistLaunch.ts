@@ -35,7 +35,7 @@ export function useWeddingVendorShortlistLaunch(input: {
   enabled?: () => boolean;
   storage?: Storage | null;
   searchRunning: () => boolean;
-  run: (category: string) => Promise<boolean>;
+  run: (category: string, materialFingerprint: string) => Promise<boolean>;
 }): void {
   const [attempted, setAttempted] = createSignal<ReadonlySet<string>>(new Set());
   createEffect(() => {
@@ -52,7 +52,7 @@ export function useWeddingVendorShortlistLaunch(input: {
       || attempted().has(coordinator.fingerprint)) return;
     setAttempted((current) => new Set([...current, coordinator.fingerprint!]));
     saveRun(input.storage, planId, { fingerprint: coordinator.fingerprint, status: "running" });
-    void input.run(coordinator.category).then((complete) => {
+    void input.run(coordinator.category, coordinator.fingerprint).then((complete) => {
       saveRun(input.storage, planId, complete ? { fingerprint: coordinator.fingerprint!, status: "complete" } : null);
     });
   });

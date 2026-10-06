@@ -357,3 +357,72 @@ tasks:
       - verified vendor photos render through the authenticated image path and missing images show an honest placeholder
       - wedding and general DecisionOS use the shared decision-card contract and native accessible renderer
       - focused tests, typecheck, build, guarded Oracle deployment, and production proof are recorded
+
+  - id: WED-150
+    title: Wedding vendor production closure program
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-150
+    depends_on:
+      - WED-147
+      - WED-149
+    files:
+      - Documents/design/wedding planner/wedding-vendor-production-closure-tasks.md
+      - Documents/design/wedding planner/wedding-vendor-production-closure-spec.md
+      - solid-ui/src/components/Wedding*.tsx
+      - solid-ui/src/components/MobileFocusDeck.tsx
+      - solid-ui/src/lib/weddingVendor*.ts
+      - solid-ui/src/lib/decisionTriage*.ts
+      - solid-ui/tests/**wedding*.test.ts
+      - solid-ui/tests/e2e/**
+      - src/server/wedding_vendor_search_routes/**
+      - src/db/wedding_vendor_evidence/**
+      - src/wedding_vendor_*.rs
+      - migrations/0097_wedding_vendor_attribute_catalog_v2.sql
+      - migrations/0098_wedding_vendor_shortlist_run_claims.sql
+      - .github/workflows/ci.yml
+      - docs/wedding-vendor-production-operations.md
+      - .agent/**
+    acceptance:
+      - agent-closable visibility, durability, semantic-action, mobile-deck, ranking-v2, automated-E2E, line-budget, security, and recovery work has executable evidence
+      - ranking v2 remains feature-gated until real-catalog coverage and two-judge NDCG gates pass
+      - hosted, elapsed-time, operator-data, accessibility, usability, rollout, and named-signoff gates retain owners and dates without fabricated completion
+      - AFP compatibility, one-scorer architecture, truthful estimates, approval-gated sends, and Caddy guard ancestry remain intact
+    progress:
+      - C1-C5 and C7 have local implementation and automated evidence; C14 has a four-scenario two-viewport Playwright/axe gate wired into CI
+      - C9-C12 pure policy modules, deterministic selector, fail-closed NDCG evaluator, and card schema slots are implemented with ranking v2 default-off
+      - C8/C15-C17 operator, canary, SLO, accessibility, usability, and rollout worksheets are documented without claiming execution
+    open_gates:
+      - C6 and C13 require a sanitised active Oracle catalog, at least 40 cases, two independent human judges, and the specified NDCG result
+      - C8 bulk enrichment requires explicit approval for each write batch and measured coverage evidence
+      - C15 requires deployment authorisation, at least 25 percent Oracle disk headroom, hosted controlled-mailbox evidence, replay, and provider drills
+      - C16 requires security-owner disposition, authorised hosted scans and drills, and 14 consecutive in-SLO days
+      - C17 requires human accessibility/usability sessions, staged rollout decisions, and named approvals
+
+  - id: WED-151
+    title: Production wedding visibility, demo-seed cleanup, and Master Agent response recovery
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-150
+    depends_on:
+      - WED-150
+    files:
+      - solid-ui/tailwind.config.cjs
+      - solid-ui/postcss.config.cjs
+      - solid-ui/src/App.tsx
+      - solid-ui/src/components/WeddingVendorChoiceCard.tsx
+      - solid-ui/src/lib/sampleDashboard.ts
+      - solid-ui/tests/**
+      - src/server/auth.rs
+      - postgres/migrations/**
+      - src/db/migration_catalog.rs
+      - scripts/stage-oracle-runtime.ps1
+      - scripts/stage-oracle-runtime-pwsh-selftest.ps1
+      - .agent/**
+    acceptance:
+      - Oracle runtime staging includes the Tailwind and PostCSS configuration used by the UI build
+      - wedding vendor actions and follow-up tags have readable production CSS and automated contrast evidence
+      - the manual vendor availability editor is removed from recommendation cards
+      - new and existing accounts retain at most one clearly labelled demo seed message
+      - every completed Master Agent command renders a plain visible response before enhanced preview content
+      - guarded deployment and external production verification are recorded

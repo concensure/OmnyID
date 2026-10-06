@@ -1923,7 +1923,7 @@ mod tests {
         account_bootstrap_error, allowed_cors_methods, allowed_cors_origins,
         auth_base_url_configured, auth_token_record_is_usable,
         change_password_revokes_other_sessions, clear_session_cookie_header_value, cookie_value,
-        demo_seed_note_specs, env_truthy, external_sign_in_failed_error,
+        env_truthy, external_sign_in_failed_error,
         forgot_password_public_response, google_client_id_configured, google_subject_candidates,
         high_risk_session_max_age_minutes, login_invalid_credentials_error,
         normalize_passkey_begin_email, passkey_authenticate_challenge_kind,
@@ -2919,27 +2919,6 @@ aSnVsBzVGTmyju6PoBR7Yw==
     }
 
     #[test]
-    fn demo_seed_covers_at_least_one_hundred_information_points() {
-        let count: usize = demo_seed_note_specs()
-            .iter()
-            .map(|spec| spec.facts.len())
-            .sum();
-        assert!(
-            count >= 100,
-            "expected at least 100 seeded information points, got {count}"
-        );
-    }
-
-    #[test]
-    fn demo_seed_includes_multi_supertag_notes() {
-        assert!(
-            demo_seed_note_specs()
-                .iter()
-                .any(|spec| spec.supertags.len() > 1)
-        );
-    }
-
-    #[test]
     fn change_password_requires_a_current_session_to_revoke_others() {
         assert!(change_password_revokes_other_sessions("session-token"));
         assert!(!change_password_revokes_other_sessions(""));
@@ -2963,6 +2942,7 @@ struct DemoSeedNoteSpec {
     relations: &'static [DemoSeedRelationSpec],
 }
 
+#[allow(dead_code)]
 fn demo_seed_note_specs() -> Vec<DemoSeedNoteSpec> {
     vec![
         DemoSeedNoteSpec {
@@ -3393,10 +3373,12 @@ fn deterministic_ulid(seed: &str) -> String {
     Ulid::from_bytes(bytes).to_string()
 }
 
+#[allow(dead_code)]
 fn demo_seed_note_thread_id(user_id: &str, slug: &str) -> String {
     deterministic_ulid(&format!("thread.demo.seed.{}.{}", user_id, slug))
 }
 
+#[allow(dead_code)]
 fn build_demo_seed_notes(
     primary_agent_id: &str,
     user: &UserRecord,
@@ -3509,48 +3491,29 @@ pub(super) async fn ensure_user_agents_and_demo_seed(
         .map_err(|err| account_bootstrap_error("get_private_thread.demo_intro", err))?
         .is_empty();
     if !demo_thread_exists {
-        let intro_messages = vec![
-            new_server_message(
-                alpha_agent.agent_id.clone(),
-                vec![beta_agent.agent_id.clone()],
-                thread_id.clone(),
-                "agent_message",
-                serde_json::json!({
-                    "body": format!("Hello {}, alpha is online and ready to relay through Omnyid.", user.display_name),
-                    "kind": "demo_seed"
-                }),
-                vec![serde_json::json!({
-                    "format": "email",
-                    "content": {
-                        "subject": "Alpha boot sequence",
-                        "body": format!("Hello {}, alpha is online and ready to relay through Omnyid.", user.display_name)
-                    }
-                })],
-                vec![],
-                vec![],
-                true,
-            )?,
-            new_server_message(
-                beta_agent.agent_id.clone(),
-                vec![alpha_agent.agent_id.clone()],
-                thread_id.clone(),
-                "agent_message",
-                serde_json::json!({
-                    "body": "Beta acknowledged. You can now send secure test messages between your demo agents.",
-                    "kind": "demo_seed"
-                }),
-                vec![serde_json::json!({
-                    "format": "email",
-                    "content": {
-                        "subject": "Beta acknowledged",
-                        "body": "Beta acknowledged. You can now send secure test messages between your demo agents."
-                    }
-                })],
-                vec![],
-                vec![],
-                true,
-            )?,
-        ];
+        let intro_messages = vec![new_server_message(
+            alpha_agent.agent_id.clone(),
+            vec![beta_agent.agent_id.clone()],
+            thread_id.clone(),
+            "agent_message",
+            serde_json::json!({
+                "title": "Demo: welcome to OmnyID",
+                "body": format!("Demo message for {}. Use the Master Agent field to ask a real question; this sample can be ignored.", user.display_name),
+                "kind": "demo_seed",
+                "is_demo": true,
+                "tags": ["demo"]
+            }),
+            vec![serde_json::json!({
+                "format": "email",
+                "content": {
+                    "subject": "Demo: welcome to OmnyID",
+                    "body": format!("Demo message for {}. Use the Master Agent field to ask a real question; this sample can be ignored.", user.display_name)
+                }
+            })],
+            vec![],
+            vec![],
+            true,
+        )?];
 
         for message in intro_messages {
             store_private_app_message(
@@ -3563,34 +3526,6 @@ pub(super) async fn ensure_user_agents_and_demo_seed(
             .await
             .map_err(|err| {
                 account_bootstrap_error("store_private_app_message.demo_intro", err.message())
-            })?;
-        }
-    }
-
-    let demo_seed_sender = existing_agents
-        .iter()
-        .find(|agent| agent.kind == "managed")
-        .map(|agent| agent.agent_id.clone())
-        .unwrap_or_else(|| primary_agent.agent_id.clone());
-    let seed_index_thread_id = demo_seed_note_thread_id(&user.id, "seed-index");
-    let seed_already_exists = !state
-        .db
-        .get_private_thread(&user.id, &seed_index_thread_id)
-        .await
-        .map_err(|err| account_bootstrap_error("get_private_thread.seed_index", err))?
-        .is_empty();
-    if !seed_already_exists {
-        for message in build_demo_seed_notes(&demo_seed_sender, user)? {
-            store_private_app_message(
-                &state.db,
-                &state.metrics,
-                &state.relay_tx,
-                &user.id,
-                message,
-            )
-            .await
-            .map_err(|err| {
-                account_bootstrap_error("store_private_app_message.seed_notes", err.message())
             })?;
         }
     }

@@ -13,7 +13,7 @@ export function MobileFocusDeck(props: {
   position: number;
   onPositionChange: (position: number) => void;
   onApprove: (item: FocusDeckItem, method: InputMethod) => void;
-  onDefer: (item: FocusDeckItem, method: InputMethod) => void;
+  onDefer: (item: FocusDeckItem, method: InputMethod) => boolean | void | Promise<boolean | void>;
   renderCard: (item: FocusDeckItem) => JSX.Element;
   renderEnd: () => JSX.Element;
   label: "Decision" | "Response";
@@ -46,7 +46,7 @@ export function MobileFocusDeck(props: {
     props.onPositionChange(next);
     setAnnouncement(next >= props.items.length ? `All ${props.label.toLowerCase()}s reviewed.` : `${props.label} ${next + 1} of ${props.items.length}: ${props.items[next]?.title ?? ""}`);
   };
-  const commit = (direction: ReturnType<typeof action>, method: InputMethod) => {
+  const commit = async (direction: ReturnType<typeof action>, method: InputMethod) => {
     const active = item();
     if (!direction) return;
     if (direction === "prev") navigate(-1);
@@ -54,7 +54,11 @@ export function MobileFocusDeck(props: {
     // Approval is deliberately two-step. The parent opens a confirmation and
     // advances only after the person has explicitly confirmed that decision.
     if (direction === "approve" && active) { props.onApprove(active, method); navigator.vibrate?.(8); }
-    if (direction === "defer" && active) { props.onDefer(active, method); navigate(1); navigator.vibrate?.(8); }
+    if (direction === "defer" && active) {
+      const saved = await props.onDefer(active, method);
+      if (saved !== false) navigate(1);
+      navigator.vibrate?.(8);
+    }
   };
   function pointerDown(event: PointerEvent & { currentTarget: HTMLDivElement }) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -74,13 +78,13 @@ export function MobileFocusDeck(props: {
     if (!current || current.pointerId !== event.pointerId) return;
     const direction = decisionOsSwipeDirection({ dx: offset().x, dy: offset().y, elapsedMs: performance.now() - current.startedAt, cardWidth: current.width, cardHeight: current.height, mapping: FOCUS_DECK_HORIZONTAL_MAPPING });
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    setDrag(null); setOffset({ x: 0, y: 0 }); commit(direction, "swipe");
+    setDrag(null); setOffset({ x: 0, y: 0 }); void commit(direction, "swipe");
   }
   function keyDown(event: KeyboardEvent) {
     if (event.key === "ArrowLeft") { event.preventDefault(); navigate(-1); }
     if (event.key === "ArrowRight") { event.preventDefault(); navigate(1); }
-    if (event.key.toLowerCase() === "l" && item()) { event.preventDefault(); commit("defer", "keyboard"); }
-    if (event.key.toLowerCase() === "a" && item()) { event.preventDefault(); commit("approve", "keyboard"); }
+    if (event.key.toLowerCase() === "l" && item()) { event.preventDefault(); void commit("defer", "keyboard"); }
+    if (event.key.toLowerCase() === "a" && item()) { event.preventDefault(); void commit("approve", "keyboard"); }
   }
   return (
     <section class="flex min-h-0 flex-1 flex-col overscroll-contain" role="region" aria-roledescription="deck" aria-label={`${props.label} deck`} tabIndex={0} onKeyDown={keyDown}>
@@ -106,7 +110,7 @@ export function MobileFocusDeck(props: {
         <nav class="grid grid-cols-4 gap-2 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" aria-label={`${props.label} actions`}>
           <button type="button" class="min-h-12 rounded-xl border border-wedding-muted bg-white px-2 text-xs font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={() => navigate(-1)}>‹ Prev</button>
           <button type="button" class="min-h-12 rounded-xl border border-wedding-muted bg-white px-2 text-xs font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={() => commit("defer", "button")}>↑ Later</button>
-          <button type="button" class="min-h-12 rounded-xl bg-wedding-cta px-2 text-xs font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" aria-label={`Approve: ${item()?.recommendedActionLabel ?? "recommendation"}`} onClick={() => commit("approve", "button")}>↓ Approve</button>
+          <button type="button" class="min-h-12 rounded-xl border-2 border-wedding-cta bg-white px-2 text-xs font-bold text-wedding-text hover:bg-wedding-surface-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" aria-label={`Approve: ${item()?.recommendedActionLabel ?? "recommendation"}`} onClick={() => commit("approve", "button")}>↓ Approve</button>
           <button type="button" class="min-h-12 rounded-xl border border-wedding-muted bg-white px-2 text-xs font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={() => navigate(1)}>Next ›</button>
         </nav>
       </Show>

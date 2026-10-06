@@ -2,6 +2,7 @@
 import type { SendAfpMessageInput } from "@/lib/api";
 import { safeWeddingLabel, type WeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
+import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -77,6 +78,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
   vendorId?: string | null;
   editorHtml?: string | null;
   createdAt?: string | null;
+  actionIntent?: WeddingVendorChoiceIntent | null;
 }): SendAfpMessageInput {
   const timestamp = timestampOrNow(input.createdAt);
   const threadId = weddingVendorOutreachThreadId({
@@ -109,6 +111,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       choice_id: input.flow.choiceId,
       grounded_on: input.flow.groundedOnLabels,
       source_artifact_id: input.sourceArtifactId ?? null,
+      action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
     },
     views: [{
       format: "email",
@@ -130,6 +133,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       choice_id: input.flow.choiceId,
       vendor_id: input.vendorId ?? null,
       vendor_label: input.flow.vendorName,
+      action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
     },
     store_in_relational: true,
   };
@@ -142,6 +146,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
   providerReceipt: { providerMessageId: string | null; clientMessageId: string | null };
   vendorId?: string | null;
   createdAt?: string | null;
+  actionIntent?: WeddingVendorChoiceIntent | null;
 }): SendAfpMessageInput {
   const timestamp = timestampOrNow(input.createdAt);
   const threadId = weddingVendorOutreachThreadId({
@@ -174,6 +179,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
       provider_message_id: input.providerReceipt.providerMessageId,
       client_message_id: input.providerReceipt.clientMessageId,
       sent_at: timestamp,
+      action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
     },
     views: [{
       format: "email",
@@ -192,6 +198,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
       vendor_contact_thread_id: threadId,
       vendor_contact_receipt_ref: input.providerReceipt.clientMessageId,
       approval_mode: "explicit_user_send",
+      action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
     },
     store_in_relational: true,
   };

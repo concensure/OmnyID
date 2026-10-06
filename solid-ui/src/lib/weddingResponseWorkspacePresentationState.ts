@@ -1,5 +1,9 @@
 // @locs-version: 1.0
-import { weddingVendorRankingCardFieldsFromRecord } from "@/lib/weddingVendorRankingState";
+import {
+  a2uiContentForArtifact,
+  vendorComparisonCardsForArtifact,
+  vendorComparisonHandoffForArtifact,
+} from "@/lib/weddingVendorComparisonArtifactState";
 import {
   weddingArtifactEvidenceStatus,
   type WeddingArtifactInput,
@@ -504,76 +508,6 @@ function inputMetadataForArtifact(artifact: WeddingArtifactSummary, inputs: read
     : {};
 }
 
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.map(clean).filter(Boolean)
-    : [];
-}
-
-function vendorComparisonHandoffForArtifact(metadata: Record<string, unknown>): WeddingWorkspaceArtifactPreview["vendorComparisonHandoff"] {
-  const handoff = metadata.vendorComparisonHandoff;
-  if (!handoff || typeof handoff !== "object" || Array.isArray(handoff)) return null;
-  const record = handoff as Record<string, unknown>;
-  const recommendationLabel = clean(record.recommendationLabel);
-  const whyLabels = stringArray(record.whyLabels).slice(0, 5);
-  const confidenceLabel = clean(record.confidenceLabel);
-  const nextActionLabel = clean(record.nextActionLabel);
-  if (!recommendationLabel || whyLabels.length === 0 || !confidenceLabel) return null;
-  return {
-    recommendationLabel,
-    whyLabels,
-    confidenceLabel,
-    nextActionLabel: nextActionLabel || "Select one or more vendors for approval-gated follow-up.",
-  };
-}
-
-function safeExternalUrl(value: unknown): string | null {
-  const url = clean(value);
-  // Keep this authenticated proxy path relative so WeddingVendorChoiceCard can
-  // fetch it with the current bearer token before creating a safe object URL.
-  if (/^\/wedding\/vendor-photo\/google\?name=/i.test(url)) return url;
-  if (!/^https?:\/\//i.test(url)) return null;
-  try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname.toLowerCase();
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "::1") return null;
-    return parsed.href;
-  } catch {
-    return null;
-  }
-}
-
-function vendorComparisonCardsForArtifact(metadata: Record<string, unknown>): WeddingWorkspaceArtifactPreview["vendorComparisonCards"] {
-  const rawCards = Array.isArray(metadata.topChoiceCards) ? metadata.topChoiceCards : [];
-  return rawCards.flatMap((item): WeddingWorkspaceArtifactPreview["vendorComparisonCards"] => {
-    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
-    const record = item as Record<string, unknown>;
-    const title = clean(record.title);
-    if (!title) return [];
-    const rank = typeof record.rank === "number" && Number.isFinite(record.rank) ? record.rank : 0;
-    return [{
-      choiceId: clean(record.choice_id) || `${rank}:${title}`,
-      rank,
-      title,
-      imageUrl: safeExternalUrl(record.image_url),
-      imageAlt: clean(record.image_alt) || `${title} venue image`,
-      scoreLabel: clean(record.score_label) || "Ranked source-backed option",
-      provider: clean(record.provider) || "Search",
-      sourceUrl: safeExternalUrl(record.source_url),
-      websiteUrl: safeExternalUrl(record.website_url),
-      mapUrl: safeExternalUrl(record.map_url),
-      instagramUrl: safeExternalUrl(record.instagram_url),
-      email: clean(record.email) || null,
-      phone: clean(record.phone) || null,
-      address: clean(record.address) || null,
-      rationaleLabels: stringArray(record.rationale_labels).slice(0, 5),
-      preferenceMatch: clean(record.preference_match) || "Review manually",
-      situationFit: clean(record.situation_fit) || "Fit requires source-page review.",
-      verificationLabel: clean(record.verification_label) || "Confirm availability, inclusions, and quote before outreach.",
-      ...weddingVendorRankingCardFieldsFromRecord(record),
-    }];
-  }).sort((left, right) => left.rank - right.rank).slice(0, 7);
-}
 
 function persistedSelectedVendorChoicesForArtifact(
   artifact: WeddingArtifactSummary,
@@ -586,38 +520,6 @@ function persistedSelectedVendorChoicesForArtifact(
       const label = clean(record.selectedOptionLabel);
       return optionId && label ? [{ optionId, label }] : [];
     });
-}
-
-function a2uiContentForArtifact(metadata: Record<string, unknown>): Record<string, unknown> | null {
-  const raw = metadata.a2ui;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  const record = raw as Record<string, unknown>;
-  const rawNodes = Array.isArray(record.nodes) ? record.nodes : Array.isArray(record.components) ? record.components : [];
-  const nodes = rawNodes.flatMap((item, index): Record<string, unknown>[] => {
-    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
-    const component = item as Record<string, unknown>;
-    const type = clean(component.type);
-    if (!type) return [];
-    const props = component.props && typeof component.props === "object" && !Array.isArray(component.props)
-      ? component.props as Record<string, unknown>
-      : {};
-    return [{
-      id: clean(component.id) || `${type}-${index + 1}`,
-      type,
-      props,
-    }];
-  });
-  if (nodes.length === 0) return null;
-  return {
-    schema_version: clean(record.schema_version) || "a2ui.v1",
-    kind: clean(record.kind) || "panel",
-    title: clean(record.title),
-    description: clean(record.description),
-    layout: record.layout && typeof record.layout === "object" && !Array.isArray(record.layout)
-      ? record.layout
-      : { type: "stack", gap: "md" },
-    nodes,
-  };
 }
 
 function uniqueLabels(labels: readonly string[]): string[] {

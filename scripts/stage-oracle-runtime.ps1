@@ -45,7 +45,9 @@ $solidUiFiles = @(
     "solid-ui/index.html",
     "solid-ui/package-lock.json",
     "solid-ui/package.json",
+    "solid-ui/postcss.config.cjs",
     "solid-ui/render-genesis-mark.cjs",
+    "solid-ui/tailwind.config.cjs",
     "solid-ui/tsconfig.json",
     "solid-ui/vite.config.mjs",
     "solid-ui/vite.config.ts"

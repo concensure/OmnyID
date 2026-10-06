@@ -86,6 +86,9 @@ export type WeddingVendorSearchApiBatchRequestLike = {
   wedding_plan_id?: string | null;
   queries: WeddingVendorSearchApiQueryLike[];
   max_results_per_query?: number;
+  source_policy?: "directory_only" | "online_capable";
+  material_fingerprint?: string | null;
+  ranking_policy_version?: string | null;
 };
 
 export type WeddingVendorSearchApiBatchSearchPort = (
@@ -244,15 +247,21 @@ export function weddingVendorSearchBatchPortFromApiSearch(input: {
   weddingPlanId?: string | null;
   maxResultsPerQuery?: number | null;
   sourcePolicy?: "directory_only" | "online_capable";
+  materialFingerprint?: string | null;
+  rankingPolicyVersion?: string | null;
   onResponse?: (response: WeddingVendorSearchApiBatchResponseLike) => void;
 }): WeddingVendorSearchPlannedBatchPort {
+  let claimSent = false;
   return async (queries) => {
     const maxResultsPerQuery = input.maxResultsPerQuery ?? null;
+    const claim = !claimSent && input.materialFingerprint ? input.materialFingerprint : null;
+    if (claim) claimSent = true;
     const response = await input.search({
       workspace_id: input.workspaceId ?? null,
       ...(input.weddingPlanId ? { wedding_plan_id: input.weddingPlanId } : {}),
       ...(maxResultsPerQuery && maxResultsPerQuery > 0 ? { max_results_per_query: maxResultsPerQuery } : {}),
       ...(input.sourcePolicy ? { source_policy: input.sourcePolicy } : {}),
+      ...(claim ? { material_fingerprint: claim, ranking_policy_version: input.rankingPolicyVersion ?? "1" } : {}),
       queries: weddingVendorSearchApiQueriesFromProviderQueries(queries),
     });
     input.onResponse?.(response);

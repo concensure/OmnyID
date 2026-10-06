@@ -105,7 +105,7 @@ export default function UsageAdminWeddingVendorAttributesEditor(props: {
                             aria-label={row.entry.label}
                             disabled={props.disabled}
                             type={
-                              row.entry.kind === "number" || row.entry.kind === "money"
+                              row.entry.kind === "number" || row.entry.kind === "money" || row.entry.kind === "coordinate"
                                 ? "number"
                                 : row.entry.kind === "url"
                                   ? "url"
@@ -113,9 +113,10 @@ export default function UsageAdminWeddingVendorAttributesEditor(props: {
                                     ? "time"
                                     : "text"
                             }
-                            min={row.entry.kind === "number" || row.entry.kind === "money" ? 0 : undefined}
-                            step={row.entry.kind === "number" || row.entry.kind === "money" ? "any" : undefined}
-                            placeholder={row.entry.kind === "tags" ? "comma, separated, tags" : "Unknown"}
+                            min={["condition_score", "food_score", "service_score"].includes(row.entry.key) ? 1 : row.entry.kind === "number" || row.entry.kind === "money" ? 0 : row.entry.kind === "coordinate" ? -180 : undefined}
+                            max={["condition_score", "food_score", "service_score"].includes(row.entry.key) ? 5 : row.entry.kind === "coordinate" ? 180 : undefined}
+                            step={row.entry.kind === "number" || row.entry.kind === "money" || row.entry.kind === "coordinate" ? "any" : undefined}
+                            placeholder={row.entry.kind === "tags" ? "comma, separated, tags" : row.entry.kind === "json" ? "JSON object or array" : "Unknown"}
                             value={edit().valueText}
                             onInput={(event) => setValue(row, event.currentTarget.value)}
                           />
