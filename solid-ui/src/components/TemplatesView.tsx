@@ -29,7 +29,7 @@ const CARD_STYLE: Record<TemplateCatalogCategory, string> = {
   life_event: "border-rose-200/60 from-rose-50/80 via-orange-50/60 to-amber-50/70 hover:border-rose-300/70",
 };
 
-export function TemplatesView(props: { onLaunch: (view: ViewName) => void }) {
+export function TemplatesView(props: { onLaunch: (view: ViewName) => void | Promise<void> }) {
   const [activeTab, setActiveTab] = createSignal<TabId>("all");
   const templates = buildTemplateCatalogState();
 
@@ -42,14 +42,14 @@ export function TemplatesView(props: { onLaunch: (view: ViewName) => void }) {
     return id === "all" ? templates.length : templates.filter((template) => template.category === id).length;
   }
 
-  function launchTemplate(template: TemplateCatalogItem) {
+  async function launchTemplate(template: TemplateCatalogItem) {
+    await props.onLaunch(template.viewTarget);
     if (template.launchIntent) dispatchWeddingNavigationIntent(template.launchIntent);
-    props.onLaunch(template.viewTarget);
   }
 
-  function launchTemplateAction(action: TemplateCatalogAction) {
+  async function launchTemplateAction(action: TemplateCatalogAction) {
+    await props.onLaunch(action.viewTarget);
     if (action.launchIntent) dispatchWeddingNavigationIntent(action.launchIntent);
-    props.onLaunch(action.viewTarget);
   }
 
   return (
@@ -140,7 +140,7 @@ export function TemplatesView(props: { onLaunch: (view: ViewName) => void }) {
                       <button
                         type="button"
                         title={action.description}
-                        onClick={() => launchTemplateAction(action)}
+                        onClick={() => void launchTemplateAction(action)}
                         class="rounded-full border border-white/70 bg-white/70 px-3 py-2 text-xs font-semibold text-on-surface-variant shadow-sm transition hover:bg-white hover:text-on-surface sm:py-1.5"
                       >
                         {action.label}
@@ -149,7 +149,7 @@ export function TemplatesView(props: { onLaunch: (view: ViewName) => void }) {
                   </For>
                   <button
                     type="button"
-                    onClick={() => launchTemplate(template)}
+                    onClick={() => void launchTemplate(template)}
                     class="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/80 group-hover:shadow sm:py-1.5"
                   >
                     Launch

@@ -392,12 +392,12 @@ function rankedVendorChoices(input: WeddingVendorComparisonInput): {
     canRunOnlineFallback: input.canRunOnlineFallback,
   });
   const rankedById = new Map([...result.bookable, ...result.verify].map((choice) => [choice.id, choice]));
-  const choices = shortlist.status === "complete"
-    ? shortlist.candidates.flatMap((choice, index) => {
-      const ranked = rankedById.get(choice.id);
-      return ranked ? [{ ...ranked, rank: index + 1 }] : [];
-    })
-    : [];
+  // A shortfall is not an empty result. Keep every suitable source-backed
+  // candidate visible while the search honestly reports how many are missing.
+  const choices = shortlist.candidates.flatMap((choice, index) => {
+    const ranked = rankedById.get(choice.id);
+    return ranked ? [{ ...ranked, rank: index + 1 }] : [];
+  });
   return { result, choices, shortlist };
 }
 
@@ -645,6 +645,9 @@ export function buildWeddingVendorComparisonArtifactState(
       sourceUrlCount: sourceLinks.length,
       parentSourceUrlCount: execution.sources.filter(usableSourceUrl).length,
       topChoiceCount: choices.length,
+      shortlistStatus: shortlist?.status ?? "legacy",
+      shortlistShortfall: shortlist?.shortfall ?? Math.max(0, 3 - choices.length),
+      shortlistReason: shortlist?.reason ?? null,
       patternId: WEDDING_VENDOR_SELECTION_PATTERN_ID,
       patternVersion: WEDDING_VENDOR_PATTERN_VERSION,
       situationType: "vendor_shortlist_ready",
@@ -687,7 +690,7 @@ export function buildWeddingVendorComparisonArtifactState(
         tone: "options",
         summary: summaryLabel,
         comparison: {
-          title: choices.length > 3 ? "Top vendor choices" : "Top three vendor choices",
+          title: choices.length === 3 ? "Top three vendor choices" : "Suitable vendor choices found so far",
           columns: [
             { label: "Vendor", kind: "option" },
             { label: "Why surfaced", kind: "text" },

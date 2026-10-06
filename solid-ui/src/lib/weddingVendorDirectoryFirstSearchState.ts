@@ -23,7 +23,7 @@ export async function runWeddingVendorDirectoryFirstSearch(input: {
     execution: directory,
     requireExactlyThree: true,
   });
-  if (directoryComparison.status === "created") {
+  if (directoryComparison.status === "created" && directoryComparison.topChoiceCount === 3) {
     return { execution: directory, comparisonStatus: "complete", onlineFallbackUsed: false };
   }
   if (directory.status === "failed" || directory.status === "blocked") {
@@ -40,7 +40,9 @@ export async function runWeddingVendorDirectoryFirstSearch(input: {
   });
   return {
     execution: online,
-    comparisonStatus: onlineComparison.status === "created" ? "complete" : "needs_online_shortfall",
+    comparisonStatus: onlineComparison.status === "created" && onlineComparison.topChoiceCount === 3
+      ? "complete"
+      : "needs_online_shortfall",
     onlineFallbackUsed: true,
   };
 }

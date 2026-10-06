@@ -33,7 +33,11 @@ export type WeddingHomeSectionRegistryInput = {
   workspace: WorkspaceProps;
   exportNotice: () => string | null;
   handleSidebarAction: NonNullable<ComponentProps<typeof WeddingHomeOverviewGrid>["onSidebarAction"]>;
-  searchResult: { action: SearchAction; preview: WeddingWorkspaceArtifactPreview | null } | null;
+  searchResult: {
+    action: SearchAction;
+    preview: WeddingWorkspaceArtifactPreview | null;
+    sourcePreview: WeddingWorkspaceArtifactPreview | null;
+  } | null;
   onDismissSearchResult: (artifactId: string) => void;
   vendorOutreach: ReturnType<typeof useWeddingVendorOutreachOwner>;
   quoteCardProps: (flow: WeddingVendorQuoteReplyFlowState) => ComponentProps<typeof WeddingVendorQuoteReplyCard>;

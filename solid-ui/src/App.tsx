@@ -16,6 +16,11 @@ import { collectKindCounts, objectKindLabel } from "@/lib/objectKinds";
 import { ToastContainer } from "@/components/Toast";
 import { normalizeViewName, VIEW_NAMES, type ViewName } from "@/lib/viewNames";
 import {
+  appViewFromBrowserHistory,
+  browserHistoryStateForAppView,
+  browserHistoryUrlForAppView,
+} from "@/lib/appViewBrowserHistoryState";
+import {
   loadAdvancedNavEnabled,
   loadSidebarSeen,
   loadThreadSeenCount,
@@ -566,7 +571,7 @@ const LazyPulseFeed = lazy(() =>
 );
 
 let decryptModulePromise: Promise<typeof import("@/lib/decrypt")> | null = null;
-const preloadedViews = new Set<ViewName>();
+const viewPreloadPromises = new Map<ViewName, Promise<void>>();
 const VIEW_PRELOADERS: Partial<Record<ViewName, () => Promise<unknown>>> = {
   threads: () => Promise.all([
     import("@/components/ThreadsListView"),
@@ -646,15 +651,20 @@ function loadDecryptModule() {
   return decryptModulePromise;
 }
 
-function preloadViewModule(view: ViewName) {
-  if (view === "para" && !loadParaViewPreference()) return;
-  if (preloadedViews.has(view)) return;
+function preloadViewModule(view: ViewName): Promise<void> {
+  if (view === "para" && !loadParaViewPreference()) return Promise.resolve();
+  const existing = viewPreloadPromises.get(view);
+  if (existing) return existing;
   const preloader = VIEW_PRELOADERS[view];
-  if (!preloader) return;
-  preloadedViews.add(view);
-  void preloader().catch(() => {
-    preloadedViews.delete(view);
-  });
+  if (!preloader) return Promise.resolve();
+  const promise = preloader().then(
+    () => undefined,
+    () => {
+      viewPreloadPromises.delete(view);
+    },
+  );
+  viewPreloadPromises.set(view, promise);
+  return promise;
 }
 
 function scheduleIdlePreload(callback: () => void) {
@@ -1163,11 +1173,14 @@ function App() {
   const _prefs = loadPrefs(initUserId);
   const initialParaViewEnabled = loadParaViewPreference();
   const initialPreferredView = normalizeViewName(_prefs.activeView) ?? "search";
+  const initialHistoryView = appViewFromBrowserHistory(window.history.state, window.location.href);
   const initialActiveView =
     gmailRedirectStatus
       ? "email"
       : calendarRedirectStatus
         ? "calendar"
+        : initialHistoryView
+          ? initialHistoryView
         : initialPreferredView === "para" && !initialParaViewEnabled
           ? "home"
           : initialPreferredView;
@@ -1245,11 +1258,17 @@ function App() {
   function launchWeddingTemplateFromDeepLink() {
     saveWeddingEntrySource("wedding_site");
     void savePrimaryUseCase("wedding_planning", "inferred").catch(() => {});
-    void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
+    void import("@/lib/weddingTemplateDeepLinkLaunchState").then(async ({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
       const launch = buildWeddingTemplateDeepLinkLaunch();
+      await preloadViewModule(launch.viewTarget);
       dispatchWeddingTemplateDeepLinkLaunch(launch);
       selectView(launch.viewTarget);
     });
+  }
+
+  async function launchPreloadedTemplateView(view: ViewName): Promise<void> {
+    await preloadViewModule(view);
+    selectView(view);
   }
   const [showAuthModal, setShowAuthModal] = createSignal(
     deepLinkParams.get("open_auth") === "1"
@@ -1541,8 +1560,9 @@ function App() {
     });
   }
 
-  function selectView(view: ViewName) {
+  function selectViewWithHistory(view: ViewName, historyMode: "push" | "replace" | "none") {
     const nextView = normalizedView(view);
+    const previousView = activeView();
     preloadViewModule(nextView);
     if (nextView === "workflows") {
       setWorkflowNewResult(saveWorkflowNewResultFlag(userId(), false));
@@ -1561,7 +1581,27 @@ function App() {
     if (nextView === "response_queue") setWeddingReturnContextActive(false);
     setActiveView(nextView);
     persistPrefs(nextView, openThreadId());
+    if (historyMode !== "none" && (previousView !== nextView || historyMode === "replace")) {
+      const nextState = browserHistoryStateForAppView(window.history.state, nextView);
+      const nextUrl = browserHistoryUrlForAppView(window.location.href, nextView);
+      if (historyMode === "replace") window.history.replaceState(nextState, "", nextUrl);
+      else window.history.pushState(nextState, "", nextUrl);
+    }
   }
+
+  function selectView(view: ViewName) {
+    selectViewWithHistory(view, "push");
+  }
+
+  onMount(() => {
+    selectViewWithHistory(activeView(), "replace");
+    const onPopState = (event: PopStateEvent) => {
+      const view = appViewFromBrowserHistory(event.state, window.location.href);
+      if (view) selectViewWithHistory(view, "none");
+    };
+    window.addEventListener("popstate", onPopState);
+    onCleanup(() => window.removeEventListener("popstate", onPopState));
+  });
 
   function openQuickControl(actionId: QuickControlActionId) {
     recordShortcutUse(actionId);
@@ -3881,7 +3921,7 @@ function App() {
               <Show when={activeView() === "templates"}>
                 <Suspense fallback={<LazyViewFallback label="Templates" />}>
                   <div class="view-enter">
-                    <LazyTemplatesView onLaunch={(view) => selectView(view)} />
+                    <LazyTemplatesView onLaunch={(view) => launchPreloadedTemplateView(view)} />
                   </div>
                 </Suspense>
               </Show>

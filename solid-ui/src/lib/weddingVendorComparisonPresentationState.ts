@@ -221,7 +221,7 @@ export function a2uiForComparison(
       {
         type: "vendor_recommendation_cards",
         props: {
-          title: choices.length > 3 ? "Recommended venue shortlist" : "Recommended top three",
+          title: choices.length === 3 ? "Recommended top three" : "Suitable vendors found so far",
           description: "Images appear only when a safe public image URL is available from a provider or the admin vendor database.",
           cards,
         },
@@ -229,7 +229,7 @@ export function a2uiForComparison(
       {
         type: "comparison_table",
         props: {
-          title: choices.length > 3 ? "Top vendor choices" : "Top three vendor choices",
+          title: choices.length === 3 ? "Top three vendor choices" : "Suitable vendor choices found so far",
           description: summary,
           columns,
           rows: [

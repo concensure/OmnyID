@@ -6,6 +6,7 @@ export type WeddingVendorSearchResultAction = {
   label: string;
   detail: string;
   artifactId: string;
+  sourceArtifactId: string;
   menu: WeddingWorkspaceMenuId;
 };
 
@@ -67,9 +68,12 @@ export function buildWeddingVendorSearchResultAction(input: {
       ? Math.max(1, Math.min(5, Math.round(input.topChoiceCount ?? 3)))
       : null;
     return {
-      label: boundedCount ? `Review top-${boundedCount} comparison` : "Review top comparison",
-      detail: "Open the saved source-backed comparison in Documents.",
+      label: "Show full search result",
+      detail: boundedCount
+        ? `${boundedCount} suitable vendor choice${boundedCount === 1 ? "" : "s"} found from the saved source-backed search.`
+        : "Suitable vendor choices found from the saved source-backed search.",
       artifactId: comparisonArtifactId,
+      sourceArtifactId: clean(input.sourceArtifactId) || comparisonArtifactId,
       menu: "documents",
     };
   }
@@ -77,9 +81,10 @@ export function buildWeddingVendorSearchResultAction(input: {
   const sourceArtifactId = clean(input.sourceArtifactId);
   if (!sourceArtifactId) return null;
   return {
-    label: "Open vendor notes",
-    detail: "Open the saved source-backed vendor notes in Documents.",
+    label: "Show full search result",
+    detail: "Show the saved source-backed vendor notes here.",
     artifactId: sourceArtifactId,
+    sourceArtifactId,
     menu: "documents",
   };
 }
@@ -101,7 +106,7 @@ export function buildWeddingVendorSearchResultActionFromArtifacts(
     const metadata = metadataRecord(comparison.metadata);
     const topChoiceCount = Number(metadata.topChoiceCount);
     return buildWeddingVendorSearchResultAction({
-      sourceArtifactId: null,
+      sourceArtifactId: [...artifacts].filter(isVendorSearchSummary).sort(newestFirst)[0]?.id ?? null,
       comparisonArtifactId: comparison.id,
       comparisonCreated: true,
       topChoiceCount: Number.isFinite(topChoiceCount) ? topChoiceCount : null,

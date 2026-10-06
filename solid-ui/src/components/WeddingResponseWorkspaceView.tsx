@@ -156,9 +156,9 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const inlineVendorSearchPreview = createMemo(() => {
     const action = props.vendorSearchResultAction;
     if (!action || dismissedVendorSearchResultArtifactId() === action.artifactId) return null;
-    const preview = state().artifactPreviews.find((artifact) => artifact.artifactId === action.artifactId)
-      ?? (state().activePreview?.artifactId === action.artifactId ? state().activePreview : null);
-    return { action, preview };
+    const preview = state().artifactPreviews.find((artifact) => artifact.artifactId === action.artifactId) ?? (state().activePreview?.artifactId === action.artifactId ? state().activePreview : null);
+    const sourcePreview = state().artifactPreviews.find((artifact) => artifact.artifactId === action.sourceArtifactId) ?? (state().activePreview?.artifactId === action.sourceArtifactId ? state().activePreview : null);
+    return { action, preview, sourcePreview };
   });
   const homeLayoutStorageScope = () =>
     state().workspace.metadata.weddingPlanId

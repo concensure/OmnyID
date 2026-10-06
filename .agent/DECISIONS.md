@@ -290,3 +290,15 @@ with no generated utility rules, making text and controls appear missing in prod
 Seeded demo messages are bounded to one per tenant. Existing signed messages are not rewritten by a
 database migration: redundant seeds are removed, while the retained seed is clearly labelled as Demo
 in the presentation projection. New accounts receive one explicitly labelled seed from the server.
+
+## 2026-10-06: Application Views Participate In Browser History
+
+Primary application view changes push a same-origin history entry with both a typed history-state
+value and a reload-safe `view` query parameter. Back and Forward consume `popstate` without pushing a
+replacement entry. Existing query, hash, and wedding-menu state are preserved so browser navigation
+does not erase contextual routes.
+
+Vendor shortlist completeness and vendor visibility are separate concerns. A strict search still
+runs one online fallback when fewer than three suitable candidates exist and records the remaining
+shortfall, but every real source-backed candidate found so far is persisted and rendered. Search
+notes expand inline from their source artifact and do not reroute the user to Documents.

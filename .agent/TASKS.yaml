@@ -314,6 +314,7 @@ tasks:
       - SEC-001
     files:
       - solid-ui/src/App.tsx
+      - solid-ui/src/components/TemplatesView.tsx
       - solid-ui/src/components/NavBar.tsx
       - solid-ui/src/components/MobileHomeMenuSheet.tsx
       - solid-ui/src/components/**Navigation*.tsx
@@ -431,3 +432,35 @@ tasks:
       - production CSS and JavaScript asset inspection confirms the wedding tokens, Master Agent response panel, one-demo copy, and removed availability editor
       - migrations 0098 and 0099 are applied; all existing tenant schemas report zero redundant server demo seeds and the UI supplies one labelled fallback
       - synchronous Oracle production proof passed with backup verification and restore drill evidence
+
+  - id: WED-152
+    title: Wedding vendor search interaction and navigation reliability
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-150
+    depends_on:
+      - WED-150
+      - WED-151
+    files:
+      - solid-ui/src/App.tsx
+      - solid-ui/src/components/ResponseQueueView.tsx
+      - solid-ui/src/components/WeddingResponseWorkspaceView.tsx
+      - solid-ui/src/components/WeddingVendorSearchHomeSections.tsx
+      - solid-ui/src/lib/weddingVendorSearchArtifactState.ts
+      - solid-ui/src/lib/weddingVendorSearchResultActionState.ts
+      - solid-ui/src/lib/weddingVendorDirectoryFirstSearchState.ts
+      - solid-ui/src/lib/weddingVendorComparisonPresentationState.ts
+      - solid-ui/src/lib/appViewBrowserHistoryState.ts
+      - solid-ui/tests/**wedding-vendor-search*.test.ts
+      - solid-ui/tests/**browser-history*.test.ts
+      - .agent/**
+    acceptance:
+      - Enter in the vendor search field submits the same operation as Search vendors
+      - a source-backed partial shortlist renders every suitable choice without padding to three
+      - full vendor search notes expand and close inline without routing to Documents
+      - browser Back and Forward restore prior primary application views
+      - wedding template launch no longer exposes a transient planner error during ordinary startup
+      - focused tests, typecheck, production build, and deployment preconditions are verified
+    progress:
+      - implementation, 1793-test wedding regression suite, typecheck, line budget, and production build pass locally
+      - Oracle cleanup reclaimed build cache and restored disk headroom from 18 percent to 29 percent free

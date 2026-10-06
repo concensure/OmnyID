@@ -48,9 +48,10 @@ test("buildWeddingVendorSearchResultAction prefers the source-backed comparison 
       topChoiceCount: 3,
     }),
     {
-      label: "Review top-3 comparison",
-      detail: "Open the saved source-backed comparison in Documents.",
+      label: "Show full search result",
+      detail: "3 suitable vendor choices found from the saved source-backed search.",
       artifactId: "vendor-comparison-1",
+      sourceArtifactId: "vendor-notes-1",
       menu: "documents",
     },
   );
@@ -64,9 +65,10 @@ test("buildWeddingVendorSearchResultAction falls back to vendor notes without a 
       comparisonCreated: false,
     }),
     {
-      label: "Open vendor notes",
-      detail: "Open the saved source-backed vendor notes in Documents.",
+      label: "Show full search result",
+      detail: "Show the saved source-backed vendor notes here.",
       artifactId: "vendor-notes-1",
+      sourceArtifactId: "vendor-notes-1",
       menu: "documents",
     },
   );
@@ -83,15 +85,15 @@ test("buildWeddingVendorSearchResultAction returns null without a saved artifact
   );
 });
 
-test("buildWeddingVendorSearchResultAction bounds comparison count for stable copy", () => {
+test("buildWeddingVendorSearchResultAction describes a bounded partial comparison", () => {
   assert.equal(
     buildWeddingVendorSearchResultAction({
       sourceArtifactId: "vendor-notes-1",
       comparisonArtifactId: "vendor-comparison-1",
       comparisonCreated: true,
       topChoiceCount: 30,
-    })?.label,
-    "Review top-5 comparison",
+    })?.detail,
+    "5 suitable vendor choices found from the saved source-backed search.",
   );
 });
 
@@ -135,9 +137,10 @@ test("buildWeddingVendorSearchResultActionFromArtifacts restores latest comparis
   ]);
 
   assert.deepEqual(action, {
-    label: "Review top-5 comparison",
-    detail: "Open the saved source-backed comparison in Documents.",
+    label: "Show full search result",
+    detail: "5 suitable vendor choices found from the saved source-backed search.",
     artifactId: "newer-comparison",
+    sourceArtifactId: "older-vendor-notes",
     menu: "documents",
   });
 });
@@ -157,9 +160,10 @@ test("buildWeddingVendorSearchResultActionFromArtifacts restores latest notes ac
   ]);
 
   assert.deepEqual(action, {
-    label: "Open vendor notes",
-    detail: "Open the saved source-backed vendor notes in Documents.",
+    label: "Show full search result",
+    detail: "Show the saved source-backed vendor notes here.",
     artifactId: "new-notes",
+    sourceArtifactId: "new-notes",
     menu: "documents",
   });
 });

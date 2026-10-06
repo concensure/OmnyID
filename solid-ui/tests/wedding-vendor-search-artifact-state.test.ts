@@ -792,7 +792,7 @@ test("buildWeddingVendorSearchTaskItems hides comparison queue work after vendor
   assert.deepEqual(tasks, []);
 });
 
-test("strict MVP comparison requires exactly three suitable cards and records honest media states", async () => {
+test("strict MVP comparison shows honest partial cards without padding to three", async () => {
   const execution = await runWeddingVendorSearchExecution({
     readiness,
     mode: "live",
@@ -826,6 +826,20 @@ test("strict MVP comparison requires exactly three suitable cards and records ho
     execution: { ...execution, sources: execution.sources.slice(0, 2), sourceCount: 2 },
     location: "Sydney", vendorCategories: ["photographer"], targetCategory: "photographer", requireExactlyThree: true,
   });
-  assert.equal(shortfall.status, "not_created");
-  assert.match(shortfall.reason ?? "", /search for 1 more/i);
+  assert.equal(shortfall.status, "created");
+  assert.equal(shortfall.topChoiceCount, 2);
+  const shortfallMetadata = shortfall.artifactInput?.metadata as Record<string, unknown>;
+  assert.equal(shortfallMetadata.shortlistStatus, "needs_online_shortfall");
+  assert.equal(shortfallMetadata.shortlistShortfall, 1);
+  assert.match(String(shortfallMetadata.shortlistReason), /search for 1 more/i);
+  assert.equal((shortfallMetadata.topChoiceCards as unknown[]).length, 2);
+
+  const singleChoice = buildWeddingVendorComparisonArtifactState({
+    metadata,
+    execution: { ...execution, sources: execution.sources.slice(0, 1), sourceCount: 1 },
+    location: "Sydney", vendorCategories: ["photographer"], targetCategory: "photographer", requireExactlyThree: true,
+  });
+  assert.equal(singleChoice.status, "created");
+  assert.equal(singleChoice.topChoiceCount, 1);
+  assert.equal(((singleChoice.artifactInput?.metadata as Record<string, unknown>).topChoiceCards as unknown[]).length, 1);
 });
