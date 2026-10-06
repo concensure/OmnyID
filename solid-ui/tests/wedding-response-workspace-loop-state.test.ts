@@ -423,7 +423,7 @@ test("buildWeddingResponseWorkspaceViewState exposes editable-vendor contact car
   assert.match(state.vendorContactCards[2]?.detailLabel ?? "", /Continue from the response/i);
 });
 
-test("vendorContactCards keeps discovery candidates out of active outreach until promoted", () => {
+test("vendorContactCards keeps directory candidates out of active outreach until this user has contact evidence", () => {
   const cards = vendorContactCards({
     metadata,
     nowIso: "2026-09-14T00:00:00.000Z",
@@ -443,9 +443,7 @@ test("vendorContactCards keeps discovery candidates out of active outreach until
     }],
   });
 
-  assert.deepEqual(cards.map((card) => card.vendorName), ["Harbour Hall"]);
-  assert.equal(cards[0]?.categoryLabel, "Venue");
-  assert.match(cards[0]?.detailLabel ?? "", /Draft initial outreach/i);
+  assert.deepEqual(cards, []);
 });
 
 test("buildWeddingResponseWorkspaceViewState turns commitment timing gaps into task projections", () => {

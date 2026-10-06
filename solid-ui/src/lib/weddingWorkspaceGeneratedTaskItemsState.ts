@@ -39,9 +39,6 @@ import {
   buildWeddingOracleUpdateTaskItems,
   type WeddingOracleUpdatePlanState,
 } from "@/lib/weddingOracleUpdatePlanState";
-import {
-  buildWeddingProductionRemainingWorkTaskItems,
-} from "@/lib/weddingProductionRemainingWorkTaskState";
 import type { WeddingProductionRemainingWorkState } from "@/lib/weddingProductionRemainingWorkState";
 import type { WeddingPersistedApprovalReceipt } from "@/lib/weddingPersistedWorkspaceState";
 import { buildWeddingPostWeddingWrapUpTaskItems } from "@/lib/weddingPostWeddingWrapUpState";
@@ -182,11 +179,6 @@ export function buildWeddingWorkspaceGeneratedTaskItems(input: WeddingWorkspaceG
     }),
     ...buildWeddingOracleUpdateTaskItems({
       oracleUpdatePlan: input.oracleUpdatePlan,
-      metadata: input.metadata,
-      existingTaskItems: baseTaskItems,
-    }),
-    ...buildWeddingProductionRemainingWorkTaskItems({
-      remainingWork: input.productionRemainingWork,
       metadata: input.metadata,
       existingTaskItems: baseTaskItems,
     }),

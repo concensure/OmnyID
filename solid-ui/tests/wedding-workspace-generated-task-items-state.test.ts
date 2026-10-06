@@ -233,7 +233,7 @@ test("buildWeddingWorkspaceGeneratedTaskItems includes live launch readiness tas
   ));
 });
 
-test("buildWeddingWorkspaceGeneratedTaskItems includes production remaining-work tasks", () => {
+test("buildWeddingWorkspaceGeneratedTaskItems keeps internal production remaining-work out of wedding decisions", () => {
   const tasks = buildWeddingWorkspaceGeneratedTaskItems({
     metadata,
     productionRemainingWork: {
@@ -257,11 +257,9 @@ test("buildWeddingWorkspaceGeneratedTaskItems includes production remaining-work
     },
   });
 
-  assert.ok(tasks.some((task) => task.title === "Clear launch blocker: Connected app integrations"));
-  assert.ok(tasks.some((task) =>
+  assert.equal(tasks.some((task) =>
     (task.metadata as Record<string, unknown>).production_remaining_work_task === true
-    && (task.metadata as Record<string, unknown>).production_remaining_work_item_id === "provider_executor_integrations"
-  ));
+  ), false);
 });
 
 test("buildWeddingWorkspaceGeneratedTaskItems surfaces due editable-vendor outreach follow-ups", () => {

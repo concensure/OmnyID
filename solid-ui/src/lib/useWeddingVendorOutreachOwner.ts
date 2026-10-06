@@ -95,7 +95,9 @@ export function useWeddingVendorOutreachOwner(input: {
     };
     try {
       const contextThreadId = `wedding_context:${metadata.responseWorkspaceId}`;
-      const contextMessages = await fetchThread(contextThreadId);
+      // A context thread is helpful grounding, not a prerequisite for a user-selected
+      // vendor. New and migrated wedding workspaces may not have one yet.
+      const contextMessages = await fetchThread(contextThreadId).catch(() => []);
       const intakeMessage = contextMessages.find((message) => message.subtype === "wedding_intake_profile");
       const intake = (intakeMessage?.content ?? {}) as Record<string, unknown>;
       couple.date_or_season = typeof intake.date_or_season === "string" ? intake.date_or_season : null;

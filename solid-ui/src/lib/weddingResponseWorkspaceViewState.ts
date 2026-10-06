@@ -368,6 +368,7 @@ function isUserFacingWeddingPlanningTask(task: WeddingPlanningTaskItem): boolean
   const metadata = record(task.metadata);
   return !(
     metadata.oracle_update_plan_task === true
+    || metadata.production_remaining_work_task === true
     || metadata.background_automation_task === true
     || metadata.provider_handoff_task === true
     || metadata.expected_behavior_gap === true
@@ -834,7 +835,10 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     now: input.nowIso,
     metadata: input.metadata ?? artifacts[0]?.metadata,
   });
-  const activeProjectionTaskItems = projectionTaskItems.filter((task) => !isClosedVendorPursuitTask(task));
+  const activeProjectionTaskItems = projectionTaskItems.filter((task) => (
+    !isClosedVendorPursuitTask(task)
+    && record(task.metadata).production_remaining_work_task !== true
+  ));
   const userFacingProjectionTaskItems = activeProjectionTaskItems.filter(isUserFacingWeddingPlanningTask);
   const vendorPursuitLogTaskItems = projectionTaskItems.filter(isClosedVendorPursuitTask);
   const vendorPursuitLogCards = buildWeddingVendorPursuitLogCards(vendorPursuitLogTaskItems);

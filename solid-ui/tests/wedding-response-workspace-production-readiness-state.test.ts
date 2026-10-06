@@ -110,11 +110,10 @@ test("response workspace exposes exact production polish proof blockers", () => 
   assert.equal(seededCorpusItem?.summary, "Source-backed seeded vendor corpus proof reference is missing.");
 });
 
-test("response workspace projects next production work into planning tasks", () => {
+test("response workspace keeps internal production work out of user planning tasks", () => {
   const state = buildWeddingResponseWorkspaceViewState({ metadata });
 
-  assert.ok(state.planningTaskItems.some((task) =>
+  assert.equal(state.planningTaskItems.some((task) =>
     (task.metadata as Record<string, unknown>).production_remaining_work_task === true
-    && /Clear launch blocker/i.test(task.title)
-  ));
+  ), false);
 });

@@ -226,12 +226,10 @@ function vendorContactPrimaryActionLabel(stage: WeddingOutreachEscalationStage):
   return "Review vendor";
 }
 
-function hasPromotedVendorEvidence(vendor: WeddingVendorContactOutreachVendor): boolean {
+function hasUserContactEvidence(vendor: WeddingVendorContactOutreachVendor): boolean {
   const contact = vendor.userContact ?? null;
   return Boolean(
-    clean(vendor.contactEmail)
-      || clean(vendor.contactPhone)
-      || clean(contact?.lastContactAt)
+    clean(contact?.lastContactAt)
       || clean(contact?.responseReceivedAt)
       || clean(contact?.threadId)
       || clean(contact?.receiptRef)
@@ -244,7 +242,9 @@ export function vendorContactCards(input: {
   nowIso?: string | null;
 }): WeddingVendorContactWorkspaceCard[] {
   return (input.vendors ?? [])
-    .filter(hasPromotedVendorEvidence)
+    // Directory contact details are research data. A Vendor Follow-Up starts only
+    // after this user has a saved contact event, reply, thread, or receipt.
+    .filter(hasUserContactEvidence)
     .map((vendor, index): WeddingVendorContactWorkspaceCard => {
       const state = buildWeddingOutreachEscalationStateFromVendorContact({
         metadata: input.metadata,

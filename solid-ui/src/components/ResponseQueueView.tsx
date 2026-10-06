@@ -412,10 +412,11 @@ export function ResponseQueueView(props: {
   const [weddingWorkspaceMenu, setWeddingWorkspaceMenuSignal] = createSignal<WeddingWorkspaceMenuId>(initialWeddingWorkspaceMenu());
   function setWeddingWorkspaceMenu(id: WeddingWorkspaceMenuId) {
     const menuId = canonicalWeddingWorkspaceMenuId(id);
+    const menuChanged = weddingWorkspaceMenu() !== menuId;
     setWeddingWorkspaceMenuSignal(menuId);
     saveWeddingWorkspaceMenu(menuId);
     if (typeof window !== "undefined") replaceWeddingWorkspaceMenuInUrl(menuId);
-    if (typeof document !== "undefined") {
+    if (menuChanged && typeof document !== "undefined") {
       document.getElementById("wedding-tabpanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
