@@ -244,6 +244,16 @@ if (!docsJs.includes('openAuthModalFromUrl')) {
 if (!weddingJs.includes('focusableSigninEls') || !weddingJs.includes("e.key !== 'Tab'")) {
   failures.push('wedding/assets/js/main.js: sign-in bridge does not trap keyboard focus');
 }
+const weddingHome = htmlByPath.get(normalize(resolve(root, 'index.html')));
+if (!/Built for couples planning across\s*<\/p>\s*<div class="logo-strip-items">\s*<span>Sydney<\/span>\s*<\/div>/m.test(weddingHome)) {
+  failures.push('index.html: planning strip must list Sydney only');
+}
+if ((weddingHome.match(/Sydney planning scenario/g) ?? []).length !== 2) {
+  failures.push('index.html: Byron Bay and Melbourne testimonial captions must use the Sydney planning scenario copy');
+}
+if (weddingHome.includes('Byron Bay planning scenario') || weddingHome.includes('Melbourne planning scenario')) {
+  failures.push('index.html: retired testimonial city captions remain');
+}
 
 if (failures.length) {
   console.error('Wedding website smoke test failed:');
