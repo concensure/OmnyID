@@ -935,7 +935,7 @@ export function NavBar(props: {
 
       {/* ── Left navigation rail ─────────────────────────────────────── */}
       <Show when={!isWatch()}>
-        <aside class="fixed left-0 top-0 bottom-0 z-40 flex w-16 flex-col items-center border-r border-white/20 bg-white/75 py-3 backdrop-blur-2xl phone:hidden">
+        <aside class="fixed left-0 top-0 bottom-0 z-[100] flex w-16 flex-col items-center border-r border-white/20 bg-white/75 py-3 backdrop-blur-2xl phone:hidden">
 
           {/* OmnyID logo — navigates to home workspace grid */}
           <div class="group relative mb-2 flex w-full justify-center">

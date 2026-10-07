@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   OPEN_WEDDING_PLANNING_INTENT_EVENT,
+  buildWeddingPlannerHomeIntent,
   buildWeddingNavigationIntentFromPresentationAction,
   buildWeddingNavigationIntentFromSidebarAction,
   dispatchWeddingNavigationIntent,
@@ -33,6 +34,21 @@ test("buildWeddingNavigationIntentFromPresentationAction routes planning files t
   assert.equal(intent.metadata.template, "wedding_planning");
   assert.equal(intent.metadata.response_workspace_id, "response_workspace:alpha");
   assert.match(intent.notice, /Opening wedding documents/);
+});
+
+test("buildWeddingPlannerHomeIntent restores the planner surface from another wedding route", () => {
+  const previous = buildWeddingNavigationIntentFromPresentationAction(
+    presentationAction({ kind: "open_calendar" }),
+  );
+  const home = buildWeddingPlannerHomeIntent(previous);
+
+  assert.equal(home.view, "response_queue");
+  assert.equal(home.surface, "planning_files");
+  assert.equal(home.sectionId, "home");
+  assert.equal(home.artifactId, null);
+  assert.equal(home.weddingPlanId, previous.weddingPlanId);
+  assert.equal(home.responseWorkspaceId, previous.responseWorkspaceId);
+  assert.equal(home.metadata.wedding_navigation_destination, "home");
 });
 
 test("buildWeddingNavigationIntentFromPresentationAction maps existing surfaces", () => {

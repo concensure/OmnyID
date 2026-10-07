@@ -6,6 +6,16 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "so
 import type { ViewName } from "@/lib/viewNames";
 import { mobileNavigationGroups, mobileNavigationLabel } from "@/lib/mobileGlobalNavigationState";
 import {
+  buildWeddingPlannerHomeIntent,
+  dispatchWeddingNavigationIntent,
+} from "@/lib/weddingNavigationState";
+import {
+  loadWeddingNavigationIntent,
+} from "@/lib/weddingNavigationLocalState";
+import {
+  buildWeddingTemplateEntryState,
+} from "@/lib/weddingTemplateEntryState";
+import {
   dispatchWeddingWorkspaceMenuSelection,
   replaceWeddingWorkspaceMenuInUrl,
   saveWeddingWorkspaceMenu,
@@ -71,6 +81,16 @@ export function MobileHomeMenuSheet(props: {
     saveWeddingWorkspaceMenu(destination.id);
     replaceWeddingWorkspaceMenuInUrl(destination.id);
     dispatchWeddingWorkspaceMenuSelection(destination.id);
+    const existing = loadWeddingNavigationIntent();
+    const entry = buildWeddingTemplateEntryState();
+    dispatchWeddingNavigationIntent(buildWeddingPlannerHomeIntent(
+      existing ?? {
+        weddingPlanId: entry.metadata.weddingPlanId,
+        responseWorkspaceId: entry.metadata.responseWorkspaceId,
+        sourceResponseId: entry.metadata.sourceResponseId,
+        metadata: entry.metadata,
+      },
+    ));
     selectApp("response_queue");
   };
 

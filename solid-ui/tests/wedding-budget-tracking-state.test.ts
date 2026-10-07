@@ -147,6 +147,18 @@ test("buildWeddingBudgetTrackingState extracts budget target from budget artifac
   assert.match(state.budgetStatusLabel, /remaining against explicit target/i);
 });
 
+test("buildWeddingBudgetTrackingState excludes payment prompts with an unknown vendor", () => {
+  const state = buildWeddingBudgetTrackingState({
+    artifacts: [{
+      title: "Budget plan",
+      kind: "budget_sheet",
+      bodyText: "| Vendor | Due | Status |\n| --- | --- | --- |\n| Unknown | $2,000 | unpaid |",
+    }],
+  });
+
+  assert.equal(state.paymentTaskCandidates.length, 0);
+});
+
 test("buildWeddingBudgetTrackingState exposes category rollups and quote tasks", () => {
   const state = buildWeddingBudgetTrackingState({
     decisionRecords: [

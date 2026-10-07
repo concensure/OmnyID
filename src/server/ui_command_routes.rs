@@ -161,6 +161,14 @@ pub(super) async fn ui_command_http(
         )
     };
 
+    // Natural-language travel planning has a deterministic, useful planner
+    // route. It must run before an optional LLM classifier: a generic
+    // web-research classification otherwise replaced a complete trip plan
+    // with an empty search handoff when a model was configured.
+    if base.intent == "travel" {
+        return Ok(Json(finalize_response(base)));
+    }
+
     // For authenticated users with an LLM configured, use the model to classify
     // intent and act accordingly — tasks, research, notes, or orchestration.
     // Unauthenticated / no-LLM calls fall through to the keyword-based base result.

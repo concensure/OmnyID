@@ -190,6 +190,32 @@ export function buildWeddingNavigationIntentFromSidebarAction(input: {
   });
 }
 
+/**
+ * Normalise any saved wedding context back onto the planner's home surface.
+ *
+ * A menu item is a destination, not merely a request to open the generic
+ * Response Queue shell. Keeping the plan/workspace identity here means the
+ * planner can be remounted after Calendar, Tasks, an error boundary, or a
+ * mobile-menu transition without depending on whichever surface was opened
+ * immediately before it.
+ */
+export function buildWeddingPlannerHomeIntent(input: Pick<
+  WeddingNavigationIntent,
+  "weddingPlanId" | "responseWorkspaceId" | "sourceResponseId" | "metadata"
+>): WeddingNavigationIntent {
+  return buildIntent({
+    surface: "planning_files",
+    weddingPlanId: input.weddingPlanId,
+    responseWorkspaceId: input.responseWorkspaceId,
+    sourceResponseId: input.sourceResponseId,
+    sectionId: "home",
+    metadata: {
+      ...input.metadata,
+      wedding_navigation_destination: "home",
+    },
+  });
+}
+
 export function dispatchWeddingNavigationIntent(
   intent: WeddingNavigationIntent,
   target: Window = window,

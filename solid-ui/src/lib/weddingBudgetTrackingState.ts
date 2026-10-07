@@ -393,6 +393,10 @@ function paidCellIsUnpaid(value: string): boolean {
   return !/\b(paid|yes|settled|complete|completed)\b/i.test(value);
 }
 
+function usableVendorLabel(value: string): boolean {
+  return Boolean(value) && !/^(?:unknown|n\/?a|none|not\s+known|tbc|vendor|supplier|budget\s+item)$/i.test(value);
+}
+
 function isoDateFromCell(value: string): string | null {
   const iso = value.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
   if (iso) return iso[1];
@@ -445,6 +449,7 @@ function paymentTaskCandidateFromTextLine(input: {
   const dueAt = isoDateFromCell(line);
   if (!dueAmount && !dueAt && !/\b(deposit|balance due|payment schedule|non-refundable)\b/i.test(line)) return null;
   const vendor = clean(input.artifact.vendorLabels?.[0]) || input.fallbackVendor;
+  if (!usableVendorLabel(vendor)) return null;
   const clauseSuffix = typeof input.clauseIndex === "number" ? `-${input.clauseIndex + 1}` : "";
   return {
     id: `wedding_budget_payment_task:${safeWeddingLabel(clean(input.artifact.id) || clean(input.artifact.title) || "payment")}:line-${input.lineIndex + 1}${clauseSuffix}`,
@@ -482,7 +487,7 @@ function paymentTaskCandidates(artifacts: readonly WeddingArtifactInput[]): Wedd
     .filter(artifactHasPaymentSignals)
     .flatMap((artifact): WeddingBudgetPaymentTaskCandidate[] => {
       const table = parseMarkdownTable(clean(artifact.bodyText));
-      const fallbackVendor = clean(artifact.vendorLabels?.[0]) || clean(artifact.title) || "vendor";
+      const fallbackVendor = clean(artifact.vendorLabels?.[0]) || clean(artifact.title) || "";
       if (!table) {
         return clean(artifact.bodyText)
           .split(/\r?\n/)
@@ -510,6 +515,7 @@ function paymentTaskCandidates(artifacts: readonly WeddingArtifactInput[]): Wedd
         const isUnpaid = paidCellIsUnpaid(paid);
         const paymentRisk = /\b(deposit|balance|payment|due|invoice|receipt|refund|cancellation|non-refundable|overdue)\b/i.test(`${category} ${vendor} ${paid} ${due} ${dueDate} ${warning}`);
         if (!hasDueAmount && !isUnpaid && !paymentRisk) return [];
+        if (!usableVendorLabel(vendor)) return [];
         const dueAt = isoDateFromCell(dueDate);
         const reasonLabel = [
           hasDueAmount ? `Due amount recorded: ${due}.` : null,

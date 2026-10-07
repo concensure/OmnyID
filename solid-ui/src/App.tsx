@@ -164,7 +164,15 @@ import { type OnboardingQuickStartSeed } from "@/lib/onboardingQuickStart";
 import { saveReportNavigationIntent, type ReportNavigationIntent } from "@/lib/reportNavigationState";
 import { subscribeWeddingNavigationAppBridge } from "@/lib/weddingNavigationAppBridge";
 import { weddingNavigationCalendarTarget } from "@/lib/weddingNavigationCalendarTargetState";
-import { consumeWeddingNavigationIntent } from "@/lib/weddingNavigationLocalState";
+import {
+  consumeWeddingNavigationIntent,
+  loadWeddingNavigationIntent,
+} from "@/lib/weddingNavigationLocalState";
+import {
+  buildWeddingPlannerHomeIntent,
+  dispatchWeddingNavigationIntent,
+} from "@/lib/weddingNavigationState";
+import { buildWeddingTemplateEntryState } from "@/lib/weddingTemplateEntryState";
 import { loadWeddingEntrySource, saveWeddingEntrySource } from "@/lib/weddingEntrySourceState";
 import {
   dispatchWeddingVendorSearchLaunch,
@@ -2222,6 +2230,16 @@ function App() {
   }
 
   function returnToWeddingPlannerHome() {
+    const existing = loadWeddingNavigationIntent();
+    const entry = buildWeddingTemplateEntryState();
+    dispatchWeddingNavigationIntent(buildWeddingPlannerHomeIntent(
+      existing ?? {
+        weddingPlanId: entry.metadata.weddingPlanId,
+        responseWorkspaceId: entry.metadata.responseWorkspaceId,
+        sourceResponseId: entry.metadata.sourceResponseId,
+        metadata: entry.metadata,
+      },
+    ));
     saveWeddingWorkspaceMenu("home");
     dispatchWeddingWorkspaceMenuSelection("home");
     selectView("response_queue");
@@ -4045,7 +4063,10 @@ function App() {
                   <ResponseQueueRouteFallback
                     error={err}
                     onBack={() => selectView("home")}
-                    onRetry={reset}
+                    onRetry={() => {
+                      returnToWeddingPlannerHome();
+                      reset();
+                    }}
                   />
                 )}
               >
