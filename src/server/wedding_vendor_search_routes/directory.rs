@@ -25,6 +25,7 @@ pub(super) async fn search_wedding_vendor_directory(
             sources.extend(
                 records
                     .into_iter()
+                    .filter(is_real_vendor_directory_record)
                     .map(wedding_vendor_record_to_search_source),
             );
         }
@@ -35,8 +36,10 @@ pub(super) async fn search_wedding_vendor_directory(
         .collect())
 }
 
-pub(super) fn wedding_vendor_directory_search_terms(query: &WeddingVendorSearchQueryRequest) -> Vec<String> {
-    let mut terms = Vec::new();
+pub(super) fn wedding_vendor_directory_search_terms(
+    query: &WeddingVendorSearchQueryRequest,
+) -> Vec<String> {
+    let mut terms = vec![query.query.trim().to_string()];
     if let Some(category) = query
         .category
         .as_deref()
@@ -45,11 +48,25 @@ pub(super) fn wedding_vendor_directory_search_terms(query: &WeddingVendorSearchQ
     {
         terms.push(category.to_string());
     }
-    terms.push(query.query.trim().to_string());
     if let Some(location) = infer_vendor_service_area(&query.query) {
         terms.push(location);
     }
     dedupe_strings(terms)
+}
+
+pub(super) fn is_real_vendor_directory_record(record: &WeddingVendorRecord) -> bool {
+    let name = record.vendor_name.trim().to_ascii_lowercase();
+    !matches!(
+        name.as_str(),
+        "easy weddings" | "easyweddings.com.au" | "venueguide" | "venueguide.au" | "venue guide"
+    ) && ![
+        "wedding venues in ",
+        "best wedding venues",
+        "live music venues in ",
+        "venues for hire in ",
+    ]
+    .iter()
+    .any(|prefix| name.starts_with(prefix))
 }
 
 pub(super) fn wedding_vendor_record_to_search_source(

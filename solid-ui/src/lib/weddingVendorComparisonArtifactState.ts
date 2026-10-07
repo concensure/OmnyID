@@ -33,8 +33,9 @@ export function isActionableVendorComparisonCard(record: Record<string, unknown>
   const title = clean(record.title).toLowerCase();
   const urls = [record.source_url, record.website_url].map(clean).join(" ").toLowerCase();
   const aggregateHost = /(?:^|[/:.])(tagvenue\.com|sydneymusic\.net|easyweddings\.com\.au|weddingwire\.|theknot\.com|wedshed\.com\.au|bridebook\.com|zola\.com)(?:[/:.]|$)/.test(urls);
+  const aggregateIdentity = /^(?:venueguide(?:\.au)?|venue guide|easy weddings|easyweddings\.com\.au)$/i.test(title);
   const categoryOrListTitle = /(?:\b(?:best|top)\s+\d*\s*(?:wedding\s+)?(?:venues?|vendors?|suppliers?|celebrants?|bands?|djs?)\b|\blive\s+music\s+venues?\s+in\b|\b(?:venues?|vendors?|suppliers?|celebrants?)\s+(?:in|near)\b|\bcommunity\s+guide\b)/.test(title);
-  return !(aggregateHost && categoryOrListTitle) && !/\b\d+\s+(?:best|top)\b/.test(title);
+  return !aggregateIdentity && !(aggregateHost && categoryOrListTitle) && !/\b\d+\s+(?:best|top)\b/.test(title);
 }
 
 export function vendorComparisonHandoffForArtifact(

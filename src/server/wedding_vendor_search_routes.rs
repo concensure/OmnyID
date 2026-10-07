@@ -1934,7 +1934,8 @@ fn env_lock() -> std::sync::MutexGuard<'static, ()> {
 mod tests {
     use super::*;
     use super::directory::{
-        wedding_vendor_directory_search_terms, wedding_vendor_record_to_search_source,
+        is_real_vendor_directory_record, wedding_vendor_directory_search_terms,
+        wedding_vendor_record_to_search_source,
     };
     use crate::db::WeddingVendorRecord;
 
@@ -2200,7 +2201,7 @@ mod tests {
     }
 
     #[test]
-    fn vendor_directory_search_terms_prioritize_category_location_and_query() {
+    fn vendor_directory_search_terms_prioritize_the_exact_query_before_category_fallbacks() {
         let query = WeddingVendorSearchQueryRequest {
             provider_kind: "brave_search".to_string(),
             category: Some(" florist ".to_string()),
@@ -2214,8 +2215,8 @@ mod tests {
         assert_eq!(
             terms,
             vec![
-                "florist".to_string(),
                 "florist in Sydney specialising in wedding".to_string(),
+                "florist".to_string(),
                 "Sydney".to_string(),
             ]
         );
@@ -2370,6 +2371,36 @@ mod tests {
                 .unwrap_or_default()
                 .contains("saved in OmnyID's shared wedding vendor database")
         );
+    }
+
+    #[test]
+    fn directory_titles_are_not_treated_as_vendor_records() {
+        let record = WeddingVendorRecord {
+            vendor_id: "directory-1".to_string(),
+            vendor_slug: "venueguide-au".to_string(),
+            vendor_name: "VenueGuide.au".to_string(),
+            category: "venue".to_string(),
+            service_area: "Sydney".to_string(),
+            address: None,
+            website_url: Some("https://venueguide.au".to_string()),
+            contact_phone: Some("0000000000".to_string()),
+            contact_email: None,
+            source_url: Some("https://venueguide.au".to_string()),
+            source_label: Some("Directory".to_string()),
+            source_checked_at: None,
+            status: "active".to_string(),
+            notes: None,
+            evidence: json!({}),
+            caveat_labels: vec![],
+            created_by_user_id: None,
+            updated_by_user_id: None,
+            created_at: "2026-10-08T00:00:00Z".to_string(),
+            updated_at: "2026-10-08T00:00:00Z".to_string(),
+            photos: vec![],
+            user_contact: None,
+        };
+
+        assert!(!is_real_vendor_directory_record(&record));
     }
 
     #[test]

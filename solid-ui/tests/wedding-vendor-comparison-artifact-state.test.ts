@@ -8,6 +8,14 @@ import {
 
 test("category pages and aggregate directories are never actionable vendor cards", () => {
   assert.equal(isActionableVendorComparisonCard({
+    title: "VenueGuide.au",
+    source_url: "https://venueguide.au",
+  }), false);
+  assert.equal(isActionableVendorComparisonCard({
+    title: "Easy Weddings",
+    source_url: "https://www.easyweddings.com.au/",
+  }), false);
+  assert.equal(isActionableVendorComparisonCard({
     title: "Live Music Venues in Sydney | SydneyMusic.net - Sydney's live music community guide",
     source_url: "https://sydneymusic.net/live-music-venues-sydney",
   }), false);

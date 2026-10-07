@@ -2,6 +2,7 @@
 import { For, Show, createMemo, createSignal } from "solid-js";
 
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
+import { weddingGanttAxisTicks } from "@/lib/weddingGanttAxisState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import {
   weddingTimelineBarWidthPercent,
@@ -21,8 +22,10 @@ export function WeddingTimelinePanel(props: {
   onOpenSavedOutputs?: () => void;
 }) {
   const [showAllRows, setShowAllRows] = createSignal(false);
+  const [showGantt, setShowGantt] = createSignal(false);
   const visibleRows = createMemo(() => showAllRows() ? props.state.ganttTimeline.rows : props.state.ganttTimeline.rows.slice(0, 6));
   const hiddenRowCount = createMemo(() => Math.max(0, props.state.ganttTimeline.rows.length - visibleRows().length));
+  const ganttAxisTicks = createMemo(() => weddingGanttAxisTicks(props.state.ganttTimeline.rows));
   const taskActionFor = (itemId: string) => {
     const task = props.state.planningTaskItems.find((item) => item.id === itemId);
     return task ? weddingTaskSidebarAction(task, props.state) : weddingTimelineSidebarAction("open_tasks", props.state, itemId);
@@ -95,6 +98,20 @@ export function WeddingTimelinePanel(props: {
         >
           Open wedding tasks
         </button>
+        <Show when={props.state.ganttTimeline.rows.length > 0}>
+          <button
+            type="button"
+            class="rounded-full border border-indigo-200 bg-indigo-100/80 px-3 py-2 text-xs font-semibold text-indigo-950 transition hover:bg-indigo-50 sm:py-1.5"
+            aria-pressed={showGantt()}
+            data-magic-action="toggle"
+            data-magic-icon="timeline"
+            data-magic-label={showGantt() ? "Hide Gantt chart" : "Show Gantt chart"}
+            data-magic-id="wedding:timeline:gantt"
+            onClick={() => setShowGantt((value) => !value)}
+          >
+            {showGantt() ? "Hide Gantt chart" : "Show Gantt chart"}
+          </button>
+        </Show>
       </div>
       <Show when={props.state.ganttTimeline.rows.length === 0}>
         <p class="mt-2 text-xs leading-5 text-indigo-950/65">
@@ -208,7 +225,7 @@ export function WeddingTimelinePanel(props: {
               </button>
             </Show>
           </div>
-          <div class="space-y-2">
+          <Show when={showGantt()} fallback={<div class="space-y-2">
           <For each={visibleRows()}>
             {(row) => {
               const fileAction = fileActionFor(row.linkedArtifactId);
@@ -289,7 +306,44 @@ export function WeddingTimelinePanel(props: {
               );
             }}
           </For>
-          </div>
+          </div>}>
+            <div class="overflow-x-auto rounded-xl border border-indigo-100 bg-white/80 p-3">
+              <div class="min-w-[680px]">
+                <div class="grid grid-cols-[minmax(10rem,14rem)_1fr] gap-x-3 border-b border-indigo-100 pb-2">
+                  <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-950/65">All tasks</p>
+                  <div class="relative h-8">
+                    <For each={ganttAxisTicks()}>
+                      {(tick) => <span class="absolute top-0 text-[10px] font-semibold text-indigo-950/70" style={{ left: `${tick.offsetPercent}%`, transform: "translateX(-50%)" }}>{tick.label}</span>}
+                    </For>
+                  </div>
+                </div>
+                <div class="mt-2 space-y-2">
+                  <For each={props.state.ganttTimeline.rows}>
+                    {(row) => (
+                      <div class="grid grid-cols-[minmax(10rem,14rem)_1fr] items-center gap-x-3">
+                        <button
+                          type="button"
+                          class="truncate text-left text-xs font-semibold text-indigo-950 underline decoration-indigo-200 underline-offset-2 hover:decoration-indigo-500"
+                          title={`View ${row.title} on the wedding calendar`}
+                          onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state, row.id))}
+                        >
+                          {row.title}
+                        </button>
+                        <button
+                          type="button"
+                          class="relative h-6 rounded bg-indigo-50/70 text-left"
+                          title={`${row.title}: ${row.startLabel} to ${row.endLabel}`}
+                          onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state, row.id))}
+                        >
+                          <span class="absolute inset-y-1 rounded" style={{ "margin-left": `${row.offsetPercent}%`, width: `${weddingTimelineBarWidthPercent({ widthPercent: row.widthPercent, offsetPercent: row.offsetPercent, durationDays: row.durationDays })}%`, "background-color": row.color }} />
+                        </button>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </div>
+            </div>
+          </Show>
           <Show when={hiddenRowCount() > 0}>
             <p class="mt-2 text-xs leading-5 text-indigo-950/60">
               {hiddenRowCount()} more timeline item{hiddenRowCount() === 1 ? "" : "s"} hidden to keep this view calm.

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildWeddingGanttTimelineState } from "@/lib/weddingGanttTimelineState";
+import { weddingGanttAxisTicks } from "@/lib/weddingGanttAxisState";
 
 test("buildWeddingGanttTimelineState maps legal vendor pricing and weather timelines into colored rows", () => {
   const state = buildWeddingGanttTimelineState({
@@ -82,4 +83,21 @@ test("buildWeddingGanttTimelineState flags sequencing risks across preparation c
   assert.ok(state.riskLabels.some((risk) => risk.id === "legal_deadline_near" && risk.severity === "blocked"));
   assert.ok(state.riskLabels.every((risk) => !/DecisionOS|anytime\/no-date|Gantt chart|surface it/i.test(risk.label)));
   assert.match(state.riskLabels.find((risk) => risk.id === "vendor_before_venue")?.label ?? "", /Confirm the wedding date and venue details/i);
+});
+
+test("weddingGanttAxisTicks labels the shared horizontal range from first to final task", () => {
+  const timeline = buildWeddingGanttTimelineState({
+    items: [
+      { id: "first", title: "Book venue", dueDate: "2026-10-12" },
+      { id: "last", title: "Finalise run sheet", dueDate: "2027-03-12" },
+    ],
+  });
+
+  const ticks = weddingGanttAxisTicks(timeline.rows);
+
+  assert.ok(ticks.length >= 2);
+  assert.equal(ticks[0]?.offsetPercent, 0);
+  assert.equal(ticks.at(-1)?.offsetPercent, 100);
+  assert.match(ticks[0]?.label ?? "", /12 Oct/);
+  assert.match(ticks.at(-1)?.label ?? "", /12 Mar/);
 });

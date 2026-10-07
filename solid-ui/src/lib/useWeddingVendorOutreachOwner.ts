@@ -39,6 +39,72 @@ import {
   type WeddingVendorOutreachFlowState,
 } from "@/lib/weddingVendorOutreachFlowState";
 
+type WeddingVendorOutreachCouple = {
+  date_or_season: string | null;
+  location: string | null;
+  guest_count: string | null;
+  budget_comfort: string | null;
+  top_priorities: string[];
+  atmosphere_description: string | null;
+  vendor_preferences: string | null;
+  couple_names: string | null;
+};
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function firstString(...values: unknown[]): string | null {
+  for (const value of values) {
+    const resolved = nonEmptyString(value);
+    if (resolved) return resolved;
+  }
+  return null;
+}
+
+function applyWeddingOutreachContext(couple: WeddingVendorOutreachCouple, value: Record<string, unknown> | null | undefined) {
+  if (!value) return;
+  couple.date_or_season ??= firstString(value.date_or_season, value.dateOrSeason);
+  couple.location ??= firstString(value.location);
+  const guestCount = value.guest_count ?? value.guestCount;
+  couple.guest_count ??= typeof guestCount === "number" ? String(guestCount) : nonEmptyString(guestCount);
+  couple.budget_comfort ??= firstString(value.budget_comfort, value.budgetComfort);
+  if (couple.top_priorities.length === 0) {
+    const priorities = value.top_priorities ?? value.topPriorities;
+    couple.top_priorities = Array.isArray(priorities)
+      ? priorities.map(nonEmptyString).filter((item): item is string => Boolean(item))
+      : [];
+  }
+  couple.atmosphere_description ??= firstString(value.atmosphere_description, value.atmosphereDescription);
+  couple.vendor_preferences ??= firstString(value.vendor_preferences, value.vendorPreferences);
+  couple.couple_names ??= firstString(value.couple_names, value.coupleNames, value.family_or_stakeholder_roles, value.familyOrStakeholderRoles);
+}
+
+export function weddingVendorOutreachCoupleFromWorkspace(input: {
+  contextCards: readonly { planningContext: Record<string, unknown> }[];
+  persistedIntake?: Record<string, unknown> | null;
+  weddingDateOrSeason?: string | null;
+  budgetTargetAmount?: number | null;
+}): WeddingVendorOutreachCouple {
+  const couple: WeddingVendorOutreachCouple = {
+    date_or_season: null,
+    location: null,
+    guest_count: null,
+    budget_comfort: null,
+    top_priorities: [],
+    atmosphere_description: null,
+    vendor_preferences: null,
+    couple_names: null,
+  };
+  for (const card of input.contextCards) applyWeddingOutreachContext(couple, card.planningContext);
+  applyWeddingOutreachContext(couple, input.persistedIntake);
+  couple.date_or_season ??= nonEmptyString(input.weddingDateOrSeason);
+  if (couple.budget_comfort === null && typeof input.budgetTargetAmount === "number" && Number.isFinite(input.budgetTargetAmount)) {
+    couple.budget_comfort = `AUD ${Math.round(input.budgetTargetAmount).toLocaleString()} total budget`;
+  }
+  return couple;
+}
+
 export function useWeddingVendorOutreachOwner(input: {
   state: () => WeddingResponseWorkspaceViewState;
   weddingVendorDirectory: () => WeddingVendor[] | undefined;
@@ -83,16 +149,10 @@ export function useWeddingVendorOutreachOwner(input: {
       [card.choiceId]: weddingVendorOutreachStartDrafting({ ...existing, recipientEmail }),
     }));
 
-    const couple = {
-      date_or_season: null as string | null,
-      location: null as string | null,
-      guest_count: null as string | null,
-      budget_comfort: null as string | null,
-      top_priorities: [] as string[],
-      atmosphere_description: null as string | null,
-      vendor_preferences: null as string | null,
-      couple_names: null as string | null,
-    };
+    const couple = weddingVendorOutreachCoupleFromWorkspace({
+      contextCards: input.state().contextCards,
+      budgetTargetAmount: input.state().budgetTracking.budgetTargetAmount,
+    });
     try {
       const contextThreadId = `wedding_context:${metadata.responseWorkspaceId}`;
       // A context thread is helpful grounding, not a prerequisite for a user-selected
@@ -100,18 +160,7 @@ export function useWeddingVendorOutreachOwner(input: {
       const contextMessages = await fetchThread(contextThreadId).catch(() => []);
       const intakeMessage = contextMessages.find((message) => message.subtype === "wedding_intake_profile");
       const intake = (intakeMessage?.content ?? {}) as Record<string, unknown>;
-      couple.date_or_season = typeof intake.date_or_season === "string" ? intake.date_or_season : null;
-      couple.location = typeof intake.location === "string" ? intake.location : null;
-      couple.guest_count = typeof intake.guest_count === "string"
-        ? intake.guest_count
-        : typeof intake.guest_count === "number" ? String(intake.guest_count) : null;
-      couple.budget_comfort = typeof intake.budget_comfort === "string" ? intake.budget_comfort : null;
-      couple.top_priorities = Array.isArray(intake.top_priorities)
-        ? intake.top_priorities.filter((item): item is string => typeof item === "string")
-        : [];
-      couple.atmosphere_description = typeof intake.atmosphere_description === "string" ? intake.atmosphere_description : null;
-      couple.vendor_preferences = typeof intake.vendor_preferences === "string" ? intake.vendor_preferences : null;
-      couple.couple_names = typeof intake.couple_names === "string" ? intake.couple_names : null;
+      applyWeddingOutreachContext(couple, intake);
 
       const result = await requestWeddingVendorOutreachDraft({
         vendor: {

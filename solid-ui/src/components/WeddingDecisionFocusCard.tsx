@@ -1,8 +1,8 @@
 // @locs-version: 1.0
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { DecisionCard } from "@/components/DecisionCard";
-import { loadContacts, subscribeContactsChangedEvent, type Contact } from "@/lib/contactsLocalState";
-import { readSession } from "@/lib/api";
+import { loadContacts, saveContacts, subscribeContactsChangedEvent, type Contact } from "@/lib/contactsLocalState";
+import { postAgentMessage, readSession } from "@/lib/api";
 
 import {
   buildWeddingDecisionDeferSidebarAction,
@@ -46,6 +46,9 @@ export function WeddingDecisionFocusCard(props: {
   const [assignmentDrafts, setAssignmentDrafts] = createSignal<Record<string, string>>({});
   const [contacts, setContacts] = createSignal<Contact[]>([]);
   const [assigneePickerTaskId, setAssigneePickerTaskId] = createSignal<string | null>(null);
+  const [newContactTaskId, setNewContactTaskId] = createSignal<string | null>(null);
+  const [newContactName, setNewContactName] = createSignal("");
+  const [newContactRole, setNewContactRole] = createSignal("");
   const contactOptions = createMemo(() => {
     const seen = new Set<string>();
     const listed = contacts().map((contact) => ({
@@ -120,6 +123,36 @@ export function WeddingDecisionFocusCard(props: {
     });
     const launch = saveWeddingVendorSearchLaunch(query, { source: "wedding_home" });
     if (launch) dispatchWeddingVendorSearchLaunch(launch);
+  }
+  function openNewContactForm(taskId: string) {
+    setNewContactTaskId(taskId);
+    setAssigneePickerTaskId(null);
+    setNewContactName("");
+    setNewContactRole("");
+  }
+  function addContactForAssignment(taskId: string) {
+    const name = newContactName().trim();
+    if (!name) return;
+    const role = newContactRole().trim();
+    const userId = readSession()?.user?.id ?? null;
+    const existing = contacts().find((contact) => contact.name.trim().toLowerCase() === name.toLowerCase());
+    const contact = existing ?? {
+      id: `contact-${Date.now()}`,
+      name,
+      relationshipKind: "other" as const,
+      ...(role ? { roles: [role] } : {}),
+    };
+    if (!existing) {
+      const next = [...contacts(), contact];
+      saveContacts(next, userId);
+      setContacts(next);
+      void postAgentMessage({
+        to: ["agent://master"],
+        content: { kind: "contact_add", name: contact.name, roles: contact.roles ?? [] },
+      }).catch(() => undefined);
+    }
+    setAssignmentDrafts((current) => ({ ...current, [taskId]: contact.name }));
+    setNewContactTaskId(null);
   }
   return (
     <Show when={props.state.personalOsProjection.hasWeddingPersonalOsSignal}>
@@ -204,9 +237,20 @@ export function WeddingDecisionFocusCard(props: {
                               <Show when={contactOptions().length > 0} fallback={<p class="px-2 py-2 text-xs text-pink-950/70">No saved contacts yet. You can still type a name.</p>}>
                                 <For each={contactOptions()}>{(contact) => <button type="button" class="block w-full rounded-lg px-2 py-2 text-left hover:bg-pink-50" onClick={() => { setAssignmentDrafts((current) => ({ ...current, [task().id]: contact.name })); setAssigneePickerTaskId(null); }}><span class="block text-xs font-semibold text-pink-950">{contact.name}</span><Show when={contact.detail}><span class="block text-[11px] text-pink-950/65">{contact.detail}</span></Show></button>}</For>
                               </Show>
+                              <button type="button" class="mt-1 block w-full rounded-lg border border-dashed border-pink-300 px-2 py-2 text-left text-xs font-semibold text-pink-800 hover:bg-pink-50" onClick={() => openNewContactForm(task().id)}>+ Add a new contact</button>
                             </div>
                           </Show>
                         </div>
+                        <Show when={newContactTaskId() === task().id}>
+                          <div class="mt-2 grid gap-2 rounded-xl border border-pink-200 bg-pink-50/70 p-2 sm:grid-cols-[1fr_1fr_auto]">
+                            <input aria-label="New contact name" class="min-h-9 rounded-lg border border-pink-200 bg-white px-2 text-xs text-pink-950 placeholder:text-pink-950/45" placeholder="Name" value={newContactName()} onInput={(event) => setNewContactName(event.currentTarget.value)} />
+                            <input aria-label="New contact role" class="min-h-9 rounded-lg border border-pink-200 bg-white px-2 text-xs text-pink-950 placeholder:text-pink-950/45" placeholder="Role (optional)" value={newContactRole()} onInput={(event) => setNewContactRole(event.currentTarget.value)} />
+                            <div class="flex gap-2">
+                              <button type="button" disabled={!newContactName().trim()} class="min-h-9 rounded-full bg-pink-700 px-3 text-xs font-semibold text-white disabled:opacity-45" onClick={() => addContactForAssignment(task().id)}>Add</button>
+                              <button type="button" class="min-h-9 rounded-full border border-pink-200 bg-white px-3 text-xs font-semibold text-pink-950" onClick={() => setNewContactTaskId(null)}>Cancel</button>
+                            </div>
+                          </div>
+                        </Show>
                         <Show when={/celebrant/i.test(`${task().title} ${task().notes ?? ""}`) && !hasChosenCelebrant()}>
                           <button type="button" class="mt-3 min-h-9 rounded-full border border-pink-300 bg-pink-100 px-3 text-xs font-semibold text-pink-950 transition hover:bg-pink-200" onClick={launchCelebrantSearch}>
                             Find an authorised celebrant
