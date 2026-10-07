@@ -8,6 +8,7 @@ import {
   fetchGoogleCalendarOAuthConfig,
   fetchGoogleCalendarOAuthUrl,
   fetchGoogleCalendarStatus,
+  fetchSupertagDefinitions,
   installDefaultSupertags,
   listCalendarEvents,
   sendAfpMessage,
@@ -81,6 +82,7 @@ const TOKEN = {
 };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DEFAULT_SUPERTAG_NAMES = ["#Work", "#Personal", "#Health", "#Finance", "#Travel", "#Learning", "#Ideas", "#Urgent"];
 
 type CalendarSpeechRecognition = SpeechRecognition & {
   maxAlternatives: number;
@@ -592,6 +594,7 @@ export function MonthlyCalendarView(props: {
     void loadEvents();
     void loadGoogleCalendarStatus();
     void loadGoogleCalendarOAuthConfig();
+    void loadTaxonomyInstallation();
     const calendarRedirectStatus = new URLSearchParams(window.location.search).get("calendar");
     if (calendarRedirectStatus) {
       setGoogleCalendarNotice(
@@ -736,6 +739,20 @@ export function MonthlyCalendarView(props: {
   const [backlinksLoading, setBacklinksLoading] = createSignal(false);
   const [taxonomyInstalling, setTaxonomyInstalling] = createSignal(false);
   const [taxonomyDone, setTaxonomyDone] = createSignal<string[] | null>(null);
+  const [taxonomyLoadFailed, setTaxonomyLoadFailed] = createSignal(false);
+
+  async function loadTaxonomyInstallation(): Promise<void> {
+    try {
+      const { definitions } = await fetchSupertagDefinitions();
+      const installedNames = new Set(definitions.map((definition) => definition.tag_name.trim().toLocaleLowerCase()));
+      const installedDefaults = DEFAULT_SUPERTAG_NAMES.filter((name) => installedNames.has(name.toLocaleLowerCase()));
+      setTaxonomyDone(installedDefaults.length === DEFAULT_SUPERTAG_NAMES.length ? installedDefaults : null);
+      setTaxonomyLoadFailed(false);
+    } catch {
+      // A failed status read is not an installed state: preserve a safe retry action.
+      setTaxonomyLoadFailed(true);
+    }
+  }
 
   createEffect(() => {
     const ev = selectedEvent();
@@ -751,12 +768,17 @@ export function MonthlyCalendarView(props: {
   });
 
   async function doInstallTaxonomy() {
+    if (taxonomyInstalling() || taxonomyDone() !== null) return;
     setTaxonomyInstalling(true);
+    setTaxonomyLoadFailed(false);
     try {
       const res = await installDefaultSupertags();
-      setTaxonomyDone(res.installed);
+      await loadTaxonomyInstallation();
+      if (taxonomyDone() === null) {
+        setTaxonomyDone(res.installed.length > 0 ? res.installed : DEFAULT_SUPERTAG_NAMES);
+      }
     } catch {
-      setTaxonomyDone([]);
+      setTaxonomyLoadFailed(true);
     } finally {
       setTaxonomyInstalling(false);
     }
@@ -1608,6 +1630,11 @@ export function MonthlyCalendarView(props: {
                   {taxonomyDone()!.length > 0
                     ? `Installed: ${taxonomyDone()!.join(", ")}`
                     : "Already installed or no tags written."}
+                </p>
+              </Show>
+              <Show when={taxonomyLoadFailed()}>
+                <p style={{ margin: "0 0 0.6em", "font-size": "0.8em", color: TOKEN.error }}>
+                  Could not check your installed taxonomy. You can retry safely.
                 </p>
               </Show>
               <button

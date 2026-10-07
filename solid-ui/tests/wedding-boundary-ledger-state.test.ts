@@ -120,6 +120,9 @@ test("wedding boundary send input preserves ledger tags and typed references", (
   assert.equal(input.type, "ledger");
   assert.equal(input.kind, "wedding_boundary_change_request");
   assert.equal(input.store_in_relational, true);
+  assert.match(input.id ?? "", /^[0-9A-HJKMNP-TV-Z]{26}$/);
+  assert.match(input.thread_id, /^[0-9A-HJKMNP-TV-Z]{26}$/);
+  assert.match(String(input.metadata?.logical_thread_id), /^wedding_boundary:/);
   assert.ok(input.supertags?.includes("wedding_boundary:approval_required"));
   assert.equal(input.content.semantic_kind, "wedding_approval_required");
   assert.ok(input.metadata?.semantic_tags.includes("plus_one_change"));

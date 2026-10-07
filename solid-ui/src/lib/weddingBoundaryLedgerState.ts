@@ -200,9 +200,31 @@ function uniqueStrings(values: readonly unknown[], limit = 80): string[] {
   return result;
 }
 
+const AFP_ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/**
+ * The authenticated AFP store accepts ULID-shaped transport identifiers only.
+ * Wedding objects deliberately use readable logical IDs, so derive a stable
+ * transport ID while retaining those logical IDs in message metadata.
+ */
+function transportUlid(seed: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = Math.imul(hash ^ seed.charCodeAt(index), 0x01000193) >>> 0;
+  }
+  let result = "";
+  for (let index = 0; index < 26; index += 1) {
+    hash = Math.imul(hash ^ (index + 1), 0x27d4eb2d) >>> 0;
+    result += AFP_ULID_ALPHABET[(hash >>> 27) & 31];
+  }
+  return result;
+}
+
 function messageToSendInput(message: AfpMessage): SendAfpMessageInput {
+  const logicalThreadId = message.thread_id;
   return {
-    thread_id: message.thread_id,
+    id: transportUlid(`${message.id}|${message.timestamp}|${JSON.stringify(message.content)}`),
+    thread_id: transportUlid(`thread|${logicalThreadId}`),
     from: message.from,
     to: message.to ?? [],
     timestamp: message.timestamp,
@@ -214,7 +236,10 @@ function messageToSendInput(message: AfpMessage): SendAfpMessageInput {
     attachments: message.attachments,
     references: message.references,
     supertags: message.supertags ?? [],
-    metadata: message.metadata,
+    metadata: {
+      ...(message.metadata ?? {}),
+      logical_thread_id: logicalThreadId,
+    },
     store_in_relational: true,
   };
 }

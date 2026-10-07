@@ -3005,11 +3005,29 @@ async fn install_default_supertags_http(
     headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     use crate::message::AFP_TYPE_SUPERTAG_DEFINITION;
+    use std::collections::HashSet;
 
     let user = authenticated_user(&state.db, &headers).await?;
     let mut installed: Vec<String> = Vec::new();
+    let existing_tags: HashSet<String> = state
+        .db
+        .list_supertag_definitions(&user.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?
+        .into_iter()
+        .filter_map(|definition| {
+            definition
+                .get("tag_name")
+                .and_then(Value::as_str)
+                .map(|tag_name| tag_name.trim().to_ascii_lowercase())
+        })
+        .collect();
 
     for (tag_name, keywords) in DEFAULT_SUPERTAG_TAXONOMY {
+        if existing_tags.contains(&tag_name.to_ascii_lowercase()) {
+            continue;
+        }
         let content = serde_json::json!({
             "tag_name":     tag_name,
             "keywords":     keywords,
