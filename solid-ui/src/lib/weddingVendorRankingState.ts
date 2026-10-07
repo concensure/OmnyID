@@ -815,9 +815,6 @@ function situationFitLabel(components: readonly WeddingVendorUtilityComponent[])
   return strong.length > 0 ? `Strong on: ${strong.join(", ")}` : "Fit requires source-page review.";
 }
 
-const VERIFICATION_LABEL =
-  "Confirm service area, date availability, package inclusions, travel, overtime, cancellation, and final quote before outreach.";
-
 function rankCandidate(
   source: WeddingVendorRankingSource,
   context: RankingContext,
@@ -867,10 +864,9 @@ function rankCandidate(
       ? matchedPreferenceTokens.slice(0, 4).join(", ")
       : "No direct preference keyword match; review manually.",
     situationFitLabel: situationFitLabel(components),
-    verificationLabel: VERIFICATION_LABEL,
+    verificationLabel: "",
     rationaleLabels: [
       ...components.filter((item) => item.known && item.value >= 0.6).map((item) => `${item.label} looks strong`),
-      `Source provider: ${source.provider}`,
     ],
     group,
     fit,

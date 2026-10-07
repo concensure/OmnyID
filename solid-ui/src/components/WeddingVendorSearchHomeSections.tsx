@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 
 import { DecisionCard } from "@/components/DecisionCard";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
@@ -10,6 +10,12 @@ import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorks
 
 type VendorSearchAction = NonNullable<WeddingResponseWorkspaceViewProps["vendorSearchResultAction"]>;
 type VendorOutreachOwner = ReturnType<typeof useWeddingVendorOutreachOwner>;
+
+const SEARCH_PROGRESS_LABELS = [
+  "gathering personal preferences",
+  "fetching vendor information...",
+  "ranking vendors based on your query",
+] as const;
 
 export function WeddingPlanningBasicsSection(props: { workspace: WeddingResponseWorkspaceViewProps }) {
   const workspace = () => props.workspace;
@@ -67,6 +73,7 @@ export function WeddingVendorSearchHomeSection(props: {
 }) {
   const workspace = () => props.workspace;
   const [fullResultExpanded, setFullResultExpanded] = createSignal(false);
+  const [searchProgressIndex, setSearchProgressIndex] = createSignal(0);
   let previousResultArtifactId: string | null = null;
   createEffect(() => {
     const artifactId = props.result?.action.artifactId ?? null;
@@ -76,6 +83,17 @@ export function WeddingVendorSearchHomeSection(props: {
   const searchDisabled = () => workspace().vendorSearchRunning
     || !workspace().onRunLiveVendorSearch
     || Boolean(workspace().vendorSearchBlockedReason);
+  createEffect(() => {
+    if (!workspace().vendorSearchRunning) {
+      setSearchProgressIndex(0);
+      return;
+    }
+    setSearchProgressIndex(0);
+    const timer = window.setInterval(() => {
+      setSearchProgressIndex((index) => (index + 1) % SEARCH_PROGRESS_LABELS.length);
+    }, 1600);
+    onCleanup(() => window.clearInterval(timer));
+  });
   return (
     <div class="rounded-2xl border border-wedding-muted bg-white/85 px-4 py-5 shadow-sm sm:px-5 sm:py-6">
       <form
@@ -118,8 +136,13 @@ export function WeddingVendorSearchHomeSection(props: {
         />
       </label>
       </form>
-      <Show when={workspace().vendorSearchNotice}>
-        {(notice) => <p class="mt-4 break-words text-xs leading-5 text-wedding-muted">{notice()}</p>}
+      <Show
+        when={workspace().vendorSearchRunning}
+        fallback={<Show when={workspace().vendorSearchNotice}>{(notice) => <p class="mt-4 break-words text-xs leading-5 text-wedding-muted">{notice()}</p>}</Show>}
+      >
+        <p class="mt-4 break-words text-xs font-medium leading-5 text-wedding-muted" role="status" aria-live="polite">
+          {SEARCH_PROGRESS_LABELS[searchProgressIndex()]}
+        </p>
       </Show>
       <Show when={!props.result && workspace().vendorSearchResultAction}>
         <button type="button" class="mt-3 min-h-11 rounded-full border border-wedding-accent bg-white px-3 text-xs font-bold text-wedding-accent" onClick={() => props.onDismiss("")}>

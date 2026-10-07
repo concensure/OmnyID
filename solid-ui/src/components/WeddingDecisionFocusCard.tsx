@@ -24,6 +24,7 @@ export function WeddingDecisionFocusCard(props: {
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
 }) {
   const [locallyDeferredIds, setLocallyDeferredIds] = createSignal<Set<string>>(new Set());
+  const [expandedTaskId, setExpandedTaskId] = createSignal<string | null>(null);
   const display = createMemo(() => buildWeddingDecisionFocusDisplayState({
     relief: props.state.personalOsProjection.decisionLoadRelief,
     locallyDeferredIds: locallyDeferredIds(),
@@ -48,6 +49,10 @@ export function WeddingDecisionFocusCard(props: {
     setLocallyDeferredIds((current) => new Set([...current, item.id]));
     props.onSidebarAction(buildWeddingDecisionDeferSidebarAction(item));
   }
+  function taskFor(itemId: string) {
+    const taskId = itemId.replace(/^task:/, "");
+    return props.state.planningTaskItems.find((task) => task.id === taskId) ?? null;
+  }
   return (
     <Show when={props.state.personalOsProjection.hasWeddingPersonalOsSignal}>
       <div class="min-w-0 rounded-[24px] border border-pink-100/80 bg-pink-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
@@ -57,9 +62,6 @@ export function WeddingDecisionFocusCard(props: {
             {display().visibleCount} now
           </span>
         </div>
-        <p class="mt-2 text-sm leading-6 text-pink-900/75">
-          {display().summaryLabel}
-        </p>
         <div class="mt-3 grid gap-2 sm:grid-cols-2">
           <button type="button" class="rounded-2xl border border-pink-100 bg-white/75 px-3 py-2 text-left transition hover:border-pink-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" title="Open wedding budget" onClick={openBudget}>
             <p class="text-xs font-semibold text-pink-950/80">Budget status</p>
@@ -83,19 +85,46 @@ export function WeddingDecisionFocusCard(props: {
             <For each={display().itemCards}>
               {(card) => {
                 const item = card.item;
+                const expandedTask = () => expandedTaskId() === item.id ? taskFor(item.id) : null;
                 return (
-                <DecisionCard
-                  card={decisionCardFromWeddingFocus(card)}
-                  mode="standard"
-                  showWhyItMatters={false}
-                  onAction={(action) => {
-                    if (action.id === "later") deferItem(item);
-                    else props.onSidebarAction(buildWeddingDecisionFocusSidebarAction(
-                      { ...props.state.personalOsProjection.decisionLoadRelief, focusItems: [item], backlogCount: 0 },
-                      action.id === "why" ? "explain_item" : "open_item",
-                    ));
-                  }}
-                />
+                <div class="space-y-2">
+                  <DecisionCard
+                    card={decisionCardFromWeddingFocus(card)}
+                    mode="standard"
+                    showWhyItMatters={false}
+                    onAction={(action) => {
+                      if (action.id === "later") {
+                        deferItem(item);
+                      } else if (action.id === "open" && item.sourceSurface === "tasks") {
+                        setExpandedTaskId((current) => current === item.id ? null : item.id);
+                      } else {
+                        props.onSidebarAction(buildWeddingDecisionFocusSidebarAction(
+                          { ...props.state.personalOsProjection.decisionLoadRelief, focusItems: [item], backlogCount: 0 },
+                          action.id === "why" ? "explain_item" : "open_item",
+                        ));
+                      }
+                    }}
+                  />
+                  <Show when={expandedTask()} fallback={expandedTaskId() === item.id ? <p class="rounded-xl border border-pink-100 bg-white/75 px-3 py-2 text-xs leading-5 text-pink-950/75">This task is no longer active.</p> : undefined}>
+                    {(task) => (
+                      <section class="rounded-xl border border-pink-200 bg-white px-3 py-3 text-pink-950" aria-label={`Task: ${task().title}`}>
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-pink-900/70">Active to-do</p>
+                            <h4 class="mt-1 break-words text-sm font-semibold">{task().title}</h4>
+                          </div>
+                          <button type="button" class="min-h-9 rounded-full border border-pink-200 bg-pink-50 px-3 text-xs font-semibold text-pink-950" onClick={() => setExpandedTaskId(null)}>Close</button>
+                        </div>
+                        <Show when={task().notes}><p class="mt-2 break-words text-xs leading-5 text-pink-950/75">{task().notes}</p></Show>
+                        <div class="mt-2 flex flex-wrap gap-1.5 text-[11px] font-medium text-pink-950/75">
+                          <Show when={task().dueLabel}><span class="rounded-full bg-pink-50 px-2 py-1">{task().dueLabel}</span></Show>
+                          <Show when={task().priority}><span class="rounded-full bg-pink-50 px-2 py-1">{task().priority} priority</span></Show>
+                          <Show when={task().assignee}><span class="rounded-full bg-pink-50 px-2 py-1">{task().assignee}</span></Show>
+                        </div>
+                      </section>
+                    )}
+                  </Show>
+                </div>
               );}}
             </For>
           </div>

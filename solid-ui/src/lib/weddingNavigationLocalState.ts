@@ -74,9 +74,13 @@ export function clearWeddingNavigationIntent(storage?: Storage | null): void {
   });
 }
 
+/**
+ * Reads the active wedding context for the next surface.
+ *
+ * It intentionally remains available while a couple moves between Calendar,
+ * Decisions, and the mobile menu. Clearing it on the first route made the
+ * hamburger's Wedding Home entry fall back to the generic response queue.
+ */
 export function consumeWeddingNavigationIntent(storage?: Storage | null): WeddingNavigationStoredIntent | null {
-  const target = storageOrNull(storage);
-  const intent = loadWeddingNavigationIntent(target);
-  if (intent) clearWeddingNavigationIntent(target);
-  return intent;
+  return loadWeddingNavigationIntent(storage);
 }

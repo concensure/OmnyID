@@ -307,13 +307,12 @@ export function comparisonRecommendationHandoff(input: {
       excluded.length > 0 ? `${excluded.length} excluded by a hard constraint or unavailability` : null,
       preferenceBackedCount > 0
         ? `${preferenceBackedCount} choice${preferenceBackedCount === 1 ? "" : "s"} matched stated preferences`
-        : "Preference fit needs manual review",
+        : null,
       costEvidenceCount > 0
         ? `${costEvidenceCount} choice${costEvidenceCount === 1 ? "" : "s"} have price evidence to compare against budget`
-        : "Price evidence is not clear yet",
+        : null,
       compactPreferenceSignalLabel(input.preferenceSignals ?? []),
       clean(input.location) ? `Location context: ${clean(input.location)}` : null,
-      `Provider evidence: ${clean(input.providerLabel) || "live search"}`,
     ].filter(Boolean),
     confidenceLabel: topChoice ? `Confidence: ${topChoice.confidenceBucket}` : "Confidence: low",
     nextActionLabel: nextAction?.label ?? "Select one or more vendors for approval-gated follow-up.",
@@ -331,9 +330,7 @@ function candidateTable(choices: readonly WeddingVendorRankedCandidate[]): strin
       choice.availabilityLabel,
       [choice.priorityMatchLabel, ...choice.rationaleLabels.slice(0, 2)].join("; "),
       contactSummaryLabel(choice),
-      choice.unknownHardConstraints.length > 0
-        ? `Unconfirmed: ${choice.unknownHardConstraints.join(", ")}`
-        : choice.verificationLabel,
+      choice.verificationLabel,
       choice.url,
     ].join(" | ") + " |"),
   ];

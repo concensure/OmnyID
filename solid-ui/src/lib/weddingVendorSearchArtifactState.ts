@@ -405,9 +405,6 @@ function markdownFor(
   execution: WeddingVendorSearchExecutionState,
   sources: readonly WeddingVendorSearchExecutionState["sources"][number][] = execution.sources,
 ): string {
-  const providerKinds = metadataStrings(execution, "provider_kinds");
-  const sourceProviderLabels = metadataStrings(execution, "source_provider_labels");
-  const sourceCountsByProvider = metadataRecord(execution, "source_counts_by_provider");
   const vendorCategories = metadataStrings(execution, "vendor_categories");
   const googlePlaceTypes = metadataStrings(execution, "google_place_types");
   const overpassTags = metadataStrings(execution, "overpass_tags");
@@ -418,13 +415,8 @@ function markdownFor(
     "",
     "These notes record source-backed vendor-search evidence. They are not a booking, quote, availability confirmation, or endorsement.",
     "",
-    "## Provider context",
+    "## Search context",
     "",
-    providerKinds.length > 0 ? `Provider kinds: ${providerKinds.join(", ")}` : "Provider kinds: not recorded",
-    sourceProviderLabels.length > 0 ? `Source providers returned: ${sourceProviderLabels.join(", ")}` : null,
-    Object.keys(sourceCountsByProvider).length > 0
-      ? `Source counts by provider: ${Object.entries(sourceCountsByProvider).map(([provider, count]) => `${provider}: ${count}`).join(", ")}`
-      : null,
     vendorCategories.length > 0 ? `Vendor categories: ${vendorCategories.join(", ")}` : "Vendor categories: inferred from source titles only",
     googlePlaceTypes.length > 0 ? `Google place types: ${googlePlaceTypes.join(", ")}` : null,
     overpassTags.length > 0 ? `Overpass tags: ${overpassTags.join(", ")}` : null,
@@ -436,14 +428,13 @@ function markdownFor(
     "",
     "## Source results",
     "",
-    "| Source | Provider | Snippet | URL |",
-    "| --- | --- | --- | --- |",
-    ...sources.map((source) => `| ${clean(source.title) || "Unknown"} | ${clean(source.provider) || clean(execution.providerLabel) || "Unknown"} | ${clean(source.snippet) || "Review source directly"} | ${source.url} |`),
+    "| Vendor | Confirmed page detail | URL |",
+    "| --- | --- | --- |",
+    ...sources.map((source) => `| ${clean(source.title) || "Unknown"} | ${clean(source.snippet) || ""} | ${source.url} |`),
     "",
     "## Verification actions",
     "",
     "- Open source pages before recommending or shortlisting a vendor.",
-    "- Confirm service area, availability, packages, inclusions, hidden fees, and cancellation terms directly.",
     "- Ask the user to tick selected vendors before drafting outreach or collapsing alternatives.",
     ...providerGuardrails.map((guardrail) => `- ${guardrail}`),
   ].filter((line): line is string => line !== null).join("\n");

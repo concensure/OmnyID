@@ -63,7 +63,7 @@ test("saveWeddingNavigationIntent stores normalized latest intent with timestamp
   });
 });
 
-test("consumeWeddingNavigationIntent returns and clears the pending intent", () => {
+test("consumeWeddingNavigationIntent preserves active context for cross-surface wedding navigation", () => {
   const storage = memoryStorage();
   const intent = buildWeddingNavigationIntentFromPresentationAction(action());
   saveWeddingNavigationIntent(intent, { storage, nowIso: "2026-09-12T00:00:00.000Z" });
@@ -71,7 +71,7 @@ test("consumeWeddingNavigationIntent returns and clears the pending intent", () 
   const consumed = consumeWeddingNavigationIntent(storage);
 
   assert.equal(consumed?.artifactId, "artifact-local");
-  assert.equal(loadWeddingNavigationIntent(storage), null);
+  assert.equal(loadWeddingNavigationIntent(storage)?.artifactId, "artifact-local");
 });
 
 test("clearWeddingNavigationIntent removes a pending intent", () => {

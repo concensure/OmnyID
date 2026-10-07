@@ -489,6 +489,7 @@ export function MonthlyCalendarView(props: {
   const [googleCalendarOAuthConfig, setGoogleCalendarOAuthConfig] = createSignal<GoogleCalendarOAuthConfig | null>(null);
   const [googleCalendarBusy, setGoogleCalendarBusy] = createSignal(false);
   const [googleCalendarNotice, setGoogleCalendarNotice] = createSignal<string | null>(null);
+  const [compactViewport, setCompactViewport] = createSignal(false);
 
   const monthKey = createMemo(() => calendarMonthStartIso(year(), month()));
   const weddingArrivalBanner = createMemo(() =>
@@ -605,10 +606,24 @@ export function MonthlyCalendarView(props: {
       window.history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search);
     }
     const tabletMq = window.matchMedia("(max-width: 64em)");
+    const phoneMq = window.matchMedia("(max-width: 48em)");
     if (tabletMq.matches) setSidebarOpen(false);
+    setCompactViewport(phoneMq.matches);
     const handler = (event: MediaQueryListEvent) => setSidebarOpen(!event.matches);
+    const compactHandler = (event: MediaQueryListEvent) => {
+      setCompactViewport(event.matches);
+      if (event.matches) {
+        setSidebarOpen(false);
+        if (viewMode() === "week") setViewMode("day");
+      }
+    };
     tabletMq.addEventListener("change", handler);
-    onCleanup(() => tabletMq.removeEventListener("change", handler));
+    phoneMq.addEventListener("change", compactHandler);
+    if (phoneMq.matches && viewMode() === "week") setViewMode("day");
+    onCleanup(() => {
+      tabletMq.removeEventListener("change", handler);
+      phoneMq.removeEventListener("change", compactHandler);
+    });
   });
 
   createEffect(() => {
@@ -817,14 +832,14 @@ export function MonthlyCalendarView(props: {
       style={{
         display: "flex",
         "flex-direction": "column",
-        height: "100%",
+        height: compactViewport() ? "auto" : "100%",
         "min-height": "0",
         background: TOKEN.bg,
         "font-family": "Inter, system-ui, sans-serif",
         "font-feature-settings": '"ss01"',
         border: `1px solid ${TOKEN.border}`,
         "border-radius": "1em",
-        overflow: "hidden",
+        overflow: compactViewport() ? "visible" : "hidden",
       }}
     >
       <header
@@ -835,7 +850,7 @@ export function MonthlyCalendarView(props: {
           display: "flex",
           "align-items": "center",
           gap: "1em",
-          padding: `0.75em ${TOKEN.mainPadding}`,
+          padding: compactViewport() ? "0.75em 1em" : `0.75em ${TOKEN.mainPadding}`,
           "flex-shrink": "0",
           "justify-content": "space-between",
           "flex-wrap": "wrap",
@@ -864,7 +879,7 @@ export function MonthlyCalendarView(props: {
           </div>
         </div>
 
-        <div style={{ display: "flex", "align-items": "center", gap: "1em", flex: 1, "justify-content": "center", "min-width": "min(100%, 18em)", "flex-wrap": "wrap" }}>
+        <div style={{ display: "flex", "align-items": "center", gap: "1em", flex: 1, "justify-content": "center", "min-width": compactViewport() ? 0 : "min(100%, 18em)", "flex-wrap": "wrap" }}>
           <div style={{ "text-align": "center", "min-width": 0 }}>
             <h2 style={{ margin: 0, "font-size": "clamp(1.1em, 4vw, 1.5em)", "line-height": 1.2, color: TOKEN.text }}>{calendarMonthLabel(year(), month())}</h2>
           </div>
@@ -906,7 +921,7 @@ export function MonthlyCalendarView(props: {
 
         <div style={{ display: "flex", "align-items": "center", gap: "0.6em", "flex-wrap": "wrap" }}>
           <div style={{ display: "flex", background: TOKEN.bg, border: `1px solid ${TOKEN.border}`, "border-radius": "0.7em", padding: "0.22em" }}>
-            <For each={(["month", "week", "day"] as ViewMode[])}>
+            <For each={(compactViewport() ? ["month", "day"] : ["month", "week", "day"]) as ViewMode[]}>
               {(mode) => (
                 <button
                   type="button"
@@ -1067,17 +1082,19 @@ export function MonthlyCalendarView(props: {
         </Show>
       </div>
 
-      <div style={{ display: "flex", flex: 1, "min-height": 0, overflow: "hidden" }}>
+      <div style={{ display: "flex", "flex-direction": compactViewport() ? "column" : "row", flex: compactViewport() ? "0 0 auto" : 1, "min-height": 0, overflow: compactViewport() ? "visible" : "hidden", "min-width": 0 }}>
+        <Show when={!compactViewport() || sidebarOpen()}>
         <aside
           style={{
-            width: sidebarOpen() ? TOKEN.sidebarW : TOKEN.sidebarCollapsed,
+            width: compactViewport() ? "100%" : sidebarOpen() ? TOKEN.sidebarW : TOKEN.sidebarCollapsed,
             background: TOKEN.surface,
-            "border-right": `1px solid ${TOKEN.border}`,
-            padding: sidebarOpen() ? TOKEN.sidebarPadding : "1em 0.65em",
+            "border-right": compactViewport() ? "none" : `1px solid ${TOKEN.border}`,
+            "border-bottom": compactViewport() ? `1px solid ${TOKEN.border}` : "none",
+            padding: compactViewport() ? "1em" : sidebarOpen() ? TOKEN.sidebarPadding : "1em 0.65em",
             display: "flex",
             "flex-direction": "column",
             gap: TOKEN.sectionGap,
-            overflow: "hidden auto",
+            overflow: compactViewport() ? "visible" : "hidden auto",
             transition: `width ${TOKEN.transition}, padding ${TOKEN.transition}`,
             "flex-shrink": 0,
           }}
@@ -1171,14 +1188,15 @@ export function MonthlyCalendarView(props: {
             </section>
           </Show>
         </aside>
+        </Show>
 
         <main
           style={{
-            flex: 1,
+            flex: compactViewport() ? "0 0 auto" : 1,
             display: "flex",
             "flex-direction": "column",
-            overflow: "hidden",
-            padding: TOKEN.mainPadding,
+            overflow: compactViewport() ? "visible" : "hidden",
+            padding: compactViewport() ? "1em" : TOKEN.mainPadding,
             gap: TOKEN.sectionGap,
             "min-width": 0,
           }}
@@ -1217,7 +1235,7 @@ export function MonthlyCalendarView(props: {
               <div style={{ display: "grid", "grid-template-columns": "repeat(7, minmax(0, 1fr))", "border-bottom": `1px solid ${TOKEN.border}` }}>
                 <For each={WEEKDAYS}>
                   {(day) => (
-                    <div style={{ padding: "0.85em 0.6em", "text-align": "center", "font-size": "0.72em", "letter-spacing": "0.14em", "text-transform": "uppercase", color: TOKEN.textSecondary }}>
+                    <div style={{ padding: compactViewport() ? "0.6em 0.15em" : "0.85em 0.6em", "text-align": "center", "font-size": compactViewport() ? "0.58em" : "0.72em", "letter-spacing": compactViewport() ? "0.04em" : "0.14em", "text-transform": "uppercase", color: TOKEN.textSecondary }}>
                       {day}
                     </div>
                   )}
@@ -1260,14 +1278,14 @@ export function MonthlyCalendarView(props: {
                             background: selected() ? "#fcf8f3" : TOKEN.surface,
                             "border-right": `1px solid ${TOKEN.border}`,
                             "border-bottom": `1px solid ${TOKEN.border}`,
-                            padding: "0.75em",
+                            padding: compactViewport() ? "0.3em" : "0.75em",
                             display: "flex",
                             "flex-direction": "column",
                             "align-items": "stretch",
                             gap: "0.55em",
                             "text-align": "left",
                             cursor: "pointer",
-                            "min-height": "8.5em",
+                            "min-height": compactViewport() ? "5.75em" : "8.5em",
                             position: "relative",
                             transition: TOKEN.transition,
                           }}
@@ -1388,14 +1406,15 @@ export function MonthlyCalendarView(props: {
 
         <aside
           style={{
-            width: TOKEN.rightPanelW,
+            width: compactViewport() ? "100%" : TOKEN.rightPanelW,
             background: TOKEN.surface,
-            "border-left": `1px solid ${TOKEN.border}`,
-            padding: TOKEN.sidebarPadding,
+            "border-left": compactViewport() ? "none" : `1px solid ${TOKEN.border}`,
+            "border-top": compactViewport() ? `1px solid ${TOKEN.border}` : "none",
+            padding: compactViewport() ? "1em" : TOKEN.sidebarPadding,
             display: "flex",
             "flex-direction": "column",
             gap: TOKEN.sectionGap,
-            overflow: "hidden auto",
+            overflow: compactViewport() ? "visible" : "hidden auto",
             "flex-shrink": 0,
           }}
         >

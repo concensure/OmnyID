@@ -49,7 +49,6 @@ export function WeddingVendorChoiceCard(props: {
     card.phone ? { label: "Phone", value: card.phone, href: `tel:${card.phone.replace(/\s+/g, "")}` } : null,
     card.address ? { label: "Address", value: card.address, href: null } : null,
     card.mapUrl ? { label: "Map", value: card.mapUrl, href: card.mapUrl } : null,
-    card.sourceUrl ? { label: "Source", value: card.sourceUrl, href: card.sourceUrl } : null,
   ].filter((item): item is { label: string; value: string; href: string | null } => item !== null);
   const [imageFailed, setImageFailed] = createSignal(false);
   const [resolvedImageUrl, setResolvedImageUrl] = createSignal<string | null>(card.imageUrl);
@@ -82,6 +81,10 @@ export function WeddingVendorChoiceCard(props: {
     });
   });
   const availabilityState = () => card.availabilityState;
+  const hasConfirmedAvailability = () => ["confirmed_available", "confirmed_unavailable", "temporary_hold", "booked"].includes(availabilityState());
+  const confirmedRationaleLabels = () => card.rationaleLabels.filter((label) => !/^source provider:/i.test(label));
+  const confirmedScoreLabels = () => [card.qualityScoreLabel, card.sentimentScoreLabel, card.valueScoreLabel]
+    .filter((label): label is string => Boolean(label?.trim()));
   const primaryAction = () => weddingVendorChoiceActionState({
     availabilityState: availabilityState(),
     outreachStage: props.outreachFlow?.stage,
@@ -122,15 +125,19 @@ export function WeddingVendorChoiceCard(props: {
             {card.scoreLabel}
           </span>
         </div>
+        <Show when={hasConfirmedAvailability()}>
         <span
           class={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-semibold ${availabilityChipClass(availabilityState())}`}
           data-testid="vendor-availability-chip"
         >
           {card.availabilityLabel}
         </span>
-        <p class="break-words text-xs leading-5 text-wedding-muted">{card.situationFit}</p>
+        </Show>
+        <Show when={card.situationFit && !/requires source-page review/i.test(card.situationFit)}>
+          <p class="break-words text-xs leading-5 text-wedding-muted">{card.situationFit}</p>
+        </Show>
         <div class="flex flex-wrap gap-1">
-          <For each={card.rationaleLabels.slice(0, 3)}>
+          <For each={confirmedRationaleLabels().slice(0, 3)}>
             {(label) => (
               <span class="max-w-full break-words rounded-full bg-wedding-surface-blush px-2 py-1 text-[11px] font-medium text-wedding-accent">
                 {label}
@@ -138,19 +145,10 @@ export function WeddingVendorChoiceCard(props: {
             )}
           </For>
         </div>
-        <p class="break-words text-[11px] leading-4 text-wedding-muted">
-          {card.verificationLabel}
-        </p>
-        <div class="grid grid-cols-3 gap-1" aria-label="Vendor score summary">
-          <span class="rounded-lg border border-wedding-muted bg-wedding-surface-blush px-2 py-1 text-[10px] font-semibold text-wedding-accent">{card.qualityScoreLabel || "Q not yet assessed"}</span>
-          <span class="rounded-lg border border-wedding-muted bg-wedding-surface-blush px-2 py-1 text-[10px] font-semibold text-wedding-accent">{card.sentimentScoreLabel || "S not yet assessed"}</span>
-          <span class="rounded-lg border border-wedding-muted bg-wedding-surface-blush px-2 py-1 text-[10px] font-semibold text-wedding-accent">{card.valueScoreLabel || "Value not yet assessed"}</span>
-        </div>
-        <p class="text-[10px] leading-4 text-wedding-muted">{card.seasonalNote || "Seasonal cost not yet assessed."}</p>
-        <Show when={card.unknownConstraints.length > 0}>
-          <p class="break-words text-[11px] leading-4 text-wedding-muted">
-            Unconfirmed: {card.unknownConstraints.join(", ")}
-          </p>
+        <Show when={confirmedScoreLabels().length > 0}>
+          <div class="grid grid-cols-3 gap-1" aria-label="Vendor score summary">
+            <For each={confirmedScoreLabels()}>{(label) => <span class="rounded-lg border border-wedding-muted bg-wedding-surface-blush px-2 py-1 text-[10px] font-semibold text-wedding-accent">{label}</span>}</For>
+          </div>
         </Show>
         <Show when={contactRows().length > 0}>
           <div class="rounded-lg border border-wedding-muted bg-wedding-surface-blush p-2">

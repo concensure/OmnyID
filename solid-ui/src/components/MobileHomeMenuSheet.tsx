@@ -24,9 +24,9 @@ import {
 
 const DIALOG_ID = "mobile-global-navigation";
 const FOCUSABLE = "button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex='-1'])";
-type WeddingMenuDestination = { id: WeddingWorkspaceMenuId; label: string; sectionId?: string; mode?: "overview" };
+type WeddingMenuDestination = { id: WeddingWorkspaceMenuId; label: string; sectionId?: string; mode?: "decisions" | "responses" | "overview" };
 const WEDDING_MENU: WeddingMenuDestination[] = [
-  { id: "home", label: "Wedding Home", mode: "overview" },
+  { id: "home", label: "Wedding Home", mode: "decisions" },
   { id: "home", label: "Live vendor research", sectionId: "vendor_search", mode: "overview" },
   { id: "people", label: "People" }, { id: "plan", label: "Plan" },
   { id: "budget", label: "Budget" }, { id: "documents", label: "Documents" },

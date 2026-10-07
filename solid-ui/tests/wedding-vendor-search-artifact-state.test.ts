@@ -55,9 +55,8 @@ test("buildWeddingVendorSearchArtifactState creates a source-linked vendor artif
   assert.equal(state.summary?.sourceLinks[0]?.url, "https://harbour-studio.example");
   assert.ok(state.summary?.searchText.includes("source_linked"));
   assert.match(state.markdown ?? "", /not a booking, quote, availability confirmation/i);
-  assert.match(state.markdown ?? "", /Source providers returned: Brave Search/i);
-  assert.match(state.markdown ?? "", /Source counts by provider: Brave Search: 1/i);
-  assert.match(state.markdown ?? "", /Confirm service area, availability, packages/i);
+  assert.doesNotMatch(state.markdown ?? "", /Brave Search/i);
+  assert.doesNotMatch(state.markdown ?? "", /Confirm service area, availability, packages/i);
   assert.deepEqual(state.artifactInput?.metadata.sourceProviderLabels, ["Brave Search"]);
   assert.deepEqual(state.artifactInput?.metadata.sourceCountsByProvider, { "Brave Search": 1 });
 });
@@ -138,7 +137,7 @@ test("cached admin vendor database results still create source-backed artifacts"
 
   assert.equal(artifact.status, "created");
   assert.equal(comparison.status, "created");
-  assert.match(artifact.markdown ?? "", /Admin vendor database/i);
+  assert.doesNotMatch(artifact.markdown ?? "", /Admin vendor database/i);
   assert.deepEqual(artifact.artifactInput?.metadata.sourceProviderLabels, ["Admin vendor database"]);
   assert.equal((comparison.artifactInput?.metadata as Record<string, unknown>).sourceUrlCount, 3);
   assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).sourceProviderLabels, ["Admin vendor database"]);
@@ -174,9 +173,9 @@ test("planned vendor search source packet preserves provider-specific search con
   });
 
   assert.equal(artifact.status, "created");
-  assert.match(artifact.markdown ?? "", /Provider kinds: google_places, overpass/i);
-  assert.match(artifact.markdown ?? "", /Source providers returned: google_places, overpass/i);
-  assert.match(artifact.markdown ?? "", /Source counts by provider: google_places: 1, overpass: 1/i);
+  assert.doesNotMatch(artifact.markdown ?? "", /Provider kinds: google_places, overpass/i);
+  assert.doesNotMatch(artifact.markdown ?? "", /Source providers returned: google_places, overpass/i);
+  assert.doesNotMatch(artifact.markdown ?? "", /Source counts by provider: google_places: 1, overpass: 1/i);
   assert.match(artifact.markdown ?? "", /Google place types: point_of_interest/i);
   assert.match(artifact.markdown ?? "", /Overpass tags: craft=photographer/i);
   assert.match(artifact.markdown ?? "", /Expected fields: name, website, phone/i);
@@ -246,7 +245,7 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   assert.match(comparison.markdown ?? "", /## Suggested next actions/);
   assert.match(comparison.markdown ?? "", /Unknown facts are never treated as negatives/);
   assert.match(comparison.markdown ?? "", /documentary/i);
-  assert.match(comparison.markdown ?? "", /Confirm service area, date availability/i);
+  assert.doesNotMatch(comparison.markdown ?? "", /Source provider:/i);
   assert.equal(a2ui?.schema_version, "a2ui.v1");
   assert.equal(Array.isArray(a2ui?.components), true);
   const recommendationCards = (a2ui?.components as Array<Record<string, unknown>>)[0] as Record<string, unknown> | undefined;
@@ -276,10 +275,8 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   assert.deepEqual(recommendationHandoff.whyLabels as string[], [
     "4 source-backed vendors found: 0 booked, 0 bookable, 4 awaiting availability confirmation",
     "1 choice matched stated preferences",
-    "Price evidence is not clear yet",
     "Intake signals used: Preferences: documentary style and transparent...; Budget comfort: balanced budget",
     "Location context: Sydney",
-    "Provider evidence: Brave Search",
   ]);
   assert.equal(recommendationHandoff.confidenceLabel, "Confidence: low");
   assert.match(String(recommendationHandoff.nextActionLabel), /Check availability with Harbour Studio/i);

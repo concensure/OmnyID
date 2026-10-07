@@ -209,7 +209,7 @@ export function decisionCardFromWeddingVendorComparison(preview: WeddingWorkspac
     confidence: handoff ? { label: handoff.confidenceLabel, reason: handoff.whyLabels.join(" ") } : null,
     timeSensitivity: null,
     visual: { kind: "none" },
-    unknowns: preview.vendorComparisonCards.flatMap((card) => card.unknownConstraints).filter((value, index, values) => values.indexOf(value) === index).slice(0, 4),
+    unknowns: [],
     patternSlots: {
       options: preview.vendorComparisonCards.slice(0, 3).map((card) => ({
         id: card.choiceId,
