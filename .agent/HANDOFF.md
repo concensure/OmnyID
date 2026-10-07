@@ -5,6 +5,35 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-08 - Oracle release of WED-153 and WED-174 (Codex)
+
+What changed:
+
+- Committed the pending WED-153 vendor enrichment/rooms work as `3c6dd08`, on top of the
+  WED-174 persistence release `885636a`.
+- Deployed the current branch to Oracle with the existing secret-file-backed remote environment.
+  The staged `0100_wedding_vendor_rooms.sql` hash matches the copy on Oracle.
+
+Verification evidence:
+
+- `cargo test wedding_vendor --lib --quiet` — 107 passed.
+- `cargo check` — passed.
+- Oracle deployment rebuilt the homeserver and UI, recreated homeserver/Caddy/backup, and the
+  workspace smoke check returned HTTP 200 with the expected CSP.
+- The remote Oracle production proof completed with `STATUS=pass`: homeserver and backup service
+  running, backup verification passed, runtime-script integrity passed, and the restore drill
+  passed.
+
+Operational follow-up:
+
+- The existing Oracle `.env.oracle` does not set `OMNYID_ENV=production`, and the compose file
+  does not pass that variable to the homeserver. The release retained the known working environment;
+  enabling strict production startup policy needs a separate, reviewed secret/config hardening
+  change. The attempted in-place preflight correction was restored because host-side validation
+  cannot read the container-only `/run/secrets` paths and exposed additional missing policy inputs.
+- Oracle proof reports root and `/var` usage at 91%; treat storage remediation as urgent before
+  another large runtime upload or restore drill.
+
 ## 2026-10-08 - WED-174 wedding guest and calendar persistence (Codex)
 
 What changed:
