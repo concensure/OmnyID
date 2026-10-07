@@ -3559,8 +3559,14 @@ export async function fetchAttachmentIngestCapabilities(): Promise<AttachmentIng
 export async function fetchThread(threadId: string): Promise<AfpMessage[]> {
   const messages = normalizeAfpMessageList(await apiFetch<unknown>(`/thread/${encodeURIComponent(threadId)}`));
   try {
-    const { decryptMessages } = await import("@/lib/decrypt");
-    return decryptMessages(messages);
+    const decrypt = await import("@/lib/decrypt");
+    // Thread navigation can win the race against App's session initialiser. Ensure
+    // the in-memory key is ready here so encrypted chat never renders as ciphertext.
+    if (!decrypt.isDecryptReady() && readSession()?.token) {
+      const keys = await fetchEncKey();
+      await decrypt.initDecrypt(keys.enc_key_hex);
+    }
+    return decrypt.decryptMessages(messages);
   } catch {
     return messages;
   }

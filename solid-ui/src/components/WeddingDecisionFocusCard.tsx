@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { DecisionCard } from "@/components/DecisionCard";
 
 import {
@@ -28,7 +28,25 @@ export function WeddingDecisionFocusCard(props: {
   state: WeddingResponseWorkspaceViewState;
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
 }) {
-  const [locallyDeferredIds, setLocallyDeferredIds] = createSignal<Set<string>>(new Set());
+  const LOCAL_DEFER_TTL_MS = 10 * 60 * 1000;
+  const deferredStorageKey = () => {
+    const workspaceId = props.state.workspace.metadata.responseWorkspaceId?.trim() || "default";
+    return `omnyid.wedding.deferred-focus.${workspaceId}`;
+  };
+  const readDeferredIds = (): Set<string> => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(deferredStorageKey()) ?? "null");
+      if (!stored || typeof stored !== "object" || !Array.isArray(stored.ids) || Number(stored.expiresAt) <= Date.now()) {
+        window.localStorage.removeItem(deferredStorageKey());
+        return new Set();
+      }
+      return new Set(stored.ids.filter((value: unknown): value is string => typeof value === "string"));
+    } catch {
+      return new Set();
+    }
+  };
+  const [locallyDeferredIds, setLocallyDeferredIds] = createSignal<Set<string>>(readDeferredIds());
   const [expandedTaskId, setExpandedTaskId] = createSignal<string | null>(null);
   const [expandedWhyItemId, setExpandedWhyItemId] = createSignal<string | null>(null);
   const [assignmentDrafts, setAssignmentDrafts] = createSignal<Record<string, string>>({});
@@ -36,6 +54,18 @@ export function WeddingDecisionFocusCard(props: {
     relief: props.state.personalOsProjection.decisionLoadRelief,
     locallyDeferredIds: locallyDeferredIds(),
   }));
+  createEffect(() => {
+    const sourceIds = new Set(props.state.personalOsProjection.decisionLoadRelief.focusItems.map((item) => item.id));
+    setLocallyDeferredIds((current) => {
+      const active = new Set([...current].filter((id) => sourceIds.has(id)));
+      if (active.size === current.size) return current;
+      try {
+        if (active.size === 0) window.localStorage.removeItem(deferredStorageKey());
+        else window.localStorage.setItem(deferredStorageKey(), JSON.stringify({ ids: [...active], expiresAt: Date.now() + LOCAL_DEFER_TTL_MS }));
+      } catch { /* storage is optional */ }
+      return active;
+    });
+  });
   const decisionFocusAction = () => buildWeddingDecisionFocusSidebarAction({
     ...props.state.personalOsProjection.decisionLoadRelief,
     focusItems: display().visibleFocusItems,
@@ -53,7 +83,16 @@ export function WeddingDecisionFocusCard(props: {
     props.onSidebarAction(weddingTimelinePrimarySidebarAction(props.state));
   }
   function deferItem(item: (typeof props.state.personalOsProjection.decisionLoadRelief.focusItems)[number]) {
-    setLocallyDeferredIds((current) => new Set([...current, item.id]));
+    const deferred = new Set([...locallyDeferredIds(), item.id]);
+    setLocallyDeferredIds(deferred);
+    // Persist the optimistic removal across the workspace refresh that follows the AFP write.
+    // The durable AFP deferral remains the source of truth once the projection catches up.
+    try {
+      window.localStorage.setItem(deferredStorageKey(), JSON.stringify({
+        ids: [...deferred],
+        expiresAt: Date.now() + LOCAL_DEFER_TTL_MS,
+      }));
+    } catch { /* storage is optional */ }
     props.onSidebarAction(buildWeddingDecisionDeferSidebarAction(item));
   }
   function taskFor(itemId: string) {
@@ -155,6 +194,7 @@ export function WeddingDecisionFocusCard(props: {
                         <div class="mt-3 flex flex-wrap items-center gap-2">
                           <input
                             aria-label={`Assign ${task().title}`}
+                            list={`wedding-task-assignee-options-${task().id}`}
                             class="min-h-9 min-w-0 flex-1 rounded-lg border border-pink-200 bg-white px-2 text-xs text-pink-950 placeholder:text-pink-950/45"
                             placeholder="Assign to someone"
                             value={assignmentDrafts()[task().id] ?? task().assignee ?? ""}
@@ -165,6 +205,9 @@ export function WeddingDecisionFocusCard(props: {
                             if (!assignee) return;
                             props.onSidebarAction({ kind: "assign_task", label: "Assign task", enabled: true, reason: null, metadata: { task_id: task().id, task_title: task().title, task_priority: task().priority ?? "normal", assignee } });
                           }}>Assign</button>
+                          <datalist id={`wedding-task-assignee-options-${task().id}`}>
+                            <For each={props.state.helperContactNames}>{(name) => <option value={name} />}</For>
+                          </datalist>
                         </div>
                         <Show when={/celebrant/i.test(`${task().title} ${task().notes ?? ""}`) && !hasChosenCelebrant()}>
                           <button type="button" class="mt-3 min-h-9 rounded-full border border-pink-300 bg-pink-100 px-3 text-xs font-semibold text-pink-950 transition hover:bg-pink-200" onClick={launchCelebrantSearch}>

@@ -181,6 +181,7 @@ export function SearchBar(props: {
   const [placeholderIdx, setPlaceholderIdx] = createSignal(0);
   const [focused, setFocused] = createSignal(false);
   const [showDropdown, setShowDropdown] = createSignal(false);
+  const [showSearchTools, setShowSearchTools] = createSignal(false);
   const [suppressNextFocusDropdown, setSuppressNextFocusDropdown] = createSignal(false);
   const [recentQueries, setRecentQueries] = createSignal<string[]>(loadRecentSearchQueries(rKey()));
   const [submitted, setSubmitted] = createSignal(false);
@@ -416,6 +417,7 @@ export function SearchBar(props: {
   let settingsRef: HTMLDivElement | undefined;
   let saveSearchRef: HTMLDivElement | undefined;
   let voiceInstance: VoiceInput | null = null;
+  let voiceStartText = "";
 
   function targetIsInteractive(node: EventTarget | null): boolean {
     return node instanceof HTMLElement
@@ -766,7 +768,7 @@ export function SearchBar(props: {
       contextHint: "productivity workspace command input",
       hotWords: ["AFP", "daemon", "backlink", "curator", "workspace", "blueprint", "orchestrate"],
       onUpdate: (text) => {
-        setEditorQuery(text);
+        setEditorQuery([voiceStartText, text].filter(Boolean).join(voiceStartText && text ? " " : ""));
       },
       onError: () => {
         setVoiceHealth("degraded");
@@ -793,6 +795,7 @@ export function SearchBar(props: {
       // Set true before start() so that a synchronous onError callback (e.g. when
       // SpeechRecognition is unavailable) can reset it to false via the error handler.
       setIsListening(true);
+      voiceStartText = query().trim();
       voiceInstance.start();
       editorHandle?.focus();
     }
@@ -3495,8 +3498,20 @@ export function SearchBar(props: {
         </p>
       </Show>
 
-      {/* Filter chips — always visible below search */}
-      <div class="mt-2 flex flex-wrap items-center gap-1.5 px-2">
+      {/* Optional search filters, logic controls, and recent queries */}
+      <div class="mt-2 px-2">
+        <button
+          type="button"
+          aria-expanded={showSearchTools()}
+          class="rounded-full border border-white/30 bg-white/20 px-3 py-1 font-mono text-[10px] text-on-surface-variant/70 transition hover:bg-white/40 hover:text-on-surface-variant"
+          onClick={() => setShowSearchTools((current) => !current)}
+        >
+          Search tools {showSearchTools() ? "−" : "+"}
+        </button>
+      </div>
+
+      <Show when={showSearchTools()}>
+      <div class="mt-1.5 flex flex-wrap items-center gap-1.5 px-2">
         <span class="font-mono text-[9px] text-on-surface-variant/30 select-none">filter</span>
         {([
           { label: "type:email", insert: "type:email " },
@@ -3581,6 +3596,8 @@ export function SearchBar(props: {
       </Show>
 
       {/* Ghost preview pill — visible when a suggestion is highlighted via arrow keys */}
+      </Show>
+
       <Show when={arrowNavIdx() >= 0 && allDropdownSuggestions()[arrowNavIdx()]}>
         <div class="mt-1.5 px-2 animate-fade-in">
           <div class="flex items-center gap-2 rounded-full border border-primary/15 bg-primary/[0.04] px-4 py-1 text-xs">

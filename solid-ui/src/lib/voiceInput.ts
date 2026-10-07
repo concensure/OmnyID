@@ -39,15 +39,17 @@ export class VoiceInput {
 
     r.onresult = (event: SpeechRecognitionEvent) => {
       let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      // resultIndex only points at the changed segment, so rebuild the complete
+      // transcript or earlier final words disappear as the user keeps talking.
+      for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript;
       }
-      if (transcript) opts.onUpdate?.(transcript);
+      if (transcript.trim()) opts.onUpdate?.(transcript.trim());
     };
 
-    r.onerror = () => {
+    r.onerror = (event) => {
       this.running = false;
-      opts.onError?.();
+      opts.onError?.(event);
     };
 
     r.onend = () => {
@@ -61,7 +63,11 @@ export class VoiceInput {
   }
 
   start(): void {
-    if (!this.recognition || this.running) return;
+    if (!this.recognition) {
+      this.opts.onError?.(new Error("Speech recognition is not supported by this browser."));
+      return;
+    }
+    if (this.running) return;
     this.running = true;
     try { this.recognition.start(); } catch { this.opts.onError?.(); }
   }

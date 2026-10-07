@@ -8,6 +8,7 @@ import type { EditorPayload } from "@/lib/editorPayload";
 import { useViewport } from "@/context/ViewportContext";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { TrustSummaryBlocks } from "@/components/renderers/TrustSummaryBlocks";
+import { A2UIRouteCard } from "@/components/renderers/A2UIExtendedCards";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { normalizeA2UIRootNodes } from "@/lib/a2uiContentState";
 import { resolveA2UIDiffViewState } from "@/lib/a2uiDiffViewState";
@@ -1219,6 +1220,10 @@ function A2UINodeRenderer(props: {
         return <p class="text-xs text-on-surface-variant line-clamp-2">{state.displayText}</p>;
       }
       return <div class="md-prose" innerHTML={renderMarkdown(state.markdown)} />;
+    }
+
+    case "route_card": {
+      return <A2UIRouteCard data={p()} />;
     }
 
     case "callout": {
