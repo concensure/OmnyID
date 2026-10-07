@@ -2,6 +2,7 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 
 import { DecisionCard } from "@/components/DecisionCard";
+import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
@@ -237,9 +238,10 @@ export function WeddingVendorSearchHomeSection(props: {
                   fallback={<p class="mt-3 text-xs leading-5 text-wedding-muted">The saved search text is not available yet.</p>}
                 >
                   {(body) => (
-                    <pre class="mt-3 max-h-[22rem] overflow-auto whitespace-pre-wrap break-words rounded-xl bg-wedding-surface-blush p-3 text-xs leading-5 text-wedding-accent">
-                      {body()}
-                    </pre>
+                    <div
+                      class="md-prose mt-3 max-h-[22rem] overflow-auto rounded-xl bg-wedding-surface-blush p-3 text-xs leading-5 text-wedding-accent"
+                      innerHTML={renderMarkdown(body())}
+                    />
                   )}
                 </Show>
               </section>

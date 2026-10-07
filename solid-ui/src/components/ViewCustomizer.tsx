@@ -7,7 +7,7 @@
 //   2. Add freely-draggable A2UICard overlays to any view
 //
 // State is persisted per-viewId in localStorage.
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import type { ViewName } from "@/lib/viewNames";
 import { A2UICard } from "@/components/A2UICard";
@@ -33,6 +33,12 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
   const [showBgPanel, setShowBgPanel] = createSignal(false);
 
   let fileRef: HTMLInputElement | undefined;
+
+  onMount(() => {
+    const open = () => setMenuOpen(true);
+    window.addEventListener("omnyid:open-view-customizer", open);
+    onCleanup(() => window.removeEventListener("omnyid:open-view-customizer", open));
+  });
 
   // Reload state whenever the view changes
   createEffect(() => {
@@ -181,20 +187,10 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
         )}
       </For>
 
-      {/* Floating + button — above AgentPersonaFAB (bottom-24) */}
+      {/* Options are opened from the Agent Persona control. */}
       <Portal>
-        <div class="fixed z-[170]" style={{ bottom: "88px", right: "16px" }}>
+        <div class="fixed z-[170]" style={{ bottom: "72px", right: "16px" }}>
           <div class="relative">
-            <button
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              class="glass-button flex h-10 w-10 items-center justify-center rounded-2xl border border-white/40 bg-white/90 text-lg font-light text-on-surface-variant shadow-panel backdrop-blur-md transition hover:bg-white hover:text-on-surface"
-              aria-label="Customize view"
-              title="Add to this view"
-            >
-              +
-            </button>
-
             {/* Dropdown menu */}
             <Show when={menuOpen()}>
               <div class="absolute bottom-full right-0 mb-2 w-60 animate-fade-in rounded-2xl border border-white/50 bg-white/96 p-3 shadow-panel backdrop-blur-xl">

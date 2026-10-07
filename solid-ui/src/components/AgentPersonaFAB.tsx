@@ -196,14 +196,15 @@ export function AgentPersonaFAB(props: {
   });
 
   function openSwitcher(preferredTab?: SwitcherTab) {
-    if (switcherBusy()) return;
+    if (switchingId() || installingTemplateId()) return;
     if (preferredTab) setTab(preferredTab);
     else setTab(personaSwitcherPreferredTab(personas()));
     setShowSwitcher(true);
+    if (!loading() && personas().length === 0) void reloadPersonas();
   }
 
   function closeSwitcher() {
-    if (switcherBusy()) return;
+    if (switchingId() || installingTemplateId()) return;
     setShowSwitcher(false);
     setSearch("");
   }
@@ -327,6 +328,13 @@ export function AgentPersonaFAB(props: {
                 class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface"
               >
                 Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => { closeSwitcher(); window.dispatchEvent(new CustomEvent("omnyid:open-view-customizer")); }}
+                class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface"
+              >
+                Customize view
               </button>
             </div>
 
