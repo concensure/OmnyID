@@ -12,7 +12,7 @@ use serde_json::json;
 pub fn travel_preview_prefers_comparison(
     query: &str,
     preferred_view: Option<&str>,
-    bullets: &[String],
+    _bullets: &[String],
 ) -> bool {
     if matches!(preferred_view, Some("comparison_table")) {
         return true;
@@ -33,7 +33,9 @@ pub fn travel_preview_prefers_comparison(
     if comparison_terms.iter().any(|term| lower.contains(term)) {
         return true;
     }
-    bullets.len() >= 4
+    // A multi-step itinerary is not a comparison request.  Keep it as one
+    // readable answer unless the caller explicitly asks to compare.
+    false
 }
 
 pub fn build_social_preview_message(
@@ -211,8 +213,8 @@ pub fn build_route_comparison_preview_message(
             .enumerate()
             .map(|(index, bullet)| {
                 json!({
-                    "label": format!("Signal {}", index + 1),
-                    "values": [bullet, "Alternative A", "Alternative B"],
+                    "label": format!("Option {}", index + 1),
+                    "values": [bullet],
                     "winner": false,
                 })
             })
@@ -222,11 +224,7 @@ pub fn build_route_comparison_preview_message(
         "workspace_command_preview",
         &title,
         summary,
-        &[
-            "Primary".to_string(),
-            "Option A".to_string(),
-            "Option B".to_string(),
-        ],
+        &["Option".to_string()],
         &rows,
     )
 }
@@ -306,8 +304,8 @@ mod tests {
     }
 
     #[test]
-    fn travel_preview_prefers_comparison_for_rich_bullets() {
-        assert!(travel_preview_prefers_comparison(
+    fn travel_preview_keeps_rich_itineraries_as_one_card() {
+        assert!(!travel_preview_prefers_comparison(
             "Route preview",
             None,
             &[

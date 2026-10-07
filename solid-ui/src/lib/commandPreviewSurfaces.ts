@@ -23,7 +23,7 @@ function spaceMessages(command: UiCommandResponse): Array<Record<string, unknown
 export function travelPreviewPrefersComparison(
   query: string,
   preferredView: string | null | undefined,
-  bullets: string[],
+  _bullets: string[],
 ): boolean {
   if (preferredView === "comparison_table") {
     return true;
@@ -44,7 +44,10 @@ export function travelPreviewPrefersComparison(
   if (comparisonTerms.some((term) => lower.includes(term))) {
     return true;
   }
-  return bullets.length >= 4;
+  // An itinerary naturally has several steps.  That is not evidence that the
+  // user asked for alternatives, and rendering it as a comparison invents two
+  // empty columns beside the actual answer.
+  return false;
 }
 
 export function buildSocialComposerPreviewMessage(
@@ -189,11 +192,11 @@ export function buildRouteComparisonPreviewMessage(
         props: {
           title: query || "Route comparison",
           description: command.summary,
-          columns: ["Primary", "Option A", "Option B"],
+          columns: ["Option"],
           rows: bullets.length > 0
             ? bullets.map((item, index) => ({
-                label: `Signal ${index + 1}`,
-                values: [item, "Alternative A", "Alternative B"],
+                label: `Option ${index + 1}`,
+                values: [item],
                 winner: false,
               }))
             : [

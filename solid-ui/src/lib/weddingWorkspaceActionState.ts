@@ -9,7 +9,8 @@ export type WeddingWorkspaceSidebarActionKind =
   | "open_connected_apps"
   | "export_bundle"
   | "approve_action"
-  | "defer_decision";
+  | "defer_decision"
+  | "assign_task";
 
 export type WeddingWorkspaceSidebarAction = {
   kind: WeddingWorkspaceSidebarActionKind;

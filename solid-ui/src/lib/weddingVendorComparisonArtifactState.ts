@@ -24,6 +24,19 @@ function safeExternalUrl(value: unknown): string | null {
   }
 }
 
+/**
+ * A persisted comparison can outlive the server-side source-classification
+ * rules that produced it.  Keep category/list pages out of the actionable
+ * vendor cards even when an old artifact is reopened.
+ */
+export function isActionableVendorComparisonCard(record: Record<string, unknown>): boolean {
+  const title = clean(record.title).toLowerCase();
+  const urls = [record.source_url, record.website_url].map(clean).join(" ").toLowerCase();
+  const aggregateHost = /(?:^|[/:.])(tagvenue\.com|sydneymusic\.net|easyweddings\.com\.au|weddingwire\.|theknot\.com|wedshed\.com\.au|bridebook\.com|zola\.com)(?:[/:.]|$)/.test(urls);
+  const categoryOrListTitle = /(?:\b(?:best|top)\s+\d*\s*(?:wedding\s+)?(?:venues?|vendors?|suppliers?|celebrants?|bands?|djs?)\b|\blive\s+music\s+venues?\s+in\b|\b(?:venues?|vendors?|suppliers?|celebrants?)\s+(?:in|near)\b|\bcommunity\s+guide\b)/.test(title);
+  return !(aggregateHost && categoryOrListTitle) && !/\b\d+\s+(?:best|top)\b/.test(title);
+}
+
 export function vendorComparisonHandoffForArtifact(
   metadata: Record<string, unknown>,
 ): WeddingWorkspaceArtifactPreview["vendorComparisonHandoff"] {
@@ -51,7 +64,7 @@ export function vendorComparisonCardsForArtifact(
     if (!item || typeof item !== "object" || Array.isArray(item)) return [];
     const record = item as Record<string, unknown>;
     const title = clean(record.title);
-    if (!title) return [];
+    if (!title || !isActionableVendorComparisonCard(record)) return [];
     const rank = typeof record.rank === "number" && Number.isFinite(record.rank) ? record.rank : 0;
     return [{
       choiceId: clean(record.choice_id) || `${rank}:${title}`,

@@ -599,6 +599,21 @@ mod tests {
     }
 
     #[test]
+    fn route_ui_command_tolerates_a_missing_first_letter_in_trip_plan_request() {
+        let response = route_ui_command(
+            "lan a family trip (2 adult, 1 toddler under 2 year old) to Tokyo from Sydney, for 5 days, from 12th Oct 2026",
+            "duckduckgo".to_string(),
+            None,
+            None,
+        );
+
+        assert_eq!(response.intent, "travel");
+        assert_eq!(response.preferred_view, "route_card");
+        assert!(response.links.is_empty());
+        assert!(response.summary.contains("Sydney to Tokyo"));
+    }
+
+    #[test]
     fn route_ui_command_builds_dashboard_focus_special_route() {
         let response = route_ui_command(
             "show dashboard messages",

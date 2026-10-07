@@ -9,7 +9,7 @@ import { weddingVendorFollowUpOutreachCardData } from "@/lib/weddingVendorFollow
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { WeddingWorkspaceDocumentsPanel } from "@/components/WeddingWorkspaceDocumentsPanel";
-import { fetchThread, ingestAttachmentBatch, type AfpMessage } from "@/lib/api";
+import { fetchThread, ingestAttachmentBatch, type AfpMessage, type SendAfpMessageInput } from "@/lib/api";
 import type { EditorPayload } from "@/lib/editorPayload";
 import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
 import { runWeddingArtifactBrowserExport, runWeddingBundleBrowserExport, selectWeddingBundleExportPayload, weddingProjectionMetadataId, type WeddingBundleExportFormat } from "@/lib/weddingBrowserExportActions";
@@ -267,6 +267,49 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   }
 
   function handleSidebarAction(action: WeddingWorkspaceSidebarAction) {
+    if (action.kind === "assign_task") {
+      const taskId = typeof action.metadata?.task_id === "string" ? action.metadata.task_id.trim() : "";
+      const assignee = typeof action.metadata?.assignee === "string" ? action.metadata.assignee.trim() : "";
+      const task = state().planningTaskItems.find((item) => item.id === taskId);
+      if (!taskId || !assignee || !task) {
+        setExportNotice("Choose a person before assigning this task.");
+        return;
+      }
+      if (!props.saveProjection) {
+        setExportNotice(`${task.title} is assigned to ${assignee} for this session. Connect account saving to keep the assignment.`);
+        return;
+      }
+      const input: SendAfpMessageInput = {
+        thread_id: `task:${task.id}`,
+        parent_id: null,
+        from: "system://omnyid-ui",
+        to: [],
+        type: "task",
+        subtype: "update",
+        content: {
+          task_id: task.id,
+          title: task.title,
+          status: "pending",
+          priority: task.priority ?? "normal",
+          assigned_to: assignee,
+        },
+        metadata: {
+          task_update_source: "wedding_decision_focus",
+          updated_task_id: task.id,
+          assigned_to_changed: true,
+          wedding_plan_id: state().workspace.metadata.weddingPlanId,
+          response_workspace_id: state().workspace.metadata.responseWorkspaceId,
+        },
+      };
+      setExportNotice(`Assigning ${task.title} to ${assignee}...`);
+      void props.saveProjection(input)
+        .then(() => {
+          setExportNotice(`${task.title} assigned to ${assignee}.`);
+          props.onRefreshWorkspace?.();
+        })
+        .catch(() => setExportNotice(`Could not save the assignment for ${task.title}.`));
+      return;
+    }
     if (action.kind === "defer_decision") {
       const sendInput = weddingDecisionDeferralActionToAfpSendInput(action, state().workspace.metadata);
       if (!sendInput) {

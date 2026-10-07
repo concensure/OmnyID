@@ -237,7 +237,13 @@ fn classify_trip_planning(query: &str) -> Option<ZeroTokenRouteHint> {
     let planning_verb = ["plan", "planning", "organise", "organize", "visit"]
         .iter()
         .any(|term| lowered.contains(term));
-    if !travel_noun || !planning_verb {
+    // A compact trip request has enough structure to be useful even when the
+    // opening verb is omitted or has a small typo (for example "lan a family
+    // trip ... to Tokyo from Sydney for 5 days").
+    let trip_shape = lowered.contains(" to ")
+        && lowered.contains(" from ")
+        && (lowered.contains(" day") || lowered.contains("family") || lowered.contains("toddler"));
+    if !travel_noun || (!planning_verb && !trip_shape) {
         return None;
     }
 

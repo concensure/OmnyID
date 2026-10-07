@@ -18,6 +18,11 @@ import {
   weddingDayCountdownLabel,
   weddingTimelinePrimarySidebarAction,
 } from "@/lib/weddingWorkspaceSidebarActionState";
+import {
+  dispatchWeddingVendorSearchLaunch,
+  saveWeddingVendorSearchLaunch,
+  weddingVendorSearchQueryFromIntake,
+} from "@/lib/weddingVendorSearchLaunchState";
 
 export function WeddingDecisionFocusCard(props: {
   state: WeddingResponseWorkspaceViewState;
@@ -25,6 +30,8 @@ export function WeddingDecisionFocusCard(props: {
 }) {
   const [locallyDeferredIds, setLocallyDeferredIds] = createSignal<Set<string>>(new Set());
   const [expandedTaskId, setExpandedTaskId] = createSignal<string | null>(null);
+  const [expandedWhyItemId, setExpandedWhyItemId] = createSignal<string | null>(null);
+  const [assignmentDrafts, setAssignmentDrafts] = createSignal<Record<string, string>>({});
   const display = createMemo(() => buildWeddingDecisionFocusDisplayState({
     relief: props.state.personalOsProjection.decisionLoadRelief,
     locallyDeferredIds: locallyDeferredIds(),
@@ -52,6 +59,23 @@ export function WeddingDecisionFocusCard(props: {
   function taskFor(itemId: string) {
     const taskId = itemId.replace(/^task:/, "");
     return props.state.planningTaskItems.find((task) => task.id === taskId) ?? null;
+  }
+  function hasChosenCelebrant() {
+    return props.state.contextCards.some((card) => {
+      const path = String(card.planningContext?.celebrantPath ?? "").trim().toLowerCase();
+      return path === "own_celebrant" || (path.length > 0 && !["need_options", "public_or_registry_celebrant"].includes(path));
+    }) || props.state.vendorContactCards.some((card) => /celebrant|officiant/i.test(card.categoryLabel));
+  }
+  function launchCelebrantSearch() {
+    const context = props.state.contextCards.map((card) => card.planningContext).find((item) => item && (item.location || item.topPriorities?.length || item.atmosphereDescription)) ?? null;
+    const query = weddingVendorSearchQueryFromIntake({
+      vendorLabels: ["authorised wedding celebrant"],
+      location: context?.location,
+      priorities: (context?.topPriorities ?? []).join(", ") || context?.vendorPreferences,
+      atmosphere: context?.atmosphereDescription,
+    });
+    const launch = saveWeddingVendorSearchLaunch(query, { source: "wedding_home" });
+    if (launch) dispatchWeddingVendorSearchLaunch(launch);
   }
   return (
     <Show when={props.state.personalOsProjection.hasWeddingPersonalOsSignal}>
@@ -95,6 +119,8 @@ export function WeddingDecisionFocusCard(props: {
                     onAction={(action) => {
                       if (action.id === "later") {
                         deferItem(item);
+                      } else if (action.id === "why") {
+                        setExpandedWhyItemId((current) => current === item.id ? null : item.id);
                       } else if (action.id === "open" && item.sourceSurface === "tasks") {
                         setExpandedTaskId((current) => current === item.id ? null : item.id);
                       } else {
@@ -105,6 +131,11 @@ export function WeddingDecisionFocusCard(props: {
                       }
                     }}
                   />
+                  <Show when={expandedWhyItemId() === item.id}>
+                    <p class="rounded-xl border border-pink-100 bg-white/75 px-3 py-2 text-xs leading-5 text-pink-950/80">
+                      {card.whyNowLabel}
+                    </p>
+                  </Show>
                   <Show when={expandedTask()} fallback={expandedTaskId() === item.id ? <p class="rounded-xl border border-pink-100 bg-white/75 px-3 py-2 text-xs leading-5 text-pink-950/75">This task is no longer active.</p> : undefined}>
                     {(task) => (
                       <section class="rounded-xl border border-pink-200 bg-white px-3 py-3 text-pink-950" aria-label={`Task: ${task().title}`}>
@@ -121,6 +152,25 @@ export function WeddingDecisionFocusCard(props: {
                           <Show when={task().priority}><span class="rounded-full bg-pink-50 px-2 py-1">{task().priority} priority</span></Show>
                           <Show when={task().assignee}><span class="rounded-full bg-pink-50 px-2 py-1">{task().assignee}</span></Show>
                         </div>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                          <input
+                            aria-label={`Assign ${task().title}`}
+                            class="min-h-9 min-w-0 flex-1 rounded-lg border border-pink-200 bg-white px-2 text-xs text-pink-950 placeholder:text-pink-950/45"
+                            placeholder="Assign to someone"
+                            value={assignmentDrafts()[task().id] ?? task().assignee ?? ""}
+                            onInput={(event) => setAssignmentDrafts((current) => ({ ...current, [task().id]: event.currentTarget.value }))}
+                          />
+                          <button type="button" class="min-h-9 rounded-full bg-pink-700 px-3 text-xs font-semibold text-white transition hover:bg-pink-800" onClick={() => {
+                            const assignee = (assignmentDrafts()[task().id] ?? task().assignee ?? "").trim();
+                            if (!assignee) return;
+                            props.onSidebarAction({ kind: "assign_task", label: "Assign task", enabled: true, reason: null, metadata: { task_id: task().id, task_title: task().title, task_priority: task().priority ?? "normal", assignee } });
+                          }}>Assign</button>
+                        </div>
+                        <Show when={/celebrant/i.test(`${task().title} ${task().notes ?? ""}`) && !hasChosenCelebrant()}>
+                          <button type="button" class="mt-3 min-h-9 rounded-full border border-pink-300 bg-pink-100 px-3 text-xs font-semibold text-pink-950 transition hover:bg-pink-200" onClick={launchCelebrantSearch}>
+                            Find an authorised celebrant
+                          </button>
+                        </Show>
                       </section>
                     )}
                   </Show>
