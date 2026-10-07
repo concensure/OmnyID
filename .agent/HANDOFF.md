@@ -5,6 +5,142 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-08 - WED-174 wedding guest and calendar persistence (Codex)
+
+What changed:
+
+- The guest card now immediately includes a successfully saved local guest in its total, attending,
+  and pending figures until the refreshed AFP projection arrives, without double counting it after
+  the server-backed row appears.
+- Wedding guest and family-boundary projections now translate their readable logical identifiers to
+  the ULID-format message and thread IDs required by the authenticated AFP store, while preserving
+  the logical thread ID in metadata. This unblocks saving boundary rules and guest records.
+- Calendar Knowledge Setup reads the authenticated user's stored supertag definitions on mount, so
+  a completed default install remains marked Installed after returning to Calendar. The endpoint now
+  skips already stored defaults rather than writing duplicate taxonomy definitions.
+
+Tests performed:
+
+- Focused TypeScript tests: 38 passing (guest display, guest/boundary projection, and boundary state).
+- `npm run typecheck` and `npm run build` in `solid-ui` passed.
+- `cargo check` passed.
+
+Next action:
+
+- Changes are local on `agent/codex/WED-174`; production deployment was not requested in this turn.
+
+## 2026-10-08 - WED-173 wedding planner correctness fixes (Codex)
+
+What changed:
+
+- Outreach drafting now draws date, location and preferences from the persisted wedding workspace
+  context and falls back to the committed budget target. It no longer requires an intake-profile
+  thread message to use existing wedding basics.
+- Directory search prioritises the exact user query before a broad category fallback, so a
+  `mackay` search can return Mackay Family Estate before generic venues. Generic directory records
+  such as VenueGuide.au and Easy Weddings are excluded server-side; old persisted comparison cards
+  filter those aggregate identities on read as well.
+- The People picker inside an expanded task in the decision-focus card includes an inline Add a new
+  contact form. A saved person is immediately selected in the assignee field.
+- The Wedding Timeline now has a Show Gantt chart control. Its all-task horizontal chart carries a
+  labelled major date axis and preserves calendar navigation from task names and bars.
+
+Tests performed:
+
+- Focused TypeScript wedding tests: 11 pass (outreach context, persisted directory exclusion, and
+  Gantt date axis).
+- `npm run typecheck` and `npm run build` in `solid-ui` pass.
+- Two focused Rust directory tests pass (exact-query ordering and generic-directory exclusion).
+- `cargo fmt --check` is still blocked by unrelated pre-existing formatting differences in shared
+  Rust files; no formatter was run over those files.
+
+Next action:
+
+- No deployment was requested. Preserve WED-153's uncommitted database/migration files; WED-161
+  remains blocked until that owner commits them.
+
+## 2026-10-08 - WED-160 Sydney-only wedding home copy (Codex)
+
+What changed:
+
+- Updated `wedding/index.html` so the planning strip lists Sydney only.
+- Changed the Byron Bay and Melbourne testimonial captions to "Sydney planning scenario".
+- Added exact-copy assertions to `wedding/tests/wedding-website-smoke.mjs`.
+
+Why:
+
+- Implements the accepted Claim Your Profile spec §2 / decision D6 without changing the
+  Hunter Valley scenario or any other page copy.
+
+Tests performed:
+
+- `node wedding/tests/wedding-website-smoke.mjs` — pass.
+- `cd solid-ui && npm run typecheck` — pass.
+- `cd solid-ui && npm run test:wedding:ci` — blocked at its line-budget phase by
+  pre-existing violations in `src/db.rs` (17,990 / 17,986),
+  `solid-ui/src/components/WeddingResponseWorkspaceView.tsx` (1,042 / 999), and
+  `solid-ui/src/lib/weddingResponseWorkspaceViewState.ts` (1,002 / 999). The scoped
+  website smoke test passes.
+
+Next action:
+
+- WED-161 remains blocked until WED-153 commits its `src/db.rs`, migration-catalog and
+  migration-0100 changes. Do not stage or alter those files.
+
+## 2026-10-08 - WED-160..172 vendor "Claim Your Profile" handed to Codex (Claude)
+
+What changed:
+
+- Wrote the spec and the task/handoff doc for the wedding vendor claim directory, AFP
+  enquiries, vendor dashboard and tiers. No code changed.
+- Registered WED-160..172 in `.agent/TASKS.yaml`, owner `codex`.
+- Recorded the architecture in `.agent/DECISIONS.md` ("2026-10-08: Wedding Vendor Claim
+  Directory").
+
+Why:
+
+- The user wants unclaimed seeded vendor listings to become vendor-owned, with E2EE AFP
+  enquiries. Codex implements and Claude reviews.
+
+Files changed:
+
+- `Documents/design/wedding planner/wedding-vendor-claim-your-profile-spec.md`
+- `Documents/design/wedding planner/wedding-vendor-claim-your-profile-tasks.md`
+- `.agent/TASKS.yaml`, `.agent/DECISIONS.md`, `.agent/HANDOFF.md`
+
+Tests performed:
+
+- None; documentation only.
+- New `TASKS.yaml` entries were checked by hand for YAML scalar pitfalls. No YAML parser
+  is installed locally.
+
+User decisions (2026-10-08):
+
+- Couples enquire from a free account.
+- Byron Bay and Melbourne testimonial captions become "Sydney planning scenario".
+- Oracle has enough disk for this work.
+- Pricing: Starter free, Pro AUD 79/month or 790/year, Founding AUD 39/month or 390/year
+  locked for life (first 100 vendors or until 2027-03-31). Claude proposed these prices
+  for 1,000 couples a month.
+
+Unresolved:
+
+- Stripe price IDs must be created by the user in the Stripe dashboard.
+- Competitor price comparison in spec §7.4 is a market impression and should be
+  checked before launch.
+
+Coordination (important):
+
+- `agent/codex/WED-150` is 44 commits ahead of `main` and unmerged. Branch
+  `agent/codex/WED-160` from it.
+- WED-153 (claude, in_progress) has uncommitted `src/db.rs`,
+  `src/db/migration_catalog.rs`, `src/db/wedding_vendor_evidence.rs` and an untracked
+  migration 0100. WED-161 is `blocked` until those are committed. Do not touch them.
+
+Next action:
+
+- Codex: read section 1 of the tasks doc, then start WED-160, which has no dependencies.
+
 ## 2026-10-06 - WED-150 wedding vendor production-closure implementation
 
 What changed:
@@ -875,3 +1011,69 @@ Remaining external gates:
   14-day SLO window, and staged rollout approvals remain external and intentionally open.
 - An authenticated human acceptance pass should verify the exact provider result and browser history
   on the target phone/laptop, because the automated and public checks do not use the user's account.
+
+## 2026-10-06 Claude: vendor email enrichment, directory cleanup, rooms model (WED-153)
+
+Done (applied directly to local Postgres and Oracle production Postgres via psql; the homeserver
+was NOT redeployed):
+
+- Added venues from the user's 2026-10-06 enquiry replies: Yarramalong Valley Farmstay
+  (Harvest Haven $15,500 for ~100 guests, midweek micro from $5,000, Nov 5-7/26-28 and all Dec
+  2027 available), Somersby Gardens Estate (no minimum spend, 4-part payment plan, Nov and early
+  Dec 2027 available, price only in a Canva guide), The Grange Wollongong (all-inclusive packages;
+  deposit, minimum spend, availability unanswered; pricing is in a SharePoint PDF not yet read).
+- Deleted 14 directory/listicle rows from production (ids in
+  `postgres/data/2026-10-06_vendor_email_enrichment.sql`). Production now has 118 active and 2
+  hidden vendors. St Siandra and SRG Hospitality were kept deliberately.
+- Migration `0100_wedding_vendor_rooms` creates `wedding_vendor_rooms` and
+  `wedding_vendor_room_photos`; registered in `migration_catalog.rs`. Three Yarramalong rooms
+  were loaded. `src/db/wedding_vendor_rooms.rs` has the records and `Db::list_wedding_vendor_rooms`;
+  `cargo check` passes. No route, UI, or upsert uses it yet.
+- Photo facts: production has 282 photos across 94 vendors (max 3 each); local dev has 0 photos
+  (0092b never applied). DB photos reach search via `source.photo_url`; the placeholder renders
+  only when there is no photo or it fails to load.
+
+Open / for Codex:
+
+- No room photos exist yet. Upload to Seaweed FS (`OMNYID_SEAWEEDFS_*`), add an authenticated
+  serving route, then insert `wedding_vendor_room_photos` rows.
+- Expose rooms in the vendor API and render in the card/comparison; add admin editing.
+- Read the Grange packages PDF and Somersby Canva guide and add their rooms and prices.
+- Stop search-cache ingestion from re-adding directory/listicle pages as hidden vendors.
+- PLYNLIMMON 1860 Heritage Cottage still has an Easy Weddings URL as its website_url.
+- All changes above are uncommitted in the working tree.
+
+### 2026-10-07 Claude follow-up (WED-153)
+
+- Resolved the open item "search cache can re-add directory pages". `upsert_discovered_wedding_vendor`
+  (`src/db/wedding_vendor_evidence.rs`) now resolves an incoming vendor to an existing row by slug,
+  normalised name+category, website host, or phone digits before inserting. A match is merged
+  (existing values win; only missing address/phone/email/website/source and empty photo slots are
+  filled), so a discovery never creates a duplicate and only adds genuinely new details.
+- Added wedlockers, hitchbird, tagvenue, weddinghero, weddingvenues.com, hiddencitysecrets and
+  weddedwonderland to `DIRECTORY_DOMAINS` so they classify as directory/listicle, which the
+  persister already skips. Directory profile pages of a real venue can still enter as hidden
+  vendors if they are not duplicates.
+- Smoke test `local_postgres_discovered_vendor_merges_duplicates_and_fills_gaps` passes against local
+  Postgres. 22 other `local_postgres_*` server tests fail in this environment; not investigated and
+  not related to these files.
+- PLYNLIMMON 1860 website in `Documents/design/wedding planner/oracle-venue-export-2026-10-06.csv`
+  is now the official site; the Oracle DB row still holds the Easy Weddings URL (not updated).
+
+### 2026-10-07 Claude: listing enrichment (WED-153)
+
+- Applied `postgres/data/2026-10-07_vendor_listing_enrichment.sql` to local and Oracle Postgres.
+  New vendors: The Tea Room QVB, Zest Boathouse at The Spit, Waterview in Bicentennial Park, Crowne
+  Plaza Hawkesbury Valley, Mackay Family Estate. Yarramalong Valley Farmstay enriched; PLYNLIMMON
+  website_url fixed in Oracle.
+- Facts live in catalog attribute keys (`style_tags`, `editorial_summary`, capacities, `price_per_head_aud`,
+  `curfew_time`, booleans, `inclusions`) with authority `directory`; the upsert only replaces rows whose
+  authority is already `directory`, so vendor_reply values are kept. Packages for Yarramalong are in
+  `wedding_vendors.evidence.packages`. Crowne Plaza and Waterview have per-room rows (hire fee in
+  `price_from_cents`, ceremony fees in `pricing_label`).
+- Mackay Family Estate photos are served as static files from Caddy at
+  `https://omnyid.com/wedding/assets/venue-photos/mackay-family-estate-{1,2}.png` (copied to
+  `/home/ubuntu/omnyid/wedding/assets/venue-photos/` on Oracle and to `wedding/assets/venue-photos/` in
+  the repo so a deploy keeps them). This is public static hosting, not Seaweed FS.
+- Not provided in the pasted listings: Tea Room QVB, Zest and Crowne Plaza websites/phones; Mackay
+  details beyond address, website, phone and photos.

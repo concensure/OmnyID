@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-10-05
+updated: 2026-10-08
 
 lifecycle:
   allowed_statuses:
@@ -465,3 +465,319 @@ tasks:
       - implementation, 1793-test wedding regression suite, typecheck, line budget, and production build pass locally
       - Oracle cleanup reclaimed build cache and restored disk headroom from 18 percent to 29 percent free
       - implementation commit db6d2c6 deployed through the guarded Oracle UI path; synchronous post-deploy proof passed
+
+  - id: WED-153
+    title: Vendor email enrichment, directory cleanup, and per-room vendor data model
+    status: in_progress
+    owner: claude
+    branch: agent/codex/WED-150
+    depends_on:
+      - WED-152
+    files:
+      - postgres/migrations/0100_wedding_vendor_rooms.sql
+      - postgres/data/2026-10-06_vendor_email_enrichment.sql
+      - src/db/wedding_vendor_rooms.rs
+      - src/db/migration_catalog.rs
+      - src/db.rs
+    acceptance:
+      - vendor reply facts (contact, price, minimum spend, availability) stored with vendor_reply authority
+      - directory and listicle pages removed from wedding_vendors
+      - rooms with pricing, inclusions, and Seaweed FS-backed photos are representable per vendor
+      - rooms are exposed through an API and rendered in the vendor card and comparison
+    progress:
+      - migration 0100 and data load applied to local and Oracle Postgres; cargo check passes
+      - Rust read path (Db::list_wedding_vendor_rooms) added but not yet called by any route
+    remaining:
+      - API route or WeddingVendorRecord field exposing rooms, upsert path, admin form, UI rendering
+      - Seaweed FS upload and authenticated serving route for room photos (none uploaded yet)
+      - homeserver redeploy so the rooms code ships (tables already exist in Oracle)
+
+  # Wedding vendor "Claim Your Profile" programme (WED-160..WED-172).
+  # Spec: Documents/design/wedding planner/wedding-vendor-claim-your-profile-spec.md
+  # Tasks + Codex handoff: Documents/design/wedding planner/wedding-vendor-claim-your-profile-tasks.md
+  # Slices: A = WED-160..169 on agent/codex/WED-160 (from agent/codex/WED-150);
+  #         B = WED-170..171 on agent/codex/WED-170 (stacked on A);
+  #         C = WED-172 on agent/codex/WED-172 (stacked on B). One PR per slice, Claude reviews.
+
+  - id: WED-160
+    title: Sydney-only copy on the wedding home page
+    status: completed
+    owner: codex
+    branch: agent/codex/WED-160
+    depends_on: []
+    files:
+      - wedding/index.html
+      - wedding/tests/wedding-website-smoke.mjs
+    acceptance:
+      - the "Built for couples planning across" strip shows Sydney only
+      - the Byron Bay and Melbourne testimonial captions read "Sydney planning scenario"
+      - no other copy changes; the Hunter Valley caption stays
+    progress:
+      - completed on agent/codex/WED-160; wedding site smoke test and solid-ui typecheck pass
+
+  - id: WED-161
+    title: Vendor claim schema migrations
+    status: blocked
+    owner: codex
+    branch: agent/codex/WED-160
+    depends_on:
+      - WED-153
+    files:
+      - postgres/migrations/0101_wedding_vendor_claims.sql
+      - postgres/migrations/0102_wedding_vendor_owner_profile.sql
+      - postgres/migrations/0103_wedding_vendor_subscriptions_and_enquiries.sql
+      - src/db/migration_catalog.rs
+      - src/db.rs
+    acceptance:
+      - schema matches spec section 8 (use next free migration numbers if 0101+ are taken)
+      - every existing wedding_vendors row has claim_status = 'unclaimed'
+      - migrations are additive and idempotent; nothing is dropped
+    remaining:
+      - blocked until WED-153 commits its uncommitted src/db.rs, migration_catalog.rs and 0100 migration
+
+  - id: WED-162
+    title: User roles and zero-storage vendor plan
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-160
+    depends_on:
+      - WED-161
+    files:
+      - src/db/wedding_vendor_claims.rs
+      - src/server/billing.rs
+      - src/server/auth.rs
+    acceptance:
+      - register, login and Google auth accept optional intent=vendor_claim and vendor_slug
+      - vendor_claim sign-ups get the vendor role, plan vendor_listing with 0 B quota, and no workspace provisioning
+      - existing couple sign-up (source=wedding) is unchanged, proven by a test
+      - auth.rs grows only by the optional parameters; new logic lives in new modules
+
+  - id: WED-163
+    title: Magic-link sign-in
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-160
+    depends_on:
+      - WED-161
+    files:
+      - src/server/auth_magic_link.rs
+      - src/server/mod.rs
+    acceptance:
+      - POST /auth/magic-link always returns 202; GET verify creates a session and redirects
+      - tokens are stored hashed, single-use, expire after OMNYID_MAGIC_LINK_TTL_MINUTES; tests cover reuse and expiry
+      - rate limited with enforce_rate_limit
+
+  - id: WED-164
+    title: Public wedding vendor directory API
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-160
+    depends_on:
+      - WED-161
+    files:
+      - src/server/wedding_vendor_claim_routes.rs
+      - src/db/wedding_vendor_claims.rs
+      - src/server/mod.rs
+    acceptance:
+      - all spec section 6.2 filters work with keyset pagination
+      - owner fields override seed fields; seed rows are never mutated
+      - claim_cta flag is correct; P95 under 150 ms on the Oracle dataset
+
+  - id: WED-165
+    title: Public directory pages and Vendor Login nav
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-160
+    depends_on:
+      - WED-164
+    files:
+      - wedding/vendors.html
+      - wedding/vendor.html
+      - wedding/assets/js/directory.js
+      - wedding/assets/css/style.css
+      - wedding/*.html
+      - wedding/tests/wedding-website-smoke.mjs
+    acceptance:
+      - Vendor Login appears in the top nav and the mobile drawer on every wedding page
+      - unclaimed cards and pages show "Claim Your Profile - It's Free"; claimed show owner photos and secure-agent badge
+      - Enquire links to ../workspace/?auth=register&source=wedding_enquiry&vendor=<slug>
+      - works at 360 px with no horizontal scroll; no third-party packages
+
+  - id: WED-166
+    title: Claim flow routes, verification, disputes and claim AFP messages
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-160
+    depends_on:
+      - WED-162
+      - WED-164
+    files:
+      - src/server/wedding_vendor_claim_routes.rs
+      - src/db/wedding_vendor_claims.rs
+      - typescript-sdk/src/workflows.ts
+    acceptance:
+      - start, resume, declaration, email-code and publish routes work; one active claim per listing
+      - a second claimant opens a dispute and freezes edits
+      - email-domain or email-code check sets verified; self-declaration alone sets claimed
+      - each transition emits an append-only wedding_vendor_claim AFP message; types are in the outbound_allowlist
+      - cross-vendor access test passes
+
+  - id: WED-167
+    title: Owner photo upload pipeline
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-160
+    depends_on:
+      - WED-166
+    files:
+      - src/server/wedding_vendor_claim_routes.rs
+      - src/db/wedding_vendor_claims.rs
+    acceptance:
+      - uploads re-encode to three WebP sizes with EXIF stripped, in the wedding-public SeaweedFS collection
+      - tier photo caps enforced (10 Starter, 30 Pro/Founding); reorder and cover persist
+      - owner photos display before seed photos; ask before adding an image crate
+
+  - id: WED-168
+    title: Vendor Agent ID and AgentCard publishing
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-160
+    depends_on:
+      - WED-166
+    files:
+      - src/agentcard.rs
+      - src/server/wedding_vendor_claim_routes.rs
+      - solid-ui/src/lib/vendorAgentKeys.ts
+    acceptance:
+      - keys are generated in the browser; private keys never leave the device except as an encrypted backup file
+      - AgentCard gains optional encryption_public_key_hex; old cards still deserialize (test)
+      - card verifies server-side, links to the listing, and is served at /.well-known/afp/agents/<id>/card
+      - linking an existing agent works by signing a server nonce
+
+  - id: WED-169
+    title: Claim wizard UI
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-160
+    depends_on:
+      - WED-163
+      - WED-166
+      - WED-167
+      - WED-168
+    files:
+      - solid-ui/src/App.tsx
+      - solid-ui/src/components/vendor/VendorClaimFlow.tsx
+      - solid-ui/src/components/vendor/VendorClaimSteps.tsx
+      - solid-ui/src/lib/vendorDirectoryTypes.ts
+      - solid-ui/tests/wedding-vendor-claim-*.test.ts
+    acceptance:
+      - CTA to auth to wizard to publish completes in under 5 minutes on a phone
+      - wizard resumes after reload; source=vendor_claim never launches the wedding template
+      - npm run test:wedding:ci and npm run build pass
+
+  - id: WED-170
+    title: AFP wedding enquiry protocol and free couple enquiries
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-170
+    depends_on:
+      - WED-168
+    files:
+      - typescript-sdk/src/weddingEnquiry.ts
+      - typescript-sdk/src/index.ts
+      - typescript-sdk/src/workflows.ts
+      - src/server/wedding_enquiry_routes.rs
+      - src/db/wedding_enquiries.rs
+      - src/server/background_workers.rs
+      - solid-ui/src/App.tsx
+      - solid-ui/src/components/WeddingEnquiryComposer.tsx
+      - solid-ui/src/components/WeddingEnquiryCoupleInbox.tsx
+      - solid-ui/tests/wedding-enquiry-*.test.ts
+    acceptance:
+      - a new couple registers free from the Enquire button and sends an enquiry in one session; couples never pay
+      - relay stores only encrypted content (test); no plaintext in logs or notification emails
+      - signature, replay window, 64 KB size cap and rate limits are enforced
+      - offline vendors get queued envelopes; federated vendors get dispatch-with-receipt; signed receipts set acked_at
+      - MessageSchema is unchanged
+
+  - id: WED-171
+    title: Vendor dashboard with local-first enquiry inbox
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-170
+    depends_on:
+      - WED-167
+      - WED-169
+      - WED-170
+    files:
+      - solid-ui/src/components/vendor/**
+      - solid-ui/src/lib/vendorEnquiryStore.ts
+      - solid-ui/src/lib/vendorDirectoryTypes.ts
+      - solid-ui/tests/wedding-vendor-*.test.ts
+    acceptance:
+      - inbox decrypts locally; Lead Quality Score computed locally with reasons shown
+      - replies go out as wedding_enquiry_response; draft_for_approval requires vendor approval
+      - listing editor, photo manager, analytics and availability panels work
+      - every file stays under 1000 lines
+
+  - id: WED-172
+    title: Vendor tiers, Founding offer and admin claim queue
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-172
+    depends_on:
+      - WED-166
+      - WED-171
+    files:
+      - src/server/billing.rs
+      - src/server/wedding_vendor_claim_routes.rs
+      - solid-ui/src/components/vendor/VendorSubscriptionPanel.tsx
+      - solid-ui/src/components/UsageAdminWeddingVendorClaimsPanel.tsx
+    acceptance:
+      - Starter free; Pro AUD 79/month or 790/year; Founding AUD 39/month or 390/year locked for life (incl. GST)
+      - Founding numbers assigned atomically up to 100, offer closes 2027-03-31; the 101st concurrent claim is refused (test)
+      - Stripe price IDs come from env vars supplied by the user; no Stripe products created from code
+      - admins can approve, verify, revoke and resolve disputes; Featured placement is labelled
+
+  - id: WED-173
+    title: Wedding planner outreach grounding, vendor directory and timeline corrections
+    status: completed
+    owner: codex
+    branch: agent/codex/WED-173
+    depends_on:
+      - WED-150
+    files:
+      - solid-ui/src/lib/useWeddingVendorOutreachOwner.ts
+      - solid-ui/src/components/WeddingDecisionFocusCard.tsx
+      - solid-ui/src/components/WeddingTimelinePanel.tsx
+      - src/server/wedding_vendor_search_routes/directory.rs
+      - src/server/wedding_vendor_search_routes/source_classification.rs
+      - solid-ui/tests/wedding-*.test.ts
+      - src/server/wedding_vendor_search_routes.rs
+    acceptance:
+      - availability drafts use existing persisted wedding basics, including budget and date
+      - directory/listicle records never enter vendor comparisons, and an exact vendor-name search is prioritised
+      - the People picker can create a contact inline and immediately makes it assignable
+      - timeline offers an all-task Gantt chart with a labelled date axis
+    progress:
+      - completed locally with focused Rust/TypeScript tests, typecheck, and production frontend build
+
+  - id: WED-174
+    title: Wedding guest, boundary, and calendar setup persistence
+    status: completed
+    owner: codex
+    branch: agent/codex/WED-174
+    depends_on:
+      - WED-150
+    files:
+      - solid-ui/src/components/WeddingGuestOperationsCard.tsx
+      - solid-ui/src/components/WeddingBoundaryManagementCard.tsx
+      - solid-ui/src/components/MonthlyCalendarView.tsx
+      - solid-ui/src/lib/wedding-*.ts
+      - solid-ui/tests/wedding-*.test.ts
+    acceptance:
+      - adding a guest immediately updates the attendance summary from persisted state
+      - boundary rules save and remain available after returning to the view
+      - calendar knowledge defaults persist as installed and the action is idempotent
+    progress:
+      - completed locally with focused TypeScript tests, typecheck, frontend build, and cargo check

@@ -502,4 +502,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Retain one clearly labelled demo seed message per tenant and remove the legacy synthetic seed graph",
         include_str!("../../postgres/migrations/0099_single_demo_seed_message.sql"),
     ),
+    (
+        "0100_wedding_vendor_rooms",
+        "Per-vendor rooms with pricing, inclusions, and Seaweed FS-backed room photos",
+        include_str!("../../postgres/migrations/0100_wedding_vendor_rooms.sql"),
+    ),
 ];

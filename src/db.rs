@@ -6,14 +6,14 @@ use crate::integration::{ActionResult, IntegrationCapability};
 use crate::knowledge_curator::{BacklinkKind, BacklinkRecord, DaemonHeartbeat, DaemonKind};
 use crate::local_sync::{DeviceBootstrap, SyncSliceSpec};
 use crate::message::{
-    AFP_TYPE_SUPERTAG_DEFINITION, SupertagDefinitionContent, collect_search_facets_from_parts,
-    metadata_store_flag,
+    collect_search_facets_from_parts, metadata_store_flag, SupertagDefinitionContent,
+    AFP_TYPE_SUPERTAG_DEFINITION,
 };
 use crate::personalization::{LoraArtifact, PersonalizationEvent};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use sqlx::{Acquire, PgPool, Row, postgres::PgPoolOptions};
+use serde_json::{json, Value};
+use sqlx::{postgres::PgPoolOptions, Acquire, PgPool, Row};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
@@ -24,10 +24,12 @@ pub use migration_catalog::MIGRATIONS;
 mod wedding_onboarding_state;
 mod wedding_vendor_directory;
 pub mod wedding_vendor_evidence;
+mod wedding_vendor_rooms;
 pub use wedding_vendor_directory::{
     WeddingVendorPhotoRecord, WeddingVendorPhotoUpsertRecord, WeddingVendorRecord,
     WeddingVendorReplyMatch, WeddingVendorUpsertRecord, WeddingVendorUserContactRecord,
 };
+pub use wedding_vendor_rooms::{WeddingVendorRoomPhotoRecord, WeddingVendorRoomRecord};
 
 const TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES: &[&str] = &[
     "messages",
@@ -13151,7 +13153,7 @@ fn parse_env_u64(name: &str, default: u64) -> u64 {
 #[cfg(test)]
 mod db_pool_settings_tests {
     use super::{
-        DatabasePoolSettings, database_pool_settings_from_env, migration_catalog::MIGRATIONS,
+        database_pool_settings_from_env, migration_catalog::MIGRATIONS, DatabasePoolSettings,
     };
     use std::path::PathBuf;
     use std::sync::{Mutex, OnceLock};
@@ -15649,19 +15651,18 @@ fn archive_index_upsert_sql() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        Db, McpToolConnectionUpsert, SavedWorkflowRecord, StorageMode,
-        TENANT_PRIVATE_SCHEMA_REQUIRED_INDEXES, TENANT_PRIVATE_SCHEMA_REQUIRED_MESSAGE_COLUMNS,
-        TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES, UserRecord, WorkflowDeploymentRecord,
-        WorkflowRunRecord, WorkflowWaitResumeRecord, archive_index_upsert_sql,
-        decrypt_gmail_token_or_legacy_plaintext, effective_storage_mode,
+        archive_index_upsert_sql, decrypt_gmail_token_or_legacy_plaintext, effective_storage_mode,
         enable_server_summarization, persisted_content_for_mode, persisted_views_for_mode,
         redacted_views_for_read, relational_projection_upsert_sql, sha256_token,
         summary_and_embedding_for_mode, tenant_private_schema_bootstrap_sql,
-        tenant_schema_drop_sql, tenant_schema_name,
+        tenant_schema_drop_sql, tenant_schema_name, Db, McpToolConnectionUpsert,
+        SavedWorkflowRecord, StorageMode, UserRecord, WorkflowDeploymentRecord, WorkflowRunRecord,
+        WorkflowWaitResumeRecord, TENANT_PRIVATE_SCHEMA_REQUIRED_INDEXES,
+        TENANT_PRIVATE_SCHEMA_REQUIRED_MESSAGE_COLUMNS, TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES,
     };
     use crate::afp::Message;
     use crate::agent_template::{
-        AgentInstance, AgentTask, FocusItem, TaskPriority, TriggerType, generate_delegated_key,
+        generate_delegated_key, AgentInstance, AgentTask, FocusItem, TaskPriority, TriggerType,
     };
     use crate::integration::{ActionResult, ActionStatus};
     use crate::knowledge_curator::{BacklinkKind, BacklinkRecord};
@@ -15837,11 +15838,9 @@ mod tests {
         assert!(!schema.contains('"'));
         assert!(!schema.contains(';'));
         assert!(!schema.contains('-'));
-        assert!(
-            schema
-                .chars()
-                .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
-        );
+        assert!(schema
+            .chars()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_'));
     }
 
     #[test]
@@ -15875,18 +15874,13 @@ mod tests {
         assert!(joined.contains("\"user_test\".messages"));
         assert!(joined.contains("ADD COLUMN IF NOT EXISTS kind TEXT"));
         assert!(joined.contains("ADD COLUMN IF NOT EXISTS supertags TEXT[] NOT NULL DEFAULT '{}'"));
-        assert!(
-            joined.contains(
-                "ADD COLUMN IF NOT EXISTS reference_targets TEXT[] NOT NULL DEFAULT '{}'"
-            )
-        );
+        assert!(joined
+            .contains("ADD COLUMN IF NOT EXISTS reference_targets TEXT[] NOT NULL DEFAULT '{}'"));
         assert!(
             joined.contains("ADD COLUMN IF NOT EXISTS metadata_keys TEXT[] NOT NULL DEFAULT '{}'")
         );
-        assert!(
-            joined
-                .contains("ADD COLUMN IF NOT EXISTS metadata_values TEXT[] NOT NULL DEFAULT '{}'")
-        );
+        assert!(joined
+            .contains("ADD COLUMN IF NOT EXISTS metadata_values TEXT[] NOT NULL DEFAULT '{}'"));
         assert!(
             joined.contains("ADD COLUMN IF NOT EXISTS metadata_terms TEXT[] NOT NULL DEFAULT '{}'")
         );
@@ -16150,161 +16144,125 @@ mod tests {
     #[test]
     fn migration_list_starts_with_versioned_init_baseline() {
         assert_eq!(super::MIGRATIONS[0].0, "0001_init");
-        assert!(
-            super::MIGRATIONS[0]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS messages")
-        );
+        assert!(super::MIGRATIONS[0]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS messages"));
     }
 
     #[test]
     fn migration_list_includes_workflow_state_baseline() {
         assert_eq!(super::MIGRATIONS[1].0, "0002_workflow_state");
-        assert!(
-            super::MIGRATIONS[1]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS outbound_email_receipts")
-        );
-        assert!(
-            super::MIGRATIONS[1]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS integration_capabilities")
-        );
-        assert!(
-            super::MIGRATIONS[1]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS personalization_events")
-        );
+        assert!(super::MIGRATIONS[1]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS outbound_email_receipts"));
+        assert!(super::MIGRATIONS[1]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS integration_capabilities"));
+        assert!(super::MIGRATIONS[1]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS personalization_events"));
     }
 
     #[test]
     fn migration_list_includes_accounts_baseline() {
         assert_eq!(super::MIGRATIONS[2].0, "0003_accounts");
-        assert!(
-            super::MIGRATIONS[2]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS users")
-        );
-        assert!(
-            super::MIGRATIONS[2]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS managed_agents")
-        );
+        assert!(super::MIGRATIONS[2]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS users"));
+        assert!(super::MIGRATIONS[2]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS managed_agents"));
     }
 
     #[test]
     fn migration_list_includes_runtime_deployments_baseline() {
         assert_eq!(super::MIGRATIONS[3].0, "0004_runtime_deployments");
-        assert!(
-            super::MIGRATIONS[3]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS runtime_deployments")
-        );
+        assert!(super::MIGRATIONS[3]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS runtime_deployments"));
     }
 
     #[test]
     fn migration_list_includes_user_onboarding_baseline() {
         assert_eq!(super::MIGRATIONS[4].0, "0005_user_onboarding");
-        assert!(
-            super::MIGRATIONS[4]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS user_onboarding")
-        );
+        assert!(super::MIGRATIONS[4]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS user_onboarding"));
     }
 
     #[test]
     fn migration_list_includes_waitlist_submissions_baseline() {
         assert_eq!(super::MIGRATIONS[5].0, "0006_waitlist_submissions");
-        assert!(
-            super::MIGRATIONS[5]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS waitlist_submissions")
-        );
+        assert!(super::MIGRATIONS[5]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS waitlist_submissions"));
     }
 
     #[test]
     fn migration_list_includes_support_access_baseline() {
         assert_eq!(super::MIGRATIONS[6].0, "0007_support_access");
-        assert!(
-            super::MIGRATIONS[6]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS support_access_grants")
-        );
+        assert!(super::MIGRATIONS[6]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS support_access_grants"));
     }
 
     #[test]
     fn migration_list_includes_runtime_backups_baseline() {
         assert_eq!(super::MIGRATIONS[7].0, "0008_runtime_backups");
-        assert!(
-            super::MIGRATIONS[7]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS runtime_backup_policies")
-        );
-        assert!(
-            super::MIGRATIONS[7]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS runtime_backups")
-        );
+        assert!(super::MIGRATIONS[7]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS runtime_backup_policies"));
+        assert!(super::MIGRATIONS[7]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS runtime_backups"));
     }
 
     #[test]
     fn migration_list_includes_runtime_restore_drills_baseline() {
         assert_eq!(super::MIGRATIONS[8].0, "0009_runtime_restore_drills");
-        assert!(
-            super::MIGRATIONS[8]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS runtime_restore_drills")
-        );
+        assert!(super::MIGRATIONS[8]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS runtime_restore_drills"));
     }
 
     #[test]
     fn migration_list_includes_runtime_update_policy_baseline() {
         assert_eq!(super::MIGRATIONS[9].0, "0010_runtime_update_policies");
-        assert!(
-            super::MIGRATIONS[9]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS runtime_update_policies")
-        );
+        assert!(super::MIGRATIONS[9]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS runtime_update_policies"));
     }
 
     #[test]
     fn migration_list_includes_runtime_update_audit_baseline() {
         assert_eq!(super::MIGRATIONS[10].0, "0011_runtime_update_audit");
-        assert!(
-            super::MIGRATIONS[10]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS runtime_update_events")
-        );
+        assert!(super::MIGRATIONS[10]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS runtime_update_events"));
     }
 
     #[test]
     fn migration_list_includes_sync_device_policy_baseline() {
         assert_eq!(super::MIGRATIONS[11].0, "0012_sync_device_policies");
-        assert!(
-            super::MIGRATIONS[11]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS sync_device_policies")
-        );
+        assert!(super::MIGRATIONS[11]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS sync_device_policies"));
     }
 
     #[test]
     fn migration_list_includes_sync_device_tokens_baseline() {
         assert_eq!(super::MIGRATIONS[12].0, "0013_sync_device_tokens");
-        assert!(
-            super::MIGRATIONS[12]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS sync_device_tokens")
-        );
+        assert!(super::MIGRATIONS[12]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS sync_device_tokens"));
     }
 
     #[test]
     fn migration_list_includes_runtime_runner_policy_events_baseline() {
         assert_eq!(super::MIGRATIONS[13].0, "0014_runtime_runner_policy_events");
-        assert!(
-            super::MIGRATIONS[13]
-                .2
-                .contains("CREATE TABLE IF NOT EXISTS runtime_runner_policy_events")
-        );
+        assert!(super::MIGRATIONS[13]
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS runtime_runner_policy_events"));
     }
 
     #[test]
@@ -16355,10 +16313,8 @@ mod tests {
 
         assert!(function_source.contains("self.recent_messages_for_agents(agent_ids, limit)"));
         assert!(function_source.contains("self.recent_private_messages_for_user(user_id, limit)"));
-        assert!(
-            function_source
-                .contains("merged.sort_by(|left, right| right.timestamp.cmp(&left.timestamp))")
-        );
+        assert!(function_source
+            .contains("merged.sort_by(|left, right| right.timestamp.cmp(&left.timestamp))"));
         assert!(function_source.contains("seen_ids.insert(message.id.clone())"));
     }
 
@@ -16955,16 +16911,12 @@ mod tests {
             .get_private_thread(&user.id, &task.thread_id)
             .await
             .expect("get private task thread");
-        assert!(
-            private_task_thread
-                .iter()
-                .any(|message| message.id == private_plan_trace.id)
-        );
-        assert!(
-            private_task_thread
-                .iter()
-                .any(|message| message.id == private_result_trace.id)
-        );
+        assert!(private_task_thread
+            .iter()
+            .any(|message| message.id == private_plan_trace.id));
+        assert!(private_task_thread
+            .iter()
+            .any(|message| message.id == private_result_trace.id));
         let tenant_private_trace_count: i64 = sqlx::query_scalar(&format!(
             "SELECT COUNT(*) FROM \"{}\".messages WHERE id = ANY($1)",
             schema_name
@@ -17024,11 +16976,9 @@ mod tests {
             .list_focus_items(&user.id, &agent_instance_id)
             .await
             .expect("list updated focus items");
-        assert!(
-            focus_items
-                .iter()
-                .any(|entry| entry["id"] == focus.id && entry["status"] == "in_progress")
-        );
+        assert!(focus_items
+            .iter()
+            .any(|entry| entry["id"] == focus.id && entry["status"] == "in_progress"));
 
         let trigger = crate::agent_template::AgentTrigger::new(
             agent_instance_id.clone(),
@@ -17102,11 +17052,9 @@ mod tests {
             .get_active_delegations(&user.id, &agent_instance_id)
             .await
             .expect("list active delegations");
-        assert!(
-            active_delegations
-                .iter()
-                .any(|entry| entry["id"] == delegation_id)
-        );
+        assert!(active_delegations
+            .iter()
+            .any(|entry| entry["id"] == delegation_id));
         let delegation_detail = db
             .get_delegation_by_id(&user.id, &delegation_id)
             .await
@@ -17120,11 +17068,9 @@ mod tests {
             .get_active_delegations(&user.id, &agent_instance_id)
             .await
             .expect("list active delegations after revoke");
-        assert!(
-            !active_delegations
-                .iter()
-                .any(|entry| entry["id"] == delegation_id)
-        );
+        assert!(!active_delegations
+            .iter()
+            .any(|entry| entry["id"] == delegation_id));
 
         let capability_id = db
             .create_capability(
@@ -17163,11 +17109,9 @@ mod tests {
             .list_capabilities(&user.id, &agent_instance_id)
             .await
             .expect("list capabilities");
-        assert!(
-            capabilities
-                .iter()
-                .any(|entry| entry["id"] == capability_id)
-        );
+        assert!(capabilities
+            .iter()
+            .any(|entry| entry["id"] == capability_id));
         let card_caps = db
             .get_capabilities_for_agent_card(&agent_instance_id)
             .await
@@ -17335,11 +17279,9 @@ mod tests {
             .list_saved_workflows(&user.id, false, 10)
             .await
             .expect("list saved workflows");
-        assert!(
-            listed_workflows
-                .iter()
-                .any(|entry| entry["workflow_id"] == saved_workflow.workflow_id)
-        );
+        assert!(listed_workflows
+            .iter()
+            .any(|entry| entry["workflow_id"] == saved_workflow.workflow_id));
         let workflow_detail = db
             .get_saved_workflow(&user.id, &saved_workflow.workflow_id)
             .await

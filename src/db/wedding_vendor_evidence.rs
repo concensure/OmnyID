@@ -456,6 +456,11 @@ impl Db {
         website_is_official: bool,
     ) -> Result<String, sqlx::Error> {
         let vendor_id = Ulid::new().to_string();
+        // A vendor already known under another slug (renamed listing, directory spelling) is
+        // merged into that row rather than duplicated; the conflict clause below then only
+        // fills fields the existing row lacks.
+        let existing_slug = self.find_existing_vendor_slug(input).await?;
+        let vendor_slug = existing_slug.as_deref().unwrap_or(&input.vendor_slug);
         let row = sqlx::query(
             r#"
             INSERT INTO wedding_vendors (
@@ -509,7 +514,7 @@ impl Db {
             "#,
         )
         .bind(&vendor_id)
-        .bind(&input.vendor_slug)
+        .bind(vendor_slug)
         .bind(&input.vendor_name)
         .bind(&input.category)
         .bind(&input.service_area)
@@ -528,7 +533,79 @@ impl Db {
         .bind(website_is_official)
         .fetch_one(&self.pool)
         .await?;
-        Ok(row.get("vendor_id"))
+        let resolved_id: String = row.get("vendor_id");
+        self.backfill_missing_vendor_photos(&resolved_id, &input.photos)
+            .await?;
+        Ok(resolved_id)
+    }
+
+    /// Slug of an existing vendor that is the same business by name, website host or phone.
+    async fn find_existing_vendor_slug(
+        &self,
+        input: &WeddingVendorUpsertRecord,
+    ) -> Result<Option<String>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT vendor_slug
+            FROM wedding_vendors
+            WHERE vendor_slug = $1
+               OR (category = $2
+                   AND lower(regexp_replace(vendor_name, '[^a-zA-Z0-9]', '', 'g')) =
+                       lower(regexp_replace($3, '[^a-zA-Z0-9]', '', 'g')))
+               OR ($4::text IS NOT NULL
+                   AND lower(regexp_replace(coalesce(website_url, ''), '^https?://(www\.)?([^/]+).*$', '\2')) =
+                       lower(regexp_replace($4, '^https?://(www\.)?([^/]+).*$', '\2')))
+               OR ($5::text IS NOT NULL AND length($5) >= 8
+                   AND regexp_replace(coalesce(contact_phone, ''), '\D', '', 'g') = $5)
+            ORDER BY (vendor_slug = $1) DESC, (status = 'active') DESC, created_at ASC
+            LIMIT 1
+            "#,
+        )
+        .bind(&input.vendor_slug)
+        .bind(&input.category)
+        .bind(&input.vendor_name)
+        .bind(input.website_url.as_deref())
+        .bind(
+            input
+                .contact_phone
+                .as_deref()
+                .map(|phone| phone.chars().filter(char::is_ascii_digit).collect::<String>())
+                .filter(|digits| !digits.is_empty()),
+        )
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    /// Adds discovered photos only to empty slots; curated photos are never replaced.
+    async fn backfill_missing_vendor_photos(
+        &self,
+        vendor_id: &str,
+        photos: &[crate::db::WeddingVendorPhotoUpsertRecord],
+    ) -> Result<(), sqlx::Error> {
+        for photo in photos.iter().take(3) {
+            sqlx::query(
+                r#"
+                INSERT INTO wedding_vendor_photos (
+                    photo_id, vendor_id, slot, photo_url, alt_text, source_label,
+                    source_url, retrieved_at, licence_metadata
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9)
+                ON CONFLICT (vendor_id, slot) DO NOTHING
+                "#,
+            )
+            .bind(Ulid::new().to_string())
+            .bind(vendor_id)
+            .bind(photo.slot)
+            .bind(&photo.photo_url)
+            .bind(&photo.alt_text)
+            .bind(&photo.source_label)
+            .bind(&photo.source_url)
+            .bind(&photo.retrieved_at)
+            .bind(&photo.licence_metadata)
+            .execute(&self.pool)
+            .await?;
+        }
+        Ok(())
     }
 }
 
@@ -802,6 +879,105 @@ mod tests {
                 .await
                 .expect("cleanup discovered");
         }
+        sqlx::query("DELETE FROM wedding_vendors WHERE vendor_id = $1")
+            .bind(&vendor_id)
+            .execute(&db.pool)
+            .await
+            .expect("cleanup");
+        sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(&user_id)
+            .execute(&db.pool)
+            .await
+            .expect("cleanup user");
+    }
+
+    #[tokio::test]
+    async fn local_postgres_discovered_vendor_merges_duplicates_and_fills_gaps() {
+        let Some((db, vendor_id)) = smoke_db().await else {
+            return;
+        };
+        let user_id = format!("test-user-{}", Ulid::new());
+        sqlx::query(
+            "INSERT INTO users (id, email, auth_provider, display_name) VALUES ($1, $2, 'password', 'Merge Test')",
+        )
+        .bind(&user_id)
+        .bind(format!("{user_id}@example.invalid"))
+        .execute(&db.pool)
+        .await
+        .expect("insert test user");
+        let incoming = |slug: &str, name: &str, phone: Option<&str>| WeddingVendorUpsertRecord {
+            vendor_slug: slug.to_string(),
+            vendor_name: name.to_string(),
+            category: "venue".to_string(),
+            service_area: "Sydney".to_string(),
+            address: Some("1 Test Street".to_string()),
+            website_url: None,
+            contact_phone: phone.map(str::to_string),
+            contact_email: None,
+            source_url: None,
+            source_label: None,
+            source_checked_at: None,
+            status: "hidden".to_string(),
+            notes: None,
+            evidence: serde_json::json!({}),
+            caveat_labels: vec![],
+            photos: vec![crate::db::WeddingVendorPhotoUpsertRecord {
+                slot: 1,
+                photo_url: "https://cdn.example/merge.jpg".to_string(),
+                alt_text: None,
+                source_label: None,
+                source_url: None,
+                retrieved_at: None,
+                licence_metadata: serde_json::json!({}),
+            }],
+        };
+        let merged = db
+            .upsert_discovered_wedding_vendor(
+                &incoming(
+                    "evidence-test-sydney",
+                    "Evidence  Test!",
+                    Some("02 9000 1234"),
+                ),
+                &user_id,
+                false,
+            )
+            .await
+            .expect("merge by name");
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM wedding_vendors WHERE vendor_id = $1 OR vendor_slug = 'evidence-test-sydney'",
+        )
+        .bind(&vendor_id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("count");
+        assert_eq!(
+            merged, vendor_id,
+            "same name must resolve to the existing vendor"
+        );
+        assert_eq!(count, 1, "no duplicate row may be created");
+        let photos: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM wedding_vendor_photos WHERE vendor_id = $1")
+                .bind(&vendor_id)
+                .fetch_one(&db.pool)
+                .await
+                .expect("photos");
+        assert_eq!(photos, 1, "missing photo is backfilled");
+        let again = db
+            .upsert_discovered_wedding_vendor(
+                &incoming(
+                    "other-slug",
+                    "Totally Different Name",
+                    Some("(02) 9000-1234"),
+                ),
+                &user_id,
+                false,
+            )
+            .await
+            .expect("merge by phone");
+        assert_eq!(
+            again, vendor_id,
+            "same phone must resolve to the existing vendor"
+        );
         sqlx::query("DELETE FROM wedding_vendors WHERE vendor_id = $1")
             .bind(&vendor_id)
             .execute(&db.pool)

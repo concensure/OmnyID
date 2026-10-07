@@ -44,6 +44,13 @@ pub(super) const DIRECTORY_DOMAINS: &[&str] = &[
     "yourwedding.com.au",
     "marryme.com.au",
     "bridestory.com",
+    "wedlockers.com.au",
+    "hitchbird.com",
+    "tagvenue.com",
+    "weddinghero.com.au",
+    "weddingvenues.com",
+    "hiddencitysecrets.com.au",
+    "weddedwonderland.com",
     "tripadvisor.*",
     "yelp.*",
 ];
@@ -390,7 +397,11 @@ pub(super) fn name_tokens(name: &str) -> Vec<String> {
         .filter(|token| !NAME_STOPWORDS.contains(&token.as_str()))
         .cloned()
         .collect::<Vec<_>>();
-    if filtered.len() >= 2 { filtered } else { all }
+    if filtered.len() >= 2 {
+        filtered
+    } else {
+        all
+    }
 }
 
 pub(super) fn entity_name_key(name: &str) -> String {

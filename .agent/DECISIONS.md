@@ -302,3 +302,45 @@ Vendor shortlist completeness and vendor visibility are separate concerns. A str
 runs one online fallback when fewer than three suitable candidates exist and records the remaining
 shortfall, but every real source-backed candidate found so far is persisted and rendered. Search
 notes expand inline from their source artifact and do not reroute the user to Documents.
+
+## 2026-10-06: Vendor Rooms Are a Child Table; Room Photos Live in Seaweed FS
+
+Rooms (spaces, packages, accommodation) are rows in `wedding_vendor_rooms`, each with its own
+pricing label, optional `price_from_cents` / `minimum_spend_cents`, inclusions, and availability
+note. `wedding_vendor_room_photos` stores image bytes by `storage_bucket` + `storage_key` in
+Seaweed FS, with `photo_url` only for externally hosted images (exactly one must be set). This
+differs from the Google-proxy vendor photos above because room photos are operator-supplied
+files, not provider content. Vendor-reply facts (price, minimum spend, availability) are also
+recorded in `wedding_vendor_attributes` with `authority = 'vendor_reply'`; unknowns stay
+`unknown` rather than guessed. Directory/listicle pages (Easy Weddings, Wedlockers, Hitchbird,
+etc.) are not vendors and were deleted from `wedding_vendors`; search-cache ingestion should
+filter them out (not yet implemented, so they may be re-cached as hidden `custom_vendor_search`
+rows).
+
+## 2026-10-08: Wedding Vendor Claim Directory
+
+Spec: `Documents/design/wedding planner/wedding-vendor-claim-your-profile-spec.md` (WED-160..172).
+
+Every seeded `wedding_vendors` row starts `unclaimed`. A vendor claims it through the existing
+workspace auth form (`source=vendor_claim`), which assigns a `vendor` role and a `vendor_listing`
+plan with a 0 B private quota. Vendor-only accounts get no workspace provisioning. Owner edits live
+in separate owner tables and never mutate seed rows, so provenance stays honest and revocation is
+clean. Owner photos are public listing data in a `wedding-public` SeaweedFS collection.
+
+"Verified" requires an email-domain, email-code or admin check. Self-declaration alone shows
+"Claimed by owner".
+
+Couple↔vendor enquiries are `wedding_enquiry` / `wedding_enquiry_response` AFP messages,
+encrypted and signed on the sender's device with keys generated in the browser. The homeserver
+relays ciphertext envelopes with minimal routing metadata and never holds keys on anyone's behalf.
+Lead Quality Score is computed on the vendor's device. `MessageSchema` is unchanged. `AgentCard`
+gains only an optional `encryption_public_key_hex`.
+
+Couples enquire from a free account. Vendor tiers (AUD, incl. GST):
+
+- Starter: free.
+- Pro: $79/month or $790/year.
+- Founding: $39/month or $390/year, locked for life, for the first 100 vendors or until
+  2027-03-31.
+
+The enquiry inbox is never paywalled.
