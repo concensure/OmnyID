@@ -23,8 +23,10 @@ What changed:
 
 Open items:
 
-- Cloudflare Zero Trust is not enabled on the account, so the staging API is not behind Cloudflare
-  Access yet; the origin lock is in place for when it is.
+- Cloudflare Zero Trust is enabled (team `omnyid`, `omnyid.cloudflareaccess.com`) with no apps,
+  identity providers or clients yet, so nothing needs migrating. The staging API is not behind
+  Cloudflare Access until an Access app for `staging.omnyid.com` is created; the API token is
+  read-only for Access (`auth.forbidden` on create), and the origin lock is already in place.
 - The Gmail sync reports `auth_invalid` (permanent); the refresh token needs re-authorising.
 - The 89k ingested emails in `public.messages` and heavy bloat in the owner's message table and
   `daemon_heartbeats` are unresolved; nothing was deleted or vacuumed.
