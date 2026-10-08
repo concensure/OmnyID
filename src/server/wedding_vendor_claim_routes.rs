@@ -35,6 +35,10 @@ use super::{
 
 const MAX_QUERY_LENGTH: usize = 120;
 const DIRECTORY_PAGE_SIZE: i64 = 24;
+const PHOTO_LICENCE_VERSION: &str = "vendor-image-licence-2026-10-09";
+const PHOTO_LICENCE_SHA256: &str =
+    "fe8e9861793131444295de144dd8a20f5fe854dc9a91736de2598dccc7ebe8d8";
+const PHOTO_LICENCE_CONSENT: &str = "I confirm that I have read and agree to the Vendor Image Licence Agreement, and that I am authorised to grant the licence above for all Images submitted.";
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -50,6 +54,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/wedding/vendor/agent-card",
             post(vendor_agent_card_publish_http),
+        )
+        .route(
+            "/api/wedding/vendor/photo-licence",
+            get(photo_licence_document_http).post(photo_licence_accept_http),
         )
         .route(
             "/.well-known/afp/agents/{agent_id}/card",
@@ -108,6 +116,28 @@ struct VendorAgentCardResponse {
 #[derive(Deserialize)]
 struct VendorAgentCardPath {
     agent_id: String,
+}
+
+#[derive(Deserialize)]
+struct PhotoLicenceAcceptanceRequest {
+    vendor_slug: String,
+    accepted: bool,
+    agreement_version: Option<String>,
+}
+
+#[derive(Serialize)]
+struct PhotoLicenceDocumentResponse {
+    agreement_version: &'static str,
+    agreement_sha256: &'static str,
+    agreement_url: &'static str,
+    consent_label: &'static str,
+}
+
+#[derive(Serialize)]
+struct PhotoLicenceAcceptanceResponse {
+    photo_licence_id: String,
+    accepted_at: String,
+    agreement_version: &'static str,
 }
 
 async fn public_directory_http(
@@ -469,6 +499,109 @@ async fn vendor_agent_card_publish_http(
     }))
 }
 
+async fn photo_licence_document_http() -> Json<PhotoLicenceDocumentResponse> {
+    Json(PhotoLicenceDocumentResponse {
+        agreement_version: PHOTO_LICENCE_VERSION,
+        agreement_sha256: PHOTO_LICENCE_SHA256,
+        agreement_url: "/wedding/vendor-image-licence.html",
+        consent_label: PHOTO_LICENCE_CONSENT,
+    })
+}
+
+async fn photo_licence_accept_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<PhotoLicenceAcceptanceRequest>,
+) -> Result<Json<PhotoLicenceAcceptanceResponse>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("vendor_photo_licence", &headers),
+        RateLimitPolicy {
+            max_requests: 10,
+            window: std::time::Duration::from_secs(24 * 60 * 60),
+        },
+    )
+    .await?;
+    if !body.accepted {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "photo licence consent is required before publishing images".to_string(),
+        ));
+    }
+    if body
+        .agreement_version
+        .as_deref()
+        .is_some_and(|version| version.trim() != PHOTO_LICENCE_VERSION)
+    {
+        return Err((
+            StatusCode::CONFLICT,
+            "the photo licence has changed; review and accept the current version".to_string(),
+        ));
+    }
+
+    let slug = valid_slug(&body.vendor_slug)?;
+    let mut tx = state.db.pool.begin().await.map_err(database_failure)?;
+    let listing = sqlx::query(
+        r#"SELECT vendor_id, claim_status, claimed_by_user_id
+           FROM wedding_vendors
+           WHERE vendor_slug = $1 AND status = 'active'
+           FOR UPDATE"#,
+    )
+    .bind(&slug)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(database_failure)?
+    .ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            "vendor listing not found".to_string(),
+        )
+    })?;
+    let vendor_id: String = listing.get("vendor_id");
+    let claim_status: String = listing.get("claim_status");
+    let owner: Option<String> = listing.get("claimed_by_user_id");
+    if owner.as_deref() != Some(user.id.as_str())
+        || !matches!(
+            claim_status.as_str(),
+            "claim_pending" | "claimed" | "verified"
+        )
+    {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "only the active claimant can accept the photo licence".to_string(),
+        ));
+    }
+
+    let photo_licence_id = Ulid::new().to_string();
+    let accepted_at = chrono::Utc::now().to_rfc3339();
+    sqlx::query(
+        r#"INSERT INTO wedding_vendor_photo_licences
+            (photo_licence_id, vendor_id, user_id, agreement_version, agreement_sha256,
+             consent_copy, accepted_at, accepted_ip_hash, accepted_user_agent)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8, $9)"#,
+    )
+    .bind(&photo_licence_id)
+    .bind(&vendor_id)
+    .bind(&user.id)
+    .bind(PHOTO_LICENCE_VERSION)
+    .bind(PHOTO_LICENCE_SHA256)
+    .bind(PHOTO_LICENCE_CONSENT)
+    .bind(&accepted_at)
+    .bind(request_ip_hash(&headers))
+    .bind(request_user_agent(&headers))
+    .execute(&mut *tx)
+    .await
+    .map_err(database_failure)?;
+    tx.commit().await.map_err(database_failure)?;
+
+    Ok(Json(PhotoLicenceAcceptanceResponse {
+        photo_licence_id,
+        accepted_at,
+        agreement_version: PHOTO_LICENCE_VERSION,
+    }))
+}
+
 async fn public_vendor_agent_card_http(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(path): axum::extract::Path<VendorAgentCardPath>,
@@ -632,6 +765,30 @@ fn invalid_agent_card() -> (StatusCode, String) {
     )
 }
 
+fn request_ip_hash(headers: &HeaderMap) -> Option<String> {
+    let client_ip = headers
+        .get("x-forwarded-for")?
+        .to_str()
+        .ok()?
+        .split(',')
+        .next()?
+        .trim();
+    if client_ip.is_empty() {
+        return None;
+    }
+    Some(hex::encode(Sha256::digest(client_ip.as_bytes())))
+}
+
+fn request_user_agent(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("user-agent")?
+        .to_str()
+        .ok()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.chars().take(512).collect())
+}
+
 fn database_failure(_: sqlx::Error) -> (StatusCode, String) {
     (
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -641,7 +798,10 @@ fn database_failure(_: sqlx::Error) -> (StatusCode, String) {
 
 #[cfg(test)]
 mod tests {
-    use super::{valid_declared_role, valid_slug};
+    use super::{
+        PHOTO_LICENCE_CONSENT, PHOTO_LICENCE_SHA256, PHOTO_LICENCE_VERSION, valid_declared_role,
+        valid_slug,
+    };
     use axum::http::StatusCode;
 
     #[test]
@@ -660,5 +820,13 @@ mod tests {
             valid_declared_role("administrator").unwrap_err().0,
             StatusCode::BAD_REQUEST
         );
+    }
+
+    #[test]
+    fn photo_licence_receipt_is_pinned_to_the_current_document() {
+        assert_eq!(PHOTO_LICENCE_VERSION, "vendor-image-licence-2026-10-09");
+        assert_eq!(PHOTO_LICENCE_SHA256.len(), 64);
+        assert!(PHOTO_LICENCE_CONSENT.starts_with("I confirm that I have read"));
+        assert!(PHOTO_LICENCE_CONSENT.contains("authorised to grant the licence"));
     }
 }

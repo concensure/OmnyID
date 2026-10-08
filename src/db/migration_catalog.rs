@@ -520,6 +520,13 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
     (
         "0103_wedding_vendor_subscriptions_and_enquiries",
         "Vendor subscription, ciphertext-only wedding enquiry relay, and listing statistics",
-        include_str!("../../postgres/migrations/0103_wedding_vendor_subscriptions_and_enquiries.sql"),
+        include_str!(
+            "../../postgres/migrations/0103_wedding_vendor_subscriptions_and_enquiries.sql"
+        ),
+    ),
+    (
+        "0104_wedding_vendor_photo_licences",
+        "Versioned vendor photo licence receipts required for live owner images",
+        include_str!("../../postgres/migrations/0104_wedding_vendor_photo_licences.sql"),
     ),
 ];

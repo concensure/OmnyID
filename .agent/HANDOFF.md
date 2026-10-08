@@ -1,5 +1,23 @@
 # Handoff
 
+## 2026-10-09 - WED-167 vendor photo licence consent (Codex)
+
+What changed:
+
+- Added migration `0104`: append-only, versioned photo-licence acceptance receipts; a new `live` owner asset must reference one. Existing early rows are preserved by a `NOT VALID` constraint while new publications are enforced.
+- Added authenticated `POST /api/wedding/vendor/photo-licence`, limited to the active claimant. The server selects the current agreement version and SHA-256 itself and records consent copy, time, hashed forwarded IP and bounded user agent. `GET` exposes the current agreement metadata.
+- Added the exact agreement as a responsive public page and a reusable phone-ready Solid consent component. Its checkbox stays disabled until the vendor scrolls to the end of the agreement; the button cannot continue without the exact supplied consent text being ticked.
+
+Verification:
+
+- `node wedding/tests/wedding-website-smoke.mjs` passed, including the new public agreement document.
+- Focused TypeScript compile for `VendorPhotoLicenceConsent.tsx` passed; formatting and `git diff --check` passed.
+- Focused Rust tests were queued behind an existing Cargo artifact lock and have not yet produced final output.
+
+Remaining:
+
+- The owner photo upload/re-encode pipeline and claim wizard do not exist yet. Wire `VendorPhotoLicenceConsent` and its receipt into that upload request before exposing the publication UI; do not accept a client-supplied licence ID without checking its vendor/user/version.
+
 ## 2026-10-09 - WED-168 AgentCard and browser key-custody foundation (Codex)
 
 What changed:

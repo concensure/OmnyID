@@ -327,6 +327,11 @@ plan with a 0 B private quota. Vendor-only accounts get no workspace provisionin
 in separate owner tables and never mutate seed rows, so provenance stays honest and revocation is
 clean. Owner photos are public listing data in a `wedding-public` SeaweedFS collection.
 
+Each newly live owner photo must refer to a server-recorded Vendor Image Licence Agreement receipt. The server
+selects the agreement version and source-document SHA-256, records the claimant, timestamp, hashed client IP and
+bounded user agent, and rejects acceptance by a non-claimant. The phone consent control stays disabled until the
+vendor has scrolled through the agreement; this is an informed-consent guard, not merely a UI acknowledgement.
+
 "Verified" requires an email-domain, email-code or admin check. Self-declaration alone shows
 "Claimed by owner".
 

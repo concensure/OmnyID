@@ -258,6 +258,13 @@ const vendorDirectory = htmlByPath.get(normalize(resolve(root, 'vendors.html')))
 if (!vendorDirectory || !vendorDirectory.includes('assets/js/directory.js')) {
   failures.push('vendors.html: vendor directory page or its data loader is missing');
 }
+const photoLicence = htmlByPath.get(normalize(resolve(root, 'vendor-image-licence.html')));
+if (!photoLicence || !photoLicence.includes('Vendor Image Licence Agreement')) {
+  failures.push('vendor-image-licence.html: current vendor photo licence document is missing');
+}
+if (!photoLicence.includes('I confirm that I have read and agree to the Vendor Image Licence Agreement')) {
+  failures.push('vendor-image-licence.html: required vendor photo consent wording is missing');
+}
 if (!weddingJs.includes('source=vendor_claim') || !weddingJs.includes('data-vendor-login')) {
   failures.push('main.js: Vendor Login does not route separately to the vendor-claim flow');
 }
