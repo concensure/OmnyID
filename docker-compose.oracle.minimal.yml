@@ -94,6 +94,8 @@ services:
       OMNYID_DOMAIN: ${OMNYID_DOMAIN}
       OMNYID_BASE_URL: ${OMNYID_BASE_URL:-https://omnyid.com}
       LOG_FORMAT: ${LOG_FORMAT:-json}
+      OMNYID_ENV: production
+      OMNYID_DELEGATION_MASTER_KEY_HEX_FILE: ${OMNYID_DELEGATION_MASTER_KEY_HEX_FILE:-/run/secrets/omnyid_delegation_master_key_hex}
       OMNYID_PUBLIC_KEY_HEX: ${OMNYID_PUBLIC_KEY_HEX}
       OMNYID_SIGNING_KEY_HEX: ${OMNYID_SIGNING_KEY_HEX}
       OMNYID_SIGNING_KEY_HEX_FILE: ${OMNYID_SIGNING_KEY_HEX_FILE:-/run/secrets/omnyid_signing_key_hex}
