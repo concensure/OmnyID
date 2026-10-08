@@ -147,7 +147,7 @@ export function WeddingGuestOperationsCard(props: {
   };
 
   return (
-    <div class="min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
+    <div class="min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 shadow-card phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[28px] sm:p-4">
       <div class="flex items-start justify-between gap-2">
         <div class="flex items-center gap-2">
           <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #0F766E" aria-hidden="true">
@@ -165,7 +165,7 @@ export function WeddingGuestOperationsCard(props: {
       <p class="mt-2 text-sm leading-6 text-sky-900/75">{props.state.summaryLabel}</p>
       <Show when={saveNotice()}>
         {(notice) => (
-          <p class="mt-3 rounded-2xl border border-sky-100 bg-white/75 px-3 py-2 text-xs leading-5 text-sky-950/75">
+          <p class="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-sky-950/75">
             {notice()}
           </p>
         )}
@@ -173,7 +173,7 @@ export function WeddingGuestOperationsCard(props: {
       <div class="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          class="rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-950"
+          class="min-h-11 flex-1 rounded-lg bg-sky-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-950 sm:flex-none"
           data-magic-action="open"
           data-magic-icon="guest"
           data-magic-label="Add guest"
@@ -184,7 +184,7 @@ export function WeddingGuestOperationsCard(props: {
         </button>
         <button
           type="button"
-          class="rounded-full border border-sky-200 bg-white/80 px-3 py-2 text-xs font-semibold text-sky-950 transition hover:bg-white"
+          class="min-h-11 flex-1 rounded-lg border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-950 transition hover:bg-sky-50 sm:flex-none"
           data-magic-action="open"
           data-magic-icon="rules"
           data-magic-label="Set guest rules"
@@ -195,13 +195,13 @@ export function WeddingGuestOperationsCard(props: {
         </button>
       </div>
       <Show when={activePanel() === "guest"}>
-        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/80 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-sm font-semibold text-sky-950">Add a guest draft</p>
           <div class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto]">
             <label class="min-w-0">
               <span class="text-xs font-semibold text-sky-950/70">Name</span>
               <input
-                class="mt-1 w-full rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-400"
+                class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                 value={guestName()}
                 onInput={(event) => setGuestName(event.currentTarget.value)}
                 placeholder="Alex Lee"
@@ -210,7 +210,7 @@ export function WeddingGuestOperationsCard(props: {
             <label class="min-w-0">
               <span class="text-xs font-semibold text-sky-950/70">Household or group</span>
               <input
-                class="mt-1 w-full rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-400"
+                class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                 value={guestGroup()}
                 onInput={(event) => setGuestGroup(event.currentTarget.value)}
                 placeholder="Bride family"
@@ -219,7 +219,7 @@ export function WeddingGuestOperationsCard(props: {
             <label class="min-w-0">
               <span class="text-xs font-semibold text-sky-950/70">RSVP</span>
               <select
-                class="mt-1 w-full rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-400"
+                class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                 value={guestRsvp()}
                 onChange={(event) => setGuestRsvp(event.currentTarget.value)}
               >
@@ -230,38 +230,26 @@ export function WeddingGuestOperationsCard(props: {
             </label>
           </div>
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
-            <label class="flex min-w-0 items-start gap-2 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2 text-xs leading-5 text-sky-950/75">
-              <input
-                type="checkbox"
-                class="mt-1 h-4 w-4 shrink-0 rounded border-sky-200 text-sky-800"
-                checked={guestPlusOneAllowed()}
-                onChange={(event) => setGuestPlusOneAllowed(event.currentTarget.checked)}
-              />
-              <span>
-                <span class="block font-semibold text-sky-950">Plus-one included</span>
-                <span class="block">Use only when this guest is allowed to bring someone.</span>
-              </span>
-            </label>
-            <label class="flex min-w-0 items-start gap-2 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2 text-xs leading-5 text-sky-950/75">
-              <input
-                type="checkbox"
-                class="mt-1 h-4 w-4 shrink-0 rounded border-sky-200 text-sky-800"
-                checked={guestChildrenInvited()}
-                onChange={(event) => setGuestChildrenInvited(event.currentTarget.checked)}
-              />
-              <span>
-                <span class="block font-semibold text-sky-950">Children included</span>
-                <span class="block">Use only when children are named or clearly invited.</span>
-              </span>
-            </label>
+            <GuestSwitchRow
+              label="Plus-one included"
+              hint="Only if this guest may bring someone."
+              checked={guestPlusOneAllowed()}
+              onChange={setGuestPlusOneAllowed}
+            />
+            <GuestSwitchRow
+              label="Children included"
+              hint="Only if children are named or clearly invited."
+              checked={guestChildrenInvited()}
+              onChange={setGuestChildrenInvited}
+            />
           </div>
-          <details class="mt-3 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2">
-            <summary class="cursor-pointer text-xs font-semibold text-sky-950">Add contact, meal, or access notes</summary>
-            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+          <details class="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3">
+            <summary class="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-sky-950">Add contact, meal, or access notes</summary>
+            <div class="grid gap-2 pb-3 sm:grid-cols-2">
               <label class="min-w-0">
                 <span class="text-xs font-semibold text-sky-950/70">Contact detail</span>
                 <input
-                  class="mt-1 w-full rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-400"
+                  class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                   value={guestContact()}
                   onInput={(event) => setGuestContact(event.currentTarget.value)}
                   placeholder="Email or phone"
@@ -270,7 +258,7 @@ export function WeddingGuestOperationsCard(props: {
               <label class="min-w-0">
                 <span class="text-xs font-semibold text-sky-950/70">Meal choice</span>
                 <input
-                  class="mt-1 w-full rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-400"
+                  class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                   value={guestMeal()}
                   onInput={(event) => setGuestMeal(event.currentTarget.value)}
                   placeholder="Chicken, fish, vegetarian"
@@ -279,7 +267,7 @@ export function WeddingGuestOperationsCard(props: {
               <label class="min-w-0">
                 <span class="text-xs font-semibold text-sky-950/70">Dietary note</span>
                 <input
-                  class="mt-1 w-full rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-400"
+                  class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                   value={guestDietary()}
                   onInput={(event) => setGuestDietary(event.currentTarget.value)}
                   placeholder="Allergy, vegan, gluten-free"
@@ -288,7 +276,7 @@ export function WeddingGuestOperationsCard(props: {
               <label class="min-w-0">
                 <span class="text-xs font-semibold text-sky-950/70">Access note</span>
                 <input
-                  class="mt-1 w-full rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-400"
+                  class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                   value={guestAccessibility()}
                   onInput={(event) => setGuestAccessibility(event.currentTarget.value)}
                   placeholder="Step-free access, wheelchair space"
@@ -298,7 +286,7 @@ export function WeddingGuestOperationsCard(props: {
           </details>
           <button
             type="button"
-            class="mt-3 rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-950 disabled:cursor-not-allowed disabled:bg-sky-300"
+            class="mt-3 min-h-11 w-full rounded-lg bg-sky-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-950 disabled:cursor-not-allowed disabled:bg-sky-300 sm:w-auto"
             disabled={!guestName().trim() || savingGuest()}
             data-magic-action="approve"
             data-magic-icon="save"
@@ -322,13 +310,13 @@ export function WeddingGuestOperationsCard(props: {
         </div>
       </Show>
       <Show when={activePanel() === "rules"}>
-        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/80 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-sm font-semibold text-sky-950">Guest rules</p>
           <div class="mt-2 grid gap-2">
             <label class="min-w-0">
               <span class="text-xs font-semibold text-sky-950/70">Plus-one rule</span>
               <input
-                class="mt-1 w-full rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-400"
+                class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                 value={plusOneRule()}
                 onInput={(event) => setPlusOneRule(event.currentTarget.value)}
               />
@@ -336,7 +324,7 @@ export function WeddingGuestOperationsCard(props: {
             <label class="min-w-0">
               <span class="text-xs font-semibold text-sky-950/70">Children rule</span>
               <input
-                class="mt-1 w-full rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-400"
+                class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                 value={childrenRule()}
                 onInput={(event) => setChildrenRule(event.currentTarget.value)}
               />
@@ -344,7 +332,7 @@ export function WeddingGuestOperationsCard(props: {
           </div>
           <button
             type="button"
-            class="mt-3 rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-950"
+            class="mt-3 min-h-11 w-full rounded-lg bg-sky-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-950 disabled:cursor-not-allowed disabled:bg-sky-300 sm:w-auto"
             disabled={savingRules()}
             data-magic-action="approve"
             data-magic-icon="save"
@@ -368,16 +356,16 @@ export function WeddingGuestOperationsCard(props: {
         </div>
       </Show>
       <Show when={guestRows().length > 0}>
-        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <div class="flex flex-wrap items-start justify-between gap-2">
             <div class="min-w-0">
               <p class="text-xs font-semibold text-sky-950/70">Guest RSVP quick actions</p>
               <p class="mt-1 text-xs leading-5 text-sky-950/60">
-                Quick changes are local until you save or re-import the guest list.
+                Changes stay on this device until you save.
               </p>
             </div>
             <Show when={(props.state.guestRows?.length ?? 0) > guestRows().length}>
-              <span class="max-w-full break-words rounded-full bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-900">
+              <span class="max-w-full break-words rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-900">
                 Showing {guestRows().length} of {props.state.guestRows?.length}
               </span>
             </Show>
@@ -385,24 +373,26 @@ export function WeddingGuestOperationsCard(props: {
           <div class="mt-2 space-y-2">
             <For each={guestRows()}>
               {(guest) => (
-                <article class="rounded-xl border border-sky-100 bg-sky-50/60 px-2.5 py-2">
+                <article class="rounded-xl border border-sky-100 bg-sky-50/60 px-2.5 py-2 phone:rounded-none phone:border-0 phone:border-t phone:border-slate-200 phone:bg-transparent phone:px-0 phone:py-3">
                   <div class="flex flex-wrap items-start justify-between gap-2">
                     <div class="min-w-0">
-                      <p class="break-words text-xs font-semibold text-sky-950">{guest.displayName}</p>
-                      <p class="mt-0.5 break-words text-[11px] leading-4 text-sky-950/60">
+                      <p class="break-words text-sm font-semibold text-sky-950">{guest.displayName}</p>
+                      <p class="mt-0.5 break-words text-xs leading-4 text-sky-950/60">
                         {guest.householdLabel} - {guest.sourceLabel}
                       </p>
                     </div>
-                    <span class={`max-w-full break-words rounded-full border px-2 py-1 text-[11px] font-semibold ${rsvpToneClass(guest.rsvpStatus)}`}>
+                    <span class={`max-w-full break-words rounded-full border px-2 py-1 text-xs font-semibold ${rsvpToneClass(guest.rsvpStatus)}`}>
                       {guest.rsvpStatus}{guest.locallyChanged ? " (local)" : ""}
                     </span>
                   </div>
-                  <div class="mt-2 flex flex-wrap gap-1.5">
+                  <div class="mt-2 grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1" role="radiogroup" aria-label={`RSVP for ${guest.displayName}`}>
                     <For each={rsvpOptions}>
                       {(status) => (
                         <button
                           type="button"
-                          class={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${guest.rsvpStatus === status ? "border-sky-300 bg-white text-sky-950" : "border-sky-100 bg-white/70 text-sky-950/70 hover:bg-white"}`}
+                          role="radio"
+                          aria-checked={guest.rsvpStatus === status}
+                          class={`min-h-11 rounded-md px-1 text-xs font-semibold transition ${guest.rsvpStatus === status ? "bg-sky-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"}`}
                           data-magic-action={status === "Attending" ? "rsvp-yes" : status === "Not attending" ? "rsvp-no" : "open"}
                           data-magic-icon={status === "Attending" ? "check" : status === "Not attending" ? "dismiss" : "clock"}
                           data-magic-label={`${guest.displayName}: ${status}`}
@@ -415,7 +405,7 @@ export function WeddingGuestOperationsCard(props: {
                     </For>
                   </div>
                   <Show when={[guest.mealPreference, guest.dietaryNote, guest.accessibilityNote].some(Boolean)}>
-                    <p class="mt-2 break-words text-[11px] leading-4 text-sky-950/60">
+                    <p class="mt-2 break-words text-xs leading-4 text-sky-950/60">
                       {[guest.mealPreference, guest.dietaryNote, guest.accessibilityNote].filter(Boolean).join(" - ")}
                     </p>
                   </Show>
@@ -426,15 +416,15 @@ export function WeddingGuestOperationsCard(props: {
         </div>
       </Show>
       <div class="mt-3 grid grid-cols-3 gap-2">
-        <div class="rounded-2xl border border-sky-100 bg-white/75 px-2.5 py-2">
+        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
           <p class="text-xs font-semibold text-sky-950/65">Attending</p>
           <p class="mt-1 text-2xl font-semibold text-sky-950">{displayCounts().attendingCount}</p>
         </div>
-        <div class="rounded-2xl border border-sky-100 bg-white/75 px-2.5 py-2">
+        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
           <p class="text-xs font-semibold text-sky-950/65">Pending</p>
           <p class="mt-1 text-2xl font-semibold text-sky-950">{displayCounts().pendingCount}</p>
         </div>
-        <div class="rounded-2xl border border-sky-100 bg-white/75 px-2.5 py-2">
+        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
           <p class="text-xs font-semibold text-sky-950/65">Needs</p>
           <p class="mt-1 text-2xl font-semibold text-sky-950">
             {displayCounts().needsCount}
@@ -452,7 +442,7 @@ export function WeddingGuestOperationsCard(props: {
         <div class="mt-3 flex flex-wrap gap-1.5">
           <For each={props.state.warningLabels}>
             {(label) => (
-              <span class="max-w-full break-words rounded-full border border-sky-100 bg-white/80 px-2 py-1 text-xs font-semibold text-sky-950/75">
+              <span class="max-w-full break-words rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-sky-950/75">
                 {label}
               </span>
             )}
@@ -460,7 +450,7 @@ export function WeddingGuestOperationsCard(props: {
         </div>
       </Show>
       <Show when={props.state.finalCountOptions.length > 0}>
-        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-xs font-semibold text-sky-950/70">Final guest count options</p>
           <div class="mt-2 space-y-2">
             <For each={props.state.finalCountOptions}>
@@ -481,7 +471,7 @@ export function WeddingGuestOperationsCard(props: {
         </div>
       </Show>
       <Show when={props.state.boundaryRuleLabels.length > 0 || props.state.invitationScopeLabels.length > 0}>
-        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-xs font-semibold text-sky-950/70">Guest rules in effect</p>
           <div class="mt-2 flex flex-wrap gap-1.5">
             <For each={[...props.state.boundaryRuleLabels, ...props.state.invitationScopeLabels]}>
@@ -495,7 +485,7 @@ export function WeddingGuestOperationsCard(props: {
         </div>
       </Show>
       <Show when={props.state.followUpTaskCandidates.length > 0}>
-        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-xs font-semibold text-sky-950/70">Guest follow-ups</p>
           <ul class="mt-2 space-y-1">
             <For each={props.state.followUpTaskCandidates}>
@@ -514,5 +504,25 @@ export function WeddingGuestOperationsCard(props: {
         </p>
       </Show>
     </div>
+  );
+}
+
+function GuestSwitchRow(props: { label: string; hint: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={props.checked}
+      class="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left"
+      onClick={() => props.onChange(!props.checked)}
+    >
+      <span class="min-w-0">
+        <span class="block text-sm font-semibold text-sky-950">{props.label}</span>
+        <span class="block text-xs text-sky-950/60">{props.hint}</span>
+      </span>
+      <span class={`relative h-6 w-11 shrink-0 rounded-full transition ${props.checked ? "bg-sky-800" : "bg-slate-300"}`} aria-hidden="true">
+        <span class={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${props.checked ? "left-[1.375rem]" : "left-0.5"}`} />
+      </span>
+    </button>
   );
 }

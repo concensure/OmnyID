@@ -266,19 +266,14 @@ export function WeddingTaskStageView(props: {
   });
 
   return (
-    <section class="min-w-0 rounded-[24px] border border-rose-100/60 bg-[linear-gradient(135deg,rgba(255,241,242,0.72),rgba(255,251,235,0.68))] p-3 shadow-[0_18px_50px_-34px_rgba(190,18,60,0.45)] sm:rounded-3xl">
+    <section class="min-w-0 rounded-[24px] border border-rose-100/60 bg-[linear-gradient(135deg,rgba(255,241,242,0.72),rgba(255,251,235,0.68))] p-3 shadow-[0_18px_50px_-34px_rgba(190,18,60,0.45)] phone:rounded-none phone:border-0 phone:bg-none phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-3xl">
       <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div class="min-w-0">
-          <p class="text-xs font-semibold text-rose-700/70">Wedding timeline</p>
-          <p class="text-xs leading-5 text-rose-950/75">
-            Anytime tasks stay first, dated tasks are grouped by preparation stage, and completed tasks can be unticked.
-          </p>
-          <p class="mt-1 text-xs leading-5 text-rose-950/60">
-            Ticking a task saves the status and asks the planner to advance the next related step.
-          </p>
+          <p class="text-base font-semibold text-rose-950">Tasks</p>
+          <p class="text-xs leading-5 text-rose-950/70">Tick a task when it is done. Dated tasks are grouped by stage.</p>
         </div>
         <Show when={hasPendingItems()}>
-          <div class="w-full rounded-2xl border border-rose-200/70 bg-white/70 px-3 py-2 text-left sm:max-w-sm">
+          <div class="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-left shadow-sm sm:max-w-sm">
             <p class="text-xs font-semibold text-rose-800/70">Ready to save</p>
             <p class="text-xs font-semibold text-rose-950">{pendingSummaryLabel()}</p>
             <div class="mt-1 space-y-1">
@@ -292,7 +287,7 @@ export function WeddingTaskStageView(props: {
             </div>
             <button
               type="button"
-              class="mt-2 w-full rounded-full bg-rose-800 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:bg-rose-300 sm:w-auto sm:py-1"
+              class="mt-2 min-h-11 w-full rounded-lg bg-rose-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:bg-rose-300 sm:w-auto"
               disabled={syncing()}
               onClick={() => void savePendingSync()}
             >
@@ -310,12 +305,12 @@ export function WeddingTaskStageView(props: {
       </div>
       <Show when={taskNotice()}>
         {(notice) => (
-          <p class="mb-3 rounded-2xl border border-rose-100 bg-white/70 px-3 py-2 text-xs leading-5 text-rose-950/70">
+          <p class="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-rose-950/70" role="status">
             {notice()}
           </p>
         )}
       </Show>
-      <div class="mb-3 flex flex-wrap gap-2">
+      <div class="mb-3 flex flex-wrap gap-2 phone:hidden">
         <button
           type="button"
           class="rounded-full border border-rose-200 bg-white/70 px-3 py-2 text-xs font-semibold text-rose-950 transition hover:bg-white"
@@ -349,10 +344,12 @@ export function WeddingTaskStageView(props: {
           Documents
         </button>
       </div>
-      <div class="mb-3 flex flex-wrap gap-2">
+      <div class="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 sm:inline-grid sm:min-w-[16rem]" role="radiogroup" aria-label="Task filter">
         <button
           type="button"
-          class={`rounded-full px-3 py-2 text-xs font-semibold transition ${activeTab() === "open" ? "bg-rose-800 text-white shadow-sm" : "border border-rose-200 bg-white/70 text-rose-950 hover:bg-white"}`}
+          role="radio"
+          aria-checked={activeTab() === "open"}
+          class={`min-h-11 rounded-md px-3 text-sm font-semibold transition ${activeTab() === "open" ? "bg-rose-800 text-white shadow-sm" : "text-slate-600 hover:bg-white"}`}
           data-magic-action="reopen"
           data-magic-icon="todo"
           data-magic-label={`To do (${openTaskCount()})`}
@@ -363,7 +360,9 @@ export function WeddingTaskStageView(props: {
         </button>
         <button
           type="button"
-          class={`rounded-full px-3 py-2 text-xs font-semibold transition ${activeTab() === "done" ? "bg-rose-800 text-white shadow-sm" : "border border-rose-200 bg-white/70 text-rose-950 hover:bg-white"}`}
+          role="radio"
+          aria-checked={activeTab() === "done"}
+          class={`min-h-11 rounded-md px-3 text-sm font-semibold transition ${activeTab() === "done" ? "bg-rose-800 text-white shadow-sm" : "text-slate-600 hover:bg-white"}`}
           data-magic-action="done"
           data-magic-icon="check"
           data-magic-label={`Done (${doneTaskCount()})`}
@@ -377,13 +376,13 @@ export function WeddingTaskStageView(props: {
         <Show
           when={filteredStages().length > 0}
           fallback={
-            <div class="rounded-2xl border border-rose-100 bg-white/70 px-3 py-3 text-sm leading-6 text-rose-950/70">
+            <div class="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-rose-950/70">
               <p>{emptyStateLabel()}</p>
               <Show when={emptyStateAction()}>
                 {(action) => (
                   <button
                     type="button"
-                    class="mt-2 rounded-full border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-950 transition hover:bg-rose-50"
+                    class="mt-2 min-h-11 rounded-lg border border-rose-200 bg-white px-4 text-sm font-semibold text-rose-950 transition hover:bg-rose-50"
                     onClick={() => setActiveTab(action().tab)}
                   >
                     {action().label}
@@ -395,7 +394,7 @@ export function WeddingTaskStageView(props: {
         >
         <For each={filteredStages()}>
           {(stage) => (
-            <div class={`min-w-0 rounded-2xl border px-3 py-2.5 ${stage.accentClass}`}>
+            <div class={`min-w-0 rounded-2xl border px-3 py-2.5 phone:rounded-none phone:border-0 phone:bg-transparent phone:px-0 ${stage.accentClass}`}>
               <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <div class="min-w-0">
                   <h4 class="break-words text-sm font-semibold">{stage.label}</h4>
@@ -411,22 +410,29 @@ export function WeddingTaskStageView(props: {
                     const completed = () => itemCompleted(item.task, item.completed);
                     const expanded = () => expandedTaskIds()[item.task.task_id] === true;
                     return (
-                      <article class={`min-w-0 rounded-xl border border-white/60 bg-white/65 px-3 py-2.5 transition ${completed() ? "opacity-60" : "shadow-sm"}`}>
+                      <article class={`min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-1 transition ${completed() ? "opacity-60" : "shadow-sm"}`}>
                         <div class="flex min-w-0 items-start gap-2">
-                          <input
-                            type="checkbox"
-                            class="mt-1 h-4 w-4 rounded border-white/70 accent-rose-700"
-                            checked={completed()}
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={completed()}
+                            class="-ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg"
                             aria-label={item.checkboxLabel}
                             data-magic-action={completed() ? "reopen" : "done"}
                             data-magic-icon={completed() ? "undo" : "check"}
                             data-magic-label={item.checkboxLabel}
                             data-magic-id={`wedding:task:${item.task.task_id}:${completed() ? "reopen" : "done"}`}
-                            onChange={() => toggleTask(item.task, item.completed)}
-                          />
+                            onClick={() => toggleTask(item.task, item.completed)}
+                          >
+                            <span class={`flex h-6 w-6 items-center justify-center rounded-full border-2 ${completed() ? "border-rose-700 bg-rose-700" : "border-slate-300 bg-white"}`}>
+                              <Show when={completed()}>
+                                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
+                              </Show>
+                            </span>
+                          </button>
                           <button
                             type="button"
-                            class="min-w-0 flex-1 text-left"
+                            class="min-h-11 min-w-0 flex-1 py-1 text-left"
                             aria-expanded={expanded()}
                             data-magic-action="open"
                             data-magic-icon="expand"
@@ -434,7 +440,7 @@ export function WeddingTaskStageView(props: {
                             data-magic-id={`wedding:task:${item.task.task_id}:expand`}
                             onClick={() => toggleExpanded(item.task.task_id)}
                           >
-                            <span class={`block break-words text-xs font-semibold leading-5 ${completed() ? "line-through text-slate-500" : item.titleClass}`}>
+                            <span class={`block break-words text-sm font-semibold leading-5 ${completed() ? "line-through text-slate-500" : item.titleClass}`}>
                               {item.title}
                             </span>
                             <span class="mt-0.5 flex flex-wrap items-center gap-2 break-words text-xs opacity-75">
@@ -445,39 +451,22 @@ export function WeddingTaskStageView(props: {
                               </Show>
                             </span>
                           </button>
-                          <span class={`mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full ${completed() ? "bg-emerald-400" : item.statusClass}`} />
+                          <span class={`mt-4 h-2.5 w-2.5 flex-shrink-0 rounded-full ${completed() ? "bg-emerald-400" : item.statusClass}`} />
                         </div>
                         <Show when={expanded()}>
-                          <div class="mt-2 rounded-xl border border-rose-100/80 bg-white/70 p-2">
-                            <div class="grid gap-2 sm:grid-cols-3">
-                              <label class="min-w-0 text-xs font-semibold text-rose-950/75">
-                                Owner
-                                <span class="mt-1 block rounded-full border border-rose-100 bg-white px-3 py-2 text-rose-950">
-                                  {taskOwner(item.task)}
-                                </span>
-                              </label>
-                              <label class="min-w-0 text-xs font-semibold text-rose-950/75">
-                                Due date
-                                <input
-                                  type="date"
-                                  class="mt-1 w-full rounded-full border border-rose-100 bg-white px-3 py-2 text-xs text-rose-950 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
-                                  value={taskDate(item.task)}
-                                  onChange={(event) => saveTaskDate(item.task, event.currentTarget.value)}
-                                />
-                              </label>
-                              <label class="min-w-0 text-xs font-semibold text-rose-950/75">
-                                Status
-                                <span class="mt-1 block rounded-full border border-rose-100 bg-white px-3 py-2 text-rose-950">
-                                  {completed() ? "Done" : "To do"}
-                                </span>
-                              </label>
-                            </div>
-                            <p class="mt-2 text-xs leading-5 text-rose-950/65">
-                              Click the checkbox when this is finished. Changing the date here keeps the task usable while account-level task editing is connected.
-                            </p>
+                          <div class="mb-2 border-t border-slate-200 pt-2">
+                            <label class="block text-xs font-semibold text-rose-950/75">
+                              Due date
+                              <input
+                                type="date"
+                                class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-rose-950 outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                                value={taskDate(item.task)}
+                                onChange={(event) => saveTaskDate(item.task, event.currentTarget.value)}
+                              />
+                            </label>
                           </div>
                         </Show>
-                        <div class="min-w-0 pl-6">
+                        <div class="min-w-0 pb-2 pl-11">
                           <Show when={item.loopLabel || item.evidenceLabels.length > 0 || item.preparationLabels.length > 0}>
                             <span class="mt-1 flex flex-wrap items-center gap-1.5">
                               <For each={item.preparationLabels}>

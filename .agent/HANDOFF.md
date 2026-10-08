@@ -40,6 +40,28 @@ the two pre-existing files above. No device or browser check was run; not deploy
 
 Not done: other wedding views (guest list, timeline, tasks) were not audited against the principles.
 
+## 2026-10-09 - UX-MPR-01 follow-up: guest list, timeline, tasks (Claude)
+
+For Codex - merge notes:
+
+- Same branch `agent/claude/UX-MPR-01`, second commit. Only
+  `WeddingGuestOperationsCard.tsx`, `WeddingTimelinePanel.tsx` and `WeddingTaskStageView.tsx` changed.
+  If you edited these, keep both sides and do not revert the `phone:` classes.
+- Guests: add-guest toggles are switch rows, RSVP quick actions are a three-way radio control,
+  rows are divider-separated on phones, primary/secondary buttons and inputs are 44px.
+- Timeline: one solid primary button; removed the subtitle and empty-state text that repeated button
+  labels; the date label that duplicated "View date" is plain text; undated items are stacked rows;
+  Gantt rows are 44px tall.
+- Tasks: 44px circular completion control (role checkbox, same data-magic ids), segmented To do /
+  Done control, stage groups lose their tinted box on phones, the expanded panel keeps only the due
+  date, and the Home/Budget/Timeline/Documents shortcut pills are hidden on phones (the phone menu and
+  back button cover them).
+
+Tests performed: `npx tsc --noEmit`, `npm run test:wedding` (1,804 passing), `npm run build` (pass).
+`npm run test:line-budget` fails only on the same two pre-existing files. No device check; not deployed.
+
+Not done: `WeddingBoundaryManagementCard.tsx` (family boundaries, shown with Guests) was not changed.
+
 ## 2026-10-08 - Oracle staging stack, www redirect, strict production policy (Claude)
 
 What changed:
