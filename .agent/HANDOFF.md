@@ -31,6 +31,7 @@ Verification:
 - `cargo check -j 1` passed before the final decode-limit hardening edit; the focused WebP and alt-text tests passed from the compiled library test binary. Re-run `cargo check -j 1` after the shared Cargo queue clears to validate the final hardening edit.
 - `npm --prefix solid-ui run typecheck` and `node wedding/tests/wedding-website-smoke.mjs` passed.
 - `npm --prefix solid-ui run test:line-budget` reports two pre-existing unrelated failures: `WeddingResponseWorkspaceView.tsx` (1042) and `weddingResponseWorkspaceViewState.ts` (1038). All WED-167 files are below 1000 lines.
+- Oracle deployment used an isolated clean worktree pinned to `5bc8ad8`, so unrelated shared-worktree changes were excluded. The Linux Docker release build passed, services restarted, and live checks returned `200` for both `/api/wedding/vendor/photo-licence` (including the pinned version/hash) and `/wedding/vendor-image-licence.html`. The deploy script's longer detached backup/restore audit remains in progress after the release.
 
 ## 2026-10-09 - WED-168 AgentCard and browser key-custody foundation (Codex)
 
