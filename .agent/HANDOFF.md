@@ -5,6 +5,46 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-08 - AGM-00 agent mesh implementation and production closure plan (Codex)
+
+What changed:
+
+- Added `Documents/design/agent/Agent mesh integration production task plan.md`, using the proposed
+  Agent Mesh Integration Spec as direction while separating verified repository facts from claims
+  that must be re-audited on each task branch.
+- Defined dependency-ordered AGM-00 through AGM-14 work covering repository/task reconciliation,
+  tenant agent storage, daemon policy, suggestion cutover, append-only retention, event pipeline,
+  synthesizer/projection/heartbeats, mobile controls, integrated validation, staging, rollback, and
+  Oracle production promotion.
+- Recommended `gpt-6-astra` at medium reasoning as the normal executor, with high reasoning limited
+  to bounded storage, security, migration, or failed-release reviews.
+- Made safe worktree reconciliation and closure of the seven existing `in_progress` tasks explicit
+  release gates. Secrets and generated artifacts must be relocated/ignored rather than blindly
+  committed. PARA receives compatibility smoke coverage but is not a feature-priority dependency.
+
+Validation performed:
+
+- Re-read the 502-line direction spec and inspected the referenced current symbols, schemas,
+  migration tail, large-file line counts, task ledger, Git ancestry/status, GitHub CI/deployment
+  visibility, Oracle rollout runbook, deploy script, and recent production handoff evidence.
+- Confirmed the plan contains the model directive, baseline worktree/task counts, secret-safe
+  reconciliation, staging, rollback, exact-SHA production proof, and PARA compatibility gates.
+- `git diff --check -- .agent/TASKS.yaml` completed without whitespace errors (Git reported only the
+  existing Windows line-ending conversion warning).
+
+Not changed:
+
+- No agent-mesh implementation, migration, environment, staging, or production deployment was
+  performed; this task only creates the implementation/release plan.
+- None of the 448 pre-existing untracked entries was staged, edited, removed, or committed. The
+  referenced direction spec remains user-owned and untracked.
+
+Recommended next action:
+
+- Claim AGM-01 only after AGM-00's live repository/worktree reconciliation steps are executed and
+  the release base is agreed. Do not start storage migration work from the current dirty primary
+  worktree.
+
 ## 2026-10-08 - WED-175 wedding home mobile gestures and schedule chart (Codex)
 
 What changed:

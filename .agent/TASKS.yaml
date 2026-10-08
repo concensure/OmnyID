@@ -806,3 +806,21 @@ tasks:
       - cleared recommendation cards do not return after navigating away and back
       - wedding home has no seeded timeline items and the overview tiles are readable touch targets
       - schedule chart spans the saved planning/wedding dates and uses editable deterministic task dates
+
+  - id: AGM-00
+    title: Agent mesh implementation and production closure task plan
+    status: done
+    owner: codex
+    branch: agent/codex/AGM-00
+    depends_on: []
+    files:
+      - Documents/design/agent/Agent mesh integration production task plan.md
+      - .agent/TASKS.yaml
+      - .agent/HANDOFF.md
+    acceptance:
+      - the direction spec is converted into a dependency-ordered implementation and release plan
+      - current repository, task-ledger, storage, staging, and production facts are distinguished from assumptions
+      - the executor model and bounded reasoning policy balance accuracy and cost
+      - worktree reconciliation is secret-safe and does not require blindly committing generated or private files
+      - completion requires a clean reviewed release SHA deployed and verified in staging and production
+      - PARA receives compatibility coverage without becoming a feature-priority dependency
