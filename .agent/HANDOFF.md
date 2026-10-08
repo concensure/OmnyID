@@ -16,7 +16,21 @@ Verification:
 
 Remaining:
 
-- The owner photo upload/re-encode pipeline and claim wizard do not exist yet. Wire `VendorPhotoLicenceConsent` and its receipt into that upload request before exposing the publication UI; do not accept a client-supplied licence ID without checking its vendor/user/version.
+- The owner photo upload/re-encode pipeline is now implemented in the follow-up below. The claim/editor wizard still does not exist: mount `VendorPhotoUploadPanel` there rather than placing it in the already oversized `App.tsx`. The server-side upload path verifies a client-supplied receipt against its vendor, claimant, current version, and hash.
+
+## 2026-10-09 - WED-167 licensed vendor photo publication follow-up (Codex)
+
+What changed:
+
+- Added protected multipart publishing at `POST /api/wedding/vendor/photos`. It accepts only the active claimant's current licence receipt, accepts JPEG/PNG/WebP up to 15 MB, applies source dimension and decoded-memory limits, re-encodes three WebP variants (removing original EXIF/metadata), rolls back stored objects on a database failure, and enforces the 10/30 tier caps.
+- Added immutable, public WebP delivery at `GET /api/public/wedding/vendor/photos/{asset_id}/{full|medium|thumb}`. An image is not publicly available until its vendor is active and claimed or verified. Directory responses prefer live owner images over seed images.
+- Added `VendorPhotoUploadPanel`, a small responsive Solid component that forces the scroll-gated licence acceptance flow before allowing a photo upload. It is deliberately not mounted in `App.tsx`, which already exceeds the project line budget; the planned vendor wizard is its mount point.
+
+Verification:
+
+- `cargo check -j 1` passed before the final decode-limit hardening edit; the focused WebP and alt-text tests passed from the compiled library test binary. Re-run `cargo check -j 1` after the shared Cargo queue clears to validate the final hardening edit.
+- `npm --prefix solid-ui run typecheck` and `node wedding/tests/wedding-website-smoke.mjs` passed.
+- `npm --prefix solid-ui run test:line-budget` reports two pre-existing unrelated failures: `WeddingResponseWorkspaceView.tsx` (1042) and `weddingResponseWorkspaceViewState.ts` (1038). All WED-167 files are below 1000 lines.
 
 ## 2026-10-09 - WED-168 AgentCard and browser key-custody foundation (Codex)
 

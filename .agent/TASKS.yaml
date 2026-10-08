@@ -640,10 +640,15 @@ tasks:
       - WED-166
     files:
       - src/server/wedding_vendor_claim_routes.rs
+      - src/server/wedding_vendor_photo_routes.rs
+      - src/server/mod.rs
+      - Cargo.toml
+      - Cargo.lock
       - src/db/wedding_vendor_claims.rs
       - src/db/migration_catalog.rs
       - postgres/migrations/0104_wedding_vendor_photo_licences.sql
       - solid-ui/src/components/vendor/VendorPhotoLicenceConsent.tsx
+      - solid-ui/src/components/vendor/VendorPhotoUploadPanel.tsx
       - solid-ui/src/lib/vendorPhotoLicenceApi.ts
       - wedding/vendor-image-licence.html
     acceptance:
@@ -653,8 +658,9 @@ tasks:
       - every live owner image is linked to a server-recorded current-version licence receipt; the consent UI requires scrolling through the agreement before its checkbox can be used
     progress:
       - added versioned licence receipt storage and the required-live-image database constraint, a claimant-only acceptance endpoint, and a scroll-gated mobile consent component
+      - added claimant-only multipart upload with 15 MB payload, source-dimension and decode-memory limits, WebP-only public variants, storage rollback, plan caps, and public delivery only after a claimed or verified listing; the reusable mobile upload panel records consent before it allows file selection
     remaining:
-      - connect the receipt to the new owner photo upload/re-encode pipeline and claim wizard
+      - mount the reusable upload panel in the planned vendor claim/editor wizard and add the owner-facing reorder control
 
   - id: WED-168
     title: Vendor Agent ID and AgentCard publishing

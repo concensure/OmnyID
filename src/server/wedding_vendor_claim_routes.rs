@@ -35,8 +35,8 @@ use super::{
 
 const MAX_QUERY_LENGTH: usize = 120;
 const DIRECTORY_PAGE_SIZE: i64 = 24;
-const PHOTO_LICENCE_VERSION: &str = "vendor-image-licence-2026-10-09";
-const PHOTO_LICENCE_SHA256: &str =
+pub(super) const PHOTO_LICENCE_VERSION: &str = "vendor-image-licence-2026-10-09";
+pub(super) const PHOTO_LICENCE_SHA256: &str =
     "fe8e9861793131444295de144dd8a20f5fe854dc9a91736de2598dccc7ebe8d8";
 const PHOTO_LICENCE_CONSENT: &str = "I confirm that I have read and agree to the Vendor Image Licence Agreement, and that I am authorised to grant the licence above for all Images submitted.";
 
@@ -166,6 +166,15 @@ async fn public_directory_http(
                 FROM wedding_vendor_photos photo
                 WHERE photo.vendor_id = v.vendor_id
             ), '[]'::jsonb) AS photos
+            ,COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                    'url', '/api/public/wedding/vendor/photos/' || asset_id || '/medium',
+                    'alt_text', COALESCE(alt_text, v.vendor_name || ' vendor photo'),
+                    'source_label', 'Vendor supplied'
+                ) ORDER BY is_cover DESC, position ASC)
+                FROM wedding_vendor_owner_assets asset
+                WHERE asset.vendor_id = v.vendor_id AND asset.status = 'live'
+            ), '[]'::jsonb) AS owner_photos
         FROM wedding_vendors v
         LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
         LEFT JOIN wedding_vendor_agent_links link ON link.vendor_id = v.vendor_id
@@ -219,6 +228,15 @@ async fn public_vendor_http(
                 FROM wedding_vendor_photos photo
                 WHERE photo.vendor_id = v.vendor_id
             ), '[]'::jsonb) AS photos
+            ,COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                    'url', '/api/public/wedding/vendor/photos/' || asset_id || '/medium',
+                    'alt_text', COALESCE(alt_text, v.vendor_name || ' vendor photo'),
+                    'source_label', 'Vendor supplied'
+                ) ORDER BY is_cover DESC, position ASC)
+                FROM wedding_vendor_owner_assets asset
+                WHERE asset.vendor_id = v.vendor_id AND asset.status = 'live'
+            ), '[]'::jsonb) AS owner_photos
         FROM wedding_vendors v
         LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
         LEFT JOIN wedding_vendor_agent_links link ON link.vendor_id = v.vendor_id
@@ -639,6 +657,12 @@ fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
         .try_get::<Option<String>, _>("linked_agent_id")
         .ok()
         .flatten();
+    let owner_photos: Value = row.get("owner_photos");
+    let display_photos = owner_photos
+        .as_array()
+        .is_some_and(|photos| !photos.is_empty())
+        .then_some(owner_photos)
+        .unwrap_or_else(|| row.get("photos"));
     json!({
         "slug": row.get::<String, _>("vendor_slug"),
         "name": row.get::<String, _>("vendor_name"),
@@ -659,7 +683,7 @@ fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
         "capacity_max": row.get::<i32, _>("capacity_max"),
         "styles": row.get::<Vec<String>, _>("styles"),
         "flags": row.get::<Vec<String>, _>("flags"),
-        "photos": row.get::<Value, _>("photos"),
+        "photos": display_photos,
     })
 }
 

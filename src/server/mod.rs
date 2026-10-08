@@ -158,8 +158,9 @@ mod user_management_routes;
 mod value_signal_helpers;
 mod wedding_admin_ai_policy;
 mod wedding_understanding_routes;
-mod wedding_vendor_outreach_routes;
 mod wedding_vendor_claim_routes;
+mod wedding_vendor_outreach_routes;
+mod wedding_vendor_photo_routes;
 mod wedding_vendor_production;
 mod wedding_vendor_search_routes;
 mod workflow_connector_bindings;
@@ -1371,6 +1372,7 @@ pub async fn run() {
         .merge(wedding_understanding_routes::routes())
         .merge(workspace_routes::routes())
         .merge(wedding_vendor_claim_routes::routes())
+        .merge(wedding_vendor_photo_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(app_state.clone());

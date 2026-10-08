@@ -382,3 +382,13 @@ Production runs with `OMNYID_ENV=production`, so unsafe startup settings fail cl
 treats Gmail OAuth as enabled whenever a homeserver URL or session secret is set, so it effectively
 requires a Gmail client id and secret; staging supplies inert placeholders. Release evidence comes
 from the Oracle runtime and local tags, not GitHub Deployments, because no GitHub release is used.
+
+## 2026-10-09: Vendor Owner Photo Publication
+
+The original vendor upload is never retained. A claimant uploads a bounded JPEG, PNG, or WebP
+payload only after recording the current versioned image-licence receipt. The service enforces
+source-dimension and decoder-memory bounds, writes full/medium/thumb WebP derivatives to the
+public SeaweedFS namespace, and deletes stored derivatives if its database write fails. A public
+derivative is served only for an active vendor listing that is claimed or verified. This keeps
+metadata out of public delivery and prevents an unverified claimant from immediately publishing
+to the directory.

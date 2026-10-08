@@ -3,7 +3,7 @@
 // @locs-version: 2.0
 // @stability: draft
 // @owner: omnyid
-import { apiFetch } from "@/lib/api";
+import { API_BASE, apiFetch, readSession } from "@/lib/api";
 
 export interface VendorPhotoLicenceDocument {
   agreement_version: string;
@@ -34,4 +34,33 @@ export async function acceptVendorPhotoLicence(input: {
       accepted: true,
     },
   });
+}
+
+export async function uploadLicensedVendorPhoto(input: {
+  vendorSlug: string;
+  photoLicenceId: string;
+  file: File;
+  altText?: string;
+  isCover?: boolean;
+}): Promise<{ asset_id: string; photo_licence_id: string; url: string }> {
+  const body = new FormData();
+  body.append("vendor_slug", input.vendorSlug);
+  body.append("photo_licence_id", input.photoLicenceId);
+  body.append("file", input.file, input.file.name);
+  if (input.altText?.trim()) body.append("alt_text", input.altText.trim());
+  body.append("is_cover", input.isCover ? "true" : "false");
+  const headers = new Headers();
+  const token = readSession()?.token;
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(`${API_BASE}/api/wedding/vendor/photos`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body,
+  });
+  const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!response.ok || !payload || typeof payload.asset_id !== "string" || typeof payload.url !== "string" || typeof payload.photo_licence_id !== "string") {
+    throw new Error((typeof payload?.error === "string" && payload.error) || "Photo upload could not be completed.");
+  }
+  return { asset_id: payload.asset_id, photo_licence_id: payload.photo_licence_id, url: payload.url };
 }
