@@ -200,6 +200,8 @@ services:
       ACME_EMAIL: ${ACME_EMAIL}
       OMNYID_PREVIEW_USERNAME: ${OMNYID_PREVIEW_USERNAME}
       OMNYID_PREVIEW_PASSWORD_HASH: ${OMNYID_PREVIEW_PASSWORD_HASH}
+      OMNYID_STAGING_USER: ${OMNYID_STAGING_USER:-staging}
+      OMNYID_STAGING_PASSWORD_HASH: ${OMNYID_STAGING_PASSWORD_HASH:?set in .env.oracle}
     ports:
       - "80:80"
       - "443:443"
@@ -208,6 +210,7 @@ services:
       - ./docs:/srv/docs:ro
       - ./wedding:/srv/wedding:ro
       - workspace-assets:/srv/workspace:ro
+      - staging-workspace-assets:/srv/staging-workspace:ro
       - caddy-data:/data
       - caddy-config:/config
 
@@ -257,5 +260,8 @@ volumes:
   postgres-data:
   seaweedfs-data:
   workspace-assets:
+  # Filled by the staging stack; declared here so Caddy can mount it read-only.
+  staging-workspace-assets:
+    name: omnyid-staging-workspace-assets
   caddy-data:
   caddy-config:

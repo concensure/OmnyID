@@ -1,0 +1,129 @@
+# Staging stack for the Oracle host. Run via scripts/staging-up.sh.
+# Isolated from production: own Postgres volume, own keys, no mail or paid API keys.
+# Service names are prefixed `staging-` so they can never resolve to production's
+# `postgres` on the shared `omnyid_default` network that Caddy uses.
+name: omnyid-staging
+
+services:
+  staging-postgres:
+    image: pgvector/pgvector:pg18
+    mem_limit: ${OMNYID_STAGING_POSTGRES_MEM_LIMIT:-768m}
+    cpus: ${OMNYID_STAGING_POSTGRES_CPUS:-0.75}
+    pids_limit: 200
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=4
+      - -c
+      - max_wal_senders=4
+    environment:
+      POSTGRES_DB: afp
+      POSTGRES_USER: afp
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - ./.secrets-staging:/run/secrets:ro
+      - staging-postgres-data:/var/lib/postgresql
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U afp -d afp"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  staging-electric:
+    image: electricsql/electric:latest
+    mem_limit: ${OMNYID_STAGING_ELECTRIC_MEM_LIMIT:-384m}
+    cpus: ${OMNYID_STAGING_ELECTRIC_CPUS:-0.5}
+    pids_limit: 128
+    depends_on:
+      staging-postgres:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
+    command: ["/app/bin/entrypoint", "start"]
+    environment:
+      DATABASE_URL_FILE: /run/secrets/database_url
+      ELECTRIC_INSECURE: "true"
+      ELECTRIC_USAGE_REPORTING: "false"
+    volumes:
+      - ./.secrets-staging:/run/secrets:ro
+      - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
+    restart: unless-stopped
+
+  staging-homeserver:
+    # Defaults to the image production runs; point at a candidate tag to test a release first.
+    image: ${OMNYID_STAGING_HOMESERVER_IMAGE:-omnyid-homeserver:latest}
+    mem_limit: ${OMNYID_STAGING_HOMESERVER_MEM_LIMIT:-1g}
+    cpus: ${OMNYID_STAGING_HOMESERVER_CPUS:-1.0}
+    pids_limit: 256
+    depends_on:
+      staging-postgres:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
+    command: ["./omnyid-homeserver"]
+    environment:
+      # Rehearses the strict production startup policy; set OMNYID_STAGING_ENV=staging to relax.
+      OMNYID_ENV: ${OMNYID_STAGING_ENV:-production}
+      DATABASE_URL_FILE: /run/secrets/database_url
+      OMNYID_AGENT_ID: agent:staging@omnyid.com
+      OMNYID_GATEWAY_AGENT_ID: agent:email-gateway-staging@omnyid.com
+      OMNYID_HOMESERVER_URL: https://staging.omnyid.com
+      OMNYID_AFP_DELEGATION: staging.omnyid.com:443
+      OMNYID_DOMAIN: staging.omnyid.com
+      OMNYID_BASE_URL: https://staging.omnyid.com
+      LOG_FORMAT: json
+      OMNYID_PUBLIC_KEY_HEX: ${OMNYID_STAGING_PUBLIC_KEY_HEX:?run scripts/staging-up.sh first}
+      OMNYID_SIGNING_KEY_HEX_FILE: /run/secrets/omnyid_signing_key_hex
+      OMNYID_ENCRYPTION_KEY_HEX_FILE: /run/secrets/omnyid_encryption_key_hex
+      OMNYID_SESSION_SECRET_FILE: /run/secrets/omnyid_session_secret
+      OMNYID_DELEGATION_MASTER_KEY_HEX_FILE: /run/secrets/omnyid_delegation_master_key_hex
+      OMNYID_RECIPIENT_KEYS_JSON: "{}"
+      OMNYID_ALLOW_INSECURE_UNSIGNED: "false"
+      OMNYID_REQUIRE_ENCRYPTION: "true"
+      OMNYID_ALLOW_PLAINTEXT_STORAGE: "false"
+      OMNYID_ENABLE_SERVER_SUMMARIZATION: "false"
+      OMNYID_ENCRYPT_BY_DEFAULT: "true"
+      OMNYID_ENABLE_INTERNAL_GRPC: "false"
+      OMNYID_ENABLE_PRIVATE_RUNTIMES: "false"
+      OMNYID_ENABLE_WEBTRANSPORT: "false"
+      # No mail provider or outbound keys: staging must never send or read real mail.
+      OMNYID_MAIL_PROVIDER: disabled
+      # The production policy requires a Gmail OAuth client whenever a homeserver URL is
+      # set. These are inert placeholders: no refresh token exists and the provider is off.
+      OMNYID_GMAIL_CLIENT_ID: staging-placeholder.apps.googleusercontent.com
+      OMNYID_GMAIL_CLIENT_SECRET_FILE: /run/secrets/omnyid_gmail_client_secret
+      OMNYID_EMAIL_ADDRESS: staging@omnyid.com
+      FROM_ADDRESS: staging@omnyid.com
+      OMNYID_ELECTRIC_URL: http://staging-electric:5133
+      OMNYID_WEDDING_EXTERNAL_SEND_ENABLED: "false"
+      OMNYID_WEDDING_ONLINE_FALLBACK_ENABLED: "false"
+      OMNYID_WEDDING_ONLINE_CATALOG_ENRICHMENT_ENABLED: "false"
+    ports:
+      - "127.0.0.1:18081:8080"
+    volumes:
+      - ./.secrets-staging:/run/secrets:ro
+      - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
+    networks:
+      - default
+      - edge
+    restart: unless-stopped
+
+  # One-shot: copies the built dashboard into the volume Caddy serves for staging.
+  staging-ui:
+    image: ${OMNYID_STAGING_UI_IMAGE:-omnyid-ui:latest}
+    volumes:
+      - staging-workspace-assets:/srv/workspace
+    restart: "no"
+
+networks:
+  # Production's default network, so its Caddy can reach staging-homeserver by name.
+  edge:
+    name: omnyid_default
+    external: true
+
+volumes:
+  staging-postgres-data:
+  staging-workspace-assets:
+    name: omnyid-staging-workspace-assets

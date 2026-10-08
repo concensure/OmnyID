@@ -367,6 +367,52 @@ wt.{$OMNYID_DOMAIN} {
     import omnyid_proxy
 }
 
+# Cloudflare proxies www; without a site here the origin handshake fails (525).
+www.{$OMNYID_DOMAIN} {
+    redir https://{$OMNYID_DOMAIN}{uri} permanent
+}
+
+# Staging stack (docker-compose.oracle.staging.yml). The app sends Bearer tokens in the
+# Authorization header, which collides with basic auth, so basic auth gates only the
+# dashboard shell; API calls are protected by the app's own sessions.
+staging.{$OMNYID_DOMAIN} {
+    # Only Cloudflare may reach this origin, so Cloudflare Access cannot be bypassed by
+    # connecting to the server IP directly. Ranges: https://api.cloudflare.com/client/v4/ips
+    @not_cloudflare not remote_ip 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+    handle @not_cloudflare {
+        abort
+    }
+    request_body {
+        max_size 4MB
+    }
+    handle / {
+        basic_auth {
+            {$OMNYID_STAGING_USER} {$OMNYID_STAGING_PASSWORD_HASH}
+        }
+        redir * /workspace/ 308
+    }
+    handle /workspace* {
+        basic_auth {
+            {$OMNYID_STAGING_USER} {$OMNYID_STAGING_PASSWORD_HASH}
+        }
+        redir /workspace /workspace/ 308
+        uri strip_prefix /workspace
+        root * /srv/staging-workspace
+        try_files {path} /index.html
+        file_server
+        header Cache-Control "no-cache, no-store, must-revalidate"
+        header Service-Worker-Allowed "/workspace/"
+        header X-Content-Type-Options "nosniff"
+        header X-Robots-Tag "noindex"
+    }
+    handle {
+        header X-Robots-Tag "noindex"
+        reverse_proxy staging-homeserver:8080 {
+            header_up X-Forwarded-For {client_ip}
+        }
+    }
+}
+
 # NOTE: this site block serves a different app (StrollerCheck) sharing this
 # same Oracle VM/Caddy instance. It is not part of the OmnyID codebase but is
 # kept here because it is already live on the deployed host — removing it
