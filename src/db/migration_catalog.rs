@@ -507,4 +507,19 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Per-vendor rooms with pricing, inclusions, and Seaweed FS-backed room photos",
         include_str!("../../postgres/migrations/0100_wedding_vendor_rooms.sql"),
     ),
+    (
+        "0101_wedding_vendor_claims",
+        "Vendor claim state, roles, verification codes, and magic-link token storage",
+        include_str!("../../postgres/migrations/0101_wedding_vendor_claims.sql"),
+    ),
+    (
+        "0102_wedding_vendor_owner_profile",
+        "Owner-supplied vendor profile, public assets, and linked AgentCard records",
+        include_str!("../../postgres/migrations/0102_wedding_vendor_owner_profile.sql"),
+    ),
+    (
+        "0103_wedding_vendor_subscriptions_and_enquiries",
+        "Vendor subscription, ciphertext-only wedding enquiry relay, and listing statistics",
+        include_str!("../../postgres/migrations/0103_wedding_vendor_subscriptions_and_enquiries.sql"),
+    ),
 ];

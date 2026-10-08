@@ -5,6 +5,36 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-09 - WED-161 vendor claim and enquiry schema foundation (Codex)
+
+What changed:
+
+- Added migrations `0101`–`0103` and registered them in the migration catalogue.
+- The schema separates owner-managed public listing data from sourced seed data, records
+  claim status/history and one-active-claim enforcement, and makes the proposed A2A
+  relay ciphertext-only by schema (no plaintext enquiry fields exist).
+- Updated WED-161 to `in_progress` on `agent/codex/WED-161`; WED-153 is now present
+  in the branch ancestry, so its former dependency block is resolved.
+
+Verification:
+
+- `git diff --check` passed.
+- `cargo check` passed.
+- The focused migration-catalog test is queued behind an unrelated running full Cargo
+  test process holding the shared target-directory lock.
+- Oracle read-only preflight passed with the restore drill deliberately skipped:
+  `artifacts/oracle-production-proof-wed161-preflight`.
+
+Release status:
+
+- Not deployed. Production has no Vendor Login, public vendor directory, claim wizard,
+  or encrypted enquiry routes yet. Do not advertise or release the schema alone.
+
+Next action:
+
+- Finish and review WED-161, then implement WED-162 through WED-170 before any
+  customer-facing Vendor Login or A2A enquiry launch.
+
 ## 2026-10-09 - UX-MPR-01 mobile UI principles pass on wedding phone views (Claude)
 
 For Codex - merge notes:

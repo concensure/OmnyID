@@ -517,9 +517,9 @@ tasks:
 
   - id: WED-161
     title: Vendor claim schema migrations
-    status: blocked
+    status: in_progress
     owner: codex
-    branch: agent/codex/WED-160
+    branch: agent/codex/WED-161
     depends_on:
       - WED-153
     files:
@@ -533,7 +533,7 @@ tasks:
       - every existing wedding_vendors row has claim_status = 'unclaimed'
       - migrations are additive and idempotent; nothing is dropped
     remaining:
-      - blocked until WED-153 commits its uncommitted src/db.rs, migration_catalog.rs and 0100 migration
+      - verify the registered migrations from a clean database once the shared Cargo build lock is released
 
   - id: WED-162
     title: User roles and zero-storage vendor plan
