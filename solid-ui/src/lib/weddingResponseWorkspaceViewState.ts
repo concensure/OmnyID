@@ -364,6 +364,36 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+function exactIsoDate(value: unknown): string | null {
+  const text = clean(value);
+  const date = text.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+}
+
+function weddingPlanningWindow(scheduleItems: readonly WeddingPlanningScheduleItem[], metadata: unknown, nowIso: string | null | undefined): { startAt: string; weddingDate: string | null } {
+  const metadataRecord = record(metadata);
+  const weddingDate = scheduleItems
+    .map((item) => {
+      const itemMetadata = record(item.metadata);
+      return /wedding\s*(date|day)/i.test(item.title)
+        ? exactIsoDate(item.startAt) ?? exactIsoDate(item.dateLabel)
+        : exactIsoDate(itemMetadata.wedding_date) ?? exactIsoDate(itemMetadata.weddingDate);
+    })
+    .find((date): date is string => Boolean(date))
+    ?? exactIsoDate(metadataRecord.wedding_date)
+    ?? exactIsoDate(metadataRecord.weddingDate);
+  const persistedStart = scheduleItems
+    .map((item) => exactIsoDate(record(item.metadata).planning_started_at))
+    .find((date): date is string => Boolean(date))
+    ?? exactIsoDate(metadataRecord.planning_started_at);
+  return { startAt: persistedStart ?? exactIsoDate(nowIso) ?? new Date().toISOString().slice(0, 10), weddingDate };
+}
+
+function isSeededTimelineTask(task: WeddingPlanningTaskItem): boolean {
+  const metadata = record(task.metadata);
+  return metadata.vendor_seed_review_task === true || metadata.seed === true || metadata.demo === true;
+}
+
 function isUserFacingWeddingPlanningTask(task: WeddingPlanningTaskItem): boolean {
   const metadata = record(task.metadata);
   return !(
@@ -628,6 +658,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     taskItems,
   });
   const projectionScheduleItems = projectionSchedule.scheduleItems;
+  const planningWindow = weddingPlanningWindow(projectionScheduleItems, input.metadata, input.nowIso);
   const workspace = buildWeddingResponseWorkspaceState(input);
   const adminDataConsent = buildWeddingAdminDataConsentState({
     enabled: input.adminDataConsentEnabled,
@@ -636,30 +667,6 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     submittedResponseCount: artifacts.length,
   });
   const delegation = buildWeddingDelegationState(input.delegatedResponsibilities ?? []);
-  const ganttTimeline = buildWeddingGanttTimelineState({
-    categoryColors: input.ganttCategoryColors,
-    items: [
-      ...projectionScheduleItems.map((item) => ({
-        id: item.id,
-        title: item.title,
-        category: item.kind,
-        startAt: item.startAt,
-        endAt: item.endAt,
-        dueLabel: item.dateLabel,
-        status: item.reviewStatus ?? item.approvalState ?? null,
-        linkedArtifactId: item.linkedArtifactId,
-      })),
-      ...taskItems.map((item) => ({
-        id: item.id,
-        title: item.title,
-        category: item.kind,
-        dueDate: item.dueAt,
-        dueLabel: item.dueLabel,
-        status: item.reviewStatus ?? item.approvalState ?? item.priority ?? null,
-        linkedArtifactId: item.linkedArtifactId,
-      })),
-    ],
-  });
   const activePreview = previewForArtifact(workspace.activeArtifact, artifacts, input.decisionRecords);
   const artifactPreviews = workspace.results
     .map((artifact) => previewForArtifact(artifact, artifacts, input.decisionRecords))
@@ -840,6 +847,35 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     && record(task.metadata).production_remaining_work_task !== true
   ));
   const userFacingProjectionTaskItems = activeProjectionTaskItems.filter(isUserFacingWeddingPlanningTask);
+  // Use the complete generated task plan so the chart can apply the project lead-time
+  // templates, but keep demo/seed review work out of a couple's timeline.
+  const timelineTaskItems = userFacingProjectionTaskItems.filter((task) => !isSeededTimelineTask(task));
+  const ganttTimeline = buildWeddingGanttTimelineState({
+    categoryColors: input.ganttCategoryColors,
+    planningStartAt: planningWindow.startAt,
+    weddingDate: planningWindow.weddingDate,
+    items: [
+      ...projectionScheduleItems.map((item) => ({
+        id: item.id,
+        title: item.title,
+        category: item.kind,
+        startAt: item.startAt,
+        endAt: item.endAt,
+        dueLabel: item.dateLabel,
+        status: item.reviewStatus ?? item.approvalState ?? null,
+        linkedArtifactId: item.linkedArtifactId,
+      })),
+      ...timelineTaskItems.map((item) => ({
+        id: item.id,
+        title: item.title,
+        category: item.kind,
+        dueDate: item.dueAt,
+        dueLabel: item.dueLabel,
+        status: item.reviewStatus ?? item.approvalState ?? item.priority ?? null,
+        linkedArtifactId: item.linkedArtifactId,
+      })),
+    ],
+  });
   const vendorPursuitLogTaskItems = projectionTaskItems.filter(isClosedVendorPursuitTask);
   const vendorPursuitLogCards = buildWeddingVendorPursuitLogCards(vendorPursuitLogTaskItems);
   const personalOsProjection = buildWeddingPersonalOsProjectionState({

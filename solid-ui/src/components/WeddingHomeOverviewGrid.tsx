@@ -89,11 +89,11 @@ export function WeddingHomeOverviewGrid(props: {
         </button>
       </div>
 
-      <button type="button" class="min-h-12 min-w-0 rounded-[24px] border border-emerald-100/80 bg-emerald-50/80 p-3 text-left shadow-card transition hover:border-emerald-200 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" title="Open wedding budget" onClick={openBudget}>
+      <button type="button" class="min-h-[11rem] min-w-0 rounded-[24px] border border-emerald-100/80 bg-emerald-50/80 p-4 text-left shadow-card transition hover:border-emerald-200 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2 sm:min-h-12 sm:p-3" title="Open wedding budget" onClick={openBudget}>
         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #B45309" aria-hidden="true">
           <WeddingDashboardIcon id="banknotes" class="h-4 w-4" />
         </span>
-        <p class={`mt-2 break-words font-bold text-emerald-950 ${dense() ? "text-lg" : "text-xl"}`}>{budgetTile()?.valueLabel}</p>
+        <p class={`mt-2 break-words font-bold text-emerald-950 ${dense() ? "text-xl" : "text-xl"}`}>{budgetTile()?.valueLabel}</p>
         <p class="text-xs text-emerald-900/85">budget status</p>
         <span class="mt-1 inline-flex rounded-full border border-emerald-200/80 bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-emerald-950">
           {budgetTile()?.toneLabel}
@@ -102,11 +102,11 @@ export function WeddingHomeOverviewGrid(props: {
         <p class={`mt-0.5 break-words text-[11px] font-semibold text-emerald-900/85 ${dense() ? "hidden" : ""}`}>{budgetTile()?.supportLabel}</p>
       </button>
 
-      <button type="button" class="min-h-12 min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 text-left shadow-card transition hover:border-sky-200 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" title={guestTile()?.actionLabel ?? "Open guests"} onClick={() => openMenu(guestTile()?.menuId)}>
+      <button type="button" class="min-h-[11rem] min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-4 text-left shadow-card transition hover:border-sky-200 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2 sm:min-h-12 sm:p-3" title={guestTile()?.actionLabel ?? "Open guests"} onClick={() => openMenu(guestTile()?.menuId)}>
         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #0F766E" aria-hidden="true">
           <WeddingDashboardIcon id="users" class="h-4 w-4" />
         </span>
-        <p class={`mt-2 break-words font-bold text-sky-950 ${dense() ? "text-lg" : "text-xl"}`}>{guestTile()?.valueLabel}</p>
+        <p class={`mt-2 break-words font-bold text-sky-950 ${dense() ? "text-xl" : "text-xl"}`}>{guestTile()?.valueLabel}</p>
         <span class="mt-1 inline-flex rounded-full border border-sky-200/80 bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-sky-950">
           {guestTile()?.toneLabel}
         </span>
@@ -114,11 +114,11 @@ export function WeddingHomeOverviewGrid(props: {
         <p class={`mt-0.5 break-words text-[11px] text-sky-900/85 ${dense() ? "hidden" : ""}`}>{guestTile()?.supportLabel}</p>
       </button>
 
-      <button type="button" class="min-h-12 min-w-0 rounded-[24px] border border-fuchsia-100/80 bg-fuchsia-50/80 p-3 text-left shadow-card transition hover:border-fuchsia-200 hover:bg-fuchsia-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" title={seatingTile()?.actionLabel ?? "Open seating"} onClick={() => openMenu(seatingTile()?.menuId)}>
+      <button type="button" class="min-h-[11rem] min-w-0 rounded-[24px] border border-fuchsia-100/80 bg-fuchsia-50/80 p-4 text-left shadow-card transition hover:border-fuchsia-200 hover:bg-fuchsia-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2 sm:min-h-12 sm:p-3" title={seatingTile()?.actionLabel ?? "Open seating"} onClick={() => openMenu(seatingTile()?.menuId)}>
         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #7C3AED" aria-hidden="true">
           <WeddingDashboardIcon id="table-cells" class="h-4 w-4" />
         </span>
-        <p class={`mt-2 break-words font-bold text-fuchsia-950 ${dense() ? "text-lg" : "text-xl"}`}>{seatingTile()?.valueLabel}</p>
+        <p class={`mt-2 break-words font-bold text-fuchsia-950 ${dense() ? "text-xl" : "text-xl"}`}>{seatingTile()?.valueLabel}</p>
         <span class="mt-1 inline-flex rounded-full border border-fuchsia-200/80 bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-950">
           {seatingTile()?.toneLabel}
         </span>
@@ -126,11 +126,11 @@ export function WeddingHomeOverviewGrid(props: {
         <p class={`mt-0.5 break-words text-[11px] text-fuchsia-900/85 ${dense() ? "hidden" : ""}`}>{seatingTile()?.supportLabel}</p>
       </button>
 
-      <button type="button" class="min-h-12 min-w-0 rounded-[24px] border border-amber-100/80 bg-amber-50/85 p-3 text-left shadow-card transition hover:border-amber-200 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" title={vendorTile()?.actionLabel ?? "Open vendor follow-ups"} onClick={() => openMenu(vendorTile()?.menuId)}>
+      <button type="button" class="min-h-[11rem] min-w-0 rounded-[24px] border border-amber-100/80 bg-amber-50/85 p-4 text-left shadow-card transition hover:border-amber-200 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2 sm:min-h-12 sm:p-3" title={vendorTile()?.actionLabel ?? "Open vendor follow-ups"} onClick={() => openMenu(vendorTile()?.menuId)}>
         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #B45309" aria-hidden="true">
           <WeddingDashboardIcon id="user-plus" class="h-4 w-4" />
         </span>
-        <p class={`mt-2 break-words font-bold text-amber-950 ${dense() ? "text-lg" : "text-xl"}`}>{vendorTile()?.valueLabel}</p>
+        <p class={`mt-2 break-words font-bold text-amber-950 ${dense() ? "text-xl" : "text-xl"}`}>{vendorTile()?.valueLabel}</p>
         <span class="mt-1 inline-flex rounded-full border border-amber-200/80 bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-amber-950">
           {vendorTile()?.toneLabel}
         </span>

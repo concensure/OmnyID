@@ -60,13 +60,14 @@ test("wedding date becomes schedule and AFP inputs for calendar plus knowledge g
     responseWorkspaceId: "workspace-456",
     sourceResponseId: "response-789",
   };
-  const scheduleItem = weddingDateToScheduleItem({ date: "2027-09-18", metadata });
+  const scheduleItem = weddingDateToScheduleItem({ date: "2027-09-18", metadata, planningStartedAt: "2026-10-08" });
   assert.equal(scheduleItem.title, "Wedding date");
   assert.equal(scheduleItem.reviewStatus, "accepted");
   assert.equal(scheduleItem.approvalState, "approved");
   assert.equal(scheduleItem.startAt, "2027-09-18T09:00:00.000Z");
+  assert.equal(scheduleItem.metadata.planning_started_at, "2026-10-08");
 
-  const sendInputs = weddingDateToAfpSendInputs({ date: "2027-09-18", metadata });
+  const sendInputs = weddingDateToAfpSendInputs({ date: "2027-09-18", metadata, planningStartedAt: "2026-10-08" });
   assert.equal(sendInputs.length, 2);
   assert.ok(sendInputs.some((input) => input.type === "calendar_event" && input.to.includes("agent://calendar")));
   assert.ok(sendInputs.some((input) => input.subtype === "wedding_decision_selection" && input.to.includes("agent://knowledge-graph")));

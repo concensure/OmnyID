@@ -781,3 +781,28 @@ tasks:
       - calendar knowledge defaults persist as installed and the action is idempotent
     progress:
       - completed locally with focused TypeScript tests, typecheck, frontend build, and cargo check
+
+  - id: WED-175
+    title: Wedding home mobile gestures, recommendation persistence, and planning schedule
+    status: completed
+    owner: codex
+    branch: agent/codex/WED-175
+    depends_on:
+      - WED-174
+    files:
+      - solid-ui/src/components/WeddingMobileFocusHome.tsx
+      - solid-ui/src/components/WeddingHomeOverviewGrid.tsx
+      - solid-ui/src/components/WeddingTimelinePanel.tsx
+      - solid-ui/src/lib/decisionOsSwipeState.ts
+      - solid-ui/src/lib/weddingGanttTimelineState.ts
+      - solid-ui/src/lib/weddingGanttAxisState.ts
+      - solid-ui/src/lib/wedding*.ts
+      - solid-ui/tests/wedding-*.test.ts
+      - solid-ui/tests/decisionos-swipe-state.test.ts
+      - .agent/**
+    acceptance:
+      - mobile availability actions respond without competing with the swipe recogniser
+      - swipe cards track the finger with a smooth directional tilt and persist completed decisions
+      - cleared recommendation cards do not return after navigating away and back
+      - wedding home has no seeded timeline items and the overview tiles are readable touch targets
+      - schedule chart spans the saved planning/wedding dates and uses editable deterministic task dates

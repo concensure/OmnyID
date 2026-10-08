@@ -18,7 +18,8 @@ export function MobileFocusDeck(props: {
   renderEnd: () => JSX.Element;
   label: "Decision" | "Response";
 }) {
-  const [drag, setDrag] = createSignal<{ x: number; y: number; startedAt: number; pointerId: number; width: number; height: number } | null>(null);
+  const [drag, setDrag] = createSignal<{ x: number; y: number; startedAt: number; pointerId: number; width: number; height: number; axis: ReturnType<typeof decisionOsSwipeAxisLock> } | null>(null);
+  const [exiting, setExiting] = createSignal(false);
   const [offset, setOffset] = createSignal({ x: 0, y: 0 });
   const [announcement, setAnnouncement] = createSignal("");
   const item = createMemo(() => props.items[Math.min(Math.max(0, props.position), props.items.length - 1)]);
@@ -39,6 +40,9 @@ export function MobileFocusDeck(props: {
     if (offset().x < 0) return "‹ Previous";
     return "Next ›";
   };
+  const interactiveTarget = (target: EventTarget | null): boolean => typeof Element !== "undefined"
+    && target instanceof Element
+    && Boolean(target.closest("button, a, input, textarea, select, [data-deck-interactive]"));
   const navigate = (delta: number) => {
     const next = props.position + delta;
     if (next < 0) { setAnnouncement(`This is the first ${props.label.toLowerCase()}.`); return; }
@@ -61,16 +65,20 @@ export function MobileFocusDeck(props: {
     }
   };
   function pointerDown(event: PointerEvent & { currentTarget: HTMLDivElement }) {
+    // Vendor CTAs, links, and form controls own their tap. Without this guard the
+    // deck captures their pointer before the browser can synthesize a click.
+    if (interactiveTarget(event.target) || exiting()) return;
     const rect = event.currentTarget.getBoundingClientRect();
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDrag({ x: event.clientX, y: event.clientY, startedAt: performance.now(), pointerId: event.pointerId, width: rect.width, height: rect.height });
+    setDrag({ x: event.clientX, y: event.clientY, startedAt: performance.now(), pointerId: event.pointerId, width: rect.width, height: rect.height, axis: null });
     setOffset({ x: 0, y: 0 });
   }
   function pointerMove(event: PointerEvent & { currentTarget: HTMLDivElement }) {
     const current = drag();
     if (!current || current.pointerId !== event.pointerId) return;
     const next = { x: event.clientX - current.x, y: event.clientY - current.y };
-    const axis = decisionOsSwipeAxisLock({ dx: next.x, dy: next.y });
+    const axis = decisionOsSwipeAxisLock({ dx: next.x, dy: next.y, lockedAxis: current.axis });
+    if (axis !== current.axis) setDrag({ ...current, axis });
     setOffset(axis === "horizontal" ? { x: next.x, y: 0 } : axis === "vertical" ? { x: 0, y: next.y } : next);
   }
   function pointerEnd(event: PointerEvent & { currentTarget: HTMLDivElement }) {
@@ -78,7 +86,29 @@ export function MobileFocusDeck(props: {
     if (!current || current.pointerId !== event.pointerId) return;
     const direction = decisionOsSwipeDirection({ dx: offset().x, dy: offset().y, elapsedMs: performance.now() - current.startedAt, cardWidth: current.width, cardHeight: current.height, mapping: FOCUS_DECK_HORIZONTAL_MAPPING });
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    setDrag(null); setOffset({ x: 0, y: 0 }); void commit(direction, "swipe");
+    setDrag(null);
+    if (!direction) {
+      setOffset({ x: 0, y: 0 });
+      return;
+    }
+    setExiting(true);
+    const exitOffset = direction === "prev" ? { x: -current.width * 1.08, y: 0 }
+      : direction === "next" ? { x: current.width * 1.08, y: 0 }
+        : direction === "defer" ? { x: 0, y: -current.height * 1.04 }
+          : { x: 0, y: current.height * 1.04 };
+    setOffset(exitOffset);
+    window.setTimeout(() => {
+      setOffset({ x: 0, y: 0 });
+      setExiting(false);
+      void commit(direction, "swipe");
+    }, 170);
+  }
+  function pointerCancel(event: PointerEvent & { currentTarget: HTMLDivElement }) {
+    const current = drag();
+    if (!current || current.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setDrag(null);
+    setOffset({ x: 0, y: 0 });
   }
   function keyDown(event: KeyboardEvent) {
     if (event.key === "ArrowLeft") { event.preventDefault(); navigate(-1); }
@@ -95,14 +125,14 @@ export function MobileFocusDeck(props: {
             {edgeLabel()}<Show when={progress() >= 1}> ✓</Show>
           </div>
           <div
-            class="flex h-full min-h-0 touch-none select-none flex-col rounded-[24px] border border-wedding-muted bg-white p-4 shadow-card transition-transform duration-200 motion-reduce:transition-opacity"
+            class={`flex h-full min-h-0 touch-none select-none flex-col rounded-[24px] border border-wedding-muted bg-white p-4 shadow-card will-change-transform ${drag() ? "transition-none" : "transition-transform duration-150 ease-out"} motion-reduce:transition-opacity`}
             style={{ transform: `translate(${offset().x}px, ${offset().y}px) rotate(${Math.max(-3, Math.min(3, offset().x / 40))}deg)` }}
             role="group"
             aria-label={`${props.label} ${props.position + 1} of ${props.items.length}: ${item()?.title ?? ""}`}
             onPointerDown={pointerDown}
             onPointerMove={pointerMove}
             onPointerUp={pointerEnd}
-            onPointerCancel={pointerEnd}
+            onPointerCancel={pointerCancel}
           >
             <Show when={item()}>{(current) => props.renderCard(current())}</Show>
           </div>

@@ -17,13 +17,18 @@ function dayLabel(date: Date, includeYear: boolean): string {
 }
 
 /** Major date ticks for the shared, horizontal Gantt time scale. */
-export function weddingGanttAxisTicks(rows: readonly WeddingGanttTimelineRow[]): WeddingGanttAxisTick[] {
+export function weddingGanttAxisTicks(
+  rows: readonly WeddingGanttTimelineRow[],
+  range?: { startLabel?: string | null; endLabel?: string | null },
+): WeddingGanttAxisTick[] {
   const ranges = rows
     .map((row) => ({ start: dateFromLabel(row.startLabel), end: dateFromLabel(row.endLabel) }))
     .filter((range): range is { start: Date; end: Date } => Boolean(range.start && range.end));
-  if (ranges.length === 0) return [];
-  const start = new Date(Math.min(...ranges.map((range) => range.start.getTime())));
-  const end = new Date(Math.max(...ranges.map((range) => range.end.getTime())));
+  const rangeStart = dateFromLabel(range?.startLabel ?? "");
+  const rangeEnd = dateFromLabel(range?.endLabel ?? "");
+  if (ranges.length === 0 && !(rangeStart && rangeEnd)) return [];
+  const start = rangeStart ?? new Date(Math.min(...ranges.map((entry) => entry.start.getTime())));
+  const end = rangeEnd ?? new Date(Math.max(...ranges.map((entry) => entry.end.getTime())));
   const spanDays = Math.max(0, Math.round((end.getTime() - start.getTime()) / 86_400_000));
   const count = Math.min(5, Math.max(2, spanDays + 1));
   const includeYear = start.getUTCFullYear() !== end.getUTCFullYear();

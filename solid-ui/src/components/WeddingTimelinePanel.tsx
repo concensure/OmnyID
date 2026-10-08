@@ -25,7 +25,10 @@ export function WeddingTimelinePanel(props: {
   const [showGantt, setShowGantt] = createSignal(false);
   const visibleRows = createMemo(() => showAllRows() ? props.state.ganttTimeline.rows : props.state.ganttTimeline.rows.slice(0, 6));
   const hiddenRowCount = createMemo(() => Math.max(0, props.state.ganttTimeline.rows.length - visibleRows().length));
-  const ganttAxisTicks = createMemo(() => weddingGanttAxisTicks(props.state.ganttTimeline.rows));
+  const ganttAxisTicks = createMemo(() => weddingGanttAxisTicks(props.state.ganttTimeline.rows, {
+    startLabel: props.state.ganttTimeline.rangeStartLabel,
+    endLabel: props.state.ganttTimeline.rangeEndLabel,
+  }));
   const taskActionFor = (itemId: string) => {
     const task = props.state.planningTaskItems.find((item) => item.id === itemId);
     return task ? weddingTaskSidebarAction(task, props.state) : weddingTimelineSidebarAction("open_tasks", props.state, itemId);

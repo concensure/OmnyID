@@ -5,6 +5,30 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-08 - WED-175 wedding home mobile gestures and schedule chart (Codex)
+
+What changed:
+
+- Mobile vendor buttons no longer compete with the deck pointer capture. Swipe movement locks to
+  one axis, tracks the finger with directional tilt, animates out on a completed gesture, and does
+  not accidentally commit on pointer cancellation.
+- Successfully saved mobile vendor/decision triage now has a workspace-scoped local mirror, so a
+  cleared recommendation stays cleared when returning to Wedding Home before the AFP refresh lands.
+- Wedding overview action tiles are substantially larger touch targets on mobile.
+- Timeline omits demo/seed review tasks. Its Gantt range runs from saved planning start to wedding
+  date plus one day, includes the generated project lead-time plan, and preserves explicit task
+  dates as editable overrides. Major axis ticks use that full window.
+
+Tests performed:
+
+- `npm run typecheck` — pass.
+- `npm run build` — pass (Vite emitted the existing `min-*`/`max-*` Tailwind configuration warning).
+- `npm run test:wedding` — 1,804 passing.
+
+Next action:
+
+- Deploy through the normal reviewed release path when production rollout is requested.
+
 ## 2026-10-08 - Oracle release of WED-153 and WED-174 (Codex)
 
 What changed:

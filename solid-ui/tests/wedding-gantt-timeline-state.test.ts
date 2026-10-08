@@ -101,3 +101,27 @@ test("weddingGanttAxisTicks labels the shared horizontal range from first to fin
   assert.match(ticks[0]?.label ?? "", /12 Oct/);
   assert.match(ticks.at(-1)?.label ?? "", /12 Mar/);
 });
+
+test("schedule chart is anchored to the saved planning window and derives editable lead-time rows", () => {
+  const timeline = buildWeddingGanttTimelineState({
+    planningStartAt: "2026-10-08",
+    weddingDate: "2027-10-12",
+    items: [
+      { id: "rings", title: "Choose wedding rings", category: "vendor", dueLabel: "7 months out" },
+      { id: "run-sheet", title: "Draft the run sheet", category: "run_sheet", dueLabel: "3 weeks out" },
+      { id: "follow-up", title: "Post-wedding follow-up", category: "general", dueLabel: "Post-wedding" },
+    ],
+  });
+
+  assert.equal(timeline.rangeStartLabel, "2026-10-08");
+  assert.equal(timeline.rangeEndLabel, "2027-10-13");
+  assert.equal(timeline.rows.find((row) => row.id === "rings")?.endLabel, "2027-03-13");
+  assert.equal(timeline.rows.find((row) => row.id === "follow-up")?.endLabel, "2027-10-13");
+
+  const ticks = weddingGanttAxisTicks(timeline.rows, {
+    startLabel: timeline.rangeStartLabel,
+    endLabel: timeline.rangeEndLabel,
+  });
+  assert.match(ticks[0]?.label ?? "", /8 Oct 2026/);
+  assert.match(ticks.at(-1)?.label ?? "", /13 Oct 2027/);
+});

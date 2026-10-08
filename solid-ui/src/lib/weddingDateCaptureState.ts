@@ -70,8 +70,13 @@ export function saveLocalWeddingDate(responseWorkspaceId: string, date: string, 
 export function weddingDateToScheduleItem(input: {
   date: string;
   metadata?: unknown;
+  planningStartedAt?: string | null;
 }): WeddingPlanningScheduleItem {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
+  const requestedStart = clean(input.planningStartedAt).slice(0, 10);
+  const planningStartedAt = validIsoDate(requestedStart)
+    ? requestedStart
+    : new Date().toISOString().slice(0, 10);
   return {
     id: `wedding_date:${safeWeddingLabel(metadata.responseWorkspaceId)}`,
     title: "Wedding date",
@@ -86,6 +91,7 @@ export function weddingDateToScheduleItem(input: {
     metadata: {
       ...metadata,
       wedding_date: input.date,
+      planning_started_at: planningStartedAt,
       wedding_workspace_menu: "timeline",
       preferred_action_label: "Review wedding date",
     },
@@ -96,9 +102,14 @@ export function weddingDateToScheduleItem(input: {
 export function weddingDateToAfpSendInputs(input: {
   date: string;
   metadata?: unknown;
+  planningStartedAt?: string | null;
 }): SendAfpMessageInput[] {
   const metadata: WeddingPlanningMetadata = normalizeWeddingPlanningMetadata(input.metadata);
-  const scheduleItem = weddingDateToScheduleItem({ date: input.date, metadata });
+  const scheduleItem = weddingDateToScheduleItem({
+    date: input.date,
+    metadata,
+    planningStartedAt: input.planningStartedAt,
+  });
   const calendarInput = weddingScheduleItemToAfpSendInput(scheduleItem);
   const decisionInput = weddingDecisionProjectionToAfpSendInput({
     id: `wedding_date:${safeWeddingLabel(metadata.responseWorkspaceId)}:${input.date}`,

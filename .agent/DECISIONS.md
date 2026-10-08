@@ -344,3 +344,19 @@ Couples enquire from a free account. Vendor tiers (AUD, incl. GST):
   2027-03-31.
 
 The enquiry inbox is never paywalled.
+
+## 2026-10-08: Wedding Home Mobile Triage and Planning Window
+
+The mobile deck leaves native controls (buttons, links, and fields) to their own pointer sequence;
+the surrounding swipe recogniser never captures those taps. A completed swipe locks to its initial
+axis, follows the finger without transition, then animates beyond the card boundary before applying
+the existing action. Cancelled gestures always return to rest without an action.
+
+Completed or deferred mobile items are mirrored in account-scoped browser storage only after the
+AFP triage save succeeds. AFP remains the authoritative history, while the mirror prevents a
+successfully completed recommendation flashing back during a route remount or slow refresh.
+
+The schedule chart's canonical range begins at `planning_started_at` recorded with the wedding date
+and ends one day after the wedding. Project task lead-time templates provide deterministic displayed
+dates until a user sets a task date; an explicit task date wins and remains editable. Demo/seed
+review tasks are deliberately excluded from the couple-facing chart.

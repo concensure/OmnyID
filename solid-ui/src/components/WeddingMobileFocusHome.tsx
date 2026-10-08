@@ -19,10 +19,12 @@ import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import {
   hiddenAttentionCount,
   installMobileFocusViewportListener,
+  loadMobileFocusTriageMemory,
   mobileFocusMode,
   mobileFocusSingleCardSectionId,
   publishMobileFocusHomeSections,
   rankFocusDeckItems,
+  saveMobileFocusTriageMemory,
   setMobileFocusMode,
   setMobileFocusSingleCardSectionId,
   type FocusDeckItem,
@@ -54,9 +56,10 @@ export function WeddingMobileFocusHome(props: {
   onCancelOutreach?: (choiceId: string) => void;
   onConnectGmailForOutreach?: () => void;
 }) {
+  const initialTriageMemory = loadMobileFocusTriageMemory(props.state.workspace.metadata.responseWorkspaceId);
   const [position, setPosition] = createSignal(0);
-  const [deferredIds, setDeferredIds] = createSignal<Set<string>>(new Set());
-  const [resolvedIds, setResolvedIds] = createSignal<Set<string>>(new Set());
+  const [deferredIds, setDeferredIds] = createSignal<Set<string>>(new Set(initialTriageMemory.deferredIds));
+  const [resolvedIds, setResolvedIds] = createSignal<Set<string>>(new Set(initialTriageMemory.resolvedIds));
   const [pendingApproval, setPendingApproval] = createSignal<PendingApproval | null>(null);
   const [pendingTriage, setPendingTriage] = createSignal<PendingTriage | null>(null);
   const [notice, setNotice] = createSignal<string | null>(null);
@@ -164,6 +167,31 @@ export function WeddingMobileFocusHome(props: {
     pending.onSaved();
   };
   const decisionItemFor = (id: string) => display().itemCards.find((card) => card.id === id)?.item;
+  const rememberTriage = (action: "approve" | "defer", itemId: string) => {
+    const resolved = new Set(resolvedIds());
+    const deferred = new Set(deferredIds());
+    if (action === "approve") {
+      resolved.add(itemId);
+      deferred.delete(itemId);
+    } else {
+      deferred.add(itemId);
+      resolved.delete(itemId);
+    }
+    setResolvedIds(resolved);
+    setDeferredIds(deferred);
+    saveMobileFocusTriageMemory(props.state.workspace.metadata.responseWorkspaceId, {
+      resolvedIds: [...resolved],
+      deferredIds: [...deferred],
+    });
+  };
+
+  function contactVendor(item: FocusDeckItem, card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) {
+    props.onContactVendor?.(card, artifactId, intent);
+    void triage("approve", item, "button", () => {
+      rememberTriage("approve", item.id);
+      setNotice("Availability draft created. Nothing is sent until you review and send it.");
+    });
+  }
 
   function requestApproval(item: FocusDeckItem, method: InputMethod) {
     if (item.kind.startsWith("vendor_")) {
@@ -188,7 +216,7 @@ export function WeddingMobileFocusHome(props: {
         else setNotice(flow?.stage === "ready_to_send"
           ? "The reply is ready. Opening its draft never sends it; sending still needs its own confirmation."
           : "This response needs one more safe review step.");
-        setResolvedIds((current) => new Set([...current, item.id]));
+        rememberTriage("approve", item.id);
       });
       return;
     }
@@ -196,7 +224,7 @@ export function WeddingMobileFocusHome(props: {
     const decision = decisionItemFor(item.id);
     if (!decision) return;
     void triage("approve", item, method, () => {
-      setResolvedIds((current) => new Set([...current, decision.id]));
+      rememberTriage("approve", decision.id);
       setNotice("Decision approved. Here is the next one that still needs you.");
     });
   }
@@ -207,7 +235,7 @@ export function WeddingMobileFocusHome(props: {
         const decision = decisionItemFor(item.id);
         if (decision) props.onSidebarAction(buildWeddingDecisionDeferSidebarAction(decision));
       }
-      setDeferredIds((current) => new Set([...current, item.id]));
+      rememberTriage("defer", item.id);
     });
   }
 
@@ -218,8 +246,10 @@ export function WeddingMobileFocusHome(props: {
 
   function completeVendorItem(item: FocusDeckItem) {
     if (item.kind === "vendor_receipt") {
-      setResolvedIds((current) => new Set([...current, item.id]));
-      setNotice("Receipt saved. Here is the next item that needs you.");
+      void triage("approve", item, "button", () => {
+        rememberTriage("approve", item.id);
+        setNotice("Receipt saved. Here is the next item that needs you.");
+      });
       return;
     }
     requestApproval(item, "button");
@@ -278,7 +308,7 @@ export function WeddingMobileFocusHome(props: {
                   ? <WeddingVendorDeckCard
                     item={item}
                     gmailConnected={props.gmailConnected}
-                    onContactVendor={(card, artifactId, intent) => props.onContactVendor?.(card, artifactId, intent)}
+                    onContactVendor={(card, artifactId, intent) => contactVendor(item, card, artifactId, intent)}
                     onOutreachBodyChange={props.onOutreachBodyChange}
                     onSendOutreach={props.onSendOutreach}
                     onCancelOutreach={props.onCancelOutreach}

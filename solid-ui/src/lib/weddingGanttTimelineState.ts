@@ -44,6 +44,8 @@ export type WeddingGanttRiskLabel = {
 export type WeddingGanttTimelineState = {
   rows: WeddingGanttTimelineRow[];
   undatedItems: WeddingGanttUndatedItem[];
+  rangeStartLabel: string | null;
+  rangeEndLabel: string | null;
   categoryColors: Record<string, string>;
   legend: { category: string; label: string; color: string }[];
   riskLabels: WeddingGanttRiskLabel[];
@@ -70,6 +72,7 @@ function clean(value: unknown): string | null {
 }
 
 function dateOnly(value: unknown): Date | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : new Date(value.getTime());
   const label = clean(value);
   if (!label) return null;
   const date = new Date(label.length === 10 ? `${label}T09:00:00.000Z` : label);
@@ -86,6 +89,42 @@ function daysBetween(start: Date, end: Date): number {
 
 function daysUntil(date: Date, now: Date): number {
   return Math.ceil((date.getTime() - now.getTime()) / 86_400_000);
+}
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 86_400_000);
+}
+
+function daysBeforeWedding(item: WeddingGanttInputItem, category: string): number | null {
+  const label = clean(item.dueLabel)?.toLowerCase() ?? "";
+  const months = label.match(/(\d+)(?:\s*[-–]\s*(\d+))?\s*months?\s+out/);
+  if (months) return Math.round(((Number(months[1]) + Number(months[2] ?? months[1])) / 2) * 30.4);
+  const weeks = label.match(/(\d+)(?:\s*[-–]\s*(\d+))?\s*weeks?\s+out/);
+  if (weeks) return Math.round(((Number(weeks[1]) + Number(weeks[2] ?? weeks[1])) / 2) * 7);
+  if (/post[-\s]?wedding/.test(label)) return -1;
+  if (/wedding day|day[-\s]?of/.test(label)) return 0;
+  return ({ legal: 300, venue: 330, vendor: 240, outreach: 220, budget: 210, guest: 90, run_sheet: 21, weather: 30, ceremony: 60, travel: 120 } as Record<string, number>)[category] ?? null;
+}
+
+function defaultDurationDays(category: string): number {
+  return ({ legal: 14, venue: 21, vendor: 14, outreach: 7, budget: 7, guest: 14, run_sheet: 14, weather: 7, ceremony: 7, travel: 14 } as Record<string, number>)[category] ?? 7;
+}
+
+function plannedDates(item: WeddingGanttInputItem, planningStart: Date | null, weddingDate: Date | null): { start: Date; end: Date } | null {
+  const explicitStart = dateOnly(item.startAt);
+  const explicitEnd = dateOnly(item.endAt) ?? dateOnly(item.dueDate);
+  if (explicitStart || explicitEnd) {
+    const start = explicitStart ?? explicitEnd;
+    return start ? { start, end: explicitEnd ?? start } : null;
+  }
+  if (!weddingDate) return null;
+  const category = categoryFor(item);
+  const leadDays = daysBeforeWedding(item, category);
+  if (leadDays === null) return null;
+  const due = addDays(weddingDate, -leadDays);
+  const durationDays = defaultDurationDays(category);
+  const start = new Date(Math.max(addDays(due, -(durationDays - 1)).getTime(), planningStart?.getTime() ?? Number.NEGATIVE_INFINITY));
+  return { start, end: due };
 }
 
 function categoryFor(item: WeddingGanttInputItem): string {
@@ -195,17 +234,21 @@ export function buildWeddingGanttTimelineState(input: {
   items?: readonly WeddingGanttInputItem[] | null;
   categoryColors?: Record<string, string> | null;
   now?: Date | string | null;
+  planningStartAt?: string | Date | null;
+  weddingDate?: string | Date | null;
 } = {}): WeddingGanttTimelineState {
   const colors = { ...DEFAULT_COLORS, ...(input.categoryColors ?? {}) };
   const now = dateOnly(input.now) ?? new Date();
+  const planningStart = dateOnly(input.planningStartAt) ?? null;
+  const weddingDate = dateOnly(input.weddingDate) ?? null;
+  const planningEnd = weddingDate ? addDays(weddingDate, 1) : null;
   const normalizedItems = input.items ?? [];
   const dated = normalizedItems.map((item) => {
-    const start = dateOnly(item.startAt) ?? dateOnly(item.dueDate);
-    const end = dateOnly(item.endAt) ?? dateOnly(item.dueDate) ?? start;
-    return start && end ? { item, start, end } : null;
+    const planned = plannedDates(item, planningStart, weddingDate);
+    return planned ? { item, ...planned } : null;
   }).filter((entry): entry is { item: WeddingGanttInputItem; start: Date; end: Date } => entry !== null);
   const undatedItems = normalizedItems
-    .filter((item) => !dateOnly(item.startAt) && !dateOnly(item.dueDate))
+    .filter((item) => plannedDates(item, planningStart, weddingDate) === null)
     .map((item): WeddingGanttUndatedItem => {
       const category = categoryFor(item);
       return {
@@ -217,8 +260,10 @@ export function buildWeddingGanttTimelineState(input: {
         linkedArtifactId: clean(item.linkedArtifactId),
       };
     });
-  const minTime = Math.min(...dated.map((entry) => entry.start.getTime()));
-  const maxTime = Math.max(...dated.map((entry) => entry.end.getTime()));
+  const firstDatedTime = Math.min(...dated.map((entry) => entry.start.getTime()));
+  const lastDatedTime = Math.max(...dated.map((entry) => entry.end.getTime()));
+  const minTime = planningStart?.getTime() ?? firstDatedTime;
+  const maxTime = planningEnd?.getTime() ?? lastDatedTime;
   const totalDays = Number.isFinite(minTime) && Number.isFinite(maxTime)
     ? Math.max(1, Math.round((maxTime - minTime) / 86_400_000) + 1)
     : 1;
@@ -248,6 +293,8 @@ export function buildWeddingGanttTimelineState(input: {
   return {
     rows,
     undatedItems,
+    rangeStartLabel: Number.isFinite(minTime) ? iso(new Date(minTime)) : null,
+    rangeEndLabel: Number.isFinite(maxTime) ? iso(new Date(maxTime)) : null,
     categoryColors: colors,
     legend: usedCategories.map((category) => ({ category, label: labelFor(category), color: colors[category] ?? colors.general })),
     riskLabels,

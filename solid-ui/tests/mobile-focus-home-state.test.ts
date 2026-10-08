@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hiddenAttentionCount, rankFocusDeckItems, type FocusDeckItem } from "../src/lib/mobileFocusHomeState.ts";
+import {
+  hiddenAttentionCount,
+  loadMobileFocusTriageMemory,
+  rankFocusDeckItems,
+  saveMobileFocusTriageMemory,
+  type FocusDeckItem,
+} from "../src/lib/mobileFocusHomeState.ts";
 
 const item = (id: string, dueAt: string | null, deferCount = 0): FocusDeckItem => ({ id, kind: "decision", sourceSurface: "tasks", title: id, recommendedActionLabel: "Open", whyNowLabel: "Now", dueAt, evidenceLabels: [], deferCount, returnedFromLater: false, external: false });
 test("mobile focus ranks overdue and near-term work ahead while retaining stable order", () => {
@@ -11,4 +17,25 @@ test("mobile focus makes repeat deferrals visible within their urgency tier", ()
   const ranked = rankFocusDeckItems([item("first", null, 0), item("returned", null, 2)], new Date("2026-10-05T00:00:00Z"));
   assert.deepEqual(ranked.map((entry) => entry.id), ["returned", "first"]);
   assert.equal(hiddenAttentionCount({ responseCount: 2, overdueDecisionCount: 3 }), 5);
+});
+
+test("mobile focus keeps completed vendor triage through a route remount", () => {
+  const original = globalThis.localStorage;
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) },
+  });
+  try {
+    saveMobileFocusTriageMemory("wedding-workspace", {
+      resolvedIds: ["vendor-comparison", "vendor-comparison"],
+      deferredIds: ["decision-later"],
+    });
+    assert.deepEqual(loadMobileFocusTriageMemory("wedding-workspace"), {
+      resolvedIds: ["vendor-comparison"],
+      deferredIds: ["decision-later"],
+    });
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, value: original });
+  }
 });

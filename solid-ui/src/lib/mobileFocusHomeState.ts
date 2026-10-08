@@ -24,6 +24,7 @@ export type FocusDeckItem = {
   vendorOutreachFlow?: WeddingVendorOutreachFlowState | null;
 };
 export type MobileHomeSection = { id: string; title: string; summary: string };
+export type MobileFocusTriageMemory = { resolvedIds: string[]; deferredIds: string[] };
 
 export const FOCUS_DECK_HORIZONTAL_MAPPING = "left_is_prev" as const;
 const [viewport, setViewport] = createSignal(false);
@@ -78,6 +79,38 @@ export function setMobileFocusMenuAttentionCount(count: number): void {
 export function setMobileFocusAskOpen(open: boolean): void { setMobileAskOpen(open); }
 export function setMobileFocusSingleCardSectionId(id: string | null): void { setSingleCardSectionId(id); }
 export function publishMobileFocusHomeSections(sections: MobileHomeSection[]): void { setHomeSections(sections); }
+
+function triageStorageKey(workspaceId: string | null | undefined): string {
+  return storageKey(workspaceId, "triage");
+}
+
+function uniqueIds(values: readonly string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).slice(-200);
+}
+
+/** A local mirror prevents a successfully saved decision flashing back during route remount. */
+export function loadMobileFocusTriageMemory(workspaceId: string | null | undefined): MobileFocusTriageMemory {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(triageStorageKey(workspaceId)) ?? "null") as Partial<MobileFocusTriageMemory> | null;
+    return {
+      resolvedIds: uniqueIds(Array.isArray(parsed?.resolvedIds) ? parsed.resolvedIds : []),
+      deferredIds: uniqueIds(Array.isArray(parsed?.deferredIds) ? parsed.deferredIds : []),
+    };
+  } catch {
+    return { resolvedIds: [], deferredIds: [] };
+  }
+}
+
+export function saveMobileFocusTriageMemory(workspaceId: string | null | undefined, memory: MobileFocusTriageMemory): void {
+  try {
+    localStorage.setItem(triageStorageKey(workspaceId), JSON.stringify({
+      resolvedIds: uniqueIds(memory.resolvedIds),
+      deferredIds: uniqueIds(memory.deferredIds),
+    }));
+  } catch {
+    // This is a read-after-navigation convenience mirror; the AFP decision remains authoritative.
+  }
+}
 
 function dueTier(value: string | null, now: Date): number {
   const at = value ? Date.parse(value) : Number.NaN;
