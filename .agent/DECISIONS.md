@@ -360,3 +360,16 @@ The schedule chart's canonical range begins at `planning_started_at` recorded wi
 and ends one day after the wedding. Project task lead-time templates provide deterministic displayed
 dates until a user sets a task date; an explicit task date wins and remains editable. Demo/seed
 review tasks are deliberately excluded from the couple-facing chart.
+
+## 2026-10-08: Same-Host Staging and Strict Production Policy
+
+Staging is a separate compose project on the Oracle host, reached at `staging.omnyid.com`, so it
+shares disk, RAM and the Docker daemon with production and does not rehearse host-level failures.
+Its services are prefixed `staging-` so they can never resolve to production's `postgres`. It runs
+with fresh keys, no mail provider and no paid API keys.
+
+Production runs with `OMNYID_ENV=production`, so unsafe startup settings fail closed. That policy
+treats Gmail OAuth as enabled whenever a homeserver URL or session secret is set, so it effectively
+requires a Gmail client id and secret; staging supplies inert placeholders. Release evidence comes
+from the Oracle runtime and local tags, not GitHub Deployments, because no GitHub release is used.
+

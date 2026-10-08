@@ -5,6 +5,42 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-08 - Oracle staging stack, www redirect, strict production policy (Claude)
+
+What changed:
+
+- Added the isolated `omnyid-staging` compose project (`docker-compose.oracle.staging.yml`,
+  `scripts/staging-up.sh`) on the Oracle host: own Postgres volume, fresh keys, seed user, resource
+  caps, no mail provider or paid API keys. It serves `staging.omnyid.com` through the existing Caddy.
+- Caddy now redirects `www.omnyid.com` to the apex (it returned 525) and restricts the staging
+  origin to Cloudflare IP ranges. Basic auth gates only the staging dashboard shell because the app's
+  Bearer tokens share the `Authorization` header.
+- Production now runs with `OMNYID_ENV=production` and a new `omnyid_delegation_master_key_hex`
+  secret file. The policy was rehearsed in a one-off container with production's real inputs first;
+  the previous image is tagged `omnyid-homeserver:prev-20261008` and the prior compose file is
+  `docker-compose.oracle.minimal.yml.pre-strict` on the server.
+- Oracle housekeeping: build cache and stale runtimes pruned, `OMNYID_BACKUP_RETAIN=3` (days).
+
+Open items:
+
+- Cloudflare Zero Trust is not enabled on the account, so the staging API is not behind Cloudflare
+  Access yet; the origin lock is in place for when it is.
+- The Gmail sync reports `auth_invalid` (permanent); the refresh token needs re-authorising.
+- The 89k ingested emails in `public.messages` and heavy bloat in the owner's message table and
+  `daemon_heartbeats` are unresolved; nothing was deleted or vacuumed.
+- Nothing was pushed; `origin/main` is an unrelated history.
+
+## 2026-10-08 - Mesh/staging ownership coordination
+
+User requests local-only release/tag and Oracle runtime verification; no push/PR/origin-main changes.
+Mesh implementation continues in sibling `OmnyID-agm`, now on `agent/codex/AGM-06`.
+Local checkpoints: storage `6969576`, policy `4e40df4`, lifecycle `206ed81`, archive/derived state
+`a86db76`. None is a release candidate. AGM-05 has local PostgreSQL contracts, 2,327 library tests
+and binary compile evidence. AGM-06 extraction is in progress; later integration gates remain open.
+That session owns mesh Rust/SDK modules and its coordination records. The user's other session
+owns the active primary-worktree Caddy/Compose/.gitignore and staging setup changes. Mesh work
+will consume their committed staging implementation without overwriting it or restarting services.
+
 ## 2026-10-08 - AGM-00 agent mesh implementation and production closure plan (Codex)
 
 What changed:
