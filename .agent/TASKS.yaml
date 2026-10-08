@@ -569,9 +569,9 @@ tasks:
 
   - id: WED-164
     title: Public wedding vendor directory API
-    status: ready
+    status: in_progress
     owner: codex
-    branch: agent/codex/WED-160
+    branch: agent/codex/WED-161
     depends_on:
       - WED-161
     files:
@@ -582,12 +582,17 @@ tasks:
       - all spec section 6.2 filters work with keyset pagination
       - owner fields override seed fields; seed rows are never mutated
       - claim_cta flag is correct; P95 under 150 ms on the Oracle dataset
+    progress:
+      - public list/detail endpoints and an authenticated rate-limited claim-intake entry point are implemented in a dedicated route module
+    remaining:
+      - add keyset pagination and Oracle dataset performance evidence
+      - project owner photos and verified AgentCard URLs after their delivery paths land
 
   - id: WED-165
     title: Public directory pages and Vendor Login nav
-    status: ready
+    status: in_progress
     owner: codex
-    branch: agent/codex/WED-160
+    branch: agent/codex/WED-161
     depends_on:
       - WED-164
     files:
@@ -602,6 +607,10 @@ tasks:
       - unclaimed cards and pages show "Claim Your Profile - It's Free"; claimed show owner photos and secure-agent badge
       - Enquire links to ../workspace/?auth=register&source=wedding_enquiry&vendor=<slug>
       - works at 360 px with no horizontal scroll; no third-party packages
+    progress:
+      - responsive directory page and shared Vendor Login navigation entry have been added without third-party packages
+    remaining:
+      - browser checks at 360 px and connect claimed listings to the verified secure-agent badge
 
   - id: WED-166
     title: Claim flow routes, verification, disputes and claim AFP messages

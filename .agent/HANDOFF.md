@@ -35,6 +35,33 @@ Next action:
 - Finish and review WED-161, then implement WED-162 through WED-170 before any
   customer-facing Vendor Login or A2A enquiry launch.
 
+## 2026-10-09 - WED-164/165 public directory and vendor entry started (Codex)
+
+What changed:
+
+- Added `src/server/wedding_vendor_claim_routes.rs`, kept under 1,000 lines, and
+  merged its routes into the homeserver. It exposes active-only public listing
+  responses without vendor email or phone fields and creates rate-limited,
+  transactional claim-intake records for authenticated vendors.
+- Added `wedding/vendors.html` plus dedicated small CSS and JS assets. The page is
+  one-column at phone width, uses 44 px actions, and builds cards with DOM APIs so
+  directory text is not injected as HTML.
+- Added a separate `Vendor login` link to every wedding header at runtime. It routes
+  to `/workspace/?auth=signin&source=vendor_claim`, rather than the couple flow.
+
+Verification:
+
+- `node wedding/tests/wedding-website-smoke.mjs` passed.
+- Rust formatting and `git diff --check` passed for this slice.
+- `cargo check` and the focused route tests are waiting behind a concurrently running
+  full Cargo test job that holds the shared target lock; do not interpret that as a
+  completed Rust verification.
+
+Release status:
+
+- Not deployed. The intake creates a pending claim but the vendor role landing,
+  signed AgentCard publishing, and encrypted A2A envelopes are not yet present.
+
 ## 2026-10-09 - UX-MPR-01 mobile UI principles pass on wedding phone views (Claude)
 
 For Codex - merge notes:

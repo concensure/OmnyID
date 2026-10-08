@@ -254,6 +254,13 @@ if ((weddingHome.match(/Sydney planning scenario/g) ?? []).length !== 2) {
 if (weddingHome.includes('Byron Bay planning scenario') || weddingHome.includes('Melbourne planning scenario')) {
   failures.push('index.html: retired testimonial city captions remain');
 }
+const vendorDirectory = htmlByPath.get(normalize(resolve(root, 'vendors.html')));
+if (!vendorDirectory || !vendorDirectory.includes('assets/js/directory.js')) {
+  failures.push('vendors.html: vendor directory page or its data loader is missing');
+}
+if (!weddingJs.includes('source=vendor_claim') || !weddingJs.includes('data-vendor-login')) {
+  failures.push('main.js: Vendor Login does not route separately to the vendor-claim flow');
+}
 
 if (failures.length) {
   console.error('Wedding website smoke test failed:');

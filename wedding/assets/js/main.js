@@ -12,6 +12,32 @@
     window.addEventListener('scroll', onScroll, { passive: true });
   }
 
+  /* ---------- vendor entry point ---------- */
+  // Keep the vendor route separate from the couple sign-in bridge. It is injected
+  // into every shared wedding header so all marketing pages expose the same entry.
+  function vendorWorkspaceHref() {
+    var depth = window.location.pathname.indexOf('/wedding/blog/') !== -1 ? '../../' : '../';
+    return depth + 'workspace/?auth=signin&source=vendor_claim';
+  }
+  var vendorHref = vendorWorkspaceHref();
+  var headerActions = document.querySelector('.header-actions');
+  if (headerActions && !headerActions.querySelector('[data-vendor-login]')) {
+    var vendorButton = document.createElement('a');
+    vendorButton.className = 'btn btn-outline vendor-login';
+    vendorButton.href = vendorHref;
+    vendorButton.setAttribute('data-vendor-login', 'true');
+    vendorButton.textContent = 'Vendor login';
+    headerActions.insertBefore(vendorButton, headerActions.firstChild);
+  }
+  var headerNav = document.getElementById('navLinks');
+  if (headerNav && !headerNav.querySelector('[data-vendor-login]')) {
+    var vendorNavLink = document.createElement('a');
+    vendorNavLink.href = vendorHref;
+    vendorNavLink.setAttribute('data-vendor-login', 'true');
+    vendorNavLink.textContent = 'For vendors';
+    headerNav.appendChild(vendorNavLink);
+  }
+
   /* ---------- mobile nav toggle ---------- */
   var navToggle = document.getElementById('navToggle');
   var navLinks = document.getElementById('navLinks');
