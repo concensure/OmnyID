@@ -12,7 +12,7 @@ Verification:
 
 - `node wedding/tests/wedding-website-smoke.mjs` passed, including the new public agreement document.
 - Focused TypeScript compile for `VendorPhotoLicenceConsent.tsx` passed; formatting and `git diff --check` passed.
-- Focused Rust tests were queued behind an existing Cargo artifact lock and have not yet produced final output.
+- `cargo check`, the focused licence-receipt test, and the migration-catalog test passed after the Cargo queue cleared.
 
 Remaining:
 
