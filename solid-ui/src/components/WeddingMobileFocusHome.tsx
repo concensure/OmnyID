@@ -34,6 +34,7 @@ import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreach
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import { buildWeddingVendorDeckProjectionState } from "@/lib/weddingVendorDeckProjectionState";
+import { friendlyErrorText } from "@/lib/visibleErrorText";
 
 type HomeSection = { id: string; title: string; render: () => JSX.Element };
 type InputMethod = "swipe" | "button" | "keyboard";
@@ -126,13 +127,13 @@ export function WeddingMobileFocusHome(props: {
 
   const save = async (input: SendAfpMessageInput): Promise<{ ok: true } | { ok: false; reason: string }> => {
     if (!props.saveProjection) {
-      return { ok: false, reason: "account sync is unavailable" };
+      return { ok: false, reason: "Account sync is unavailable. Your choice isn't recorded yet." };
     }
     try {
       await props.saveProjection(input);
       return { ok: true };
     } catch (error) {
-      return { ok: false, reason: error instanceof Error ? error.message : "the account save failed" };
+      return { ok: false, reason: friendlyErrorText(error, "Your choice isn't recorded yet. Try again.") };
     }
   };
   const triage = async (action: "approve" | "defer", item: FocusDeckItem, method: InputMethod, onSaved: () => void): Promise<boolean> => {
@@ -151,7 +152,7 @@ export function WeddingMobileFocusHome(props: {
       return true;
     }
     setPendingTriage({ input, onSaved });
-    setNotice(`Couldn't save your decision — ${result.reason}. Your choice is not recorded yet.`);
+    setNotice(result.reason);
     return false;
   };
   const retryTriage = async () => {
@@ -159,7 +160,7 @@ export function WeddingMobileFocusHome(props: {
     if (!pending) return;
     const result = await save(pending.input);
     if (!result.ok) {
-      setNotice(`Couldn't save your decision — ${result.reason}. Your choice is not recorded yet.`);
+      setNotice(result.reason);
       return;
     }
     setPendingTriage(null);
@@ -262,7 +263,7 @@ export function WeddingMobileFocusHome(props: {
 
   return (
     <MobileFocusHome
-      title={selectedSection() ? "‹ Home" : currentTitle()}
+      title={selectedSection()?.title ?? currentTitle()}
       attentionCount={hiddenAttentionCount({
         responseCount: responses().length,
         overdueDecisionCount: decisions().filter((item) => item.dueAt && Date.parse(item.dueAt) <= Date.now()).length,
@@ -333,8 +334,11 @@ export function WeddingMobileFocusHome(props: {
       >
         {(section) => (
           <div class="flex min-h-0 flex-1 flex-col">
-            <button type="button" class="mb-2 min-h-12 text-left text-sm font-semibold text-wedding-accent" onClick={() => setMobileFocusSingleCardSectionId(null)}>‹ Home</button>
-            <div class="min-h-0 flex-1 overflow-auto">{section().render()}</div>
+            <button type="button" class="mb-1 inline-flex min-h-11 items-center gap-1 self-start rounded-lg pr-3 text-sm font-semibold text-wedding-accent active:bg-wedding-surface-blush" onClick={() => setMobileFocusSingleCardSectionId(null)}>
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7" /></svg>
+              Home
+            </button>
+            <div class="min-h-0 flex-1 overflow-auto pb-44">{section().render()}</div>
           </div>
         )}
       </Show>

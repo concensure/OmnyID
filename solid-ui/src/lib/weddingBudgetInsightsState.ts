@@ -233,7 +233,7 @@ function scenarios(targetAmount: number | null, knownAmount: number, currency: s
         ? "Trim choices or move money from another category before committing."
         : def.id === "stretch"
           ? "Only use this version after taxes, service fees, and payment dates are clear."
-          : "This version still has room for the next choice.";
+          : "";
     return {
       id: def.id,
       label: def.label,
@@ -242,10 +242,12 @@ function scenarios(targetAmount: number | null, knownAmount: number, currency: s
       meaningLabel: def.meaningLabel,
       nextStepLabel,
       summaryLabel: target === null
-        ? "Set a total budget to compare this version."
+        ? "Set a total budget to compare."
         : remaining !== null && remaining < 0
-          ? `${moneyLabel(Math.abs(remaining), currency)} over this version.`
-          : `${moneyLabel(remaining, currency)} left in this version.`,
+          ? `${moneyLabel(Math.abs(remaining), currency)} over`
+          : knownAmount === 0
+            ? "No choices counted yet"
+            : `${moneyLabel(remaining, currency)} left`,
     };
   });
 }

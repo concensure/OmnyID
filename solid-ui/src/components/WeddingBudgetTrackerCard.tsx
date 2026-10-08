@@ -65,6 +65,7 @@ export function WeddingBudgetTrackerCard(props: {
       : (props.weddingPlanId ? loadWeddingBudgetAllocationDraft(props.weddingPlanId) : null) ?? emptyWeddingBudgetAllocationDraft(currency),
   );
   const [saving, setSaving] = createSignal(false);
+  const [activeScenario, setActiveScenario] = createSignal<"safe" | "balanced" | "stretch">("balanced");
   const [savingContribution, setSavingContribution] = createSignal(false);
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
   const [contributionNotice, setContributionNotice] = createSignal<string | null>(null);
@@ -159,7 +160,7 @@ export function WeddingBudgetTrackerCard(props: {
   }
 
   return (
-    <div class="min-w-0 rounded-[24px] border border-emerald-100/80 bg-emerald-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
+    <div class="min-w-0 rounded-[24px] border border-emerald-100/80 bg-emerald-50/80 p-3 shadow-card phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[28px] sm:p-4">
       <div class="flex items-start justify-between gap-2">
         <div class="flex items-center gap-2">
           <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #B45309" aria-hidden="true">
@@ -183,7 +184,7 @@ export function WeddingBudgetTrackerCard(props: {
           </p>
         </div>
       </Show>
-      <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 px-2.5 py-2">
+      <div class="mt-3 rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
         <p class="text-xs font-semibold text-emerald-950/65">Budget target</p>
         <p class="mt-1 text-sm leading-6 text-emerald-950/75">{props.state.budgetStatusLabel}</p>
         <Show when={props.state.budgetTargetAmount !== null}>
@@ -207,19 +208,19 @@ export function WeddingBudgetTrackerCard(props: {
       </div>
 
       <div class="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-6">
-        <div class="rounded-2xl border border-emerald-100 bg-white/75 px-2.5 py-2">
+        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
           <p class="text-xs font-semibold text-emerald-950/65">Committed</p>
           <p class="mt-1 break-words text-lg font-semibold text-emerald-950">{moneyLabel(props.state.insights.committedAmount, currency)}</p>
         </div>
-        <div class="rounded-2xl border border-emerald-100 bg-white/75 px-2.5 py-2">
+        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
           <p class="text-xs font-semibold text-emerald-950/65">Estimated</p>
           <p class="mt-1 break-words text-lg font-semibold text-emerald-950">{moneyLabel(props.state.insights.estimatedAmount, currency)}</p>
         </div>
-        <div class="rounded-2xl border border-emerald-100 bg-white/75 px-2.5 py-2">
+        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
           <p class="text-xs font-semibold text-emerald-950/65">Paid</p>
           <p class="mt-1 break-words text-lg font-semibold text-emerald-950">{moneyLabel(props.state.insights.paidAmount, currency)}</p>
         </div>
-        <div class="rounded-2xl border border-emerald-100 bg-white/75 px-2.5 py-2">
+        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
           <p class="text-xs font-semibold text-emerald-950/65">Remaining</p>
           <p class="mt-1 break-words text-lg font-semibold text-emerald-950">
             {props.state.insights.remainingAmount === null ? "Set budget" : moneyLabel(props.state.insights.remainingAmount, currency)}
@@ -235,7 +236,7 @@ export function WeddingBudgetTrackerCard(props: {
         </div>
       </div>
 
-      <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
+      <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
         <p class="text-sm font-semibold text-emerald-950">Set your budget</p>
         <p class="mt-1 text-xs leading-5 text-emerald-900/70">
           Set an overall figure, then split it across categories. "Stationery, Transport & Other" automatically absorbs whatever's left, so the total always stays balanced.
@@ -247,7 +248,7 @@ export function WeddingBudgetTrackerCard(props: {
             inputmode="numeric"
             min="0"
             step="100"
-            class="mt-1 w-full rounded-2xl border border-emerald-100 bg-white px-3 py-2 text-sm font-normal text-emerald-950 outline-none focus:border-emerald-300"
+            class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-emerald-950 outline-none focus:border-emerald-300"
             value={draft().totalAmount || ""}
             placeholder="0"
             onInput={(event) => setTotalAmount(Number(event.currentTarget.value))}
@@ -259,7 +260,7 @@ export function WeddingBudgetTrackerCard(props: {
               const amount = () => draft().categoryAmounts[category.id];
               const sliderMax = () => Math.max(draft().totalAmount, amount(), 1);
               return (
-                <div class="rounded-2xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5">
+                <div class="rounded-2xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5 phone:rounded-none phone:border-0 phone:border-t phone:bg-transparent phone:px-0">
                   <div class="flex items-center justify-between gap-2">
                     <span class="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-emerald-950">
                       <span class="min-w-0 break-words">
@@ -300,7 +301,7 @@ export function WeddingBudgetTrackerCard(props: {
                     value={amount() || ""}
                     placeholder="0"
                     aria-label={`${category.label} exact amount`}
-                    class="mt-2 w-full rounded-2xl border border-emerald-100 bg-white px-3 py-1.5 text-sm font-normal text-emerald-950 outline-none focus:border-emerald-300"
+                    class="mt-2 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-normal text-emerald-950 outline-none focus:border-emerald-300"
                     onInput={(event) => setCategoryAmount(category.id, Number(event.currentTarget.value))}
                   />
                 </div>
@@ -326,7 +327,7 @@ export function WeddingBudgetTrackerCard(props: {
           type="button"
           disabled={!saveState().canSave}
           onClick={() => void saveAllocation()}
-          class="mt-3 w-full rounded-full bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300 sm:w-auto sm:py-2"
+          class="mt-3 w-full rounded-full bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300 sm:w-auto sm:py-2 phone:min-h-12"
         >
           {saving() ? "Saving..." : "Save budget"}
         </button>
@@ -346,7 +347,7 @@ export function WeddingBudgetTrackerCard(props: {
         </div>
       </Show>
       <Show when={props.state.categoryRollups.length > 0}>
-        <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-xs font-semibold text-emerald-950/65">Top categories</p>
           <div class="mt-2 space-y-1.5">
             <For each={props.state.categoryRollups.slice(0, 3)}>
@@ -360,32 +361,63 @@ export function WeddingBudgetTrackerCard(props: {
           </div>
         </div>
       </Show>
-      <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
-        <div class="flex flex-wrap items-start justify-between gap-2">
-          <div class="min-w-0">
-            <p class="text-sm font-semibold text-emerald-950">Safe, balanced, stretch</p>
-            <p class="mt-1 text-xs leading-5 text-emerald-900/70">Shows the effect of choices against three budget versions.</p>
-          </div>
-          <span class="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-900">
-            {moneyLabel(props.state.totalKnownAmount, currency)} selected
-          </span>
+      <section class="mt-4" aria-labelledby="wedding-budget-version-heading">
+        <div class="flex items-baseline justify-between gap-2">
+          <h3 id="wedding-budget-version-heading" class="text-sm font-semibold text-emerald-950">Budget version</h3>
+          <Show when={props.state.totalKnownAmount > 0}>
+            <span class="text-xs text-emerald-900/70">{moneyLabel(props.state.totalKnownAmount, currency)} selected</span>
+          </Show>
         </div>
-        <div class="mt-3 grid gap-2 sm:grid-cols-3">
+        <div class="mt-2 space-y-2" role="radiogroup" aria-labelledby="wedding-budget-version-heading">
           <For each={props.state.insights.scenarios}>
-            {(scenario) => (
-              <div class="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
-                <p class="text-xs font-semibold text-emerald-950">{scenario.label}</p>
-                <p class="mt-1 text-sm font-semibold text-emerald-950">
-                  {scenario.targetAmount === null ? "Set budget" : moneyLabel(scenario.targetAmount, currency)}
-                </p>
-                <p class="mt-1 text-xs leading-5 text-emerald-900/70">{scenario.summaryLabel}</p>
-                <p class="mt-2 text-xs leading-5 text-emerald-950/75">{scenario.meaningLabel}</p>
-                <p class="mt-1 text-xs font-semibold leading-5 text-emerald-950">{scenario.nextStepLabel}</p>
-              </div>
-            )}
+            {(scenario) => {
+              const active = () => activeScenario() === scenario.id;
+              return (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={active()}
+                  onClick={() => setActiveScenario(scenario.id)}
+                  class={`block min-h-11 w-full rounded-xl p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 ${
+                    active()
+                      ? "border-2 border-emerald-800 bg-white shadow-card"
+                      : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"
+                  }`}
+                >
+                  <span class="flex items-center justify-between gap-2">
+                    <span class="flex min-w-0 items-center gap-2">
+                      <span
+                        class={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${active() ? "border-emerald-800 bg-emerald-800" : "border-slate-300 bg-white"}`}
+                        aria-hidden="true"
+                      >
+                        <Show when={active()}>
+                          <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+                        </Show>
+                      </span>
+                      <span class={`text-sm font-semibold ${active() ? "text-emerald-950" : "text-slate-700"}`}>{scenario.label}</span>
+                      <Show when={scenario.id === "balanced"}>
+                        <span class="rounded-full bg-emerald-800 px-2 py-0.5 text-xs font-semibold text-white">Recommended</span>
+                      </Show>
+                    </span>
+                    <span class={`shrink-0 text-sm font-semibold ${active() ? "text-emerald-950" : "text-slate-700"}`}>
+                      {scenario.targetAmount === null ? "Set budget" : moneyLabel(scenario.targetAmount, currency)}
+                    </span>
+                  </span>
+                  <span class="mt-1 block pl-7 text-xs">{scenario.summaryLabel}</span>
+                  <Show when={active()}>
+                    <span class="mt-2 block pl-7 text-sm text-emerald-950">
+                      {scenario.meaningLabel}
+                      <Show when={scenario.nextStepLabel}>
+                        {" "}<span class="font-semibold">{scenario.nextStepLabel}</span>
+                      </Show>
+                    </span>
+                  </Show>
+                </button>
+              );
+            }}
           </For>
         </div>
-      </div>
+      </section>
       <Show when={props.state.insights.unaffordableWarningLabels.length > 0}>
         <div class="mt-3 rounded-2xl border border-rose-100 bg-rose-50/80 p-3">
           <p class="text-sm font-semibold text-rose-950">Budget warning</p>
@@ -406,7 +438,7 @@ export function WeddingBudgetTrackerCard(props: {
           </ul>
         </div>
       </Show>
-      <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
+      <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
         <p class="text-sm font-semibold text-emerald-950">Extra costs to check</p>
         <div class="mt-2 flex flex-wrap gap-1.5">
           <For each={props.state.insights.feeCoverageLabels}>
@@ -419,7 +451,7 @@ export function WeddingBudgetTrackerCard(props: {
         </div>
       </div>
       <Show when={props.state.insights.monthlyCashNeeds.length > 0}>
-        <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-sm font-semibold text-emerald-950">Cash needed by month</p>
           <p class="mt-1 text-xs leading-5 text-emerald-900/70">{props.state.insights.monthlyCashNeedsSummaryLabel}</p>
           <div class="mt-2 space-y-1.5">
@@ -440,7 +472,7 @@ export function WeddingBudgetTrackerCard(props: {
         </div>
       </Show>
       <Show when={props.state.paymentTaskCandidates.length > 0}>
-        <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-sm font-semibold text-emerald-950">Payments to check</p>
           <p class="mt-1 text-xs leading-5 text-emerald-900/70">
             Review deposits, balances, receipts, and due dates before anyone pays.
@@ -477,7 +509,7 @@ export function WeddingBudgetTrackerCard(props: {
         </div>
       </Show>
       <Show when={props.state.quoteTaskCandidates.length > 0}>
-        <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-xs font-semibold text-emerald-950/70">Quotes to check</p>
           <ul class="mt-2 space-y-1">
             <For each={props.state.quoteTaskCandidates.slice(0, 3)}>
@@ -491,7 +523,7 @@ export function WeddingBudgetTrackerCard(props: {
         </div>
       </Show>
       <Show when={props.state.insights.quoteNormalForms.length > 0}>
-        <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-sm font-semibold text-emerald-950">Quote normaliser</p>
           <p class="mt-1 text-xs leading-5 text-emerald-900/70">Turns different vendor quote styles into the same fields.</p>
           <div class="mt-3 space-y-2">
@@ -538,14 +570,14 @@ export function WeddingBudgetTrackerCard(props: {
           </div>
         </div>
       </Show>
-      <div class="mt-3 rounded-2xl border border-emerald-100 bg-white/75 p-3">
+      <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
         <p class="text-sm font-semibold text-emerald-950">Contributions</p>
         <div class="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem]">
           <input
             type="text"
             value={contributorLabel()}
             placeholder="Who is contributing?"
-            class="rounded-2xl border border-emerald-100 bg-white px-3 py-2 text-sm text-emerald-950 outline-none focus:border-emerald-300"
+            class="min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-emerald-950 outline-none focus:border-emerald-300"
             onInput={(event) => {
               setContributorLabel(event.currentTarget.value);
               setContributionNotice(null);
@@ -558,7 +590,7 @@ export function WeddingBudgetTrackerCard(props: {
             step="100"
             value={contributionAmount()}
             placeholder="Amount"
-            class="rounded-2xl border border-emerald-100 bg-white px-3 py-2 text-sm text-emerald-950 outline-none focus:border-emerald-300"
+            class="min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-emerald-950 outline-none focus:border-emerald-300"
             onInput={(event) => {
               setContributionAmount(event.currentTarget.value);
               setContributionNotice(null);
@@ -569,7 +601,7 @@ export function WeddingBudgetTrackerCard(props: {
           type="text"
           value={contributionCondition()}
           placeholder="Condition, for example: venue only, no condition, paid after invoice"
-          class="mt-2 w-full rounded-2xl border border-emerald-100 bg-white px-3 py-2 text-sm text-emerald-950 outline-none focus:border-emerald-300"
+          class="mt-2 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-emerald-950 outline-none focus:border-emerald-300"
           onInput={(event) => {
             setContributionCondition(event.currentTarget.value);
             setContributionNotice(null);
@@ -613,7 +645,7 @@ export function WeddingBudgetTrackerCard(props: {
         <div class="mt-3 space-y-2">
           <For each={props.state.lineItems.slice(0, 5)}>
             {(item) => (
-              <article class="rounded-2xl border border-emerald-100 bg-white/75 p-3 shadow-sm transition hover:border-emerald-200 hover:bg-white hover:shadow">
+              <article class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-emerald-200 hover:bg-white hover:shadow">
                 <div class="flex items-start justify-between gap-2">
                   <p class="break-words text-sm font-semibold text-emerald-950">{item.vendorName}</p>
                   <span class="max-w-full break-words rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900">

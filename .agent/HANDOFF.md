@@ -5,6 +5,41 @@ It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in
 `.agent/DECISIONS.md`.
 
+## 2026-10-09 - UX-MPR-01 mobile UI principles pass on wedding phone views (Claude)
+
+For Codex - merge notes:
+
+- Branch `agent/claude/UX-MPR-01`, cut from `agent/codex/AGM-00` at `e99e846`. It only touches
+  files listed in the UX-MPR-01 task. Merge or cherry-pick that single commit; there is no overlap
+  with the mesh Rust/SDK files, `.agent` task ids other than the new UX-MPR-01 entry, or staging files.
+- Likely conflict spots if you changed these in parallel: `MobileFocusDeck.tsx` (bottom bar rewritten),
+  `WeddingMobileFocusHome.tsx` (header title, Home button, save-failure notices),
+  `WeddingBudgetTrackerCard.tsx` (scenario block rewritten, panel classes), and
+  `AgentPersonaFAB.tsx` (two `phone:` position classes). Keep both sides' behaviour; do not revert the
+  `phone:` classes.
+- `WeddingResponseWorkspaceView.tsx` is still 1,042 lines (existing line-budget failure); this change
+  kept it flat. Do not let it grow while merging.
+
+What changed (source: `Documents/UI/mobile UI design principles.md`):
+
+- Budget: Safe/Balanced/Stretch is a single radio list; Balanced is marked Recommended, the chosen
+  row is solid-bordered, others are muted, and detail copy shows only on the chosen row. Removed the
+  repeated "left in this version" and "still has room" filler; with nothing selected it reads "No
+  choices counted yet". The outer budget card is flat on phones.
+- Vendor search: removed the duplicated "‹ Home" (the header now shows the section title and the body
+  keeps one SVG back button); flattened nested cards on phones; inputs and buttons are 44px.
+- Deck: bottom bar is Later (secondary) plus Approve (primary); Prev/Next became icon buttons above it.
+- Errors: new `friendlyErrorText` maps protocol/network text such as "Invalid AFP message" to plain
+  language. Used in vendor search, mobile triage saves, outreach drafts and guest saves.
+- Floating agent button is lifted above the phone action bar (`phone:` variant) and focus-home scroll
+  areas have bottom padding so the last control can scroll clear of it.
+
+Tests performed: `npx tsc --noEmit`, `npm run test:wedding` (1,804 passing), focused
+visible-error and budget tests, `npm run build` (pass). `npm run test:line-budget` still fails only on
+the two pre-existing files above. No device or browser check was run; not deployed.
+
+Not done: other wedding views (guest list, timeline, tasks) were not audited against the principles.
+
 ## 2026-10-08 - Oracle staging stack, www redirect, strict production policy (Claude)
 
 What changed:

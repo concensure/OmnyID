@@ -11,6 +11,7 @@ import {
 } from "@/lib/weddingGuestOperationsLocalState";
 import { weddingGuestOperationsDisplayCounts } from "@/lib/weddingGuestOperationsDisplayState";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
+import { friendlyErrorText } from "@/lib/visibleErrorText";
 
 type GuestRsvpStatus = "Attending" | "Not attending" | "Pending";
 
@@ -121,7 +122,7 @@ export function WeddingGuestOperationsCard(props: {
       setGuestAccessibility("");
       setSaveNotice(notice);
     } catch (error) {
-      setSaveNotice(error instanceof Error ? error.message : "Guest draft could not be saved. Try again.");
+      setSaveNotice(friendlyErrorText(error, "Guest draft could not be saved. Try again."));
     } finally {
       setSavingGuest(false);
     }
@@ -139,7 +140,7 @@ export function WeddingGuestOperationsCard(props: {
       saveLocalState({ rules: labels });
       setSaveNotice(notice);
     } catch (error) {
-      setSaveNotice(error instanceof Error ? error.message : "Guest rules could not be saved. Try again.");
+      setSaveNotice(friendlyErrorText(error, "Guest rules could not be saved. Try again."));
     } finally {
       setSavingRules(false);
     }

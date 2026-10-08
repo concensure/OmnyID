@@ -96,7 +96,7 @@ export function WeddingVendorSearchHomeSection(props: {
     onCleanup(() => window.clearInterval(timer));
   });
   return (
-    <div class="rounded-2xl border border-wedding-muted bg-white/85 px-4 py-5 shadow-sm sm:px-5 sm:py-6">
+    <div class="rounded-xl border border-wedding-muted bg-white/85 px-4 py-5 shadow-sm phone:rounded-none phone:border-0 phone:bg-transparent phone:px-0 phone:py-2 phone:shadow-none sm:px-5 sm:py-6">
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -110,7 +110,7 @@ export function WeddingVendorSearchHomeSection(props: {
         </div>
         <button
           type="submit"
-          class="min-h-11 shrink-0 rounded-full border border-wedding-accent bg-white px-4 py-2 text-sm font-bold text-wedding-accent transition hover:bg-wedding-surface-blush disabled:cursor-not-allowed disabled:opacity-50"
+          class="min-h-11 shrink-0 rounded-lg border border-wedding-accent bg-white px-4 py-2 text-sm font-bold text-wedding-accent transition hover:bg-wedding-surface-blush disabled:cursor-not-allowed disabled:opacity-50 phone:w-full"
           title={workspace().vendorSearchBlockedReason ?? undefined}
           disabled={searchDisabled()}
           data-magic-action="open"
@@ -125,7 +125,7 @@ export function WeddingVendorSearchHomeSection(props: {
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="text-xs font-semibold text-wedding-muted">Search query</span>
           <Show when={workspace().vendorSearchQuerySourceLabel}>
-            {(label) => <span class="rounded-full border border-wedding-muted bg-wedding-surface-blush px-2 py-0.5 text-[10px] font-semibold text-wedding-accent">{label()}</span>}
+            {(label) => <span class="rounded-full border border-wedding-muted bg-wedding-surface-blush px-2 py-0.5 text-xs font-semibold text-wedding-accent">{label()}</span>}
           </Show>
         </div>
         <input
@@ -133,7 +133,7 @@ export function WeddingVendorSearchHomeSection(props: {
           value={workspace().vendorSearchQuery ?? ""}
           onInput={(event) => workspace().onVendorSearchQueryChange?.(event.currentTarget.value)}
           placeholder="florist in Sydney specialising in wedding"
-          class="mt-1 w-full rounded-2xl border-2 border-wedding-muted bg-white px-3 py-2 text-sm text-wedding-accent shadow-sm outline-none transition placeholder:text-wedding-muted focus:border-wedding-accent focus:ring-4 focus:ring-wedding-surface-blush"
+          class="mt-1 min-h-11 w-full rounded-lg border-2 border-wedding-muted bg-white px-3 py-2 text-sm text-wedding-accent shadow-sm outline-none transition placeholder:text-wedding-muted focus:border-wedding-accent focus:ring-4 focus:ring-wedding-surface-blush"
         />
       </label>
       </form>
@@ -152,22 +152,22 @@ export function WeddingVendorSearchHomeSection(props: {
       </Show>
       <Show when={props.result}>
         {(result) => (
-          <div class="mt-4 rounded-2xl border border-wedding-muted bg-wedding-surface-blush p-3">
+          <div class="mt-4 rounded-xl border border-wedding-muted bg-wedding-surface-blush p-3 phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0">
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="break-words text-sm font-semibold text-wedding-accent">{result().preview?.title ?? result().action.label}</p>
                 <p class="mt-1 break-words text-xs leading-5 text-wedding-muted">{result().action.detail}</p>
               </div>
-              <button type="button" class="min-h-11 rounded-full border border-wedding-muted bg-white px-3 text-xs font-semibold text-wedding-accent" onClick={() => props.onDismiss(result().action.artifactId)}>
+              <button type="button" class="min-h-11 rounded-lg border border-wedding-muted bg-white px-3 text-sm font-semibold text-wedding-accent" onClick={() => props.onDismiss(result().action.artifactId)}>
                 Done
               </button>
             </div>
             <Show when={result().preview}>
               {(preview) => (
                 <>
-                  <div class="mt-3 grid gap-2 sm:grid-cols-3">
+                  <div class="mt-3 flex flex-wrap gap-2">
                     <For each={[preview().category, preview().evidenceSummary.sourceCountLabel, preview().vendorComparisonHandoff?.confidenceLabel ?? preview().evidenceSummary.statusLabel].filter(Boolean)}>
-                      {(label) => <span class="rounded-xl border border-wedding-muted bg-white px-3 py-2 text-xs font-medium text-wedding-muted">{label}</span>}
+                      {(label) => <span class="rounded-lg border border-wedding-muted bg-white px-3 py-1.5 text-xs font-medium text-wedding-muted">{label}</span>}
                     </For>
                   </div>
                   <Show when={preview().vendorComparisonCards.length > 0}>
@@ -202,7 +202,7 @@ export function WeddingVendorSearchHomeSection(props: {
             <div class="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                class="min-h-11 rounded-full border border-wedding-accent bg-white px-3 text-xs font-bold text-wedding-accent"
+                class="min-h-11 rounded-lg border border-wedding-accent bg-white px-3 text-sm font-bold text-wedding-accent"
                 title={result().action.detail ?? undefined}
                 aria-expanded={fullResultExpanded()}
                 aria-controls="wedding-vendor-search-full-result"

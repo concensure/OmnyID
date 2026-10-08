@@ -38,6 +38,7 @@ import {
   weddingVendorOutreachStartSending,
   type WeddingVendorOutreachFlowState,
 } from "@/lib/weddingVendorOutreachFlowState";
+import { friendlyErrorText } from "@/lib/visibleErrorText";
 
 type WeddingVendorOutreachCouple = {
   date_or_season: string | null;
@@ -206,7 +207,7 @@ export function useWeddingVendorOutreachOwner(input: {
         }),
       });
     } catch (error) {
-      const reason = error instanceof Error ? error.message : "couldn't write an outreach draft right now — please try again in a moment";
+      const reason = friendlyErrorText(error, "couldn't write an outreach draft right now — please try again in a moment");
       setVendorOutreachFlows((current) => {
         const flow = current[card.choiceId];
         if (!flow) return current;
@@ -311,7 +312,7 @@ export function useWeddingVendorOutreachOwner(input: {
       }));
       input.onRefreshWorkspace()?.();
     } catch (error) {
-      const reason = error instanceof Error ? error.message : "couldn't send this enquiry right now — please try again in a moment";
+      const reason = friendlyErrorText(error, "couldn't send this enquiry right now — please try again in a moment");
       setVendorOutreachFlows((current) => {
         const currentFlow = current[choiceId] ?? flow;
         return { ...current, [choiceId]: weddingVendorOutreachSendFailed(currentFlow, reason) };

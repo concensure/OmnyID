@@ -8,6 +8,12 @@ import {
 import { FOCUS_DECK_HORIZONTAL_MAPPING, type FocusDeckItem } from "@/lib/mobileFocusHomeState";
 
 type InputMethod = "swipe" | "button" | "keyboard";
+const ICON_BUTTON_CLASS = "inline-flex h-11 w-11 items-center justify-center rounded-lg text-wedding-accent active:bg-wedding-surface-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent";
+
+function DeckIcon(props: { d: string }) {
+  return <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={props.d} /></svg>;
+}
+
 export function MobileFocusDeck(props: {
   items: FocusDeckItem[];
   position: number;
@@ -35,10 +41,10 @@ export function MobileFocusDeck(props: {
   });
   const edgeLabel = () => {
     const direction = action();
-    if (direction === "approve") return `↓ Approve: ${item()?.recommendedActionLabel ?? "recommendation"}`;
-    if (direction === "defer") return "↑ Later";
-    if (offset().x < 0) return "‹ Previous";
-    return "Next ›";
+    if (direction === "approve") return `Approve: ${item()?.recommendedActionLabel ?? "recommendation"}`;
+    if (direction === "defer") return "Later";
+    if (offset().x < 0) return "Previous";
+    return "Next";
   };
   const interactiveTarget = (target: EventTarget | null): boolean => typeof Element !== "undefined"
     && target instanceof Element
@@ -137,11 +143,14 @@ export function MobileFocusDeck(props: {
             <Show when={item()}>{(current) => props.renderCard(current())}</Show>
           </div>
         </div>
-        <nav class="grid grid-cols-4 gap-2 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" aria-label={`${props.label} actions`}>
-          <button type="button" class="min-h-12 rounded-xl border border-wedding-muted bg-white px-2 text-xs font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={() => navigate(-1)}>‹ Prev</button>
-          <button type="button" class="min-h-12 rounded-xl border border-wedding-muted bg-white px-2 text-xs font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={() => commit("defer", "button")}>↑ Later</button>
-          <button type="button" class="min-h-12 rounded-xl border-2 border-wedding-cta bg-white px-2 text-xs font-bold text-wedding-text hover:bg-wedding-surface-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" aria-label={`Approve: ${item()?.recommendedActionLabel ?? "recommendation"}`} onClick={() => commit("approve", "button")}>↓ Approve</button>
-          <button type="button" class="min-h-12 rounded-xl border border-wedding-muted bg-white px-2 text-xs font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={() => navigate(1)}>Next ›</button>
+        <div class="flex items-center justify-between pt-2">
+          <button type="button" class={ICON_BUTTON_CLASS} aria-label={`Previous ${props.label.toLowerCase()}`} onClick={() => navigate(-1)}><DeckIcon d="M15 19l-7-7 7-7" /></button>
+          <p class="text-xs text-wedding-muted" aria-hidden="true">Swipe up for later, down to approve</p>
+          <button type="button" class={ICON_BUTTON_CLASS} aria-label={`Next ${props.label.toLowerCase()}`} onClick={() => navigate(1)}><DeckIcon d="M9 5l7 7-7 7" /></button>
+        </div>
+        <nav class="flex gap-2 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))]" aria-label={`${props.label} actions`}>
+          <button type="button" class="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-lg border border-wedding-muted bg-white px-4 text-sm font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={() => commit("defer", "button")}><DeckIcon d="M12 6v6l4 2M12 21a9 9 0 100-18 9 9 0 000 18z" />Later</button>
+          <button type="button" class="inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-wedding-cta bg-white px-4 text-sm font-bold text-wedding-text hover:bg-wedding-surface-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" aria-label={`Approve: ${item()?.recommendedActionLabel ?? "recommendation"}`} onClick={() => commit("approve", "button")}><DeckIcon d="M5 13l4 4L19 7" />Approve</button>
         </nav>
       </Show>
     </section>

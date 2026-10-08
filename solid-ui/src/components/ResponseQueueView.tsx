@@ -194,6 +194,7 @@ import { weddingImportFileInputsFromBrowserFile } from "@/lib/weddingXlsxImportP
 import type { WeddingRichResponseAction } from "@/lib/weddingRichResponseRendererState";
 import type { WeddingProjectionDispatchReceiptState } from "@/lib/weddingProjectionDispatchState";
 import type { ViewName } from "@/lib/viewNames";
+import { friendlyErrorText } from "@/lib/visibleErrorText";
 import type { WeddingPlanningScheduleItem } from "@/lib/weddingCalendarProjectionState";
 import {
   buildWeddingVendorSearchQueryEditState,
@@ -1785,7 +1786,7 @@ export function ResponseQueueView(props: {
       }
       const artifact = buildWeddingVendorSearchArtifactState({ metadata, execution });
       if (artifact.status !== "created" || !artifact.summary || !artifact.artifactInput || !artifact.markdown) {
-        setWeddingVendorSearchNotice(responseNotice || artifact.reason || execution.message);
+        setWeddingVendorSearchNotice(friendlyErrorText(responseNotice || artifact.reason || execution.message));
         return false;
       }
       const generatedArtifact: WeddingGeneratedArtifact = {
@@ -1832,7 +1833,7 @@ export function ResponseQueueView(props: {
       );
       return comparisonArtifact.status === "created";
     } catch (error) {
-      setWeddingVendorSearchNotice(error instanceof Error ? error.message : "Live vendor search failed.");
+      setWeddingVendorSearchNotice(friendlyErrorText(error, "Vendor search failed. Try again in a moment."));
       return false;
     } finally {
       setWeddingVendorSearchRunning(false);

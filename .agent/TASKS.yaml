@@ -824,3 +824,25 @@ tasks:
       - worktree reconciliation is secret-safe and does not require blindly committing generated or private files
       - completion requires a clean reviewed release SHA deployed and verified in staging and production
       - PARA receives compatibility coverage without becoming a feature-priority dependency
+
+  - id: UX-MPR-01
+    title: Apply mobile UI design principles to wedding planner phone views
+    status: completed
+    owner: claude
+    branch: agent/claude/UX-MPR-01
+    depends_on:
+      - WED-175
+    files:
+      - solid-ui/src/components/WeddingBudgetTrackerCard.tsx
+      - solid-ui/src/components/WeddingVendorSearchHomeSections.tsx
+      - solid-ui/src/components/WeddingMobileFocusHome.tsx
+      - solid-ui/src/components/MobileFocusDeck.tsx
+      - solid-ui/src/components/MobileFocusHome.tsx
+      - solid-ui/src/components/AgentPersonaFAB.tsx
+      - solid-ui/src/lib/visibleErrorText.ts
+      - solid-ui/src/lib/weddingBudgetInsightsState.ts
+    acceptance:
+      - budget versions are one selectable list with a recommended badge and no repeated amounts
+      - vendor search shows a single Home control and no protocol wording in errors
+      - deck bottom bar has one primary and one secondary action with SVG icons
+      - the agent floating button never sits over the phone action bar or the last form control

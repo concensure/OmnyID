@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { visibleErrorText } from "../src/lib/visibleErrorText.ts";
+import { friendlyErrorText, visibleErrorText } from "../src/lib/visibleErrorText.ts";
 
 test("visibleErrorText turns HTML error pages into plain user-facing text", () => {
   assert.equal(
@@ -19,4 +19,16 @@ test("visibleErrorText strips inline HTML from plain error payloads", () => {
 
 test("visibleErrorText falls back for empty values", () => {
   assert.equal(visibleErrorText("", "Authentication failed."), "Authentication failed.");
+});
+
+test("friendlyErrorText hides protocol wording from users", () => {
+  const afp = friendlyErrorText(new Error("Invalid AFP message"));
+  assert.doesNotMatch(afp, /afp/i);
+  assert.match(afp, /haven't been saved/i);
+});
+
+test("friendlyErrorText explains lost connections and keeps readable messages", () => {
+  assert.match(friendlyErrorText(new TypeError("Failed to fetch")), /^Connection lost\./);
+  assert.equal(friendlyErrorText("Add a vendor category first."), "Add a vendor category first.");
+  assert.equal(friendlyErrorText("", "Try again."), "Try again.");
 });

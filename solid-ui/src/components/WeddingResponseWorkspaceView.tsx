@@ -910,10 +910,10 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
         <Show when={activeMenu() !== "home"}>
           <button
             type="button"
-            class="mb-3 inline-flex min-h-11 items-center rounded-xl border border-wedding-muted bg-white px-3 text-sm font-semibold text-wedding-accent transition hover:bg-wedding-surface-blush"
+            class="mb-3 inline-flex min-h-11 items-center gap-1 rounded-lg border border-wedding-muted bg-white pl-2 pr-3 text-sm font-semibold text-wedding-accent transition hover:bg-wedding-surface-blush"
             onClick={() => props.onSelectMenu?.("home")}
           >
-            ← Wedding Home
+            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7" /></svg>Wedding Home
           </button>
         </Show>
         <Show when={activeMenu() === "home"}>

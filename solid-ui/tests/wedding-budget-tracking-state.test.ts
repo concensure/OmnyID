@@ -471,6 +471,11 @@ test("buildWeddingBudgetTrackingState normalizes quote fields and scenario budge
   assert.equal(state.insights.scenarios.find((scenario) => scenario.id === "safe")?.targetAmount, 27000);
   assert.match(state.insights.scenarios.find((scenario) => scenario.id === "safe")?.meaningLabel ?? "", /buffer/i);
   assert.match(state.insights.scenarios.find((scenario) => scenario.id === "stretch")?.nextStepLabel ?? "", /taxes/i);
+  for (const scenario of state.insights.scenarios) {
+    assert.doesNotMatch(scenario.summaryLabel, /in this version/i);
+    assert.notEqual(scenario.nextStepLabel, "This version still has room for the next choice.");
+  }
+  assert.equal(state.insights.scenarios.find((scenario) => scenario.id === "balanced")?.nextStepLabel, "");
   assert.equal(state.insights.contributionRows[0]?.personLabel, "Alex parents");
   assert.equal(state.insights.quoteNormalForms[0]?.linkedArtifactId, "artifact:vendors");
   assert.equal(state.insights.quoteNormalForms[0]?.hoursLabel, "8 hours");
