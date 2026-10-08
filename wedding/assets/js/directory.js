@@ -20,7 +20,7 @@
     var heading = document.createElement('h3'); heading.textContent = vendor.name || 'Wedding vendor'; body.appendChild(heading);
     var meta = document.createElement('p'); meta.className = 'vendor-meta'; meta.textContent = [vendor.category, vendor.service_area].filter(Boolean).join(' · '); body.appendChild(meta);
     if (vendor.description) { var desc = document.createElement('p'); desc.className = 'vendor-meta'; desc.textContent = vendor.description.slice(0, 180); body.appendChild(desc); }
-    var action = document.createElement('a'); action.className = vendor.claim_cta ? 'btn btn-outline' : 'btn btn-primary'; action.href = vendor.claim_cta ? claimHref(vendor.slug) : '../workspace/?auth=register&source=wedding_enquiry&vendor=' + encodeURIComponent(vendor.slug); action.textContent = vendor.claim_cta ? 'Claim your profile' : 'Enquire securely'; body.appendChild(action);
+    var action = document.createElement('a'); action.className = vendor.claim_cta ? 'btn btn-outline' : 'btn btn-primary'; action.href = vendor.claim_cta ? claimHref(vendor.slug) : vendor.agent_card_url ? '../workspace/?auth=register&source=wedding_enquiry&vendor=' + encodeURIComponent(vendor.slug) : (vendor.website_url || '#'); action.textContent = vendor.claim_cta ? 'Claim your profile' : vendor.agent_card_url ? 'Enquire securely' : 'View vendor'; body.appendChild(action);
     article.appendChild(body); return article;
   }
   function render(items) {

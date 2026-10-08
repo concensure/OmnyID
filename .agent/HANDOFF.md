@@ -1,5 +1,24 @@
 # Handoff
 
+## 2026-10-09 - WED-168 AgentCard and browser key-custody foundation (Codex)
+
+What changed:
+
+- Added an optional `encryption_public_key_hex` to AgentCard. It is included in the signature only when present, preserving verification of legacy cards while detecting a substituted or removed encryption key.
+- Added a rate-limited authenticated AgentCard publish endpoint. It accepts only a self-signed card for the deterministic managed vendor Agent ID, requires both enquiry capabilities and a 32-byte X25519 public key, and never accepts a private key. Public card discovery is served from the standard well-known route only after the listing is claimed or verified.
+- Added browser-side key custody in `solid-ui/src/lib/vendorAgentKeys.ts`: temporary extractable generation is used only to create the encrypted recovery backup, then private Ed25519/X25519 keys are re-imported non-extractable and stored in IndexedDB.
+- Directory cards advertise secure enquiry only once a public AgentCard URL is present; otherwise they link to the vendor website rather than promising an unavailable conversation.
+
+Verification:
+
+- Focused TypeScript compile of `vendorAgentKeys.ts` passed.
+- Wedding static-site smoke test passed.
+- Rust formatting and `git diff --check` passed. Full Rust test commands are still draining from a shared Cargo target-directory queue; do not treat them as completed until their final output is captured.
+
+Release status:
+
+- Not deployed. The claim verification transition and ciphertext-only enquiry relay remain incomplete, so direct vendor enquiries must remain gated.
+
 This file is for agent commentary, session notes, and coordination details.
 It is not project truth. Keep durable facts in `.agent/PROJECT_STATE.md`, task
 ownership in `.agent/TASKS.yaml`, and architecture decisions in

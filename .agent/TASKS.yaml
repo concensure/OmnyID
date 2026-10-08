@@ -648,9 +648,9 @@ tasks:
 
   - id: WED-168
     title: Vendor Agent ID and AgentCard publishing
-    status: ready
+    status: in_progress
     owner: codex
-    branch: agent/codex/WED-160
+    branch: agent/codex/WED-161
     depends_on:
       - WED-166
     files:
@@ -662,6 +662,13 @@ tasks:
       - AgentCard gains optional encryption_public_key_hex; old cards still deserialize (test)
       - card verifies server-side, links to the listing, and is served at /.well-known/afp/agents/<id>/card
       - linking an existing agent works by signing a server nonce
+    progress:
+      - AgentCard now signs an optional encryption key while retaining verification compatibility for cards without one
+      - authenticated claimants can publish a verified hosted AgentCard for their deterministic vendor Agent ID; public retrieval remains gated until the claim is claimed or verified
+      - browser key custody creates Ed25519/X25519 pairs, stores non-extractable private CryptoKeys in IndexedDB, and returns an encrypted recovery backup
+    remaining:
+      - add browser-generated non-extractable key storage and encrypted backup export
+      - add the claim publish transition and signed nonce path for an existing agent
 
   - id: WED-169
     title: Claim wizard UI

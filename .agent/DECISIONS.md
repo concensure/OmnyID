@@ -336,6 +336,11 @@ relays ciphertext envelopes with minimal routing metadata and never holds keys o
 Lead Quality Score is computed on the vendor's device. `MessageSchema` is unchanged. `AgentCard`
 gains only an optional `encryption_public_key_hex`.
 
+When present, `encryption_public_key_hex` is part of the AgentCard's signed payload. Cards without
+the field retain the original AFP-v1 payload, so an existing card remains verifiable; removing or
+replacing a published encryption key invalidates its signature. A vendor AgentCard is bound to a
+deterministic managed Agent ID for that vendor/account pair before it can be linked to the listing.
+
 Couples enquire from a free account. Vendor tiers (AUD, incl. GST):
 
 - Starter: free.
@@ -372,4 +377,3 @@ Production runs with `OMNYID_ENV=production`, so unsafe startup settings fail cl
 treats Gmail OAuth as enabled whenever a homeserver URL or session secret is set, so it effectively
 requires a Gmail client id and secret; staging supplies inert placeholders. Release evidence comes
 from the Oracle runtime and local tags, not GitHub Deployments, because no GitHub release is used.
-

@@ -18,12 +18,15 @@ use axum::{
     Json, Router,
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
-    routing::get,
+    routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use sqlx::Row;
 use ulid::Ulid;
+
+use crate::agentcard::AgentCard;
 
 use super::{
     AppState, RateLimitPolicy,
@@ -43,6 +46,14 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/wedding/vendor/intake",
             get(vendor_intake_status_http).post(vendor_intake_start_http),
+        )
+        .route(
+            "/api/wedding/vendor/agent-card",
+            post(vendor_agent_card_publish_http),
+        )
+        .route(
+            "/.well-known/afp/agents/{agent_id}/card",
+            get(public_vendor_agent_card_http),
         )
 }
 
@@ -79,6 +90,24 @@ struct VendorIntakeResponse {
     vendor_slug: String,
     status: String,
     requires_agent_card: bool,
+    expected_agent_id: String,
+}
+
+#[derive(Deserialize)]
+struct VendorAgentCardRequest {
+    vendor_slug: String,
+    card: AgentCard,
+}
+
+#[derive(Serialize)]
+struct VendorAgentCardResponse {
+    agent_id: String,
+    card_url: String,
+}
+
+#[derive(Deserialize)]
+struct VendorAgentCardPath {
+    agent_id: String,
 }
 
 async fn public_directory_http(
@@ -93,7 +122,7 @@ async fn public_directory_http(
         r#"
         SELECT
             v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
-            v.website_url, v.claim_status,
+            v.website_url, v.claim_status, link.agent_id AS linked_agent_id,
             COALESCE(p.description, '') AS owner_description,
             COALESCE(p.price_tier, '') AS price_tier,
             COALESCE(p.capacity_min, 0) AS capacity_min,
@@ -109,6 +138,7 @@ async fn public_directory_http(
             ), '[]'::jsonb) AS photos
         FROM wedding_vendors v
         LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
+        LEFT JOIN wedding_vendor_agent_links link ON link.vendor_id = v.vendor_id
         WHERE v.status = 'active'
           AND ($1::TEXT IS NULL OR lower(v.vendor_name) LIKE '%' || lower($1) || '%'
                OR lower(v.category) LIKE '%' || lower($1) || '%'
@@ -145,7 +175,7 @@ async fn public_vendor_http(
         r#"
         SELECT
             v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
-            v.website_url, v.claim_status,
+            v.website_url, v.claim_status, link.agent_id AS linked_agent_id,
             COALESCE(p.description, '') AS owner_description,
             COALESCE(p.price_tier, '') AS price_tier,
             COALESCE(p.capacity_min, 0) AS capacity_min,
@@ -161,6 +191,7 @@ async fn public_vendor_http(
             ), '[]'::jsonb) AS photos
         FROM wedding_vendors v
         LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
+        LEFT JOIN wedding_vendor_agent_links link ON link.vendor_id = v.vendor_id
         WHERE v.status = 'active' AND v.vendor_slug = $1
         LIMIT 1
         "#,
@@ -268,7 +299,11 @@ async fn vendor_intake_start_http(
     .map_err(database_failure)? {
         tx.commit().await.map_err(database_failure)?;
         return Ok(Json(VendorIntakeResponse {
-            claim_id: existing.get("claim_id"), vendor_slug: slug, status: existing.get("status"), requires_agent_card: true,
+            claim_id: existing.get("claim_id"),
+            expected_agent_id: expected_vendor_agent_id(&slug, &user.id),
+            vendor_slug: slug,
+            status: existing.get("status"),
+            requires_agent_card: true,
         }));
     }
 
@@ -298,14 +333,179 @@ async fn vendor_intake_start_http(
 
     Ok(Json(VendorIntakeResponse {
         claim_id,
+        expected_agent_id: expected_vendor_agent_id(&slug, &user.id),
         vendor_slug: slug,
         status: "started".to_string(),
         requires_agent_card: true,
     }))
 }
 
+async fn vendor_agent_card_publish_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<VendorAgentCardRequest>,
+) -> Result<Json<VendorAgentCardResponse>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("vendor_agent_card", &headers),
+        RateLimitPolicy {
+            max_requests: 10,
+            window: std::time::Duration::from_secs(60 * 60),
+        },
+    )
+    .await?;
+
+    let slug = valid_slug(&body.vendor_slug)?;
+    let expected_agent_id = expected_vendor_agent_id(&slug, &user.id);
+    validate_vendor_agent_card(&body.card, &expected_agent_id)?;
+
+    let mut tx = state.db.pool.begin().await.map_err(database_failure)?;
+    let listing = sqlx::query(
+        r#"SELECT vendor_id, vendor_name, claim_status, claimed_by_user_id
+           FROM wedding_vendors
+           WHERE vendor_slug = $1 AND status = 'active'
+           FOR UPDATE"#,
+    )
+    .bind(&slug)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(database_failure)?
+    .ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            "vendor listing not found".to_string(),
+        )
+    })?;
+    let vendor_id: String = listing.get("vendor_id");
+    let vendor_name: String = listing.get("vendor_name");
+    let claim_status: String = listing.get("claim_status");
+    let owner: Option<String> = listing.get("claimed_by_user_id");
+    if claim_status == "unclaimed" || owner.as_deref() != Some(user.id.as_str()) {
+        return Err((
+            StatusCode::CONFLICT,
+            "start and retain the vendor claim before publishing an AgentCard".to_string(),
+        ));
+    }
+
+    if let Some(existing_owner) =
+        sqlx::query("SELECT owner_user_id FROM managed_agents WHERE agent_id = $1 FOR UPDATE")
+            .bind(&expected_agent_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(database_failure)?
+    {
+        let existing_owner: String = existing_owner.get("owner_user_id");
+        if existing_owner != user.id {
+            return Err((
+                StatusCode::CONFLICT,
+                "that managed agent is owned by another account".to_string(),
+            ));
+        }
+    }
+
+    let metadata = json!({
+        "origin": "wedding_vendor_claim",
+        "vendor_slug": slug,
+        "key_id": body.card.key_id,
+    });
+    sqlx::query(
+        r#"INSERT INTO managed_agents
+            (id, owner_user_id, agent_id, label, email, kind, created_at, metadata)
+           VALUES ($1, $2, $3, $4, $5, 'wedding_vendor', NOW(), $6)
+           ON CONFLICT (agent_id) DO UPDATE SET
+             label = EXCLUDED.label,
+             email = EXCLUDED.email,
+             kind = EXCLUDED.kind,
+             metadata = EXCLUDED.metadata"#,
+    )
+    .bind(Ulid::new().to_string())
+    .bind(&user.id)
+    .bind(&expected_agent_id)
+    .bind(format!("{} enquiries", vendor_name))
+    .bind(&user.email)
+    .bind(metadata)
+    .execute(&mut *tx)
+    .await
+    .map_err(database_failure)?;
+
+    if let Some(existing_agent_id) = sqlx::query(
+        "SELECT agent_id FROM wedding_vendor_agent_links WHERE vendor_id = $1 FOR UPDATE",
+    )
+    .bind(&vendor_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(database_failure)?
+    {
+        let existing_agent_id: String = existing_agent_id.get("agent_id");
+        if existing_agent_id != expected_agent_id {
+            return Err((
+                StatusCode::CONFLICT,
+                "this listing is already linked to another managed agent".to_string(),
+            ));
+        }
+    }
+
+    sqlx::query(
+        r#"INSERT INTO wedding_vendor_agent_links
+            (vendor_id, agent_id, agent_card, card_verified_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (vendor_id) DO UPDATE SET
+             agent_id = EXCLUDED.agent_id,
+             agent_card = EXCLUDED.agent_card,
+             card_verified_at = EXCLUDED.card_verified_at"#,
+    )
+    .bind(&vendor_id)
+    .bind(&expected_agent_id)
+    .bind(serde_json::to_value(&body.card).map_err(|_| invalid_agent_card())?)
+    .execute(&mut *tx)
+    .await
+    .map_err(database_failure)?;
+    tx.commit().await.map_err(database_failure)?;
+
+    Ok(Json(VendorAgentCardResponse {
+        card_url: vendor_agent_card_url(&expected_agent_id),
+        agent_id: expected_agent_id,
+    }))
+}
+
+async fn public_vendor_agent_card_http(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(path): axum::extract::Path<VendorAgentCardPath>,
+) -> Result<Json<AgentCard>, (StatusCode, String)> {
+    let agent_id = path.agent_id.trim();
+    if agent_id.is_empty() || agent_id.len() > 160 {
+        return Err((StatusCode::NOT_FOUND, "agent card not found".to_string()));
+    }
+    let card_value = sqlx::query(
+        r#"SELECT link.agent_card
+           FROM wedding_vendor_agent_links link
+           JOIN wedding_vendors vendor ON vendor.vendor_id = link.vendor_id
+           WHERE link.agent_id = $1
+             AND vendor.status = 'active'
+             AND vendor.claim_status IN ('claimed', 'verified')"#,
+    )
+    .bind(agent_id)
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(database_failure)?
+    .ok_or_else(|| (StatusCode::NOT_FOUND, "agent card not found".to_string()))?
+    .get::<Value, _>("agent_card");
+    let card: AgentCard = serde_json::from_value(card_value)
+        .map_err(|_| (StatusCode::NOT_FOUND, "agent card not found".to_string()))?;
+    if !card.verify() || !valid_encryption_public_key(&card.encryption_public_key_hex) {
+        return Err((StatusCode::NOT_FOUND, "agent card not found".to_string()));
+    }
+    Ok(Json(card))
+}
+
 fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
     let claim_status: String = row.get("claim_status");
+    let has_public_agent_card = matches!(claim_status.as_str(), "claimed" | "verified");
+    let agent_id = row
+        .try_get::<Option<String>, _>("linked_agent_id")
+        .ok()
+        .flatten();
     json!({
         "slug": row.get::<String, _>("vendor_slug"),
         "name": row.get::<String, _>("vendor_name"),
@@ -315,6 +515,11 @@ fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
         "website_url": row.try_get::<Option<String>, _>("website_url").ok().flatten(),
         "claim_status": claim_status,
         "claim_cta": row.get::<String, _>("claim_status") == "unclaimed",
+        "agent_card_url": if has_public_agent_card {
+            agent_id.as_deref().map(vendor_agent_card_url)
+        } else {
+            None
+        },
         "description": row.get::<String, _>("owner_description"),
         "price_tier": row.get::<String, _>("price_tier"),
         "capacity_min": row.get::<i32, _>("capacity_min"),
@@ -374,6 +579,57 @@ fn valid_declared_role(raw: &str) -> Result<&str, (StatusCode, String)> {
             "declared_role must be owner, manager, marketing, or other".to_string(),
         )),
     }
+}
+
+fn expected_vendor_agent_id(vendor_slug: &str, user_id: &str) -> String {
+    let fingerprint = hex::encode(Sha256::digest(
+        format!("{vendor_slug}:{user_id}").as_bytes(),
+    ));
+    format!(
+        "agent:vendor-{vendor_slug}-{}@omnyid.com",
+        &fingerprint[..12]
+    )
+}
+
+fn vendor_agent_card_url(agent_id: &str) -> String {
+    format!("/.well-known/afp/agents/{agent_id}/card")
+}
+
+fn validate_vendor_agent_card(
+    card: &AgentCard,
+    expected_agent_id: &str,
+) -> Result<(), (StatusCode, String)> {
+    if card.agent_id != expected_agent_id
+        || !card.verify()
+        || !valid_encryption_public_key(&card.encryption_public_key_hex)
+    {
+        return Err(invalid_agent_card());
+    }
+    for capability in ["wedding_enquiry", "wedding_enquiry_response"] {
+        if !card
+            .capabilities
+            .iter()
+            .any(|entry| entry.name == capability)
+        {
+            return Err(invalid_agent_card());
+        }
+    }
+    Ok(())
+}
+
+fn valid_encryption_public_key(value: &Option<String>) -> bool {
+    value
+        .as_deref()
+        .and_then(|hex_value| hex::decode(hex_value).ok())
+        .is_some_and(|key| key.len() == 32)
+}
+
+fn invalid_agent_card() -> (StatusCode, String) {
+    (
+        StatusCode::BAD_REQUEST,
+        "a signed AgentCard with the required enquiry capabilities and X25519 public key is required"
+            .to_string(),
+    )
 }
 
 fn database_failure(_: sqlx::Error) -> (StatusCode, String) {

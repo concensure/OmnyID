@@ -46,6 +46,10 @@ pub struct AgentCard {
     pub key_id: String,
     pub previous_key_ids: Vec<String>,
     pub public_key_hex: String,
+    /// Optional X25519 public key used solely to encrypt an envelope to this
+    /// agent. It is signed with the rest of the card, never a private key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encryption_public_key_hex: Option<String>,
     pub homeserver_url: String,
     pub capabilities: Vec<CapabilityDescriptor>,
     pub timestamp: String,
@@ -66,6 +70,7 @@ impl AgentCard {
             key_id,
             previous_key_ids,
             public_key_hex,
+            encryption_public_key_hex: None,
             homeserver_url,
             capabilities: vec![
                 CapabilityDescriptor::builtin("afp-v1"),
@@ -212,7 +217,7 @@ pub fn derive_public_key_hex(signing_seed_hex: &str) -> Option<String> {
 }
 
 fn agent_card_signable_payload(card: &AgentCard) -> String {
-    [
+    let mut fields = vec![
         card.protocol.clone(),
         card.agent_id.clone(),
         card.key_id.clone(),
@@ -221,8 +226,15 @@ fn agent_card_signable_payload(card: &AgentCard) -> String {
         card.homeserver_url.clone(),
         canonical_json_string(&serde_json::json!(card.capabilities)),
         card.timestamp.clone(),
-    ]
-    .join("\n")
+    ];
+
+    // Preserve the original AFP-v1 payload for cards that pre-date encrypted
+    // envelopes. Once present, the encryption key is signed and cannot be
+    // swapped or stripped without invalidating the card.
+    if let Some(encryption_public_key_hex) = &card.encryption_public_key_hex {
+        fields.push(encryption_public_key_hex.clone());
+    }
+    fields.join("\n")
 }
 
 fn parse_signature_parts(signature: &str) -> Option<(&str, &str)> {
@@ -267,6 +279,40 @@ mod tests {
         card.signature = sign_agent_card(&card, signing_seed_hex).expect("signature");
 
         assert!(card.verify());
+    }
+
+    #[test]
+    fn signed_encryption_key_is_verified_and_legacy_cards_still_deserialize() {
+        let signing_seed_hex = "1414141414141414141414141414141414141414141414141414141414141414";
+        let public_key_hex = derive_public_key_hex(signing_seed_hex).expect("public key");
+        let mut card = AgentCard::new(
+            "agent:test@omnyid.local".to_string(),
+            "main".to_string(),
+            vec![],
+            public_key_hex,
+            "https://omnyid.local".to_string(),
+        );
+        card.encryption_public_key_hex =
+            Some("abababababababababababababababababababababababababababababababab".to_string());
+        card.signature = sign_agent_card(&card, signing_seed_hex).expect("signature");
+
+        assert!(card.verify());
+        card.encryption_public_key_hex = None;
+        assert!(!card.verify());
+
+        let legacy: AgentCard = serde_json::from_value(serde_json::json!({
+            "protocol": "afp-v1",
+            "agent_id": "agent:legacy@omnyid.local",
+            "key_id": "main",
+            "previous_key_ids": [],
+            "public_key_hex": "00",
+            "homeserver_url": "https://omnyid.local",
+            "capabilities": [],
+            "timestamp": "2026-01-01T00:00:00Z",
+            "signature": ""
+        }))
+        .expect("legacy card should deserialize");
+        assert_eq!(legacy.encryption_public_key_hex, None);
     }
 
     #[test]
