@@ -93,8 +93,8 @@ export function buildWeddingVendorSearchQueryEditState(query: string): WeddingVe
   return {
     resultAction: null,
     notice: clean(query)
-      ? "Search query updated. Run live search to refresh the saved vendor results."
-      : "Search query cleared. Add a vendor search query or use your onboarding answers.",
+      ? "Search request updated. Run live search to refresh the saved vendor results."
+      : "Search request cleared. Add a vendor search request or use your onboarding answers.",
   };
 }
 

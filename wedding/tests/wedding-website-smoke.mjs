@@ -80,7 +80,7 @@ function isExternal(url) {
 // into it (e.g. ../workspace/?auth=signin&source=wedding) have no local file
 // to resolve against.
 function isWorkspaceAppLink(url) {
-  return /^(\.\.\/)+workspace\/(\?.*)?$/.test(url.split('#')[0]);
+  return /^(\.\.\/)+workspace\/(?:vendor\.html)?(\?.*)?$/.test(url.split('#')[0]);
 }
 
 function targetPath(fromFile, rawUrl) {

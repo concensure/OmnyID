@@ -529,4 +529,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Versioned vendor photo licence receipts required for live owner images",
         include_str!("../../postgres/migrations/0104_wedding_vendor_photo_licences.sql"),
     ),
+    (
+        "0105_wedding_vendor_owner_photo_removal",
+        "Fourteen-day retention and server-side purge scheduling for owner photo removals",
+        include_str!("../../postgres/migrations/0105_wedding_vendor_owner_photo_removal.sql"),
+    ),
 ];

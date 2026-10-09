@@ -3,7 +3,7 @@
 // @locs-version: 2.0
 // @stability: draft
 // @owner: omnyid
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 
 import {
   VENDOR_PHOTO_LICENCE_VERSION,
@@ -11,7 +11,10 @@ import {
 } from "@/components/vendor/VendorPhotoLicenceConsent";
 import {
   acceptVendorPhotoLicence,
+  listVendorManagedPhotos,
+  scheduleVendorPhotoRemoval,
   uploadLicensedVendorPhoto,
+  type VendorManagedPhoto,
 } from "@/lib/vendorPhotoLicenceApi";
 
 export function VendorPhotoUploadPanel(props: {
@@ -25,6 +28,16 @@ export function VendorPhotoUploadPanel(props: {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [success, setSuccess] = createSignal<string | null>(null);
+  const [photos, setPhotos] = createSignal<VendorManagedPhoto[]>([]);
+
+  const refreshPhotos = async () => {
+    try {
+      setPhotos(await listVendorManagedPhotos(props.vendorSlug));
+    } catch {
+      // The photo-management list is an enhancement; keep upload available.
+    }
+  };
+  createEffect(() => void refreshPhotos());
 
   async function accept() {
     setBusy(true);
@@ -58,6 +71,7 @@ export function VendorPhotoUploadPanel(props: {
         isCover: isCover(),
       });
       setSuccess("Photo published. It has been converted to WebP without EXIF metadata.");
+      await refreshPhotos();
       props.onPublished?.(uploaded.url);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Photo upload could not be completed.");
@@ -70,6 +84,45 @@ export function VendorPhotoUploadPanel(props: {
     <section class="space-y-4" aria-label="Publish vendor photos">
       <Show when={!receiptId()}>
         <VendorPhotoLicenceConsent disabled={busy()} onAccepted={() => void accept()} />
+      </Show>
+      <Show when={photos().length > 0}>
+        <div class="rounded-2xl border border-wedding-muted bg-white p-4">
+          <h3 class="text-sm font-semibold text-wedding-text">Published photos</h3>
+          <div class="mt-3 grid grid-cols-2 gap-3">
+            <For each={photos()}>
+              {(photo) => (
+                <article class="overflow-hidden rounded-lg border border-wedding-muted">
+                  <img class="aspect-square w-full object-cover" src={photo.url} alt={photo.alt_text ?? "Vendor photo"} />
+                  <div class="space-y-2 p-2">
+                    <Show when={photo.status === "live"} fallback={<p class="text-xs text-wedding-muted">Hidden; permanently removed after 14 days.</p>}>
+                      <button
+                        class="min-h-10 w-full rounded-md border border-red-300 px-2 text-xs font-semibold text-red-700"
+                        type="button"
+                        disabled={busy()}
+                        onClick={() => void (async () => {
+                          if (!window.confirm("Remove this photo from the public listing? It will be permanently deleted after 14 days.")) return;
+                          setBusy(true);
+                          setError(null);
+                          try {
+                            await scheduleVendorPhotoRemoval(props.vendorSlug, photo.asset_id);
+                            setSuccess("Photo removed from the public listing. It will be permanently deleted after 14 days.");
+                            await refreshPhotos();
+                          } catch (reason) {
+                            setError(reason instanceof Error ? reason.message : "Could not schedule the photo removal.");
+                          } finally {
+                            setBusy(false);
+                          }
+                        })()}
+                      >
+                        Remove photo
+                      </button>
+                    </Show>
+                  </div>
+                </article>
+              )}
+            </For>
+          </div>
+        </div>
       </Show>
       <Show when={receiptId()}>
         <div class="rounded-2xl border border-wedding-muted bg-white p-4">

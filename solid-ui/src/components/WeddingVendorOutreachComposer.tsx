@@ -12,6 +12,7 @@ export function WeddingVendorOutreachComposer(props: {
   onBodyChange: (bodyMarkdown: string) => void;
   onSend: () => void;
   onCancel: () => void;
+  onRetryDraft?: () => void;
   onConnectGmail: () => void;
 }) {
   const gate = () => weddingVendorOutreachSendGate(props.flow, { gmailConnected: props.gmailConnected });
@@ -46,6 +47,7 @@ export function WeddingVendorOutreachComposer(props: {
             <Show when={props.flow.blockedReason}>
               {(reason) => <p class="mt-1 break-words text-sm leading-6 text-wedding-accent/80">{reason()}</p>}
             </Show>
+            <button type="button" onClick={props.onRetryDraft} disabled={props.busy || !props.onRetryDraft} class="mt-3 min-h-10 rounded-lg border border-wedding-accent bg-white px-3 text-sm font-bold text-wedding-accent disabled:opacity-60">Retry draft</button>
           </div>
         </Show>
 

@@ -64,3 +64,25 @@ export async function uploadLicensedVendorPhoto(input: {
   }
   return { asset_id: payload.asset_id, photo_licence_id: payload.photo_licence_id, url: payload.url };
 }
+
+export interface VendorManagedPhoto {
+  asset_id: string;
+  alt_text: string | null;
+  is_cover: boolean;
+  status: "live" | "hidden";
+  url: string;
+  purge_after: string | null;
+}
+
+export async function listVendorManagedPhotos(vendorSlug: string): Promise<VendorManagedPhoto[]> {
+  const response = await apiFetch<{ photos?: VendorManagedPhoto[] }>(
+    `/api/wedding/vendor/photos?vendor_slug=${encodeURIComponent(vendorSlug)}`,
+  );
+  return Array.isArray(response.photos) ? response.photos : [];
+}
+
+export async function scheduleVendorPhotoRemoval(vendorSlug: string, assetId: string): Promise<void> {
+  await apiFetch(`/api/wedding/vendor/photos/${encodeURIComponent(assetId)}?vendor_slug=${encodeURIComponent(vendorSlug)}`, {
+    method: "DELETE",
+  });
+}

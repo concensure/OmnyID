@@ -8,8 +8,6 @@ import {
   fetchGoogleCalendarOAuthConfig,
   fetchGoogleCalendarOAuthUrl,
   fetchGoogleCalendarStatus,
-  fetchSupertagDefinitions,
-  installDefaultSupertags,
   listCalendarEvents,
   sendAfpMessage,
   syncGoogleCalendar,
@@ -20,6 +18,7 @@ import {
 } from "@/lib/api";
 import { type GoogleCalendarConnectionStatus } from "@/lib/googleCalendarConnectionState";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
+import { CalendarKnowledgeSetup } from "@/components/CalendarKnowledgeSetup";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { navigateToView } from "@/lib/decisionosNavigation";
 import {
@@ -82,7 +81,6 @@ const TOKEN = {
 };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DEFAULT_SUPERTAG_NAMES = ["#Work", "#Personal", "#Health", "#Finance", "#Travel", "#Learning", "#Ideas", "#Urgent"];
 
 type CalendarSpeechRecognition = SpeechRecognition & {
   maxAlternatives: number;
@@ -594,7 +592,6 @@ export function MonthlyCalendarView(props: {
     void loadEvents();
     void loadGoogleCalendarStatus();
     void loadGoogleCalendarOAuthConfig();
-    void loadTaxonomyInstallation();
     const calendarRedirectStatus = new URLSearchParams(window.location.search).get("calendar");
     if (calendarRedirectStatus) {
       setGoogleCalendarNotice(
@@ -737,23 +734,6 @@ export function MonthlyCalendarView(props: {
   // ── Real backlinks for the selected event ─────────────────────────────────
   const [backlinks, setBacklinks] = createSignal<BacklinkItem[]>([]);
   const [backlinksLoading, setBacklinksLoading] = createSignal(false);
-  const [taxonomyInstalling, setTaxonomyInstalling] = createSignal(false);
-  const [taxonomyDone, setTaxonomyDone] = createSignal<string[] | null>(null);
-  const [taxonomyLoadFailed, setTaxonomyLoadFailed] = createSignal(false);
-
-  async function loadTaxonomyInstallation(): Promise<void> {
-    try {
-      const { definitions } = await fetchSupertagDefinitions();
-      const installedNames = new Set(definitions.map((definition) => definition.tag_name.trim().toLocaleLowerCase()));
-      const installedDefaults = DEFAULT_SUPERTAG_NAMES.filter((name) => installedNames.has(name.toLocaleLowerCase()));
-      setTaxonomyDone(installedDefaults.length === DEFAULT_SUPERTAG_NAMES.length ? installedDefaults : null);
-      setTaxonomyLoadFailed(false);
-    } catch {
-      // A failed status read is not an installed state: preserve a safe retry action.
-      setTaxonomyLoadFailed(true);
-    }
-  }
-
   createEffect(() => {
     const ev = selectedEvent();
     if (!ev) {
@@ -766,23 +746,6 @@ export function MonthlyCalendarView(props: {
       .catch(() => setBacklinks([]))
       .finally(() => setBacklinksLoading(false));
   });
-
-  async function doInstallTaxonomy() {
-    if (taxonomyInstalling() || taxonomyDone() !== null) return;
-    setTaxonomyInstalling(true);
-    setTaxonomyLoadFailed(false);
-    try {
-      const res = await installDefaultSupertags();
-      await loadTaxonomyInstallation();
-      if (taxonomyDone() === null) {
-        setTaxonomyDone(res.installed.length > 0 ? res.installed : DEFAULT_SUPERTAG_NAMES);
-      }
-    } catch {
-      setTaxonomyLoadFailed(true);
-    } finally {
-      setTaxonomyInstalling(false);
-    }
-  }
 
   const searchPeopleMatches = createMemo(() => {
     const query = normalizedSearch();
@@ -1618,35 +1581,7 @@ export function MonthlyCalendarView(props: {
           </section>
 
           {/* ── Default supertag taxonomy onboarding ── */}
-          <section>
-            <p style={capsLabelStyle()}>Knowledge Setup</p>
-            <div style={detailCardStyle()}>
-              <p style={{ margin: "0 0 0.6em", "font-size": "0.82em", color: TOKEN.text, "line-height": 1.6 }}>
-                Install the default supertag taxonomy to let the Knowledge Curator auto-tag your messages with{" "}
-                <strong>#Work</strong>, <strong>#Personal</strong>, <strong>#Health</strong>, and more.
-              </p>
-              <Show when={taxonomyDone() !== null}>
-                <p style={{ margin: "0 0 0.6em", "font-size": "0.8em", color: TOKEN.success }}>
-                  {taxonomyDone()!.length > 0
-                    ? `Installed: ${taxonomyDone()!.join(", ")}`
-                    : "Already installed or no tags written."}
-                </p>
-              </Show>
-              <Show when={taxonomyLoadFailed()}>
-                <p style={{ margin: "0 0 0.6em", "font-size": "0.8em", color: TOKEN.error }}>
-                  Could not check your installed taxonomy. You can retry safely.
-                </p>
-              </Show>
-              <button
-                type="button"
-                onClick={() => void doInstallTaxonomy()}
-                disabled={taxonomyInstalling() || taxonomyDone() !== null}
-                style={primaryButtonStyle(taxonomyInstalling() || taxonomyDone() !== null)}
-              >
-                {taxonomyInstalling() ? "Installing…" : taxonomyDone() !== null ? "Installed" : "Install defaults"}
-              </button>
-            </div>
-          </section>
+          <CalendarKnowledgeSetup />
         </aside>
       </div>
 

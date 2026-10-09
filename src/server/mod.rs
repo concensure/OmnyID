@@ -1413,6 +1413,11 @@ pub async fn run() {
         wedding_vendor_production::wedding_quote_reconciliation_loop(wedding_quote_state).await;
     });
 
+    let vendor_photo_purge_state = app_state.clone();
+    tokio::spawn(async move {
+        wedding_vendor_photo_routes::owner_photo_purge_loop(vendor_photo_purge_state).await;
+    });
+
     let listener = tokio::net::TcpListener::bind(http_addr)
         .await
         .expect("http bind failed");

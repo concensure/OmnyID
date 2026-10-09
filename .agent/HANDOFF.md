@@ -1,5 +1,27 @@
 # Handoff
 
+## 2026-10-09 - WED-169 vendor claim portal and WED-176 mobile polish (Codex)
+
+What changed:
+
+- Added a dedicated Vite entry at `/workspace/vendor.html`, linked from the wedding directory as “Vendor sign in” and “Claim your profile”. The portal keeps the oversized `App.tsx` untouched, captures a claimant’s listing handle and role, then mounts the existing scroll-gated licensed upload panel.
+- Extended claimant photo management. `GET /api/wedding/vendor/photos` lists owner images; `DELETE /api/wedding/vendor/photos/{asset_id}` hides a live image immediately and schedules retention expiry. Migration `0105` adds the removal timestamps, and a six-hour server worker removes all three SeaweedFS variants once their fourteen-day grace period ends.
+- Phone decision triage now applies and persists the choice locally when account projection saving is temporarily unavailable, retains a Retry action, and does not falsely show the generic unsaved failure. Failed vendor-availability drafts now offer Retry draft.
+- Removed internal live-search copy, positioned Search vendors below the field, tightened mobile overview tile hierarchy, and moved calendar knowledge setup into a small component that installs the baseline taxonomy by default.
+
+Verification:
+
+- `npm --prefix solid-ui run typecheck` passed.
+- `npm --prefix solid-ui run build` passed (including `vendor.html`).
+- `cargo check` passed.
+- `node wedding/tests/wedding-website-smoke.mjs` passed.
+- Focused vendor-search action-state tests passed.
+
+Remaining:
+
+- The vendor portal links to the existing account sign-in page when unauthenticated; the shared account-auth flow does not yet return a newly authenticated user directly to `/workspace/vendor.html`.
+- Not deployed in this change set. Use a clean release worktree: this shared workspace has unrelated modifications in auth and vendor-search backend files.
+
 ## 2026-10-09 - WED-167 vendor photo licence consent (Codex)
 
 What changed:

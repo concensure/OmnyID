@@ -3,6 +3,15 @@
 This file records project architecture and coordination decisions. It is
 project truth, not a running diary.
 
+## 2026-10-09: Vendor photo removal has a fourteen-day reversible grace period
+
+An owner removal immediately changes the asset to `hidden`, so it can no
+longer appear in directory APIs or public image delivery. The stored WebP
+variants remain for fourteen days, then a server-side purge worker removes all
+three object variants before marking the record `removed`. This makes the
+retention rule independent of a browser staying open and avoids immediate,
+irrecoverable deletion from an accidental click.
+
 ## 2026-10-05: Mobile Wedding Decisions Require Explicit Confirmation
 
 A phone-deck swipe only requests approval; it does not open the vendor

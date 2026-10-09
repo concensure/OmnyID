@@ -52,7 +52,7 @@ export function WeddingPlanningBasicsSection(props: { workspace: WeddingResponse
                 />
               </label>
               <p class="mt-2 break-words text-[11px] leading-5 text-amber-900/75">
-                A specific search query here can unblock vendor fit preferences for live search.
+                A specific request here can unblock vendor fit preferences for live search.
               </p>
             </Show>
           </div>
@@ -84,6 +84,10 @@ export function WeddingVendorSearchHomeSection(props: {
   const searchDisabled = () => workspace().vendorSearchRunning
     || !workspace().onRunLiveVendorSearch
     || Boolean(workspace().vendorSearchBlockedReason);
+  const visibleVendorSearchNotice = () => {
+    const notice = workspace().vendorSearchNotice?.trim() ?? "";
+    return /^Directory-only vendor search returned\b/i.test(notice) ? null : notice || null;
+  };
   createEffect(() => {
     if (!workspace().vendorSearchRunning) {
       setSearchProgressIndex(0);
@@ -103,31 +107,11 @@ export function WeddingVendorSearchHomeSection(props: {
           if (!searchDisabled()) workspace().onRunLiveVendorSearch?.();
         }}
       >
-      <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="min-w-0">
         <div class="min-w-0">
           <p class="text-lg font-bold leading-6 text-wedding-accent">Live vendor search</p>
-          <p class="mt-1 break-words text-xs leading-5 text-wedding-muted">Compare and enquire.</p>
-        </div>
-        <button
-          type="submit"
-          class="min-h-11 shrink-0 rounded-lg border border-wedding-accent bg-white px-4 py-2 text-sm font-bold text-wedding-accent transition hover:bg-wedding-surface-blush disabled:cursor-not-allowed disabled:opacity-50 phone:w-full"
-          title={workspace().vendorSearchBlockedReason ?? undefined}
-          disabled={searchDisabled()}
-          data-magic-action="open"
-          data-magic-icon="search"
-          data-magic-label={workspace().vendorSearchRunning ? "Vendor search running" : "Search wedding vendors"}
-          data-magic-id="wedding:vendor-search:run"
-        >
-          {workspace().vendorSearchRunning ? "Searching..." : "Search vendors"}
-        </button>
       </div>
       <label class="mt-5 block">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <span class="text-xs font-semibold text-wedding-muted">Search query</span>
-          <Show when={workspace().vendorSearchQuerySourceLabel}>
-            {(label) => <span class="rounded-full border border-wedding-muted bg-wedding-surface-blush px-2 py-0.5 text-xs font-semibold text-wedding-accent">{label()}</span>}
-          </Show>
-        </div>
         <input
           type="text"
           value={workspace().vendorSearchQuery ?? ""}
@@ -136,10 +120,23 @@ export function WeddingVendorSearchHomeSection(props: {
           class="mt-1 min-h-11 w-full rounded-lg border-2 border-wedding-muted bg-white px-3 py-2 text-sm text-wedding-accent shadow-sm outline-none transition placeholder:text-wedding-muted focus:border-wedding-accent focus:ring-4 focus:ring-wedding-surface-blush"
         />
       </label>
+      <button
+        type="submit"
+        class="mt-3 min-h-11 w-full rounded-lg border border-wedding-accent bg-white px-4 py-2 text-sm font-bold text-wedding-accent transition hover:bg-wedding-surface-blush disabled:cursor-not-allowed disabled:opacity-50"
+        title={workspace().vendorSearchBlockedReason ?? undefined}
+        disabled={searchDisabled()}
+        data-magic-action="open"
+        data-magic-icon="search"
+        data-magic-label={workspace().vendorSearchRunning ? "Vendor search running" : "Search wedding vendors"}
+        data-magic-id="wedding:vendor-search:run"
+      >
+        {workspace().vendorSearchRunning ? "Searching..." : "Search vendors"}
+      </button>
+      </div>
       </form>
       <Show
         when={workspace().vendorSearchRunning}
-        fallback={<Show when={workspace().vendorSearchNotice}>{(notice) => <p class="mt-4 break-words text-xs leading-5 text-wedding-muted">{notice()}</p>}</Show>}
+        fallback={<Show when={visibleVendorSearchNotice()}>{(notice) => <p class="mt-4 break-words text-xs leading-5 text-wedding-muted">{notice()}</p>}</Show>}
       >
         <p class="mt-4 break-words text-xs font-medium leading-5 text-wedding-muted" role="status" aria-live="polite">
           {SEARCH_PROGRESS_LABELS[searchProgressIndex()]}
@@ -188,6 +185,7 @@ export function WeddingVendorSearchHomeSection(props: {
                                 onOutreachBodyChange={props.outreach.onOutreachBodyChange}
                                 onSendOutreach={(choiceId) => void props.outreach.onSendOutreach(choiceId)}
                                 onCancelOutreach={props.outreach.onCancelOutreach}
+                                onRetryOutreach={props.outreach.onRetryOutreach}
                                 onConnectGmailForOutreach={() => void props.outreach.onConnectGmailForOutreach()}
                               />
                             )}

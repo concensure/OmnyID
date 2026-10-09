@@ -117,6 +117,7 @@ export function useWeddingVendorOutreachOwner(input: {
   const [vendorOutreachFlows, setVendorOutreachFlows] = createSignal<Record<string, WeddingVendorOutreachFlowState>>({});
   const [vendorOutreachArtifactIds, setVendorOutreachArtifactIds] = createSignal<Record<string, string>>({});
   const [vendorOutreachIntents, setVendorOutreachIntents] = createSignal<Record<string, WeddingVendorChoiceIntent>>({});
+  const [vendorOutreachRetries, setVendorOutreachRetries] = createSignal<Record<string, { card: WeddingVendorChoiceCardData; artifactId: string; intent: WeddingVendorChoiceIntent }>>({});
 
   createEffect(() => {
     const persisted = projectWeddingVendorOutreachFlows(input.state().afpMessages);
@@ -141,6 +142,7 @@ export function useWeddingVendorOutreachOwner(input: {
   async function onContactVendor(card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent = "CHECK_AVAILABILITY_AND_REQUEST_QUOTE") {
     setVendorOutreachArtifactIds((current) => ({ ...current, [card.choiceId]: artifactId }));
     setVendorOutreachIntents((current) => ({ ...current, [card.choiceId]: intent }));
+    setVendorOutreachRetries((current) => ({ ...current, [card.choiceId]: { card, artifactId, intent } }));
     const metadata = input.state().workspace.metadata;
     const recipientEmail = weddingVendorOutreachRecipient(card, input.weddingVendorDirectory() ?? []);
     const existing = vendorOutreachFlows()[card.choiceId]
@@ -230,6 +232,16 @@ export function useWeddingVendorOutreachOwner(input: {
       delete next[choiceId];
       return next;
     });
+    setVendorOutreachRetries((current) => {
+      const next = { ...current };
+      delete next[choiceId];
+      return next;
+    });
+  }
+
+  function onRetryOutreach(choiceId: string) {
+    const retry = vendorOutreachRetries()[choiceId];
+    if (retry) void onContactVendor(retry.card, retry.artifactId, retry.intent);
   }
 
   async function onConnectGmailForOutreach() {
@@ -325,6 +337,7 @@ export function useWeddingVendorOutreachOwner(input: {
     onContactVendor,
     onOutreachBodyChange,
     onCancelOutreach,
+    onRetryOutreach,
     onConnectGmailForOutreach,
     onSendOutreach,
   };

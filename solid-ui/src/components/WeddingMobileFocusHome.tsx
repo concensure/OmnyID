@@ -39,7 +39,7 @@ import { friendlyErrorText } from "@/lib/visibleErrorText";
 type HomeSection = { id: string; title: string; render: () => JSX.Element };
 type InputMethod = "swipe" | "button" | "keyboard";
 type PendingApproval = { item: FocusDeckItem; method: InputMethod };
-type PendingTriage = { input: SendAfpMessageInput; onSaved: () => void };
+type PendingTriage = { input: SendAfpMessageInput; onSaved: () => void; locallyApplied: boolean };
 
 export function WeddingMobileFocusHome(props: {
   state: WeddingResponseWorkspaceViewState;
@@ -151,8 +151,13 @@ export function WeddingMobileFocusHome(props: {
       onSaved();
       return true;
     }
-    setPendingTriage({ input, onSaved });
-    setNotice(result.reason);
+    // A swipe is an intentional, completed local decision. Keep it visible in
+    // the deck immediately, persist it on this device, and retry account sync
+    // separately. This avoids making a transient connection error undo a
+    // gesture the person has already made.
+    onSaved();
+    setPendingTriage({ input, onSaved, locallyApplied: true });
+    setNotice("Saved on this device. We’ll retry the account sync when you’re connected.");
     return false;
   };
   const retryTriage = async () => {
@@ -165,7 +170,7 @@ export function WeddingMobileFocusHome(props: {
     }
     setPendingTriage(null);
     setNotice(null);
-    pending.onSaved();
+    if (!pending.locallyApplied) pending.onSaved();
   };
   const decisionItemFor = (id: string) => display().itemCards.find((card) => card.id === id)?.item;
   const rememberTriage = (action: "approve" | "defer", itemId: string) => {

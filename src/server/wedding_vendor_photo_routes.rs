@@ -16,10 +16,10 @@ use std::{io::Cursor, sync::Arc};
 use axum::{
     Json, Router,
     body::Body,
-    extract::{DefaultBodyLimit, Multipart, Path, State},
+    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
     http::{HeaderMap, StatusCode, header},
     response::Response,
-    routing::{get, post},
+    routing::{delete, get},
 };
 use image::{
     DynamicImage, GenericImageView, ImageFormat, ImageReader, Limits, imageops::FilterType,
@@ -48,7 +48,14 @@ const THUMB_EDGE: u32 = 480;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/api/wedding/vendor/photos", post(upload_owner_photo_http))
+        .route(
+            "/api/wedding/vendor/photos",
+            get(list_owner_photos_http).post(upload_owner_photo_http),
+        )
+        .route(
+            "/api/wedding/vendor/photos/{asset_id}",
+            delete(schedule_owner_photo_removal_http),
+        )
         .route(
             "/api/public/wedding/vendor/photos/{asset_id}/{variant}",
             get(public_owner_photo_http),
@@ -60,6 +67,88 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
 struct PublicPhotoPath {
     asset_id: String,
     variant: String,
+}
+
+#[derive(Deserialize)]
+struct OwnerPhotoQuery {
+    vendor_slug: String,
+}
+
+#[derive(Deserialize)]
+struct OwnerPhotoPath {
+    asset_id: String,
+}
+
+async fn list_owner_photos_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<OwnerPhotoQuery>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let vendor_id = owned_vendor_id(&state, &user.id, &query.vendor_slug).await?;
+    let rows = sqlx::query(
+        r#"SELECT asset_id, alt_text, is_cover, status, removal_requested_at, purge_after
+           FROM wedding_vendor_owner_assets
+           WHERE vendor_id = $1 AND status IN ('live', 'hidden')
+           ORDER BY position ASC"#,
+    )
+    .bind(vendor_id)
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(database_failure)?;
+    let photos = rows.into_iter().map(|row| json!({
+        "asset_id": row.get::<String, _>("asset_id"),
+        "alt_text": row.get::<Option<String>, _>("alt_text"),
+        "is_cover": row.get::<bool, _>("is_cover"),
+        "status": row.get::<String, _>("status"),
+        "url": format!("/api/public/wedding/vendor/photos/{}/medium", row.get::<String, _>("asset_id")),
+        "purge_after": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("purge_after").map(|value| value.to_rfc3339()),
+    })).collect::<Vec<_>>();
+    Ok(Json(json!({ "photos": photos })))
+}
+
+async fn schedule_owner_photo_removal_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(path): Path<OwnerPhotoPath>,
+    Query(query): Query<OwnerPhotoQuery>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let vendor_id = owned_vendor_id(&state, &user.id, &query.vendor_slug).await?;
+    let asset_id = valid_ulid(&path.asset_id, "photo")?;
+    let result = sqlx::query(
+        r#"UPDATE wedding_vendor_owner_assets
+           SET status = 'hidden', is_cover = FALSE, removal_requested_at = NOW(),
+               purge_after = NOW() + INTERVAL '14 days'
+           WHERE asset_id = $1 AND vendor_id = $2 AND status = 'live'"#,
+    )
+    .bind(asset_id)
+    .bind(vendor_id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(database_failure)?;
+    if result.rows_affected() == 0 {
+        return Err((StatusCode::NOT_FOUND, "live photo not found".to_string()));
+    }
+    Ok(Json(json!({ "status": "scheduled_for_removal", "purge_after_days": 14 })))
+}
+
+async fn owned_vendor_id(
+    state: &AppState,
+    user_id: &str,
+    vendor_slug: &str,
+) -> Result<String, (StatusCode, String)> {
+    let slug = valid_slug(vendor_slug)?;
+    let row = sqlx::query(
+        "SELECT vendor_id FROM wedding_vendors WHERE vendor_slug = $1 AND status = 'active' AND claimed_by_user_id = $2 AND claim_status IN ('claim_pending', 'claimed', 'verified')",
+    )
+    .bind(slug)
+    .bind(user_id)
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(database_failure)?
+    .ok_or_else(|| (StatusCode::FORBIDDEN, "only the active claimant can manage vendor photos".to_string()))?;
+    Ok(row.get("vendor_id"))
 }
 
 async fn upload_owner_photo_http(
@@ -323,6 +412,56 @@ async fn public_owner_photo_http(
                 "photo response failed".to_string(),
             )
         })
+}
+
+/// Removes files whose owner-requested fourteen-day grace period has elapsed.
+/// Hidden assets are never public during the grace period; a failed object-store
+/// deletion remains eligible for the next pass instead of being marked removed.
+pub(super) async fn owner_photo_purge_loop(state: Arc<AppState>) {
+    loop {
+        if let Err(error) = purge_due_owner_photos(&state).await {
+            tracing::warn!(%error, "vendor photo purge pass failed");
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(6 * 60 * 60)).await;
+    }
+}
+
+async fn purge_due_owner_photos(state: &AppState) -> Result<(), sqlx::Error> {
+    let Some(client) = seaweedfs_client() else {
+        tracing::warn!("vendor photo purge deferred because object storage is unavailable");
+        return Ok(());
+    };
+    let rows = sqlx::query(
+        r#"SELECT asset_id, seaweed_fid_full, seaweed_fid_medium, seaweed_fid_thumb
+           FROM wedding_vendor_owner_assets
+           WHERE status = 'hidden' AND purge_after <= NOW()
+           ORDER BY purge_after ASC
+           LIMIT 100"#,
+    )
+    .fetch_all(&state.db.pool)
+    .await?;
+    for row in rows {
+        let keys = [
+            row.get::<String, _>("seaweed_fid_full"),
+            row.get::<String, _>("seaweed_fid_medium"),
+            row.get::<String, _>("seaweed_fid_thumb"),
+        ];
+        let mut all_deleted = true;
+        for key in keys {
+            if delete_object_payload(&client, &key).await.is_err() {
+                all_deleted = false;
+            }
+        }
+        if all_deleted {
+            sqlx::query(
+                "UPDATE wedding_vendor_owner_assets SET status = 'removed' WHERE asset_id = $1 AND status = 'hidden'",
+            )
+            .bind(row.get::<String, _>("asset_id"))
+            .execute(&state.db.pool)
+            .await?;
+        }
+    }
+    Ok(())
 }
 
 fn webp_variants(image: &DynamicImage) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), image::ImageError> {

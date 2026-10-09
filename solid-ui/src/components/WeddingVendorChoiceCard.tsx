@@ -38,6 +38,7 @@ export function WeddingVendorChoiceCard(props: {
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
+  onRetryOutreach?: (choiceId: string) => void;
   onConnectGmailForOutreach?: () => void;
 }) {
   const card = props.card;
@@ -245,6 +246,7 @@ export function WeddingVendorChoiceCard(props: {
               onBodyChange={(bodyMarkdown) => props.onOutreachBodyChange?.(card.choiceId, bodyMarkdown)}
               onSend={() => props.onSendOutreach?.(card.choiceId)}
               onCancel={() => props.onCancelOutreach?.(card.choiceId)}
+              onRetryDraft={() => props.onRetryOutreach?.(card.choiceId)}
               onConnectGmail={() => props.onConnectGmailForOutreach?.()}
             />
           )}

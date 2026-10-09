@@ -100,14 +100,14 @@ test("buildWeddingVendorSearchResultAction describes a bounded partial compariso
 test("buildWeddingVendorSearchQueryEditState clears stale result actions after manual edits", () => {
   assert.deepEqual(buildWeddingVendorSearchQueryEditState(" florist in Sydney "), {
     resultAction: null,
-    notice: "Search query updated. Run live search to refresh the saved vendor results.",
+    notice: "Search request updated. Run live search to refresh the saved vendor results.",
   });
 });
 
 test("buildWeddingVendorSearchQueryEditState explains fallback after clearing the query", () => {
   assert.deepEqual(buildWeddingVendorSearchQueryEditState("   "), {
     resultAction: null,
-    notice: "Search query cleared. Add a vendor search query or use your onboarding answers.",
+    notice: "Search request cleared. Add a vendor search request or use your onboarding answers.",
   });
 });
 

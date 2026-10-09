@@ -688,24 +688,60 @@ tasks:
 
   - id: WED-169
     title: Claim wizard UI
-    status: ready
+    status: in_progress
     owner: codex
-    branch: agent/codex/WED-160
+    branch: agent/codex/WED-161
     depends_on:
       - WED-163
       - WED-166
       - WED-167
       - WED-168
     files:
-      - solid-ui/src/App.tsx
       - solid-ui/src/components/vendor/VendorClaimFlow.tsx
-      - solid-ui/src/components/vendor/VendorClaimSteps.tsx
-      - solid-ui/src/lib/vendorDirectoryTypes.ts
-      - solid-ui/tests/wedding-vendor-claim-*.test.ts
+      - solid-ui/src/components/vendor/VendorPhotoUploadPanel.tsx
+      - solid-ui/src/vendor-claim-main.tsx
+      - solid-ui/vendor.html
+      - solid-ui/src/lib/vendorClaimApi.ts
+      - solid-ui/src/lib/vendorPhotoLicenceApi.ts
+      - src/server/wedding_vendor_photo_routes.rs
+      - src/db/migration_catalog.rs
+      - postgres/migrations/0105_wedding_vendor_owner_photo_removal.sql
     acceptance:
       - CTA to auth to wizard to publish completes in under 5 minutes on a phone
       - wizard resumes after reload; source=vendor_claim never launches the wedding template
       - npm run test:wedding:ci and npm run build pass
+    progress:
+      - added a separate /workspace/vendor.html entry point, claim form, and claimant photo editor without extending App.tsx
+      - mounted the scroll-gated licensed photo upload panel and added owner photo listing/removal controls
+      - removal hides the asset immediately, marks it for 14-day retention, and a server worker purges all three object variants after the grace period
+    remaining:
+      - preserve the vendor-portal return target through the shared account-auth flow
+
+  - id: WED-176
+    title: Wedding mobile reliability and vendor search polish
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-161
+    depends_on:
+      - WED-175
+    files:
+      - solid-ui/src/components/WeddingMobileFocusHome.tsx
+      - solid-ui/src/components/WeddingVendorSearchHomeSections.tsx
+      - solid-ui/src/components/WeddingHomeOverviewGrid.tsx
+      - solid-ui/src/components/MonthlyCalendarView.tsx
+      - solid-ui/src/components/WeddingVendorOutreachComposer.tsx
+      - solid-ui/src/lib/weddingVendorOutreachFlowState.ts
+      - solid-ui/src/lib/useWeddingVendorOutreachOwner.ts
+      - solid-ui/tests/wedding-*.test.ts
+    acceptance:
+      - mobile decision swipes retain a retryable local state when persistence is temporarily unavailable
+      - live vendor search removes internal source/query copy and puts its submit action below the field
+      - availability draft failures expose a usable retry path rather than a generic connection-loss dead end
+      - overview tiles preserve icon/title and tag hierarchy on phone widths; calendar knowledge setup is installed by default
+    progress:
+      - phone swipes now retain local triage state and expose a retryable account-sync action after a transient persistence failure
+      - vendor search copy no longer exposes the internal search-query/source wording; its submit action sits below the field
+      - failed availability draft creation has a Retry draft action; overview tile hierarchy and automatic calendar taxonomy installation are implemented
 
   - id: WED-170
     title: AFP wedding enquiry protocol and free couple enquiries

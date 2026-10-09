@@ -61,6 +61,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, "index.html"),
         dashboard: resolve(import.meta.dirname, "dashboard.html"),
+        vendor: resolve(import.meta.dirname, "vendor.html"),
       },
       onwarn(warning, warn) {
         const message = typeof warning === "string" ? warning : warning.message ?? "";
