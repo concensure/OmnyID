@@ -10,6 +10,13 @@ export * from "@/lib/weddingVendorQualityModelState";
 export * from "@/lib/weddingVendorSeasonalCostState";
 export * from "@/lib/weddingVendorLocationUtilityState";
 export * from "@/lib/weddingVendorRankingEvaluationState";
+import {
+  normalizeWeddingVendorRooms,
+  weddingVendorRoomCardRows,
+  weddingVendorRoomCardRowsFromRecord,
+  type WeddingVendorRoomCardRow,
+  type WeddingVendorRoomEvidence,
+} from "@/lib/weddingVendorRoomState";
 
 export type WeddingVendorAttributeStatus = "known" | "estimated" | "unknown" | "not_applicable";
 
@@ -57,6 +64,7 @@ export type WeddingVendorSourceEvidence = {
   place_id?: string | null;
   attributes?: Record<string, WeddingVendorAttributeEvidence> | null;
   availability?: WeddingVendorAvailabilityEvidence | null;
+  rooms?: WeddingVendorRoomEvidence[] | null;
 };
 
 export type WeddingVendorRankingSource = WeddingVendorSourceEvidence & {
@@ -113,6 +121,7 @@ export type WeddingVendorRankedCandidate = {
   email: string | null;
   instagramUrl: string | null;
   snippet: string;
+  rooms: WeddingVendorRoomCardRow[];
   score: number;
   preferenceMatchLabel: string;
   situationFitLabel: string;
@@ -165,6 +174,7 @@ export type WeddingVendorRankingCardFields = {
   sentimentScoreLabel: string | null;
   valueScoreLabel: string | null;
   seasonalNote: string | null;
+  rooms: WeddingVendorRoomCardRow[];
 };
 
 export type WeddingVendorAvailabilityUpdate = {
@@ -244,6 +254,7 @@ export function normalizeWeddingVendorSourceEvidence(record: Record<string, unkn
   const reviewCount = finiteNumber(record.review_count);
   const attributes = normalizeAttributes(record.attributes);
   const availability = normalizeAvailability(record.availability);
+  const rooms = normalizeWeddingVendorRooms(record.rooms);
   if (vendorId) evidence.vendor_id = vendorId;
   if (sourceKind) evidence.source_kind = sourceKind;
   if (category) evidence.category = category;
@@ -253,6 +264,7 @@ export function normalizeWeddingVendorSourceEvidence(record: Record<string, unkn
   if (reviewCount !== null) evidence.review_count = reviewCount;
   if (attributes) evidence.attributes = attributes;
   if (availability) evidence.availability = availability;
+  if (rooms) evidence.rooms = rooms;
   return evidence;
 }
 
@@ -277,6 +289,7 @@ export function weddingVendorRankingCardFieldsFromRecord(record: Record<string, 
     sentimentScoreLabel: clean(record.sentiment_score_label) || null,
     valueScoreLabel: clean(record.value_score_label) || null,
     seasonalNote: clean(record.seasonal_note) || null,
+    rooms: weddingVendorRoomCardRowsFromRecord(record.rooms),
   };
 }
 
@@ -859,6 +872,7 @@ function rankCandidate(
     email: source.email,
     instagramUrl: source.instagramUrl,
     snippet: source.snippet,
+    rooms: weddingVendorRoomCardRows(source.rooms),
     score: fit ?? 0,
     preferenceMatchLabel: matchedPreferenceTokens.length > 0
       ? matchedPreferenceTokens.slice(0, 4).join(", ")

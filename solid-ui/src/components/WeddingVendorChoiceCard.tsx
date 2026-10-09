@@ -3,12 +3,14 @@ import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 
 import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreachComposer";
 import {
+  API_BASE,
   fetchGoogleWeddingVendorPhoto,
   isGoogleWeddingVendorPhotoPath,
 } from "@/lib/api";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingVendorAvailabilityState } from "@/lib/weddingVendorRankingState";
 import { weddingVendorPhotoPlaceholder } from "@/lib/weddingVendorPhotoPlaceholderState";
+import { weddingVendorRoomPhotoSrc } from "@/lib/weddingVendorRoomState";
 import { weddingVendorChoiceActionState, type WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import {
   weddingVendorOutreachSentLabel,
@@ -149,6 +151,34 @@ export function WeddingVendorChoiceCard(props: {
         <Show when={confirmedScoreLabels().length > 0}>
           <div class="grid grid-cols-3 gap-1" aria-label="Vendor score summary">
             <For each={confirmedScoreLabels()}>{(label) => <span class="rounded-lg border border-wedding-muted bg-wedding-surface-blush px-2 py-1 text-[10px] font-semibold text-wedding-accent">{label}</span>}</For>
+          </div>
+        </Show>
+        <Show when={card.rooms.length > 0}>
+          <div class="rounded-lg border border-wedding-muted bg-wedding-surface-blush p-2" data-testid="vendor-rooms">
+            <p class="text-[11px] font-semibold uppercase text-wedding-muted">Rooms and pricing</p>
+            <ul class="mt-1 space-y-1.5">
+              <For each={card.rooms}>
+                {(room) => (
+                  <li class="flex gap-2 text-[11px] leading-4">
+                    <Show when={weddingVendorRoomPhotoSrc(room.imageUrl, API_BASE)}>
+                      {(src) => (
+                        <img
+                          src={src()}
+                          alt={`${room.name} at ${card.title}`}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          class="h-12 w-12 shrink-0 rounded-md object-cover"
+                        />
+                      )}
+                    </Show>
+                    <div class="min-w-0">
+                      <p class="break-words font-semibold text-wedding-text">{room.name}</p>
+                      <p class="break-words text-wedding-muted">{room.summary}</p>
+                    </div>
+                  </li>
+                )}
+              </For>
+            </ul>
           </div>
         </Show>
         <Show when={contactRows().length > 0}>

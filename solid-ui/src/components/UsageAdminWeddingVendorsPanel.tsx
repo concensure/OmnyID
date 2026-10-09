@@ -14,6 +14,7 @@ import {
   type AdminWeddingVendorDraft,
 } from "@/lib/adminWeddingVendorFormState";
 import UsageAdminWeddingVendorAttributesEditor from "@/components/UsageAdminWeddingVendorAttributesEditor";
+import UsageAdminWeddingVendorRoomsEditor from "@/components/UsageAdminWeddingVendorRoomsEditor";
 import {
   buildWeddingVendorAttributeWrites,
   weddingVendorAttributeCoverage,
@@ -43,6 +44,7 @@ export default function UsageAdminWeddingVendorsPanel() {
       return response.vendors;
     }),
   );
+  const editedVendor = createMemo(() => vendors()?.find((vendor) => vendor.vendorId === draft().vendorId) ?? null);
   const attributeCoverage = createMemo(() => weddingVendorAttributeCoverage({
     catalog: attributeCatalog(),
     vendors: vendors() ?? [],
@@ -263,6 +265,16 @@ export default function UsageAdminWeddingVendorsPanel() {
             disabled={busy()}
             onEdit={(key, edit) => setAttributeEdits((current) => ({ ...current, [key]: edit }))}
           />
+
+          <Show when={editedVendor()}>
+            {(vendor) => (
+              <UsageAdminWeddingVendorRoomsEditor
+                vendor={vendor()}
+                disabled={busy()}
+                onVendorChanged={() => void refetch()}
+              />
+            )}
+          </Show>
 
           <textarea class="mt-3 min-h-20 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Notes" value={draft().notes} onInput={(event) => updateDraft("notes", event.currentTarget.value)} />
           <textarea class="mt-2 min-h-20 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Caveat labels, one per line" value={draft().caveatLabels} onInput={(event) => updateDraft("caveatLabels", event.currentTarget.value)} />

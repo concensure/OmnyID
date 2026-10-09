@@ -6,6 +6,10 @@ import type {
   WeddingVendorRankedCandidate,
   WeddingVendorRankingResult,
 } from "@/lib/weddingVendorRankingState";
+import {
+  weddingVendorRoomCardRowsToRecords,
+  weddingVendorRoomsComparisonLabel,
+} from "@/lib/weddingVendorRoomState";
 import { weddingVendorShortlistMedia } from "@/lib/weddingVendorShortlistPolicyState";
 
 export type WeddingVendorComparisonContext = {
@@ -150,6 +154,7 @@ export function vendorChoiceCards(
     score_label: scoreLabelFor(choice),
     preference_match: choice.preferenceMatchLabel,
     situation_fit: choice.situationFitLabel,
+    rooms: weddingVendorRoomCardRowsToRecords(choice.rooms),
     rationale_labels: [choice.priorityMatchLabel, ...choice.riskFlags, ...choice.rationaleLabels].slice(0, 5),
     verification_label: choice.verificationLabel,
     group: choice.group,
@@ -238,6 +243,7 @@ export function a2uiForComparison(
             { label: "Why surfaced", values: choices.map((choice) => choice.rationaleLabels.slice(0, 2).join("; ")) },
             { label: "Preference match", values: choices.map((choice) => choice.preferenceMatchLabel) },
             { label: "Situation fit", values: choices.map((choice) => choice.situationFitLabel) },
+            { label: "Rooms and pricing", values: choices.map((choice) => weddingVendorRoomsComparisonLabel(choice.rooms)) },
             { label: "Contact details", values: choices.map((choice) => contactSummaryLabel(choice)) },
             { label: "Verify before action", values: choices.map((choice) => choice.verificationLabel) },
             { label: "Source", values: choices.map((choice) => choice.url) },

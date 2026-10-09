@@ -1,5 +1,6 @@
 import { customEventDetail, isRecord } from "./eventDetail";
 import { normalizeWeddingVendorSourceEvidence, type WeddingVendorAvailabilityUpdate, type WeddingVendorSourceEvidence } from "./weddingVendorRankingState";
+import { normalizeAdminWeddingVendorRooms, type AdminWeddingVendorRoom } from "./adminWeddingVendorRoomState";
 import { normalizeWeddingVendorAttributeCatalogFields, normalizeWeddingVendorAttributeFields, type WeddingVendorAttributeCatalogFields, type WeddingVendorAttributeFields, type WeddingVendorAttributeWriteFields } from "./weddingVendorAttributeCatalogState";
 import { normalizeInboxSummary, type InboxSummary } from "./firstRunExperienceResponseState";
 import {
@@ -5579,6 +5580,7 @@ export type WeddingVendor = {
   createdAt: string;
   updatedAt: string;
   photos: WeddingVendorPhoto[];
+  rooms: AdminWeddingVendorRoom[];
   userContact: WeddingVendorContactRecord | null;
 } & WeddingVendorAttributeFields;
 
@@ -6043,6 +6045,7 @@ function normalizeWeddingVendor(value: unknown): WeddingVendor | null {
           return normalized ? [normalized] : [];
         })
       : [],
+    rooms: normalizeAdminWeddingVendorRooms(value.rooms),
     userContact: normalizeWeddingVendorContactRecord(value.user_contact),
     ...normalizeWeddingVendorAttributeFields(value),
   };
