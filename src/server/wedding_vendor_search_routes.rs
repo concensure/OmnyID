@@ -89,6 +89,8 @@ struct WeddingVendorSearchSource {
     attributes: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     availability: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rooms: Option<Value>,
     #[serde(skip)]
     vendor_slug: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2389,8 +2391,60 @@ mod tests {
                 licence_metadata: json!({}),
                 created_at: "2026-09-29T00:00:00Z".to_string(),
             }],
+            rooms: vec![crate::db::WeddingVendorRoomRecord {
+                room_id: "room-1".to_string(),
+                vendor_id: "vendor-1".to_string(),
+                room_name: "Harvest Haven".to_string(),
+                sort_order: 0,
+                description: None,
+                capacity_seated: Some(100),
+                capacity_standing: None,
+                pricing_label: Some("From $15,500 for ~100 guests".to_string()),
+                price_from_cents: Some(1_550_000),
+                minimum_spend_cents: None,
+                minimum_spend_note: None,
+                inclusions: vec!["Tables and chairs".to_string()],
+                availability_note: None,
+                source_url: None,
+                source_label: None,
+                source_checked_at: None,
+                evidence: json!({}),
+                photos: vec![
+                    crate::db::WeddingVendorRoomPhotoRecord {
+                        slot: 1,
+                        storage_bucket: Some("bucket".to_string()),
+                        storage_key: Some("private/key.webp".to_string()),
+                        photo_url: None,
+                        content_type: Some("image/webp".to_string()),
+                        alt_text: None,
+                        source_label: None,
+                        source_url: None,
+                    },
+                    crate::db::WeddingVendorRoomPhotoRecord {
+                        slot: 2,
+                        storage_bucket: None,
+                        storage_key: None,
+                        photo_url: Some("https://cdn.example/barn.jpg".to_string()),
+                        content_type: None,
+                        alt_text: None,
+                        source_label: None,
+                        source_url: None,
+                    },
+                ],
+            }],
             user_contact: None,
         });
+        let rooms = source.rooms.as_ref().expect("rooms mapped");
+        assert_eq!(rooms[0]["name"], "Harvest Haven");
+        assert_eq!(rooms[0]["pricing_label"], "From $15,500 for ~100 guests");
+        assert_eq!(
+            rooms[0]["photo_urls"],
+            json!([
+                "/api/public/wedding/vendor/room-photos/room-1/1",
+                "https://cdn.example/barn.jpg"
+            ])
+        );
+        assert!(!rooms.to_string().contains("private/key.webp"));
 
         assert_eq!(source.title, "Chloe's Florals");
         assert_eq!(source.url, "https://chloes.example");
@@ -2436,6 +2490,7 @@ mod tests {
             created_at: "2026-10-08T00:00:00Z".to_string(),
             updated_at: "2026-10-08T00:00:00Z".to_string(),
             photos: vec![],
+            rooms: vec![],
             user_contact: None,
         };
 

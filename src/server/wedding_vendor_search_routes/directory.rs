@@ -1,6 +1,6 @@
 // @locs-version: 1.0
 use super::*;
-use crate::db::WeddingVendorRecord;
+use crate::db::{WeddingVendorRecord, WeddingVendorRoomRecord};
 
 pub(super) async fn search_wedding_vendor_directory(
     db: &Db,
@@ -72,6 +72,7 @@ pub(super) fn is_real_vendor_directory_record(record: &WeddingVendorRecord) -> b
 pub(super) fn wedding_vendor_record_to_search_source(
     record: WeddingVendorRecord,
 ) -> WeddingVendorSearchSource {
+    let rooms = rooms_evidence(&record.rooms);
     let url = record
         .website_url
         .clone()
@@ -110,6 +111,7 @@ pub(super) fn wedding_vendor_record_to_search_source(
             .source_url
             .filter(|url| url.contains("maps") || url.contains("openstreetmap")),
         photo_url: record.photos.first().map(|photo| photo.photo_url.clone()),
+        rooms,
         address: record.address,
         phone: record.contact_phone,
         email: record.contact_email,
@@ -122,4 +124,50 @@ pub(super) fn wedding_vendor_record_to_search_source(
         service_area: Some(record.service_area),
         ..WeddingVendorSearchSource::default()
     }
+}
+
+const MAX_ROOMS_PER_SOURCE: usize = 6;
+
+/// Public room payload for a search source; stored photos resolve through the public
+/// room-photo route so object-store keys never leave the server.
+fn rooms_evidence(rooms: &[WeddingVendorRoomRecord]) -> Option<Value> {
+    if rooms.is_empty() {
+        return None;
+    }
+    Some(Value::Array(
+        rooms
+            .iter()
+            .take(MAX_ROOMS_PER_SOURCE)
+            .map(|room| {
+                let photo_urls = room
+                    .photos
+                    .iter()
+                    .filter_map(|photo| match (&photo.photo_url, &photo.storage_key) {
+                        (Some(url), _) => Some(url.clone()),
+                        (None, Some(_)) => Some(format!(
+                            "/api/public/wedding/vendor/room-photos/{}/{}",
+                            room.room_id, photo.slot
+                        )),
+                        (None, None) => None,
+                    })
+                    .collect::<Vec<_>>();
+                serde_json::json!({
+                    "room_id": room.room_id,
+                    "name": room.room_name,
+                    "description": room.description,
+                    "capacity_seated": room.capacity_seated,
+                    "capacity_standing": room.capacity_standing,
+                    "pricing_label": room.pricing_label,
+                    "price_from_cents": room.price_from_cents,
+                    "minimum_spend_cents": room.minimum_spend_cents,
+                    "minimum_spend_note": room.minimum_spend_note,
+                    "inclusions": room.inclusions,
+                    "availability_note": room.availability_note,
+                    "source_url": room.source_url,
+                    "source_label": room.source_label,
+                    "photo_urls": photo_urls,
+                })
+            })
+            .collect(),
+    ))
 }

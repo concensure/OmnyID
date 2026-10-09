@@ -29,7 +29,10 @@ pub use wedding_vendor_directory::{
     WeddingVendorPhotoRecord, WeddingVendorPhotoUpsertRecord, WeddingVendorRecord,
     WeddingVendorReplyMatch, WeddingVendorUpsertRecord, WeddingVendorUserContactRecord,
 };
-pub use wedding_vendor_rooms::{WeddingVendorRoomPhotoRecord, WeddingVendorRoomRecord};
+pub use wedding_vendor_rooms::{
+    WeddingVendorRoomExternalPhoto, WeddingVendorRoomPhotoRecord, WeddingVendorRoomRecord,
+    WeddingVendorRoomUpsertRecord,
+};
 
 const TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES: &[&str] = &[
     "messages",
@@ -4175,12 +4178,14 @@ impl Db {
             }
         }
 
+        let mut rooms_by_vendor = self.list_wedding_vendor_rooms(&vendor_ids).await?;
         Ok(vendor_rows
             .into_iter()
             .map(|row| {
                 let vendor_id: String = row.get("vendor_id");
                 WeddingVendorRecord {
                     photos: photos_by_vendor.remove(&vendor_id).unwrap_or_default(),
+                    rooms: rooms_by_vendor.remove(&vendor_id).unwrap_or_default(),
                     vendor_id,
                     vendor_slug: row.get("vendor_slug"),
                     vendor_name: row.get("vendor_name"),
@@ -4322,6 +4327,7 @@ impl Db {
             }
         }
 
+        let mut rooms_by_vendor = self.list_wedding_vendor_rooms(&vendor_ids).await?;
         Ok(vendor_rows
             .into_iter()
             .map(|row| {
@@ -4329,6 +4335,7 @@ impl Db {
                 let contact_id: Option<String> = row.get("contact_id");
                 WeddingVendorRecord {
                     photos: photos_by_vendor.remove(&vendor_id).unwrap_or_default(),
+                    rooms: rooms_by_vendor.remove(&vendor_id).unwrap_or_default(),
                     user_contact: contact_id.map(|contact_id| WeddingVendorUserContactRecord {
                         contact_id,
                         user_id: row.get("contact_user_id"),
@@ -4525,6 +4532,7 @@ impl Db {
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
             photos: Vec::new(),
+            rooms: Vec::new(),
             user_contact: None,
         }))
     }

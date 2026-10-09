@@ -2,6 +2,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::wedding_vendor_rooms::WeddingVendorRoomRecord;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WeddingVendorPhotoRecord {
     pub photo_id: String,
@@ -39,6 +41,8 @@ pub struct WeddingVendorRecord {
     pub created_at: String,
     pub updated_at: String,
     pub photos: Vec<WeddingVendorPhotoRecord>,
+    #[serde(default)]
+    pub rooms: Vec<WeddingVendorRoomRecord>,
     pub user_contact: Option<WeddingVendorUserContactRecord>,
 }
 

@@ -16,8 +16,10 @@ use crate::{
 #[cfg(test)]
 mod tests;
 mod wedding_admin;
+mod wedding_rooms;
 
 use wedding_admin::*;
+use wedding_rooms::*;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -49,6 +51,25 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/admin/wedding/vendors/{vendor_id}",
             put(admin_wedding_vendor_update_http).delete(admin_wedding_vendor_delete_http),
+        )
+        .route(
+            "/admin/wedding/vendors/{vendor_id}/rooms",
+            put(admin_wedding_vendor_room_upsert_http),
+        )
+        .route(
+            "/admin/wedding/vendors/{vendor_id}/rooms/{room_id}",
+            axum::routing::delete(admin_wedding_vendor_room_delete_http),
+        )
+        .route(
+            "/admin/wedding/vendors/{vendor_id}/rooms/{room_id}/photos/{slot}",
+            put(admin_wedding_vendor_room_photo_upload_http)
+                .layer(axum::extract::DefaultBodyLimit::max(
+                    super::wedding_vendor_photo_routes::MAX_IMAGE_BYTES,
+                )),
+        )
+        .route(
+            "/api/public/wedding/vendor/room-photos/{room_id}/{slot}",
+            get(public_wedding_vendor_room_photo_http),
         )
         .route(
             "/wedding/vendors/{vendor_id}/contact",

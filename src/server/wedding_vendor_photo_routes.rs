@@ -39,10 +39,10 @@ use super::{
     wedding_vendor_claim_routes::{PHOTO_LICENCE_SHA256, PHOTO_LICENCE_VERSION},
 };
 
-const MAX_IMAGE_BYTES: usize = 15 * 1024 * 1024;
+pub(super) const MAX_IMAGE_BYTES: usize = 15 * 1024 * 1024;
 const MAX_DECODED_IMAGE_BYTES: u64 = 128 * 1024 * 1024;
 const MAX_SOURCE_EDGE: u32 = 8_000;
-const FULL_EDGE: u32 = 2400;
+pub(super) const FULL_EDGE: u32 = 2400;
 const MEDIUM_EDGE: u32 = 1200;
 const THUMB_EDGE: u32 = 480;
 
@@ -472,7 +472,7 @@ fn webp_variants(image: &DynamicImage) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), im
     ))
 }
 
-fn decode_upload(bytes: &[u8], format: ImageFormat) -> Result<DynamicImage, image::ImageError> {
+pub(super) fn decode_upload(bytes: &[u8], format: ImageFormat) -> Result<DynamicImage, image::ImageError> {
     let mut limits = Limits::default();
     limits.max_image_width = Some(MAX_SOURCE_EDGE);
     limits.max_image_height = Some(MAX_SOURCE_EDGE);
@@ -482,7 +482,7 @@ fn decode_upload(bytes: &[u8], format: ImageFormat) -> Result<DynamicImage, imag
     reader.decode()
 }
 
-fn encode_webp(image: &DynamicImage, edge: u32) -> Result<Vec<u8>, image::ImageError> {
+pub(super) fn encode_webp(image: &DynamicImage, edge: u32) -> Result<Vec<u8>, image::ImageError> {
     let resized = image.resize(edge, edge, FilterType::Lanczos3);
     let mut output = Cursor::new(Vec::new());
     resized.write_to(&mut output, ImageFormat::WebP)?;
@@ -532,6 +532,7 @@ fn database_failure(_: sqlx::Error) -> (StatusCode, String) {
 mod tests {
     use super::{clean_alt_text, decode_upload, webp_variants};
     use image::{DynamicImage, ImageFormat};
+    use std::io::Cursor;
 
     #[test]
     fn generated_variants_are_webp() {

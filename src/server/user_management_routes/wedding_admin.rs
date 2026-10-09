@@ -17,7 +17,7 @@ use crate::admin_tool_secrets::{
 };
 use crate::db::{WeddingVendorRecord, wedding_vendor_evidence::VendorAttributeWrite};
 use crate::server::{llm_resolution::read_hosted_anthropic_api_key, wedding_admin_ai_policy};
-fn validate_optional_http_url(
+pub(super) fn validate_optional_http_url(
     value: Option<String>,
     label: &str,
 ) -> Result<Option<String>, (StatusCode, String)> {
