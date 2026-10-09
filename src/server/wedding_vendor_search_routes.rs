@@ -594,19 +594,46 @@ async fn wedding_vendor_search_http(
         })
         .map(str::to_string)
         .collect::<BTreeSet<_>>();
-    let claim = req.material_fingerprint.as_deref().map(str::trim).filter(|value| !value.is_empty())
-        .map(|fingerprint| (
-            req.wedding_plan_id.as_deref().map(str::trim).unwrap_or(""),
-            categories.iter().next().map(String::as_str).unwrap_or("uncategorised"),
-            fingerprint,
-            req.ranking_policy_version.as_deref().map(str::trim).filter(|value| !value.is_empty()).unwrap_or("1"),
-        ));
+    let claim = req
+        .material_fingerprint
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|fingerprint| {
+            (
+                req.wedding_plan_id.as_deref().map(str::trim).unwrap_or(""),
+                categories
+                    .iter()
+                    .next()
+                    .map(String::as_str)
+                    .unwrap_or("uncategorised"),
+                fingerprint,
+                req.ranking_policy_version
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or("1"),
+            )
+        });
     if let Some((plan_id, category, fingerprint, policy_version)) = claim {
         if plan_id.is_empty() {
-            return Err((StatusCode::BAD_REQUEST, "wedding_plan_id is required with material_fingerprint".to_string()));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "wedding_plan_id is required with material_fingerprint".to_string(),
+            ));
         }
-        let acquired = state.db.claim_wedding_vendor_shortlist_run(&user.id, plan_id, category, fingerprint, policy_version)
-            .await.map_err(internal_error).map_err(status_to_http)?;
+        let acquired = state
+            .db
+            .claim_wedding_vendor_shortlist_run(
+                &user.id,
+                plan_id,
+                category,
+                fingerprint,
+                policy_version,
+            )
+            .await
+            .map_err(internal_error)
+            .map_err(status_to_http)?;
         if !acquired {
             return Err((StatusCode::CONFLICT, "This wedding vendor shortlist is already running or complete for the same material inputs.".to_string()));
         }
@@ -635,17 +662,19 @@ async fn wedding_vendor_search_http(
     if source_policy == WeddingVendorSourcePolicy::DirectoryOnly {
         let directory_count = sources.len();
         if let Some((plan_id, category, fingerprint, policy_version)) = claim {
-            state.db.complete_wedding_vendor_shortlist_run(
-                &user.id,
-                plan_id,
-                category,
-                fingerprint,
-                policy_version,
-                directory_count > 0,
-            )
-            .await
-            .map_err(internal_error)
-            .map_err(status_to_http)?;
+            state
+                .db
+                .complete_wedding_vendor_shortlist_run(
+                    &user.id,
+                    plan_id,
+                    category,
+                    fingerprint,
+                    policy_version,
+                    directory_count > 0,
+                )
+                .await
+                .map_err(internal_error)
+                .map_err(status_to_http)?;
         }
         return Ok(Json(WeddingVendorSearchResponse {
             ok: directory_count > 0,
@@ -1087,12 +1116,22 @@ async fn wedding_vendor_search_http(
         ),
     };
     if let Some((plan_id, category, fingerprint, policy_version)) = claim {
-        state.db.complete_wedding_vendor_shortlist_run(&user.id, plan_id, category, fingerprint, policy_version, response.ok)
-            .await.map_err(internal_error).map_err(status_to_http)?;
+        state
+            .db
+            .complete_wedding_vendor_shortlist_run(
+                &user.id,
+                plan_id,
+                category,
+                fingerprint,
+                policy_version,
+                response.ok,
+            )
+            .await
+            .map_err(internal_error)
+            .map_err(status_to_http)?;
     }
     Ok(Json(response))
 }
-
 
 /// Sources collected since the last call came from `query`, so they inherit its category and
 /// service area; persistence and per-category attributes then stay correct in mixed searches.
@@ -1932,11 +1971,11 @@ fn env_lock() -> std::sync::MutexGuard<'static, ()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::directory::{
         is_real_vendor_directory_record, wedding_vendor_directory_search_terms,
         wedding_vendor_record_to_search_source,
     };
+    use super::*;
     use crate::db::WeddingVendorRecord;
 
     fn clear_provider_capability_env() {

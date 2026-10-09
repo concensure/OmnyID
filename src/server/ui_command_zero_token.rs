@@ -6,7 +6,7 @@
  * @owner: omnyid
  */
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone)]
 pub(super) struct ZeroTokenRouteHint {
@@ -187,8 +187,7 @@ fn classify_travel(query: &str) -> Option<ZeroTokenRouteHint> {
                 "summary": "Prepared a route comparison.",
                 "bullets": [],
             }),
-            route_reason:
-                "A zero-token travel comparison command matched a direct route-comparison phrase.",
+            route_reason: "A zero-token travel comparison command matched a direct route-comparison phrase.",
             heuristics_used: vec![
                 "zero_token_command_signal".to_string(),
                 "zero_token_travel_compare_signal".to_string(),
@@ -474,10 +473,11 @@ mod tests {
         assert_eq!(hint.intent, "travel");
         assert_eq!(hint.preferred_view, "route_card");
         assert!(hint.summary.contains("Sydney to Tokyo"));
-        assert!(hint
-            .bullets
-            .iter()
-            .any(|item| item.contains("12th Oct 2026")));
+        assert!(
+            hint.bullets
+                .iter()
+                .any(|item| item.contains("12th Oct 2026"))
+        );
         assert!(hint.bullets.iter().any(|item| item.starts_with("Day 1:")));
     }
 
@@ -486,9 +486,10 @@ mod tests {
         let hint = classify_zero_token_signal("plan my day").expect("schedule hint");
         assert_eq!(hint.intent, "schedule");
         assert_eq!(hint.preferred_view, "draggable_calendar");
-        assert!(hint
-            .heuristics_used
-            .contains(&"zero_token_schedule_signal".to_string()));
+        assert!(
+            hint.heuristics_used
+                .contains(&"zero_token_schedule_signal".to_string())
+        );
     }
 
     #[test]
@@ -505,9 +506,10 @@ mod tests {
         let hint = classify_zero_token_signal("open a space for launch prep").expect("spaces hint");
         assert_eq!(hint.intent, "spaces");
         assert_eq!(hint.preferred_view, "spaces");
-        assert!(hint
-            .heuristics_used
-            .contains(&"zero_token_space_signal".to_string()));
+        assert!(
+            hint.heuristics_used
+                .contains(&"zero_token_space_signal".to_string())
+        );
     }
 
     #[test]

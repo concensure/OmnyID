@@ -397,11 +397,7 @@ pub(super) fn name_tokens(name: &str) -> Vec<String> {
         .filter(|token| !NAME_STOPWORDS.contains(&token.as_str()))
         .cloned()
         .collect::<Vec<_>>();
-    if filtered.len() >= 2 {
-        filtered
-    } else {
-        all
-    }
+    if filtered.len() >= 2 { filtered } else { all }
 }
 
 pub(super) fn entity_name_key(name: &str) -> String {

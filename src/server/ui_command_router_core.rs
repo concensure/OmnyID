@@ -487,9 +487,11 @@ mod tests {
                 .and_then(|value| value["model_inference_ran"].as_bool()),
             Some(false)
         );
-        assert!(response.links[0]
-            .url
-            .contains("google.com/search?q=what+is+rust"));
+        assert!(
+            response.links[0]
+                .url
+                .contains("google.com/search?q=what+is+rust")
+        );
     }
 
     #[test]
@@ -591,10 +593,12 @@ mod tests {
         assert_eq!(response.intent, "travel");
         assert_eq!(response.preferred_view, "route_card");
         assert!(response.links.is_empty());
-        assert!(response
-            .bullets
-            .iter()
-            .any(|item| item.starts_with("Day 1:")));
+        assert!(
+            response
+                .bullets
+                .iter()
+                .any(|item| item.starts_with("Day 1:"))
+        );
         assert!(response.summary.contains("Sydney to Tokyo"));
     }
 

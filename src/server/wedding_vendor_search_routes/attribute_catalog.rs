@@ -71,11 +71,30 @@ const PRICE_LEVEL_GOOGLE: &[&str] = &[
     "PRICE_LEVEL_VERY_EXPENSIVE",
 ];
 const LOCATION_SETTING_CLASS: &[&str] = &[
-    "iconic_waterfront", "heritage_garden", "parkland_garden", "premium_city", "suburban_landscaped", "suburban_function", "limited",
+    "iconic_waterfront",
+    "heritage_garden",
+    "parkland_garden",
+    "premium_city",
+    "suburban_landscaped",
+    "suburban_function",
+    "limited",
 ];
 
-const fn operator_spec(key: &'static str, label: &'static str, kind: AttrKind, applies_to: &'static [&'static str], group: &'static str) -> VendorAttributeSpec {
-    VendorAttributeSpec { key, label, kind, applies_to, preferred_authority: "operator", group }
+const fn operator_spec(
+    key: &'static str,
+    label: &'static str,
+    kind: AttrKind,
+    applies_to: &'static [&'static str],
+    group: &'static str,
+) -> VendorAttributeSpec {
+    VendorAttributeSpec {
+        key,
+        label,
+        kind,
+        applies_to,
+        preferred_authority: "operator",
+        group,
+    }
 }
 
 const fn spec(
@@ -114,19 +133,83 @@ const fn aggregate_spec(
 }
 
 pub(crate) const VENDOR_ATTRIBUTE_CATALOG: &[VendorAttributeSpec] = &[
-    operator_spec("location_setting_class", "Location setting", AttrKind::Enum(LOCATION_SETTING_CLASS), VENUE, "fit"),
-    spec("year_built", "Year built", AttrKind::Number, VENUE, "quality"),
-    spec("last_major_renovation_year", "Last major renovation year", AttrKind::Number, VENUE, "quality"),
-    operator_spec("condition_score", "Condition score", AttrKind::Number, VENUE, "quality"),
-    spec("venue_hire_fee_aud", "Venue hire fee (AUD)", AttrKind::Money, VENUE, "commercial"),
-    spec("catering_price_per_head_aud", "Catering per head (AUD)", AttrKind::Money, VENUE, "commercial"),
-    spec("seasonal_price_list", "Seasonal price list or URL", AttrKind::Text, ALL, "commercial"),
-    aggregate_spec("rating_easyweddings", "Easy Weddings rating", AttrKind::Number, "quality"),
-    aggregate_spec("review_count_easyweddings", "Easy Weddings review count", AttrKind::Number, "quality"),
+    operator_spec(
+        "location_setting_class",
+        "Location setting",
+        AttrKind::Enum(LOCATION_SETTING_CLASS),
+        VENUE,
+        "fit",
+    ),
+    spec(
+        "year_built",
+        "Year built",
+        AttrKind::Number,
+        VENUE,
+        "quality",
+    ),
+    spec(
+        "last_major_renovation_year",
+        "Last major renovation year",
+        AttrKind::Number,
+        VENUE,
+        "quality",
+    ),
+    operator_spec(
+        "condition_score",
+        "Condition score",
+        AttrKind::Number,
+        VENUE,
+        "quality",
+    ),
+    spec(
+        "venue_hire_fee_aud",
+        "Venue hire fee (AUD)",
+        AttrKind::Money,
+        VENUE,
+        "commercial",
+    ),
+    spec(
+        "catering_price_per_head_aud",
+        "Catering per head (AUD)",
+        AttrKind::Money,
+        VENUE,
+        "commercial",
+    ),
+    spec(
+        "seasonal_price_list",
+        "Seasonal price list or URL",
+        AttrKind::Text,
+        ALL,
+        "commercial",
+    ),
+    aggregate_spec(
+        "rating_easyweddings",
+        "Easy Weddings rating",
+        AttrKind::Number,
+        "quality",
+    ),
+    aggregate_spec(
+        "review_count_easyweddings",
+        "Easy Weddings review count",
+        AttrKind::Number,
+        "quality",
+    ),
     aggregate_spec("latitude", "Latitude", AttrKind::Coordinate, "location"),
     aggregate_spec("longitude", "Longitude", AttrKind::Coordinate, "location"),
-    operator_spec("food_score", "Food score", AttrKind::Number, VENUE, "quality"),
-    operator_spec("service_score", "Service score", AttrKind::Number, VENUE, "quality"),
+    operator_spec(
+        "food_score",
+        "Food score",
+        AttrKind::Number,
+        VENUE,
+        "quality",
+    ),
+    operator_spec(
+        "service_score",
+        "Service score",
+        AttrKind::Number,
+        VENUE,
+        "quality",
+    ),
     spec(
         "capacity_seated_max",
         "Seated capacity (max)",
@@ -549,7 +632,10 @@ pub(crate) fn validate_attribute_value(
                         (1.0..=5.0).contains(&number)
                     } else {
                         number >= 0.0
-                    } => Ok(()),
+                    } =>
+            {
+                Ok(())
+            }
             _ if matches!(spec.key, "condition_score" | "food_score" | "service_score") => {
                 Err(wrong_shape("a score from 1 to 5"))
             }
@@ -591,8 +677,16 @@ pub(crate) fn validate_attribute_value(
             _ => Err(wrong_shape("a 24-hour time such as \"23:00\"")),
         },
         AttrKind::Coordinate => match value.as_f64() {
-            Some(number) if number.is_finite()
-                && if spec.key == "latitude" { (-90.0..=90.0).contains(&number) } else { (-180.0..=180.0).contains(&number) } => Ok(()),
+            Some(number)
+                if number.is_finite()
+                    && if spec.key == "latitude" {
+                        (-90.0..=90.0).contains(&number)
+                    } else {
+                        (-180.0..=180.0).contains(&number)
+                    } =>
+            {
+                Ok(())
+            }
             _ => Err(wrong_shape("a valid latitude or longitude")),
         },
         AttrKind::Json => match value {
@@ -798,7 +892,14 @@ mod tests {
 
     #[test]
     fn aggregate_attributes_prefer_independent_aggregate() {
-        for key in ["rating_google", "review_count_google", "business_status", "rating_easyweddings", "latitude", "longitude"] {
+        for key in [
+            "rating_google",
+            "review_count_google",
+            "business_status",
+            "rating_easyweddings",
+            "latitude",
+            "longitude",
+        ] {
             assert_eq!(
                 attribute_spec(key).expect("spec").preferred_authority,
                 "independent_aggregate"
@@ -817,7 +918,14 @@ mod tests {
         assert!(admin_attribute_write(admin("latitude", Some(json!(-33.8688)), "known")).is_ok());
         assert!(admin_attribute_write(admin("longitude", Some(json!(151.2093)), "known")).is_ok());
         assert!(admin_attribute_write(admin("latitude", Some(json!(-133.0)), "known")).is_err());
-        assert!(admin_attribute_write(admin("seasonal_price_list", Some(json!("https://venue.test/pricing.pdf")), "known")).is_ok());
+        assert!(
+            admin_attribute_write(admin(
+                "seasonal_price_list",
+                Some(json!("https://venue.test/pricing.pdf")),
+                "known"
+            ))
+            .is_ok()
+        );
         assert!(admin_attribute_write(admin("condition_score", Some(json!(4.5)), "known")).is_ok());
         assert!(admin_attribute_write(admin("food_score", Some(json!(0)), "known")).is_err());
         assert!(admin_attribute_write(admin("service_score", Some(json!(6)), "known")).is_err());
