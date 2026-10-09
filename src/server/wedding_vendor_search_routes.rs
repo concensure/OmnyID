@@ -2412,6 +2412,7 @@ mod tests {
                 photos: vec![
                     crate::db::WeddingVendorRoomPhotoRecord {
                         slot: 1,
+                        stored: true,
                         storage_bucket: Some("bucket".to_string()),
                         storage_key: Some("private/key.webp".to_string()),
                         photo_url: None,
@@ -2422,6 +2423,7 @@ mod tests {
                     },
                     crate::db::WeddingVendorRoomPhotoRecord {
                         slot: 2,
+                        stored: false,
                         storage_bucket: None,
                         storage_key: None,
                         photo_url: Some("https://cdn.example/barn.jpg".to_string()),

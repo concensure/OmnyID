@@ -9,8 +9,13 @@ use ulid::Ulid;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WeddingVendorRoomPhotoRecord {
     pub slot: i32,
+    /// Object-store coordinates stay server-side; clients see `stored` and the public route.
+    #[serde(skip_serializing)]
     pub storage_bucket: Option<String>,
+    #[serde(skip_serializing)]
     pub storage_key: Option<String>,
+    #[serde(default)]
+    pub stored: bool,
     pub photo_url: Option<String>,
     pub content_type: Option<String>,
     pub alt_text: Option<String>,
@@ -102,7 +107,7 @@ impl Db {
                 source_url = EXCLUDED.source_url,
                 source_label = EXCLUDED.source_label,
                 source_checked_at = EXCLUDED.source_checked_at,
-                evidence = EXCLUDED.evidence,
+                evidence = wedding_vendor_rooms.evidence || EXCLUDED.evidence,
                 updated_at = NOW()
             RETURNING room_id
             "#,
@@ -321,6 +326,7 @@ impl Db {
                 photos_by_room.entry(row.get("room_id")).or_default().push(
                     WeddingVendorRoomPhotoRecord {
                         slot: row.get("slot"),
+                        stored: row.get::<Option<String>, _>("storage_key").is_some(),
                         storage_bucket: row.get("storage_bucket"),
                         storage_key: row.get("storage_key"),
                         photo_url: row.get("photo_url"),

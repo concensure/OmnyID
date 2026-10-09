@@ -142,13 +142,13 @@ fn rooms_evidence(rooms: &[WeddingVendorRoomRecord]) -> Option<Value> {
                 let photo_urls = room
                     .photos
                     .iter()
-                    .filter_map(|photo| match (&photo.photo_url, &photo.storage_key) {
+                    .filter_map(|photo| match (&photo.photo_url, photo.stored) {
                         (Some(url), _) => Some(url.clone()),
-                        (None, Some(_)) => Some(format!(
+                        (None, true) => Some(format!(
                             "/api/public/wedding/vendor/room-photos/{}/{}",
                             room.room_id, photo.slot
                         )),
-                        (None, None) => None,
+                        (None, false) => None,
                     })
                     .collect::<Vec<_>>();
                 serde_json::json!({
