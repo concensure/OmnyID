@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-10-08
+updated: 2026-10-10
 
 lifecycle:
   allowed_statuses:
@@ -468,36 +468,37 @@ tasks:
 
   - id: WED-153
     title: Vendor email enrichment, directory cleanup, and per-room vendor data model
-    status: in_progress
+    status: review
     owner: claude
-    branch: agent/codex/WED-150
+    branch: agent/codex/WED-161
     depends_on:
       - WED-152
     files:
       - postgres/migrations/0100_wedding_vendor_rooms.sql
       - postgres/data/2026-10-06_vendor_email_enrichment.sql
       - src/db/wedding_vendor_rooms.rs
-      - src/db/migration_catalog.rs
-      - src/db.rs
+      - src/db/wedding_vendor_directory.rs
+      - src/server/user_management_routes/wedding_rooms.rs
+      - src/server/wedding_vendor_search_routes/directory.rs
+      - solid-ui/src/lib/weddingVendorRoomState.ts
+      - solid-ui/src/lib/adminWeddingVendorRoomState.ts
+      - solid-ui/src/components/UsageAdminWeddingVendorRoomsEditor.tsx
     acceptance:
       - vendor reply facts (contact, price, minimum spend, availability) stored with vendor_reply authority
       - directory and listicle pages removed from wedding_vendors
       - rooms with pricing, inclusions, and Seaweed FS-backed photos are representable per vendor
       - rooms are exposed through an API and rendered in the vendor card and comparison
     progress:
-      - migration 0100 and data load applied to local and Oracle Postgres; cargo check passes
-      - Rust read path (Db::list_wedding_vendor_rooms) added but not yet called by any route
+      - migration 0100 and data load applied to local and Oracle Postgres; enrichment and rooms schema released to Oracle in 3c6dd08
+      - rooms load with every vendor record and ride on search sources (rooms field); stored photos resolve through a public room-photo route and object-store keys are never serialised
+      - operator routes PUT/DELETE /admin/wedding/vendors/{vendor_id}/rooms[/{room_id}] and PUT .../photos/{slot} (raw JPEG/PNG/WebP body, re-encoded to WebP, stored in Seaweed FS)
+      - vendor card shows Rooms and pricing; comparison table has a Rooms and pricing row; operator vendor panel has a rooms editor with photo upload
+      - local Postgres round-trip test (OMNYID_RUN_DB_SMOKE=1) passes; cargo wedding_ lib tests, solid-ui tsc, build and test:wedding pass
     remaining:
-      - API route or WeddingVendorRecord field exposing rooms, upsert path, admin form, UI rendering
-      - Seaweed FS upload and authenticated serving route for room photos (none uploaded yet)
-      - homeserver redeploy so the rooms code ships (tables already exist in Oracle)
-
-  # Wedding vendor "Claim Your Profile" programme (WED-160..WED-172).
-  # Spec: Documents/design/wedding planner/wedding-vendor-claim-your-profile-spec.md
-  # Tasks + Codex handoff: Documents/design/wedding planner/wedding-vendor-claim-your-profile-tasks.md
-  # Slices: A = WED-160..169 on agent/codex/WED-160 (from agent/codex/WED-150);
-  #         B = WED-170..171 on agent/codex/WED-170 (stacked on A);
-  #         C = WED-172 on agent/codex/WED-172 (stacked on B). One PR per slice, Claude reviews.
+      - homeserver and UI redeploy so the rooms API and editor ship (tables already exist in Oracle)
+      - no room photos are uploaded yet; add them through the operator rooms editor once object storage is configured
+      - read the Grange packages PDF and the Somersby Canva guide and add their rooms and prices
+      - the A2UIRenderer recommendation cards do not show rooms; the comparison table row does
 
   - id: WED-160
     title: Sydney-only copy on the wedding home page

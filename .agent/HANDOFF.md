@@ -1,5 +1,38 @@
 # Handoff
 
+## 2026-10-10 - WED-153 vendor rooms: API, card, comparison and operator editor (Claude -> Codex: please merge)
+
+Merge request for Codex:
+
+- Please review and merge these four commits, in order, on `agent/codex/WED-161` (they sit on top of `f3c6784`):
+  - `8805290` `chore: apply rustfmt to server files` - formatting only, six `src/server/` files that were left modified in the shared worktree.
+  - `92ed73f` `feat(WED-153): expose vendor rooms via API`
+  - `1e67eea` `fix(WED-153): keep storage keys server-side`
+  - `9d9eddd` `feat(WED-153): show vendor rooms in cards and admin`
+- They cannot be cherry-picked onto `main` alone: they build on `3c6dd08` (WED-153 persistence) and on the WED-169 photo helpers. The branch is about 69 commits ahead of `main`, so merge the branch through the normal PR/squash path rather than these four on their own.
+- Task WED-153 is set to `review` in `TASKS.yaml`; mark it `done` after the merge. Nothing is deployed.
+
+What changed:
+
+- `WeddingVendorRecord` now carries `rooms` (loaded in `list_wedding_vendors` and `list_active_wedding_vendors_for_user`), and directory search sources carry a `rooms` array. Stored room photos resolve to `/api/public/wedding/vendor/room-photos/{room_id}/{slot}`; bucket and key are `skip_serializing`, clients see a `stored` flag.
+- New operator routes in `src/server/user_management_routes/wedding_rooms.rs`: `PUT /admin/wedding/vendors/{vendor_id}/rooms` (upsert by vendor + room name; evidence is merged, not replaced), `DELETE .../rooms/{room_id}` (also removes the stored objects), `PUT .../rooms/{room_id}/photos/{slot}` (raw JPEG/PNG/WebP body, re-encoded to WebP via the WED-169 helpers, stored in Seaweed FS), and the public photo route. The WED-169 helpers `decode_upload`, `encode_webp`, `FULL_EDGE` and `MAX_IMAGE_BYTES` are now `pub(super)`.
+- UI: rooms flow `source.rooms` -> ranked candidate -> persisted card `rooms` rows (display strings only, so saved comparisons do not change when room data does). `WeddingVendorChoiceCard` shows a Rooms and pricing block; the comparison table has a Rooms and pricing row; the operator vendor panel has a rooms editor with photo upload.
+- Also fixed a pre-existing test compile error: `wedding_vendor_photo_routes.rs` tests used `Cursor` without importing it, so `cargo test --lib` did not compile at `f3c6784`.
+
+Verification (all run on this branch):
+
+- `cargo check` passed; `cargo test --lib wedding_` 127 passed; the gated Postgres round trip (`OMNYID_RUN_DB_SMOKE=1 cargo test --lib local_postgres_room`) passed against local Postgres, covering upsert-by-name, photo replace, foreign-vendor rejection, hidden-vendor photo lookup and delete.
+- `npm --prefix solid-ui exec tsc -- --noEmit`, `npm --prefix solid-ui run build`, and `typescript-sdk` `tsc --noEmit` passed; `npm --prefix solid-ui run test:wedding` 1812 passed.
+- `npm --prefix solid-ui run test:line-budget` still fails only for the two pre-existing files (`WeddingResponseWorkspaceView.tsx` 1042, `weddingResponseWorkspaceViewState.ts` 1038). No file touched here is over budget.
+- Not exercised: the new operator HTTP routes and the Seaweed FS upload/serve path against a running server, and the editor in a browser. They compile and their validation is unit-tested, but run one real upload before relying on them.
+
+Remaining (also in `TASKS.yaml`):
+
+- Redeploy so the rooms API and editor ship (the tables already exist on Oracle). Use a clean release worktree; the shared worktree has many unrelated untracked files.
+- No room photos exist yet. Upload through the operator rooms editor once `OMNYID_SEAWEEDFS_*` is configured in the target environment.
+- Add the Grange packages PDF and Somersby Canva guide rooms and prices (needs the source documents read).
+- `A2UIRenderer` recommendation cards do not show rooms; the comparison table row does.
+
 ## 2026-10-09 - WED-177 confirmed vendor selection and directory seed (Codex)
 
 - Vendor comparison ticking is now pending-only. The explicit **Save selected vendors** action writes the existing contact-reference AFP messages, preserving the saved vendor set for unsent follow-up flows instead of writing on every click.
