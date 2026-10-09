@@ -534,4 +534,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Fourteen-day retention and server-side purge scheduling for owner photo removals",
         include_str!("../../postgres/migrations/0105_wedding_vendor_owner_photo_removal.sql"),
     ),
+    (
+        "0106_wedding_vendor_mackay_family_estate",
+        "Production seed for the searchable Mackay Family Estate directory record",
+        include_str!("../../postgres/migrations/0106_wedding_vendor_mackay_family_estate.sql"),
+    ),
 ];

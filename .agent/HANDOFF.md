@@ -1,5 +1,11 @@
 # Handoff
 
+## 2026-10-09 - WED-177 confirmed vendor selection and directory seed (Codex)
+
+- Vendor comparison ticking is now pending-only. The explicit **Save selected vendors** action writes the existing contact-reference AFP messages, preserving the saved vendor set for unsent follow-up flows instead of writing on every click.
+- Added migration `0106` and catalog registration to make `Mackay Family Estate` a production directory record, rather than relying on the unexecuted operator data-load file. A `Mackay` directory query now has a matching active, contactable source.
+- Verification: Solid typecheck, `cargo check`, focused vendor-search tests, and diff hygiene passed.
+
 ## 2026-10-09 - WED-169 vendor claim portal and WED-176 mobile polish (Codex)
 
 What changed:

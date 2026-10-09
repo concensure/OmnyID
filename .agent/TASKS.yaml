@@ -743,6 +743,22 @@ tasks:
       - vendor search copy no longer exposes the internal search-query/source wording; its submit action sits below the field
       - failed availability draft creation has a Retry draft action; overview tile hierarchy and automatic calendar taxonomy installation are implemented
 
+  - id: WED-177
+    title: Confirmed vendor comparison selection and Mackay directory result
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-161
+    depends_on:
+      - WED-176
+    files:
+      - solid-ui/src/components/WeddingArtifactDetailPanel.tsx
+      - postgres/migrations/0106_wedding_vendor_mackay_family_estate.sql
+      - src/db/migration_catalog.rs
+    acceptance:
+      - comparison rows allow one or more pending selections and deselections before saving
+      - one explicit save persists selected vendor contacts for unsent follow-up workflows
+      - a Mackay search returns Mackay Family Estate from the production directory
+
   - id: WED-170
     title: AFP wedding enquiry protocol and free couple enquiries
     status: ready

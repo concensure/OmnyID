@@ -168,22 +168,17 @@ function ArtifactPreviewCard(props: {
   function toggleOption(optionId: string): void {
     const next = toggleWeddingDecisionSelectionValue(props.artifact.artifactId, optionId);
     setSelectedOptionIds(next);
-    if (!next.includes(optionId)) return;
-    const option = decisionState().options.find((candidate) =>
-      candidate.id === optionId || candidate.alternateIds?.includes(optionId)
-    );
-    if (!option) return;
-    const optionLabel = option.label.trim().toLowerCase();
-    const contact = props.artifact.vendorComparisonCards.find((card) => {
-      const title = card.title.trim().toLowerCase();
-      return title === optionLabel || optionLabel.includes(title) || title.includes(optionLabel);
-    }) ?? null;
-    props.onVendorChoiceSelected?.({
-      artifact: props.artifact,
-      optionId: option.id,
-      optionLabel: option.label,
-      contact,
-    });
+  }
+
+  function saveSelectedVendors(): void {
+    for (const option of decisionState().options.filter((candidate) => effectiveSelectedOptionIds().includes(candidate.id))) {
+      const optionLabel = option.label.trim().toLowerCase();
+      const contact = props.artifact.vendorComparisonCards.find((card) => {
+        const title = card.title.trim().toLowerCase();
+        return title === optionLabel || optionLabel.includes(title) || title.includes(optionLabel);
+      }) ?? null;
+      props.onVendorChoiceSelected?.({ artifact: props.artifact, optionId: option.id, optionLabel: option.label, contact });
+    }
   }
 
   if (preview.kind === "email") {
@@ -584,10 +579,10 @@ function ArtifactPreviewCard(props: {
             <button
               type="button"
               disabled={!comparisonUi().footer.enabled}
-              onClick={() => props.onOpenFollowUpQueue?.()}
+              onClick={saveSelectedVendors}
               class="rounded-full bg-teal-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
             >
-              {comparisonUi().footer.actionLabel}
+              Save selected vendors
             </button>
           </div>
         </Show>
