@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unsubscribe — OmnyID Weddings</title>
+<meta name="description" content="Stop receiving the OmnyID Weddings newsletter.">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="assets/logo/omnyid-mark.png">
+<link rel="apple-touch-icon" href="assets/logo/omnyid-mark.png">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="index.html" class="logo" aria-label="OmnyID Weddings home">
+      <img class="logo-img" src="assets/logo/omnyid-logo.png" alt="" width="102" height="40">
+      <span>Weddings</span>
+    </a>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">✦ Newsletter</p>
+      <h1>Unsubscribe from the newsletter</h1>
+      <p id="unsubIntro">Confirm below and we'll stop emailing you new planning guides.</p>
+      <div class="unsub-actions">
+        <button class="btn btn-primary btn-lg" type="button" id="unsubButton">Unsubscribe</button>
+        <a class="btn btn-outline btn-lg" href="index.html">Keep me subscribed</a>
+      </div>
+      <p class="newsletter-status" id="unsubStatus" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var token = new URLSearchParams(window.location.search).get('token') || '';
+  var button = document.getElementById('unsubButton');
+  var status = document.getElementById('unsubStatus');
+  function show(message, kind) {
+    status.textContent = message;
+    status.className = 'newsletter-status' + (kind ? ' is-' + kind : '');
+  }
+  if (!token) {
+    button.disabled = true;
+    show('This page needs the unsubscribe link from one of our emails. Contact hello@omnyid.com if you need help.', 'error');
+    return;
+  }
+  button.addEventListener('click', function () {
+    button.disabled = true;
+    show('Unsubscribing…', '');
+    fetch('/wedding/newsletter/unsubscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token })
+    }).then(function (response) {
+      if (!response.ok) {
+        return response.text().then(function (text) { throw new Error(text || 'Something went wrong. Please try again.'); });
+      }
+      show("You're unsubscribed. You won't receive any more newsletters from us.", 'success');
+    }).catch(function (err) {
+      button.disabled = false;
+      show(err.message || 'Something went wrong. Please try again.', 'error');
+    });
+  });
+})();
+</script>
+</body>
+</html>

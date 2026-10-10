@@ -225,6 +225,16 @@
         import omnyid_proxy
     }
 
+    # Blog newsletter signup and one-click unsubscribe. Same reasoning as the
+    # waitlist route: must precede the static /wedding/* file-server block.
+    handle /wedding/newsletter {
+        import omnyid_proxy
+    }
+
+    handle /wedding/newsletter/* {
+        import omnyid_proxy
+    }
+
     # Free "Wedding Understanding" lead-magnet tool (analyses text/photos via
     # a vision model). Same reasoning as the waitlist route above: must be
     # handled before the static /wedding/* file-server block below.

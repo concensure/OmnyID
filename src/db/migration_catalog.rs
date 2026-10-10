@@ -539,4 +539,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Production seed for the searchable Mackay Family Estate directory record",
         include_str!("../../postgres/migrations/0106_wedding_vendor_mackay_family_estate.sql"),
     ),
+    (
+        "0107_wedding_newsletter_subscribers",
+        "Wedding blog newsletter subscribers with one-click unsubscribe tokens",
+        include_str!("../../postgres/migrations/0107_wedding_newsletter_subscribers.sql"),
+    ),
 ];

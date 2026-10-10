@@ -21,6 +21,7 @@ use ulid::Ulid;
 
 mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
+mod wedding_newsletter;
 mod wedding_onboarding_state;
 mod wedding_vendor_directory;
 pub mod wedding_vendor_evidence;

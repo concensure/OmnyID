@@ -21,6 +21,7 @@ import type { UsageOperatorProfitabilityPanelProps } from "@/components/UsageOpe
 import UsageAdminWeddingOpsPanel from "@/components/UsageAdminWeddingOpsPanel";
 import type { UsageAdminWeddingOpsPanelProps } from "@/components/UsageAdminWeddingOpsPanel";
 import UsageAdminWeddingVendorsPanel from "@/components/UsageAdminWeddingVendorsPanel";
+import UsageAdminWeddingNewsletterPanel from "@/components/UsageAdminWeddingNewsletterPanel";
 import UsageAdminWeddingWaitlistPanel from "@/components/UsageAdminWeddingWaitlistPanel";
 
 export type UsageOperatorSectionProps = {
@@ -139,6 +140,8 @@ export default function UsageOperatorSection(props: UsageOperatorSectionProps) {
       <UsageAdminWeddingVendorsPanel />
 
       <UsageAdminWeddingWaitlistPanel />
+
+      <UsageAdminWeddingNewsletterPanel />
 
       <UsageOperatorUserFilterForm
         queryDraft={props.userFilterForm.queryDraft}
