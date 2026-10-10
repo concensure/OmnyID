@@ -2,6 +2,8 @@
 (function () {
   'use strict';
 
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   /* ---------- header scroll state ---------- */
   var header = document.querySelector('.site-header');
   if (header) {
@@ -12,46 +14,32 @@
     window.addEventListener('scroll', onScroll, { passive: true });
   }
 
-  /* ---------- vendor entry point ---------- */
-  // Keep the vendor route separate from the couple sign-in bridge. It is injected
-  // into every shared wedding header so all marketing pages expose the same entry.
-  function vendorWorkspaceHref() {
-    var depth = window.location.pathname.indexOf('/wedding/blog/') !== -1 ? '../../' : '../';
-    return depth + 'workspace/?auth=signin&source=vendor_claim';
-  }
-  var vendorHref = vendorWorkspaceHref();
-  var headerActions = document.querySelector('.header-actions');
-  if (headerActions && !headerActions.querySelector('[data-vendor-login]')) {
-    var vendorButton = document.createElement('a');
-    vendorButton.className = 'btn btn-outline vendor-login';
-    vendorButton.href = vendorHref;
-    vendorButton.setAttribute('data-vendor-login', 'true');
-    vendorButton.textContent = 'Vendor login';
-    headerActions.insertBefore(vendorButton, headerActions.firstChild);
-  }
-  var headerNav = document.getElementById('navLinks');
-  if (headerNav && !headerNav.querySelector('[data-vendor-login]')) {
-    var vendorNavLink = document.createElement('a');
-    vendorNavLink.href = vendorHref;
-    vendorNavLink.setAttribute('data-vendor-login', 'true');
-    vendorNavLink.textContent = 'For vendors';
-    headerNav.appendChild(vendorNavLink);
-  }
-
   /* ---------- mobile nav toggle ---------- */
   var navToggle = document.getElementById('navToggle');
   var navLinks = document.getElementById('navLinks');
   if (navToggle && navLinks) {
-    navToggle.addEventListener('click', function () {
-      var open = navLinks.classList.toggle('is-open');
+    var setNav = function (open) {
+      navLinks.classList.toggle('is-open', open);
       navToggle.classList.toggle('is-open', open);
       navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    };
+    navToggle.addEventListener('click', function () {
+      setNav(!navLinks.classList.contains('is-open'));
     });
     navLinks.querySelectorAll('a').forEach(function (a) {
-      a.addEventListener('click', function () {
-        navLinks.classList.remove('is-open');
-        navToggle.classList.remove('is-open');
-      });
+      a.addEventListener('click', function () { setNav(false); });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && navLinks.classList.contains('is-open')) {
+        setNav(false);
+        navToggle.focus();
+      }
+    });
+    document.addEventListener('click', function (e) {
+      if (navLinks.classList.contains('is-open') && !navLinks.contains(e.target) && !navToggle.contains(e.target)) {
+        setNav(false);
+      }
     });
   }
 
@@ -90,7 +78,7 @@
     var suffix = el.getAttribute('data-suffix') || '';
     var prefix = el.getAttribute('data-prefix') || '';
     var decimals = el.getAttribute('data-decimals') ? parseInt(el.getAttribute('data-decimals'), 10) : 0;
-    var duration = 1400;
+    var duration = reduceMotion ? 0 : 1400;
     var start = null;
     function step(ts) {
       if (!start) start = ts;
@@ -162,10 +150,12 @@
         activate(order[idx]);
       }, 4200);
     }
-    tabRow.addEventListener('mouseenter', function () { clearInterval(autoTimer); });
-    tabRow.addEventListener('mouseleave', scheduleAuto);
-    tabRow.addEventListener('click', function () { idx = order.indexOf(document.querySelector('.tab-btn.is-active').getAttribute('data-tab')); });
-    scheduleAuto();
+    var previewShell = tabRow.closest('.preview-shell') || tabRow;
+    var stopAuto = function () { clearInterval(autoTimer); };
+    ['mouseenter', 'focusin', 'click', 'touchstart'].forEach(function (evt) {
+      previewShell.addEventListener(evt, stopAuto, { passive: true });
+    });
+    if (!reduceMotion) scheduleAuto();
   }
 
   /* ---------- testimonial carousel ---------- */
@@ -180,13 +170,15 @@
       tIdx = i;
     }
     dots.forEach(function (d, i) {
-      d.addEventListener('click', function () { showSlide(i); restartAuto(); });
+      d.addEventListener('click', function () { showSlide(i); clearInterval(testiTimer); });
     });
     var testiTimer;
     function restartAuto() {
       clearInterval(testiTimer);
+      if (reduceMotion) return;
       testiTimer = setInterval(function () { showSlide((tIdx + 1) % slides.length); }, 5500);
     }
+    testiWrap.addEventListener('focusin', function () { clearInterval(testiTimer); });
     if (slides.length) { showSlide(0); restartAuto(); }
   }
 
@@ -200,10 +192,12 @@
       item.closest('.faq-list').querySelectorAll('.faq-item').forEach(function (other) {
         other.classList.remove('is-open');
         other.querySelector('.faq-a').style.maxHeight = null;
+        other.querySelector('.faq-q').setAttribute('aria-expanded', 'false');
       });
       if (!isOpen) {
         item.classList.add('is-open');
         a.style.maxHeight = a.scrollHeight + 'px';
+        q.setAttribute('aria-expanded', 'true');
       }
     });
   });
@@ -238,19 +232,6 @@
           card.style.display = match ? '' : 'none';
         });
       });
-    });
-  }
-
-  /* ---------- newsletter form (front-end only, no backend) ---------- */
-  var newsletterForm = document.querySelector('.newsletter-form');
-  if (newsletterForm) {
-    newsletterForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var btn = newsletterForm.querySelector('button');
-      var original = btn.textContent;
-      btn.textContent = 'Subscribed ✓';
-      btn.disabled = true;
-      setTimeout(function () { btn.textContent = original; btn.disabled = false; newsletterForm.reset(); }, 2600);
     });
   }
 
@@ -365,130 +346,50 @@
     });
   }
 
-  /* ---------- waitlist: email capture -> popup for name + wedding date ---------- */
-  var waitlistEmailForm = document.getElementById('waitlistEmailForm');
-  var waitlistModal = document.getElementById('waitlistModal');
-  if (waitlistEmailForm && waitlistModal) {
-    var waitlistEmailInput = document.getElementById('waitlistEmail');
-    var waitlistEmailError = document.getElementById('waitlistEmailError');
-    var waitlistDetailsForm = document.getElementById('waitlistDetailsForm');
-    var waitlistDetailsStatus = document.getElementById('waitlistDetailsStatus');
-    var waitlistFormView = document.getElementById('waitlistFormView');
-    var waitlistSuccessView = document.getElementById('waitlistSuccessView');
-    var waitlistFirstName = document.getElementById('waitlistFirstName');
-    var waitlistLastName = document.getElementById('waitlistLastName');
-    var waitlistWeddingDate = document.getElementById('waitlistWeddingDate');
-    var lastWaitlistTrigger = null;
-    var confirmedEmail = '';
-
-    var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    function openWaitlistModal() {
-      lastWaitlistTrigger = document.activeElement;
-      waitlistModal.classList.add('is-open');
-      waitlistModal.setAttribute('aria-hidden', 'false');
-      document.body.classList.add('no-scroll');
-      setTimeout(function () {
-        if (waitlistFirstName) waitlistFirstName.focus({ preventScroll: true });
-      }, 0);
+  /* ---------- newsletter signup ---------- */
+  var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  document.querySelectorAll('[data-newsletter-form]').forEach(function (form) {
+    var input = form.querySelector('input[type="email"]');
+    var button = form.querySelector('button[type="submit"]');
+    var status = document.getElementById(input.getAttribute('aria-describedby'));
+    function show(message, kind) {
+      if (!status) return;
+      status.textContent = message;
+      status.className = 'newsletter-status' + (kind ? ' is-' + kind : '');
     }
-    function closeWaitlistModal() {
-      waitlistModal.classList.remove('is-open');
-      waitlistModal.setAttribute('aria-hidden', 'true');
-      document.body.classList.remove('no-scroll');
-      if (lastWaitlistTrigger && document.contains(lastWaitlistTrigger) && typeof lastWaitlistTrigger.focus === 'function') {
-        lastWaitlistTrigger.focus();
-      }
-    }
-    waitlistModal.querySelectorAll('[data-close-waitlist]').forEach(function (el) {
-      el.addEventListener('click', closeWaitlistModal);
-    });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && waitlistModal.classList.contains('is-open')) closeWaitlistModal();
-    });
-
-    waitlistEmailForm.addEventListener('submit', function (e) {
+    form.addEventListener('submit', function (e) {
       e.preventDefault();
-      var value = (waitlistEmailInput.value || '').trim();
-      var isValid = EMAIL_PATTERN.test(value);
-      waitlistEmailInput.setAttribute('aria-invalid', isValid ? 'false' : 'true');
-      if (waitlistEmailError) waitlistEmailError.classList.toggle('is-visible', !isValid);
-      if (!isValid) return;
-
-      confirmedEmail = value;
-      if (waitlistEmailError) waitlistEmailError.classList.remove('is-visible');
-
-      /* reset the popup to its form state each time it's reopened */
-      if (waitlistFormView) waitlistFormView.hidden = false;
-      if (waitlistSuccessView) waitlistSuccessView.hidden = true;
-      if (waitlistDetailsForm) {
-        waitlistDetailsForm.reset();
-        waitlistDetailsForm.querySelector('button[type="submit"]').disabled = false;
+      var email = (input.value || '').trim();
+      var valid = EMAIL_PATTERN.test(email);
+      input.setAttribute('aria-invalid', valid ? 'false' : 'true');
+      if (!valid) {
+        show('Please enter a valid email address.', 'error');
+        input.focus();
+        return;
       }
-      if (waitlistDetailsStatus) {
-        waitlistDetailsStatus.textContent = '';
-        waitlistDetailsStatus.className = 'waitlist-status';
-      }
-      openWaitlistModal();
-    });
-
-    if (waitlistDetailsForm) {
-      waitlistDetailsForm.addEventListener('submit', function (e) {
-        e.preventDefault();
-        var firstName = (waitlistFirstName.value || '').trim();
-        var lastName = (waitlistLastName.value || '').trim();
-        var weddingDate = (waitlistWeddingDate && waitlistWeddingDate.value) || '';
-
-        waitlistFirstName.setAttribute('aria-invalid', firstName ? 'false' : 'true');
-        waitlistLastName.setAttribute('aria-invalid', lastName ? 'false' : 'true');
-        if (!firstName || !lastName) {
-          if (waitlistDetailsStatus) {
-            waitlistDetailsStatus.textContent = 'Please add your first and last name.';
-            waitlistDetailsStatus.className = 'waitlist-status is-error';
-          }
-          return;
+      button.disabled = true;
+      show('Subscribing…', '');
+      fetch('/wedding/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, source: form.getAttribute('data-newsletter-source') || 'wedding_site' })
+      }).then(function (response) {
+        if (!response.ok) {
+          return response.text().then(function (text) {
+            throw new Error(text || 'Something went wrong. Please try again.');
+          });
         }
-
-        var submitBtn = waitlistDetailsForm.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        if (waitlistDetailsStatus) {
-          waitlistDetailsStatus.textContent = 'Submitting…';
-          waitlistDetailsStatus.className = 'waitlist-status';
-        }
-
-        fetch('/wedding/waitlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: confirmedEmail,
-            first_name: firstName,
-            last_name: lastName,
-            expected_wedding_date: weddingDate || null
-          })
-        }).then(function (response) {
-          if (!response.ok) {
-            return response.json().catch(function () { return {}; }).then(function (payload) {
-              throw new Error((payload && payload.error) || 'Something went wrong. Please try again.');
-            });
-          }
-          return response.json();
-        }).then(function () {
-          if (waitlistFormView) waitlistFormView.hidden = true;
-          if (waitlistSuccessView) waitlistSuccessView.hidden = false;
-          if (waitlistFirstName) {
-            var successFocus = waitlistSuccessView && waitlistSuccessView.querySelector('button');
-            if (successFocus) successFocus.focus({ preventScroll: true });
-          }
-        }).catch(function (err) {
-          submitBtn.disabled = false;
-          if (waitlistDetailsStatus) {
-            waitlistDetailsStatus.textContent = err.message || 'Something went wrong. Please try again.';
-            waitlistDetailsStatus.className = 'waitlist-status is-error';
-          }
-        });
+        return response.json();
+      }).then(function () {
+        form.reset();
+        show("Thanks, you're subscribed. We'll email you when we publish new planning guides.", 'success');
+      }).catch(function (err) {
+        show(err.message || 'Something went wrong. Please try again.', 'error');
+      }).then(function () {
+        button.disabled = false;
       });
-    }
-  }
+    });
+  });
 
   /* ---------- current year ---------- */
   document.querySelectorAll('[data-year]').forEach(function (el) {

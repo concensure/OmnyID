@@ -11,6 +11,7 @@ const docsJs = readFileSync(docsApp, 'utf8');
 const weddingJs = readFileSync(resolve(root, 'assets', 'js', 'main.js'), 'utf8');
 const expectedPages = [
   'blog.html',
+  'disclosures.html',
   'index.html',
   'pricing.html',
   'privacy.html',
@@ -102,6 +103,8 @@ function knownVirtualFragment(target, hash) {
   return normalize(target) === normalize(docsIndex) && (hash === 'login' || hash === 'auth');
 }
 
+// Pages that deliberately omit the site shell (no nav, sign-in modal or main.js).
+const standalonePages = new Set(['newsletter-unsubscribe.html']);
 const failures = [];
 const htmlByPath = new Map([[normalize(docsIndex), docsHtml]]);
 const pages = htmlFiles(root);
@@ -130,26 +133,28 @@ for (const file of pages) {
     failures.push(`${name}: missing responsive viewport meta tag`);
   }
 
-  if (!html.includes('id="navToggle"') || !html.includes('id="navLinks"')) {
-    failures.push(`${name}: missing mobile menu toggle/nav pair`);
-  }
-  if (!html.includes('id="signinModal"')) {
-    failures.push(`${name}: missing sign-in/register bridge modal`);
-  }
-  if (!/class=["']signin-panel["'][^>]*role=["']dialog["'][^>]*aria-modal=["']true["'][^>]*aria-labelledby=["']signinTitle["']/.test(html)) {
-    failures.push(`${name}: sign-in modal panel is not an accessible labelled dialog`);
-  }
-  if (!html.includes('id="signinTitle"')) {
-    failures.push(`${name}: sign-in modal title target is missing`);
-  }
-  if (!/class=["']signin-overlay["'][^>]*data-close-signin/.test(html)) {
-    failures.push(`${name}: sign-in modal overlay is not wired to close`);
-  }
-  if (!html.includes('data-close-signin')) {
-    failures.push(`${name}: sign-in modal has no close control`);
-  }
-  if (!html.includes('assets/js/main.js') && !html.includes('../assets/js/main.js')) {
-    failures.push(`${name}: missing wedding interaction script`);
+  if (!standalonePages.has(name)) {
+    if (!html.includes('id="navToggle"') || !html.includes('id="navLinks"')) {
+      failures.push(`${name}: missing mobile menu toggle/nav pair`);
+    }
+    if (!html.includes('id="signinModal"')) {
+      failures.push(`${name}: missing sign-in/register bridge modal`);
+    }
+    if (!/class=["']signin-panel["'][^>]*role=["']dialog["'][^>]*aria-modal=["']true["'][^>]*aria-labelledby=["']signinTitle["']/.test(html)) {
+      failures.push(`${name}: sign-in modal panel is not an accessible labelled dialog`);
+    }
+    if (!html.includes('id="signinTitle"')) {
+      failures.push(`${name}: sign-in modal title target is missing`);
+    }
+    if (!/class=["']signin-overlay["'][^>]*data-close-signin/.test(html)) {
+      failures.push(`${name}: sign-in modal overlay is not wired to close`);
+    }
+    if (!html.includes('data-close-signin')) {
+      failures.push(`${name}: sign-in modal has no close control`);
+    }
+    if (!html.includes('assets/js/main.js') && !html.includes('../assets/js/main.js')) {
+      failures.push(`${name}: missing wedding interaction script`);
+    }
   }
   if (/href="#"/.test(html)) {
     failures.push(`${name}: contains dead href="#" link`);
@@ -169,7 +174,7 @@ for (const file of pages) {
   if (/use your Agent ID/.test(html) && !/auth=agent-id[^"']*/.test(html)) {
     failures.push(`${name}: Agent ID fallback link is missing`);
   }
-  if (!/data-open-signin/.test(html)) {
+  if (!standalonePages.has(name) && !/data-open-signin/.test(html)) {
     failures.push(`${name}: no account CTA opens the sign-in bridge`);
   }
 
@@ -183,7 +188,8 @@ for (const file of pages) {
 
   for (const match of html.matchAll(/<img\b([^>]*)>/gi)) {
     const imageAttrs = tagAttrs(match[1]);
-    if (imageAttrs.alt === undefined || imageAttrs.alt.trim() === '') {
+    const decorativeLogo = imageAttrs.alt === '' && /\blogo-img\b/.test(imageAttrs.class ?? '');
+    if (imageAttrs.alt === undefined || (imageAttrs.alt.trim() === '' && !decorativeLogo)) {
       failures.push(`${name}: image missing alt text`);
     }
   }
@@ -265,9 +271,59 @@ if (!photoLicence || !photoLicence.includes('Vendor Image Licence Agreement')) {
 if (!photoLicence.includes('I confirm that I have read and agree to the Vendor Image Licence Agreement')) {
   failures.push('vendor-image-licence.html: required vendor photo consent wording is missing');
 }
-if (!weddingJs.includes('source=vendor_claim') || !weddingJs.includes('data-vendor-login')) {
-  failures.push('main.js: Vendor Login does not route separately to the vendor-claim flow');
+
+for (const file of pages) {
+  const name = relative(root, file).replaceAll('\\', '/');
+  if (standalonePages.has(name)) continue;
+  const html = htmlByPath.get(normalize(file));
+  const header = html.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '';
+  const footer = html.match(/<footer[\s\S]*?<\/footer>/)?.[0] ?? '';
+  for (const banned of ['Privacy', 'How it works', 'For vendors', 'Vendor login', 'Vendor sign in', 'Start planning']) {
+    if (header.includes(banned)) failures.push(`${name}: header must not contain "${banned}"`);
+  }
+  if (!/<a [^>]*class="btn btn-primary"[^>]*data-signin-mode="signin">Sign in<\/a>/.test(header)) {
+    failures.push(`${name}: header Sign in must use the primary button style`);
+  }
+  if (!/href="(?:\.\.\/)+workspace\/\?auth=signin&amp;source=vendor_claim"[^>]*data-vendor-login>Vendor login<\/a>/.test(footer)) {
+    failures.push(`${name}: footer must link Vendor login to the vendor-claim flow`);
+  }
+  if (!/assets\/logo\/omnyid-logo\.png/.test(header) || /class="mark"/.test(html)) {
+    failures.push(`${name}: header must use the supplied OmnyID logo, not the retired heart mark`);
+  }
 }
+for (const asset of ['omnyid-logo.png', 'omnyid-mark.png']) {
+  if (!existsSync(resolve(root, 'assets', 'logo', asset))) failures.push(`assets/logo/${asset} is missing`);
+}
+if (/vendor entry point|For vendors/.test(weddingJs)) {
+  failures.push('main.js: header vendor-login injection must stay removed');
+}
+
+const disclosures = htmlByPath.get(normalize(resolve(root, 'disclosures.html'))) ?? '';
+for (const required of ['Vendor commission', 'Advertisement', 'Sponsored', 'best fit']) {
+  if (!disclosures.includes(required)) failures.push(`disclosures.html: missing required disclosure wording "${required}"`);
+}
+for (const retired of ['Revenue is your subscription', 'No vendor commissions', 'No advertising, no sponsored placement']) {
+  if (disclosures.includes(retired)) failures.push(`disclosures.html: retired claim remains: "${retired}"`);
+}
+const pricing = htmlByPath.get(normalize(resolve(root, 'pricing.html'))) ?? '';
+if (!pricing.includes('$39 <small>AUD / one-off</small>')) failures.push('pricing.html: Couple\'s Plan must be $39 AUD / one-off');
+if (pricing.includes('Full Autonomy') || pricing.includes('$69')) failures.push('pricing.html: Full Autonomy plan must be removed');
+if (pricing.includes('Up to 3 saved vendor comparisons')) failures.push('pricing.html: free plan must not cap vendor comparisons');
+if (!pricing.includes('Email drafting &amp; approval, up to a monthly limit')) failures.push('pricing.html: free plan must include limited email drafting');
+if (/AUD \/ month<\/small><\/div>\s*<a[^>]*>Start your plan/.test(pricing)) failures.push('pricing.html: Couple\'s Plan must not be monthly');
+
+if (!weddingHome.includes('<p>Subscribe to our newsletter</p>') || !/<button class="btn btn-primary" type="submit">Subscribe<\/button>/.test(weddingHome)) {
+  failures.push('index.html: newsletter prompt and Subscribe button are required');
+}
+if (/waitlist/i.test(weddingHome)) failures.push('index.html: waitlist wording must be removed');
+const howIdx = weddingHome.indexOf('id="how-it-works"');
+const flowIdx = weddingHome.indexOf('id="vendor-flow"');
+const previewIdx = weddingHome.indexOf('id="preview"');
+if (!(howIdx > -1 && flowIdx > howIdx && previewIdx > flowIdx)) {
+  failures.push('index.html: vendor response flow section must sit between How it works and Inside your workspace');
+}
+if (!existsSync(resolve(root, 'assets', 'images', 'vendor-reply-flow.png'))) failures.push('assets/images/vendor-reply-flow.png is missing');
+if (!weddingJs.includes('/wedding/newsletter')) failures.push('main.js: newsletter form is not wired to the subscribe endpoint');
 
 if (failures.length) {
   console.error('Wedding website smoke test failed:');

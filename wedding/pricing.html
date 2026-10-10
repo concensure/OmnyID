@@ -4,47 +4,43 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pricing — OmnyID Weddings</title>
-<meta name="description" content="Simple, honest pricing. Free to get organised, $39 AUD for both partners on the complete proactive Wedding Planner, $69 AUD for higher autonomy, and $300 AUD for wedding planners and studios.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23C17B87'/%3E%3Cpath d='M16 23s-8-4.7-8-10.4C8 9 10.7 7 13.4 7c1.6 0 3 .8 3.9 2 .8-1.2 2.3-2 3.9-2C23.9 7 26 9.5 26 12.6 26 18.3 16 23 16 23z' fill='%23fff'/%3E%3C/svg%3E">
+<meta name="description" content="Simple, honest pricing. Free to get organised, a one-off $39 AUD for both partners on the complete proactive Wedding Planner, and $300 AUD a month per seat for wedding planners and studios.">
+<link rel="icon" type="image/png" href="assets/logo/omnyid-mark.png">
+<link rel="apple-touch-icon" href="assets/logo/omnyid-mark.png">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to main content</a>
 
 <header class="site-header">
   <div class="container header-inner">
-    <a href="index.html" class="logo">
-      <svg class="mark" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="17" cy="17" r="17" fill="#C17B87"/>
-        <path d="M17 24s-8-4.7-8-10.4C9 10 11.7 8 14.4 8c1.6 0 3 .8 3.9 2 .8-1.2 2.3-2 3.9-2C24.9 8 27 10.5 27 13.6 27 19.3 17 24 17 24z" fill="#fff"/>
-      </svg>
-      OmnyID <span>Weddings</span>
+    <a href="index.html" class="logo" aria-label="OmnyID Weddings home">
+      <img class="logo-img" src="assets/logo/omnyid-logo.png" alt="" width="102" height="40">
+      <span>Weddings</span>
     </a>
-    <nav class="nav-links" id="navLinks">
+    <nav class="nav-links" id="navLinks" aria-label="Main">
       <a href="index.html">Home</a>
-      <a href="index.html#how-it-works">How it works</a>
       <a href="user-guide.html">User guide</a>
-      <a href="pricing.html" class="active">Pricing</a>
+      <a href="pricing.html" class="active" aria-current="page">Pricing</a>
       <a href="blog.html">Blog</a>
-      <a href="privacy.html">Privacy</a>
       <a href="disclosures.html">Disclosures</a>
     </nav>
     <div class="header-actions">
-      <a href="../workspace/?auth=signin&amp;source=wedding" class="btn btn-ghost" data-open-signin data-signin-mode="signin">Sign in</a>
-      <a href="../workspace/?auth=register&amp;source=wedding" class="btn btn-primary" data-open-signin data-signin-mode="register">Start planning free</a>
+      <a href="../workspace/?auth=signin&amp;source=wedding" class="btn btn-primary" data-open-signin data-signin-mode="signin">Sign in</a>
     </div>
-    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
+    <button class="nav-toggle" id="navToggle" type="button" aria-label="Open menu" aria-controls="navLinks" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
   </div>
 </header>
 
-<main>
+<main id="main">
 
   <section class="page-hero">
     <div class="container">
       <p class="eyebrow">✦ Pricing</p>
       <h1>Simple pricing, no surprise fees</h1>
-      <p>Start free and see if it fits. Upgrade only when you're ready for full end-to-end planning — cancel or downgrade any time.</p>
+      <p>Start free and see if it fits. Upgrade with a single one-off payment when you're ready for full end-to-end planning. No subscription to cancel.</p>
     </div>
   </section>
 
@@ -58,13 +54,14 @@
           <div class="price-amount">$0 <small>/ forever</small></div>
           <a class="btn btn-outline btn-block" href="../workspace/?auth=register&amp;source=wedding" data-open-signin data-signin-mode="register">Start for free</a>
           <ul class="price-features">
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> One active wedding plan</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Budget tracker &amp; guest list</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Timeline with key deadlines</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Up to 3 saved vendor comparisons</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Calendar reminders</li>
-            <li class="muted"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Email drafting &amp; approval</li>
-            <li class="muted"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Maps &amp; vendor research</li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>One active wedding plan</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Budget tracker &amp; guest list</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Timeline with key deadlines</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Vendor comparisons</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Maps &amp; vendor research</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Calendar reminders</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Email drafting &amp; approval, up to a monthly limit</span></li>
+            <li class="muted"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg> <span><span class="sr-only">Not included: </span>Full response workspace, scoped sharing &amp; exports</span></li>
           </ul>
         </div>
 
@@ -72,31 +69,15 @@
           <span class="price-badge">Most couples choose this</span>
           <h3>Couple's Plan</h3>
           <p class="price-tagline">Both partners included — the complete, proactive Wedding Planner</p>
-          <div class="price-amount">$39 <small>AUD / month</small></div>
-          <a class="btn btn-primary btn-block" href="../workspace/?auth=register&amp;source=wedding" data-open-signin data-signin-mode="register" style="background:var(--rose);">Start your plan</a>
+          <div class="price-amount">$39 <small>AUD / one-off</small></div>
+          <a class="btn btn-primary btn-block" href="../workspace/?auth=register&amp;source=wedding" data-open-signin data-signin-mode="register" >Start your plan</a>
           <ul class="price-features">
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Everything in Free</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Both partners on one shared plan, at no extra cost</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Proactive next-step guidance as your plan progresses — never a blank checklist</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Unlimited vendor shortlists with fit &amp; source</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Email drafts with one-click approval, map &amp; location cards</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Australian NOIM &amp; legal-timing reminders</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Full response workspace, scoped sharing &amp; exports</li>
-          </ul>
-        </div>
-
-        <div class="price-card">
-          <h3>Full Autonomy</h3>
-          <p class="price-tagline">Higher autonomy, more communications, more room to plan bigger</p>
-          <div class="price-amount">$69 <small>AUD / month</small></div>
-          <a class="btn btn-primary btn-block" href="../workspace/?auth=register&amp;source=wedding" data-open-signin data-signin-mode="register">Start your plan</a>
-          <ul class="price-features">
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Everything in Couple's Plan</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Higher autonomy — more research &amp; drafting handled before it needs your review</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Multiple connected email accounts, with more drafts per month</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Expanded storage for contracts, invoices, mood boards &amp; photos</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Larger guest lists with advanced seating optimisation</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Priority response times &amp; support</li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Everything in Free</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Both partners on one shared plan, at no extra cost</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Proactive next-step guidance as your plan progresses, never a blank checklist</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Email drafting &amp; approval without the free-plan monthly limit</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Australian NOIM &amp; legal-timing reminders</span></li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> <span>Full response workspace, scoped sharing &amp; exports</span></li>
           </ul>
         </div>
 
@@ -106,12 +87,12 @@
           <div class="price-amount">$300 <small>AUD / month, per seat</small></div>
           <a class="btn btn-outline btn-block" href="mailto:hello@omnyid.com">Talk to us</a>
           <ul class="price-features">
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Everything in Full Autonomy</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Unlimited client wedding plans</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Shared vendor library across clients</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Client-facing, white-label exports</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Scoped vendor access, never full client data</li>
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Priority onboarding &amp; support</li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Everything in Couple's Plan</li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Unlimited client wedding plans</li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Shared vendor library across clients</li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Client-facing, white-label exports</li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Scoped vendor access, never full client data</li>
+            <li><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Priority onboarding &amp; support</li>
           </ul>
         </div>
 
@@ -162,28 +143,32 @@
         <h2>Good to know</h2>
       </div>
       <div class="faq-list reveal">
-        <div class="faq-item is-open">
-          <button class="faq-q">Is my data really never sold?<span class="plus">+</span></button>
-          <div class="faq-a" style="max-height:200px;"><div class="faq-a-inner">Yes. On every plan, including Free, your wedding data is never sold, rented or transferred to third parties for marketing or advertising. Sharing only ever happens when you explicitly choose to share a specific plan, artifact, or draft. Read the full details on our <a href="privacy.html">privacy page</a>.</div></div>
+        <div class="faq-item">
+          <button class="faq-q" type="button" aria-expanded="false">Is my data really never sold?<span class="plus" aria-hidden="true">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Yes. On every plan, including Free, your wedding data is never sold, rented or transferred to third parties for marketing or advertising. Sharing only ever happens when you explicitly choose to share a specific plan, artifact, or draft. Read the full details on our <a href="privacy.html">privacy page</a>.</div></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">What happens to my plan after the wedding?<span class="plus">+</span></button>
+          <button class="faq-q" type="button" aria-expanded="false">How does OmnyID make money if the Free plan costs nothing?<span class="plus" aria-hidden="true">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">From the one-off Couple's Plan, from commission that a vendor may pay us when you book them through OmnyID, and from advertising and sponsored placements that are always labelled as such. None of these decides which vendors we recommend to you. Those are based on what we know about you and what you have told us you want. Read the full <a href="disclosures.html">disclosures</a>.</div></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q" type="button" aria-expanded="false">What happens to my plan after the wedding?<span class="plus" aria-hidden="true">+</span></button>
           <div class="faq-a"><div class="faq-a-inner">Your workspace stays exactly as it is — searchable and exportable — so you can revisit vendor contacts, budgets and decisions whenever you like. Nothing is deleted automatically.</div></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">Can I switch between plans, or upgrade later?<span class="plus">+</span></button>
-          <div class="faq-a"><div class="faq-a-inner">Yes. You can move between Free, Couple's Plan and Full Autonomy at any time from your account settings. Downgrading keeps your existing data intact, though newer features stay locked until you upgrade again.</div></div>
+          <button class="faq-q" type="button" aria-expanded="false">Can I upgrade later?<span class="plus" aria-hidden="true">+</span></button>
+          <div class="faq-a"><div class="faq-a-inner">Yes. You can start on Free and buy the Couple's Plan at any time. It is a one-off payment, so there is no subscription to cancel. Your plan and data are the same on both.</div></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">Do you support diverse traditions, cultures and family structures?<span class="plus">+</span></button>
+          <button class="faq-q" type="button" aria-expanded="false">Do you support diverse traditions, cultures and family structures?<span class="plus" aria-hidden="true">+</span></button>
           <div class="faq-a"><div class="faq-a-inner">Yes. We only ask about cultural, religious, accessibility or family considerations when it materially changes a recommendation — for example, ceremony structure, catering, or seating — and we never assume based on names, locations or weak signals.</div></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">Can vendors see our budget or guest list?<span class="plus">+</span></button>
+          <button class="faq-q" type="button" aria-expanded="false">Can vendors see our budget or guest list?<span class="plus" aria-hidden="true">+</span></button>
           <div class="faq-a"><div class="faq-a-inner">No. Vendor access is always scoped to what you approve — typically a single draft email or a run sheet excerpt. Your full budget, guest list, and family notes are never exposed to vendors by default.</div></div>
         </div>
         <div class="faq-item">
-          <button class="faq-q">Is the Companies plan right for a solo celebrant or small studio?<span class="plus">+</span></button>
+          <button class="faq-q" type="button" aria-expanded="false">Is the Companies plan right for a solo celebrant or small studio?<span class="plus" aria-hidden="true">+</span></button>
           <div class="faq-a"><div class="faq-a-inner">Yes — it's priced per seat, so a solo planner pays for one seat while larger studios add seats as their team grows. <a href="mailto:hello@omnyid.com">Get in touch</a> and we'll help you size it correctly.</div></div>
         </div>
       </div>
@@ -209,18 +194,16 @@
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <a href="index.html" class="logo">
-          <svg class="mark" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="17" cy="17" r="17" fill="#C17B87"/>
-            <path d="M17 24s-8-4.7-8-10.4C9 10 11.7 8 14.4 8c1.6 0 3 .8 3.9 2 .8-1.2 2.3-2 3.9-2C24.9 8 27 10.5 27 13.6 27 19.3 17 24 17 24z" fill="#fff"/>
-          </svg>
-          OmnyID <span>Weddings</span>
+        <a href="index.html" class="logo" aria-label="OmnyID Weddings home">
+          <img class="logo-img" src="assets/logo/omnyid-logo.png" alt="" width="102" height="40">
+          <span>Weddings</span>
         </a>
-        <p>A private planning workspace for couples — part of the OmnyID personal agent. Your day, organised, remembered, and never for sale.</p>
+        <p>A private planning workspace for couples — part of the OmnyID personal agent. Your day, organised and remembered, with your data never for sale.</p>
       </div>
       <div class="footer-col">
         <h4>Product</h4>
         <a href="index.html#how-it-works">How it works</a>
+        <a href="index.html#vendor-flow">Vendor replies</a>
         <a href="index.html#preview">Workspace preview</a>
         <a href="pricing.html">Pricing</a>
       </div>
@@ -235,14 +218,11 @@
         <h4>Company</h4>
         <a href="../docs/index.html">About OmnyID</a>
         <a href="mailto:hello@omnyid.com">Contact</a>
+        <a href="../workspace/?auth=signin&amp;source=vendor_claim" data-vendor-login>Vendor login</a>
       </div>
     </div>
     <div class="footer-bottom">
       <span>© <span data-year></span> OmnyID. All rights reserved.</span>
-      <div class="footer-social">
-        <a href="mailto:hello@omnyid.com?subject=OmnyID%20Weddings%20Instagram" aria-label="Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg></a>
-        <a href="mailto:hello@omnyid.com?subject=OmnyID%20Weddings%20Pinterest" aria-label="Pinterest"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 16c1-2 1.5-4 1.5-6a2.5 2.5 0 015 0c0 1.5-1 3-2.5 3"/></svg></a>
-      </div>
     </div>
   </div>
 </footer>

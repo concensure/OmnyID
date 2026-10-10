@@ -5,40 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmnyID Weddings — Plan your wedding end to end, without the overwhelm</title>
 <meta name="description" content="A calm, private planning workspace for couples. Budget, vendors, timeline, guest list and every decision — organised in one place, remembered for good.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23C17B87'/%3E%3Cpath d='M16 23s-8-4.7-8-10.4C8 9 10.7 7 13.4 7c1.6 0 3 .8 3.9 2 .8-1.2 2.3-2 3.9-2C23.9 7 26 9.5 26 12.6 26 18.3 16 23 16 23z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="assets/logo/omnyid-mark.png">
+<link rel="apple-touch-icon" href="assets/logo/omnyid-mark.png">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to main content</a>
 
 <header class="site-header">
   <div class="container header-inner">
-    <a href="index.html" class="logo">
-      <svg class="mark" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="17" cy="17" r="17" fill="#C17B87"/>
-        <path d="M17 24s-8-4.7-8-10.4C9 10 11.7 8 14.4 8c1.6 0 3 .8 3.9 2 .8-1.2 2.3-2 3.9-2C24.9 8 27 10.5 27 13.6 27 19.3 17 24 17 24z" fill="#fff"/>
-      </svg>
-      OmnyID <span>Weddings</span>
+    <a href="index.html" class="logo" aria-label="OmnyID Weddings home">
+      <img class="logo-img" src="assets/logo/omnyid-logo.png" alt="" width="102" height="40">
+      <span>Weddings</span>
     </a>
-    <nav class="nav-links" id="navLinks">
-      <a href="index.html" class="active">Home</a>
-      <a href="index.html#how-it-works">How it works</a>
+    <nav class="nav-links" id="navLinks" aria-label="Main">
+      <a href="index.html" class="active" aria-current="page">Home</a>
       <a href="user-guide.html">User guide</a>
       <a href="pricing.html">Pricing</a>
       <a href="blog.html">Blog</a>
-      <a href="privacy.html">Privacy</a>
       <a href="disclosures.html">Disclosures</a>
     </nav>
     <div class="header-actions">
-      <a href="../workspace/?auth=signin&amp;source=wedding" class="btn btn-ghost">Sign in</a>
-      <a href="../workspace/?auth=register&amp;source=wedding" class="btn btn-primary">Start planning free</a>
+      <a href="../workspace/?auth=signin&amp;source=wedding" class="btn btn-primary" data-open-signin data-signin-mode="signin">Sign in</a>
     </div>
-    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
+    <button class="nav-toggle" id="navToggle" type="button" aria-label="Open menu" aria-controls="navLinks" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
   </div>
 </header>
 
-<main>
+<main id="main">
 
   <!-- ============ HERO ============ -->
   <section class="hero">
@@ -115,6 +111,42 @@
           <h3>Everything, remembered</h3>
           <p>Vendors, quotes, dates and preferences stay linked and searchable — so replanning after a change takes minutes, not evenings.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VENDOR RESPONSE FLOW ============ -->
+  <section id="vendor-flow" aria-labelledby="vendorFlowTitle">
+    <div class="container">
+      <div class="flow-layout">
+        <div class="flow-copy reveal">
+          <p class="eyebrow">✦ When a vendor replies</p>
+          <h2 id="vendorFlowTitle">Vendor replies land in one place, with a reply ready for you to approve.</h2>
+          <p class="flow-lede">You don't have to dig through an inbox to find the quote, work out what it means for your budget, and then write back. OmnyID brings the reply to you as one decision, and drafts your answer. You stay in charge of what gets sent.</p>
+          <ol class="flow-steps">
+            <li>
+              <span class="flow-num" aria-hidden="true">1</span>
+              <div><h3>The vendor replies</h3><p>Their quote arrives in the same thread as your enquiry. OmnyID pulls out the total, what's included and how long it's valid. If a quote is an attachment it can't read, it tells you rather than guessing.</p></div>
+            </li>
+            <li>
+              <span class="flow-num" aria-hidden="true">2</span>
+              <div><h3>See what it means for your plan</h3><p>The quote is set against your budget, and anything over is flagged. You get a suggested next step with the reasons behind it, based on what you've told us matters to you.</p></div>
+            </li>
+            <li>
+              <span class="flow-num" aria-hidden="true">3</span>
+              <div><h3>Review the drafted reply</h3><p>A reply is drafted for you to edit or send as it is. Before it can go, you approve the wording and confirm any budget impact.</p></div>
+            </li>
+            <li>
+              <span class="flow-num" aria-hidden="true">4</span>
+              <div><h3>Send, with a moment to undo</h3><p>Nothing sends until you approve it. Once sent, there's a short window to undo, and the quote, reply and decision stay linked in your plan.</p></div>
+            </li>
+          </ol>
+          <p class="flow-note">Suggestions are based on you, not on who pays us. <a href="disclosures.html">See how OmnyID earns money</a>.</p>
+        </div>
+        <figure class="flow-shot reveal">
+          <img src="assets/images/vendor-reply-flow.png" width="840" height="2434" loading="lazy" alt="OmnyID quote reply screen with demo data. It says Needs your decision: Chloe's Florals quote reply, $799, which is $200 over the floral budget. It shows a recommendation to ask for trade-offs, the reasons behind it, a quote summary with total, valid-until date and vendor, a budget-impact confirmation, and buttons to see the quote and review the reply.">
+          <figcaption>The vendor reply screen in OmnyID, shown with demo data. Chloe's Florals is a fictional vendor.</figcaption>
+        </figure>
       </div>
     </div>
   </section>
@@ -454,20 +486,23 @@
     </div>
   </section>
 
-  <!-- ============ WAITLIST ============ -->
-  <section>
+  <!-- ============ NEWSLETTER ============ -->
+  <section aria-labelledby="newsletterTitle">
     <div class="container">
       <div class="newsletter-band reveal">
         <div>
-          <h3>Know someone about to get married?</h3>
-          <p>Join the waitlist — we'll reach out as new planning tools and vendor cities open up.</p>
+          <h3 id="newsletterTitle">Know someone about to get married?</h3>
+          <p>Subscribe to our newsletter</p>
         </div>
-        <form class="waitlist-form" id="waitlistEmailForm" novalidate>
-          <input type="email" required placeholder="you@example.com" aria-label="Email address" id="waitlistEmail">
-          <button class="btn btn-primary" type="submit">Join waitlist</button>
-        </form>
+        <div class="newsletter-action">
+          <form class="newsletter-form" data-newsletter-form data-newsletter-source="home" novalidate>
+            <label class="sr-only" for="newsletterEmail">Email address</label>
+            <input type="email" id="newsletterEmail" name="email" required autocomplete="email" placeholder="you@example.com" aria-describedby="newsletterStatus">
+            <button class="btn btn-primary" type="submit">Subscribe</button>
+          </form>
+          <p class="newsletter-status" id="newsletterStatus" role="status" aria-live="polite"></p>
+        </div>
       </div>
-      <p class="waitlist-error" id="waitlistEmailError" role="alert">Please enter a valid email address.</p>
     </div>
   </section>
 
@@ -477,18 +512,16 @@
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <a href="index.html" class="logo">
-          <svg class="mark" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="17" cy="17" r="17" fill="#C17B87"/>
-            <path d="M17 24s-8-4.7-8-10.4C9 10 11.7 8 14.4 8c1.6 0 3 .8 3.9 2 .8-1.2 2.3-2 3.9-2C24.9 8 27 10.5 27 13.6 27 19.3 17 24 17 24z" fill="#fff"/>
-          </svg>
-          OmnyID <span>Weddings</span>
+        <a href="index.html" class="logo" aria-label="OmnyID Weddings home">
+          <img class="logo-img" src="assets/logo/omnyid-logo.png" alt="" width="102" height="40">
+          <span>Weddings</span>
         </a>
-        <p>A private planning workspace for couples — part of the OmnyID personal agent. Your day, organised, remembered, and never for sale.</p>
+        <p>A private planning workspace for couples — part of the OmnyID personal agent. Your day, organised and remembered, with your data never for sale.</p>
       </div>
       <div class="footer-col">
         <h4>Product</h4>
         <a href="index.html#how-it-works">How it works</a>
+        <a href="index.html#vendor-flow">Vendor replies</a>
         <a href="index.html#preview">Workspace preview</a>
         <a href="pricing.html">Pricing</a>
       </div>
@@ -503,14 +536,11 @@
         <h4>Company</h4>
         <a href="../docs/index.html">About OmnyID</a>
         <a href="mailto:hello@omnyid.com">Contact</a>
+        <a href="../workspace/?auth=signin&amp;source=vendor_claim" data-vendor-login>Vendor login</a>
       </div>
     </div>
     <div class="footer-bottom">
       <span>© <span data-year></span> OmnyID. All rights reserved.</span>
-      <div class="footer-social">
-        <a href="mailto:hello@omnyid.com?subject=OmnyID%20Weddings%20Instagram" aria-label="Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg></a>
-        <a href="mailto:hello@omnyid.com?subject=OmnyID%20Weddings%20Pinterest" aria-label="Pinterest"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 16c1-2 1.5-4 1.5-6a2.5 2.5 0 015 0c0 1.5-1 3-2.5 3"/></svg></a>
-      </div>
     </div>
   </div>
 </footer>
@@ -535,42 +565,6 @@
       </div>
     </div>
     <p class="signin-foot">You can also continue with Google on the next page, or <a href="../workspace/?auth=agent-id&amp;source=wedding" data-agent-id-link>use your Agent ID</a>. Not ready yet? <button type="button" class="link-btn" data-close-signin>Keep browsing</button></p>
-  </div>
-</div>
-
-<div class="signin-modal" id="waitlistModal" aria-hidden="true">
-  <div class="signin-overlay" data-close-waitlist></div>
-  <div class="signin-panel waitlist-panel" role="dialog" aria-modal="true" aria-labelledby="waitlistTitle">
-    <button class="signin-close" type="button" data-close-waitlist aria-label="Close">&times;</button>
-    <div id="waitlistFormView">
-      <p class="eyebrow">✦ Almost there</p>
-      <h2 id="waitlistTitle">A couple of details</h2>
-      <p class="signin-lede">So we can let you know when planning tools open up near you.</p>
-      <form id="waitlistDetailsForm" novalidate>
-        <div class="waitlist-row">
-          <div class="waitlist-field">
-            <label for="waitlistFirstName">First name</label>
-            <input type="text" id="waitlistFirstName" name="firstName" autocomplete="given-name" required>
-          </div>
-          <div class="waitlist-field">
-            <label for="waitlistLastName">Last name</label>
-            <input type="text" id="waitlistLastName" name="lastName" autocomplete="family-name" required>
-          </div>
-        </div>
-        <div class="waitlist-field">
-          <label for="waitlistWeddingDate">Expected wedding date (optional)</label>
-          <input type="date" id="waitlistWeddingDate" name="weddingDate">
-        </div>
-        <button class="btn btn-primary waitlist-submit" type="submit">Join the waitlist</button>
-        <p class="waitlist-status" id="waitlistDetailsStatus" role="status"></p>
-      </form>
-    </div>
-    <div id="waitlistSuccessView" class="waitlist-success" hidden>
-      <p class="eyebrow">✦ You're on the list</p>
-      <h2>Thanks — we'll be in touch.</h2>
-      <p>We'll email you as soon as there's news for your area.</p>
-      <button type="button" class="btn btn-outline" data-close-waitlist>Keep browsing</button>
-    </div>
   </div>
 </div>
 

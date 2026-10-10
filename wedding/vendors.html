@@ -5,21 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Wedding vendors in Sydney | OmnyID Weddings</title>
 <meta name="description" content="Find a wedding vendor, claim your business profile, and prepare to receive secure agent-to-agent enquiries through OmnyID.">
+<link rel="icon" type="image/png" href="assets/logo/omnyid-mark.png">
+<link rel="apple-touch-icon" href="assets/logo/omnyid-mark.png">
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/css/directory.css">
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to main content</a>
 <header class="site-header">
   <div class="container header-inner">
-    <a href="index.html" class="logo" aria-label="OmnyID Weddings home">OmnyID <span>Weddings</span></a>
-    <nav class="nav-links" id="navLinks" aria-label="Wedding navigation">
-      <a href="index.html">Home</a><a href="user-guide.html">User guide</a><a href="pricing.html">Pricing</a><a href="blog.html">Blog</a>
+    <a href="index.html" class="logo" aria-label="OmnyID Weddings home">
+      <img class="logo-img" src="assets/logo/omnyid-logo.png" alt="" width="102" height="40">
+      <span>Weddings</span>
+    </a>
+    <nav class="nav-links" id="navLinks" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="user-guide.html">User guide</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="blog.html">Blog</a>
+      <a href="disclosures.html">Disclosures</a>
     </nav>
-    <div class="header-actions"><a href="../workspace/vendor.html?source=vendor_claim" class="btn btn-ghost">Vendor sign in</a><a href="../workspace/?auth=signin&amp;source=wedding" class="btn btn-ghost" data-open-signin data-signin-mode="signin">Sign in</a><a href="../workspace/?auth=register&amp;source=wedding" class="btn btn-primary" data-open-signin data-signin-mode="register">Start planning free</a></div>
-    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    <div class="header-actions">
+      <a href="../workspace/?auth=signin&amp;source=wedding" class="btn btn-primary" data-open-signin data-signin-mode="signin">Sign in</a>
+    </div>
+    <button class="nav-toggle" id="navToggle" type="button" aria-label="Open menu" aria-controls="navLinks" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
   </div>
 </header>
-<main>
+<main id="main">
   <section class="directory-hero">
     <div class="container">
       <p class="eyebrow">Sydney wedding directory</p>
@@ -40,7 +54,42 @@
     </div>
   </section>
 </main>
-<footer class="site-footer"><div class="container footer-bottom"><span>© <span data-year></span> OmnyID.</span><a href="privacy.html">Privacy</a></div></footer>
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="logo" aria-label="OmnyID Weddings home">
+          <img class="logo-img" src="assets/logo/omnyid-logo.png" alt="" width="102" height="40">
+          <span>Weddings</span>
+        </a>
+        <p>A private planning workspace for couples — part of the OmnyID personal agent. Your day, organised and remembered, with your data never for sale.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <a href="index.html#how-it-works">How it works</a>
+        <a href="index.html#vendor-flow">Vendor replies</a>
+        <a href="index.html#preview">Workspace preview</a>
+        <a href="pricing.html">Pricing</a>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <a href="user-guide.html">User guide</a>
+        <a href="blog.html">Blog</a>
+        <a href="privacy.html">Privacy policy</a>
+        <a href="disclosures.html">Disclosures</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="../docs/index.html">About OmnyID</a>
+        <a href="mailto:hello@omnyid.com">Contact</a>
+        <a href="../workspace/?auth=signin&amp;source=vendor_claim" data-vendor-login>Vendor login</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span data-year></span> OmnyID. All rights reserved.</span>
+    </div>
+  </div>
+</footer>
 <div class="signin-modal" id="signinModal" aria-hidden="true"><div class="signin-overlay" data-close-signin></div><div class="signin-panel" role="dialog" aria-modal="true" aria-labelledby="signinTitle"><button class="signin-close" type="button" data-close-signin aria-label="Close">×</button><p class="eyebrow">Continue to your workspace</p><h2 id="signinTitle">Sign in or create an account</h2><div class="signin-options"><div class="signin-option" data-option="signin"><a class="btn btn-outline btn-block" href="../workspace/?auth=signin&amp;source=wedding">Sign in</a></div><div class="signin-option is-primary" data-option="register"><a class="btn btn-primary btn-block" href="../workspace/?auth=register&amp;source=wedding">Create free account</a></div></div><p class="signin-foot"><a href="../workspace/?auth=agent-id&amp;source=wedding" data-agent-id-link>Use your Agent ID</a></p></div></div>
 <script src="assets/js/main.js"></script><script src="assets/js/directory.js"></script>
 </body>
