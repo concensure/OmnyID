@@ -230,7 +230,7 @@ const WEDDING_WORKSPACE_MENU_ITEMS: Array<{
     id: "people",
     icon: "contacts",
     label: "People",
-    title: "Guests, seating, family boundaries, and people-related planning.",
+    title: "Guests, seating, and family decisions.",
     className: "border-amber-100 bg-amber-50/80 text-amber-950 hover:border-amber-200",
     activeClassName: "border-amber-300 bg-amber-100 text-amber-950",
   },

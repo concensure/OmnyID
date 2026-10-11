@@ -245,13 +245,15 @@ export function vendorContactCards(input: {
     // Directory contact details are research data. A Vendor Follow-Up starts only
     // after this user has a saved contact event, reply, thread, or receipt.
     .filter(hasUserContactEvidence)
-    .map((vendor, index): WeddingVendorContactWorkspaceCard => {
+    .map((vendor, index): WeddingVendorContactWorkspaceCard | null => {
       const state = buildWeddingOutreachEscalationStateFromVendorContact({
         metadata: input.metadata,
         vendor,
         now: input.nowIso,
       });
       const contact = vendor.userContact ?? null;
+      const dueAt = contact?.followUpDueAt ?? null;
+      if (dueAt && Date.parse(dueAt) > Date.parse(input.nowIso ?? new Date().toISOString())) return null;
       const lastContactLabel = shortDateLabel(contact?.lastContactAt);
       const followUpLabel = shortDateLabel(contact?.followUpDueAt);
       const replyLabel = shortDateLabel(contact?.responseReceivedAt);
@@ -288,11 +290,13 @@ export function vendorContactCards(input: {
             : "follow_up",
         lastContactLabel,
         followUpDueLabel: followUpLabel,
+        followUpDueAt: dueAt,
         replyLabel,
         metadataLabels,
         contactChips,
       };
     })
+    .filter((card): card is WeddingVendorContactWorkspaceCard => card !== null)
     .sort((left, right) => {
       const rank: Record<WeddingVendorContactWorkspaceCard["tone"], number> = {
         urgent: 0,

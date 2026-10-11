@@ -271,6 +271,7 @@ export type WeddingVendorContactWorkspaceCard = {
   actionMode: "follow_up" | "waiting" | "reply_recorded";
   lastContactLabel: string | null;
   followUpDueLabel: string | null;
+  followUpDueAt: string | null;
   replyLabel: string | null;
   metadataLabels: string[];
   contactChips: Array<{ kind: "address" | "email" | "phone"; label: string; value: string | null }>;

@@ -226,6 +226,14 @@ export function useWeddingVendorOutreachOwner(input: {
     });
   }
 
+  function onOutreachRecipientChange(choiceId: string, recipientEmail: string) {
+    setVendorOutreachFlows((current) => {
+      const flow = current[choiceId];
+      if (!flow) return current;
+      return { ...current, [choiceId]: { ...flow, recipientEmail: recipientEmail.trim() || null } };
+    });
+  }
+
   function onCancelOutreach(choiceId: string) {
     setVendorOutreachFlows((current) => {
       const next = { ...current };
@@ -302,7 +310,7 @@ export function useWeddingVendorOutreachOwner(input: {
         actionIntent: vendorOutreachIntents()[choiceId],
       });
       await saveProjection(sentProjection);
-      if (directoryVendor) {
+      if (directoryVendor && !flow.choiceId.startsWith("response:")) {
         try {
           await recordWeddingVendorContact(directoryVendor.vendorId, {
             contact_method: "agent_email_draft",
@@ -336,6 +344,7 @@ export function useWeddingVendorOutreachOwner(input: {
     flows: vendorOutreachFlows,
     onContactVendor,
     onOutreachBodyChange,
+    onOutreachRecipientChange,
     onCancelOutreach,
     onRetryOutreach,
     onConnectGmailForOutreach,

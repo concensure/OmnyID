@@ -9,7 +9,7 @@ import { weddingVendorFollowUpOutreachCardData } from "@/lib/weddingVendorFollow
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { WeddingWorkspaceDocumentsPanel } from "@/components/WeddingWorkspaceDocumentsPanel";
-import { fetchThread, ingestAttachmentBatch, type AfpMessage, type SendAfpMessageInput } from "@/lib/api";
+import { fetchThread, ingestAttachmentBatch, recordWeddingVendorContact, type AfpMessage, type SendAfpMessageInput } from "@/lib/api";
 import type { EditorPayload } from "@/lib/editorPayload";
 import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
 import { runWeddingArtifactBrowserExport, runWeddingBundleBrowserExport, selectWeddingBundleExportPayload, weddingProjectionMetadataId, type WeddingBundleExportFormat } from "@/lib/weddingBrowserExportActions";
@@ -864,9 +864,18 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       gmailConnected: Boolean(props.gmailStatus?.connected),
       onOpenOutreachComposer: (card) => void vendorOutreach.onContactVendor(weddingVendorFollowUpOutreachCardData(card), ""),
       onOutreachBodyChange: vendorOutreach.onOutreachBodyChange,
+      onOutreachRecipientChange: vendorOutreach.onOutreachRecipientChange,
       onSendOutreach: (choiceId) => void vendorOutreach.onSendOutreach(choiceId),
       onCancelOutreach: vendorOutreach.onCancelOutreach,
       onConnectGmailForOutreach: () => void vendorOutreach.onConnectGmailForOutreach(),
+      onSetFollowUpDate: (card, date) => {
+        if (!card.vendorId || !date) return;
+        void recordWeddingVendorContact(card.vendorId, {
+          contact_method: "other",
+          follow_up_due_at: new Date(`${date}T12:00:00`).toISOString(),
+          notes: card.detailLabel,
+        }).then(() => props.onRefreshWorkspace?.()).catch(() => undefined);
+      },
     },
   }));
 

@@ -397,11 +397,6 @@ export function ContactsView() {
         </button>
       </div>
 
-      <div class="rounded-2xl border border-sky-200/60 bg-sky-50/80 px-4 py-3 text-sm text-sky-900 shadow-sm">
-        Contacts are currently <span class="font-semibold">stored locally in this workspace</span> and synced to the agent on a best-effort basis.
-        If sync fails, your local contact list is still preserved here.
-      </div>
-
       <div class="grid min-w-0 gap-3 rounded-2xl border border-emerald-200/70 bg-emerald-50/80 p-4 shadow-sm lg:grid-cols-[1fr_auto] lg:items-start">
         <div class="min-w-0">
           <p class="text-sm font-semibold text-emerald-950">Reach-out strength</p>

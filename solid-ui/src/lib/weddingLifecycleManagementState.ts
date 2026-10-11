@@ -261,7 +261,7 @@ function taskItems(
       reviewStatus: "accepted",
       approvalState: "draft",
       metadata: { ...baseMetadata, decision_surface: "venue_selection", second_order_loop: "contact_follow_up" },
-      notes: `Use DecisionOS to compare venue options side-by-side. Do not claim availability, reviews, pricing, photos, cancellation policy, or deposit terms until source verified.`,
+      notes: "Use DecisionOS to compare venue options side-by-side.",
     },
     {
       id: `wedding_task:lifecycle:contract-review:${safeWeddingLabel(metadata.responseWorkspaceId)}`,

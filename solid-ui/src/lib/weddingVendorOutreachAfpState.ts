@@ -80,6 +80,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
   createdAt?: string | null;
   actionIntent?: WeddingVendorChoiceIntent | null;
 }): SendAfpMessageInput {
+  const isResponse = input.flow.choiceId.startsWith("response:");
   const timestamp = timestampOrNow(input.createdAt);
   const threadId = weddingVendorOutreachThreadId({
     responseWorkspaceId: input.metadata.responseWorkspaceId,
@@ -97,8 +98,8 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
     to: ["user://couple", "agent://decision-queue", "agent://knowledge-graph"],
     timestamp,
     type: "email_draft",
-    kind: "wedding_vendor_outreach_draft",
-    subtype: "wedding_vendor_outreach_draft",
+    kind: isResponse ? "wedding_vendor_response_draft" : "wedding_vendor_outreach_draft",
+    subtype: isResponse ? "wedding_vendor_response_draft" : "wedding_vendor_outreach_draft",
     content: {
       to,
       subject,
@@ -123,7 +124,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       : [],
     supertags: uniqueStrings([
       ...input.metadata.supertags,
-      "wedding_vendor_outreach",
+      isResponse ? "wedding_vendor_response" : "wedding_vendor_outreach",
       "wedding_email_draft",
     ]),
     metadata: {
@@ -148,6 +149,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
   createdAt?: string | null;
   actionIntent?: WeddingVendorChoiceIntent | null;
 }): SendAfpMessageInput {
+  const isResponse = input.flow.choiceId.startsWith("response:");
   const timestamp = timestampOrNow(input.createdAt);
   const threadId = weddingVendorOutreachThreadId({
     responseWorkspaceId: input.metadata.responseWorkspaceId,
@@ -164,8 +166,8 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
     to: ["user://couple", "agent://decision-queue", "agent://knowledge-graph"],
     timestamp,
     type: "email",
-    kind: "wedding_vendor_outreach_sent",
-    subtype: "wedding_vendor_outreach_sent",
+    kind: isResponse ? "wedding_vendor_response_sent" : "wedding_vendor_outreach_sent",
+    subtype: isResponse ? "wedding_vendor_response_sent" : "wedding_vendor_outreach_sent",
     content: {
       to,
       subject,
@@ -186,10 +188,10 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
       content: { to, subject, text },
     }],
     attachments: [],
-    references: [{ type: "wedding_vendor_outreach_draft", target: input.draftMessageId, label: "Outreach draft" }],
+    references: [{ type: isResponse ? "wedding_vendor_response_draft" : "wedding_vendor_outreach_draft", target: input.draftMessageId, label: isResponse ? "Vendor response draft" : "Outreach draft" }],
     supertags: uniqueStrings([
       ...input.metadata.supertags,
-      "wedding_vendor_outreach",
+      isResponse ? "wedding_vendor_response" : "wedding_vendor_outreach",
       "delivery_confirmed",
     ]),
     metadata: {

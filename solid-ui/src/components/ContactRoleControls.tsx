@@ -98,6 +98,11 @@ export function ContactRoleInput(props: {
           <p class="mt-2 text-[11px] leading-4 text-on-surface-variant">{description()}</p>
         )}
       </Show>
+      <div class="mt-2 flex flex-wrap gap-1.5">
+        <For each={options().slice(0, 8)}>
+          {(role) => <button type="button" class="min-h-9 rounded-full border border-primary/25 bg-primary/10 px-2.5 text-[11px] font-semibold text-primary hover:bg-primary/15" onClick={() => props.onChange(addContactRole(props.roles, role))}>+ {role}</button>}
+        </For>
+      </div>
       <Show when={props.roles.length > 0}>
         <div class="mt-2 flex flex-wrap gap-1.5">
           <ContactRoleChips

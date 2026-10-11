@@ -59,6 +59,9 @@ export function WeddingGuestOperationsCard(props: {
   const [savingGuest, setSavingGuest] = createSignal(false);
   const [savingRules, setSavingRules] = createSignal(false);
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
+  const [showAddedGuests, setShowAddedGuests] = createSignal(false);
+  const [editingDraftIndex, setEditingDraftIndex] = createSignal<number | null>(null);
+  const [guestFilter, setGuestFilter] = createSignal<GuestRsvpStatus | "Needs" | null>(null);
   const displayCounts = createMemo(() => weddingGuestOperationsDisplayCounts(props.state, draftGuests()));
   const guestRows = createMemo(() => (props.state.guestRows ?? []).slice(0, 8).map((row) => ({
     ...row,
@@ -105,12 +108,15 @@ export function WeddingGuestOperationsCard(props: {
           accessibilityNote: guestAccessibility(),
         })
         : "Guest draft saved on this device. Account saving is not connected yet.";
-      const nextGuests = [
-        ...draftGuests(),
-        { name, group, rsvp: guestRsvp() },
-      ].slice(-80);
+      const draft = { name, group, rsvp: guestRsvp() };
+      const existingIndex = editingDraftIndex();
+      const nextGuests = existingIndex === null
+        ? [...draftGuests(), draft].slice(-80)
+        : draftGuests().map((guest, index) => index === existingIndex ? draft : guest);
       setDraftGuests(nextGuests);
       saveLocalState({ guests: nextGuests });
+      setEditingDraftIndex(null);
+      setShowAddedGuests(true);
       setGuestName("");
       setGuestGroup("");
       setGuestRsvp("Pending");
@@ -294,18 +300,19 @@ export function WeddingGuestOperationsCard(props: {
             data-magic-id="wedding:guests:add-draft"
             onClick={() => void saveGuestDraft()}
           >
-            {savingGuest() ? "Saving..." : "Add to guest list"}
+            {savingGuest() ? "Saving..." : editingDraftIndex() === null ? "Add to guest list" : "Save guest changes"}
           </button>
           <Show when={draftGuests().length > 0}>
-            <ul class="mt-3 space-y-1">
-              <For each={draftGuests()}>
-                {(guest) => (
-                  <li class="rounded-xl border border-sky-100 bg-sky-50/70 px-2.5 py-2 text-xs text-sky-950/80">
-                    <span class="font-semibold">{guest.name}</span> - {guest.group} - {guest.rsvp}
-                  </li>
-                )}
-              </For>
-            </ul>
+            <div class="mt-3">
+              <button type="button" class="text-xs font-semibold text-sky-800 underline underline-offset-2" onClick={() => setShowAddedGuests((value) => !value)}>
+                {showAddedGuests() ? "Hide added guests" : `Show ${draftGuests().length} added guest${draftGuests().length === 1 ? "" : "s"}`}
+              </button>
+              <Show when={showAddedGuests()}>
+                <ul class="mt-2 space-y-1"><For each={draftGuests()}>{(guest, index) => (
+                  <li><button type="button" class="w-full rounded-xl border border-sky-100 bg-sky-50/70 px-2.5 py-2 text-left text-xs text-sky-950/80 hover:border-sky-300" onClick={() => { setGuestName(guest.name); setGuestGroup(guest.group); setGuestRsvp(guest.rsvp); setEditingDraftIndex(index()); }}><span class="font-semibold">{guest.name}</span> - {guest.group} - {guest.rsvp}</button></li>
+                )}</For></ul>
+              </Show>
+            </div>
           </Show>
         </div>
       </Show>
@@ -342,6 +349,7 @@ export function WeddingGuestOperationsCard(props: {
           >
             {savingRules() ? "Saving..." : "Save guest rules"}
           </button>
+          <p class="mt-2 text-xs leading-5 text-sky-950/65">Save these rules so new invitations and guest decisions use the same plus-one and children guidance.</p>
           <Show when={savedRules().length > 0}>
             <div class="mt-3 flex flex-wrap gap-1.5">
               <For each={savedRules()}>
@@ -371,7 +379,7 @@ export function WeddingGuestOperationsCard(props: {
             </Show>
           </div>
           <div class="mt-2 space-y-2">
-            <For each={guestRows()}>
+            <For each={guestRows().filter((guest) => guestFilter() === null || (guestFilter() === "Needs" ? guest.rsvpStatus === "Pending" || !guest.contactLabel || !guest.mealPreference : guest.rsvpStatus === guestFilter()))}>
               {(guest) => (
                 <article class="rounded-xl border border-sky-100 bg-sky-50/60 px-2.5 py-2 phone:rounded-none phone:border-0 phone:border-t phone:border-slate-200 phone:bg-transparent phone:px-0 phone:py-3">
                   <div class="flex flex-wrap items-start justify-between gap-2">
@@ -416,20 +424,20 @@ export function WeddingGuestOperationsCard(props: {
         </div>
       </Show>
       <div class="mt-3 grid grid-cols-3 gap-2">
-        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
+        <button type="button" onClick={() => setGuestFilter("Attending")} class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-left hover:border-sky-300">
           <p class="text-xs font-semibold text-sky-950/65">Attending</p>
           <p class="mt-1 text-2xl font-semibold text-sky-950">{displayCounts().attendingCount}</p>
-        </div>
-        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
+        </button>
+        <button type="button" onClick={() => setGuestFilter("Pending")} class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-left hover:border-sky-300">
           <p class="text-xs font-semibold text-sky-950/65">Pending</p>
           <p class="mt-1 text-2xl font-semibold text-sky-950">{displayCounts().pendingCount}</p>
-        </div>
-        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
+        </button>
+        <button type="button" onClick={() => setGuestFilter("Needs")} class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-left hover:border-sky-300">
           <p class="text-xs font-semibold text-sky-950/65">Needs</p>
           <p class="mt-1 text-2xl font-semibold text-sky-950">
             {displayCounts().needsCount}
           </p>
-        </div>
+        </button>
       </div>
       <Show
         when={props.state.warningLabels.length > 0}
@@ -513,15 +521,15 @@ function GuestSwitchRow(props: { label: string; hint: string; checked: boolean; 
       type="button"
       role="switch"
       aria-checked={props.checked}
-      class="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left"
+      class="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border-2 border-sky-800 bg-sky-50 px-3 py-2 text-left shadow-sm"
       onClick={() => props.onChange(!props.checked)}
     >
       <span class="min-w-0">
         <span class="block text-sm font-semibold text-sky-950">{props.label}</span>
         <span class="block text-xs text-sky-950/60">{props.hint}</span>
       </span>
-      <span class={`relative h-6 w-11 shrink-0 rounded-full transition ${props.checked ? "bg-sky-800" : "bg-slate-300"}`} aria-hidden="true">
-        <span class={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${props.checked ? "left-[1.375rem]" : "left-0.5"}`} />
+      <span class={`relative h-7 w-12 shrink-0 rounded-full border-2 border-sky-950 transition ${props.checked ? "bg-sky-800" : "bg-white"}`} aria-hidden="true">
+        <span class={`absolute top-0.5 h-5 w-5 rounded-full border border-sky-950 bg-white shadow transition-all ${props.checked ? "left-5" : "left-0.5"}`} />
       </span>
     </button>
   );

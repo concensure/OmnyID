@@ -1,5 +1,13 @@
 # Handoff
 
+## 2026-10-12 - WED-179 people, guest, contact, and vendor response usability (Codex)
+
+- Removed internal-facing lifecycle copy from the helper/outreach path and simplified the People label.
+- Vendor response cards now use an editable email composer, category-focused labels, a native date-picker follow-up field, and vendor-response AFP message kinds. Future scheduled follow-ups are withheld from the response queue until due.
+- Guest drafts collapse behind a show/hide link, can be reopened for editing, summary counters filter visible guest rows, and invitation toggles have stronger visual affordance. Guest-rule saving now explains its effect.
+- Contacts no longer expose local-sync implementation copy; role controls provide tap-friendly wedding role suggestions.
+- `npm run typecheck` and `npm run build` were attempted in `solid-ui`; both stop at the existing missing `zod` dependency imported by `typescript-sdk/src/workflows.ts`.
+
 ## 2026-10-10 - WED-153 vendor rooms: API, card, comparison and operator editor (Claude -> Codex: please merge)
 
 Merge request for Codex:

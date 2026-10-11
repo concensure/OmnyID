@@ -15,7 +15,7 @@ function contactChipValue(
 // composer as the vendor choice card, instead of routing to a generic
 // approval queue that has no compose surface.
 export function weddingVendorFollowUpOutreachChoiceId(card: WeddingVendorContactWorkspaceCard): string {
-  return `follow-up:${card.vendorId ?? card.id}`;
+  return `${card.actionMode === "reply_recorded" ? "response" : "follow-up"}:${card.vendorId ?? card.id}`;
 }
 
 export function weddingVendorFollowUpOutreachCardData(card: WeddingVendorContactWorkspaceCard): WeddingVendorChoiceCardData {

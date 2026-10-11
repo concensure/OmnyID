@@ -10,6 +10,7 @@ export function WeddingVendorOutreachComposer(props: {
   busy: boolean;
   gmailConnected: boolean;
   onBodyChange: (bodyMarkdown: string) => void;
+  onRecipientChange?: (email: string) => void;
   onSend: () => void;
   onCancel: () => void;
   onRetryDraft?: () => void;
@@ -79,9 +80,16 @@ export function WeddingVendorOutreachComposer(props: {
             />
           </div>
 
-          <p class="mt-3 break-words text-sm text-wedding-muted">
-            To: {props.flow.recipientEmail ?? "no email on file"}
-          </p>
+          <label class="mt-3 block text-sm font-semibold text-wedding-text">
+            Vendor email
+            <input
+              type="email"
+              value={props.flow.recipientEmail ?? ""}
+              onInput={(event) => props.onRecipientChange?.(event.currentTarget.value)}
+              placeholder="vendor@example.com"
+              class="mt-1 min-h-11 w-full rounded-xl border border-wedding-muted/35 bg-white px-3 py-2 text-sm font-normal text-wedding-text outline-none focus:border-wedding-cta focus:ring-2 focus:ring-wedding-surface-blush"
+            />
+          </label>
 
           <Show when={props.flow.stage === "send_failed" && props.flow.blockedReason}>
             {(reason) => (

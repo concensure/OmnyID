@@ -15,6 +15,30 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-179
+    title: Wedding people, guests, contacts, and vendor-response follow-up usability
+    status: done
+    owner: codex
+    branch: agent/codex/WED-179
+    depends_on:
+      - WED-174
+      - WED-173
+    files:
+      - solid-ui/src/components/WeddingVendorFollowUpPanel.tsx
+      - solid-ui/src/components/WeddingGuestOperationsCard.tsx
+      - solid-ui/src/components/ContactsView.tsx
+      - solid-ui/src/components/ContactRoleControls.tsx
+      - solid-ui/src/components/ResponseQueueView.tsx
+      - solid-ui/src/lib/wedding*.ts
+      - solid-ui/tests/wedding-*.test.ts
+      - .agent/**
+    acceptance:
+      - vendor reply cards present the response summary, category only, an editable reply composer, and a schedulable follow-up date
+      - future follow-up dates suppress the response card until due
+      - guest lists collapse until expanded; summary filters and guest editing work
+      - contacts persist new entries through the remote sync path and offer wedding role choices on mobile-friendly controls
+    progress:
+      - implemented locally; frontend build/typecheck remain blocked by the pre-existing unresolved typescript-sdk zod dependency
   - id: UX-MFH-01
     title: Local Master Agent output and mobile focus home
     status: in_progress
