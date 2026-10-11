@@ -18,7 +18,6 @@ import {
 } from "@/lib/api";
 import { type GoogleCalendarConnectionStatus } from "@/lib/googleCalendarConnectionState";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
-import { CalendarKnowledgeSetup } from "@/components/CalendarKnowledgeSetup";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { navigateToView } from "@/lib/decisionosNavigation";
 import {
@@ -592,6 +591,12 @@ export function MonthlyCalendarView(props: {
     void loadEvents();
     void loadGoogleCalendarStatus();
     void loadGoogleCalendarOAuthConfig();
+    const syncTimer = window.setInterval(() => {
+      if (googleCalendarStatus()?.connected && !googleCalendarStatus()?.token_expired && !googleCalendarBusy()) {
+        void syncGoogleCalendarNow();
+      }
+    }, 10 * 60 * 1000);
+    onCleanup(() => window.clearInterval(syncTimer));
     const calendarRedirectStatus = new URLSearchParams(window.location.search).get("calendar");
     if (calendarRedirectStatus) {
       setGoogleCalendarNotice(
@@ -1485,6 +1490,7 @@ export function MonthlyCalendarView(props: {
               }
             >
               <div style={{ display: "flex", "flex-direction": "column", gap: "0.9em" }}>
+                <Show when={selectedEvent()!.summary.trim() !== selectedEvent()!.description.trim()}>
                 <div style={detailCardStyle()}>
                   <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "0.75em" }}>
                     <div style={{ display: "flex", gap: "0.55em", "align-items": "center" }}>
@@ -1523,6 +1529,7 @@ export function MonthlyCalendarView(props: {
                     {selectedEvent()!.summary}
                   </p>
                 </div>
+                </Show>
 
                 {/* ── Real backlinks from the Knowledge Curator ── */}
                 <div style={detailCardStyle()}>
@@ -1580,8 +1587,6 @@ export function MonthlyCalendarView(props: {
             </Show>
           </section>
 
-          {/* ── Default supertag taxonomy onboarding ── */}
-          <CalendarKnowledgeSetup />
         </aside>
       </div>
 

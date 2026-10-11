@@ -25,6 +25,7 @@ export function WeddingTimelinePanel(props: {
 }) {
   const [showAllRows, setShowAllRows] = createSignal(false);
   const [showGantt, setShowGantt] = createSignal(false);
+  const [mobileFilter, setMobileFilter] = createSignal<"all" | "upcoming" | "completed">("all");
   const visibleRows = createMemo(() => showAllRows() ? props.state.ganttTimeline.rows : props.state.ganttTimeline.rows.slice(0, 6));
   const hiddenRowCount = createMemo(() => Math.max(0, props.state.ganttTimeline.rows.length - visibleRows().length));
   const ganttAxisTicks = createMemo(() => weddingGanttAxisTicks(props.state.ganttTimeline.rows, {
@@ -114,6 +115,9 @@ export function WeddingTimelinePanel(props: {
             {showGantt() ? "Hide Gantt chart" : "Show Gantt chart"}
           </button>
         </Show>
+      </div>
+      <div class="mt-3 flex gap-2 overflow-x-auto phone:flex sm:hidden">
+        <For each={["all", "upcoming", "completed"] as const}>{(filter) => <button type="button" onClick={() => setMobileFilter(filter)} class={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${mobileFilter() === filter ? "border-indigo-700 bg-indigo-700 text-white" : "border-indigo-200 bg-white text-indigo-950"}`}>{filter === "all" ? `All (${props.state.ganttTimeline.rows.length})` : filter[0].toUpperCase() + filter.slice(1)}</button>}</For>
       </div>
       <Show when={props.state.ganttTimeline.undatedItems.length > 0}>
         <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
@@ -224,12 +228,12 @@ export function WeddingTimelinePanel(props: {
               </button>
             </Show>
           </div>
-          <Show when={showGantt()} fallback={<div class="space-y-2">
-          <For each={visibleRows()}>
+          <Show when={showGantt()} fallback={<div class="relative space-y-2 before:absolute before:bottom-3 before:left-3 before:top-3 before:w-px before:bg-indigo-200">
+          <For each={visibleRows().filter((row) => mobileFilter() === "all" || (mobileFilter() === "completed" ? /done|complete/i.test(row.statusLabel) : !/done|complete/i.test(row.statusLabel)))}>
             {(row) => {
               const fileAction = fileActionFor(row.linkedArtifactId);
               return (
-                <article class="min-w-0">
+                <article class="relative min-w-0 pl-8 before:absolute before:left-1.5 before:top-2 before:h-3 before:w-3 before:rounded-full before:border-2 before:border-indigo-600 before:bg-white">
                   <div class="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                     <p class="min-w-0 break-words text-sm font-semibold text-indigo-950">{row.title}</p>
                     <span class="shrink-0 text-xs font-semibold text-indigo-900/75">{row.startLabel}</span>
@@ -251,7 +255,7 @@ export function WeddingTimelinePanel(props: {
                   <p class="mt-1 break-words text-xs leading-5 text-indigo-950/65">
                     {row.categoryLabel} - {row.durationDays} day{row.durationDays === 1 ? "" : "s"} - {weddingTimelineStatusLabel(row.statusLabel)}
                   </p>
-                  <div class="mt-2 flex flex-wrap gap-1.5">
+                  <div class="mt-2 hidden flex-wrap gap-1.5 sm:flex">
                     <button
                       type="button"
                       class={ROW_ACTION_CLASS}
@@ -295,7 +299,7 @@ export function WeddingTimelinePanel(props: {
             }}
           </For>
           </div>}>
-            <div class="overflow-x-auto rounded-xl border border-indigo-100 bg-white/80 p-3">
+            <div class="hidden overflow-x-auto rounded-xl border border-indigo-100 bg-white/80 p-3 sm:block">
               <div class="min-w-[680px]">
                 <div class="grid grid-cols-[minmax(10rem,14rem)_1fr] gap-x-3 border-b border-indigo-100 pb-2">
                   <p class="text-xs font-semibold uppercase tracking-wide text-indigo-950/65">All tasks</p>

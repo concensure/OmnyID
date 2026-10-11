@@ -1,5 +1,11 @@
 # Handoff
 
+## 2026-10-12 - WED-180 inspiration, calendar and timeline polish (Codex)
+
+- WED-178 committed changes were reviewed as a separate public-site/newsletter slice and are retained as safe release ancestors of this branch.
+- Removed inspiration storage caveats, redundant image label and item tags; removed Calendar knowledge setup and hides an AI summary when it repeats event context.
+- Connected Google Calendar now refreshes automatically every ten minutes while the calendar stays open. Mobile timeline has compact filters, vertical connector nodes and hides secondary row actions.
+
 ## 2026-10-12 - WED-179 people, guest, contact, and vendor response usability (Codex)
 
 - Removed internal-facing lifecycle copy from the helper/outreach path and simplified the People label.

@@ -15,6 +15,23 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-180
+    title: Wedding inspiration, calendar, and mobile timeline polish
+    status: done
+    owner: codex
+    branch: agent/codex/WED-180
+    depends_on: [WED-179, WED-178]
+    files:
+      - solid-ui/src/components/WeddingInspirationPanel.tsx
+      - solid-ui/src/components/WeddingTimelinePanel.tsx
+      - solid-ui/src/components/MonthlyCalendarView.tsx
+      - .agent/**
+    acceptance:
+      - inspiration and calendar surfaces avoid duplicate or internal-facing copy
+      - connected Google Calendar refreshes automatically while open
+      - mobile timeline remains readable and action-light
+    progress:
+      - committed with WED-178 and WED-179 as release ancestors
   - id: WED-179
     title: Wedding people, guests, contacts, and vendor-response follow-up usability
     status: done

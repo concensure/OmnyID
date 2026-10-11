@@ -164,9 +164,7 @@ export function WeddingInspirationPanel(props: {
       }));
       const savedState = buildWeddingInspirationState(items);
       setLocalItems([]);
-      setNotice(savedState.unsavedOriginalFileCount > 0
-        ? "Inspiration saved as planning clues. The original files still need file storage before you can reopen them later."
-        : "Inspiration saved with this wedding. OmnyID kept the meaning, tags, and planning clues.");
+      setNotice("Inspiration saved with this wedding. OmnyID kept the planning clues for future recommendations.");
       props.onRefreshWorkspace?.();
     } catch {
       setNotice("Inspiration is ready, but it could not be saved yet.");
@@ -370,12 +368,6 @@ export function WeddingInspirationPanel(props: {
         </div>
       </Show>
 
-      <Show when={combinedState().originalFileCount > 0}>
-        <p class="mt-2 rounded-2xl border border-rose-100 bg-white/75 px-3 py-2 text-xs leading-5 text-rose-950/65">
-          {combinedState().originalFileStatusLabel}
-        </p>
-      </Show>
-
       <div class="mt-3 grid gap-2 sm:grid-cols-2">
         <For each={combinedState().items.slice(0, 12)}>
           {(item) => (
@@ -386,16 +378,11 @@ export function WeddingInspirationPanel(props: {
               <div class="p-3">
                 <div class="flex flex-wrap items-start justify-between gap-2">
                   <p class="text-sm font-semibold text-rose-950">{item.title}</p>
-                  <span class="rounded-full bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-950/70">{sourceLabel(item)}</span>
+                  <Show when={sourceLabel(item) !== "Image"}><span class="rounded-full bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-950/70">{sourceLabel(item)}</span></Show>
                 </div>
                 <Show when={item.note}>
                   {(note) => <p class="mt-1 text-xs leading-5 text-rose-950/65">{note()}</p>}
                 </Show>
-                <div class="mt-2 flex flex-wrap gap-1">
-                  <For each={item.tags.slice(0, 5)}>
-                    {(tag) => <span class="rounded-full border border-rose-100 bg-rose-50/80 px-2 py-0.5 text-[11px] text-rose-950/70">{tag}</span>}
-                  </For>
-                </div>
               </div>
             </article>
           )}
