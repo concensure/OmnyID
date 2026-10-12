@@ -1,3 +1,10 @@
+## 2026-10-13 - WED-181 Stripe one-off checkout webhook rollout (Codex)
+
+- Confirmed the Wedding upgrade is a `mode=payment` one-off Checkout flow, so Stripe `subscription_data` must not be sent: it is valid only for a recurring Price and would reject the AUD 39 purchase.
+- Made paid `checkout.session.completed` / async success handling explicit: Stripe session `status: complete` maps to the account entitlement status `active`. Added a regression fixture with the real `complete` session status.
+- Verification: focused billing test passed; `cargo check` passed.
+- Released commits `480c37a` and `3269ba1` to Oracle. The workspace returns HTTP 200 and serves `main-DXv7pLra.js`; Caddy, UI, and homeserver are running. The release helper now uses bounded non-interactive SSH connections to prevent a stalled release client.
+- The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
 ## 2026-10-12 - WED-183 workspace recovery and core view verification (Codex)

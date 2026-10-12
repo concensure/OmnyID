@@ -105,6 +105,7 @@ tasks:
       - WED-178 through WED-180 are release ancestors; storage and database editor changes are ready for deployment
       - Stripe Checkout resolves the configured one-off Wedding product and only entitles a signed paid checkout bound to the authenticated account
       - partner co-ownership remains separately blocked on the existing missing backend ACL, shared-key, audit, and conflict-resolution contracts
+      - paid one-off Checkout completion explicitly persists active entitlement status even when Stripe reports the session status as complete; subscription-only metadata remains intentionally excluded from payment-mode Checkout
   - id: WED-180
     title: Wedding inspiration, calendar, and mobile timeline polish
     status: done

@@ -1,3 +1,6 @@
+## 2026-10-13: Wedding upgrade remains a one-off payment entitlement
+
+The AUD 39 OmnyID Wedding upgrade uses Stripe Checkout `mode=payment` with a one-off Price. The signed paid Checkout completion, bound by server-set session metadata, is the entitlement source and persists `active` rather than Stripe's transient Checkout Session `complete` status. `subscription_data` is deliberately not supplied unless a future recurring Price explicitly changes this product to a Stripe subscription.
 # Decisions
 
 This file records project architecture and coordination decisions. It is
