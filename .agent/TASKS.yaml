@@ -15,6 +15,28 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-182
+    title: Custom-email confirmation delivery and Master Agent travel resilience
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-182
+    depends_on: [WED-181]
+    files:
+      - src/server/auth*.rs
+      - src/server/*email*.rs
+      - src/server/*agent*.rs
+      - src/agent*.rs
+      - solid-ui/src/App.tsx
+      - solid-ui/src/lib/api.ts
+      - solid-ui/tests/**
+      - .agent/**
+    acceptance:
+      - custom-email registration sends a confirmation email through configured delivery and gives a clear retry state without exposing internal details
+      - Master Agent gives useful travel guidance even if optional weather or maps tools are unavailable, while clearly distinguishing unavailable live facts
+      - focused tests, build checks, and an Oracle production proof are recorded
+    progress:
+      - registration now reports a real transactional-delivery failure without exposing account state, and Master Agent travel answers replace tool-outage-only text with actionable planning guidance
+      - Oracle Gmail OAuth client and secret files are present, but its refresh-token exchange currently returns HTTP 400; successful confirmation delivery requires a newly authorized refresh token before it can be verified end to end
   - id: WED-181
     title: Wedding account entitlement, collaboration, and database editing reliability
     status: in_progress

@@ -418,3 +418,9 @@ visible rather than appearing to fail. Field definitions use `database_schema_up
 OmnyID Wedding uses authenticated server-created Stripe Checkout in `payment` mode instead of a reusable Payment Link, preserving an internal account binding and keeping credentials out of the browser.
 
 The server accepts a restricted key and either a Price ID or Product ID. A product must resolve to one active AUD one-off price (or a matching default price). The webhook grants entitlement only for a signed paid Checkout event with server-issued Wedding metadata and a bound account ID. Workspace return URLs normalize to one `/workspace/` segment.
+
+## 2026-10-12: Transactional email truthfulness and travel-tool resilience
+
+Password registration remains account-enumeration safe, but a known failed confirmation-email delivery must not be presented as a successful inbox handoff. The registration response therefore reports a generic delivery retry state only when the server's own attempt fails; it does not disclose whether any address already exists. Oracle's Gmail OAuth client and file-backed secrets are present, but the refresh-token exchange currently returns HTTP 400, so a newly authorised refresh token is required before confirmation delivery can be verified.
+
+Travel responses must retain useful planning guidance when optional live weather or map lookups fail. A response that is only tool-outage text is replaced with a clearly caveated, actionable itinerary-planning fallback; a partial answer with real guidance is preserved.

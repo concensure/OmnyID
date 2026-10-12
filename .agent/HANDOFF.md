@@ -1479,3 +1479,21 @@ Verification: `cargo check` and `cargo test server::billing::tests --lib` passed
 Open: subscribe the Stripe destination to `checkout.session.async_payment_succeeded` if delayed payment methods are enabled. Partner co-ownership still requires backend ACL/shared-key/audit/conflict contracts and must not be presented as live shared data access.
 
 Deployment: release commit `fc93467` was staged to Oracle. The initial compose recreate encountered a verified stale generated UI-container-name conflict; the exact exited `omnyid-ui-1` container was removed and the scoped homeserver/UI start then completed. Oracle Stripe secrets were written after staging (the deployment prune removes `.secrets`), are mode `0600`, and are loaded by the homeserver entrypoint. The public workspace probe returned HTTP 200. The synchronous Oracle production proof passed with homeserver and backup service running, backup verification passing, and restore-drill status passing. `/readyz` is authentication-protected (HTTP 401 without its operational credential), so it was not treated as a failed health assertion.
+
+## 2026-10-12 - WED-182 custom-email confirmation and Master Agent travel fallback
+
+Changed:
+
+- Password registration no longer tells a user to check their inbox after the server's transactional confirmation delivery has already failed. It returns a generic retry state that remains safe against account enumeration.
+- Master Agent task output that consists only of unavailable weather/map/tool status now becomes a clear, actionable travel-planning fallback. A partial answer that already includes useful guidance is left intact.
+
+Verification:
+
+- `cargo test registration_delivery_failure_is_honest_without_revealing_account_state --lib` passed.
+- `cargo test travel_tool_outage_is_replaced_with_actionable_planning_guidance --lib` passed.
+- `cargo test travel_answer_with_guidance_is_not_replaced_when_one_tool_is_unavailable --lib` passed.
+- `cargo check` and `git diff --check` passed.
+
+Operational finding:
+
+- Oracle has the Gmail OAuth client and both file-backed Gmail secrets, and `OMNYID_BASE_URL` is set to the expected public origin. Its refresh-token exchange returns HTTP 400. A fresh user-authorized Gmail refresh token must be installed securely before confirmation mail can be delivered and the full registration flow can be verified; no credential was printed, copied, or committed.

@@ -81,8 +81,9 @@ pub(super) async fn register_http(
                 warn!(
                     user_id = %existing_user.id,
                     error = %err.1,
-                    "Suppressing register verification-email delivery/config error"
+                    "Verification email could not be delivered during registration"
                 );
+                return Ok(Json(registration_delivery_unavailable_response(&email)));
             }
         }
         return Ok(Json(registration_public_response(&email)));
@@ -111,8 +112,11 @@ pub(super) async fn register_http(
         warn!(
             user_id = %user.id,
             error = %err.1,
-            "Suppressing register verification-email delivery/config error"
+            "Verification email could not be delivered during registration"
         );
+        return Ok(Json(registration_delivery_unavailable_response(
+            &user.email,
+        )));
     }
 
     Ok(Json(registration_public_response(&user.email)))
@@ -1078,6 +1082,17 @@ fn registration_public_response(email: &str) -> AuthResponse {
     )
 }
 
+/// Registration remains account-enumeration safe, but it must not tell a person
+/// to check an inbox when the server itself knows its transactional delivery
+/// attempt failed. This response describes a service-wide delivery problem,
+/// rather than whether a particular address exists.
+fn registration_delivery_unavailable_response(email: &str) -> AuthResponse {
+    verification_required_response(
+        email,
+        "We could not send a confirmation email yet. Please try again shortly.",
+    )
+}
+
 fn generate_secure_token() -> String {
     let raw: [u8; 32] = rand::rng().random();
     hex::encode(raw)
@@ -1929,7 +1944,8 @@ mod tests {
         passkey_authenticate_challenge_kind, passkey_authentication_begin_options,
         passkey_authentication_failed_error, passkey_origin_configured,
         passkey_public_rate_limit_key, passkey_registration_failed_error, passkey_rp_id_configured,
-        password_processing_error, password_verification_error, registration_public_response,
+        password_processing_error, password_verification_error,
+        registration_delivery_unavailable_response, registration_public_response,
         request_origin_is_allowed, require_account_status_active,
         require_cookie_auth_allowed_origin, require_recent_high_risk_session,
         resend_verification_public_response, session_cookie_header_value,
@@ -2727,6 +2743,17 @@ aSnVsBzVGTmyju6PoBR7Yw==
         );
         assert!(response.token.is_none());
         assert!(response.user.is_none());
+    }
+
+    #[test]
+    fn registration_delivery_failure_is_honest_without_revealing_account_state() {
+        let response = registration_delivery_unavailable_response("person@example.com");
+        assert!(response.verification_required);
+        assert_eq!(response.email.as_deref(), Some("person@example.com"));
+        assert_eq!(
+            response.message.as_deref(),
+            Some("We could not send a confirmation email yet. Please try again shortly.")
+        );
     }
 
     #[test]

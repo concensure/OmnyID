@@ -97,6 +97,69 @@ fn default_priority() -> String {
     "normal".to_string()
 }
 
+fn travel_request_needs_useful_fallback(task_content: &str, response: &str) -> bool {
+    let task = task_content.to_ascii_lowercase();
+    let response = response.to_ascii_lowercase();
+    let travel_request = [
+        "travel",
+        "trip",
+        "flight",
+        "hotel",
+        "itinerary",
+        "route",
+        "map",
+        "weather",
+        "forecast",
+        "destination",
+    ]
+    .iter()
+    .any(|term| task.contains(term));
+    let tool_outage = response.contains("unavailable")
+        || response.contains("could not retrieve")
+        || response.contains("couldn't retrieve")
+        || response.contains("not available");
+    let useful_guidance = [
+        "consider",
+        "pack",
+        "plan",
+        "book",
+        "check",
+        "day",
+        "itinerary",
+        "budget",
+        "stay",
+        "flight",
+        "hotel",
+        "transport",
+        "recommend",
+        "option",
+        "suggest",
+    ]
+    .iter()
+    .any(|term| response.contains(term));
+
+    travel_request && tool_outage && !useful_guidance
+}
+
+fn useful_travel_fallback(task_content: &str) -> String {
+    format!(
+        "I could not confirm the live weather or route details for this part of the trip yet. \
+         I can still help you make progress: set the destination and dates, compare refundable transport and accommodation, \
+         leave time buffers for transfers, and keep one flexible activity each day. \
+         Share the origin, destination, dates, travellers, and priorities and I will turn this into a practical itinerary. \
+         Request: {}",
+        task_content.trim()
+    )
+}
+
+fn preserve_useful_travel_answer(task_content: &str, response: String) -> String {
+    if travel_request_needs_useful_fallback(task_content, &response) {
+        useful_travel_fallback(task_content)
+    } else {
+        response
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct TaskResult {
     pub task_id: String,
@@ -679,17 +742,20 @@ async fn execute_task_llm(
         temperature: 0.3,
     };
 
-    if let Some(ep) = runpod_endpoint {
+    let response = if let Some(ep) = runpod_endpoint {
         runpod_infer(ep, api_key, model, &req)
             .await
-            .map(|r| r.content)
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?
     } else {
         anthropic_infer(api_key, model, &req)
             .await
-            .map(|r| r.content)
-            .map_err(|e| e.to_string())
-    }
+            .map_err(|e| e.to_string())?
+    };
+
+    Ok(preserve_useful_travel_answer(
+        &task.content,
+        response.content,
+    ))
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -734,6 +800,28 @@ mod tests {
     fn planning_system_prompt_omits_soul_when_none() {
         let prompt = planning_system_prompt(None, &[]);
         assert!(!prompt.contains("Agent soul context"));
+    }
+
+    #[test]
+    fn travel_tool_outage_is_replaced_with_actionable_planning_guidance() {
+        let answer = preserve_useful_travel_answer(
+            "Plan a family trip to Tokyo and check the weather and route from Sydney",
+            "Weather unavailable. Map unavailable.".to_string(),
+        );
+
+        assert!(answer.contains("refundable transport and accommodation"));
+        assert!(!answer.contains("Weather unavailable"));
+    }
+
+    #[test]
+    fn travel_answer_with_guidance_is_not_replaced_when_one_tool_is_unavailable() {
+        let response =
+            "Live weather is unavailable, but pack layers and keep a flexible indoor option."
+                .to_string();
+        assert_eq!(
+            preserve_useful_travel_answer("Plan a trip to Tokyo", response.clone()),
+            response
+        );
     }
 
     #[test]
