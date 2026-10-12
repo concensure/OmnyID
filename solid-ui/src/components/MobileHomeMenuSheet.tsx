@@ -48,6 +48,7 @@ export function MobileHomeMenuSheet(props: {
   advanced: boolean;
   paraViewEnabled: boolean;
   studyLensEnabled: boolean;
+  hideTrigger?: boolean;
   userId?: string | null;
   onSelectApp: (view: ViewName) => void;
 }) {
@@ -134,7 +135,7 @@ export function MobileHomeMenuSheet(props: {
   }
 
   return <>
-    <button
+    <Show when={!props.hideTrigger}><button
       type="button"
       class="fixed left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] z-[60] flex min-h-12 min-w-12 items-center justify-center rounded-2xl border border-white/70 bg-white/95 px-3 text-sm font-semibold text-on-surface shadow-card backdrop-blur-xl sm:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       aria-label={`Open navigation menu. Current page: ${mobileNavigationLabel(props.activeView)}`}
@@ -148,7 +149,7 @@ export function MobileHomeMenuSheet(props: {
         <span class="absolute -right-1 -top-1 min-w-5 rounded-full bg-error px-1 text-center text-xs leading-5 text-white" aria-label={`${mobileFocusMenuAttentionCount()} items need attention`}>{mobileFocusMenuAttentionCount()}</span>
       </Show>
       <span class="sr-only">Menu</span>
-    </button>
+    </button></Show>
 
     <Show when={mobileFocusMenuOpen()}>
       <div class="fixed inset-0 z-[70] phone:block sm:hidden" role="presentation">

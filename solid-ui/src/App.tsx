@@ -3311,6 +3311,7 @@ function App() {
           advanced={advanced()}
           paraViewEnabled={paraViewEnabled()}
           studyLensEnabled={studyLensEnabled()}
+          hideTrigger={activeView() === "response_queue" && primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active"}
           userId={userId()}
           onSelectApp={selectKnownView}
         />
