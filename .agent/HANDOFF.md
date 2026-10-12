@@ -1477,3 +1477,5 @@ Changed: replaced the reusable Payment Link with authenticated server-created on
 Verification: `cargo check` and `cargo test server::billing::tests --lib` passed (21 tests). `npm run typecheck` passed; rerun `npm run build` once more before deployment.
 
 Open: subscribe the Stripe destination to `checkout.session.async_payment_succeeded` if delayed payment methods are enabled. Partner co-ownership still requires backend ACL/shared-key/audit/conflict contracts and must not be presented as live shared data access.
+
+Deployment: release commit `fc93467` was staged to Oracle. The initial compose recreate encountered a verified stale generated UI-container-name conflict; the exact exited `omnyid-ui-1` container was removed and the scoped homeserver/UI start then completed. Oracle Stripe secrets were written after staging (the deployment prune removes `.secrets`), are mode `0600`, and are loaded by the homeserver entrypoint. The public workspace probe returned HTTP 200. `/readyz` is authentication-protected (HTTP 401 without its operational credential), so it was not treated as a failed health assertion.
