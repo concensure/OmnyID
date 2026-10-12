@@ -37,6 +37,7 @@ tasks:
     progress:
       - registration now reports a real transactional-delivery failure without exposing account state, and Master Agent travel answers replace tool-outage-only text with actionable planning guidance
       - Oracle Gmail OAuth client and secret files are present, but its refresh-token exchange currently returns HTTP 400; successful confirmation delivery requires a newly authorized refresh token before it can be verified end to end
+      - release commit 09d338f is staged on Oracle; the homeserver was restarted with both fixes, the public workspace returned HTTP 200, and the synchronous production proof passed
   - id: WED-181
     title: Wedding account entitlement, collaboration, and database editing reliability
     status: in_progress

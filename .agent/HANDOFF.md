@@ -1497,3 +1497,8 @@ Verification:
 Operational finding:
 
 - Oracle has the Gmail OAuth client and both file-backed Gmail secrets, and `OMNYID_BASE_URL` is set to the expected public origin. Its refresh-token exchange returns HTTP 400. A fresh user-authorized Gmail refresh token must be installed securely before confirmation mail can be delivered and the full registration flow can be verified; no credential was printed, copied, or committed.
+
+Deployment:
+
+- Commit `09d338f` was staged through the scoped Oracle homeserver/UI deployment. The running homeserver restarted with the source markers for both the email-delivery response and travel fallback; `https://omnyid.com/workspace/` returned HTTP 200.
+- `artifacts/oracle-production-proof-wed182-postdeploy/oracle-production-proof.json` reports `status=pass` with `failure_step=none` after the synchronous Oracle audit and restore drill.
