@@ -875,12 +875,18 @@ fn extract_billing_event_fields(
         .or_else(|| data.pointer("/items/data/0/plan/nickname"))
         .and_then(Value::as_str)
         .map(str::to_lowercase);
-    let status = if checkout_payment_is_paid(payload) {
-        Some("active".to_string())
-    } else {
-        data.get("status")
+    // Checkout Session status (`complete`) describes the payment flow, not an
+    // entitlement. A signed, paid completion always stores an active plan.
+    let status = match payload.get("type").and_then(Value::as_str) {
+        Some("checkout.session.completed" | "checkout.session.async_payment_succeeded")
+            if checkout_payment_is_paid(payload) =>
+        {
+            Some("active".to_string())
+        }
+        _ => data
+            .get("status")
             .and_then(Value::as_str)
-            .map(str::to_string)
+            .map(str::to_string),
     };
     let period_end = data
         .get("current_period_end")
@@ -1328,6 +1334,7 @@ mod tests {
             "data": { "object": {
                 "mode": "payment",
                 "payment_status": "paid",
+                "status": "complete",
                 "metadata": {
                     "account_id": "user_abc",
                     "omnyid_plan": "pro",
@@ -1340,6 +1347,8 @@ mod tests {
         let (account_id, _, _, plan, status, _) = extract_billing_event_fields(&paid);
         assert_eq!(account_id.as_deref(), Some("user_abc"));
         assert_eq!(plan.as_deref(), Some("pro"));
+        // Stripe marks the Checkout Session itself as `complete`; that is not
+        // the entitlement status persisted by OmnyID.
         assert_eq!(status.as_deref(), Some("active"));
 
         let unpaid = serde_json::json!({
