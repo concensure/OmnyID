@@ -115,7 +115,7 @@ function Invoke-CheckedRemoteCommand {
     $previousEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $output = & ssh.exe -i $KeyPath "$User@$RemoteHost" $Command 2>&1
+        $output = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPath "$User@$RemoteHost" $Command 2>&1
         $exitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousEap
@@ -171,7 +171,7 @@ function Assert-RemoteOracleRuntimeScripts {
 
     foreach ($requiredScript in $requiredScripts) {
         $fullPath = ($RemoteDirValue.TrimEnd('/') + '/' + $requiredScript.TrimStart('/')).Replace("'", "'\''")
-        $existsResult = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" "if [ -f '$fullPath' ]; then echo present; else echo missing; fi" 2>&1
+        $existsResult = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPathValue "$UserValue@$RemoteHostValue" "if [ -f '$fullPath' ]; then echo present; else echo missing; fi" 2>&1
         if ($LASTEXITCODE -ne 0) {
             throw "[deploy-oracle] remote runtime script verification failed for $requiredScript"
         }
@@ -181,7 +181,7 @@ function Assert-RemoteOracleRuntimeScripts {
         }
 
         if ($requiredScript.EndsWith(".sh")) {
-            $normalizeResult = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" "sed -i 's/\r$//' '$fullPath' && chmod +x '$fullPath'" 2>&1
+            $normalizeResult = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPathValue "$UserValue@$RemoteHostValue" "sed -i 's/\r$//' '$fullPath' && chmod +x '$fullPath'" 2>&1
             if ($LASTEXITCODE -ne 0) {
                 throw "[deploy-oracle] remote runtime script normalization failed for $requiredScript"
             }
@@ -213,7 +213,7 @@ function Sync-OracleSecrets {
     $stagingDir = ($RemoteDirValue.TrimEnd('/') + '/' + $stagingDirName).Replace("//", "/")
     $stagingDirLiteral = Convert-ToShellSingleQuotedLiteral $stagingDir
 
-    $mkdirSecretsOutput = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" "mkdir -p $remoteDirLiteral $stagingDirLiteral" 2>&1
+    $mkdirSecretsOutput = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPathValue "$UserValue@$RemoteHostValue" "mkdir -p $remoteDirLiteral $stagingDirLiteral" 2>&1
     if ($mkdirSecretsOutput) { $mkdirSecretsOutput | ForEach-Object { Write-Host $_ } }
     if ($LASTEXITCODE -ne 0) {
         throw "[deploy-oracle] failed to create remote secret staging directory"
@@ -245,7 +245,7 @@ function Sync-OracleSecrets {
             $remoteTargetLiteral = Convert-ToShellSingleQuotedLiteral $remoteTarget
 
             $promoteCommand = "sudo mkdir -p $remoteSecretsDirLiteral && sudo install -m 600 $stageTargetLiteral $remoteTargetLiteral"
-            $promoteOutput = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" $promoteCommand 2>&1
+            $promoteOutput = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPathValue "$UserValue@$RemoteHostValue" $promoteCommand 2>&1
             if ($promoteOutput) { $promoteOutput | ForEach-Object { Write-Host $_ } }
             if ($LASTEXITCODE -ne 0) {
                 throw "[deploy-oracle] failed to promote secret payload for $($entry.Key)"
@@ -253,13 +253,13 @@ function Sync-OracleSecrets {
         }
 
         $normalizeCommand = "sudo sh -lc 'chmod 700 $remoteSecretsRootLiteral && chmod 600 $remoteSecretsRootLiteral/*'"
-        $normalizeOutput = & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" $normalizeCommand 2>&1
+        $normalizeOutput = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPathValue "$UserValue@$RemoteHostValue" $normalizeCommand 2>&1
         if ($normalizeOutput) { $normalizeOutput | ForEach-Object { Write-Host $_ } }
         if ($LASTEXITCODE -ne 0) {
             throw "[deploy-oracle] failed to normalize remote secret permissions"
         }
     } finally {
-        & ssh.exe -i $KeyPathValue "$UserValue@$RemoteHostValue" "rm -rf $stagingDirLiteral" 2>$null | Out-Null
+        & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPathValue "$UserValue@$RemoteHostValue" "rm -rf $stagingDirLiteral" 2>$null | Out-Null
     }
 }
 
@@ -334,7 +334,7 @@ try {
 $previousEap = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $mkdirOutput = & ssh.exe -i $KeyPath "$User@$RemoteHost" "mkdir -p $RemoteDir /srv/omnyid/runtimes" 2>&1
+    $mkdirOutput = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPath "$User@$RemoteHost" "mkdir -p $RemoteDir /srv/omnyid/runtimes" 2>&1
     if ($mkdirOutput) { $mkdirOutput | ForEach-Object { Write-Host $_ } }
     $mkdirExit = $LASTEXITCODE
 
@@ -357,7 +357,7 @@ try {
         $remoteDirLiteralForPrune = Convert-ToShellSingleQuotedLiteral $RemoteDir
         $remotePrunePathArguments = Join-ShellArguments -Values $remotePrunePaths
         $remotePruneCommand = "cd $remoteDirLiteralForPrune && rm -rf -- $remotePrunePathArguments"
-        $remotePruneOutput = & ssh.exe -i $KeyPath "$User@$RemoteHost" $remotePruneCommand 2>&1
+        $remotePruneOutput = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPath "$User@$RemoteHost" $remotePruneCommand 2>&1
         if ($remotePruneOutput) { $remotePruneOutput | ForEach-Object { Write-Host $_ } }
         $remotePruneExit = $LASTEXITCODE
     }
@@ -372,7 +372,7 @@ try {
     }
     $extractCommand = "cd $RemoteDir && (tar --warning=no-unknown-keyword -xf omnyid.tar 2>/tmp/omnyid-tar-extract.err || tar -xf omnyid.tar) && rm -f omnyid.tar"
     Write-Host "[deploy-oracle] extracting runtime archive on remote host"
-    $extractOutput = & ssh.exe -i $KeyPath "$User@$RemoteHost" $extractCommand 2>&1
+    $extractOutput = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPath "$User@$RemoteHost" $extractCommand 2>&1
     if ($extractOutput) { $extractOutput | ForEach-Object { Write-Host $_ } }
     $extractExit = $LASTEXITCODE
 } finally {
