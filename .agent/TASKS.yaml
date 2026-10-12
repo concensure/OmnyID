@@ -15,6 +15,27 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-184
+    title: Restore wedding navigation, directory search, and task contact assignment
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-184
+    depends_on: [WED-183, WED-179, WED-177]
+    files:
+      - solid-ui/src/components/MobileHomeMenuSheet.tsx
+      - solid-ui/src/components/WeddingDecisionFocusCard.tsx
+      - solid-ui/src/components/WeddingVendorSearchHomeSections.tsx
+      - solid-ui/src/components/ResponseQueueView.tsx
+      - solid-ui/src/lib/wedding*State.ts
+      - solid-ui/tests/**
+      - .agent/**
+    acceptance:
+      - wedding mobile navigation remains visible, safe-area aware, and fully tappable
+      - a Mackay directory search returns Mackay Family Estate when it is available in the vendor directory
+      - task assignment can add a contact and email inline from a decision-card active to-do
+      - build and regression checks protect the restored interactions before Oracle deployment
+    progress:
+      - auditing the WED-179/WED-177 implementations and current deployed branch for regressions
   - id: WED-183
     title: Workspace bootstrap recovery and core view verification
     status: done

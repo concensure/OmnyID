@@ -5,6 +5,7 @@ import { WeddingProjectionQueuePanel } from "@/components/WeddingProjectionQueue
 import { WeddingWorkspaceContextPanels } from "@/components/WeddingWorkspaceContextPanels";
 import { WeddingVendorQuoteProofDrawer } from "@/components/WeddingVendorQuoteProofDrawer";
 import { WeddingMobileFocusHome } from "@/components/WeddingMobileFocusHome";
+import { WeddingMobilePage, weddingMobilePageTitle } from "@/components/WeddingMobilePage";
 import { weddingVendorFollowUpOutreachCardData } from "@/lib/weddingVendorFollowUpPanelActionState";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
@@ -909,6 +910,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   });
 
   return (
+    <WeddingMobilePage title={activeMenu() === 'response_queue' && isMobileFocusViewport() ? '' : weddingMobilePageTitle(activeMenu())} activeMenu={activeMenu()} onSelectMenu={props.onSelectMenu}>
     <section
       class={rootClass()}
       role="tabpanel"
@@ -1047,5 +1049,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
         )}
       </Show>
     </section>
+    </WeddingMobilePage>
   );
 }
