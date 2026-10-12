@@ -279,7 +279,7 @@ function Test-SecretPresent {
 function Test-StripeSecretKey {
     param([string]$Value)
     $trimmed = Get-TrimmedValue $Value
-    return (($trimmed.StartsWith("sk_live_") -or $trimmed.StartsWith("sk_test_")) -and $trimmed.Length -gt 8)
+    return (($trimmed.StartsWith("sk_live_") -or $trimmed.StartsWith("sk_test_") -or $trimmed.StartsWith("rk_live_") -or $trimmed.StartsWith("rk_test_")) -and $trimmed.Length -gt 8)
 }
 
 function Test-StripeWebhookSecret {
@@ -294,6 +294,21 @@ function Test-StripePriceId {
     return ($trimmed.StartsWith("price_") -and $trimmed.Length -gt 6)
 }
 
+function Test-StripeCheckoutReference {
+    param([string]$Value)
+    $trimmed = Get-TrimmedValue $Value
+    return (Test-StripePriceId $trimmed) -or ($trimmed.StartsWith("prod_") -and $trimmed.Length -gt 5)
+}
+
+function Get-FirstStripeValue {
+    param([string[]]$Names)
+    foreach ($name in $Names) {
+        $value = Get-SecretEnvValue $name
+        if (-not [string]::IsNullOrWhiteSpace($value)) { return $value }
+    }
+    return ""
+}
+
 function Test-StripeProductionConfigPresent {
     foreach ($name in @(
         "OMNYID_STRIPE_SECRET_KEY",
@@ -301,6 +316,11 @@ function Test-StripeProductionConfigPresent {
         "OMNYID_STRIPE_PRO_PRICE_ID",
         "OMNYID_STRIPE_CHECKOUT_PRICE_ID",
         "OMNYID_STRIPE_TEAM_PRICE_ID",
+        "OMNYID_STRIPE_WEDDING_PRODUCT_ID",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_PRO_PRICE_ID",
+        "STRIPE_CHECKOUT_PRICE_ID",
+        "STRIPE_PRODUCT_ID",
         "OMNYID_WORKSPACE_BASE_URL",
         "OMNYID_UI_BASE_URL"
     )) {
@@ -515,18 +535,18 @@ if ($watcherSamplingEnabled -and -not $watcherEnabled) {
 }
 
 if (Test-StripeProductionConfigPresent) {
-    if (-not (Test-StripeSecretKey (Get-EnvValue "OMNYID_STRIPE_SECRET_KEY"))) {
-        $violations.Add("OMNYID_STRIPE_SECRET_KEY must be set to a valid Stripe secret key when self-serve billing is configured")
+    $stripeSecretKey = Get-FirstStripeValue @("OMNYID_STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY")
+    if (-not (Test-StripeSecretKey $stripeSecretKey)) {
+        $violations.Add("OMNYID_STRIPE_SECRET_KEY or STRIPE_SECRET_KEY must be set to a valid Stripe secret or restricted key when self-serve billing is configured")
     }
 
     if (-not (Test-StripeWebhookSecret (Get-EnvValue "OMNYID_STRIPE_WEBHOOK_SECRET"))) {
         $violations.Add("OMNYID_STRIPE_WEBHOOK_SECRET must be set to a valid Stripe webhook secret when self-serve billing is configured")
     }
 
-    $proPriceId = Get-EnvValue "OMNYID_STRIPE_PRO_PRICE_ID"
-    $fallbackPriceId = Get-EnvValue "OMNYID_STRIPE_CHECKOUT_PRICE_ID"
-    if (-not (Test-StripePriceId $proPriceId) -and -not (Test-StripePriceId $fallbackPriceId)) {
-        $violations.Add("OMNYID_STRIPE_PRO_PRICE_ID or OMNYID_STRIPE_CHECKOUT_PRICE_ID must be set to a valid Stripe price id when self-serve billing is configured")
+    $checkoutReference = Get-FirstStripeValue @("OMNYID_STRIPE_PRO_PRICE_ID", "OMNYID_STRIPE_CHECKOUT_PRICE_ID", "OMNYID_STRIPE_WEDDING_PRODUCT_ID", "STRIPE_PRO_PRICE_ID", "STRIPE_CHECKOUT_PRICE_ID", "STRIPE_PRODUCT_ID")
+    if (-not (Test-StripeCheckoutReference $checkoutReference)) {
+        $violations.Add("A valid Stripe Wedding product or price id must be configured when self-serve billing is configured")
     }
 
     $teamPriceId = Get-TrimmedValue (Get-EnvValue "OMNYID_STRIPE_TEAM_PRICE_ID")

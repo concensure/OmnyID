@@ -8,7 +8,7 @@
 
 use crate::secret_manager::read_process_secret_trimmed;
 use crate::server::billing::{
-    billing_workspace_base_url_is_configured, stripe_checkout_price_id_for_plan,
+    billing_workspace_base_url_is_configured, stripe_checkout_reference_for_plan,
 };
 
 /// Dependency readiness probes for the /readyz endpoint (GAP-087).
@@ -198,15 +198,17 @@ pub async fn check_composio_readiness(client: &reqwest::Client) -> String {
 /// It fails closed on partial or obviously invalid configuration so `/readyz`
 /// does not report green while checkout or portal flows are dead in production.
 pub fn check_stripe_billing_readiness() -> String {
-    let secret = read_process_secret_trimmed("OMNYID_STRIPE_SECRET_KEY");
+    let secret = read_process_secret_trimmed("OMNYID_STRIPE_SECRET_KEY")
+        .or_else(|| read_process_secret_trimmed("STRIPE_SECRET_KEY"));
     let webhook_secret = read_process_secret_trimmed("OMNYID_STRIPE_WEBHOOK_SECRET");
-    let pro_price = stripe_checkout_price_id_for_plan("pro");
-    let team_price_raw = read_process_secret_trimmed("OMNYID_STRIPE_TEAM_PRICE_ID");
+    let pro_checkout_reference = stripe_checkout_reference_for_plan("pro");
+    let team_price_raw = read_process_secret_trimmed("OMNYID_STRIPE_TEAM_PRICE_ID")
+        .or_else(|| read_process_secret_trimmed("STRIPE_TEAM_PRICE_ID"));
     let return_url_ready = billing_workspace_base_url_is_configured();
 
     let any_present = secret.is_some()
         || webhook_secret.is_some()
-        || pro_price.is_some()
+        || pro_checkout_reference.is_some()
         || team_price_raw.is_some()
         || return_url_ready;
     if !any_present {
@@ -225,9 +227,8 @@ pub fn check_stripe_billing_readiness() -> String {
         return "misconfigured: missing_billing_workspace_base_url".to_string();
     }
 
-    let has_pro_price = pro_price.is_some();
-    if !has_pro_price {
-        return "misconfigured: missing_or_invalid_OMNYID_STRIPE_PRO_PRICE_ID".to_string();
+    if pro_checkout_reference.is_none() {
+        return "misconfigured: missing_or_invalid_stripe_checkout_product_or_price".to_string();
     }
 
     let team_price_valid = team_price_raw
@@ -311,8 +312,11 @@ fn secret_present(name: &str) -> bool {
 
 fn stripe_secret_key_looks_valid(value: &str) -> bool {
     let trimmed = value.trim();
-    (trimmed.starts_with("sk_live_") || trimmed.starts_with("sk_test_"))
-        && trimmed.len() > "sk_test_".len()
+    (trimmed.starts_with("sk_live_")
+        || trimmed.starts_with("sk_test_")
+        || trimmed.starts_with("rk_live_")
+        || trimmed.starts_with("rk_test_"))
+        && trimmed.len() > "rk_test_".len()
 }
 
 fn stripe_webhook_secret_looks_valid(value: &str) -> bool {

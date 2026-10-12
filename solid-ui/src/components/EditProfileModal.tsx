@@ -1,5 +1,5 @@
 ﻿// @locs-version: 1.0
-import { readSession } from "@/lib/api";
+import { createBillingCheckoutSession, readSession } from "@/lib/api";
 import { For, createEffect, createSignal } from "solid-js";
 import { DialogShell } from "@/components/DialogShell";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
@@ -29,6 +29,8 @@ export function EditProfileModal(props: { onClose: () => void }) {
   const [avatar, setAvatar] = createSignal(initial.avatar || ":)");
   const [websites, setWebsites] = createSignal<string[]>(initial.websites);
   const [saving, setSaving] = createSignal(false);
+  const [upgrading, setUpgrading] = createSignal(false);
+  const [upgradeError, setUpgradeError] = createSignal("");
   let displayNameRef: HTMLInputElement | undefined;
 
   function toggleWebsite(id: string) {
@@ -58,6 +60,23 @@ export function EditProfileModal(props: { onClose: () => void }) {
   function requestClose() {
     if (saving()) return;
     props.onClose();
+  }
+
+  async function startWeddingUpgrade() {
+    if (upgrading()) return;
+    setUpgradeError("");
+    setUpgrading(true);
+    try {
+      const checkout = await createBillingCheckoutSession("pro");
+      window.location.assign(checkout.url);
+    } catch (error) {
+      setUpgradeError(
+        error instanceof Error
+          ? error.message
+          : "We could not start secure checkout. Please try again.",
+      );
+      setUpgrading(false);
+    }
   }
 
   function handleFormShortcut(event: KeyboardEvent) {
@@ -198,9 +217,19 @@ export function EditProfileModal(props: { onClose: () => void }) {
             <p class="mt-1 text-xs leading-5 text-on-surface-variant">
               Upgrade once for AUD 39 to receive 100 MB of storage and fewer API throttles while you plan.
             </p>
-            <a href="https://buy.stripe.com/dRmeVccl50xA8fP5iG53O01" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/15">
-              Upgrade to OmnyID Wedding
-            </a>
+            <button
+              type="button"
+              onClick={() => void startWeddingUpgrade()}
+              disabled={upgrading()}
+              class="mt-3 inline-flex min-h-11 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {upgrading() ? "Opening secure checkout..." : "Upgrade to OmnyID Wedding"}
+            </button>
+            {upgradeError() && (
+              <p class="mt-2 text-xs leading-5 text-error" role="alert">
+                {upgradeError()}
+              </p>
+            )}
           </div>
 
           <div class="flex justify-end gap-2 pt-2">

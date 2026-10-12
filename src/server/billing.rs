@@ -110,6 +110,12 @@ struct BillingSelfServeConfig {
     portal_enabled: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum StripeCheckoutReference {
+    Price(String),
+    Product(String),
+}
+
 #[derive(Deserialize)]
 pub(super) struct BillingCheckoutBody {
     plan: Option<String>,
@@ -317,7 +323,7 @@ fn enrich_billing_status_with_operational_guidance(
 }
 
 fn stripe_secret_key_value() -> Option<String> {
-    read_process_secret_trimmed("OMNYID_STRIPE_SECRET_KEY")
+    stripe_config_value(&["OMNYID_STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY"])
         .filter(|value| stripe_secret_key_looks_valid(value))
 }
 
@@ -328,8 +334,11 @@ fn stripe_webhook_secret_value() -> Option<String> {
 
 fn stripe_secret_key_looks_valid(value: &str) -> bool {
     let trimmed = value.trim();
-    (trimmed.starts_with("sk_live_") || trimmed.starts_with("sk_test_"))
-        && trimmed.len() > "sk_test_".len()
+    (trimmed.starts_with("sk_live_")
+        || trimmed.starts_with("sk_test_")
+        || trimmed.starts_with("rk_live_")
+        || trimmed.starts_with("rk_test_"))
+        && trimmed.len() > "rk_test_".len()
 }
 
 fn stripe_webhook_secret_looks_valid(value: &str) -> bool {
@@ -342,6 +351,24 @@ fn stripe_price_id_looks_valid(value: &str) -> bool {
     trimmed.starts_with("price_") && trimmed.len() > "price_".len()
 }
 
+fn stripe_product_id_looks_valid(value: &str) -> bool {
+    let trimmed = value.trim();
+    trimmed.starts_with("prod_") && trimmed.len() > "prod_".len()
+}
+
+fn stripe_config_value(names: &[&str]) -> Option<String> {
+    names
+        .iter()
+        .find_map(|name| read_process_secret_trimmed(name))
+}
+
+fn stripe_checkout_reference_looks_valid(reference: &StripeCheckoutReference) -> bool {
+    match reference {
+        StripeCheckoutReference::Price(value) => stripe_price_id_looks_valid(value),
+        StripeCheckoutReference::Product(value) => stripe_product_id_looks_valid(value),
+    }
+}
+
 pub(crate) fn billing_workspace_base_url_is_configured() -> bool {
     billing_workspace_base_url().is_some()
 }
@@ -350,15 +377,15 @@ fn billing_self_serve_config() -> BillingSelfServeConfig {
     let secret_present = stripe_secret_key_value().is_some();
     let webhook_secret_present = stripe_webhook_secret_value().is_some();
     let return_url_ready = billing_workspace_base_url_is_configured();
-    let checkout_price_present = stripe_checkout_price_id_for_plan("pro")
-        .as_deref()
-        .map(stripe_price_id_looks_valid)
+    let checkout_reference_present = stripe_checkout_reference_for_plan("pro")
+        .as_ref()
+        .map(stripe_checkout_reference_looks_valid)
         .unwrap_or(false);
     BillingSelfServeConfig {
         checkout_enabled: secret_present
             && webhook_secret_present
             && return_url_ready
-            && checkout_price_present,
+            && checkout_reference_present,
         portal_enabled: secret_present && return_url_ready,
     }
 }
@@ -372,20 +399,33 @@ fn stripe_secret_key_configured() -> Result<String, (StatusCode, String)> {
     })
 }
 
-pub(crate) fn stripe_checkout_price_id_for_plan(plan: &str) -> Option<String> {
+pub(crate) fn stripe_checkout_reference_for_plan(plan: &str) -> Option<StripeCheckoutReference> {
     let value = match plan.trim().to_ascii_lowercase().as_str() {
-        "pro" => read_process_secret_trimmed("OMNYID_STRIPE_PRO_PRICE_ID")
-            .or_else(|| read_process_secret_trimmed("OMNYID_STRIPE_CHECKOUT_PRICE_ID")),
-        "team" => read_process_secret_trimmed("OMNYID_STRIPE_TEAM_PRICE_ID"),
+        "pro" => stripe_config_value(&[
+            "OMNYID_STRIPE_PRO_PRICE_ID",
+            "OMNYID_STRIPE_CHECKOUT_PRICE_ID",
+            "OMNYID_STRIPE_WEDDING_PRODUCT_ID",
+            "STRIPE_PRO_PRICE_ID",
+            "STRIPE_CHECKOUT_PRICE_ID",
+            "STRIPE_PRODUCT_ID",
+        ]),
+        "team" => stripe_config_value(&["OMNYID_STRIPE_TEAM_PRICE_ID", "STRIPE_TEAM_PRICE_ID"]),
         _ => None,
     }?;
-    stripe_price_id_looks_valid(&value).then_some(value)
+    if stripe_price_id_looks_valid(&value) {
+        Some(StripeCheckoutReference::Price(value))
+    } else if stripe_product_id_looks_valid(&value) {
+        Some(StripeCheckoutReference::Product(value))
+    } else {
+        None
+    }
 }
 
 fn billing_workspace_base_url() -> Option<String> {
     std::env::var("OMNYID_WORKSPACE_BASE_URL")
         .ok()
         .or_else(|| std::env::var("OMNYID_UI_BASE_URL").ok())
+        .and_then(|value| normalize_billing_workspace_base_url(&value))
         .or_else(|| {
             let base_url = std::env::var("OMNYID_HOMESERVER_URL").ok()?;
             let parsed = reqwest::Url::parse(base_url.trim()).ok()?;
@@ -401,6 +441,19 @@ fn billing_workspace_base_url() -> Option<String> {
             derived.set_fragment(None);
             Some(derived.to_string().trim_end_matches('/').to_string())
         })
+}
+
+fn normalize_billing_workspace_base_url(value: &str) -> Option<String> {
+    let mut parsed = reqwest::Url::parse(value.trim()).ok()?;
+    if !matches!(parsed.scheme(), "https" | "http") || parsed.host_str().is_none() {
+        return None;
+    }
+    parsed.set_query(None);
+    parsed.set_fragment(None);
+    let path = parsed.path().trim_end_matches('/').to_string();
+    let normalized_path = path.strip_suffix("/workspace").unwrap_or(&path);
+    parsed.set_path(normalized_path);
+    Some(parsed.to_string().trim_end_matches('/').to_string())
 }
 
 fn billing_workspace_return_url(status: &str) -> Result<String, (StatusCode, String)> {
@@ -421,12 +474,14 @@ async fn create_stripe_checkout_session(
     existing_customer_id: Option<&str>,
     customer_email: Option<&str>,
     account_id: &str,
-    price_id: &str,
+    checkout_reference: &StripeCheckoutReference,
 ) -> Result<String, (StatusCode, String)> {
+    let price_id = resolve_stripe_checkout_price_id(secret_key, checkout_reference).await?;
     let mut params = vec![
-        ("mode".to_string(), "subscription".to_string()),
-        ("line_items[0][price]".to_string(), price_id.to_string()),
+        ("mode".to_string(), "payment".to_string()),
+        ("line_items[0][price]".to_string(), price_id),
         ("line_items[0][quantity]".to_string(), "1".to_string()),
+        ("customer_creation".to_string(), "always".to_string()),
         (
             "success_url".to_string(),
             billing_workspace_return_url("checkout_success")?,
@@ -438,6 +493,11 @@ async fn create_stripe_checkout_session(
         ("client_reference_id".to_string(), account_id.to_string()),
         ("allow_promotion_codes".to_string(), "true".to_string()),
         ("metadata[account_id]".to_string(), account_id.to_string()),
+        ("metadata[omnyid_plan]".to_string(), "pro".to_string()),
+        (
+            "metadata[billing_product]".to_string(),
+            "omnyid_wedding".to_string(),
+        ),
     ];
     if let Some(customer_id) = existing_customer_id.filter(|value| !value.trim().is_empty()) {
         params.push(("customer".to_string(), customer_id.to_string()));
@@ -480,6 +540,111 @@ async fn create_stripe_checkout_session(
                 "Stripe checkout session response was missing a redirect URL.".to_string(),
             )
         })
+}
+
+async fn resolve_stripe_checkout_price_id(
+    secret_key: &str,
+    checkout_reference: &StripeCheckoutReference,
+) -> Result<String, (StatusCode, String)> {
+    let StripeCheckoutReference::Product(product_id) = checkout_reference else {
+        return match checkout_reference {
+            StripeCheckoutReference::Price(price_id) => Ok(price_id.clone()),
+            StripeCheckoutReference::Product(_) => unreachable!(),
+        };
+    };
+
+    let client = reqwest::Client::new();
+    let product_url = format!("https://api.stripe.com/v1/products/{product_id}");
+    let product_response = client
+        .get(product_url)
+        .basic_auth(secret_key, Some(""))
+        .send()
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::BAD_GATEWAY,
+                "Stripe product lookup failed.".to_string(),
+            )
+        })?;
+    if !product_response.status().is_success() {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            "Stripe product lookup could not be completed.".to_string(),
+        ));
+    }
+    let product: Value = product_response.json().await.map_err(|_| {
+        (
+            StatusCode::BAD_GATEWAY,
+            "Stripe product lookup returned an invalid response.".to_string(),
+        )
+    })?;
+    let default_price_id = product
+        .get("default_price")
+        .and_then(Value::as_str)
+        .filter(|value| stripe_price_id_looks_valid(value));
+
+    let prices_response = client
+        .get("https://api.stripe.com/v1/prices")
+        .basic_auth(secret_key, Some(""))
+        .query(&[
+            ("product", product_id.as_str()),
+            ("active", "true"),
+            ("type", "one_time"),
+            ("currency", "aud"),
+            ("limit", "100"),
+        ])
+        .send()
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::BAD_GATEWAY,
+                "Stripe price lookup failed.".to_string(),
+            )
+        })?;
+    if !prices_response.status().is_success() {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            "Stripe price lookup could not be completed.".to_string(),
+        ));
+    }
+    let prices: Value = prices_response.json().await.map_err(|_| {
+        (
+            StatusCode::BAD_GATEWAY,
+            "Stripe price lookup returned an invalid response.".to_string(),
+        )
+    })?;
+    let candidates = prices
+        .get("data")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter(|item| {
+                    item.get("active").and_then(Value::as_bool) == Some(true)
+                        && item.get("type").and_then(Value::as_str) == Some("one_time")
+                        && item.get("currency").and_then(Value::as_str) == Some("aud")
+                })
+                .filter_map(|item| item.get("id").and_then(Value::as_str))
+                .filter(|id| stripe_price_id_looks_valid(id))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if let Some(default_price_id) = default_price_id {
+        if candidates
+            .iter()
+            .any(|candidate| *candidate == default_price_id)
+        {
+            return Ok(default_price_id.to_string());
+        }
+    }
+    if candidates.len() == 1 {
+        return Ok(candidates[0].to_string());
+    }
+    Err((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "The configured Stripe product needs one active one-off AUD price or a default price."
+            .to_string(),
+    ))
 }
 
 async fn create_stripe_billing_portal_session(
@@ -533,8 +698,10 @@ async fn create_stripe_billing_portal_session(
 /// POST /billing/webhook
 ///
 /// Stripe webhook receiver. Idempotent via `stripe_event_id`.
-/// Supported events: `customer.subscription.created/updated/deleted`,
-/// `invoice.payment_succeeded`, `invoice.payment_failed`.
+/// Supported events include one-off Checkout completion and legacy subscription
+/// notifications.  A Checkout completion upgrades an account only when Stripe
+/// reports that the payment is paid and the session carries our server-set
+/// account binding.
 ///
 /// Set `OMNYID_STRIPE_WEBHOOK_SECRET` to enable signature verification.
 pub(super) async fn billing_webhook_http(
@@ -546,7 +713,7 @@ pub(super) async fn billing_webhook_http(
     // Set OMNYID_STRIPE_WEBHOOK_SECRET to the signing secret from the Stripe dashboard.
     // If the secret is absent the webhook is rejected unless
     // OMNYID_STRIPE_SKIP_WEBHOOK_VERIFY=true is explicitly set (dev/testing only).
-    let webhook_secret = std::env::var("OMNYID_STRIPE_WEBHOOK_SECRET").ok();
+    let webhook_secret = stripe_webhook_secret_value();
     match &webhook_secret {
         Some(secret) => {
             let stripe_sig = headers
@@ -612,7 +779,8 @@ pub(super) async fn billing_webhook_http(
         })));
     }
 
-    if let Some(acct) = &account_id {
+    if billing_event_updates_entitlement(&payload, account_id.as_deref()) {
+        let acct = account_id.as_deref().expect("checked above");
         state
             .db
             .upsert_billing_subscription(
@@ -701,14 +869,19 @@ fn extract_billing_event_fields(
                 .map(str::to_string)
         });
     let plan = data
-        .pointer("/plan/nickname")
+        .pointer("/metadata/omnyid_plan")
+        .or_else(|| data.pointer("/metadata/plan"))
+        .or_else(|| data.pointer("/plan/nickname"))
         .or_else(|| data.pointer("/items/data/0/plan/nickname"))
         .and_then(Value::as_str)
         .map(str::to_lowercase);
-    let status = data
-        .get("status")
-        .and_then(Value::as_str)
-        .map(str::to_string);
+    let status = if checkout_payment_is_paid(payload) {
+        Some("active".to_string())
+    } else {
+        data.get("status")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    };
     let period_end = data
         .get("current_period_end")
         .and_then(Value::as_i64)
@@ -732,6 +905,47 @@ fn extract_billing_event_fields(
         status,
         period_end,
     )
+}
+
+fn checkout_payment_is_paid(payload: &Value) -> bool {
+    let event_type = payload
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if !matches!(
+        event_type,
+        "checkout.session.completed" | "checkout.session.async_payment_succeeded"
+    ) {
+        return false;
+    }
+    let data = payload.pointer("/data/object").unwrap_or(&Value::Null);
+    data.get("mode").and_then(Value::as_str) == Some("payment")
+        && data.get("payment_status").and_then(Value::as_str) == Some("paid")
+        && data
+            .pointer("/metadata/billing_product")
+            .and_then(Value::as_str)
+            == Some("omnyid_wedding")
+}
+
+fn billing_event_updates_entitlement(payload: &Value, account_id: Option<&str>) -> bool {
+    if account_id.is_none() {
+        return false;
+    }
+    let event_type = payload
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    match event_type {
+        "checkout.session.completed" | "checkout.session.async_payment_succeeded" => {
+            checkout_payment_is_paid(payload)
+        }
+        "customer.subscription.created"
+        | "customer.subscription.updated"
+        | "customer.subscription.deleted"
+        | "invoice.payment_succeeded"
+        | "invoice.payment_failed" => true,
+        _ => false,
+    }
 }
 
 /// GET /billing/status
@@ -901,12 +1115,13 @@ pub(super) async fn billing_checkout_http(
         .filter(|value| !value.is_empty())
         .unwrap_or("pro")
         .to_ascii_lowercase();
-    let price_id = stripe_checkout_price_id_for_plan(&requested_plan).ok_or_else(|| {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Stripe checkout is not configured for the requested plan.".to_string(),
-        )
-    })?;
+    let checkout_reference =
+        stripe_checkout_reference_for_plan(&requested_plan).ok_or_else(|| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Stripe checkout is not configured for the requested plan.".to_string(),
+            )
+        })?;
     let status = state
         .db
         .get_billing_status(&user.id)
@@ -935,7 +1150,7 @@ pub(super) async fn billing_checkout_http(
         status.get("stripe_customer_id").and_then(Value::as_str),
         Some(&user.email),
         &user.id,
-        &price_id,
+        &checkout_reference,
     )
     .await?;
     Ok(Json(serde_json::json!({
@@ -1009,10 +1224,13 @@ pub(super) async fn billing_archive_only_http(
 mod tests {
     use super::{
         FREE_MAX_UPLOAD_BYTES, FREE_STORAGE_BYTES, PAID_MAX_UPLOAD_BYTES, PAID_STORAGE_BYTES,
-        STRIPE_WEBHOOK_TIMESTAMP_TOLERANCE_SECS, billing_self_serve_config,
-        connected_tool_billing_json, enrich_billing_status_with_external_tool_usage,
+        STRIPE_WEBHOOK_TIMESTAMP_TOLERANCE_SECS, StripeCheckoutReference,
+        billing_event_updates_entitlement, billing_self_serve_config, billing_workspace_return_url,
+        checkout_payment_is_paid, connected_tool_billing_json,
+        enrich_billing_status_with_external_tool_usage,
         enrich_billing_status_with_operational_guidance, enrich_billing_status_with_storage,
         extract_billing_event_fields, normalize_usage_event_text, storage_policy_for_plan,
+        stripe_checkout_reference_for_plan, stripe_secret_key_looks_valid,
         usage_event_number_is_valid, verify_stripe_signature_at,
     };
     use crate::db::{
@@ -1032,6 +1250,11 @@ mod tests {
             "OMNYID_STRIPE_PRO_PRICE_ID",
             "OMNYID_STRIPE_CHECKOUT_PRICE_ID",
             "OMNYID_STRIPE_TEAM_PRICE_ID",
+            "OMNYID_STRIPE_WEDDING_PRODUCT_ID",
+            "STRIPE_SECRET_KEY",
+            "STRIPE_PRO_PRICE_ID",
+            "STRIPE_CHECKOUT_PRICE_ID",
+            "STRIPE_PRODUCT_ID",
             "OMNYID_WORKSPACE_BASE_URL",
             "OMNYID_UI_BASE_URL",
             "OMNYID_HOMESERVER_URL",
@@ -1099,6 +1322,42 @@ mod tests {
     }
 
     #[test]
+    fn paid_wedding_checkout_event_is_the_only_checkout_event_that_changes_entitlement() {
+        let paid = serde_json::json!({
+            "type": "checkout.session.completed",
+            "data": { "object": {
+                "mode": "payment",
+                "payment_status": "paid",
+                "metadata": {
+                    "account_id": "user_abc",
+                    "omnyid_plan": "pro",
+                    "billing_product": "omnyid_wedding"
+                }
+            }}
+        });
+        assert!(checkout_payment_is_paid(&paid));
+        assert!(billing_event_updates_entitlement(&paid, Some("user_abc")));
+        let (account_id, _, _, plan, status, _) = extract_billing_event_fields(&paid);
+        assert_eq!(account_id.as_deref(), Some("user_abc"));
+        assert_eq!(plan.as_deref(), Some("pro"));
+        assert_eq!(status.as_deref(), Some("active"));
+
+        let unpaid = serde_json::json!({
+            "type": "checkout.session.completed",
+            "data": { "object": {
+                "mode": "payment",
+                "payment_status": "unpaid",
+                "metadata": { "account_id": "user_abc", "billing_product": "omnyid_wedding" }
+            }}
+        });
+        assert!(!checkout_payment_is_paid(&unpaid));
+        assert!(!billing_event_updates_entitlement(
+            &unpaid,
+            Some("user_abc")
+        ));
+    }
+
+    #[test]
     fn stripe_webhook_signature_accepts_valid_recent_payload() {
         let secret = "whsec_test_secret";
         let body = r#"{"id":"evt_123","type":"invoice.payment_succeeded"}"#;
@@ -1160,7 +1419,11 @@ mod tests {
             "plan": "free",
             "status": "active"
         });
-        let policy = enrich_billing_status_with_storage(&mut status, FREE_STORAGE_BYTES + 1024, "member@example.com");
+        let policy = enrich_billing_status_with_storage(
+            &mut status,
+            FREE_STORAGE_BYTES + 1024,
+            "member@example.com",
+        );
         assert_eq!(policy.quota_bytes, FREE_STORAGE_BYTES);
         assert_eq!(status["quota_state"].as_str(), Some("exceeded"));
         assert_eq!(status["storage_remaining_bytes"].as_i64(), Some(0));
@@ -1179,13 +1442,14 @@ mod tests {
             "plan": "pro_plus_storage",
             "status": "active"
         });
-        let policy = enrich_billing_status_with_storage(&mut status, PAID_STORAGE_BYTES, "member@example.com");
+        let policy = enrich_billing_status_with_storage(
+            &mut status,
+            PAID_STORAGE_BYTES,
+            "member@example.com",
+        );
         assert_eq!(policy.addon_count, 0);
         assert_eq!(status["quota_state"].as_str(), Some("ok"));
-        assert_eq!(
-            status["storage_remaining_bytes"].as_i64(),
-            Some(0)
-        );
+        assert_eq!(status["storage_remaining_bytes"].as_i64(), Some(0));
         assert_eq!(status["storage_addon_count"].as_u64(), Some(0));
     }
 
@@ -1197,7 +1461,11 @@ mod tests {
             "status": "active",
             "archive_only_enabled": true
         });
-        enrich_billing_status_with_storage(&mut status, PAID_STORAGE_BYTES + 1, "member@example.com");
+        enrich_billing_status_with_storage(
+            &mut status,
+            PAID_STORAGE_BYTES + 1,
+            "member@example.com",
+        );
         assert_eq!(status["archive_only_enabled"].as_bool(), Some(true));
         let warning = status["archive_only_warning"].as_str().unwrap_or("");
         assert!(warning.contains("Archive-only mode is active"));
@@ -1302,18 +1570,27 @@ mod tests {
     }
 
     #[test]
-    fn billing_self_serve_config_rejects_invalid_price_ids() {
+    fn billing_self_serve_config_accepts_a_product_reference_and_restricted_key() {
         let _guard = billing_env_lock().lock().expect("lock billing env");
         clear_billing_env();
         unsafe {
-            std::env::set_var("OMNYID_STRIPE_SECRET_KEY", "sk_test_123");
+            std::env::set_var("STRIPE_SECRET_KEY", "rk_test_123");
             std::env::set_var("OMNYID_STRIPE_WEBHOOK_SECRET", "whsec_123");
-            std::env::set_var("OMNYID_STRIPE_PRO_PRICE_ID", "prod_123");
-            std::env::set_var("OMNYID_WORKSPACE_BASE_URL", "https://app.omnyid.com");
+            std::env::set_var("STRIPE_PRO_PRICE_ID", "prod_123");
+            std::env::set_var("OMNYID_WORKSPACE_BASE_URL", "https://omnyid.com/workspace/");
         }
         let config = billing_self_serve_config();
-        assert!(!config.checkout_enabled);
+        assert!(config.checkout_enabled);
         assert!(config.portal_enabled);
+        assert!(stripe_secret_key_looks_valid("rk_live_123"));
+        assert_eq!(
+            stripe_checkout_reference_for_plan("pro"),
+            Some(StripeCheckoutReference::Product("prod_123".to_string()))
+        );
+        assert_eq!(
+            billing_workspace_return_url("checkout_success").as_deref(),
+            Ok("https://omnyid.com/workspace/?billing=checkout_success")
+        );
         clear_billing_env();
     }
 

@@ -412,3 +412,9 @@ Stripe Payment Link without embedding a Stripe credential.
 Database grid row, cell, and field mutations each emit an AFP message. Successful messages are
 also projected locally until the dashboard refresh arrives, so a successful save is immediately
 visible rather than appearing to fail. Field definitions use `database_schema_update` AFP messages.
+
+## 2026-10-12: One-off Stripe Wedding entitlement
+
+OmnyID Wedding uses authenticated server-created Stripe Checkout in `payment` mode instead of a reusable Payment Link, preserving an internal account binding and keeping credentials out of the browser.
+
+The server accepts a restricted key and either a Price ID or Product ID. A product must resolve to one active AUD one-off price (or a matching default price). The webhook grants entitlement only for a signed paid Checkout event with server-issued Wedding metadata and a bound account ID. Workspace return URLs normalize to one `/workspace/` segment.

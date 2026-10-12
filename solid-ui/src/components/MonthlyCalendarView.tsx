@@ -1490,7 +1490,7 @@ export function MonthlyCalendarView(props: {
               }
             >
               <div style={{ display: "flex", "flex-direction": "column", gap: "0.9em" }}>
-                <Show when={selectedEvent()!.summary.trim() !== selectedEvent()!.description.trim()}>
+                <Show when={(selectedEvent()?.summary ?? "").trim() !== (selectedEvent()?.description ?? "").trim()}>
                 <div style={detailCardStyle()}>
                   <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "0.75em" }}>
                     <div style={{ display: "flex", gap: "0.55em", "align-items": "center" }}>

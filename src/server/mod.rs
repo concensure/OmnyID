@@ -10881,8 +10881,11 @@ fn env_var_present(name: &str) -> bool {
 
 fn stripe_secret_key_looks_valid(value: &str) -> bool {
     let trimmed = value.trim();
-    (trimmed.starts_with("sk_live_") || trimmed.starts_with("sk_test_"))
-        && trimmed.len() > "sk_test_".len()
+    (trimmed.starts_with("sk_live_")
+        || trimmed.starts_with("sk_test_")
+        || trimmed.starts_with("rk_live_")
+        || trimmed.starts_with("rk_test_"))
+        && trimmed.len() > "rk_test_".len()
 }
 
 fn stripe_webhook_secret_looks_valid(value: &str) -> bool {
@@ -10902,6 +10905,11 @@ fn stripe_production_config_present() -> bool {
         "OMNYID_STRIPE_PRO_PRICE_ID",
         "OMNYID_STRIPE_CHECKOUT_PRICE_ID",
         "OMNYID_STRIPE_TEAM_PRICE_ID",
+        "OMNYID_STRIPE_WEDDING_PRODUCT_ID",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_PRO_PRICE_ID",
+        "STRIPE_CHECKOUT_PRICE_ID",
+        "STRIPE_PRODUCT_ID",
         "OMNYID_WORKSPACE_BASE_URL",
         "OMNYID_UI_BASE_URL",
     ]
@@ -10945,31 +10953,30 @@ fn validate_startup_deployment_policy() -> Result<(), String> {
     }
 
     if stripe_production_config_present() {
-        let stripe_secret = std::env::var("OMNYID_STRIPE_SECRET_KEY").unwrap_or_default();
+        let stripe_secret = crate::secret_manager::read_process_secret_trimmed(
+            "OMNYID_STRIPE_SECRET_KEY",
+        )
+        .or_else(|| crate::secret_manager::read_process_secret_trimmed("STRIPE_SECRET_KEY"))
+        .unwrap_or_default();
         if !stripe_secret_key_looks_valid(&stripe_secret) {
             violations.push(
                 "OMNYID_STRIPE_SECRET_KEY must be set to a valid Stripe secret key when self-serve billing is configured".to_string(),
             );
         }
 
-        let webhook_secret = std::env::var("OMNYID_STRIPE_WEBHOOK_SECRET").unwrap_or_default();
+        let webhook_secret = crate::secret_manager::read_process_secret_trimmed(
+            "OMNYID_STRIPE_WEBHOOK_SECRET",
+        )
+        .unwrap_or_default();
         if !stripe_webhook_secret_looks_valid(&webhook_secret) {
             violations.push(
                 "OMNYID_STRIPE_WEBHOOK_SECRET must be set to a valid Stripe webhook secret when self-serve billing is configured".to_string(),
             );
         }
 
-        let pro_price = std::env::var("OMNYID_STRIPE_PRO_PRICE_ID")
-            .ok()
-            .filter(|value| stripe_price_id_looks_valid(value))
-            .or_else(|| {
-                std::env::var("OMNYID_STRIPE_CHECKOUT_PRICE_ID")
-                    .ok()
-                    .filter(|value| stripe_price_id_looks_valid(value))
-            });
-        if pro_price.is_none() {
+        if self::billing::stripe_checkout_reference_for_plan("pro").is_none() {
             violations.push(
-                "OMNYID_STRIPE_PRO_PRICE_ID or OMNYID_STRIPE_CHECKOUT_PRICE_ID must be set to a valid Stripe price id when self-serve billing is configured".to_string(),
+                "a valid Stripe Wedding product or price must be configured when self-serve billing is configured".to_string(),
             );
         }
 

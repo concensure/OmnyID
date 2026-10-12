@@ -32,11 +32,13 @@ tasks:
       - .agent/**
     acceptance:
       - standard accounts receive 50 MiB storage, paid accounts 100 MiB, and administrators are exempt
-      - the profile upgrade path describes the one-off Wedding upgrade without exposing payment credentials
+      - the profile upgrade path starts a signed, account-bound one-off Wedding Checkout without exposing payment credentials
+      - Stripe product identifiers and restricted server keys are accepted without treating a paid Wedding upgrade as a subscription
       - database rows and columns can be added and edited, and saving emits a durable AFP message
       - partner and collaborator actions use existing access controls without leaking internal messages
     progress:
       - WED-178 through WED-180 are release ancestors; storage and database editor changes are ready for deployment
+      - Stripe Checkout resolves the configured one-off Wedding product and only entitles a signed paid checkout bound to the authenticated account
       - partner co-ownership remains separately blocked on the existing missing backend ACL, shared-key, audit, and conflict-resolution contracts
   - id: WED-180
     title: Wedding inspiration, calendar, and mobile timeline polish

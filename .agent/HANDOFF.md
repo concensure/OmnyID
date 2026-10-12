@@ -1469,3 +1469,11 @@ Verification:
 Open:
 
 - Existing wedding collaboration UI is explicitly a scaffold: durable partner co-ownership still needs backend ACLs, shared-key distribution, per-collaborator audit, and conflict handling. Do not represent its current invite controls as live shared access.
+
+## 2026-10-12 - WED-181 Stripe Checkout completion
+
+Changed: replaced the reusable Payment Link with authenticated server-created one-off Stripe Checkout; added restricted-key/Product-ID support; passed Stripe configuration only to the Oracle homeserver; made file-backed webhook secrets work; normalized workspace returns; and repaired a calendar null-safety type error.
+
+Verification: `cargo check` and `cargo test server::billing::tests --lib` passed (21 tests). `npm run typecheck` passed; rerun `npm run build` once more before deployment.
+
+Open: subscribe the Stripe destination to `checkout.session.async_payment_succeeded` if delayed payment methods are enabled. Partner co-ownership still requires backend ACL/shared-key/audit/conflict contracts and must not be presented as live shared data access.
