@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-183
     title: Workspace bootstrap recovery and core view verification
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-183
     depends_on: [WED-182]
@@ -34,7 +34,8 @@ tasks:
     progress:
       - fixed eager Solid memo ordering in Database, Notes, and Workflows composer; workflow API failures now remain retryable in-view
       - selectively removes tagged disposable vendor smoke artifacts without exposing internal cleanup copy
-      - local signed-session browser checks, typecheck, build, and focused tests completed; awaiting Oracle deployment
+      - local signed-session browser checks, typecheck, build, and focused tests completed
+      - deployed commit b7cf8c1 to Oracle; scripted post-deploy proof and clean production browser check passed
   - id: WED-182
     title: Custom-email confirmation delivery and Master Agent travel resilience
     status: in_progress

@@ -7,7 +7,8 @@
 - Wedding vendor smoke fixtures are selectively removed from the matching signed-in browser workspace and no longer show the internal cleanup directive or block a real search.
 - Local signed-session browser checks confirmed Database, Notes, and Workflows render without the global error boundary. Database's existing `database_record` AFP save path was inspected; its networked write needs an authenticated homeserver session for end-to-end production exercise.
 - Verification run: `npm run typecheck`, `npm run build`, focused Node tests for database failure handling, vendor smoke fixture cleanup, workflow editor failures, and workflow wait/resume failures (15 passed).
-- Pending: commit this WED-183 branch, deploy the UI to Oracle with the existing production script, then run Oracle proof and mark the task done.
+- Released as `b7cf8c1` (`fix(WED-183): recover workspace core views`). Oracle deployment used the existing remote environment; its scripted post-deploy proof passed at `artifacts/oracle-production-proof-wed183-deploy/postdeploy`.
+- A clean production Chromium check passed against `https://omnyid.com/workspace/?auth=signin&source=wedding` (HTTP 200, no page errors). The deployed workspace references `main-BOriMZtG.js`.
 
 ## 2026-10-12 - WED-180 inspiration, calendar and timeline polish (Codex)
 
