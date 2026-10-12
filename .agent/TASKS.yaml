@@ -15,6 +15,29 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-181
+    title: Wedding account entitlement, collaboration, and database editing reliability
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-181
+    depends_on: [WED-180]
+    files:
+      - src/server/billing.rs
+      - src/server/file_upload_routes.rs
+      - solid-ui/src/components/EditProfileModal.tsx
+      - solid-ui/src/components/DatabaseView.tsx
+      - solid-ui/src/lib/pricing.ts
+      - solid-ui/src/lib/weddingCollaboration*.ts
+      - solid-ui/tests/**
+      - .agent/**
+    acceptance:
+      - standard accounts receive 50 MiB storage, paid accounts 100 MiB, and administrators are exempt
+      - the profile upgrade path describes the one-off Wedding upgrade without exposing payment credentials
+      - database rows and columns can be added and edited, and saving emits a durable AFP message
+      - partner and collaborator actions use existing access controls without leaking internal messages
+    progress:
+      - WED-178 through WED-180 are release ancestors; storage and database editor changes are ready for deployment
+      - partner co-ownership remains separately blocked on the existing missing backend ACL, shared-key, audit, and conflict-resolution contracts
   - id: WED-180
     title: Wedding inspiration, calendar, and mobile timeline polish
     status: done

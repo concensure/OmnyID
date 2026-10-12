@@ -39,7 +39,7 @@ test("billing derived state centralizes plan, storage, and payment labels", () =
   assert.equal(derived.checkoutAvailabilityLabel, "available");
   assert.equal(derived.storageUsageLabel, "1.0 KB");
   assert.equal(derived.quotaStateLabel, "ok");
-  assert.equal(derived.nextUpgradeLabel, "Paid - 2 GB for $20/mo");
+  assert.equal(derived.nextUpgradeLabel, "OmnyID Wedding - 100 MB for AUD 39 once");
   assert.equal(derived.upgradePathHeadline, "Self-serve checkout is configured");
   assert.equal(derived.manualRequestLabel, "Request upgrade");
   assert.equal(derived.billingPortalHeadline, "Not configured on this deployment");

@@ -24,6 +24,11 @@ export type DatabaseViewColumnDef = {
   label: string;
 };
 
+export type DatabaseViewSchemaUpdate = {
+  table: string;
+  column: DatabaseViewColumnDef;
+};
+
 export function databaseScalarString(value: unknown, fallback = ""): string {
   return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
 }
@@ -65,6 +70,29 @@ export function databaseRecordUpdateFromMessage(msg: {
     patch: rawPatch,
     timestamp: msg.timestamp ?? "",
   };
+}
+
+export function databaseSchemaUpdateFromMessage(msg: { content: unknown }): DatabaseViewSchemaUpdate | null {
+  if (!isRecord(msg.content) || msg.content.kind !== "database_schema_update") return null;
+  const table = databaseScalarString(msg.content.table ?? msg.content.database, "default");
+  const column = isRecord(msg.content.column) ? msg.content.column : null;
+  const key = databaseScalarString(column?.key, "").trim();
+  const label = databaseScalarString(column?.label, key).trim();
+  if (!key || !label) return null;
+  return { table, column: { key, label } };
+}
+
+export function databaseSchemaColumnsFromMessages(
+  messages: Array<{ content: unknown }>,
+  table: string | null,
+): DatabaseViewColumnDef[] {
+  const columns = new Map<string, DatabaseViewColumnDef>();
+  for (const message of messages) {
+    const schema = databaseSchemaUpdateFromMessage(message);
+    if (!schema || (table && schema.table !== table)) continue;
+    columns.set(schema.column.key, schema.column);
+  }
+  return Array.from(columns.values());
 }
 
 export function databaseRecordsFromMessages(
@@ -130,13 +158,17 @@ export function databaseImportPreviewRows(rows: Record<string, unknown>[]): stri
 export function databaseColumnDefs(
   records: DatabaseViewRecord[],
   ghostHeaders: string[],
+  declaredColumns: DatabaseViewColumnDef[] = [],
 ): DatabaseViewColumnDef[] {
-  const keys = new Set<string>();
+  const columns = new Map<string, DatabaseViewColumnDef>();
+  for (const column of declaredColumns) columns.set(column.key, column);
   for (const record of records.slice(0, 20)) {
-    for (const key of Object.keys(record.data)) keys.add(key);
+    for (const key of Object.keys(record.data)) {
+      if (!columns.has(key)) columns.set(key, { key, label: key });
+    }
   }
-  if (keys.size === 0) return ghostHeaders.map((header) => ({ key: header.toLowerCase(), label: header }));
-  return Array.from(keys).slice(0, 8).map((key) => ({ key, label: key }));
+  if (columns.size === 0) return ghostHeaders.map((header) => ({ key: header.toLowerCase(), label: header }));
+  return Array.from(columns.values()).slice(0, 8);
 }
 
 export function formatDatabaseEditableValue(value: unknown): string {

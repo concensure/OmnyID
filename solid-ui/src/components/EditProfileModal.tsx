@@ -193,6 +193,16 @@ export function EditProfileModal(props: { onClose: () => void }) {
             </div>
           </div>
 
+          <div class="rounded-2xl border border-primary/25 bg-primary/7 p-4">
+            <p class="text-sm font-semibold text-on-surface">OmnyID Wedding</p>
+            <p class="mt-1 text-xs leading-5 text-on-surface-variant">
+              Upgrade once for AUD 39 to receive 100 MB of storage and fewer API throttles while you plan.
+            </p>
+            <a href="https://buy.stripe.com/dRmeVccl50xA8fP5iG53O01" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/15">
+              Upgrade to OmnyID Wedding
+            </a>
+          </div>
+
           <div class="flex justify-end gap-2 pt-2">
             <button
               type="button"

@@ -401,3 +401,14 @@ public SeaweedFS namespace, and deletes stored derivatives if its database write
 derivative is served only for an active vendor listing that is claimed or verified. This keeps
 metadata out of public delivery and prevents an unverified claimant from immediately publishing
 to the directory.
+
+## 2026-10-12: Wedding storage entitlement and database persistence
+
+The storage limit is enforced at every server-side status and file-upload path: standard accounts
+receive 50 MiB and paid Wedding accounts receive 100 MiB. Configured operator email accounts are
+exempt; a client-visible plan string cannot grant that exemption. The profile uses the supplied
+Stripe Payment Link without embedding a Stripe credential.
+
+Database grid row, cell, and field mutations each emit an AFP message. Successful messages are
+also projected locally until the dashboard refresh arrives, so a successful save is immediately
+visible rather than appearing to fail. Field definitions use `database_schema_update` AFP messages.

@@ -3,9 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   hasRecognizedPlanMetadata,
-  STORAGE_ADDON,
   STORAGE_PLANS,
-  formatUsdPerMonth,
+  formatAudOneOff,
   nextStorageUpgradeLabel,
   normalizePlanId,
 } from "../src/lib/pricing.ts";
@@ -31,21 +30,20 @@ test("hasRecognizedPlanMetadata only accepts supported plan ids", () => {
   assert.equal(hasRecognizedPlanMetadata("enterprise_custom"), false);
 });
 
-test("formatUsdPerMonth renders whole-dollar monthly pricing", () => {
-  assert.equal(formatUsdPerMonth(STORAGE_PLANS.paid.monthlyPriceUsd), "$20/mo");
-  assert.equal(formatUsdPerMonth(STORAGE_ADDON.monthlyPriceUsd), "$10/mo");
+test("formatAudOneOff renders the Wedding one-off price", () => {
+  assert.equal(formatAudOneOff(STORAGE_PLANS.paid.priceAud), "AUD 39 one-off");
 });
 
 test("nextStorageUpgradeLabel reflects the free-to-paid upgrade path", () => {
   assert.equal(
     nextStorageUpgradeLabel("free"),
-    "Paid - 2 GB for $20/mo",
+    "OmnyID Wedding - 100 MB for AUD 39 once",
   );
 });
 
 test("nextStorageUpgradeLabel reflects the paid storage add-on path", () => {
   assert.equal(
     nextStorageUpgradeLabel("paid"),
-    "Additional storage - +10 GB for $10/mo",
+    "Your OmnyID Wedding upgrade is active (100 MB storage).",
   );
 });

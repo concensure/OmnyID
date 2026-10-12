@@ -55,9 +55,7 @@ import {
   type CostDashboardFailureReceipt,
 } from "@/lib/costDashboardFailureState";
 import {
-  STORAGE_ADDON,
   STORAGE_PLANS,
-  formatUsdPerMonth,
   hasRecognizedPlanMetadata,
   nextStorageUpgradeLabel,
   normalizePlanId,
@@ -968,7 +966,7 @@ export function CostDashboardView(props: { initialSnapshot?: DashboardBootstrap[
                 </div>
                 <Show when={hasRecognizedPlanState() && normalizedPlanId() === "paid"}>
                   <p class="text-xs text-on-surface-variant/65">
-                    Current paid expansion block: +{STORAGE_ADDON.storageQuotaGb} GB for {formatUsdPerMonth(STORAGE_ADDON.monthlyPriceUsd)}.
+                    OmnyID Wedding includes 100 MB of storage after the one-off upgrade.
                   </p>
                 </Show>
               </div>

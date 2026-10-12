@@ -22,7 +22,7 @@ test("buildBillingUpgradeRequestBody includes account and storage context", () =
 
   assert.match(body, /Account email: owner@example\.com/);
   assert.match(body, /Current plan: Free/);
-  assert.match(body, /Suggested next upgrade: Paid - 2 GB for \$20\/mo/);
+  assert.match(body, /Suggested next upgrade: OmnyID Wedding - 100 MB for AUD 39 one-off/);
   assert.match(body, /Storage used: 512 MB/);
   assert.match(body, /Storage remaining: 512 MB of 1\.0 GB/);
 });
@@ -41,7 +41,7 @@ test("buildBillingUpgradeMailtoHref targets the support inbox and encodes the bo
 
   assert.match(href, new RegExp(`^mailto:${BILLING_UPGRADE_EMAIL}\\?subject=`));
   assert.match(decodeURIComponent(href), /Account email: ops@example\.com/);
-  assert.match(decodeURIComponent(href), /Suggested next upgrade: Additional storage - \+10 GB for \$10\/mo/);
+  assert.match(decodeURIComponent(href), /Suggested next upgrade: Your OmnyID Wedding upgrade is active \(100 MB storage\)\./);
 });
 
 test("buildBillingUpgradeRequestBody does not echo unsupported billing classification strings", () => {
@@ -72,7 +72,7 @@ test("buildBillingUpgradeRequestBody does not infer a concrete upgrade path from
   assert.match(body, /Current plan: Plan metadata unavailable/);
   assert.match(body, /Suggested next upgrade: Retry billing status to confirm a supported plan id before inferring the next storage upgrade path\./);
   assert.doesNotMatch(body, /Enterprise Custom/);
-  assert.doesNotMatch(body, /Additional storage - \+10 GB for \$10\/mo/);
+  assert.doesNotMatch(body, /Your OmnyID Wedding upgrade is active \(100 MB storage\)\./);
 });
 
 test("buildBillingUpgradeRequestBody does not treat blank plan metadata as a confirmed free tier", () => {
@@ -87,7 +87,7 @@ test("buildBillingUpgradeRequestBody does not treat blank plan metadata as a con
   assert.match(body, /Current plan: Plan metadata unavailable/);
   assert.match(body, /Suggested next upgrade: Retry billing status to confirm a supported plan id before inferring the next storage upgrade path\./);
   assert.doesNotMatch(body, /Current plan: Free/);
-  assert.doesNotMatch(body, /Suggested next upgrade: Paid - 2 GB for \$20\/mo/);
+  assert.doesNotMatch(body, /Suggested next upgrade: OmnyID Wedding - 100 MB for AUD 39 one-off/);
 });
 
 test("buildBillingUpgradeRequestBody does not invent fallback storage capacity from unsupported plan metadata", () => {

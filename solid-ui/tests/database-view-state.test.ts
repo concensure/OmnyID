@@ -8,6 +8,8 @@ import {
   databaseRecordFromMessage,
   databaseRecordUpdateFromMessage,
   databaseRecordsFromMessages,
+  databaseSchemaColumnsFromMessages,
+  databaseSchemaUpdateFromMessage,
   formatDatabaseEditableValue,
   parseDatabaseEditedValue,
 } from "../src/lib/databaseViewState.ts";
@@ -121,4 +123,24 @@ test("database view state derives fallback columns and edited value coercion det
   assert.equal(parseDatabaseEditedValue("true", false), true);
   assert.deepEqual(parseDatabaseEditedValue('{"ok":true}', null), { ok: true });
   assert.equal(parseDatabaseEditedValue("raw text", null), "raw text");
+});
+
+test("database view state keeps durable user-created column definitions", () => {
+  const message = {
+    content: {
+      kind: "database_schema_update",
+      table: "clients",
+      column: { key: "follow_up", label: "Follow-up" },
+    },
+  };
+  assert.deepEqual(databaseSchemaUpdateFromMessage(message), {
+    table: "clients",
+    column: { key: "follow_up", label: "Follow-up" },
+  });
+  assert.deepEqual(databaseSchemaColumnsFromMessages([message], "clients"), [
+    { key: "follow_up", label: "Follow-up" },
+  ]);
+  assert.deepEqual(databaseColumnDefs([], [], databaseSchemaColumnsFromMessages([message], "clients")), [
+    { key: "follow_up", label: "Follow-up" },
+  ]);
 });

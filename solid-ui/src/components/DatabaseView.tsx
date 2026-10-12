@@ -11,6 +11,7 @@ import {
   databaseImportPreviewRows,
   databaseImportRows,
   databaseRecordsFromMessages,
+  databaseSchemaColumnsFromMessages,
   formatDatabaseEditableValue,
   parseDatabaseEditedValue,
   type DatabaseViewColumnDef as ColDef,
@@ -26,6 +27,13 @@ import {
   analyzeDatabaseImportInput,
   analyzeDatabaseRecordContent,
 } from "@/lib/structuredTextInputState";
+
+type DatabaseMessage = {
+  id: string;
+  type: string;
+  content: unknown;
+  timestamp: string;
+};
 
 function sendRecord(table: string, data: unknown) {
   const threadId = `db_${table}_${Date.now()}`;
@@ -66,6 +74,23 @@ function sendRecordUpdate(table: string, targetRecordId: string, patch: Record<s
       database_table: table,
       target_record_id: targetRecordId,
     },
+    memory_scope: {
+      memory_space: "personal",
+      author_mask: "private",
+      author_type: "human",
+      human_only: true,
+    },
+  });
+}
+
+function sendSchemaUpdate(table: string, column: ColDef) {
+  return sendAfpMessage({
+    thread_id: `db_${table}_schema`,
+    from: "user@omnyid.local",
+    to: ["agent://database"],
+    type: "database_schema_update",
+    content: { kind: "database_schema_update", table, column },
+    metadata: { origin: "database_view", database_table: table },
     memory_scope: {
       memory_space: "personal",
       author_mask: "private",
@@ -140,7 +165,11 @@ function GhostGrid(props: {
   );
 }
 
-function ImportModal(props: { defaultTable: string; onClose: () => void; onCreated: () => void }) {
+function ImportModal(props: {
+  defaultTable: string;
+  onClose: () => void;
+  onCreated: (messages: DatabaseMessage[]) => void;
+}) {
   const [raw, setRaw] = createSignal("");
   const [table, setTable] = createSignal(props.defaultTable || "imported");
   const [busy, setBusy] = createSignal(false);
@@ -169,8 +198,19 @@ function ImportModal(props: { defaultTable: string; onClose: () => void; onCreat
     if (rows.length === 0) { setError("No records found — paste CSV or JSON."); return; }
     setBusy(true);
     try {
-      for (const row of rows) await sendRecord(table(), row);
-      props.onCreated(); props.onClose();
+      const timestamp = new Date().toISOString();
+      const messages: DatabaseMessage[] = [];
+      for (const row of rows) {
+        const result = await sendRecord(table(), row);
+        messages.push({
+          id: result.message_id,
+          type: "database_record",
+          timestamp,
+          content: { kind: "database_record", table: table(), data: row },
+        });
+      }
+      props.onCreated(messages);
+      props.onClose();
     } catch (err) {
       setError(
         buildDatabaseViewFailureReceipt(
@@ -265,7 +305,11 @@ function ImportModal(props: { defaultTable: string; onClose: () => void; onCreat
   );
 }
 
-function AddRecordModal(props: { tables: string[]; onClose: () => void; onCreated: () => void }) {
+function AddRecordModal(props: {
+  tables: string[];
+  onClose: () => void;
+  onCreated: (message: DatabaseMessage) => void;
+}) {
   const [table, setTable] = createSignal(props.tables[0] ?? "");
   const [newTable, setNewTable] = createSignal("");
   const [content, setContent] = createSignal("");
@@ -286,8 +330,13 @@ function AddRecordModal(props: { tables: string[]; onClose: () => void; onCreate
       let data: unknown = content();
       const parsed = parseJsonValue(content());
       if (parsed.ok) data = parsed.value;
-      await sendRecord(targetTable, data);
-      props.onCreated();
+      const result = await sendRecord(targetTable, data);
+      props.onCreated({
+        id: result.message_id,
+        type: "database_record",
+        timestamp: new Date().toISOString(),
+        content: { kind: "database_record", table: targetTable, data },
+      });
       props.onClose();
     } catch (err) {
       setError(
@@ -422,6 +471,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   const [showImport, setShowImport] = createSignal(false);
   const [tableScrollTop, setTableScrollTop] = createSignal(0);
   const [selectedRowIds, setSelectedRowIds] = createSignal<string[]>([]);
+  const [localMessages, setLocalMessages] = createSignal<DatabaseMessage[]>([]);
   let tableScrollRef: HTMLDivElement | undefined;
 
   const headPad = createMemo(() => ({
@@ -474,7 +524,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
 
   const records = createMemo(() => {
     void refreshKey();
-    const messages = dashboardBootstrapMessages(props.bootstrap)
+    const messages = [...dashboardBootstrapMessages(props.bootstrap), ...localMessages()]
       .filter((m) =>
         m.type.includes("database") ||
         m.type === "database_record" ||
@@ -501,8 +551,20 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   );
 
   const columns = createMemo((): ColDef[] => {
-    return databaseColumnDefs(visibleRecords(), ghostHeaders());
+    return databaseColumnDefs(
+      visibleRecords(),
+      ghostHeaders(),
+      databaseSchemaColumnsFromMessages(
+        [...dashboardBootstrapMessages(props.bootstrap), ...localMessages()],
+        activeTable(),
+      ),
+    );
   });
+
+  function recordLocalMessage(message: DatabaseMessage) {
+    setLocalMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
+    setRefreshKey((value) => value + 1);
+  }
 
   createEffect(() => {
     const visibleIds = new Set(visibleRecords().map((row) => row.id));
@@ -537,10 +599,20 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     setSavingCell({ rowId: row.id, col });
     setEditError(null);
     try {
-      await sendRecordUpdate(row.table, row.id, { [col]: nextValue });
+      const result = await sendRecordUpdate(row.table, row.id, { [col]: nextValue });
+      recordLocalMessage({
+        id: result.message_id,
+        type: "note:ledger_update",
+        timestamp: new Date().toISOString(),
+        content: {
+          kind: "database_record_update",
+          table: row.table,
+          target_record_id: row.id,
+          patch: { [col]: nextValue },
+        },
+      });
       setEditingCell(null);
       setEditingValue("");
-      setRefreshKey((value) => value + 1);
     } catch (error) {
       setEditError(
         buildDatabaseViewFailureReceipt(
@@ -619,7 +691,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
             class="mt-1 block w-full bg-transparent text-xl font-bold text-on-surface outline-none border-b border-transparent focus:border-primary/30 transition placeholder:text-on-surface/30"
             placeholder="Unnamed Database"
           />
-          <p class="mt-0.5 text-sm text-on-surface-variant">AFP database records — append-only, agent-indexed.</p>
+          <p class="mt-0.5 text-sm text-on-surface-variant">Add rows and fields, then save your changes to this private table.</p>
         </div>
         <div class="flex items-center gap-2 mt-2 flex-shrink-0">
           {/* Density mode */}
@@ -653,8 +725,28 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
                 {([
                   { icon: "◈", label: "New Record", action: () => { setShowAdd(true); setShowPlusMenu(false); } },
                   { icon: "⊞", label: "New Field", action: () => {
-                    const col = prompt("Field name:");
-                    if (col?.trim()) setGhostHeaders((h) => [...h, col.trim()]);
+                    const label = prompt("Field name:")?.trim();
+                    const table = activeTable() ?? tableName().trim() ?? tables()[0];
+                    if (!label) { setShowPlusMenu(false); return; }
+                    if (!table) {
+                      setGhostHeaders((headers) => [...headers, label]);
+                      setShowPlusMenu(false);
+                      return;
+                    }
+                    const key = label.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || `field_${Date.now()}`;
+                    void (async () => {
+                      try {
+                        const result = await sendSchemaUpdate(table, { key, label });
+                        recordLocalMessage({
+                          id: result.message_id,
+                          type: "database_schema_update",
+                          timestamp: new Date().toISOString(),
+                          content: { kind: "database_schema_update", table, column: { key, label } },
+                        });
+                      } catch (error) {
+                        setEditError(buildDatabaseViewFailureReceipt("Add field", error instanceof Error ? error.message : "Could not add this field."));
+                      }
+                    })();
                     setShowPlusMenu(false);
                   }},
                   { icon: "↑", label: "Import CSV / JSON", action: () => { setShowImport(true); setShowPlusMenu(false); } },
@@ -925,7 +1017,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         <AddRecordModal
           tables={tables()}
           onClose={() => setShowAdd(false)}
-          onCreated={() => setRefreshKey((k) => k + 1)}
+          onCreated={recordLocalMessage}
         />
       </Show>
 
@@ -933,7 +1025,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         <ImportModal
           defaultTable={activeTable() ?? tableName() ?? "imported"}
           onClose={() => setShowImport(false)}
-          onCreated={() => setRefreshKey((k) => k + 1)}
+          onCreated={(messages) => messages.forEach(recordLocalMessage)}
         />
       </Show>
 

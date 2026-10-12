@@ -32,7 +32,7 @@ use crate::{
 };
 
 use super::{
-    AppState, app_to_proto, auth::authenticated_user, billing::storage_policy_for_plan,
+    AppState, app_to_proto, auth::authenticated_user, billing::storage_policy_for_account,
     internal_error, internal_http_error, status_to_http,
 };
 
@@ -121,7 +121,7 @@ async fn upload_file_http(
         .get("plan")
         .and_then(Value::as_str)
         .unwrap_or("free");
-    let policy = storage_policy_for_plan(plan);
+    let policy = storage_policy_for_account(plan, &user.email);
     let archive_only_enabled = billing
         .get("archive_only_enabled")
         .and_then(Value::as_bool)
@@ -347,7 +347,7 @@ async fn list_file_library_http(
         .get("plan")
         .and_then(Value::as_str)
         .unwrap_or("free");
-    let storage_policy = storage_policy_for_plan(plan);
+    let storage_policy = storage_policy_for_account(plan, &user.email);
     let items = state
         .db
         .list_private_attachments_library(

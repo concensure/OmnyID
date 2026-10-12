@@ -38,9 +38,9 @@ function normalizePlanId(plan: string | null | undefined): "free" | "paid" {
 function nextStorageUpgradeLabel(plan: string | null | undefined): string {
   const normalized = normalizePlanId(plan);
   if (normalized === "free") {
-    return "Paid - 2 GB for $20/mo";
+    return "OmnyID Wedding - 100 MB for AUD 39 one-off";
   }
-  return "Additional storage - +10 GB for $10/mo";
+  return "Your OmnyID Wedding upgrade is active (100 MB storage).";
 }
 
 function byteCountLabel(bytes: number | null | undefined) {

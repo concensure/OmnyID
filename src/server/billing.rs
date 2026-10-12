@@ -21,12 +21,10 @@ pub(crate) struct StoragePolicy {
     pub addon_count: u32,
 }
 
-const GIB_BYTES: i64 = 1024 * 1024 * 1024;
-// Oracle-hosted account policy: new/free accounts receive 1 GiB and the base
-// paid upgrade receives 2 GiB. Additional storage remains an explicit add-on.
-const FREE_STORAGE_BYTES: i64 = GIB_BYTES;
-const PAID_STORAGE_BYTES: i64 = 2 * GIB_BYTES;
-const STORAGE_ADDON_BYTES: i64 = 10 * GIB_BYTES;
+const MIB_BYTES: i64 = 1024 * 1024;
+// Wedding accounts start with 50 MiB; the one-off Wedding upgrade grants 100 MiB.
+const FREE_STORAGE_BYTES: i64 = 50 * MIB_BYTES;
+const PAID_STORAGE_BYTES: i64 = 100 * MIB_BYTES;
 const FREE_MAX_UPLOAD_BYTES: i64 = 25 * 1024 * 1024;
 const PAID_MAX_UPLOAD_BYTES: i64 = 100 * 1024 * 1024;
 
@@ -44,32 +42,34 @@ pub(crate) fn storage_policy_for_plan(plan: &str) -> StoragePolicy {
         };
     }
 
-    let addon_count = if raw.contains("20gb") || raw.contains("addon2") || raw.contains("plus2") {
-        2
-    } else if raw.contains("addon")
-        || raw.contains("10gb")
-        || raw.contains("extra_storage")
-        || raw.contains("plus_storage")
-        || raw.contains("storage_plus")
-    {
-        1
-    } else {
-        0
-    };
-
     StoragePolicy {
-        quota_bytes: PAID_STORAGE_BYTES + (addon_count as i64 * STORAGE_ADDON_BYTES),
+        quota_bytes: PAID_STORAGE_BYTES,
         max_upload_bytes: PAID_MAX_UPLOAD_BYTES,
-        addon_count,
+        addon_count: 0,
     }
+}
+
+/// Operators are identified from the same configured allow-list used for the
+/// administrative cost controls.  A client supplied billing plan must never
+/// be enough to grant unlimited storage.
+pub(crate) fn storage_policy_for_account(plan: &str, email: &str) -> StoragePolicy {
+    if crate::server::cost_controls::operator_access_allowed(email) {
+        return StoragePolicy {
+            quota_bytes: i64::MAX,
+            max_upload_bytes: PAID_MAX_UPLOAD_BYTES,
+            addon_count: 0,
+        };
+    }
+    storage_policy_for_plan(plan)
 }
 
 pub(crate) fn enrich_billing_status_with_storage(
     status: &mut Value,
     used_bytes: i64,
+    account_email: &str,
 ) -> StoragePolicy {
     let plan = status.get("plan").and_then(Value::as_str).unwrap_or("free");
-    let policy = storage_policy_for_plan(plan);
+    let policy = storage_policy_for_account(plan, account_email);
     let remaining_bytes = (policy.quota_bytes - used_bytes).max(0);
     let quota_exceeded = used_bytes > policy.quota_bytes;
     status["storage_quota_bytes"] = serde_json::json!(policy.quota_bytes);
@@ -755,7 +755,7 @@ pub(super) async fn billing_status_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
-    enrich_billing_status_with_storage(&mut status, used_bytes);
+    enrich_billing_status_with_storage(&mut status, used_bytes, &user.email);
     let tool_connections = state
         .db
         .list_mcp_tool_connections(&user.id)
@@ -996,7 +996,7 @@ pub(super) async fn billing_archive_only_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
-    enrich_billing_status_with_storage(&mut status, used_bytes);
+    enrich_billing_status_with_storage(&mut status, used_bytes, &user.email);
     enrich_billing_status_with_operational_guidance(
         &mut status,
         load_runtime_operational_guidance(),
@@ -1009,7 +1009,7 @@ pub(super) async fn billing_archive_only_http(
 mod tests {
     use super::{
         FREE_MAX_UPLOAD_BYTES, FREE_STORAGE_BYTES, PAID_MAX_UPLOAD_BYTES, PAID_STORAGE_BYTES,
-        STORAGE_ADDON_BYTES, STRIPE_WEBHOOK_TIMESTAMP_TOLERANCE_SECS, billing_self_serve_config,
+        STRIPE_WEBHOOK_TIMESTAMP_TOLERANCE_SECS, billing_self_serve_config,
         connected_tool_billing_json, enrich_billing_status_with_external_tool_usage,
         enrich_billing_status_with_operational_guidance, enrich_billing_status_with_storage,
         extract_billing_event_fields, normalize_usage_event_text, storage_policy_for_plan,
@@ -1141,16 +1141,16 @@ mod tests {
     }
 
     #[test]
-    fn storage_policy_maps_paid_and_addon_plans() {
+    fn storage_policy_maps_all_paid_plans_to_the_wedding_entitlement() {
         let paid = storage_policy_for_plan("pro");
         assert_eq!(paid.quota_bytes, PAID_STORAGE_BYTES);
         assert_eq!(paid.max_upload_bytes, PAID_MAX_UPLOAD_BYTES);
         assert_eq!(paid.addon_count, 0);
 
         let addon = storage_policy_for_plan("pro_plus_storage");
-        assert_eq!(addon.quota_bytes, PAID_STORAGE_BYTES + STORAGE_ADDON_BYTES);
+        assert_eq!(addon.quota_bytes, PAID_STORAGE_BYTES);
         assert_eq!(addon.max_upload_bytes, PAID_MAX_UPLOAD_BYTES);
-        assert_eq!(addon.addon_count, 1);
+        assert_eq!(addon.addon_count, 0);
     }
 
     #[test]
@@ -1160,7 +1160,7 @@ mod tests {
             "plan": "free",
             "status": "active"
         });
-        let policy = enrich_billing_status_with_storage(&mut status, FREE_STORAGE_BYTES + 1024);
+        let policy = enrich_billing_status_with_storage(&mut status, FREE_STORAGE_BYTES + 1024, "member@example.com");
         assert_eq!(policy.quota_bytes, FREE_STORAGE_BYTES);
         assert_eq!(status["quota_state"].as_str(), Some("exceeded"));
         assert_eq!(status["storage_remaining_bytes"].as_i64(), Some(0));
@@ -1173,20 +1173,20 @@ mod tests {
     }
 
     #[test]
-    fn storage_enrichment_keeps_paid_headroom_and_addon_count() {
+    fn storage_enrichment_keeps_the_paid_wedding_quota() {
         let mut status = serde_json::json!({
             "account_id": "user_456",
             "plan": "pro_plus_storage",
             "status": "active"
         });
-        let policy = enrich_billing_status_with_storage(&mut status, PAID_STORAGE_BYTES);
-        assert_eq!(policy.addon_count, 1);
+        let policy = enrich_billing_status_with_storage(&mut status, PAID_STORAGE_BYTES, "member@example.com");
+        assert_eq!(policy.addon_count, 0);
         assert_eq!(status["quota_state"].as_str(), Some("ok"));
         assert_eq!(
             status["storage_remaining_bytes"].as_i64(),
-            Some(STORAGE_ADDON_BYTES)
+            Some(0)
         );
-        assert_eq!(status["storage_addon_count"].as_u64(), Some(1));
+        assert_eq!(status["storage_addon_count"].as_u64(), Some(0));
     }
 
     #[test]
@@ -1197,7 +1197,7 @@ mod tests {
             "status": "active",
             "archive_only_enabled": true
         });
-        enrich_billing_status_with_storage(&mut status, PAID_STORAGE_BYTES + 1);
+        enrich_billing_status_with_storage(&mut status, PAID_STORAGE_BYTES + 1, "member@example.com");
         assert_eq!(status["archive_only_enabled"].as_bool(), Some(true));
         let warning = status["archive_only_warning"].as_str().unwrap_or("");
         assert!(warning.contains("Archive-only mode is active"));

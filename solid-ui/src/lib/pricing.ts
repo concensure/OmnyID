@@ -4,7 +4,8 @@ export type PlanId = "free" | "paid";
 export type StoragePlan = {
   id: PlanId;
   label: string;
-  monthlyPriceUsd: number;
+  priceAud: number;
+  billingCadence: "one_off";
   storageQuotaGb: number;
   maxUploadMb: number;
 };
@@ -13,23 +14,19 @@ export const STORAGE_PLANS: Record<PlanId, StoragePlan> = {
   free: {
     id: "free",
     label: "Free",
-    monthlyPriceUsd: 0,
-    storageQuotaGb: 1,
+    priceAud: 0,
+    billingCadence: "one_off",
+    storageQuotaGb: 0.05,
     maxUploadMb: 25,
   },
   paid: {
     id: "paid",
     label: "Paid",
-    monthlyPriceUsd: 20,
-    storageQuotaGb: 2,
+    priceAud: 39,
+    billingCadence: "one_off",
+    storageQuotaGb: 0.1,
     maxUploadMb: 100,
   },
-};
-
-export const STORAGE_ADDON = {
-  label: "Additional storage",
-  monthlyPriceUsd: 10,
-  storageQuotaGb: 10,
 };
 
 export function hasRecognizedPlanMetadata(plan: string | null | undefined): boolean {
@@ -43,14 +40,14 @@ export function normalizePlanId(plan: string | null | undefined): PlanId {
   return "paid";
 }
 
-export function formatUsdPerMonth(priceUsd: number): string {
-  return `$${priceUsd.toFixed(0)}/mo`;
+export function formatAudOneOff(priceAud: number): string {
+  return `AUD ${priceAud.toFixed(0)} one-off`;
 }
 
 export function nextStorageUpgradeLabel(plan: string | null | undefined): string {
   const normalized = normalizePlanId(plan);
   if (normalized === "free") {
-    return `${STORAGE_PLANS.paid.label} - ${STORAGE_PLANS.paid.storageQuotaGb} GB for ${formatUsdPerMonth(STORAGE_PLANS.paid.monthlyPriceUsd)}`;
+  return "OmnyID Wedding - 100 MB for AUD 39 once";
   }
-  return `${STORAGE_ADDON.label} - +${STORAGE_ADDON.storageQuotaGb} GB for ${formatUsdPerMonth(STORAGE_ADDON.monthlyPriceUsd)}`;
+  return "Your OmnyID Wedding upgrade is active (100 MB storage).";
 }

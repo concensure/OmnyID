@@ -1450,3 +1450,22 @@ Open / for Codex:
   the repo so a deploy keeps them). This is public static hosting, not Seaweed FS.
 - Not provided in the pasted listings: Tea Room QVB, Zest and Crowne Plaza websites/phones; Mackay
   details beyond address, website, phone and photos.
+
+## 2026-10-12 - WED-181 storage and database editor repair
+
+Changed:
+
+- Enforced 50 MiB standard / 100 MiB paid Wedding storage on billing status and file routes; configured operator emails are exempt.
+- Added a clear Profile upgrade card for the supplied AUD 39 one-off OmnyID Wedding Stripe Payment Link. No Stripe key was written to source control or frontend code.
+- Made Database immediately project successful row, cell, import, and new-field saves; field definitions persist as `database_schema_update` AFP messages. Removed the internal-facing Database subtitle.
+
+Verification:
+
+- `cargo check` passed.
+- `cargo test server::billing::tests --lib` passed (20 tests).
+- Focused UI state tests passed (24 tests), `npm run typecheck` passed, and `npm run build` passed after installing the workspace SDK dependencies.
+- `git diff --check` passed.
+
+Open:
+
+- Existing wedding collaboration UI is explicitly a scaffold: durable partner co-ownership still needs backend ACLs, shared-key distribution, per-collaborator audit, and conflict handling. Do not represent its current invite controls as live shared access.
