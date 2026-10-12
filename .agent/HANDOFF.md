@@ -1,5 +1,14 @@
 # Handoff
 
+## 2026-10-12 - WED-183 workspace recovery and core view verification (Codex)
+
+- Fixed the production `Cannot access lexical declaration ... before initialization` failure caused by eager Solid memos being declared before their sources in Database, Notes, and the workflow composer.
+- Workflows now keeps its editor mounted and shows a retryable failure receipt if the initial workflow API call fails instead of allowing the resource rejection to trip the application error boundary.
+- Wedding vendor smoke fixtures are selectively removed from the matching signed-in browser workspace and no longer show the internal cleanup directive or block a real search.
+- Local signed-session browser checks confirmed Database, Notes, and Workflows render without the global error boundary. Database's existing `database_record` AFP save path was inspected; its networked write needs an authenticated homeserver session for end-to-end production exercise.
+- Verification run: `npm run typecheck`, `npm run build`, focused Node tests for database failure handling, vendor smoke fixture cleanup, workflow editor failures, and workflow wait/resume failures (15 passed).
+- Pending: commit this WED-183 branch, deploy the UI to Oracle with the existing production script, then run Oracle proof and mark the task done.
+
 ## 2026-10-12 - WED-180 inspiration, calendar and timeline polish (Codex)
 
 - WED-178 committed changes were reviewed as a separate public-site/newsletter slice and are retained as safe release ancestors of this branch.

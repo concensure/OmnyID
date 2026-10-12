@@ -3,6 +3,20 @@
 This file records project architecture and coordination decisions. It is
 project truth, not a running diary.
 
+## 2026-10-12: Eager Solid computations must follow their reactive sources
+
+`createMemo` evaluates immediately. Any memo that reads another memo must be
+declared after its source, especially in lazily loaded signed-in views. This
+prevents persisted navigation state from turning an otherwise isolated view
+into an application-wide temporal-dead-zone error boundary.
+
+## 2026-10-12: Disposable vendor smoke data is silently scoped and purged
+
+Artifacts explicitly marked as disposable vendor smoke fixtures are removed
+only from the signed-in planner's matching local workspace. They never block a
+live vendor search or expose internal fixture-cleanup instructions to users;
+non-fixture imported artifacts remain untouched.
+
 ## 2026-10-09: Vendor photo removal has a fourteen-day reversible grace period
 
 An owner removal immediately changes the asset to `hidden`, so it can no

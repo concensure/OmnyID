@@ -768,8 +768,15 @@ export function WorkflowsView(props: {
   const nodeSuccessRates = createMemo(() => workflowNodeSuccessRates(runHistory()));
 
   const [workflows, { mutate, refetch }] = createResource(async () => {
-    const response = await listWorkflows(false, 50);
-    return response.workflows;
+    try {
+      const response = await listWorkflows(false, 50);
+      return response.workflows;
+    } catch (error) {
+      // A temporary workflow API failure must leave the editor usable and
+      // retryable; never let an eager resource rejection unmount the view.
+      setWorkflowFeedbackFailure("Load workflows", error);
+      return [];
+    }
   });
   createEffect(() => {
     const hasWorkflow = Boolean(currentWorkflow()) || (workflows()?.length ?? 0) > 0;

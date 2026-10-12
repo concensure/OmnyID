@@ -264,49 +264,6 @@ export function WorkflowsComposerPanel() {
     return workflowComposerDescribeHistoryPreviewPanelState(describeHistoryPreviewState());
   });
 
-  const describeHistoryEntryCards = createMemo<ComposerHistoryEntryCardState[]>(() => {
-    const historyActionsDisabled = composerRenderState().historyActionsDisabled;
-    const selectedEventId = selectedDescribeHistoryEventId();
-    const actionHandler = (
-      kind: WorkflowComposerDescribeHistoryActionKind,
-      entry: DescribeHistoryEntry,
-    ): (() => void) => {
-      if (kind === "reuse") {
-        return () => {
-          applyDescribeHistorySelection(entry);
-          setFeedback(workflowDescribeHistoryReuseFeedback());
-        };
-      }
-      if (kind === "compare") {
-        return () =>
-          setSelectedDescribeHistoryEventId((current: string | null) =>
-            current === entry.event_id ? null : entry.event_id
-          );
-      }
-      if (kind === "save_branch") {
-        return () => void saveWorkflowBranchFromDescribeHistory(entry);
-      }
-      return () => {
-        applyDescribeHistorySelection(entry);
-        void regenerateCurrentWorkflowFromIntent();
-      };
-    };
-    return (composerRenderState().savedDescription?.recentDescribeHistory ?? []).map((entry) => {
-      const selected = selectedEventId === entry.event_id;
-      return {
-        actionItems: workflowComposerActionItems(
-          workflowComposerDescribeHistoryActionDescriptors({
-            actionsDisabled: historyActionsDisabled,
-            selected,
-          }),
-          (kind) => actionHandler(kind, entry),
-        ),
-        entry,
-        metadataBadges: workflowComposerDescribeHistoryMetadataBadges(entry),
-      };
-    });
-  });
-
   const intentEditorActionItems = createMemo<ComposerActionItem[]>(() =>
     workflowComposerIntentActionItems({
       createWorkflowFromIntent,
@@ -391,6 +348,49 @@ export function WorkflowsComposerPanel() {
       workflow: currentWorkflow(),
       workflowActionState: workflowActionState(),
       workflowInteractionLocked: workflowInteractionLocked(),
+    });
+  });
+
+  const describeHistoryEntryCards = createMemo<ComposerHistoryEntryCardState[]>(() => {
+    const historyActionsDisabled = composerRenderState().historyActionsDisabled;
+    const selectedEventId = selectedDescribeHistoryEventId();
+    const actionHandler = (
+      kind: WorkflowComposerDescribeHistoryActionKind,
+      entry: DescribeHistoryEntry,
+    ): (() => void) => {
+      if (kind === "reuse") {
+        return () => {
+          applyDescribeHistorySelection(entry);
+          setFeedback(workflowDescribeHistoryReuseFeedback());
+        };
+      }
+      if (kind === "compare") {
+        return () =>
+          setSelectedDescribeHistoryEventId((current: string | null) =>
+            current === entry.event_id ? null : entry.event_id
+          );
+      }
+      if (kind === "save_branch") {
+        return () => void saveWorkflowBranchFromDescribeHistory(entry);
+      }
+      return () => {
+        applyDescribeHistorySelection(entry);
+        void regenerateCurrentWorkflowFromIntent();
+      };
+    };
+    return (composerRenderState().savedDescription?.recentDescribeHistory ?? []).map((entry) => {
+      const selected = selectedEventId === entry.event_id;
+      return {
+        actionItems: workflowComposerActionItems(
+          workflowComposerDescribeHistoryActionDescriptors({
+            actionsDisabled: historyActionsDisabled,
+            selected,
+          }),
+          (kind) => actionHandler(kind, entry),
+        ),
+        entry,
+        metadataBadges: workflowComposerDescribeHistoryMetadataBadges(entry),
+      };
     });
   });
 

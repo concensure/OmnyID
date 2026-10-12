@@ -490,38 +490,6 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     comfortable: 40,
     spacious: 56,
   }[densityBucket(densityMode())]));
-  const shouldVirtualizeRows = createMemo(() => visibleRecords().length > 200);
-  const virtualWindow = createMemo(() => {
-    const total = visibleRecords().length;
-    if (!shouldVirtualizeRows()) {
-      return {
-        start: 0,
-        end: total,
-        topSpacer: 0,
-        bottomSpacer: 0,
-      };
-    }
-    const rowHeight = rowHeightPx();
-    const viewportHeight = tableScrollRef?.clientHeight ?? 640;
-    const overscan = 8;
-    const visibleCount = Math.max(1, Math.ceil(viewportHeight / rowHeight));
-    const start = Math.max(0, Math.floor(tableScrollTop() / rowHeight) - overscan);
-    const end = Math.min(total, start + visibleCount + overscan * 2);
-    return {
-      start,
-      end,
-      topSpacer: start * rowHeight,
-      bottomSpacer: Math.max(0, (total - end) * rowHeight),
-    };
-  });
-  const renderedRecords = createMemo(() => {
-    const rows = visibleRecords();
-    const window = virtualWindow();
-    return shouldVirtualizeRows() ? rows.slice(window.start, window.end) : rows;
-  });
-  const totalColumnCount = createMemo(() => columns().length + 3);
-  const selectedCount = createMemo(() => selectedRowIds().length);
-
   const records = createMemo(() => {
     void refreshKey();
     const messages = [...dashboardBootstrapMessages(props.bootstrap), ...localMessages()]
@@ -560,6 +528,41 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       ),
     );
   });
+
+  // These computations read visibleRecords()/columns(), whose createMemos run
+  // immediately. Keep their declarations below those sources so a saved
+  // Database view can be restored directly without a temporal-dead-zone crash.
+  const shouldVirtualizeRows = createMemo(() => visibleRecords().length > 200);
+  const virtualWindow = createMemo(() => {
+    const total = visibleRecords().length;
+    if (!shouldVirtualizeRows()) {
+      return {
+        start: 0,
+        end: total,
+        topSpacer: 0,
+        bottomSpacer: 0,
+      };
+    }
+    const rowHeight = rowHeightPx();
+    const viewportHeight = tableScrollRef?.clientHeight ?? 640;
+    const overscan = 8;
+    const visibleCount = Math.max(1, Math.ceil(viewportHeight / rowHeight));
+    const start = Math.max(0, Math.floor(tableScrollTop() / rowHeight) - overscan);
+    const end = Math.min(total, start + visibleCount + overscan * 2);
+    return {
+      start,
+      end,
+      topSpacer: start * rowHeight,
+      bottomSpacer: Math.max(0, (total - end) * rowHeight),
+    };
+  });
+  const renderedRecords = createMemo(() => {
+    const rows = visibleRecords();
+    const window = virtualWindow();
+    return shouldVirtualizeRows() ? rows.slice(window.start, window.end) : rows;
+  });
+  const totalColumnCount = createMemo(() => columns().length + 3);
+  const selectedCount = createMemo(() => selectedRowIds().length);
 
   function recordLocalMessage(message: DatabaseMessage) {
     setLocalMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);

@@ -3330,10 +3330,6 @@ export function NoteView(props: NoteViewProps) {
     [...new Set(allNotesResolved().flatMap((n) => n.supertags))]
   );
 
-  const noteEditorPrimaryId = createMemo<string | null>(() =>
-    filteredNotes()[0]?.id ?? allNotesResolved()[0]?.id ?? null
-  );
-
   // ── Filtering + search (Phase 5) ─────────────────────────────────────────
   const filteredNotes = createMemo<Note[]>(() => {
     let notes = allNotesResolved();
@@ -3364,6 +3360,12 @@ export function NoteView(props: NoteViewProps) {
     }
     return notes;
   });
+
+  // filteredNotes is evaluated synchronously by createMemo, so this dependent
+  // memo must be declared after it to support opening Notes directly.
+  const noteEditorPrimaryId = createMemo<string | null>(() =>
+    filteredNotes()[0]?.id ?? allNotesResolved()[0]?.id ?? null
+  );
 
   const selectedNote = createMemo<Note | null>(() =>
     allNotesResolved().find((n) => n.id === selectedId()) ?? null

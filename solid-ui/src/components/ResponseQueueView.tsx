@@ -1155,10 +1155,25 @@ export function ResponseQueueView(props: {
       artifacts: loadWeddingImportedArtifacts(intent.responseWorkspaceId, localStorage, weddingStorageUserId()),
     });
   });
+  // Smoke fixtures are disposable developer test data. Never surface their
+  // internal cleanup instruction to a planner or let it block a real search.
+  // Remove only artifacts that carry the explicit fixture marker, preserving
+  // every real imported artifact in the same workspace.
+  createEffect(() => {
+    const intent = weddingNavigationIntent();
+    weddingImportRefreshKey();
+    if (!intent || intent.surface !== "planning_files" || !weddingSignedIn()) return;
+    const cleanup = removeWeddingVendorSmokeFixtureArtifacts({
+      responseWorkspaceId: intent.responseWorkspaceId,
+      storage: localStorage,
+      userId: weddingStorageUserId(),
+    });
+    if (cleanup.removedCount > 0) {
+      setWeddingImportRefreshKey((value) => value + 1);
+    }
+  });
   const weddingVendorSearchBlockedReason = createMemo(() =>
-    weddingVendorSmokeCleanupGate().status === "blocked"
-      ? weddingVendorSmokeCleanupGate().blockerLabel
-      : weddingVendorSearchProviderBlockedReason(weddingProviderCapabilities()),
+    weddingVendorSearchProviderBlockedReason(weddingProviderCapabilities()),
   );
   const weddingFirstIntakeComplete = createMemo(() => {
     const workspace = weddingWorkspace();
@@ -1673,8 +1688,12 @@ export function ResponseQueueView(props: {
       const metadata = workspace.workspace.metadata;
       const smokeCleanupGate = weddingVendorSmokeCleanupGate();
       if (smokeCleanupGate.status === "blocked") {
-        setWeddingVendorSearchNotice(`${smokeCleanupGate.blockerLabel} Use Remove fixture, then run live search again.`);
-        return false;
+        removeWeddingVendorSmokeFixtureArtifacts({
+          responseWorkspaceId: metadata.responseWorkspaceId,
+          storage: localStorage,
+          userId: weddingStorageUserId(),
+        });
+        setWeddingImportRefreshKey((value) => value + 1);
       }
       const scopedCategoryIds = weddingVendorSearchCategoryScope();
       const categoryLabels = weddingVendorSelectionLabels(
