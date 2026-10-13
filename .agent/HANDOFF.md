@@ -1629,3 +1629,10 @@ Open:
 - Relay live transport remains disabled pending the documented Cloudflare
   inventory and security gates; existing Gmail remains the owner-approved
   temporary transport.
+
+Deployment correction:
+
+- The disabled relay's optional secret-file paths must default to empty in
+  Compose. A fixed default path made the runtime entrypoint require relay
+  secrets even while OMNYID_VENDOR_MAIL_ENABLED=false; this is corrected in
+  the follow-up deployment commit.
