@@ -6,6 +6,15 @@ The AUD 39 OmnyID Wedding upgrade uses Stripe Checkout `mode=payment` with a one
 This file records project architecture and coordination decisions. It is
 project truth, not a running diary.
 
+## 2026-10-14: Gmail remains temporary continuity transport while relay is disabled
+
+The owner instructed the existing Gmail wiring to remain live because the
+Cloudflare Email Routing control-plane API is currently unavailable. This
+preserves the existing flow only; it does not enable the new relay or permit
+Gmail as a vendor-relay fallback. Relay configuration defaults disabled, and
+Cloudflare/DNS/routing state remains untouched until the inventory and security
+gates are complete.
+
 ## 2026-10-13: Wedding vendor relay uses a mail subdomain and isolated providers
 
 Wedding masks use `@mail.omnyid.com`; Cloudflare Email Sending is primary and

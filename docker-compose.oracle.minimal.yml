@@ -131,6 +131,13 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_PASS_FILE: ${SMTP_PASS_FILE:-/run/secrets/omnyid_smtp_pass}
       SMTP_PORT: ${SMTP_PORT:-587}
+      OMNYID_VENDOR_MAIL_ENABLED: ${OMNYID_VENDOR_MAIL_ENABLED:-false}
+      OMNYID_VENDOR_MAIL_PROVIDER: ${OMNYID_VENDOR_MAIL_PROVIDER:-disabled}
+      OMNYID_VENDOR_MAIL_MASK_DOMAIN: ${OMNYID_VENDOR_MAIL_MASK_DOMAIN:-mail.omnyid.com}
+      OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN_FILE: ${OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN_FILE:-/run/secrets/omnyid_vendor_mail_cloudflare_api_token}
+      OMNYID_VENDOR_MAIL_RESEND_API_KEY_FILE: ${OMNYID_VENDOR_MAIL_RESEND_API_KEY_FILE:-/run/secrets/omnyid_vendor_mail_resend_api_key}
+      OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET_FILE: ${OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET_FILE:-/run/secrets/omnyid_vendor_mail_worker_shared_secret}
+      OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET_FILE: ${OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET_FILE:-/run/secrets/omnyid_vendor_mail_resend_webhook_secret}
       OMNYID_ANTHROPIC_KEY_FILE: ${OMNYID_ANTHROPIC_KEY_FILE:-/run/secrets/omnyid_anthropic_api_key}
       OMNYID_NVIDIA_API_KEY_FILE: ${OMNYID_NVIDIA_API_KEY_FILE:-/run/secrets/omnyid_nvidia_api_key}
       OMNYID_RUNPOD_API_KEY_FILE: ${OMNYID_RUNPOD_API_KEY_FILE:-/run/secrets/omnyid_runpod_api_key}

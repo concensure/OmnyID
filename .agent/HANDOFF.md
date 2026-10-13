@@ -7,6 +7,14 @@
 - The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
+## 2026-10-14 - WED-185 disabled vendor-relay configuration foundation (Codex)
+
+- Recorded the owner-approved temporary continuity exception: existing Gmail wiring remains live while Cloudflare Email Routing API access is unavailable. The new vendor relay is still disabled, and Gmail is not a selectable relay provider or fallback.
+- Added `OMNYID_VENDOR_MAIL_*` example variables and file-backed Oracle secret-sync mappings for Cloudflare, Resend, Worker, and Resend webhook credentials. The compose service receives them separately from the existing Gmail/SMTP values.
+- Added a fail-closed `vendor_mail_provider` configuration module: only `cloudflare_email_sending` and `resend` are accepted; enabling either without its platform credentials reports content-free non-readiness; Gmail/SMTP/Outlook names are rejected. No outbound provider call or routing change exists in this slice.
+- Added the RELAY-01 threat-model draft, including trust boundaries, explicitly non-E2EE privacy language, residual risks, and the required independent-review release blockers.
+- Local TypeScript SDK typecheck passed. `cargo test gateway::vendor_mail_provider --lib` is compiling under the shared artifact lock at handoff time; repository-wide `cargo fmt --check` reports pre-existing unrelated formatting drift, while the new Rust module was formatted independently. No deployment was attempted because this disabled configuration foundation has no live behavior change.
+
 ## 2026-10-14 - WED-185 regression repair and Wedding blog release (Codex)
 
 - Released `f13f551` to Oracle. The vendor-search field now holds its draft while typing, avoiding the first-character viewport jump; it commits on blur or explicit search.

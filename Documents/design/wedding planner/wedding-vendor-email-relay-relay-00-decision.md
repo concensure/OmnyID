@@ -23,6 +23,25 @@ Date: 2026-10-13
   security, webhook-verification, and provider-readiness gates in RELAY-14
   have passed.
 
+## Temporary legacy Gmail transport
+
+On 2026-10-14 the owner directed that the existing Gmail wiring remain the
+live transport while the Cloudflare Email Routing API is unavailable. This is
+a temporary continuity decision, not a change to the accepted relay design:
+
+- Existing general and wedding follow-up mail continues through the already
+  deployed Gmail configuration. No new relay path is enabled and no Gmail
+  credential is copied into `OMNYID_VENDOR_MAIL_*` configuration.
+- Cloudflare routing, DNS, MX/SPF, catch-all, Worker, and Resend settings are
+  unchanged. In particular, this decision does not authorize a Gmail
+  forwarder for the future mask domain.
+- The relay configuration and AFP contracts may be developed disabled, but
+  must fail closed until the Cloudflare inventory, gateway-capsule boundary,
+  authenticated ingress, and independent security review are complete.
+- The future relay still uses `@mail.omnyid.com`, Cloudflare Email Sending as
+  primary outbound transport, and Resend only as its provider fallback. A
+  later cutover requires an explicit release decision and machine evidence.
+
 ## Cloudflare control-plane safety gate
 
 Before changing any Email Routing rule or DNS record, save all of the
@@ -60,4 +79,3 @@ privacy reviewer, independent security reviewer, and production approver
 before live traffic is enabled. The gateway key/KMS boundary, quarantine
 lifetime, collision-word vocabulary, native-AFP default, and post-wedding
 archive policy also require recorded approval.
-

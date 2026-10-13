@@ -9,3 +9,4 @@ pub mod slack_gateway;
 pub mod smtp_fallback;
 pub mod smtp_in;
 pub mod smtp_out;
+pub mod vendor_mail_provider;

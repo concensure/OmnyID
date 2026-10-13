@@ -35,6 +35,8 @@ tasks:
       - task assignment can add a contact and email inline from a decision-card active to-do
       - build and regression checks protect the restored interactions before Oracle deployment
     progress:
+      - temporary owner override recorded: the existing Gmail transport remains live while Cloudflare Email Routing API access is unavailable; the new relay remains disabled and does not select Gmail
+      - added isolated OMNYID_VENDOR_MAIL_* file-backed configuration, Oracle secret-sync names, platform-only provider validation, readiness state, and RELAY-01 draft threat model; no Cloudflare, DNS, Resend, or Gmail configuration was changed
       - auditing the WED-179/WED-177 implementations and current deployed branch for regressions
   - id: WED-183
     title: Workspace bootstrap recovery and core view verification
@@ -1083,9 +1085,9 @@ tasks:
         - solid-ui/src/**
         - wedding/**
         - .agent/**
-    acceptance:
-      - Cloudflare routing and DNS inventory is saved before any routing mutation and includes a rollback payload
-      - vendor relay defaults disabled and cannot fall back to Gmail or a user mailbox
+      acceptance:
+        - Cloudflare routing and DNS inventory is saved before any routing mutation and includes a rollback payload
+        - vendor relay defaults disabled and cannot fall back to Gmail or a user mailbox; existing Gmail transport remains a temporary owner-approved continuity path until Cloudflare control-plane access is restored
       - wedding mask addresses use the mail.omnyid.com subdomain
       - provider delivery and inbound events are authenticated, deduplicated, and content-free outside encrypted AFP storage
       - the existing wedding approval and Response Queue workflow is retained
