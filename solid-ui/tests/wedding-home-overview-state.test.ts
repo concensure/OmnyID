@@ -152,7 +152,7 @@ test("home status escalates urgent vendor and resilience work", () => {
 
   assert.equal(status.tone, "risk");
   assert.match(status.title, /needs attention/i);
-  assert.equal(status.menuId, "response_queue");
+  assert.equal(status.menuId, "home");
   assert.equal(status.actionLabel, "Open vendor follow-ups");
 });
 
@@ -233,17 +233,17 @@ test("home overview seating tile opens seating even before guest list exists", (
   assert.equal(firstActionTarget(seating!), "seating");
 });
 
-test("home overview vendor tile opens response queue before outreach exists", () => {
+test("home overview vendor tile opens wedding vendor tracking before outreach exists", () => {
   const tiles = buildWeddingHomeOverviewActionTiles(state());
   const vendors = tiles.find((tile) => tile.id === "vendors");
 
   assert.equal(vendors?.valueLabel, "Track vendors");
   assert.equal(vendors?.tone, "needs_input");
   assert.equal(vendors?.toneLabel, "Needs vendors");
-  assert.equal(vendors?.menuId, "response_queue");
-  assert.equal(vendors?.actionLabel, "Open response queue");
+  assert.equal(vendors?.menuId, "home");
+  assert.equal(vendors?.actionLabel, "Open vendor tracking");
   assert.match(vendors?.detailLabel ?? "", /outreach, replies, and follow-ups/i);
-  assert.equal(firstActionTarget(vendors!), "response_queue");
+  assert.equal(firstActionTarget(vendors!), "home");
 });
 
 test("home overview vendor tile surfaces urgent and due follow-ups", () => {
@@ -263,7 +263,7 @@ test("home overview vendor tile surfaces urgent and due follow-ups", () => {
   assert.equal(vendors?.detailLabel, "1 due - 1 waiting");
   assert.equal(vendors?.supportLabel, "1 closed");
   assert.equal(vendors?.actionLabel, "Open vendor follow-ups");
-  assert.equal(firstActionTarget(vendors!), "response_queue");
+  assert.equal(firstActionTarget(vendors!), "home");
 });
 
 test("home overview tiles reflect populated guests and seating", () => {

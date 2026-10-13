@@ -34,3 +34,12 @@ test("buildDecryptedDisplayState hides ciphertext-shaped content while encrypted
   assert.equal(decryptedDisplayLabel({ encryption: { scheme: "x" }, content: { ciphertext: "secret" } }), ENCRYPTED_MESSAGE_UNAVAILABLE_LABEL);
   assert.deepEqual(decryptedDisplayStringValues({ encryption: { scheme: "x" }, content: { ciphertext: "secret" } }), []);
 });
+
+test("buildDecryptedDisplayState does not claim to be decrypting when the envelope is already present", () => {
+  const state = buildDecryptedDisplayState({
+    encryption: { scheme: "omnyid-envelope-v1", nonce: "nonce123", ciphertext: "abc123" },
+    content: { omnyid_encrypted: true },
+  });
+
+  assert.equal(state.placeholder, ENCRYPTED_MESSAGE_UNAVAILABLE_LABEL);
+});

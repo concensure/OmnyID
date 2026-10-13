@@ -1519,3 +1519,38 @@ Deployment:
 
 - Commit `09d338f` was staged through the scoped Oracle homeserver/UI deployment. The running homeserver restarted with the source markers for both the email-delivery response and travel fallback; `https://omnyid.com/workspace/` returned HTTP 200.
 - `artifacts/oracle-production-proof-wed182-postdeploy/oracle-production-proof.json` reports `status=pass` with `failure_step=none` after the synchronous Oracle audit and restore drill.
+# 2026-10-13 - WED-185 relay foundation and wedding response hotfix
+
+Changed:
+
+- Added a Cloudflare Email Routing inventory/rollback capture script and a
+  RELAY-00 decision record. The selected address domain is `mail.omnyid.com`;
+  Cloudflare Email Sending is primary and Resend fallback. Wedding relay has
+  no Gmail or personal-mailbox fallback.
+- Removed sample-dashboard merging for authenticated workspaces. The generic
+  Greenfield queue content can no longer mask real user content.
+- Made the Track vendors tile open the existing wedding vendor-follow-up panel,
+  which owns the wedding vendor reply projection, instead of the unrelated
+  general Response Queue.
+- Dashboard loading now obtains the local encryption key before attempting to
+  decrypt its AFP messages. An encrypted envelope that cannot be opened now
+  says the device must be unlocked rather than claiming it is still decrypting.
+
+Cloudflare control-plane result:
+
+- The supplied token verifies for basic zone/account reads, but Email Routing
+  rules reads return Cloudflare error `10000`. No Email Routing or DNS change
+  was made, and the incomplete capture artifact is intentionally not committed.
+
+Verification:
+
+- `node --import ./tests/node-ts-specifier-hooks.mjs --experimental-strip-types --test tests/decrypted-display-state.test.ts tests/wedding-home-overview-state.test.ts` (19 passed).
+- `npm run typecheck` (passed).
+- `npm run build` (passed; existing Tailwind/chunk-size warnings only).
+
+Remaining:
+
+- Cloudflare needs the Email Routing Rules and Email Sending API permissions
+  required to capture the mandatory inventory and run the external smoke.
+- RELAY-01 onward, including authenticated gateway routes and the transport
+  retrofit, remain in progress; live vendor relay is deliberately disabled.

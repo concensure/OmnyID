@@ -1155,6 +1155,10 @@ function App() {
   const [dashboard, setDashboard] = createSignal<DashboardBootstrap | null>(null);
   const workspaceBootstrap = createMemo<DashboardBootstrap | null>(() => {
     const live = dashboard();
+    // Sample content is a guest-only walkthrough.  Never merge it into an
+    // authenticated workspace: fabricated queue items can otherwise obscure
+    // a real user's messages and make operational copy appear user-facing.
+    if (session()?.token) return live;
     const sample = buildSampleDashboardBootstrap(session()?.user ?? live?.user);
     return mergeDashboardBootstrapWithSample(live, sample);
   });
@@ -1941,7 +1945,21 @@ function App() {
       const payload = await fetchDashboardBootstrap();
       if (seq !== dashboardFetchSeq) return;
       // Decrypt AFP messages in-memory before rendering — plaintext never re-stored
-      const { decryptMessages } = await loadDecryptModule();
+      const decrypt = await loadDecryptModule();
+      // A dashboard reload can happen immediately after sign-in, before the
+      // mount-time key initializer completes.  Initialize here as well so a
+      // successfully authenticated device does not remain in a false
+      // "decrypting" state until a later navigation happens to reload it.
+      if (!decrypt.isDecryptReady() && session()?.token) {
+        try {
+          const keys = await fetchEncKey();
+          await decrypt.initDecrypt(keys.enc_key_hex);
+        } catch {
+          // Preserve ciphertext-only rendering when this device genuinely
+          // cannot obtain its account key.
+        }
+      }
+      const { decryptMessages } = decrypt;
       payload.messages = decryptMessages(payload.messages);
       setDashboard(payload);
       dispatchDecisionOsUpdateEvent(payload);

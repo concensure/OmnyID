@@ -377,11 +377,13 @@ export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorksp
     detailLabel: vendorCards.length > 0
       ? `${dueVendorCount} due - ${waitingVendorCount} waiting`
       : "Keep outreach, replies, and follow-ups in one place.",
-    supportLabel: vendorCards.length > 0 ? `${closedVendorCount} closed` : "Open response queue",
+    supportLabel: vendorCards.length > 0 ? `${closedVendorCount} closed` : "Open vendor tracking",
     tone: urgentVendorCount > 0 ? "risk" as const : dueVendorCount > 0 ? "attention" as const : vendorCards.length > 0 ? "ready" as const : "needs_input" as const,
     toneLabel: urgentVendorCount > 0 ? "Urgent" : dueVendorCount > 0 ? "Follow up" : vendorCards.length > 0 ? "Tracked" : "Needs vendors",
-    menuId: "response_queue" as const,
-    actionLabel: vendorCards.length > 0 ? "Open vendor follow-ups" : "Open response queue",
+    // Wedding vendor replies are represented by the wedding home follow-up
+    // panel, not the unrelated, general-purpose Response Queue.
+    menuId: "home" as const,
+    actionLabel: vendorCards.length > 0 ? "Open vendor follow-ups" : "Open vendor tracking",
   };
 
   return [

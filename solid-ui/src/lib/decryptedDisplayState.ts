@@ -25,9 +25,12 @@ function hasEncryption(encryption: unknown): boolean {
   return Boolean(encryption && typeof encryption === "object");
 }
 
-function contentLooksLikeCiphertext(content: Record<string, unknown>): boolean {
+function contentLooksLikeCiphertext(content: Record<string, unknown>, encryption: unknown): boolean {
   const keys = Object.keys(content).map((key) => key.toLowerCase());
-  return keys.some((key) => ["ciphertext", "nonce", "aad", "encrypted_content"].includes(key));
+  const encryptionKeys = isRecord(encryption)
+    ? Object.keys(encryption).map((key) => key.toLowerCase())
+    : [];
+  return [...keys, ...encryptionKeys].some((key) => ["ciphertext", "nonce", "aad", "encrypted_content"].includes(key));
 }
 
 function displayStringValues(content: Record<string, unknown>): string[] {
@@ -46,7 +49,7 @@ export function buildDecryptedDisplayState(
       decrypted: false,
       content: {},
       stringValues: [],
-      placeholder: contentLooksLikeCiphertext(content)
+      placeholder: contentLooksLikeCiphertext(content, message.encryption)
         ? ENCRYPTED_MESSAGE_UNAVAILABLE_LABEL
         : ENCRYPTED_MESSAGE_PENDING_LABEL,
     };

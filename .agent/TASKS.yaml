@@ -1063,3 +1063,29 @@ tasks:
       - vendor search shows a single Home control and no protocol wording in errors
       - deck bottom bar has one primary and one secondary action with SVG icons
       - the agent floating button never sits over the phone action bar or the last form control
+
+  - id: WED-185
+    title: Wedding vendor email relay foundation and controlled rollout
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-185
+    depends_on:
+      - WED-179
+    files:
+      - scripts/capture-cloudflare-email-routing-inventory.ps1
+      - scripts/oracle-secret-sync.ps1
+      - oracle-cloud.env.example
+      - src/gateway/**
+      - src/server/**
+      - src/db/**
+      - postgres/migrations/**
+      - typescript-sdk/src/**
+      - solid-ui/src/**
+      - .agent/**
+    acceptance:
+      - Cloudflare routing and DNS inventory is saved before any routing mutation and includes a rollback payload
+      - vendor relay defaults disabled and cannot fall back to Gmail or a user mailbox
+      - wedding mask addresses use the mail.omnyid.com subdomain
+      - provider delivery and inbound events are authenticated, deduplicated, and content-free outside encrypted AFP storage
+      - the existing wedding approval and Response Queue workflow is retained
+      - focused tests, build, and Oracle deployment evidence are recorded from machine authorities

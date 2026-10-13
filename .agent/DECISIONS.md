@@ -6,6 +6,15 @@ The AUD 39 OmnyID Wedding upgrade uses Stripe Checkout `mode=payment` with a one
 This file records project architecture and coordination decisions. It is
 project truth, not a running diary.
 
+## 2026-10-13: Wedding vendor relay uses a mail subdomain and isolated providers
+
+Wedding masks use `@mail.omnyid.com`; Cloudflare Email Sending is primary and
+Resend is fallback. The wedding path must not select Gmail OAuth, Gmail SMTP,
+or any user mailbox. Cloudflare inbound remains a dedicated catch-all Worker,
+but its rule and DNS may not change until an exact pre-change inventory and
+rollback payload have been captured. Live relay sending is disabled until the
+relay security and provider gates are complete.
+
 ## 2026-10-12: Eager Solid computations must follow their reactive sources
 
 `createMemo` evaluates immediately. Any memo that reads another memo must be
