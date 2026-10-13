@@ -1079,9 +1079,10 @@ tasks:
       - src/server/**
       - src/db/**
       - postgres/migrations/**
-      - typescript-sdk/src/**
-      - solid-ui/src/**
-      - .agent/**
+        - typescript-sdk/src/**
+        - solid-ui/src/**
+        - wedding/**
+        - .agent/**
     acceptance:
       - Cloudflare routing and DNS inventory is saved before any routing mutation and includes a rollback payload
       - vendor relay defaults disabled and cannot fall back to Gmail or a user mailbox

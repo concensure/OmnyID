@@ -450,3 +450,11 @@ The server accepts a restricted key and either a Price ID or Product ID. A produ
 Password registration remains account-enumeration safe, but a known failed confirmation-email delivery must not be presented as a successful inbox handoff. The registration response therefore reports a generic delivery retry state only when the server's own attempt fails; it does not disclose whether any address already exists. Oracle's Gmail OAuth client and file-backed secrets are present, but the refresh-token exchange currently returns HTTP 400, so a newly authorised refresh token is required before confirmation delivery can be verified.
 
 Travel responses must retain useful planning guidance when optional live weather or map lookups fail. A response that is only tool-outage text is replaced with a clearly caveated, actionable itinerary-planning fallback; a partial answer with real guidance is preserved.
+
+## 2026-10-14: Wedding planner navigation must stay within the wedding surface
+
+The Wedding overview's vendor tile points to the Wedding Home vendor-follow-up panel rather than
+the generic product Response Queue. It selects the wedding home and scrolls to that panel, so a
+real vendor reply cannot be replaced by unrelated sample queue content. Vendor-search text is
+held locally while typing and committed only on blur or submit; persisting each keystroke remounts
+the planning surface and causes the page to jump.

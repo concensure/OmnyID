@@ -7,6 +7,15 @@
 - The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
+## 2026-10-14 - WED-185 regression repair and Wedding blog release (Codex)
+
+- Released `f13f551` to Oracle. The vendor-search field now holds its draft while typing, avoiding the first-character viewport jump; it commits on blur or explicit search.
+- The Wedding overview's **Track vendors** tile stays within the wedding home and scrolls to the real vendor-follow-up panel, instead of opening the unrelated generic Response Queue.
+- Published the two requested WED-178 articles: **Fake wedding exits: are they worth it?** and **When a fake exit goes wrong, and how to run one well**. `blog.html` now includes both cards and a client-side guide search, including celebrant advice.
+- Verification: `node wedding/tests/wedding-website-smoke.mjs`, `npm run typecheck`, `npm run build`, and `npm run test:wedding` (1,820 tests) passed. Oracle served-content checks passed for the index, both article URLs, blog search markup, and the deployed search-field source.
+- Deployment was UI-only with Caddy reload disabled. The Caddyfile SHA-256 remained `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`; the StrollerCheck block and running Caddy/homeserver remained intact.
+- WED-185 remains in progress: Cloudflare Email Routing inventory is still blocked by API permission error 10000, so no routing or DNS mutation has been made.
+
 ## 2026-10-12 - WED-183 workspace recovery and core view verification (Codex)
 
 - Fixed the production `Cannot access lexical declaration ... before initialization` failure caused by eager Solid memos being declared before their sources in Database, Notes, and the workflow composer.
