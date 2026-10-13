@@ -124,6 +124,25 @@ pub(super) fn read_hosted_anthropic_api_key() -> Option<String> {
         .or_else(|| read_process_secret_trimmed("ANTHROPIC_API_KEY"))
 }
 
+/// Platform-owned provider secret for the wedding draft failover chain. This
+/// honours the normal `*_FILE` convention through `read_process_secret_trimmed`.
+pub(super) fn read_hosted_cerebras_api_key() -> Option<String> {
+    read_process_secret_trimmed("OMNYID_CEREBRAS_API_KEY")
+        .or_else(|| read_process_secret_trimmed("CEREBRAS_API_KEY"))
+}
+
+/// Platform-owned provider secret for the wedding draft failover chain.
+pub(super) fn read_hosted_mistral_api_key() -> Option<String> {
+    read_process_secret_trimmed("OMNYID_MISTRAL_API_KEY")
+        .or_else(|| read_process_secret_trimmed("MISTRAL_API_KEY"))
+}
+
+pub(super) fn hosted_wedding_draft_model_configured() -> bool {
+    read_hosted_cerebras_api_key().is_some()
+        || read_hosted_mistral_api_key().is_some()
+        || read_hosted_anthropic_api_key().is_some()
+}
+
 fn read_hosted_nvidia_api_key() -> Option<String> {
     resolve_admin_tool_secret(NVIDIA_LLM_SPEC)
         .map(|secret| secret.secret)

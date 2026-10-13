@@ -57,11 +57,20 @@ following for zone `1e9906283b35a7537f3f4345a2c4083e`:
 The capture script is `scripts/capture-cloudflare-email-routing-inventory.ps1`.
 It writes a dedicated rollback payload and never prints the API token.
 
-The token supplied on 2026-10-13 verifies for ordinary zone/account reads,
-but Cloudflare's Email Routing rules endpoint still returns error `10000`.
-No routing or DNS mutation has therefore been made. The required token must
-allow Email Routing Rules read/edit and Email Sending edit for the relevant
-resources before work continues at the Cloudflare control plane.
+On 2026-10-14 the updated user-owned token successfully read the account,
+zone, routing rules, catch-all, and destination addresses. The saved
+catch-all rollback payload records a disabled `drop` rule, so no existing
+forwarding behavior was altered. The same token still returns `403/10000` for
+the Email Routing status endpoint and DNS export. The inventory is therefore
+intentionally marked incomplete and no routing or DNS mutation is authorized
+until those two reads succeed.
+
+The token is entitled to use Cloudflare Email Sending: a deliberately empty,
+non-sending REST request reached `400/10001`
+(`email.sending.error.invalid_request_schema`), rather than `403/10105`.
+That proves entitlement and send permission but does not send mail or prove a
+sender domain. A user-owned token is acceptable for Cloudflare SMTP/REST when
+it has Email Sending Edit permission and can act on the sender's account.
 
 ## Provider-event endpoints (after authenticated gateway implementation)
 

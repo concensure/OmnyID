@@ -1,6 +1,9 @@
 param(
     [string[]]$EnvFiles = @(".env", "oracle-cloud.local.env"),
-    [string]$SecretDir = ".secrets"
+    [string]$SecretDir = ".secrets",
+    # Restrict a run to named plaintext environment keys when migrating one
+    # newly supplied credential without rewriting unrelated local secrets.
+    [string[]]$Keys = @()
 )
 
 Set-StrictMode -Version Latest
@@ -18,12 +21,25 @@ $mappings = @(
     @{ Key = "OMNYID_GMAIL_REFRESH_TOKEN"; FileKey = "OMNYID_GMAIL_REFRESH_TOKEN_FILE"; FileName = "omnyid_gmail_refresh_token" },
     @{ Key = "OMNYID_IMAP_PASSWORD"; FileKey = "OMNYID_IMAP_PASSWORD_FILE"; FileName = "omnyid_imap_password" },
     @{ Key = "SMTP_PASS"; FileKey = "SMTP_PASS_FILE"; FileName = "omnyid_smtp_pass" },
+    @{ Key = "OMNYID_CEREBRAS_API_KEY"; FileKey = "OMNYID_CEREBRAS_API_KEY_FILE"; FileName = "omnyid_cerebras_api_key" },
+    @{ Key = "CEREBRAS_API_KEY"; FileKey = "OMNYID_CEREBRAS_API_KEY_FILE"; FileName = "omnyid_cerebras_api_key" },
+    @{ Key = "OMNYID_MISTRAL_API_KEY"; FileKey = "OMNYID_MISTRAL_API_KEY_FILE"; FileName = "omnyid_mistral_api_key" },
+    @{ Key = "MISTRAL_API_KEY"; FileKey = "OMNYID_MISTRAL_API_KEY_FILE"; FileName = "omnyid_mistral_api_key" },
     @{ Key = "OMNYID_ANTHROPIC_KEY"; FileKey = "OMNYID_ANTHROPIC_KEY_FILE"; FileName = "omnyid_anthropic_api_key" },
     @{ Key = "ANTHROPIC_API_KEY"; FileKey = "OMNYID_ANTHROPIC_KEY_FILE"; FileName = "omnyid_anthropic_api_key" },
     @{ Key = "OMNYID_RUNPOD_API_KEY"; FileKey = "OMNYID_RUNPOD_API_KEY_FILE"; FileName = "omnyid_runpod_api_key" },
     @{ Key = "OMNYID_OPENAI_API_KEY"; FileKey = "OMNYID_OPENAI_API_KEY_FILE"; FileName = "omnyid_openai_api_key" },
     @{ Key = "OPENAI_API_KEY"; FileKey = "OMNYID_OPENAI_API_KEY_FILE"; FileName = "omnyid_openai_api_key" }
 )
+
+if ($Keys.Count -gt 0) {
+    $wanted = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($key in $Keys) { [void]$wanted.Add($key) }
+    $mappings = @($mappings | Where-Object { $wanted.Contains($_.Key) })
+    if ($mappings.Count -eq 0) {
+        throw "[migrate-env-secrets-to-files] none of the requested keys have a secret-file mapping"
+    }
+}
 
 function Parse-EnvFile {
     param([string]$Path)

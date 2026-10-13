@@ -1079,6 +1079,7 @@ tasks:
       - scripts/capture-cloudflare-email-routing-inventory.ps1
       - scripts/oracle-secret-sync.ps1
       - oracle-cloud.env.example
+      - Documents/design/wedding planner/wedding-vendor-email-relay-relay-00-decision.md
       - src/gateway/**
       - src/server/**
       - src/db/**
@@ -1100,3 +1101,5 @@ tasks:
       - comparison-card image URLs are accepted only from images.unsplash.com; arbitrary URLs and legacy proxy paths are omitted
       - comparison artifacts and shortlist presentation now enforce the same direct-Unsplash image rule as live vendor-search results
       - the Wedding planner guide entry point and automatic guide display have been removed
+      - vendor outreach drafts now use a provider ladder: Cerebras, Mistral, then Anthropic; provider-labelled usage receipts preserve the existing audit boundary and a deterministic draft remains the final no-send fallback
+      - latest Cloudflare capture saved routing rules, exact catch-all rollback, and destination addresses; routing-status and DNS-export reads remain blocked by 403/10000, while a content-free Email Sending check confirms the account is entitled

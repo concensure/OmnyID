@@ -15,6 +15,35 @@ Gmail as a vendor-relay fallback. Relay configuration defaults disabled, and
 Cloudflare/DNS/routing state remains untouched until the inventory and security
 gates are complete.
 
+## 2026-10-14: Wedding draft provider order is Cerebras, Mistral, Anthropic
+
+The platform-funded wedding vendor draft route attempts configured providers in
+this order: Cerebras, Mistral, then Anthropic. A provider failure or invalid
+structured response proceeds to the next provider; only a final failure uses
+the existing deterministic, review-before-send template. Provider selection is
+limited to this wedding draft path and does not alter Master Agent/BYOK routing.
+Each successful call records its actual provider in the existing tenant-scoped
+usage ledger.
+
+The configured Cerebras account currently exposes `qwen-3.8-27b` and
+`gpt-oss-120b`; the default is `qwen-3.8-27b`. Authentication works, but a
+minimal completion returned HTTP 402, so the owner must add funds or enable
+usage before Cerebras can produce drafts. The supplied local environment does
+not currently contain a parseable `MISTRAL_API_KEY` or
+`OMNYID_MISTRAL_API_KEY`, so Mistral cannot yet be deployed as the second
+provider.
+
+## 2026-10-14: Cloudflare inventory is partially captured and Email Sending is entitled
+
+The updated user-owned Cloudflare API token can read routing rules, the exact
+catch-all, and destination addresses. It still receives `403/10000` from the
+routing-status and DNS-export endpoints, so the required pre-change inventory
+is incomplete and routing/DNS must remain untouched. A deliberately invalid,
+content-free request to Email Sending returned `400/10001`, not `403/10105`;
+the account is entitled and the token has Email Sending permission. This is not
+authorization to enable the relay or send test mail before the remaining
+security gates.
+
 ## 2026-10-13: Wedding vendor relay uses a mail subdomain and isolated providers
 
 Wedding masks use `@mail.omnyid.com`; Cloudflare Email Sending is primary and

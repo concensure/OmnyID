@@ -7,9 +7,9 @@
  */
 //
 // Admin-funded "write me an outreach email to this vendor" draft generator.
-// Modelled directly on wedding_understanding_routes.rs: a hosted Anthropic key
-// pays for the call, so every limit here exists to bound that spend and to
-// stop the model from inventing facts about the couple it was not given.
+// A platform-owned provider ladder pays for the call, so every limit here
+// exists to bound that spend and to stop the model from inventing facts about
+// the couple it was not given.
 //
 // Unlike wedding_understanding_routes.rs this route is authenticated — it is
 // reached only from inside a signed-in couple's own workspace — so rate
@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::db::wedding_vendor_evidence::{VENDOR_AVAILABILITY_STATES, VendorAvailabilityInput};
+use crate::inference::{InferenceBackend, InferenceMessage, InferenceRequest, dispatch_infer};
 use crate::wedding_shared_tool_metering::{
     WeddingSharedToolFeature, WeddingSharedToolProvider, WeddingSharedToolUsageInput,
     record_wedding_shared_tool_usage,
@@ -35,12 +36,74 @@ use crate::wedding_shared_tool_metering::{
 use super::{
     AppState, RateLimitPolicy,
     auth::{authenticated_rate_limit_key, authenticated_user, enforce_rate_limit},
-    llm_resolution::read_hosted_anthropic_api_key,
+    llm_resolution::{
+        read_hosted_anthropic_api_key, read_hosted_cerebras_api_key, read_hosted_mistral_api_key,
+    },
     wedding_admin_ai_policy,
 };
 
-const MODEL: &str = "claude-haiku-4-5-20251001";
+// Verified against the configured Cerebras account's /v1/models response.
+const DEFAULT_CEREBRAS_MODEL: &str = "qwen-3.8-27b";
+const DEFAULT_MISTRAL_MODEL: &str = "mistral-small-latest";
+const DEFAULT_ANTHROPIC_MODEL: &str = "claude-haiku-4-5-20251001";
 const MAX_OUTPUT_TOKENS: u32 = 600;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OutreachDraftProvider {
+    Cerebras,
+    Mistral,
+    Anthropic,
+}
+
+impl OutreachDraftProvider {
+    const ORDER: [Self; 3] = [Self::Cerebras, Self::Mistral, Self::Anthropic];
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Cerebras => "cerebras",
+            Self::Mistral => "mistral",
+            Self::Anthropic => "anthropic",
+        }
+    }
+
+    const fn metering_provider(self) -> WeddingSharedToolProvider {
+        match self {
+            Self::Cerebras => WeddingSharedToolProvider::CerebrasLlm,
+            Self::Mistral => WeddingSharedToolProvider::MistralLlm,
+            Self::Anthropic => WeddingSharedToolProvider::AnthropicLlm,
+        }
+    }
+
+    fn model(self) -> String {
+        let (env_key, default_model) = match self {
+            Self::Cerebras => (
+                "OMNYID_WEDDING_OUTREACH_CEREBRAS_MODEL",
+                DEFAULT_CEREBRAS_MODEL,
+            ),
+            Self::Mistral => (
+                "OMNYID_WEDDING_OUTREACH_MISTRAL_MODEL",
+                DEFAULT_MISTRAL_MODEL,
+            ),
+            Self::Anthropic => (
+                "OMNYID_WEDDING_OUTREACH_ANTHROPIC_MODEL",
+                DEFAULT_ANTHROPIC_MODEL,
+            ),
+        };
+        std::env::var(env_key)
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty() && value.len() <= 128)
+            .unwrap_or_else(|| default_model.to_string())
+    }
+
+    fn api_key(self) -> Option<String> {
+        match self {
+            Self::Cerebras => read_hosted_cerebras_api_key(),
+            Self::Mistral => read_hosted_mistral_api_key(),
+            Self::Anthropic => read_hosted_anthropic_api_key(),
+        }
+    }
+}
 
 const MAX_VENDOR_SNIPPET_CHARS: usize = 800;
 const MAX_COUPLE_FIELD_CHARS: usize = 400;
@@ -263,7 +326,7 @@ struct WeddingVendorOutreachDraftResponse {
     subject: String,
     body_markdown: String,
     grounded_on: Vec<String>,
-    model: &'static str,
+    model: String,
 }
 
 fn capped(value: &Option<String>, max_chars: usize) -> Option<String> {
@@ -467,59 +530,59 @@ async fn wedding_vendor_outreach_draft_http(
     );
 
     // A user-selected follow-up must remain editable and saveable even if the
-    // optional hosted model is disabled, out of credit, or returns malformed
-    // output. The fallback uses only validated couple fields and never sends.
-    let (payload, model) = if wedding_admin_ai_policy::execution_enabled() {
-        if let Some(api_key) = read_hosted_anthropic_api_key() {
-            match anthropic_text_infer(
-                &state.http_client,
-                &api_key,
-                MODEL,
-                WEDDING_VENDOR_OUTREACH_SYSTEM_PROMPT,
-                &user_text,
-            )
-            .await
-            {
+    // optional hosted models are disabled, out of credit, or return malformed
+    // output. Provider failures deliberately cascade Cerebras -> Mistral ->
+    // Anthropic; the final fallback uses only validated couple fields and
+    // never sends. Do not log model output because it can contain email text.
+    let generated = if wedding_admin_ai_policy::execution_enabled() {
+        let mut result = None;
+        for provider in OutreachDraftProvider::ORDER {
+            let Some(api_key) = provider.api_key() else {
+                continue;
+            };
+            let model = provider.model();
+            match outreach_text_infer(provider, &api_key, &model, &user_text).await {
                 Ok(raw) => match parse_outreach_model_payload(&raw) {
-                    Ok(payload) => (payload, MODEL),
-                    Err(err) => {
-                        tracing::warn!(%err, raw = %raw, "wedding_vendor_outreach_draft: model output invalid; using deterministic draft");
-                        (
-                            deterministic_outreach_payload(vendor, couple),
-                            "deterministic_template",
-                        )
+                    Ok(payload) => {
+                        result = Some((payload, provider, model));
+                        break;
                     }
+                    Err(_) => tracing::warn!(
+                        provider = provider.label(),
+                        "wedding_vendor_outreach_draft: invalid model output; trying next provider"
+                    ),
                 },
-                Err(err) => {
-                    tracing::warn!(%err, user_id = %user.id, "wedding_vendor_outreach_draft: model call failed; using deterministic draft");
-                    (
-                        deterministic_outreach_payload(vendor, couple),
-                        "deterministic_template",
-                    )
-                }
+                Err(_) => tracing::warn!(
+                    provider = provider.label(),
+                    user_id = %user.id,
+                    "wedding_vendor_outreach_draft: model call failed; trying next provider"
+                ),
             }
-        } else {
+        }
+        result
+    } else {
+        None
+    };
+
+    let (payload, selected_provider, model) = generated
+        .map(|(payload, provider, model)| (payload, Some(provider), model))
+        .unwrap_or_else(|| {
             (
                 deterministic_outreach_payload(vendor, couple),
-                "deterministic_template",
+                None,
+                "deterministic_template".to_string(),
             )
-        }
-    } else {
-        (
-            deterministic_outreach_payload(vendor, couple),
-            "deterministic_template",
-        )
-    };
+        });
 
     // Fail closed if the platform-funded call cannot be written to the shared
     // wedding usage ledger. This provides a durable, tenant-scoped audit receipt
     // without exposing an admin key or rerouting a direct Master Agent request.
-    if model == MODEL {
+    if let Some(provider) = selected_provider {
         record_wedding_shared_tool_usage(
             &state.db,
             WeddingSharedToolUsageInput {
                 user_id: user.id.clone(),
-                provider: WeddingSharedToolProvider::AnthropicLlm,
+                provider: provider.metering_provider(),
                 feature: WeddingSharedToolFeature::VendorOutreachDraft,
                 quantity: 1.0,
                 estimated_cost_usd: 0.0,
@@ -636,42 +699,45 @@ fn parse_outreach_model_payload(raw: &str) -> Result<ModelOutreachPayload, Strin
     Ok(payload)
 }
 
-async fn anthropic_text_infer(
-    client: &reqwest::Client,
+async fn outreach_text_infer(
+    provider: OutreachDraftProvider,
     api_key: &str,
     model: &str,
-    system: &str,
     user_text: &str,
 ) -> Result<String, String> {
-    let body = serde_json::json!({
-        "model": model,
-        "max_tokens": MAX_OUTPUT_TOKENS,
-        "temperature": 0.6,
-        "system": system,
-        "messages": [{ "role": "user", "content": user_text }],
-    });
-    let resp = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("http error: {e}"))?;
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("anthropic api error {status}: {text}"));
-    }
-    let json: Value = resp
-        .json()
-        .await
-        .map_err(|e| format!("decode error: {e}"))?;
-    Ok(json["content"][0]["text"]
-        .as_str()
-        .unwrap_or("")
-        .to_string())
+    let backend = match provider {
+        OutreachDraftProvider::Cerebras => InferenceBackend::OpenAICompat {
+            base_url: "https://api.cerebras.ai/v1".to_string(),
+            api_key: api_key.to_string(),
+            cost_per_1m_input: 0.0,
+            cost_per_1m_output: 0.0,
+        },
+        OutreachDraftProvider::Mistral => InferenceBackend::OpenAICompat {
+            base_url: "https://api.mistral.ai/v1".to_string(),
+            api_key: api_key.to_string(),
+            cost_per_1m_input: 0.0,
+            cost_per_1m_output: 0.0,
+        },
+        OutreachDraftProvider::Anthropic => InferenceBackend::Anthropic {
+            api_key: api_key.to_string(),
+        },
+    };
+    let response = dispatch_infer(
+        &backend,
+        model,
+        &InferenceRequest {
+            system: WEDDING_VENDOR_OUTREACH_SYSTEM_PROMPT.to_string(),
+            messages: vec![InferenceMessage {
+                role: "user".to_string(),
+                content: user_text.to_string(),
+            }],
+            max_tokens: MAX_OUTPUT_TOKENS,
+            temperature: 0.6,
+        },
+    )
+    .await
+    .map_err(|_| "provider request failed".to_string())?;
+    Ok(response.content)
 }
 
 #[cfg(test)]
@@ -827,6 +893,21 @@ mod tests {
         assert_eq!(payload.subject, "Enquiry");
         assert_eq!(payload.body_markdown, "Hello there");
         assert_eq!(payload.grounded_on, vec!["location".to_string()]);
+    }
+
+    #[test]
+    fn hosted_draft_provider_order_is_cerebras_then_mistral_then_anthropic() {
+        assert_eq!(
+            OutreachDraftProvider::ORDER,
+            [
+                OutreachDraftProvider::Cerebras,
+                OutreachDraftProvider::Mistral,
+                OutreachDraftProvider::Anthropic,
+            ]
+        );
+        assert_eq!(OutreachDraftProvider::Cerebras.label(), "cerebras");
+        assert_eq!(OutreachDraftProvider::Mistral.label(), "mistral");
+        assert_eq!(OutreachDraftProvider::Anthropic.label(), "anthropic");
     }
 
     #[test]

@@ -1660,3 +1660,20 @@ Follow-up UI hardening:
   copy completed (`UI assets ready at /srv/workspace`), the homeserver stayed
   up, `/wedding/` returned HTTP 200, and Caddy's SHA-256 remained
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+Provider and Cloudflare follow-up:
+
+- Wedding vendor drafts now cascade Cerebras -> Mistral -> Anthropic and only
+  then use the deterministic review-before-send template. Successful provider
+  calls are metered by their actual provider; model output is no longer logged.
+  The local Cerebras credential was moved to
+  `.secrets/omnyid_cerebras_api_key` and is ready for Oracle sync.
+- Cerebras authentication and model discovery work, but its currently exposed
+  `qwen-3.8-27b` completion returned HTTP 402. The supplied local `.env` has
+  no parseable Mistral key, so the Mistral leg remains unconfigured until the
+  owner supplies `MISTRAL_API_KEY` or `OMNYID_MISTRAL_API_KEY`.
+- `artifacts/cloudflare-email-routing-inventory-20261014` contains rules,
+  catch-all, rollback, destination-address inventory, and explicit error
+  records. Routing-status and DNS export remain `403/10000`; no routing/DNS
+  mutation occurred. A deliberately invalid, non-sending Email Sending request
+  returned `400/10001`, proving this account/token is entitled (not `10105`).

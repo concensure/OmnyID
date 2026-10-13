@@ -16,7 +16,9 @@ use crate::admin_tool_secrets::{
     WEATHER_API_SPEC, admin_tool_secret_status,
 };
 use crate::db::{WeddingVendorRecord, wedding_vendor_evidence::VendorAttributeWrite};
-use crate::server::{llm_resolution::read_hosted_anthropic_api_key, wedding_admin_ai_policy};
+use crate::server::{
+    llm_resolution::hosted_wedding_draft_model_configured, wedding_admin_ai_policy,
+};
 pub(super) fn validate_optional_http_url(
     value: Option<String>,
     label: &str,
@@ -343,7 +345,7 @@ pub(super) fn admin_wedding_ai_routing_policy_json() -> Value {
     let routing_enabled = wedding_admin_ai_policy::routing_enabled();
     let audit_receipts_enabled = wedding_admin_ai_policy::audit_receipts_enabled();
     let daily_request_limit = wedding_admin_ai_policy::daily_request_limit();
-    let model_configured = read_hosted_anthropic_api_key().is_some();
+    let model_configured = hosted_wedding_draft_model_configured();
     let execution_enabled = wedding_admin_ai_policy::execution_enabled() && model_configured;
     serde_json::json!({
         "backendPolicyEndpointMounted": true,

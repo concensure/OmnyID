@@ -4,6 +4,8 @@ use crate::db::{Db, UserExternalToolUsageEventInsert, UserExternalToolUsageEvent
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WeddingSharedToolProvider {
+    CerebrasLlm,
+    MistralLlm,
     AnthropicLlm,
     BraveSearch,
     GooglePlaces,
@@ -52,6 +54,22 @@ struct WeddingSharedToolDescriptor {
 
 fn provider_descriptor(provider: WeddingSharedToolProvider) -> WeddingSharedToolDescriptor {
     match provider {
+        WeddingSharedToolProvider::CerebrasLlm => WeddingSharedToolDescriptor {
+            tool_slug: "cerebras-llm",
+            tool_name: "Cerebras hosted LLM",
+            provider_key: "cerebras-llm",
+            provider_category: "llm",
+            billing_category: "wedding_ai",
+            default_usage_unit: "requests",
+        },
+        WeddingSharedToolProvider::MistralLlm => WeddingSharedToolDescriptor {
+            tool_slug: "mistral-llm",
+            tool_name: "Mistral hosted LLM",
+            provider_key: "mistral-llm",
+            provider_category: "llm",
+            billing_category: "wedding_ai",
+            default_usage_unit: "requests",
+        },
         WeddingSharedToolProvider::AnthropicLlm => WeddingSharedToolDescriptor {
             tool_slug: "anthropic-llm",
             tool_name: "Anthropic hosted LLM",
@@ -301,6 +319,30 @@ mod tests {
             event.metadata_json.as_ref().unwrap()["feature"],
             "vendor_outreach_draft"
         );
+    }
+
+    #[test]
+    fn wedding_outreach_metering_labels_cerebras_and_mistral() {
+        for (provider, expected_slug) in [
+            (WeddingSharedToolProvider::CerebrasLlm, "cerebras-llm"),
+            (WeddingSharedToolProvider::MistralLlm, "mistral-llm"),
+        ] {
+            let event = wedding_shared_tool_usage_event(WeddingSharedToolUsageInput {
+                user_id: "couple-1".to_string(),
+                provider,
+                feature: WeddingSharedToolFeature::VendorOutreachDraft,
+                quantity: 1.0,
+                estimated_cost_usd: 0.0,
+                usage_unit: None,
+                wedding_plan_id: Some("plan-1".to_string()),
+                operation: Some("vendor_outreach_draft".to_string()),
+                provider_request_id: None,
+                occurred_at: Some("2026-10-14T00:00:00Z".to_string()),
+            })
+            .expect("event");
+            assert_eq!(event.tool_slug, expected_slug);
+            assert_eq!(event.billing_category, "wedding_ai");
+        }
     }
 
     #[test]
