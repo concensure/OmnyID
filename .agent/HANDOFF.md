@@ -1636,3 +1636,15 @@ Deployment correction:
   Compose. A fixed default path made the runtime entrypoint require relay
   secrets even while OMNYID_VENDOR_MAIL_ENABLED=false; this is corrected in
   the follow-up deployment commit.
+
+Production release:
+
+- Released `050f652` and the Compose correction `db32e0a` to Oracle on
+  2026-10-14 using the existing production environment. The initial scoped
+  release built the new homeserver and UI assets, but exposed the optional
+  secret-path error above. The Compose-only recovery then recreated
+  `homeserver` without rebuilding or changing Caddy.
+- Verified `omnyid-homeserver-1` is running, logs `Omnyid HTTP listening on
+  0.0.0.0:8080`, the configured Gmail sync scheduler is active, and
+  `https://omnyid.com/wedding/` returns HTTP 200. Caddy still has SHA-256
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
