@@ -61,14 +61,19 @@ function unique(values: readonly string[]): string[] {
 function httpUrl(value: string | null | undefined): string | null {
   const candidate = clean(value);
   if (!candidate) return null;
-  // Google Places photos are served through this same-origin, backend-validated
-  // proxy. It is a real provider photo, not a presentation placeholder.
-  if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(candidate)) {
-    return candidate;
-  }
   try {
     const url = new URL(candidate);
     return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function unsplashPhotoUrl(value: string | null | undefined): string | null {
+  const url = httpUrl(value);
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.toLowerCase() === "images.unsplash.com" ? url : null;
   } catch {
     return null;
   }
@@ -205,7 +210,7 @@ export function weddingVendorShortlistMedia(input: {
   imageUrl?: string | null;
   imageAlt?: string | null;
 }): WeddingVendorShortlistMedia {
-  const photo = httpUrl(input.imageUrl);
+  const photo = unsplashPhotoUrl(input.imageUrl);
   const name = clean(input.vendorName) || "Vendor";
   if (photo) {
     return { kind: "verified_photo", url: photo, alt: clean(input.imageAlt) || `${name} vendor photo`, label: "Vendor photo" };

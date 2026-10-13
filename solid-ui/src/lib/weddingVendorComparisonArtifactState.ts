@@ -12,13 +12,24 @@ function stringArray(value: unknown): string[] {
 
 function safeExternalUrl(value: unknown): string | null {
   const url = clean(value);
-  if (/^\/wedding\/vendor-photo\/google\?name=/i.test(url)) return url;
   if (!/^https?:\/\//i.test(url)) return null;
   try {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
     if (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(hostname)) return null;
     return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+/** Comparison-card imagery is deliberately limited to the licenced, stable
+ * Unsplash CDN. Links are handled separately by safeExternalUrl. */
+function unsplashImageUrl(value: unknown): string | null {
+  const url = safeExternalUrl(value);
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.toLowerCase() === "images.unsplash.com" ? url : null;
   } catch {
     return null;
   }
@@ -71,7 +82,7 @@ export function vendorComparisonCardsForArtifact(
       choiceId: clean(record.choice_id) || `${rank}:${title}`,
       rank,
       title,
-      imageUrl: safeExternalUrl(record.image_url),
+      imageUrl: unsplashImageUrl(record.image_url),
       imageAlt: clean(record.image_alt) || `${title} venue image`,
       scoreLabel: clean(record.score_label) || "Ranked source-backed option",
       provider: clean(record.provider) || "Search",

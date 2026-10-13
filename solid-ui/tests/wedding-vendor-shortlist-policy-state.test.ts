@@ -41,16 +41,17 @@ test("shortlist removes canonical duplicates and unsuitable booked, excluded, ca
 });
 
 test("media is always verified photo or an honest placeholder", () => {
-  assert.deepEqual(weddingVendorShortlistMedia({ vendorName: "Harbour House", imageUrl: "https://images.example/harbour.jpg" }), {
-    kind: "verified_photo", url: "https://images.example/harbour.jpg", alt: "Harbour House vendor photo", label: "Vendor photo",
+  assert.deepEqual(weddingVendorShortlistMedia({ vendorName: "Harbour House", imageUrl: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format" }), {
+    kind: "verified_photo", url: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format", alt: "Harbour House vendor photo", label: "Vendor photo",
   });
   assert.equal(
     weddingVendorShortlistMedia({
       vendorName: "Harbour House",
       imageUrl: "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc&max_width_px=720",
     }).kind,
-    "verified_photo",
+    "placeholder",
   );
+  assert.equal(weddingVendorShortlistMedia({ vendorName: "Harbour House", imageUrl: "https://images.example/harbour.jpg" }).kind, "placeholder");
   const placeholder = weddingVendorShortlistMedia({ vendorName: "Harbour House", imageUrl: "javascript:bad" });
   assert.equal(placeholder.kind, "placeholder");
   assert.match(placeholder.label, /placeholder/i);

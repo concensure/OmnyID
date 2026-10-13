@@ -1648,3 +1648,12 @@ Production release:
   0.0.0.0:8080`, the configured Gmail sync scheduler is active, and
   `https://omnyid.com/wedding/` returns HTTP 200. Caddy still has SHA-256
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+Follow-up UI hardening:
+
+- Persisted comparison artifacts and shortlist-card media had a separate
+  permissive image policy, including the legacy Google photo proxy. They now
+  use the same direct `images.unsplash.com` allowlist as live vendor search;
+  all other image URLs resolve to the existing honest placeholder. Focused
+  comparison/shortlist/search tests (25) and Solid typecheck pass. This UI-only
+  change still needs the scoped `ui` release before it is live.

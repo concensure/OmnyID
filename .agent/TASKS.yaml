@@ -1098,4 +1098,5 @@ tasks:
       - reply drafting now falls back to a deterministic, review-before-send template when the optional hosted model is unavailable; no email is sent by the fallback
       - directory-only free-text searches preserve the exact vendor wording, so Mackay resolves against the active vendor directory without an online provider
       - comparison-card image URLs are accepted only from images.unsplash.com; arbitrary URLs and legacy proxy paths are omitted
+      - comparison artifacts and shortlist presentation now enforce the same direct-Unsplash image rule as live vendor-search results
       - the Wedding planner guide entry point and automatic guide display have been removed

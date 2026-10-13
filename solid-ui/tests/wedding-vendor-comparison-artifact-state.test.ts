@@ -38,3 +38,24 @@ test("reopened comparison artifacts hide previously persisted category pages", (
   });
   assert.deepEqual(cards.map((card) => card.title), ["Harbour Lights Events"]);
 });
+
+test("comparison cards only render direct Unsplash image URLs", () => {
+  const [card] = vendorComparisonCardsForArtifact({
+    topChoiceCards: [{
+      rank: 1,
+      title: "Mackay Family Estate",
+      source_url: "https://mackay-family-estate.example",
+      image_url: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format",
+    }, {
+      rank: 2,
+      title: "Other Venue",
+      source_url: "https://other-venue.example",
+      image_url: "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc",
+    }],
+  });
+  assert.match(card.imageUrl ?? "", /^https:\/\/images\.unsplash\.com\//);
+  const cards = vendorComparisonCardsForArtifact({
+    topChoiceCards: [{ rank: 1, title: "Other Venue", source_url: "https://other-venue.example", image_url: "https://cdn.example/venue.jpg" }],
+  });
+  assert.equal(cards[0]?.imageUrl, null);
+});
