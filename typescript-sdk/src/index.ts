@@ -123,7 +123,7 @@ export const AfpRelationLinkContentSchema = z.object({
   source_refs: z.array(z.string()).default([]),
 });
 
-const MessageSchema = z.object({
+export const MessageSchema = z.object({
   protocol: z.literal('afp-v1').default('afp-v1'),
   id: z.string().default(''),
   thread_id: z.string(),
@@ -162,6 +162,181 @@ export type Message = z.infer<typeof MessageSchema>;
 export type Action = z.infer<typeof ActionSchema>;
 export type MessageInput = z.input<typeof MessageSchema>;
 export type ActionInput = z.input<typeof ActionSchema>;
+
+// Wedding vendor email is carried as encrypted AFP content. These schemas keep
+// the decrypted payload, its permitted plaintext routing metadata, and the AFP
+// envelope distinct so callers cannot accidentally persist an email body in
+// metadata while constructing a relay message.
+export const WeddingVendorEmailParticipantSchema = z.object({
+  name: z.string().trim().min(1).max(256).optional(),
+  address: z.string().trim().email().max(320),
+});
+
+export const WeddingVendorEmailContentSchema = z.object({
+  schema: z.literal('wedding_vendor_email/v1'),
+  vendor_id: z.string().trim().min(1).max(256),
+  direction: z.enum(['inbound', 'outbound', 'reply']),
+  subject: z.string().max(998).optional(),
+  text: z.string().max(1_000_000).optional(),
+  html: z.string().max(1_000_000).optional(),
+  from: WeddingVendorEmailParticipantSchema,
+  to: z.array(WeddingVendorEmailParticipantSchema).min(1).max(50),
+  provider_message_id: z.string().trim().min(1).max(512).optional(),
+  internet_message_id: z.string().trim().min(1).max(998).optional(),
+  in_reply_to: z.string().trim().min(1).max(998).optional(),
+  references: z.array(z.string().trim().min(1).max(998)).max(100).default([]),
+  received_at: z.string().datetime().optional(),
+}).strict();
+
+export const EmailReadContentSchema = z.object({
+  schema_version: z.literal('email_read/v1'),
+  source_message_id: z.string().trim().min(1).max(128),
+  read_at: z.string().datetime(),
+  actor_agent_id: z.string().trim().min(1).max(512),
+}).strict();
+
+export const EmailDeliveryStatusContentSchema = z.object({
+  schema: z.literal('email_delivery_status/v1'),
+  source_message_id: z.string().trim().min(1).max(128),
+  status: z.enum(['accepted', 'sent', 'delivered', 'delayed', 'failed']),
+  occurred_at: z.string().datetime(),
+  provider_message_id: z.string().trim().min(1).max(512).optional(),
+}).strict();
+
+export const EmailBounceContentSchema = z.object({
+  schema: z.literal('email_bounce/v1'),
+  source_message_id: z.string().trim().min(1).max(128),
+  bounce_kind: z.enum(['hard', 'soft', 'complaint']),
+  occurred_at: z.string().datetime(),
+  provider_message_id: z.string().trim().min(1).max(512).optional(),
+  diagnostic_code: z.string().trim().min(1).max(128).optional(),
+}).strict();
+
+const OpaqueRelayValueSchema = z.string().trim().min(1).max(512)
+  .refine((value) => !value.includes('@'), 'must not contain an email address');
+const IdempotencyKeySchema = z.string().regex(/^sha256:[a-f0-9]{64}$/i);
+
+export const WeddingVendorEmailMetadataSchema = z.object({
+  schema: z.enum([
+    'wedding_vendor_email/v1',
+    'email_delivery_status/v1',
+    'email_bounce/v1',
+  ]),
+  transport: z.literal('email_relay').optional(),
+  provider_event_digest: IdempotencyKeySchema.optional(),
+  vendor_id: OpaqueRelayValueSchema.optional(),
+  relay_thread_id: OpaqueRelayValueSchema.optional(),
+  risk_classification: z.enum(['normal', 'quarantined', 'blocked']).optional(),
+  idempotency_key: IdempotencyKeySchema,
+}).strict();
+
+export const EmailReadMetadataSchema = z.object({
+  schema: z.literal('email_read/v1'),
+  idempotency_key: IdempotencyKeySchema,
+}).strict();
+
+export const WeddingVendorEncryptedContentMarkerSchema = z.object({
+  omnyid_encrypted: z.literal(true),
+  scheme: z.literal('omnyid-envelope-v1'),
+}).strict();
+
+const RelaySubtypes = ['incoming', 'outgoing', 'reply', 'delivery_status', 'bounce'] as const;
+
+export const WeddingVendorEmailEnvelopeSchema = MessageSchema.superRefine((message, ctx) => {
+  if (message.type !== 'email') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay messages must use type=email', path: ['type'] });
+  }
+  if (message.kind !== 'communication') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay messages must use kind=communication', path: ['kind'] });
+  }
+  if (!RelaySubtypes.includes(message.subtype as (typeof RelaySubtypes)[number])) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'unsupported relay subtype', path: ['subtype'] });
+  }
+  if (!message.supertags.includes('wedding_vendor_email')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay supertag is required', path: ['supertags'] });
+  }
+  if (!WeddingVendorEncryptedContentMarkerSchema.safeParse(message.content).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay content must be an encrypted marker', path: ['content'] });
+  }
+  if (!message.encryption || typeof message.encryption !== 'object') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay encryption envelope is required', path: ['encryption'] });
+  }
+  const metadata = message.metadata ?? {};
+  if (!WeddingVendorEmailMetadataSchema.safeParse(metadata).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay metadata is not allowlisted', path: ['metadata'] });
+  }
+});
+
+export const EmailReadEnvelopeSchema = MessageSchema.superRefine((message, ctx) => {
+  if (message.type !== 'email' || message.kind !== 'communication' || message.subtype !== 'read') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid read-event envelope' });
+  }
+  if (!message.parent_id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read event must name its source message', path: ['parent_id'] });
+  }
+  const matchingReference = message.references.some((reference) =>
+    reference.type === 'message'
+    && reference.target === message.parent_id
+    && reference.metadata?.relation === 'read');
+  if (!matchingReference) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read event must reference its source message in the same thread', path: ['references'] });
+  }
+  if (!message.supertags.includes('wedding_vendor_email') || !message.supertags.includes('user_read_event')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read-event supertags are required', path: ['supertags'] });
+  }
+  if (!WeddingVendorEncryptedContentMarkerSchema.safeParse(message.content).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read content must be an encrypted marker', path: ['content'] });
+  }
+  if (!EmailReadMetadataSchema.safeParse(message.metadata ?? {}).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read metadata is not allowlisted', path: ['metadata'] });
+  }
+});
+
+export type WeddingVendorEmailContent = z.infer<typeof WeddingVendorEmailContentSchema>;
+export type EmailReadContent = z.infer<typeof EmailReadContentSchema>;
+export type EmailDeliveryStatusContent = z.infer<typeof EmailDeliveryStatusContentSchema>;
+export type EmailBounceContent = z.infer<typeof EmailBounceContentSchema>;
+
+export interface WeddingVendorEmailEnvelopeInput {
+  id: string;
+  thread_id: string;
+  parent_id?: string;
+  from: string;
+  to: string[];
+  timestamp: string;
+  subtype: (typeof RelaySubtypes)[number];
+  metadata: z.infer<typeof WeddingVendorEmailMetadataSchema>;
+  encryption: Record<string, unknown>;
+  signature?: string;
+}
+
+export function buildWeddingVendorEmailEnvelope(input: WeddingVendorEmailEnvelopeInput): Message {
+  return WeddingVendorEmailEnvelopeSchema.parse({
+    protocol: 'afp-v1',
+    ...input,
+    type: 'email',
+    kind: 'communication',
+    supertags: ['wedding_vendor_email'],
+    content: { omnyid_encrypted: true, scheme: 'omnyid-envelope-v1' },
+    views: [],
+    references: [],
+    typed_refs: [],
+    attachments: [],
+    store_in_relational: true,
+    signature: input.signature ?? '',
+  });
+}
+
+export async function weddingVendorEmailIdempotencyKey(
+  namespace: string,
+  stableParts: readonly string[],
+): Promise<string> {
+  const canonical = [namespace.trim(), ...stableParts.map((part) => part.trim())]
+    .map((part) => `${part.length}:${part}`)
+    .join('|');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  return `sha256:${Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
 
 export interface MessageSearchFacets {
   type?: string;

@@ -138,6 +138,7 @@ pub mod ui_surface_messages;
 pub mod webauthn;
 pub mod wedding_shared_tool_metering;
 pub mod wedding_vendor_decision_patterns;
+pub mod wedding_vendor_email_contract;
 pub mod wedding_vendor_quote_orchestration;
 pub mod wedding_vendor_replay;
 pub mod workflow_instance_contracts;

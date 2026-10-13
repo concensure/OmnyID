@@ -7,6 +7,14 @@
 - The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
+## 2026-10-14 - WED-185 AFP relay contract foundation (Codex)
+
+- Added matching TypeScript and Rust contracts for `wedding_vendor_email/v1`, `email_read/v1`, delivery-status, and bounce decrypted payloads, while retaining the existing generic AFP message/protobuf shape unchanged.
+- Relay envelopes require `type=email`, `kind=communication`, approved subtypes, `wedding_vendor_email` supertag, an exact encrypted-content marker, a non-empty encryption envelope, and content-free metadata. The allowlist rejects unapproved fields and `@`-bearing metadata values.
+- Read events require both relay/read supertags and an explicit `message` reference to their `parent_id`; their metadata is restricted to schema plus opaque idempotency key. Deterministic SHA-256 helpers deliberately do not replace AFP ULIDs.
+- Verification: `npm run typecheck`, `npm run build`, and `node --test tests/vendor-email-contract.test.mjs` passed in `typescript-sdk`; `cargo test wedding_vendor_email_contract --lib` and `cargo test vendor_mail_provider --lib` each passed (3 tests).
+- No Oracle deployment or external mail-provider change: this is a disabled SDK/server validation layer only. Next safe dependency slice is RELAY-03 additive mask/thread/event/read-projection persistence design and migrations.
+
 ## 2026-10-14 - WED-185 disabled vendor-relay configuration foundation (Codex)
 
 - Recorded the owner-approved temporary continuity exception: existing Gmail wiring remains live while Cloudflare Email Routing API access is unavailable. The new vendor relay is still disabled, and Gmail is not a selectable relay provider or fallback.

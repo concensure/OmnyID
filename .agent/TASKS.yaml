@@ -37,6 +37,7 @@ tasks:
     progress:
       - temporary owner override recorded: the existing Gmail transport remains live while Cloudflare Email Routing API access is unavailable; the new relay remains disabled and does not select Gmail
       - added isolated OMNYID_VENDOR_MAIL_* file-backed configuration, Oracle secret-sync names, platform-only provider validation, readiness state, and RELAY-01 draft threat model; no Cloudflare, DNS, Resend, or Gmail configuration was changed
+      - RELAY-02 AFP foundation added: TypeScript and Rust typed email/read/delivery/bounce contracts, encrypted-envelope and metadata allowlist validation, parent-reference validation for reads, and deterministic SHA-256 idempotency helpers; no relay routes or provider dispatch are enabled
       - auditing the WED-179/WED-177 implementations and current deployed branch for regressions
   - id: WED-183
     title: Workspace bootstrap recovery and core view verification
