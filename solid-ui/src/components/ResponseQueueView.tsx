@@ -7,7 +7,6 @@ import type { DashboardBootstrap } from "@/lib/api";
 import { QueueDensityToggle } from "@/components/QueueDensityToggle";
 import { ResponseQueueSurface } from "@/components/ResponseQueueSurface";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
-import { WeddingPlannerWalkthrough } from "@/components/WeddingPlannerWalkthrough";
 import { WeddingResponseWorkspaceView } from "@/components/WeddingResponseWorkspaceView";
 import { WeddingRichResponseView } from "@/components/WeddingRichResponseView";
 import { WorkspaceSetupBanner } from "@/components/WorkspaceSetupBanner";
@@ -78,10 +77,6 @@ import {
   saveResponseQueueDensity,
   type QueueDensity,
 } from "@/lib/queueDensityLocalState";
-import {
-  saveWeddingPlannerWalkthroughSeen,
-  shouldAutoShowWeddingPlannerWalkthrough,
-} from "@/lib/weddingPlannerWalkthroughLocalState";
 import {
   markWeddingArtifactAfpProjectionSent,
   weddingGeneratedArtifactToAfpSendInput,
@@ -430,9 +425,6 @@ export function ResponseQueueView(props: {
     document.getElementById(`wedding-tab-${nextItem.id}`)?.focus();
   }
   const [showWeddingSharePlan, setShowWeddingSharePlan] = createSignal(false);
-  const [showWeddingWalkthrough, setShowWeddingWalkthrough] = createSignal(false);
-  let weddingUploadFilesControlRef: HTMLLabelElement | undefined;
-  const [weddingWalkthroughChecked, setWeddingWalkthroughChecked] = createSignal(false);
   const [weddingNavigationIntent, setWeddingNavigationIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
   const [weddingWorkspaceQuery, setWeddingWorkspaceQuery] = createSignal("");
   const [activeWeddingArtifactId, setActiveWeddingArtifactId] = createSignal<string | null>(null);
@@ -569,17 +561,6 @@ export function ResponseQueueView(props: {
   const weddingStorageUserEmail = createMemo(() => bootstrap()?.user?.email ?? "");
   const weddingSignedIn = createMemo(() => Boolean(bootstrap()?.user && bootstrap()?.user.auth_provider !== "guest"));
   const weddingVendorSmokeTestAvailable = createMemo(() => weddingSignedIn());
-  function closeWeddingWalkthrough() {
-    saveWeddingPlannerWalkthroughSeen(weddingStorageUserId());
-    setShowWeddingWalkthrough(false);
-  }
-
-  function focusWeddingUploadFilesControl() {
-    window.setTimeout(() => {
-      weddingUploadFilesControlRef?.scrollIntoView({ behavior: "smooth", block: "center" });
-      weddingUploadFilesControlRef?.focus({ preventScroll: true });
-    }, 0);
-  }
   const [weddingArrivalMenuAppliedKey, setWeddingArrivalMenuAppliedKey] = createSignal<string | null>(null);
   createEffect(() => {
     const intent = weddingNavigationIntent();
@@ -1182,18 +1163,6 @@ export function ResponseQueueView(props: {
       || Boolean(workspace?.contextCards.some((card) => card.planningContext));
   });
 
-  createEffect(() => {
-    const workspace = weddingWorkspace();
-    if (!shouldAutoShowWeddingPlannerWalkthrough({
-      alreadyChecked: weddingWalkthroughChecked(),
-      hasWeddingWorkspace: Boolean(workspace),
-      firstIntakeComplete: weddingFirstIntakeComplete(),
-      userId: weddingStorageUserId(),
-    })) return;
-    setWeddingWalkthroughChecked(true);
-    setShowWeddingWalkthrough(true);
-  });
-
   onMount(() => {
     const menuHandler = (event: Event) => {
       const menu = weddingWorkspaceMenuIdFromEvent(event);
@@ -1785,7 +1754,7 @@ export function ResponseQueueView(props: {
       const directoryFirstSearch = await runWeddingVendorDirectoryFirstSearch({
         comparison: comparisonInput,
         run: (sourcePolicy) => runWeddingPlannedVendorSearchExecution({
-          providerPlans: weddingVendorDirectorySearchPlans({ providerPlans: providerPlansForExecution, category: comparisonInput.targetCategory ?? "wedding vendor", location: weddingVendorSearchServiceArea() }), mode: "live",
+          providerPlans: weddingVendorDirectorySearchPlans({ providerPlans: providerPlansForExecution, category: comparisonInput.targetCategory ?? "wedding vendor", location: weddingVendorSearchServiceArea(), searchQuery: freeformQuery }), mode: "live",
           providerLabel: weddingConfiguredVendorSearchProviderLabel(latestProviderCapabilities, configuredProviderKinds),
           workspaceId: metadata.responseWorkspaceId, maxQueries: 8,
           batchPort: weddingVendorSearchBatchPortFromApiSearch({
@@ -1965,16 +1934,7 @@ export function ResponseQueueView(props: {
             </For>
           </div>
           <div aria-label="Wedding planner controls" class="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              title="Open a short guide to the wedding planner."
-              onClick={() => setShowWeddingWalkthrough(true)}
-              class="min-h-10 rounded-full border border-rose-100 bg-rose-50/80 px-4 text-xs font-semibold text-rose-950 transition hover:border-rose-200 hover:bg-rose-50"
-            >
-              Show guide
-            </button>
             <label
-              ref={weddingUploadFilesControlRef}
               tabIndex={0}
               class={`group relative z-[1000] inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border px-4 text-xs font-semibold shadow-sm transition ${
               weddingImportRunning()
@@ -2015,15 +1975,6 @@ export function ResponseQueueView(props: {
           />
         </Show>
       </div>
-      <Show when={weddingWorkspace() && showWeddingWalkthrough()}>
-        <WeddingPlannerWalkthrough
-          inline
-          onClose={closeWeddingWalkthrough}
-          onFocusUploadFiles={focusWeddingUploadFilesControl}
-          onOpenSharePlan={() => setShowWeddingSharePlan(true)}
-          onSelectMenu={setWeddingWorkspaceMenu}
-        />
-      </Show>
       <Show when={weddingWorkspace() && weddingImportNotice()}>
         {(notice) => (
           <p class="ml-auto max-w-2xl rounded-2xl border border-teal-100 bg-white/85 px-3 py-2 text-xs leading-5 text-teal-950 shadow-sm">

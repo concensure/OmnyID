@@ -110,7 +110,9 @@ pub(super) fn wedding_vendor_record_to_search_source(
         map_url: record
             .source_url
             .filter(|url| url.contains("maps") || url.contains("openstreetmap")),
-        photo_url: record.photos.first().map(|photo| photo.photo_url.clone()),
+        photo_url: record.photos.iter().find_map(|photo| {
+            is_unsplash_photo_url(&photo.photo_url).then(|| photo.photo_url.clone())
+        }),
         rooms,
         address: record.address,
         phone: record.contact_phone,

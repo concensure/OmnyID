@@ -1316,7 +1316,7 @@ async fn persist_live_vendor_sources(
             photos: source
                 .photo_url
                 .as_deref()
-                .filter(|url| looks_like_public_http_url(url))
+                .filter(|url| is_unsplash_photo_url(url))
                 .map(|url| WeddingVendorPhotoUpsertRecord {
                     slot: 1,
                     photo_url: url.to_string(),
@@ -1370,6 +1370,22 @@ fn looks_like_public_http_url(url: &str) -> bool {
         hostname.as_str(),
         "localhost" | "127.0.0.1" | "0.0.0.0" | "::1"
     )
+}
+
+/// Couple-facing vendor cards accept only direct Unsplash image URLs. This keeps
+/// the directory from embedding arbitrary remote image hosts or stale proxy URLs.
+pub(super) fn is_unsplash_photo_url(url: &str) -> bool {
+    if !looks_like_public_http_url(url) {
+        return false;
+    }
+    let parsed = match reqwest::Url::parse(url.trim()) {
+        Ok(parsed) => parsed,
+        Err(_) => return false,
+    };
+    parsed.scheme() == "https"
+        && parsed
+            .host_str()
+            .is_some_and(|host| host.eq_ignore_ascii_case("images.unsplash.com"))
 }
 
 fn infer_email_from_text(text: &str) -> Option<String> {
@@ -2383,7 +2399,8 @@ mod tests {
                 photo_id: "photo-1".to_string(),
                 vendor_id: "vendor-1".to_string(),
                 slot: 1,
-                photo_url: "https://cdn.example/chloes.jpg".to_string(),
+                photo_url: "https://images.unsplash.com/photo-1507504031003-b417219a0fde"
+                    .to_string(),
                 alt_text: Some("Chloe's Florals storefront".to_string()),
                 source_label: Some("Admin vendor database".to_string()),
                 source_url: Some("https://chloes.example/gallery".to_string()),
@@ -2457,7 +2474,7 @@ mod tests {
         );
         assert_eq!(
             source.photo_url.as_deref(),
-            Some("https://cdn.example/chloes.jpg")
+            Some("https://images.unsplash.com/photo-1507504031003-b417219a0fde")
         );
         assert!(
             source
@@ -2466,6 +2483,17 @@ mod tests {
                 .unwrap_or_default()
                 .contains("saved in OmnyID's shared wedding vendor database")
         );
+    }
+
+    #[test]
+    fn couple_facing_vendor_photos_require_the_unsplash_host() {
+        assert!(is_unsplash_photo_url(
+            "https://images.unsplash.com/photo-1507504031003-b417219a0fde"
+        ));
+        assert!(!is_unsplash_photo_url("https://cdn.example/venue.jpg"));
+        assert!(!is_unsplash_photo_url(
+            "/wedding/vendor-photo/google?name=places%2Fabc"
+        ));
     }
 
     #[test]

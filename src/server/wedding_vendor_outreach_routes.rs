@@ -315,14 +315,6 @@ async fn wedding_vendor_outreach_draft_http(
 ) -> Result<Json<WeddingVendorOutreachDraftResponse>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
 
-    if !wedding_admin_ai_policy::execution_enabled() {
-        return Err((
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Admin-funded wedding AI is not enabled for this workspace yet. Please try again later."
-                .to_string(),
-        ));
-    }
-
     enforce_rate_limit(
         &state,
         authenticated_rate_limit_key("wedding_vendor_outreach_draft_burst", &headers),
@@ -435,11 +427,6 @@ async fn wedding_vendor_outreach_draft_http(
         ));
     }
 
-    let api_key = read_hosted_anthropic_api_key().ok_or((
-        StatusCode::SERVICE_UNAVAILABLE,
-        "Assisted vendor outreach is not configured on this homeserver. Set the hosted Anthropic API key (see Documents/deployment/OMNYID_ORACLE_DEPLOYMENT.md) to enable it.".to_string(),
-    ))?;
-
     let vendor = &request.vendor;
     let couple = &request.couple;
     let vendor_lines = [
@@ -479,64 +466,153 @@ async fn wedding_vendor_outreach_draft_http(
         "Vendor to write to:\n{vendor_lines}\n\nWhat the couple has told OmnyID about their wedding (use only this — nothing else is known):\n{couple_lines}"
     );
 
-    let raw = anthropic_text_infer(
-        &state.http_client,
-        &api_key,
-        MODEL,
-        WEDDING_VENDOR_OUTREACH_SYSTEM_PROMPT,
-        &user_text,
-    )
-    .await
-    .map_err(|err| {
-        tracing::warn!(%err, user_id = %user.id, "wedding_vendor_outreach_draft: model call failed");
+    // A user-selected follow-up must remain editable and saveable even if the
+    // optional hosted model is disabled, out of credit, or returns malformed
+    // output. The fallback uses only validated couple fields and never sends.
+    let (payload, model) = if wedding_admin_ai_policy::execution_enabled() {
+        if let Some(api_key) = read_hosted_anthropic_api_key() {
+            match anthropic_text_infer(
+                &state.http_client,
+                &api_key,
+                MODEL,
+                WEDDING_VENDOR_OUTREACH_SYSTEM_PROMPT,
+                &user_text,
+            )
+            .await
+            {
+                Ok(raw) => match parse_outreach_model_payload(&raw) {
+                    Ok(payload) => (payload, MODEL),
+                    Err(err) => {
+                        tracing::warn!(%err, raw = %raw, "wedding_vendor_outreach_draft: model output invalid; using deterministic draft");
+                        (
+                            deterministic_outreach_payload(vendor, couple),
+                            "deterministic_template",
+                        )
+                    }
+                },
+                Err(err) => {
+                    tracing::warn!(%err, user_id = %user.id, "wedding_vendor_outreach_draft: model call failed; using deterministic draft");
+                    (
+                        deterministic_outreach_payload(vendor, couple),
+                        "deterministic_template",
+                    )
+                }
+            }
+        } else {
+            (
+                deterministic_outreach_payload(vendor, couple),
+                "deterministic_template",
+            )
+        }
+    } else {
         (
-            StatusCode::BAD_GATEWAY,
-            "couldn't write an outreach draft right now — please try again in a moment".to_string(),
+            deterministic_outreach_payload(vendor, couple),
+            "deterministic_template",
         )
-    })?;
-
-    let payload = parse_outreach_model_payload(&raw).map_err(|err| {
-        tracing::warn!(%err, raw = %raw, "wedding_vendor_outreach_draft: could not parse model output");
-        (
-            StatusCode::BAD_GATEWAY,
-            "couldn't write an outreach draft right now — please try again in a moment".to_string(),
-        )
-    })?;
+    };
 
     // Fail closed if the platform-funded call cannot be written to the shared
     // wedding usage ledger. This provides a durable, tenant-scoped audit receipt
     // without exposing an admin key or rerouting a direct Master Agent request.
-    record_wedding_shared_tool_usage(
-        &state.db,
-        WeddingSharedToolUsageInput {
-            user_id: user.id.clone(),
-            provider: WeddingSharedToolProvider::AnthropicLlm,
-            feature: WeddingSharedToolFeature::VendorOutreachDraft,
-            quantity: 1.0,
-            estimated_cost_usd: 0.0,
-            usage_unit: Some("requests".to_string()),
-            wedding_plan_id: Some(request.wedding_plan_id.clone()),
-            operation: Some("vendor_outreach_draft".to_string()),
-            provider_request_id: None,
-            occurred_at: Some(chrono::Utc::now().to_rfc3339()),
-        },
-    )
-    .await
-    .map_err(|err| {
-        tracing::error!(%err, user_id = %user.id, "wedding_vendor_outreach_draft: audit receipt failed");
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "couldn't save the admin-funded AI usage receipt; the draft was not returned. Please try again."
-                .to_string(),
+    if model == MODEL {
+        record_wedding_shared_tool_usage(
+            &state.db,
+            WeddingSharedToolUsageInput {
+                user_id: user.id.clone(),
+                provider: WeddingSharedToolProvider::AnthropicLlm,
+                feature: WeddingSharedToolFeature::VendorOutreachDraft,
+                quantity: 1.0,
+                estimated_cost_usd: 0.0,
+                usage_unit: Some("requests".to_string()),
+                wedding_plan_id: Some(request.wedding_plan_id.clone()),
+                operation: Some("vendor_outreach_draft".to_string()),
+                provider_request_id: None,
+                occurred_at: Some(chrono::Utc::now().to_rfc3339()),
+            },
         )
-    })?;
+        .await
+        .map_err(|err| {
+            tracing::error!(%err, user_id = %user.id, "wedding_vendor_outreach_draft: audit receipt failed");
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "couldn't save the admin-funded AI usage receipt; the draft was not returned. Please try again."
+                    .to_string(),
+            )
+        })?;
+    }
 
     Ok(Json(WeddingVendorOutreachDraftResponse {
         subject: payload.subject,
         body_markdown: payload.body_markdown,
         grounded_on: payload.grounded_on,
-        model: MODEL,
+        model,
     }))
+}
+
+fn deterministic_outreach_payload(
+    vendor: &WeddingVendorOutreachVendorInput,
+    couple: &WeddingVendorOutreachCoupleInput,
+) -> ModelOutreachPayload {
+    let mut grounded_on = Vec::new();
+    let intro = match capped(&couple.couple_names, MAX_COUPLE_FIELD_CHARS) {
+        Some(names) => {
+            grounded_on.push("couple_names".to_string());
+            format!("We are {names} and are planning our wedding")
+        }
+        None => "We are planning our wedding".to_string(),
+    };
+    let mut details = Vec::new();
+    if let Some(date) = capped(&couple.date_or_season, MAX_COUPLE_FIELD_CHARS) {
+        details.push(format!("for {date}"));
+        grounded_on.push("date_or_season".to_string());
+    }
+    if let Some(location) = capped(&couple.location, MAX_COUPLE_FIELD_CHARS) {
+        details.push(format!("in {location}"));
+        grounded_on.push("location".to_string());
+    }
+    if let Some(guests) = capped(&couple.guest_count, MAX_COUPLE_FIELD_CHARS) {
+        details.push(format!("for around {guests} guests"));
+        grounded_on.push("guest_count".to_string());
+    }
+    if let Some(preferences) = capped(&couple.vendor_preferences, MAX_COUPLE_FIELD_CHARS) {
+        details.push(format!("with {preferences} in mind"));
+        grounded_on.push("vendor_preferences".to_string());
+    }
+    if let Some(atmosphere) = capped(&couple.atmosphere_description, MAX_COUPLE_FIELD_CHARS) {
+        details.push(format!("and a {atmosphere} atmosphere"));
+        grounded_on.push("atmosphere_description".to_string());
+    }
+    if let Some(budget) = capped(&couple.budget_comfort, MAX_COUPLE_FIELD_CHARS) {
+        details.push(format!("within a {budget} budget"));
+        grounded_on.push("budget_comfort".to_string());
+    }
+    let priorities = couple
+        .top_priorities
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .take(3)
+        .collect::<Vec<_>>();
+    let priority_sentence = if priorities.is_empty() {
+        String::new()
+    } else {
+        grounded_on.push("top_priorities".to_string());
+        format!(" Our priorities include {}.", priorities.join(", "))
+    };
+    let detail_sentence = if details.is_empty() {
+        String::new()
+    } else {
+        format!(" {}.", details.join(" "))
+    };
+    ModelOutreachPayload {
+        subject: format!("Wedding enquiry for {}", vendor.name.trim()),
+        body_markdown: format!(
+            "Hello {} team,\n\n{}{detail_sentence}{priority_sentence} Could you please let us know whether you are available, the package options you offer, and an indicative quote? We would be happy to share any other details you need.\n\nThank you.",
+            vendor.name.trim(),
+            intro,
+        ),
+        grounded_on,
+    }
 }
 
 fn parse_outreach_model_payload(raw: &str) -> Result<ModelOutreachPayload, String> {
@@ -715,6 +791,33 @@ mod tests {
         let mut only_priorities = WeddingVendorOutreachCoupleInput::default();
         only_priorities.top_priorities = vec!["venue".to_string()];
         assert!(couple_has_grounding(&only_priorities));
+    }
+
+    #[test]
+    fn deterministic_outreach_draft_uses_only_supplied_couple_fields() {
+        let vendor = WeddingVendorOutreachVendorInput {
+            name: "Mackay Family Estate".to_string(),
+            category: Some("venue".to_string()),
+            website_url: None,
+            address: None,
+            source_url: None,
+            snippet: None,
+        };
+        let payload = deterministic_outreach_payload(&vendor, &sample_couple());
+
+        assert!(payload.subject.contains("Mackay Family Estate"));
+        assert!(payload.body_markdown.contains("March 2027"));
+        assert!(payload.body_markdown.contains("Sydney"));
+        assert!(payload.body_markdown.contains("flowers, photography"));
+        assert!(!payload.body_markdown.contains("120 guests"));
+        assert_eq!(
+            payload.grounded_on,
+            vec![
+                "date_or_season".to_string(),
+                "location".to_string(),
+                "top_priorities".to_string(),
+            ]
+        );
     }
 
     #[test]

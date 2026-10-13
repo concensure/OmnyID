@@ -1083,14 +1083,19 @@ tasks:
       - src/server/**
       - src/db/**
       - postgres/migrations/**
-        - typescript-sdk/src/**
-        - solid-ui/src/**
-        - wedding/**
-        - .agent/**
-      acceptance:
-        - Cloudflare routing and DNS inventory is saved before any routing mutation and includes a rollback payload
-        - vendor relay defaults disabled and cannot fall back to Gmail or a user mailbox; existing Gmail transport remains a temporary owner-approved continuity path until Cloudflare control-plane access is restored
+      - typescript-sdk/src/**
+      - solid-ui/src/**
+      - wedding/**
+      - .agent/**
+    acceptance:
+      - Cloudflare routing and DNS inventory is saved before any routing mutation and includes a rollback payload
+      - vendor relay defaults disabled and cannot fall back to Gmail or a user mailbox; existing Gmail transport remains a temporary owner-approved continuity path until Cloudflare control-plane access is restored
       - wedding mask addresses use the mail.omnyid.com subdomain
       - provider delivery and inbound events are authenticated, deduplicated, and content-free outside encrypted AFP storage
       - the existing wedding approval and Response Queue workflow is retained
       - focused tests, build, and Oracle deployment evidence are recorded from machine authorities
+    progress:
+      - reply drafting now falls back to a deterministic, review-before-send template when the optional hosted model is unavailable; no email is sent by the fallback
+      - directory-only free-text searches preserve the exact vendor wording, so Mackay resolves against the active vendor directory without an online provider
+      - comparison-card image URLs are accepted only from images.unsplash.com; arbitrary URLs and legacy proxy paths are omitted
+      - the Wedding planner guide entry point and automatic guide display have been removed

@@ -312,11 +312,16 @@ function vendorComparisonTask(
 
 function publicImageUrl(value: unknown): string | null {
   const url = clean(value);
-  if (/^\/wedding\/vendor-photo\/google\?name=/i.test(url)) return url;
-  // The caller only ever passes a provider-supplied photo field (e.g. source.photo_url),
-  // so the provider already told us this is a photo. Re-deriving that from the URL string
-  // dropped valid CDN thumbnails (Brave/EXA) that carry no file extension.
-  return usableSourceUrl({ url }) ? url : null;
+  // Do not render arbitrary third-party image URLs in couple-facing cards. The
+  // directory's verified-photo policy allows only the stable Unsplash host.
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname.toLowerCase() === "images.unsplash.com"
+      ? parsed.toString()
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function sourceHostname(url: string): string {

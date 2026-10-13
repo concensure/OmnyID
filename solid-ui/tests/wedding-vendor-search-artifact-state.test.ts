@@ -342,7 +342,7 @@ test("buildWeddingVendorComparisonArtifactState ranks beachfront gothic venue fi
         {
           title: "Palm Beach Estate",
           url: "https://palm-beach-estate.example",
-          photo_url: "https://cdn.example/palm-beach-estate.webp",
+          photo_url: "https://images.unsplash.com/photo-1507504031003-b417219a0fde",
           snippet: "Private beachfront wedding venue in Sydney with harbour views and capacity for 60 guests.",
           provider: "Brave Search",
         },
@@ -379,8 +379,8 @@ test("buildWeddingVendorComparisonArtifactState ranks beachfront gothic venue fi
   ]));
   const palmCard = cards.find((card) => card.title === "Palm Beach Estate");
   const gothicCard = cards.find((card) => card.title === "St Josephs Guesthouse");
-  assert.equal(palmCard?.image_url, "https://cdn.example/palm-beach-estate.webp");
-  assert.equal(gothicCard?.image_url, "https://cdn.example/st-josephs.jpg");
+  assert.equal(palmCard?.image_url, "https://images.unsplash.com/photo-1507504031003-b417219a0fde");
+  assert.equal(gothicCard?.image_url, null);
   assert.match(String(palmCard?.preference_match), /beachfront/i);
   assert.match(String(gothicCard?.preference_match), /gothic/i);
   assert.match(String(gothicCard?.situation_fit), /Strong on: Style and preferences|Fit requires source-page review/);
@@ -800,7 +800,7 @@ test("strict MVP comparison shows honest partial cards without padding to three"
       query,
       sources: [
         { title: "One", url: "https://one.example", provider: "Directory" },
-        { title: "Two", url: "https://two.example", photo_url: "https://images.example/two.jpg", provider: "Directory" },
+        { title: "Two", url: "https://two.example", photo_url: "https://images.unsplash.com/photo-1507504031003-b417219a0fde", provider: "Directory" },
         { title: "Three", url: "https://three.example", provider: "Directory" },
       ],
     }),

@@ -1586,3 +1586,46 @@ Remaining:
   required to capture the mandatory inventory and run the external smoke.
 - RELAY-01 onward, including authenticated gateway routes and the transport
   retrofit, remain in progress; live vendor relay is deliberately disabled.
+
+# 2026-10-14 - WED-185 wedding reply and catalogue repair
+
+Changed:
+
+- The vendor follow-up reply action now receives a deterministic, editable
+  draft if the optional hosted Anthropic draft call is unavailable. It still
+  persists through the existing AFP projection before display and still
+  requires explicit user approval before the existing Gmail send path runs.
+- Directory-only searches retain a couple's exact free-text query, fixing
+  searches such as Mackay when no online provider is configured.
+- Vendor comparison cards accept only direct images.unsplash.com photo URLs;
+  all other external and legacy proxy image URLs are omitted.
+- Removed the Wedding planner guide's automatic display and entry point.
+
+Production investigation:
+
+- Oracle has active venue-mackay-family-estate with a phone number and two
+  photo records; migration 0106_wedding_vendor_mackay_family_estate is
+  already applied. The missing result was the client query plan, not absent
+  catalogue data.
+- Homeserver logs show the reply failure was caused by Anthropic returning an
+  insufficient-credit response, not a lost browser connection.
+- Recorded pre-release Caddy SHA-256
+  06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40.
+  The release must use a scoped homeserver/UI deployment with Caddy reload
+  skipped.
+
+Verification:
+
+- focused Solid tests: 29 passing
+- Solid typecheck: passed
+- focused Rust outreach tests: 11 passing
+- focused Rust vendor-search tests: 22 passing
+- git diff --check: passed
+
+Open:
+
+- The repository-wide cargo fmt --check still reports pre-existing formatting
+  drift in unrelated files. Changed Rust files were formatted directly.
+- Relay live transport remains disabled pending the documented Cloudflare
+  inventory and security gates; existing Gmail remains the owner-approved
+  temporary transport.

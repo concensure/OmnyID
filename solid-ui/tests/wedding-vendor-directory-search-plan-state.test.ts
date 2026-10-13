@@ -9,3 +9,13 @@ test("directory-only search retains an internal query when paid providers are di
   assert.equal(plans[0]!.queries[0]!.query, "Venue Sydney");
   assert.equal(plans[0]!.queries[0]!.category, "venue");
 });
+
+test("directory-only search preserves an exact free-text vendor name", () => {
+  const plans = weddingVendorDirectorySearchPlans({
+    providerPlans: [],
+    category: "Custom vendor search",
+    location: "Sydney",
+    searchQuery: "Mackay",
+  });
+  assert.equal(plans[0]!.queries[0]!.query, "Mackay");
+});
