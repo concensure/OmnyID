@@ -1655,5 +1655,8 @@ Follow-up UI hardening:
   permissive image policy, including the legacy Google photo proxy. They now
   use the same direct `images.unsplash.com` allowlist as live vendor search;
   all other image URLs resolve to the existing honest placeholder. Focused
-  comparison/shortlist/search tests (25) and Solid typecheck pass. This UI-only
-  change still needs the scoped `ui` release before it is live.
+  comparison/shortlist/search tests (25) and Solid typecheck pass.
+- Released `0ef2673` as a scoped Oracle `ui` build on 2026-10-14. The asset
+  copy completed (`UI assets ready at /srv/workspace`), the homeserver stayed
+  up, `/wedding/` returned HTTP 200, and Caddy's SHA-256 remained
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
