@@ -1677,3 +1677,12 @@ Provider and Cloudflare follow-up:
   records. Routing-status and DNS export remain `403/10000`; no routing/DNS
   mutation occurred. A deliberately invalid, non-sending Email Sending request
   returned `400/10001`, proving this account/token is entitled (not `10105`).
+- Released `807fe72` to Oracle on 2026-10-14. The homeserver rebuilt and is
+  running with the file-backed Cerebras key; its HTTP listener and the public
+  wedding page returned normally. Caddy was not reloaded and still has SHA-256
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+- The local Oracle environment is missing the staging-only Caddy password
+  interpolation value. A transient inert value was used only to let Compose
+  validate while recreating `homeserver`; Caddy was untouched. Do not perform a
+  Caddy restart/reload through Compose until that source environment value is
+  restored through its approved secret path.
