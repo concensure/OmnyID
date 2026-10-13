@@ -544,4 +544,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Wedding blog newsletter subscribers with one-click unsubscribe tokens",
         include_str!("../../postgres/migrations/0107_wedding_newsletter_subscribers.sql"),
     ),
+    (
+        "0108_wedding_vendor_email_relay_foundation",
+        "Disabled wedding vendor relay masks, encrypted thread sidecars, provider-event dedupe, and rebuildable read projection",
+        include_str!("../../postgres/migrations/0108_wedding_vendor_email_relay_foundation.sql"),
+    ),
 ];

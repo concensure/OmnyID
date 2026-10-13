@@ -7,6 +7,13 @@
 - The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
+## 2026-10-14 - WED-185 relay persistence foundation (Codex)
+
+- Added migration `0108_wedding_vendor_email_relay_foundation` and catalog registration. It creates `wedding_agent_identity_masks`, `wedding_vendor_email_threads`, `wedding_vendor_email_provider_events`, and `wedding_vendor_email_read_projection` with lifecycle, tenant, uniqueness, dedupe, and lookup indexes.
+- The mask domain is constrained to `mail.omnyid.com`; relay thread address data is only `BYTEA` ciphertext plus keyed digest. The migration contains no subject, body, HTML, preview, filename, or plaintext address column.
+- Legacy Gmail contact data is intentionally not copied: the existing `wedding_vendor_user_contacts.vendor_email` field is plaintext, so a later reviewed encryption/backfill service must own any migration of unambiguous records.
+- Verification: `cargo test migration_list --lib` passed (32 tests). The workspace has no local `psql` executable, so live Postgres application of the new SQL remains a pre-deployment requirement. No Oracle deployment or provider/routing change was made.
+
 ## 2026-10-14 - WED-185 AFP relay contract foundation (Codex)
 
 - Added matching TypeScript and Rust contracts for `wedding_vendor_email/v1`, `email_read/v1`, delivery-status, and bounce decrypted payloads, while retaining the existing generic AFP message/protobuf shape unchanged.
