@@ -539,6 +539,9 @@ main:focus{ outline:none; }
 
 /* ---------- blog ---------- */
 .blog-filter{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:44px; }
+.blog-search{ flex:1 1 260px; max-width:360px; }
+.blog-search input{ width:100%; min-height:40px; border:1px solid var(--line); border-radius:99px; padding:9px 18px; color:var(--ink); background:var(--paper); font:inherit; font-size:13.5px; outline:none; }
+.blog-search input:focus{ border-color:var(--rose); box-shadow:0 0 0 3px rgba(193,123,135,.16); }
 .filter-chip{ padding:9px 18px; border-radius:99px; border:1px solid var(--line); font-size:13.5px; font-weight:600; color: var(--ink-soft); background: var(--paper); transition: all .2s; }
 .filter-chip:hover{ border-color: var(--rose); color: var(--ink); }
 .filter-chip.is-active{ background: var(--ink); color: var(--white); border-color: var(--ink); }

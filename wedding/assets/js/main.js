@@ -222,17 +222,31 @@
   if (filterRow) {
     var chips = filterRow.querySelectorAll('.filter-chip');
     var cards = document.querySelectorAll('.blog-card');
+    var searchInput = filterRow.querySelector('[data-blog-search]');
+    var searchStatus = document.querySelector('[data-blog-search-status]');
+    var selectedCategory = 'all';
+    function filterCards() {
+      var query = (searchInput && searchInput.value || '').trim().toLowerCase();
+      var visibleCount = 0;
+      cards.forEach(function (card) {
+        var haystack = [card.getAttribute('data-keywords'), card.textContent].join(' ').toLowerCase();
+        var matchesCategory = selectedCategory === 'all' || card.getAttribute('data-category') === selectedCategory;
+        var matchesQuery = !query || haystack.indexOf(query) !== -1;
+        var match = matchesCategory && matchesQuery;
+        card.style.display = match ? '' : 'none';
+        if (match) visibleCount += 1;
+      });
+      if (searchStatus) searchStatus.textContent = visibleCount + (visibleCount === 1 ? ' guide found.' : ' guides found.');
+    }
     chips.forEach(function (chip) {
       chip.addEventListener('click', function () {
         chips.forEach(function (c) { c.classList.remove('is-active'); });
         chip.classList.add('is-active');
-        var cat = chip.getAttribute('data-filter');
-        cards.forEach(function (card) {
-          var match = cat === 'all' || card.getAttribute('data-category') === cat;
-          card.style.display = match ? '' : 'none';
-        });
+        selectedCategory = chip.getAttribute('data-filter') || 'all';
+        filterCards();
       });
     });
+    if (searchInput) searchInput.addEventListener('input', filterCards);
   }
 
   /* ---------- sign-in / register bridge modal ---------- */

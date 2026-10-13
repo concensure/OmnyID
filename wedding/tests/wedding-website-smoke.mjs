@@ -22,6 +22,8 @@ const expectedPages = [
   'blog/why-ai-wedding-planners-fall-short.html',
   'blog/wedding-favours-guests-actually-keep.html',
   'blog/personalised-wedding-favour-ideas.html',
+  'blog/fake-wedding-exit-is-it-worth-it.html',
+  'blog/fake-wedding-exit-what-can-go-wrong.html',
 ];
 
 function htmlFiles(dir) {
@@ -251,6 +253,17 @@ if (!weddingJs.includes('focusableSigninEls') || !weddingJs.includes("e.key !== 
   failures.push('wedding/assets/js/main.js: sign-in bridge does not trap keyboard focus');
 }
 const weddingHome = htmlByPath.get(normalize(resolve(root, 'index.html')));
+const blogHome = htmlByPath.get(normalize(resolve(root, 'blog.html'))) ?? '';
+for (const required of [
+  'data-blog-search',
+  'fake-wedding-exit-is-it-worth-it.html',
+  'fake-wedding-exit-what-can-go-wrong.html',
+]) {
+  if (!blogHome.includes(required)) failures.push(`blog.html: missing ${required}`);
+}
+if (!weddingJs.includes('filterCards') || !weddingJs.includes('data-blog-search')) {
+  failures.push('main.js: blog search is not wired to the guide cards');
+}
 if (!/Built for couples planning across\s*<\/p>\s*<div class="logo-strip-items">\s*<span>Sydney<\/span>\s*<\/div>/m.test(weddingHome)) {
   failures.push('index.html: planning strip must list Sydney only');
 }

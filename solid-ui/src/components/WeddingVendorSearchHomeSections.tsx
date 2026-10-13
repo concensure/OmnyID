@@ -18,6 +18,45 @@ const SEARCH_PROGRESS_LABELS = [
   "ranking vendors based on your query",
 ] as const;
 
+// Keep typing local to the field. Updating the persisted wedding query on each
+// keystroke rebuilds the home surface and can move the viewport under the user.
+function VendorSearchDraftInput(props: {
+  workspace: WeddingResponseWorkspaceViewProps;
+  placeholder: string;
+  class: string;
+  name?: string;
+}) {
+  const workspace = () => props.workspace;
+  const [draft, setDraft] = createSignal(workspace().vendorSearchQuery ?? "");
+  let lastExternalValue = workspace().vendorSearchQuery ?? "";
+
+  createEffect(() => {
+    const externalValue = workspace().vendorSearchQuery ?? "";
+    if (externalValue === lastExternalValue) return;
+    lastExternalValue = externalValue;
+    setDraft(externalValue);
+  });
+
+  function commit() {
+    const value = draft();
+    if (value === lastExternalValue) return;
+    lastExternalValue = value;
+    workspace().onVendorSearchQueryChange?.(value);
+  }
+
+  return (
+    <input
+      type="text"
+      name={props.name}
+      value={draft()}
+      onInput={(event) => setDraft(event.currentTarget.value)}
+      onBlur={commit}
+      placeholder={props.placeholder}
+      class={props.class}
+    />
+  );
+}
+
 export function WeddingPlanningBasicsSection(props: { workspace: WeddingResponseWorkspaceViewProps }) {
   const workspace = () => props.workspace;
   return (
@@ -43,10 +82,8 @@ export function WeddingPlanningBasicsSection(props: { workspace: WeddingResponse
             <Show when={workspace().vendorSearchReadiness?.missing.some((item) => /priorities|fit preferences/i.test(item))}>
               <label class="mt-3 block text-xs font-semibold text-amber-950">
                 Vendor fit preferences
-                <input
-                  type="text"
-                  value={workspace().vendorSearchQuery ?? ""}
-                  onInput={(event) => workspace().onVendorSearchQueryChange?.(event.currentTarget.value)}
+                <VendorSearchDraftInput
+                  workspace={workspace()}
                   placeholder="beachfront venue in Sydney with Gothic style for 60 guests"
                   class="mt-1 w-full rounded-xl border border-amber-100 bg-white px-3 py-2 text-sm font-normal text-amber-950 outline-none transition placeholder:text-amber-950/35 focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
                 />
@@ -104,6 +141,10 @@ export function WeddingVendorSearchHomeSection(props: {
       <form
         onSubmit={(event) => {
           event.preventDefault();
+          const input = event.currentTarget.elements.namedItem("wedding-vendor-search-query");
+          if (input instanceof HTMLInputElement) {
+            workspace().onVendorSearchQueryChange?.(input.value);
+          }
           if (!searchDisabled()) workspace().onRunLiveVendorSearch?.();
         }}
       >
@@ -112,10 +153,9 @@ export function WeddingVendorSearchHomeSection(props: {
           <p class="text-lg font-bold leading-6 text-wedding-accent">Live vendor search</p>
       </div>
       <label class="mt-5 block">
-        <input
-          type="text"
-          value={workspace().vendorSearchQuery ?? ""}
-          onInput={(event) => workspace().onVendorSearchQueryChange?.(event.currentTarget.value)}
+        <VendorSearchDraftInput
+          workspace={workspace()}
+          name="wedding-vendor-search-query"
           placeholder="florist in Sydney specialising in wedding"
           class="mt-1 min-h-11 w-full rounded-lg border-2 border-wedding-muted bg-white px-3 py-2 text-sm text-wedding-accent shadow-sm outline-none transition placeholder:text-wedding-muted focus:border-wedding-accent focus:ring-4 focus:ring-wedding-surface-blush"
         />

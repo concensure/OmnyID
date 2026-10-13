@@ -51,6 +51,18 @@ export function WeddingHomeOverviewGrid(props: {
   function openMenu(menuId: WeddingWorkspaceMenuId | undefined) {
     if (menuId) props.onSelectMenu?.(menuId);
   }
+  function openVendorFollowUps() {
+    // Vendor replies are rendered in the wedding-home follow-up panel. Keep
+    // the planner on its wedding surface and take the user directly to it.
+    props.onSelectMenu?.("home");
+    if (typeof window === "undefined") return;
+    window.setTimeout(() => {
+      document.querySelector("[data-wedding-home-section='vendor_follow_up']")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+  }
 
   return (
     <div class={`grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3 ${dense() ? "grid-cols-2" : ""}`}>
@@ -118,7 +130,7 @@ export function WeddingHomeOverviewGrid(props: {
         <p class={`mt-0.5 break-words text-[11px] text-fuchsia-900/85 ${dense() ? "hidden" : ""}`}>{seatingTile()?.supportLabel}</p>
       </button>
 
-      <button type="button" class="min-h-[11rem] min-w-0 rounded-[24px] border border-amber-100/80 bg-amber-50/85 p-4 text-left shadow-card transition hover:border-amber-200 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2 sm:min-h-12 sm:p-3" title={vendorTile()?.actionLabel ?? "Open vendor follow-ups"} onClick={() => openMenu(vendorTile()?.menuId)}>
+      <button type="button" class="min-h-[11rem] min-w-0 rounded-[24px] border border-amber-100/80 bg-amber-50/85 p-4 text-left shadow-card transition hover:border-amber-200 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2 sm:min-h-12 sm:p-3" title={vendorTile()?.actionLabel ?? "Open vendor follow-ups"} onClick={openVendorFollowUps}>
         <TileHeading icon="user-plus" title="Track vendors" color="#B45309" />
         <p class={`mt-2 break-words font-bold text-amber-950 ${dense() ? "text-xl" : "text-xl"}`}>{vendorTile()?.valueLabel}</p>
         <span class="mt-1 inline-flex rounded-full border border-amber-200/80 bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-amber-950">
