@@ -3762,6 +3762,25 @@ function App() {
                           </For>
                         </ul>
                       </Show>
+                      <Show when={(result().links?.length ?? 0) > 0}>
+                        <div class="mt-3 border-t border-outline-variant/40 pt-3">
+                          <p class="text-xs font-semibold uppercase tracking-[0.12em] text-on-surface-variant">Sources and results</p>
+                          <div class="mt-2 flex flex-wrap gap-2">
+                            <For each={(result().links ?? []).slice(0, 6)}>
+                              {(link) => (
+                                <a
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  class="max-w-full break-words rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10"
+                                >
+                                  {link.title || link.url}
+                                </a>
+                              )}
+                            </For>
+                          </div>
+                        </div>
+                      </Show>
                     </section>
                   )}
                 </Show>

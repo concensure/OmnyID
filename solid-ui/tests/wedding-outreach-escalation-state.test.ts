@@ -158,7 +158,22 @@ test("buildWeddingOutreachEscalationState closes the loop after a reply", () => 
   assert.equal(state.status, "replied");
   assert.deepEqual(state.options.map((option) => option.id), ["no_action"]);
   assert.equal(state.taskItem.approvalState, "draft");
-  assert.match(state.decisionPrompt, /Continue from the response/i);
+  assert.match(state.decisionPrompt, /Review the recorded response/i);
+});
+
+test("buildWeddingOutreachEscalationState uses the saved vendor reply excerpt", () => {
+  const state = buildWeddingOutreachEscalationState({
+    metadata,
+    vendorLabel: "Photo Team",
+    initialOutreachSentAt: "2026-09-01T00:00:00.000Z",
+    replyReceivedAt: "2026-09-12T00:00:00.000Z",
+    vendorReplySummary: "We are available and our $4,200 package includes a second photographer.",
+    now: "2026-09-14T00:00:00.000Z",
+    createdAt: 1,
+  });
+
+  assert.match(state.decisionPrompt, /available/i);
+  assert.match(state.decisionPrompt, /second photographer/i);
 });
 
 test("buildWeddingOutreachEscalationStateFromVendorContact waits until the recorded follow-up date", () => {

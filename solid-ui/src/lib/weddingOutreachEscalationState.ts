@@ -53,6 +53,7 @@ export type WeddingOutreachEscalationInput = {
   initialOutreachSentAt?: string | null;
   replyReceivedAt?: string | null;
   followUpDueAt?: string | null;
+  vendorReplySummary?: string | null;
   now?: string | null;
   alternativeVendorLabels?: readonly string[] | null;
   sourceLabels?: readonly string[] | null;
@@ -66,6 +67,7 @@ export type WeddingVendorContactOutreachRecord = {
   followUpDueAt?: string | null;
   threadId?: string | null;
   receiptRef?: string | null;
+  notes?: string | null;
 };
 
 export type WeddingVendorContactOutreachVendor = {
@@ -113,6 +115,20 @@ function uniqueStrings(values: readonly unknown[] | null | undefined, limit = 16
     if (result.length >= limit) break;
   }
   return result;
+}
+
+function replySummaryFromNotes(value: unknown): string | null {
+  const notes = clean(value);
+  if (!notes) return null;
+  // Reply projection stores a provenance label, optional subject, and the
+  // received-message excerpt separated by pipes. The excerpt is what helps a
+  // couple decide what to do next; provider labels are not useful here.
+  const parts = notes.split("|").map((part) => part.trim()).filter(Boolean);
+  const meaningful = parts.filter((part) => !/^(?:AFP vendor reply|Subject:)/i.test(part));
+  const summary = (meaningful.at(-1) ?? parts.at(-1) ?? notes)
+    .replace(/\s+/g, " ")
+    .trim();
+  return summary ? summary.slice(0, 320) : null;
 }
 
 function parseDate(value: unknown): Date | null {
@@ -231,6 +247,7 @@ function decisionPrompt(input: {
   stage: WeddingOutreachEscalationStage;
   vendorLabel: string;
   dayCount: number | null;
+  vendorReplySummary: string | null;
 }): string {
   if (input.stage === "escalate_to_user") {
     return `No reply from ${input.vendorLabel} after ${input.dayCount ?? 7} days. Choose: follow up again, move on, or call them.`;
@@ -245,7 +262,9 @@ function decisionPrompt(input: {
     return `${input.vendorLabel} has been contacted. Wait until the planned follow-up date before nudging.`;
   }
   if (input.stage === "closed") {
-    return `${input.vendorLabel} replied. Continue from the response rather than sending more follow-ups.`;
+    return input.vendorReplySummary
+      ? `${input.vendorLabel} said: ${input.vendorReplySummary}`
+      : `${input.vendorLabel} replied. Review the recorded response before taking another step.`;
   }
   return `Draft initial outreach to ${input.vendorLabel}?`;
 }
@@ -309,12 +328,13 @@ export function buildWeddingOutreachEscalationState(input: WeddingOutreachEscala
   const initialSentAt = parseDate(input.initialOutreachSentAt);
   const replyReceivedAt = parseDate(input.replyReceivedAt);
   const followUpDueAt = parseDate(input.followUpDueAt);
+  const vendorReplySummary = clean(input.vendorReplySummary) || null;
   const now = parseDate(input.now) ?? new Date();
   const dayCount = initialSentAt ? wholeDaysBetween(initialSentAt, now) : null;
   const stage = stageFor({ initialSentAt, replyReceivedAt, followUpDueAt, now, dayCount });
   const label = stageLabel(stage);
   const options = optionsFor(stage, vendorPhoneLabel);
-  const prompt = decisionPrompt({ stage, vendorLabel, dayCount });
+  const prompt = decisionPrompt({ stage, vendorLabel, dayCount, vendorReplySummary });
   const alternatives = uniqueStrings(input.alternativeVendorLabels, 8);
   const markdown = markdownFor({
     vendorLabel,
@@ -441,6 +461,7 @@ export function buildWeddingOutreachEscalationStateFromVendorContact(
     initialOutreachSentAt: contact?.lastContactAt,
     replyReceivedAt: contact?.responseReceivedAt,
     followUpDueAt: contact?.followUpDueAt,
+    vendorReplySummary: replySummaryFromNotes(contact?.notes),
     now: input.now,
     alternativeVendorLabels: input.alternativeVendorLabels,
     sourceLabels,

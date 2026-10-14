@@ -519,23 +519,12 @@ function decisionLoadCandidate(item: WeddingPersonalOsRankedItem): boolean {
 
 function decisionLoadReliefLabels(
   focusItems: readonly WeddingPersonalOsRankedItem[],
-  backlogCount: number,
+  _backlogCount: number,
 ): string[] {
-  const familyLabels = Array.from(new Set(focusItems.map((item) => item.pressureFamily)))
-    .map((family) => family === "knowledge"
-      ? "evidence gaps"
-      : family === "opportunity"
-        ? "choice narrowing"
-        : family === "attention"
-          ? "follow-up decisions"
-          : "commitment decisions");
-
   return [
     focusItems.length > 0 ? `Limits active wedding choices to the top ${focusItems.length}.` : "No immediate decision pile-up.",
-    backlogCount > 0 ? `${backlogCount} lower-priority decision${backlogCount === 1 ? "" : "s"} stay in the backlog.` : null,
-    familyLabels.length > 0 ? `Decision load drivers: ${familyLabels.join(", ")}.` : null,
     "Keeps vendor search, budget, guest, and logistics work as ranked next actions instead of an unbounded checklist.",
-  ].filter((label): label is string => Boolean(label));
+  ];
 }
 
 export function buildWeddingPersonalOsProjectionState(input: {

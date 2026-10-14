@@ -53,6 +53,7 @@ export function WeddingDecisionFocusCard(props: {
   const [locallyDeferredIds, setLocallyDeferredIds] = createSignal<Set<string>>(readDeferredIds());
   const [expandedTaskId, setExpandedTaskId] = createSignal<string | null>(null);
   const [expandedWhyItemId, setExpandedWhyItemId] = createSignal<string | null>(null);
+  const [showDecisionHistory, setShowDecisionHistory] = createSignal(false);
   const [assignmentDrafts, setAssignmentDrafts] = createSignal<Record<string, string>>({});
   const [assignmentContacts, setAssignmentContacts] = createSignal<Record<string, Contact>>({});
   const [contacts, setContacts] = createSignal<Contact[]>([]);
@@ -396,9 +397,25 @@ export function WeddingDecisionFocusCard(props: {
             </For>
           </ul>
         </Show>
-        <button type="button" disabled={display().reviewDisabled} aria-disabled={display().reviewDisabled} title={display().reviewDisabled ? "There are no decisions ready to review." : "Review the current decision focus."} class="mt-3 w-full rounded-full border border-pink-200 bg-white/75 px-3 py-2 text-xs font-semibold text-pink-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:py-1.5" onClick={() => props.onSidebarAction(decisionFocusAction())}>
-          Review top decisions
-        </button>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button type="button" disabled={display().reviewDisabled} aria-disabled={display().reviewDisabled} title={display().reviewDisabled ? "There are no decisions ready to review." : "Review the current decision focus."} class="w-full rounded-full border border-pink-200 bg-white/75 px-3 py-2 text-xs font-semibold text-pink-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:py-1.5" onClick={() => props.onSidebarAction(decisionFocusAction())}>
+            Review top decisions
+          </button>
+          <Show when={props.state.decisionRecordCards.length > 0}>
+            <button type="button" class="w-full rounded-full border border-pink-200 bg-white/75 px-3 py-2 text-xs font-semibold text-pink-950 transition hover:bg-white sm:w-auto sm:py-1.5" onClick={() => setShowDecisionHistory((current) => !current)} aria-expanded={showDecisionHistory()}>
+              {showDecisionHistory() ? "Hide past decisions" : `Past decisions (${props.state.decisionRecordCards.length})`}
+            </button>
+          </Show>
+        </div>
+        <Show when={showDecisionHistory() && props.state.decisionRecordCards.length > 0}>
+          <section class="mt-3 space-y-2 rounded-2xl border border-pink-100 bg-white/75 p-3" aria-label="Past decisions and agent records">
+            <p class="text-xs font-semibold text-pink-950">Past decisions and agent records</p>
+            <p class="text-xs leading-5 text-pink-950/75">These saved choices are the context OmnyID uses when preparing later plans and follow-ups.</p>
+            <For each={props.state.decisionRecordCards}>
+              {(record) => <div class="rounded-xl border border-pink-100 bg-white px-3 py-2"><p class="text-xs font-semibold text-pink-950">{record.title}</p><p class="mt-1 text-xs leading-5 text-pink-950/75">{record.detailLabel}</p></div>}
+            </For>
+          </section>
+        </Show>
       </div>
     </Show>
   );

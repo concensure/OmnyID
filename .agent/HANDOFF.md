@@ -1722,3 +1722,21 @@ Release completion (2026-10-14):
   `runtime-env-entrypoint.sh` to LF before restarting homeserver; normal
   `deploy-oracle.ps1` already performs that normalization after extraction.
   Caddy was never reloaded.
+
+Current WED-185 UI clarity follow-up (pending release):
+
+- Removed implementation-only mailbox caveats from Email and kept the
+  temporary Connect Gmail action available. Vendor follow-up now derives a
+  compact practical summary from the persisted inbound vendor-reply note,
+  rather than a generic instruction to continue from a response.
+- Decision Focus has an on-demand past-decision and background-agent record
+  view. Wedding documents add the compared vendor category without changing
+  stored artifact titles, and the comparison panel has a readable light
+  surface. Master Agent result links are visible when a search returns them.
+- Restored directory photo display only through direct Unsplash URLs or the
+  authenticated bounded Google Places proxy. The backend rejects arbitrary
+  image URLs and unsafe proxy forms. Exact directory search terms still reach
+  the Mackay Family Estate migration record.
+- Verification before release: `npm run test:wedding --prefix solid-ui` (1823
+  passing), `cargo test wedding_vendor_search_routes --lib` (65 passing),
+  `npm run build --prefix solid-ui`, and `git diff --check` all pass.

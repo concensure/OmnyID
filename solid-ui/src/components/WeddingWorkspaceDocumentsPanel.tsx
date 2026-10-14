@@ -63,6 +63,13 @@ type WeddingWorkspaceDocumentsPanelProps = {
 };
 
 export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsPanelProps) {
+  const documentTitle = (artifact: WeddingWorkspaceDocumentsPanelProps["state"]["workspace"]["results"][number]) => {
+    if (artifact.kind !== "vendor_table") return artifact.title;
+    const category = artifact.sourceLabels.find((label) =>
+      /^(?:venue|celebrant|photograph(?:er|y)|florist|cater(?:er|ing)|music|band|dj|transport|cake|styling|stationery|wedding vendor)s?$/i.test(label.trim()),
+    );
+    return category ? `${artifact.title} — ${category}` : artifact.title;
+  };
   const visiblePreview = createMemo(() => {
     const activePreview = props.activePreview;
     const activeIsVisible = activePreview
@@ -283,7 +290,7 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
                     type="button"
                     data-magic-action="open"
                     data-magic-icon="document"
-                    data-magic-label={`Open ${artifact.title}`}
+                    data-magic-label={`Open ${documentTitle(artifact)}`}
                     data-magic-id={`wedding:document:${artifact.id}:open`}
                     onClick={() => props.onSelectArtifact?.(artifact.id)}
                     class={`w-full rounded-2xl border px-3 py-3 text-left transition ${
@@ -292,7 +299,7 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
                         : "border-slate-200/80 bg-white/75 hover:border-sky-200 hover:bg-sky-50/70"
                     }`}
                   >
-                    <p class="break-words text-sm font-semibold text-on-surface">{artifact.title}</p>
+                    <p class="break-words text-sm font-semibold text-on-surface">{documentTitle(artifact)}</p>
                     <p class="mt-1 break-words text-xs text-on-surface-variant">
                       {artifact.category} - {weddingApprovalStateLabel(artifact.approvalState)}
                     </p>

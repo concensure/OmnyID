@@ -788,19 +788,9 @@ export function EmailView(props: {
                       ? `${smartFolderCounts().find((entry) => entry.id === selectedSmartFolder())?.label ?? "Smart folder"} lens`
                       : `${mailboxLabel(selectedMailbox())} list`}
                   </p>
-                  <p class="mt-1 text-sm text-[#6d6158]">
-                    <Show
-                      when={selectedSmartFolder()}
-                      fallback={isDemo()
-                        ? `Browse sample ${mailboxLabel(selectedMailbox()).toLowerCase()} messages in demo mode.`
-                        : `Browse ${mailboxLabel(selectedMailbox()).toLowerCase()} messages with AFP-backed fallback metadata.`}
-                    >
+                  <Show when={selectedSmartFolder()}>
+                    <p class="mt-1 text-sm text-[#6d6158]">
                       Focused slice of inbox work surfaced from existing labels, supertags, and message cues.
-                    </Show>
-                  </p>
-                  <Show when={!isDemo()}>
-                    <p class="mt-2 max-w-2xl text-xs leading-5 text-[#8b7d72]">
-                      Read state plus Archive and Trash actions in this workspace are currently <span class="font-medium text-[#6d6158]">local mailbox organization controls</span>. Gmail connection improves inbox visibility, but these controls do not yet guarantee remote Gmail folder mutation.
                     </p>
                   </Show>
                 </div>

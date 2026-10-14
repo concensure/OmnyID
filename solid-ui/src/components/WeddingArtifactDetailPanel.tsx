@@ -301,12 +301,12 @@ function ArtifactPreviewCard(props: {
       return (
         <div class="min-w-0 rounded-2xl border border-teal-100 bg-teal-50/75 p-4">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-xs font-semibold text-teal-950">A2UI comparison surface</p>
+            <p class="text-xs font-semibold text-teal-950">Vendor comparison</p>
             <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-medium text-teal-900">
               {preview.rowCountLabel}
             </span>
           </div>
-          <div class="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-3 text-white">
+          <div class="mt-3 rounded-xl border border-teal-200 bg-white p-3 text-slate-900">
             <A2UIRenderer message={a2uiPreview()!.message} view={a2uiPreview()!.view} />
           </div>
           {resolutionBanner()}

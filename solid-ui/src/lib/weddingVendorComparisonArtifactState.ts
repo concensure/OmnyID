@@ -23,10 +23,12 @@ function safeExternalUrl(value: unknown): string | null {
   }
 }
 
-/** Comparison-card imagery is deliberately limited to the licenced, stable
- * Unsplash CDN. Links are handled separately by safeExternalUrl. */
+/** Comparison-card imagery permits the licenced Unsplash CDN and the
+ * authenticated first-party Google Places proxy. Links are handled separately. */
 function unsplashImageUrl(value: unknown): string | null {
-  const url = safeExternalUrl(value);
+  const raw = clean(value);
+  if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(raw)) return raw;
+  const url = safeExternalUrl(raw);
   if (!url) return null;
   try {
     return new URL(url).hostname.toLowerCase() === "images.unsplash.com" ? url : null;

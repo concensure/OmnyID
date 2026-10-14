@@ -70,6 +70,8 @@ function httpUrl(value: string | null | undefined): string | null {
 }
 
 function unsplashPhotoUrl(value: string | null | undefined): string | null {
+  const raw = clean(value);
+  if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(raw)) return raw;
   const url = httpUrl(value);
   if (!url) return null;
   try {

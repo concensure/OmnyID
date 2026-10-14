@@ -511,3 +511,12 @@ envelope. It is rendered as plaintext; non-empty envelope metadata remains
 unreadable until client-side decryption succeeds. Operational
 `daemon_heartbeat` records are retained for monitoring but excluded from chat
 responses and client render units.
+
+## 2026-10-14: Vendor media is limited to verified direct or first-party sources
+
+Couple-facing vendor cards may render a direct `images.unsplash.com` image or
+the authenticated OmnyID Google Places photo proxy. The proxy accepts only a
+validated `places/` photo resource name and a bounded width, keeping the
+Google credential server-side. Arbitrary third-party URLs and arbitrary proxy
+parameters remain excluded. This retains photos already stored in the vendor
+directory without exposing image URLs or weakening the existing source policy.

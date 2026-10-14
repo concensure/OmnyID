@@ -1106,3 +1106,7 @@ tasks:
       - Vendor Follow-up now uses native editable/selectable message, email, and date controls; its rationale is collapsed by default, missing directory email is explicit, and an official vendor website link is offered when available
       - legacy AFP rows with an empty encryption marker render as plaintext, while real encrypted envelopes remain protected; daemon heartbeats are excluded from chat at both the API and render layers
       - `da42505` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; Mistral's file-backed secret is mounted, `/wedding/` returns 200, and Caddy was not reloaded
+      - email view now keeps only user-facing mailbox copy and retains the temporary Gmail connect action while Cloudflare relay control-plane work remains gated
+      - vendor follow-up uses the stored vendor response excerpt where available, while Decision Focus exposes saved past decisions and background-agent records on demand
+      - comparison documents identify their vendor category, comparison rendering uses readable light contrast, and Master Agent result sources are displayed when returned
+      - vendor photos accept only direct Unsplash images or the authenticated, narrowly validated first-party Google Places proxy; exact directory queries continue to include Mackay Family Estate

@@ -393,6 +393,7 @@ test("buildWeddingResponseWorkspaceViewState exposes editable-vendor contact car
           contactMethod: "email",
           lastContactAt: "2026-09-08T00:00:00.000Z",
           responseReceivedAt: "2026-09-10T00:00:00.000Z",
+          notes: "Gmail | Subject: Available for your date | We can hold the date until Friday and have sent the package options.",
         },
       },
     ],
@@ -417,7 +418,7 @@ test("buildWeddingResponseWorkspaceViewState exposes editable-vendor contact car
   assert.equal(state.vendorContactCards[1]?.actionMode, "reply_recorded");
   assert.equal(state.vendorContactCards[1]?.primaryActionLabel, "View response");
   assert.equal(state.vendorContactCards[1]?.replyLabel, "2026-09-10");
-  assert.match(state.vendorContactCards[1]?.detailLabel ?? "", /Continue from the response/i);
+  assert.match(state.vendorContactCards[1]?.detailLabel ?? "", /hold the date until Friday/i);
 });
 
 test("vendorContactCards keeps directory candidates out of active outreach until this user has contact evidence", () => {

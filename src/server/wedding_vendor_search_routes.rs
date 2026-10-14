@@ -1372,8 +1372,9 @@ fn looks_like_public_http_url(url: &str) -> bool {
     )
 }
 
-/// Couple-facing vendor cards accept only direct Unsplash image URLs. This keeps
-/// the directory from embedding arbitrary remote image hosts or stale proxy URLs.
+/// Couple-facing vendor cards accept licensed Unsplash images and the narrowly
+/// validated first-party Google Places proxy. The latter is fetched with the
+/// couple's authenticated session; arbitrary remote image hosts stay excluded.
 pub(super) fn is_unsplash_photo_url(url: &str) -> bool {
     if !looks_like_public_http_url(url) {
         return false;
@@ -1386,6 +1387,27 @@ pub(super) fn is_unsplash_photo_url(url: &str) -> bool {
         && parsed
             .host_str()
             .is_some_and(|host| host.eq_ignore_ascii_case("images.unsplash.com"))
+}
+
+pub(super) fn is_google_wedding_vendor_photo_proxy_url(url: &str) -> bool {
+    let Some(query) = url.trim().strip_prefix("/wedding/vendor-photo/google?") else {
+        return false;
+    };
+    let mut params = query.split('&');
+    let Some(name) = params.next() else {
+        return false;
+    };
+    if !name.to_ascii_lowercase().starts_with("name=places%2f") || name.len() <= "name=places%2f".len() {
+        return false;
+    }
+    match (params.next(), params.next()) {
+        (None, None) => true,
+        (Some(width), None) => width
+            .strip_prefix("max_width_px=")
+            .and_then(|value| value.parse::<u16>().ok())
+            .is_some_and(|value| (120..=1200).contains(&value)),
+        _ => false,
+    }
 }
 
 fn infer_email_from_text(text: &str) -> Option<String> {
@@ -2486,13 +2508,16 @@ mod tests {
     }
 
     #[test]
-    fn couple_facing_vendor_photos_require_the_unsplash_host() {
+    fn couple_facing_vendor_photos_allow_unsplash_or_the_authenticated_google_proxy() {
         assert!(is_unsplash_photo_url(
             "https://images.unsplash.com/photo-1507504031003-b417219a0fde"
         ));
         assert!(!is_unsplash_photo_url("https://cdn.example/venue.jpg"));
-        assert!(!is_unsplash_photo_url(
-            "/wedding/vendor-photo/google?name=places%2Fabc"
+        assert!(is_google_wedding_vendor_photo_proxy_url(
+            "/wedding/vendor-photo/google?name=places%2Fabc%2Fphotos%2Fone&max_width_px=720"
+        ));
+        assert!(!is_google_wedding_vendor_photo_proxy_url(
+            "/wedding/vendor-photo/google?name=places%2Fabc&key=secret"
         ));
     }
 

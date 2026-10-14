@@ -312,8 +312,9 @@ function vendorComparisonTask(
 
 function publicImageUrl(value: unknown): string | null {
   const url = clean(value);
-  // Do not render arbitrary third-party image URLs in couple-facing cards. The
-  // directory's verified-photo policy allows only the stable Unsplash host.
+  // Do not render arbitrary third-party image URLs in couple-facing cards.
+  // Google Places media stays behind our authenticated, narrowly shaped proxy.
+  if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(url)) return url;
   try {
     const parsed = new URL(url);
     return parsed.protocol === "https:" && parsed.hostname.toLowerCase() === "images.unsplash.com"

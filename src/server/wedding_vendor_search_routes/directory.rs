@@ -111,7 +111,9 @@ pub(super) fn wedding_vendor_record_to_search_source(
             .source_url
             .filter(|url| url.contains("maps") || url.contains("openstreetmap")),
         photo_url: record.photos.iter().find_map(|photo| {
-            is_unsplash_photo_url(&photo.photo_url).then(|| photo.photo_url.clone())
+            (is_unsplash_photo_url(&photo.photo_url)
+                || is_google_wedding_vendor_photo_proxy_url(&photo.photo_url))
+                .then(|| photo.photo_url.clone())
         }),
         rooms,
         address: record.address,
