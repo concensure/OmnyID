@@ -105,8 +105,32 @@ function GhostGrid(props: {
   tableName: string;
   onHeaderEdit: (idx: number, val: string) => void;
   onTableNameEdit: (val: string) => void;
+  onCreate: (table: string, data: Record<string, string>) => Promise<void>;
 }) {
-  const ROWS = 6;
+  const ROWS = 3;
+  const [draft, setDraft] = createSignal<Record<string, string>>({});
+  const [saving, setSaving] = createSignal(false);
+  const [error, setError] = createSignal("");
+  const createRow = async () => {
+    const table = props.tableName.trim();
+    const data = props.headers.reduce<Record<string, string>>((result, header, index) => {
+      const value = draft()[`${index}`]?.trim();
+      if (value) result[header.trim() || `Field ${index + 1}`] = value;
+      return result;
+    }, {});
+    if (!table) { setError("Name this table before saving its first row."); return; }
+    if (Object.keys(data).length === 0) { setError("Enter at least one cell to save this row."); return; }
+    setSaving(true);
+    setError("");
+    try {
+      await props.onCreate(table, data);
+      setDraft({});
+    } catch {
+      setError("This row could not be saved. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <div class="animate-fade-in">
       <div class="mb-3 flex items-center gap-2">
@@ -147,6 +171,31 @@ function GhostGrid(props: {
             </tr>
           </thead>
           <tbody>
+            <tr class="border-b border-primary/15 bg-primary/[0.025]">
+              <For each={props.headers}>
+                {(_, index) => (
+                  <td class="px-3 py-2">
+                    <input
+                      value={draft()[`${index()}`] ?? ""}
+                      onInput={(event) => setDraft((current) => ({ ...current, [`${index()}`]: event.currentTarget.value }))}
+                      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void createRow(); } }}
+                      placeholder="Enter value"
+                      class="w-full min-w-24 rounded-md border border-transparent bg-white/60 px-2 py-1.5 text-on-surface outline-none placeholder:text-on-surface-variant/40 focus:border-primary/35"
+                    />
+                  </td>
+                )}
+              </For>
+            </tr>
+            <tr class="border-b border-white/20">
+              <td colSpan={props.headers.length} class="px-3 py-2">
+                <div class="flex items-center gap-3">
+                  <button type="button" disabled={saving()} onClick={() => void createRow()} class="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-60">
+                    {saving() ? "Saving…" : "Save row"}
+                  </button>
+                  <Show when={error()}><span class="text-xs text-red-600">{error()}</span></Show>
+                </div>
+              </td>
+            </tr>
             {Array.from({ length: ROWS }, (_, r) => (
               <tr class="border-b border-white/20 last:border-0">
                 <For each={props.headers}>
@@ -569,6 +618,17 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     setRefreshKey((value) => value + 1);
   }
 
+  async function createFirstRecord(table: string, data: Record<string, string>) {
+    const result = await sendRecord(table, data);
+    recordLocalMessage({
+      id: result.message_id,
+      type: "database_record",
+      timestamp: new Date().toISOString(),
+      content: { kind: "database_record", table, data },
+    });
+    setActiveTable(table);
+  }
+
   createEffect(() => {
     const visibleIds = new Set(visibleRecords().map((row) => row.id));
     setSelectedRowIds((current) => current.filter((id) => visibleIds.has(id)));
@@ -727,6 +787,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
                 onPointerDown={(e) => e.stopPropagation()}>
                 {([
                   { icon: "◈", label: "New Record", action: () => { setShowAdd(true); setShowPlusMenu(false); } },
+                  { icon: "▦", label: "New Table", action: () => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); setShowPlusMenu(false); } },
                   { icon: "⊞", label: "New Field", action: () => {
                     const label = prompt("Field name:")?.trim();
                     const table = activeTable() ?? tableName().trim() ?? tables()[0];
@@ -767,8 +828,8 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       </div>
 
       {/* Table filter pills */}
-      <Show when={tables().length > 0}>
-        <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-medium text-on-surface-variant">Tables</span>
           <button type="button" onClick={() => setActiveTable(null)}
             class={`rounded-full px-3 py-1 text-xs font-medium transition border ${!activeTable() ? "bg-primary text-white border-primary" : "border-outline/20 bg-white/40 text-on-surface-variant hover:bg-white/60"}`}>
             All
@@ -781,8 +842,10 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
               </button>
             )}
           </For>
-        </div>
-      </Show>
+          <button type="button" onClick={() => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); }} class="rounded-full border border-dashed border-primary/35 bg-primary/5 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/10">
+            + New table
+          </button>
+      </div>
 
       {/* Grid */}
       <Show
@@ -793,6 +856,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
             tableName={tableName()}
             onHeaderEdit={(i, val) => setGhostHeaders((prev) => prev.map((h, idx) => idx === i ? (val || h) : h))}
             onTableNameEdit={(val) => setTableName(val)}
+            onCreate={createFirstRecord}
           />
         }
       >

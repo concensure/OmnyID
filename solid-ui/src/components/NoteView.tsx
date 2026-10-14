@@ -39,6 +39,7 @@ import {
 import { recordShortcutUse } from "@/lib/shortcutRecency";
 import {
   sendNoteMessage,
+  sendAfpMessage,
   fetchThread,
   subscribeThread,
   type AfpMessage,
@@ -1028,15 +1029,26 @@ function NoteGraphView(props: {
   onSelectNote: (id: string) => void;
   selectedId: string | null;
 }) {
-  const graphRows = createMemo(() =>
-    props.notes.map((note) => ({
-      id: note.id,
-      title: note.title,
-      supertag: note.supertags[0] ?? null,
-      backlinks: note.backlinks,
-      brokenBacklinks: note.backlinks.filter((backlink) => !backlinkTargetExists(backlink, props.notes)),
-    }))
-  );
+  const graphNodes = createMemo(() => {
+    const count = Math.max(props.notes.length, 1);
+    const radius = Math.min(140, 62 + count * 10);
+    return props.notes.map((note, index) => {
+      const angle = (Math.PI * 2 * index) / count - Math.PI / 2;
+      return {
+        note,
+        x: 400 + radius * Math.cos(angle),
+        y: 190 + radius * Math.sin(angle),
+        label: note.title.length > 22 ? `${note.title.slice(0, 21)}…` : note.title,
+      };
+    });
+  });
+  const graphEdges = createMemo(() => {
+    const byId = new Map(graphNodes().map((node) => [node.note.id, node]));
+    return graphNodes().flatMap((source) => source.note.backlinks.flatMap((link) => {
+      const target = byId.get(link.targetId);
+      return target ? [{ source, target, relation: link.relation }] : [];
+    }));
+  });
 
   return (
     <div
@@ -1056,68 +1068,35 @@ function NoteGraphView(props: {
         <div>
           <h2 style={{ margin: 0, "font-size": "0.9375em", "font-weight": "600", color: TOKEN.text }}>Knowledge graph</h2>
           <p style={{ margin: "0.25em 0 0", "font-size": "0.75em", color: TOKEN.textSecondary }}>
-            Graph view currently uses a lightweight relationship list in this workspace build.
+            Each note is a node. Saved links between notes are shown as edges.
           </p>
         </div>
       </div>
-      <div style={{ display: "flex", "flex-direction": "column", gap: "0.5em" }}>
-        <For each={graphRows()} fallback={
-          <div style={{ padding: "2em", "text-align": "center", color: TOKEN.textSecondary, "font-size": "0.875em" }}>
-            No linked notes available yet.
-          </div>
-        }>
-          {(row) => (
-            <button
-              type="button"
-              onClick={() => props.onSelectNote(row.id)}
-              style={{
-                display: "flex",
-                "flex-direction": "column",
-                gap: "0.35em",
-                padding: "0.875em 1em",
-                border: `1px solid ${props.selectedId === row.id ? TOKEN.accent : TOKEN.border}`,
-                background: props.selectedId === row.id ? "rgba(255,107,53,0.08)" : TOKEN.bg,
-                "border-radius": "0.75em",
-                cursor: "pointer",
-                "text-align": "left",
-                transition: TOKEN.transition,
-              }}
-            >
-              <div style={{ display: "flex", "align-items": "center", gap: "0.5em", "justify-content": "space-between" }}>
-                <span style={{ "font-size": "0.875em", "font-weight": "600", color: TOKEN.text }}>{row.title}</span>
-                <Show when={row.supertag}>
-                  <span style={{ "font-size": "0.6875em", color: TOKEN.accent, background: "rgba(255,107,53,0.08)", padding: "0.2em 0.55em", "border-radius": "9999px" }}>
-                    {row.supertag}
-                  </span>
-                </Show>
-              </div>
-              <Show
-                when={row.backlinks.length > 0}
-                fallback={<span style={{ "font-size": "0.75em", color: TOKEN.textSecondary }}>No backlinks yet.</span>}
+      <Show
+        when={graphNodes().length > 0}
+        fallback={<div style={{ padding: "2em", "text-align": "center", color: TOKEN.textSecondary, "font-size": "0.875em" }}>Create a note to start your graph.</div>}
+      >
+        <div style={{ overflow: "auto", "border-radius": "0.875em", background: TOKEN.bg, border: `1px solid ${TOKEN.border}` }}>
+          <svg viewBox="0 0 800 380" role="img" aria-label="Knowledge graph of linked notes" style={{ display: "block", width: "100%", "min-width": "34em", height: "auto" }}>
+            <defs><marker id="note-edge-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill={TOKEN.textSecondary} /></marker></defs>
+            <For each={graphEdges()}>{(edge) => <line x1={edge.source.x} y1={edge.source.y} x2={edge.target.x} y2={edge.target.y} stroke={TOKEN.textSecondary} stroke-opacity="0.5" stroke-width="1.5" marker-end="url(#note-edge-arrow)"><title>{edge.relation || "linked"}</title></line>}</For>
+            <For each={graphNodes()}>{(node) => (
+              <g
+                role="button"
+                tabindex="0"
+                aria-label={`Open note ${node.note.title}`}
+                onClick={() => props.onSelectNote(node.note.id)}
+                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); props.onSelectNote(node.note.id); } }}
+                style={{ cursor: "pointer" }}
               >
-                <div style={{ display: "flex", "flex-direction": "column", gap: "0.25em" }}>
-                  <span style={{ "font-size": "0.75em", color: TOKEN.textSecondary }}>
-                    Links to {row.backlinks.map((link) => link.targetTitle).join(", ")}
-                  </span>
-                  <Show when={row.brokenBacklinks.length > 0}>
-                    <span
-                      title="This link is broken"
-                      style={{
-                        "font-size": "0.75em",
-                        color: "#b2644b",
-                        "text-decoration": "line-through",
-                        "text-decoration-thickness": "1px",
-                      }}
-                    >
-                      Broken: {row.brokenBacklinks.map((link) => link.targetTitle).join(", ")}
-                    </span>
-                  </Show>
-                </div>
-              </Show>
-            </button>
-          )}
-        </For>
-      </div>
+                <circle cx={node.x} cy={node.y} r={props.selectedId === node.note.id ? "31" : "27"} fill={props.selectedId === node.note.id ? TOKEN.accent : TOKEN.surface} stroke={props.selectedId === node.note.id ? TOKEN.accent : TOKEN.border} stroke-width="2" />
+                <text x={node.x} y={node.y + 4} text-anchor="middle" fill={props.selectedId === node.note.id ? "#fff" : TOKEN.text} style={{ "font-size": "11px", "font-weight": "600", "pointer-events": "none" }}>{node.label}</text>
+              </g>
+            )}</For>
+          </svg>
+        </div>
+        <p style={{ margin: 0, "font-size": "0.75em", color: TOKEN.textSecondary }}>{graphNodes().length} note{graphNodes().length === 1 ? "" : "s"} · {graphEdges().length} link{graphEdges().length === 1 ? "" : "s"}. Select a node to open it.</p>
+      </Show>
     </div>
   );
 }
@@ -1469,7 +1448,7 @@ function NoteGraphAccessPane(props: {
             Knowledge graph access
           </p>
           <p style={{ margin: "0.25em 0 0", "font-size": "0.8125em", color: TOKEN.textSecondary }}>
-            Reach graph context from the note workspace through an expandable pane, without making graph the default home.
+            Explore links between your notes, then select a node to continue editing.
           </p>
         </div>
         <div style={{ display: "flex", "align-items": "center", gap: "0.5em", "flex-wrap": "wrap" }}>
@@ -2198,6 +2177,7 @@ function NoteRightPanel(props: {
   onSelectNote: (id: string) => void;
   onFilter: (filter: string) => void;
   onTagUpdate: (note: Note, removeTags: string[], addTags: string[], removeSupertags: string[], addSupertags: string[]) => void;
+  onQuickAction: (note: Note, action: "reminder" | "meeting" | "task") => Promise<void>;
 }) {
   return (
     <aside
@@ -2230,6 +2210,21 @@ function NoteRightPanel(props: {
           const [newTag, setNewTag] = createSignal("");
           const [addingTag, setAddingTag] = createSignal(false);
           const [supertagMenu, setSupertagMenu] = createSignal<{ tag: string; x: number; y: number } | null>(null);
+          const [quickActionNotice, setQuickActionNotice] = createSignal<string | null>(null);
+          const [quickActionBusy, setQuickActionBusy] = createSignal<"reminder" | "meeting" | "task" | null>(null);
+
+          async function runQuickAction(action: "reminder" | "meeting" | "task") {
+            setQuickActionBusy(action);
+            setQuickActionNotice(null);
+            try {
+              await props.onQuickAction(note(), action);
+              setQuickActionNotice(action === "reminder" ? "Reminder created and linked to this note." : action === "meeting" ? "Meeting follow-up linked to this note." : "Open task created and linked to this note.");
+            } catch {
+              setQuickActionNotice("This action could not be saved. Please try again.");
+            } finally {
+              setQuickActionBusy(null);
+            }
+          }
 
           function removeTag(tag: string) {
             props.onTagUpdate(note(), [tag], [], [], []);
@@ -2438,8 +2433,16 @@ function NoteRightPanel(props: {
 
             {/* Contextual suggestion chips — Phase 7 */}
             <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.375em" }}>
-              {["Add reminder?", "Link to meeting?", "Create task?"].map((chip) => (
+              {([
+                { action: "reminder" as const, label: "Add reminder", title: "Create a reminder task linked to this note" },
+                { action: "meeting" as const, label: "Link to meeting", title: "Create a meeting follow-up linked to this note" },
+                { action: "task" as const, label: "Create task", title: "Create an open task linked to this note" },
+              ]).map((chip) => (
                 <button
+                  type="button"
+                  title={chip.title}
+                  disabled={quickActionBusy() !== null}
+                  onClick={() => void runQuickAction(chip.action)}
                   style={{
                     padding: "0.25em 0.75em",
                     background: TOKEN.bg,
@@ -2459,10 +2462,13 @@ function NoteRightPanel(props: {
                   onFocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `2px solid ${TOKEN.accent}`; }}
                   onBlur={(e) => { (e.currentTarget as HTMLElement).style.outline = "none"; }}
                 >
-                  {chip}
+                  {quickActionBusy() === chip.action ? "Saving…" : chip.label}
                 </button>
               ))}
             </div>
+            <Show when={quickActionNotice()}>
+              <p style={{ margin: 0, "font-size": "0.75em", color: TOKEN.textSecondary }}>{quickActionNotice()}</p>
+            </Show>
 
             {/* Backlinks — Phase 6 */}
             <Show when={note().backlinks.length > 0}>
@@ -2870,6 +2876,7 @@ function NoteEditorWorkspace(props: {
               <div style={{ "margin-top": "0.875em" }}>
                 <TiptapEditor
                   mode="full"
+                  showToolbar={true}
                   initialContent={body()}
                   disabled={props.saveState?.state === "saving"}
                   placeholder="Start writing..."
@@ -3346,6 +3353,8 @@ export function NoteView(props: NoteViewProps) {
     } else if (f.startsWith("area:")) {
       const aid = f.slice(5);
       notes = notes.filter((n) => n.areaId === aid);
+    } else if (f === "ai-groups") {
+      notes = notes.filter((n) => n.supertags.length > 0 || n.tags.length > 0);
     }
     const q = query().trim().toLowerCase();
     if (q) {
@@ -3486,6 +3495,30 @@ export function NoteView(props: NoteViewProps) {
     }).catch(() => {
       // On error remove the local delta so the UI reverts
       setLocalTagDeltas((prev) => prev.filter((d) => d.updateId !== tempId));
+    });
+  }
+
+  async function handleQuickNoteAction(note: Note, action: "reminder" | "meeting" | "task") {
+    const title = note.title.trim() || "Untitled note";
+    const actionLabel = action === "reminder" ? "Reminder" : action === "meeting" ? "Meeting follow-up" : "Task";
+    await sendAfpMessage({
+      thread_id: note.threadId ?? note.id,
+      from: "user@omnyid.local",
+      to: ["agent://notes"],
+      type: action === "meeting" ? "note:ledger_update" : "task",
+      kind: action === "meeting" ? "note_meeting_link" : "note_task",
+      subtype: `note_${action}`,
+      content: {
+        kind: action === "meeting" ? "note_meeting_link" : "note_task",
+        title: `${actionLabel}: ${title}`,
+        source_note_id: note.id,
+        source_note_title: title,
+        status: "open",
+        reminder: action === "reminder",
+      },
+      references: note.messageId ? [{ id: note.messageId, rel: "source_note" }] : undefined,
+      metadata: { origin: "notes_quick_action", note_id: note.id, action },
+      memory_scope: { memory_space: "personal", author_mask: "private", author_type: "human", human_only: true },
     });
   }
 
@@ -4056,6 +4089,7 @@ export function NoteView(props: NoteViewProps) {
               setBrowserSectionOpen(true);
             }}
             onTagUpdate={handleTagUpdate}
+            onQuickAction={handleQuickNoteAction}
           />
         </Show>
       </div>

@@ -57,6 +57,7 @@ import {
 } from "@/lib/threadLoadFailureState";
 import { afpRecord } from "@/lib/afpMessageRecord";
 import { loadAgentResponseStylePayload } from "@/lib/agentResponseStyle";
+import { dashboardBootstrapMessages } from "@/lib/dashboardBootstrapState";
 import {
   absoluteUtcTimestamp,
   displayMessageTimestamp,
@@ -231,6 +232,9 @@ export function ThreadView(props: {
   workspaceAssistRefreshOrigin?: WorkspaceAssistRefreshOrigin | null;
 }) {
   const [messages, setMessages] = createSignal<AfpMessage[]>([]);
+  const bootstrapMessagesForThread = createMemo(() =>
+    dashboardBootstrapMessages(props.bootstrap).filter((message) => message.thread_id === props.threadId),
+  );
   const [loading, setLoading] = createSignal(true);
   const [loadError, setLoadError] = createSignal<ThreadLoadFailureReceipt | null>(null);
   const [refreshError, setRefreshError] = createSignal<ThreadLoadFailureReceipt | null>(null);
@@ -590,10 +594,20 @@ export function ThreadView(props: {
   async function reload(opts?: { preserveExisting?: boolean }) {
     try {
       const msgs = await fetchThread(props.threadId);
-      setMessages(msgs);
+      // The dashboard bootstrap is an authenticated snapshot of the same AFP
+      // mailbox. Keep it as a read-only fallback when a thread fetch races the
+      // relay index and returns an empty list.
+      setMessages(msgs.length > 0 ? msgs : bootstrapMessagesForThread());
       setLoadError(null);
       setRefreshError(null);
     } catch (err: unknown) {
+      const fallback = bootstrapMessagesForThread();
+      if (fallback.length > 0) {
+        setMessages(fallback);
+        setLoadError(null);
+        setRefreshError(null);
+        return;
+      }
       if (opts?.preserveExisting) {
         setRefreshError(
           buildThreadLoadFailureReceipt(

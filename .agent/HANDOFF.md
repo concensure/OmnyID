@@ -2006,3 +2006,35 @@ Remaining:
 - The relay remains disabled. Cloudflare routing status and DNS export reads still
   fail with 403/10000, leaving RELAY-00 incomplete; RELAY-01 remains pending
   independent security/privacy review and RELAY-04 through RELAY-17 stay gated.
+
+## 2026-10-15 - WED-185 workspace interaction repair (Codex)
+
+Changed:
+
+- Thread opening now resolves magic actions to a real thread identifier and keeps
+  the authenticated dashboard snapshot as a read-only fallback if the thread fetch
+  races empty. Thread-row action controls have larger 2x touch targets.
+- Notes now has a node-and-edge SVG knowledge graph, functional AI Groups
+  filtering, an explicit rich-text toolbar with heading and font-size controls,
+  and working reminder, meeting-follow-up, and task actions saved as AFP records.
+- Database shows a usable blank first row, supports direct cell entry and save,
+  and exposes existing table browsing plus new-table creation.
+- Oracle compose accepts `COMPOSIO_API_KEY_FILE`; the user-provided project key was
+  migrated to the existing local file-backed secret and referenced by the local
+  Oracle environment. The project credential does not change per-user connection
+  ownership.
+
+Verification:
+
+- `npm run test:wedding --prefix solid-ui` (1,833 passing)
+- `npm run build --prefix solid-ui` (passing)
+- `npm run typecheck --prefix solid-ui` still reports two pre-existing wedding
+  component contract errors in `WeddingDecisionFocusCard.tsx` and
+  `WeddingWorkspaceDocumentsPanel.tsx`; none originate in these files.
+- `git diff --check` passed.
+
+Next:
+
+- Commit and deploy the scoped source archive, sync the file-backed Composio
+  secret, then verify live UI and the server-reported Composio status without
+  restarting or reloading Caddy.

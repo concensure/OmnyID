@@ -609,8 +609,12 @@ function togglePreview(tid: string, e: MouseEvent) {
 
     const unsubscribeMagicActionEvent = subscribeMagicActionEvent(({ action, msgId }) => {
       if (!msgId) return;
-      if (action === 'open') { markRead(msgId); props.onOpenThread(msgId); }
-      if (action === 'star') toggleStar(msgId);
+      const matchingThread = threads().find((thread) =>
+        thread.threadId === msgId || thread.messages.some((message) => message.id === msgId),
+      );
+      const threadId = matchingThread?.threadId ?? msgId;
+      if (action === 'open') { markRead(threadId); props.onOpenThread(threadId); }
+      if (action === 'star') toggleStar(threadId);
     });
     onCleanup(() => unsubscribeMagicActionEvent());
 
@@ -1517,12 +1521,12 @@ function togglePreview(tid: string, e: MouseEvent) {
                               <div class="pb-3" />
                             </button>
                             <Show when={unread() > 0}>
-                              <span class="h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" title="New messages" />
+                              <span class="h-4 w-4 flex-shrink-0 rounded-full bg-blue-500" title="New messages" />
                             </Show>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); toggleStar(thread.threadId); }}
-                              class={`flex-shrink-0 text-sm transition ${starredThreads().has(thread.threadId) ? "text-amber-400" : "text-transparent group-hover:text-on-surface-variant/40"}`}
+                              class={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-xl transition ${starredThreads().has(thread.threadId) ? "text-amber-400" : "text-transparent group-hover:text-on-surface-variant/40"}`}
                               title="Star thread"
                             >
                               {starredThreads().has(thread.threadId) ? "⭐" : "☆"}
@@ -1530,7 +1534,7 @@ function togglePreview(tid: string, e: MouseEvent) {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); togglePin(thread.threadId); }}
-                              class={`flex-shrink-0 text-[11px] transition ${pinnedThreads().has(thread.threadId) ? "opacity-100" : "text-transparent group-hover:opacity-40 hover:opacity-80"}`}
+                              class={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-lg transition ${pinnedThreads().has(thread.threadId) ? "opacity-100" : "text-transparent group-hover:opacity-40 hover:opacity-80"}`}
                               title={pinnedThreads().has(thread.threadId) ? "Unpin thread" : "Pin to top"}
                             >
                               📌
@@ -1539,7 +1543,7 @@ function togglePreview(tid: string, e: MouseEvent) {
                               <button type="button"
                                 title="Archive thread"
                                 onClick={(e) => { e.stopPropagation(); archiveThread(thread.threadId); }}
-                                class="flex-shrink-0 text-[10px] text-transparent group-hover:text-on-surface-variant/40 hover:text-rose-500 transition"
+                                class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-base text-transparent group-hover:text-on-surface-variant/40 hover:text-rose-500 transition"
                                 aria-label="Archive">
                                 ⊗
                               </button>
@@ -1548,14 +1552,14 @@ function togglePreview(tid: string, e: MouseEvent) {
                               <button type="button"
                                 title="Restore thread"
                                 onClick={(e) => { e.stopPropagation(); unarchiveThread(thread.threadId); }}
-                                class="flex-shrink-0 text-[10px] text-on-surface-variant/60 hover:text-emerald-600 transition">
+                                class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-base text-on-surface-variant/60 hover:text-emerald-600 transition">
                                 ↩
                               </button>
                             </Show>
                             <button
                               type="button"
                               title={previewThreadId() === thread.threadId ? "Collapse preview" : "Preview messages"}
-                              class="flex-shrink-0 self-start mt-1 rounded-lg px-2 py-1 text-[10px] text-on-surface-variant/50 transition hover:bg-white/40 hover:text-on-surface-variant"
+                              class="flex-shrink-0 self-start mt-1 min-h-8 rounded-lg px-3 py-1.5 text-xs text-on-surface-variant/50 transition hover:bg-white/40 hover:text-on-surface-variant"
                               onClick={(e) => togglePreview(thread.threadId, e)}
                             >
                               {previewThreadId() === thread.threadId ? "▲" : "▼"}
@@ -1884,13 +1888,13 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                   </button>
                   {/* 18n — unread dot */}
                   <Show when={unread() > 0}>
-                    <span class="h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" title="New messages" />
+                    <span class="h-4 w-4 flex-shrink-0 rounded-full bg-blue-500" title="New messages" />
                   </Show>
                   {/* 18m — star button */}
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); toggleStar(thread.threadId); }}
-                    class={`flex-shrink-0 text-sm transition ${
+                    class={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-xl transition ${
                       starredThreads().has(thread.threadId)
                         ? "text-amber-400"
                         : "text-transparent group-hover:text-on-surface-variant/40"
@@ -1903,7 +1907,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); togglePin(thread.threadId); }}
-                    class={`flex-shrink-0 text-[11px] transition ${
+                    class={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-lg transition ${
                       pinnedThreads().has(thread.threadId)
                         ? "opacity-100"
                         : "text-transparent group-hover:opacity-40 hover:opacity-80"
@@ -1918,7 +1922,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                     <button type="button"
                       title="Archive thread"
                       onClick={(e) => { e.stopPropagation(); archiveThread(thread.threadId); }}
-                      class="flex-shrink-0 text-[10px] text-transparent group-hover:text-on-surface-variant/40 hover:text-rose-500 transition"
+                      class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-base text-transparent group-hover:text-on-surface-variant/40 hover:text-rose-500 transition"
                       aria-label="Archive">
                       ⊗
                     </button>
@@ -1927,7 +1931,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                     <button type="button"
                       title="Restore thread"
                       onClick={(e) => { e.stopPropagation(); unarchiveThread(thread.threadId); }}
-                      class="flex-shrink-0 text-[10px] text-on-surface-variant/60 hover:text-emerald-600 transition">
+                      class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-base text-on-surface-variant/60 hover:text-emerald-600 transition">
                       ↩
                     </button>
                   </Show>
@@ -1936,7 +1940,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                     type="button"
                     title="Export thread as Markdown"
                     onClick={(e) => { e.stopPropagation(); exportThread(thread); }}
-                    class="flex-shrink-0 text-[10px] text-transparent group-hover:text-on-surface-variant/40 hover:text-primary transition"
+                    class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-base text-transparent group-hover:text-on-surface-variant/40 hover:text-primary transition"
                     aria-label="Export thread"
                   >
                     ↓
@@ -1946,7 +1950,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                     type="button"
                     title={lockedThreads().has(thread.threadId) ? "Unlock thread" : "Lock thread (prevents archive/merge)"}
                     onClick={(e) => { e.stopPropagation(); toggleLock(thread.threadId); }}
-                    class={`flex-shrink-0 text-[11px] transition ${
+                    class={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center text-lg transition ${
                       lockedThreads().has(thread.threadId)
                         ? "text-amber-500"
                         : "text-transparent group-hover:text-on-surface-variant/40 hover:text-amber-500"
@@ -1971,7 +1975,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                       type="button"
                       title="Quick reply"
                       onClick={(e) => { e.stopPropagation(); setThreadActionError(null); setReplyingToThread((prev) => toggleThreadReplyComposerState(prev, thread.threadId)); }}
-                      class="flex-shrink-0 text-[10px] text-transparent group-hover:text-on-surface-variant/50 hover:text-primary transition"
+                      class="inline-flex min-h-8 flex-shrink-0 items-center justify-center px-3 text-xs text-transparent group-hover:text-on-surface-variant/50 hover:text-primary transition"
                       aria-label="Reply"
                     >
                       ↩ Reply
@@ -1981,7 +1985,7 @@ onPointerDown={(e) => { // 26h — long-press opens preview
                   <button
                     type="button"
                     title={previewThreadId() === thread.threadId ? "Collapse preview" : "Preview messages"}
-                    class="flex-shrink-0 self-start mt-1 rounded-lg px-2 py-1 text-[10px] text-on-surface-variant/50 transition hover:bg-white/40 hover:text-on-surface-variant"
+                    class="flex-shrink-0 self-start mt-1 min-h-8 rounded-lg px-3 py-1.5 text-xs text-on-surface-variant/50 transition hover:bg-white/40 hover:text-on-surface-variant"
                     onClick={(e) => togglePreview(thread.threadId, e)}
                   >
                     {previewThreadId() === thread.threadId ? "▲" : "▼"}

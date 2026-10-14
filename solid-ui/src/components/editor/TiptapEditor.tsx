@@ -15,7 +15,7 @@
 
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Editor } from "@tiptap/core";
+import { Editor, Extension } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
@@ -202,6 +202,22 @@ function buildMentionSuggestion(suggestions: MentionSuggestion[]) {
 
 // ── Build extension list per mode ──────────────────────────────────────────
 
+const FontSize = Extension.create({
+  name: "fontSize",
+  addGlobalAttributes() {
+    return [{
+      types: ["textStyle"],
+      attributes: {
+        fontSize: {
+          default: null,
+          parseHTML: (element) => element.style.fontSize || null,
+          renderHTML: (attributes) => attributes.fontSize ? { style: `font-size: ${attributes.fontSize}` } : {},
+        },
+      },
+    }];
+  },
+});
+
 function buildExtensions(mode: EditorMode, placeholder: string, mentionSuggestions?: MentionSuggestion[]) {
   const base = [
     StarterKit.configure({
@@ -217,6 +233,7 @@ function buildExtensions(mode: EditorMode, placeholder: string, mentionSuggestio
     ...base,
     Underline,
     TextStyle,
+    FontSize,
     Color,
     Highlight.configure({ multicolor: false }),
     Link.configure({ openOnClick: false, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" } }),

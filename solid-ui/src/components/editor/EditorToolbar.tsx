@@ -63,6 +63,29 @@ function HeadingSelect(props: { editor: Editor; state: EditorState }) {
   );
 }
 
+function FontSizeSelect(props: { editor: Editor }) {
+  return (
+    <select
+      aria-label="Font size"
+      title="Font size"
+      class="h-7 rounded-md border-none bg-transparent px-1.5 text-[12px] font-medium text-on-surface-variant hover:bg-black/5 focus:outline-none cursor-pointer"
+      value=""
+      onChange={(event) => {
+        const size = event.currentTarget.value;
+        const chain = props.editor.chain().focus();
+        if (size) chain.setMark("textStyle", { fontSize: size }).run();
+        else chain.setMark("textStyle", { fontSize: null }).removeEmptyTextStyle().run();
+      }}
+    >
+      <option value="">Size</option>
+      <option value="0.875em">Small</option>
+      <option value="1em">Normal</option>
+      <option value="1.25em">Large</option>
+      <option value="1.5em">Extra large</option>
+    </select>
+  );
+}
+
 // ── Color picker ───────────────────────────────────────────────────────────
 
 const COLORS = ["#1c1b1f", "#635bff", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
@@ -175,6 +198,7 @@ export function EditorToolbar(props: {
       {/* Full + Email: headings, alignment, lists */}
       <Show when={props.mode !== "compact"}>
         <HeadingSelect editor={e()} state={s()} />
+        <FontSizeSelect editor={e()} />
         <Sep />
 
         <ToolBtn active={s().alignLeft} title="Align left" onClick={() => e().chain().focus().setTextAlign("left").run()}>⬅</ToolBtn>

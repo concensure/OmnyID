@@ -587,3 +587,16 @@ gateway's explicit `wedding_vendor_reply_received` kind, a known contact match, 
 an authenticated Gmail inbound record with a Gmail message id. Migration `0110`
 removes the one exact synthetic A2Z row for every account; it does not touch real
 vendor contact or reply records.
+
+## 2026-10-15: Workspace interactions retain durable AFP records
+
+Thread rendering may use the authenticated dashboard bootstrap as a read-only
+fallback only when the thread endpoint races or returns no messages. This avoids an
+empty conversation after a valid list selection without replacing the authoritative
+thread fetch. Note quick actions create user-owned AFP task or meeting-follow-up
+records; they do not silently invoke an external calendar provider.
+
+The Composio project credential is injected only by `COMPOSIO_API_KEY_FILE` from
+the Oracle secret mount. It enables the shared provider project while each user
+continues to create and own their individual Composio connection record and OAuth
+grant.
