@@ -1130,3 +1130,4 @@ tasks:
       - comparison views allow one or several vendor choices to be explicitly added to follow-up, photo placeholders no longer contain internal evidence wording, and the transient search `Done` control has been removed
       - the sprout template row activates an already-installed persona instead of being inert; custom cards persist their chosen text/callout/stats/table layout, and local image cards are compressed, saved, and movable
       - `0973aab` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the UI build completed, `/wedding/` returned 200, homeserver remained running, and Caddy was not reloaded
+      - `9eb57aa` was released to Oracle on 2026-10-14 with the scoped `homeserver` service after its release build completed; a new Gmail enquiry now has no local thread ID in the provider payload, `/wedding/` returned 200, and Caddy was not reloaded

@@ -1887,6 +1887,17 @@ Verification:
   and Caddy's SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
 
+Deployment correction:
+
+- The browser-side omission exposed a second copy of the same defect: the
+  server filled a missing Gmail thread with an OmnyID `compose:<user>` value.
+  Commit `9eb57aa` changes that default to empty, so Gmail receives no
+  `threadId` for a new enquiry and creates the provider conversation itself.
+- The scoped homeserver release build completed on Oracle, then recreated only
+  `omnyid-homeserver-1`. It is running, `https://omnyid.com/wedding/` returns
+  HTTP 200, and Caddy was not restarted or reloaded (SHA-256 unchanged at
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`).
+
 Remaining:
 
 - The external email relay remains disabled behind its Cloudflare inventory and
