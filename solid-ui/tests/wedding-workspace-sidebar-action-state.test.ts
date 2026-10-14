@@ -203,6 +203,19 @@ test("wedding task sidebar action opens task-specific wedding workspace sections
   assert.equal(action.metadata?.a2ui_primary_action, "open_wedding_inspiration");
 });
 
+test("legacy vendor research tasks open the vendor search surface", () => {
+  const action = weddingTaskSidebarAction({
+    id: "wedding_task:vendor-research",
+    title: "Research wedding photographers and build a shortlist",
+    kind: "task",
+    metadata: {},
+  }, state());
+
+  assert.equal(action.kind, "open_workspace_menu");
+  assert.equal(action.metadata?.wedding_workspace_menu, "response_queue");
+  assert.equal(action.metadata?.source_task_id, "wedding_task:vendor-research");
+});
+
 test("wedding task sidebar action falls back to tasks for ordinary task items", () => {
   const workspace = state();
   const action = weddingTaskSidebarAction({

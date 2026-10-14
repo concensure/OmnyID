@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from
 
 import { WeddingProjectionQueuePanel } from "@/components/WeddingProjectionQueuePanel";
 import { WeddingWorkspaceContextPanels } from "@/components/WeddingWorkspaceContextPanels";
+import { WeddingVendorSearchHomeSection } from "@/components/WeddingVendorSearchHomeSections";
 import { WeddingVendorQuoteProofDrawer } from "@/components/WeddingVendorQuoteProofDrawer";
 import { WeddingMobileFocusHome } from "@/components/WeddingMobileFocusHome";
 import { WeddingMobilePage, weddingMobilePageTitle } from "@/components/WeddingMobilePage";
@@ -134,7 +135,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const activeMenu = () => props.activeMenu ?? "home";
   const showTechnicalDetails = () => activeMenu() === "advanced";
   const compactMode = () => Boolean(props.compact);
-  const contextOnlyMenu = () => !["home", "documents", "advanced"].includes(activeMenu());
+  const contextOnlyMenu = () => !["home", "documents", "advanced", "response_queue"].includes(activeMenu());
   const rootClass = () => {
     const spacing = compactMode() ? "gap-3" : "gap-4";
     return contextOnlyMenu() ? `grid min-w-0 ${spacing}` : `grid min-w-0 ${spacing} xl:grid-cols-2`;
@@ -142,7 +143,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const primaryColumnClass = () => {
     const spacing = compactMode() ? "space-y-3" : "space-y-4";
     if (contextOnlyMenu()) return "hidden";
-    return activeMenu() === "home" || activeMenu() === "documents"
+    return activeMenu() === "home" || activeMenu() === "documents" || activeMenu() === "response_queue"
       ? `min-w-0 ${spacing} xl:col-span-2`
       : `min-w-0 ${spacing}`;
   };
@@ -910,7 +911,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   });
 
   return (
-    <WeddingMobilePage title={activeMenu() === 'response_queue' && isMobileFocusViewport() ? '' : weddingMobilePageTitle(activeMenu())} activeMenu={activeMenu()} onSelectMenu={props.onSelectMenu}>
+    <WeddingMobilePage title={(activeMenu() === "response_queue" || activeMenu() === "timeline") && isMobileFocusViewport() ? "" : weddingMobilePageTitle(activeMenu())} activeMenu={activeMenu()} onSelectMenu={props.onSelectMenu}>
     <section
       class={rootClass()}
       role="tabpanel"
@@ -952,6 +953,15 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             onMove={moveHomeSectionToIndex}
           />
           </Show>
+        </Show>
+
+        <Show when={activeMenu() === "response_queue"}>
+          <WeddingVendorSearchHomeSection
+            workspace={props}
+            result={inlineVendorSearchPreview()}
+            outreach={vendorOutreach}
+            onDismiss={setDismissedVendorSearchResultArtifactId}
+          />
         </Show>
 
         <WeddingWorkspaceDocumentsPanel
