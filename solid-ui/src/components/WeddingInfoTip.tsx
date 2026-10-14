@@ -1,4 +1,6 @@
 // @locs-version: 1.0
+import { createSignal, Show } from "solid-js";
+import { Portal } from "solid-js/web";
 import type { JSX } from "solid-js";
 
 type WeddingInfoTone = "emerald" | "sky" | "fuchsia" | "indigo" | "rose" | "stone";
@@ -19,23 +21,45 @@ export function WeddingInfoTip(props: {
   tone?: WeddingInfoTone;
 }) {
   const tone = () => props.tone ?? "stone";
+  const [open, setOpen] = createSignal(false);
+  const [position, setPosition] = createSignal({ top: 0, right: 0 });
+  let trigger: HTMLButtonElement | undefined;
+  const show = () => {
+    if (trigger) {
+      const rect = trigger.getBoundingClientRect();
+      setPosition({ top: rect.bottom + 8, right: Math.max(12, window.innerWidth - rect.right) });
+    }
+    setOpen(true);
+  };
 
   return (
-    <span class="group relative inline-flex shrink-0 align-middle">
+    <span class="inline-flex shrink-0 align-middle">
       <button
+        ref={trigger}
         type="button"
         aria-label={props.label ?? props.title}
+        aria-describedby={open() ? "wedding-info-tip" : undefined}
         class={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-bold leading-none shadow-sm transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-white/80 ${toneClasses[tone()]}`}
+        onMouseEnter={show}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={show}
+        onBlur={() => setOpen(false)}
       >
         i
       </button>
-      <span
-        role="tooltip"
-        class="pointer-events-none absolute right-0 top-[calc(100%+0.45rem)] z-40 hidden w-72 max-w-[78vw] rounded-2xl border border-stone-200 bg-white p-3 text-left text-xs leading-5 text-stone-800 shadow-xl group-hover:block group-focus-within:block"
-      >
-        <span class="block font-semibold text-stone-950">{props.title}</span>
-        <span class="mt-1 block">{props.children}</span>
-      </span>
+      <Show when={open()}>
+        <Portal>
+          <span
+            id="wedding-info-tip"
+            role="tooltip"
+            style={{ top: `${position().top}px`, right: `${position().right}px` }}
+            class="pointer-events-none fixed z-[9999] w-72 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-stone-200 bg-white p-3 text-left text-xs leading-5 text-stone-800 shadow-xl"
+          >
+            <span class="block font-semibold text-stone-950">{props.title}</span>
+            <span class="mt-1 block">{props.children}</span>
+          </span>
+        </Portal>
+      </Show>
     </span>
   );
 }

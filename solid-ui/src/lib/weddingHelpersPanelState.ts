@@ -273,7 +273,7 @@ export function buildWeddingHelperPeople(
   partnerNames: readonly string[] = [],
 ): string[] {
   const seen = new Set<string>();
-  const fallbackPartners = partnerNames.length > 0 ? [...partnerNames] : ["Partner 1", "Partner 2"];
+  const fallbackPartners = partnerNames.length > 0 ? [...partnerNames] : ["You", "Your partner"];
   const names = [...contactNames, ...customHelpers, ...fallbackPartners].filter((name) => {
     const label = clean(name);
     const key = label.toLowerCase();

@@ -125,10 +125,21 @@ function replySummaryFromNotes(value: unknown): string | null {
   // couple decide what to do next; provider labels are not useful here.
   const parts = notes.split("|").map((part) => part.trim()).filter(Boolean);
   const meaningful = parts.filter((part) => !/^(?:AFP vendor reply|Subject:)/i.test(part));
-  const summary = (meaningful.at(-1) ?? parts.at(-1) ?? notes)
+  const bodyExcerpt = meaningful.at(-1);
+  if (bodyExcerpt) {
+    const summary = bodyExcerpt
     .replace(/\s+/g, " ")
     .trim();
-  return summary ? summary.slice(0, 320) : null;
+    return summary ? summary.slice(0, 320) : null;
+  }
+  // A subject is routing metadata, not a useful response summary. If Gmail did
+  // not return a body excerpt, turn an enquiry subject into a plain-language
+  // status instead of displaying the raw subject line to the couple.
+  const subject = parts.find((part) => /^Subject:/i.test(part))?.replace(/^Subject:\s*/i, "").trim() ?? "";
+  if (/photograph/i.test(subject)) return "They replied about your wedding photography enquiry.";
+  if (/venue/i.test(subject)) return "They replied about your wedding venue enquiry.";
+  if (/celebran|offician/i.test(subject)) return "They replied about your ceremony enquiry.";
+  return subject ? "They replied to your wedding enquiry; open the response for the details." : null;
 }
 
 function parseDate(value: unknown): Date | null {

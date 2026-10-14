@@ -8,6 +8,7 @@ import type {
   WeddingBoundaryChangeRequest,
   WeddingBoundaryEventInvitation,
   WeddingBoundaryGuestProfile,
+  WeddingBoundaryHousehold,
   WeddingBoundaryLedgerObject,
   WeddingBoundaryPolicy,
   WeddingBoundaryPolicyRuleType,
@@ -94,6 +95,20 @@ export function buildWeddingGuestBoundaryDraftObjects(
     accessibilityNote: clean(input.accessibilityNote) || null,
     metadata: commonMetadata,
   };
+  const household: WeddingBoundaryHousehold = {
+    id: householdId,
+    kind: "wedding_boundary_household",
+    title: householdLabel,
+    visibility: "approved_shared",
+    createdBy: "couple",
+    createdAt: nowIso,
+    householdId,
+    displayName: householdLabel,
+    primaryContactPersonId: personId,
+    memberPersonIds: [personId],
+    familySide: "other",
+    metadata: commonMetadata,
+  };
   const invitation: WeddingBoundaryEventInvitation = {
     id: invitationId,
     kind: "wedding_boundary_event_invitation",
@@ -110,7 +125,7 @@ export function buildWeddingGuestBoundaryDraftObjects(
     visibleToGuest: true,
     metadata: commonMetadata,
   };
-  return [guest, invitation];
+  return [household, guest, invitation];
 }
 
 export function buildWeddingGuestBoundaryRuleObjects(

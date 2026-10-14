@@ -549,4 +549,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Disabled wedding vendor relay masks, encrypted thread sidecars, provider-event dedupe, and rebuildable read projection",
         include_str!("../../postgres/migrations/0108_wedding_vendor_email_relay_foundation.sql"),
     ),
+    (
+        "0109_wedding_vendor_category_canonicalization",
+        "Canonical comparable wedding vendor categories and A2Z Weddings photography classification",
+        include_str!("../../postgres/migrations/0109_wedding_vendor_category_canonicalization.sql"),
+    ),
 ];

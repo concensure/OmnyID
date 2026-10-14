@@ -1148,7 +1148,7 @@ fn tag_new_sources(
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
-            .map(str::to_string);
+            .map(canonical_wedding_vendor_category);
         let service_area = infer_vendor_service_area(&query.query);
         for source in sources.iter_mut().skip(*tagged_upto) {
             source.category = source.category.take().or_else(|| category.clone());
@@ -1156,6 +1156,17 @@ fn tag_new_sources(
         }
     }
     *tagged_upto = sources.len();
+}
+
+fn canonical_wedding_vendor_category(value: &str) -> String {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "photography" | "photo" | "photographer" => "photographer".to_string(),
+        "venue" | "venues" => "venue".to_string(),
+        "floristry" | "flowers" | "florist" => "florist".to_string(),
+        "catering" | "caterer" => "caterer".to_string(),
+        // Celebrants and officiants are intentionally distinct services.
+        other => other.to_string(),
+    }
 }
 
 fn provider_query_attempt_key(provider_kind: &str, query: &str) -> String {
@@ -1213,8 +1224,8 @@ fn discovery_context(queries: &[WeddingVendorSearchQueryRequest]) -> (String, St
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .unwrap_or("wedding vendor")
-        .to_string();
+        .map(canonical_wedding_vendor_category)
+        .unwrap_or_else(|| "wedding vendor".to_string());
     let service_area = infer_vendor_service_area(&primary_query.query)
         .unwrap_or_else(|| primary_query.query.trim().to_string())
         .chars()

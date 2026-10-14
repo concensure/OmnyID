@@ -56,9 +56,15 @@ export function WeddingHelpersPanel(props: {
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
   const inferredPartnerNames = createMemo(() => inferWeddingPartnerNames(props.state));
   const helperPeople = createMemo(() => buildWeddingHelperPeople(props.state.helperContactNames, customHelpers(), inferredPartnerNames()));
-  const helperTasks = createMemo(() => props.state.planningTaskItems.slice(0, 30));
+  const helperTasks = createMemo(() => props.state.planningTaskItems.slice(0, 30).map((task) => ({
+    ...task,
+    // An unassigned task belongs to the account owner first. It can then be
+    // deliberately reassigned to a partner or helper instead of vanishing
+    // from everyone's workload.
+    assignee: task.assignee?.trim() || helperPeople()[0] || "You",
+  })));
   const taskAssignee = (task: WeddingPlanningTask) =>
-    taskAssignees()[task.id] ?? task.assignee ?? "Unassigned";
+    taskAssignees()[task.id] ?? task.assignee ?? helperPeople()[0] ?? "You";
   const taskAction = (task: WeddingPlanningTask) => weddingTaskSidebarAction(task, props.state);
   const openHelperTasks = createMemo(() => helperTasks().filter((task) => !doneTaskIds()[task.id]));
   const doneHelperTasks = createMemo(() => helperTasks().filter((task) => doneTaskIds()[task.id]));
@@ -179,6 +185,7 @@ export function WeddingHelpersPanel(props: {
     const text = [
       ...state.contextCards.flatMap((card) => [...card.answeredLabels, ...card.metadataLabels]),
       ...state.helperContactNames,
+      JSON.stringify(state.workspace.metadata ?? {}),
     ].join("\n");
     const names: string[] = [];
     const pair = text.match(/\b([A-Z][a-z]{1,30})\s+(?:and|&)\s+([A-Z][a-z]{1,30})\b/);

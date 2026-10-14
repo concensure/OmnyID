@@ -16,7 +16,7 @@ const metadata = {
   source_response_id: "afp:source",
 };
 
-test("buildWeddingGuestBoundaryDraftObjects creates guest and invitation ledger objects", () => {
+test("buildWeddingGuestBoundaryDraftObjects creates household, guest, and invitation ledger objects", () => {
   const objects = buildWeddingGuestBoundaryDraftObjects({
     displayName: "Alex Lee",
     householdLabel: "Bride family",
@@ -29,20 +29,22 @@ test("buildWeddingGuestBoundaryDraftObjects creates guest and invitation ledger 
     accessibilityNote: "Wheelchair access",
   }, metadata, "2026-09-25T00:00:00.000Z");
 
-  assert.equal(objects.length, 2);
-  assert.equal(objects[0]?.kind, "wedding_boundary_guest_profile");
-  assert.equal(objects[1]?.kind, "wedding_boundary_event_invitation");
-  assert.equal(objects[1]?.kind === "wedding_boundary_event_invitation" ? objects[1].invitationStatus : null, "rsvp_yes");
-  assert.equal(objects[1]?.kind === "wedding_boundary_event_invitation" ? objects[1].plusOneAllowed : null, true);
-  assert.equal(objects[1]?.kind === "wedding_boundary_event_invitation" ? objects[1].childrenInvited : null, true);
-  assert.equal(objects[0]?.kind === "wedding_boundary_guest_profile" ? objects[0].contactLabel : null, "alex@example.test");
-  assert.equal(objects[0]?.kind === "wedding_boundary_guest_profile" ? objects[0].mealPreference : null, "Fish");
-  assert.equal(objects[0]?.kind === "wedding_boundary_guest_profile" ? objects[0].dietaryNote : null, "Nut allergy");
-  assert.equal(objects[0]?.kind === "wedding_boundary_guest_profile" ? objects[0].accessibilityNote : null, "Wheelchair access");
+  assert.equal(objects.length, 3);
+  assert.equal(objects[0]?.kind, "wedding_boundary_household");
+  assert.equal(objects[1]?.kind, "wedding_boundary_guest_profile");
+  assert.equal(objects[2]?.kind, "wedding_boundary_event_invitation");
+  assert.equal(objects[0]?.kind === "wedding_boundary_household" ? objects[0].displayName : null, "Bride family");
+  assert.equal(objects[2]?.kind === "wedding_boundary_event_invitation" ? objects[2].invitationStatus : null, "rsvp_yes");
+  assert.equal(objects[2]?.kind === "wedding_boundary_event_invitation" ? objects[2].plusOneAllowed : null, true);
+  assert.equal(objects[2]?.kind === "wedding_boundary_event_invitation" ? objects[2].childrenInvited : null, true);
+  assert.equal(objects[1]?.kind === "wedding_boundary_guest_profile" ? objects[1].contactLabel : null, "alex@example.test");
+  assert.equal(objects[1]?.kind === "wedding_boundary_guest_profile" ? objects[1].mealPreference : null, "Fish");
+  assert.equal(objects[1]?.kind === "wedding_boundary_guest_profile" ? objects[1].dietaryNote : null, "Nut allergy");
+  assert.equal(objects[1]?.kind === "wedding_boundary_guest_profile" ? objects[1].accessibilityNote : null, "Wheelchair access");
 });
 
 test("guest invitation drafts expose plus-one and children facts through AFP", () => {
-  const [, invitation] = buildWeddingGuestBoundaryDraftObjects({
+  const [, , invitation] = buildWeddingGuestBoundaryDraftObjects({
     displayName: "Alex Lee",
     householdLabel: "Bride family",
     rsvpStatus: "Pending",
@@ -60,7 +62,7 @@ test("guest invitation drafts expose plus-one and children facts through AFP", (
 });
 
 test("guest boundary drafts project through AFP topology and knowledge graph routing", () => {
-  const [guest] = buildWeddingGuestBoundaryDraftObjects({
+  const [, guest] = buildWeddingGuestBoundaryDraftObjects({
     displayName: "Alex Lee",
     householdLabel: "Bride family",
     rsvpStatus: "Pending",

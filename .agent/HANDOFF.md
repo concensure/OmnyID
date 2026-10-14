@@ -1753,3 +1753,27 @@ Release completion (2026-10-14):
   search is present.
 - Caddy was not restarted or reloaded. Its Caddyfile SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+Current guest and directory follow-up (pending release):
+
+- Vendor reply summaries no longer show raw `Subject:` text. Where a body
+  excerpt was not available from Gmail, the UI states the enquiry type rather
+  than presenting routing metadata.
+- RSVP quick actions persist immediately to Wedding; the misleading local-only
+  copy is removed. Saving a guest now creates its household ledger record,
+  allowing Family Boundaries to show groups and the guest list to render the
+  household display name. The guest UI explicitly supports grouping a saved
+  guest by exact name and household.
+- Helper fallbacks are `You` and `Your partner`, with unassigned work assigned
+  to the first (account-owner) person. Wedding tooltips use a portal above the
+  navigation surface. Comparable categories normalize at persistence and in
+  the existing directory; A2Z Weddings is migrated to `photographer`.
+- Local verification: Solid typecheck, `npm run test:wedding --prefix solid-ui`
+  (1823 passing), `cargo test wedding_vendor_search_routes --lib` (65 passing),
+  production UI build, and `git diff --check` pass.
+- Production audit before this release: vendor records do have photo rows, but
+  the homeserver reports `OMNYID_GOOGLE_PLACES_API_KEY` missing. The
+  authenticated Places proxy therefore cannot retrieve those photos. Do not
+  weaken the media allowlist or expose Google resource names; install the key
+  through the approved file-backed Oracle secret path before claiming live
+  directory photos are restored.

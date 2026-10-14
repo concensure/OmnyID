@@ -66,6 +66,7 @@ test("buildWeddingResponseWorkspaceViewState counts saved boundary guests in gue
   assert.equal(state.guestTracking.missingContactCount, 0);
   assert.equal(state.guestTracking.missingMealCount, 0);
   assert.ok(state.guestTracking.sourceLabels.includes("Saved guest records"));
+  assert.equal(state.guestTracking.guestRows[0]?.householdLabel, "Friends");
   assert.equal(state.seatingPlan.guestRowsConsidered, 1);
   assert.equal(state.seatingPlan.unassignedAttendingCount, 1);
   assert.equal(state.seatingPlan.suggestedTableCount, 1);

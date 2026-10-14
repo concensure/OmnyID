@@ -56,6 +56,7 @@ export function WeddingGuestOperationsCard(props: {
   const [draftGuests, setDraftGuests] = createSignal<WeddingGuestOperationsLocalDraftGuest[]>(localState.guests);
   const [savedRules, setSavedRules] = createSignal<string[]>(localState.rules);
   const [rsvpOverrides, setRsvpOverrides] = createSignal<Record<string, string>>(localState.rsvpOverrides);
+  const [savingRsvpId, setSavingRsvpId] = createSignal<string | null>(null);
   const [savingGuest, setSavingGuest] = createSignal(false);
   const [savingRules, setSavingRules] = createSignal(false);
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
@@ -79,14 +80,37 @@ export function WeddingGuestOperationsCard(props: {
       rsvpOverrides: next.rsvpOverrides ?? rsvpOverrides(),
     });
   };
-  const setGuestRsvpOverride = (guestId: string, status: GuestRsvpStatus) => {
-    const original = (props.state.guestRows ?? []).find((row) => row.id === guestId)?.rsvpStatus;
+  const setGuestRsvpOverride = async (guestId: string, status: GuestRsvpStatus) => {
+    const guest = (props.state.guestRows ?? []).find((row) => row.id === guestId);
+    if (!guest || savingRsvpId()) return;
+    const original = guest.rsvpStatus;
+    setSavingRsvpId(guestId);
+    setSaveNotice(null);
+    try {
+      if (!props.onSaveGuestDraft) throw new Error("Saving is not connected yet.");
+      await props.onSaveGuestDraft({
+        displayName: guest.displayName,
+        householdLabel: guest.householdLabel,
+        rsvpStatus: status,
+        plusOneAllowed: false,
+        childrenInvited: false,
+        contactLabel: guest.contactLabel ?? "",
+        mealPreference: guest.mealPreference ?? "",
+        dietaryNote: guest.dietaryNote ?? "",
+        accessibilityNote: guest.accessibilityNote ?? "",
+      });
+    } catch (error) {
+      setSaveNotice(friendlyErrorText(error, "RSVP could not be saved. Try again."));
+      setSavingRsvpId(null);
+      return;
+    }
     const nextOverrides = { ...rsvpOverrides() };
     if (original === status) delete nextOverrides[guestId];
     else nextOverrides[guestId] = status;
     setRsvpOverrides(nextOverrides);
     saveLocalState({ rsvpOverrides: nextOverrides });
-    setSaveNotice(`RSVP marked ${status.toLowerCase()} on this device. Save or re-import the guest list later to make it account data.`);
+    setSaveNotice(`${guest.displayName}'s RSVP is saved to your wedding guest list.`);
+    setSavingRsvpId(null);
   };
   const saveGuestDraft = async () => {
     const name = guestName().trim();
@@ -186,7 +210,7 @@ export function WeddingGuestOperationsCard(props: {
           data-magic-id="wedding:guests:add-panel"
           onClick={() => setActivePanel(activePanel() === "guest" ? null : "guest")}
         >
-          Add guest
+          Add or group guest
         </button>
         <button
           type="button"
@@ -202,7 +226,8 @@ export function WeddingGuestOperationsCard(props: {
       </div>
       <Show when={activePanel() === "guest"}>
         <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-          <p class="text-sm font-semibold text-sky-950">Add a guest draft</p>
+          <p class="text-sm font-semibold text-sky-950">Add or group a guest</p>
+          <p class="mt-1 text-xs leading-5 text-sky-950/65">Use a saved guest's exact name and choose their household to move them into a family or group.</p>
           <div class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto]">
             <label class="min-w-0">
               <span class="text-xs font-semibold text-sky-950/70">Name</span>
@@ -368,9 +393,7 @@ export function WeddingGuestOperationsCard(props: {
           <div class="flex flex-wrap items-start justify-between gap-2">
             <div class="min-w-0">
               <p class="text-xs font-semibold text-sky-950/70">Guest RSVP quick actions</p>
-              <p class="mt-1 text-xs leading-5 text-sky-950/60">
-                Changes stay on this device until you save.
-              </p>
+              <p class="mt-1 text-xs leading-5 text-sky-950/60">Choose a status to save it to this wedding guest list.</p>
             </div>
             <Show when={(props.state.guestRows?.length ?? 0) > guestRows().length}>
               <span class="max-w-full break-words rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-900">
@@ -400,14 +423,15 @@ export function WeddingGuestOperationsCard(props: {
                           type="button"
                           role="radio"
                           aria-checked={guest.rsvpStatus === status}
+                          disabled={savingRsvpId() === guest.id}
                           class={`min-h-11 rounded-md px-1 text-xs font-semibold transition ${guest.rsvpStatus === status ? "bg-sky-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"}`}
                           data-magic-action={status === "Attending" ? "rsvp-yes" : status === "Not attending" ? "rsvp-no" : "open"}
                           data-magic-icon={status === "Attending" ? "check" : status === "Not attending" ? "dismiss" : "clock"}
                           data-magic-label={`${guest.displayName}: ${status}`}
                           data-magic-id={`wedding:guest:${guest.id}:rsvp:${status.toLowerCase().replace(/\W+/g, "-")}`}
-                          onClick={() => setGuestRsvpOverride(guest.id, status)}
+                          onClick={() => void setGuestRsvpOverride(guest.id, status)}
                         >
-                          {status}
+                          {savingRsvpId() === guest.id ? "Saving..." : status}
                         </button>
                       )}
                     </For>

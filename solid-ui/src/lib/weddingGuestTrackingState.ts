@@ -179,7 +179,7 @@ function finalCountOptions(input: {
     },
     {
       id: "wait_for_pending_rsvps",
-      label: `Wait for pending RSVPs (${withPending} max)`,
+      label: `Count every pending RSVP as attending (${withPending})`,
       headcount: withPending,
       budgetImpactAmount: cost === null ? null : withPending * cost,
       riskLabel: input.pendingCount > 0 ? "Risk: caterer deadline or late-count fees may apply." : "No pending RSVPs to wait for.",
@@ -443,15 +443,20 @@ export function buildWeddingGuestTrackingState(input: {
 
   const boundaryProfiles = new Map<string, Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_guest_profile" }>>();
   const boundaryInvitations = new Map<string, Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_event_invitation" }>>();
+  const boundaryHouseholds = new Map<string, Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_household" }>>();
   for (const object of input.boundaryObjects ?? []) {
     if (object.kind === "wedding_boundary_guest_profile") boundaryProfiles.set(object.personId, object);
     if (object.kind === "wedding_boundary_event_invitation") boundaryInvitations.set(object.personId, object);
+    if (object.kind === "wedding_boundary_household") boundaryHouseholds.set(object.householdId, object);
   }
   if (boundaryProfiles.size > 0) sourceLabels.push("Saved guest records");
   for (const profile of boundaryProfiles.values()) {
     const invitation = boundaryInvitations.get(profile.personId);
     guestRowCount += 1;
-    householdKeys.add(uniqueHouseholdKey(profile.displayName, profile.householdId ?? ""));
+    const householdLabel = (boundaryHouseholds.get(profile.householdId ?? "")?.displayName
+      ?? clean(profile.householdId)
+      ?? "Ungrouped");
+    householdKeys.add(uniqueHouseholdKey(profile.displayName, householdLabel));
     const status = invitation?.invitationStatus;
     if (status === "rsvp_yes") attendingCount += 1;
     else if (status === "rsvp_no" || status === "declined_by_couple") declinedCount += 1;
@@ -463,13 +468,13 @@ export function buildWeddingGuestTrackingState(input: {
     guestRows.push({
       id: `boundary:${profile.personId}`,
       displayName: profile.displayName,
-      householdLabel: clean(profile.householdId) || "Ungrouped",
+      householdLabel,
       rsvpStatus: status === "rsvp_yes" ? "Attending" : status === "rsvp_no" || status === "declined_by_couple" ? "Not attending" : "Pending",
       contactLabel: hasUsefulValue(profile.contactLabel ?? "") ? profile.contactLabel ?? null : null,
       mealPreference: hasUsefulValue(profile.mealPreference ?? "") ? profile.mealPreference ?? null : null,
       dietaryNote: hasUsefulValue(profile.dietaryNote ?? "") ? profile.dietaryNote ?? null : null,
       accessibilityNote: hasUsefulValue(profile.accessibilityNote ?? "") ? profile.accessibilityNote ?? null : null,
-      sourceLabel: "Saved guest records",
+      sourceLabel: "Saved in your guest list",
     });
   }
 

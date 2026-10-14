@@ -520,3 +520,11 @@ validated `places/` photo resource name and a bounded width, keeping the
 Google credential server-side. Arbitrary third-party URLs and arbitrary proxy
 parameters remain excluded. This retains photos already stored in the vendor
 directory without exposing image URLs or weakening the existing source policy.
+
+## 2026-10-14: Guest RSVP edits are account changes, not local-only toggles
+
+Changing an RSVP in the guest card writes the same durable guest, household,
+and invitation ledger projection used by the rest of Wedding. Household records
+are created with guest records and the UI presents their display names, never
+their internal identifiers. Unassigned planning work defaults to the account
+owner, who may then intentionally assign it to a partner or helper.

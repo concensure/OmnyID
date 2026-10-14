@@ -50,7 +50,7 @@ test("wedding helper overdue check ignores malformed dates", () => {
 });
 
 test("wedding helper people dedupe contacts, custom helpers, and partner names calmly", () => {
-  assert.deepEqual(buildWeddingHelperPeople(["Alex", " alex ", ""], ["Sam", "sam"]), ["Alex", "Sam", "Partner 1", "Partner 2"]);
+  assert.deepEqual(buildWeddingHelperPeople(["Alex", " alex ", ""], ["Sam", "sam"]), ["Alex", "Sam", "You", "Your partner"]);
   assert.deepEqual(buildWeddingHelperPeople(["Alex"], ["Sam"], ["Claire", "James"]), ["Alex", "Sam", "Claire", "James"]);
   assert.deepEqual(buildWeddingHelperPeople([], [], ["Claire", "Claire"]), ["Claire"]);
 });
