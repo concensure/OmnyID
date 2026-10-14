@@ -312,7 +312,7 @@ import {
   commandPreviewWorkflowPendingIntentSeed,
   type CommandPreviewWorkflowPendingIntentSeed,
 } from "@/lib/commandPreviewRouting.js";
-import { readUiCommandFallbackNotice } from "@/lib/uiCommandFallbackState";
+import { isAiModelSetupRequired, readUiCommandFallbackNotice } from "@/lib/uiCommandFallbackState";
 import {
   commandPreviewUnlockNotice,
   readableCommandPreview,
@@ -2796,6 +2796,7 @@ function App() {
     }
   });
   const commandFallbackNotice = createMemo(() => readUiCommandFallbackNotice(commandResult()));
+  const commandRequiresAiSetup = createMemo(() => isAiModelSetupRequired(commandResult()));
   const commandPreviewUnlockNoticeState = createMemo(() =>
     commandPreviewUnlockNotice(commandResult()?.preview_message),
   );
@@ -3826,7 +3827,7 @@ function App() {
                           </div>
                         )}
                       </Show>
-                      <Show when={workspaceSearchRouterPreview.result()}>
+                      <Show when={!commandRequiresAiSetup() && workspaceSearchRouterPreview.result()}>
                         {(routerPreview) => (
                           <Show when={!searchPreviewEmbedsLocalRouter(commandPreviewMessage())}>
                             <Suspense>
@@ -3839,17 +3840,19 @@ function App() {
                           </Show>
                         )}
                       </Show>
-                      <ViewDispatcher
-                        message={preview()}
-                        onViewWorkflow={commandWorkflowHandoffHandler()}
-                      />
-                      <Show when={advanced()}>
+                      <Show when={!commandRequiresAiSetup()}>
+                        <ViewDispatcher
+                          message={preview()}
+                          onViewWorkflow={commandWorkflowHandoffHandler()}
+                        />
+                      </Show>
+                      <Show when={!commandRequiresAiSetup() && advanced()}>
                         <Suspense>
                           <LazyAlternateViewsInspector message={preview()} compact />
                         </Suspense>
                       </Show>
                       {/* Canvas switch pill — shown for orchestrate/workflow intents */}
-                      <Show when={commandWorkflowHandoffVisible()}>
+                      <Show when={!commandRequiresAiSetup() && commandWorkflowHandoffVisible()}>
                         <div class="flex justify-end">
                           <button
                             type="button"

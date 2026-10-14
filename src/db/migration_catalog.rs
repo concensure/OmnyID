@@ -554,4 +554,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Canonical comparable wedding vendor categories and A2Z Weddings photography classification",
         include_str!("../../postgres/migrations/0109_wedding_vendor_category_canonicalization.sql"),
     ),
+    (
+        "0110_remove_spurious_a2z_vendor_reply",
+        "Remove a synthetic A2Z outreach draft that was incorrectly projected as a reply",
+        include_str!("../../postgres/migrations/0110_remove_spurious_a2z_vendor_reply.sql"),
+    ),
 ];

@@ -62,12 +62,22 @@ export class VoiceInput {
     this.recognition = r;
   }
 
-  start(): void {
+  async start(): Promise<void> {
     if (!this.recognition) {
       this.opts.onError?.(new Error("Speech recognition is not supported by this browser."));
       return;
     }
     if (this.running) return;
+    // SpeechRecognition implementations do not consistently prompt for mic
+    // access themselves. Ask through MediaDevices in the user-gesture path,
+    // release the probe stream immediately, then let the recognizer own input.
+    try {
+      const stream = await navigator.mediaDevices?.getUserMedia?.({ audio: true });
+      stream?.getTracks().forEach((track) => track.stop());
+    } catch (error) {
+      this.opts.onError?.(error);
+      return;
+    }
     this.running = true;
     try { this.recognition.start(); } catch { this.opts.onError?.(); }
   }

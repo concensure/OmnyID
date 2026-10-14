@@ -1,7 +1,6 @@
 ﻿// @locs-version: 1.0
 import { Show } from "solid-js";
 import { DialogShell } from "./DialogShell";
-import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import type { AgentSettingsSoulFailureReceipt } from "@/lib/agentSettingsSoulFailureState";
 
 type Props = {
@@ -15,6 +14,7 @@ type Props = {
 };
 
 export function SoulEditorModal(props: Props) {
+  let editor: HTMLTextAreaElement | undefined;
   return (
     <DialogShell
       open={props.open}
@@ -22,7 +22,7 @@ export function SoulEditorModal(props: Props) {
       labelledBy="soul-editor-title"
       describedBy="soul-editor-description"
       busy={props.saving}
-      focusableSelector='button:not([disabled]), .ProseMirror, [tabindex]:not([tabindex="-1"])'
+      focusableSelector='button:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
       overlayClass="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-on-surface/30 p-4 backdrop-blur-sm animate-fade-in"
       dialogClass="glass-surface mx-4 w-full max-w-2xl rounded-2xl border border-white/45 p-6 shadow-panel"
       dialogStyle={{ "max-height": "min(720px, calc(100vh - 32px))", overflow: "auto" }}
@@ -45,21 +45,22 @@ export function SoulEditorModal(props: Props) {
               x
             </button>
           </div>
-          <TiptapEditor
-            mode="full"
-            initialContent={props.value}
+          <textarea
+            ref={(element) => {
+              editor = element;
+              if (props.open) queueMicrotask(() => editor?.focus());
+            }}
+            value={props.value}
             disabled={props.saving}
             placeholder="Describe the agent's standing personality, tone, boundaries, and rules."
-            showFooter={false}
-            submitShortcut="none"
-            clearOnSend={false}
-            class="border-white/20 bg-white/10"
-            contentClass="min-h-[12em] font-mono text-xs leading-5"
-            onReady={(handle) => {
-              if (props.open) queueMicrotask(() => handle.focus());
+            class="min-h-[12em] w-full resize-y rounded-xl border border-white/20 bg-white/10 p-3 font-mono text-xs leading-5 text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            onInput={(event) => props.onChange(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                event.preventDefault();
+                props.onSave();
+              }
             }}
-            onChange={(_text, markdown) => props.onChange(markdown)}
-            onSend={async () => {}}
           />
           <div class="mt-3 flex flex-wrap items-center gap-3">
             <Show when={props.error}>

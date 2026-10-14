@@ -47,34 +47,41 @@ fn style_ui_command_response(
     response
 }
 
-/// A saved provider preference is not the same thing as a successful model response.
-/// Keep that distinction in the response boundary so the command-bar UI does not tell
-/// a user with a saved BYOK configuration that they have no model at all.
-fn saved_model_fallback_response(mut response: UiCommandResponse) -> UiCommandResponse {
-    let is_command_fallback = response
-        .boundary
-        .as_ref()
-        .and_then(|boundary| boundary.get("kind"))
-        .and_then(Value::as_str)
-        == Some("command_fallback");
-    if !is_command_fallback {
-        return response;
+/// Commands that need reasoning must not be presented as completed work until a
+/// usable user-selected model exists. In particular, a deterministic route card
+/// is not a substitute for the user's requested agent plan.
+fn ai_model_setup_required_response(engine: String, has_saved_model_config: bool) -> UiCommandResponse {
+    let detail = if has_saved_model_config {
+        "The saved AI model settings are incomplete or unavailable. Finish connecting an AI model before asking the Master Agent to plan or create anything."
+    } else {
+        "Connect an AI model before asking the Master Agent to plan or create anything."
+    };
+    UiCommandResponse {
+        intent: "ai_model_setup".to_string(),
+        suggested_view: "agent_settings".to_string(),
+        preferred_view: "agent_settings".to_string(),
+        summary: detail.to_string(),
+        engine,
+        links: vec![],
+        runner_draft: None,
+        bullets: vec![],
+        card_id: None,
+        preview_message: None,
+        intent_route: None,
+        boundary: Some(serde_json::json!({
+            "kind": "command_fallback",
+            "label": "Connect AI model first",
+            "detail": detail,
+            "llm_connected": false,
+            "model_configured": false,
+        })),
+        execution_explanation: Some(serde_json::json!({
+            "mode": "blocked",
+            "reason": "No usable AI model is connected to this workspace.",
+            "model_inference_ran": false,
+            "executed_agent_work": false,
+        })),
     }
-
-    response.boundary = Some(serde_json::json!({
-        "kind": "command_fallback",
-        "label": "Saved AI model could not complete this request",
-        "detail": "A model setting is saved for this workspace, but the Master Agent did not receive a usable model response. OmnyID returned a deterministic fallback instead.",
-        "llm_connected": false,
-        "model_configured": true,
-    }));
-    response.execution_explanation = Some(serde_json::json!({
-        "mode": "deterministic_fallback",
-        "reason": "A saved model configuration could not produce a usable command response.",
-        "model_inference_ran": true,
-        "executed_agent_work": false,
-    }));
-    response
 }
 
 fn command_router_system_prompt_with_skill_guidance(
@@ -141,6 +148,21 @@ pub(super) async fn ui_command_http(
         .unwrap_or(true);
     let store_in_history = request.store_in_history.unwrap_or(default_store_in_history);
 
+    // Resolve once and gate before the deterministic router. The router can make
+    // useful-looking route cards, but it cannot perform the user-requested agent
+    // work without an explicitly connected model.
+    let resolved_llm = super::llm_resolution::resolve_user_inference_backend(&state.db, &user.id)
+        .await
+        .ok()
+        .flatten();
+    let has_saved_model_config = state
+        .db
+        .get_llm_config(&user.id)
+        .await
+        .ok()
+        .flatten()
+        .is_some();
+
     let deployment = state
         .db
         .find_runtime_deployment_by_user(&user.id)
@@ -161,6 +183,13 @@ pub(super) async fn ui_command_http(
         )
     };
 
+    let Some(resolved_llm) = resolved_llm else {
+        return Ok(Json(finalize_response(ai_model_setup_required_response(
+            engine,
+            has_saved_model_config,
+        ))));
+    };
+
     // Natural-language travel planning has a deterministic, useful planner
     // route. It must run before an optional LLM classifier: a generic
     // web-research classification otherwise replaced a complete trip plan
@@ -172,8 +201,6 @@ pub(super) async fn ui_command_http(
     // For authenticated users with an LLM configured, use the model to classify
     // intent and act accordingly — tasks, research, notes, or orchestration.
     // Unauthenticated / no-LLM calls fall through to the keyword-based base result.
-    if let Ok(Some(resolved_llm)) =
-        super::llm_resolution::resolve_user_inference_backend(&state.db, &user.id).await
     {
         let backend_name = resolved_llm.backend_name;
         let model = resolved_llm.model;
@@ -1027,22 +1054,5 @@ pub(super) async fn ui_command_http(
         return Ok(Json(finalize_response(response)));
     }
 
-    // The model resolver deliberately fails closed when a saved configuration has
-    // no usable key, budget, or endpoint. Preserve the useful deterministic result,
-    // but accurately describe this as a saved-model availability problem rather than
-    // claiming that no model was configured.
-    let has_saved_model_config = state
-        .db
-        .get_llm_config(&user.id)
-        .await
-        .ok()
-        .flatten()
-        .is_some();
-    let response = if has_saved_model_config {
-        saved_model_fallback_response(base)
-    } else {
-        base
-    };
-
-    Ok(Json(finalize_response(response)))
+    Ok(Json(finalize_response(base)))
 }

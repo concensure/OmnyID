@@ -2,7 +2,7 @@ import { For, Show, Suspense, createEffect, createMemo, createSignal, lazy, onCl
 import { VoiceInput } from "../lib/voiceInput";
 import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
-import { applySearchBooleanMode, type SearchBooleanMode } from "@/lib/searchBooleanMode";
+import { searchSubmissionText, type SearchBooleanMode } from "@/lib/searchBooleanMode";
 import {
   clearRecentSearchQueries,
   clearSessionSearchHistory,
@@ -796,7 +796,7 @@ export function SearchBar(props: {
       // SpeechRecognition is unavailable) can reset it to false via the error handler.
       setIsListening(true);
       voiceStartText = query().trim();
-      voiceInstance.start();
+      void voiceInstance.start();
       editorHandle?.focus();
     }
   }
@@ -895,7 +895,7 @@ export function SearchBar(props: {
   }
 
   async function submitQuery(q: string, modeOverride?: string) {
-    const effectiveQuery = applySearchBooleanMode(q, booleanMode());
+    const effectiveQuery = searchSubmissionText(q, booleanMode());
     setRecentQueries(saveRecentSearchQuery(q, rKey()));
     setSessionHistory((prev) => {
       return saveSessionSearchHistory([q, ...prev.filter((r) => r !== q)], shKey());
@@ -3289,8 +3289,7 @@ export function SearchBar(props: {
               ? "Voice input requires HTTPS — not available on this connection"
               : `${isListening() ? "Stop recording" : "Start voice input"} (Ctrl+Shift+M)${voiceHealth() === "degraded" ? " · Degraded — check mic permissions" : ""}`
           }
-          onPointerDown={(event) => {
-            event.preventDefault();
+          onClick={() => {
             toggleMic();
           }}
           class={`flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-full transition ${

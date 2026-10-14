@@ -226,6 +226,28 @@ test("weddingVendorReplyInputsFromAfpMessages extracts connected email vendor re
   assert.match(replies[0]?.messageSnippet ?? "", /hold the date/i);
 });
 
+test("weddingVendorReplyInputsFromAfpMessages never treats an outbound draft as a vendor reply", () => {
+  const replies = weddingVendorReplyInputsFromAfpMessages({
+    messages: [{
+      id: "outreach-draft-a2z",
+      thread_id: "01JQ0YQ2X3E2G7M8N9P0QRSTUV",
+      from: "user@example.test",
+      to: ["agent://master"],
+      timestamp: "2026-10-11T13:34:16.056Z",
+      type: "email",
+      kind: "wedding_vendor_outreach_draft",
+      subtype: "wedding_vendor_outreach_draft",
+      supertags: ["wedding", "vendor"],
+      content: { subject: "Wedding photography enquiry for A2Z Weddings" },
+      metadata: { vendor_id: "photographer-a2z-weddings", vendor_label: "A2Z Weddings" },
+      views: [],
+      attachments: [],
+    }],
+  });
+
+  assert.deepEqual(replies, []);
+});
+
 test("weddingVendorReplyInputsFromAfpMessages can match known contact threads without vendor metadata", () => {
   const replies = weddingVendorReplyInputsFromAfpMessages({
     knownContacts: [{

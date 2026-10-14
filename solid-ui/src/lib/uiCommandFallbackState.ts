@@ -61,3 +61,11 @@ export function readUiCommandFallbackNotice(
     tone: "neutral",
   };
 }
+
+export function isAiModelSetupRequired(
+  command: UiCommandBoundaryCarrier | null | undefined,
+): boolean {
+  const boundary = afpOptionalRecord(command?.boundary);
+  return boundary?.kind === "command_fallback" && boundary.llm_connected === false
+    && boundary.model_configured !== true;
+}

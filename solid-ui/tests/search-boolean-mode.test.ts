@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { applySearchBooleanMode } from "../src/lib/searchBooleanMode.ts";
+import { applySearchBooleanMode, searchSubmissionText } from "../src/lib/searchBooleanMode.ts";
 
 test("applySearchBooleanMode joins plain terms with AND for match-all mode", () => {
   assert.equal(
@@ -35,5 +35,12 @@ test("applySearchBooleanMode leaves explicit operators untouched", () => {
   assert.equal(
     applySearchBooleanMode("tag:#launch OR tag:#roadmap", "all"),
     "tag:#launch OR tag:#roadmap",
+  );
+});
+
+test("searchSubmissionText preserves natural-language agent requests", () => {
+  assert.equal(
+    searchSubmissionText("plan a family trip to Tokyo from Sydney for five days", "all"),
+    "plan a family trip to Tokyo from Sydney for five days",
   );
 });

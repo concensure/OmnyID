@@ -541,3 +541,27 @@ task list.
 Google Places remains server-only. Oracle receives it through the existing
 `OMNYID_GOOGLE_PLACES_API_KEY_FILE` mount; the process environment is the relevant
 runtime check because a later `docker exec` shell does not inherit entrypoint exports.
+
+## 2026-10-14: Master Agent reasoning requires a usable connected model
+
+The deterministic command router remains useful for internal routing only, but it
+must not be displayed as a completed user plan when the account has no usable model.
+The authenticated command endpoint therefore returns a model-setup boundary before
+travel, browser-AI, search, or other deterministic fallbacks. The UI renders that
+boundary as a Connect AI model first action and suppresses the generated card
+renderer. Boolean retrieval expansion likewise preserves natural-language agent
+commands unchanged.
+
+Voice input is transcript-only: browser microphone permission is requested through
+`getUserMedia` from the user gesture, the probe stream is immediately stopped, and
+SpeechRecognition text is placed in the command field. No voice file is attached or
+persisted by this flow.
+
+## 2026-10-14: Vendor replies require inbound provenance
+
+An older browser projection could classify its own A2Z vendor outreach draft as a
+reply because it contained vendor wording. Reply projection now accepts either the
+gateway's explicit `wedding_vendor_reply_received` kind, a known contact match, or
+an authenticated Gmail inbound record with a Gmail message id. Migration `0110`
+removes the one exact synthetic A2Z row for every account; it does not touch real
+vendor contact or reply records.

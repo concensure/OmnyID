@@ -161,6 +161,14 @@ function messageLooksLikeVendorReply(message: AfpMessage, knownMatch: WeddingVen
   if (message.kind === "wedding_vendor_reply_received") return true;
   const metadata = record(message.metadata);
   const content = record(message.content);
+  // Do not infer a reply merely because a local outreach draft happens to
+  // mention a vendor. A real Gmail import identifies itself as inbound and
+  // carries Gmail delivery metadata; the gateway's derived kind above is the
+  // stronger relay path. This prevents drafts from closing a vendor follow-up.
+  const isImportedGmail = message.subtype === "gmail_inbound"
+    && clean(metadata.provider)?.toLowerCase() === "gmail"
+    && Boolean(clean(metadata.gmail_message_id) || clean(content.gmail_message_id));
+  if (!isImportedGmail) return false;
   const tags = strings(message.supertags);
   const text = [
     message.type,

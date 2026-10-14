@@ -43,3 +43,17 @@ fn ui_command_route_requires_authenticated_user_and_has_no_optional_auth_fallbac
     assert!(source.contains("handle_browser_classified_route("));
     assert!(source.contains("&user,"));
 }
+
+#[test]
+fn ui_command_requires_a_usable_model_before_deterministic_planning_routes() {
+    let source = include_str!("../ui_command_routes.rs");
+    let gate = source
+        .find("let Some(resolved_llm) = resolved_llm else")
+        .expect("missing usable-model gate");
+    let travel_route = source
+        .find("if base.intent == \"travel\"")
+        .expect("missing travel route");
+
+    assert!(gate < travel_route, "travel must not create a plan before model setup");
+    assert!(source.contains("Connect AI model first"));
+}

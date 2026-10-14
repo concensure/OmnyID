@@ -280,8 +280,34 @@ export function WeddingDecisionFocusCard(props: {
                           ...current,
                           [item.id]: `${recommendedVendor()!.title} was selected for follow-up.`,
                         })), 350);
-                      } else if (action.id === "follow_up" && comparison() && recommendedVendor()) {
-                        void props.vendorOutreach?.onContactVendor(recommendedVendor()!, comparison()!.artifactId, "CHECK_AVAILABILITY_AND_REQUEST_QUOTE");
+                      } else if (action.id === "follow_up") {
+                        const artifact = comparison();
+                        const vendor = recommendedVendor();
+                        if (artifact && vendor && props.vendorOutreach) {
+                          // The composer mounts from this flow, so provide an
+                          // immediate visible receipt instead of leaving a
+                          // Follow-Up tap apparently inert while drafting.
+                          setVendorSelectionNotice((current) => ({
+                            ...current,
+                            [item.id]: `Preparing an editable follow-up for ${vendor.title}...`,
+                          }));
+                          void props.vendorOutreach.onContactVendor(
+                            vendor,
+                            artifact.artifactId,
+                            "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
+                          );
+                        } else {
+                          // Older decision records can outlive their comparison
+                          // artifact. Keep the action useful by opening the
+                          // existing vendor-search path rather than silently
+                          // forwarding an unrendered sidebar action.
+                          const launch = saveWeddingVendorSearchLaunch(item.title, { source: "wedding_home" });
+                          if (launch) dispatchWeddingVendorSearchLaunch(launch);
+                          setVendorSelectionNotice((current) => ({
+                            ...current,
+                            [item.id]: "This decision needs a vendor choice first. Vendor search is ready to review.",
+                          }));
+                        }
                       } else if (action.id === "assign") {
                         const task = taskFor(item.id);
                         if (task) {
