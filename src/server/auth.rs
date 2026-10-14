@@ -1352,7 +1352,12 @@ pub(super) async fn thread_messages_for_headers(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
-    Ok(merge_thread_messages(private_messages, public_messages))
+    // Daemon liveness records belong in operational monitoring, never in a
+    // person's chat transcript. Keep the source rows for audit/health use.
+    Ok(merge_thread_messages(private_messages, public_messages)
+        .into_iter()
+        .filter(|message| message.r#type != "daemon_heartbeat")
+        .collect())
 }
 
 pub(crate) async fn store_private_app_message(

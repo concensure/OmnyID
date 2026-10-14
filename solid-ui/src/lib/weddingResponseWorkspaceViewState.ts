@@ -273,6 +273,7 @@ export type WeddingVendorContactWorkspaceCard = {
   followUpDueLabel: string | null;
   followUpDueAt: string | null;
   replyLabel: string | null;
+  websiteUrl: string | null;
   metadataLabels: string[];
   contactChips: Array<{ kind: "address" | "email" | "phone"; label: string; value: string | null }>;
 };

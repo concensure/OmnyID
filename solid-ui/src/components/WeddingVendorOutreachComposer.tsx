@@ -1,7 +1,5 @@
 // @locs-version: 1.0
-import { For, Show } from "solid-js";
-
-import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import { createSignal, For, Show } from "solid-js";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 import { weddingVendorOutreachSendGate } from "@/lib/weddingVendorOutreachFlowState";
 
@@ -15,8 +13,21 @@ export function WeddingVendorOutreachComposer(props: {
   onCancel: () => void;
   onRetryDraft?: () => void;
   onConnectGmail: () => void;
+  /** The directory's official vendor URL, when an email address is unavailable. */
+  vendorWebsiteUrl?: string | null;
 }) {
   const gate = () => weddingVendorOutreachSendGate(props.flow, { gmailConnected: props.gmailConnected });
+  const [whyOpen, setWhyOpen] = createSignal(false);
+  const officialWebsiteUrl = () => {
+    const value = props.vendorWebsiteUrl?.trim();
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+    } catch {
+      return null;
+    }
+  };
 
   return (
     <Show when={props.flow.stage !== "sent"}>
@@ -55,30 +66,35 @@ export function WeddingVendorOutreachComposer(props: {
         <Show when={props.flow.stage === "draft_ready" || props.flow.stage === "send_failed" || props.flow.stage === "sending"}>
           <Show when={props.flow.groundedOnLabels.length > 0}>
             <div class="mt-3 rounded-xl bg-wedding-surface-muted px-3 py-2">
-              <p class="text-xs font-semibold text-wedding-text">Why we wrote it this way:</p>
-              <ul class="mt-1 space-y-0.5">
-                <For each={props.flow.groundedOnLabels}>
-                  {(label) => <li class="break-words text-xs leading-5 text-wedding-muted">{label}</li>}
-                </For>
-              </ul>
+              <button
+                type="button"
+                onClick={() => setWhyOpen((open) => !open)}
+                aria-expanded={whyOpen()}
+                class="w-full text-left text-xs font-semibold text-wedding-text underline decoration-wedding-muted/50 underline-offset-2"
+              >
+                Why we wrote it this way{whyOpen() ? " (hide)" : ""}
+              </button>
+              <Show when={whyOpen()}>
+                <ul class="mt-2 space-y-0.5 select-text">
+                  <For each={props.flow.groundedOnLabels}>
+                    {(label) => <li class="break-words text-xs leading-5 text-wedding-muted">{label}</li>}
+                  </For>
+                </ul>
+              </Show>
             </div>
           </Show>
 
-          <div class="mt-3">
-            <TiptapEditor
-              mode="email"
-              initialContent={props.flow.bodyMarkdown}
-              threadId={props.flow.threadId ?? undefined}
-              emailTo={props.flow.recipientEmail ?? undefined}
-              emailSubject={props.flow.subject}
+          <label class="mt-3 block text-sm font-semibold text-wedding-text">
+            Suggested message
+            <textarea
+              value={props.flow.bodyMarkdown}
+              onInput={(event) => props.onBodyChange(event.currentTarget.value)}
               disabled={props.busy}
               placeholder="Write the enquiry here."
-              class="content-font-body"
-              showFooter={false}
-              onChange={(_text, markdown) => props.onBodyChange(markdown)}
-              onSend={async () => {}}
+              class="mt-1 min-h-44 w-full resize-y select-text rounded-xl border border-wedding-muted/35 bg-white px-3 py-2 text-sm font-normal leading-6 text-wedding-text outline-none placeholder:text-wedding-muted focus:border-wedding-cta focus:ring-2 focus:ring-wedding-surface-blush disabled:cursor-wait disabled:opacity-70"
+              aria-label={`Suggested message for ${props.flow.vendorName}`}
             />
-          </div>
+          </label>
 
           <label class="mt-3 block text-sm font-semibold text-wedding-text">
             Vendor email
@@ -86,10 +102,30 @@ export function WeddingVendorOutreachComposer(props: {
               type="email"
               value={props.flow.recipientEmail ?? ""}
               onInput={(event) => props.onRecipientChange?.(event.currentTarget.value)}
+              disabled={props.busy}
               placeholder="vendor@example.com"
-              class="mt-1 min-h-11 w-full rounded-xl border border-wedding-muted/35 bg-white px-3 py-2 text-sm font-normal text-wedding-text outline-none focus:border-wedding-cta focus:ring-2 focus:ring-wedding-surface-blush"
+              class="mt-1 min-h-11 w-full select-text rounded-xl border border-wedding-muted/35 bg-white px-3 py-2 text-sm font-normal text-wedding-text outline-none focus:border-wedding-cta focus:ring-2 focus:ring-wedding-surface-blush disabled:cursor-wait disabled:opacity-70"
             />
           </label>
+
+          <Show when={!props.flow.recipientEmail}>
+            <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-950">
+              <p class="font-semibold">No vendor email is available in the directory.</p>
+              <Show
+                when={officialWebsiteUrl()}
+                fallback={<p class="mt-1">Add the vendor's email above before sending this message.</p>}
+              >
+                {(url) => (
+                  <p class="mt-1">
+                    Use the vendor's official enquiry form instead: {" "}
+                    <a class="font-semibold underline underline-offset-2" href={url()} target="_blank" rel="noopener noreferrer">
+                      Open {props.flow.vendorName}'s website
+                    </a>.
+                  </p>
+                )}
+              </Show>
+            </div>
+          </Show>
 
           <Show when={props.flow.stage === "send_failed" && props.flow.blockedReason}>
             {(reason) => (

@@ -9,6 +9,7 @@ import {
   threadViewDateLabel,
   threadViewFilterRenderEntriesByQuery,
   threadViewFilterRenderEntriesBySender,
+  isThreadChatVisibleMessage,
   threadViewMessageContentCardId,
   threadViewRenderableEntries,
   threadViewRenderSearchText,
@@ -69,6 +70,22 @@ test("thread view render state groups generative cards with matching updates onl
   assert.equal(units[0].kind, "generative_card");
   assert.deepEqual(units[0].kind === "generative_card" ? units[0].updates.map((entry) => entry.id) : [], ["update-1"]);
   assert.equal(threadViewRenderUnitMessage(units[1]).id, "note-1");
+});
+
+test("thread view hides daemon heartbeats from conversation rendering", () => {
+  const heartbeat = message({
+    id: "heartbeat-1",
+    thread_id: "t-1",
+    type: "daemon_heartbeat",
+    content: { text: "operational liveness" },
+  });
+  const note = message({ id: "note-1", thread_id: "t-1", type: "note", content: { text: "Couple update" } });
+
+  assert.equal(isThreadChatVisibleMessage(heartbeat), false);
+  assert.deepEqual(
+    threadViewBuildRenderUnits([heartbeat, note]).map((unit) => threadViewRenderUnitMessage(unit).id),
+    ["note-1"],
+  );
 });
 
 test("thread view render state groups Active-ToDos task updates with their ledger board", () => {

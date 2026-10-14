@@ -292,6 +292,7 @@ export function vendorContactCards(input: {
         followUpDueLabel: followUpLabel,
         followUpDueAt: dueAt,
         replyLabel,
+        websiteUrl: clean(vendor.websiteUrl) || null,
         metadataLabels,
         contactChips,
       };

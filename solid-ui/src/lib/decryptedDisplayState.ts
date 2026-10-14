@@ -22,7 +22,9 @@ function clean(value: unknown): string {
 }
 
 function hasEncryption(encryption: unknown): boolean {
-  return Boolean(encryption && typeof encryption === "object");
+  // Older plaintext AFP rows serialise their absent envelope as `{}`. Treating
+  // that marker as encrypted hides otherwise readable messages in every thread.
+  return Boolean(encryption && typeof encryption === "object" && Object.keys(encryption as object).length > 0);
 }
 
 function contentLooksLikeCiphertext(content: Record<string, unknown>, encryption: unknown): boolean {

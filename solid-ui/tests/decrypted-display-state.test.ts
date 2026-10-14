@@ -35,6 +35,18 @@ test("buildDecryptedDisplayState hides ciphertext-shaped content while encrypted
   assert.deepEqual(decryptedDisplayStringValues({ encryption: { scheme: "x" }, content: { ciphertext: "secret" } }), []);
 });
 
+test("buildDecryptedDisplayState treats an empty legacy envelope as plaintext", () => {
+  const state = buildDecryptedDisplayState({
+    encryption: {},
+    content: { subject: "Mackay family estate", body: "We can hold your date." },
+  });
+
+  assert.equal(state.decrypted, true);
+  assert.equal(state.encrypted, false);
+  assert.deepEqual(state.stringValues, ["Mackay family estate", "We can hold your date."]);
+  assert.equal(state.placeholder, null);
+});
+
 test("buildDecryptedDisplayState does not claim to be decrypting when the envelope is already present", () => {
   const state = buildDecryptedDisplayState({
     encryption: { scheme: "omnyid-envelope-v1", nonce: "nonce123", ciphertext: "abc123" },

@@ -1686,3 +1686,23 @@ Provider and Cloudflare follow-up:
   validate while recreating `homeserver`; Caddy was untouched. Do not perform a
   Caddy restart/reload through Compose until that source environment value is
   restored through its approved secret path.
+
+Current WED-185 follow-up (pending release):
+
+- Vendor Follow-up has native, selectable draft and email controls; the source
+  rationale is collapsed until requested. The date field can be typed directly
+  and has an explicit calendar button. A missing directory email is shown
+  truthfully, with a stored official vendor-website link when one exists.
+- Thread rendering treats legacy empty encryption `{}` as plaintext, while
+  non-empty encryption envelopes still require in-memory client decryption.
+  `daemon_heartbeat` is excluded in both the authenticated thread endpoint and
+  client render state.
+- The owner-confirmed `MISTRAL_API_KEY` was migrated from the local `.env` to
+  the gitignored file-backed secret `.secrets/omnyid_mistral_api_key`; its
+  Oracle reference already exists in `oracle-cloud.local.env` and Compose.
+- Verification: Solid typecheck; focused Solid tests (28 passing); focused
+  Rust provider-order and thread-merge tests passing; Solid production build;
+  `git diff --check` passing. Repository-wide `cargo fmt --check` continues to
+  report unrelated existing drift; `src/server/auth.rs` was formatted directly.
+- Next: commit the code, install the Mistral secret on Oracle, then scope the
+  deployment to `homeserver` and `ui` with `OMNYID_STAGING_PASSWORD_HASH=disabled` only for Compose interpolation. Do not reload Caddy.

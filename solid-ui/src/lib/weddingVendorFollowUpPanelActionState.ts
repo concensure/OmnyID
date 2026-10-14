@@ -28,7 +28,7 @@ export function weddingVendorFollowUpOutreachCardData(card: WeddingVendorContact
     scoreLabel: "",
     provider: "",
     sourceUrl: null,
-    websiteUrl: null,
+    websiteUrl: card.websiteUrl,
     mapUrl: null,
     instagramUrl: null,
     email: contactChipValue(card, "email"),

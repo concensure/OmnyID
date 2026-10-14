@@ -1103,3 +1103,5 @@ tasks:
       - the Wedding planner guide entry point and automatic guide display have been removed
       - vendor outreach drafts now use a provider ladder: Cerebras, Mistral, then Anthropic; provider-labelled usage receipts preserve the existing audit boundary and a deterministic draft remains the final no-send fallback
       - latest Cloudflare capture saved routing rules, exact catch-all rollback, and destination addresses; routing-status and DNS-export reads remain blocked by 403/10000, while a content-free Email Sending check confirms the account is entitled
+      - Vendor Follow-up now uses native editable/selectable message, email, and date controls; its rationale is collapsed by default, missing directory email is explicit, and an official vendor website link is offered when available
+      - legacy AFP rows with an empty encryption marker render as plaintext, while real encrypted envelopes remain protected; daemon heartbeats are excluded from chat at both the API and render layers

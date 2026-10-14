@@ -143,11 +143,12 @@ export function WeddingVendorFollowUpPanel(props: {
         <div class="space-y-3 sm:space-y-4">
           <For each={activeCards()}>
             {(card) => {
+              let followUpDateInput: HTMLInputElement | undefined;
               const rationale = () => weddingVendorFollowUpCardRationale(card);
               const outreachChoiceId = () => weddingVendorFollowUpOutreachChoiceId(card);
               const outreachFlow = () => props.vendorOutreachFlows[outreachChoiceId()] ?? null;
               return (
-                <article class="rounded-2xl border border-wedding-muted/25 bg-white p-3 py-3 sm:p-4 sm:py-4">
+                <article class="select-text rounded-2xl border border-wedding-muted/25 bg-white p-3 py-3 sm:p-4 sm:py-4">
                   <p class="inline-flex rounded-full border border-wedding-accent bg-wedding-surface-blush px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-wedding-text shadow-sm">
                     Needs your response
                   </p>
@@ -165,13 +166,27 @@ export function WeddingVendorFollowUpPanel(props: {
                     </div>
                     <label class="rounded-xl border border-wedding-muted/20 bg-wedding-surface-muted px-2.5 py-2">
                       <span class="text-[11px] font-semibold uppercase tracking-[0.12em] text-wedding-muted">Follow-up date</span>
-                      <input
-                        type="date"
-                        value={card.followUpDueAt ? card.followUpDueAt.slice(0, 10) : ""}
-                        onChange={(event) => props.onSetFollowUpDate(card, event.currentTarget.value)}
-                        class="mt-1 block min-h-9 w-full cursor-pointer rounded-lg border border-wedding-muted/35 bg-white px-2 text-xs font-semibold text-wedding-text outline-none focus:border-wedding-cta focus:ring-2 focus:ring-wedding-surface-blush"
-                        aria-label={`Follow-up date for ${card.vendorName}`}
-                      />
+                      <div class="mt-1 flex gap-1">
+                        <input
+                          ref={(element) => { followUpDateInput = element; }}
+                          type="date"
+                          value={card.followUpDueAt ? card.followUpDueAt.slice(0, 10) : ""}
+                          onChange={(event) => props.onSetFollowUpDate(card, event.currentTarget.value)}
+                          class="block min-h-10 min-w-0 flex-1 cursor-text select-text rounded-lg border border-wedding-muted/35 bg-white px-2 text-xs font-semibold text-wedding-text outline-none focus:border-wedding-cta focus:ring-2 focus:ring-wedding-surface-blush"
+                          aria-label={`Follow-up date for ${card.vendorName}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            followUpDateInput?.focus();
+                            followUpDateInput?.showPicker?.();
+                          }}
+                          class="min-h-10 shrink-0 rounded-lg border border-wedding-muted/35 bg-white px-2 text-xs font-semibold text-wedding-text hover:bg-wedding-surface-blush"
+                          aria-label={`Open calendar for ${card.vendorName}`}
+                        >
+                          Calendar
+                        </button>
+                      </div>
                     </label>
                   </div>
 
@@ -198,7 +213,7 @@ export function WeddingVendorFollowUpPanel(props: {
                           Reply to {card.vendorName}
                         </button>
                         <Show when={outreachFlow()}>
-                          {(flow) => <WeddingVendorOutreachComposer flow={flow()} busy={flow().stage === "drafting" || flow().stage === "sending"} gmailConnected={props.gmailConnected} onBodyChange={(body) => props.onOutreachBodyChange(outreachChoiceId(), body)} onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)} onSend={() => props.onSendOutreach(outreachChoiceId())} onCancel={() => props.onCancelOutreach(outreachChoiceId())} onConnectGmail={() => props.onConnectGmailForOutreach()} />}
+                          {(flow) => <WeddingVendorOutreachComposer flow={flow()} busy={flow().stage === "drafting" || flow().stage === "sending"} gmailConnected={props.gmailConnected} vendorWebsiteUrl={card.websiteUrl} onBodyChange={(body) => props.onOutreachBodyChange(outreachChoiceId(), body)} onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)} onSend={() => props.onSendOutreach(outreachChoiceId())} onCancel={() => props.onCancelOutreach(outreachChoiceId())} onConnectGmail={() => props.onConnectGmailForOutreach()} />}
                         </Show>
                       </>
                     }
@@ -245,6 +260,7 @@ export function WeddingVendorFollowUpPanel(props: {
                             flow={flow()}
                             busy={flow().stage === "drafting" || flow().stage === "sending"}
                             gmailConnected={props.gmailConnected}
+                            vendorWebsiteUrl={card.websiteUrl}
                             onBodyChange={(bodyMarkdown) => props.onOutreachBodyChange(outreachChoiceId(), bodyMarkdown)}
                             onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)}
                             onSend={() => props.onSendOutreach(outreachChoiceId())}

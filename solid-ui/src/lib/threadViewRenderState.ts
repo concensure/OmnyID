@@ -18,6 +18,11 @@ export type ThreadViewRenderEntry =
   | { kind: "last_visit_divider"; id: string }
   | ThreadViewRenderUnit;
 
+/** Operational liveness events are not conversation content. */
+export function isThreadChatVisibleMessage(message: AfpMessage): boolean {
+  return message.type !== "daemon_heartbeat";
+}
+
 export function threadViewMessageContentCardId(message: AfpMessage): string | null {
   const cardId = (message.encryption ? decryptedDisplayContent(message) : afpRecord(message.content)).card_id;
   return typeof cardId === "string" || typeof cardId === "number" ? String(cardId) : null;
@@ -32,9 +37,10 @@ export function threadViewDateLabel(timestamp: string): string {
 }
 
 export function threadViewBuildRenderUnits(messages: AfpMessage[]): ThreadViewRenderUnit[] {
+  const chatMessages = messages.filter(isThreadChatVisibleMessage);
   const cardMap = new Map<string, AfpMessage>();
   const ledgerBoardMap = new Map<string, AfpMessage>();
-  for (const message of messages) {
+  for (const message of chatMessages) {
     if (message.type === "generative_card") {
       const cardId = threadViewMessageContentCardId(message) ?? message.id;
       cardMap.set(cardId, message);
@@ -46,7 +52,7 @@ export function threadViewBuildRenderUnits(messages: AfpMessage[]): ThreadViewRe
 
   const updatesByCardId = new Map<string, AfpMessage[]>();
   const taskUpdatesByBoardId = new Map<string, AfpMessage[]>();
-  for (const message of messages) {
+  for (const message of chatMessages) {
     if (message.type === "card_section_update") {
       const cardId = threadViewMessageContentCardId(message) ?? "";
       if (!cardId || !cardMap.has(cardId)) continue;
@@ -63,7 +69,7 @@ export function threadViewBuildRenderUnits(messages: AfpMessage[]): ThreadViewRe
 
   const units: ThreadViewRenderUnit[] = [];
   const seenCardIds = new Set<string>();
-  for (const message of messages) {
+  for (const message of chatMessages) {
     if (message.type === "card_section_update") continue;
     if (isActiveTodosTaskUpdate(message) && message.parent_id && ledgerBoardMap.has(message.parent_id)) continue;
     if (message.type === "generative_card") {

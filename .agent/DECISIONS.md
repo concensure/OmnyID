@@ -496,3 +496,18 @@ the generic product Response Queue. It selects the wedding home and scrolls to t
 real vendor reply cannot be replaced by unrelated sample queue content. Vendor-search text is
 held locally while typing and committed only on blur or submit; persisting each keystroke remounts
 the planning surface and causes the page to jump.
+
+## 2026-10-14: Vendor Follow-up must use native editable controls
+
+The vendor follow-up surface uses a native textarea, email input, and date input
+rather than a nested rich-text editor for its minimum viable reply path. This
+keeps direct editing, text selection, clipboard use, and the browser calendar
+reliably available. When an address is missing from the directory, the UI is
+truthful about that fact and offers the stored official website rather than
+inventing an email address or contact-form URL.
+
+An empty `{}` encryption marker is a legacy plaintext representation, not an
+envelope. It is rendered as plaintext; non-empty envelope metadata remains
+unreadable until client-side decryption succeeds. Operational
+`daemon_heartbeat` records are retained for monitoring but excluded from chat
+responses and client render units.
