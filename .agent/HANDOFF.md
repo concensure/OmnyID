@@ -1913,3 +1913,52 @@ Remaining:
 - The external email relay remains disabled behind its Cloudflare inventory and
   independent security gates. This repair only restores the temporarily
   owner-approved Gmail continuity path for explicit user-approved enquiries.
+
+## 2026-10-14 - WED-185 agent setup gate and vendor-reply correction (Codex)
+
+Changed:
+
+- Master Agent commands now require a usable configured AI provider before a
+  deterministic plan/A2UI card can be produced. An unconfigured account sees a
+  clear “Connect AI model first” boundary with a route to Agent Settings,
+  rather than a malformed pseudo-plan.
+- Natural-language submissions no longer pass through the boolean-search
+  normaliser, so normal requests such as a family-trip plan retain their
+  original phrasing.
+- The LORA/soul editor now uses a native, focusable textarea rather than the
+  unstable rich-text overlay; keyboard saving remains supported.
+- Voice start requests microphone permission directly from the click gesture,
+  stops the short permission probe, and feeds recognised speech into the
+  Master Agent text field instead of attaching an audio file.
+- Decision Focus follow-up now opens an actionable vendor-outreach path (or a
+  useful vendor-search handoff when no comparison artifact exists).
+- Removed the known synthetic A2Z reply projection. A vendor response now
+  needs inbound provenance: an authenticated Gmail inbound record, an explicit
+  vendor-reply event, or a known contact match. The scoped migration removes
+  only the historic null-email A2Z synthetic row.
+
+Verification:
+
+- `npm run typecheck --prefix solid-ui`, `npm run test:wedding --prefix
+  solid-ui` (1,831 tests), `cargo test
+  ui_command_requires_a_usable_model_before_deterministic_planning_routes
+  --lib`, `npm run build --prefix solid-ui`, and `git diff --check` passed.
+- Released code commit `1e9be62` as a scoped Oracle `homeserver` and `ui`
+  build. Both services recreated and are running; `https://omnyid.com/wedding/`
+  returned HTTP 200. The private homeserver health endpoint returned its
+  expected authentication boundary (401), not an unauthenticated health
+  payload. Caddy was neither restarted nor reloaded; its SHA-256 remains
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+Relay status:
+
+- Re-captured the Cloudflare routing inventory without changing routing. The
+  token can list the seven routing rules, disabled catch-all, and four
+  destination addresses; routing-status and DNS-export reads still return
+  Cloudflare 403/10000. The saved catch-all rollback JSON remains in the
+  untracked evidence artifact. No external email was sent and no Cloudflare
+  routing/DNS state was changed.
+- RELAY-00 remains incomplete until those inventory reads succeed; RELAY-01
+  needs independent security/privacy sign-off. RELAY-04 through RELAY-17
+  remain gated by the gateway capsule, signed inbound receiver, attachment
+  isolation, authenticated read projection, security review, and canary.
