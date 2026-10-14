@@ -1355,18 +1355,10 @@ export function ResponseQueueView(props: {
     } else if (action.metadata?.vendor_search_scope !== "lead_time_category") {
       setWeddingVendorSearchCategoryScope(null);
     }
-    if (
-      action.kind === "continue_chat"
-      && weddingRecommendationRequestedOutput(action) === "first_recommendation_set"
-      && weddingRecommendationDraftReady({
-        dateOrSeason: weddingFollowUpDate(),
-        location: weddingFollowUpLocation(),
-        guestCount: weddingFollowUpGuests(),
-        budgetComfort: weddingFollowUpBudget(),
-        prioritiesCsv: weddingFollowUpPriorities(),
-      })
-    ) {
-      generateWeddingFollowUp();
+    if (action.kind === "continue_chat" && weddingRecommendationRequestedOutput(action) === "first_recommendation_set") {
+      // Context cards are already a saved planning source. Do not reject a direct
+      // Generate action simply because an older browser intake draft is incomplete.
+      void generateWeddingFollowUp();
       setWeddingWorkspaceMenu("home");
       return;
     }

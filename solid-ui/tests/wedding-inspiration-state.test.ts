@@ -67,6 +67,28 @@ test("buildWeddingExperienceModelState turns inspiration into explainable planni
   assert.match(model.validationPrompt?.question ?? "", /sound like/i);
 });
 
+test("two visual uploads and every new note immediately give the experience model useful work", () => {
+  const photos = buildWeddingInspirationState([
+    buildWeddingInspirationItem({ title: "First saved photo", kind: "image", createdAt: "2026-09-26T00:00:00.000Z" }),
+    buildWeddingInspirationItem({ title: "Second saved photo", kind: "screenshot", createdAt: "2026-09-26T00:01:00.000Z" }),
+  ]);
+  const photoModel = buildWeddingExperienceModelState(photos);
+  assert.ok(photoModel.traits.some((trait) => trait.id === "wedding_experience:visual_direction"));
+
+  const withNewNote = buildWeddingInspirationState([
+    ...photos.items,
+    buildWeddingInspirationItem({
+      title: "Wedding thought",
+      kind: "thought",
+      note: "Keep dinner relaxed and make the room feel warm.",
+      createdAt: "2026-09-26T00:02:00.000Z",
+    }),
+  ]);
+  const noteTrait = buildWeddingExperienceModelState(withNewNote).traits
+    .find((trait) => trait.id === "wedding_experience:latest_couple_note");
+  assert.match(noteTrait?.plainMeaning ?? "", /Keep dinner relaxed/i);
+});
+
 test("evaluateWeddingExperienceDecisionFit flags clear style tradeoffs without inventing meaning", () => {
   const state = buildWeddingInspirationState([
     buildWeddingInspirationItem({ title: "Reception 1", note: "warm lighting and long table", createdAt: "2026-09-26T00:00:00.000Z" }),

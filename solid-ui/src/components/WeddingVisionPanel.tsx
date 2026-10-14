@@ -16,13 +16,40 @@ function Rating(props: { count: number }) {
   return <span aria-label={`${props.count} out of 5`}>{props.count}/5</span>;
 }
 
+function noteFeelTags(note: string): string[] {
+  const tags = [
+    /warm|candle|intimate/i.test(note) ? "Warm" : null,
+    /relaxed|casual|informal/i.test(note) ? "Relaxed" : null,
+    /guest|family|friend|social/i.test(note) ? "Social" : null,
+    /personal|meaningful|story|vow/i.test(note) ? "Personal" : null,
+    /food|feast|hospitality/i.test(note) ? "Generous" : null,
+  ].filter((tag): tag is string => Boolean(tag));
+  return [...new Set(tags)];
+}
+
 export function WeddingVisionPanel(props: {
   state: WeddingResponseWorkspaceViewState;
   onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
   onRefreshWorkspace?: () => void;
 }) {
-  const vision = createMemo(() => buildWeddingVisionState(props.state));
+  const [savedAgentNotes, setSavedAgentNotes] = createSignal<string[]>([]);
+  const vision = createMemo(() => {
+    const base = buildWeddingVisionState(props.state);
+    const notes = savedAgentNotes();
+    if (notes.length === 0) return base;
+    const latest = notes[0];
+    const localTags = notes.flatMap(noteFeelTags);
+    return {
+      ...base,
+      feelTags: [...new Set([...localTags, ...base.feelTags])].slice(0, 7),
+      evidenceLabels: [
+        `You told OmnyID: “${latest.length > 120 ? `${latest.slice(0, 117).trimEnd()}...` : latest}”`,
+        ...base.evidenceLabels,
+      ].slice(0, 8),
+      sourceMixLabels: ["Latest couple note", ...base.sourceMixLabels].slice(0, 6),
+    };
+  });
   const [editOpen, setEditOpen] = createSignal(false);
   const [feelDraft, setFeelDraft] = createSignal("");
   const [priorityDraft, setPriorityDraft] = createSignal("");
@@ -75,7 +102,7 @@ export function WeddingVisionPanel(props: {
     return lines.length > 0 ? lines : null;
   }
 
-  async function saveVisionNote(body: string, title: string) {
+  async function saveVisionNote(body: string, title: string): Promise<"local" | "remote"> {
     const now = new Date().toISOString();
     const item: WeddingCustomSurfaceItem = {
       id: `wedding-vision-${Date.now()}`,
@@ -90,8 +117,7 @@ export function WeddingVisionPanel(props: {
       updatedAt: now,
     };
     if (!props.saveProjection) {
-      setSaveNotice("Saved on this page.");
-      return;
+      return "local";
     }
     await props.saveProjection(weddingCustomSurfaceItemToAfpSendInput({
       item,
@@ -99,6 +125,7 @@ export function WeddingVisionPanel(props: {
       action: "upsert",
     }));
     props.onRefreshWorkspace?.();
+    return "remote";
   }
 
   async function saveDirectEdits() {
@@ -111,14 +138,14 @@ export function WeddingVisionPanel(props: {
     localStorage.setItem(storageKey(), JSON.stringify(payload));
     setOverrideRefresh((value) => value + 1);
     try {
-      await saveVisionNote([
+      const saved = await saveVisionNote([
         "Vision corrections:",
         `How it should feel:\n${feelDraft()}`,
         `What matters most:\n${priorityDraft()}`,
         `What we do not want:\n${avoidDraft()}`,
         `How we decide:\n${rulesDraft()}`,
       ].join("\n\n"), "Wedding vision correction");
-      setSaveNotice("Vision saved.");
+      setSaveNotice(saved === "remote" ? "Vision saved." : "Vision saved on this device until account sync is available.");
       setEditOpen(false);
     } catch {
       setSaveNotice("Saved on this page. Wedding memory sync is not available yet.");
@@ -129,11 +156,14 @@ export function WeddingVisionPanel(props: {
     const note = agentNote().trim();
     if (!note) return;
     try {
-      await saveVisionNote(note, "Wedding vision note");
+      const saved = await saveVisionNote(note, "Wedding vision note");
+      setSavedAgentNotes((notes) => [note, ...notes.filter((existing) => existing !== note)].slice(0, 4));
       setAgentNote("");
-      setSaveNotice("Note saved for OmnyID.");
+      setSaveNotice(saved === "remote"
+        ? "Note sent to OmnyID and added to the wedding compass."
+        : "Note added to this wedding compass on this device until account sync is available.");
     } catch {
-      setSaveNotice("Saved on this page. Wedding memory sync is not available yet.");
+      setSaveNotice("Your note could not be saved yet. It is still in the field—check your connection and try again.");
     }
   }
 

@@ -86,18 +86,7 @@ export function WeddingImportantDetailsPanel(props: {
             <article class="rounded-2xl border border-rose-100 bg-white/75 p-3">
               <div class="flex items-start justify-between gap-2">
                 <p class="break-words text-xs font-semibold text-rose-950">{card.title}</p>
-                <span class="max-w-full break-words rounded-full bg-rose-50 px-2 py-1 text-xs font-medium text-rose-900">
-                  {card.statusLabel}
-                </span>
-              </div>
-              <div class="mt-2 flex flex-wrap gap-1.5">
-                <For each={card.metadataLabels.slice(0, 3)}>
-                  {(label) => (
-                    <span class="max-w-full break-words rounded-full border border-rose-100 bg-rose-50/70 px-2 py-1 text-xs text-rose-900/80">
-                      {label}
-                    </span>
-                  )}
-                </For>
+                <p class="max-w-full break-words text-right text-xs font-medium text-rose-900/75">{card.statusLabel}</p>
               </div>
               <ul class="mt-2 space-y-1">
                 <For each={visibleLabels(card)}>

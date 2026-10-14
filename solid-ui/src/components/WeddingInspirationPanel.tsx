@@ -79,9 +79,9 @@ export function WeddingInspirationPanel(props: {
   const combinedState = createMemo<WeddingInspirationState>(() =>
     buildWeddingInspirationState([...localItems(), ...props.state.inspiration.items]),
   );
-  const experienceModel = () => localItems().length > 0
-    ? buildWeddingExperienceModelState(combinedState())
-    : props.state.experienceModel;
+  // Build from the combined local + saved evidence so the agent's working model
+  // responds immediately to a second photo or every new note, before refresh returns.
+  const experienceModel = () => buildWeddingExperienceModelState(combinedState());
 
   async function addFiles(files: FileList | File[]) {
     const incoming = Array.from(files).slice(0, MAX_INSPIRATION_BATCH_SIZE);
@@ -174,7 +174,7 @@ export function WeddingInspirationPanel(props: {
   }
 
   return (
-    <section class="min-w-0 rounded-[24px] border border-rose-100/80 bg-rose-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
+    <section class="w-full max-w-none min-w-0 rounded-[24px] border border-rose-100/80 bg-rose-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-5 xl:p-6">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
           <p class="text-lg font-bold tracking-tight text-rose-950">Inspiration</p>

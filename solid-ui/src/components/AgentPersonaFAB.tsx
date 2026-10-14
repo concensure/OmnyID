@@ -78,6 +78,7 @@ export function AgentPersonaFAB(props: {
   const [search, setSearch] = createSignal("");
   const [loadError, setLoadError] = createSignal<PersonaSwitcherFailureReceipt | null>(null);
   const [actionError, setActionError] = createSignal<PersonaSwitcherFailureReceipt | null>(null);
+  const [actionNotice, setActionNotice] = createSignal<string | null>(null);
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let didLongPress = false;
   const switcherBusy = createMemo(() => personaSwitcherBusy({
@@ -238,9 +239,11 @@ export function AgentPersonaFAB(props: {
     }
     setSwitchingId(persona.id);
     setActionError(null);
+    setActionNotice(null);
     try {
       const result = await activatePersonaAndList(persona.id);
       setPersonas(result.personas);
+      setActionNotice(`${persona.name} is now active.`);
       closeSwitcher();
     } catch (error: unknown) {
       setActionError(
@@ -258,10 +261,12 @@ export function AgentPersonaFAB(props: {
     if (switcherBusy()) return;
     setInstallingTemplateId(template.id);
     setActionError(null);
+    setActionNotice(null);
     try {
       const result = await installPersonaTemplateAndList(template);
       setPersonas(result.personas);
-      closeSwitcher();
+      setTab("mine");
+      setActionNotice(`${template.name} is installed and active.`);
     } catch (error: unknown) {
       setActionError(
         buildPersonaSwitcherFailureReceipt(
@@ -412,6 +417,13 @@ export function AgentPersonaFAB(props: {
                   <p>{receipt().summary}</p>
                   <p class="opacity-80">Next step: {receipt().nextStep}</p>
                 </div>
+              )}
+            </Show>
+            <Show when={actionNotice()}>
+              {(notice) => (
+                <p class="mb-2 rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-[0.6875em] font-medium leading-5 text-emerald-800">
+                  {notice()}
+                </p>
               )}
             </Show>
             <Show when={tab() === "mine"}>

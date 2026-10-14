@@ -161,6 +161,43 @@ function traitFromRule(rule: TraitRule, items: readonly WeddingInspirationItem[]
   };
 }
 
+function visualDirectionTrait(items: readonly WeddingInspirationItem[]): WeddingExperienceTrait | null {
+  const visualItems = items.filter((item) => item.kind === "image" || item.kind === "screenshot");
+  if (visualItems.length < 2) return null;
+  return {
+    id: "wedding_experience:visual_direction",
+    kind: "atmosphere",
+    label: "A visual direction is emerging",
+    plainMeaning: "There are enough images here to compare what keeps recurring. Add a note about what you want to keep or avoid, and OmnyID will turn that into sharper recommendations.",
+    confidence: confidence(visualItems.length, visualItems.length),
+    score: visualItems.length,
+    evidenceLabels: visualItems.slice(0, 6).map((item) => item.title),
+    sourceItemIds: visualItems.slice(0, 12).map((item) => item.id),
+  };
+}
+
+function latestNoteTrait(items: readonly WeddingInspirationItem[]): WeddingExperienceTrait | null {
+  const notes = items
+    .filter((item) => item.kind === "thought" || Boolean(clean(item.note)))
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+  const latest = notes[0];
+  if (!latest) return null;
+  const note = clean(latest.note);
+  const clue = note.length > 120 ? `${note.slice(0, 117).trimEnd()}...` : note;
+  return {
+    id: "wedding_experience:latest_couple_note",
+    kind: "value",
+    label: "Your latest note is guiding the plan",
+    plainMeaning: clue
+      ? `OmnyID is treating this as a direct planning instruction: “${clue}”`
+      : "OmnyID is treating your latest note as a direct planning instruction.",
+    confidence: "early",
+    score: 1,
+    evidenceLabels: [latest.title],
+    sourceItemIds: [latest.id],
+  };
+}
+
 function constraintForTrait(trait: WeddingExperienceTrait): WeddingExperienceModelState["recommendationConstraints"][number] {
   if (trait.id.endsWith("guest_conversation")) {
     return {
@@ -283,8 +320,13 @@ export function buildWeddingExperienceModelState(
   inspiration: Pick<WeddingInspirationState, "items"> | null | undefined,
 ): WeddingExperienceModelState {
   const items = inspiration?.items ?? [];
-  const traits = TRAIT_RULES
+  const traits = [
+    ...TRAIT_RULES
     .map((rule) => traitFromRule(rule, items))
+    .filter((trait): trait is WeddingExperienceTrait => trait !== null),
+    visualDirectionTrait(items),
+    latestNoteTrait(items),
+  ]
     .filter((trait): trait is WeddingExperienceTrait => trait !== null)
     .sort((left, right) => right.score - left.score || left.label.localeCompare(right.label))
     .slice(0, 6);

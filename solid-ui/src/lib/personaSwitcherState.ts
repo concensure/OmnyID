@@ -98,8 +98,16 @@ export async function installPersonaTemplateAndList(
     labels: template.labels,
   });
   const result = await activatePersonaAndList(created.persona.id, api);
+  const installedPersona = result.activePersona ?? {
+    ...created.persona,
+    is_active: true,
+  };
   return {
-    personas: result.personas,
-    installedPersona: result.activePersona,
+    // Keep the newly created persona visible even if a replica briefly returns
+    // an older list immediately after activation.
+    personas: result.personas.some((persona) => persona.id === installedPersona.id)
+      ? result.personas
+      : [...result.personas, installedPersona],
+    installedPersona,
   };
 }

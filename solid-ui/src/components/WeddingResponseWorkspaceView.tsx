@@ -41,7 +41,7 @@ import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProvide
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
 import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import { useWeddingVendorQuoteDecisionProjection } from "@/lib/useWeddingVendorQuoteDecisionProjection";
-import { isMobileFocusViewport } from "@/lib/mobileFocusHomeState";
+import { installMobileFocusViewportListener, isMobileFocusViewport } from "@/lib/mobileFocusHomeState";
 import { useWeddingApprovalExecution } from "@/lib/useWeddingApprovalExecution";
 import { buildWeddingHomeSections, WeddingHomeSectionRegistry } from "@/lib/weddingHomeSectionRegistry";
 
@@ -67,6 +67,7 @@ function saveWeddingHomeSectionOrder(scope: string, order: readonly WeddingHomeS
 }
 
 export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceViewProps) {
+  onMount(() => installMobileFocusViewportListener());
   const state = () => props.state;
   const activePreview = () => state().activePreview;
   const [exportNotice, setExportNotice] = createSignal<string | null>(null);
@@ -911,7 +912,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   });
 
   return (
-    <WeddingMobilePage title={(activeMenu() === "response_queue" || activeMenu() === "timeline") && isMobileFocusViewport() ? "" : weddingMobilePageTitle(activeMenu())} activeMenu={activeMenu()} onSelectMenu={props.onSelectMenu}>
+    <WeddingMobilePage title={(activeMenu() === "response_queue" || activeMenu() === "timeline" || activeMenu() === "inspiration") && isMobileFocusViewport() ? "" : weddingMobilePageTitle(activeMenu())} activeMenu={activeMenu()} onSelectMenu={props.onSelectMenu}>
     <section
       class={rootClass()}
       role="tabpanel"

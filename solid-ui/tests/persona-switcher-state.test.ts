@@ -152,3 +152,17 @@ test("installPersonaTemplateAndList creates, activates, and returns the installe
   assert.equal(result.installedPersona?.id, "persona-9");
   assert.equal(result.personas[0]?.is_active, true);
 });
+
+test("install keeps the active template visible when a fresh list briefly lags activation", async () => {
+  const template = makeTemplate({ name: "Reliable planner" });
+  const created = makePersona({ id: "persona-new", name: "Reliable planner" });
+  const result = await installPersonaTemplateAndList(template, {
+    async activatePersona() {},
+    async createPersona() { return { persona: created }; },
+    async listPersonas() { return { personas: [] }; },
+  });
+
+  assert.equal(result.installedPersona?.id, "persona-new");
+  assert.equal(result.installedPersona?.is_active, true);
+  assert.equal(result.personas[0]?.id, "persona-new");
+});
