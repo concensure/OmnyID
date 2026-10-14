@@ -1754,6 +1754,27 @@ Release completion (2026-10-14):
 - Caddy was not restarted or reloaded. Its Caddyfile SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
 
+Current WED-185 mobile and Places release completion (2026-10-14):
+
+- Released `2dce677` with only `homeserver` and `ui`. Mobile Wedding now gives
+  the clear-decision state the available view above the tab bar; Timeline has one
+  mobile title, a visible rail, correctly filtered completed items, and touch
+  navigation to the task action. The Vendors tab renders the existing live vendor
+  search surface again, including for older vendor-research tasks without a menu
+  marker.
+- Copied the supplied local `GOOGLE_PLACES_API_KEY` only into the gitignored,
+  file-backed Oracle secret. The running homeserver PID 1 exposes
+  `OMNYID_GOOGLE_PLACES_API_KEY`; no credential was committed or logged. A new
+  `docker exec` shell intentionally does not inherit entrypoint-derived values.
+- Local evidence: Solid typecheck, full wedding test suite, production build, and
+  `git diff --check` passed. Oracle evidence: UI job exited 0, homeserver recreated
+  and logged its HTTP listener, `https://omnyid.com/wedding/` returned HTTP 200,
+  and Caddy's SHA-256 is unchanged at
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+- The relay remains disabled while Cloudflare ingress/control-plane and the
+  independent RELAY security gates remain unresolved; temporary Gmail continuity
+  is unchanged and was not used as a relay fallback.
+
 Current guest and directory follow-up (pending release):
 
 - Vendor reply summaries no longer show raw `Subject:` text. Where a body

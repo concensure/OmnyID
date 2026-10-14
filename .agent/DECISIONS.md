@@ -528,3 +528,16 @@ and invitation ledger projection used by the rest of Wedding. Household records
 are created with guest records and the UI presents their display names, never
 their internal identifiers. Unassigned planning work defaults to the account
 owner, who may then intentionally assign it to a partner or helper.
+
+## 2026-10-14: Mobile Wedding action surfaces retain the persistent tab bar
+
+The clear-decision state fills the available mobile content area but reserves the
+fixed Wedding tab bar. Timeline uses its in-panel title and information control as
+the sole mobile title; its task rows remain visually chart-like while opening the
+same task/menu action as desktop. Older vendor-research task projections infer the
+existing Vendors (`response_queue`) surface rather than falling back to a generic
+task list.
+
+Google Places remains server-only. Oracle receives it through the existing
+`OMNYID_GOOGLE_PLACES_API_KEY_FILE` mount; the process environment is the relevant
+runtime check because a later `docker exec` shell does not inherit entrypoint exports.

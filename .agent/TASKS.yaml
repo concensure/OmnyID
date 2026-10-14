@@ -1114,3 +1114,6 @@ tasks:
       - guest RSVP actions now persist immediately, household records are written alongside guest profiles, internal household identifiers are never rendered, and helper workload defaults new work to the account owner
       - vendor follow-up suppresses raw email subjects, vendor categories normalize comparable labels (with A2Z Weddings classified as `photographer`), and tooltips render above the wedding navigation surface
       - `8bd182f` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; production shows A2Z Weddings as `photographer`, `/wedding/` returned 200, and Caddy was not reloaded
+      - mobile Wedding Home now gives the clear-decision state the full available view above the persistent tab bar; the Timeline has one mobile title, an edge-free mobile surface, visible chart rails, working completed filtering, and touch actions that open the linked task surface
+      - the mobile Vendors tab once again renders the existing live vendor-search surface; legacy vendor-research tasks infer that same surface when their older projection lacks a menu target
+      - `2dce677` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; the Google Places credential is a mounted file-backed secret in the running homeserver process, `/wedding/` returned 200, and Caddy was not reloaded
