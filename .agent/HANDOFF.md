@@ -7,6 +7,13 @@
 - The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
+## 2026-10-15 - WED-185 mobile vendor and outreach refinement (Codex)
+
+- Fixed the mobile vendor-search Enter path so it remains a form submission rather than being intercepted as a home-navigation magic action. Mobile decision cards now keep touch gestures in the card, tolerate pointer-capture gaps in WebViews, and accept a fast downward approval swipe.
+- Vendor comparison guidance now compares the highest-ranked option with the next option using saved priorities and ranking evidence. Hosted outreach drafts require readable paragraphs and normalise one-line provider output into paragraphs.
+- Added and registered the ACO On The Pier directory migration plus the exact `mailto:Bianca.Astwood@aco.com.au?subject=Pier%202F3%20Venue%20Hire` hand-off. Oracle’s existing ACO row was updated and verified with that address.
+- Verification: `npm run test:wedding --prefix solid-ui` (1,833 passing), `npm run build --prefix solid-ui`, focused Rust outreach tests (13 passing), and migration-catalog test passed. Released commits `5d74e13` and `34177ec`; `https://omnyid.com/wedding/` returned HTTP 200. Caddy was not reloaded; checksum remains `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
 ## 2026-10-14 - WED-185 relay persistence foundation (Codex)
 
 - Added migration `0108_wedding_vendor_email_relay_foundation` and catalog registration. It creates `wedding_agent_identity_masks`, `wedding_vendor_email_threads`, `wedding_vendor_email_provider_events`, and `wedding_vendor_email_read_projection` with lifecycle, tenant, uniqueness, dedupe, and lookup indexes.
