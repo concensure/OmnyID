@@ -2035,6 +2035,14 @@ Verification:
 
 Next:
 
-- Commit and deploy the scoped source archive, sync the file-backed Composio
-  secret, then verify live UI and the server-reported Composio status without
-  restarting or reloading Caddy.
+- Released scoped source commit `247a222` to Oracle. The homeserver was rebuilt
+  and is running; the UI asset-sync job completed successfully (its normal exit
+  status is 0). `https://omnyid.com/wedding/` returned HTTP 200, the private
+  `/healthz` boundary returned expected HTTP 401 without a session, and the
+  container can read `/run/secrets/composio_api_key` through
+  `COMPOSIO_API_KEY_FILE`.
+- Caddy was neither restarted nor reloaded; its SHA-256 remained
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+- The Composio status API is intentionally authenticated, so provider usability
+  still needs to be observed from a signed-in user session; configuration and
+  secret-mount evidence are confirmed server-side.
