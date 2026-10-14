@@ -1110,3 +1110,4 @@ tasks:
       - vendor follow-up uses the stored vendor response excerpt where available, while Decision Focus exposes saved past decisions and background-agent records on demand
       - comparison documents identify their vendor category, comparison rendering uses readable light contrast, and Master Agent result sources are displayed when returned
       - vendor photos accept only direct Unsplash images or the authenticated, narrowly validated first-party Google Places proxy; exact directory queries continue to include Mackay Family Estate
+      - `aca37c1` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; production `/wedding/` returned 200, the Mackay Family Estate row is present, and Caddy was not reloaded

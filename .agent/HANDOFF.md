@@ -1740,3 +1740,16 @@ Current WED-185 UI clarity follow-up (pending release):
 - Verification before release: `npm run test:wedding --prefix solid-ui` (1823
   passing), `cargo test wedding_vendor_search_routes --lib` (65 passing),
   `npm run build --prefix solid-ui`, and `git diff --check` all pass.
+
+Release completion (2026-10-14):
+
+- Released `aca37c1` with scoped `homeserver` and `ui` Compose targets. The UI
+  build completed and the homeserver release build completed in the Oracle
+  Docker cache before both targets were recreated.
+- Verified `omnyid-homeserver-1` is running and logs `Omnyid HTTP listening on
+  0.0.0.0:8080`; `https://omnyid.com/wedding/` returned HTTP 200.
+- Production Postgres returns `Mackay Family Estate` from `wedding_vendors`,
+  confirming that the directory migration data required by the exact-query
+  search is present.
+- Caddy was not restarted or reloaded. Its Caddyfile SHA-256 remains
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
