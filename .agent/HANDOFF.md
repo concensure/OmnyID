@@ -1775,6 +1775,14 @@ Current WED-185 mobile and Places release completion (2026-10-14):
   independent RELAY security gates remain unresolved; temporary Gmail continuity
   is unchanged and was not used as a relay fallback.
 
+Follow-up UI release (2026-10-14):
+
+- Released `4254dce` as a scoped `ui` asset update. The mobile clear-decision
+  state now suppresses the otherwise empty focus header and fills the entire
+  available content area above the persistent tab bar. The UI job exited 0;
+  `/wedding/` remains HTTP 200, the homeserver remains healthy with the Places
+  key, and Caddy was not reloaded (SHA unchanged).
+
 Current guest and directory follow-up (pending release):
 
 - Vendor reply summaries no longer show raw `Subject:` text. Where a body

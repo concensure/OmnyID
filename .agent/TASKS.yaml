@@ -1117,3 +1117,4 @@ tasks:
       - mobile Wedding Home now gives the clear-decision state the full available view above the persistent tab bar; the Timeline has one mobile title, an edge-free mobile surface, visible chart rails, working completed filtering, and touch actions that open the linked task surface
       - the mobile Vendors tab once again renders the existing live vendor-search surface; legacy vendor-research tasks infer that same surface when their older projection lacks a menu target
       - `2dce677` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; the Google Places credential is a mounted file-backed secret in the running homeserver process, `/wedding/` returned 200, and Caddy was not reloaded
+      - `4254dce` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the clear-decision state now also removes the empty mobile header, so it fills the complete content area above the tab bar
