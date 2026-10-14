@@ -44,12 +44,25 @@ function VendorSearchDraftInput(props: {
     workspace().onVendorSearchQueryChange?.(value);
   }
 
+  function selectQuery(event: { currentTarget: HTMLInputElement }) {
+    // A named vendor lookup is commonly an edit of the last search. Selecting
+    // it on focus makes that edit reliable on both touch and pointer devices.
+    event.currentTarget.select();
+  }
+
   return (
     <input
       type="text"
       name={props.name}
       value={draft()}
       onInput={(event) => setDraft(event.currentTarget.value)}
+      onFocus={selectQuery}
+      onPointerUp={(event) => {
+        // Some mobile browsers place the caret after focus. Re-select on the
+        // completing pointer event so a tap consistently selects the query.
+        event.preventDefault();
+        selectQuery(event);
+      }}
       onBlur={commit}
       placeholder={props.placeholder}
       class={props.class}
@@ -119,8 +132,7 @@ export function WeddingVendorSearchHomeSection(props: {
     previousResultArtifactId = artifactId;
   });
   const searchDisabled = () => workspace().vendorSearchRunning
-    || !workspace().onRunLiveVendorSearch
-    || Boolean(workspace().vendorSearchBlockedReason);
+    || !workspace().onRunLiveVendorSearch;
   const visibleVendorSearchNotice = () => {
     const notice = workspace().vendorSearchNotice?.trim() ?? "";
     return /^Directory-only vendor search returned\b/i.test(notice) ? null : notice || null;
@@ -163,7 +175,9 @@ export function WeddingVendorSearchHomeSection(props: {
       <button
         type="submit"
         class="mt-3 min-h-11 w-full rounded-lg border border-wedding-accent bg-white px-4 py-2 text-sm font-bold text-wedding-accent transition hover:bg-wedding-surface-blush disabled:cursor-not-allowed disabled:opacity-50"
-        title={workspace().vendorSearchBlockedReason ?? undefined}
+        title={workspace().vendorSearchBlockedReason
+          ? `${workspace().vendorSearchBlockedReason} A named search can still check your wedding directory.`
+          : undefined}
         disabled={searchDisabled()}
         data-magic-action="open"
         data-magic-icon="search"
@@ -202,20 +216,29 @@ export function WeddingVendorSearchHomeSection(props: {
             <Show when={result().preview}>
               {(preview) => (
                 <>
+                  {(() => {
+                    // A search source packet is valid without a comparison
+                    // shortlist. Older locally cached packets may omit this
+                    // optional display list entirely, so normalise it before
+                    // rendering rather than allowing it to take down Planner.
+                    const comparisonPreview = () => Array.isArray(preview().vendorComparisonCards)
+                      ? preview()
+                      : { ...preview(), vendorComparisonCards: [] };
+                    return <>
                   <div class="mt-3 flex flex-wrap gap-2">
-                    <For each={[preview().category, preview().evidenceSummary.sourceCountLabel, preview().vendorComparisonHandoff?.confidenceLabel ?? preview().evidenceSummary.statusLabel].filter(Boolean)}>
+                    <For each={[comparisonPreview().category, comparisonPreview().evidenceSummary.sourceCountLabel, comparisonPreview().vendorComparisonHandoff?.confidenceLabel ?? comparisonPreview().evidenceSummary.statusLabel].filter(Boolean)}>
                       {(label) => <span class="rounded-lg border border-wedding-muted bg-white px-3 py-1.5 text-xs font-medium text-wedding-muted">{label}</span>}
                     </For>
                   </div>
-                  <Show when={preview().vendorComparisonCards.length > 0}>
+                  <Show when={comparisonPreview().vendorComparisonCards.length > 0}>
                     <DecisionCard
-                      card={decisionCardFromWeddingVendorComparison(preview())}
+                      card={decisionCardFromWeddingVendorComparison(comparisonPreview())}
                       mode="standard"
                       showActions={false}
                       class="mt-3 shadow-none"
                       hero={(
                         <div class="grid gap-2 lg:grid-cols-3">
-                          <For each={preview().vendorComparisonCards.slice(0, 3)}>
+                          <For each={comparisonPreview().vendorComparisonCards.slice(0, 3)}>
                             {(vendor) => (
                               <WeddingVendorChoiceCard
                                 card={vendor}
@@ -234,6 +257,8 @@ export function WeddingVendorSearchHomeSection(props: {
                       )}
                     />
                   </Show>
+                    </>;
+                  })()}
                 </>
               )}
             </Show>

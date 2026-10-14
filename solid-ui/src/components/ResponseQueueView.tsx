@@ -1661,6 +1661,10 @@ export function ResponseQueueView(props: {
         scopedCategoryIds && scopedCategoryIds.length > 0 ? scopedCategoryIds : weddingFollowUpVendorIds(),
       );
       const freeformQuery = options?.category ? "" : currentWeddingVendorSearchQuery();
+      // A couple may search for a named vendor before completing the optional
+      // live-search intake. That is a local directory lookup, not a request to
+      // spend a provider credit, and must retain the exact name.
+      const directoryLookupOnly = Boolean(freeformQuery);
       const effectiveCategoryLabels = options?.category ? [options.category] : categoryLabels.length > 0
         ? categoryLabels
         : freeformQuery
@@ -1675,11 +1679,13 @@ export function ResponseQueueView(props: {
         prioritiesCsv: weddingFollowUpPriorities(),
         vendorCategories: effectiveCategoryLabels,
       });
-      if (liveWorkflowReadiness.status === "blocked") {
+      if (!directoryLookupOnly && liveWorkflowReadiness.status === "blocked") {
         setWeddingVendorSearchNotice(`Live vendor search needs ${liveWorkflowReadiness.missing.join(", ")}.`);
         return false;
       }
-      const latestProviderCapabilities = await refreshWeddingProviderCapabilitiesNow();
+      const latestProviderCapabilities = directoryLookupOnly
+        ? weddingProviderCapabilities()
+        : await refreshWeddingProviderCapabilitiesNow();
       const configuredProviderKinds = weddingConfiguredVendorSearchProviderKinds(latestProviderCapabilities);
       const readiness = buildWeddingVendorSearchReadinessState({
         location: weddingVendorSearchServiceArea(),
@@ -1689,15 +1695,17 @@ export function ResponseQueueView(props: {
         musicOrBandNeeded: null,
         liveSearchProviderReady: configuredProviderKinds.length > 0,
       });
-      if (readiness.status === "blocked") {
+      if (!directoryLookupOnly && readiness.status === "blocked") {
         setWeddingVendorSearchNotice(`Vendor search needs ${readiness.missing.join(", ")}.`);
         return false;
       }
       const providerCaution = weddingVendorSearchProviderCautionReason(latestProviderCapabilities);
-      setWeddingVendorSearchNotice([
-        `Running live vendor search with ${weddingConfiguredVendorSearchProviderLabel(latestProviderCapabilities, configuredProviderKinds)}...`,
-        providerCaution,
-      ].filter(Boolean).join(" "));
+      setWeddingVendorSearchNotice(directoryLookupOnly
+        ? "Searching your wedding vendor directory..."
+        : [
+          `Running live vendor search with ${weddingConfiguredVendorSearchProviderLabel(latestProviderCapabilities, configuredProviderKinds)}...`,
+          providerCaution,
+        ].filter(Boolean).join(" "));
       const plan = buildWeddingVendorSearchProviderPlanState({
         readiness,
         providerKinds: configuredProviderKinds,
@@ -1740,13 +1748,22 @@ export function ResponseQueueView(props: {
         budgetComfort: weddingFollowUpBudget(), atmosphereDescription: weddingFollowUpAtmosphere(),
         inspirationImageUrls: linesFromText(weddingFollowUpImageLinks()), topPriorities: linesFromText(weddingFollowUpPriorities()),
         vendorCategories: effectiveCategoryLabels, targetCategory: effectiveCategoryLabels[0] ?? null,
-        requireExactlyThree: true, canRunOnlineFallback: configuredProviderKinds.length > 0,
+        requireExactlyThree: true,
+        // An exact vendor-name lookup must be predictable and private: search
+        // the existing directory only instead of turning a name into a broad
+        // online query when the directory has fewer than three matches.
+        canRunOnlineFallback: !directoryLookupOnly && configuredProviderKinds.length > 0,
       };
       let responseNotice = "";
       const directoryFirstSearch = await runWeddingVendorDirectoryFirstSearch({
         comparison: comparisonInput,
         run: (sourcePolicy) => runWeddingPlannedVendorSearchExecution({
-          providerPlans: weddingVendorDirectorySearchPlans({ providerPlans: providerPlansForExecution, category: comparisonInput.targetCategory ?? "wedding vendor", location: weddingVendorSearchServiceArea(), searchQuery: freeformQuery }), mode: "live",
+          providerPlans: weddingVendorDirectorySearchPlans({
+            providerPlans: sourcePolicy === "directory_only" && directoryLookupOnly ? [] : providerPlansForExecution,
+            category: comparisonInput.targetCategory ?? "wedding vendor",
+            location: weddingVendorSearchServiceArea(),
+            searchQuery: freeformQuery,
+          }), mode: "live",
           providerLabel: weddingConfiguredVendorSearchProviderLabel(latestProviderCapabilities, configuredProviderKinds),
           workspaceId: metadata.responseWorkspaceId, maxQueries: 8,
           batchPort: weddingVendorSearchBatchPortFromApiSearch({

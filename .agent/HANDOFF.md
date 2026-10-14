@@ -1835,3 +1835,22 @@ Verification:
 Remaining:
 
 - The vendor relay stays disabled. The partially captured Cloudflare routing/DNS inventory and independent RELAY security gates remain blockers; existing Gmail continuity is unchanged and is not a relay fallback.
+
+## 2026-10-14 - WED-185 search and decision-sync repair (pending release)
+
+Changed:
+
+- The vendor query input selects the current request on focus and on touch completion. Provider readiness no longer disables a named directory lookup: an exact query such as `Mackay` skips optional live-provider intake, retains its exact local directory query, and does not broaden into an online search.
+- Source-only/older cached vendor-search packets normalise a missing comparison-card list before rendering, so a valid one-result lookup cannot crash the wedding planner.
+- The mobile Decision Focus AFP message now has a deterministic ULID-shaped transport thread ID. The former readable `decision_triage:...` thread string was rejected by the authenticated `/send` endpoint and caused the local-only retry notice. The logical scope remains in minimised metadata; the component also passes the authenticated account identity to the sender.
+- The legacy task router recognises plural vendor categories such as `photographers`, preserving the direct mobile Vendors action.
+
+Verification:
+
+- Focused Solid tests: 24 passing.
+- Full Wedding suite: 1,830 passing.
+- Solid typecheck and production build passed; `git diff --check` passed.
+
+Remaining:
+
+- This is UI/AFP projection work only. It does not enable the vendor email relay. RELAY-04 through RELAY-17 remain gated by gateway-key, signed-inbound, attachment, authenticated API, security-review, and production rollout work; RELAY-00 has an incomplete Cloudflare routing/DNS inventory capture and RELAY-01 needs independent sign-off.

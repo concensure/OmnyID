@@ -46,6 +46,7 @@ export function WeddingMobileFocusHome(props: {
   homeSections: HomeSection[];
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
+  userId?: string | null;
   onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
   onApproveQuoteReply?: (flow: WeddingVendorQuoteReplyFlowState) => void;
   onAcknowledgeQuoteReply?: (flow: WeddingVendorQuoteReplyFlowState) => void;
@@ -143,6 +144,7 @@ export function WeddingMobileFocusHome(props: {
       deckPosition: position(),
       deckSize: items().length,
       inputMethod: method,
+      userId: props.userId,
     });
     const result = await save(input);
     if (result.ok) {

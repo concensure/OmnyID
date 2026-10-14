@@ -1122,3 +1122,6 @@ tasks:
       - Important details no longer renders metadata/status tag pills; a Generate recommendations action now runs from saved context instead of being rejected by an older incomplete browser intake draft
       - Vision notes have a visible local compass update and truthful remote/local save receipt; sprout persona templates retain the installed active persona through a briefly stale list response and show an explicit installed-and-active confirmation
       - `cb2ef81` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the UI job exited 0, `/wedding/` returned 200, homeserver was not restarted, and Caddy was not reloaded
+      - named vendor searches now select their existing request on focus, run a private exact directory lookup even when optional live-provider intake is incomplete, and render source-only packets safely without crashing Planner
+      - mobile decision triage now derives a valid deterministic AFP transport thread ID (with the logical triage scope retained as metadata), resolving the authenticated AFP rejection that produced the misleading local-only sync state; this path does not call an LLM
+      - legacy plural vendor-research tasks now route to the vendor search surface as well as singular task titles

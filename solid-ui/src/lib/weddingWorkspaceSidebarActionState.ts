@@ -122,7 +122,7 @@ function taskWorkspaceMenuId(task: WeddingPlanningTask): WeddingWorkspaceMenuId 
   const taskText = `${task.title} ${task.notes ?? ""} ${JSON.stringify(task.metadata ?? {})}`.toLowerCase();
   // Older projected tasks did not carry a surface target. Keep their most
   // useful action direct: a vendor-research task belongs on the vendor tab.
-  if (/\b(vendor|photographer|florist|caterer|celebrant|officiant)\b/.test(taskText)
+  if (/\b(vendors?|photographers?|florists?|caterers?|celebrants?|officiants?)\b/.test(taskText)
     && /\b(research|search|shortlist|quote|contact|outreach)\b/.test(taskText)) {
     return "response_queue";
   }

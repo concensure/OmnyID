@@ -935,6 +935,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             homeSections={orderedHomeSections()}
             onSidebarAction={handleSidebarAction}
             saveProjection={props.saveProjection}
+            userId={props.contactUserId}
             onSelectMenu={props.onSelectMenu}
             onApproveQuoteReply={approveQuoteReplyWording}
             onAcknowledgeQuoteReply={acknowledgeQuoteReplyBudgetImpact}
