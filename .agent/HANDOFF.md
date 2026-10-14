@@ -1898,6 +1898,16 @@ Deployment correction:
   HTTP 200, and Caddy was not restarted or reloaded (SHA-256 unchanged at
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`).
 
+Follow-up card calculation:
+
+- A stats-card request now asks the open Wedding workspace for aggregate-only
+  values before rendering. Invitation-vs-RSVP cards use the saved guest count
+  and the sum of attending plus declined RSVP records; no guest identity or
+  contact data is passed into the custom-card surface. Commit `00fcc19` was
+  released with the scoped Oracle UI service. Its asset build completed,
+  `/wedding/` remains HTTP 200, the homeserver remains up, and Caddy is still
+  unchanged.
+
 Remaining:
 
 - The external email relay remains disabled behind its Cloudflare inventory and
