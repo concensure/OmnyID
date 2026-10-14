@@ -1105,3 +1105,4 @@ tasks:
       - latest Cloudflare capture saved routing rules, exact catch-all rollback, and destination addresses; routing-status and DNS-export reads remain blocked by 403/10000, while a content-free Email Sending check confirms the account is entitled
       - Vendor Follow-up now uses native editable/selectable message, email, and date controls; its rationale is collapsed by default, missing directory email is explicit, and an official vendor website link is offered when available
       - legacy AFP rows with an empty encryption marker render as plaintext, while real encrypted envelopes remain protected; daemon heartbeats are excluded from chat at both the API and render layers
+      - `da42505` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; Mistral's file-backed secret is mounted, `/wedding/` returns 200, and Caddy was not reloaded

@@ -1706,3 +1706,19 @@ Current WED-185 follow-up (pending release):
   report unrelated existing drift; `src/server/auth.rs` was formatted directly.
 - Next: commit the code, install the Mistral secret on Oracle, then scope the
   deployment to `homeserver` and `ui` with `OMNYID_STAGING_PASSWORD_HASH=disabled` only for Compose interpolation. Do not reload Caddy.
+
+Release completion (2026-10-14):
+
+- Released `da42505` to Oracle. The scoped `ui` asset job completed with exit
+  code 0 and the homeserver is running on its rebuilt image, logging its HTTP
+  listener on `0.0.0.0:8080`.
+- The Mistral file-backed secret is present at the mounted container path;
+  neither its name beyond the configured file key nor its content was logged.
+  The configured draft order remains Cerebras, Mistral, then Anthropic.
+- `https://omnyid.com/wedding/` returned HTTP 200. Caddy remained running
+  throughout and its Caddyfile SHA-256 is unchanged at
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+- The manual Windows archive transfer required normalizing the remote
+  `runtime-env-entrypoint.sh` to LF before restarting homeserver; normal
+  `deploy-oracle.ps1` already performs that normalization after extraction.
+  Caddy was never reloaded.
