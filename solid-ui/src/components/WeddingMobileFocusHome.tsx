@@ -265,6 +265,11 @@ export function WeddingMobileFocusHome(props: {
     ? "Wedding overview"
     : `${mobileFocusMode() === "responses" ? "Response" : "Decision"} ${Math.min(position() + 1, items().length)} of ${items().length}`;
   const selectedSection = createMemo(() => props.homeSections.find((section) => section.id === mobileFocusSingleCardSectionId()) ?? null);
+  const clearDecisionView = () => !selectedSection()
+    && !pendingApproval()
+    && !notice()
+    && mobileFocusMode() !== "overview"
+    && items().length === 0;
 
   return (
     <MobileFocusHome
@@ -273,6 +278,7 @@ export function WeddingMobileFocusHome(props: {
         responseCount: responses().length,
         overdueDecisionCount: decisions().filter((item) => item.dueAt && Date.parse(item.dueAt) <= Date.now()).length,
       })}
+      immersive={clearDecisionView()}
     >
       <Show when={notice()}>
         {(message) => (
