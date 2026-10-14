@@ -349,7 +349,10 @@ fn outgoing_request_from_gmail_send_body(
         ))?;
     let message_id = ulid::Ulid::new().to_string();
     Ok(crate::gateway::smtp_out::OutgoingEmailRequest {
-        thread_id: clean_optional(body.thread_id).unwrap_or_else(|| format!("compose:{user_id}")),
+        // Gmail's `threadId` is a provider identifier, not an OmnyID compose
+        // or AFP thread. Leave it empty for a new message so Gmail creates the
+        // conversation; explicit reply flows can still pass their Gmail ID.
+        thread_id: clean_optional(body.thread_id).unwrap_or_default(),
         message_id,
         parent_id: None,
         to: vec![to],

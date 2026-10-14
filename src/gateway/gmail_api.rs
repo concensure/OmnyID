@@ -339,6 +339,24 @@ mod tests {
     }
 
     #[test]
+    fn gmail_send_payload_omits_thread_id_for_a_new_message() {
+        let request = OutgoingEmailRequest {
+            thread_id: "".to_string(),
+            message_id: "msg_test_01".to_string(),
+            parent_id: None,
+            to: vec!["friend@example.com".to_string()],
+            subject: "Hello".to_string(),
+            body: "Body text".to_string(),
+            in_reply_to: None,
+            references: vec![],
+        };
+
+        let payload = gmail_send_payload(&request, "encoded".to_string());
+
+        assert!(payload.get("threadId").is_none());
+    }
+
+    #[test]
     fn gmail_send_receipt_requires_provider_message_id() {
         assert_eq!(
             validated_gmail_message_id(GmailMessageId {
