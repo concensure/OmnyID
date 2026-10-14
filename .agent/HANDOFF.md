@@ -1836,7 +1836,7 @@ Remaining:
 
 - The vendor relay stays disabled. The partially captured Cloudflare routing/DNS inventory and independent RELAY security gates remain blockers; existing Gmail continuity is unchanged and is not a relay fallback.
 
-## 2026-10-14 - WED-185 search and decision-sync repair (pending release)
+## 2026-10-14 - WED-185 search and decision-sync repair
 
 Changed:
 
@@ -1850,6 +1850,11 @@ Verification:
 - Focused Solid tests: 24 passing.
 - Full Wedding suite: 1,830 passing.
 - Solid typecheck and production build passed; `git diff --check` passed.
+- Released `e4fa5f9` as a scoped Oracle `ui` build. `omnyid-ui-1` exited 0
+  after copying its assets, `omnyid-homeserver-1` remained up, and
+  `https://omnyid.com/wedding/` returned HTTP 200. Caddy was not restarted or
+  reloaded; its Caddyfile SHA-256 remains
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
 
 Remaining:
 

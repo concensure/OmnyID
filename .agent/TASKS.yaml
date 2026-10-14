@@ -1125,3 +1125,4 @@ tasks:
       - named vendor searches now select their existing request on focus, run a private exact directory lookup even when optional live-provider intake is incomplete, and render source-only packets safely without crashing Planner
       - mobile decision triage now derives a valid deterministic AFP transport thread ID (with the logical triage scope retained as metadata), resolving the authenticated AFP rejection that produced the misleading local-only sync state; this path does not call an LLM
       - legacy plural vendor-research tasks now route to the vendor search surface as well as singular task titles
+      - `e4fa5f9` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the one-shot UI job exited 0, homeserver remained running, `/wedding/` returned 200, and Caddy was not reloaded
