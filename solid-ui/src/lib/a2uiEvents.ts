@@ -7,6 +7,7 @@ import {
 
 export const A2UI_COPY_FALLBACK_EVENT = "omnyid:a2ui-copy-fallback";
 export const A2UI_CARD_REQUEST_EVENT = "omnyid:a2ui-card-request";
+export const A2UI_CARD_STATS_REQUEST_EVENT = "omnyid:a2ui-card-stats-request";
 export const A2UI_SHARE_EVENT = "omnyid:a2ui-share";
 export const SOCIAL_COMPOSE_ACTION_EVENT = "omnyid:social-compose-action";
 export const SPACE_FEED_COMPOSE_EVENT = "omnyid:space-feed-compose";
@@ -19,6 +20,15 @@ export type A2uiCardRequestEventDetail = {
   type: string | null;
   prompt: string;
   attachedFileName?: string;
+};
+
+export type A2uiCardStatsContext = {
+  invitationCount: number;
+  rsvpReceivedCount: number;
+};
+
+export type A2uiCardStatsRequestEventDetail = {
+  respond: (context: A2uiCardStatsContext) => void;
 };
 
 export type A2uiShareEventDetail = Record<string, unknown>;
@@ -57,6 +67,15 @@ export function dispatchA2uiCardRequestEvent(
   target: Window = window,
 ): void {
   target.dispatchEvent(new CustomEvent(A2UI_CARD_REQUEST_EVENT, { detail }));
+}
+
+/** Requests aggregate-only wedding stats from an open Wedding workspace. */
+export function requestA2uiCardStatsContext(target: Window = window): A2uiCardStatsContext | null {
+  let context: A2uiCardStatsContext | null = null;
+  target.dispatchEvent(new CustomEvent(A2UI_CARD_STATS_REQUEST_EVENT, {
+    detail: { respond: (value: A2uiCardStatsContext) => { context = value; } },
+  }));
+  return context;
 }
 
 export function readA2uiCardRequestEventDetail(

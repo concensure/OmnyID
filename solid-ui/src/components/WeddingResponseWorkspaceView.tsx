@@ -14,6 +14,7 @@ import { WeddingWorkspaceDocumentsPanel } from "@/components/WeddingWorkspaceDoc
 import { fetchThread, ingestAttachmentBatch, recordWeddingVendorContact, type AfpMessage, type SendAfpMessageInput } from "@/lib/api";
 import type { EditorPayload } from "@/lib/editorPayload";
 import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
+import { A2UI_CARD_STATS_REQUEST_EVENT, type A2uiCardStatsRequestEventDetail } from "@/lib/a2uiEvents";
 import { runWeddingArtifactBrowserExport, runWeddingBundleBrowserExport, selectWeddingBundleExportPayload, weddingProjectionMetadataId, type WeddingBundleExportFormat } from "@/lib/weddingBrowserExportActions";
 import { weddingDecisionDeferralActionToAfpSendInput } from "@/lib/weddingDecisionDeferralAfpState";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
@@ -194,6 +195,18 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       element.click();
     });
     onCleanup(unsubscribe);
+
+    const provideCardStats = (event: Event) => {
+      const detail = (event as CustomEvent<A2uiCardStatsRequestEventDetail>).detail;
+      if (!detail || typeof detail.respond !== "function") return;
+      const guests = state().guestTracking;
+      detail.respond({
+        invitationCount: guests.guestRowCount,
+        rsvpReceivedCount: guests.attendingCount + guests.declinedCount,
+      });
+    };
+    window.addEventListener(A2UI_CARD_STATS_REQUEST_EVENT, provideCardStats);
+    onCleanup(() => window.removeEventListener(A2UI_CARD_STATS_REQUEST_EVENT, provideCardStats));
   });
 
   onCleanup(() => {

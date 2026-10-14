@@ -1,6 +1,7 @@
 // @locs-version: 1.0
 import {
   A2UI_CARD_REQUEST_EVENT,
+  A2UI_CARD_STATS_REQUEST_EVENT,
   A2UI_COPY_FALLBACK_EVENT,
   A2UI_SHARE_EVENT,
   SOCIAL_COMPOSE_ACTION_EVENT,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/a2uiEvents";
 import type {
   A2uiCardRequestEventDetail,
+  A2uiCardStatsRequestEventDetail,
   A2uiCopyFallbackEventDetail,
   A2uiShareEventDetail,
   SocialComposeActionEventDetail,
@@ -82,6 +84,7 @@ declare global {
 
   interface WindowEventMap {
     [A2UI_CARD_REQUEST_EVENT]: CustomEvent<A2uiCardRequestEventDetail>;
+    [A2UI_CARD_STATS_REQUEST_EVENT]: CustomEvent<A2uiCardStatsRequestEventDetail>;
     [A2UI_COPY_FALLBACK_EVENT]: CustomEvent<A2uiCopyFallbackEventDetail>;
     [A2UI_SHARE_EVENT]: CustomEvent<A2uiShareEventDetail>;
     [ACTION_CHIP_EVENT]: CustomEvent<ActionChipEventDetail>;

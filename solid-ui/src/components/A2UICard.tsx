@@ -3,7 +3,7 @@
 // @primary-capability: user-composable-agent-card
 import { createSignal, Show } from "solid-js";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
-import { dispatchA2uiCardRequestEvent } from "@/lib/a2uiEvents";
+import { dispatchA2uiCardRequestEvent, requestA2uiCardStatsContext, type A2uiCardStatsContext } from "@/lib/a2uiEvents";
 import type { OverlayCardGeneratedContent, OverlayCardType } from "@/lib/viewCustomizerLocalState";
 
 const CARD_TYPES = [
@@ -41,13 +41,13 @@ export function A2UICard(props: A2UICardProps) {
     props.onContentChange?.(content, content.type);
   }
 
-  function statPairs(prompt: string): Array<{ label: string; value: string }> {
+  function statPairs(prompt: string, context: A2uiCardStatsContext | null): Array<{ label: string; value: string }> {
     const invitation = prompt.match(/(?:invitations?\s*(?:sent)?|sent\s+invitations?)\D{0,8}(\d+)/i)?.[1];
     const rsvps = prompt.match(/(?:rsvps?\s*(?:received)?|responses?\s*(?:received)?)\D{0,8}(\d+)/i)?.[1];
     if (/invitation|rsvp/i.test(prompt)) {
       return [
-        { label: "Invitations sent", value: invitation ?? "—" },
-        { label: "RSVPs received", value: rsvps ?? "—" },
+        { label: "Invitations sent", value: invitation ?? (context ? String(context.invitationCount) : "—") },
+        { label: "RSVPs received", value: rsvps ?? (context ? String(context.rsvpReceivedCount) : "—") },
       ];
     }
     const named = Array.from(prompt.matchAll(/([A-Za-z][A-Za-z ]{1,28})\s*[:=]\s*(\d+(?:\.\d+)?%?)/g)).slice(0, 4)
@@ -55,14 +55,16 @@ export function A2UICard(props: A2UICardProps) {
     return named.length > 0 ? named : [{ label: "Measure", value: "—" }];
   }
 
-  function generatedFor(type: CardType, prompt: string): GeneratedContent {
+  function generatedFor(type: CardType, prompt: string, statsContext: A2uiCardStatsContext | null): GeneratedContent {
     if (type === "stats") {
-      const metrics = statPairs(prompt);
+      const metrics = statPairs(prompt, statsContext);
       const hasValues = metrics.some((metric) => metric.value !== "—");
       return {
         type,
         title: /invitation|rsvp/i.test(prompt) ? "Invitation & RSVP status" : "Key stats",
-        body: hasValues ? "Calculated from the values in your request." : "Add counts in this card request, or update Guests, to show verified figures.",
+        body: hasValues
+          ? statsContext && !/\d/.test(prompt) ? "Calculated from your saved guest and RSVP records." : "Calculated from the values in your request."
+          : "Add counts in this card request, or update Guests, to show verified figures.",
         metrics,
       };
     }
@@ -115,7 +117,8 @@ export function A2UICard(props: A2UICardProps) {
       attachedFileName: attached()?.name,
     });
     const type = cardType() ?? "custom";
-    commit(generatedFor(type, prompt));
+    const statsContext = type === "stats" ? requestA2uiCardStatsContext() : null;
+    commit(generatedFor(type, prompt, statsContext));
     setChatInput(prompt);
     setBusy(false);
   }
