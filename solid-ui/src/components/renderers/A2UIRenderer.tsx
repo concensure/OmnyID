@@ -1545,9 +1545,7 @@ function A2UINodeRenderer(props: {
                   <Show
                     when={card.showImage}
                     fallback={
-                      <div class="flex aspect-[4/3] items-center justify-center bg-white/8 px-3 text-center text-xs font-semibold text-on-surface-variant">
-                        Image pending from source
-                      </div>
+                      <div class="aspect-[4/3] bg-white/8" aria-label={`${card.title} image unavailable`} />
                     }
                   >
                     <img

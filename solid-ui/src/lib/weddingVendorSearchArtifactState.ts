@@ -317,9 +317,13 @@ function publicImageUrl(value: unknown): string | null {
   if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(url)) return url;
   try {
     const parsed = new URL(url);
-    return parsed.protocol === "https:" && parsed.hostname.toLowerCase() === "images.unsplash.com"
-      ? parsed.toString()
-      : null;
+    const hostname = parsed.hostname.toLowerCase();
+    const isUnsplash = hostname === "images.unsplash.com";
+    const isOmnyidVenueAsset = hostname === "omnyid.com"
+      && /^\/wedding\/assets\/venue-photos\/[a-z0-9][a-z0-9._-]*\.(?:jpe?g|png|webp)$/i.test(parsed.pathname)
+      && !parsed.search
+      && !parsed.hash;
+    return parsed.protocol === "https:" && (isUnsplash || isOmnyidVenueAsset) ? parsed.toString() : null;
   } catch {
     return null;
   }

@@ -257,13 +257,10 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   assert.equal(comparisonTable?.type, "comparison_table");
   assert.equal((comparisonProps?.selection as Record<string, unknown> | undefined)?.mode, "multi");
   assert.equal(((comparisonProps?.selection as Record<string, unknown> | undefined)?.confirm_action as Record<string, unknown> | undefined)?.kind, "confirm_vendor_choices");
-  const columnActions = comparisonProps?.column_actions as Array<Record<string, unknown>>;
-  assert.equal(columnActions.length, 3);
-  assert.equal(columnActions[0]?.vendor_label, "Harbour Studio");
-  assert.equal(columnActions[0]?.source_url, "https://harbour-studio.example");
-  assert.equal((columnActions[0]?.actions as Array<Record<string, unknown>>)[0]?.kind, "select_vendor_for_follow_up");
-  assert.equal((columnActions[0]?.actions as Array<Record<string, unknown>>)[1]?.kind, "open_vendor_source");
-  assert.equal((columnActions[0]?.actions as Array<Record<string, unknown>>)[2]?.kind, "prepare_approval_gated_outreach");
+  // Selection and outreach live inside the interactive vendor cards, so this
+  // portable A2UI data has no unhandled action/footer affordances.
+  assert.equal(comparisonProps?.column_actions, undefined);
+  assert.equal(comparisonProps?.footer_actions, undefined);
   assert.deepEqual((comparison.artifactInput?.metadata as Record<string, unknown>).topChoiceLabels, [
     "Harbour Studio",
     "Budget Lens",

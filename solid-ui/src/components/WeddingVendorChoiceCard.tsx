@@ -42,6 +42,8 @@ export function WeddingVendorChoiceCard(props: {
   onCancelOutreach?: (choiceId: string) => void;
   onRetryOutreach?: (choiceId: string) => void;
   onConnectGmailForOutreach?: () => void;
+  selectedForFollowUp?: boolean;
+  onToggleFollowUp?: (card: WeddingVendorChoiceCardData) => void;
 }) {
   const card = props.card;
   const [contactOpen, setContactOpen] = createSignal(false);
@@ -213,6 +215,20 @@ export function WeddingVendorChoiceCard(props: {
           </div>
         </Show>
         <div class="flex flex-wrap gap-1.5">
+          <Show when={props.onToggleFollowUp}>
+            <button
+              type="button"
+              onClick={() => props.onToggleFollowUp?.(card)}
+              aria-pressed={Boolean(props.selectedForFollowUp)}
+              class={`min-h-11 rounded-full px-2.5 py-1.5 text-xs font-bold transition ${
+                props.selectedForFollowUp
+                  ? "bg-wedding-accent text-white hover:bg-wedding-accent/90"
+                  : "border border-wedding-muted bg-white text-wedding-text hover:bg-wedding-surface-blush"
+              }`}
+            >
+              {props.selectedForFollowUp ? "Selected for follow-up" : "Select for follow-up"}
+            </button>
+          </Show>
           <Show when={card.websiteUrl ?? card.sourceUrl}>
             {(url) => (
               <a

@@ -501,29 +501,86 @@ export type SendAfpMessageInput = {
   signature?: string;
 };
 
+const AFP_TRANSPORT_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+let afpTransportSequence = 0;
+
+function isAfpTransportId(value: unknown): value is string {
+  return typeof value === "string"
+    && value.length === 26
+    && /^[0-9A-HJKMNP-TV-Z]+$/i.test(value);
+}
+
+/**
+ * `/send` deliberately accepts only ULID-shaped transport identifiers. UI
+ * features still use readable logical IDs for their local domain model, so
+ * keep those in metadata and derive an opaque, valid transport ID here.
+ */
+function afpTransportId(seed: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = Math.imul(hash ^ seed.charCodeAt(index), 0x01000193) >>> 0;
+  }
+  let result = "";
+  for (let index = 0; index < 26; index += 1) {
+    hash = Math.imul(hash ^ (index + 1), 0x27d4eb2d) >>> 0;
+    result += AFP_TRANSPORT_ALPHABET[(hash >>> 27) & 31];
+  }
+  return result;
+}
+
+export function normalizeAfpTransportInput(body: SendAfpMessageInput): SendAfpMessageInput {
+  const logicalThreadId = body.thread_id.trim();
+  const logicalMessageId = body.id?.trim() ?? "";
+  const timestamp = body.timestamp ?? new Date().toISOString();
+  const transportThreadId = isAfpTransportId(logicalThreadId)
+    ? logicalThreadId
+    : afpTransportId(`thread|${logicalThreadId}`);
+  const transportMessageId = isAfpTransportId(logicalMessageId)
+    ? logicalMessageId
+    : afpTransportId(`message|${logicalMessageId}|${logicalThreadId}|${timestamp}|${JSON.stringify(body.content)}|${++afpTransportSequence}`);
+  if (transportThreadId === logicalThreadId && transportMessageId === logicalMessageId && timestamp === body.timestamp) {
+    return body;
+  }
+  const metadata = { ...(body.metadata ?? {}) };
+  if (transportThreadId !== logicalThreadId && logicalThreadId && !metadata.logical_thread_id) {
+    metadata.logical_thread_id = logicalThreadId;
+  }
+  if (transportMessageId !== logicalMessageId && logicalMessageId && !metadata.logical_message_id) {
+    metadata.logical_message_id = logicalMessageId;
+  }
+  return {
+    ...body,
+    id: transportMessageId,
+    thread_id: transportThreadId,
+    timestamp,
+    metadata,
+  };
+}
+
 export function sendAfpMessage<T = { success: boolean; message_id: string }>(
   body: SendAfpMessageInput,
 ) {
+  const message = normalizeAfpTransportInput(body);
   return apiFetch<T>("/send", {
     method: "POST",
     bodyJson: {
-      id: body.id ?? undefined,
-      thread_id: body.thread_id,
-      parent_id: body.parent_id ?? null,
-      from: body.from,
-      to: body.to,
-      timestamp: body.timestamp ?? new Date().toISOString(),
-      type: body.type,
-      kind: body.kind ?? undefined,
-      subtype: body.subtype,
-      content: body.content,
-      views: body.views ?? [],
-      attachments: body.attachments ?? [],
-      references: body.references ?? [],
-      supertags: body.supertags ?? [],
-      metadata: mergeMemoryScopeMetadata(body.metadata ?? {}, body.memory_scope),
-      store_in_relational: body.store_in_relational,
-      signature: body.signature ?? "",
+      id: message.id,
+      thread_id: message.thread_id,
+      parent_id: message.parent_id ?? null,
+      from: message.from,
+      to: message.to,
+      timestamp: message.timestamp,
+      type: message.type,
+      kind: message.kind ?? undefined,
+      subtype: message.subtype,
+      content: message.content,
+      views: message.views ?? [],
+      attachments: message.attachments ?? [],
+      references: message.references ?? [],
+      supertags: message.supertags ?? [],
+      metadata: mergeMemoryScopeMetadata(message.metadata ?? {}, message.memory_scope),
+      store_in_relational: message.store_in_relational,
+      signature: message.signature ?? "",
     },
   });
 }

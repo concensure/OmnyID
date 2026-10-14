@@ -1,7 +1,7 @@
 // @locs-version: 1.0
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 
-import type { SendAfpMessageInput } from "@/lib/api";
+import { executeUiCommand, type SendAfpMessageInput } from "@/lib/api";
 import {
   buildWeddingInspirationItem,
   buildWeddingInspirationState,
@@ -76,12 +76,56 @@ export function WeddingInspirationPanel(props: {
   const [noteValue, setNoteValue] = createSignal("");
   const [saving, setSaving] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
+  const [experienceFeedback, setExperienceFeedback] = createSignal<"yes" | "mostly" | "not_really" | null>(null);
+  const [correction, setCorrection] = createSignal("");
+  const [correctionRunning, setCorrectionRunning] = createSignal(false);
+  let correctionTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => {
+    if (correctionTimer) clearTimeout(correctionTimer);
+  });
   const combinedState = createMemo<WeddingInspirationState>(() =>
     buildWeddingInspirationState([...localItems(), ...props.state.inspiration.items]),
   );
   // Build from the combined local + saved evidence so the agent's working model
   // responds immediately to a second photo or every new note, before refresh returns.
-  const experienceModel = () => buildWeddingExperienceModelState(combinedState());
+  const experienceModel = () => buildWeddingExperienceModelState(combinedState(), {
+    evidenceWeight: experienceFeedback() === "mostly" ? 0.8 : 1,
+  });
+
+  function validateExperience(option: string): void {
+    if (option === "Yes") {
+      setExperienceFeedback("yes");
+      setNotice("Thanks — we’ll keep using this direction when planning.");
+      return;
+    }
+    if (option === "Mostly") {
+      setExperienceFeedback("mostly");
+      setNotice("Got it — OmnyID will use the current preference evidence at 80% weight while you add more clues.");
+      return;
+    }
+    setExperienceFeedback("not_really");
+    setNotice("Tell OmnyID what feels off so it can revise the working direction.");
+  }
+
+  function requestCorrection(value: string): void {
+    if (correctionTimer) clearTimeout(correctionTimer);
+    const clean = value.trim();
+    if (!clean) return;
+    correctionTimer = setTimeout(() => {
+      setCorrectionRunning(true);
+      void executeUiCommand({
+        query: `Revise the wedding inspiration direction using this correction from the couple: ${clean}`,
+        browser_intent: "wedding_inspiration_correction",
+      })
+        .then((response) => {
+          setNotice(response.summary || "Thanks — OmnyID is revising the working direction from your note.");
+        })
+        .catch(() => {
+          setNotice("Your correction is still here. Connect an AI model to have OmnyID revise the direction.");
+        })
+        .finally(() => setCorrectionRunning(false));
+    }, 550);
+  }
 
   async function addFiles(files: FileList | File[]) {
     const incoming = Array.from(files).slice(0, MAX_INSPIRATION_BATCH_SIZE);
@@ -345,7 +389,7 @@ export function WeddingInspirationPanel(props: {
                     data-magic-icon={option === "Not really" ? "discard" : "star"}
                     data-magic-label={option}
                     data-magic-id={`wedding:inspiration:validate:${option.toLowerCase().replace(/\W+/g, "-")}`}
-                    onClick={() => setNotice(option === "Not really" ? "Got it. Add a note about what feels off, and OmnyID will use that correction." : "Thanks. OmnyID will treat this as a planning clue.")}
+                    onClick={() => validateExperience(option)}
                   >
                     {option}
                   </button>
@@ -353,6 +397,25 @@ export function WeddingInspirationPanel(props: {
               </For>
             </div>
           )}
+        </Show>
+        <Show when={experienceFeedback() === "not_really"}>
+          <div class="mt-3">
+            <label class="text-xs font-semibold text-rose-950/70" for="wedding-inspiration-correction">How should this feel instead?</label>
+            <textarea
+              id="wedding-inspiration-correction"
+              value={correction()}
+              onInput={(event) => {
+                const value = event.currentTarget.value;
+                setCorrection(value);
+                requestCorrection(value);
+              }}
+              placeholder="For example: warmer, more relaxed, and less formal."
+              class="mt-1 min-h-20 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm text-rose-950 outline-none transition placeholder:text-rose-950/40 focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+            />
+            <Show when={correctionRunning()}>
+              <p class="mt-1 text-xs text-rose-950/65">Updating the working direction…</p>
+            </Show>
+          </div>
         </Show>
       </div>
 

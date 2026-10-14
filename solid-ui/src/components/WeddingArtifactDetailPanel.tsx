@@ -2,11 +2,10 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 import { AttachmentsRenderer } from "@/components/renderers/AttachmentsRenderer";
-import { A2UIRenderer } from "@/components/renderers/A2UIRenderer";
 import { WeddingApprovalPreviewPanel } from "@/components/WeddingApprovalPreviewPanel";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
-import type { AfpMessage, AfpView } from "@/lib/api";
+import type { WeddingVendor } from "@/lib/api";
 import {
   buildWeddingComparisonColumns,
   type WeddingComparisonColumnState,
@@ -94,30 +93,16 @@ function comparisonCellClass(column: WeddingComparisonColumnState, value: string
   return `${base} text-teal-950/80`;
 }
 
-function artifactA2UIView(artifact: WeddingWorkspaceArtifactPreview): { message: AfpMessage; view: AfpView } | null {
-  if (!artifact.a2uiContent) return null;
-  const view: AfpView = {
-    format: "a2ui",
-    content: artifact.a2uiContent,
-    priority: 1,
-  };
-  const message: AfpMessage = {
-    id: `${artifact.artifactId}:a2ui-preview`,
-    thread_id: artifact.artifactId,
-    from: "omnyid:wedding",
-    to: [],
-    timestamp: new Date(artifact.createdAt).toISOString(),
-    type: "wedding_artifact_preview",
-    kind: "wedding_artifact",
-    subtype: artifact.kind,
-    content: artifact.a2uiContent,
-    metadata: { artifact_id: artifact.artifactId },
-    views: [view],
-    attachments: [],
-    references: [],
-    encryption: null,
-  };
-  return { message, view };
+function normalizedVendorName(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function safeVendorImageUrl(value: string | null | undefined): string | null {
+  const candidate = value?.trim() ?? "";
+  if (/^https:\/\/images\.unsplash\.com\//i.test(candidate)) return candidate;
+  if (/^\/api\/wedding\/vendor-photos\/google\//i.test(candidate)) return candidate;
+  if (/^https:\/\/omnyid\.com\/wedding\/assets\/venue-photos\/[a-z0-9][a-z0-9._-]*\.(?:jpe?g|png|webp)$/i.test(candidate)) return candidate;
+  return null;
 }
 
 export type WeddingVendorChoiceSelectionSaveInput = {
@@ -125,11 +110,13 @@ export type WeddingVendorChoiceSelectionSaveInput = {
   optionId: string;
   optionLabel: string;
   contact: WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number] | null;
+  selected: boolean;
 };
 
 function ArtifactPreviewCard(props: {
   artifact: WeddingWorkspaceArtifactPreview;
   preview: WeddingArtifactPreviewState;
+  vendorDirectory?: readonly WeddingVendor[];
   onOpenFollowUpQueue?: () => void;
   onOpenVendorQuoteReplySurface?: () => void;
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
@@ -165,23 +152,34 @@ function ArtifactPreviewCard(props: {
     preferenceText: props.artifact.bodyText,
   }));
 
-  function toggleOption(optionId: string): void {
-    const next = toggleWeddingDecisionSelectionValue(props.artifact.artifactId, optionId);
-    setSelectedOptionIds(next);
+  function optionForId(optionId: string) {
+    return decisionState().options.find((option) => option.id === optionId
+      || option.alternateIds?.includes(optionId)) ?? null;
   }
 
-  function saveSelectedVendors(): void {
-    for (const option of decisionState().options.filter((candidate) =>
-      effectiveSelectedOptionIds().includes(candidate.id)
-      || candidate.alternateIds?.some((alternateId) => effectiveSelectedOptionIds().includes(alternateId)),
-    )) {
-      const optionLabel = option.label.trim().toLowerCase();
-      const contact = props.artifact.vendorComparisonCards.find((card) => {
-        const title = card.title.trim().toLowerCase();
-        return title === optionLabel || optionLabel.includes(title) || title.includes(optionLabel);
-      }) ?? null;
-      props.onVendorChoiceSelected?.({ artifact: props.artifact, optionId: option.id, optionLabel: option.label, contact });
-    }
+  function saveVendorSelection(optionId: string, selected: boolean): void {
+    const option = optionForId(optionId);
+    if (!option) return;
+    const optionLabel = option.label.trim().toLowerCase();
+    const contact = props.artifact.vendorComparisonCards.find((card) => {
+      const title = card.title.trim().toLowerCase();
+      return title === optionLabel || optionLabel.includes(title) || title.includes(optionLabel);
+    }) ?? null;
+    props.onVendorChoiceSelected?.({
+      artifact: props.artifact,
+      optionId: option.id,
+      optionLabel: option.label,
+      contact,
+      selected,
+    });
+  }
+
+  function toggleOption(optionId: string): void {
+    const option = optionForId(optionId);
+    const wasSelected = Boolean(option?.selected);
+    const next = toggleWeddingDecisionSelectionValue(props.artifact.artifactId, optionId);
+    setSelectedOptionIds(next);
+    saveVendorSelection(optionId, !wasSelected);
   }
 
   if (preview.kind === "email") {
@@ -269,7 +267,6 @@ function ArtifactPreviewCard(props: {
   }
 
   if (preview.kind === "table") {
-    const a2uiPreview = createMemo(() => artifactA2UIView(props.artifact));
     const comparisonColumns = createMemo(() => preview.columns ?? buildWeddingComparisonColumns(preview.headers));
     const comparisonUi = createMemo(() => buildWeddingVendorComparisonUiState({
       decision: decisionState(),
@@ -277,7 +274,12 @@ function ArtifactPreviewCard(props: {
       comparisonHandoffAvailable: Boolean(props.artifact.vendorComparisonHandoff),
       expanded: comparisonExpanded(),
     }));
-    const rowActionFor = (optionId: string) => comparisonUi().rowActions.find((action) => action.optionId === optionId) ?? null;
+    const cardWithCurrentPhoto = (card: WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number]) => {
+      if (safeVendorImageUrl(card.imageUrl)) return card;
+      const vendor = props.vendorDirectory?.find((entry) => normalizedVendorName(entry.vendorName) === normalizedVendorName(card.title));
+      const photo = vendor?.photos.map((entry) => safeVendorImageUrl(entry.photoUrl)).find((entry): entry is string => Boolean(entry));
+      return photo ? { ...card, imageUrl: photo, imageAlt: vendor?.photos.find((entry) => entry.photoUrl === photo)?.altText ?? `${card.title} photo` } : card;
+    };
     const resolutionBanner = () => (
       <div class={`mt-3 rounded-xl border p-3 ${
         comparisonUi().resolution.resolved
@@ -300,80 +302,17 @@ function ArtifactPreviewCard(props: {
         </div>
       </div>
     );
-    if (a2uiPreview()) {
-      return (
-        <div class="min-w-0 rounded-2xl border border-teal-100 bg-teal-50/75 p-4">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-xs font-semibold text-teal-950">Vendor comparison</p>
-            <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-medium text-teal-900">
-              {preview.rowCountLabel}
-            </span>
-          </div>
-          <div class="mt-3 rounded-xl border border-teal-200 bg-white p-3 text-slate-900">
-            <A2UIRenderer message={a2uiPreview()!.message} view={a2uiPreview()!.view} />
-          </div>
-          {resolutionBanner()}
-          <Show when={decisionState().eligible && decisionState().options.length > 0}>
-            <div class="mt-3 rounded-xl border border-teal-100 bg-white/85 p-3">
-              <p class="text-sm font-semibold text-teal-950">Follow-up selection</p>
-              <p class="mt-1 text-sm leading-6 text-teal-900/75">{decisionState().instructionLabel}</p>
-              <div class="mt-2 flex flex-wrap gap-2">
-                <For each={decisionState().options}>
-                  {(option) => (
-                    <button
-                      type="button"
-                      onClick={() => toggleOption(option.id)}
-                      class={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                        effectiveSelectedOptionIds().includes(option.id)
-                          ? "border-teal-800 bg-teal-900 text-white"
-                          : "border-teal-100 bg-white text-teal-900 hover:border-teal-300"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  )}
-                </For>
-              </div>
-              <button
-                type="button"
-                disabled={effectiveSelectedOptionIds().length === 0}
-                onClick={() => {
-                  saveSelectedVendors();
-                  props.onOpenFollowUpQueue?.();
-                }}
-                class="mt-3 min-h-11 rounded-lg bg-teal-900 px-3 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-teal-200 disabled:text-teal-700"
-              >
-                Add selected vendors to follow-up
-              </button>
-            </div>
-          </Show>
-        </div>
-      );
-    }
     return (
       <div class="min-w-0 rounded-2xl border border-teal-100 bg-teal-50/75 p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <p class="text-xs font-semibold text-teal-950">Comparison table</p>
+          <p class="text-xs font-semibold text-teal-950">
+            {props.artifact.vendorComparisonCards.length >= 3 ? "Top three vendor choices" : "Vendor comparison"}
+          </p>
           <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-medium text-teal-900">
             {preview.rowCountLabel}
           </span>
         </div>
         {resolutionBanner()}
-        <Show when={decisionState().eligible && decisionState().options.length > 0}>
-          <div class="mt-3 rounded-xl border border-teal-100 bg-white/75 p-3">
-            <p class="text-sm font-semibold text-teal-950">What needs your yes/no</p>
-            <p class="mt-1 text-sm leading-6 text-teal-900/75">{decisionState().instructionLabel}</p>
-            <div class="mt-2 flex flex-wrap gap-1.5">
-              <For each={decisionState().scopeLabels}>
-                {(label) => (
-                  <span class="max-w-full break-words rounded-full border border-teal-100 bg-teal-50/70 px-2 py-1 text-xs text-teal-900/80">
-                    {label}
-                  </span>
-                )}
-              </For>
-            </div>
-          </div>
-        </Show>
         <Show when={props.artifact.vendorComparisonHandoff}>
           {(handoff) => (
             <div class="mt-3 rounded-xl border border-teal-100 bg-white/80 p-3">
@@ -401,9 +340,13 @@ function ArtifactPreviewCard(props: {
         <Show when={props.artifact.vendorComparisonCards.length > 0}>
           <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <For each={comparisonUi().expansion.expanded ? props.artifact.vendorComparisonCards : props.artifact.vendorComparisonCards.slice(0, 3)}>
-              {(card) => (
+              {(rawCard) => {
+                const card = cardWithCurrentPhoto(rawCard);
+                return (
                 <WeddingVendorChoiceCard
                   card={card}
+                  selectedForFollowUp={Boolean(optionForId(card.choiceId)?.selected)}
+                  onToggleFollowUp={() => toggleOption(card.choiceId)}
                   outreachFlow={props.outreachFlows?.[card.choiceId] ?? null}
                   gmailConnected={props.gmailConnected}
                   onContactVendor={(selectedCard, intent) => props.onContactVendor?.(selectedCard, props.artifact.artifactId, intent)}
@@ -412,7 +355,8 @@ function ArtifactPreviewCard(props: {
                   onCancelOutreach={props.onCancelOutreach}
                   onConnectGmailForOutreach={props.onConnectGmailForOutreach}
                 />
-              )}
+                );
+              }}
             </For>
           </div>
         </Show>
@@ -447,9 +391,6 @@ function ArtifactPreviewCard(props: {
             <table class="min-w-[38rem] text-left text-xs sm:min-w-full">
               <thead class="bg-teal-50 text-teal-950">
                 <tr>
-                  <Show when={decisionState().eligible && decisionState().options.length > 0}>
-                    <th class="px-3 py-2 font-semibold">Pick</th>
-                  </Show>
                   <For each={comparisonColumns()}>
                     {(column) => (
                       <th class={comparisonHeaderClass(column)}>
@@ -462,9 +403,6 @@ function ArtifactPreviewCard(props: {
                   </For>
                   <Show when={decisionState().eligible && decisionState().options.some((option) => option.preferenceFitLabels.length + option.tradeoffLabels.length > 0)}>
                     <th class="px-3 py-2 font-semibold">Preference fit</th>
-                  </Show>
-                  <Show when={decisionState().eligible && decisionState().options.length > 0}>
-                    <th class="px-3 py-2 font-semibold">Actions</th>
                   </Show>
                 </tr>
               </thead>
@@ -483,20 +421,6 @@ function ArtifactPreviewCard(props: {
                 }))}>
                   {(option) => (
                     <tr class={`border-t border-teal-100 ${option.selected ? "bg-teal-100/60" : ""}`}>
-                      <Show when={decisionState().eligible && decisionState().options.length > 0}>
-                        <td class="px-3 py-2 align-top">
-                          <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-950">
-                            <input
-                              type="checkbox"
-                              checked={option.selected}
-                              onChange={() => toggleOption(option.id)}
-                              aria-label={`Select ${option.label} for follow-up reports`}
-                              class="h-3.5 w-3.5 rounded border-teal-300 text-teal-700"
-                            />
-                            {option.selected ? "Selected" : "Choose"}
-                          </label>
-                        </td>
-                      </Show>
                       <For each={option.cells}>
                         {(cell, cellIndex) => {
                           const column = () => comparisonColumns()[cellIndex()] ?? {
@@ -523,37 +447,6 @@ function ArtifactPreviewCard(props: {
                           </div>
                         </td>
                       </Show>
-                      <Show when={comparisonUi().dynamic}>
-                        <td class="min-w-[10rem] px-3 py-2 align-top">
-                          <Show when={rowActionFor(option.id)}>
-                            {(action) => (
-                              <div class="flex flex-col gap-1.5">
-                                <Show when={action().sourceUrl}>
-                                  {(sourceUrl) => (
-                                    <a
-                                      class="inline-flex justify-center rounded-full border border-teal-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-teal-950 transition hover:bg-teal-50"
-                                      href={sourceUrl()}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      aria-label={action().sourceLabel ?? undefined}
-                                    >
-                                      Open source
-                                    </a>
-                                  )}
-                                </Show>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleOption(option.id)}
-                                  aria-label={action().selectAriaLabel}
-                                  class={`rounded-full px-2.5 py-1.5 text-xs font-semibold transition ${action().selected ? "bg-teal-900 text-white hover:bg-teal-800" : "border border-teal-200 bg-teal-50 text-teal-950 hover:bg-teal-100"}`}
-                                >
-                                  {action().selectLabel}
-                                </button>
-                              </div>
-                            )}
-                          </Show>
-                        </td>
-                      </Show>
                     </tr>
                   )}
                 </For>
@@ -575,29 +468,6 @@ function ArtifactPreviewCard(props: {
                 {comparisonUi().expansion.actionLabel}
               </button>
             </div>
-          </div>
-        </Show>
-        <Show when={comparisonUi().dynamic}>
-          <div class="mt-3 flex flex-col gap-2 rounded-xl border border-teal-100 bg-white/80 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-teal-950">
-                {comparisonUi().footer.summaryLabel}
-              </p>
-              <p class="mt-1 text-xs leading-5 text-teal-900/70">
-                {comparisonUi().footer.consequenceLabel}
-              </p>
-              <p class="mt-1 text-xs leading-5 text-teal-900/70">
-                {comparisonUi().footer.confirmationLabel}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={!comparisonUi().footer.enabled}
-              onClick={saveSelectedVendors}
-              class="rounded-full bg-teal-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-            >
-              Save selected vendors
-            </button>
           </div>
         </Show>
         <Show when={decisionState().collapsedOptionCount > 0}>

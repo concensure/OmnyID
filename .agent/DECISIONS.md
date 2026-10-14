@@ -542,6 +542,28 @@ Google Places remains server-only. Oracle receives it through the existing
 `OMNYID_GOOGLE_PLACES_API_KEY_FILE` mount; the process environment is the relevant
 runtime check because a later `docker exec` shell does not inherit entrypoint exports.
 
+## 2026-10-14: Saved vendor comparisons use the live vendor-card action surface
+
+Persisted comparison A2UI can describe data but must not carry action controls that
+the generic renderer cannot execute. Wedding documents therefore render vendor
+comparisons with the same interactive cards as Wedding Home: selecting a vendor
+immediately writes (or removes) the follow-up reference, and outreach remains in the
+approval-gated composer. Existing saved cards are rehydrated from the current vendor
+directory where a safe image is available.
+
+The permitted media set is deliberately narrow: direct Unsplash, the authenticated
+Google Places proxy, or an exact `https://omnyid.com/wedding/assets/venue-photos/`
+administrator-managed asset without a query or fragment. This adds legitimate
+first-party vendor listings without accepting arbitrary remote image URLs.
+
+## 2026-10-14: Wedding AFP UI projections normalise transport identifiers
+
+The AFP send endpoint requires ULID-shaped message and thread identifiers. Wedding
+UI features retain their readable domain identifiers in metadata and derive valid
+opaque transport identifiers at the shared send boundary, so a local-looking
+identifier cannot cause an account-sync failure. This also fixes persisted Vision
+notes and vendor-selection changes without weakening server validation.
+
 ## 2026-10-14: Master Agent reasoning requires a usable connected model
 
 The deterministic command router remains useful for internal routing only, but it

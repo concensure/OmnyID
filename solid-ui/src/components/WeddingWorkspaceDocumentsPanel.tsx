@@ -7,6 +7,7 @@ import {
   type WeddingVendorChoiceSelectionSaveInput,
 } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
+import type { WeddingVendor } from "@/lib/api";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
@@ -60,6 +61,7 @@ type WeddingWorkspaceDocumentsPanelProps = {
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onConnectGmailForOutreach?: () => void;
+  weddingVendorDirectory?: readonly WeddingVendor[];
 };
 
 export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsPanelProps) {
@@ -312,6 +314,7 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
           <div class="mt-4">
             <WeddingArtifactDetailPanel
               preview={visiblePreview()}
+              vendorDirectory={props.weddingVendorDirectory}
               exportNotice={props.exportNotice}
               approvalRunning={props.approvalRunning}
               approvalReceipt={props.approvalReceipt}

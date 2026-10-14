@@ -141,9 +141,10 @@ test("buildWeddingResponseWorkspaceViewState projects selected top-three vendor 
   const comparisonNode = (state.activePreview?.a2uiContent?.nodes as Array<Record<string, unknown>> | undefined)
     ?.find((node) => node.type === "comparison_table");
   const comparisonNodeProps = comparisonNode?.props as Record<string, unknown> | undefined;
-  assert.ok(Array.isArray(comparisonNodeProps?.column_actions));
-  assert.ok(JSON.stringify(comparisonNodeProps?.column_actions).includes("open_vendor_source"));
-  assert.ok(Array.isArray(comparisonNodeProps?.footer_actions));
+  // The document renderer supplies interactive per-vendor cards; persisted
+  // A2UI data must not describe inert action/footer controls.
+  assert.equal(comparisonNodeProps?.column_actions, undefined);
+  assert.equal(comparisonNodeProps?.footer_actions, undefined);
   assert.equal((comparisonNodeProps?.selection as Record<string, unknown> | undefined)?.mode, "multi");
   assert.match(state.activePreview?.vendorComparisonHandoff?.recommendationLabel ?? "", /Harbour Studio/i);
   assert.equal(state.activePreview?.vendorComparisonHandoff?.confidenceLabel, "Confidence: low");

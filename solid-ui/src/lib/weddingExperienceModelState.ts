@@ -318,8 +318,10 @@ export function evaluateWeddingExperienceDecisionFit(
 
 export function buildWeddingExperienceModelState(
   inspiration: Pick<WeddingInspirationState, "items"> | null | undefined,
+  options?: { evidenceWeight?: number },
 ): WeddingExperienceModelState {
   const items = inspiration?.items ?? [];
+  const evidenceWeight = Math.min(1, Math.max(0, options?.evidenceWeight ?? 1));
   const traits = [
     ...TRAIT_RULES
     .map((rule) => traitFromRule(rule, items))
@@ -328,6 +330,7 @@ export function buildWeddingExperienceModelState(
     latestNoteTrait(items),
   ]
     .filter((trait): trait is WeddingExperienceTrait => trait !== null)
+    .map((trait) => evidenceWeight === 1 ? trait : { ...trait, score: trait.score * evidenceWeight })
     .sort((left, right) => right.score - left.score || left.label.localeCompare(right.label))
     .slice(0, 6);
   const topLabels = traits.slice(0, 4).map((trait) => trait.label.toLowerCase());
@@ -336,7 +339,9 @@ export function buildWeddingExperienceModelState(
     summaryLabel: topLabels.length > 0
       ? `OmnyID is seeing ${topLabels.join(", ")}. Treat this as a working guess until you confirm it.`
       : "Add a few examples and OmnyID will start turning them into a simple wedding style model.",
-    confidenceLabel: traits.some((trait) => trait.confidence === "strong")
+    confidenceLabel: evidenceWeight === 0.8
+      ? "Working at 80% confidence"
+      : traits.some((trait) => trait.confidence === "strong")
       ? "Strong pattern"
       : traits.some((trait) => trait.confidence === "emerging")
         ? "Pattern emerging"

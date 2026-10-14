@@ -23,6 +23,7 @@ export type WeddingVendorContactReferenceInput = {
   artifactTitle: string;
   optionId: string;
   optionLabel: string;
+  selected?: boolean;
   contact?: WeddingVendorContactReferenceDetails | null;
 };
 
@@ -45,6 +46,7 @@ export function weddingVendorContactReferenceToAfpSendInput(
     source_url: clean(contact?.sourceUrl) || null,
     source_provider: clean(contact?.provider) || null,
   };
+  const selected = input.selected !== false;
   return {
     thread_id: input.artifactId,
     parent_id: input.artifactId,
@@ -61,8 +63,10 @@ export function weddingVendorContactReferenceToAfpSendInput(
       artifact_id: input.artifactId,
       artifact_title: input.artifactTitle,
       contact_details: contactDetails,
-      selected_for_follow_up: true,
-      next_step: "Use these details for approval-gated quote questions or outreach only after the user approves the message.",
+      selected_for_follow_up: selected,
+      next_step: selected
+        ? "Use these details for approval-gated quote questions or outreach only after the user approves the message."
+        : "Remove this vendor from the follow-up list.",
     },
     metadata: {
       ...input.metadata,
@@ -70,10 +74,11 @@ export function weddingVendorContactReferenceToAfpSendInput(
       artifact_id: input.artifactId,
       selected_option_id: input.optionId,
       selected_vendor_name: vendorName,
+      selected_for_follow_up: selected,
       contact_details_available: Object.values(contactDetails).some(Boolean),
     },
     supertags: [
-      "wedding_vendor_selected",
+      selected ? "wedding_vendor_selected" : "wedding_vendor_deselected",
       "wedding_vendor_contact_reference",
       "wedding_vendor_follow_up",
       "decisionos:wedding_vendor_selection",
@@ -87,8 +92,8 @@ export function weddingVendorContactReferenceToAfpSendInput(
     views: [{
       format: "summary",
       content: {
-        title: `${vendorName} selected for follow-up`,
-        detail: "Saved vendor contact details for the wedding planner workflow.",
+        title: selected ? `${vendorName} selected for follow-up` : `${vendorName} removed from follow-up`,
+        detail: selected ? "Saved vendor contact details for the wedding planner workflow." : "Removed this vendor from the wedding follow-up list.",
         contact_details: contactDetails,
       },
       priority: 1,

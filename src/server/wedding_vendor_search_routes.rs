@@ -1383,9 +1383,10 @@ fn looks_like_public_http_url(url: &str) -> bool {
     )
 }
 
-/// Couple-facing vendor cards accept licensed Unsplash images and the narrowly
-/// validated first-party Google Places proxy. The latter is fetched with the
-/// couple's authenticated session; arbitrary remote image hosts stay excluded.
+/// Couple-facing vendor cards accept licensed Unsplash images, the narrowly
+/// validated first-party Google Places proxy, and bounded static assets served
+/// by OmnyID for an administrator-managed vendor listing. Arbitrary remote
+/// image hosts stay excluded.
 pub(super) fn is_unsplash_photo_url(url: &str) -> bool {
     if !looks_like_public_http_url(url) {
         return false;
@@ -1398,6 +1399,28 @@ pub(super) fn is_unsplash_photo_url(url: &str) -> bool {
         && parsed
             .host_str()
             .is_some_and(|host| host.eq_ignore_ascii_case("images.unsplash.com"))
+}
+
+pub(super) fn is_omnyid_wedding_vendor_asset_url(url: &str) -> bool {
+    let parsed = match reqwest::Url::parse(url.trim()) {
+        Ok(parsed) => parsed,
+        Err(_) => return false,
+    };
+    if parsed.scheme() != "https"
+        || !parsed
+            .host_str()
+            .is_some_and(|host| host.eq_ignore_ascii_case("omnyid.com"))
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return false;
+    }
+    let path = parsed.path();
+    path.starts_with("/wedding/assets/venue-photos/")
+        && matches!(
+            path.rsplit('.').next().map(str::to_ascii_lowercase).as_deref(),
+            Some("jpg" | "jpeg" | "png" | "webp")
+        )
 }
 
 pub(super) fn is_google_wedding_vendor_photo_proxy_url(url: &str) -> bool {
@@ -2519,7 +2542,7 @@ mod tests {
     }
 
     #[test]
-    fn couple_facing_vendor_photos_allow_unsplash_or_the_authenticated_google_proxy() {
+    fn couple_facing_vendor_photos_allow_approved_public_or_first_party_assets() {
         assert!(is_unsplash_photo_url(
             "https://images.unsplash.com/photo-1507504031003-b417219a0fde"
         ));
@@ -2529,6 +2552,15 @@ mod tests {
         ));
         assert!(!is_google_wedding_vendor_photo_proxy_url(
             "/wedding/vendor-photo/google?name=places%2Fabc&key=secret"
+        ));
+        assert!(is_omnyid_wedding_vendor_asset_url(
+            "https://omnyid.com/wedding/assets/venue-photos/curzon-hall.jpg"
+        ));
+        assert!(!is_omnyid_wedding_vendor_asset_url(
+            "https://omnyid.com/wedding/assets/venue-photos/curzon-hall.jpg?tracking=1"
+        ));
+        assert!(!is_omnyid_wedding_vendor_asset_url(
+            "https://omnyid.com.evil/wedding/assets/venue-photos/curzon-hall.jpg"
         ));
     }
 

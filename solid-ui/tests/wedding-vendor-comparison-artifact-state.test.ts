@@ -39,7 +39,7 @@ test("reopened comparison artifacts hide previously persisted category pages", (
   assert.deepEqual(cards.map((card) => card.title), ["Harbour Lights Events"]);
 });
 
-test("comparison cards render Unsplash and authenticated Google proxy photos only", () => {
+test("comparison cards render approved public, proxy, and bounded first-party photos only", () => {
   const cardsWithSafePhotos = vendorComparisonCardsForArtifact({
     topChoiceCards: [{
       rank: 1,
@@ -51,10 +51,16 @@ test("comparison cards render Unsplash and authenticated Google proxy photos onl
       title: "Other Venue",
       source_url: "https://other-venue.example",
       image_url: "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc",
+    }, {
+      rank: 3,
+      title: "Harbour Venue",
+      source_url: "https://harbour-venue.example",
+      image_url: "https://omnyid.com/wedding/assets/venue-photos/harbour-venue.jpg",
     }],
   });
   assert.match(cardsWithSafePhotos[0]?.imageUrl ?? "", /^https:\/\/images\.unsplash\.com\//);
   assert.match(cardsWithSafePhotos[1]?.imageUrl ?? "", /^\/wedding\/vendor-photo\/google\?/);
+  assert.equal(cardsWithSafePhotos[2]?.imageUrl, "https://omnyid.com/wedding/assets/venue-photos/harbour-venue.jpg");
   const cards = vendorComparisonCardsForArtifact({
     topChoiceCards: [{ rank: 1, title: "Other Venue", source_url: "https://other-venue.example", image_url: "https://cdn.example/venue.jpg" }],
   });

@@ -1962,3 +1962,47 @@ Relay status:
   needs independent security/privacy sign-off. RELAY-04 through RELAY-17
   remain gated by the gateway capsule, signed inbound receiver, attachment
   isolation, authenticated read projection, security review, and canary.
+
+## 2026-10-14 - WED-185 documents, vision, and vendor-media repair (Codex)
+
+Changed:
+
+- Wedding Documents now uses the interactive, light vendor comparison cards in
+  place of the persisted generic A2UI action layer. Vendor selection is inside
+  each card, saves immediately (and can be deselected), and the existing
+  approval-gated generated outreach composer remains available there.
+- The vendor photo policy now accepts bounded first-party admin listing assets
+  under `/wedding/assets/venue-photos/`, in addition to Unsplash and the
+  authenticated Google Places proxy. Saved comparison cards can rehydrate a
+  missing image from the current directory. No placeholder claims that an image
+  is pending.
+- Shared AFP send normalisation preserves readable identifiers as metadata while
+  supplying the required ULID transport identifiers. This restores account saves
+  for Vision notes and comparison selection rather than reporting a false
+  connection failure.
+- Inspiration validation is now actionable: Yes confirms locally without an
+  agent request; Mostly applies 80% evidence weight; Not really opens a
+  correction field and debounces an authenticated agent command.
+
+Verification:
+
+- `npm run typecheck --prefix solid-ui`
+- `npm run test:wedding --prefix solid-ui` (1,833 passing)
+- `cargo test --lib wedding_vendor_search_routes::tests::couple_facing_vendor_photos_allow_approved_public_or_first_party_assets`
+- `npm run build --prefix solid-ui` and `git diff --check`
+
+Deployment:
+
+- Released commit `5178725` through a scoped Oracle `homeserver` and `ui`
+  build. The `ui` compose service exits successfully after copying its static
+  assets to the shared serving volume; the active homeserver is running.
+  `https://omnyid.com/wedding/` returned HTTP 200 and the private health route
+  returned its expected unauthenticated 401 boundary on port 18080.
+- Caddy was not restarted or reloaded. Its SHA-256 remained
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+Remaining:
+
+- The relay remains disabled. Cloudflare routing status and DNS export reads still
+  fail with 403/10000, leaving RELAY-00 incomplete; RELAY-01 remains pending
+  independent security/privacy review and RELAY-04 through RELAY-17 stay gated.

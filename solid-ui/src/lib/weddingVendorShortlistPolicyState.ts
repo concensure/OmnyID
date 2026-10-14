@@ -75,7 +75,13 @@ function unsplashPhotoUrl(value: string | null | undefined): string | null {
   const url = httpUrl(value);
   if (!url) return null;
   try {
-    return new URL(url).hostname.toLowerCase() === "images.unsplash.com" ? url : null;
+    const parsed = new URL(url);
+    const isUnsplash = parsed.hostname.toLowerCase() === "images.unsplash.com";
+    const isOmnyidVenueAsset = parsed.hostname.toLowerCase() === "omnyid.com"
+      && /^\/wedding\/assets\/venue-photos\/[a-z0-9][a-z0-9._-]*\.(?:jpe?g|png|webp)$/i.test(parsed.pathname)
+      && !parsed.search
+      && !parsed.hash;
+    return isUnsplash || isOmnyidVenueAsset ? url : null;
   } catch {
     return null;
   }

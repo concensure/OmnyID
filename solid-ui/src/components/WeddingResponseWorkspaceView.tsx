@@ -264,7 +264,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       setExportNotice("Vendor selected. Account saving is not connected yet, so contact details are only local for now.");
       return;
     }
-    setExportNotice(`Saving ${input.optionLabel}'s contact details to the wedding record...`);
+    setExportNotice(`${input.selected ? "Saving" : "Removing"} ${input.optionLabel}${input.selected ? "'s contact details" : ""} ${input.selected ? "to" : "from"} the wedding record...`);
     void props.saveProjection(weddingVendorContactReferenceToAfpSendInput({
       metadata: state().workspace.metadata,
       artifactId: input.artifact.artifactId,
@@ -272,13 +272,16 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       optionId: input.optionId,
       optionLabel: input.optionLabel,
       contact: input.contact,
+      selected: input.selected,
     }))
       .then(() => {
-        setExportNotice(`${input.optionLabel} saved for vendor follow-up.`);
+        setExportNotice(input.selected
+          ? `${input.optionLabel} saved for vendor follow-up.`
+          : `${input.optionLabel} removed from vendor follow-up.`);
         props.onRefreshWorkspace?.();
       })
       .catch(() => {
-        setExportNotice(`${input.optionLabel} was selected, but the contact details could not be saved yet.`);
+        setExportNotice(`${input.optionLabel} could not be updated yet. Your selection is still visible here.`);
       });
   }
 
@@ -1023,6 +1026,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)}
           onCancelOutreach={vendorOutreach.onCancelOutreach}
           onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
+          weddingVendorDirectory={props.weddingVendorDirectory}
         />
 
         <Show when={showTechnicalDetails() && state().projectionQueue}>

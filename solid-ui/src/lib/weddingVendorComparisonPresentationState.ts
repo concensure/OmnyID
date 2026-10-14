@@ -215,7 +215,6 @@ export function a2uiForComparison(
   weddingPlanId: string | null = null,
 ): Record<string, unknown> {
   const columns = choices.map((choice) => `#${choice.rank} ${choice.title}`);
-  const choiceActions = vendorChoiceActionRows(choices);
   const cards = vendorChoiceCards(choices, weddingPlanId);
   return {
     schema_version: "a2ui.v1",
@@ -227,7 +226,6 @@ export function a2uiForComparison(
         type: "vendor_recommendation_cards",
         props: {
           title: choices.length === 3 ? "Recommended top three" : "Suitable vendors found so far",
-          description: "Images appear only when a safe public image URL is available from a provider or the admin vendor database.",
           cards,
         },
       },
@@ -245,7 +243,6 @@ export function a2uiForComparison(
             { label: "Situation fit", values: choices.map((choice) => choice.situationFitLabel) },
             { label: "Rooms and pricing", values: choices.map((choice) => weddingVendorRoomsComparisonLabel(choice.rooms)) },
             { label: "Contact details", values: choices.map((choice) => contactSummaryLabel(choice)) },
-            { label: "Verify before action", values: choices.map((choice) => choice.verificationLabel) },
             { label: "Source", values: choices.map((choice) => choice.url) },
           ],
           selection: {
@@ -259,29 +256,7 @@ export function a2uiForComparison(
               approval_required_before_outreach: true,
             },
           },
-          column_actions: choiceActions,
-          footer_actions: [
-            { kind: "confirm_vendor_choices", label: "Confirm selected vendors", enabled: true, requires_user_confirmation: true },
-            {
-              kind: "prepare_follow_up_for_selected_vendors",
-              label: "Prepare follow-up for selected",
-              enabled: true,
-              requires_user_confirmation: true,
-              approval_required_before_outreach: true,
-              no_external_send_without_approval: true,
-            },
-          ],
         },
-      },
-    ],
-    actions: [
-      { kind: "confirm_vendor_choices", label: "Confirm selected vendors", enabled: true, requires_user_confirmation: true },
-      {
-        kind: "prepare_follow_up_for_selected_vendors",
-        label: "Prepare follow-up for selected",
-        enabled: true,
-        requires_user_confirmation: true,
-        approval_required_before_outreach: true,
       },
     ],
   };
