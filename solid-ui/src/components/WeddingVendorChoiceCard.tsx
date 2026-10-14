@@ -103,7 +103,6 @@ export function WeddingVendorChoiceCard(props: {
           <div class={`flex aspect-[4/3] flex-col items-center justify-center gap-1 px-3 text-center ${placeholder().toneClass}`}>
             <span class="text-lg font-semibold">{placeholder().initials}</span>
             <span class="text-xs font-medium">{placeholder().label}</span>
-            <span class="text-[10px] leading-4 opacity-80">Photo unavailable — placeholder, not vendor evidence</span>
           </div>
         }
       >

@@ -513,10 +513,17 @@ export function AgentPersonaFAB(props: {
                     <button
                       type="button"
                       onClick={() => {
-                        if (installed()) return;
+                        // A template may already exist from a previous install.
+                        // Treat a tap as a usable action in that case too: activate
+                        // it instead of presenting an inert "Installed" row.
+                        const existing = installedPersona();
+                        if (existing) {
+                          void switchPersona(existing);
+                          return;
+                        }
                         void installTemplate(template);
                       }}
-                      disabled={installed() || switcherBusy()}
+                      disabled={switcherBusy()}
                       class="mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-on-surface/6 disabled:cursor-default disabled:hover:bg-transparent"
                     >
                       <span class="pt-0.5 text-lg leading-none">
@@ -539,7 +546,9 @@ export function AgentPersonaFAB(props: {
                         {installed()
                           ? installedPersona()?.is_active
                             ? "Active"
-                            : "Installed"
+                            : switchingId() === installedPersona()?.id
+                              ? "Activating…"
+                              : "Use"
                           : installingTemplateId() === template.id
                             ? "Installing…"
                             : "Install"}

@@ -171,7 +171,10 @@ function ArtifactPreviewCard(props: {
   }
 
   function saveSelectedVendors(): void {
-    for (const option of decisionState().options.filter((candidate) => effectiveSelectedOptionIds().includes(candidate.id))) {
+    for (const option of decisionState().options.filter((candidate) =>
+      effectiveSelectedOptionIds().includes(candidate.id)
+      || candidate.alternateIds?.some((alternateId) => effectiveSelectedOptionIds().includes(alternateId)),
+    )) {
       const optionLabel = option.label.trim().toLowerCase();
       const contact = props.artifact.vendorComparisonCards.find((card) => {
         const title = card.title.trim().toLowerCase();
@@ -310,7 +313,7 @@ function ArtifactPreviewCard(props: {
             <A2UIRenderer message={a2uiPreview()!.message} view={a2uiPreview()!.view} />
           </div>
           {resolutionBanner()}
-          <Show when={decisionState().eligible && decisionState().options.length > 1}>
+          <Show when={decisionState().eligible && decisionState().options.length > 0}>
             <div class="mt-3 rounded-xl border border-teal-100 bg-white/85 p-3">
               <p class="text-sm font-semibold text-teal-950">Follow-up selection</p>
               <p class="mt-1 text-sm leading-6 text-teal-900/75">{decisionState().instructionLabel}</p>
@@ -331,6 +334,17 @@ function ArtifactPreviewCard(props: {
                   )}
                 </For>
               </div>
+              <button
+                type="button"
+                disabled={effectiveSelectedOptionIds().length === 0}
+                onClick={() => {
+                  saveSelectedVendors();
+                  props.onOpenFollowUpQueue?.();
+                }}
+                class="mt-3 min-h-11 rounded-lg bg-teal-900 px-3 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-teal-200 disabled:text-teal-700"
+              >
+                Add selected vendors to follow-up
+              </button>
             </div>
           </Show>
         </div>
@@ -345,7 +359,7 @@ function ArtifactPreviewCard(props: {
           </span>
         </div>
         {resolutionBanner()}
-        <Show when={decisionState().eligible && decisionState().options.length > 1}>
+        <Show when={decisionState().eligible && decisionState().options.length > 0}>
           <div class="mt-3 rounded-xl border border-teal-100 bg-white/75 p-3">
             <p class="text-sm font-semibold text-teal-950">What needs your yes/no</p>
             <p class="mt-1 text-sm leading-6 text-teal-900/75">{decisionState().instructionLabel}</p>
@@ -433,7 +447,7 @@ function ArtifactPreviewCard(props: {
             <table class="min-w-[38rem] text-left text-xs sm:min-w-full">
               <thead class="bg-teal-50 text-teal-950">
                 <tr>
-                  <Show when={decisionState().eligible && decisionState().options.length > 1}>
+                  <Show when={decisionState().eligible && decisionState().options.length > 0}>
                     <th class="px-3 py-2 font-semibold">Pick</th>
                   </Show>
                   <For each={comparisonColumns()}>
@@ -449,7 +463,7 @@ function ArtifactPreviewCard(props: {
                   <Show when={decisionState().eligible && decisionState().options.some((option) => option.preferenceFitLabels.length + option.tradeoffLabels.length > 0)}>
                     <th class="px-3 py-2 font-semibold">Preference fit</th>
                   </Show>
-                  <Show when={decisionState().eligible && decisionState().options.length > 1}>
+                  <Show when={decisionState().eligible && decisionState().options.length > 0}>
                     <th class="px-3 py-2 font-semibold">Actions</th>
                   </Show>
                 </tr>
@@ -469,7 +483,7 @@ function ArtifactPreviewCard(props: {
                 }))}>
                   {(option) => (
                     <tr class={`border-t border-teal-100 ${option.selected ? "bg-teal-100/60" : ""}`}>
-                      <Show when={decisionState().eligible && decisionState().options.length > 1}>
+                      <Show when={decisionState().eligible && decisionState().options.length > 0}>
                         <td class="px-3 py-2 align-top">
                           <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-950">
                             <input

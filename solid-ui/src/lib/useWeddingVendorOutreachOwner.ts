@@ -299,7 +299,6 @@ export function useWeddingVendorOutreachOwner(input: {
         subject: flow.subject,
         html,
         text: flow.bodyMarkdown,
-        thread_id: draftProjection.thread_id,
       });
       const sentProjection = weddingVendorOutreachSentAfpSendInput({
         flow,

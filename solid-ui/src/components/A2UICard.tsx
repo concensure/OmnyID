@@ -4,6 +4,7 @@
 import { createSignal, Show } from "solid-js";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { dispatchA2uiCardRequestEvent } from "@/lib/a2uiEvents";
+import type { OverlayCardGeneratedContent, OverlayCardType } from "@/lib/viewCustomizerLocalState";
 
 const CARD_TYPES = [
   { id: "text", label: "Text", icon: "P", hint: "Paragraph or notes" },
@@ -13,29 +14,70 @@ const CARD_TYPES = [
   { id: "custom", label: "Ask Agent", icon: "*", hint: "Describe anything" },
 ] as const;
 
-type CardType = (typeof CARD_TYPES)[number]["id"];
-
-type GeneratedContent = {
-  type: CardType;
-  title?: string;
-  body: string;
-  imageUrl?: string;
-};
+type CardType = OverlayCardType;
+type GeneratedContent = OverlayCardGeneratedContent;
 
 export type A2UICardProps = {
   personaTone?: string;
   onDismiss?: () => void;
+  initialCardType?: CardType;
+  initialContent?: GeneratedContent;
+  onContentChange?: (content: GeneratedContent, cardType: CardType) => void;
 };
 
 export function A2UICard(props: A2UICardProps) {
-  const [cardType, setCardType] = createSignal<CardType | null>(null);
-  const [chatInput, setChatInput] = createSignal("");
-  const [generated, setGenerated] = createSignal<GeneratedContent | null>(null);
+  const [cardType, setCardType] = createSignal<CardType | null>(props.initialCardType ?? props.initialContent?.type ?? null);
+  const [chatInput, setChatInput] = createSignal(props.initialContent?.body ?? "");
+  const [generated, setGenerated] = createSignal<GeneratedContent | null>(props.initialContent ?? null);
   const [busy, setBusy] = createSignal(false);
   const [attached, setAttached] = createSignal<{ name: string; url: string; isImage: boolean } | null>(null);
   const [confirmed, setConfirmed] = createSignal(false);
 
   let fileRef: HTMLInputElement | undefined;
+
+  function commit(content: GeneratedContent) {
+    setGenerated(content);
+    setCardType(content.type);
+    props.onContentChange?.(content, content.type);
+  }
+
+  function statPairs(prompt: string): Array<{ label: string; value: string }> {
+    const invitation = prompt.match(/(?:invitations?\s*(?:sent)?|sent\s+invitations?)\D{0,8}(\d+)/i)?.[1];
+    const rsvps = prompt.match(/(?:rsvps?\s*(?:received)?|responses?\s*(?:received)?)\D{0,8}(\d+)/i)?.[1];
+    if (/invitation|rsvp/i.test(prompt)) {
+      return [
+        { label: "Invitations sent", value: invitation ?? "—" },
+        { label: "RSVPs received", value: rsvps ?? "—" },
+      ];
+    }
+    const named = Array.from(prompt.matchAll(/([A-Za-z][A-Za-z ]{1,28})\s*[:=]\s*(\d+(?:\.\d+)?%?)/g)).slice(0, 4)
+      .map((match) => ({ label: match[1]!.trim(), value: match[2]! }));
+    return named.length > 0 ? named : [{ label: "Measure", value: "—" }];
+  }
+
+  function generatedFor(type: CardType, prompt: string): GeneratedContent {
+    if (type === "stats") {
+      const metrics = statPairs(prompt);
+      const hasValues = metrics.some((metric) => metric.value !== "—");
+      return {
+        type,
+        title: /invitation|rsvp/i.test(prompt) ? "Invitation & RSVP status" : "Key stats",
+        body: hasValues ? "Calculated from the values in your request." : "Add counts in this card request, or update Guests, to show verified figures.",
+        metrics,
+      };
+    }
+    if (type === "table") {
+      const tableRows = Array.from(prompt.split(/\n|;/)).map((line) => line.trim()).filter(Boolean).slice(0, 6)
+        .map((line, index) => {
+          const [label, ...rest] = line.split(/:|—|-/);
+          return { label: label.trim() || `Item ${index + 1}`, value: rest.join(" ").trim() || "Review" };
+        });
+      return { type, title: "Planning table", body: prompt || "Add rows to structure this card.", tableRows: tableRows.length > 0 ? tableRows : [{ label: "Item", value: "Add a row" }] };
+    }
+    if (type === "callout") return { type, title: "Planning highlight", body: prompt || "Add the key point you want to keep visible." };
+    if (type === "text") return { type, title: "Notes", body: prompt || "Add your note." };
+    return { type, title: "Custom response", body: prompt || `Content from ${attached()?.name ?? "your request"}.` };
+  }
 
   const confirmMsg = () => {
     const tone = props.personaTone;
@@ -53,7 +95,7 @@ export function A2UICard(props: A2UICardProps) {
       if (typeof result !== "string") return;
       const isImage = file.type.startsWith("image/");
       setAttached({ name: file.name, url: result, isImage });
-      setGenerated({
+      commit({
         type: cardType() ?? "custom",
         title: file.name,
         body: `Attached: ${file.name}`,
@@ -72,20 +114,8 @@ export function A2UICard(props: A2UICardProps) {
       prompt,
       attachedFileName: attached()?.name,
     });
-    await new Promise((resolve) => setTimeout(resolve, 800));
     const type = cardType() ?? "custom";
-    const titleMap: Record<CardType, string> = {
-      text: "Generated Text",
-      callout: "Agent Insight",
-      stats: "Key Stats",
-      table: "Data Table",
-      custom: "Agent Response",
-    };
-    setGenerated({
-      type,
-      title: titleMap[type],
-      body: prompt || `Content from ${attached()?.name ?? "file"}.`,
-    });
+    commit(generatedFor(type, prompt));
     setChatInput(prompt);
     setBusy(false);
   }
@@ -130,7 +160,17 @@ export function A2UICard(props: A2UICardProps) {
                 style={{ "max-height": "120px" }}
               />
             </Show>
-            <p class="text-[11px] leading-relaxed text-on-surface">{content().body}</p>
+            <Show when={content().type === "stats" && content().metrics}>
+              <div class="mb-2 grid grid-cols-2 gap-1.5">
+                {content().metrics!.map((metric) => <div class="rounded-lg bg-white/80 px-2 py-1.5"><p class="text-[9px] text-on-surface-variant">{metric.label}</p><p class="text-base font-semibold text-on-surface">{metric.value}</p></div>)}
+              </div>
+            </Show>
+            <Show when={content().type === "table" && content().tableRows}>
+              <div class="mb-2 overflow-hidden rounded-lg border border-primary/10 bg-white/80">
+                {content().tableRows!.map((row) => <div class="grid grid-cols-2 gap-2 border-b border-primary/10 px-2 py-1.5 text-[10px] last:border-b-0"><span class="font-medium text-on-surface">{row.label}</span><span class="text-on-surface-variant">{row.value}</span></div>)}
+              </div>
+            </Show>
+            <p class={`text-[11px] leading-relaxed text-on-surface ${content().type === "callout" ? "border-l-2 border-primary pl-2 font-medium" : ""}`}>{content().body}</p>
           </div>
         )}
       </Show>

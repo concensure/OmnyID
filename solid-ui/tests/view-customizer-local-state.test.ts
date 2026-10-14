@@ -73,3 +73,39 @@ test("view customizer local state writers persist only normalized values", () =>
   saveViewCustomizerBg("note", null);
   assert.equal(localStorageState.has("omnyid.view.bg.note"), false);
 });
+
+test("view customizer preserves a generated stat card and a movable image card", () => {
+  saveViewCustomizerCards("wedding", [
+    {
+      id: " stats ",
+      x: 48,
+      y: 96,
+      kind: "agent",
+      cardType: "stats",
+      generated: {
+        type: "stats",
+        title: "Invitation & RSVP status",
+        body: "Calculated from the values in your request.",
+        metrics: [{ label: "Invitations sent", value: "42" }, { label: "RSVPs received", value: "31" }],
+      },
+    },
+    { id: " image ", x: 80, y: 120, kind: "image", imageDataUrl: "data:image/webp;base64,abc", imageAlt: "Table flowers" },
+  ]);
+
+  assert.deepEqual(loadViewCustomizerCards("wedding"), [
+    {
+      id: "stats",
+      x: 48,
+      y: 96,
+      kind: "agent",
+      cardType: "stats",
+      generated: {
+        type: "stats",
+        title: "Invitation & RSVP status",
+        body: "Calculated from the values in your request.",
+        metrics: [{ label: "Invitations sent", value: "42" }, { label: "RSVPs received", value: "31" }],
+      },
+    },
+    { id: "image", x: 80, y: 120, kind: "image", imageDataUrl: "data:image/webp;base64,abc", imageAlt: "Table flowers" },
+  ]);
+});
