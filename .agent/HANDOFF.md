@@ -1777,3 +1777,13 @@ Current guest and directory follow-up (pending release):
   weaken the media allowlist or expose Google resource names; install the key
   through the approved file-backed Oracle secret path before claiming live
   directory photos are restored.
+
+Release completion (2026-10-14):
+
+- Released `8bd182f` to Oracle using only `homeserver` and `ui` Compose
+  targets. Both images rebuilt and both targets were recreated successfully.
+- Verified the homeserver listener on `0.0.0.0:8080`, public
+  `https://omnyid.com/wedding/` HTTP 200, and production query result
+  `A2Z Weddings|photographer` after migration `0109`.
+- Caddy was not reloaded. Its Caddyfile SHA-256 remains
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
