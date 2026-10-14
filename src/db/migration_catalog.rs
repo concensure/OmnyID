@@ -559,4 +559,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Remove a synthetic A2Z outreach draft that was incorrectly projected as a reply",
         include_str!("../../postgres/migrations/0110_remove_spurious_a2z_vendor_reply.sql"),
     ),
+    (
+        "0111_wedding_vendor_aco_on_the_pier",
+        "Official ACO On The Pier venue enquiry contact",
+        include_str!("../../postgres/migrations/0111_wedding_vendor_aco_on_the_pier.sql"),
+    ),
 ];
