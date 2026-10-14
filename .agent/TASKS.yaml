@@ -1126,3 +1126,7 @@ tasks:
       - mobile decision triage now derives a valid deterministic AFP transport thread ID (with the logical triage scope retained as metadata), resolving the authenticated AFP rejection that produced the misleading local-only sync state; this path does not call an LLM
       - legacy plural vendor-research tasks now route to the vendor search surface as well as singular task titles
       - `e4fa5f9` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the one-shot UI job exited 0, homeserver remained running, `/wedding/` returned 200, and Caddy was not reloaded
+      - new vendor enquiries no longer send the internal AFP tracking thread ID as a Gmail thread ID; Gmail now creates its own conversation while the existing AFP draft/sent record preserves wedding tracking, fixing the rejected approved-enquiry send path
+      - comparison views allow one or several vendor choices to be explicitly added to follow-up, photo placeholders no longer contain internal evidence wording, and the transient search `Done` control has been removed
+      - the sprout template row activates an already-installed persona instead of being inert; custom cards persist their chosen text/callout/stats/table layout, and local image cards are compressed, saved, and movable
+      - `0973aab` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the UI build completed, `/wedding/` returned 200, homeserver remained running, and Caddy was not reloaded

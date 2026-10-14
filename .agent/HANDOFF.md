@@ -1859,3 +1859,36 @@ Verification:
 Remaining:
 
 - This is UI/AFP projection work only. It does not enable the vendor email relay. RELAY-04 through RELAY-17 remain gated by gateway-key, signed-inbound, attachment, authenticated API, security-review, and production rollout work; RELAY-00 has an incomplete Cloudflare routing/DNS inventory capture and RELAY-01 needs independent sign-off.
+
+## 2026-10-14 - WED-185 approved-enquiry and Sprout recovery
+
+Changed:
+
+- Fixed approved vendor enquiry delivery: the browser had sent an internal AFP
+  tracking thread ID to Gmail's `threadId` field. A new message has no Gmail
+  thread ID yet, so Gmail rejected it. The send now leaves that provider field
+  absent and continues to retain the AFP draft/sent relationship separately.
+- A2UI comparison views can now select one or several vendors and explicitly
+  add them to follow-up. The stale transient `Done` button and internal photo
+  placeholder sentence are removed.
+- A template row in the sprout picker now activates an existing installed
+  persona instead of doing nothing. Custom card data persists as the requested
+  text/callout/stats/table shape; image cards accept a local image, compress it
+  when necessary, persist it locally, and remain draggable.
+
+Verification:
+
+- `npm run typecheck --prefix solid-ui`
+- focused card/persona/outreach tests: 22 passing
+- full `npm run test:wedding --prefix solid-ui`: 1,830 passing
+- `npm run build --prefix solid-ui` and `git diff --check`
+- released `0973aab` with the scoped Oracle `ui` service. The build completed,
+  `https://omnyid.com/wedding/` returned HTTP 200, the homeserver remained up,
+  and Caddy's SHA-256 remains
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+Remaining:
+
+- The external email relay remains disabled behind its Cloudflare inventory and
+  independent security gates. This repair only restores the temporarily
+  owner-approved Gmail continuity path for explicit user-approved enquiries.
