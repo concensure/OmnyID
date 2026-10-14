@@ -1816,3 +1816,22 @@ Release completion (2026-10-14):
   `A2Z Weddings|photographer` after migration `0109`.
 - Caddy was not reloaded. Its Caddyfile SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+## 2026-10-14 - WED-185 Inspiration and persona interaction release (Codex)
+
+Changed:
+
+- The Inspiration working model is calculated from the current combined local and saved evidence. Any two photos/screenshots now produce an explainable visual-direction trait even if filenames carry no useful text; the most recent note becomes a clearly labelled planning instruction.
+- Inspiration uses the available page width and its duplicate mobile app-bar title is suppressed. Important details now presents plain status text rather than internal-looking tag pills.
+- Generate recommendations no longer depends on stale browser intake fields once its context card is ready. Vision notes update the active wedding compass after a durable save (or explicitly state the local-only state), and a failed save leaves the note in the field.
+- Template installation from the sprout persona switcher keeps the activated persona visible through a delayed list read and confirms that it was installed and activated.
+
+Verification:
+
+- `npm run typecheck --prefix solid-ui`, `npm run test:wedding --prefix solid-ui`, `npm run build --prefix solid-ui`, and `git diff --check` passed locally.
+- Released code commit `cb2ef81` as a scoped Oracle `ui` build. The asset job exited 0, `https://omnyid.com/wedding/` returned HTTP 200, and `omnyid-homeserver-1` remained running.
+- Caddy was not restarted or reloaded; its SHA-256 remains `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+Remaining:
+
+- The vendor relay stays disabled. The partially captured Cloudflare routing/DNS inventory and independent RELAY security gates remain blockers; existing Gmail continuity is unchanged and is not a relay fallback.
