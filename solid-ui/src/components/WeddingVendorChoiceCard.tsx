@@ -27,6 +27,15 @@ function availabilityChipClass(state: WeddingVendorAvailabilityState): string {
   return "border-wedding-muted bg-wedding-surface-blush text-wedding-accent";
 }
 
+function vendorEmailHref(title: string, email: string): string {
+  // ACO supplied a venue-hire subject line, which makes the hand-off useful
+  // without changing the generic email behaviour for every other vendor.
+  if (/^bianca\.astwood@aco\.com\.au$/i.test(email.trim()) || /aco\s+on\s+the\s+pier/i.test(title)) {
+    return "mailto:Bianca.Astwood@aco.com.au?subject=Pier%202F3%20Venue%20Hire";
+  }
+  return `mailto:${email}`;
+}
+
 export function WeddingVendorChoiceCard(props: {
   card: WeddingVendorChoiceCardData;
   outreachFlow?: WeddingVendorOutreachFlowState | null;
@@ -50,7 +59,7 @@ export function WeddingVendorChoiceCard(props: {
   const contactRows = () => [
     card.websiteUrl ? { label: "Website", value: card.websiteUrl, href: card.websiteUrl } : null,
     card.instagramUrl ? { label: "Instagram", value: card.instagramUrl, href: card.instagramUrl } : null,
-    card.email ? { label: "Email", value: card.email, href: `mailto:${card.email}` } : null,
+    card.email ? { label: "Email", value: card.email, href: vendorEmailHref(card.title, card.email) } : null,
     card.phone ? { label: "Phone", value: card.phone, href: `tel:${card.phone.replace(/\s+/g, "")}` } : null,
     card.address ? { label: "Address", value: card.address, href: null } : null,
     card.mapUrl ? { label: "Map", value: card.mapUrl, href: card.mapUrl } : null,

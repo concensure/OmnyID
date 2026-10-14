@@ -117,7 +117,7 @@ Rules:
 - Name at least one concrete thing the couple said (a priority, their location, their season) so the vendor can see this is not a mass mailout.
 - Ask a clear question: availability, package options, and an indicative quote.
 - Make no pricing promises and no claim that anything is booked or confirmed.
-- 120 to 180 words. Plain sentences, no headings, no emoji, no signature block — the app appends the sender identity separately.
+- 120 to 180 words. Use exactly three short paragraphs separated by blank lines: a greeting and context, the request, then a brief thanks. Plain sentences, no headings, no emoji, no signature block — the app appends the sender identity separately.
 - Respond with ONLY valid JSON, no markdown code fences, no commentary before or after it, matching exactly this shape:
 {"subject": string, "body_markdown": string, "grounded_on": [string, ...]}
 
@@ -685,7 +685,7 @@ fn parse_outreach_model_payload(raw: &str) -> Result<ModelOutreachPayload, Strin
         .trim_start_matches("```")
         .trim_end_matches("```")
         .trim();
-    let payload: ModelOutreachPayload =
+    let mut payload: ModelOutreachPayload =
         serde_json::from_str(cleaned).map_err(|e| format!("json parse error: {e}"))?;
     if payload.subject.trim().is_empty() {
         return Err("empty subject".to_string());
@@ -696,7 +696,47 @@ fn parse_outreach_model_payload(raw: &str) -> Result<ModelOutreachPayload, Strin
     if payload.grounded_on.is_empty() {
         return Err("empty grounded_on".to_string());
     }
+    payload.body_markdown = normalized_outreach_paragraphs(&payload.body_markdown);
     Ok(payload)
+}
+
+/// Provider output is still treated as content, but its presentation has a
+/// stable contract: an outreach draft reads like an email, not one dense wall
+/// of text. Preserve existing paragraph content and only split a one-line
+/// response at sentence boundaries when the provider missed that contract.
+fn normalized_outreach_paragraphs(body: &str) -> String {
+    let paragraphs = body
+        .split("\n\n")
+        .map(|paragraph| paragraph.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|paragraph| !paragraph.is_empty())
+        .collect::<Vec<_>>();
+    if paragraphs.len() >= 2 {
+        return paragraphs.join("\n\n");
+    }
+
+    let text = paragraphs.into_iter().next().unwrap_or_default();
+    let mut sentences = Vec::new();
+    let mut start = 0;
+    for (index, character) in text.char_indices() {
+        if matches!(character, '.' | '!' | '?') {
+            let end = index + character.len_utf8();
+            let sentence = text[start..end].trim();
+            if !sentence.is_empty() {
+                sentences.push(sentence.to_string());
+            }
+            start = end;
+        }
+    }
+    let remainder = text[start..].trim();
+    if !remainder.is_empty() {
+        sentences.push(remainder.to_string());
+    }
+    if sentences.len() >= 3 {
+        let final_sentence = sentences.pop().unwrap_or_default();
+        let opening = sentences.remove(0);
+        return format!("{opening}\n\n{}\n\n{final_sentence}", sentences.join(" "));
+    }
+    format!("{text}\n\nCould you please share your availability, package options, and an indicative quote?\n\nThank you.")
 }
 
 async fn outreach_text_infer(
@@ -888,11 +928,20 @@ mod tests {
 
     #[test]
     fn parses_fenced_json_response() {
-        let raw = "```json\n{\"subject\": \"Enquiry\", \"body_markdown\": \"Hello there\", \"grounded_on\": [\"location\"]}\n```";
+        let raw = "```json\n{\"subject\": \"Enquiry\", \"body_markdown\": \"Hello there. We are planning a Sydney wedding. Could you send availability?\", \"grounded_on\": [\"location\"]}\n```";
         let payload = parse_outreach_model_payload(raw).expect("should parse");
         assert_eq!(payload.subject, "Enquiry");
-        assert_eq!(payload.body_markdown, "Hello there");
+        assert_eq!(
+            payload.body_markdown,
+            "Hello there.\n\nWe are planning a Sydney wedding.\n\nCould you send availability?"
+        );
         assert_eq!(payload.grounded_on, vec!["location".to_string()]);
+    }
+
+    #[test]
+    fn preserves_model_paragraphs_for_outreach_email() {
+        let body = "Hello there team.\n\nWe are planning a Sydney wedding.\n\nCould you send availability and package options?";
+        assert_eq!(normalized_outreach_paragraphs(body), body);
     }
 
     #[test]

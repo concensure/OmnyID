@@ -624,6 +624,8 @@ export function buildWeddingVendorComparisonArtifactState(
     providerLabel: execution.providerLabel,
     preferenceSignals,
     location: input.location,
+    topPriorities: input.topPriorities,
+    atmosphereDescription: input.atmosphereDescription,
   });
   const providerKinds = metadataStrings(execution, "provider_kinds");
   const sourceProviderLabels = metadataStrings(execution, "source_provider_labels");

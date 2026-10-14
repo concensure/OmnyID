@@ -75,7 +75,14 @@ export function MobileFocusDeck(props: {
     // deck captures their pointer before the browser can synthesize a click.
     if (interactiveTarget(event.target) || exiting()) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    // Some mobile WebViews expose Pointer Events but reject capture on the
+    // initial touch. The gesture still works without capture while it remains
+    // in the card, so never let that implementation detail discard a swipe.
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Best-effort capture only.
+    }
     setDrag({ x: event.clientX, y: event.clientY, startedAt: performance.now(), pointerId: event.pointerId, width: rect.width, height: rect.height, axis: null });
     setOffset({ x: 0, y: 0 });
   }
@@ -132,7 +139,13 @@ export function MobileFocusDeck(props: {
           </div>
           <div
             class={`flex h-full min-h-0 touch-none select-none flex-col rounded-[24px] border border-wedding-muted bg-white p-4 shadow-card will-change-transform ${drag() ? "transition-none" : "transition-transform duration-150 ease-out"} motion-reduce:transition-opacity`}
-            style={{ transform: `translate(${offset().x}px, ${offset().y}px) rotate(${Math.max(-3, Math.min(3, offset().x / 40))}deg)` }}
+            style={{
+              transform: `translate(${offset().x}px, ${offset().y}px) rotate(${Math.max(-3, Math.min(3, offset().x / 40))}deg)`,
+              // Keep browsers from treating a deliberate card gesture as page
+              // scroll. This also covers builds where the utility class is not
+              // emitted by the Tailwind scanner.
+              "touch-action": "none",
+            }}
             role="group"
             aria-label={`${props.label} ${props.position + 1} of ${props.items.length}: ${item()?.title ?? ""}`}
             onPointerDown={pointerDown}

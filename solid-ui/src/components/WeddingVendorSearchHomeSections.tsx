@@ -63,6 +63,15 @@ function VendorSearchDraftInput(props: {
         event.preventDefault();
         selectQuery(event);
       }}
+      onKeyDown={(event) => {
+        // Keep Enter inside this form. The mobile magic-pointer layer treats
+        // its own action controls as navigation targets, so letting an Enter
+        // bubble there could replace the vendor search with the home surface.
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.form?.requestSubmit();
+      }}
       onBlur={commit}
       placeholder={props.placeholder}
       class={props.class}
@@ -153,6 +162,7 @@ export function WeddingVendorSearchHomeSection(props: {
       <form
         onSubmit={(event) => {
           event.preventDefault();
+          event.stopPropagation();
           const input = event.currentTarget.elements.namedItem("wedding-vendor-search-query");
           if (input instanceof HTMLInputElement) {
             workspace().onVendorSearchQueryChange?.(input.value);
@@ -179,10 +189,6 @@ export function WeddingVendorSearchHomeSection(props: {
           ? `${workspace().vendorSearchBlockedReason} A named search can still check your wedding directory.`
           : undefined}
         disabled={searchDisabled()}
-        data-magic-action="open"
-        data-magic-icon="search"
-        data-magic-label={workspace().vendorSearchRunning ? "Vendor search running" : "Search wedding vendors"}
-        data-magic-id="wedding:vendor-search:run"
       >
         {workspace().vendorSearchRunning ? "Searching..." : "Search vendors"}
       </button>

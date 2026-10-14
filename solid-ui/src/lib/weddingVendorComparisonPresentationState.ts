@@ -268,8 +268,11 @@ export function comparisonRecommendationHandoff(input: {
   providerLabel?: string | null;
   preferenceSignals?: readonly string[] | null;
   location?: string | null;
+  topPriorities?: readonly string[] | null;
+  atmosphereDescription?: string | null;
 }): Record<string, unknown> {
   const topChoice = input.choices[0] ?? null;
+  const runnerUp = input.choices[1] ?? null;
   const preferenceBackedCount = input.choices.filter((choice) =>
     !/No direct preference keyword match/i.test(choice.preferenceMatchLabel)
   ).length;
@@ -279,9 +282,19 @@ export function comparisonRecommendationHandoff(input: {
   const { bookable, verify, excluded, booked } = input.result;
   const nextAction = input.result.nextActions[0] ?? null;
   const total = booked.length + bookable.length + verify.length;
+  const userPriority = uniqueStrings([
+    ...(input.topPriorities ?? []),
+    ...(input.preferenceSignals ?? []),
+    input.atmosphereDescription,
+    input.location,
+  ], 1)[0] ?? null;
+  const topFit = clean(topChoice?.preferenceMatchLabel).replace(/; review manually\.?$/i, "");
+  const alternativeFit = clean(runnerUp?.preferenceMatchLabel).replace(/; review manually\.?$/i, "");
   return {
     recommendationLabel: topChoice
-      ? `Start by reviewing ${topChoice.title}, then select every vendor you want OmnyID to pursue.`
+      ? runnerUp
+        ? `${topChoice.title} is the stronger first choice for ${userPriority ?? "your stated priorities"}${topFit && !/^No direct/i.test(topFit) ? `, with evidence for ${topFit}` : ""}; compare ${runnerUp.title}${alternativeFit && !/^No direct/i.test(alternativeFit) ? ` for its ${alternativeFit} fit` : ""} before deciding whom to contact.`
+        : `${topChoice.title} is the available option to assess against ${userPriority ?? "your stated priorities"}${topFit && !/^No direct/i.test(topFit) ? `, with evidence for ${topFit}` : ""}; check availability and package details before outreach.`
       : "Review source-backed vendor options before outreach.",
     whyLabels: [
       `${total} source-backed vendor${total === 1 ? "" : "s"} found: ${booked.length} booked, ${bookable.length} bookable, ${verify.length} awaiting availability confirmation`,

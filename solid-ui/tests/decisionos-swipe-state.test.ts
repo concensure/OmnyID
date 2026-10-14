@@ -106,7 +106,8 @@ test("four-way focus deck swipe keeps approval distance-only", () => {
   assert.equal(decisionOsSwipeAxisLock({ dx: 12, dy: 4 }), "horizontal");
   assert.equal(decisionOsSwipeDirection({ dx: 100, dy: 0, elapsedMs: 300, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), "next");
   assert.equal(decisionOsSwipeDirection({ dx: -100, dy: 0, elapsedMs: 300, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), "prev");
-  assert.equal(decisionOsSwipeDirection({ dx: 0, dy: 40, elapsedMs: 10, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), null);
+  assert.equal(decisionOsSwipeDirection({ dx: 0, dy: 20, elapsedMs: 10, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), null);
+  assert.equal(decisionOsSwipeDirection({ dx: 0, dy: 30, elapsedMs: 40, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), "approve");
   assert.equal(decisionOsSwipeDirection({ dx: 0, dy: 130, elapsedMs: 300, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), "approve");
   assert.equal(decisionOsSwipeProgress({ dx: -72, dy: 0, cardWidth: 360, cardHeight: 500 }), 0.91);
   assert.equal(decisionOsSwipeProgress({ dx: 0, dy: 120, cardWidth: 360, cardHeight: 500 }), 1);
