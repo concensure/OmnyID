@@ -1152,3 +1152,4 @@ tasks:
       - live mobile vendor comparison cards now persist follow-up selection, budget tooltips flip and scroll within the phone viewport, and custom image cards support whole-card touch dragging
       - vendor follow-up selection now emits its AFP update without remounting the active comparison; agenda confirmations and due-date changes use the existing wedding-responsibility AFP projection, while Budget can select a known person or add-and-select a contact without interrupting contribution entry
       - timeline chart task labels retain their left edge on narrow screens and information tips use a viewport-clamped portal position in both Timeline and Budget
+      - `d8f3541` was released to Oracle on 2026-10-15 as a scoped UI asset update; `/workspace/` and `/wedding/` returned 200, the deployed ResponseQueue bundle contains the quiet selection, agenda, and contact-picker paths, and Caddy was not reloaded

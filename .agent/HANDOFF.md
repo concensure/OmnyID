@@ -2162,6 +2162,42 @@ Deployment:
   SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
 
+## 2026-10-15 - WED-185 stable wedding selection and planning actions (Codex)
+
+Changed:
+
+- Choosing or removing a vendor for follow-up now immediately updates only the
+  selection highlight and writes the existing vendor-contact AFP projection in
+  the background. It no longer refreshes/remounts the active comparison card.
+- Phone schedule labels no longer truncate their left edge. Information tips
+  now use a portal position and height clamped to the visible viewport, which
+  covers the Timeline and Budget controls.
+- Weekly agenda `Confirm status` is now an immediate on-track confirmation;
+  it remains visibly confirmed and writes a wedding-responsibility AFP record.
+  `Add due date` opens a date picker prefilled from the task's current date or
+  a priority/category lead-time estimate, and persists the selected due date
+  through that same AFP responsibility projection.
+- Budget contribution entry accepts typed names or existing people from its
+  list. `Add a contact` creates a local contact, selects it in the form, and
+  sends its contact AFP projection without remounting the budget form.
+
+Verification:
+
+- `npm run test:wedding --prefix solid-ui` (1,848 passing)
+- `npm run typecheck --prefix solid-ui` (passing)
+- `npm run build --prefix solid-ui` (passing)
+- `git diff --check` (passing)
+
+Deployment:
+
+- Commit `d8f3541` was released as a scoped `ui` asset build. The UI seed job
+  exited 0; `https://omnyid.com/workspace/` and `https://omnyid.com/wedding/`
+  returned HTTP 200. The served ResponseQueue bundle contains the quiet
+  selection, agenda confirmation, contact-picker, and viewport-clamp paths.
+- Homeserver remained running. Caddy was neither reloaded nor restarted; its
+  SHA-256 remains
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
 ## 2026-10-15 - WED-185 Sprout, outreach, and mobile interaction repair (Codex)
 
 Changed:
