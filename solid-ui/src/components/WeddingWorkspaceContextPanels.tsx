@@ -109,6 +109,12 @@ export function WeddingWorkspaceContextPanels(props: {
     await props.saveProjection(input);
     props.onRefreshWorkspace?.();
   }
+  async function saveBudgetContributorContact(input: SendAfpMessageInput) {
+    if (!props.saveProjection) throw new Error("Saving is not connected yet.");
+    // Creating a contact should not remount the budget card while the couple is
+    // still entering the associated contribution.
+    await props.saveProjection(input);
+  }
   async function decideBoundaryRequest(requestId: string, decision: WeddingBoundaryRequestDecision): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
     const request = props.state.boundaryState.approvalQueue.find((item) => item.requestId === requestId);
@@ -257,6 +263,9 @@ export function WeddingWorkspaceContextPanels(props: {
           metadata={props.state.workspace.metadata}
           onSaveAllocation={saveBudgetAllocation}
           onSaveContribution={saveBudgetAllocation}
+          onSaveContributorContact={saveBudgetContributorContact}
+          contributorPeople={props.state.helperContactNames}
+          contactUserId={props.contactUserId}
           onOpenArtifact={props.onOpenArtifact}
         />
       </div>

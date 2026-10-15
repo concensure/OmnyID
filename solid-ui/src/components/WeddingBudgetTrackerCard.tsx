@@ -5,6 +5,11 @@ import type { SendAfpMessageInput } from "@/lib/api";
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import { weddingDecisionProjectionToAfpSendInput } from "@/lib/weddingDecisionAfpProjectionState";
+import { loadContacts, saveContacts } from "@/lib/contactsLocalState";
+import {
+  upsertWeddingHelperContact,
+  weddingHelperContactToAfpSendInput,
+} from "@/lib/weddingHelpersPanelState";
 import type { WeddingBudgetTrackingState } from "@/lib/weddingBudgetTrackingState";
 import {
   WEDDING_BUDGET_CATEGORIES,
@@ -55,6 +60,9 @@ export function WeddingBudgetTrackerCard(props: {
   metadata?: unknown;
   onSaveAllocation?: (input: SendAfpMessageInput) => Promise<unknown>;
   onSaveContribution?: (input: SendAfpMessageInput) => Promise<unknown>;
+  onSaveContributorContact?: (input: SendAfpMessageInput) => Promise<unknown>;
+  contributorPeople?: readonly string[];
+  contactUserId?: string | null;
   onOpenArtifact?: (artifactId: string) => void;
 }) {
   const currency = props.state.lineItems[0]?.currency ?? "AUD";
@@ -72,6 +80,10 @@ export function WeddingBudgetTrackerCard(props: {
   const [contributorLabel, setContributorLabel] = createSignal("");
   const [contributionAmount, setContributionAmount] = createSignal("");
   const [contributionCondition, setContributionCondition] = createSignal("");
+  const [showContributorContactFields, setShowContributorContactFields] = createSignal(false);
+  const [contributorContactName, setContributorContactName] = createSignal("");
+  const [contributorContactEmail, setContributorContactEmail] = createSignal("");
+  const [savingContributorContact, setSavingContributorContact] = createSignal(false);
   const [lastSyncedAllocationSignature, setLastSyncedAllocationSignature] = createSignal(budgetAllocationSignature(props.state));
   const allocated = createMemo(() => weddingBudgetAllocationAllocatedAmount(draft()));
   const remaining = createMemo(() => weddingBudgetAllocationRemaining(draft()));
@@ -86,6 +98,9 @@ export function WeddingBudgetTrackerCard(props: {
     if (draft().totalAmount > 0 || !props.onSaveAllocation) return saveState().disabledReason;
     return null;
   });
+  const contributorPeople = createMemo(() => [...new Set((props.contributorPeople ?? [])
+    .map((person) => person.trim())
+    .filter(Boolean))].slice(0, 60));
 
   createEffect(() => {
     const signature = budgetAllocationSignature(props.state);
@@ -156,6 +171,39 @@ export function WeddingBudgetTrackerCard(props: {
       setContributionNotice("Could not save the contribution right now. Try again in a moment.");
     } finally {
       setSavingContribution(false);
+    }
+  }
+
+  async function addContributorContact(): Promise<void> {
+    const name = contributorContactName().trim();
+    if (!name || savingContributorContact()) return;
+    const email = contributorContactEmail().trim();
+    setSavingContributorContact(true);
+    const result = upsertWeddingHelperContact(loadContacts(props.contactUserId), {
+      name,
+      email,
+      role: "Budget contributor",
+    });
+    if (result) saveContacts(result.contacts, props.contactUserId);
+    // Fill the contribution field immediately. The AFP event makes the new
+    // person available to the rest of the wedding workspace on its next read.
+    setContributorLabel(name);
+    try {
+      const message = weddingHelperContactToAfpSendInput({
+        name,
+        email,
+        role: "Budget contributor",
+        metadata: props.metadata ?? {},
+      });
+      if (message && props.onSaveContributorContact) await props.onSaveContributorContact(message);
+      setContributionNotice(`${name} added to Contacts and selected as the contributor.`);
+      setShowContributorContactFields(false);
+      setContributorContactName("");
+      setContributorContactEmail("");
+    } catch {
+      setContributionNotice(`${name} is selected here and saved in Contacts. Wedding memory will retry when saving is available.`);
+    } finally {
+      setSavingContributorContact(false);
     }
   }
 
@@ -575,14 +623,27 @@ export function WeddingBudgetTrackerCard(props: {
         <div class="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem]">
           <input
             type="text"
+            list="wedding-budget-contributor-people"
             value={contributorLabel()}
             placeholder="Who is contributing?"
             class="min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-emerald-950 outline-none focus:border-emerald-300"
             onInput={(event) => {
-              setContributorLabel(event.currentTarget.value);
+              const value = event.currentTarget.value;
+              if (value === "__add_new_contributor_contact__") {
+                setContributorLabel("");
+                setShowContributorContactFields(true);
+                return;
+              }
+              setContributorLabel(value);
               setContributionNotice(null);
             }}
           />
+          <datalist id="wedding-budget-contributor-people">
+            <For each={contributorPeople()}>
+              {(person) => <option value={person} />}
+            </For>
+            <option value="__add_new_contributor_contact__">Add a new contact…</option>
+          </datalist>
           <input
             type="number"
             inputmode="numeric"
@@ -597,6 +658,29 @@ export function WeddingBudgetTrackerCard(props: {
             }}
           />
         </div>
+        <button
+          type="button"
+          aria-expanded={showContributorContactFields()}
+          class="mt-2 text-xs font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-2"
+          onClick={() => setShowContributorContactFields((value) => !value)}
+        >
+          Add a contact
+        </button>
+        <Show when={showContributorContactFields()}>
+          <div class="mt-2 grid gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 p-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <label class="text-xs font-semibold text-emerald-950">
+              Name
+              <input type="text" value={contributorContactName()} onInput={(event) => setContributorContactName(event.currentTarget.value)} class="mt-1 min-h-10 w-full rounded-lg border border-emerald-200 bg-white px-2 text-sm font-normal text-emerald-950 outline-none" />
+            </label>
+            <label class="text-xs font-semibold text-emerald-950">
+              Email (optional)
+              <input type="email" value={contributorContactEmail()} onInput={(event) => setContributorContactEmail(event.currentTarget.value)} class="mt-1 min-h-10 w-full rounded-lg border border-emerald-200 bg-white px-2 text-sm font-normal text-emerald-950 outline-none" />
+            </label>
+            <button type="button" disabled={!contributorContactName().trim() || savingContributorContact()} onClick={() => void addContributorContact()} class="min-h-10 rounded-lg border border-emerald-200 bg-white px-3 text-xs font-semibold text-emerald-950 disabled:cursor-not-allowed disabled:opacity-50">
+              {savingContributorContact() ? "Adding..." : "Add and select"}
+            </button>
+          </div>
+        </Show>
         <input
           type="text"
           value={contributionCondition()}

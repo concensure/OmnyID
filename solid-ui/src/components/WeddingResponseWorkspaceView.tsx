@@ -259,12 +259,16 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     setExportNotice(runWeddingBundleBrowserExport(payload));
   }
 
-  function saveVendorChoiceSelection(input: WeddingVendorChoiceSelectionSaveInput) {
+  function saveVendorChoiceSelection(input: WeddingVendorChoiceSelectionSaveInput, options?: {
+    refreshWorkspace?: boolean;
+    surfaceNotice?: boolean;
+  }) {
+    const surfaceNotice = options?.surfaceNotice !== false;
     if (!props.saveProjection) {
-      setExportNotice("Vendor selected. Account saving is not connected yet, so contact details are only local for now.");
+      if (surfaceNotice) setExportNotice("Vendor selected. Account saving is not connected yet, so contact details are only local for now.");
       return;
     }
-    setExportNotice(`${input.selected ? "Saving" : "Removing"} ${input.optionLabel}${input.selected ? "'s contact details" : ""} ${input.selected ? "to" : "from"} the wedding record...`);
+    if (surfaceNotice) setExportNotice(`${input.selected ? "Saving" : "Removing"} ${input.optionLabel}${input.selected ? "'s contact details" : ""} ${input.selected ? "to" : "from"} the wedding record...`);
     void props.saveProjection(weddingVendorContactReferenceToAfpSendInput({
       metadata: state().workspace.metadata,
       artifactId: input.artifact.artifactId,
@@ -275,13 +279,15 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       selected: input.selected,
     }))
       .then(() => {
-        setExportNotice(input.selected
-          ? `${input.optionLabel} saved for vendor follow-up.`
-          : `${input.optionLabel} removed from vendor follow-up.`);
-        props.onRefreshWorkspace?.();
+        if (surfaceNotice) {
+          setExportNotice(input.selected
+            ? `${input.optionLabel} saved for vendor follow-up.`
+            : `${input.optionLabel} removed from vendor follow-up.`);
+        }
+        if (options?.refreshWorkspace !== false) props.onRefreshWorkspace?.();
       })
       .catch(() => {
-        setExportNotice(`${input.optionLabel} could not be updated yet. Your selection is still visible here.`);
+        if (surfaceNotice) setExportNotice(`${input.optionLabel} could not be updated yet. Your selection is still visible here.`);
       });
   }
 
@@ -979,7 +985,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             result={inlineVendorSearchPreview()}
             outreach={vendorOutreach}
             onDismiss={setDismissedVendorSearchResultArtifactId}
-            onVendorChoiceSelected={saveVendorChoiceSelection}
+            onVendorChoiceSelected={(input) => saveVendorChoiceSelection(input, { refreshWorkspace: false, surfaceNotice: false })}
           />
         </Show>
 
@@ -1019,7 +1025,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onResearch={handleSidebarAction}
           onOpenFollowUpQueue={openSelectedVendorFollowUpQueue}
           onOpenVendorQuoteReplySurface={openVendorQuoteReplySurface}
-          onVendorChoiceSelected={saveVendorChoiceSelection}
+          onVendorChoiceSelected={(input) => saveVendorChoiceSelection(input, { refreshWorkspace: false, surfaceNotice: false })}
           outreachFlows={vendorOutreach.flows()}
           gmailConnected={Boolean(props.gmailStatus?.connected)}
           onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)}

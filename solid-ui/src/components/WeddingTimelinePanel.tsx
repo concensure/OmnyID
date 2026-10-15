@@ -324,8 +324,8 @@ export function WeddingTimelinePanel(props: {
           </For>
           </div>}>
             <div class="overflow-x-auto rounded-xl border border-indigo-100 bg-white/80 p-3">
-              <div class="min-w-[680px]">
-                <div class="grid grid-cols-[minmax(10rem,14rem)_1fr] gap-x-3 border-b border-indigo-100 pb-2">
+              <div class="min-w-[600px] sm:min-w-[680px]">
+                <div class="grid grid-cols-[minmax(8rem,12rem)_1fr] gap-x-3 border-b border-indigo-100 pb-2 sm:grid-cols-[minmax(10rem,14rem)_1fr]">
                   <p class="text-xs font-semibold uppercase tracking-wide text-indigo-950/65">All tasks</p>
                   <div class="relative h-8">
                     <For each={ganttAxisTicks()}>
@@ -336,10 +336,10 @@ export function WeddingTimelinePanel(props: {
                 <div class="mt-2 space-y-2">
                   <For each={filteredRows()}>
                     {(row) => (
-                      <div class="grid grid-cols-[minmax(10rem,14rem)_1fr] items-center gap-x-3">
+                      <div class="grid grid-cols-[minmax(8rem,12rem)_1fr] items-center gap-x-3 sm:grid-cols-[minmax(10rem,14rem)_1fr]">
                         <button
                           type="button"
-                          class="min-h-11 truncate text-left text-xs font-semibold text-indigo-950"
+                          class="min-h-11 overflow-visible text-left text-xs font-semibold leading-4 text-indigo-950"
                           title={`View ${row.title} on the wedding calendar`}
                           onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state, row.id))}
                         >

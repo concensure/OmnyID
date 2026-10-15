@@ -200,16 +200,20 @@ test("wedding helper weekly agenda rows explain the next short planning move", (
 test("wedding helper local state normalizes helpers assignments and dates", () => {
   const state = normalizeWeddingHelperLocalState({
     doneTaskIds: { task_one: true, task_two: false },
+    confirmedTaskIds: { task_one: true, task_two: false },
     taskAssignees: { task_one: " Alex ", empty: "" },
     taskConsultedPeople: { task_one: "Sam" },
     taskLastContactDates: { task_one: "2027-06-01", bad: "next week" },
+    taskDueDates: { task_one: "2027-06-10", bad: "next week" },
     customHelpers: ["Mia", " mia ", "", "Coordinator"],
   });
 
   assert.deepEqual(state.doneTaskIds, { task_one: true });
+  assert.deepEqual(state.confirmedTaskIds, { task_one: true });
   assert.deepEqual(state.taskAssignees, { task_one: "Alex" });
   assert.deepEqual(state.taskConsultedPeople, { task_one: "Sam" });
   assert.deepEqual(state.taskLastContactDates, { task_one: "2027-06-01" });
+  assert.deepEqual(state.taskDueDates, { task_one: "2027-06-10" });
   assert.deepEqual(state.customHelpers, ["Mia", "Coordinator"]);
 });
 
@@ -226,18 +230,22 @@ test("wedding helper local state saves by workspace and survives malformed stora
 
   const saved = saveWeddingHelperLocalState("response_workspace:one", {
     doneTaskIds: { task_one: true },
+    confirmedTaskIds: { task_one: true },
     taskAssignees: { task_one: "Alex" },
     taskConsultedPeople: { task_one: "Sam" },
     taskLastContactDates: { task_one: "2027-06-01" },
+    taskDueDates: { task_one: "2027-06-10" },
     customHelpers: ["Mia"],
   });
 
   assert.deepEqual(loadWeddingHelperLocalState("response_workspace:one"), saved);
   assert.deepEqual(loadWeddingHelperLocalState("response_workspace:two"), {
     doneTaskIds: {},
+    confirmedTaskIds: {},
     taskAssignees: {},
     taskConsultedPeople: {},
     taskLastContactDates: {},
+    taskDueDates: {},
     customHelpers: [],
   });
 

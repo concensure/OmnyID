@@ -44,9 +44,11 @@ export function WeddingHelpersPanel(props: {
   const workspaceId = () => props.state.workspace.metadata.responseWorkspaceId;
   const initialState = loadWeddingHelperLocalState(workspaceId());
   const [doneTaskIds, setDoneTaskIds] = createSignal<Record<string, true>>(initialState.doneTaskIds);
+  const [confirmedTaskIds, setConfirmedTaskIds] = createSignal<Record<string, true>>(initialState.confirmedTaskIds);
   const [taskAssignees, setTaskAssignees] = createSignal<Record<string, string>>(initialState.taskAssignees);
   const [taskConsultedPeople, setTaskConsultedPeople] = createSignal<Record<string, string>>(initialState.taskConsultedPeople);
   const [taskLastContactDates, setTaskLastContactDates] = createSignal<Record<string, string>>(initialState.taskLastContactDates);
+  const [taskDueDates, setTaskDueDates] = createSignal<Record<string, string>>(initialState.taskDueDates);
   const [taskTab, setTaskTab] = createSignal<WeddingHelperTaskTab>("open");
   const [customHelperName, setCustomHelperName] = createSignal("");
   const [customHelperEmail, setCustomHelperEmail] = createSignal("");
@@ -54,15 +56,22 @@ export function WeddingHelpersPanel(props: {
   const [customHelperRole, setCustomHelperRole] = createSignal("Helper");
   const [customHelpers, setCustomHelpers] = createSignal<string[]>(initialState.customHelpers);
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
+  const [agendaDueDateTaskId, setAgendaDueDateTaskId] = createSignal<string | null>(null);
+  const [agendaDueDateDraft, setAgendaDueDateDraft] = createSignal("");
   const inferredPartnerNames = createMemo(() => inferWeddingPartnerNames(props.state));
   const helperPeople = createMemo(() => buildWeddingHelperPeople(props.state.helperContactNames, customHelpers(), inferredPartnerNames()));
-  const helperTasks = createMemo(() => props.state.planningTaskItems.slice(0, 30).map((task) => ({
+  const helperTasks = createMemo(() => props.state.planningTaskItems.slice(0, 30).map((task) => {
+    const localDueDate = taskDueDates()[task.id];
+    return {
     ...task,
+    dueAt: localDueDate ? `${localDueDate}T12:00:00.000Z` : task.dueAt,
+    dueLabel: localDueDate || task.dueLabel,
     // An unassigned task belongs to the account owner first. It can then be
     // deliberately reassigned to a partner or helper instead of vanishing
     // from everyone's workload.
     assignee: task.assignee?.trim() || helperPeople()[0] || "You",
-  })));
+  };
+  }));
   const taskAssignee = (task: WeddingPlanningTask) =>
     taskAssignees()[task.id] ?? task.assignee ?? helperPeople()[0] ?? "You";
   const taskAction = (task: WeddingPlanningTask) => weddingTaskSidebarAction(task, props.state);
@@ -94,9 +103,11 @@ export function WeddingHelpersPanel(props: {
   createEffect(() => {
     saveWeddingHelperLocalState(workspaceId(), {
       doneTaskIds: doneTaskIds(),
+      confirmedTaskIds: confirmedTaskIds(),
       taskAssignees: taskAssignees(),
       taskConsultedPeople: taskConsultedPeople(),
       taskLastContactDates: taskLastContactDates(),
+      taskDueDates: taskDueDates(),
       customHelpers: customHelpers(),
     });
   });
@@ -115,7 +126,7 @@ export function WeddingHelpersPanel(props: {
     consultedLabel?: string;
     lastContactDate?: string;
     status?: WeddingHelperResponsibilityStatus;
-  }): Promise<void> {
+  }, options?: { refreshWorkspace?: boolean; quiet?: boolean }): Promise<void> {
     if (!props.saveProjection) return;
     const sendInput = weddingHelperResponsibilityToAfpSendInput({
       task,
@@ -128,11 +139,51 @@ export function WeddingHelpersPanel(props: {
     if (!sendInput) return;
     try {
       await props.saveProjection(sendInput);
-      setSaveNotice("Saved to wedding memory.");
-      props.onRefreshWorkspace?.();
+      if (!options?.quiet) setSaveNotice("Saved to wedding memory.");
+      if (options?.refreshWorkspace !== false) props.onRefreshWorkspace?.();
     } catch {
-      setSaveNotice("Saved on this page. Wedding memory will sync when saving is available.");
+      if (!options?.quiet) setSaveNotice("Saved on this page. Wedding memory will sync when saving is available.");
     }
+  }
+
+  function expectedDueDate(task: WeddingPlanningTask): string {
+    const current = task.dueAt?.slice(0, 10);
+    if (current && /^\d{4}-\d{2}-\d{2}$/.test(current)) return current;
+    const title = task.title.toLowerCase();
+    const leadDays = /venue|vendor|photograph|florist|cater|celebrant|officiant/.test(title)
+      ? 14
+      : /invite|guest|seating/.test(title)
+        ? 21
+        : task.priority === "urgent"
+          ? 3
+          : task.priority === "high"
+            ? 7
+            : 10;
+    const date = new Date();
+    date.setDate(date.getDate() + leadDays);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function openAgendaDueDate(task: WeddingPlanningTask): void {
+    setAgendaDueDateTaskId(task.id);
+    setAgendaDueDateDraft(expectedDueDate(task));
+  }
+
+  function confirmAgendaTask(task: WeddingPlanningTask): void {
+    setConfirmedTaskIds((current) => ({ ...current, [task.id]: true }));
+    void saveTaskResponsibility(task, { status: "on_track" }, { refreshWorkspace: false, quiet: true });
+  }
+
+  function saveAgendaDueDate(task: WeddingPlanningTask): void {
+    const dueDate = agendaDueDateDraft();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return;
+    setTaskDueDates((current) => ({ ...current, [task.id]: dueDate }));
+    setAgendaDueDateTaskId(null);
+    void saveTaskResponsibility(
+      { ...task, dueAt: `${dueDate}T12:00:00.000Z`, dueLabel: dueDate },
+      { status: "open" },
+      { refreshWorkspace: false, quiet: true },
+    );
   }
 
   function upsertHelperContact(draft: {
@@ -314,14 +365,41 @@ export function WeddingHelpersPanel(props: {
                       </p>
                       <p class="mt-1 text-xs leading-5 text-fuchsia-900/70">{row.reasonLabel}</p>
                     </div>
-                    <button
-                      type="button"
-                      class="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1.5 text-[11px] font-semibold text-fuchsia-950 transition hover:bg-white"
-                      onClick={() => props.onSidebarAction(taskAction(row.task))}
+                    <Show
+                      when={row.suggestedActionLabel === "Confirm status"}
+                      fallback={
+                        <button
+                          type="button"
+                          class="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1.5 text-[11px] font-semibold text-fuchsia-950 transition hover:bg-white"
+                          onClick={() => props.onSidebarAction(taskAction(row.task))}
+                        >
+                          {row.suggestedActionLabel}
+                        </button>
+                      }
                     >
-                      {row.suggestedActionLabel}
-                    </button>
+                      <button
+                        type="button"
+                        aria-pressed={Boolean(confirmedTaskIds()[row.id])}
+                        class={`rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition ${confirmedTaskIds()[row.id] ? "border-emerald-300 bg-emerald-100 text-emerald-950" : "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-950 hover:bg-white"}`}
+                        onClick={() => confirmAgendaTask(row.task)}
+                      >
+                        {confirmedTaskIds()[row.id] ? "On track" : "Confirm status"}
+                      </button>
+                    </Show>
                   </div>
+                  <Show when={row.dueLabel === "Add due date"}>
+                    <div class="mt-2">
+                      <Show
+                        when={agendaDueDateTaskId() === row.id}
+                        fallback={<button type="button" class="text-xs font-semibold text-fuchsia-900 underline decoration-fuchsia-300 underline-offset-2" onClick={() => openAgendaDueDate(row.task)}>Add due date</button>}
+                      >
+                        <div class="flex flex-wrap items-center gap-2">
+                          <input type="date" value={agendaDueDateDraft()} onInput={(event) => setAgendaDueDateDraft(event.currentTarget.value)} class="min-h-10 rounded-lg border border-fuchsia-200 bg-white px-2 text-xs text-fuchsia-950 outline-none" />
+                          <button type="button" class="min-h-10 rounded-lg border border-fuchsia-200 bg-fuchsia-100 px-3 text-xs font-semibold text-fuchsia-950" onClick={() => saveAgendaDueDate(row.task)}>Set due date</button>
+                        </div>
+                      </Show>
+                    </div>
+                  </Show>
                 </li>
               )}
             </For>

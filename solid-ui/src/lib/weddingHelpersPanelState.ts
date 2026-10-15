@@ -27,13 +27,15 @@ export type WeddingHelperWorkloadRow = {
 
 export type WeddingHelperLocalState = {
   doneTaskIds: Record<string, true>;
+  confirmedTaskIds: Record<string, true>;
   taskAssignees: Record<string, string>;
   taskConsultedPeople: Record<string, string>;
   taskLastContactDates: Record<string, string>;
+  taskDueDates: Record<string, string>;
   customHelpers: string[];
 };
 
-export type WeddingHelperResponsibilityStatus = "open" | "done";
+export type WeddingHelperResponsibilityStatus = "open" | "on_track" | "done";
 
 export type WeddingHelperWeeklyAgendaRow = {
   id: string;
@@ -165,11 +167,13 @@ function helperResponsibilitySemanticObject(input: {
     id: `semantic:wedding_helper_responsibility:${safeWeddingLabel(input.taskId)}:${input.status}`,
     kind: needsOwner ? "wedding_approval_required" : "wedding_active_loop",
     title: input.taskTitle,
-    stateLabel: input.status === "done" ? "Done" : needsOwner ? "Needs owner" : "Owner assigned",
+    stateLabel: input.status === "done" ? "Done" : input.status === "on_track" ? "On track" : needsOwner ? "Needs owner" : "Owner assigned",
     tone: input.status === "done" ? "status" : needsOwner ? "action" : "status",
     summary: needsOwner
       ? "This wedding task needs one clear owner before the agent can help move it forward."
-      : `${input.ownerLabel} owns this task.${input.consultedLabel ? ` Consult ${input.consultedLabel}.` : ""}`,
+      : input.status === "on_track"
+        ? `${input.ownerLabel} confirmed this task is on track.${input.consultedLabel ? ` Consult ${input.consultedLabel}.` : ""}`
+        : `${input.ownerLabel} owns this task.${input.consultedLabel ? ` Consult ${input.consultedLabel}.` : ""}`,
     comparison: null,
     actions: [{
       label: needsOwner ? "Assign owner" : open ? "Open task" : "Review completed work",
@@ -196,9 +200,11 @@ function storageKey(workspaceId: string): string {
 function emptyWeddingHelperLocalState(): WeddingHelperLocalState {
   return {
     doneTaskIds: {},
+    confirmedTaskIds: {},
     taskAssignees: {},
     taskConsultedPeople: {},
     taskLastContactDates: {},
+    taskDueDates: {},
     customHelpers: [],
   };
 }
@@ -207,9 +213,11 @@ export function normalizeWeddingHelperLocalState(value: unknown): WeddingHelperL
   const source = record(value);
   return {
     doneTaskIds: doneTaskRecord(source.doneTaskIds),
+    confirmedTaskIds: doneTaskRecord(source.confirmedTaskIds),
     taskAssignees: stringRecord(source.taskAssignees),
     taskConsultedPeople: stringRecord(source.taskConsultedPeople),
     taskLastContactDates: stringRecord(source.taskLastContactDates, true),
+    taskDueDates: stringRecord(source.taskDueDates, true),
     customHelpers: uniqueStrings(Array.isArray(source.customHelpers) ? source.customHelpers : []),
   };
 }
@@ -461,7 +469,11 @@ export function weddingHelperResponsibilityToAfpMessage(
 
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
   const nowIso = clean(input.nowIso) || new Date().toISOString();
-  const status: WeddingHelperResponsibilityStatus = input.status === "done" ? "done" : "open";
+  const status: WeddingHelperResponsibilityStatus = input.status === "done"
+    ? "done"
+    : input.status === "on_track"
+      ? "on_track"
+      : "open";
   const ownerLabel = clean(input.ownerLabel) || clean(input.task.assignee) || "Unassigned";
   const consultedLabel = clean(input.consultedLabel);
   const lastContactDate = clean(input.lastContactDate);

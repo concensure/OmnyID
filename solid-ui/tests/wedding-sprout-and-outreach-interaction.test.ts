@@ -10,6 +10,11 @@ const choiceCard = readFileSync(resolve(process.cwd(), "src/components/WeddingVe
 const vendorSearch = readFileSync(resolve(process.cwd(), "src/components/WeddingVendorSearchHomeSections.tsx"), "utf8");
 const infoTip = readFileSync(resolve(process.cwd(), "src/components/WeddingInfoTip.tsx"), "utf8");
 const customizer = readFileSync(resolve(process.cwd(), "src/components/ViewCustomizer.tsx"), "utf8");
+const workspaceView = readFileSync(resolve(process.cwd(), "src/components/WeddingResponseWorkspaceView.tsx"), "utf8");
+const helpersPanel = readFileSync(resolve(process.cwd(), "src/components/WeddingHelpersPanel.tsx"), "utf8");
+const helpersState = readFileSync(resolve(process.cwd(), "src/lib/weddingHelpersPanelState.ts"), "utf8");
+const budgetTracker = readFileSync(resolve(process.cwd(), "src/components/WeddingBudgetTrackerCard.tsx"), "utf8");
+const timelinePanel = readFileSync(resolve(process.cwd(), "src/components/WeddingTimelinePanel.tsx"), "utf8");
 
 test("Sprout performs its initial persona load before enabling template actions", () => {
   assert.match(personaFab, /reloadPersonas\(options\?: \{ initial\?: boolean \}\)/);
@@ -39,9 +44,31 @@ test("live vendor results offer a persisted follow-up selection on mobile", () =
   assert.match(choiceCard, /min-h-11 w-full rounded-xl[\s\S]*sm:w-auto/);
 });
 
-test("phone tooltip placement flips inside the viewport and custom image cards use pointer drag", () => {
-  assert.match(infoTip, /spaceBelow >= estimatedTipHeight/);
-  assert.match(infoTip, /max-h-\[calc\(100dvh-1\.5rem\)\] .*overflow-y-auto/);
+test("phone tooltip placement clamps inside the viewport and custom image cards use pointer drag", () => {
+  assert.match(infoTip, /const opensBelow = spaceBelow >= estimatedTipHeight/);
+  assert.match(infoTip, /window\.innerWidth - tooltipWidth - viewportMargin/);
+  assert.match(infoTip, /"max-height": `\$\{position\(\)\.maxHeight\}px`/);
   assert.match(customizer, /touch-none cursor-grab active:cursor-grabbing/);
   assert.match(customizer, /setPointerCapture\?\.\(event\.pointerId\)/);
+});
+
+test("live selection persists an AFP update without remounting the comparison", () => {
+  assert.match(workspaceView, /refreshWorkspace: false, surfaceNotice: false/);
+  assert.match(workspaceView, /if \(options\?\.refreshWorkspace !== false\) props\.onRefreshWorkspace/);
+});
+
+test("agenda confirmations and due dates use the wedding responsibility AFP projection", () => {
+  assert.match(helpersPanel, /status: "on_track"/);
+  assert.match(helpersPanel, /type="date" value=\{agendaDueDateDraft\(\)\}/);
+  assert.match(helpersPanel, /dueAt: `\$\{dueDate\}T12:00:00\.000Z`/);
+  assert.match(helpersState, /WeddingHelperResponsibilityStatus = "open" \| "on_track" \| "done"/);
+  assert.match(helpersState, /confirmedTaskIds/);
+});
+
+test("budget contributions support saved people and adding a selected contact", () => {
+  assert.match(budgetTracker, /list="wedding-budget-contributor-people"/);
+  assert.match(budgetTracker, /__add_new_contributor_contact__/);
+  assert.match(budgetTracker, /Add and select/);
+  assert.match(budgetTracker, /weddingHelperContactToAfpSendInput/);
+  assert.match(timelinePanel, /overflow-visible text-left text-xs/);
 });
