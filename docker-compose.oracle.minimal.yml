@@ -49,7 +49,7 @@ services:
     # Electric.
     # Invoke through sh so Windows worktrees cannot strip the script execute
     # bit from this bind-mounted file during a production source sync.
-    entrypoint: ["/bin/sh", "/usr/local/bin/runtime-env-entrypoint.sh"]
+    entrypoint: ["/bin/bash", "/usr/local/bin/runtime-env-entrypoint.sh"]
     command: ["/app/bin/entrypoint", "start"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-}
@@ -84,7 +84,7 @@ services:
     depends_on:
       - postgres
       - seaweedfs
-    entrypoint: ["/bin/sh", "/usr/local/bin/runtime-env-entrypoint.sh"]
+    entrypoint: ["/bin/bash", "/usr/local/bin/runtime-env-entrypoint.sh"]
     command: ["./omnyid-homeserver"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-}
