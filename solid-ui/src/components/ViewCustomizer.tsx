@@ -137,6 +137,7 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
     let cx = originX, cy = originY;
 
     function onMove(e: PointerEvent) {
+      e.preventDefault();
       cx = originX + (e.clientX - pointerX);
       cy = originY + (e.clientY - pointerY);
       // Update position reactively (batched in next animation frame for perf)
@@ -190,8 +191,14 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
         {(card) => (
           <Portal>
             <div
-              class="fixed z-[180] animate-fade-in"
+              class={`fixed z-[180] animate-fade-in ${card.kind === "image" ? "touch-none cursor-grab active:cursor-grabbing" : ""}`}
               style={{ left: `${card.x}px`, top: `${card.y}px` }}
+              onPointerDown={(event) => {
+                if (card.kind !== "image") return;
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+                event.preventDefault();
+                startDragCard(card.id, event.clientX, event.clientY, card.x, card.y);
+              }}
             >
               <div class={card.kind === "image"
                 ? "group relative h-[220px] w-[min(320px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-white/60 bg-white shadow-panel"
@@ -205,6 +212,8 @@ export function ViewCustomizer(props: { viewId: ViewName }) {
                     ? "absolute inset-x-0 top-0 z-10 flex cursor-grab items-center justify-between bg-gradient-to-b from-black/55 to-transparent px-3 pb-7 pt-2 text-white opacity-90 select-none active:cursor-grabbing"
                     : "mb-3 flex cursor-grab items-center justify-between select-none active:cursor-grabbing"}
                   onPointerDown={(e) => {
+                    if (card.kind === "image") return;
+                    e.currentTarget.setPointerCapture?.(e.pointerId);
                     e.preventDefault();
                     startDragCard(card.id, e.clientX, e.clientY, card.x, card.y);
                   }}

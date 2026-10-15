@@ -27,7 +27,16 @@ export function WeddingInfoTip(props: {
   const show = () => {
     if (trigger) {
       const rect = trigger.getBoundingClientRect();
-      setPosition({ top: rect.bottom + 8, right: Math.max(12, window.innerWidth - rect.right) });
+      const viewportMargin = 12;
+      const estimatedTipHeight = Math.min(224, Math.max(120, window.innerHeight - viewportMargin * 2));
+      const preferredTop = rect.bottom + 8;
+      const spaceBelow = window.innerHeight - preferredTop;
+      // A lower phone control needs its tooltip to flip above the trigger
+      // rather than disappearing past the viewport edge.
+      const top = spaceBelow >= estimatedTipHeight
+        ? preferredTop
+        : Math.max(viewportMargin, rect.top - estimatedTipHeight - 8);
+      setPosition({ top, right: Math.max(viewportMargin, window.innerWidth - rect.right) });
     }
     setOpen(true);
   };
@@ -44,6 +53,7 @@ export function WeddingInfoTip(props: {
         onMouseLeave={() => setOpen(false)}
         onFocus={show}
         onBlur={() => setOpen(false)}
+        onClick={() => open() ? setOpen(false) : show()}
       >
         i
       </button>
@@ -53,7 +63,7 @@ export function WeddingInfoTip(props: {
             id="wedding-info-tip"
             role="tooltip"
             style={{ top: `${position().top}px`, right: `${position().right}px` }}
-            class="pointer-events-none fixed z-[9999] w-72 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-stone-200 bg-white p-3 text-left text-xs leading-5 text-stone-800 shadow-xl"
+            class="pointer-events-none fixed z-[9999] max-h-[calc(100dvh-1.5rem)] w-72 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl border border-stone-200 bg-white p-3 text-left text-xs leading-5 text-stone-800 shadow-xl"
           >
             <span class="block font-semibold text-stone-950">{props.title}</span>
             <span class="mt-1 block">{props.children}</span>

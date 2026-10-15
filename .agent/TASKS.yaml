@@ -1148,3 +1148,5 @@ tasks:
       - `fdcceea` was released to Oracle on 2026-10-15 as a scoped `ui` asset update; `/workspace/` and `/wedding/` returned 200, the production ResponseQueue bundle contains the ring-research action, homeserver remained running, and Caddy was not reloaded
       - manual vendor searches now stay on the Vendors surface from launch through completed comparison rendering; only automatic background shortlists return to Wedding Home
       - People mobile cards now use one-column status badges, larger internal spacing, independent stacked action cards, and full-width bottom CTAs; mobile content reserves clear space above the persistent tab bar and Sprout control
+      - Sprout persona templates now complete their initial authenticated load instead of remaining permanently disabled; new vendor drafts retain provider wording but are formatted into editable email paragraphs, and provider-confirmed sends show an encouraging success state
+      - live mobile vendor comparison cards now persist follow-up selection, budget tooltips flip and scroll within the phone viewport, and custom image cards support whole-card touch dragging

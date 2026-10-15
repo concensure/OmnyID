@@ -2161,3 +2161,29 @@ Deployment:
 - Homeserver remained running. Caddy was neither reloaded nor restarted; its
   SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+## 2026-10-15 - WED-185 Sprout, outreach, and mobile interaction repair (Codex)
+
+Changed:
+
+- Fixed the Sprout persona loader deadlock: the initial signed-in persona
+  request is now allowed to start, so template Install controls become usable.
+- Successful vendor sends now display a provider-confirmed, encouraging status.
+  Draft text is normalized into editable paragraphs before it is displayed,
+  persisted, and sent.
+- Live Vendor results now use the same persisted follow-up selection path on
+  mobile as saved comparison documents. Phone info tips flip within the
+  viewport, and custom image cards drag from the whole image tile.
+
+Verification:
+
+- `npm run test:wedding --prefix solid-ui` (1,845 passing)
+- `npm run typecheck --prefix solid-ui` (passing)
+- `npm run build --prefix solid-ui` (passing)
+- `git diff --check` (passing)
+
+Deployment:
+
+- Pending commit and scoped Oracle UI asset deployment. Do not reload or
+  restart Caddy; preserve SHA-256
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.

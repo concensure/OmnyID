@@ -160,8 +160,10 @@ export function AgentPersonaFAB(props: {
   const filteredPersonas = createMemo(() => filterPersonas(personas(), search()));
   const filteredTemplates = createMemo(() => filterPersonaTemplates(PERSONA_TEMPLATES, search()));
 
-  async function reloadPersonas() {
-    if (personaReloadBlocked({ loading: loading(), signedIn: props.signedIn })) return;
+  async function reloadPersonas(options?: { initial?: boolean }) {
+    // The component starts in a loading state. That initial request must be
+    // allowed through; otherwise every template Install action stays disabled.
+    if (!options?.initial && personaReloadBlocked({ loading: loading(), signedIn: props.signedIn })) return;
     if (!props.signedIn) {
       setPersonas([]);
       setLoadError(null);
@@ -190,7 +192,7 @@ export function AgentPersonaFAB(props: {
     }
   }
 
-  onMount(reloadPersonas);
+  onMount(() => void reloadPersonas({ initial: true }));
 
   onCleanup(() => {
     if (longPressTimer) clearTimeout(longPressTimer);

@@ -979,6 +979,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             result={inlineVendorSearchPreview()}
             outreach={vendorOutreach}
             onDismiss={setDismissedVendorSearchResultArtifactId}
+            onVendorChoiceSelected={saveVendorChoiceSelection}
           />
         </Show>
 

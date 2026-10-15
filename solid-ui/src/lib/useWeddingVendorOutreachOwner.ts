@@ -63,6 +63,21 @@ function firstString(...values: unknown[]): string | null {
   return null;
 }
 
+/** Make a provider's one-line reply read as a human email before it is shown or sent. */
+export function formatWeddingVendorOutreachParagraphs(value: string): string {
+  const normalized = value.replace(/\r\n?/g, "\n").trim();
+  if (!normalized) return "";
+  if (/\n\s*\n/.test(normalized)) return normalized;
+  const prose = normalized.replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+  const sentences = prose.match(/[^.!?]+[.!?]+(?:[\"')\]]+)?|[^.!?]+$/g)
+    ?.map((sentence) => sentence.trim())
+    .filter(Boolean) ?? [prose];
+  // Each sentence is its own short email paragraph. This preserves every
+  // provider-written word while making greeting, context, request, and close
+  // easy to scan and edit on a phone.
+  return sentences.join("\n\n");
+}
+
 function applyWeddingOutreachContext(couple: WeddingVendorOutreachCouple, value: Record<string, unknown> | null | undefined) {
   if (!value) return;
   couple.date_or_season ??= firstString(value.date_or_season, value.dateOrSeason);
@@ -184,7 +199,7 @@ export function useWeddingVendorOutreachOwner(input: {
       if (!saveProjection) throw new Error("Could not save the draft yet. Reconnect the wedding workspace and try again.");
       const persistedFlow = weddingVendorOutreachDraftSucceeded(flow, {
         subject: result.subject,
-        bodyMarkdown: result.bodyMarkdown,
+        bodyMarkdown: formatWeddingVendorOutreachParagraphs(result.bodyMarkdown),
         groundedOnLabels,
       });
       const directoryVendor = outreachDirectoryVendorMatch(card.title);

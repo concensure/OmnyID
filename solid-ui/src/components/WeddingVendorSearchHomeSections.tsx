@@ -4,10 +4,16 @@ import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { DecisionCard } from "@/components/DecisionCard";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
+import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
 import type { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
+import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
+import {
+  loadWeddingDecisionSelections,
+  toggleWeddingDecisionSelectionValue,
+} from "@/lib/weddingDecisionSelectionState";
 
 type VendorSearchAction = NonNullable<WeddingResponseWorkspaceViewProps["vendorSearchResultAction"]>;
 type VendorOutreachOwner = ReturnType<typeof useWeddingVendorOutreachOwner>;
@@ -130,16 +136,35 @@ export function WeddingVendorSearchHomeSection(props: {
   } | null;
   outreach: VendorOutreachOwner;
   onDismiss: (artifactId: string) => void;
+  onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
 }) {
   const workspace = () => props.workspace;
   const [fullResultExpanded, setFullResultExpanded] = createSignal(false);
   const [searchProgressIndex, setSearchProgressIndex] = createSignal(0);
+  const [selectedChoiceIds, setSelectedChoiceIds] = createSignal<string[]>([]);
   let previousResultArtifactId: string | null = null;
   createEffect(() => {
     const artifactId = props.result?.action.artifactId ?? null;
     if (artifactId !== previousResultArtifactId) setFullResultExpanded(false);
+    if (artifactId) setSelectedChoiceIds(loadWeddingDecisionSelections(artifactId));
+    else setSelectedChoiceIds([]);
     previousResultArtifactId = artifactId;
   });
+  function selectedForFollowUp(artifact: WeddingWorkspaceArtifactPreview, choiceId: string): boolean {
+    return artifact.persistedSelectedVendorChoices.some((choice) => choice.optionId === choiceId)
+      || selectedChoiceIds().includes(choiceId);
+  }
+  function toggleFollowUp(artifact: WeddingWorkspaceArtifactPreview, card: WeddingVendorChoiceCardData): void {
+    const selected = !selectedForFollowUp(artifact, card.choiceId);
+    setSelectedChoiceIds(toggleWeddingDecisionSelectionValue(artifact.artifactId, card.choiceId));
+    props.onVendorChoiceSelected?.({
+      artifact,
+      optionId: card.choiceId,
+      optionLabel: card.title,
+      contact: card,
+      selected,
+    });
+  }
   const searchDisabled = () => workspace().vendorSearchRunning
     || !workspace().onRunLiveVendorSearch;
   const visibleVendorSearchNotice = () => {
@@ -245,6 +270,8 @@ export function WeddingVendorSearchHomeSection(props: {
                             {(vendor) => (
                               <WeddingVendorChoiceCard
                                 card={vendor}
+                                selectedForFollowUp={selectedForFollowUp(preview(), vendor.choiceId)}
+                                onToggleFollowUp={(card) => toggleFollowUp(preview(), card)}
                                 outreachFlow={props.outreach.flows()[vendor.choiceId] ?? null}
                                 gmailConnected={Boolean(workspace().gmailStatus?.connected)}
                                 onContactVendor={(card, intent) => void props.outreach.onContactVendor(card, result().action.artifactId, intent)}

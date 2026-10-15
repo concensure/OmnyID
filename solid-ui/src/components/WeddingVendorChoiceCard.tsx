@@ -229,7 +229,7 @@ export function WeddingVendorChoiceCard(props: {
               type="button"
               onClick={() => props.onToggleFollowUp?.(card)}
               aria-pressed={Boolean(props.selectedForFollowUp)}
-              class={`min-h-11 rounded-full px-2.5 py-1.5 text-xs font-bold transition ${
+              class={`min-h-11 w-full rounded-xl px-3 py-2 text-xs font-bold transition sm:w-auto sm:rounded-full sm:px-2.5 sm:py-1.5 ${
                 props.selectedForFollowUp
                   ? "bg-wedding-accent text-white hover:bg-wedding-accent/90"
                   : "border border-wedding-muted bg-white text-wedding-text hover:bg-wedding-surface-blush"
@@ -289,6 +289,12 @@ export function WeddingVendorChoiceCard(props: {
               {"✓ "}
               {weddingVendorOutreachSentLabel({ sentAtIso: props.outreachFlow?.sentAtIso ?? null })}
             </span>
+          </Show>
+          <Show when={props.outreachFlow?.stage === "sent"}>
+            <div class="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-emerald-950" role="status" aria-live="polite">
+              <p class="text-sm font-bold">Message sent!</p>
+              <p class="mt-1 text-xs leading-5">You are another step closer to your wedding.</p>
+            </div>
           </Show>
         </div>
         <Show when={props.outreachFlow}>
