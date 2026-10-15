@@ -7,6 +7,13 @@
 - The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
+## 2026-10-15 - WED-185 account-verification delivery and exact vendor lookup (Codex)
+
+- Registration no longer presents a contradictory waiting-for-email state after a known delivery failure. The server retries verification/password-reset delivery through a separately mounted Resend credential when the legacy gateway fails; the vendor relay remains disabled and still rejects Gmail/SMTP as a provider.
+- Exact free-text directory searches no longer apply `Custom vendor search` as a category, fixing Mackay Family Estate being discarded from its own named lookup.
+- Imported the supplied 2026-10-15 venue data into Oracle conservatively: new rows were added and existing rows gained only non-destructive enrichment evidence. Directory-host websites were not added as vendor websites.
+- Local verification: `cargo test gateway::smtp_out::tests --lib` (5 passed), `npm run test:wedding --prefix solid-ui` (1,833 passed), and `npm run build --prefix solid-ui` passed. Commit `41c0986` is building on Oracle with scoped homeserver/UI services; do not reload Caddy. The protected Caddy checksum remains `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
 ## 2026-10-15 - WED-185 mobile vendor and outreach refinement (Codex)
 
 - Fixed the mobile vendor-search Enter path so it remains a form submission rather than being intercepted as a home-navigation magic action. Mobile decision cards now keep touch gestures in the card, tolerate pointer-capture gaps in WebViews, and accept a fast downward approval swipe.
