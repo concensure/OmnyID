@@ -1,5 +1,6 @@
 // @locs-version: 1.0
 import type { WeddingInspirationItem, WeddingInspirationState } from "@/lib/weddingInspirationState";
+import { weddingFacetsForPhrase } from "@/lib/weddingFacetVocabularyState";
 
 export type WeddingExperienceTraitKind =
   | "atmosphere"
@@ -50,7 +51,7 @@ type TraitRule = {
   label: string;
   plainMeaning: string;
   tags: string[];
-  signals: RegExp[];
+  facetIds: string[];
 };
 
 const TRAIT_RULES: TraitRule[] = [
@@ -60,7 +61,7 @@ const TRAIT_RULES: TraitRule[] = [
     label: "Warm and intimate",
     plainMeaning: "Prioritise lighting, closeness, and a room that feels easy to settle into.",
     tags: ["warm lighting", "candles", "long table"],
-    signals: [/warm/i, /candle/i, /intimate/i, /communal/i],
+    facetIds: ["atmosphere.warm", "scale.intimate"],
   },
   {
     id: "relaxed_low_formality",
@@ -68,7 +69,7 @@ const TRAIT_RULES: TraitRule[] = [
     label: "Relaxed, low-formality",
     plainMeaning: "Avoid choices that make the day feel over-produced or stiff.",
     tags: ["informal"],
-    signals: [/relaxed/i, /informal/i, /casual/i],
+    facetIds: ["atmosphere.relaxed"],
   },
   {
     id: "guest_conversation",
@@ -76,7 +77,7 @@ const TRAIT_RULES: TraitRule[] = [
     label: "Guest conversation matters",
     plainMeaning: "Prefer layouts, flowers, music, and timelines that make it easy for guests to talk.",
     tags: ["long table", "low florals", "reception"],
-    signals: [/communal/i, /conversation/i, /reception mood/i],
+    facetIds: ["atmosphere.warm"],
   },
   {
     id: "restrained_visuals",
@@ -84,7 +85,7 @@ const TRAIT_RULES: TraitRule[] = [
     label: "Restrained styling",
     plainMeaning: "Keep visual styling calm and intentional instead of competing for attention.",
     tags: ["low florals"],
-    signals: [/restrained/i, /minimal/i],
+    facetIds: ["atmosphere.calm", "aesthetic.modern_minimal"],
   },
   {
     id: "place_led",
@@ -92,7 +93,7 @@ const TRAIT_RULES: TraitRule[] = [
     label: "Place-led feeling",
     plainMeaning: "The venue and setting should carry more of the mood than heavy decoration.",
     tags: ["venue"],
-    signals: [/venue look/i, /garden/i, /setting/i],
+    facetIds: ["setting.garden", "setting.waterfront", "setting.heritage_estate", "experience.views_led"],
   },
   {
     id: "personal_style",
@@ -100,7 +101,7 @@ const TRAIT_RULES: TraitRule[] = [
     label: "Personal over generic",
     plainMeaning: "Shortlist options that feel specific to you, not only conventionally wedding-like.",
     tags: ["dress", "vendor portfolio", "pinterest"],
-    signals: [/attire preference/i, /vendor style/i, /saved inspiration/i],
+    facetIds: ["aesthetic.blank_canvas", "aesthetic.classic", "aesthetic.bohemian"],
   },
 ];
 
@@ -139,10 +140,9 @@ function traitFromRule(rule: TraitRule, items: readonly WeddingInspirationItem[]
   let score = 0;
   for (const item of items) {
     const tagMatches = item.tags.filter((tag) => rule.tags.includes(tag));
-    const signalMatches = item.preferenceSignals.filter((signal) => rule.signals.some((pattern) => pattern.test(signal)));
-    const note = item.note ?? "";
-    const noteMatch = note && rule.signals.some((pattern) => pattern.test(note)) ? ["note"] : [];
-    const matches = uniqueStrings([...tagMatches, ...signalMatches, ...noteMatch], 4);
+    const text = [...item.preferenceSignals, item.note ?? ""].join(" ");
+    const facetMatches = weddingFacetsForPhrase(text).filter((facet) => rule.facetIds.includes(facet.id));
+    const matches = uniqueStrings([...tagMatches, ...facetMatches.map((facet) => facet.label)], 4);
     if (matches.length === 0) continue;
     score += matches.length + 1;
     sourceIds.push(item.id);
@@ -235,43 +235,43 @@ const EXPERIENCE_DECISION_FIT_RULES: Array<{
   traitIdSuffix: string;
   fitLabel: string;
   tradeoffLabel: string;
-  fit: RegExp;
-  tradeoff: RegExp;
+  fitFacetIds: string[];
+  tradeoffFacetIds: string[];
 }> = [
   {
     traitIdSuffix: "warm_intimate",
     fitLabel: "supports warm, intimate atmosphere",
     tradeoffLabel: "may feel too cold or large-scale for the warm, intimate direction",
-    fit: /\b(warm|candle|ambient|intimate|cosy|cozy|low lighting|soft lighting)\b/i,
-    tradeoff: /\b(cold|bright white|fluorescent|industrial|large ballroom|warehouse|stark)\b/i,
+    fitFacetIds: ["atmosphere.warm", "scale.intimate"],
+    tradeoffFacetIds: ["scale.large"],
   },
   {
     traitIdSuffix: "guest_conversation",
     fitLabel: "supports easy guest conversation",
     tradeoffLabel: "may make guest conversation harder",
-    fit: /\b(low floral|long table|communal|acoustic|conversation|quiet|lounge)\b/i,
-    tradeoff: /\b(tall centerpiece|tall floral|high floral|loud|club volume|speaker near|blocked sightline)\b/i,
+    fitFacetIds: ["atmosphere.warm"],
+    tradeoffFacetIds: ["atmosphere.lively"],
   },
   {
     traitIdSuffix: "relaxed_low_formality",
     fitLabel: "keeps the day relaxed",
     tradeoffLabel: "may add more formality than the couple seems to want",
-    fit: /\b(relaxed|informal|casual|simple|low pressure|easy)\b/i,
-    tradeoff: /\b(black tie|formal|choreographed|strict run sheet|grand entrance|multiple speeches)\b/i,
+    fitFacetIds: ["atmosphere.relaxed"],
+    tradeoffFacetIds: ["atmosphere.elegant", "atmosphere.grand"],
   },
   {
     traitIdSuffix: "restrained_visuals",
     fitLabel: "matches restrained styling",
     tradeoffLabel: "may compete with the restrained visual direction",
-    fit: /\b(restrained|minimal|simple|clean|low floral|understated)\b/i,
-    tradeoff: /\b(maximal|dramatic|oversized|lush|heavy decor|statement installation)\b/i,
+    fitFacetIds: ["atmosphere.calm", "aesthetic.modern_minimal"],
+    tradeoffFacetIds: ["aesthetic.ornate_glam"],
   },
   {
     traitIdSuffix: "place_led",
     fitLabel: "lets the setting carry the feeling",
     tradeoffLabel: "may rely on decoration instead of the setting",
-    fit: /\b(garden|view|heritage|waterfront|venue character|setting)\b/i,
-    tradeoff: /\b(blank canvas|heavy styling|cover the room|transform the space)\b/i,
+    fitFacetIds: ["setting.garden", "setting.waterfront", "setting.heritage_estate", "experience.views_led"],
+    tradeoffFacetIds: ["aesthetic.blank_canvas", "aesthetic.ornate_glam"],
   },
 ];
 
@@ -291,13 +291,14 @@ export function evaluateWeddingExperienceDecisionFit(
   const fitLabels: string[] = [];
   const tradeoffLabels: string[] = [];
   const evidenceLabels: string[] = [];
+  const matchedFacets = new Set(weddingFacetsForPhrase(text).map((facet) => facet.id));
   for (const trait of model.traits) {
     const rule = EXPERIENCE_DECISION_FIT_RULES.find((candidate) => trait.id.endsWith(candidate.traitIdSuffix));
     if (!rule) continue;
-    if (rule.tradeoff.test(text)) {
+    if (rule.tradeoffFacetIds.some((id) => matchedFacets.has(id))) {
       tradeoffLabels.push(rule.tradeoffLabel);
       evidenceLabels.push(...trait.evidenceLabels.slice(0, 2));
-    } else if (rule.fit.test(text)) {
+    } else if (rule.fitFacetIds.some((id) => matchedFacets.has(id))) {
       fitLabels.push(rule.fitLabel);
       evidenceLabels.push(...trait.evidenceLabels.slice(0, 2));
     }

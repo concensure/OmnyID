@@ -2402,3 +2402,24 @@ Remaining:
 - Split the oversized Rust catalog test module below its line budget.
 - Move experience-model and decision-fit synonym matching onto the vocabulary without changing its
   public test behaviour. R5 must not begin until those R4 contracts are complete.
+
+## 2026-10-15 - WED-191 facet vocabulary completion (Codex)
+
+Changed:
+
+- Split `attribute_catalog` tests into a sibling module, leaving the production catalog at 860
+  lines. Its `style_facets` validation still reads the shared vocabulary and rejects unknown ids.
+- Replaced the experience model's duplicated synonym regexes with vocabulary facet ids for both
+  inspiration traits and decision-fit checks. Existing experience-model behaviour remains covered.
+
+Verification:
+
+- Focused inspiration, decision-selection, and facet-vocabulary tests: 24 passed.
+- `npm run typecheck` (solid-ui): passed.
+- `cargo test --lib wedding_vendor_search_routes::attribute_catalog -- --nocapture`: 11 passed,
+  with the existing unused `user_id` warning.
+
+Next:
+
+- Implement R5 deterministic venue facet derivation, using the new vocabulary and never storing
+  rank-time derived facets.

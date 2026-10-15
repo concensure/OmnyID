@@ -1180,8 +1180,6 @@ tasks:
       - task documentation defines sign-in import idempotency and venue-first, photographer-second facet rollout
       - focused verification evidence is recorded in the handoff
     progress:
-      - added the shared `wedding_facets.v1` JSON vocabulary, TypeScript lookup API, Rust include-time validation, Docker build input, and label-based admin multi-select
-      - focused TypeScript vocabulary test, TypeScript typecheck, and focused Rust allowlist test pass; catalog split and experience-model synonym de-duplication remain
       - baseline fixture, focused regression test, and 360x740 Playwright screenshot fixture are implemented
       - full wedding test suite ran with 1855 passing tests; baseline screenshot passed at 360x740
       - line-budget failure is pre-existing outside this task's file scope
@@ -1265,7 +1263,7 @@ tasks:
       - Vite production build began but did not yield a final result in the interactive command window; retain this as a release gate
   - id: WED-191
     title: Facet vocabulary and style facets attribute key
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-187
     depends_on:
@@ -1282,3 +1280,8 @@ tasks:
       - style_facets accepts only valid vocabulary ids
       - the admin editor presents style facets as a label-based multi-select
       - experience-trait synonym mapping has no duplicate regex source
+    progress:
+      - shared `wedding_facets.v1` JSON is imported by TypeScript and compile-time included by Rust; Docker copies the build input
+      - `style_facets` validates ids against the vocabulary and the admin editor uses label-based multi-select input
+      - catalog tests moved to a sibling module; the production catalog is 860 lines
+      - experience traits and decision-fit matching consume vocabulary synonyms; focused TypeScript and Rust tests pass
