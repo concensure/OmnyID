@@ -2153,6 +2153,11 @@ Verification:
 
 Deployment:
 
-- Pending commit and scoped Oracle UI asset deployment. Do not reload or
-  restart Caddy; preserve SHA-256
+- Commit `3521a81` was deployed as a scoped UI asset update. The UI asset-sync
+  job exited 0, `https://omnyid.com/workspace/` and
+  `https://omnyid.com/wedding/` returned HTTP 200, and the public dynamic
+  ResponseQueue bundle contains the updated vendor-search and People-card
+  source labels.
+- Homeserver remained running. Caddy was neither reloaded nor restarted; its
+  SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
