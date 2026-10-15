@@ -1376,3 +1376,31 @@ tasks:
     progress:
       - catalog-driven corpus builder and separate ranker-blind Casper/Iris sheet renderer are implemented
       - the sanitised active catalog required for actual cases, independent human scores, disagreement resolutions, and gate report are not present in this checkout
+  - id: WED-196
+    title: Preference interpreter and confirmation chips
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-187
+    depends_on:
+      - WED-189
+      - WED-193
+    files:
+      - src/server/wedding_preference_routes.rs
+      - src/server/mod.rs
+      - solid-ui/src/lib/weddingPreferenceProfileAfpState.ts
+      - solid-ui/src/lib/weddingPreferenceInterpreterState.ts
+      - solid-ui/src/lib/weddingVendorShortlistPolicyState.ts
+      - solid-ui/tests/wedding-preference-*.test.ts
+      - .agent/**
+    acceptance:
+      - authenticated interpreter accepts only evidence-anchored vocabulary facets and falls back deterministically when the shared provider ladder fails
+      - preference-profile AFP messages are immutable successors with vocabulary and facet supertags
+      - profile confirmation changes the material fingerprint without mutating the prior comparison input
+      - interpreter and confirmation presentation remain non-blocking
+    progress:
+      - scoped after checking the existing provider ladder, projection conventions, and workflow allowlists
+      - no existing workflow daemon emits wedding preference-profile messages, so its outbound allowlist and output contract require no change
+      - authenticated interpreter route uses the shared Interpreter ladder, validates vocabulary ids, substring anchors, hard-constraint keys, and bounded output, then returns an empty fallback on exhaustion
+      - intake computes the deterministic profile first, calls/caches the interpreter only for unmapped or ambiguous phrases, and retains the deterministic profile on any route failure
+      - immutable preference-profile AFP send inputs retain parent lineage; confirmation chips appear on the home intake summary and above a vendor comparison, creating a user-authority successor and a distinct material fingerprint
+      - focused Rust validator tests, TypeScript checking, and the full wedding test suite (1874 tests) pass

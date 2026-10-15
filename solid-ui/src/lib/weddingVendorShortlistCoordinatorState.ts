@@ -46,6 +46,8 @@ export function buildWeddingVendorShortlistCoordinatorState(input: {
   dateOrSeason?: string | null;
   preferences?: string | null;
   rankingPolicyVersion?: string | null;
+  profileMessageId?: string | null;
+  vocabularyVersion?: string | null;
   activeFingerprint?: string | null;
   completedFingerprint?: string | null;
   runningFingerprint?: string | null;
@@ -67,6 +69,7 @@ export function buildWeddingVendorShortlistCoordinatorState(input: {
     weddingPlanId: planId, category: categorySelection.category, location, guestCount: input.guestCount,
     budgetComfort: input.budgetComfort, dateOrSeason: input.dateOrSeason, preferences: input.preferences,
     priorities: input.onboardingPriorities, rankingPolicyVersion: input.rankingPolicyVersion,
+    profileMessageId: input.profileMessageId, vocabularyVersion: input.vocabularyVersion,
   });
   if (clean(input.runningFingerprint) === fingerprint) {
     return { status: "running", category: categorySelection.category, fingerprint, action: null, reason: null };

@@ -131,11 +131,13 @@ export function weddingVendorMaterialFingerprint(input: {
   priorities?: readonly string[] | null;
   preferences?: string | null;
   rankingPolicyVersion?: string | null;
+  profileMessageId?: string | null;
+  vocabularyVersion?: string | null;
 }): string {
   const material = [
     clean(input.weddingPlanId), clean(input.category), clean(input.location), clean(input.guestCount),
     clean(input.budgetComfort), clean(input.dateOrSeason), unique((input.priorities ?? []).map(clean)).sort().join(","),
-    clean(input.preferences), clean(input.rankingPolicyVersion) || "1",
+    clean(input.preferences), clean(input.rankingPolicyVersion) || "1", clean(input.profileMessageId), clean(input.vocabularyVersion),
   ].map(key).join("|");
   let hash = 2166136261;
   for (const character of material) {

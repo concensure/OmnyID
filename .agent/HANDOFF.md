@@ -2530,3 +2530,37 @@ Remaining:
 - Supply the sanitised active catalog, collect the two independent human score sheets, resolve
   flagged disagreements, and generate the machine gate report. The policy-v2 flag stays off until
   that evidence exists.
+
+## 2026-10-16 - WED-196 preference interpreter and confirmation checkpoint (Codex, in progress)
+
+Changed:
+
+- Added authenticated `POST /wedding/preference-profile/interpret` behind the existing shared
+  Cerebras -> Mistral -> Anthropic interpreter ladder. The route is 451 lines, rate-limited and
+  metered, and returns `{status:"fallback"}` with no facets whenever the ladder is unavailable or
+  exhausted.
+- Provider output is parsed as JSON and rejects unknown vocabulary ids, anchors that are not
+  case-insensitive substrings of submitted input, unknown hard-constraint keys, and an otherwise
+  empty result. Facets, trade-offs, readings, and questions are bounded.
+- Added deterministic-first client orchestration and material/version cache helpers, immutable
+  profile AFP send inputs with successor lineage, profile/version fingerprint inputs, and
+  confirmation chips on the intake home and above vendor comparisons. Chips are non-blocking and
+  use 44px minimum targets; confirmation creates a user-authority (confidence 1.0) successor.
+- Checked `typescript-sdk/src/workflows.ts`: no existing workflow daemon emits
+  `wedding_preference_profile`, so no outbound allowlist or output-contract change is needed.
+
+Verification:
+
+- `cargo test --lib wedding_preference_routes -- --nocapture`: 3 passed (existing unused
+  `email_group_routes` variable warning only).
+- `npm run typecheck` (solid-ui): passed.
+- `npm run test:wedding` (solid-ui): 1,874 passed.
+- `git diff --check`: passed.
+
+Remaining:
+
+- The authenticated production route needs Oracle runtime verification with the existing hosted
+  provider keys; do not copy a hosted key into the local checkout.
+- R5 catalog coverage, R7 interactive widen invocation/three-card mobile evidence, R8 real catalog
+  scoring, R10–R13, build/CI, and all production release gates remain. Do not enable policy 2 or
+  deploy it yet.

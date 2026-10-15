@@ -671,3 +671,13 @@ component records its signed `weightShift`; the total is unchanged. The reason l
 one strongest facet result for each couple anchor, then adds location, budget, guest-capacity and
 quality rows. It validates provenance before retaining a pro or con and exposes a per-candidate
 drop counter for diagnostics. Policy 1 remains unchanged.
+
+## 2026-10-16: Preference interpretation is advisory and successor-only
+
+The preference interpreter may map only vocabulary ids anchored in the couple's submitted text; it
+never ranks, invents a constraint, or persists a profile server-side. A missing key, failed
+provider, malformed JSON, or fully invalid output yields an empty fallback so the deterministic
+synonym profile remains active. Client confirmation upgrades facets to user authority and confidence
+1.0, then emits a new `wedding_preference_profile` AFP message with the previous message as its
+parent. The preference profile message id and vocabulary version are material comparison inputs,
+preventing a confirmed reading from silently reusing an old comparison.

@@ -4,12 +4,15 @@ import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { DecisionCard } from "@/components/DecisionCard";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
+import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferenceConfirmationChips";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
 import type { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
+import type { WeddingPreferenceProfile } from "@/lib/weddingPreferenceProfileState";
+import type { WeddingPreferenceChipChange } from "@/lib/weddingPreferenceInterpreterState";
 import {
   loadWeddingDecisionSelections,
   toggleWeddingDecisionSelectionValue,
@@ -137,6 +140,10 @@ export function WeddingVendorSearchHomeSection(props: {
   outreach: VendorOutreachOwner;
   onDismiss: (artifactId: string) => void;
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
+  preferenceProfile?: WeddingPreferenceProfile | null;
+  preferenceSaving?: boolean;
+  onPreferenceChange?: (change: WeddingPreferenceChipChange) => void;
+  onPreferenceConfirm?: () => void;
 }) {
   const workspace = () => props.workspace;
   const [fullResultExpanded, setFullResultExpanded] = createSignal(false);
@@ -235,6 +242,9 @@ export function WeddingVendorSearchHomeSection(props: {
       <Show when={props.result}>
         {(result) => (
           <div class="mt-4 rounded-xl border border-wedding-muted bg-wedding-surface-blush p-3 phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0">
+            <Show when={props.preferenceProfile && props.onPreferenceChange && props.onPreferenceConfirm}>
+              <div class="mb-3"><WeddingPreferenceConfirmationChips profile={props.preferenceProfile ?? null} saving={props.preferenceSaving} onChange={(change) => props.onPreferenceChange?.(change)} onConfirm={() => props.onPreferenceConfirm?.()} /></div>
+            </Show>
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="break-words text-sm font-semibold text-wedding-accent">{result().preview?.title ?? result().action.label}</p>
