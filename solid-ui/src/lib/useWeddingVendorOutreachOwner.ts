@@ -191,6 +191,7 @@ export function useWeddingVendorOutreachOwner(input: {
         },
         couple,
         wedding_plan_id: metadata.weddingPlanId,
+        verify_questions: card.verifyQuestions,
       });
       const groundedOnLabels = weddingVendorOutreachGroundedOnLabels(result.groundedOn, couple);
       const flow = vendorOutreachFlows()[card.choiceId];

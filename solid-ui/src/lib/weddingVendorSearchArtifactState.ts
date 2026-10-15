@@ -616,7 +616,7 @@ export function buildWeddingVendorComparisonArtifactState(
     map_url: choice.mapUrl,
   }, `#${choice.rank} `));
   const topChoiceActionRows = vendorChoiceActionRows(choices);
-  const topChoiceCards = vendorChoiceCards(choices, metadata.weddingPlanId || null);
+  const topChoiceCards = vendorChoiceCards(choices, metadata.weddingPlanId || null, input);
   const preferenceSignals = comparisonPreferenceSignals(input);
   const recommendationHandoff = comparisonRecommendationHandoff({
     choices,

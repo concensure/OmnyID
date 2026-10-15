@@ -6398,6 +6398,7 @@ export const requestWeddingVendorOutreachDraft = (body: {
   vendor: WeddingVendorOutreachDraftVendorInput;
   couple: WeddingVendorOutreachDraftCoupleInput;
   wedding_plan_id: string;
+  verify_questions?: string[];
 }) =>
   apiFetch<unknown>("/wedding/vendor-outreach-draft", { method: "POST", bodyJson: body })
     .then(normalizeWeddingVendorOutreachDraftResponse);

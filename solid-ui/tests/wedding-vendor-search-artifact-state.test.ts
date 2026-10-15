@@ -268,7 +268,7 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   ]);
   const comparisonMetadata = comparison.artifactInput?.metadata as Record<string, unknown>;
   const recommendationHandoff = comparisonMetadata.vendorComparisonHandoff as Record<string, unknown>;
-  assert.match(String(recommendationHandoff.recommendationLabel), /Harbour Studio/i);
+  assert.equal(recommendationHandoff.recommendationLabel, "Compare the 4 options below.");
   assert.deepEqual(recommendationHandoff.whyLabels as string[], [
     "4 source-backed vendors found: 0 booked, 0 bookable, 4 awaiting availability confirmation",
     "1 choice matched stated preferences",
@@ -380,7 +380,7 @@ test("buildWeddingVendorComparisonArtifactState ranks beachfront gothic venue fi
   assert.equal(gothicCard?.image_url, null);
   assert.match(String(palmCard?.preference_match), /beachfront/i);
   assert.match(String(gothicCard?.preference_match), /gothic/i);
-  assert.match(String(gothicCard?.situation_fit), /Strong on: Style and preferences|Fit requires source-page review/);
+  assert.equal(gothicCard?.situation_fit, "");
   assert.deepEqual(gothicCard?.unknown_constraints, ["capacity"]);
   assert.equal(gothicCard?.group, "verify");
   assert.equal(cardComponent.type, "vendor_recommendation_cards");

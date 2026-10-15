@@ -11,6 +11,7 @@ import {
   weddingVendorRoomsComparisonLabel,
 } from "@/lib/weddingVendorRoomState";
 import { weddingVendorShortlistMedia } from "@/lib/weddingVendorShortlistPolicyState";
+import { weddingVendorAnchorRows, weddingVendorVerifyQuestions } from "@/lib/weddingVendorAnchorRowState";
 
 export type WeddingVendorComparisonContext = {
   preferences?: string | null;
@@ -79,6 +80,13 @@ function uniqueStrings(values: readonly unknown[], limit = 24): string[] {
   return result;
 }
 
+function matchedPriorityAnchor(choice: WeddingVendorRankedCandidate, priorities: readonly string[] | null | undefined): string | null {
+  const matched = new Set(choice.matchedPreferenceTokens.map((token) => token.toLowerCase()));
+  return (priorities ?? []).map(clean).find((priority) =>
+    priority.toLowerCase().split(/[^a-z0-9]+/).some((token) => token.length >= 4 && matched.has(token)),
+  ) ?? null;
+}
+
 export function scoreLabelFor(choice: WeddingVendorRankedCandidate): string {
   return `${choice.fitLabel} · ${choice.confidenceLabel}`;
 }
@@ -131,12 +139,16 @@ export function vendorChoiceActionRows(choices: readonly WeddingVendorRankedCand
 export function vendorChoiceCards(
   choices: readonly WeddingVendorRankedCandidate[],
   weddingPlanId: string | null = null,
+  context: Pick<WeddingVendorComparisonContext, "topPriorities" | "location" | "budgetComfort"> & { guestCount?: string | null } = {},
 ): Array<Record<string, unknown>> {
   return choices.map((choice) => {
     const media = weddingVendorShortlistMedia({ vendorName: choice.title, imageUrl: choice.imageUrl });
+    const anchorRows = weddingVendorAnchorRows(choice, context);
+    const verifyQuestions = weddingVendorVerifyQuestions(anchorRows, choice.unknownHardConstraints);
     return {
     choice_id: choice.id,
     rank: choice.rank,
+    comparison_count: choices.length,
     title: choice.title,
     image_url: media.url,
     image_alt: media.alt,
@@ -152,10 +164,18 @@ export function vendorChoiceCards(
     instagram_url: choice.instagramUrl,
     score: choice.score,
     score_label: scoreLabelFor(choice),
-    preference_match: choice.preferenceMatchLabel,
-    situation_fit: choice.situationFitLabel,
+    checked_facts_count: choice.components.filter((component) => component.known).length,
+    anchor_rows: anchorRows.map((row) => ({
+      anchor: row.anchor,
+      status: row.status,
+      detail: row.detail,
+      component_id: row.componentId,
+    })),
+    verify_questions: verifyQuestions,
+    preference_match: choice.matchedPreferenceTokens.length > 0 ? `Matched: ${choice.matchedPreferenceTokens.slice(0, 4).join(", ")}` : "",
+    situation_fit: "",
     rooms: weddingVendorRoomCardRowsToRecords(choice.rooms),
-    rationale_labels: [choice.priorityMatchLabel, ...choice.riskFlags, ...choice.rationaleLabels].slice(0, 5),
+    rationale_labels: [...choice.riskFlags].slice(0, 5),
     verification_label: choice.verificationLabel,
     group: choice.group,
     availability_state: choice.availabilityState,
@@ -282,19 +302,19 @@ export function comparisonRecommendationHandoff(input: {
   const { bookable, verify, excluded, booked } = input.result;
   const nextAction = input.result.nextActions[0] ?? null;
   const total = booked.length + bookable.length + verify.length;
-  const userPriority = uniqueStrings([
-    ...(input.topPriorities ?? []),
-    ...(input.preferenceSignals ?? []),
-    input.atmosphereDescription,
-    input.location,
-  ], 1)[0] ?? null;
-  const topFit = clean(topChoice?.preferenceMatchLabel).replace(/; review manually\.?$/i, "");
-  const alternativeFit = clean(runnerUp?.preferenceMatchLabel).replace(/; review manually\.?$/i, "");
+  const styleAnchor = topChoice ? matchedPriorityAnchor(topChoice, input.topPriorities) : null;
+  const topStyle = topChoice?.components.find((component) => component.id === "style");
+  const topLocation = topChoice?.components.find((component) => component.id === "location");
+  const strongestAnchor = topStyle?.known && topStyle.value >= 0.6 && styleAnchor
+    ? styleAnchor
+    : topLocation?.known && topLocation.value >= 0.6 && clean(input.location)
+      ? clean(input.location)
+      : null;
   return {
     recommendationLabel: topChoice
       ? runnerUp
-        ? `${topChoice.title} is the stronger first choice for ${userPriority ?? "your stated priorities"}${topFit && !/^No direct/i.test(topFit) ? `, with evidence for ${topFit}` : ""}; compare ${runnerUp.title}${alternativeFit && !/^No direct/i.test(alternativeFit) ? ` for its ${alternativeFit} fit` : ""} before deciding whom to contact.`
-        : `${topChoice.title} is the available option to assess against ${userPriority ?? "your stated priorities"}${topFit && !/^No direct/i.test(topFit) ? `, with evidence for ${topFit}` : ""}; check availability and package details before outreach.`
+        ? strongestAnchor ? `${topChoice.title} is strongest on ${strongestAnchor}.` : `Compare the ${total} options below.`
+        : `${total} venue fits what you've told us so far.`
       : "Review source-backed vendor options before outreach.",
     whyLabels: [
       `${total} source-backed vendor${total === 1 ? "" : "s"} found: ${booked.length} booked, ${bookable.length} bookable, ${verify.length} awaiting availability confirmation`,

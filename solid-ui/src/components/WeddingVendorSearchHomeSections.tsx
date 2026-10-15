@@ -254,7 +254,7 @@ export function WeddingVendorSearchHomeSection(props: {
                       : { ...preview(), vendorComparisonCards: [] };
                     return <>
                   <div class="mt-3 flex flex-wrap gap-2">
-                    <For each={[comparisonPreview().category, comparisonPreview().evidenceSummary.sourceCountLabel, comparisonPreview().vendorComparisonHandoff?.confidenceLabel ?? comparisonPreview().evidenceSummary.statusLabel].filter(Boolean)}>
+                    <For each={[comparisonPreview().category, comparisonPreview().evidenceSummary.sourceCountLabel, comparisonPreview().vendorComparisonHandoff?.confidenceLabel].filter(Boolean)}>
                       {(label) => <span class="rounded-lg border border-wedding-muted bg-white px-3 py-1.5 text-xs font-medium text-wedding-muted">{label}</span>}
                     </For>
                   </div>

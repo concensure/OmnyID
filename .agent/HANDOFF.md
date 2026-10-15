@@ -2162,6 +2162,38 @@ Deployment:
   SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
 
+## 2026-10-15 - WED-187 personalised recommendation baseline (Codex, in progress)
+
+Changed:
+
+- Created `agent/codex/WED-187` from `agent/codex/WED-185` at `81eef59` in the isolated
+  `.worktrees/WED-187` worktree, leaving the active WED-178 checkout untouched.
+- Updated the personalised recommendation spec and plan: a valid browser-held Wedding
+  Understanding result imports idempotently after account creation **or any later sign-in**;
+  venue style facets are first, and photographers follow only after the venue pass stabilises.
+- Added a consent-safe sparse Bondi fixture and regression test that locks the current v1
+  `38 fit`, `Matches 1/2 of your priorities`, and `Strong on: Location` output.
+- Added a 360x740 Playwright deck fixture. Its captured image is at
+  `solid-ui/test-results/wedding-personalised-recom-a3d82-ndi-vendor-ranking-baseline/bondi-v1-mobile-baseline.png`.
+
+Verification:
+
+- Focused R0 ranking regression: passing.
+- `npm run test:wedding --prefix solid-ui`: 1,852 passing.
+- The 360x740 Playwright screenshot test: passing.
+- `npm run typecheck --prefix solid-ui`: completed successfully before the build command.
+- `npm run test:line-budget --prefix solid-ui`: fails on two pre-existing files not touched by
+  WED-187: `WeddingResponseWorkspaceView.tsx` (1,090 lines) and
+  `weddingResponseWorkspaceViewState.ts` (1,040 lines), both over the 999-line limit.
+- Build and Rust checks require a rerun: the initial frontend build lacked the worktree-local
+  TypeScript SDK dependencies; after installing the locked SDK dependencies, concurrent existing
+  Cargo work held the shared target lock. No source change was made to address either condition.
+
+Next action:
+
+- Re-run build and Rust checks once the shared Cargo target lock is free, then continue R0 only
+  after recording the evidence; R1 and R2 remain dependent on the completed baseline.
+
 ## 2026-10-15 - WED-185 mobile Documents and decision-surface refinement (Codex)
 
 Changed:
@@ -2259,3 +2291,38 @@ Deployment:
 - Homeserver remained running. Caddy was neither reloaded nor restarted; its
   SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+## 2026-10-15 - WED-187/188 personalised vendor recommendation baseline and truthful cards (Codex)
+
+Changed:
+
+- Added a consent-safe Bondi Icebergs sparse-evidence fixture, locked the v1 rank output, and
+  captured the 360x740 vendor-card regression scenario.
+- Implemented conservative v1 anchor rows: missing style keywords remain unconfirmed rather than
+  becoming a negative; unresolved rows produce at most three draft-only verification questions.
+- Reworked comparison presentation to use count-aware, evidence-backed language; a one-candidate
+  decision has no recommendation projection. The mobile card has its semantic primary action,
+  Website, Contact, and local-only Not for us controls.
+- Added the optional `verify_questions` request field through the client and outreach endpoint.
+  Questions are appended to a generated draft only; sending remains approval-gated.
+- Updated the planning documents for idempotent next-sign-in quiz import and venue-first facet
+  rollout before photographers.
+
+Verification:
+
+- `npm run typecheck` (solid-ui): passed.
+- `npm run test:wedding` (solid-ui): 1,855 passed.
+- Focused copy/anchor tests: passed.
+- `npx playwright test --config playwright.config.ts tests/e2e/wedding-personalised-recommendation-baseline.spec.ts`: passed.
+- `npx tsc --noEmit` (typescript-sdk): passed.
+- `cargo check`: passed, with the pre-existing unused `user_id` warning in `email_group_routes.rs`.
+- `npm run test:line-budget`: blocked by existing oversized `WeddingResponseWorkspaceView.tsx`
+  (1,090) and `weddingResponseWorkspaceViewState.ts` (1,040); this change does not add to
+  that inherited failure.
+- `cargo test wedding_`: did not complete before the shared Cargo artifact lock/compile window;
+  rerun it before commit. UI build was not rerun in this pass.
+
+Next:
+
+- Continue with WED-189 by extracting the existing outreach provider ladder into the shared
+  wedding ladder, then rerun the remaining build and Rust test gates.

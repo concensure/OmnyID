@@ -38,10 +38,11 @@ test("a successful vendor delivery has a clear, encouraging confirmation", () =>
   assert.match(choiceCard, /another step closer to your wedding/);
 });
 
-test("live vendor results offer a persisted follow-up selection on mobile", () => {
+test("live vendor results use the primary action for mobile follow-up selection", () => {
   assert.match(vendorSearch, /loadWeddingDecisionSelections/);
   assert.match(vendorSearch, /onToggleFollowUp=\{\(card\) => toggleFollowUp/);
-  assert.match(choiceCard, /min-h-11 w-full rounded-xl[\s\S]*sm:w-auto/);
+  assert.match(choiceCard, /hidden min-h-11[\s\S]*sm:inline-flex/);
+  assert.match(choiceCard, /min-h-12 w-full rounded-xl/);
 });
 
 test("phone tooltip placement clamps inside the viewport and custom image cards use pointer drag", () => {

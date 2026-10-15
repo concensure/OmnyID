@@ -22,6 +22,7 @@ export function weddingVendorFollowUpOutreachCardData(card: WeddingVendorContact
   return {
     choiceId: weddingVendorFollowUpOutreachChoiceId(card),
     rank: 0,
+    comparisonCount: 1,
     title: card.vendorName,
     imageUrl: null,
     imageAlt: null,
@@ -38,6 +39,9 @@ export function weddingVendorFollowUpOutreachCardData(card: WeddingVendorContact
     preferenceMatch: "",
     situationFit: "",
     verificationLabel: "",
+    checkedFactsCount: 0,
+    anchorRows: [],
+    verifyQuestions: [],
     ...weddingVendorRankingCardFieldsFromRecord({ vendor_id: card.vendorId }),
   };
 }

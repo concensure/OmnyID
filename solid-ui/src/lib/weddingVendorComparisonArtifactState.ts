@@ -1,5 +1,6 @@
 // @locs-version: 1.0
 import { weddingVendorRankingCardFieldsFromRecord } from "@/lib/weddingVendorRankingState";
+import type { WeddingVendorAnchorRow, WeddingVendorAnchorRowStatus } from "@/lib/weddingVendorAnchorRowState";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 
 function clean(value: unknown): string {
@@ -8,6 +9,23 @@ function clean(value: unknown): string {
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map(clean).filter(Boolean) : [];
+}
+
+function anchorRows(value: unknown): WeddingVendorAnchorRow[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): WeddingVendorAnchorRow[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const row = item as Record<string, unknown>;
+    const status = clean(row.status);
+    if (!clean(row.anchor) || !["met", "not_met", "unknown"].includes(status)) return [];
+    return [{
+      anchor: clean(row.anchor),
+      status: status as WeddingVendorAnchorRowStatus,
+      detail: clean(row.detail),
+      componentId: clean(row.component_id),
+      verifyQuestion: null,
+    }];
+  }).slice(0, 4);
 }
 
 function safeExternalUrl(value: unknown): string | null {
@@ -87,14 +105,12 @@ function practicalRecommendationLabel(
   cards: readonly WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number][],
 ): string {
   const first = cards[0];
-  const second = cards[1];
   if (!first) return "Review the source-backed vendor evidence before choosing who to contact.";
-  const firstFit = clean(first.preferenceMatch).replace(/^review manually\.?$/i, "");
-  const secondFit = clean(second?.preferenceMatch).replace(/^review manually\.?$/i, "");
-  if (second) {
-    return `${first.title}${firstFit ? ` is the stronger fit for ${firstFit}` : " is ranked first on the available evidence"}; ${second.title}${secondFit ? ` is the alternative for ${secondFit}` : " is the next option to compare"}.`;
-  }
-  return `${first.title}${firstFit ? ` is the available fit for ${firstFit}` : " is the available source-backed option"}; confirm availability before contacting them.`;
+  if (cards.length === 1) return "1 venue fits what you've told us so far; confirm the open questions before contacting them.";
+  const metAnchor = first.anchorRows.find((row) => row.status === "met")?.anchor;
+  return metAnchor
+    ? `${first.title} is strongest on ${metAnchor}.`
+    : `Compare the ${cards.length} options below.`;
 }
 
 export function vendorComparisonCardsForArtifact(
@@ -110,6 +126,8 @@ export function vendorComparisonCardsForArtifact(
     return [{
       choiceId: clean(record.choice_id) || `${rank}:${title}`,
       rank,
+      comparisonCount: typeof record.comparison_count === "number" && Number.isFinite(record.comparison_count)
+        ? Math.max(1, Math.floor(record.comparison_count)) : 1,
       title,
       imageUrl: unsplashImageUrl(record.image_url),
       imageAlt: clean(record.image_alt) || `${title} venue image`,
@@ -126,6 +144,10 @@ export function vendorComparisonCardsForArtifact(
       preferenceMatch: clean(record.preference_match) || "Review manually",
       situationFit: clean(record.situation_fit) || "Fit requires source-page review.",
       verificationLabel: clean(record.verification_label) || "Confirm availability, inclusions, and quote before outreach.",
+      checkedFactsCount: typeof record.checked_facts_count === "number" && Number.isFinite(record.checked_facts_count)
+        ? Math.max(0, Math.floor(record.checked_facts_count)) : 0,
+      anchorRows: anchorRows(record.anchor_rows),
+      verifyQuestions: stringArray(record.verify_questions).slice(0, 3),
       ...weddingVendorRankingCardFieldsFromRecord(record),
     }];
   }).sort((left, right) => left.rank - right.rank).slice(0, 7);

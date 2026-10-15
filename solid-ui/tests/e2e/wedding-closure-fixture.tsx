@@ -6,7 +6,7 @@ import type { FocusDeckItem } from "../../src/lib/mobileFocusHomeState";
 import type { WeddingVendorChoiceCardData } from "../../src/components/WeddingVendorChoiceCard";
 
 const card = (rank: number, category = "venue"): WeddingVendorChoiceCardData => ({
-  choiceId: `${category}-${rank}`, rank, title: `${category[0]?.toUpperCase()}${category.slice(1)} ${["Harbour House", "Garden Rooms", "Park Pavilion"][rank - 1]}`,
+  choiceId: `${category}-${rank}`, rank, comparisonCount: 3, title: `${category[0]?.toUpperCase()}${category.slice(1)} ${["Harbour House", "Garden Rooms", "Park Pavilion"][rank - 1]}`,
   imageUrl: rank === 1 ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23f4e4df'/%3E%3Cpath d='M0 500L260 250l180 170 120-100 240 180z' fill='%237a3038'/%3E%3C/svg%3E" : null,
   imageAlt: "Wedding venue", scoreLabel: `${90 - rank} fit`, provider: "Controlled fixture",
   sourceUrl: "https://example.com/source", websiteUrl: "https://example.com", mapUrl: "https://example.com/map",

@@ -1158,3 +1158,57 @@ tasks:
       - timeline lead-time tasks use short user-facing actions such as `Search for planner`
       - `255f99a` was released to Oracle on 2026-10-15 as a scoped `ui` asset update; `/workspace/` and `/wedding/` returned 200, the public ResponseQueue bundle contains the Documents export and upload controls, homeserver remained running, and Caddy was not reloaded
       - `d8f3541` was released to Oracle on 2026-10-15 as a scoped UI asset update; `/workspace/` and `/wedding/` returned 200, the deployed ResponseQueue bundle contains the quiet selection, agenda, and contact-picker paths, and Caddy was not reloaded
+
+  - id: WED-187
+    title: Wedding vendor personalised recommendation baseline
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-187
+    depends_on:
+      - WED-185
+    files:
+      - Documents/design/wedding planner/wedding-vendor-personalised-recommendation-spec.md
+      - Documents/design/wedding planner/wedding-vendor-personalised-recommendation-tasks.md
+      - solid-ui/tests/fixtures/wedding-vendor-personalised-recommendation-baseline.ts
+      - solid-ui/tests/wedding-vendor-personalised-recommendation-baseline.test.ts
+      - .agent/TASKS.yaml
+      - .agent/DECISIONS.md
+      - .agent/HANDOFF.md
+    acceptance:
+      - a consent-safe synthetic fixture reproduces the documented v1 Bondi ranking output
+      - the baseline test locks the v1 fit, priority-match, and strongest-component labels
+      - task documentation defines sign-in import idempotency and venue-first, photographer-second facet rollout
+      - focused verification evidence is recorded in the handoff
+    progress:
+      - baseline fixture, focused regression test, and 360x740 Playwright screenshot fixture are implemented
+      - full wedding test suite ran with 1855 passing tests; baseline screenshot passed at 360x740
+      - line-budget failure is pre-existing outside this task's file scope
+  - id: WED-188
+    title: Personalised vendor comparison evidence and outreach questions
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-187
+    depends_on:
+      - WED-187
+    files:
+      - solid-ui/src/lib/weddingVendorAnchorRowState.ts
+      - solid-ui/src/lib/weddingVendorComparisonPresentationState.ts
+      - solid-ui/src/lib/weddingVendorComparisonArtifactState.ts
+      - solid-ui/src/lib/weddingResponseWorkspaceViewState.ts
+      - solid-ui/src/lib/decisionCardState.ts
+      - solid-ui/src/lib/api.ts
+      - solid-ui/src/lib/useWeddingVendorOutreachOwner.ts
+      - solid-ui/src/components/WeddingVendorChoiceCard.tsx
+      - solid-ui/src/components/WeddingVendorDeckCard.tsx
+      - src/server/wedding_vendor_outreach_routes.rs
+      - solid-ui/tests/**
+      - .agent/**
+    acceptance:
+      - comparison cards show compact, truthful per-anchor evidence and uncertainty without generic handoff claims
+      - up to three unresolved verification questions are carried into a draft only, never sent without user approval
+      - a single candidate produces no recommendation object in the decision-card projection
+      - mobile actions include a clear primary action and Website, Contact, and Not for us controls
+    progress:
+      - v1 anchor rows, truthful count-aware handoff copy, optional draft verify questions, and the local-only Not for us removal are implemented
+      - focused copy/anchor tests, full wedding tests, TypeScript checks, and the 360x740 screenshot pass
+      - the repository-wide line-budget gate remains blocked by pre-existing oversized workspace files; cargo test is awaiting a shared artifact lock

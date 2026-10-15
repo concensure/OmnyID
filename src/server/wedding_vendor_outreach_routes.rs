@@ -109,6 +109,8 @@ const MAX_VENDOR_SNIPPET_CHARS: usize = 800;
 const MAX_COUPLE_FIELD_CHARS: usize = 400;
 const MAX_VENDOR_FIELD_CHARS: usize = 400;
 const MAX_TOP_PRIORITIES: usize = 8;
+const MAX_VERIFY_QUESTIONS: usize = 3;
+const MAX_VERIFY_QUESTION_CHARS: usize = 200;
 
 const WEDDING_VENDOR_OUTREACH_SYSTEM_PROMPT: &str = r#"You write a short, warm, first-person-plural wedding vendor enquiry email on behalf of a couple, addressed to one vendor.
 
@@ -312,6 +314,8 @@ pub(super) struct WeddingVendorOutreachDraftRequest {
     couple: WeddingVendorOutreachCoupleInput,
     #[allow(dead_code)]
     wedding_plan_id: String,
+    #[serde(default)]
+    verify_questions: Vec<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -482,6 +486,11 @@ async fn wedding_vendor_outreach_draft_http(
         )?;
     }
     request.couple.top_priorities.truncate(MAX_TOP_PRIORITIES);
+    for question in &request.verify_questions {
+        reject_if_over_length("verify_questions[]", &Some(question.clone()), MAX_VERIFY_QUESTION_CHARS)?;
+    }
+    request.verify_questions.retain(|question| !question.trim().is_empty());
+    request.verify_questions.truncate(MAX_VERIFY_QUESTIONS);
 
     if !couple_has_grounding(&request.couple) {
         return Err((
@@ -529,6 +538,13 @@ async fn wedding_vendor_outreach_draft_http(
         "Vendor to write to:\n{vendor_lines}\n\nWhat the couple has told OmnyID about their wedding (use only this — nothing else is known):\n{couple_lines}"
     );
 
+    let verify_questions = request.verify_questions.iter().map(|question| question.trim()).collect::<Vec<_>>();
+    let user_text = if verify_questions.is_empty() {
+        user_text
+    } else {
+        format!("{user_text}\n\nQuestions to include (ask these exactly when appropriate):\n- {}", verify_questions.join("\n- "))
+    };
+
     // A user-selected follow-up must remain editable and saveable even if the
     // optional hosted models are disabled, out of credit, or return malformed
     // output. Provider failures deliberately cascade Cerebras -> Mistral ->
@@ -568,7 +584,7 @@ async fn wedding_vendor_outreach_draft_http(
         .map(|(payload, provider, model)| (payload, Some(provider), model))
         .unwrap_or_else(|| {
             (
-                deterministic_outreach_payload(vendor, couple),
+                deterministic_outreach_payload(vendor, couple, &request.verify_questions),
                 None,
                 "deterministic_template".to_string(),
             )
@@ -615,6 +631,7 @@ async fn wedding_vendor_outreach_draft_http(
 fn deterministic_outreach_payload(
     vendor: &WeddingVendorOutreachVendorInput,
     couple: &WeddingVendorOutreachCoupleInput,
+    verify_questions: &[String],
 ) -> ModelOutreachPayload {
     let vendor_name = outreach_vendor_display_name(&vendor.name);
     let mut grounded_on = Vec::new();
@@ -668,10 +685,21 @@ fn deterministic_outreach_payload(
     } else {
         format!(" {}.", details.join(" "))
     };
+    let questions = verify_questions
+        .iter()
+        .map(|question| question.trim())
+        .filter(|question| !question.is_empty())
+        .take(MAX_VERIFY_QUESTIONS)
+        .collect::<Vec<_>>();
+    let question_sentence = if questions.is_empty() {
+        String::new()
+    } else {
+        format!(" We would also appreciate answers to: {}", questions.join(" "))
+    };
     ModelOutreachPayload {
         subject: format!("Wedding enquiry for {vendor_name}"),
         body_markdown: format!(
-            "Hello {} team,\n\n{}{detail_sentence}{priority_sentence} Could you please let us know whether you are available, the package options you offer, and an indicative quote? We would be happy to share any other details you need.\n\nThank you.",
+            "Hello {} team,\n\n{}{detail_sentence}{priority_sentence} Could you please let us know whether you are available, the package options you offer, and an indicative quote?{question_sentence} We would be happy to share any other details you need.\n\nThank you.",
             vendor_name,
             intro,
         ),
@@ -876,6 +904,7 @@ mod tests {
             },
             couple: sample_couple(),
             wedding_plan_id: "wp_1".to_string(),
+            verify_questions: vec![],
         };
         assert!(request.vendor.name.trim().is_empty());
     }
@@ -922,7 +951,7 @@ mod tests {
             source_url: None,
             snippet: None,
         };
-        let payload = deterministic_outreach_payload(&vendor, &sample_couple());
+        let payload = deterministic_outreach_payload(&vendor, &sample_couple(), &[]);
 
         assert!(payload.subject.contains("Mackay Family Estate"));
         assert!(payload.body_markdown.contains("March 2027"));
@@ -937,6 +966,23 @@ mod tests {
                 "top_priorities".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn deterministic_outreach_draft_includes_user_reviewable_verify_questions() {
+        let vendor = WeddingVendorOutreachVendorInput {
+            name: "Mackay Family Estate".to_string(),
+            category: Some("venue".to_string()),
+            website_url: None,
+            address: None,
+            source_url: None,
+            snippet: None,
+        };
+        let questions = vec!["Could you confirm the seated capacity?".to_string()];
+        let payload = deterministic_outreach_payload(&vendor, &sample_couple(), &questions);
+
+        assert!(payload.body_markdown.contains("Could you confirm the seated capacity?"));
+        assert_eq!(payload.grounded_on.len(), 3);
     }
 
     #[test]

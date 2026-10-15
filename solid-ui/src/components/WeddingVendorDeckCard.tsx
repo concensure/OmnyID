@@ -17,7 +17,8 @@ export function WeddingVendorDeckCard(props: {
   onDone: () => void;
 }) {
   const [index, setIndex] = createSignal(0);
-  const cards = () => props.item.vendorComparison?.cards ?? [];
+  const [dismissedChoiceIds, setDismissedChoiceIds] = createSignal<Set<string>>(new Set());
+  const cards = () => (props.item.vendorComparison?.cards ?? []).filter((card) => !dismissedChoiceIds().has(card.choiceId));
   const selected = () => cards()[Math.min(index(), Math.max(0, cards().length - 1))] ?? null;
   const move = (delta: number) => {
     if (cards().length === 0) return;
@@ -49,7 +50,7 @@ export function WeddingVendorDeckCard(props: {
         </div>
       )}>
         <div class="min-h-0" role="region" aria-roledescription="carousel" aria-label="Ranked wedding vendors" onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()}>
-          <Show when={selected()} keyed>{(card) => <WeddingVendorChoiceCard card={card} onContactVendor={(choice, intent) => props.onContactVendor(choice, props.item.vendorComparison?.artifactId ?? "", intent)} onReviewQuote={() => props.onDone()} onReviewBooking={() => props.onDone()} onViewEvidence={() => props.onDone()} />}</Show>
+          <Show when={selected()} keyed>{(card) => <WeddingVendorChoiceCard card={card} onContactVendor={(choice, intent) => props.onContactVendor(choice, props.item.vendorComparison?.artifactId ?? "", intent)} onReviewQuote={() => props.onDone()} onReviewBooking={() => props.onDone()} onViewEvidence={() => props.onDone()} onNotForUs={(choice) => setDismissedChoiceIds((current) => new Set([...current, choice.choiceId]))} />}</Show>
           <div class="mt-2 flex items-center justify-between gap-3">
             <button type="button" class="min-h-12 min-w-12 rounded-full border border-wedding-muted bg-white text-lg font-bold text-wedding-accent" aria-label="Previous vendor" onClick={() => move(-1)}>←</button>
             <div class="flex gap-2" aria-live="polite">

@@ -123,6 +123,8 @@ export type WeddingVendorRankedCandidate = {
   snippet: string;
   rooms: WeddingVendorRoomCardRow[];
   score: number;
+  /** Additive v1 evidence for truthful presentation; it does not affect ranking. */
+  matchedPreferenceTokens: string[];
   preferenceMatchLabel: string;
   situationFitLabel: string;
   verificationLabel: string;
@@ -874,6 +876,7 @@ function rankCandidate(
     snippet: source.snippet,
     rooms: weddingVendorRoomCardRows(source.rooms),
     score: fit ?? 0,
+    matchedPreferenceTokens,
     preferenceMatchLabel: matchedPreferenceTokens.length > 0
       ? matchedPreferenceTokens.slice(0, 4).join(", ")
       : "No direct preference keyword match; review manually.",

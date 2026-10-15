@@ -617,3 +617,15 @@ contains those cards only; it does not append vendor comparison cards as additio
 decisions. When a decision deterministically requires supplier research (for example,
 choosing wedding rings), the surface opens a category-specific vendor search before
 any vendor selection or message is prepared.
+
+## 2026-10-15: Personalised recommendation import and facet rollout
+
+A locally stored Wedding Understanding result imports after every successful account
+creation or sign-in while it remains valid. The import is idempotent by the local-result
+fingerprint and wedding plan, so an existing account holder who takes the quiz imports
+once at their next sign-in without creating duplicate AFP profile successors or repeated
+confirmation banners.
+
+Venue style facets are the first released facet pass. Photographer `aesthetic.*` and
+`atmosphere.*` facets are a subsequent independently evaluated pass and do not alter the
+venue corpus or policy gate.

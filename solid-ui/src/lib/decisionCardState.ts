@@ -201,7 +201,7 @@ export function decisionCardFromWeddingVendorComparison(preview: WeddingWorkspac
     domain: "wedding",
     pressure: "medium",
     whyItMatters: handoff?.nextActionLabel ?? "Compare the source-backed shortlist before choosing who to contact.",
-    recommendation: handoff && evidence.length > 0 && handoff.whyLabels.length > 0
+    recommendation: preview.vendorComparisonCards.length > 1 && handoff && evidence.length > 0 && handoff.whyLabels.length > 0
       ? { summary: handoff.recommendationLabel, reasons: handoff.whyLabels.slice(0, 3) }
       : null,
     actions: [{ id: "open", label: "Open comparison", role: "primary", effect: "Opens the persisted comparison in Documents", intent: "review" }],
@@ -215,7 +215,7 @@ export function decisionCardFromWeddingVendorComparison(preview: WeddingWorkspac
         id: card.choiceId,
         name: card.title,
         summary: card.situationFit,
-        recommended: card.rank === 1,
+        recommended: preview.vendorComparisonCards.length > 1 && card.rank === 1,
       })),
     },
     verification: evidence.length > 0

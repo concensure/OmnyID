@@ -203,6 +203,7 @@ export type WeddingWorkspaceArtifactPreview = {
   vendorComparisonCards: Array<{
     choiceId: string;
     rank: number;
+    comparisonCount: number;
     title: string;
     imageUrl: string | null;
     imageAlt: string | null;
@@ -218,7 +219,7 @@ export type WeddingWorkspaceArtifactPreview = {
     rationaleLabels: string[];
     preferenceMatch: string;
     situationFit: string;
-    verificationLabel: string;
+    verificationLabel: string; checkedFactsCount: number; anchorRows: Array<{ anchor: string; status: "met" | "not_met" | "unknown"; detail: string; componentId: string; verifyQuestion: string | null }>; verifyQuestions: string[];
   } & WeddingVendorRankingCardFields>;
   persistedSelectedVendorChoices: Array<{
     optionId: string;
