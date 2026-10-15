@@ -2423,3 +2423,24 @@ Next:
 
 - Implement R5 deterministic venue facet derivation, using the new vocabulary and never storing
   rank-time derived facets.
+
+## 2026-10-15 - WED-192 deterministic facet derivation (Codex, in progress)
+
+Changed:
+
+- Added a pure, rank-time venue facet derivation function for setting-class, boolean, tag,
+  stored-facet, room, and capacity evidence. Merged facets retain all evidence and their highest
+  confidence; it makes no writes.
+- Bondi derives waterfront, beach, and views facets without a scale guess. Capacity and room tests
+  cover large and intimate scale outcomes.
+
+Verification:
+
+- `tests/wedding-vendor-facet-derivation-state.test.ts`: 3 passed.
+- `npm run typecheck` (solid-ui): passed.
+- `git diff --check`: passed.
+
+Remaining:
+
+- The requested `oracle-venue-export-2026-10-07-enriched.csv` and sanitised attribute snapshot
+  are not present locally, so the target active-venue coverage report cannot be produced yet.
