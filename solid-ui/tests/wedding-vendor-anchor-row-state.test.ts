@@ -23,3 +23,18 @@ test("sparse preference evidence remains unknown rather than a false negative", 
     "Could you tell us how this fits intimacy?",
   ]);
 });
+
+test("policy-v2 anchor rows and outreach questions come from the evidence ledger", () => {
+  const ranked = rankWeddingVendorCandidates({
+    sources: [WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_SOURCE],
+    requirements: WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_REQUIREMENTS,
+    rankingPolicy: "2",
+    now: new Date("2026-10-15T00:00:00Z"),
+  });
+  const candidate = ranked.verify[0];
+  assert.ok(candidate);
+  const rows = weddingVendorAnchorRows(candidate, WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_REQUIREMENTS);
+  assert.equal(rows.find((row) => row.anchor === "Bondi, Sydney")?.status, "met");
+  assert.equal(rows.find((row) => row.anchor === "Intimacy")?.status, "unknown");
+  assert.deepEqual(weddingVendorVerifyQuestions(rows, []), candidate.reasons?.filter((reason) => reason.polarity === "unknown").map((reason) => reason.verifyQuestion).filter((question): question is string => Boolean(question)).slice(0, 3));
+});

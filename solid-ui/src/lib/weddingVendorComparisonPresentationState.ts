@@ -12,6 +12,7 @@ import {
 } from "@/lib/weddingVendorRoomState";
 import { weddingVendorShortlistMedia } from "@/lib/weddingVendorShortlistPolicyState";
 import { weddingVendorAnchorRows, weddingVendorVerifyQuestions } from "@/lib/weddingVendorAnchorRowState";
+import { weddingFacetById } from "@/lib/weddingFacetVocabularyState";
 
 export type WeddingVendorComparisonContext = {
   preferences?: string | null;
@@ -21,6 +22,7 @@ export type WeddingVendorComparisonContext = {
   inspirationImageUrls?: readonly string[] | null;
   topPriorities?: readonly string[] | null;
   vendorCategories?: readonly string[] | null;
+  guestCount?: string | null;
 };
 
 export const COMPARISON_RANKING_SUMMARY =
@@ -91,6 +93,28 @@ export function scoreLabelFor(choice: WeddingVendorRankedCandidate): string {
   return `${choice.fitLabel} · ${choice.confidenceLabel}`;
 }
 
+export function weddingVendorFacetLabels(choice: WeddingVendorRankedCandidate): string[] {
+  const requested = new Set(choice.profileFacetIds ?? []);
+  const requestedDimensions = new Set([...requested].map((id) => weddingFacetById(id)?.dimension).filter((value): value is string => Boolean(value)));
+  const related = (choice.vendorFacets ?? []).filter((facet) => requested.has(facet.facetId) || requestedDimensions.has(weddingFacetById(facet.facetId)?.dimension ?? ""));
+  const fallback = related.length > 0 ? related : (choice.vendorFacets ?? []).filter((facet) => weddingFacetById(facet.facetId)?.dimension === "setting");
+  return fallback.sort((left, right) => right.confidence - left.confidence || left.facetId.localeCompare(right.facetId)).slice(0, 2).flatMap((facet) => weddingFacetById(facet.facetId)?.label ?? []);
+}
+
+export function weddingVendorFitWord(choice: WeddingVendorRankedCandidate): string | null {
+  if (choice.confidenceBucket === "low" || choice.fit === null) return null;
+  if (choice.fit >= 75) return "Strong match";
+  if (choice.fit >= 60) return "Good match";
+  if (choice.fit >= 45) return "Partial match";
+  return null;
+}
+
+export function weddingVendorWorthKnowing(choice: WeddingVendorRankedCandidate): string | null {
+  const con = choice.reasons?.filter((reason) => reason.polarity === "con" && reason.evidence.length > 0).sort((left, right) => right.weight - left.weight || left.id.localeCompare(right.id))[0];
+  if (con) return con.claim;
+  return null;
+}
+
 export function vendorChoiceActionRows(choices: readonly WeddingVendorRankedCandidate[]): Array<Record<string, unknown>> {
   return choices.map((choice) => {
     const actions: Array<Record<string, unknown>> = [
@@ -144,7 +168,7 @@ export function vendorChoiceCards(
   return choices.map((choice) => {
     const media = weddingVendorShortlistMedia({ vendorName: choice.title, imageUrl: choice.imageUrl });
     const anchorRows = weddingVendorAnchorRows(choice, context);
-    const verifyQuestions = weddingVendorVerifyQuestions(anchorRows, choice.unknownHardConstraints);
+    const verifyQuestions = weddingVendorVerifyQuestions(anchorRows, choice.reasons ? [] : choice.unknownHardConstraints);
     return {
     choice_id: choice.id,
     rank: choice.rank,
@@ -172,6 +196,10 @@ export function vendorChoiceCards(
       component_id: row.componentId,
     })),
     verify_questions: verifyQuestions,
+    facet_labels: weddingVendorFacetLabels(choice),
+    worth_knowing: weddingVendorWorthKnowing(choice),
+    fit_word: weddingVendorFitWord(choice),
+    reasons: choice.reasons,
     preference_match: choice.matchedPreferenceTokens.length > 0 ? `Matched: ${choice.matchedPreferenceTokens.slice(0, 4).join(", ")}` : "",
     situation_fit: "",
     rooms: weddingVendorRoomCardRowsToRecords(choice.rooms),
@@ -233,9 +261,12 @@ export function a2uiForComparison(
   choices: readonly WeddingVendorRankedCandidate[],
   summary: string,
   weddingPlanId: string | null = null,
+  context: Pick<WeddingVendorComparisonContext, "topPriorities" | "location" | "budgetComfort" | "guestCount"> = {},
 ): Record<string, unknown> {
   const columns = choices.map((choice) => `#${choice.rank} ${choice.title}`);
-  const cards = vendorChoiceCards(choices, weddingPlanId);
+  const cards = vendorChoiceCards(choices, weddingPlanId, context);
+  const anchorRows = choices.flatMap((choice) => weddingVendorAnchorRows(choice, context));
+  const anchors = [...new Set(anchorRows.map((row) => row.anchor))];
   return {
     schema_version: "a2ui.v1",
     kind: "panel",
@@ -258,9 +289,10 @@ export function a2uiForComparison(
           rows: [
             { label: "Fit and confidence", values: choices.map((choice) => scoreLabelFor(choice)) },
             { label: "Availability", values: choices.map((choice) => choice.availabilityLabel) },
-            { label: "Why surfaced", values: choices.map((choice) => choice.rationaleLabels.slice(0, 2).join("; ")) },
-            { label: "Preference match", values: choices.map((choice) => choice.preferenceMatchLabel) },
-            { label: "Situation fit", values: choices.map((choice) => choice.situationFitLabel) },
+            ...anchors.map((anchor) => ({ label: anchor, values: choices.map((choice) => {
+              const row = weddingVendorAnchorRows(choice, context).find((item) => item.anchor === anchor);
+              return row ? `${row.status === "met" ? "✓" : row.status === "not_met" ? "✗" : "?"} ${row.detail}` : "? Not confirmed";
+            }) })),
             { label: "Rooms and pricing", values: choices.map((choice) => weddingVendorRoomsComparisonLabel(choice.rooms)) },
             { label: "Contact details", values: choices.map((choice) => contactSummaryLabel(choice)) },
             { label: "Source", values: choices.map((choice) => choice.url) },
@@ -302,7 +334,7 @@ export function comparisonRecommendationHandoff(input: {
   const { bookable, verify, excluded, booked } = input.result;
   const nextAction = input.result.nextActions[0] ?? null;
   const total = booked.length + bookable.length + verify.length;
-  const styleAnchor = topChoice ? matchedPriorityAnchor(topChoice, input.topPriorities) : null;
+  const styleAnchor = topChoice?.reasons?.find((reason) => reason.polarity === "pro" && reason.evidence.length > 0)?.anchor ?? (topChoice ? matchedPriorityAnchor(topChoice, input.topPriorities) : null);
   const topStyle = topChoice?.components.find((component) => component.id === "style");
   const topLocation = topChoice?.components.find((component) => component.id === "location");
   const strongestAnchor = topStyle?.known && topStyle.value >= 0.6 && styleAnchor
@@ -313,7 +345,7 @@ export function comparisonRecommendationHandoff(input: {
   return {
     recommendationLabel: topChoice
       ? runnerUp
-        ? strongestAnchor ? `${topChoice.title} is strongest on ${strongestAnchor}.` : `Compare the ${total} options below.`
+        ? strongestAnchor && runnerUp.reasons?.find((reason) => reason.polarity === "pro" && reason.evidence.length > 0)?.anchor ? `${topChoice.title} fits ${strongestAnchor} best; ${runnerUp.title} is stronger on ${runnerUp.reasons.find((reason) => reason.polarity === "pro" && reason.evidence.length > 0)?.anchor}.` : `Compare the ${total} options below.`
         : `${total} venue fits what you've told us so far.`
       : "Review source-backed vendor options before outreach.",
     whyLabels: [

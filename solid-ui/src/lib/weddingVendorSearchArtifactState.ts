@@ -32,6 +32,7 @@ import {
   type WeddingVendorRankingSource,
 } from "@/lib/weddingVendorRankingState";
 import { weddingVendorRankingPolicyV2Enabled } from "@/lib/weddingVendorRankingV2State";
+import { WEDDING_FACET_VOCABULARY_VERSION } from "@/lib/weddingFacetVocabularyState";
 import {
   selectWeddingVendorShortlist,
   type WeddingVendorShortlistOutcome,
@@ -664,6 +665,8 @@ export function buildWeddingVendorComparisonArtifactState(
       topChoiceLabels: choices.map((choice) => choice.title),
       topChoiceActionRows,
       topChoiceCards,
+      profile_ref: null,
+      vocabulary_version: WEDDING_FACET_VOCABULARY_VERSION,
       topChoiceContactDetails: choices.map((choice) => vendorChoiceContactDetails(choice)),
       vendorComparisonPreferenceSignals: preferenceSignals,
       vendorComparisonNextActions: result.nextActions,
@@ -736,9 +739,16 @@ export function buildWeddingVendorComparisonArtifactState(
             targetMenu: "documents",
           },
         ],
-        semanticTags: ["wedding_comparison", "wedding_decision", "wedding_approval_required"],
+        semanticTags: [
+          "wedding_comparison",
+          "wedding_decision",
+          "wedding_approval_required",
+          ...choices.flatMap((choice) => (choice.vendorFacets ?? [])
+            .filter((facet) => (choice.profileFacetIds ?? []).includes(facet.facetId))
+            .map((facet) => `wedding_facet:${facet.facetId}`)),
+        ],
       },
-      a2ui: a2uiForComparison(choices, summaryLabel, metadata.weddingPlanId || null),
+      a2ui: a2uiForComparison(choices, summaryLabel, metadata.weddingPlanId || null, input),
     },
     sourceLabels: uniqueStrings([
       "Top vendor comparison",

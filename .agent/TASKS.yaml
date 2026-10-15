@@ -1327,3 +1327,31 @@ tasks:
       - policy 2 uses the 0.20 facet-match component, records a deterministic 0.06 maximum top-priority shift on affected components, and preserves total weight
       - the ledger emits one strongest evidence-backed facet row per couple anchor plus location, cost, capacity, and quality rows; unsupported pro/con rows are dropped and counted
       - focused profile, derivation, and policy tests (12) plus TypeScript checking pass; R5 catalog-coverage evidence remains a separate external release gate
+  - id: WED-194
+    title: Ledger-driven vendor card, widen actions and desktop rows
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-187
+    depends_on:
+      - WED-188
+      - WED-193
+    files:
+      - solid-ui/src/lib/weddingVendorAnchorRowState.ts
+      - solid-ui/src/lib/weddingVendorComparisonPresentationState.ts
+      - solid-ui/src/lib/weddingVendorComparisonArtifactState.ts
+      - solid-ui/src/lib/weddingVendorSearchArtifactState.ts
+      - solid-ui/src/components/WeddingVendorChoiceCard.tsx
+      - solid-ui/src/components/WeddingVendorDeckCard.tsx
+      - solid-ui/src/components/A2UIRenderer.tsx
+      - solid-ui/tests/wedding-vendor-*.test.ts
+      - .agent/**
+    acceptance:
+      - policy-2 cards render ledger rows, related facets, evidence-safe comparison copy, and ledger verify questions while legacy cards retain v1 rendering
+      - one- and two-result comparisons expose truthful near misses and non-persisting widen actions
+      - artifacts carry optional versioned ledger fields and remain backward compatible
+      - mobile and desktop presentation preserve the existing accessibility requirements
+    progress:
+      - policy-2 cards now derive anchor rows and outreach questions from the ledger, with legacy v1 rows preserved when no ledger exists
+      - card and artifact projections carry related facet labels, fit words, worth-knowing evidence, optional vocabulary/profile fields, and matched-facet supertags; desktop A2UI uses anchor rows
+      - focused anchor, copy-guard, artifact, and policy tests (14) plus TypeScript checking pass
+      - near-miss and non-persisting widen-action execution, legacy artifact regression coverage, and mobile accessibility evidence remain

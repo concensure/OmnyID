@@ -2466,3 +2466,24 @@ Next:
 
 - Start R7 ledger-driven card rendering. The R5 active-venue coverage report remains blocked on
   the absent sanitised Oracle export; it is a release gate, not a reason to change the ranker.
+
+## 2026-10-16 - WED-194 ledger-driven card checkpoint (Codex, in progress)
+
+Changed:
+
+- Policy-2 anchor rows and outreach questions now come from the reason ledger. Legacy candidates
+  still use the existing R1 rows without any changed interpretation.
+- Card projections include related facet labels, confidence-gated fit wording, a provenance-backed
+  “Worth knowing” line, vocabulary version, optional profile reference, and matching facet tags.
+  The A2UI desktop table now renders anchor rows instead of duplicate preference/situation rows.
+
+Verification:
+
+- Focused anchor-row, copy-guard, artifact, and policy tests: 14 passed.
+- `npm run typecheck` (solid-ui): passed.
+- `git diff --check`: passed.
+
+Remaining:
+
+- Add executable near-miss/widen actions without persisting a changed profile, then run the
+  mobile/axe evidence and legacy-artifact regression for R7.

@@ -148,6 +148,9 @@ export function vendorComparisonCardsForArtifact(
         ? Math.max(0, Math.floor(record.checked_facts_count)) : 0,
       anchorRows: anchorRows(record.anchor_rows),
       verifyQuestions: stringArray(record.verify_questions).slice(0, 3),
+      facetLabels: stringArray(record.facet_labels).slice(0, 2),
+      worthKnowing: clean(record.worth_knowing) || null,
+      fitWord: clean(record.fit_word) || null,
       ...weddingVendorRankingCardFieldsFromRecord(record),
     }];
   }).sort((left, right) => left.rank - right.rank).slice(0, 7);

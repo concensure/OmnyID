@@ -43,6 +43,18 @@ export function weddingVendorAnchorRows(
   candidate: WeddingVendorRankedCandidate,
   requirements: Pick<WeddingVendorRankingRequirements, "topPriorities" | "location" | "budgetComfort" | "guestCount">,
 ): WeddingVendorAnchorRow[] {
+  if (candidate.reasons) {
+    return candidate.reasons.map((reason): WeddingVendorAnchorRow => {
+      const detailPrefix = reason.anchor ? `${reason.anchor} — ` : "";
+      return {
+        anchor: reason.anchor ?? (reason.id === "quality" ? "Reviews and reputation" : reason.id),
+        status: reason.polarity === "pro" ? "met" : reason.polarity === "con" ? "not_met" : "unknown",
+        detail: reason.claim.startsWith(detailPrefix) ? reason.claim.slice(detailPrefix.length) : reason.claim,
+        componentId: reason.id,
+        verifyQuestion: reason.verifyQuestion,
+      };
+    }).slice(0, 4);
+  }
   const style = component(candidate, "style");
   const matched = new Set(candidate.matchedPreferenceTokens.map((item) => item.toLowerCase()));
   const priorities = (requirements.topPriorities ?? []).map(clean).filter(Boolean).map((anchor): WeddingVendorAnchorRow => {

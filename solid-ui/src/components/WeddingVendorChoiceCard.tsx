@@ -162,10 +162,18 @@ export function WeddingVendorChoiceCard(props: {
             </ul>
           </section>
         </Show>
+        <Show when={card.fitWord}><p class="text-xs font-semibold text-wedding-accent">{card.fitWord}</p></Show>
+        <Show when={(card.facetLabels?.length ?? 0) > 0}><p class="text-xs text-wedding-muted">{card.facetLabels?.join(" · ")}</p></Show>
         <Show when={card.verifyQuestions.length > 0}>
           <section aria-label="We'll ask them">
             <p class="text-[11px] font-semibold uppercase text-wedding-muted">We&apos;ll ask them</p>
             <ul class="mt-1 list-disc space-y-1 pl-4 text-xs leading-5 text-wedding-muted"><For each={card.verifyQuestions}>{(question) => <li>{question}</li>}</For></ul>
+          </section>
+        </Show>
+        <Show when={card.worthKnowing}>
+          <section aria-label="Worth knowing" class="rounded-lg border border-wedding-muted bg-wedding-surface-blush p-2 text-xs leading-5 text-wedding-text">
+            <p class="text-[11px] font-semibold uppercase text-wedding-muted">Worth knowing</p>
+            <p>{card.worthKnowing}</p>
           </section>
         </Show>
         <Show when={confirmedScoreLabels().length > 0}>
