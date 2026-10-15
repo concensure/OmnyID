@@ -2186,7 +2186,13 @@ Verification:
 
 Deployment:
 
-- Pending scoped UI release to Oracle after commit. Caddy must not be touched.
+- Commit `255f99a` was released as a scoped `ui` asset build. The one-shot UI
+  job exited 0; `https://omnyid.com/workspace/` and
+  `https://omnyid.com/wedding/` returned HTTP 200, and the public dynamic
+  ResponseQueue bundle contains the Documents export and upload controls.
+- Homeserver remained running. Caddy was neither reloaded nor restarted; its
+  SHA-256 remains
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
 
 ## 2026-10-15 - WED-185 stable wedding selection and planning actions (Codex)
 

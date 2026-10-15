@@ -1156,4 +1156,5 @@ tasks:
       - mobile Documents now uses a unified upload/research/visibility toolbar, a neutral consent setting, a grouped export panel, accessible search treatment, and additional safe-area clearance for Sprout
       - provider-only vendor-search readiness no longer creates a couple-facing task; remaining blocked intake is phrased as a practical research prerequisite, and budget contributions no longer render synthetic contributor or vendor-condition copy
       - timeline lead-time tasks use short user-facing actions such as `Search for planner`
+      - `255f99a` was released to Oracle on 2026-10-15 as a scoped `ui` asset update; `/workspace/` and `/wedding/` returned 200, the public ResponseQueue bundle contains the Documents export and upload controls, homeserver remained running, and Caddy was not reloaded
       - `d8f3541` was released to Oracle on 2026-10-15 as a scoped UI asset update; `/workspace/` and `/wedding/` returned 200, the deployed ResponseQueue bundle contains the quiet selection, agenda, and contact-picker paths, and Caddy was not reloaded
