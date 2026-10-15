@@ -26,7 +26,7 @@ export function WeddingMobilePage(props: {
         scrollContainer={() => scrollRoot}
       />
       <Show when={props.activeMenu ?? props.title} keyed>{(_menu) => (
-        <main class="wedding-mobile-content wedding-mobile-tab-content min-w-0 px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] sm:contents">
+        <main class="wedding-mobile-content wedding-mobile-tab-content min-w-0 px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] sm:contents">
           <Show when={props.title || props.subtitle}>
             <div class="mb-4 mt-1 sm:hidden">
               <Show when={props.title}><h1 data-wedding-mobile-large-title class="break-words font-display text-wed-large font-semibold text-wedding-text">{props.title}</h1></Show>

@@ -263,40 +263,38 @@ export function WeddingWorkspaceContextPanels(props: {
 
       <Show when={activeMenu() === "people"}>
       <div class="grid gap-3 xl:grid-cols-2">
-        <section class="rounded-[24px] border border-amber-100/80 bg-amber-50/75 p-4 shadow-card sm:rounded-[28px]">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p class="text-base font-semibold text-amber-950">{peopleAggregate().title}</p>
-              <p class="mt-1 text-sm leading-6 text-amber-950/70">
-                {peopleAggregate().detail}
-              </p>
-            </div>
-            <div class="flex flex-wrap gap-1.5 text-[11px] font-semibold text-amber-950/75 sm:justify-end">
+        <section class="rounded-[24px] border border-amber-100/80 bg-amber-50/75 p-5 shadow-card sm:rounded-[28px] sm:p-4">
+          <div class="min-w-0">
+            <p class="text-base font-semibold text-amber-950">{peopleAggregate().title}</p>
+            <p class="mt-2 text-sm leading-6 text-amber-950/70">
+              {peopleAggregate().detail}
+            </p>
+            <div class="mt-4 grid grid-cols-1 gap-2 text-[11px] font-semibold text-amber-950/75 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap sm:gap-1.5">
               <For each={peopleAggregate().summaryPills}>
                 {(label) => (
-                  <span class="rounded-full border border-amber-100 bg-white/75 px-2.5 py-1">
+                  <span class="min-w-0 rounded-full border border-amber-100 bg-white/75 px-3 py-1.5 leading-5 sm:px-2.5 sm:py-1">
                     {label}
                   </span>
                 )}
               </For>
             </div>
           </div>
-          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+          <div class="mt-5 grid gap-4 sm:grid-cols-2 sm:gap-2">
             <For each={peopleAggregate().actions}>
               {(action) => (
-                <button
-                  type="button"
-                  disabled={!action.enabled}
-                  class="rounded-2xl border border-amber-200 bg-white/80 p-3 text-left transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-45"
-                  onClick={() => openAggregateAction(action)}
-                >
-                  <span class="text-sm font-semibold text-amber-950">{action.title}</span>
-                  <span class="mt-1 block text-xs leading-5 text-amber-950/70">{action.detail}</span>
-                  <span class="mt-2 block text-[11px] font-semibold text-amber-950/65">{action.metaLabel}</span>
-                  <span class="mt-3 inline-flex rounded-full bg-amber-900 px-3 py-1 text-[11px] font-semibold text-white">
+                <article class="flex min-w-0 flex-col rounded-2xl border border-amber-200 bg-white/80 p-4 text-left">
+                  <h2 class="break-words text-base font-semibold text-amber-950">{action.title}</h2>
+                  <p class="mt-2 break-words text-sm leading-6 text-amber-950/70">{action.detail}</p>
+                  <p class="mt-3 break-words text-xs font-semibold leading-5 text-amber-950/65">{action.metaLabel}</p>
+                  <button
+                    type="button"
+                    disabled={!action.enabled}
+                    class="mt-5 min-h-12 w-full rounded-xl bg-amber-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
+                    onClick={() => openAggregateAction(action)}
+                  >
                     Open {action.title}
-                  </span>
-                </button>
+                  </button>
+                </article>
               )}
             </For>
           </div>

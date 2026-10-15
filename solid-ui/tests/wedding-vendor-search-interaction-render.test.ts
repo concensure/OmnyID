@@ -7,6 +7,10 @@ const source = readFileSync(
   resolve(process.cwd(), "src/components/WeddingVendorSearchHomeSections.tsx"),
   "utf8",
 );
+const responseQueueSource = readFileSync(
+  resolve(process.cwd(), "src/components/ResponseQueueView.tsx"),
+  "utf8",
+);
 
 test("vendor search uses native form submission so Enter and the button share one action", () => {
   assert.match(source, /<form[\s\S]*onSubmit=\{\(event\) => \{/);
@@ -36,4 +40,10 @@ test("full vendor search evidence expands and closes in place", () => {
   assert.match(source, /result\(\)\.sourcePreview\?\.bodyText/);
   assert.match(source, /setFullResultExpanded\(false\)/);
   assert.doesNotMatch(source, /Open in Documents/);
+});
+
+test("a manual vendor search remains on the vendor surface when it launches and completes", () => {
+  assert.match(responseQueueSource, /function applyWeddingVendorSearchLaunch[\s\S]*setWeddingWorkspaceMenu\("response_queue"\)/);
+  assert.match(responseQueueSource, /setWeddingWorkspaceMenu\(options\?\.stayOnHome \? "home" : "response_queue"\)/);
+  assert.doesNotMatch(responseQueueSource, /options\?\.stayOnHome === false \? "documents" : "home"/);
 });

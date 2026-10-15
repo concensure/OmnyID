@@ -488,7 +488,10 @@ export function ResponseQueueView(props: {
     setWeddingVendorSearchResultAction(null);
     setWeddingVendorSearchResultActionSuppressed(true);
     setWeddingVendorSearchCategoryScope(null);
-    setWeddingWorkspaceMenu("home");
+    // A vendor-search launch is an explicit request to work in the vendor
+    // surface.  Sending it home hides the entered query and makes a first
+    // search look as though it was lost until the user opens Vendors again.
+    setWeddingWorkspaceMenu("response_queue");
     setWeddingVendorSearchNotice("Vendor search is ready. Review the query, then run live search when you are ready.");
   }
 
@@ -1823,7 +1826,10 @@ export function ResponseQueueView(props: {
         topChoiceCount: comparisonArtifact.topChoiceCount,
       });
       setActiveWeddingArtifactId(resultAction?.artifactId ?? generatedArtifact.summary.id);
-      setWeddingWorkspaceMenu(options?.stayOnHome === false ? "documents" : "home");
+      // Keep a person-initiated search on the vendor surface so its result is
+      // immediately visible.  Background shortlists intentionally remain a
+      // home update, where they do not interrupt the person using another tab.
+      setWeddingWorkspaceMenu(options?.stayOnHome ? "home" : "response_queue");
       setWeddingVendorSearchCategoryScope(null);
       setWeddingVendorSearchResultAction(resultAction);
       setWeddingVendorSearchResultActionSuppressed(false);

@@ -2131,3 +2131,28 @@ Deployment:
 - Homeserver remained running. Caddy was neither restarted nor reloaded; its
   SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+## 2026-10-15 - WED-185 vendor-search continuity and People mobile layout (Codex)
+
+Changed:
+
+- A user-initiated vendor search now stays in the Vendors workspace through
+  launch and result rendering. Automatic background shortlists remain Home
+  updates, so they do not interrupt active work.
+- Rebuilt the People summary for narrow screens: title, description, and
+  status badges stack cleanly; Guests and Seating each have a separate card
+  with a full-width bottom CTA. Mobile page padding now clears the persistent
+  tab bar and floating Sprout control.
+
+Verification:
+
+- `npm run test:wedding --prefix solid-ui` (1,840 passing)
+- `npm run typecheck --prefix solid-ui` (passing)
+- `npm run build --prefix solid-ui` (passing)
+- `git diff --check` (passing)
+
+Deployment:
+
+- Pending commit and scoped Oracle UI asset deployment. Do not reload or
+  restart Caddy; preserve SHA-256
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
