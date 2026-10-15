@@ -5318,8 +5318,12 @@ function AuthModal(props: {
         setTab("signin");
         setEmail(submittedEmail);
         setPassword("");
-        setPendingVerificationEmail(submittedEmail);
-        setError(data.message || "Check your email to verify your account before signing in.");
+        const message = data.message || "Check your email to verify your account before signing in.";
+        // Do not tell someone to wait for an email when the server has already
+        // reported that its delivery attempt failed.
+        const deliveryUnavailable = /could not send a confirmation email/i.test(message);
+        setPendingVerificationEmail(deliveryUnavailable ? "" : submittedEmail);
+        setError(message);
         return;
       }
       setEmail(submittedEmail);

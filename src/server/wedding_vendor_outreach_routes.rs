@@ -616,6 +616,7 @@ fn deterministic_outreach_payload(
     vendor: &WeddingVendorOutreachVendorInput,
     couple: &WeddingVendorOutreachCoupleInput,
 ) -> ModelOutreachPayload {
+    let vendor_name = outreach_vendor_display_name(&vendor.name);
     let mut grounded_on = Vec::new();
     let intro = match capped(&couple.couple_names, MAX_COUPLE_FIELD_CHARS) {
         Some(names) => {
@@ -668,14 +669,26 @@ fn deterministic_outreach_payload(
         format!(" {}.", details.join(" "))
     };
     ModelOutreachPayload {
-        subject: format!("Wedding enquiry for {}", vendor.name.trim()),
+        subject: format!("Wedding enquiry for {vendor_name}"),
         body_markdown: format!(
             "Hello {} team,\n\n{}{detail_sentence}{priority_sentence} Could you please let us know whether you are available, the package options you offer, and an indicative quote? We would be happy to share any other details you need.\n\nThank you.",
-            vendor.name.trim(),
+            vendor_name,
             intro,
         ),
         grounded_on,
     }
+}
+
+/// Search/listing snippets sometimes append marketing prose to a business
+/// name (for example `Venue, with harbour views`).  That is useful evidence,
+/// not part of an email salutation.
+fn outreach_vendor_display_name(value: &str) -> &str {
+    value
+        .split(", with ")
+        .next()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or("the vendor")
 }
 
 fn parse_outreach_model_payload(raw: &str) -> Result<ModelOutreachPayload, String> {
