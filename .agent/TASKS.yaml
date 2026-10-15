@@ -1356,3 +1356,23 @@ tasks:
       - focused anchor, copy-guard, artifact, and policy tests (14) plus TypeScript checking pass
       - near misses now retain their exclusion constraint; widen actions create a fresh rank input/result without mutating requirements or the profile, and are serialized on the artifact/A2UI projection
       - the existing 360x740 Playwright plus axe sparse-Bondi baseline passes; interactive workspace invocation of serialized widen actions and the 3-result mobile evidence remain
+  - id: WED-195
+    title: Evaluation corpus judged by Casper and Iris
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-187
+    depends_on:
+      - WED-187
+      - WED-193
+    files:
+      - solid-ui/scripts/build-wedding-vendor-evaluation-corpus.mjs
+      - solid-ui/scripts/render-wedding-vendor-judge-sheet.mjs
+      - Documents/design/wedding planner/wedding-vendor-ranking-eval-*
+      - .agent/**
+    acceptance:
+      - a sanitised-catalog corpus contains at least 40 cases with two independent judge sheets and all required profile slices
+      - a machine report evaluates v1/v2 NDCG, deterministic probes, explained coverage and unmapped phrases
+      - the v2 release gate remains fail-closed until Casper and Iris complete and resolve the corpus
+    progress:
+      - catalog-driven corpus builder and separate ranker-blind Casper/Iris sheet renderer are implemented
+      - the sanitised active catalog required for actual cases, independent human scores, disagreement resolutions, and gate report are not present in this checkout

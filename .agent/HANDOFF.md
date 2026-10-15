@@ -2510,3 +2510,23 @@ Remaining:
 
 - Connect serialized widen actions to a workspace rerun callback and add a three-result mobile
   evidence fixture. Do not advertise the serialized action as an already-persisted profile change.
+
+## 2026-10-16 - WED-195 evaluation preparation (Codex, in progress)
+
+Changed:
+
+- Added a JSON-based sanitised-catalog corpus builder that produces 40 ranker-blind cases spanning
+  guest count, budget, season, region and priority slices.
+- Added independent Markdown judging-sheet rendering for Casper and Iris. It intentionally does
+  not include rank order or scores.
+
+Verification:
+
+- Both scripts' `--help` paths execute successfully.
+- `git diff --check`: passed.
+
+Remaining:
+
+- Supply the sanitised active catalog, collect the two independent human score sheets, resolve
+  flagged disagreements, and generate the machine gate report. The policy-v2 flag stays off until
+  that evidence exists.
