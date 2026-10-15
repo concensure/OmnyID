@@ -136,6 +136,8 @@ services:
       # Account verification and password-reset mail may fall back to Resend
       # when the legacy mailbox OAuth token has expired. This is intentionally
       # separate from the vendor-relay provider selection below.
+      OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN_FILE: ${OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN_FILE:-}
+      OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID: ${OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID:-}
       OMNYID_TRANSACTIONAL_RESEND_API_KEY_FILE: ${OMNYID_TRANSACTIONAL_RESEND_API_KEY_FILE:-}
       OMNYID_TRANSACTIONAL_FROM_ADDRESS: ${OMNYID_TRANSACTIONAL_FROM_ADDRESS:-}
       OMNYID_VENDOR_MAIL_ENABLED: ${OMNYID_VENDOR_MAIL_ENABLED:-false}

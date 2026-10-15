@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   isActionableVendorComparisonCard,
   vendorComparisonCardsForArtifact,
+  vendorComparisonHandoffForArtifact,
 } from "@/lib/weddingVendorComparisonArtifactState";
 
 test("category pages and aggregate directories are never actionable vendor cards", () => {
@@ -37,6 +38,23 @@ test("reopened comparison artifacts hide previously persisted category pages", (
     ],
   });
   assert.deepEqual(cards.map((card) => card.title), ["Harbour Lights Events"]);
+});
+
+test("legacy generic recommendation is rebuilt from persisted vendor fit evidence", () => {
+  const handoff = vendorComparisonHandoffForArtifact({
+    vendorComparisonHandoff: {
+      recommendationLabel: "Start by reviewing Harbour Studio, then select every vendor you want OmnyID to pursue.",
+      whyLabels: ["2 source-backed vendors found"],
+      confidenceLabel: "Confidence: developing",
+    },
+    topChoiceCards: [
+      { rank: 1, title: "Harbour Studio", source_url: "https://harbour.example", preference_match: "a waterfront ceremony" },
+      { rank: 2, title: "Garden House", source_url: "https://garden.example", preference_match: "a garden reception" },
+    ],
+  });
+  assert.match(handoff?.recommendationLabel ?? "", /Harbour Studio is the stronger fit for a waterfront ceremony/i);
+  assert.match(handoff?.recommendationLabel ?? "", /Garden House is the alternative for a garden reception/i);
+  assert.doesNotMatch(handoff?.recommendationLabel ?? "", /Start by reviewing/i);
 });
 
 test("comparison cards render approved public, proxy, and bounded first-party photos only", () => {

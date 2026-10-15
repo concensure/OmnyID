@@ -100,9 +100,20 @@ function normalizedVendorName(value: string): string {
 function safeVendorImageUrl(value: string | null | undefined): string | null {
   const candidate = value?.trim() ?? "";
   if (/^https:\/\/images\.unsplash\.com\//i.test(candidate)) return candidate;
+  if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(candidate)) return candidate;
   if (/^\/api\/wedding\/vendor-photos\/google\//i.test(candidate)) return candidate;
   if (/^https:\/\/omnyid\.com\/wedding\/assets\/venue-photos\/[a-z0-9][a-z0-9._-]*\.(?:jpe?g|png|webp)$/i.test(candidate)) return candidate;
   return null;
+}
+
+function vendorNamesReferToSameDirectoryEntry(cardName: string, vendorName: string): boolean {
+  const card = normalizedVendorName(cardName);
+  const vendor = normalizedVendorName(vendorName);
+  if (!card || !vendor) return false;
+  if (card === vendor || card.includes(vendor) || vendor.includes(card)) return true;
+  const cardWords = cardName.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 4);
+  const vendorWords = vendorName.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 4);
+  return cardWords.length > 0 && cardWords.every((word) => vendorWords.some((candidate) => candidate.includes(word) || word.includes(candidate)));
 }
 
 export type WeddingVendorChoiceSelectionSaveInput = {
@@ -275,9 +286,10 @@ function ArtifactPreviewCard(props: {
       expanded: comparisonExpanded(),
     }));
     const cardWithCurrentPhoto = (card: WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number]) => {
-      if (safeVendorImageUrl(card.imageUrl)) return card;
-      const vendor = props.vendorDirectory?.find((entry) => normalizedVendorName(entry.vendorName) === normalizedVendorName(card.title));
+      const vendor = props.vendorDirectory?.find((entry) => vendorNamesReferToSameDirectoryEntry(card.title, entry.vendorName));
       const photo = vendor?.photos.map((entry) => safeVendorImageUrl(entry.photoUrl)).find((entry): entry is string => Boolean(entry));
+      // Directory media is the current approved source, so it deliberately
+      // replaces stale saved-card media as well as filling an empty card.
       return photo ? { ...card, imageUrl: photo, imageAlt: vendor?.photos.find((entry) => entry.photoUrl === photo)?.altText ?? `${card.title} photo` } : card;
     };
     const resolutionBanner = () => (

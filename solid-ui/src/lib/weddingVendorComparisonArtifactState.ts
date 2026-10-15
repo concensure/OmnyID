@@ -63,7 +63,11 @@ export function vendorComparisonHandoffForArtifact(
   const handoff = metadata.vendorComparisonHandoff;
   if (!handoff || typeof handoff !== "object" || Array.isArray(handoff)) return null;
   const record = handoff as Record<string, unknown>;
-  const recommendationLabel = clean(record.recommendationLabel);
+  const persistedRecommendation = clean(record.recommendationLabel);
+  const cards = vendorComparisonCardsForArtifact(metadata);
+  const recommendationLabel = /^start by reviewing\b.*\bthen select every vendor\b/i.test(persistedRecommendation)
+    ? practicalRecommendationLabel(cards)
+    : persistedRecommendation;
   const whyLabels = stringArray(record.whyLabels).slice(0, 5);
   const confidenceLabel = clean(record.confidenceLabel);
   const nextActionLabel = clean(record.nextActionLabel);
@@ -74,6 +78,23 @@ export function vendorComparisonHandoffForArtifact(
     confidenceLabel,
     nextActionLabel: nextActionLabel || "Select one or more vendors for approval-gated follow-up.",
   };
+}
+
+/** Replace an old action-only sentence with the ranking facts carried by the
+ * saved cards. This is intentionally deterministic: opening a document does
+ * not invent preference evidence or require a model call. */
+function practicalRecommendationLabel(
+  cards: readonly WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number][],
+): string {
+  const first = cards[0];
+  const second = cards[1];
+  if (!first) return "Review the source-backed vendor evidence before choosing who to contact.";
+  const firstFit = clean(first.preferenceMatch).replace(/^review manually\.?$/i, "");
+  const secondFit = clean(second?.preferenceMatch).replace(/^review manually\.?$/i, "");
+  if (second) {
+    return `${first.title}${firstFit ? ` is the stronger fit for ${firstFit}` : " is ranked first on the available evidence"}; ${second.title}${secondFit ? ` is the alternative for ${secondFit}` : " is the next option to compare"}.`;
+  }
+  return `${first.title}${firstFit ? ` is the available fit for ${firstFit}` : " is the available source-backed option"}; confirm availability before contacting them.`;
 }
 
 export function vendorComparisonCardsForArtifact(

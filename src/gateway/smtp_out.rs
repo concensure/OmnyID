@@ -160,6 +160,9 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
         in_reply_to: None,
         references: vec![],
     };
+    if let Some(result) = send_transactional_platform_email(to, subject, body).await {
+        return result;
+    }
     match send_outgoing_email(&request).await {
         Ok(()) => Ok(()),
         Err(primary_error) => {
@@ -170,8 +173,7 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
                 crate::secret_manager::read_process_secret_trimmed(
                     "OMNYID_VENDOR_MAIL_RESEND_API_KEY",
                 )
-            })
-            else {
+            }) else {
                 return Err(primary_error);
             };
 
@@ -206,6 +208,117 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
             })
         }
     }
+}
+
+/// Platform-owned account mail is separate from the Gmail continuity gateway.
+/// Cloudflare Email Sending is attempted first; Resend is only used after that
+/// attempt fails or when Cloudflare has not been configured yet.
+async fn send_transactional_platform_email(
+    to: &str,
+    subject: &str,
+    body: &str,
+) -> Option<Result<(), String>> {
+    let cloudflare_api_key = crate::secret_manager::read_process_secret_trimmed(
+        "OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN",
+    )
+    .or_else(|| {
+        crate::secret_manager::read_process_secret_trimmed(
+            "OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN",
+        )
+    });
+    let cloudflare_account_id = std::env::var("OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID")
+        .ok()
+        .or_else(|| std::env::var("OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID").ok())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let resend_api_key =
+        crate::secret_manager::read_process_secret_trimmed("OMNYID_TRANSACTIONAL_RESEND_API_KEY")
+            .or_else(|| {
+                crate::secret_manager::read_process_secret_trimmed(
+                    "OMNYID_VENDOR_MAIL_RESEND_API_KEY",
+                )
+            });
+    if cloudflare_api_key.is_none() && resend_api_key.is_none() {
+        return None;
+    }
+
+    let from = std::env::var("OMNYID_TRANSACTIONAL_FROM_ADDRESS")
+        .ok()
+        .or_else(|| std::env::var("FROM_ADDRESS").ok())
+        .or_else(|| std::env::var("OMNYID_EMAIL_ADDRESS").ok())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let Some(from) = from else {
+        return Some(Err("Transactional delivery requires OMNYID_TRANSACTIONAL_FROM_ADDRESS, FROM_ADDRESS, or OMNYID_EMAIL_ADDRESS".to_string()));
+    };
+
+    let cloudflare_error = match (cloudflare_api_key, cloudflare_account_id) {
+        (Some(api_key), Some(account_id)) => match send_transactional_email_via_cloudflare(
+            &api_key,
+            &account_id,
+            &from,
+            to,
+            subject,
+            body,
+        )
+        .await
+        {
+            Ok(()) => return Some(Ok(())),
+            Err(error) => {
+                warn!(error = %error, "Cloudflare transactional email delivery failed; attempting Resend fallback");
+                Some(error)
+            }
+        },
+        (Some(_), None) => Some(
+            "Cloudflare transactional email requires OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID"
+                .to_string(),
+        ),
+        (None, _) => None,
+    };
+
+    match resend_api_key {
+        Some(api_key) => Some(send_transactional_email_via_resend(&api_key, &from, to, subject, body)
+            .await
+            .map_err(|resend_error| match cloudflare_error {
+                Some(cloudflare_error) => format!("Cloudflare primary failed: {cloudflare_error}; Resend fallback failed: {resend_error}"),
+                None => resend_error,
+            })),
+        None => Some(Err(cloudflare_error.unwrap_or_else(|| "No platform transactional email provider is configured".to_string()))),
+    }
+}
+
+async fn send_transactional_email_via_cloudflare(
+    api_key: &str,
+    account_id: &str,
+    from: &str,
+    to: &str,
+    subject: &str,
+    body: &str,
+) -> Result<(), String> {
+    let response = reqwest::Client::new()
+        .post(format!(
+            "https://api.cloudflare.com/client/v4/accounts/{}/email/sending/send",
+            urlencoding::encode(account_id)
+        ))
+        .bearer_auth(api_key)
+        .json(&serde_json::json!({
+            "from": from,
+            "to": [to],
+            "subject": subject,
+            "text": body,
+        }))
+        .send()
+        .await
+        .map_err(|error| format!("Cloudflare Email Sending request failed: {error}"))?;
+    if response.status().is_success() {
+        return Ok(());
+    }
+    let status = response.status();
+    let detail = response.text().await.unwrap_or_default();
+    Err(format!(
+        "Cloudflare Email Sending returned {status}: {}",
+        detail.chars().take(500).collect::<String>()
+    ))
 }
 
 async fn send_transactional_email_via_resend(
