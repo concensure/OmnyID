@@ -600,3 +600,12 @@ The Composio project credential is injected only by `COMPOSIO_API_KEY_FILE` from
 the Oracle secret mount. It enables the shared provider project while each user
 continues to create and own their individual Composio connection record and OAuth
 grant.
+
+## 2026-10-15: Platform-owned account mail uses Cloudflare before Resend
+
+Account verification and password-reset mail now uses Cloudflare Email Sending
+(`POST /accounts/{account_id}/email/sending/send`) with `hello@mail.omnyid.com`
+as the configured sender. Resend is retained only as the platform-owned fallback;
+the legacy Gmail mailbox gateway is not selected while either platform provider
+is configured. This is intentionally separate from the vendor relay, which stays
+behind its inbound-routing and security gates.

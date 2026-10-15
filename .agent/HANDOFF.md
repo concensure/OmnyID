@@ -2061,3 +2061,36 @@ Next:
 - The Composio status API is intentionally authenticated, so provider usability
   still needs to be observed from a signed-in user session; configuration and
   secret-mount evidence are confirmed server-side.
+
+## 2026-10-15 - WED-185 Cloudflare transactional primary and comparison refresh (Codex)
+
+Changed:
+
+- Account verification and reset mail attempts Cloudflare Email Sending first,
+  then Resend; it only reaches the legacy mailbox gateway when neither
+  platform provider is configured. The Cloudflare token is file-backed and the
+  account ID is process-scoped in Oracle.
+- Saved comparison cards refresh from the current approved vendor directory
+  photo and replace the legacy generic “Start by reviewing” copy with the
+  saved per-vendor fit evidence.
+
+Verification and deployment:
+
+- Cloudflare reported both `omnyid.com` and `mail.omnyid.com` sending
+  subdomains enabled. Two authorised test sends to `concensure@gmail.com`, one
+  from each subdomain address, were accepted and queued by Cloudflare.
+- `cargo test gateway::smtp_out::tests --lib` (5 tests), `npm run
+  test:wedding --prefix solid-ui` (1,834 tests), `npm run build --prefix
+  solid-ui`, and `git diff --check` completed locally. Typecheck still exposes
+  the two pre-existing contract errors noted in the earlier handoff.
+- Commit `c73ac17` was deployed as scoped `homeserver` and `ui` builds.
+  `https://omnyid.com/wedding/` and a first-party venue image both returned
+  HTTP 200; the homeserver process has the non-secret Cloudflare account ID and
+  a non-empty transactional token. Caddy was not reloaded and its SHA-256
+  remains `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
+
+External state:
+
+- Resend reports `mail.omnyid.com` as `pending`; it remains a fallback until
+  DNS verification completes. The Cloudflare sending test demonstrates that
+  account mail does not need to wait on that DNS step.
