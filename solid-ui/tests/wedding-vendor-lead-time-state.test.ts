@@ -76,7 +76,7 @@ test("buildWeddingVendorLeadTimeTaskItems creates research tasks for the existin
 
   const venue = tasks.find((task) => task.metadata?.vendor_lead_time_category_id === "venue");
   assert.ok(venue);
-  assert.match(venue.title, /Vendor research, right now: Venue/);
+  assert.match(venue.title, /Search for venue/);
   assert.equal(venue.kind, "research");
   assert.equal(venue.metadata?.vendor_lead_time_research_task, true);
   assert.equal(venue.metadata?.wedding_workspace_menu, "response_queue");
@@ -116,7 +116,7 @@ test("buildWeddingResponseWorkspaceViewState surfaces lead-time vendor research 
 
   assert.ok(state.planningTaskItems.some((task) => task.metadata?.vendor_lead_time_research_task === true));
   assert.ok(state.personalOsProjection.decisionLoadRelief.focusItems.some((item) =>
-    /Vendor research, right now/i.test(item.title)
+    /Search for venue/i.test(item.title)
     && item.evidenceLabels.includes("vendor research timing")
   ));
   assert.ok(state.personalOsProjection.decisionLoadRelief.backlogCount > 0);

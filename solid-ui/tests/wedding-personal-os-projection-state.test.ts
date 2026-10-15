@@ -504,7 +504,7 @@ test("wedding PersonalOS projection ranks vendor search freshness tasks", () => 
 
   assert.equal(state.rankedItems[0]?.title, "Verify price, package inclusions, and availability for selected vendors");
   assert.ok(state.rankedItems[0]?.evidenceLabels.includes("vendor search freshness"));
-  assert.match(state.rankedItems[0]?.explanation ?? "", /source freshness, price\/availability verification/i);
+  assert.match(state.rankedItems[0]?.explanation ?? "", /Review the shortlist and choose who you want to contact/i);
 });
 
 test("wedding PersonalOS projection ranks top-three vendor comparison decisions", () => {

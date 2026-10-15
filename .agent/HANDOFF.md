@@ -2162,6 +2162,32 @@ Deployment:
   SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.
 
+## 2026-10-15 - WED-185 mobile Documents and decision-surface refinement (Codex)
+
+Changed:
+
+- Removed redundant mobile wedding/decision chrome and surrounding card shells;
+  the focused decision remains the prominent content above the tab bar, while
+  desktop controls remain available at larger breakpoints.
+- Reworked the phone Documents presentation without changing its actions:
+  consistent upload/research/visibility controls, neutral anonymized-sharing
+  row, grouped export controls, an accessible search affordance, and clear
+  space beneath scrollable content for Sprout.
+- Removed technical provider-readiness copy from couple decisions, removed a
+  provider-only internal task, made timeline lead-time actions concise, and
+  filtered synthetic contribution conditions from the budget surface.
+
+Verification:
+
+- `npm run test:wedding --prefix solid-ui` (1,851 passing)
+- `npm run typecheck --prefix solid-ui` (passing)
+- `npm run build --prefix solid-ui` (passing; existing chunk-size warnings)
+- `git diff --check` (passing)
+
+Deployment:
+
+- Pending scoped UI release to Oracle after commit. Caddy must not be touched.
+
 ## 2026-10-15 - WED-185 stable wedding selection and planning actions (Codex)
 
 Changed:

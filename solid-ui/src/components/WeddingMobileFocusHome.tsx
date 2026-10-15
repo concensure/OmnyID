@@ -281,9 +281,7 @@ export function WeddingMobileFocusHome(props: {
     requestApproval(item, "button");
   }
 
-  const currentTitle = () => mobileFocusMode() === "overview"
-    ? "Wedding overview"
-    : `${mobileFocusMode() === "responses" ? "Response" : "Decision"} ${Math.min(position() + 1, items().length)} of ${items().length}`;
+  const currentTitle = () => "";
   const selectedSection = createMemo(() => props.homeSections.find((section) => section.id === mobileFocusSingleCardSectionId()) ?? null);
   const clearDecisionView = () => !selectedSection()
     && !pendingApproval()
@@ -298,7 +296,7 @@ export function WeddingMobileFocusHome(props: {
         responseCount: responses().length,
         overdueDecisionCount: decisions().filter((item) => item.dueAt && Date.parse(item.dueAt) <= Date.now()).length,
       })}
-      immersive={clearDecisionView()}
+      immersive={clearDecisionView() || (!selectedSection() && mobileFocusMode() !== "overview")}
     >
       <Show when={notice()}>
         {(message) => (
@@ -365,7 +363,7 @@ export function WeddingMobileFocusHome(props: {
       >
         {(section) => (
           <div class="flex min-h-0 flex-1 flex-col">
-            <button type="button" class="mb-1 inline-flex min-h-11 items-center gap-1 self-start rounded-lg pr-3 text-sm font-semibold text-wedding-accent active:bg-wedding-surface-blush" onClick={() => setMobileFocusSingleCardSectionId(null)}>
+            <button type="button" class="mb-1 hidden min-h-11 items-center gap-1 self-start rounded-lg pr-3 text-sm font-semibold text-wedding-accent active:bg-wedding-surface-blush sm:inline-flex" onClick={() => setMobileFocusSingleCardSectionId(null)}>
               <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7" /></svg>
               Home
             </button>
@@ -393,7 +391,6 @@ function DeckCard(props: {
         }}
         class="shadow-none"
       />
-      <p class="mt-auto pt-4 text-xs text-wedding-muted">Use the action bar or swipe. Sending a vendor message always needs a separate confirmation.</p>
     </div>
   );
 }

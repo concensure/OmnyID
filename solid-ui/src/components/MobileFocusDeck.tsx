@@ -138,7 +138,7 @@ export function MobileFocusDeck(props: {
             {edgeLabel()}<Show when={progress() >= 1}> ✓</Show>
           </div>
           <div
-            class={`flex h-full min-h-0 touch-none select-none flex-col rounded-[24px] border border-wedding-muted bg-white p-4 shadow-card will-change-transform ${drag() ? "transition-none" : "transition-transform duration-150 ease-out"} motion-reduce:transition-opacity`}
+            class={`flex h-full min-h-0 touch-none select-none flex-col rounded-[24px] border border-wedding-muted bg-white p-4 shadow-card will-change-transform phone:rounded-none phone:border-0 phone:bg-transparent phone:px-0 phone:shadow-none ${drag() ? "transition-none" : "transition-transform duration-150 ease-out"} motion-reduce:transition-opacity`}
             style={{
               transform: `translate(${offset().x}px, ${offset().y}px) rotate(${Math.max(-3, Math.min(3, offset().x / 40))}deg)`,
               // Keep browsers from treating a deliberate card gesture as page

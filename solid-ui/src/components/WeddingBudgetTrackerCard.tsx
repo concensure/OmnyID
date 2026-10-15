@@ -711,7 +711,10 @@ export function WeddingBudgetTrackerCard(props: {
             <For each={props.state.insights.contributionRows}>
               {(row) => (
                 <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs leading-5 text-emerald-950/75">
-                  <span class="font-semibold">{row.personLabel}</span> - {row.amountLabel} - {row.conditionLabel}
+                  <span class="font-semibold">{row.personLabel}</span> - {row.amountLabel}
+                  <Show when={row.conditionLabel && row.conditionLabel !== "No condition recorded."}>
+                    {(condition) => <> - {condition()}</>}
+                  </Show>
                 </div>
               )}
             </For>

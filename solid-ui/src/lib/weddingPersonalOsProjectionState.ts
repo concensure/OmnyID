@@ -359,7 +359,7 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
       hasDelegationTask(task.metadata) ? "Delegated wedding ownership should be confirmed so follow-ups and Contacts stay accountable." : null,
       hasFinalPhaseTask(task.metadata) ? "Final-phase wedding work affects run sheet, confirmations, day-of fallback, guests, vendors, or final payments." : null,
       hasLegalAdministrationTask(task.metadata) ? "Legal document and NOIM preparation should stay visible before celebrant review; no form is lodged automatically." : null,
-      hasVendorSearchReviewTask(task.metadata) ? "Vendor search results need source freshness, price/availability verification, and user selection before reports narrow or outreach is sent." : null,
+      hasVendorSearchReviewTask(task.metadata) ? "Review the shortlist and choose who you want to contact." : null,
       hasVendorLeadTimeResearchTask(task.metadata) ? "This vendor category is surfacing because its planning lead-time window is open or close to opening." : null,
       hasVendorComparisonDecisionTask(task.metadata) ? "The top-three vendor comparison is ready for the user to choose preferred vendors before outreach or report narrowing." : null,
       hasVendorSeedReviewTask(task.metadata) ? "Seeded vendor rows are planning hints only; refresh source pages and verify fit before using them for recommendations or outreach." : null,

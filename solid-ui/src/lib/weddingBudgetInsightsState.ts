@@ -311,8 +311,11 @@ function contributionRows(artifacts: readonly WeddingArtifactInput[]): WeddingBu
   return lines.flatMap((line): WeddingBudgetContribution[] => {
     if (!/\b(contribut\w*|paying|covering|gift from|family)\b/i.test(line)) return [];
     const amount = moneyValue(line);
-    const person = clean(line.match(/\b(?:from|by|person|name)[:\s-]+([^:,$.;|]+)/i)?.[1]) || "Contributor";
-    const condition = clean(line.match(/\b(?:condition|only if|for|toward|towards)[:\s-]+([^.;|]+)/i)?.[1]) || "Confirm conditions before spending.";
+    const person = clean(line.match(/\b(?:from|by|person|name)[:\s-]+([^:,$.;|]+)/i)?.[1]);
+    // An unowned, amount-free phrase such as "contributor — ask vendor" is
+    // planning noise, not a contribution the couple recorded.
+    if (!person || amount === null || amount <= 0) return [];
+    const condition = clean(line.match(/\b(?:condition|only if|for|toward|towards)[:\s-]+([^.;|]+)/i)?.[1]);
     return [{ personLabel: person, amountLabel: moneyLabel(amount), conditionLabel: condition }];
   }).slice(0, 8);
 }

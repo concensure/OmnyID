@@ -14,7 +14,7 @@ const mobilePage = readFileSync(
 
 test("People summary stacks status badges before wider phone layouts", () => {
   assert.match(contextPanels, /grid grid-cols-1 gap-2[\s\S]*min-\[420px\]:grid-cols-2/);
-  assert.match(contextPanels, /p-5 shadow-card sm:rounded-\[28px\] sm:p-4/);
+  assert.match(contextPanels, /p-5 shadow-card phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-\[28px\] sm:p-4/);
 });
 
 test("People actions have distinct content and full-width mobile CTAs", () => {
@@ -24,5 +24,5 @@ test("People actions have distinct content and full-width mobile CTAs", () => {
 });
 
 test("mobile pages reserve space above the tab bar and floating Sprout control", () => {
-  assert.match(mobilePage, /pb-\[calc\(8rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(mobilePage, /pb-\[calc\(10rem\+env\(safe-area-inset-bottom\)\)\]/);
 });

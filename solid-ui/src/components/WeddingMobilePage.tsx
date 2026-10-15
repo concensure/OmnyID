@@ -19,14 +19,16 @@ export function WeddingMobilePage(props: {
   let scrollRoot: HTMLDivElement | undefined;
   return (
     <div ref={scrollRoot} data-wedding-mobile-scroll-root class="min-w-0 bg-wedding-surface phone:h-[100dvh] phone:overflow-y-auto phone:overscroll-y-contain sm:contents">
-      <WeddingMobileAppBar
-        title={props.title}
-        back={props.back}
-        trailing={props.appBarTrailing}
-        scrollContainer={() => scrollRoot}
-      />
+      <Show when={props.title || props.back || props.appBarTrailing}>
+        <WeddingMobileAppBar
+          title={props.title}
+          back={props.back}
+          trailing={props.appBarTrailing}
+          scrollContainer={() => scrollRoot}
+        />
+      </Show>
       <Show when={props.activeMenu ?? props.title} keyed>{(_menu) => (
-        <main class="wedding-mobile-content wedding-mobile-tab-content min-w-0 px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] sm:contents">
+        <main class="wedding-mobile-content wedding-mobile-tab-content min-w-0 px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] sm:contents">
           <Show when={props.title || props.subtitle}>
             <div class="mb-4 mt-1 sm:hidden">
               <Show when={props.title}><h1 data-wedding-mobile-large-title class="break-words font-display text-wed-large font-semibold text-wedding-text">{props.title}</h1></Show>

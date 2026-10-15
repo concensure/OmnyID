@@ -266,7 +266,7 @@ export function buildWeddingVendorLeadTimeTaskItems(input: {
     .filter((recommendation) => !existingKeys.has(recommendation.categoryId))
     .map((recommendation): WeddingPlanningTaskItem => ({
       id: `wedding_vendor_lead_time:${safeWeddingLabel(recommendation.categoryId)}:${safeWeddingLabel(metadata.responseWorkspaceId)}`,
-      title: `Vendor research, right now: ${recommendation.label}`,
+      title: `Search for ${recommendation.label.toLowerCase()}`,
       kind: "research",
       dueLabel: recommendation.windowCloseAt
         ? `Research window closes ${recommendation.windowCloseAt}`

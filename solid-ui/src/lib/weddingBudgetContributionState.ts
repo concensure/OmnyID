@@ -105,7 +105,7 @@ export function weddingBudgetContributionsFromDecisionRecords(
       return {
         personLabel,
         amountLabel: amountCell || moneyLabel(amount, "AUD"),
-        conditionLabel: cellValue(record.selectedOptionCells, "Condition") || "Confirm conditions before spending.",
+        conditionLabel: cellValue(record.selectedOptionCells, "Condition") || "No condition recorded.",
       };
     })
     .filter((row): row is WeddingBudgetContribution => Boolean(row));

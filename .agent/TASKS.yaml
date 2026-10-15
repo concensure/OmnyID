@@ -1152,4 +1152,8 @@ tasks:
       - live mobile vendor comparison cards now persist follow-up selection, budget tooltips flip and scroll within the phone viewport, and custom image cards support whole-card touch dragging
       - vendor follow-up selection now emits its AFP update without remounting the active comparison; agenda confirmations and due-date changes use the existing wedding-responsibility AFP projection, while Budget can select a known person or add-and-select a contact without interrupting contribution entry
       - timeline chart task labels retain their left edge on narrow screens and information tips use a viewport-clamped portal position in both Timeline and Budget
+      - mobile decision and workspace surfaces now suppress duplicate chrome, use edge-to-edge content shells, and hide the redundant Home-back control while retaining the persistent navigation
+      - mobile Documents now uses a unified upload/research/visibility toolbar, a neutral consent setting, a grouped export panel, accessible search treatment, and additional safe-area clearance for Sprout
+      - provider-only vendor-search readiness no longer creates a couple-facing task; remaining blocked intake is phrased as a practical research prerequisite, and budget contributions no longer render synthetic contributor or vendor-condition copy
+      - timeline lead-time tasks use short user-facing actions such as `Search for planner`
       - `d8f3541` was released to Oracle on 2026-10-15 as a scoped UI asset update; `/workspace/` and `/wedding/` returned 200, the deployed ResponseQueue bundle contains the quiet selection, agenda, and contact-picker paths, and Caddy was not reloaded

@@ -154,8 +154,8 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     return contextOnlyMenu() ? `min-w-0 ${spacing}` : `min-w-0 ${spacing} xl:sticky xl:top-4 xl:self-start`;
   };
   const cardClass = () => compactMode()
-    ? "rounded-[20px] border border-white/60 bg-white/75 p-0 shadow-card backdrop-blur sm:rounded-[24px] sm:p-3"
-    : "rounded-[24px] border border-white/60 bg-white/75 p-0 shadow-card backdrop-blur sm:rounded-[28px] sm:p-4";
+    ? "rounded-[20px] border border-white/60 bg-white/75 p-0 shadow-card backdrop-blur phone:rounded-none phone:border-0 phone:bg-transparent phone:shadow-none sm:rounded-[24px] sm:p-3"
+    : "rounded-[24px] border border-white/60 bg-white/75 p-0 shadow-card backdrop-blur phone:rounded-none phone:border-0 phone:bg-transparent phone:shadow-none sm:rounded-[28px] sm:p-4";
   const documentsCardClass = () => `${cardClass()} xl:col-span-2`;
   const inlineVendorSearchPreview = createMemo(() => {
     const action = props.vendorSearchResultAction;
@@ -934,7 +934,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   });
 
   return (
-    <WeddingMobilePage title={(activeMenu() === "response_queue" || activeMenu() === "timeline" || activeMenu() === "inspiration") && isMobileFocusViewport() ? "" : weddingMobilePageTitle(activeMenu())} activeMenu={activeMenu()} onSelectMenu={props.onSelectMenu}>
+    <WeddingMobilePage title={isMobileFocusViewport() ? "" : weddingMobilePageTitle(activeMenu())} activeMenu={activeMenu()} onSelectMenu={props.onSelectMenu}>
     <section
       class={rootClass()}
       role="tabpanel"
@@ -945,7 +945,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
         <Show when={activeMenu() !== "home"}>
           <button
             type="button"
-            class="mb-3 inline-flex min-h-11 items-center gap-1 rounded-lg border border-wedding-muted bg-white pl-2 pr-3 text-sm font-semibold text-wedding-accent transition hover:bg-wedding-surface-blush"
+            class="mb-3 hidden min-h-11 items-center gap-1 rounded-lg border border-wedding-muted bg-white pl-2 pr-3 text-sm font-semibold text-wedding-accent transition hover:bg-wedding-surface-blush sm:inline-flex"
             onClick={() => props.onSelectMenu?.("home")}
           >
             <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7" /></svg>Wedding Home

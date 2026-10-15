@@ -250,13 +250,14 @@ function vendorSearchTaskItems(
   metadata: WeddingPlanningMetadata,
   vendorSearch: WeddingVendorSearchReadinessState,
 ): WeddingPlanningTaskItem[] {
-  if (vendorSearch.status === "ready") return [];
+  // A missing live-provider connection is an operator concern, not a couple's
+  // planning task. Keep user-facing intake tasks only while their own context
+  // is incomplete.
+  if (vendorSearch.status !== "blocked") return [];
   if (vendorSearch.missing.length === 0 && vendorSearch.searchBrief.length === 0) return [];
   return [{
     id: `wedding_task:vendor-search-readiness:${safeWeddingLabel(metadata.responseWorkspaceId)}`,
-    title: vendorSearch.status === "blocked"
-      ? "Complete vendor-search intake before researching vendors"
-      : "Connect live vendor-search provider before presenting vendor matches",
+    title: "Complete vendor-search intake before researching vendors",
     kind: "research",
     dueLabel: "Before vendor shortlist decisions",
     priority: "high",

@@ -272,7 +272,7 @@ export function WeddingWorkspaceContextPanels(props: {
 
       <Show when={activeMenu() === "people"}>
       <div class="grid gap-3 xl:grid-cols-2">
-        <section class="rounded-[24px] border border-amber-100/80 bg-amber-50/75 p-5 shadow-card sm:rounded-[28px] sm:p-4">
+        <section class="rounded-[24px] border border-amber-100/80 bg-amber-50/75 p-5 shadow-card phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[28px] sm:p-4">
           <div class="min-w-0">
             <p class="text-base font-semibold text-amber-950">{peopleAggregate().title}</p>
             <p class="mt-2 text-sm leading-6 text-amber-950/70">
@@ -331,7 +331,7 @@ export function WeddingWorkspaceContextPanels(props: {
       </Show>
 
       <div hidden={activeMenu() !== "plan"}>
-        <section class="rounded-[24px] border border-indigo-100/80 bg-indigo-50/75 p-4 shadow-card sm:rounded-[28px]">
+        <section class="rounded-[24px] border border-indigo-100/80 bg-indigo-50/75 p-4 shadow-card phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[28px]">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p class="text-base font-semibold text-indigo-950">{planAggregate().title}</p>

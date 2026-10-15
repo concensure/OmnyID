@@ -84,11 +84,9 @@ test("buildWeddingTemplateFollowUpState turns answered prompts into saveable pla
   assert.ok(state.workspaceView.workspace.results.some((artifact) => /Final planning run sheet/i.test(artifact.title)));
   assert.ok(state.workspaceView.workspace.results.some((artifact) => artifact.title === "Vow preparation"));
   assert.ok(state.workspaceView.projectionQueue?.queue.pendingItems.some((item) => /contract/i.test(item.title)));
-  assert.ok(state.workspaceView.projectionQueue?.queue.pendingItems.some((item) =>
+  assert.equal(state.workspaceView.projectionQueue?.queue.pendingItems.some((item) =>
     /live vendor-search provider/i.test(item.title)
-    && (item.sendInput.metadata as Record<string, unknown>).second_order_loop === "contact_follow_up"
-    && /live provider not connected/i.test(String(item.sendInput.content.description))
-  ));
+  ), false);
   assert.ok(state.workspaceView.projectionQueue?.queue.pendingItems.some((item) => /RSVP/i.test(item.title)));
   assert.ok(state.workspaceView.projectionQueue?.queue.pendingItems.some((item) => /seating/i.test(item.title)));
   assert.ok(state.workspaceView.projectionQueue?.queue.pendingItems.some((item) => /run sheet/i.test(item.title)));
