@@ -629,3 +629,11 @@ confirmation banners.
 Venue style facets are the first released facet pass. Photographer `aesthetic.*` and
 `atmosphere.*` facets are a subsequent independently evaluated pass and do not alter the
 venue corpus or policy gate.
+
+## 2026-10-15: Wedding LLM features use one fixed provider ladder
+
+Platform-funded wedding LLM work uses Cerebras, then Mistral, then Anthropic. Each feature
+resolves its own model override first and otherwise falls back to its outreach override and the
+shared defaults. Invalid, empty, timed-out, or failed provider responses advance the ladder;
+feature routes keep their own response validators and durable metering receipts. Anthropic is
+last and defaults to Claude Haiku 5.5 (`claude-haiku-5-5`).

@@ -2326,3 +2326,30 @@ Next:
 
 - Continue with WED-189 by extracting the existing outreach provider ladder into the shared
   wedding ladder, then rerun the remaining build and Rust test gates.
+
+## 2026-10-15 - WED-189 shared wedding LLM ladder (Codex, in progress)
+
+Changed:
+
+- Extracted the wedding provider order, feature-aware model resolution, per-provider timeout,
+  response validation fallback, and attempt receipts into `wedding_llm_ladder.rs`.
+- Outreach now invokes the shared ladder and retains its deterministic, no-send draft fallback and
+  existing durable usage-metering receipt.
+- Set the shared Anthropic default and all documented feature overrides to `claude-haiku-5-5`.
+  The outreach route is now 835 lines.
+
+Verification:
+
+- `cargo check`: passed; only the existing `email_group_routes.rs` unused-variable warning.
+- The authenticated Anthropic `/v1/models` check was attempted but skipped because the local
+  checkout has no hosted Anthropic key. No secret or response body was emitted.
+- `cargo test --lib wedding_llm_ladder`: 6 passed.
+- `cargo test --lib wedding_`: 148 passed.
+- `npm run typecheck` (solid-ui): passed.
+- `npm run build` (solid-ui): started Vite production transformation but did not return a final
+  result within the command window; rerun before release.
+
+Next:
+
+- Obtain a completed UI build and review the provider model id with an operator environment that
+  has the hosted Anthropic key before release. Then continue R3.

@@ -1212,3 +1212,28 @@ tasks:
       - v1 anchor rows, truthful count-aware handoff copy, optional draft verify questions, and the local-only Not for us removal are implemented
       - focused copy/anchor tests, full wedding tests, TypeScript checks, and the 360x740 screenshot pass
       - the repository-wide line-budget gate remains blocked by pre-existing oversized workspace files; cargo test is awaiting a shared artifact lock
+  - id: WED-189
+    title: Shared wedding LLM provider ladder
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-187
+    depends_on:
+      - WED-187
+    files:
+      - src/server/wedding_llm_ladder.rs
+      - src/server/wedding_vendor_outreach_routes.rs
+      - src/server/mod.rs
+      - src/wedding_shared_tool_metering.rs
+      - .env.example
+      - oracle-cloud.env.example
+      - .agent/**
+    acceptance:
+      - wedding LLM features share a Cerebras, Mistral, Anthropic ladder with feature-specific model overrides
+      - outreach preserves its deterministic no-send fallback and records successful provider usage
+      - ladder tests cover success, provider fallback, invalid output, missing keys, exhaustion, and feature overrides
+      - the outreach route is below 900 lines
+    progress:
+      - shared ladder extraction is implemented; outreach now calls it and remains below 900 lines
+      - `cargo check`, six focused ladder tests, and 148 library wedding tests pass with only the existing email_group_routes unused-variable warning
+      - authenticated Anthropic model listing could not run because no hosted key is configured locally
+      - solid-ui typecheck passes; the production UI build needs a clean completion result outside the command window

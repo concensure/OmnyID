@@ -20,6 +20,8 @@ pub enum WeddingSharedToolProvider {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WeddingSharedToolFeature {
     VendorOutreachDraft,
+    Interpreter,
+    Enrichment,
     VendorDiscovery,
     MapsTravel,
     WeatherContingency,
@@ -148,6 +150,8 @@ fn provider_descriptor(provider: WeddingSharedToolProvider) -> WeddingSharedTool
 fn feature_label(feature: WeddingSharedToolFeature) -> &'static str {
     match feature {
         WeddingSharedToolFeature::VendorOutreachDraft => "vendor_outreach_draft",
+        WeddingSharedToolFeature::Interpreter => "interpreter",
+        WeddingSharedToolFeature::Enrichment => "enrichment",
         WeddingSharedToolFeature::VendorDiscovery => "vendor_discovery",
         WeddingSharedToolFeature::MapsTravel => "maps_travel",
         WeddingSharedToolFeature::WeatherContingency => "weather_contingency",

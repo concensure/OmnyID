@@ -157,6 +157,7 @@ mod user_integrations;
 mod user_management_routes;
 mod value_signal_helpers;
 mod wedding_admin_ai_policy;
+mod wedding_llm_ladder;
 mod wedding_understanding_routes;
 mod wedding_newsletter_routes;
 mod wedding_vendor_claim_routes;
