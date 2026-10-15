@@ -48,3 +48,23 @@ test("policy v2 attaches evidence-backed reasons and vetoes a decisive must-have
   assert.deepEqual(result.excluded.map((candidate) => candidate.id), ["industrial"]);
   assert.ok(result.excluded[0]?.reasons?.every((reason) => reason.polarity === "unknown" || reason.evidence.length > 0));
 });
+
+test("policy v2 records the top-priority component shift and component ledger rows", () => {
+  const result = rankWeddingVendorCandidates({ sources: [WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_SOURCE], requirements: WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_REQUIREMENTS, rankingPolicy: "2", now });
+  const candidate = result.verify[0];
+  assert.ok((candidate?.components.find((component) => component.id === "style")?.weightShift ?? 0) < 0);
+  assert.equal(candidate?.components.find((component) => component.id === "capacity")?.weightShift, 0.06);
+  assert.deepEqual(candidate?.reasons?.map((reason) => reason.id).filter((id) => ["location", "cost", "capacity", "quality"].includes(id)), ["capacity", "cost", "location", "quality"]);
+  assert.equal(candidate?.reasons?.find((reason) => reason.id === "location")?.polarity, "pro");
+  assert.equal(candidate?.reasons?.find((reason) => reason.id === "cost")?.polarity, "unknown");
+  assert.equal(candidate?.reasonLedgerDebug?.droppedUnsupportedReasons, 0);
+});
+
+test("policy v2 keeps one strongest reason for a multi-facet couple anchor", () => {
+  const preferenceProfile = { facets: [
+    { facetId: "aesthetic.modern_minimal", weight: "strong" as const, polarity: 1 as const, anchor: "Modern and warm", anchorSource: "priority" as const, confidence: 1, authority: "user" as const },
+    { facetId: "atmosphere.warm", weight: "strong" as const, polarity: 1 as const, anchor: "Modern and warm", anchorSource: "priority" as const, confidence: 1, authority: "user" as const },
+  ], unmapped: [] };
+  const result = rankWeddingVendorCandidates({ sources: [venue("anchored", { style_facets: attr(["aesthetic.modern_minimal", "atmosphere.warm"]) })], requirements: { vendorCategories: ["venue"] }, preferenceProfile, rankingPolicy: "2", now });
+  assert.equal(result.verify[0]?.reasons?.filter((reason) => reason.anchor === "Modern and warm").length, 1);
+});

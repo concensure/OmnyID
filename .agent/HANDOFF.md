@@ -2445,24 +2445,24 @@ Remaining:
 - The requested `oracle-venue-export-2026-10-07-enriched.csv` and sanitised attribute snapshot
   are not present locally, so the target active-venue coverage report cannot be produced yet.
 
-## 2026-10-15 - WED-193 profile and policy-v2 facet integration (Codex, in progress)
+## 2026-10-16 - WED-193 profile and policy-v2 facet integration (Codex, complete)
 
 Changed:
 
-- Added deterministic couple preference profiles, confidence-aware facet matching, and an
-  evidence-backed facet reason ledger.
-- Policy 2 now uses derived vendor facets as its style component. A user-confirmed must-have with
-  decisive conflicting evidence excludes a candidate; unknowns remain neutral and actionable.
-- The policy-2 Bondi fixture now scores 52 (policy 1 remains 38); this is recorded as a new
-  deterministic baseline rather than a silently reused score.
+- Added confidence-aware partial matching for related vocabulary facets and stable profile-weight
+  ordering, alongside the existing deterministic profile and decisive must-have veto.
+- Policy 2 now gives the facet-match component its 0.20 base weight. A mapped top priority shifts
+  at most 0.06 from the remaining components, with signed shifts retained on the candidate.
+- The ledger now retains one strongest facet row per couple anchor, adds provenance-backed
+  location/cost/capacity/quality rows, and drops/counts any unsupported pro or con.
 
 Verification:
 
-- Focused profile, derivation, and policy tests: 9 passed.
+- Focused profile, derivation, and policy tests: 12 passed.
 - `npm run typecheck` (solid-ui): passed.
 - `git diff --check`: passed.
 
-Remaining:
+Next:
 
-- Add location, cost, capacity, and quality rows to the reason ledger and implement the documented
-  priority weight shift before marking R6 complete.
+- Start R7 ledger-driven card rendering. The R5 active-venue coverage report remains blocked on
+  the absent sanitised Oracle export; it is a release gate, not a reason to change the ranker.

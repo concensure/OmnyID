@@ -41,5 +41,5 @@ export function mergePreferenceProfile(base: WeddingPreferenceProfile, override:
     const userWins = facet.authority === "user" && current?.authority !== "user";
     if (!current || userWins || (current.authority !== "user" && (rank[facet.weight] > rank[current.weight] || (rank[facet.weight] === rank[current.weight] && facet.confidence > current.confidence)))) chosen.set(facet.facetId, { ...facet });
   }
-  return { facets: [...chosen.values()].sort((left, right) => right.weight.localeCompare(left.weight) || left.facetId.localeCompare(right.facetId)), unmapped: [...new Set([...base.unmapped, ...(override?.unmapped ?? [])].filter(Boolean))] };
+  return { facets: [...chosen.values()].sort((left, right) => rank[right.weight] - rank[left.weight] || left.facetId.localeCompare(right.facetId)), unmapped: [...new Set([...base.unmapped, ...(override?.unmapped ?? [])].filter(Boolean))] };
 }

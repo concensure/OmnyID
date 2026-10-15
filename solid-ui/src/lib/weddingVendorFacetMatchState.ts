@@ -1,7 +1,7 @@
 // @locs-version: 1.0
 import type { WeddingPreferenceProfile } from "@/lib/weddingPreferenceProfileState";
 import type { WeddingVendorDerivedFacet } from "@/lib/weddingVendorFacetDerivationState";
-import { weddingFacetConflicts } from "@/lib/weddingFacetVocabularyState";
+import { weddingFacetById, weddingFacetConflicts } from "@/lib/weddingFacetVocabularyState";
 
 export type WeddingVendorFacetMatchOutcome = "match" | "partial" | "conflict" | "unknown";
 export type WeddingVendorFacetMatch = { facetId: string; anchor: string; outcome: WeddingVendorFacetMatchOutcome; confidence: number; evidence: WeddingVendorDerivedFacet["evidence"] };
@@ -14,6 +14,9 @@ export function matchWeddingVendorFacets(profile: WeddingPreferenceProfile, vend
     if (direct) return { facetId: preference.facetId, anchor: preference.anchor, outcome: "match", confidence: direct.confidence, evidence: direct.evidence };
     const conflict = weddingFacetConflicts(preference.facetId).map((facet) => vendor.get(facet.id)).find(Boolean);
     if (conflict) return { facetId: preference.facetId, anchor: preference.anchor, outcome: "conflict", confidence: conflict.confidence, evidence: conflict.evidence };
+    const dimension = weddingFacetById(preference.facetId)?.dimension;
+    const related = dimension ? vendorFacets.filter((facet) => weddingFacetById(facet.facetId)?.dimension === dimension).sort((left, right) => right.confidence - left.confidence || left.facetId.localeCompare(right.facetId))[0] : undefined;
+    if (related) return { facetId: preference.facetId, anchor: preference.anchor, outcome: "partial", confidence: related.confidence, evidence: related.evidence };
     return { facetId: preference.facetId, anchor: preference.anchor, outcome: "unknown", confidence: 0, evidence: [] };
   });
   const total = profile.facets.reduce((sum, facet) => sum + weight[facet.weight], 0);

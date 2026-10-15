@@ -662,3 +662,12 @@ profile. Unknown facets use the neutral 0.5 prior with zero confidence, while us
 must-have conflicts exclude only when their conflicting vendor evidence is decisive (at least 0.7).
 The original policy-1 path remains untouched. The R0 Bondi policy-2 fixture is now 52 rather than
 the earlier pre-facet 42; policy 1 remains 38.
+
+## 2026-10-16: Policy-v2 ledger and priority shift are deterministic
+
+Policy 2 assigns the facet-match component the specified 0.20 base weight. Only a mapped
+`topPriorities` anchor redistributes up to 0.06 from the other positive-weight components, and each
+component records its signed `weightShift`; the total is unchanged. The reason ledger keeps exactly
+one strongest facet result for each couple anchor, then adds location, budget, guest-capacity and
+quality rows. It validates provenance before retaining a pro or con and exposes a per-candidate
+drop counter for diagnostics. Policy 1 remains unchanged.

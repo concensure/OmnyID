@@ -33,7 +33,7 @@ import { weddingVendorSentimentScore, weddingVenueQualityScore } from "@/lib/wed
 import { buildDeterministicPreferenceProfile, mergePreferenceProfile, type WeddingPreferenceProfile } from "@/lib/weddingPreferenceProfileState";
 import { deriveWeddingVendorFacets, type WeddingVendorDerivedFacet } from "@/lib/weddingVendorFacetDerivationState";
 import { matchWeddingVendorFacets } from "@/lib/weddingVendorFacetMatchState";
-import { buildWeddingVendorFacetReasonLedger, type WeddingVendorReason } from "@/lib/weddingVendorReasonLedgerState";
+import { buildWeddingVendorReasonLedger, type WeddingVendorReason } from "@/lib/weddingVendorReasonLedgerState";
 
 export type WeddingVendorAttributeStatus = "known" | "estimated" | "unknown" | "not_applicable";
 
@@ -124,6 +124,8 @@ export type WeddingVendorUtilityComponent = {
   known: boolean;
   authority: string | null;
   retrievedAt: string | null;
+  /** Policy-v2 redistribution for the couple's highest-ranked dimension. */
+  weightShift?: number;
 };
 
 export type WeddingVendorRankedCandidate = {
@@ -159,6 +161,7 @@ export type WeddingVendorRankedCandidate = {
   vendorFacets?: WeddingVendorDerivedFacet[];
   profileFacetIds?: string[];
   reasons?: WeddingVendorReason[];
+  reasonLedgerDebug?: { droppedUnsupportedReasons: number };
   fitLabel: string;
   confidence: number;
   confidenceBucket: WeddingVendorConfidenceBucket;
@@ -469,6 +472,7 @@ const LOCATION_STOPWORDS = new Set([
 ]);
 
 type RankingContext = {
+  requirements: WeddingVendorRankingRequirements;
   now: Date;
   guests: number | null;
   budget: number | null;
@@ -494,6 +498,7 @@ function buildContext(requirements: WeddingVendorRankingRequirements, now: Date)
   const requirementText = [requirements.preferences, requirements.atmosphereDescription, ...priorities].map(clean).join(" ");
   const categories = (requirements.vendorCategories ?? []).map((category) => clean(category).toLowerCase()).filter(Boolean);
   return {
+    requirements,
     now,
     guests: parseGuestCount(requirements.guestCount),
     budget: parseBudgetAud(requirements.budgetComfort),
@@ -676,6 +681,37 @@ function situationFitLabel(components: readonly WeddingVendorUtilityComponent[])
   return strong.length > 0 ? `Strong on: ${strong.join(", ")}` : "Fit requires source-page review.";
 }
 
+const FACET_COMPONENT_PREFIXES: ReadonlyArray<readonly [string, string]> = [
+  ["aesthetic.", "style"],
+  ["atmosphere.", "style"],
+  ["scale.", "capacity"],
+  ["setting.", "location"],
+  ["experience.", "planning"],
+  ["practical.", "planning"],
+];
+
+/** Keeps total weight stable while making the couple's stated top dimension visible in v2. */
+function applyPriorityWeightShift(
+  components: WeddingVendorUtilityComponent[],
+  profile: WeddingPreferenceProfile | null,
+): void {
+  const top = profile?.facets.find((facet) => facet.anchorSource === "priority");
+  const targetId = top && FACET_COMPONENT_PREFIXES.find(([prefix]) => top.facetId.startsWith(prefix))?.[1];
+  const target = targetId ? components.find((component) => component.id === targetId && component.weight > 0) : undefined;
+  if (!target) return;
+  const donors = components.filter((component) => component !== target && component.weight > 0);
+  const donorWeight = donors.reduce((sum, component) => sum + component.weight, 0);
+  const shift = Math.min(0.06, donorWeight);
+  if (shift <= 0) return;
+  target.weight += shift;
+  target.weightShift = shift;
+  for (const donor of donors) {
+    const reduction = shift * donor.weight / donorWeight;
+    donor.weight -= reduction;
+    donor.weightShift = -reduction;
+  }
+}
+
 function rankCandidate(
   source: WeddingVendorRankingSource,
   context: RankingContext,
@@ -702,7 +738,7 @@ function rankCandidate(
   if (rankingPolicy === "2") {
     const style = weddingVendorStyleUtility({ preferences: context.preferenceTokens, styleTags, editorialSummary: typeof attributeOf(source, "editorial_summary").value === "string" ? attributeOf(source, "editorial_summary").value as string : null, snippet: source.snippet });
     const styleComponent = v2Components.find((component) => component.id === "style");
-    if (styleComponent) Object.assign(styleComponent, facetMatch
+    if (styleComponent) Object.assign(styleComponent, { weight: 0.2 }, facetMatch
       ? { value: facetMatch.value ?? 0.5, confidence: facetMatch.confidence, known: facetMatch.confidence > 0 }
       : { value: style.value ?? 0, confidence: style.confidence, known: style.value !== null });
     const hire = finiteNumber(attributeOf(source, "venue_hire_fee_aud").value) ?? 0;
@@ -726,6 +762,7 @@ function rankCandidate(
       }, priorities: [] }) : null;
       Object.assign(qualityComponent, { value: Math.max(0, Math.min(1, ((venueQuality?.score ?? sentiment.score) - 3.5) / 1.5)), confidence: Math.max(sentiment.confidence, venueQuality?.confidence ?? 0), known: true });
     }
+    applyPriorityWeightShift(v2Components, preferenceProfile);
   }
   const components = rankingPolicy === "2" ? v2Components : v1.components;
   const matchedPreferenceTokens = rankingPolicy === "2"
@@ -791,7 +828,10 @@ function rankCandidate(
     suburb: rankingPolicy === "2" ? clean(source.address).split(",")[0]?.trim() || null : undefined,
     vendorFacets: rankingPolicy === "2" ? vendorFacets : undefined,
     profileFacetIds: rankingPolicy === "2" ? preferenceProfile?.facets.map((facet) => facet.facetId) ?? [] : undefined,
-    reasons: rankingPolicy === "2" && preferenceProfile && facetMatch ? buildWeddingVendorFacetReasonLedger(preferenceProfile, facetMatch.perFacet) : undefined,
+    ...(rankingPolicy === "2" && preferenceProfile && facetMatch ? (() => {
+      const ledger = buildWeddingVendorReasonLedger({ source, components, profile: preferenceProfile, requirements: context.requirements, facetMatches: facetMatch.perFacet });
+      return { reasons: ledger.reasons, reasonLedgerDebug: ledger.debug };
+    })() : {}),
     fitLabel: fitText,
     confidence,
     confidenceBucket: bucket,

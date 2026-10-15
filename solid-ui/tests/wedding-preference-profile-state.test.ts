@@ -19,3 +19,11 @@ test("user profile confirmation wins and unknown facet evidence remains neutral"
   assert.equal(match.confidence, 0);
   assert.equal(match.perFacet[0]?.outcome, "unknown");
 });
+
+test("a related non-conflicting facet is a confidence-aware partial match", () => {
+  const profile = buildDeterministicPreferenceProfile({ topPriorities: ["Intimacy"] });
+  const match = matchWeddingVendorFacets(profile, [{ facetId: "scale.mid", confidence: 0.6, evidence: [{ attributeKey: "capacity_seated_max", value: 100, authority: "primary_official", sourceUrl: null }] }]);
+  assert.equal(match.perFacet[0]?.outcome, "partial");
+  assert.equal(match.value, 0.5);
+  assert.equal(match.confidence, 0.6);
+});

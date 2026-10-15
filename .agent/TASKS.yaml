@@ -1306,7 +1306,7 @@ tasks:
       - the specified 2026-10-07 enriched export and sanitised attribute snapshot are absent from this checkout, so the active-venue coverage measurement remains an external evidence gate
   - id: WED-193
     title: Couple facet mapping, facet match and reason ledger
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-187
     depends_on:
@@ -1323,6 +1323,7 @@ tasks:
       - facet matching is confidence-aware, deterministic, and treats unknowns neutrally
       - policy 2 produces evidence-backed reasons and applies must-have conflicts safely
     progress:
-      - deterministic profiles, confidence-aware neutral facet matching, derived-facet policy-2 style scoring, and evidence-backed facet reasons are implemented
-      - a decisive user-confirmed must-have conflict excludes the candidate; focused profile, derivation, and policy tests pass
-      - location/cost/capacity/quality ledger rows and the documented priority-weight shift remain before R6 completion
+      - deterministic profiles preserve unmapped anchors; user-confirmed entries win and related facets produce confidence-aware partial matches
+      - policy 2 uses the 0.20 facet-match component, records a deterministic 0.06 maximum top-priority shift on affected components, and preserves total weight
+      - the ledger emits one strongest evidence-backed facet row per couple anchor plus location, cost, capacity, and quality rows; unsupported pro/con rows are dropped and counted
+      - focused profile, derivation, and policy tests (12) plus TypeScript checking pass; R5 catalog-coverage evidence remains a separate external release gate
