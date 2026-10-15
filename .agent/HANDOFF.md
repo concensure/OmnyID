@@ -2122,8 +2122,12 @@ Verification:
 - `npm run build --prefix solid-ui` (passing)
 - `git diff --check` (passing)
 
-Next:
+Deployment:
 
-- Commit this UI-only repair and deploy the scoped `ui` service to Oracle. Do
-  not reload or restart Caddy; verify its SHA-256 remains
+- Commit `fdcceea` was deployed as a scoped `ui` asset build. The UI seed job
+  completed normally, `https://omnyid.com/workspace/` and
+  `https://omnyid.com/wedding/` returned HTTP 200, and the served dynamic
+  ResponseQueue bundle contains the ring-research code path.
+- Homeserver remained running. Caddy was neither restarted nor reloaded; its
+  SHA-256 remains
   `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.

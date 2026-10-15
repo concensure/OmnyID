@@ -1145,3 +1145,4 @@ tasks:
       - vendor-dependent decisions, including wedding rings, now show an inline research surface and open the vendor tab with a concrete category query before any selection or outreach
       - Enter in a native vendor-search field is isolated from the armed global Magic Pointer action, preventing the observed jump back to Wedding Home; the mobile timeline starts in its date-scaled schedule chart and respects completed filtering there
       - restored the Artifact Detail vendor-directory prop contract, returning the full UI typecheck to clean status
+      - `fdcceea` was released to Oracle on 2026-10-15 as a scoped `ui` asset update; `/workspace/` and `/wedding/` returned 200, the production ResponseQueue bundle contains the ring-research action, homeserver remained running, and Caddy was not reloaded
