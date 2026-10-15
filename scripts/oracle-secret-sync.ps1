@@ -12,6 +12,7 @@ $script:OracleRemoteSecretFileNames = @{
     "OMNYID_GMAIL_REFRESH_TOKEN_FILE" = "omnyid_gmail_refresh_token"
     "OMNYID_IMAP_PASSWORD_FILE"       = "omnyid_imap_password"
     "SMTP_PASS_FILE"                  = "omnyid_smtp_pass"
+    "OMNYID_TRANSACTIONAL_RESEND_API_KEY_FILE" = "omnyid_transactional_resend_api_key"
     "OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN_FILE" = "omnyid_vendor_mail_cloudflare_api_token"
     "OMNYID_VENDOR_MAIL_RESEND_API_KEY_FILE" = "omnyid_vendor_mail_resend_api_key"
     "OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET_FILE" = "omnyid_vendor_mail_worker_shared_secret"

@@ -131,6 +131,11 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_PASS_FILE: ${SMTP_PASS_FILE:-/run/secrets/omnyid_smtp_pass}
       SMTP_PORT: ${SMTP_PORT:-587}
+      # Account verification and password-reset mail may fall back to Resend
+      # when the legacy mailbox OAuth token has expired. This is intentionally
+      # separate from the vendor-relay provider selection below.
+      OMNYID_TRANSACTIONAL_RESEND_API_KEY_FILE: ${OMNYID_TRANSACTIONAL_RESEND_API_KEY_FILE:-}
+      OMNYID_TRANSACTIONAL_FROM_ADDRESS: ${OMNYID_TRANSACTIONAL_FROM_ADDRESS:-}
       OMNYID_VENDOR_MAIL_ENABLED: ${OMNYID_VENDOR_MAIL_ENABLED:-false}
       OMNYID_VENDOR_MAIL_PROVIDER: ${OMNYID_VENDOR_MAIL_PROVIDER:-disabled}
       OMNYID_VENDOR_MAIL_MASK_DOMAIN: ${OMNYID_VENDOR_MAIL_MASK_DOMAIN:-mail.omnyid.com}

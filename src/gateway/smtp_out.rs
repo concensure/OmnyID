@@ -160,7 +160,82 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
         in_reply_to: None,
         references: vec![],
     };
-    send_outgoing_email(&request).await
+    match send_outgoing_email(&request).await {
+        Ok(()) => Ok(()),
+        Err(primary_error) => {
+            let Some(resend_api_key) = crate::secret_manager::read_process_secret_trimmed(
+                "OMNYID_TRANSACTIONAL_RESEND_API_KEY",
+            )
+            .or_else(|| {
+                crate::secret_manager::read_process_secret_trimmed(
+                    "OMNYID_VENDOR_MAIL_RESEND_API_KEY",
+                )
+            })
+            else {
+                return Err(primary_error);
+            };
+
+            let from_address = std::env::var("OMNYID_TRANSACTIONAL_FROM_ADDRESS")
+                .ok()
+                .or_else(|| std::env::var("FROM_ADDRESS").ok())
+                .or_else(|| std::env::var("OMNYID_EMAIL_ADDRESS").ok())
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| {
+                    format!(
+                        "{primary_error}; Resend fallback requires FROM_ADDRESS or OMNYID_EMAIL_ADDRESS"
+                    )
+                })?;
+
+            warn!(
+                error = %primary_error,
+                "Primary transactional email delivery failed; attempting Resend fallback"
+            );
+            send_transactional_email_via_resend(
+                &resend_api_key,
+                &from_address,
+                to,
+                subject,
+                body,
+            )
+            .await
+            .map_err(|resend_error| {
+                format!(
+                    "Primary transactional delivery failed: {primary_error}; Resend fallback failed: {resend_error}"
+                )
+            })
+        }
+    }
+}
+
+async fn send_transactional_email_via_resend(
+    api_key: &str,
+    from: &str,
+    to: &str,
+    subject: &str,
+    body: &str,
+) -> Result<(), String> {
+    let response = reqwest::Client::new()
+        .post("https://api.resend.com/emails")
+        .bearer_auth(api_key)
+        .json(&serde_json::json!({
+            "from": from,
+            "to": [to],
+            "subject": subject,
+            "text": body,
+        }))
+        .send()
+        .await
+        .map_err(|error| format!("Resend request failed: {error}"))?;
+
+    if response.status().is_success() {
+        return Ok(());
+    }
+
+    let status = response.status();
+    let detail = response.text().await.unwrap_or_default();
+    let detail = detail.chars().take(500).collect::<String>();
+    Err(format!("Resend returned {status}: {detail}"))
 }
 
 fn gmail_config_from_env(config: &MailGatewayConfig) -> Result<GmailOAuthConfig, String> {

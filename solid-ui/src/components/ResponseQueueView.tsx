@@ -1747,7 +1747,10 @@ export function ResponseQueueView(props: {
         location: weddingFollowUpLocation(), dateOrSeason: weddingFollowUpDate(), guestCount: weddingFollowUpGuests(),
         budgetComfort: weddingFollowUpBudget(), atmosphereDescription: weddingFollowUpAtmosphere(),
         inspirationImageUrls: linesFromText(weddingFollowUpImageLinks()), topPriorities: linesFromText(weddingFollowUpPriorities()),
-        vendorCategories: effectiveCategoryLabels, targetCategory: effectiveCategoryLabels[0] ?? null,
+        vendorCategories: effectiveCategoryLabels,
+        // A named directory lookup is not a category request. Treating it as
+        // `Custom vendor search` filters out a real saved venue such as Mackay.
+        targetCategory: directoryLookupOnly ? null : effectiveCategoryLabels[0] ?? null,
         requireExactlyThree: true,
         // An exact vendor-name lookup must be predictable and private: search
         // the existing directory only instead of turning a name into a broad
