@@ -1354,4 +1354,5 @@ tasks:
       - policy-2 cards now derive anchor rows and outreach questions from the ledger, with legacy v1 rows preserved when no ledger exists
       - card and artifact projections carry related facet labels, fit words, worth-knowing evidence, optional vocabulary/profile fields, and matched-facet supertags; desktop A2UI uses anchor rows
       - focused anchor, copy-guard, artifact, and policy tests (14) plus TypeScript checking pass
-      - near-miss and non-persisting widen-action execution, legacy artifact regression coverage, and mobile accessibility evidence remain
+      - near misses now retain their exclusion constraint; widen actions create a fresh rank input/result without mutating requirements or the profile, and are serialized on the artifact/A2UI projection
+      - the existing 360x740 Playwright plus axe sparse-Bondi baseline passes; interactive workspace invocation of serialized widen actions and the 3-result mobile evidence remain

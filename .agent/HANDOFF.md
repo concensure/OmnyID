@@ -2487,3 +2487,26 @@ Remaining:
 
 - Add executable near-miss/widen actions without persisting a changed profile, then run the
   mobile/axe evidence and legacy-artifact regression for R7.
+
+## 2026-10-16 - WED-194 near-miss and widening checkpoint (Codex, in progress)
+
+Changed:
+
+- Added pure near-miss and widen-action state. A widening action clones requirements/profile,
+  invokes the deterministic ranker, and returns the new result; it never writes the saved plan or
+  profile. Seated-capacity widening switches to cocktail/standing capacity.
+- Comparison artifacts and A2UI now carry bounded near misses and serialized widen actions for the
+  workspace caller. Optional radius, unknown-price and must-to-strong inputs are represented for
+  the matching search/workspace integration.
+
+Verification:
+
+- Focused ledger/card/widen tests: 5 passed.
+- `npm run typecheck` (solid-ui): passed.
+- Playwright 360x740 sparse-Bondi baseline with axe: passed.
+- `git diff --check`: passed.
+
+Remaining:
+
+- Connect serialized widen actions to a workspace rerun callback and add a three-result mobile
+  evidence fixture. Do not advertise the serialized action as an already-persisted profile change.

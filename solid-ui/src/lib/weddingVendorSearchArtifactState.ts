@@ -33,6 +33,7 @@ import {
 } from "@/lib/weddingVendorRankingState";
 import { weddingVendorRankingPolicyV2Enabled } from "@/lib/weddingVendorRankingV2State";
 import { WEDDING_FACET_VOCABULARY_VERSION } from "@/lib/weddingFacetVocabularyState";
+import { weddingVendorNearMisses, weddingVendorWidenActions } from "@/lib/weddingVendorWidenActionState";
 import {
   selectWeddingVendorShortlist,
   type WeddingVendorShortlistOutcome,
@@ -622,6 +623,8 @@ export function buildWeddingVendorComparisonArtifactState(
   }, `#${choice.rank} `));
   const topChoiceActionRows = vendorChoiceActionRows(choices);
   const topChoiceCards = vendorChoiceCards(choices, metadata.weddingPlanId || null, input);
+  const nearMisses = weddingVendorNearMisses(result);
+  const widenActions = weddingVendorWidenActions(result, input);
   const preferenceSignals = comparisonPreferenceSignals(input);
   const recommendationHandoff = comparisonRecommendationHandoff({
     choices,
@@ -670,6 +673,8 @@ export function buildWeddingVendorComparisonArtifactState(
       topChoiceContactDetails: choices.map((choice) => vendorChoiceContactDetails(choice)),
       vendorComparisonPreferenceSignals: preferenceSignals,
       vendorComparisonNextActions: result.nextActions,
+      vendorComparisonNearMisses: nearMisses,
+      vendorComparisonWidenActions: widenActions,
       vendorComparisonHandoff: recommendationHandoff,
       vendorComparisonSelection: {
         mode: "multi",
@@ -748,7 +753,7 @@ export function buildWeddingVendorComparisonArtifactState(
             .map((facet) => `wedding_facet:${facet.facetId}`)),
         ],
       },
-      a2ui: a2uiForComparison(choices, summaryLabel, metadata.weddingPlanId || null, input),
+      a2ui: { ...a2uiForComparison(choices, summaryLabel, metadata.weddingPlanId || null, input), near_misses: nearMisses, widen_actions: widenActions },
     },
     sourceLabels: uniqueStrings([
       "Top vendor comparison",

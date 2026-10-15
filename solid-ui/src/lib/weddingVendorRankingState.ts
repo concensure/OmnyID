@@ -110,6 +110,9 @@ export type WeddingVendorRankingRequirements = {
   vendorCategories?: readonly string[] | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** Ephemeral widen-action inputs; they are never persisted by the ranker. */
+  maxDistanceKm?: number | null;
+  includeUnknownPrice?: boolean | null;
 };
 
 export type WeddingVendorRankingGroup = "booked" | "bookable" | "verify" | "excluded";
