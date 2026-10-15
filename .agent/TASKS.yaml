@@ -1237,3 +1237,27 @@ tasks:
       - `cargo check`, six focused ladder tests, and 148 library wedding tests pass with only the existing email_group_routes unused-variable warning
       - authenticated Anthropic model listing could not run because no hosted key is configured locally
       - solid-ui typecheck passes; the production UI build needs a clean completion result outside the command window
+  - id: WED-190
+    title: Split ranking orchestrator and connect policy v2
+    status: done
+    owner: codex
+    branch: agent/codex/WED-187
+    depends_on:
+      - WED-187
+    files:
+      - solid-ui/src/lib/weddingVendorRankingState.ts
+      - solid-ui/src/lib/weddingVendorUtilityComponentsState.ts
+      - solid-ui/src/lib/weddingVendorRankingV2State.ts
+      - solid-ui/src/lib/weddingVendorSearchArtifactState.ts
+      - solid-ui/src/components/ResponseQueueView.tsx
+      - solid-ui/tests/wedding-vendor-ranking-policy-v2.test.ts
+      - .agent/**
+    acceptance:
+      - policy 1 remains the default and preserves the documented baseline output
+      - policy 2 uses the existing prior, cost, location, quality, sentiment, confidence, and availability helpers
+      - policy version is included in launch fingerprints and search receipts
+      - the ranking orchestrator remains below 900 lines
+    progress:
+      - v1 components are split out and policy-v2 selection is wired behind the disabled-by-default build flag
+      - `npm run typecheck`, the focused policy/baseline/coordinator tests, and the complete wedding test suite pass
+      - Vite production build began but did not yield a final result in the interactive command window; retain this as a release gate

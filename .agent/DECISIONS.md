@@ -637,3 +637,11 @@ resolves its own model override first and otherwise falls back to its outreach o
 shared defaults. Invalid, empty, timed-out, or failed provider responses advance the ladder;
 feature routes keep their own response validators and durable metering receipts. Anthropic is
 last and defaults to Claude Haiku 5.5 (`claude-haiku-5-5`).
+
+## 2026-10-15: Policy-v2 ranking is opt-in and fingerprinted
+
+The production default remains ranking policy `1`. Policy `2` is selected only by
+`VITE_WEDDING_VENDOR_RANKING_POLICY_V2`; it changes both the ranking execution and the
+material-fingerprint/receipt policy version so a policy-1 result is never reused as a policy-2
+result. The v1 utility calculation is isolated from the eligibility, availability, and grouping
+orchestrator to preserve its baseline behaviour while v2 evolves independently.

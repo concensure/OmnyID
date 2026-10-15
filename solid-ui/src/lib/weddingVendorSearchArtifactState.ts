@@ -31,6 +31,7 @@ import {
   type WeddingVendorRankingResult,
   type WeddingVendorRankingSource,
 } from "@/lib/weddingVendorRankingState";
+import { weddingVendorRankingPolicyV2Enabled } from "@/lib/weddingVendorRankingV2State";
 import {
   selectWeddingVendorShortlist,
   type WeddingVendorShortlistOutcome,
@@ -374,6 +375,7 @@ function rankedVendorChoices(input: WeddingVendorComparisonInput): {
   choices: WeddingVendorRankedCandidate[];
   shortlist: WeddingVendorShortlistOutcome | null;
 } {
+  const rankingPolicyV2 = weddingVendorRankingPolicyV2Enabled(import.meta.env);
   const result = rankWeddingVendorCandidates({
     sources: rankingSourcesFor(input),
     requirements: {
@@ -386,6 +388,7 @@ function rankedVendorChoices(input: WeddingVendorComparisonInput): {
       atmosphereDescription: input.atmosphereDescription,
       vendorCategories: input.vendorCategories,
     },
+    rankingPolicy: rankingPolicyV2 ? "2" : "1",
   });
   const legacyChoices = [
     ...result.booked,
@@ -400,6 +403,7 @@ function rankedVendorChoices(input: WeddingVendorComparisonInput): {
     bookable: result.bookable,
     verify: result.verify,
     canRunOnlineFallback: input.canRunOnlineFallback,
+    rankingPolicyV2,
   });
   const rankedById = new Map([...result.bookable, ...result.verify].map((choice) => [choice.id, choice]));
   // A shortfall is not an empty result. Keep every suitable source-backed

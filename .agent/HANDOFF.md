@@ -2353,3 +2353,29 @@ Next:
 
 - Obtain a completed UI build and review the provider model id with an operator environment that
   has the hosted Anthropic key before release. Then continue R3.
+
+## 2026-10-15 - WED-190 ranking policy-v2 connection (Codex)
+
+Changed:
+
+- Moved the policy-1 evidence components into `weddingVendorUtilityComponentsState.ts`; the
+  ranking orchestrator is 783 lines and continues to own only eligibility, availability, grouping,
+  and policy dispatch.
+- Added the opt-in policy-2 path, including prior-shrunk fit, effective-cost, coordinate-or-token
+  location, quality/sentiment, confidence-aware bounds, and demand-aware availability priors.
+- The UI derives the policy version from the disabled-by-default Vite flag for both ranking and
+  fingerprinted search receipts. Policy 1 remains byte-stable; the Bondi v2 probe is 42, not 38.
+
+Verification:
+
+- `npm run typecheck` (solid-ui): passed.
+- `npm run test:wedding -- --runInBand` (solid-ui): 1,855 passed.
+- Focused policy-v2, baseline, and shortlist coordinator tests: passed.
+- `git diff --check`: passed.
+- `npm run build` began Vite transformation but did not report final completion in the command
+  window; it remains a release gate.
+
+Next:
+
+- Continue R4 with the venue-only facet vocabulary. Do not enable policy 2 or deploy it before
+  R8/R13 evaluation and release gates.

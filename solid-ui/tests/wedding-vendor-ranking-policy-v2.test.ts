@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { rankWeddingVendorCandidates, type WeddingVendorAttributeEvidence, type WeddingVendorRankingSource } from "../src/lib/weddingVendorRankingState.ts";
+import {
+  WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_REQUIREMENTS,
+  WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_SOURCE,
+} from "./fixtures/wedding-vendor-personalised-recommendation-baseline.ts";
+
+const now = new Date("2026-10-15T00:00:00Z");
+const attr = (value: unknown): WeddingVendorAttributeEvidence => ({ status: "known", value, confidence: 0.9, authority: "primary_official" });
+
+function venue(id: string, attributes: Record<string, WeddingVendorAttributeEvidence>, snippet = "") : WeddingVendorRankingSource {
+  return { id, title: id, provider: "Directory", url: `https://${id}.example.test`, websiteUrl: `https://${id}.example.test`, mapUrl: null, imageUrl: null, address: "Bondi NSW", phone: null, email: null, instagramUrl: null, snippet, category: "venue", attributes };
+}
+
+test("policy v2 is opt-in and changes the documented sparse Bondi result from v1", () => {
+  const v1 = rankWeddingVendorCandidates({ sources: [WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_SOURCE], requirements: WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_REQUIREMENTS, now });
+  const v2 = rankWeddingVendorCandidates({ sources: [WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_SOURCE], requirements: WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_REQUIREMENTS, rankingPolicy: "2", now });
+  assert.equal(v1.verify[0]?.fit, 38);
+  assert.equal(v2.verify[0]?.fit, 42);
+  assert.equal(v2.verify[0]?.fitUpper, 57);
+  assert.equal(v2.verify[0]?.availabilityProbability, 0.5);
+});
+
+test("policy v2 does not reward a sparse keyword echo above structured style evidence", () => {
+  const sparse = venue("sparse", {}, "intimate waterfront coastal garden rustic venue");
+  const evidenced = venue("evidenced", { style_tags: attr(["intimate", "waterfront", "coastal"]), editorial_summary: attr("An intimate waterfront wedding venue.") });
+  const result = rankWeddingVendorCandidates({ sources: [sparse, evidenced], requirements: { vendorCategories: ["venue"], preferences: "intimate waterfront coastal" }, rankingPolicy: "2", now });
+  assert.deepEqual(result.verify.map((candidate) => candidate.id), ["evidenced", "sparse"]);
+});
+
+test("policy v2 retains hard capacity vetoes, keeps unknown availability actionable, and is deterministic", () => {
+  const tooSmall = venue("small", { capacity_seated_max: attr(40), style_tags: attr(["waterfront"]) });
+  const unknown = venue("unknown", { capacity_seated_max: attr(150), style_tags: attr(["waterfront"]) });
+  const input = { sources: [tooSmall, unknown], requirements: { vendorCategories: ["venue"], guestCount: "100", preferences: "waterfront" }, rankingPolicy: "2" as const, now };
+  const first = rankWeddingVendorCandidates(input);
+  const second = rankWeddingVendorCandidates(input);
+  assert.deepEqual(first.excluded.map((candidate) => candidate.id), ["small"]);
+  assert.deepEqual(first.verify.map((candidate) => candidate.id), ["unknown"]);
+  assert.deepEqual(second, first);
+});

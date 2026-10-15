@@ -17,6 +17,19 @@ import {
   type WeddingVendorRoomCardRow,
   type WeddingVendorRoomEvidence,
 } from "@/lib/weddingVendorRoomState";
+import {
+  buildComponents,
+  computeConfidence,
+  computeFit,
+  type WeddingVendorAttributeView,
+} from "@/lib/weddingVendorUtilityComponentsState";
+import {
+  weddingVendorPriorShrunkFit,
+  weddingVendorStyleUtility,
+} from "@/lib/weddingVendorRankingV2State";
+import { weddingVendorAvailabilityPrior, weddingVendorEffectiveCost } from "@/lib/weddingVendorSeasonalCostState";
+import { weddingVendorLocationUtility } from "@/lib/weddingVendorLocationUtilityState";
+import { weddingVendorSentimentScore, weddingVenueQualityScore } from "@/lib/weddingVendorQualityModelState";
 
 export type WeddingVendorAttributeStatus = "known" | "estimated" | "unknown" | "not_applicable";
 
@@ -91,6 +104,8 @@ export type WeddingVendorRankingRequirements = {
   topPriorities?: readonly string[] | null;
   atmosphereDescription?: string | null;
   vendorCategories?: readonly string[] | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type WeddingVendorRankingGroup = "booked" | "bookable" | "verify" | "excluded";
@@ -131,6 +146,12 @@ export type WeddingVendorRankedCandidate = {
   rationaleLabels: string[];
   group: WeddingVendorRankingGroup;
   fit: number | null;
+  /** Policy-v2 upper fit bound, used only for shortlist diversification. */
+  fitUpper?: number;
+  availabilityProbability?: number;
+  styleTags?: string[];
+  locationSettingClass?: string | null;
+  suburb?: string | null;
   fitLabel: string;
   confidence: number;
   confidenceBucket: WeddingVendorConfidenceBucket;
@@ -387,7 +408,7 @@ export function weddingQualityUtility(rating: number, reviewCount: number): { va
 // Evidence access
 // ---------------------------------------------------------------------------------------------
 
-type AttributeView = {
+type AttributeView = WeddingVendorAttributeView & {
   present: boolean;
   status: WeddingVendorAttributeStatus;
   value: unknown;
@@ -415,24 +436,6 @@ function attributeOf(source: WeddingVendorRankingSource, key: string): Attribute
 /** Strong enough to base a hard decision on: stated as known, or estimated with solid confidence. */
 function decisive(view: AttributeView): boolean {
   return view.present && (view.status === "known" || view.confidence >= 0.7);
-}
-
-const AUTHORITY_FACTOR: Record<string, number> = {
-  operator: 1,
-  vendor_reply: 1,
-  primary_official: 0.9,
-  independent_aggregate: 0.8,
-  directory: 0.5,
-  editorial: 0.4,
-  inferred: 0.3,
-};
-
-const STALE_AFTER_MS = 365 * 24 * 60 * 60 * 1000;
-
-function recencyFactor(retrievedAt: string | null, now: Date): number {
-  if (!retrievedAt) return 1;
-  const retrieved = Date.parse(retrievedAt.replace(" ", "T"));
-  return Number.isFinite(retrieved) && now.getTime() - retrieved > STALE_AFTER_MS ? 0.5 : 1;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -467,7 +470,17 @@ type RankingContext = {
   locationTokens: string[];
   requirementKeys: string[];
   singleVenueSearch: boolean;
+  weddingMonth: number | null;
+  planCoordinates: { latitude: number; longitude: number } | null;
 };
+
+const MONTHS: Record<string, number> = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
+
+function weddingMonth(value: string | null | undefined): number | null {
+  const text = clean(value).toLowerCase();
+  const entry = Object.entries(MONTHS).find(([name]) => new RegExp(`\\b${name.slice(0, 3)}`).test(text));
+  return entry ? entry[1] : null;
+}
 
 function buildContext(requirements: WeddingVendorRankingRequirements, now: Date): RankingContext {
   const priorities = (requirements.topPriorities ?? []).map(clean).filter(Boolean);
@@ -482,6 +495,9 @@ function buildContext(requirements: WeddingVendorRankingRequirements, now: Date)
     locationTokens: tokens(clean(requirements.location), 3).filter((token) => !LOCATION_STOPWORDS.has(token)),
     requirementKeys: declaredHardRequirementKeys(requirementText),
     singleVenueSearch: categories.length > 0 && categories.every((category) => category === "venue"),
+    weddingMonth: weddingMonth(requirements.dateOrSeason),
+    planCoordinates: typeof requirements.latitude === "number" && typeof requirements.longitude === "number"
+      ? { latitude: requirements.latitude, longitude: requirements.longitude } : null,
   };
 }
 
@@ -607,186 +623,9 @@ function effectiveAvailability(source: WeddingVendorRankingSource, now: Date): {
 // Stage 3: personal utility
 // ---------------------------------------------------------------------------------------------
 
-const VENUE_WEIGHTS = { style: 0.25, cost: 0.2, location: 0.15, capacity: 0.12, quality: 0.13, planning: 0.08, risk: 0.07 };
-// Non-venue vendors carry execution risk (you cannot reshoot a wedding), taken out of style weight.
-const VENDOR_WEIGHTS = { style: 0.12, cost: 0.2, location: 0.15, capacity: 0, quality: 0.13, planning: 0, risk: 0.2 };
-
-const PLANNING_INCLUSIONS = ["coordinator", "furniture", "linen", "av", "ceremony_setup", "wet_weather_setup", "catering"];
-
-function component(
-  id: string,
-  label: string,
-  weight: number,
-  evidence: { value: number; confidence: number; authority: string | null; retrievedAt?: string | null } | null,
-): WeddingVendorUtilityComponent {
-  return {
-    id,
-    label,
-    weight,
-    value: evidence?.value ?? 0,
-    confidence: evidence?.confidence ?? 0,
-    known: evidence !== null,
-    authority: evidence?.authority ?? null,
-    retrievedAt: evidence?.retrievedAt ?? null,
-  };
-}
-
-function textOf(source: WeddingVendorRankingSource): string {
-  const summary = attributeOf(source, "editorial_summary");
-  const styleTags = attributeOf(source, "style_tags");
-  return [
-    source.title,
-    source.snippet,
-    typeof summary.value === "string" ? summary.value : "",
-    Array.isArray(styleTags.value) ? styleTags.value.join(" ") : "",
-  ].join(" ").toLowerCase();
-}
-
-function styleEvidence(source: WeddingVendorRankingSource, context: RankingContext) {
-  if (context.preferenceTokens.length === 0) return { evidence: null, matched: [] as string[] };
-  const text = textOf(source);
-  if (text.replace(/\s+/g, " ").trim().length < 20) return { evidence: null, matched: [] as string[] };
-  const matched = context.preferenceTokens.filter((token) => text.includes(token));
-  const tags = attributeOf(source, "style_tags");
-  const summary = attributeOf(source, "editorial_summary");
-  const structured = tags.present ? tags : summary;
-  return {
-    matched,
-    evidence: {
-      value: Math.min(1, matched.length / Math.min(context.preferenceTokens.length, 5)),
-      confidence: structured.present ? structured.confidence : 0.5,
-      authority: structured.present ? structured.authority : "directory",
-      retrievedAt: structured.retrievedAt,
-    },
-  };
-}
-
-function costEvidence(source: WeddingVendorRankingSource, context: RankingContext) {
-  if (context.budget === null) return null;
-  const total = attributeOf(source, "price_estimate_total_aud");
-  const totalValue = finiteNumber(total.value);
-  if (total.present && totalValue !== null) {
-    return total.confidence >= 0.5
-      ? { value: weddingBudgetUtility(totalValue, context.budget), confidence: total.confidence, authority: total.authority, retrievedAt: total.retrievedAt }
-      : null;
-  }
-  const perHead = attributeOf(source, "price_per_head_aud");
-  const perHeadValue = finiteNumber(perHead.value);
-  if (perHead.present && perHeadValue !== null && context.guests !== null && perHead.confidence >= 0.5) {
-    return {
-      value: weddingBudgetUtility(perHeadValue * context.guests, context.budget),
-      confidence: perHead.confidence * 0.8,
-      authority: perHead.authority,
-      retrievedAt: perHead.retrievedAt,
-    };
-  }
-  return null;
-}
-
-function locationEvidence(source: WeddingVendorRankingSource, context: RankingContext) {
-  const address = clean(source.address);
-  if (context.locationTokens.length === 0 || !address) return null;
-  const haystack = `${address} ${textOf(source)}`.toLowerCase();
-  const matches = context.locationTokens.some((token) => haystack.includes(token));
-  return {
-    value: matches ? 1 : 0.3,
-    confidence: 0.8,
-    authority: /google/i.test(source.provider) ? "independent_aggregate" : "directory",
-    retrievedAt: null,
-  };
-}
-
-function capacityEvidence(source: WeddingVendorRankingSource, context: RankingContext) {
-  if (context.guests === null) return null;
-  const capacity = attributeOf(source, context.standingReception ? "capacity_standing_max" : "capacity_seated_max");
-  const capacityValue = finiteNumber(capacity.value);
-  if (!capacity.present || capacityValue === null || capacityValue <= 0) return null;
-  const ratio = context.guests / capacityValue;
-  const value = ratio > 0.9 ? 0.6 : ratio < 0.33 ? 0.7 : 1;
-  return { value, confidence: capacity.confidence, authority: capacity.authority, retrievedAt: capacity.retrievedAt };
-}
-
-function qualityEvidence(source: WeddingVendorRankingSource) {
-  const rating = attributeOf(source, "rating_google");
-  const count = attributeOf(source, "review_count_google");
-  const ratingValue = finiteNumber(rating.value) ?? finiteNumber(source.rating);
-  const countValue = finiteNumber(count.value) ?? finiteNumber(source.review_count);
-  if (ratingValue === null || countValue === null) return null;
-  const quality = weddingQualityUtility(ratingValue, countValue);
-  return {
-    ...quality,
-    authority: rating.present ? rating.authority : "independent_aggregate",
-    retrievedAt: rating.retrievedAt,
-  };
-}
-
-function planningEvidence(source: WeddingVendorRankingSource) {
-  const inclusions = attributeOf(source, "inclusions");
-  if (!inclusions.present || !Array.isArray(inclusions.value)) return null;
-  const present = inclusions.value.map((item) => clean(item).toLowerCase().replace(/[\s-]+/g, "_"));
-  const covered = PLANNING_INCLUSIONS.filter((item) => present.some((entry) => entry.includes(item))).length;
-  return {
-    value: covered / PLANNING_INCLUSIONS.length,
-    confidence: inclusions.confidence,
-    authority: inclusions.authority,
-    retrievedAt: inclusions.retrievedAt,
-  };
-}
-
-function riskEvidence(source: WeddingVendorRankingSource) {
-  const views = ["public_liability_insurance", "contract_provided", "backup_shooter", "equipment_redundancy"]
-    .map((key) => attributeOf(source, key))
-    .filter((view) => view.present && typeof view.value === "boolean");
-  const scores: number[] = views.map((view) => (view.value === true ? 1 : 0));
-  const response = attributeOf(source, "response_time_hours");
-  const hours = finiteNumber(response.value);
-  if (response.present && hours !== null) scores.push(hours <= 48 ? 1 : hours <= 96 ? 0.5 : 0);
-  const all = [...views, ...(response.present && hours !== null ? [response] : [])];
-  if (scores.length === 0) return null;
-  const meanConfidence = all.reduce((sum, view) => sum + view.confidence, 0) / all.length;
-  return {
-    value: scores.reduce((sum, score) => sum + score, 0) / scores.length,
-    confidence: meanConfidence,
-    authority: all[0]?.authority ?? null,
-    retrievedAt: all[0]?.retrievedAt ?? null,
-  };
-}
-
-function buildComponents(source: WeddingVendorRankingSource, venue: boolean, context: RankingContext) {
-  const weights = venue ? VENUE_WEIGHTS : VENDOR_WEIGHTS;
-  const style = styleEvidence(source, context);
-  const components = [
-    component("style", "Style and preferences", weights.style, style.evidence),
-    component("cost", "Cost against budget", weights.cost, costEvidence(source, context)),
-    component("location", "Location", weights.location, locationEvidence(source, context)),
-    ...(venue ? [component("capacity", "Capacity comfort", weights.capacity, capacityEvidence(source, context))] : []),
-    component("quality", "Reviews and reputation", weights.quality, qualityEvidence(source)),
-    ...(venue ? [component("planning", "Planning burden", weights.planning, planningEvidence(source))] : []),
-    component("risk", "Execution risk", weights.risk, riskEvidence(source)),
-  ];
-  return { components, matchedPreferenceTokens: style.matched };
-}
-
-function computeFit(components: readonly WeddingVendorUtilityComponent[]): number | null {
-  const known = components.filter((item) => item.known);
-  const weight = known.reduce((sum, item) => sum + item.weight, 0);
-  if (known.length === 0 || weight <= 0) return null;
-  return Math.round(100 * known.reduce((sum, item) => sum + item.weight * item.value, 0) / weight);
-}
-
-// ---------------------------------------------------------------------------------------------
-// Stage 4: evidence confidence (kept separate from fit)
-// ---------------------------------------------------------------------------------------------
-
-function computeConfidence(components: readonly WeddingVendorUtilityComponent[], now: Date): number {
-  const totalWeight = components.reduce((sum, item) => sum + item.weight, 0);
-  const known = components.filter((item) => item.known);
-  if (totalWeight <= 0 || known.length === 0) return 0;
-  const coverage = known.reduce((sum, item) => sum + item.weight, 0) / totalWeight;
-  const authority = known.reduce((sum, item) => sum + (AUTHORITY_FACTOR[item.authority ?? ""] ?? 0.5), 0) / known.length;
-  const recency = known.reduce((sum, item) => sum + recencyFactor(item.retrievedAt, now), 0) / known.length;
-  return coverage * authority * recency;
-}
+// v1 component calculation lives in weddingVendorUtilityComponentsState. Keeping
+// this orchestrator focused on eligibility, availability, grouping and policy choice
+// makes policy changes independently reviewable.
 
 function confidenceBucket(confidence: number): WeddingVendorConfidenceBucket {
   return confidence >= 0.6 ? "high" : confidence >= 0.35 ? "medium" : "low";
@@ -833,13 +672,52 @@ function situationFitLabel(components: readonly WeddingVendorUtilityComponent[])
 function rankCandidate(
   source: WeddingVendorRankingSource,
   context: RankingContext,
+  rankingPolicy: "1" | "2",
 ): { candidate: WeddingVendorRankedCandidate; constraints: HardConstraint[] } {
   const venue = isVenue(source, context);
   const eligibility = evaluateEligibility(source, venue, context);
   const availability = effectiveAvailability(source, context.now);
-  const { components, matchedPreferenceTokens } = buildComponents(source, venue, context);
-  const fit = computeFit(components);
-  const confidence = computeConfidence(components, context.now);
+  const dependencies = { attributeOf, budgetUtility: weddingBudgetUtility, qualityUtility: weddingQualityUtility };
+  const v1 = buildComponents(source, venue, context, dependencies);
+  const v2StyleTags = attributeOf(source, "style_tags");
+  const styleTags = Array.isArray(v2StyleTags.value) ? v2StyleTags.value.map(clean).filter(Boolean) : [];
+  const v2Components = v1.components.map((component) => ({ ...component }));
+  if (rankingPolicy === "2") {
+    const style = weddingVendorStyleUtility({ preferences: context.preferenceTokens, styleTags, editorialSummary: typeof attributeOf(source, "editorial_summary").value === "string" ? attributeOf(source, "editorial_summary").value as string : null, snippet: source.snippet });
+    const styleComponent = v2Components.find((component) => component.id === "style");
+    if (styleComponent) Object.assign(styleComponent, { value: style.value ?? 0, confidence: style.confidence, known: style.value !== null });
+    const hire = finiteNumber(attributeOf(source, "venue_hire_fee_aud").value) ?? 0;
+    const perHead = finiteNumber(attributeOf(source, "price_per_head_aud").value) ?? 0;
+    const quoteTotal = finiteNumber(attributeOf(source, "price_estimate_total_aud").value);
+    const estimated = weddingVendorEffectiveCost({ venueHireFee: hire, cateringPerGuest: perHead, guestCount: context.guests ?? 0, minimumSpend: finiteNumber(attributeOf(source, "minimum_spend_aud").value) ?? undefined, corkage: finiteNumber(attributeOf(source, "corkage_fee_aud").value) ?? undefined, month: context.weddingMonth, quoteTotal });
+    const costComponent = v2Components.find((component) => component.id === "cost");
+    if (costComponent && context.budget !== null && (quoteTotal !== null || hire > 0 || perHead > 0)) Object.assign(costComponent, { value: weddingBudgetUtility(estimated.total, context.budget), confidence: estimated.confidence, known: true, authority: estimated.authority });
+    const locationComponent = v2Components.find((component) => component.id === "location");
+    const sourceLatitude = finiteNumber(attributeOf(source, "latitude").value);
+    const sourceLongitude = finiteNumber(attributeOf(source, "longitude").value);
+    const location = weddingVendorLocationUtility({ plan: context.planCoordinates, vendor: sourceLatitude !== null && sourceLongitude !== null ? { latitude: sourceLatitude, longitude: sourceLongitude } : null, tokenMatch: locationComponent?.known ? locationComponent.value : null, category: source.category });
+    if (locationComponent) Object.assign(locationComponent, { value: location.value, confidence: location.confidence, known: true });
+    const qualityComponent = v2Components.find((component) => component.id === "quality");
+    const rating = finiteNumber(attributeOf(source, "rating_google").value) ?? finiteNumber(source.rating);
+    const reviewCount = finiteNumber(attributeOf(source, "review_count_google").value) ?? finiteNumber(source.review_count);
+    if (qualityComponent && rating !== null && reviewCount !== null) {
+      const sentiment = weddingVendorSentimentScore([{ rating, reviewCount }]);
+      const venueQuality = venue ? weddingVenueQualityScore({ factors: {
+        location: { score: null }, condition: { score: null }, food: { score: null }, service: { score: rating }, capacity: { score: null }, facilities: { score: null }, exclusivity: { score: null },
+      }, priorities: [] }) : null;
+      Object.assign(qualityComponent, { value: Math.max(0, Math.min(1, ((venueQuality?.score ?? sentiment.score) - 3.5) / 1.5)), confidence: Math.max(sentiment.confidence, venueQuality?.confidence ?? 0), known: true });
+    }
+  }
+  const components = rankingPolicy === "2" ? v2Components : v1.components;
+  const matchedPreferenceTokens = rankingPolicy === "2"
+    ? weddingVendorStyleUtility({ preferences: context.preferenceTokens, styleTags, editorialSummary: typeof attributeOf(source, "editorial_summary").value === "string" ? attributeOf(source, "editorial_summary").value as string : null }).matched
+    : v1.matchedPreferenceTokens;
+  const fit = rankingPolicy === "2"
+    ? weddingVendorPriorShrunkFit(components.map((component) => ({ weight: component.weight, value: component.known ? component.value : null, confidence: component.confidence })))
+    : computeFit(components);
+  const confidence = rankingPolicy === "2"
+    ? Math.max(0, Math.min(1, components.reduce((sum, component) => sum + component.weight * component.confidence, 0) / Math.max(0.01, components.reduce((sum, component) => sum + component.weight, 0))))
+    : computeConfidence(components, context.now);
   const bucket = confidenceBucket(confidence);
 
   let group: WeddingVendorRankingGroup;
@@ -887,6 +765,11 @@ function rankCandidate(
     ],
     group,
     fit,
+    fitUpper: rankingPolicy === "2" && fit !== null ? Math.min(100, fit + Math.round((1 - confidence) * 20)) : undefined,
+    availabilityProbability: rankingPolicy === "2" && group === "verify" ? weddingVendorAvailabilityPrior({ month: context.weddingMonth }) : undefined,
+    styleTags: rankingPolicy === "2" ? styleTags : undefined,
+    locationSettingClass: rankingPolicy === "2" ? clean(attributeOf(source, "location_setting_class").value) || null : undefined,
+    suburb: rankingPolicy === "2" ? clean(source.address).split(",")[0]?.trim() || null : undefined,
     fitLabel: fitText,
     confidence,
     confidenceBucket: bucket,
@@ -960,9 +843,11 @@ export function rankWeddingVendorCandidates(input: {
   sources: readonly WeddingVendorRankingSource[];
   requirements: WeddingVendorRankingRequirements;
   now?: Date;
+  rankingPolicy?: "1" | "2";
 }): WeddingVendorRankingResult {
   const context = buildContext(input.requirements, input.now ?? new Date());
-  const ranked = input.sources.map((source) => rankCandidate(source, context));
+  const rankingPolicy = input.rankingPolicy ?? "1";
+  const ranked = input.sources.map((source) => rankCandidate(source, context, rankingPolicy));
   const inGroup = (group: WeddingVendorRankingGroup) =>
     ranked.map(({ candidate }) => candidate).filter((candidate) => candidate.group === group);
   const verify = inGroup("verify").sort((left, right) =>
