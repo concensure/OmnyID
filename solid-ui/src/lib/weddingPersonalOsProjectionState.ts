@@ -539,7 +539,7 @@ export function buildWeddingPersonalOsProjectionState(input: {
 }): WeddingPersonalOsProjectionState {
   const now = input.now ?? new Date();
   const limit = input.limit ?? 12;
-  const decisionFocusLimit = Math.max(1, Math.min(5, Math.trunc(input.decisionFocusLimit ?? 3)));
+  const decisionFocusLimit = Math.max(1, Math.min(3, Math.trunc(input.decisionFocusLimit ?? 3)));
   const candidateItems = [
     ...(input.taskItems ?? []).map((item) => taskItem(item, now)),
     ...(input.scheduleItems ?? []).map((item) => scheduleItem(item, now)),

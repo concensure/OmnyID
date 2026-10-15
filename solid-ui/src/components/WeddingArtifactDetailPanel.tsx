@@ -648,6 +648,7 @@ function usesDedicatedVendorQuoteReplyFlow(preview: WeddingWorkspaceArtifactPrev
 
 export function WeddingArtifactDetailPanel(props: {
   preview: WeddingWorkspaceArtifactPreview | null;
+  vendorDirectory?: readonly WeddingVendor[];
   exportNotice: string | null;
   approvalRunning: boolean;
   approvalReceipt: WeddingApprovalExecutionState | null;
@@ -786,6 +787,7 @@ export function WeddingArtifactDetailPanel(props: {
                       <ArtifactPreviewCard
                         artifact={preview()}
                         preview={previewState()}
+                        vendorDirectory={props.vendorDirectory}
                         onOpenFollowUpQueue={props.onOpenFollowUpQueue}
                         onOpenVendorQuoteReplySurface={props.onOpenVendorQuoteReplySurface}
                         onVendorChoiceSelected={props.onVendorChoiceSelected}

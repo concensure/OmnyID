@@ -609,3 +609,11 @@ as the configured sender. Resend is retained only as the platform-owned fallback
 the legacy Gmail mailbox gateway is not selected while either platform provider
 is configured. This is intentionally separate from the vendor relay, which stays
 behind its inbound-routing and security gates.
+
+## 2026-10-15: Wedding focus is bounded and vendor-dependent decisions open research
+
+Wedding Home may show at most three ranked decision cards. The mobile decision deck
+contains those cards only; it does not append vendor comparison cards as additional
+decisions. When a decision deterministically requires supplier research (for example,
+choosing wedding rings), the surface opens a category-specific vendor search before
+any vendor selection or message is prepared.

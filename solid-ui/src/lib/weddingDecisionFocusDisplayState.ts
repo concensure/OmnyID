@@ -4,6 +4,9 @@ import type {
   WeddingPersonalOsRankedItem,
 } from "@/lib/weddingPersonalOsProjectionState";
 
+/** The wedding home is a daily focus, not an endless decision queue. */
+export const WEDDING_DAILY_DECISION_LIMIT = 3;
+
 export type WeddingDecisionFocusDisplayState = {
   visibleFocusItems: WeddingPersonalOsRankedItem[];
   itemCards: WeddingDecisionFocusItemCard[];
@@ -49,6 +52,8 @@ function checkedLabel(item: WeddingPersonalOsRankedItem): string {
 }
 
 function recommendedActionLabel(item: WeddingPersonalOsRankedItem): string {
+  const vendorResearchQuery = weddingVendorResearchQueryForDecision(item);
+  if (vendorResearchQuery) return `Research ${vendorResearchQuery} before choosing`;
   if (item.sourceSurface === "approval_queue") return "Review and approve only if it looks right";
   if (item.sourceSurface === "decision_queue") return "Compare the options and choose one";
   if (item.sourceSurface === "calendar") return "Open the date and confirm the next step";
@@ -58,10 +63,32 @@ function recommendedActionLabel(item: WeddingPersonalOsRankedItem): string {
 }
 
 function compareLabel(item: WeddingPersonalOsRankedItem): string {
+  if (weddingVendorResearchQueryForDecision(item)) return "Research vendors";
   if (item.sourceSurface === "approval_queue") return "Review approval";
   if (item.sourceSurface === "calendar") return "View date";
   if (item.sourceSurface === "tasks") return "Open task";
   return "Compare";
+}
+
+/**
+ * Small, deterministic routing for decisions that cannot sensibly be made
+ * until a vendor category has been researched.  This deliberately stays
+ * separate from recommendations: it creates a search surface, never a
+ * vendor choice or an enquiry.
+ */
+export function weddingVendorResearchQueryForDecision(item: Pick<WeddingPersonalOsRankedItem, "title" | "evidenceLabels">): string | null {
+  const text = `${item.title} ${(item.evidenceLabels ?? []).join(" ")}`.toLowerCase();
+  if (/\b(ring|rings|jewell?er|jewell?ry|wedding band)\b/.test(text)) return "wedding ring jewellers";
+  // Do not hijack a payment, contract, or calendar decision merely because it
+  // mentions a venue or caterer. Other categories become research work only
+  // when the decision itself is about finding or choosing that supplier.
+  if (!/\b(choose|find|research|search|shortlist|compare|select|book)\b/.test(text)
+    && !/vendor research timing|vendor search freshness/.test(text)) return null;
+  if (/\b(photo|photographer|photography)\b/.test(text)) return "wedding photographers";
+  if (/\b(florist|floral|flowers?)\b/.test(text)) return "wedding florists";
+  if (/\b(caterer|catering|menu)\b/.test(text)) return "wedding caterers";
+  if (/\b(venue|reception)\b/.test(text)) return "wedding venues";
+  return null;
 }
 
 export function buildWeddingDecisionFocusItemCard(item: WeddingPersonalOsRankedItem): WeddingDecisionFocusItemCard {
@@ -82,7 +109,12 @@ export function buildWeddingDecisionFocusDisplayState(input: {
   locallyDeferredIds?: ReadonlySet<string> | null;
 }): WeddingDecisionFocusDisplayState {
   const locallyDeferredIds = input.locallyDeferredIds ?? new Set<string>();
-  const visibleFocusItems = input.relief.focusItems.filter((item) => !locallyDeferredIds.has(item.id));
+  // Older saved projections could contain a larger focus limit.  Enforce the
+  // product limit at the presentation boundary too, so a refresh cannot turn
+  // the daily focus back into an endless stack of cards.
+  const visibleFocusItems = input.relief.focusItems
+    .filter((item) => !locallyDeferredIds.has(item.id))
+    .slice(0, WEDDING_DAILY_DECISION_LIMIT);
   return {
     visibleFocusItems,
     itemCards: visibleFocusItems.map(buildWeddingDecisionFocusItemCard),

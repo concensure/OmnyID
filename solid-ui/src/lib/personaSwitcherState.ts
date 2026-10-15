@@ -91,12 +91,29 @@ export async function installPersonaTemplateAndList(
   template: PersonaTemplate,
   api: PersonaSwitcherApi = defaultPersonaSwitcherApi,
 ): Promise<{ personas: AgentPersona[]; installedPersona: AgentPersona | null }> {
-  const created = await api.createPersona({
-    name: template.name,
-    soul_md: template.soul_md,
-    writing_style: template.writing_style,
-    labels: template.labels,
-  });
+  let created: { persona: AgentPersona };
+  try {
+    created = await api.createPersona({
+      name: template.name,
+      soul_md: template.soul_md,
+      writing_style: template.writing_style,
+      labels: template.labels,
+    });
+  } catch (createError) {
+    // A retry can arrive after the server created the persona but before the
+    // browser received its response.  Recover that installed template and
+    // activate it rather than leaving the Sprout action looking inert.
+    const existing = await api.listPersonas().catch(() => null);
+    const existingId = existing
+      ? findInstalledPersonaIdForTemplate(template, existing.personas)
+      : null;
+    if (!existingId) throw createError;
+    const result = await activatePersonaAndList(existingId, api);
+    const installedPersona = result.activePersona
+      ?? existing!.personas.find((persona) => persona.id === existingId)
+      ?? null;
+    return { personas: result.personas, installedPersona };
+  }
   const result = await activatePersonaAndList(created.persona.id, api);
   const installedPersona = result.activePersona ?? {
     ...created.persona,

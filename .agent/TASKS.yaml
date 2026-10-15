@@ -1140,3 +1140,8 @@ tasks:
       - account-verification and password-reset mail now selects Cloudflare Email Sending before Resend, using `hello@mail.omnyid.com`; the legacy mailbox gateway is used only when neither platform provider is configured, while the vendor relay remains separately gated
       - a named directory lookup no longer treats the `Custom vendor search` label as a category filter, so an exact Mackay search can rank the active Mackay Family Estate record
       - saved vendor comparison cards now refresh safe first-party directory media and replace legacy generic recommendations with persisted vendor-fit evidence
+      - restored the mobile Sprout placement above the tab bar and made template installation recover an already-created persona after a request timeout; the card reports the active persona
+      - wedding decision focus is hard-capped at three ranked items across projection, desktop, and mobile; mobile no longer appends vendor cards to the decision deck
+      - vendor-dependent decisions, including wedding rings, now show an inline research surface and open the vendor tab with a concrete category query before any selection or outreach
+      - Enter in a native vendor-search field is isolated from the armed global Magic Pointer action, preventing the observed jump back to Wedding Home; the mobile timeline starts in its date-scaled schedule chart and respects completed filtering there
+      - restored the Artifact Detail vendor-directory prop contract, returning the full UI typecheck to clean status

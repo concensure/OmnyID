@@ -2094,3 +2094,36 @@ External state:
 - Resend reports `mail.omnyid.com` as `pending`; it remains a fallback until
   DNS verification completes. The Cloudflare sending test demonstrates that
   account mail does not need to wait on that DNS step.
+
+## 2026-10-15 - WED-185 mobile interaction and decision-focus regression repair (Codex)
+
+Changed:
+
+- Restored a safe phone position for the Sprout control and bounded its panel to
+  the visible viewport. Persona template installation now recovers and activates a
+  matching persona if an earlier create request succeeded server-side but its
+  response was lost.
+- Decision focus is constrained to three ranked items throughout the projection
+  and display layers. The mobile decision deck no longer mixes in vendor cards.
+  Wedding-ring decisions now expose an inline jeweller research action and open
+  the vendor-search tab with that concrete query; no vendor is selected or sent
+  automatically.
+- Native text controls now take priority over Magic Pointer keyboard actions,
+  preventing Enter in vendor search from executing an armed global action and
+  returning to Wedding Home. Mobile Timeline opens in the scaled schedule chart
+  and applies its completed filter to that chart.
+- Restored the `WeddingArtifactDetailPanel` directory-media prop path, clearing
+  the outstanding UI typecheck contract error.
+
+Verification:
+
+- `npm run test:wedding --prefix solid-ui` (1,836 passing)
+- `npm run typecheck --prefix solid-ui` (passing)
+- `npm run build --prefix solid-ui` (passing)
+- `git diff --check` (passing)
+
+Next:
+
+- Commit this UI-only repair and deploy the scoped `ui` service to Oracle. Do
+  not reload or restart Caddy; verify its SHA-256 remains
+  `06c79d0b5178f836a9f82b27a0a0902478ba9eca1f6d285c41390a0ae773cb40`.

@@ -14,7 +14,10 @@ import {
   buildWeddingDecisionDeferSidebarAction,
   buildWeddingDecisionFocusSidebarAction,
 } from "@/lib/weddingDecisionFocusActionState";
-import { buildWeddingDecisionFocusDisplayState } from "@/lib/weddingDecisionFocusDisplayState";
+import {
+  buildWeddingDecisionFocusDisplayState,
+  weddingVendorResearchQueryForDecision,
+} from "@/lib/weddingDecisionFocusDisplayState";
 import { decisionCardFromWeddingFocus, type DecisionCardModel } from "@/lib/decisionCardState";
 import type { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
@@ -186,6 +189,26 @@ export function WeddingDecisionFocusCard(props: {
     const launch = saveWeddingVendorSearchLaunch(query, { source: "wedding_home" });
     if (launch) dispatchWeddingVendorSearchLaunch(launch);
   }
+  function launchVendorResearch(item: (typeof props.state.personalOsProjection.decisionLoadRelief.focusItems)[number]) {
+    const query = weddingVendorResearchQueryForDecision(item);
+    if (!query) return false;
+    const launch = saveWeddingVendorSearchLaunch(query, { source: "wedding_home" });
+    if (launch) dispatchWeddingVendorSearchLaunch(launch);
+    props.onSidebarAction({
+      kind: "open_workspace_menu",
+      label: `Research ${query}`,
+      enabled: true,
+      reason: null,
+      metadata: {
+        wedding_workspace_menu: "response_queue",
+        vendor_search_scope: "decision_vendor_research",
+        vendor_search_query: query,
+        source_decision_id: item.id,
+      },
+      contextLabels: [item.title, query],
+    });
+    return true;
+  }
   function openNewContactForm(taskId: string) {
     setNewContactTaskId(taskId);
     setAssigneePickerTaskId(null);
@@ -275,6 +298,7 @@ export function WeddingDecisionFocusCard(props: {
                           optionId: recommendedVendor()!.choiceId,
                           optionLabel: recommendedVendor()!.title,
                           contact: recommendedVendor(),
+                          selected: true,
                         });
                         window.setTimeout(() => setVendorSelectionNotice((current) => ({
                           ...current,
@@ -321,6 +345,11 @@ export function WeddingDecisionFocusCard(props: {
                         }
                       } else if (action.id === "why") {
                         setExpandedWhyItemId((current) => current === item.id ? null : item.id);
+                      } else if (action.id === "open" && launchVendorResearch(item)) {
+                        setVendorSelectionNotice((current) => ({
+                          ...current,
+                          [item.id]: `Vendor research is open for ${weddingVendorResearchQueryForDecision(item)}. Compare options before choosing or ordering.`,
+                        }));
                       } else if (action.id === "open" && item.sourceSurface === "tasks") {
                         setExpandedTaskId((current) => current === item.id ? null : item.id);
                       } else {
@@ -333,6 +362,17 @@ export function WeddingDecisionFocusCard(props: {
                   />
                   <Show when={vendorSelectionNotice()[item.id]}>
                     {(notice) => <p role="status" class="rounded-xl border border-pink-200 bg-white px-3 py-2 text-xs font-semibold text-pink-950">{notice()}</p>}
+                  </Show>
+                  <Show when={weddingVendorResearchQueryForDecision(item)}>
+                    {(query) => (
+                      <section class="rounded-xl border border-pink-200 bg-white/85 px-3 py-3 text-pink-950" aria-label={`Vendor research for ${query()}`}>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-pink-900/70">Start with vendor research</p>
+                        <p class="mt-1 text-sm leading-5">Compare a few {query()} before you settle the size, order timing, or insurance details.</p>
+                        <button type="button" class="mt-3 min-h-10 rounded-full bg-pink-700 px-3 text-xs font-semibold text-white transition hover:bg-pink-800" onClick={() => launchVendorResearch(item)}>
+                          Research {query()}
+                        </button>
+                      </section>
+                    )}
                   </Show>
                   <Show when={recommendedFlow()}>
                     {(visibleFlow) => {

@@ -24,7 +24,9 @@ export function WeddingTimelinePanel(props: {
   onOpenSavedOutputs?: () => void;
 }) {
   const [showAllRows, setShowAllRows] = createSignal(false);
-  const [showGantt, setShowGantt] = createSignal(false);
+  // The mobile timeline is a visual schedule, not only a list of coloured
+  // dots. Start with the date-scaled chart visible there as well.
+  const [showGantt, setShowGantt] = createSignal(typeof window !== "undefined" && window.matchMedia("(max-width: 39.99em)").matches);
   const [mobileFilter, setMobileFilter] = createSignal<"all" | "upcoming" | "completed">("all");
   const isCompleted = (status: string | null | undefined) => /done|complete|accepted/i.test(status ?? "");
   // Filter before applying the compact mobile limit. Previously the first six
@@ -321,7 +323,7 @@ export function WeddingTimelinePanel(props: {
             }}
           </For>
           </div>}>
-            <div class="hidden overflow-x-auto rounded-xl border border-indigo-100 bg-white/80 p-3 sm:block">
+            <div class="overflow-x-auto rounded-xl border border-indigo-100 bg-white/80 p-3">
               <div class="min-w-[680px]">
                 <div class="grid grid-cols-[minmax(10rem,14rem)_1fr] gap-x-3 border-b border-indigo-100 pb-2">
                   <p class="text-xs font-semibold uppercase tracking-wide text-indigo-950/65">All tasks</p>
@@ -332,7 +334,7 @@ export function WeddingTimelinePanel(props: {
                   </div>
                 </div>
                 <div class="mt-2 space-y-2">
-                  <For each={props.state.ganttTimeline.rows}>
+                  <For each={filteredRows()}>
                     {(row) => (
                       <div class="grid grid-cols-[minmax(10rem,14rem)_1fr] items-center gap-x-3">
                         <button

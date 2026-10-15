@@ -166,3 +166,20 @@ test("install keeps the active template visible when a fresh list briefly lags a
   assert.equal(result.installedPersona?.is_active, true);
   assert.equal(result.personas[0]?.id, "persona-new");
 });
+
+test("install recovers a template created by a timed-out earlier attempt", async () => {
+  const template = makeTemplate({ name: "Recoverable planner" });
+  const existing = makePersona({ id: "persona-existing", name: template.name, soul_md: template.soul_md });
+  const calls: string[] = [];
+  const result = await installPersonaTemplateAndList(template, {
+    async createPersona() { throw new Error("request timed out"); },
+    async activatePersona(id) { calls.push(`activate:${id}`); },
+    async listPersonas() {
+      calls.push("list");
+      return { personas: [{ ...existing, is_active: calls.includes("activate:persona-existing") }] };
+    },
+  });
+
+  assert.deepEqual(calls, ["list", "activate:persona-existing", "list"]);
+  assert.equal(result.installedPersona?.id, "persona-existing");
+});

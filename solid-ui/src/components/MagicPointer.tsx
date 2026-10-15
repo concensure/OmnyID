@@ -77,6 +77,11 @@ export function MagicPointer() {
   }
 
   onMount(() => {
+    function isEditableTarget(target: EventTarget | null): boolean {
+      return target instanceof Element
+        && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+    }
+
     function onMouseMove(e: MouseEvent) {
       // Mouse movement takes over from keyboard mode so the reticle follows the cursor again.
       if (kbMode()) {
@@ -114,6 +119,10 @@ export function MagicPointer() {
     }
 
     function onKeyDown(e: KeyboardEvent) {
+      // Native text entry owns its keyboard.  In particular, Enter in the
+      // vendor-search form must never be reinterpreted as the last armed
+      // Magic Pointer action (which could navigate back to Wedding Home).
+      if (e.defaultPrevented || isEditableTarget(e.target)) return;
       // Tab / Shift+Tab: cycle through data-magic-action elements without a mouse.
       if (e.key === 'Tab' && phase() !== 'executing' && phase() !== 'confirming') {
         const magicEls = Array.from(

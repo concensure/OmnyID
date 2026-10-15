@@ -11,7 +11,11 @@ import type { SendAfpMessageInput } from "@/lib/api";
 import { decisionTriageToAfpSendInput } from "@/lib/decisionTriageAfpState";
 import { buildDecisionTriageProjectionState } from "@/lib/decisionTriageProjectionState";
 import { decisionCardFromFocusDeckItem } from "@/lib/decisionCardState";
-import { buildWeddingDecisionFocusDisplayState } from "@/lib/weddingDecisionFocusDisplayState";
+import {
+  buildWeddingDecisionFocusDisplayState,
+  WEDDING_DAILY_DECISION_LIMIT,
+  weddingVendorResearchQueryForDecision,
+} from "@/lib/weddingDecisionFocusDisplayState";
 import { buildWeddingDecisionDeferSidebarAction } from "@/lib/weddingDecisionFocusActionState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
@@ -33,8 +37,11 @@ import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteR
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
-import { buildWeddingVendorDeckProjectionState } from "@/lib/weddingVendorDeckProjectionState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
+import {
+  dispatchWeddingVendorSearchLaunch,
+  saveWeddingVendorSearchLaunch,
+} from "@/lib/weddingVendorSearchLaunchState";
 
 type HomeSection = { id: string; title: string; render: () => JSX.Element };
 type InputMethod = "swipe" | "button" | "keyboard";
@@ -104,12 +111,13 @@ export function WeddingMobileFocusHome(props: {
       returnedFromLater: false,
       external: flow.stage === "ready_to_send",
     }))));
-  const vendorItems = createMemo(() => buildWeddingVendorDeckProjectionState({
-    artifactPreviews: props.state.artifactPreviews,
-    outreachFlows: props.vendorOutreachFlows,
-  }).filter((item) => !hiddenIds().has(item.id))
-    .filter((item) => item.kind !== "vendor_comparison" || props.state.vendorContactCards.length === 0));
-  const items = () => mobileFocusMode() === "responses" ? responses() : [...vendorItems(), ...decisions()];
+  // The decision deck is deliberately finite. Vendor comparison work remains
+  // reachable from Overview instead of being appended after every decision.
+  const items = () => mobileFocusMode() === "responses"
+    ? responses()
+    : mobileFocusMode() === "decisions"
+      ? decisions().slice(0, WEDDING_DAILY_DECISION_LIMIT)
+      : [];
 
   createEffect(() => {
     publishMobileFocusHomeSections(props.homeSections.map((section) => ({
@@ -252,6 +260,16 @@ export function WeddingMobileFocusHome(props: {
     setMobileFocusSingleCardSectionId("quote_replies");
   }
 
+  function openVendorResearch(item: FocusDeckItem) {
+    const decision = decisionItemFor(item.id);
+    const query = decision ? weddingVendorResearchQueryForDecision(decision) : null;
+    if (!query) return false;
+    const launch = saveWeddingVendorSearchLaunch(query, { source: "wedding_home" });
+    if (launch) dispatchWeddingVendorSearchLaunch(launch);
+    props.onSelectMenu?.("response_queue");
+    return true;
+  }
+
   function completeVendorItem(item: FocusDeckItem) {
     if (item.kind === "vendor_receipt") {
       void triage("approve", item, "button", () => {
@@ -329,7 +347,7 @@ export function WeddingMobileFocusHome(props: {
                     onConnectGmail={props.onConnectGmailForOutreach}
                     onDone={() => completeVendorItem(item)}
                   />
-                  : <DeckCard item={item} onOpenAgentDraft={openAgentDraft} />}
+                  : <DeckCard item={item} onOpenAgentDraft={openAgentDraft} onOpenVendorResearch={openVendorResearch} />}
                 renderEnd={() => (
                   <QueueClearedZenState
                     variant="wedding"
@@ -359,14 +377,20 @@ export function WeddingMobileFocusHome(props: {
   );
 }
 
-function DeckCard(props: { item: FocusDeckItem; onOpenAgentDraft: () => void }) {
+function DeckCard(props: {
+  item: FocusDeckItem;
+  onOpenAgentDraft: () => void;
+  onOpenVendorResearch: (item: FocusDeckItem) => boolean;
+}) {
   return (
     <div class="flex min-h-0 flex-1 flex-col">
       <DecisionCard
         card={decisionCardFromFocusDeckItem(props.item)}
         mode="standard"
-        showActions={props.item.kind === "response"}
-        onAction={() => props.onOpenAgentDraft()}
+        showActions
+        onAction={() => {
+          if (!props.onOpenVendorResearch(props.item)) props.onOpenAgentDraft();
+        }}
         class="shadow-none"
       />
       <p class="mt-auto pt-4 text-xs text-wedding-muted">Use the action bar or swipe. Sending a vendor message always needs a separate confirmation.</p>

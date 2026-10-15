@@ -20,6 +20,11 @@ test("opening a vendor search query selects the current request on touch and des
   assert.match(source, /onPointerUp=\{\(event\) => \{[\s\S]*selectQuery\(event\)/);
 });
 
+test("vendor search owns Enter rather than an armed global action", () => {
+  const magicPointer = readFileSync(resolve(process.cwd(), "src/components/MagicPointer.tsx"), "utf8");
+  assert.match(magicPointer, /e\.defaultPrevented \|\| isEditableTarget\(e\.target\)/);
+});
+
 test("provider readiness does not disable a named directory lookup", () => {
   assert.doesNotMatch(source, /\|\| Boolean\(workspace\(\)\.vendorSearchBlockedReason\)/);
   assert.match(source, /A named search can still check your wedding directory/);

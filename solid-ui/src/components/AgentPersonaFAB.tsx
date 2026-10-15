@@ -312,7 +312,7 @@ export function AgentPersonaFAB(props: {
 
       <Show when={showSwitcher()}>
         {/* Panel: fluid width so it doesn't overflow on narrow screens */}
-        <div class="fixed bottom-[4.75rem] right-6 phone:bottom-[calc(12rem+env(safe-area-inset-bottom))] phone:right-3 z-50 max-h-[32rem] w-[min(25rem,_calc(100vw_-_1.5rem))] overflow-hidden rounded-3xl border border-white/45 bg-white/96 shadow-panel backdrop-blur-xl animate-fade-in">
+        <div class="fixed bottom-[4.75rem] right-6 phone:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] phone:right-3 z-50 max-h-[min(32rem,calc(100dvh_-_6rem))] w-[min(25rem,_calc(100vw_-_1.5rem))] overflow-hidden rounded-3xl border border-white/45 bg-white/96 shadow-panel backdrop-blur-xl animate-fade-in">
           <div class="border-b border-outline/10 px-3.5 py-3">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -572,7 +572,7 @@ export function AgentPersonaFAB(props: {
       {/* Avatar emoji + mood ring + capability count chip + status dot.          */}
       <button
         type="button"
-        class={`fixed bottom-6 right-6 phone:bottom-[calc(8.5rem+env(safe-area-inset-bottom))] phone:right-3 z-50 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/85 text-on-surface/70 shadow-md outline-none transition-all backdrop-blur-2xl hover:bg-white/95 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-primary/50 ${fabAnim()} ${moodRingClass()}`}
+        class={`fixed bottom-6 right-6 phone:bottom-[calc(4.25rem+env(safe-area-inset-bottom))] phone:right-3 z-50 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/85 text-on-surface/70 shadow-md outline-none transition-all backdrop-blur-2xl hover:bg-white/95 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-primary/50 ${fabAnim()} ${moodRingClass()}`}
         onPointerDown={startLongPress}
         onPointerUp={cancelLongPress}
         onPointerLeave={cancelLongPress}

@@ -5,7 +5,11 @@ import {
   buildWeddingDecisionDeferSidebarAction,
   buildWeddingDecisionFocusSidebarAction,
 } from "../src/lib/weddingDecisionFocusActionState.ts";
-import { buildWeddingDecisionFocusDisplayState } from "../src/lib/weddingDecisionFocusDisplayState.ts";
+import {
+  buildWeddingDecisionFocusDisplayState,
+  WEDDING_DAILY_DECISION_LIMIT,
+  weddingVendorResearchQueryForDecision,
+} from "../src/lib/weddingDecisionFocusDisplayState.ts";
 import { weddingDecisionDeferralActionToAfpSendInput } from "../src/lib/weddingDecisionDeferralAfpState.ts";
 import type { WeddingPersonalOsRankedItem } from "../src/lib/weddingPersonalOsProjectionState.ts";
 
@@ -24,6 +28,24 @@ function item(input: Partial<WeddingPersonalOsRankedItem> & Pick<WeddingPersonal
     ...input,
   };
 }
+
+test("decision focus stays to the three most critical cards and routes ring choices into vendor research", () => {
+  const rings = item({ title: "Choose, size, order, and insure wedding rings", sourceSurface: "tasks" });
+  const display = buildWeddingDecisionFocusDisplayState({
+    relief: {
+      summaryLabel: "Many decisions",
+      focusLimit: 5,
+      focusItems: [rings, item({ title: "Second", sourceSurface: "tasks" }), item({ title: "Third", sourceSurface: "tasks" }), item({ title: "Fourth", sourceSurface: "tasks" })],
+      backlogCount: 1,
+      reliefLabels: [],
+    },
+  });
+
+  assert.equal(display.visibleFocusItems.length, WEDDING_DAILY_DECISION_LIMIT);
+  assert.equal(display.itemCards[0]?.recommendedActionLabel, "Research wedding ring jewellers before choosing");
+  assert.equal(display.itemCards[0]?.compareLabel, "Research vendors");
+  assert.equal(weddingVendorResearchQueryForDecision(rings), "wedding ring jewellers");
+});
 
 test("buildWeddingDecisionFocusSidebarAction routes task focus to Tasks with compact metadata", () => {
   const action = buildWeddingDecisionFocusSidebarAction({
