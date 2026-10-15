@@ -654,3 +654,11 @@ The homeserver Dockerfile copies that specific build input, preventing a contain
 a stale or separately maintained facet list. `style_facets` stores facet id strings; per-facet
 confidence and evidence remain in the ordinary attribute notes until a structured attribute format
 is introduced.
+
+## 2026-10-15: Policy-v2 style uses deterministic facet matches
+
+Under policy `2`, vendor facets are derived at rank time and matched to a deterministic preference
+profile. Unknown facets use the neutral 0.5 prior with zero confidence, while user-confirmed
+must-have conflicts exclude only when their conflicting vendor evidence is decisive (at least 0.7).
+The original policy-1 path remains untouched. The R0 Bondi policy-2 fixture is now 52 rather than
+the earlier pre-facet 42; policy 1 remains 38.

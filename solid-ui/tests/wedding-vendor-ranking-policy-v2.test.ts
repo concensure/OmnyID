@@ -18,8 +18,8 @@ test("policy v2 is opt-in and changes the documented sparse Bondi result from v1
   const v1 = rankWeddingVendorCandidates({ sources: [WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_SOURCE], requirements: WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_REQUIREMENTS, now });
   const v2 = rankWeddingVendorCandidates({ sources: [WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_SOURCE], requirements: WEDDING_VENDOR_PERSONALISED_RECOMMENDATION_BASELINE_REQUIREMENTS, rankingPolicy: "2", now });
   assert.equal(v1.verify[0]?.fit, 38);
-  assert.equal(v2.verify[0]?.fit, 42);
-  assert.equal(v2.verify[0]?.fitUpper, 57);
+  assert.equal(v2.verify[0]?.fit, 52);
+  assert.equal(v2.verify[0]?.fitUpper, 71);
   assert.equal(v2.verify[0]?.availabilityProbability, 0.5);
 });
 
@@ -39,4 +39,12 @@ test("policy v2 retains hard capacity vetoes, keeps unknown availability actiona
   assert.deepEqual(first.excluded.map((candidate) => candidate.id), ["small"]);
   assert.deepEqual(first.verify.map((candidate) => candidate.id), ["unknown"]);
   assert.deepEqual(second, first);
+});
+
+test("policy v2 attaches evidence-backed reasons and vetoes a decisive must-have conflict", () => {
+  const source = venue("industrial", { style_facets: attr(["aesthetic.ornate_glam"]) });
+  const preferenceProfile = { facets: [{ facetId: "aesthetic.modern_minimal", weight: "must" as const, polarity: 1 as const, anchor: "Minimal", anchorSource: "priority" as const, confidence: 1, authority: "user" as const }], unmapped: [] };
+  const result = rankWeddingVendorCandidates({ sources: [source], requirements: { vendorCategories: ["venue"] }, preferenceProfile, rankingPolicy: "2", now });
+  assert.deepEqual(result.excluded.map((candidate) => candidate.id), ["industrial"]);
+  assert.ok(result.excluded[0]?.reasons?.every((reason) => reason.polarity === "unknown" || reason.evidence.length > 0));
 });

@@ -30,6 +30,10 @@ import {
 import { weddingVendorAvailabilityPrior, weddingVendorEffectiveCost } from "@/lib/weddingVendorSeasonalCostState";
 import { weddingVendorLocationUtility } from "@/lib/weddingVendorLocationUtilityState";
 import { weddingVendorSentimentScore, weddingVenueQualityScore } from "@/lib/weddingVendorQualityModelState";
+import { buildDeterministicPreferenceProfile, mergePreferenceProfile, type WeddingPreferenceProfile } from "@/lib/weddingPreferenceProfileState";
+import { deriveWeddingVendorFacets, type WeddingVendorDerivedFacet } from "@/lib/weddingVendorFacetDerivationState";
+import { matchWeddingVendorFacets } from "@/lib/weddingVendorFacetMatchState";
+import { buildWeddingVendorFacetReasonLedger, type WeddingVendorReason } from "@/lib/weddingVendorReasonLedgerState";
 
 export type WeddingVendorAttributeStatus = "known" | "estimated" | "unknown" | "not_applicable";
 
@@ -152,6 +156,9 @@ export type WeddingVendorRankedCandidate = {
   styleTags?: string[];
   locationSettingClass?: string | null;
   suburb?: string | null;
+  vendorFacets?: WeddingVendorDerivedFacet[];
+  profileFacetIds?: string[];
+  reasons?: WeddingVendorReason[];
   fitLabel: string;
   confidence: number;
   confidenceBucket: WeddingVendorConfidenceBucket;
@@ -673,19 +680,31 @@ function rankCandidate(
   source: WeddingVendorRankingSource,
   context: RankingContext,
   rankingPolicy: "1" | "2",
+  preferenceProfile: WeddingPreferenceProfile | null,
 ): { candidate: WeddingVendorRankedCandidate; constraints: HardConstraint[] } {
   const venue = isVenue(source, context);
   const eligibility = evaluateEligibility(source, venue, context);
   const availability = effectiveAvailability(source, context.now);
   const dependencies = { attributeOf, budgetUtility: weddingBudgetUtility, qualityUtility: weddingQualityUtility };
   const v1 = buildComponents(source, venue, context, dependencies);
+  const vendorFacets = rankingPolicy === "2" ? deriveWeddingVendorFacets({ source, guestCount: context.guests }) : [];
+  const facetMatch = rankingPolicy === "2" && preferenceProfile ? matchWeddingVendorFacets(preferenceProfile, vendorFacets) : null;
+  if (facetMatch && preferenceProfile) for (const [index, match] of facetMatch.perFacet.entries()) {
+    const preference = preferenceProfile.facets[index];
+    if (!preference || preference.weight !== "must") continue;
+    if (match.outcome === "conflict" && match.confidence >= 0.7) eligibility.failReasons.push(`${preference.anchor} is a must-have, but the vendor evidence conflicts with it`);
+    else if (match.outcome === "conflict") eligibility.riskFlags.push(`${preference.anchor} may conflict with a must-have`);
+    else if (match.outcome === "unknown") eligibility.unknownConstraints.push({ key: preference.facetId, label: preference.anchor, detail: `Confirm ${preference.anchor} with ${source.title}` });
+  }
   const v2StyleTags = attributeOf(source, "style_tags");
   const styleTags = Array.isArray(v2StyleTags.value) ? v2StyleTags.value.map(clean).filter(Boolean) : [];
   const v2Components = v1.components.map((component) => ({ ...component }));
   if (rankingPolicy === "2") {
     const style = weddingVendorStyleUtility({ preferences: context.preferenceTokens, styleTags, editorialSummary: typeof attributeOf(source, "editorial_summary").value === "string" ? attributeOf(source, "editorial_summary").value as string : null, snippet: source.snippet });
     const styleComponent = v2Components.find((component) => component.id === "style");
-    if (styleComponent) Object.assign(styleComponent, { value: style.value ?? 0, confidence: style.confidence, known: style.value !== null });
+    if (styleComponent) Object.assign(styleComponent, facetMatch
+      ? { value: facetMatch.value ?? 0.5, confidence: facetMatch.confidence, known: facetMatch.confidence > 0 }
+      : { value: style.value ?? 0, confidence: style.confidence, known: style.value !== null });
     const hire = finiteNumber(attributeOf(source, "venue_hire_fee_aud").value) ?? 0;
     const perHead = finiteNumber(attributeOf(source, "price_per_head_aud").value) ?? 0;
     const quoteTotal = finiteNumber(attributeOf(source, "price_estimate_total_aud").value);
@@ -770,6 +789,9 @@ function rankCandidate(
     styleTags: rankingPolicy === "2" ? styleTags : undefined,
     locationSettingClass: rankingPolicy === "2" ? clean(attributeOf(source, "location_setting_class").value) || null : undefined,
     suburb: rankingPolicy === "2" ? clean(source.address).split(",")[0]?.trim() || null : undefined,
+    vendorFacets: rankingPolicy === "2" ? vendorFacets : undefined,
+    profileFacetIds: rankingPolicy === "2" ? preferenceProfile?.facets.map((facet) => facet.facetId) ?? [] : undefined,
+    reasons: rankingPolicy === "2" && preferenceProfile && facetMatch ? buildWeddingVendorFacetReasonLedger(preferenceProfile, facetMatch.perFacet) : undefined,
     fitLabel: fitText,
     confidence,
     confidenceBucket: bucket,
@@ -844,10 +866,14 @@ export function rankWeddingVendorCandidates(input: {
   requirements: WeddingVendorRankingRequirements;
   now?: Date;
   rankingPolicy?: "1" | "2";
+  preferenceProfile?: WeddingPreferenceProfile | null;
 }): WeddingVendorRankingResult {
   const context = buildContext(input.requirements, input.now ?? new Date());
   const rankingPolicy = input.rankingPolicy ?? "1";
-  const ranked = input.sources.map((source) => rankCandidate(source, context, rankingPolicy));
+  const preferenceProfile = rankingPolicy === "2"
+    ? mergePreferenceProfile(buildDeterministicPreferenceProfile(input.requirements), input.preferenceProfile)
+    : null;
+  const ranked = input.sources.map((source) => rankCandidate(source, context, rankingPolicy, preferenceProfile));
   const inGroup = (group: WeddingVendorRankingGroup) =>
     ranked.map(({ candidate }) => candidate).filter((candidate) => candidate.group === group);
   const verify = inGroup("verify").sort((left, right) =>

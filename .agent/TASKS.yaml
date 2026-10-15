@@ -1304,3 +1304,25 @@ tasks:
       - deterministic setting, boolean, tag, stored-facet, and room/capacity derivation is implemented as a pure rank-time function
       - Bondi, room-size, provenance-merge, TypeScript typecheck, and diff checks pass
       - the specified 2026-10-07 enriched export and sanitised attribute snapshot are absent from this checkout, so the active-venue coverage measurement remains an external evidence gate
+  - id: WED-193
+    title: Couple facet mapping, facet match and reason ledger
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-187
+    depends_on:
+      - WED-192
+    files:
+      - solid-ui/src/lib/weddingPreferenceProfileState.ts
+      - solid-ui/src/lib/weddingVendorFacetMatchState.ts
+      - solid-ui/src/lib/weddingVendorReasonLedgerState.ts
+      - solid-ui/src/lib/weddingVendorRankingState.ts
+      - solid-ui/tests/wedding-preference-profile-state.test.ts
+      - .agent/**
+    acceptance:
+      - deterministic preference profiles preserve the couple anchor and distinguish mapped from unmapped phrases
+      - facet matching is confidence-aware, deterministic, and treats unknowns neutrally
+      - policy 2 produces evidence-backed reasons and applies must-have conflicts safely
+    progress:
+      - deterministic profiles, confidence-aware neutral facet matching, derived-facet policy-2 style scoring, and evidence-backed facet reasons are implemented
+      - a decisive user-confirmed must-have conflict excludes the candidate; focused profile, derivation, and policy tests pass
+      - location/cost/capacity/quality ledger rows and the documented priority-weight shift remain before R6 completion
