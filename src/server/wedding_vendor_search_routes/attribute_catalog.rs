@@ -8,6 +8,24 @@ use crate::db::wedding_vendor_evidence::{
 };
 use serde_json::{Value, json};
 
+const WEDDING_FACET_VOCABULARY: &str = include_str!("../../../solid-ui/src/lib/weddingFacetVocabulary.json");
+
+fn wedding_facet_vocabulary() -> Result<(String, Vec<String>), String> {
+    let value: Value = serde_json::from_str(WEDDING_FACET_VOCABULARY)
+        .map_err(|error| format!("invalid wedding facet vocabulary: {error}"))?;
+    let version = value["version"]
+        .as_str()
+        .ok_or_else(|| "wedding facet vocabulary has no version".to_string())?
+        .to_string();
+    let ids = value["facets"]
+        .as_array()
+        .ok_or_else(|| format!("wedding facet vocabulary {version} has no facets"))?
+        .iter()
+        .filter_map(|facet| facet["id"].as_str().map(str::to_string))
+        .collect();
+    Ok((version, ids))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum AttrKind {
     Bool,
@@ -355,6 +373,7 @@ pub(crate) const VENDOR_ATTRIBUTE_CATALOG: &[VendorAttributeSpec] = &[
         "quality",
     ),
     spec("style_tags", "Style tags", AttrKind::Tags, ALL, "fit"),
+    spec("style_facets", "Style facets", AttrKind::Tags, ALL, "fit"),
     spec(
         "exclusive_use",
         "Exclusive use",
@@ -657,6 +676,14 @@ pub(crate) fn validate_attribute_value(
                             .is_some_and(|text| !text.trim().is_empty() && text.len() <= 80)
                     }) =>
             {
+                if spec.key == "style_facets" {
+                    let (version, vocabulary) = wedding_facet_vocabulary()?;
+                    if let Some(unknown) = tags.iter().filter_map(Value::as_str).find(|tag| !vocabulary.iter().any(|facet| facet == tag)) {
+                        return Err(format!(
+                            "attribute 'style_facets' contains unknown facet '{unknown}' for vocabulary {version}."
+                        ));
+                    }
+                }
                 Ok(())
             }
             _ => Err(wrong_shape("a list of up to 40 short text tags")),
@@ -1053,5 +1080,14 @@ mod tests {
             .expect("entry");
         assert_eq!(status["kind"], json!("enum"));
         assert_eq!(status["enum_values"].as_array().expect("values").len(), 3);
+    }
+
+    #[test]
+    fn style_facets_are_limited_to_the_shared_versioned_vocabulary() {
+        assert!(admin_attribute_write(admin("style_facets", Some(json!(["scale.intimate"])), "known")).is_ok());
+        let error = admin_attribute_write(admin("style_facets", Some(json!(["scale.imaginary"])), "known"))
+            .expect_err("unknown facet must be rejected");
+        assert!(error.contains("scale.imaginary"));
+        assert!(error.contains("wedding_facets.v1"));
     }
 }

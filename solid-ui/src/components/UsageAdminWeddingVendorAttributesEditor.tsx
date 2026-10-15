@@ -6,6 +6,7 @@ import {
   type WeddingVendorAttributeRow,
 } from "@/lib/weddingVendorAttributeCatalogState";
 import type { WeddingVendorAttributeStatus } from "@/lib/weddingVendorRankingState";
+import { WEDDING_FACET_VOCABULARY } from "@/lib/weddingFacetVocabularyState";
 
 const STATUS_OPTIONS = Object.keys(WEDDING_VENDOR_ATTRIBUTE_STATUS_LABELS) as WeddingVendorAttributeStatus[];
 const INPUT_CLASS = "min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900";
@@ -99,7 +100,19 @@ export default function UsageAdminWeddingVendorAttributesEditor(props: {
                             <For each={row.entry.enumValues}>{(option) => <option value={option}>{option}</option>}</For>
                           </select>
                         </Show>
-                        <Show when={!["bool", "enum"].includes(row.entry.kind)}>
+                        <Show when={row.entry.key === "style_facets"}>
+                          <select
+                            class={`${INPUT_CLASS} min-h-28 w-full`}
+                            aria-label={row.entry.label}
+                            disabled={props.disabled}
+                            multiple
+                            value={edit().valueText.split(",").map((value) => value.trim()).filter(Boolean)}
+                            onChange={(event) => setValue(row, Array.from(event.currentTarget.selectedOptions, (option) => option.value).join(", "))}
+                          >
+                            <For each={WEDDING_FACET_VOCABULARY}>{(facet) => <option value={facet.id}>{facet.label}</option>}</For>
+                          </select>
+                        </Show>
+                        <Show when={!["bool", "enum"].includes(row.entry.kind) && row.entry.key !== "style_facets"}>
                           <input
                             class={`${INPUT_CLASS} w-full`}
                             aria-label={row.entry.label}

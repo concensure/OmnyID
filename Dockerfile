@@ -17,6 +17,7 @@ COPY runtime-templates/ ./runtime-templates/
 COPY service-adapter-templates/ ./service-adapter-templates/
 COPY scripts/ ./scripts/
 COPY src/ ./src/
+COPY solid-ui/src/lib/weddingFacetVocabulary.json ./solid-ui/src/lib/weddingFacetVocabulary.json
 
 # Cache the crate registry and incremental build artifacts across builds so an
 # interrupted or re-triggered deploy doesn't recompile the world from scratch.

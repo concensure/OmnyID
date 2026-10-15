@@ -645,3 +645,12 @@ The production default remains ranking policy `1`. Policy `2` is selected only b
 material-fingerprint/receipt policy version so a policy-1 result is never reused as a policy-2
 result. The v1 utility calculation is isolated from the eligibility, availability, and grouping
 orchestrator to preserve its baseline behaviour while v2 evolves independently.
+
+## 2026-10-15: Facet vocabulary is a shared JSON build input
+
+`solid-ui/src/lib/weddingFacetVocabulary.json` is the single `wedding_facets.v1` source. Vite
+imports it with a JSON module attribute and the Rust catalog includes the same file at compile time.
+The homeserver Dockerfile copies that specific build input, preventing a container build from using
+a stale or separately maintained facet list. `style_facets` stores facet id strings; per-facet
+confidence and evidence remain in the ordinary attribute notes until a structured attribute format
+is introduced.

@@ -2379,3 +2379,26 @@ Next:
 
 - Continue R4 with the venue-only facet vocabulary. Do not enable policy 2 or deploy it before
   R8/R13 evaluation and release gates.
+
+## 2026-10-15 - WED-191 facet vocabulary foundation (Codex, in progress)
+
+Changed:
+
+- Added shared `wedding_facets.v1` JSON (45 v1 facet ids), a TypeScript whole-word/phrase lookup
+  module, and its vocabulary integrity test.
+- Added `style_facets` to the Rust catalog. Admin writes now reject an unknown id with both that
+  id and the vocabulary version in the error. Docker copies the JSON for Rust's compile-time read.
+- The operator attribute editor now renders `style_facets` as a multi-select of couple-facing
+  labels instead of an arbitrary comma-separated free-text field.
+
+Verification:
+
+- `node --import ./tests/node-ts-specifier-hooks.mjs --experimental-strip-types --test tests/wedding-facet-vocabulary-state.test.ts`: passed.
+- `npm run typecheck` (solid-ui): passed.
+- `cargo test --lib wedding_vendor_search_routes::attribute_catalog::tests::style_facets_are_limited_to_the_shared_versioned_vocabulary -- --nocapture`: passed, with the existing unused `user_id` warning.
+
+Remaining:
+
+- Split the oversized Rust catalog test module below its line budget.
+- Move experience-model and decision-fit synonym matching onto the vocabulary without changing its
+  public test behaviour. R5 must not begin until those R4 contracts are complete.
