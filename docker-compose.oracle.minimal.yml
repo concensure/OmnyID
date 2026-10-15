@@ -47,7 +47,9 @@ services:
     # wrapper's `exec "$@"` ran with no arguments (a no-op) and the container
     # exited 0 immediately in an endless restart loop without ever starting
     # Electric.
-    entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
+    # Invoke through sh so Windows worktrees cannot strip the script execute
+    # bit from this bind-mounted file during a production source sync.
+    entrypoint: ["/bin/sh", "/usr/local/bin/runtime-env-entrypoint.sh"]
     command: ["/app/bin/entrypoint", "start"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-}
@@ -82,7 +84,7 @@ services:
     depends_on:
       - postgres
       - seaweedfs
-    entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
+    entrypoint: ["/bin/sh", "/usr/local/bin/runtime-env-entrypoint.sh"]
     command: ["./omnyid-homeserver"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-}
