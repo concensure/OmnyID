@@ -173,3 +173,38 @@ fn comparison_referencing_superseded_version_is_not_active() {
     assert!(state.comparisons.contains_key("comparison-v1"));
     assert!(!state.active_comparisons.contains_key("comparison-v1"));
 }
+
+#[test]
+fn review_event_is_private_linked_and_does_not_duplicate_the_quotation() {
+    let review = QuotationReviewSuccessor {
+        review_id: "review-1".to_string(),
+        parent_version_id: "production-hire-quote-v1".to_string(),
+        version_id: "production-hire-quote-v2".to_string(),
+        material_fingerprint: "fingerprint-v2".to_string(),
+        actor_id: "user-1".to_string(),
+        reviewed_at: "2026-10-17T10:00:00Z".to_string(),
+        action: QuotationReviewAction::ConfirmLine {
+            line_id: "equipment_hire".to_string(),
+        },
+        quotation: Some(quote_v2()),
+        rejected: false,
+    };
+    let message = quotation_review_message(
+        &review,
+        "production-hire-quote",
+        "thread-1",
+        "quotation-message-1",
+        "user-1",
+    );
+    assert_eq!(message.kind.as_deref(), Some(QUOTATION_REVIEW_KIND));
+    assert_eq!(message.parent_id.as_deref(), Some("quotation-message-1"));
+    assert_eq!(
+        message.metadata.as_ref().unwrap()["privacy_scope"],
+        "tenant_private"
+    );
+    assert!(message.content.get("quotation").is_none());
+    assert!(message.references.iter().any(|reference| {
+        reference["type"] == "normalised_quotation_successor"
+            && reference["target"] == "production-hire-quote-v2"
+    }));
+}

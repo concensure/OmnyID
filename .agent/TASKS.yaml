@@ -1728,3 +1728,31 @@ tasks:
       - Solid record/approve-act state and A2UI projections use existing stat-row, callout, and action-chip primitives and carry external_payment false
       - focused Rust closure tests pass (6), Solid closure tests pass (4), and Solid UI type checking passes
       - remaining integration is the small wedding budget/timeline consumer that persists the generic budget commitment after WED-187 workspace state is reconciled
+  - id: WED-214
+    title: Authenticated generic quotation persistence and replay API
+    status: done
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-207
+      - WED-208
+    files:
+      - src/quotation/afp.rs
+      - src/server/quotation_routes.rs
+      - src/server/mod.rs
+      - .agent/**
+    acceptance:
+      - confirmed quotations persist only against tenant-visible source ids and valid source-linked contracts
+      - review actions load the exact active version, reject stale commands, and append review plus successor events
+      - comparisons recalculate totals server-side from active versions and never trust client-supplied totals
+      - authenticated replay returns only the current tenant thread and suppresses stale comparisons
+      - duplicate writes remain idempotent under content-addressed AFP ids
+    progress:
+      - started after WED-211 closure checkpoint 2ae412c to complete the WED-207 route/persistence boundary
+      - authenticated routes store confirmed normalisations only when every source id is visible in the user's tenant-private thread
+      - supersession and optional parent ids must resolve in that same thread; unavailable or cross-tenant identifiers return a generic not-found response
+      - review routes replay the thread, require the exact active version, append a compact review audit event, and then append the validated normalisation successor
+      - comparison routes accept scenario and source-linked requirements but recalculate every candidate total and ranking from active server-side quotation versions
+      - state reads use deterministic replay and suppress comparisons that reference stale versions
+      - writes reuse the existing private AFP store and its content-addressed duplicate handling
+      - focused route validation test, five AFP/replay tests, and cargo check pass; inherited email_group_routes warning only

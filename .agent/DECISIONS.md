@@ -754,3 +754,13 @@ terms block progress until explicitly reviewed. A deposit is cash flow unless ex
 as a fee, preventing it from being counted twice. Only an evidence-backed booking confirmation
 produces an idempotent quotation-version-bound budget commitment. Closure projections declare that
 payment execution is false; payment remains out of scope.
+
+## 2026-10-17: Generic quotation APIs derive authority from tenant AFP replay
+
+Confirmed quotation, review, comparison, and state routes authenticate through the existing session
+boundary and resolve their source/version ids only from messages visible in that user's thread.
+Review operates on the replay-derived active quotation and appends a compact review record before its
+normalisation successor. Comparison accepts scenario and evidence-linked requirement assessments but
+recalculates totals and ranking from active server-side quotation versions; client totals are never
+trusted. All writes use the existing private AFP store, preserving idempotency, relay notification,
+indexing, and tenant isolation without introducing a quotation-specific database.

@@ -2745,3 +2745,25 @@ Remaining:
 
 - After WED-187 reconciliation, add the small wedding budget/timeline adapter that persists the
   generic `BudgetCommitment`. Do not mark WED-211 done until that idempotency integration is tested.
+
+## 2026-10-17 - WED-214 generic quotation persistence API (Codex, complete)
+
+Changed:
+
+- Added authenticated normalisation, review, comparison, and state routes over tenant-private AFP.
+- Normalisations require tenant-visible sources and valid supersession lineage. Reviews apply only
+  to replay-derived active versions, store a compact audit event, and append the validated successor.
+- Comparisons recalculate totals/ranking server-side from active versions and source-linked
+  requirements. State reads use the existing deterministic replay and suppress stale comparisons.
+
+Verification:
+
+- quotation route unit test: 1 passed.
+- quotation AFP/replay tests: 5 passed after adding the compact review event assertion.
+- `cargo check`: passed; inherited `email_group_routes.rs` unused-variable warning only.
+
+Remaining:
+
+- HTTP integration coverage against a temporary Postgres instance is still desirable in CI. The
+  route uses the existing authenticated thread lookup and private AFP store rather than a parallel
+  quotation table.

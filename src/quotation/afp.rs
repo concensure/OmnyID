@@ -1,4 +1,7 @@
-use super::contracts::{NormalisedQuotation, QuotationComparison};
+use super::{
+    contracts::{NormalisedQuotation, QuotationComparison},
+    review::QuotationReviewSuccessor,
+};
 use crate::message::AFPMessage;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -7,6 +10,7 @@ use sha2::{Digest, Sha256};
 pub const NORMALISED_QUOTATION_KIND: &str = "quotation_normalisation_confirmed";
 pub const CORRECTED_QUOTATION_KIND: &str = "quotation_normalisation_corrected";
 pub const QUOTATION_COMPARISON_KIND: &str = "quotation_comparison_materialised";
+pub const QUOTATION_REVIEW_KIND: &str = "quotation_review_recorded";
 
 pub(super) fn stable_hash<T: Serialize>(value: &T) -> String {
     let encoded = serde_json::to_vec(value).unwrap_or_default();
@@ -145,6 +149,60 @@ pub fn quotation_comparison_message(
         .iter()
         .map(|candidate| reference("normalised_quotation_version", &candidate.version_id))
         .collect();
+    message.typed_refs = message.references.clone();
+    message
+}
+
+pub fn quotation_review_message(
+    review: &QuotationReviewSuccessor,
+    quotation_id: &str,
+    thread_id: &str,
+    parent_message_id: &str,
+    actor: &str,
+) -> AFPMessage {
+    let payload = json!({
+        "review_id": review.review_id,
+        "quotation_id": quotation_id,
+        "parent_version_id": review.parent_version_id,
+        "version_id": review.version_id,
+        "material_fingerprint": review.material_fingerprint,
+        "actor_id": review.actor_id,
+        "reviewed_at": review.reviewed_at,
+        "action": review.action,
+        "rejected": review.rejected,
+    });
+    let payload_hash = stable_hash(&payload);
+    let mut message = base_message(
+        format!(
+            "quotation-review:{}:{}",
+            review.review_id,
+            &payload_hash[..16]
+        ),
+        thread_id,
+        Some(parent_message_id),
+        &review.reviewed_at,
+        actor,
+    );
+    message.kind = Some(QUOTATION_REVIEW_KIND.to_string());
+    message.subtype = message.kind.clone();
+    message.content = payload;
+    message.metadata = Some(json!({
+        "payload_hash": payload_hash,
+        "idempotency_key": message.id,
+        "privacy_scope": "tenant_private",
+        "e2ee_required": true,
+        "schema_version": "quotation.review.v1",
+    }));
+    message.references = vec![
+        reference("quotation", quotation_id),
+        reference("normalised_quotation_version", &review.parent_version_id),
+    ];
+    if !review.rejected {
+        message.references.push(reference(
+            "normalised_quotation_successor",
+            &review.version_id,
+        ));
+    }
     message.typed_refs = message.references.clone();
     message
 }
