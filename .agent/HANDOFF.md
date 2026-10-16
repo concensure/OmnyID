@@ -2651,3 +2651,29 @@ Remaining:
 
 - WED-205 schema-bound shared-ladder extraction is next. The WED-204 route wiring is deliberately
   three small additions in `src/server/mod.rs`, so it can be replayed after the dirty WED-187 work.
+
+## 2026-10-17 - WED-205 schema-bound quotation extraction (Codex, complete)
+
+Changed:
+
+- Added registry-derived, injection-resistant quotation prompts plus strict JSON proposal parsing.
+- Added exact-excerpt, locator, type, date, numeric range, currency, unit, and price-basis
+  validation. Invalid supported-looking values become unknown and cannot enter calculation as
+  confirmed facts.
+- Extended the existing Cerebras -> Mistral -> Anthropic ladder with an independent quotation
+  feature and zero-temperature entry point while preserving 0.6 for all existing callers.
+- Added authenticated `/quotation/normalisation/propose`, privacy-minimised extraction receipts,
+  usage metering, fail-closed manual review, and a deterministic structured-submission path.
+
+Verification:
+
+- quotation extraction integration tests: 5 passed.
+- shared ladder unit tests: 7 passed.
+- quotation normalisation route validation test: 1 passed.
+- inherited `email_group_routes.rs` unused-variable warning remains.
+
+Remaining:
+
+- WED-208 review/correction successors, WED-210 clarification, WED-211 closure, and WED-213 release
+  gates remain. Durable generic quotation API persistence must bind these proposal receipts to the
+  existing AFP normalisation events before a user decision can depend on them.

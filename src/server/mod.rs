@@ -139,6 +139,7 @@ mod privacy_routes;
 mod proactive_ranking_helpers;
 mod proactive_routes;
 mod protocol_routes;
+mod quotation_normalisation_routes;
 mod quotation_source_routes;
 mod runtime_routes;
 mod scope_helpers;
@@ -1356,6 +1357,7 @@ pub async fn run() {
         .merge(goal_routes::routes())
         .merge(conversion_routes::routes())
         .merge(ingest_routes::routes())
+        .merge(quotation_normalisation_routes::routes())
         .merge(quotation_source_routes::routes())
         .merge(knowledge_routes::routes())
         .merge(para_routes::routes())

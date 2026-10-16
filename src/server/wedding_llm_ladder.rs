@@ -22,6 +22,7 @@ pub enum WeddingLlmFeature {
     Outreach,
     Interpreter,
     Enrichment,
+    QuoteNormalisation,
 }
 
 impl WeddingLlmFeature {
@@ -30,6 +31,7 @@ impl WeddingLlmFeature {
             Self::Outreach => "OUTREACH",
             Self::Interpreter => "INTERPRETER",
             Self::Enrichment => "ENRICHMENT",
+            Self::QuoteNormalisation => "QUOTE_NORMALISATION",
         }
     }
 }
@@ -151,6 +153,25 @@ pub async fn run_ladder<T, Validate>(
 where
     Validate: Fn(&str) -> Result<T, String>,
 {
+    run_ladder_with_temperature(feature, system, user_text, max_tokens, 0.6, validate).await
+}
+
+pub async fn run_ladder_with_temperature<T, Validate>(
+    feature: WeddingLlmFeature,
+    system: &str,
+    user_text: &str,
+    max_tokens: u32,
+    temperature: f32,
+    validate: Validate,
+) -> LadderOutcome<T>
+where
+    Validate: Fn(&str) -> Result<T, String>,
+{
+    let temperature = if temperature.is_finite() {
+        temperature.clamp(0.0, 2.0)
+    } else {
+        0.0
+    };
     let mut attempts = Vec::new();
     for provider in WeddingLlmProvider::ORDER {
         let model = model_for(feature, provider);
@@ -170,7 +191,7 @@ where
                 content: user_text.to_string(),
             }],
             max_tokens,
-            temperature: 0.6,
+            temperature,
         };
         let result = tokio::time::timeout(
             PROVIDER_TIMEOUT,
@@ -326,6 +347,23 @@ mod tests {
         assert_eq!(
             model_for(WeddingLlmFeature::Interpreter, WeddingLlmProvider::Cerebras),
             "interpreter-test-model"
+        );
+        // SAFETY: see the matching set above.
+        unsafe { std::env::remove_var(key) };
+    }
+
+    #[test]
+    fn quotation_feature_has_an_independent_model_override() {
+        let _guard = env_lock().lock().expect("environment lock");
+        let key = "OMNYID_WEDDING_QUOTE_NORMALISATION_MISTRAL_MODEL";
+        // SAFETY: the module test lock serialises the temporary process environment mutation.
+        unsafe { std::env::set_var(key, "quote-normalisation-test-model") };
+        assert_eq!(
+            model_for(
+                WeddingLlmFeature::QuoteNormalisation,
+                WeddingLlmProvider::Mistral
+            ),
+            "quote-normalisation-test-model"
         );
         // SAFETY: see the matching set above.
         unsafe { std::env::remove_var(key) };

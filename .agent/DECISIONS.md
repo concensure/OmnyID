@@ -714,3 +714,14 @@ capability/parser metadata, content fingerprint, page count, and retention state
 transient extraction input; it is not copied into the source-received ledger event or operational
 logs. Capability, ownership, size, MIME, and unreadable/encrypted failures remain typed fail-closed
 states with a manual-entry path.
+
+## 2026-10-17: Quotation extraction is an untrusted proposal with exact anchors
+
+The shared wedding-funded provider ladder gains a quotation-normalisation feature but keeps the
+existing Cerebras, Mistral, then Anthropic order. Quotation requests use temperature zero and a
+prompt generated from the selected registry fingerprint. Provider JSON is deny-unknown and bounded;
+confirmed or inferred fields survive only when an exact excerpt occurs in the parsed source and
+their type, range, currency, unit, basis, and locator can be verified. Unsupported material is
+downgraded to unknown or retained as bounded unmapped review material. Exhaustion creates a manual
+review state, never a trusted normalisation. A structured vendor submission bypasses the LLM but
+passes through the identical validator and receipt contract.

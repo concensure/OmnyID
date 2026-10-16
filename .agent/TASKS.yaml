@@ -1594,3 +1594,37 @@ tasks:
       - receipts retain source/version, content fingerprint, MIME, filename, parser, page count, and retention state without persisting a copied source body
       - typed source planners fail closed for ownership, size, encryption/readability, MIME, OCR, and PDF-parser blockers
       - focused Rust source-service tests, inherited PDF parser selection regression, Solid UI type checking, and quotation source state tests pass
+  - id: WED-205
+    title: Schema-bound quotation extraction through the shared LLM ladder
+    status: done
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-203
+      - WED-204
+    files:
+      - src/quotation/extraction.rs
+      - src/quotation/extraction_prompt.rs
+      - src/quotation/mod.rs
+      - src/server/wedding_llm_ladder.rs
+      - src/server/quotation_normalisation_routes.rs
+      - src/server/mod.rs
+      - src/wedding_shared_tool_metering.rs
+      - tests/quotation_extraction.rs
+      - .agent/**
+    acceptance:
+      - extraction accepts only JSON proposals derived from the versioned registry and never executes source instructions
+      - confirmed material facts require an exact source excerpt and unsupported values are rejected or downgraded
+      - quotation extraction uses the existing provider order at zero temperature with bounded attempts and no raw prompt/output logging
+      - provider exhaustion yields manual review with no confirmed normalisation
+      - structured vendor submissions have a deterministic no-LLM validation path
+    progress:
+      - started after WED-204 commit f3e3a0f on the isolated quotation worktree
+      - strict deny-unknown JSON proposal contracts are bounded by output, field, unmapped-item, label, and excerpt limits
+      - prompts are generated from the selected registry fingerprint and explicitly treat document instructions as inert untrusted data
+      - aliases canonicalise through the registry; unsupported excerpts, types, ranges, currencies, units, bases, and locators are dropped or downgraded to unknown
+      - confirmed and inferred proposals require an exact excerpt contained in the parsed source; page and section locators require parser-supplied structure
+      - the existing Cerebras to Mistral to Anthropic ladder supports an independent quotation feature and zero-temperature requests without changing existing feature defaults
+      - authenticated extraction returns manual_review_required with no confirmed proposal on feature disablement or provider exhaustion and records a privacy-minimised usage receipt on success
+      - deterministic structured submissions bypass the LLM while using the same validation and receipt contracts
+      - focused extraction tests pass (5), shared ladder tests pass (7), and route validation test passes (1)
