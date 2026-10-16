@@ -62,6 +62,8 @@ fn projections_are_deterministic_private_source_referenced_and_body_free() {
         "agent://quotation-normaliser",
     );
     assert_eq!(first.id, second.id);
+    assert_eq!(first.protocol, "afp-v1");
+    assert_eq!(first.id.len(), 26);
     assert_eq!(first.kind.as_deref(), Some(NORMALISED_QUOTATION_KIND));
     assert_eq!(
         first.metadata.as_ref().unwrap()["privacy_scope"],

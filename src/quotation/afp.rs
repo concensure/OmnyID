@@ -20,6 +20,18 @@ pub(super) fn stable_hash<T: Serialize>(value: &T) -> String {
     hex::encode(Sha256::digest(encoded))
 }
 
+fn stable_message_id<T: Serialize>(namespace: &str, value: &T) -> String {
+    let encoded = serde_json::to_vec(value).unwrap_or_default();
+    let mut hasher = Sha256::new();
+    hasher.update(namespace.as_bytes());
+    hasher.update([0]);
+    hasher.update(encoded);
+    let digest = hasher.finalize();
+    let mut bytes = [0_u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    ulid::Ulid::from_bytes(bytes).to_string()
+}
+
 pub(super) fn reference(reference_type: &str, target: &str) -> Value {
     json!({"type": reference_type, "target": target})
 }
@@ -32,7 +44,7 @@ pub(super) fn base_message(
     from: &str,
 ) -> AFPMessage {
     AFPMessage {
-        protocol: "afp/1.0".to_string(),
+        protocol: "afp-v1".to_string(),
         id,
         thread_id: thread_id.to_string(),
         parent_id: parent_id.map(str::to_string),
@@ -65,10 +77,9 @@ pub fn normalised_quotation_message(
 ) -> AFPMessage {
     let payload_hash = stable_hash(quotation);
     let mut message = base_message(
-        format!(
-            "quotation-normalised:{}:{}",
-            quotation.identity.version_id,
-            &payload_hash[..16]
+        stable_message_id(
+            "quotation-normalised",
+            &(thread_id, &quotation.identity.version_id, &payload_hash),
         ),
         thread_id,
         parent_message_id,
@@ -126,10 +137,9 @@ pub fn quotation_comparison_message(
 ) -> AFPMessage {
     let payload_hash = stable_hash(comparison);
     let mut message = base_message(
-        format!(
-            "quotation-comparison:{}:{}",
-            comparison.comparison_id,
-            &payload_hash[..16]
+        stable_message_id(
+            "quotation-comparison",
+            &(thread_id, &comparison.comparison_id, &payload_hash),
         ),
         thread_id,
         parent_id,
@@ -176,10 +186,9 @@ pub fn quotation_review_message(
     });
     let payload_hash = stable_hash(&payload);
     let mut message = base_message(
-        format!(
-            "quotation-review:{}:{}",
-            review.review_id,
-            &payload_hash[..16]
+        stable_message_id(
+            "quotation-review",
+            &(thread_id, &review.review_id, &payload_hash),
         ),
         thread_id,
         Some(parent_message_id),
@@ -221,7 +230,10 @@ pub fn clarification_send_reservation_message(
     actor: &str,
 ) -> AFPMessage {
     let mut message = base_message(
-        format!("quotation-clarification-reserved:{idempotency_key}"),
+        stable_message_id(
+            "quotation-clarification-reserved",
+            &(thread_id, idempotency_key),
+        ),
         thread_id,
         Some(approval_message_id),
         timestamp,
@@ -265,7 +277,10 @@ pub fn clarification_sent_message(
     actor: &str,
 ) -> AFPMessage {
     let mut message = base_message(
-        format!("quotation-clarification-sent:{}", receipt.idempotency_key),
+        stable_message_id(
+            "quotation-clarification-sent",
+            &(thread_id, &receipt.idempotency_key),
+        ),
         thread_id,
         Some(reservation_message_id),
         &receipt.sent_at,
@@ -292,4 +307,41 @@ pub fn clarification_sent_message(
     ];
     message.typed_refs = message.references.clone();
     message
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stable_message_id;
+
+    fn is_afp_ulid(value: &str) -> bool {
+        value.len() == 26
+            && value.bytes().all(|byte| {
+                matches!(
+                    byte,
+                    b'0'..=b'9'
+                        | b'A'..=b'H'
+                        | b'J'..=b'N'
+                        | b'P'..=b'T'
+                        | b'V'..=b'Z'
+                )
+            })
+    }
+
+    #[test]
+    fn content_addressed_ids_are_afp_valid_deterministic_and_scoped() {
+        let first = stable_message_id("quotation", &("thread-a", "version-1"));
+        assert!(is_afp_ulid(&first));
+        assert_eq!(
+            first,
+            stable_message_id("quotation", &("thread-a", "version-1"))
+        );
+        assert_ne!(
+            first,
+            stable_message_id("quotation", &("thread-b", "version-1"))
+        );
+        assert_ne!(
+            first,
+            stable_message_id("comparison", &("thread-a", "version-1"))
+        );
+    }
 }

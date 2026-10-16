@@ -1786,9 +1786,13 @@ tasks:
     files:
       - src/quotation/metrics.rs
       - src/quotation/features.rs
+      - src/quotation/afp.rs
       - src/quotation/mod.rs
       - src/server/quotation_normalisation_routes.rs
       - src/server/quotation_routes.rs
+      - src/server/mod.rs
+      - tests/api_flows.rs
+      - tests/quotation_afp.rs
       - tests/quotation_readiness.rs
       - solid-ui/src/lib/quotationReadinessState.ts
       - solid-ui/tests/quotation-readiness-state.test.ts
@@ -1818,3 +1822,4 @@ tasks:
       - focused Playwright evidence passes at 360x740 and desktop with serious/critical Axe checks, no horizontal overflow, escaped malicious source text, drawer focus return, approval invalidation, and non-payment closure copy
       - browser verification found and fixed a non-reactive evidence drawer conditional; it now opens and returns focus through Solid's reactive Show boundary
       - remaining browser evidence is the broader hosted security matrix; local temporary-Postgres evidence remains blocked because DATABASE_URL is unset and Docker Desktop is not running
+      - the existing Postgres CI lane now compiles and, when TEST_DATABASE_URL is present, executes quotation HTTP evidence for canonical afp-v1 deterministic ids, tenant isolation, duplicate replay, server-side comparison, default-off recommendation, and stale-review rejection

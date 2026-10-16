@@ -1513,10 +1513,12 @@ pub async fn build_test_router(database_url: &str) -> Router {
 
     let app = Router::new()
         .route("/healthz", get(healthz_http))
+        .route("/send", post(send_http))
         .route("/relay/ws", get(relay_ws_http))
         .route("/thread/{thread_id}", get(get_thread_http))
         .route("/actions/decision", post(record_action_decision_http))
         .route("/gateway/email", post(handle_gateway_email))
+        .merge(quotation_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(app_state);

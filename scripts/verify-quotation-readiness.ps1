@@ -12,6 +12,8 @@ Push-Location $root
 try {
     cargo test --test quotation_baseline --test quotation_contracts --test quotation_intelligence --test quotation_afp --test quotation_vendor_context --test quotation_extraction --test quotation_review --test quotation_clarification --test quotation_closure --test quotation_readiness
     if ($LASTEXITCODE -ne 0) { throw "Quotation Rust verification failed" }
+    cargo test --test api_flows
+    if ($LASTEXITCODE -ne 0) { throw "Quotation Postgres HTTP verification failed" }
     cargo test --lib quotation
     if ($LASTEXITCODE -ne 0) { throw "Quotation route and prompt unit verification failed" }
     cargo test --lib document_ingest_service

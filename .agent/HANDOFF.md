@@ -2879,3 +2879,35 @@ Verification:
   (`store_private_app_message` now returns its atomic insert outcome; server route registration was
   added). Once WED-187 is committed, preserve both sides while resolving those files; no dirty
   WED-187 file was modified from this worktree.
+
+## 2026-10-17 - WED-213 Postgres HTTP evidence lane (Codex, local checkpoint)
+
+Changed:
+
+- Restored the missing `tests/api_flows.rs` target expected by the existing Postgres CI job with a
+  focused authenticated quotation flow. It covers tenant-private source visibility, cross-tenant
+  read/write denial, duplicate normalisation replay, server-derived totals, the default-off
+  recommendation gate, and stale review rejection.
+- Extended only the test router with the production `/send` and quotation routes; production route
+  composition is unchanged.
+- Fixed release-blocking AFP mismatches found by the HTTP test: server-generated quotation events
+  declared `afp/1.0` and used readable IDs, while the storage boundary requires `afp-v1` and ULIDs.
+  They now use the canonical protocol plus deterministic, thread-scoped ULIDs while preserving
+  domain identifiers in payloads and references.
+- Added the HTTP target to the quotation verifier. The existing `rust-api-flows` CI job supplies its
+  disposable `omnyid_test` Postgres URL, so no new service or parallel persistence layer was added.
+
+Verification:
+
+- `cargo test --test api_flows --quiet`: compiled and passed locally with the single database test
+  skipped because `TEST_DATABASE_URL` is unset.
+- `cargo test --test quotation_afp --quiet`: 5 passed; the focused canonical protocol/ULID helper
+  unit test also passed.
+- Docker Desktop remains unavailable locally, so the Postgres assertions are executable but not yet
+  locally observed. Do not call this hosted evidence verified until the CI job records a pass.
+
+Remaining:
+
+- Run and retain the Postgres CI result, hosted shadow extraction metrics, broader hosted browser and
+  security matrix, gated Gmail ambiguity/reconciliation smoke, and seven-day allowlisted cohort.
+  All quotation release flags remain off.

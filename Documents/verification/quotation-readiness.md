@@ -32,7 +32,10 @@ From PowerShell at repository root:
 
 The script exercises the synthetic corpus, contracts, deterministic engine, AFP replay, source
 boundary, extraction, review, clarification, closure, vendor-context boundary, readiness rules,
-client state, and type checking. It does not call live model, OCR, email, payment, or vendor systems.
+client state, and type checking. It also compiles the Postgres HTTP flow; when
+`TEST_DATABASE_URL` points to the disposable local `omnyid_test` database, that flow executes
+tenant isolation, idempotent replay, server-side comparison, default-off recommendation, and stale
+review checks. It does not call live model, OCR, email, payment, or vendor systems.
 
 ## Release controls
 
@@ -53,8 +56,9 @@ them even when requested.
 - Exercise the completed clarification and wedding-closure adapters against a gated live Gmail
   account and temporary Postgres, including provider-receipt reconciliation after an ambiguous
   delivery result.
-- Run tenant-isolation HTTP tests against temporary Postgres, browser accessibility at 360x740 and
-  desktop across the hosted application, and complete the security matrix for SSRF, prompt
+- Execute the checked-in tenant-isolation HTTP test in the temporary-Postgres CI lane and retain its
+  result, run browser accessibility at 360x740 and desktop across the hosted application, and
+  complete the security matrix for SSRF, prompt
   injection, oversized inputs, stale actions, grants, and log leakage. The focused local quotation
   fixture passes Axe at 360x740 and desktop, prevents source-excerpt HTML execution, checks focus
   return and horizontal overflow, and proves approval invalidation; the existing wedding suite

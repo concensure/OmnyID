@@ -796,3 +796,13 @@ Contract and deposit deadlines map to the existing wedding task/reminder project
 contract receipt, and deposit records alone never create committed spend, terminal states do not
 leave an open deadline task, and every adapter output explicitly states that payment execution is
 false.
+
+## 2026-10-17: Content-addressed quotation events use AFP-valid deterministic ULIDs
+
+The authoritative AFP write boundary accepts the canonical `afp-v1` protocol and only ULID-shaped
+message and thread identifiers. Quotation normalisation, comparison, review,
+clarification-reservation, and clarification-receipt events therefore derive a 128-bit ULID from a
+SHA-256 digest of their event namespace, thread, and stable domain payload. Quotation projections
+declare `afp-v1`. This preserves idempotent replay while satisfying AFP core and avoids cross-thread
+primary-key collisions. Readable quotation/version/idempotency identifiers remain in content,
+metadata, and typed references rather than being overloaded as transport message ids.
