@@ -681,3 +681,26 @@ synonym profile remains active. Client confirmation upgrades facets to user auth
 1.0, then emits a new `wedding_preference_profile` AFP message with the previous message as its
 parent. The preference profile message id and vocabulary version are material comparison inputs,
 preventing a confirmed reading from silently reusing an old comparison.
+
+## 2026-10-17: Quotation intelligence is template-neutral and deterministic after extraction
+
+Quotation source parsing and model extraction are untrusted proposal stages. Only versioned,
+schema-valid facts with registered source anchors enter the quotation ledger and calculator.
+Authoritative money uses integer minor units with checked i128 intermediates; unknown required
+amounts remain outside exact totals. Comparison excludes only confirmed hard conflicts, keeps
+unknown hard requirements conditional, and emits no winner for a single quote, ties, incomplete
+evidence, scenario mismatch, or mixed currencies.
+
+The quotation core uses a context namespace and generic/category registries. Wedding planning is
+an adapter, not the owner of the core. Existing OCR, MinerU/LlamaParse, DecisionOS cards, A2UI
+primitives, approval gates, and vendor relay remain the required integration points; no parallel
+OCR, card foundation, renderer, or mail sender is introduced.
+
+## 2026-10-17: Vendor quotation context is explicit fact-level permission
+
+A future vendor experience receives no open-ended user context. A grant binds user authority,
+target vendor, quotation/thread, purpose, allowlisted fact ids, approval receipt, issue/expiry,
+single-use or reusable scope, and projection version. Expiry, revocation, recipient mismatch, and
+single-use consumption are enforced when projecting. Competitor information, private notes,
+hidden preferences, full-plan content, and internal scores are prohibited even if requested by a
+malformed grant. Grant and revocation state remains append-only AFP lineage owned by the user.

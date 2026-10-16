@@ -2564,3 +2564,65 @@ Remaining:
 - R5 catalog coverage, R7 interactive widen invocation/three-card mobile evidence, R8 real catalog
   scoring, R10–R13, build/CI, and all production release gates remain. Do not enable policy 2 or
   deploy it yet.
+
+## 2026-10-17 - WED-202/203/206/207/209/212 quotation intelligence core (Codex, complete)
+
+Branch/worktree:
+
+- `agent/codex/WED-202`
+- `C:\Users\ozans\Desktop\projects\OmnyID-WED-202`
+- based on `ac5b529343df6267afb64ece298f235ef5a3eb96`
+
+Changed:
+
+- Added a consent-safe corpus of 12 synthetic documents/24 versions and compatibility baselines
+  for existing quote DecisionOS and supersession behaviour.
+- Added strict template-neutral Rust/TypeScript contracts, shared JSON schema, and versioned
+  generic/venue registries. A shared non-wedding fixture proves both SDKs parse the same wire data.
+- Added checked integer calculation, canonicalisation, discounts, minimum spends, tax, optional
+  selections, material changes, gap ranking, conservative comparison, and formula traces.
+- Added private append-only AFP normalisation/comparison projection and replay that is stable under
+  duplicate/shuffled delivery and suppresses stale-version comparisons.
+- Added fact-level vendor-context grants and revocations with target, purpose, expiry, scope,
+  approval receipt, denylist, deterministic projection, and read-time enforcement.
+- Added DecisionOS/A2UI adapters using existing review/clarify/compare patterns and existing A2UI
+  primitives. Shared renderers and oversized wedding workspace files were not edited.
+
+Commits in dependency order:
+
+- `d089982` WED-202 establish quotation baseline corpus
+- `ce20b32` WED-203 add generic quotation contracts
+- `80bac0a` WED-206 add deterministic quotation engine
+- `beb4aa9` WED-207 add quotation AFP replay
+- `baff67c` WED-212 add vendor context permission boundary
+- `e0de345` WED-209 add quotation DecisionOS adapters
+
+Verification:
+
+- targeted `rustfmt --check`: passed for all quotation Rust sources/tests.
+- `cargo check`: passed; inherited `email_group_routes.rs` unused-variable warning only.
+- focused Rust quotation suite: 31 passed.
+- TypeScript SDK typecheck and quotation tests: passed (2 tests).
+- Solid UI typecheck, quotation adapter tests (4), and production build: passed.
+- fixture secret/email scan, `git diff --check`, and all-new-file 999-line budget: passed.
+- repository line-budget check remains red only for inherited
+  `WeddingResponseWorkspaceView.tsx` (1141) and `weddingResponseWorkspaceViewState.ts` (1041);
+  neither was edited.
+- `npm ci` reported 51 dependency audit findings (42 moderate, 7 high, 2 critical) in the existing
+  Solid UI dependency graph; no dependency version or lockfile was changed by this work.
+
+Assumptions and remaining integration:
+
+- The dirty WED-187 implementation and human-judge work remains untouched. These commits are
+  predominantly new modules/files and can be merged or cherry-picked after WED-187 is completed;
+  `.agent/TASKS.yaml`/handoff reconciliation is the expected coordination conflict.
+- The specification/task documents remain uncommitted in the dirty WED-187 worktree. Preserve and
+  commit them when reconciling the branches.
+- The current delivery is the deterministic quotation foundation, AFP/replay, permission boundary,
+  and UI projection. Source-service extraction from oversized `ingest_routes.rs`, reuse of the
+  existing OCR/PDF adapters, shared-LLM extraction, authenticated routes, review/correction UI,
+  clarification send/reply, and booking closure remain later tasks.
+- Start those integration tasks only after WED-187 is reconciled because its current uncommitted
+  work overlaps `src/server/mod.rs`, `wedding_llm_ladder.rs`, shared wedding UI state, and related
+  route files. Do not implement another OCR, mail sender, decision-card foundation, or wedding-only
+  quotation store.
