@@ -19,6 +19,10 @@
       "import": "./dist/retrieval.js",
       "types": "./dist/retrieval.d.ts"
     },
+    "./quotation": {
+      "import": "./dist/quotation.js",
+      "types": "./dist/quotation.d.ts"
+    },
     "./workflows": {
       "import": "./dist/workflows.js",
       "types": "./dist/workflows.d.ts"
@@ -37,6 +41,7 @@
     "build": "node ./scripts/build-clean.mjs",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
     "test:continuity": "npm run build && node --test tests/continuity.test.mjs tests/package-exports.test.mjs",
+    "test:quotation": "npm run build && node --test tests/quotation.test.mjs",
     "prepublishOnly": "npm run build"
   },
   "engines": {

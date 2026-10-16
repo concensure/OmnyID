@@ -97,6 +97,7 @@ pub mod projection_agent;
 pub mod prompt_guidance;
 pub mod provenance_record;
 pub mod query;
+pub mod quotation;
 pub mod relay;
 pub mod response_queue_policy;
 pub mod reversible_actions;

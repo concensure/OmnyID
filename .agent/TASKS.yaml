@@ -1426,3 +1426,34 @@ tasks:
       - added 12 synthetic documents and 24 immutable versions across text PDF, scanned PDF/image OCR, email body, DOCX, and parser-unavailable paths
       - eight venue fixtures cover fixed and per-person prices, minimum spend, included/excluded/unknown tax, service charge, options, bond, discount, unknowns, and conflicts
       - focused quotation baseline tests pass (4 tests); existing quote decision output remains deterministic and revisions resolve the prior decision first
+  - id: WED-203
+    title: Generic quotation schemas and category registry
+    status: done
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-202
+    files:
+      - schemas/quotation/**
+      - src/quotation/contracts.rs
+      - src/quotation/category_registry.rs
+      - src/quotation/validation.rs
+      - src/quotation/mod.rs
+      - src/lib.rs
+      - typescript-sdk/src/quotation.ts
+      - typescript-sdk/src/index.ts
+      - tests/quotation_contracts.rs
+      - .agent/**
+    acceptance:
+      - Rust and TypeScript expose equivalent template-neutral v1 quotation wire contracts
+      - generic and venue registries are data-driven, versioned, validated, and fingerprinted
+      - unknown, excluded, zero, false, and not-applicable states remain distinct
+      - confirmed and inferred facts require registered exact source anchors
+      - non-wedding context fixtures validate without a wedding plan identifier
+      - every new file remains below 999 lines
+    progress:
+      - contract implementation started on the clean WED-202 worktree after baseline commit d089982
+      - added strict JSON schema plus data-driven generic and venue registries with aliases, applicability, comparison groups, materiality, formulas, and clarification templates
+      - Rust contracts retain commercial terms and bounded unmapped vendor items; validation enforces registered evidence anchors, safe integer money, currency, item, and excerpt bounds
+      - TypeScript exports matching Zod contracts and parses the same non-wedding production-planner fixture as Rust
+      - focused verification passes: 6 Rust contract tests, 2 TypeScript quotation tests, and SDK type checking
