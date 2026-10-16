@@ -725,3 +725,12 @@ their type, range, currency, unit, basis, and locator can be verified. Unsupport
 downgraded to unknown or retained as bounded unmapped review material. Exhaustion creates a manual
 review state, never a trusted normalisation. A structured vendor submission bypasses the LLM but
 passes through the identical validator and receipt contract.
+
+## 2026-10-17: Quotation review creates successors and gates material uncertainty
+
+Review never mutates an extraction or quotation version. Each command binds the active version and
+material fingerprint, and accepted confirm/correct/unknown/not-applicable actions create a new
+content-addressed successor. Corrections require an anchor from the quotation's registered source
+set and must pass the same normalised-quotation validator. Selection, contact, and closure remain
+blocked while a high-materiality field is unreviewed, below the confidence threshold, unknown, or
+conflicting. Source preview renders escaped text only and returns focus to its trigger.

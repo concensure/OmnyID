@@ -1628,3 +1628,37 @@ tasks:
       - authenticated extraction returns manual_review_required with no confirmed proposal on feature disablement or provider exhaustion and records a privacy-minimised usage receipt on success
       - deterministic structured submissions bypass the LLM while using the same validation and receipt contracts
       - focused extraction tests pass (5), shared ladder tests pass (7), and route validation test passes (1)
+  - id: WED-208
+    title: Quotation review and source-linked correction successors
+    status: done
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-207
+      - WED-205
+    files:
+      - src/quotation/review.rs
+      - src/quotation/mod.rs
+      - tests/quotation_review.rs
+      - solid-ui/src/lib/quotationReviewState.ts
+      - solid-ui/src/lib/quotationEvidenceState.ts
+      - solid-ui/src/components/QuotationReviewCard.tsx
+      - solid-ui/src/components/QuotationEvidenceDrawer.tsx
+      - solid-ui/src/components/QuotationSourcePreview.tsx
+      - solid-ui/tests/quotation-review-state.test.ts
+      - .agent/**
+    acceptance:
+      - review actions create immutable revision-bound successors and stale actions fail closed
+      - material low-confidence fields block selection or contact until explicitly reviewed
+      - every retained confirmed fact remains source-linked and corrections change the material fingerprint
+      - blocked source and manual-entry paths remain honest and accessible
+      - review surfaces use semantic text and icons, safe text rendering, keyboard focus return, mobile layout, and 44px controls
+    progress:
+      - started after WED-205 commit 2cbc7d7 without touching the oversized wedding workspace components
+      - review commands bind expected version and material fingerprint; stale commands cannot overwrite successors
+      - confirm, correct, unknown, not-applicable, and reject actions produce deterministic review ids without mutating the proposal
+      - corrections require an anchor registered on the quotation source set and all non-rejected successors pass the quotation validator
+      - high-materiality unreviewed, low-confidence, unknown, or conflicting fields form a deterministic downstream action gate
+      - pure Solid state groups review fields, binds commands to revisions, and reconciles optimistic state only to the server successor
+      - bounded review, evidence drawer, and escaped-text source preview components use semantic status copy, text/icon evidence, focus return, mobile-safe wrapping, and 44px actions
+      - focused Rust review tests pass (4), Solid state tests pass (3), and Solid UI type checking passes

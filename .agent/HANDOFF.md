@@ -2677,3 +2677,26 @@ Remaining:
 - WED-208 review/correction successors, WED-210 clarification, WED-211 closure, and WED-213 release
   gates remain. Durable generic quotation API persistence must bind these proposal receipts to the
   existing AFP normalisation events before a user decision can depend on them.
+
+## 2026-10-17 - WED-208 quotation review successors (Codex, complete)
+
+Changed:
+
+- Added immutable, revision-bound review commands and deterministic successors for confirm,
+  correct, unknown, not-applicable, and extraction rejection actions.
+- Added a fail-closed gate for unreviewed or uncertain high-materiality facts.
+- Added pure client reconciliation/grouping/evidence state plus bounded review card, evidence
+  drawer, and escaped-text source preview components. Oversized wedding workspace files remain
+  untouched.
+
+Verification:
+
+- quotation review Rust tests: 4 passed.
+- quotation review Solid state tests: 3 passed.
+- Solid UI type checking: passed.
+- inherited `email_group_routes.rs` unused-variable warning remains.
+
+Remaining:
+
+- Persist review commands as AFP events in the generic quotation API when the final route/store
+  adapter is added. WED-210 clarification and WED-211 closure may now consume the material gate.
