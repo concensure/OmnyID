@@ -1644,6 +1644,7 @@ tasks:
       - solid-ui/src/lib/quotationEvidenceState.ts
       - solid-ui/src/components/QuotationReviewCard.tsx
       - solid-ui/src/components/QuotationEvidenceDrawer.tsx
+      - .gitignore
       - solid-ui/src/components/QuotationSourcePreview.tsx
       - solid-ui/tests/quotation-review-state.test.ts
       - .agent/**
@@ -1791,6 +1792,10 @@ tasks:
       - tests/quotation_readiness.rs
       - solid-ui/src/lib/quotationReadinessState.ts
       - solid-ui/tests/quotation-readiness-state.test.ts
+      - solid-ui/e2e/quotation-intelligence-fixture.html
+      - solid-ui/tests/e2e/wedding-quotation-intelligence.spec.ts
+      - solid-ui/tests/e2e/quotation-intelligence-fixture.tsx
+      - solid-ui/src/components/QuotationEvidenceDrawer.tsx
       - scripts/verify-quotation-readiness.ps1
       - Documents/verification/quotation-readiness.md
       - .agent/**
@@ -1809,4 +1814,7 @@ tasks:
       - quotation remote source preparation now revalidates public HTTP URLs before the shared parser/OCR service, preserving SSRF controls
       - reproducible PowerShell verification and a readiness evidence document were added; the current release status remains untested and no flags were enabled
       - focused verification passes: 57 Rust integration tests, 15 source/ladder/route unit tests, 19 Solid tests, Solid type checking, cargo check, and git whitespace check
-      - local clarification send/reply and wedding budget/timeline adapters are complete, 1,874 existing wedding tests pass, and the production UI build passes; remaining release evidence is hosted shadow extraction metrics, Postgres tenant HTTP tests, browser accessibility/security matrix, live gated provider smoke, and a seven-day allowlisted cohort
+      - local clarification send/reply and wedding budget/timeline adapters are complete, 1,874 existing wedding tests pass, and the production UI build passes; remaining release evidence is hosted shadow extraction metrics, Postgres tenant HTTP tests, the broader hosted browser security matrix, live gated provider smoke, and a seven-day allowlisted cohort
+      - focused Playwright evidence passes at 360x740 and desktop with serious/critical Axe checks, no horizontal overflow, escaped malicious source text, drawer focus return, approval invalidation, and non-payment closure copy
+      - browser verification found and fixed a non-reactive evidence drawer conditional; it now opens and returns focus through Solid's reactive Show boundary
+      - remaining browser evidence is the broader hosted security matrix; local temporary-Postgres evidence remains blocked because DATABASE_URL is unset and Docker Desktop is not running

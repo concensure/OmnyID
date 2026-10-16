@@ -25,6 +25,9 @@ From PowerShell at repository root:
 
 ```powershell
 ./scripts/verify-quotation-readiness.ps1
+
+# Include the focused 360x740 and desktop accessibility/security fixture.
+./scripts/verify-quotation-readiness.ps1 -IncludeBrowser
 ```
 
 The script exercises the synthetic corpus, contracts, deterministic engine, AFP replay, source
@@ -51,9 +54,11 @@ them even when requested.
   account and temporary Postgres, including provider-receipt reconciliation after an ambiguous
   delivery result.
 - Run tenant-isolation HTTP tests against temporary Postgres, browser accessibility at 360x740 and
-  desktop, and the security matrix for SSRF, XSS, prompt injection, oversized inputs, stale actions,
-  grants, and log leakage. The local existing wedding suite currently passes 1,874 tests and the
-  production UI build passes, but neither substitutes for browser/hosted evidence.
+  desktop across the hosted application, and complete the security matrix for SSRF, prompt
+  injection, oversized inputs, stale actions, grants, and log leakage. The focused local quotation
+  fixture passes Axe at 360x740 and desktop, prevents source-excerpt HTML execution, checks focus
+  return and horizontal overflow, and proves approval invalidation; the existing wedding suite
+  passes 1,874 tests and the production UI build passes. These do not substitute for hosted evidence.
 - Record a seven-day allowlisted review cohort before broadening category or autonomy.
 
 Vendor links remain disabled until the vendor-context red-team evidence passes. Payment execution

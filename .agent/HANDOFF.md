@@ -2848,3 +2848,34 @@ Remaining:
 - Hosted shadow-model metrics, temporary-Postgres tenant HTTP tests, browser accessibility/security
   evidence, a gated live Gmail smoke/reconciliation exercise, and the seven-day allowlisted cohort.
   Keep all quotation feature flags off until that evidence is recorded and hashed.
+
+## 2026-10-17 - WED-213 focused browser evidence (Codex, local checkpoint)
+
+Changed:
+
+- Added a real Solid quotation fixture covering review, escaped source evidence, editable
+  clarification approval, send receipt state, and closure/deposit actions.
+- Added Playwright checks at 360x740 and 1280x800 for serious/critical Axe violations, horizontal
+  overflow, source HTML non-execution, drawer focus return, approval invalidation, receipt state,
+  and explicit non-payment copy.
+- The browser run exposed a real defect: `QuotationEvidenceDrawer` evaluated its conditional only on
+  initial render. It now uses a reactive `Show` boundary, so opening/closing and focus restoration
+  work as designed.
+- `verify-quotation-readiness.ps1 -IncludeBrowser` reproduces the focused browser evidence without
+  making live-provider calls.
+
+Verification:
+
+- Focused Playwright: 2 passed (mobile and desktop); Solid type checking passed before the run.
+- Temporary-Postgres HTTP tests could not run locally: `DATABASE_URL` is unset and Docker Desktop's
+  engine is unavailable. This is an environment evidence gap, not a code pass/fail claim.
+- GitHub Actions was queried read-only. The latest visible `main` CI run is failed at remote SHA
+  `509dc31b` (run `23703104075`, 2026-03-29); its Rust job failed before exposing steps and the log
+  endpoint now returns HTTP 410. It predates this branch/base, so it is not evidence about these
+  commits and no CI/production pass is claimed.
+- Reconciliation audit against the still-dirty WED-187 worktree found 48 dirty paths and only six
+  exact path overlaps with this branch: the three `.agent/` ledgers, `.gitignore`,
+  `src/server/auth.rs`, and `src/server/mod.rs`. The two code overlaps are small and intentional
+  (`store_private_app_message` now returns its atomic insert outcome; server route registration was
+  added). Once WED-187 is committed, preserve both sides while resolving those files; no dirty
+  WED-187 file was modified from this worktree.

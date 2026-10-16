@@ -1,5 +1,6 @@
 param(
-    [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot ".."))
+    [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")),
+    [switch]$IncludeBrowser
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,6 +43,10 @@ try {
         tests/quotation-wedding-closure-adapter.test.ts `
         tests/quotation-readiness-state.test.ts
     if ($LASTEXITCODE -ne 0) { throw "Quotation Solid verification failed" }
+    if ($IncludeBrowser) {
+        npx playwright test tests/e2e/wedding-quotation-intelligence.spec.ts --config playwright.config.ts
+        if ($LASTEXITCODE -ne 0) { throw "Quotation browser verification failed" }
+    }
 }
 finally {
     Pop-Location
