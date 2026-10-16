@@ -1489,3 +1489,28 @@ tasks:
       - comparison orders confirmed requirement coverage before comparable cost and evidence strength; single, tied, cross-currency, scenario-mismatched and incomplete cases do not emit unsafe winners
       - material-change and top-three clarification policies are stable and deterministic
       - focused verification passes: 13 engine tests, 6 contract tests, 2 TypeScript quotation tests, and SDK type checking
+  - id: WED-207
+    title: Quotation AFP lineage and deterministic replay foundation
+    status: done
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-206
+    files:
+      - src/quotation/afp.rs
+      - src/quotation/replay.rs
+      - src/quotation/mod.rs
+      - tests/quotation_afp.rs
+      - .agent/**
+    acceptance:
+      - confirmed normalisation and materialised comparison messages use stable AFP ids, canonical and typed references, privacy metadata, and no raw source body
+      - corrected and superseding quotation versions form append-only parent/reference lineage
+      - shuffled duplicate delivery replays to the same active quotation and comparison state
+      - replay ignores comparisons that reference stale quotation versions
+      - all event projections remain template-neutral
+    progress:
+      - AFP and replay implementation started after deterministic engine commit 80bac0a
+      - normalisation and comparison events use deterministic content-addressed ids, tenant-private/E2EE metadata, mirrored typed references, and bounded evidence excerpts rather than source bodies
+      - successor normalisations use explicit parent message lineage plus superseded-version references
+      - replay validates quotation payloads, deduplicates delivery, derives active successors, and suppresses comparisons that reference stale versions
+      - focused AFP/replay tests pass (4 tests), alongside the 13 deterministic engine tests
