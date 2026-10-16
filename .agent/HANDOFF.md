@@ -1,3 +1,37 @@
+## 2026-10-17 - WED-213 quotation intelligence dark Oracle release (Codex)
+
+- Released the WED-202 quotation intelligence line through commits `4c7454d` and
+  `50d92d6`. All local, Oracle, and staging Compose profiles now pass the versioned
+  release gate and independent quotation flags to the homeserver with disabled
+  defaults.
+- The first Oracle image build failed before replacing a service because the Docker
+  context omitted compile-time `schemas/quotation` registries. `Dockerfile` and the
+  runtime stage now include `schemas/`; the packaging self-test asserts the registry
+  and all 54 runtime paths before deployment.
+- The scoped retry rebuilt and recreated only `homeserver` and the one-shot `ui`
+  asset job. Caddy was not reloaded because the approved staging-password source is
+  still absent. The temporary inert Compose interpolation value was removed after
+  the run and the original remote env restored.
+- Oracle verification: the deployed `src/quotation/mod.rs` SHA-256 matches the local
+  checkout (`2b827e05e770b0349c288a67642b238119a999d4f02cd9f66b56d12a6d75c189`);
+  all nine quotation env controls are present and disabled; the state route returns
+  401 without authentication; homepage, Wedding, and workspace return HTTP 200.
+  The full remote post-deploy audit reported backup verification pass, restore drill
+  pass, and `FAILURE_STEP=none`. A synchronous collection pass also reports
+  `status=pass`, both core services running, runtime-script integrity pass, and 81%
+  root usage; its restore step was skipped because the immediately preceding full
+  drill had passed.
+- Release-candidate verification: 57 quotation integration tests, compiled API-flow
+  target, 29 focused Rust unit executions, 23 Solid tests, Solid typecheck, cargo
+  check, whitespace checks, and Playwright at 360px and desktop passed. The Oracle
+  stage self-test also passed with 54 paths.
+- WED-213 remains `in_progress`, and every product switch remains off. Outstanding
+  gates are real hosted shadow-extraction metrics, a Postgres-backed HTTP run (the
+  local target compiled but had no `TEST_DATABASE_URL`), the broader hosted browser
+  security matrix, a live gated provider smoke, and the seven-day allowlisted cohort.
+  Do not enable recommendation, extraction, clarification send, closure, or vendor
+  grants until their evidence is independently verified.
+
 ## 2026-10-13 - WED-181 Stripe one-off checkout webhook rollout (Codex)
 
 - Confirmed the Wedding upgrade is a `mode=payment` one-off Checkout flow, so Stripe `subscription_data` must not be sent: it is valid only for a recurring Price and would reject the AUD 39 purchase.

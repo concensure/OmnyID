@@ -1,3 +1,15 @@
+## 2026-10-17: Quotation intelligence is deployed dark until evidence gates pass
+
+The generic quotation engine, authenticated AFP persistence, review, comparison,
+clarification, closure, and vendor-context boundaries may be present in the Oracle
+runtime before staged-release evidence is complete, but every independently
+controlled capability remains disabled. Compose supplies the versioned release
+gate and all feature flags with fail-closed defaults. No environment request can
+enable a capability without a verified evidence digest and a verified readiness
+report. This keeps the deployed contracts reusable by Wedding and future OmnyID
+templates without claiming that hosted extraction, sending, or recommendation is
+ready.
+
 ## 2026-10-13: Wedding upgrade remains a one-off payment entitlement
 
 The AUD 39 OmnyID Wedding upgrade uses Stripe Checkout `mode=payment` with a one-off Price. The signed paid Checkout completion, bound by server-set session metadata, is the entitlement source and persists `active` rather than Stripe's transient Checkout Session `complete` status. `subscription_data` is deliberately not supplied unless a future recurring Price explicitly changes this product to a Stripe subscription.
