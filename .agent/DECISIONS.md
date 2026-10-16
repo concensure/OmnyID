@@ -744,3 +744,13 @@ to the existing communication executor; the quotation module does not implement 
 Outbound context is structured and rejects competitor/private/internal/full-plan keys. Inbound reply
 facts re-enter the normal evidence/review path with exact excerpts, and the old decision resolves
 only after its direct quotation successor is durably stored.
+
+## 2026-10-17: Booking closure is an evidence-backed state machine, not payment
+
+Quotation selection does not imply contract, payment, booking, or budget commitment. Closure uses
+revision-exact successors for selection, contract receipt and review, deposit request and paid
+record, booking confirmation, cancellation, refund, and supersession. Changed quote-to-contract
+terms block progress until explicitly reviewed. A deposit is cash flow unless explicitly identified
+as a fee, preventing it from being counted twice. Only an evidence-backed booking confirmation
+produces an idempotent quotation-version-bound budget commitment. Closure projections declare that
+payment execution is false; payment remains out of scope.

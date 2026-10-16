@@ -2723,3 +2723,25 @@ Remaining:
 - After reconciling WED-187, connect `ClarificationSendDecision::Approved` to the existing generic
   approval/send executor and connect inbound reply matching to `reply_anchors`. Do not mark WED-210
   done until those adapters and their provider-receipt regression are exercised.
+
+## 2026-10-17 - WED-211 closure contract checkpoint (Codex, in progress)
+
+Changed:
+
+- Added an evidence-backed closure transition table, deterministic replay, quote-to-contract change
+  gate, deposit cash-flow/fee split, booking-only budget commitment, deadlines, cancellation/refund,
+  and supersession.
+- Added private AFP transition input, record/approve-act UI state, existing-primitive A2UI projection,
+  and an accessible closure card. Every projection explicitly keeps payment execution false.
+
+Verification:
+
+- quotation closure Rust tests: 6 passed.
+- quotation closure Solid state tests: 4 passed.
+- Solid UI type checking: passed.
+- inherited `email_group_routes.rs` unused-variable warning remains.
+
+Remaining:
+
+- After WED-187 reconciliation, add the small wedding budget/timeline adapter that persists the
+  generic `BudgetCommitment`. Do not mark WED-211 done until that idempotency integration is tested.

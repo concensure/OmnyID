@@ -1695,3 +1695,36 @@ tasks:
       - Solid state invalidates approval on edits, requires a provider receipt, and emits tenant-private E2EE draft/approval AFP inputs
       - focused Rust clarification tests pass (5), Solid state tests pass (3), and Solid UI type checking passes
       - remaining integration is a thin adapter from an approved clarification to the existing generic approval/send and inbound-reply routes after WED-187 shared wiring is reconciled
+  - id: WED-211
+    title: Quotation contract, deposit, booking, and budget closure
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-209
+      - WED-208
+    files:
+      - src/quotation/closure.rs
+      - src/quotation/mod.rs
+      - tests/quotation_closure.rs
+      - solid-ui/src/lib/quotationClosureState.ts
+      - solid-ui/src/lib/quotationClosureAfpState.ts
+      - solid-ui/src/components/QuotationClosureCard.tsx
+      - solid-ui/tests/quotation-closure-state.test.ts
+      - .agent/**
+    acceptance:
+      - selection, contract, deposit, booking, cancellation, refund, and supersession remain distinct evidence-backed successor states
+      - invalid leaps and changed unreviewed contract terms fail closed
+      - deposits are cash-flow schedules unless explicitly fees and are never double-counted
+      - only booking confirmation creates an idempotent source-linked budget commitment
+      - replay is deterministic and no payment execution is introduced
+    progress:
+      - started after clarification contract commit a9f91c4 using the WED-208 material review gate
+      - deterministic transition table keeps selection, contract receipt/review, deposit request/paid record, booking confirmation, cancellation, refund, and supersession distinct
+      - transitions require user authority, exact expected state, bounded source evidence, and explicit review of material quote-to-contract changes
+      - deposits project separately as cash flow and add cost only when explicitly marked as fees; no transition executes payment
+      - only evidence-backed booking confirmation creates a deterministic quotation-version-bound budget commitment
+      - duplicate and shuffled transition replay is stable; cancellation and refund retain successor evidence
+      - Solid record/approve-act state and A2UI projections use existing stat-row, callout, and action-chip primitives and carry external_payment false
+      - focused Rust closure tests pass (6), Solid closure tests pass (4), and Solid UI type checking passes
+      - remaining integration is the small wedding budget/timeline consumer that persists the generic budget commitment after WED-187 workspace state is reconciled
