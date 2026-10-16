@@ -2911,3 +2911,32 @@ Remaining:
 - Run and retain the Postgres CI result, hosted shadow extraction metrics, broader hosted browser and
   security matrix, gated Gmail ambiguity/reconciliation smoke, and seven-day allowlisted cohort.
   All quotation release flags remain off.
+
+## 2026-10-17 - WED-213 Gmail ambiguity reconciliation (Codex, local checkpoint)
+
+Changed:
+
+- A retry with an exact persisted clarification-send reservation now searches the connected Gmail
+  sent mailbox by the deterministic RFC Message-ID. Exactly one matching Gmail message supplies the
+  provider receipt and is projected through the existing append-only AFP sent event.
+- No match remains reserved and returns conflict; multiple/invalid results fail closed. A retry
+  reloads the reservation after an insert race and rejects any non-matching reservation payload.
+- Recovery audits an already-authorized reservation before current revision/expiry checks, so an
+  actual ambiguous delivery can be reconciled later without allowing an expired approval to create
+  a new send. The existing Gmail OAuth client and sender remain the only provider integration.
+
+Verification:
+
+- Gmail API unit filter: 8 passed, including zero/one/multiple search-result handling.
+- Clarification route unit filter: 4 passed, including exact reservation recovery after expiry and
+  rejection of a tampered reservation.
+- Quotation clarification integration tests: 5 passed; `cargo check` passed with the inherited
+  `email_group_routes.rs` unused-variable warning only.
+- The complete quotation verifier also passed: 57 quotation integration tests, the compiled
+  API-flow target, 29 focused Rust unit executions, 23 Solid tests, Solid type checking, cargo
+  check, and whitespace checks.
+
+Remaining:
+
+- The gated live Gmail smoke must still exercise success, timeout-with-provider-acceptance recovery,
+  and true no-delivery conflict against an allowlisted account. No live message was sent here.

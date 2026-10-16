@@ -194,6 +194,53 @@ pub async fn list_gmail_message_ids(
     Ok(payload.messages)
 }
 
+pub async fn find_gmail_message_by_rfc822_message_id(
+    config: &GmailOAuthConfig,
+    message_id_header: &str,
+) -> Result<Option<String>, String> {
+    let message_id_header = message_id_header.trim();
+    if message_id_header.is_empty() || message_id_header.contains(['\r', '\n']) {
+        return Err("Gmail reconciliation message id is invalid".to_string());
+    }
+    let query = format!("in:sent rfc822msgid:{message_id_header}");
+    let client = gmail_client();
+    let token = exchange_refresh_token(client, config).await?;
+    let response = client
+        .get(format!(
+            "{}/{}/messages",
+            GMAIL_SEND_URL_BASE, config.user_id
+        ))
+        .bearer_auth(token.access_token)
+        .query(&[
+            ("q", query),
+            ("maxResults", "2".to_string()),
+            ("includeSpamTrash", "false".to_string()),
+        ])
+        .send()
+        .await
+        .map_err(|err| format!("Gmail API reconciliation request failed: {err}"))?;
+
+    if !response.status().is_success() {
+        return Err(gmail_upstream_status_error(
+            "Gmail API reconciliation search",
+            response.status(),
+        ));
+    }
+    let payload = response
+        .json::<GmailListResponse>()
+        .await
+        .map_err(|err| format!("Gmail API reconciliation decode failed: {err}"))?;
+    validated_gmail_search_result(payload)
+}
+
+fn validated_gmail_search_result(payload: GmailListResponse) -> Result<Option<String>, String> {
+    match payload.messages.as_slice() {
+        [] => Ok(None),
+        [message] => validated_gmail_message_id(message.clone()).map(Some),
+        _ => Err("Gmail reconciliation search returned multiple messages".to_string()),
+    }
+}
+
 pub async fn fetch_gmail_raw_message(
     config: &GmailOAuthConfig,
     message_id: &str,
@@ -274,8 +321,9 @@ mod tests {
     use base64::Engine as _;
 
     use super::{
-        GmailMessageId, build_gmail_raw_message, gmail_client, gmail_send_payload,
-        gmail_upstream_status_error, validated_gmail_message_id,
+        GmailListResponse, GmailMessageId, build_gmail_raw_message, gmail_client,
+        gmail_send_payload, gmail_upstream_status_error, validated_gmail_message_id,
+        validated_gmail_search_result,
     };
     use crate::gateway::smtp_out::OutgoingEmailRequest;
 
@@ -397,5 +445,36 @@ mod tests {
         );
         assert!(!err.contains("refresh_token"));
         assert!(!err.contains("client_secret"));
+    }
+
+    #[test]
+    fn gmail_reconciliation_requires_one_durable_provider_message() {
+        assert_eq!(
+            validated_gmail_search_result(GmailListResponse { messages: vec![] })
+                .expect("empty search"),
+            None
+        );
+        assert_eq!(
+            validated_gmail_search_result(GmailListResponse {
+                messages: vec![GmailMessageId {
+                    id: " provider-1 ".to_string(),
+                }],
+            })
+            .expect("single search result"),
+            Some("provider-1".to_string())
+        );
+        assert!(
+            validated_gmail_search_result(GmailListResponse {
+                messages: vec![
+                    GmailMessageId {
+                        id: "provider-1".to_string(),
+                    },
+                    GmailMessageId {
+                        id: "provider-2".to_string(),
+                    },
+                ],
+            })
+            .is_err()
+        );
     }
 }

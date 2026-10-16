@@ -174,11 +174,25 @@ pub fn authorise_clarification_send(
         chrono::DateTime::parse_from_rfc3339(now).map_err(|_| ClarificationError::StaleApproval)?;
     let expires = chrono::DateTime::parse_from_rfc3339(&approval.expires_at)
         .map_err(|_| ClarificationError::StaleApproval)?;
-    if approval.approval_receipt_id.trim().is_empty() {
-        return Err(ClarificationError::MissingApprovalReceipt);
-    }
     if expires <= now {
         return Err(ClarificationError::ApprovalExpired);
+    }
+    let idempotency_key = clarification_send_idempotency_key(draft, approval)?;
+    if let Some(receipt) = prior_receipts
+        .iter()
+        .find(|receipt| receipt.idempotency_key == idempotency_key)
+    {
+        return Ok(ClarificationSendDecision::AlreadySent(receipt.clone()));
+    }
+    Ok(ClarificationSendDecision::Approved { idempotency_key })
+}
+
+pub fn clarification_send_idempotency_key(
+    draft: &ClarificationDraft,
+    approval: &ClarificationApproval,
+) -> Result<String, ClarificationError> {
+    if approval.approval_receipt_id.trim().is_empty() {
+        return Err(ClarificationError::MissingApprovalReceipt);
     }
     let expected_hash = draft_hash(draft);
     if approval.draft_id != draft.draft_id
@@ -195,13 +209,7 @@ pub fn authorise_clarification_send(
             format!("{}:{}", approval.approval_id, expected_hash).as_bytes()
         ))
     );
-    if let Some(receipt) = prior_receipts
-        .iter()
-        .find(|receipt| receipt.idempotency_key == idempotency_key)
-    {
-        return Ok(ClarificationSendDecision::AlreadySent(receipt.clone()));
-    }
-    Ok(ClarificationSendDecision::Approved { idempotency_key })
+    Ok(idempotency_key)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

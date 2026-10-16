@@ -787,6 +787,13 @@ the receipt references it, so the existing inbound email matcher restores the qu
 Matched email bodies enter the shared source parser as tenant-authorised text and must still pass
 exact-anchor extraction, review, successor persistence, and deterministic re-comparison.
 
+Reconciliation is an audit of the already-persisted authorization, not a second authorization.
+On retry, the adapter first requires the exact server-derived reservation, then searches the
+connected Gmail account's sent mailbox by the deterministic RFC Message-ID. Exactly one provider message may be
+projected into the durable sent receipt; no match remains reserved and multiple matches fail closed.
+Because no new send occurs, an existing reservation remains reconcilable after approval expiry or a
+later comparison revision, while an expired approval can never create a fresh reservation.
+
 ## 2026-10-17: Wedding closure consumes generic commitments through existing projections
 
 The quotation core remains template-neutral. Only an evidence-backed `booking_confirmed` snapshot

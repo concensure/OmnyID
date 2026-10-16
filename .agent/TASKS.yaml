@@ -1787,10 +1787,13 @@ tasks:
       - src/quotation/metrics.rs
       - src/quotation/features.rs
       - src/quotation/afp.rs
+      - src/quotation/clarification.rs
       - src/quotation/mod.rs
       - src/server/quotation_normalisation_routes.rs
       - src/server/quotation_routes.rs
+      - src/server/quotation_routes/clarification_routes.rs
       - src/server/mod.rs
+      - src/gateway/gmail_api.rs
       - tests/api_flows.rs
       - tests/quotation_afp.rs
       - tests/quotation_readiness.rs
@@ -1823,3 +1826,5 @@ tasks:
       - browser verification found and fixed a non-reactive evidence drawer conditional; it now opens and returns focus through Solid's reactive Show boundary
       - remaining browser evidence is the broader hosted security matrix; local temporary-Postgres evidence remains blocked because DATABASE_URL is unset and Docker Desktop is not running
       - the existing Postgres CI lane now compiles and, when TEST_DATABASE_URL is present, executes quotation HTTP evidence for canonical afp-v1 deterministic ids, tenant isolation, duplicate replay, server-side comparison, default-off recommendation, and stale-review rejection
+      - delivery-ambiguous clarification retries now query Gmail by the deterministic RFC Message-ID and append the durable provider receipt only for an exact stored reservation; no match remains fail-closed, and an existing reservation can be audited after approval expiry without authorising a new send
+      - the latest complete local verifier passes 57 quotation integration tests, the compiled API-flow target, 29 focused Rust unit executions, 23 Solid tests, Solid type checking, cargo check, and whitespace checks; live-provider and hosted evidence remain unverified
