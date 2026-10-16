@@ -7,6 +7,7 @@
 pub mod afp;
 pub mod calculation;
 pub mod category_registry;
+pub mod clarification;
 pub mod comparison;
 pub mod contracts;
 pub mod extraction;
@@ -20,6 +21,7 @@ pub mod vendor_context;
 pub use afp::*;
 pub use calculation::*;
 pub use category_registry::*;
+pub use clarification::*;
 pub use comparison::*;
 pub use contracts::*;
 pub use extraction::*;

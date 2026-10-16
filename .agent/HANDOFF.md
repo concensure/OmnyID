@@ -2700,3 +2700,26 @@ Remaining:
 
 - Persist review commands as AFP events in the generic quotation API when the final route/store
   adapter is added. WED-210 clarification and WED-211 closure may now consume the material gate.
+
+## 2026-10-17 - WED-210 clarification contract checkpoint (Codex, in progress)
+
+Changed:
+
+- Added three-question unanswered-gap draft construction, structured outbound privacy denial,
+  exact approval/hash/revision/expiry validation, send idempotency, and provider-receipt replay.
+- Added exact-excerpt reply anchoring and deterministic post-reply material-change/total projection.
+- Added editable client state, private/E2EE AFP draft and approval inputs, and a bounded accessible
+  clarification card. No mail sender was added.
+
+Verification:
+
+- quotation clarification Rust tests: 5 passed.
+- quotation clarification Solid state tests: 3 passed.
+- Solid UI type checking: passed.
+- inherited `email_group_routes.rs` unused-variable warning remains.
+
+Remaining:
+
+- After reconciling WED-187, connect `ClarificationSendDecision::Approved` to the existing generic
+  approval/send executor and connect inbound reply matching to `reply_anchors`. Do not mark WED-210
+  done until those adapters and their provider-receipt regression are exercised.

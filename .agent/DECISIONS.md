@@ -734,3 +734,13 @@ content-addressed successor. Corrections require an anchor from the quotation's 
 set and must pass the same normalised-quotation validator. Selection, contact, and closure remain
 blocked while a high-materiality field is unreviewed, below the confidence threshold, unknown, or
 conflicting. Source preview renders escaped text only and returns focus to its trigger.
+
+## 2026-10-17: Clarification approval is content- and revision-exact
+
+A quotation clarification is a persisted editable draft of at most three unanswered fact questions.
+Approval binds the entire draft hash, recipient, quotation version, comparison revision, expiry,
+and durable approval receipt. Any edit invalidates approval. The resulting idempotency key is passed
+to the existing communication executor; the quotation module does not implement another sender.
+Outbound context is structured and rejects competitor/private/internal/full-plan keys. Inbound reply
+facts re-enter the normal evidence/review path with exact excerpts, and the old decision resolves
+only after its direct quotation successor is durably stored.

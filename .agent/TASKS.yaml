@@ -1662,3 +1662,36 @@ tasks:
       - pure Solid state groups review fields, binds commands to revisions, and reconciles optimistic state only to the server successor
       - bounded review, evidence drawer, and escaped-text source preview components use semantic status copy, text/icon evidence, focus return, mobile-safe wrapping, and 44px actions
       - focused Rust review tests pass (4), Solid state tests pass (3), and Solid UI type checking passes
+  - id: WED-210
+    title: Approval-bound quotation clarification loop
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-209
+      - WED-208
+    files:
+      - src/quotation/clarification.rs
+      - src/quotation/mod.rs
+      - tests/quotation_clarification.rs
+      - solid-ui/src/lib/quotationClarificationState.ts
+      - solid-ui/src/lib/quotationClarificationAfpState.ts
+      - solid-ui/src/components/QuotationClarificationCard.tsx
+      - solid-ui/tests/quotation-clarification-state.test.ts
+      - .agent/**
+    acceptance:
+      - at most three ranked unanswered gaps form an editable persisted draft
+      - send approval binds exact draft hash, recipient, quotation/comparison revisions, and expiry
+      - changed or stale drafts fail closed and retries are receipt-idempotent
+      - outbound context excludes competitor and private-note content
+      - reply facts require exact source evidence and old decisions resolve only after a durable successor
+    progress:
+      - started after WED-208 commit a84c3ad using the existing clarification ranking and communication approval boundary
+      - deterministic draft builder selects at most three unanswered fact keys and rejects competitor, private-note, hidden-preference, internal-score, and full-plan context
+      - approval validation binds draft hash, recipient, quotation version, comparison revision, expiry, and durable approval receipt
+      - sends expose a stable idempotency key and return an existing provider receipt on retry; no parallel sender was introduced
+      - reply facts require exact excerpts from the inbound body and produce source-version anchors for the ordinary review successor path
+      - re-evaluation calculates material changes and totals and resolves an old decision only after a persisted direct successor
+      - Solid state invalidates approval on edits, requires a provider receipt, and emits tenant-private E2EE draft/approval AFP inputs
+      - focused Rust clarification tests pass (5), Solid state tests pass (3), and Solid UI type checking passes
+      - remaining integration is a thin adapter from an approved clarification to the existing generic approval/send and inbound-reply routes after WED-187 shared wiring is reconciled
