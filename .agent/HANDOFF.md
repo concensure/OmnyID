@@ -2767,3 +2767,28 @@ Remaining:
 - HTTP integration coverage against a temporary Postgres instance is still desirable in CI. The
   route uses the existing authenticated thread lookup and private AFP store rather than a parallel
   quotation table.
+
+## 2026-10-17 - WED-213 readiness and release-control checkpoint (Codex, in progress)
+
+Changed:
+
+- Added fixed fail-closed thresholds, aggregate-only metrics, readiness status, and independent
+  feature switches requiring a versioned verified-evidence digest. Defaults remain off.
+- Extraction and recommendation routes enforce the controls; source preparation rechecks remote
+  URLs with the existing public-HTTP SSRF guard.
+- Added a reproducible PowerShell verifier and readiness document. The document intentionally says
+  `untested for release`; no flag or deployment was changed.
+
+Verification:
+
+- reproducible verifier: 57 Rust integration tests and 19 Solid tests passed.
+- Solid UI type checking, `cargo check`, and `git diff --check`: passed.
+- focused shared source service, LLM ladder, and quotation route/prompt unit suites: 15 passed; the
+  verifier includes those filters for subsequent runs.
+- inherited `email_group_routes.rs` unused-variable warning remains.
+
+Remaining:
+
+- WED-213 remains in progress until hosted shadow metrics, temporary-Postgres tenant tests,
+  accessibility/security browser evidence, existing wedding regressions, the WED-210/WED-211
+  adapters, and a seven-day allowlisted cohort are complete. Do not set the release gate to verified.

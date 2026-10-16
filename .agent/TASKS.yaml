@@ -1756,3 +1756,42 @@ tasks:
       - state reads use deterministic replay and suppress comparisons that reference stale versions
       - writes reuse the existing private AFP store and its content-addressed duplicate handling
       - focused route validation test, five AFP/replay tests, and cargo check pass; inherited email_group_routes warning only
+  - id: WED-213
+    title: Quotation evaluation, security, observability, and staged release gates
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-208
+      - WED-209
+      - WED-210
+      - WED-211
+      - WED-212
+    files:
+      - src/quotation/metrics.rs
+      - src/quotation/features.rs
+      - src/quotation/mod.rs
+      - src/server/quotation_normalisation_routes.rs
+      - src/server/quotation_routes.rs
+      - tests/quotation_readiness.rs
+      - solid-ui/src/lib/quotationReadinessState.ts
+      - solid-ui/tests/quotation-readiness-state.test.ts
+      - scripts/verify-quotation-readiness.ps1
+      - Documents/verification/quotation-readiness.md
+      - .agent/**
+    acceptance:
+      - source-anchor, unsupported-material, arithmetic/replay/order, and approval safety gates are fail-closed and cannot be lowered at runtime
+      - accuracy gates require at least 98 percent material money/currency exact match and 95 percent inclusion-state accuracy
+      - metrics contain counts, latency, fallback, correction, and cost only and reject raw source/model content
+      - independent kill switches default off and cannot bypass failed or untested evidence
+      - readiness distinguishes untested, blocked, failed, and verified and produces reproducible local artifacts
+    progress:
+      - started after generic AFP persistence commit 3891761; no feature will be enabled or deployed by this task
+      - compile-time release thresholds distinguish untested, blocked, failed, and verified evidence and fail on any unsupported confirmed material field
+      - privacy-minimised metric contracts permit bounded counts, latency, fallback, correction, and micro-cost only and deny unknown/raw content fields, identifiers, email-like values, and URLs
+      - independent extraction, recommendation, clarification draft/send, closure, and vendor-grant flags default off and require a versioned verified-evidence digest before environment requests are honoured
+      - extraction and recommendation server routes enforce the release controls; disabled recommendation still returns an evidence table without a winner
+      - quotation remote source preparation now revalidates public HTTP URLs before the shared parser/OCR service, preserving SSRF controls
+      - reproducible PowerShell verification and a readiness evidence document were added; the current release status remains untested and no flags were enabled
+      - focused verification passes: 57 Rust integration tests, 15 source/ladder/route unit tests, 19 Solid tests, Solid type checking, cargo check, and git whitespace check
+      - remaining release evidence includes hosted shadow extraction metrics, Postgres tenant HTTP tests, browser accessibility/security matrix, clarification send/reply and wedding budget adapters, and a seven-day allowlisted cohort

@@ -329,11 +329,18 @@ async fn store_comparison_http(
             requirements: input.requirements,
         });
     }
-    let comparison = compare_quotations(
+    let mut comparison = compare_quotations(
         request.comparison_id,
         request.scenario.scenario_id,
         candidates,
     );
+    if !crate::quotation::QuotationFeatureFlags::from_env().recommendation {
+        comparison.recommended_quotation_id = None;
+        comparison.recommendation_reason = Some(
+            "Quotation recommendations are disabled until release evidence is verified."
+                .to_string(),
+        );
+    }
     let message = quotation_comparison_message(
         &comparison,
         &request.thread_id,

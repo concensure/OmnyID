@@ -114,6 +114,15 @@ async fn propose_http(
     };
     let started = Instant::now();
 
+    if !crate::quotation::QuotationFeatureFlags::from_env().extraction {
+        return Ok(Json(ProposeResponse {
+            status: "manual_review_required",
+            extraction: None,
+            receipt: None,
+            attempt_kinds: vec!["feature_disabled".to_string()],
+        }));
+    }
+
     if let Some(proposal) = request.structured_submission {
         let extraction =
             validate_structured_submission(proposal, &registry, &source).map_err(|_| {

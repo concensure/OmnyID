@@ -764,3 +764,13 @@ normalisation successor. Comparison accepts scenario and evidence-linked require
 recalculates totals and ranking from active server-side quotation versions; client totals are never
 trusted. All writes use the existing private AFP store, preserving idempotency, relay notification,
 indexing, and tenant isolation without introducing a quotation-specific database.
+
+## 2026-10-17: Quotation release controls require versioned verified evidence
+
+Accuracy thresholds are compile-time constants: 100% confirmed-material anchor coverage, zero
+unsupported confirmed material facts, at least 98% exact money/currency, at least 95% inclusion
+accuracy, and 100% determinism plus send approval/receipt enforcement. Empty data is untested and a
+known failing threshold is failed. All quotation feature switches default off and are ignored unless
+a `quotation.readiness.v1` verified gate plus hexadecimal evidence digest is configured. In-process
+readiness can still force every requested feature off. Metrics accept aggregate counts, latency,
+fallback, correction, and micro-cost only; raw source/model content is outside their schema.

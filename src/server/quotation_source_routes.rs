@@ -115,6 +115,16 @@ async fn prepare_source_http(
             "source unreadable".to_string(),
         )
     })?;
+    if let ResolvedSourcePayload::RemoteUrl(url) = &source.payload {
+        crate::gateway::rest_adapter::validate_public_http_url(url)
+            .await
+            .map_err(|_| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    "source URL is not allowed".to_string(),
+                )
+            })?;
+    }
     let mime_type = source
         .mime_type
         .as_deref()
