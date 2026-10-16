@@ -1804,6 +1804,11 @@ tasks:
       - solid-ui/tests/e2e/quotation-intelligence-fixture.tsx
       - solid-ui/src/components/QuotationEvidenceDrawer.tsx
       - scripts/verify-quotation-readiness.ps1
+      - docker-compose.yml
+      - docker-compose.oracle.yml
+      - docker-compose.oracle.minimal.yml
+      - docker-compose.oracle.quic.yml
+      - docker-compose.oracle.staging.yml
       - Documents/verification/quotation-readiness.md
       - .agent/**
     acceptance:
@@ -1828,3 +1833,4 @@ tasks:
       - the existing Postgres CI lane now compiles and, when TEST_DATABASE_URL is present, executes quotation HTTP evidence for canonical afp-v1 deterministic ids, tenant isolation, duplicate replay, server-side comparison, default-off recommendation, and stale-review rejection
       - delivery-ambiguous clarification retries now query Gmail by the deterministic RFC Message-ID and append the durable provider receipt only for an exact stored reservation; no match remains fail-closed, and an existing reservation can be audited after approval expiry without authorising a new send
       - the latest complete local verifier passes 57 quotation integration tests, the compiled API-flow target, 29 focused Rust unit executions, 23 Solid tests, Solid type checking, cargo check, and whitespace checks; live-provider and hosted evidence remain unverified
+      - every Compose homeserver profile now receives the versioned quotation gate and independent feature flags with fail-closed defaults; the release candidate verifier also passes both 360px and desktop Playwright accessibility checks
