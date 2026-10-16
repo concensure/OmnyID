@@ -91,6 +91,14 @@ pub enum PriceBasis {
     MinimumSpend,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineEffect {
+    #[default]
+    Charge,
+    Discount,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaxTreatment {
@@ -138,6 +146,8 @@ pub struct LineItem {
     pub category: String,
     pub inclusion: InclusionState,
     pub price_basis: PriceBasis,
+    #[serde(default)]
+    pub effect: LineEffect,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unit_price: Option<Money>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -252,6 +262,11 @@ pub struct CalculationGap {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FormulaTrace {
     pub line_id: String,
+    pub formula_id: String,
+    pub formula_version: String,
+    #[serde(default)]
+    pub input_line_ids: Vec<String>,
+    pub rounding: String,
     pub expression: String,
     pub amount_minor: i64,
 }
@@ -321,6 +336,8 @@ pub struct RankedCandidate {
     pub vendor_id: String,
     pub disposition: CandidateDisposition,
     pub total: ComparableTotal,
+    pub requirement_coverage_bps: u16,
+    pub evidence_strength_bps: u16,
     pub hard_conflict_ids: Vec<String>,
     pub unknown_hard_requirement_ids: Vec<String>,
 }

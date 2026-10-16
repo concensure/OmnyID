@@ -1457,3 +1457,35 @@ tasks:
       - Rust contracts retain commercial terms and bounded unmapped vendor items; validation enforces registered evidence anchors, safe integer money, currency, item, and excerpt bounds
       - TypeScript exports matching Zod contracts and parses the same non-wedding production-planner fixture as Rust
       - focused verification passes: 6 Rust contract tests, 2 TypeScript quotation tests, and SDK type checking
+  - id: WED-206
+    title: Deterministic quotation normalisation and comparable-cost engine
+    status: done
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-203
+    files:
+      - src/quotation/calculation.rs
+      - src/quotation/comparison.rs
+      - src/quotation/normalisation.rs
+      - src/quotation/contracts.rs
+      - src/quotation/mod.rs
+      - typescript-sdk/src/quotation.ts
+      - tests/quotation_intelligence.rs
+      - .agent/**
+    acceptance:
+      - integer-only formulas cover fixed, per-person, per-item, per-hour, percentage, minimum spend, and tax without overflow or rounding drift
+      - optional extras are excluded unless selected and commercial cash-flow terms are excluded from cost
+      - required unknowns never become zero and instead create ranked clarification gaps
+      - confirmed hard conflicts exclude candidates while unknown hard requirements remain conditional
+      - a single quote, ties, incomplete evidence, and currency mismatches produce no unsafe winner
+      - canonicalisation retains vendor labels and source anchors while flagging incompatible duplicates
+      - material changes between immutable quotation versions are deterministic
+    progress:
+      - implementation started after generic contract commit ce20b32; extraction integration remains a later dependent task
+      - checked i128 intermediates and safe i64 results cover fixed, quantity, percentage charge/discount, minimum-spend and tax formulas with explicit rounding traces
+      - optional lines require scenario selection; deposits and refundable bonds remain separate commercial cash-flow terms
+      - canonicalisation resolves registry aliases, merges exact duplicates with their anchors, and marks incompatible duplicates conflicting
+      - comparison orders confirmed requirement coverage before comparable cost and evidence strength; single, tied, cross-currency, scenario-mismatched and incomplete cases do not emit unsafe winners
+      - material-change and top-three clarification policies are stable and deterministic
+      - focused verification passes: 13 engine tests, 6 contract tests, 2 TypeScript quotation tests, and SDK type checking

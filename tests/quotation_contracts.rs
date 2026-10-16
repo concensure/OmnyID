@@ -36,6 +36,7 @@ fn generic_quote() -> NormalisedQuotation {
             category: "item_rate".to_string(),
             inclusion: InclusionState::Included,
             price_basis: PriceBasis::Fixed,
+            effect: LineEffect::Charge,
             unit_price: Some(Money {
                 amount_minor: 400_000,
                 currency: "AUD".to_string(),

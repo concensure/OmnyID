@@ -51,6 +51,8 @@ export const PriceBasisSchema = z.enum([
   'minimum_spend',
 ]);
 
+export const LineEffectSchema = z.enum(['charge', 'discount']);
+
 export const TaxTreatmentSchema = z.enum([
   'inclusive',
   'exclusive',
@@ -88,6 +90,7 @@ export const LineItemSchema = z.object({
   category: z.string().min(1).max(500),
   inclusion: InclusionStateSchema,
   price_basis: PriceBasisSchema,
+  effect: LineEffectSchema.default('charge'),
   unit_price: MoneySchema.optional(),
   quantity: ScaledQuantitySchema.optional(),
   rate_bps: z.number().int().min(0).max(100_000).optional(),
@@ -156,9 +159,41 @@ export const ComparableTotalSchema = z.object({
   }).strict()),
   formula_trace: z.array(z.object({
     line_id: z.string(),
+    formula_id: z.string(),
+    formula_version: z.string(),
+    input_line_ids: z.array(z.string()).default([]),
+    rounding: z.string(),
     expression: z.string(),
     amount_minor: z.number().int().safe(),
   }).strict()),
+}).strict();
+
+export const RequirementAssessmentSchema = z.object({
+  requirement_id: z.string().min(1).max(500),
+  importance: z.enum(['hard', 'soft']),
+  status: z.enum(['met', 'conflict', 'unknown']),
+  evidence: EvidenceSchema,
+}).strict();
+
+export const RankedCandidateSchema = z.object({
+  quotation_id: z.string().min(1).max(500),
+  version_id: z.string().min(1).max(500),
+  vendor_id: z.string().min(1).max(500),
+  disposition: z.enum(['eligible', 'conditional', 'excluded']),
+  total: ComparableTotalSchema,
+  requirement_coverage_bps: z.number().int().min(0).max(10_000),
+  evidence_strength_bps: z.number().int().min(0).max(10_000),
+  hard_conflict_ids: z.array(z.string()),
+  unknown_hard_requirement_ids: z.array(z.string()),
+}).strict();
+
+export const QuotationComparisonSchema = z.object({
+  schema_version: z.literal(COMPARISON_SCHEMA_VERSION),
+  comparison_id: z.string().min(1).max(500),
+  scenario_id: z.string().min(1).max(500),
+  candidates: z.array(RankedCandidateSchema),
+  recommended_quotation_id: z.string().optional(),
+  recommendation_reason: z.string().optional(),
 }).strict();
 
 export type EvidenceState = z.infer<typeof EvidenceStateSchema>;
@@ -171,3 +206,6 @@ export type UnmappedItem = z.infer<typeof UnmappedItemSchema>;
 export type NormalisedQuotation = z.infer<typeof NormalisedQuotationSchema>;
 export type ComparableScenario = z.infer<typeof ComparableScenarioSchema>;
 export type ComparableTotal = z.infer<typeof ComparableTotalSchema>;
+export type RequirementAssessment = z.infer<typeof RequirementAssessmentSchema>;
+export type RankedCandidate = z.infer<typeof RankedCandidateSchema>;
+export type QuotationComparison = z.infer<typeof QuotationComparisonSchema>;

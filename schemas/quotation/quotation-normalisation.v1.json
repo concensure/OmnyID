@@ -86,6 +86,7 @@
         "category": {"$ref": "#/$defs/bounded_string"},
         "inclusion": {"enum": ["included", "required", "optional", "excluded", "conditional", "unknown"]},
         "price_basis": {"enum": ["fixed", "per_person", "per_item", "per_hour", "percentage", "minimum_spend"]},
+        "effect": {"enum": ["charge", "discount"], "default": "charge"},
         "unit_price": {"$ref": "#/$defs/money"},
         "quantity": {"$ref": "#/$defs/quantity"},
         "rate_bps": {"type": "integer", "minimum": 0, "maximum": 100000},

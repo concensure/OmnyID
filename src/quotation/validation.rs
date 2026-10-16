@@ -238,6 +238,13 @@ pub fn validate_normalised_quotation(quotation: &NormalisedQuotation) -> Vec<Val
             }
             _ => {}
         }
+        if line.price_basis == PriceBasis::MinimumSpend && line.effect == LineEffect::Discount {
+            issues.push(issue(
+                format!("{path}.effect"),
+                "invalid_minimum_spend_effect",
+                "minimum spend lines cannot be discounts",
+            ));
+        }
         validate_evidence(
             &line.evidence,
             &format!("{path}.evidence"),
