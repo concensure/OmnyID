@@ -1539,3 +1539,28 @@ tasks:
       - competitor, private-note, hidden-preference, full-plan, and internal-score keys remain prohibited even if a malformed grant requests them
       - grant and revocation AFP events are deterministic, tenant-private, E2EE-required, parent-linked, and typed-reference mirrored
       - focused permission tests pass (4 tests), alongside 4 AFP replay tests
+  - id: WED-209
+    title: Quotation comparison DecisionOS and A2UI adapters
+    status: done
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-206
+      - WED-207
+    files:
+      - solid-ui/src/lib/quotationDecisionCardState.ts
+      - solid-ui/tests/quotation-decision-card.test.ts
+      - .agent/**
+    acceptance:
+      - quotation projections adapt to existing review, compare, and clarify decision-card patterns without a new foundational card
+      - one quotation never receives a comparative recommendation
+      - recommendations require an eligible policy result and source evidence
+      - A2UI uses existing comparison table, stat row, callout, constraint badge, insight, and decision-compatible action primitives
+      - every action is typed, user-confirmation aware, and bound to comparison revision
+    progress:
+      - isolated adapter implementation started without editing the shared card renderer or oversized wedding workspace files
+      - generic quotation projections now adapt to existing review, clarify, and compare card patterns; no foundational card or renderer fork was added
+      - recommendations require multiple candidates, an eligible policy result, and an active source reference
+      - A2UI composition reuses stat_row, comparison_table, constraint_badges, insight_line, callout, and action_chips with revision-bound typed actions
+      - focused adapter tests pass (4 tests) and Solid UI type checking passes
+      - the inherited line-budget check still fails only for WeddingResponseWorkspaceView.tsx (1141) and weddingResponseWorkspaceViewState.ts (1041); neither file was edited
