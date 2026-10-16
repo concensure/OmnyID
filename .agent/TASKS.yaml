@@ -1404,3 +1404,25 @@ tasks:
       - intake computes the deterministic profile first, calls/caches the interpreter only for unmapped or ambiguous phrases, and retains the deterministic profile on any route failure
       - immutable preference-profile AFP send inputs retain parent lineage; confirmation chips appear on the home intake summary and above a vendor comparison, creating a user-authority successor and a distinct material fingerprint
       - focused Rust validator tests, TypeScript checking, and the full wedding test suite (1874 tests) pass
+  - id: WED-202
+    title: Quotation intelligence baseline and consent-safe golden corpus
+    status: done
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-196
+    files:
+      - tests/fixtures/quotation/**
+      - tests/quotation_baseline.rs
+      - Documents/design/quotation/quotation-golden-corpus.md
+      - .agent/**
+    acceptance:
+      - at least 24 synthetic quotation versions across at least 12 documents, including eight venue cases
+      - every gold fact has an exact synthetic source excerpt and explicit evidence state
+      - source fixtures cover current parser and OCR boundaries, missing capability, revision, and instruction-like source text
+      - baseline tests preserve deterministic single-quote and supersession DecisionOS behaviour
+    progress:
+      - isolated clean worktree created from ac5b529 to avoid overlap with ongoing WED-187 R10-R12 and human-judge changes
+      - added 12 synthetic documents and 24 immutable versions across text PDF, scanned PDF/image OCR, email body, DOCX, and parser-unavailable paths
+      - eight venue fixtures cover fixed and per-person prices, minimum spend, included/excluded/unknown tax, service charge, options, bond, discount, unknowns, and conflicts
+      - focused quotation baseline tests pass (4 tests); existing quote decision output remains deterministic and revisions resolve the prior decision first
