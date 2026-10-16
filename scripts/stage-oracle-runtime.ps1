@@ -31,6 +31,7 @@ $runtimeDirectories = @(
     "postgres",
     "proto",
     "runtime-templates",
+    "schemas",
     "service-adapter-templates",
     "src",
     "wedding"

@@ -78,6 +78,7 @@ try {
         "solid-ui/Dockerfile",
         "solid-ui/dashboard.html",
         "solid-ui/index.html",
+        "solid-ui/vendor.html",
         "solid-ui/package-lock.json",
         "solid-ui/package.json",
         "solid-ui/postcss.config.cjs",
@@ -99,6 +100,7 @@ try {
         "postgres",
         "proto",
         "runtime-templates",
+        "schemas",
         "service-adapter-templates",
         "src",
         "wedding",
@@ -116,6 +118,7 @@ try {
 
     New-TestFile -RelativePath "docs/index.html"
     New-TestFile -RelativePath "src/main.rs"
+    New-TestFile -RelativePath "schemas/quotation/generic.v1.json" -Contents "{}"
     New-TestFile -RelativePath "wedding/index.html"
     New-TestFile -RelativePath "solid-ui/src/main.tsx"
     New-TestFile -RelativePath "typescript-sdk/scripts/build-clean.mjs"
@@ -129,6 +132,7 @@ try {
     & (Join-Path $PSScriptRoot "stage-oracle-runtime.ps1") -SourceRoot $sourceRoot -OutputDir $stageWithoutData -IncludeSimulatedData:$false
 
     Assert-True (Test-Path -LiteralPath (Join-Path $stageWithData "src/main.rs")) "expected runtime source file in staged output"
+    Assert-True (Test-Path -LiteralPath (Join-Path $stageWithData "schemas/quotation/generic.v1.json")) "expected compile-time quotation schema in staged output"
     Assert-True (Test-Path -LiteralPath (Join-Path $stageWithData "solid-ui/src/main.tsx")) "expected Solid UI source in staged output"
     Assert-True (Test-Path -LiteralPath (Join-Path $stageWithData "solid-ui/postcss.config.cjs")) "expected Solid UI PostCSS config in staged output"
     Assert-True (Test-Path -LiteralPath (Join-Path $stageWithData "solid-ui/tailwind.config.cjs")) "expected Solid UI Tailwind config in staged output"
@@ -145,8 +149,8 @@ try {
     $manifestWithData = Get-Content (Join-Path $stageWithData "oracle-runtime-manifest.json") -Raw | ConvertFrom-Json
     $manifestWithoutData = Get-Content (Join-Path $stageWithoutData "oracle-runtime-manifest.json") -Raw | ConvertFrom-Json
 
-    Assert-Equal $manifestWithData.copied_path_count 52 "expected copied path count with simulated data"
-    Assert-Equal $manifestWithoutData.copied_path_count 51 "expected copied path count without simulated data"
+    Assert-Equal $manifestWithData.copied_path_count 54 "expected copied path count with simulated data"
+    Assert-Equal $manifestWithoutData.copied_path_count 53 "expected copied path count without simulated data"
     Assert-True ($manifestWithData.total_staged_bytes -gt $manifestWithoutData.total_staged_bytes) "expected simulated-data stage to be larger"
     Assert-True ($manifestWithData.largest_paths.Count -gt 0) "expected largest paths list in manifest"
     Assert-Equal $manifestWithData.include_simulated_data $true "expected manifest to record simulated-data inclusion"

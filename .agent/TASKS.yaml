@@ -1804,6 +1804,9 @@ tasks:
       - solid-ui/tests/e2e/quotation-intelligence-fixture.tsx
       - solid-ui/src/components/QuotationEvidenceDrawer.tsx
       - scripts/verify-quotation-readiness.ps1
+      - scripts/stage-oracle-runtime.ps1
+      - scripts/stage-oracle-runtime-pwsh-selftest.ps1
+      - Dockerfile
       - docker-compose.yml
       - docker-compose.oracle.yml
       - docker-compose.oracle.minimal.yml
@@ -1834,3 +1837,4 @@ tasks:
       - delivery-ambiguous clarification retries now query Gmail by the deterministic RFC Message-ID and append the durable provider receipt only for an exact stored reservation; no match remains fail-closed, and an existing reservation can be audited after approval expiry without authorising a new send
       - the latest complete local verifier passes 57 quotation integration tests, the compiled API-flow target, 29 focused Rust unit executions, 23 Solid tests, Solid type checking, cargo check, and whitespace checks; live-provider and hosted evidence remain unverified
       - every Compose homeserver profile now receives the versioned quotation gate and independent feature flags with fail-closed defaults; the release candidate verifier also passes both 360px and desktop Playwright accessibility checks
+      - the first scoped Oracle build failed before service replacement because the runtime bundle omitted the compile-time quotation registries; Docker and Oracle staging now carry `schemas/`, with a packaging regression assertion
