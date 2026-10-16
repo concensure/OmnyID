@@ -12,6 +12,7 @@ pub mod contracts;
 pub mod normalisation;
 pub mod replay;
 pub mod validation;
+pub mod vendor_context;
 
 pub use afp::*;
 pub use calculation::*;
@@ -21,3 +22,4 @@ pub use contracts::*;
 pub use normalisation::*;
 pub use replay::*;
 pub use validation::*;
+pub use vendor_context::*;

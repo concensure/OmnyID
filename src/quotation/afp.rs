@@ -8,16 +8,16 @@ pub const NORMALISED_QUOTATION_KIND: &str = "quotation_normalisation_confirmed";
 pub const CORRECTED_QUOTATION_KIND: &str = "quotation_normalisation_corrected";
 pub const QUOTATION_COMPARISON_KIND: &str = "quotation_comparison_materialised";
 
-fn stable_hash<T: Serialize>(value: &T) -> String {
+pub(super) fn stable_hash<T: Serialize>(value: &T) -> String {
     let encoded = serde_json::to_vec(value).unwrap_or_default();
     hex::encode(Sha256::digest(encoded))
 }
 
-fn reference(reference_type: &str, target: &str) -> Value {
+pub(super) fn reference(reference_type: &str, target: &str) -> Value {
     json!({"type": reference_type, "target": target})
 }
 
-fn base_message(
+pub(super) fn base_message(
     id: String,
     thread_id: &str,
     parent_id: Option<&str>,

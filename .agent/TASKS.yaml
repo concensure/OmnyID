@@ -1514,3 +1514,28 @@ tasks:
       - successor normalisations use explicit parent message lineage plus superseded-version references
       - replay validates quotation payloads, deduplicates delivery, derives active successors, and suppresses comparisons that reference stale versions
       - focused AFP/replay tests pass (4 tests), alongside the 13 deterministic engine tests
+  - id: WED-212
+    title: Permissioned quotation vendor-context projection foundation
+    status: done
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-207
+    files:
+      - src/quotation/vendor_context.rs
+      - src/quotation/mod.rs
+      - tests/quotation_vendor_context.rs
+      - .agent/**
+    acceptance:
+      - a vendor projection requires a target vendor, quotation/thread, purpose, approval receipt, allowlisted fact ids, issue/expiry, scope, and projection version
+      - expiry, revocation, recipient mismatch, and consumed single-use grants fail closed at projection time
+      - competitor facts, private notes, full-plan content, and internal scores cannot be projected even when requested
+      - grant and revocation AFP events are append-only, parent-linked, private, and source-referenced
+      - projection output includes only the minimum allowed fields and their provenance references
+    progress:
+      - permission-boundary implementation started after AFP replay commit beb4aa9
+      - grants bind user authority, target vendor, quotation/thread, purpose, explicit fact ids, issue/expiry, scope, approval receipt, and projection version
+      - projection checks recipient, expiry, revocation, and single-use consumption at read time and returns only allowlisted facts plus provenance
+      - competitor, private-note, hidden-preference, full-plan, and internal-score keys remain prohibited even if a malformed grant requests them
+      - grant and revocation AFP events are deterministic, tenant-private, E2EE-required, parent-linked, and typed-reference mirrored
+      - focused permission tests pass (4 tests), alongside 4 AFP replay tests
