@@ -19,8 +19,10 @@ export function clarificationDraftAfpInput(threadId: string, draft: QuotationCla
       recipient: draft.recipient,
       subject: draft.subject,
       questions: draft.questions,
+      context: draft.context ?? [],
       quotation_version_id: draft.quotation_version_id,
       comparison_revision: draft.comparison_revision,
+      created_at: draft.created_at,
     },
     references: [
       { type: "quotation", target: draft.quotation_id },

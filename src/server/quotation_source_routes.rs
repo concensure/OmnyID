@@ -89,6 +89,37 @@ fn blocked_http(plan: QuotationSourcePlan) -> (StatusCode, String) {
     )
 }
 
+async fn resolve_quotation_source(
+    message: &crate::message::AFPMessage,
+    source_attachment_id: Option<&str>,
+    mime_type: Option<&str>,
+) -> Result<super::document_ingest_service::ResolvedIngestSource, String> {
+    match resolve_source_from_message(message, source_attachment_id, mime_type).await {
+        Ok(source) => Ok(source),
+        Err(error) if source_attachment_id.is_none() => {
+            let body = message
+                .content
+                .get("body")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|body| !body.is_empty())
+                .ok_or(error)?;
+            Ok(super::document_ingest_service::ResolvedIngestSource {
+                payload: ResolvedSourcePayload::InlineBytes {
+                    bytes: body.as_bytes().to_vec(),
+                    file_name: Some(format!("message-{}.txt", message.id)),
+                },
+                source_url: None,
+                source_kind: "afp_message_body".to_string(),
+                source_message_id: Some(message.id.clone()),
+                source_attachment_id: None,
+                mime_type: Some("text/plain".to_string()),
+            })
+        }
+        Err(error) => Err(error),
+    }
+}
+
 async fn prepare_source_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -103,7 +134,7 @@ async fn prepare_source_http(
         .find(|candidate| candidate.id == source_message_id)
         .map(super::proto_to_app)
         .ok_or((StatusCode::NOT_FOUND, "source unavailable".to_string()))?;
-    let source = resolve_source_from_message(
+    let source = resolve_quotation_source(
         &message,
         request.source_attachment_id.as_deref(),
         request.mime_type.as_deref(),
@@ -209,6 +240,23 @@ async fn prepare_source_http(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn incoming_email_body_is_a_first_class_quotation_source() {
+        let message = crate::message::AFPMessage {
+            id: "reply-1".to_string(),
+            thread_id: "thread-1".to_string(),
+            r#type: "email".to_string(),
+            subtype: Some("incoming".to_string()),
+            content: serde_json::json!({"body": "Beverages are AUD 55 per guest."}),
+            ..Default::default()
+        };
+        let source = resolve_quotation_source(&message, None, None)
+            .await
+            .expect("email body source");
+        assert_eq!(source.source_kind, "afp_message_body");
+        assert_eq!(source.mime_type.as_deref(), Some("text/plain"));
+    }
 
     #[test]
     fn identifiers_are_bounded_and_control_free() {

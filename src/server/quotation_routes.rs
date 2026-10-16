@@ -1,5 +1,7 @@
 //! Authenticated persistence and replay routes for template-neutral quotations.
 
+mod clarification_routes;
+
 use std::sync::Arc;
 
 use axum::{
@@ -29,6 +31,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/quotation/reviews", post(store_review_http))
         .route("/quotation/comparisons", post(store_comparison_http))
         .route("/quotation/state", get(quotation_state_http))
+        .merge(clarification_routes::routes())
 }
 
 #[derive(Deserialize)]

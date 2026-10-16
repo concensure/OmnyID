@@ -1366,7 +1366,7 @@ pub(crate) async fn store_private_app_message(
     relay_tx: &tokio::sync::broadcast::Sender<String>,
     owner_user_id: &str,
     message: AFPMessage,
-) -> Result<(), Status> {
+) -> Result<bool, Status> {
     let proto = super::app_to_proto(message.clone());
     if !super::validate_proto_message(&proto) {
         return Err(Status::invalid_argument("Invalid AFP message"));
@@ -1406,7 +1406,7 @@ pub(crate) async fn store_private_app_message(
         metrics.inc_messages_replayed();
     }
 
-    Ok(())
+    Ok(inserted)
 }
 
 pub(super) async fn store_app_message_for_headers(

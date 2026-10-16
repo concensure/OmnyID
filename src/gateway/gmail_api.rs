@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::sync::OnceLock;
 
-use super::smtp_out::OutgoingEmailRequest;
+use super::smtp_out::{OutgoingEmailRequest, outgoing_message_id_header};
 
 const GOOGLE_OAUTH_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const GMAIL_SEND_URL_BASE: &str = "https://gmail.googleapis.com/gmail/v1/users";
@@ -243,6 +243,10 @@ pub fn build_gmail_raw_message(request: &OutgoingEmailRequest, from_address: &st
         "Subject: {}\r\n",
         sanitize_header(&request.subject)
     ));
+    mime.push_str(&format!(
+        "Message-ID: {}\r\n",
+        outgoing_message_id_header(request)
+    ));
     mime.push_str("MIME-Version: 1.0\r\n");
     mime.push_str("Content-Type: text/plain; charset=UTF-8\r\n");
     if let Some(in_reply_to) = request.in_reply_to.as_ref() {
@@ -304,6 +308,7 @@ mod tests {
         assert!(decoded.contains("From: sender@example.com\r\n"));
         assert!(decoded.contains("To: friend@example.com\r\n"));
         assert!(decoded.contains("Subject: Hello\r\n"));
+        assert!(decoded.contains("Message-ID: <msg_test_01@omnyid.invalid>\r\n"));
         assert!(decoded.contains("In-Reply-To: <parent@example.com>\r\n"));
         assert!(decoded.contains("References: <root@example.com> <parent@example.com>\r\n"));
         assert!(decoded.ends_with("\r\nBody text"));

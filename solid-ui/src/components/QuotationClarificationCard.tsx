@@ -4,6 +4,8 @@ import type { QuotationClarificationState } from "@/lib/quotationClarificationSt
 export type QuotationClarificationCardProps = {
   state: QuotationClarificationState;
   onQuestionChange: (factKey: string, value: string) => void;
+  onRecipientChange?: (value: string) => void;
+  onSubjectChange?: (value: string) => void;
   onRequestApproval: () => void;
   onSend: () => void;
 };
@@ -16,6 +18,27 @@ export default function QuotationClarificationCard(props: QuotationClarification
         <h2 id="quotation-clarification-title" class="text-lg font-semibold">Clarify this quotation</h2>
         <p class="text-sm text-slate-600">Review these questions before anything is sent to {props.state.draft.recipient}.</p>
       </header>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label class="block text-sm font-medium">
+          Recipient
+          <input
+            type="email"
+            value={props.state.draft.recipient}
+            disabled={sending()}
+            onInput={(event) => props.onRecipientChange?.(event.currentTarget.value)}
+            class="mt-1 min-h-11 w-full rounded-lg border px-3"
+          />
+        </label>
+        <label class="block text-sm font-medium">
+          Subject
+          <input
+            value={props.state.draft.subject}
+            disabled={sending()}
+            onInput={(event) => props.onSubjectChange?.(event.currentTarget.value)}
+            class="mt-1 min-h-11 w-full rounded-lg border px-3"
+          />
+        </label>
+      </div>
       <div class="space-y-3">
         <For each={props.state.draft.questions}>{(question, index) => (
           <label class="block text-sm font-medium">

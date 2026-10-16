@@ -363,7 +363,7 @@ fn outgoing_request_from_gmail_send_body(
     })
 }
 
-async fn gmail_config_for_user(
+pub(super) async fn gmail_config_for_user(
     state: &Arc<AppState>,
     user_id: &str,
 ) -> Result<crate::gateway::gmail_api::GmailOAuthConfig, (StatusCode, String)> {
@@ -397,6 +397,17 @@ async fn gmail_config_for_user(
     })
 }
 
+pub(super) async fn send_gmail_outgoing_request(
+    state: &Arc<AppState>,
+    user_id: &str,
+    request: &crate::gateway::smtp_out::OutgoingEmailRequest,
+) -> Result<String, (StatusCode, String)> {
+    let gmail_config = gmail_config_for_user(state, user_id).await?;
+    crate::gateway::gmail_api::send_gmail_message_with_receipt(request, &gmail_config)
+        .await
+        .map_err(|error| (StatusCode::BAD_GATEWAY, error))
+}
+
 async fn gmail_send_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -404,12 +415,7 @@ async fn gmail_send_http(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     let request = outgoing_request_from_gmail_send_body(&user.id, body)?;
-    let gmail_config = gmail_config_for_user(&state, &user.id).await?;
-
-    let provider_message_id =
-        crate::gateway::gmail_api::send_gmail_message_with_receipt(&request, &gmail_config)
-            .await
-            .map_err(|e| (StatusCode::BAD_GATEWAY, e))?;
+    let provider_message_id = send_gmail_outgoing_request(&state, &user.id, &request).await?;
 
     Ok(Json(serde_json::json!({
         "ok": true,
@@ -480,12 +486,7 @@ async fn gmail_send_prepared_draft_http(
         ))?;
     let request =
         outgoing_request_from_prepared_draft(&user.id, &body.draft_message_id, &draft_message)?;
-    let gmail_config = gmail_config_for_user(&state, &user.id).await?;
-
-    let provider_message_id =
-        crate::gateway::gmail_api::send_gmail_message_with_receipt(&request, &gmail_config)
-            .await
-            .map_err(|e| (StatusCode::BAD_GATEWAY, e))?;
+    let provider_message_id = send_gmail_outgoing_request(&state, &user.id, &request).await?;
 
     Ok(Json(serde_json::json!({
         "sent": true,

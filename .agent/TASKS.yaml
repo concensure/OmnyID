@@ -1664,7 +1664,7 @@ tasks:
       - focused Rust review tests pass (4), Solid state tests pass (3), and Solid UI type checking passes
   - id: WED-210
     title: Approval-bound quotation clarification loop
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-202
     depends_on:
@@ -1676,8 +1676,14 @@ tasks:
       - tests/quotation_clarification.rs
       - solid-ui/src/lib/quotationClarificationState.ts
       - solid-ui/src/lib/quotationClarificationAfpState.ts
+      - solid-ui/src/lib/quotationClarificationApi.ts
       - solid-ui/src/components/QuotationClarificationCard.tsx
       - solid-ui/tests/quotation-clarification-state.test.ts
+      - src/server/quotation_routes/clarification_routes.rs
+      - src/server/email_group_routes.rs
+      - src/gateway/gmail_api.rs
+      - src/gateway/smtp_out.rs
+      - src/server/quotation_source_routes.rs
       - .agent/**
     acceptance:
       - at most three ranked unanswered gaps form an editable persisted draft
@@ -1694,10 +1700,15 @@ tasks:
       - re-evaluation calculates material changes and totals and resolves an old decision only after a persisted direct successor
       - Solid state invalidates approval on edits, requires a provider receipt, and emits tenant-private E2EE draft/approval AFP inputs
       - focused Rust clarification tests pass (5), Solid state tests pass (3), and Solid UI type checking passes
-      - remaining integration is a thin adapter from an approved clarification to the existing generic approval/send and inbound-reply routes after WED-187 shared wiring is reconciled
+      - authenticated send orchestration reloads the exact persisted draft and its parent-linked approval, rejects stale quotation/comparison revisions, and delegates to the existing Gmail sender
+      - an AFP send reservation is inserted before the external call; concurrent or delivery-ambiguous retries fail closed, while completed retries return the original durable provider receipt
+      - outgoing Gmail messages carry a deterministic Message-ID referenced by the send receipt, allowing the existing inbound gateway to match vendor replies back to the quotation thread
+      - authenticated plain-text inbound email bodies are accepted by the existing quotation source preparation path, then pass through ordinary extraction, exact-anchor review, successor persistence, and comparison re-evaluation
+      - recipient and subject edits now invalidate approval alongside question edits; the reusable Solid API adapter persists draft then approval before calling send
+      - full quotation verification passes with 57 Rust integration tests, 26 focused Rust unit-test executions, 23 Solid tests, Solid type checking, cargo check, and whitespace checks; 1,874 existing wedding tests and the production UI build also pass
   - id: WED-211
     title: Quotation contract, deposit, booking, and budget closure
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-202
     depends_on:
@@ -1711,6 +1722,8 @@ tasks:
       - solid-ui/src/lib/quotationClosureAfpState.ts
       - solid-ui/src/components/QuotationClosureCard.tsx
       - solid-ui/tests/quotation-closure-state.test.ts
+      - solid-ui/src/lib/quotationWeddingClosureAdapter.ts
+      - solid-ui/tests/quotation-wedding-closure-adapter.test.ts
       - .agent/**
     acceptance:
       - selection, contract, deposit, booking, cancellation, refund, and supersession remain distinct evidence-backed successor states
@@ -1727,7 +1740,9 @@ tasks:
       - duplicate and shuffled transition replay is stable; cancellation and refund retain successor evidence
       - Solid record/approve-act state and A2UI projections use existing stat-row, callout, and action-chip primitives and carry external_payment false
       - focused Rust closure tests pass (6), Solid closure tests pass (4), and Solid UI type checking passes
-      - remaining integration is the small wedding budget/timeline consumer that persists the generic budget commitment after WED-187 workspace state is reconciled
+      - a small adapter maps only evidence-backed booking-confirmed commitments into the existing wedding decision/budget projection with stable ids and quotation/source-version lineage
+      - contract and deposit deadlines reuse the existing wedding task projection and reminders; terminal closure states emit no open deadline task and every projection keeps payment execution false
+      - adapter tests prove the commitment is counted once as quote-backed spend, non-booked states fail closed, source lineage is retained, and deadline task ids are deterministic
   - id: WED-214
     title: Authenticated generic quotation persistence and replay API
     status: done
@@ -1794,4 +1809,4 @@ tasks:
       - quotation remote source preparation now revalidates public HTTP URLs before the shared parser/OCR service, preserving SSRF controls
       - reproducible PowerShell verification and a readiness evidence document were added; the current release status remains untested and no flags were enabled
       - focused verification passes: 57 Rust integration tests, 15 source/ladder/route unit tests, 19 Solid tests, Solid type checking, cargo check, and git whitespace check
-      - remaining release evidence includes hosted shadow extraction metrics, Postgres tenant HTTP tests, browser accessibility/security matrix, clarification send/reply and wedding budget adapters, and a seven-day allowlisted cohort
+      - local clarification send/reply and wedding budget/timeline adapters are complete, 1,874 existing wedding tests pass, and the production UI build passes; remaining release evidence is hosted shadow extraction metrics, Postgres tenant HTTP tests, browser accessibility/security matrix, live gated provider smoke, and a seven-day allowlisted cohort

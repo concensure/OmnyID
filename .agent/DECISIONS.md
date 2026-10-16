@@ -774,3 +774,25 @@ known failing threshold is failed. All quotation feature switches default off an
 a `quotation.readiness.v1` verified gate plus hexadecimal evidence digest is configured. In-process
 readiness can still force every requested feature off. Metrics accept aggregate counts, latency,
 fallback, correction, and micro-cost only; raw source/model content is outside their schema.
+
+## 2026-10-17: Clarification send reserves before delegating to existing Gmail transport
+
+Quotation clarification does not introduce a mail provider or a second sender. The authenticated
+adapter reloads the tenant-visible persisted draft and its parent-linked approval, verifies the
+active quotation and comparison revisions, and then calls the existing Gmail transport. A stable
+AFP reservation is inserted atomically before the provider call. A duplicate reservation cannot
+send again: a completed retry replays its stored provider receipt, while a delivery-ambiguous
+attempt requires explicit reconciliation. Gmail messages carry a deterministic RFC Message-ID and
+the receipt references it, so the existing inbound email matcher restores the quotation thread.
+Matched email bodies enter the shared source parser as tenant-authorised text and must still pass
+exact-anchor extraction, review, successor persistence, and deterministic re-comparison.
+
+## 2026-10-17: Wedding closure consumes generic commitments through existing projections
+
+The quotation core remains template-neutral. Only an evidence-backed `booking_confirmed` snapshot
+can produce a generic `BudgetCommitment`; the wedding adapter maps it to the existing wedding
+decision/budget projection with a stable commitment id and quotation/source-version references.
+Contract and deposit deadlines map to the existing wedding task/reminder projection. Selection,
+contract receipt, and deposit records alone never create committed spend, terminal states do not
+leave an open deadline task, and every adapter output explicitly states that payment execution is
+false.

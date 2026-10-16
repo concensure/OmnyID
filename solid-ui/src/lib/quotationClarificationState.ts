@@ -9,6 +9,7 @@ export type QuotationClarificationDraft = {
   recipient: string;
   subject: string;
   questions: ClarificationQuestion[];
+  context?: Array<{ key: string; value: string }>;
   created_at: string;
 };
 
@@ -40,6 +41,30 @@ export function editClarificationQuestion(
       draft_hash: "",
       questions: state.draft.questions.map((candidate) => candidate.fact_key === factKey ? { ...candidate, question: cleaned } : candidate),
     },
+  };
+}
+
+export function editClarificationEnvelope(
+  state: QuotationClarificationState,
+  patch: { recipient?: string; subject?: string },
+): QuotationClarificationState {
+  const recipient = patch.recipient === undefined ? state.draft.recipient : patch.recipient.trim();
+  const subject = patch.subject === undefined ? state.draft.subject : patch.subject.trim();
+  if (!recipient || !recipient.includes("@") || recipient.includes("\n") || recipient.includes("\r")) {
+    return { ...state, error: "Enter a valid recipient email address." };
+  }
+  if (!subject || subject.length > 300) {
+    return { ...state, error: "Subject must be between 1 and 300 characters." };
+  }
+  if (recipient === state.draft.recipient && subject === state.draft.subject) return state;
+  return {
+    ...state,
+    status: "editing",
+    approvalId: null,
+    approvalDraftHash: null,
+    providerReceiptId: null,
+    error: null,
+    draft: { ...state.draft, recipient, subject, draft_hash: "" },
   };
 }
 

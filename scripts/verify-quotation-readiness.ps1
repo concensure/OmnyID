@@ -15,6 +15,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Quotation route and prompt unit verification failed" }
     cargo test --lib document_ingest_service
     if ($LASTEXITCODE -ne 0) { throw "Shared document-ingest service verification failed" }
+    cargo test --lib gmail_api
+    if ($LASTEXITCODE -ne 0) { throw "Gmail threading and provider-receipt verification failed" }
     cargo test --lib wedding_llm_ladder
     if ($LASTEXITCODE -ne 0) { throw "Shared LLM ladder verification failed" }
     cargo check
@@ -37,6 +39,7 @@ try {
         tests/quotation-review-state.test.ts `
         tests/quotation-clarification-state.test.ts `
         tests/quotation-closure-state.test.ts `
+        tests/quotation-wedding-closure-adapter.test.ts `
         tests/quotation-readiness-state.test.ts
     if ($LASTEXITCODE -ne 0) { throw "Quotation Solid verification failed" }
 }

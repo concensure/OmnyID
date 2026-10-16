@@ -2792,3 +2792,59 @@ Remaining:
 - WED-213 remains in progress until hosted shadow metrics, temporary-Postgres tenant tests,
   accessibility/security browser evidence, existing wedding regressions, the WED-210/WED-211
   adapters, and a seven-day allowlisted cohort are complete. Do not set the release gate to verified.
+
+## 2026-10-17 - WED-210 clarification communication adapter (Codex, complete)
+
+Changed:
+
+- Added authenticated `/quotation/clarifications/send`. It reloads tenant-visible persisted draft
+  and approval events, checks exact hash/parent/expiry plus active quotation/comparison revisions,
+  reserves the idempotency key, and delegates to the existing Gmail transport.
+- Added deterministic Gmail Message-ID headers and AFP external-email references so the existing
+  inbound gateway matches replies to the original quotation thread. Plain incoming email bodies can
+  now be prepared through the shared quotation source/parser path.
+- Added reusable Solid persistence/send calls plus editable recipient and subject fields. Any edit
+  invalidates prior approval. No parallel sender, reply matcher, parser, or OCR was introduced.
+- Delivery-ambiguous attempts remain reserved and fail closed instead of risking a duplicate send;
+  explicit provider-receipt reconciliation is the recovery path.
+
+Verification:
+
+- clarification integration tests: 5 passed; quotation route/source/prompt unit tests: 9 passed.
+- Gmail transport/threading unit tests: 7 passed; shared source tests: 3 passed.
+- quotation Solid suite includes 4 clarification state tests; type checking passed.
+
+## 2026-10-17 - WED-211 wedding closure consumer adapter (Codex, complete)
+
+Changed:
+
+- Added a small wedding adapter that accepts only an evidence-backed `booking_confirmed` generic
+  commitment and reuses the existing wedding decision/budget projection. Stable commitment,
+  quotation-version, and booking-evidence references are retained.
+- Added contract/deposit deadline mapping to existing wedding task/reminder projections. Booking,
+  cancellation, refund, and supersession do not leave open deadline tasks; payment execution stays
+  false.
+
+Verification:
+
+- 3 focused adapter tests passed, including actual wedding budget aggregation and deadline AFP.
+- New files are 408 lines or fewer. The inherited focused line-budget test still fails only for
+  `WeddingResponseWorkspaceView.tsx` (1141) and `weddingResponseWorkspaceViewState.ts` (1041);
+  neither file was changed.
+
+## 2026-10-17 - WED-213 local readiness follow-up (Codex, still in progress)
+
+Verification:
+
+- Reproducible verifier passed: 57 quotation Rust integration tests, 26 focused Rust unit tests,
+  23 Solid tests, Solid type checking, `cargo check`, and `git diff --check`.
+- The full existing wedding suite passed (1,874 tests) and the Vite production UI build passed. Its
+  existing large-chunk and Tailwind screen-variant warnings remain non-blocking.
+- No live provider, deployment, feature enablement, or production-state claim was made. The sole
+  compiler warning remains the inherited unused `user_id` in `email_group_routes.rs`.
+
+Remaining:
+
+- Hosted shadow-model metrics, temporary-Postgres tenant HTTP tests, browser accessibility/security
+  evidence, a gated live Gmail smoke/reconciliation exercise, and the seven-day allowlisted cohort.
+  Keep all quotation feature flags off until that evidence is recorded and hashed.

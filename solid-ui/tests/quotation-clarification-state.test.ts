@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { clarificationApprovalAfpInput, clarificationDraftAfpInput } from "@/lib/quotationClarificationAfpState";
-import { beginClarificationSend, editClarificationQuestion, recordClarificationReceipt, type QuotationClarificationState } from "@/lib/quotationClarificationState";
+import { beginClarificationSend, editClarificationEnvelope, editClarificationQuestion, recordClarificationReceipt, type QuotationClarificationState } from "@/lib/quotationClarificationState";
 
 function state(): QuotationClarificationState {
   return {
@@ -30,6 +30,15 @@ test("editing invalidates prior approval", () => {
   assert.equal(edited.status, "editing");
   assert.equal(edited.approvalId, null);
   assert.equal(beginClarificationSend(edited).error, "This draft changed. Review and approve it again.");
+});
+
+test("editing recipient or subject invalidates prior approval", () => {
+  const recipient = editClarificationEnvelope(state(), { recipient: "other@example.test" });
+  assert.equal(recipient.status, "editing");
+  assert.equal(recipient.approvalId, null);
+  assert.equal(recipient.draft.draft_hash, "");
+  const subject = editClarificationEnvelope(state(), { subject: "Updated quotation questions" });
+  assert.equal(subject.approvalDraftHash, null);
 });
 
 test("approved sends require and retain a provider receipt", () => {

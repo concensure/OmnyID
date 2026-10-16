@@ -47,11 +47,13 @@ them even when requested.
 
 - Run the full golden corpus through configured parsers and the hosted provider ladder in shadow
   mode; record precision, recall, exact matches, latency, fallback, correction, and cost aggregates.
-- Complete the existing clarification send/reply adapter and wedding budget/timeline adapter, then
-  exercise provider-receipt and idempotency regressions.
+- Exercise the completed clarification and wedding-closure adapters against a gated live Gmail
+  account and temporary Postgres, including provider-receipt reconciliation after an ambiguous
+  delivery result.
 - Run tenant-isolation HTTP tests against temporary Postgres, browser accessibility at 360x740 and
-  desktop, existing wedding regressions, and the security matrix for SSRF, XSS, prompt injection,
-  oversized inputs, stale actions, grants, and log leakage.
+  desktop, and the security matrix for SSRF, XSS, prompt injection, oversized inputs, stale actions,
+  grants, and log leakage. The local existing wedding suite currently passes 1,874 tests and the
+  production UI build passes, but neither substitutes for browser/hosted evidence.
 - Record a seven-day allowlisted review cohort before broadening category or autonomy.
 
 Vendor links remain disabled until the vendor-context red-team evidence passes. Payment execution

@@ -1,4 +1,5 @@
 use super::{
+    ClarificationApproval, ClarificationDraft, ClarificationSendReceipt,
     contracts::{NormalisedQuotation, QuotationComparison},
     review::QuotationReviewSuccessor,
 };
@@ -11,6 +12,8 @@ pub const NORMALISED_QUOTATION_KIND: &str = "quotation_normalisation_confirmed";
 pub const CORRECTED_QUOTATION_KIND: &str = "quotation_normalisation_corrected";
 pub const QUOTATION_COMPARISON_KIND: &str = "quotation_comparison_materialised";
 pub const QUOTATION_REVIEW_KIND: &str = "quotation_review_recorded";
+pub const CLARIFICATION_SEND_RESERVED_KIND: &str = "quotation_clarification_send_reserved";
+pub const CLARIFICATION_SENT_KIND: &str = "quotation_clarification_sent";
 
 pub(super) fn stable_hash<T: Serialize>(value: &T) -> String {
     let encoded = serde_json::to_vec(value).unwrap_or_default();
@@ -203,6 +206,90 @@ pub fn quotation_review_message(
             &review.version_id,
         ));
     }
+    message.typed_refs = message.references.clone();
+    message
+}
+
+pub fn clarification_send_reservation_message(
+    draft: &ClarificationDraft,
+    approval: &ClarificationApproval,
+    idempotency_key: &str,
+    thread_id: &str,
+    draft_message_id: &str,
+    approval_message_id: &str,
+    timestamp: &str,
+    actor: &str,
+) -> AFPMessage {
+    let mut message = base_message(
+        format!("quotation-clarification-reserved:{idempotency_key}"),
+        thread_id,
+        Some(approval_message_id),
+        timestamp,
+        actor,
+    );
+    message.kind = Some(CLARIFICATION_SEND_RESERVED_KIND.to_string());
+    message.subtype = message.kind.clone();
+    message.content = json!({
+        "idempotency_key": idempotency_key,
+        "draft_id": draft.draft_id,
+        "draft_hash": super::draft_hash(draft),
+        "approval_id": approval.approval_id,
+        "recipient": draft.recipient,
+        "quotation_version_id": draft.quotation_version_id,
+        "comparison_revision": draft.comparison_revision,
+        "reserved_at": timestamp,
+    });
+    message.metadata = Some(json!({
+        "idempotency_key": idempotency_key,
+        "privacy_scope": "tenant_private",
+        "e2ee_required": true,
+        "schema_version": "quotation.clarification.send.v1",
+    }));
+    message.references = vec![
+        reference("clarification_draft", draft_message_id),
+        reference("clarification_approval", approval_message_id),
+        reference("normalised_quotation_version", &draft.quotation_version_id),
+        reference("quotation_comparison", &draft.comparison_revision),
+    ];
+    message.typed_refs = message.references.clone();
+    message
+}
+
+pub fn clarification_sent_message(
+    receipt: &ClarificationSendReceipt,
+    thread_id: &str,
+    reservation_message_id: &str,
+    draft_message_id: &str,
+    approval_message_id: &str,
+    external_message_id: &str,
+    actor: &str,
+) -> AFPMessage {
+    let mut message = base_message(
+        format!("quotation-clarification-sent:{}", receipt.idempotency_key),
+        thread_id,
+        Some(reservation_message_id),
+        &receipt.sent_at,
+        actor,
+    );
+    message.kind = Some(CLARIFICATION_SENT_KIND.to_string());
+    message.subtype = message.kind.clone();
+    message.content = json!({"receipt": receipt});
+    message.metadata = Some(json!({
+        "idempotency_key": receipt.idempotency_key,
+        "privacy_scope": "tenant_private",
+        "e2ee_required": true,
+        "schema_version": "quotation.clarification.send.v1",
+    }));
+    message.references = vec![
+        reference("clarification_send_reservation", reservation_message_id),
+        reference("clarification_draft", draft_message_id),
+        reference("clarification_approval", approval_message_id),
+        json!({
+            "type": "external_email",
+            "target": external_message_id,
+            "metadata": {"relation": "message_id"},
+        }),
+    ];
     message.typed_refs = message.references.clone();
     message
 }

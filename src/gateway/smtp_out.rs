@@ -22,6 +22,19 @@ pub struct OutgoingEmailRequest {
     pub references: Vec<String>,
 }
 
+pub fn outgoing_message_id_header(request: &OutgoingEmailRequest) -> String {
+    let local = request
+        .message_id
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
+        .take(160)
+        .collect::<String>();
+    format!(
+        "<{}@omnyid.invalid>",
+        if local.is_empty() { "message" } else { &local }
+    )
+}
+
 #[instrument(skip(message), fields(thread_id = %message.thread_id, message_id = %message.id, message_type = %message.r#type))]
 pub async fn dispatch_outgoing_message(message: &AFPMessage) -> Result<bool, String> {
     let Some(request) = build_outgoing_email_request(message) else {
