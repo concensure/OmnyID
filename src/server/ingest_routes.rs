@@ -16,6 +16,8 @@ use crate::message::{
 use chrono::Datelike as _;
 use std::collections::BTreeSet;
 
+use super::document_ingest_service::{ResolvedIngestSource, ResolvedSourcePayload};
+
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route(
@@ -323,25 +325,6 @@ struct AttachmentIngestOutcome {
     academic_unit_tag: Option<String>,
     academic_summary: Option<String>,
     zettelkasten_stage: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum ResolvedSourcePayload {
-    RemoteUrl(String),
-    InlineBytes {
-        bytes: Vec<u8>,
-        file_name: Option<String>,
-    },
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct ResolvedIngestSource {
-    payload: ResolvedSourcePayload,
-    source_url: Option<String>,
-    source_kind: String,
-    source_message_id: Option<String>,
-    source_attachment_id: Option<String>,
-    mime_type: Option<String>,
 }
 
 async fn validate_remote_source_url(source_url: &str) -> Result<(), (StatusCode, String)> {
@@ -1415,7 +1398,7 @@ async fn attachment_payload_from_storage(
     Ok(None)
 }
 
-async fn resolve_source_from_message(
+pub(super) async fn resolve_source_from_message(
     message: &AFPMessage,
     preferred_attachment_id: Option<&str>,
     fallback_mime_type: Option<&str>,
@@ -1634,7 +1617,7 @@ fn extract_text_from_pdf_bytes(_bytes: &[u8]) -> Result<String, String> {
 }
 
 fn pdf_server_processing_supported() -> bool {
-    std::env::var("OMNYID_MINERU_URL").is_ok() || std::env::var("OMNYID_LLAMAPARSE_KEY").is_ok()
+    super::document_ingest_service::pdf_server_processing_supported()
 }
 
 pub(super) async fn attachment_ingest_capabilities_http()
@@ -1648,9 +1631,7 @@ pub(super) async fn attachment_ingest_capabilities_http()
 }
 
 fn image_ocr_supported() -> bool {
-    crate::secret_manager::read_process_secret_trimmed("OMNYID_OPENAI_API_KEY")
-        .or_else(|| crate::secret_manager::read_process_secret_trimmed("OPENAI_API_KEY"))
-        .is_some()
+    super::document_ingest_service::image_ocr_supported()
 }
 
 fn cleanup_target_is_ephemeral_ingest_output(
@@ -1770,17 +1751,7 @@ fn persist_ephemeral_ingest_output(message: &mut AFPMessage) -> Result<(), (Stat
 }
 
 fn is_image_like_source(mime_type: Option<&str>, file_name: Option<&str>) -> bool {
-    if mime_type.is_some_and(|mime| mime.to_ascii_lowercase().starts_with("image/")) {
-        return true;
-    }
-    file_name.is_some_and(|name| {
-        let lower = name.to_ascii_lowercase();
-        [
-            ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".heic", ".heif",
-        ]
-        .iter()
-        .any(|ext| lower.ends_with(ext))
-    })
+    super::document_ingest_service::is_image_like_source(mime_type, file_name)
 }
 
 async fn read_source_bytes_for_ocr(
@@ -1832,86 +1803,11 @@ async fn call_image_ocr(
     mime_type: &str,
     file_name: Option<&str>,
 ) -> Result<String, String> {
-    let api_key = crate::secret_manager::read_process_secret_trimmed("OMNYID_OPENAI_API_KEY")
-        .or_else(|| crate::secret_manager::read_process_secret_trimmed("OPENAI_API_KEY"))
-        .ok_or_else(|| "OMNYID_OPENAI_API_KEY not configured - needed for image OCR".to_string())?;
-    let model =
-        std::env::var("OMNYID_IMAGE_OCR_MODEL").unwrap_or_else(|_| "gpt-4o-mini".to_string());
-    let (bytes, resolved_file_name) = read_source_bytes_for_ocr(source).await?;
-    let effective_file_name = file_name.or(resolved_file_name.as_deref());
-    let data_mime = infer_image_data_url_mime(effective_file_name, mime_type);
-    let data_url = format!(
-        "data:{};base64,{}",
-        data_mime,
-        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes)
-    );
-    let body = serde_json::json!({
-        "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are an OCR assistant for a student knowledge graph. Extract all readable text from the image faithfully. Keep headings and bullet-like structure when visible. Do not summarize, interpret, or add commentary."
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "Extract the readable text from this image for connected notes."
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": { "url": data_url }
-                    }
-                ]
-            }
-        ],
-        "max_tokens": 1600,
-        "temperature": 0
-    });
-    let response: serde_json::Value = reqwest::Client::new()
-        .post("https://api.openai.com/v1/chat/completions")
-        .bearer_auth(&api_key)
-        .header("Content-Type", "application/json")
-        .json(&body)
-        .timeout(std::time::Duration::from_secs(120))
-        .send()
-        .await
-        .map_err(|e| format!("image OCR request failed: {e}"))?
-        .json()
-        .await
-        .map_err(|e| format!("image OCR response parse error: {e}"))?;
-    let text = response["choices"][0]["message"]["content"]
-        .as_str()
-        .unwrap_or("")
-        .trim()
-        .to_string();
-    if text.is_empty() {
-        return Err("image OCR returned no readable text".to_string());
-    }
-    Ok(text)
+    super::document_ingest_service::call_image_ocr(source, mime_type, file_name).await
 }
 
 fn select_parser(mime_type: &str, override_parser: Option<&str>) -> &'static str {
-    if let Some(p) = override_parser {
-        return match p {
-            "mineru" => "mineru",
-            "llamaparse" => "llamaparse",
-            "pdf_unavailable" => "pdf_unavailable",
-            _ => "readability",
-        };
-    }
-    if mime_type.contains("pdf") {
-        if std::env::var("OMNYID_MINERU_URL").is_ok() {
-            "mineru"
-        } else if std::env::var("OMNYID_LLAMAPARSE_KEY").is_ok() {
-            "llamaparse"
-        } else {
-            "pdf_unavailable"
-        }
-    } else {
-        "readability"
-    }
+    super::document_ingest_service::select_parser(mime_type, override_parser)
 }
 
 fn select_whisper_model(override_model: Option<&str>) -> String {
@@ -1992,141 +1888,7 @@ async fn call_parser(
     source: &ResolvedIngestSource,
     mime_type: &str,
 ) -> Result<(String, Option<u32>, Option<String>), String> {
-    if let ResolvedSourcePayload::InlineBytes { bytes, .. } = &source.payload {
-        if mime_type.contains("pdf") {
-            return Ok((extract_text_from_pdf_bytes(bytes)?, None, None));
-        }
-        if parser_family == "readability"
-            || mime_type.starts_with("text/")
-            || mime_type.contains("json")
-            || mime_type.contains("csv")
-            || mime_type.contains("xml")
-            || mime_type.contains("html")
-            || mime_type.contains("markdown")
-        {
-            return Ok((decode_text_payload(bytes, mime_type), None, None));
-        }
-        return Err(
-            "attachment-backed binary documents currently require a fetchable URL or a text-like attachment payload".to_string(),
-        );
-    }
-
-    let source_url = match &source.payload {
-        ResolvedSourcePayload::RemoteUrl(url) => url.as_str(),
-        ResolvedSourcePayload::InlineBytes { .. } => unreachable!(),
-    };
-
-    match parser_family {
-        "pdf_unavailable" => Err(
-            "PDF parsing is not configured. Set OMNYID_MINERU_URL or OMNYID_LLAMAPARSE_KEY to ingest scanned or non-extractable PDFs."
-                .to_string(),
-        ),
-        "mineru" => {
-            let base = std::env::var("OMNYID_MINERU_URL")
-                .map_err(|_| "OMNYID_MINERU_URL not configured".to_string())?;
-            let client = reqwest::Client::new();
-            let resp: serde_json::Value = client
-                .post(format!("{base}/parse"))
-                .json(&serde_json::json!({ "url": source_url, "mime_type": mime_type }))
-                .timeout(std::time::Duration::from_secs(120))
-                .send()
-                .await
-                .map_err(|e| format!("MinerU request failed: {e}"))?
-                .json()
-                .await
-                .map_err(|e| format!("MinerU response error: {e}"))?;
-            let text = resp["markdown"]
-                .as_str()
-                .or_else(|| resp["text"].as_str())
-                .unwrap_or("")
-                .to_string();
-            Ok((
-                text,
-                resp["page_count"].as_u64().map(|p| p as u32),
-                resp["title"].as_str().map(String::from),
-            ))
-        }
-        "llamaparse" => {
-            let api_key = std::env::var("OMNYID_LLAMAPARSE_KEY")
-                .map_err(|_| "OMNYID_LLAMAPARSE_KEY not configured".to_string())?;
-            let client = reqwest::Client::new();
-            let upload: serde_json::Value = client
-                .post("https://api.cloud.llamaindex.ai/api/parsing/upload")
-                .header("Authorization", format!("Bearer {api_key}"))
-                .json(&serde_json::json!({ "url": source_url }))
-                .timeout(std::time::Duration::from_secs(30))
-                .send()
-                .await
-                .map_err(|e| format!("LlamaParse upload failed: {e}"))?
-                .json()
-                .await
-                .map_err(|e| format!("LlamaParse upload response error: {e}"))?;
-            let job_id = upload["id"]
-                .as_str()
-                .ok_or_else(|| "LlamaParse: missing job id".to_string())?
-                .to_string();
-            for _ in 0..12 {
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                let status: serde_json::Value = client
-                    .get(format!(
-                        "https://api.cloud.llamaindex.ai/api/parsing/job/{job_id}"
-                    ))
-                    .header("Authorization", format!("Bearer {api_key}"))
-                    .send()
-                    .await
-                    .map_err(|e| format!("LlamaParse poll failed: {e}"))?
-                    .json()
-                    .await
-                    .map_err(|e| format!("LlamaParse poll response error: {e}"))?;
-                if status["status"].as_str() == Some("SUCCESS") {
-                    break;
-                }
-            }
-            let result: serde_json::Value = client
-                .get(format!(
-                    "https://api.cloud.llamaindex.ai/api/parsing/job/{job_id}/result/markdown"
-                ))
-                .header("Authorization", format!("Bearer {api_key}"))
-                .send()
-                .await
-                .map_err(|e| format!("LlamaParse result fetch failed: {e}"))?
-                .json()
-                .await
-                .map_err(|e| format!("LlamaParse result response error: {e}"))?;
-            Ok((
-                result["markdown"].as_str().unwrap_or("").to_string(),
-                None,
-                None,
-            ))
-        }
-        "readability" => {
-            let client = reqwest::Client::new();
-            let html = client
-                .get(source_url)
-                .timeout(std::time::Duration::from_secs(30))
-                .send()
-                .await
-                .map_err(|e| format!("fetch failed: {e}"))?
-                .text()
-                .await
-                .map_err(|e| format!("read body failed: {e}"))?;
-            let text: String = html
-                .split('<')
-                .enumerate()
-                .map(|(i, chunk)| {
-                    if i == 0 {
-                        chunk.to_string()
-                    } else {
-                        chunk.splitn(2, '>').nth(1).unwrap_or("").to_string()
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
-            let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
-            Ok((text, None, None))
-        }
-        other => Err(format!("document parser '{other}' is not implemented")),
-    }
+    super::document_ingest_service::call_parser(parser_family, source, mime_type).await
 }
 
 /// Returns `(text, language, duration_secs, segments)`.

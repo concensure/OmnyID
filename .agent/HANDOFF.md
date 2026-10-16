@@ -2626,3 +2626,28 @@ Assumptions and remaining integration:
   work overlaps `src/server/mod.rs`, `wedding_llm_ladder.rs`, shared wedding UI state, and related
   route files. Do not implement another OCR, mail sender, decision-card foundation, or wedding-only
   quotation store.
+
+## 2026-10-17 - WED-204 shared quotation source bridge (Codex, complete)
+
+Changed:
+
+- Extracted the existing document parser/OCR implementation into
+  `src/server/document_ingest_service.rs`; ordinary `/ingest/*` calls delegate to it and the large
+  ingest route file is smaller than before.
+- Added authenticated `/quotation/sources/prepare`, which can resolve only a message or attachment
+  in a thread visible to the current user. It returns a stable metadata receipt and transient parsed
+  text without logging the source or copying its body into a ledger payload.
+- Added typed capability/source state for client preflight and revision-exact receipt matching.
+
+Verification:
+
+- shared service unit tests: 3 passed.
+- inherited missing-PDF-parser selection regression: 1 passed.
+- Solid UI type checking and quotation source state tests: 3 passed.
+- `cargo check`: passed before the final unused-import cleanup; inherited `email_group_routes.rs`
+  unused-variable warning only.
+
+Remaining:
+
+- WED-205 schema-bound shared-ladder extraction is next. The WED-204 route wiring is deliberately
+  three small additions in `src/server/mod.rs`, so it can be replayed after the dirty WED-187 work.

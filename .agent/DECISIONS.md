@@ -704,3 +704,13 @@ single-use or reusable scope, and projection version. Expiry, revocation, recipi
 single-use consumption are enforced when projecting. Competitor information, private notes,
 hidden preferences, full-plan content, and internal scores are prohibited even if requested by a
 malformed grant. Grant and revocation state remains append-only AFP lineage owned by the user.
+
+## 2026-10-17: Quotation sources reuse the document-ingest provider boundary
+
+Quotation ingestion resolves an existing authenticated thread message or attachment, then invokes
+the same parser selection, MinerU/LlamaParse, readability, and image OCR implementation as ordinary
+ingestion. A source receipt is content-addressed and records only source/version references,
+capability/parser metadata, content fingerprint, page count, and retention state. Parsed text is a
+transient extraction input; it is not copied into the source-received ledger event or operational
+logs. Capability, ownership, size, MIME, and unreadable/encrypted failures remain typed fail-closed
+states with a manual-entry path.

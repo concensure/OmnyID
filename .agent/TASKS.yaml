@@ -1564,3 +1564,33 @@ tasks:
       - A2UI composition reuses stat_row, comparison_table, constraint_badges, insight_line, callout, and action_chips with revision-bound typed actions
       - focused adapter tests pass (4 tests) and Solid UI type checking passes
       - the inherited line-budget check still fails only for WeddingResponseWorkspaceView.tsx (1141) and weddingResponseWorkspaceViewState.ts (1041); neither file was edited
+  - id: WED-204
+    title: Reusable quotation source ingestion and parser capability boundary
+    status: done
+    owner: codex
+    branch: agent/codex/WED-202
+    depends_on:
+      - WED-203
+    files:
+      - src/server/document_ingest_service.rs
+      - src/server/ingest_routes.rs
+      - src/server/quotation_source_routes.rs
+      - src/server/mod.rs
+      - solid-ui/src/lib/quotationSourceState.ts
+      - solid-ui/src/lib/quotationCapabilityState.ts
+      - tests/quotation_source_service.rs
+      - .agent/**
+    acceptance:
+      - ordinary ingestion and quotation ingestion share parser selection and OCR capability logic
+      - quotation sources are immutable references with stable content fingerprints and no copied body
+      - unsupported MIME, unavailable parser or OCR, oversized, encrypted, and missing ownership states fail closed with typed blockers
+      - retries are idempotent and cross-tenant identifiers do not disclose source existence
+      - existing ingest behaviour remains compatible and ingest_routes.rs does not grow
+    progress:
+      - resumed on the isolated quotation worktree after confirming the dirty WED-187 worktree remains untouched
+      - extracted parser selection, MinerU/LlamaParse calls, image OCR capability/invocation, and text/readability handling into a shared document-ingest service
+      - ordinary ingest delegates to the shared service and ingest_routes.rs is 238 lines smaller than its baseline
+      - authenticated quotation preparation resolves only a source message already visible in the user's private thread and returns a stable receipt plus transient parsed text
+      - receipts retain source/version, content fingerprint, MIME, filename, parser, page count, and retention state without persisting a copied source body
+      - typed source planners fail closed for ownership, size, encryption/readability, MIME, OCR, and PDF-parser blockers
+      - focused Rust source-service tests, inherited PDF parser selection regression, Solid UI type checking, and quotation source state tests pass
