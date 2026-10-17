@@ -30,6 +30,7 @@ fn empty_evidence_is_untested_and_fails_closed() {
         vendor_context_grants: true,
         vendor_response_capabilities: true,
         claimed_vendor_responses: true,
+        email_response_reconciliation: true,
     };
     assert_eq!(
         requested.gated_by(&report),

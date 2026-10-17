@@ -2231,3 +2231,49 @@ tasks:
       - the full quotation verifier passes 97 Rust integration tests, 20 focused quotation library tests, shared ingest/Gmail/LLM ladder tests, cargo check, six SDK tests plus typecheck/build, 44 Solid tests, and ten mobile/desktop Playwright checks including the new upload flow, Axe, and overflow assertions
       - the Solid production bundle passes with the inherited large-chunk advisory; the only Rust warning is the inherited email-group unused variable and every new file is at most 535 lines
       - TEST_DATABASE_URL and CLAMD_HOST are unset locally, so no real Postgres upload persistence or clean ClamAV daemon round trip was claimed; all release flags remain disabled and no provider, Oracle, Cloudflare, payment, email, or production configuration changed
+  - id: WED-224
+    title: Converge email and federation vendor quotation responses
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-220
+      - WED-221
+      - WED-222
+      - WED-223
+    files:
+      - src/quotation/vendor_response_reconciliation.rs
+      - src/quotation/mod.rs
+      - src/quotation/clarification.rs
+      - src/quotation/features.rs
+      - src/quotation/vendor_revision.rs
+      - src/server/quotation_routes/clarification_routes.rs
+      - src/server/quotation_source_routes.rs
+      - src/gateway/gmail_api.rs
+      - src/gateway/imap_sync.rs
+      - src/gateway/smtp_in.rs
+      - src/db/quotation_vendor_responses.rs
+      - src/server/quotation_email_response.rs
+      - src/server/quotation_vendor_response_routes.rs
+      - src/server/federation_*.rs
+      - tests/quotation_vendor_response_api.rs
+      - scripts/verify-quotation-readiness.ps1
+      - .agent/**
+    acceptance:
+      - approved invitation email contains only approved projection fields and questions and uses existing deterministic Message-ID, send reservation, and ambiguity reconciliation
+      - inbound email matches an exact invitation/thread through headers or durable provider identifiers and never guesses from prose or sender alone
+      - matched email bodies and attachments reuse quotation source preparation and converge with verified AFP and portal inputs on quotation.vendor_response.v1
+      - material/source fingerprints deduplicate channel retries while delivery accepted, received, parsed, reviewed, and resolved remain distinct states
+      - provider delivery never becomes booking evidence and disabled relay/federation paths remain explicit and honest
+      - Gmail/federation, no-send, reconciliation, duplicate-channel, ambiguity, and line-budget checks pass with Cloudflare relay disabled
+    progress:
+      - started from clean WED-223 commit a35c65c; the audit retained the existing Gmail send reservation/receipt and federation retry boundaries while isolating quotation attribution from the legacy sender fallback
+      - approved invitation email now includes only hash-bound, case-insensitive denylist-checked context and reviewed questions while retaining the existing deterministic Message-ID, send reservation, provider lookup, and durable receipt flow
+      - Gmail quotation ingestion is separately release-gated and requires exact approved-recipient plus In-Reply-To/References binding to one sent clarification; it never uses sender-only, subject, or prose matching and revalidates the approved active grant, projection, quotation version, revocation, expiry, and terminal closure
+      - matched body and bounded MIME attachments form one deterministic tenant-private source; safe attachments reuse existing signature/active-content checks, fail-closed ClamAV, owner quota/storage, readability/image OCR, and source receipts, while unsupported PDF/DOCX inline extraction remains explicit review-only evidence rather than lossy text
+      - email, secure-link, and decrypted verified-AFP payloads converge on quotation.vendor_response.v1; canonical material/source fingerprints deduplicate exact cross-channel retries and material changes require parent-linked successors, with single-use grants unable to create a changed second response
+      - claimed AFP acceptance appends only a tenant-private delivery_accepted event; authenticated owner convergence rechecks the stored ciphertext routing metadata, tenant, claimed Agent, active grant/version, canonical response fingerprint, and review-only semantics before persisting plaintext
+      - generic federation delivery receipts now state that peer acceptance is neither commercial acceptance nor booking evidence; Cloudflare/AFP relay, quotation email reconciliation, release gate, and every quotation feature flag remain disabled
+      - the full quotation verifier passes 99 Rust integration tests, the conditional API flow, 31 quotation unit tests, shared document/Gmail/MIME/federation/LLM checks, cargo check, six SDK tests plus typecheck/build, and 44 Solid tests; the first Windows rustc access violation was resolved by rerunning with CARGO_BUILD_JOBS=2
+      - new files are 863 and 648 physical lines and the bounded response route is 748 lines; the only Rust warning is the inherited email-group unused variable
+      - TEST_DATABASE_URL and CLAMD_HOST are unset, so real Postgres HTTP convergence, clean ClamAV daemon, provider smoke, independent security/privacy review, and release activation remain pending; no provider, Oracle, Cloudflare, email, payment, or deployment mutation occurred

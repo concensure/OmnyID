@@ -1,3 +1,42 @@
+## 2026-10-18 - WED-224 email and AFP response convergence (Codex, review)
+
+Changed:
+
+- Approved clarification mail now includes only the hash-bound, denylist-checked context and
+  reviewed questions. The existing deterministic Message-ID, pre-send reservation, provider
+  reconciliation, and receipt flow is unchanged.
+- Gmail sync has a separately release-gated quotation adapter. It requires exact recipient plus
+  `In-Reply-To`/`References` binding to one sent clarification, reloads the active approved grant,
+  rejects ambiguous/stale/revoked/terminal authority, and never uses the generic sender fallback.
+- Matched bodies and bounded MIME attachments become a deterministic tenant-private AFP source.
+  Safe attachments reuse the WED-223 validation, ClamAV, owner quota/storage, shared readability/
+  image OCR, and manual-review fallback. PDF/DOCX bytes are preserved for review when safe inline
+  extraction is unavailable; they are never lossily decoded as text.
+- Email, portal, and verified AFP plaintext converge through the canonical vendor-response/source
+  fingerprint. Exact cross-channel material deduplicates without a new review; changed material is
+  parent-linked. Claimed AFP transport acceptance now records only `delivery_accepted`; an
+  authenticated owner convergence route must match the stored signed routing fingerprint before a
+  canonical review event can be appended.
+
+Verification:
+
+- `scripts/verify-quotation-readiness.ps1` passed with `CARGO_BUILD_JOBS=2`: 99 Rust quotation
+  integration tests, conditional API flow, 31 quotation unit tests, shared ingest/Gmail/MIME/
+  federation/LLM tests, `cargo check`, six SDK tests plus typecheck/build, and 44 Solid tests.
+- The first full run hit a Windows `rustc` `STATUS_ACCESS_VIOLATION`; reducing build parallelism
+  produced a clean full pass. The only compiler warning remains the inherited unused `user_id` in
+  `email_group_routes.rs`. New files are 863 and 648 physical lines; the bounded route is 748.
+- `TEST_DATABASE_URL` and `CLAMD_HOST` are unset, so the real Postgres HTTP convergence round trip,
+  clean-daemon attachment scan, and separately authorized allowlisted provider smoke are not
+  claimed. Cloudflare/AFP relay, email reconciliation, release gate, and all quotation feature
+  flags remain off; no provider, Oracle, Cloudflare, payment, email, or deployment mutation ran.
+
+Next:
+
+- Run the owner-scoped Gmail/AFP convergence matrix on disposable Postgres with clamd, then obtain
+  independent security/privacy review. Do not enable the email reconciliation, claimed-vendor, or
+  relay flags before that evidence and the WED-185 relay gates pass.
+
 ## 2026-10-18 - WED-223 vendor quotation revision ingestion (Codex, review)
 
 Changed:

@@ -82,6 +82,18 @@ fn bounded(value: &str, max: usize) -> bool {
     !value.is_empty() && value.chars().count() <= max && !value.chars().any(char::is_control)
 }
 
+pub fn clarification_context_is_shareable(context: &[ClarificationContextFact]) -> bool {
+    context.len() <= 100
+        && context.iter().all(|fact| {
+            let normalized_key = fact.key.trim().to_ascii_lowercase();
+            bounded(&fact.key, 180)
+                && bounded(&fact.value, 500)
+                && !FORBIDDEN_CONTEXT_PREFIXES
+                    .iter()
+                    .any(|prefix| normalized_key.starts_with(prefix))
+        })
+}
+
 pub fn draft_hash(draft: &ClarificationDraft) -> String {
     let bytes = serde_json::to_vec(draft).unwrap_or_default();
     format!("sha256:{}", hex::encode(Sha256::digest(bytes)))
@@ -107,13 +119,7 @@ pub fn build_clarification_draft(
     {
         return Err(ClarificationError::InvalidDraft);
     }
-    if context.iter().any(|fact| {
-        !bounded(&fact.key, 180)
-            || !bounded(&fact.value, 500)
-            || FORBIDDEN_CONTEXT_PREFIXES
-                .iter()
-                .any(|prefix| fact.key.starts_with(prefix))
-    }) {
+    if !clarification_context_is_shareable(&context) {
         return Err(ClarificationError::ForbiddenContext);
     }
     let mut seen = BTreeSet::new();

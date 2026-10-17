@@ -18,17 +18,20 @@ use crate::{
     db::{StoredVendorTransport, VendorTransportStoreOutcome, VendorTransportWrite},
     message::AFPMessage,
     quotation::{
-        ActiveVendorGrant, ClaimedVendorAuthority, ClosureState, ContextGrantAction,
-        QuotationFeatureFlags, VendorTransportFailure, VendorTransportReceipt,
-        WEDDING_ENQUIRY_RESPONSE_TYPE, WEDDING_ENQUIRY_TYPE, envelope_bytes, envelope_digest,
-        replay_quotation_messages, valid_vendor_encrypted_envelope,
-        validate_claimed_vendor_response, vendor_transport_receipt,
+        ActiveVendorGrant, ChannelReconciliationDecision, ClaimedVendorAuthority, ClosureState,
+        ContextGrantAction, ContextGrantScope, QuotationFeatureFlags, QuotationVendorResponse,
+        VendorTransportFailure, VendorTransportReceipt, WEDDING_ENQUIRY_RESPONSE_TYPE,
+        WEDDING_ENQUIRY_TYPE, afp_transport_accepted_message, afp_vendor_response_message,
+        channel_reconciled_message, envelope_bytes, envelope_digest,
+        reconcile_verified_afp_response, replay_quotation_messages, routing_metadata,
+        valid_vendor_encrypted_envelope, validate_claimed_vendor_response,
+        vendor_transport_receipt,
     },
 };
 
 use super::{
     AppState,
-    auth::{authenticated_user, thread_messages_for_headers},
+    auth::{authenticated_user, store_private_app_message, thread_messages_for_headers},
     proto_to_app,
     quotation_response_capability_routes::{
         approved_receipt_visible, grant_envelope, grant_revoked, owner_messages,
@@ -51,6 +54,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/quotation/vendor-transactions/responses",
             post(submit_response_http),
         )
+        .route(
+            "/quotation/vendor-transactions/responses/converge",
+            post(converge_response_http),
+        )
 }
 
 #[derive(Deserialize)]
@@ -70,6 +77,20 @@ struct SubmitResponseRequest {
     request_id: String,
     invitation_message_id: String,
     message: AFPMessage,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ConvergeResponseRequest {
+    transport_message_id: String,
+    response: QuotationVendorResponse,
+}
+
+#[derive(Serialize)]
+struct ConvergeResponseResult {
+    status: &'static str,
+    response_id: String,
+    replayed: bool,
 }
 
 #[derive(Serialize)]
@@ -547,7 +568,161 @@ async fn submit_response_http(
         .store_vendor_transport(&write, &receipt)
         .await
         .map_err(database_failure)?;
-    store_outcome(outcome)
+    match outcome {
+        VendorTransportStoreOutcome::Stored(receipt)
+        | VendorTransportStoreOutcome::Retry(receipt) => {
+            let accepted = afp_transport_accepted_message(
+                &receipt,
+                &write.thread_id,
+                &write.grant_message_id,
+                &write.vendor_id,
+                &write.quotation_id,
+                &write.quotation_version_id,
+                write.response_id.as_deref().unwrap_or_default(),
+                write.response_fingerprint.as_deref().unwrap_or_default(),
+                &write.owner_user_id,
+            );
+            // Transport storage is already committed. A private AFP projection is
+            // replay-safe and best-effort; failure cannot misreport the provider receipt.
+            let _ = store_private_app_message(
+                &state.db,
+                &state.metrics,
+                &state.relay_tx,
+                &write.owner_user_id,
+                accepted,
+            )
+            .await;
+            Ok(Json(receipt))
+        }
+        VendorTransportStoreOutcome::RequestConflict
+        | VendorTransportStoreOutcome::NonceConflict => Err((
+            StatusCode::CONFLICT,
+            "request could not be replayed".to_string(),
+        )),
+    }
+}
+
+async fn converge_response_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<ConvergeResponseRequest>,
+) -> Result<Json<ConvergeResponseResult>, (StatusCode, String)> {
+    if !enabled() || !valid_id(&request.transport_message_id) {
+        return Err(service_unavailable());
+    }
+    let user = authenticated_user(&state.db, &headers).await?;
+    let stored = state
+        .db
+        .vendor_response_transport_for_owner(&user.id, &request.transport_message_id)
+        .await
+        .map_err(database_failure)?
+        .ok_or_else(unavailable)?;
+    let envelope =
+        serde_json::from_slice::<AFPMessage>(&stored.envelope).map_err(|_| unavailable())?;
+    let routing = routing_metadata(&envelope).map_err(|_| unavailable())?;
+    if envelope.id != stored.message_id
+        || request.response.thread_id != stored.thread_id
+        || request.response.attestation.attested_by != stored.from_agent_id
+        || routing.grant_message_id != stored.grant_message_id
+        || routing.grant_id != stored.grant_id
+        || routing.vendor_id != stored.vendor_id
+        || routing.quotation_id != stored.quotation_id
+        || routing.quotation_version_id != stored.quotation_version_id
+        || !routing
+            .projection_fingerprint
+            .eq_ignore_ascii_case(&stored.projection_fingerprint)
+        || stored.response_id.as_deref() != Some(routing.response_id.as_str())
+        || stored.response_fingerprint.as_deref() != Some(routing.response_fingerprint.as_str())
+    {
+        return Err(unavailable());
+    }
+    let messages = owner_messages(&state, &user.id, &stored.thread_id)
+        .await
+        .map_err(|_| unavailable())?;
+    let grant_message = messages
+        .iter()
+        .find(|message| message.id == stored.grant_message_id)
+        .ok_or_else(unavailable)?;
+    let bundle = grant_envelope(grant_message).ok_or_else(unavailable)?;
+    let grant = &bundle.grant;
+    let replay = replay_quotation_messages(&messages);
+    let closure_terminal = replay
+        .active_closures
+        .get(&grant.quotation_id)
+        .is_some_and(|closure| {
+            matches!(
+                closure.state,
+                ClosureState::BookingConfirmed
+                    | ClosureState::Cancelled
+                    | ClosureState::Refunded
+                    | ClosureState::Superseded
+            )
+        });
+    if grant.granted_by_user_id != user.id
+        || grant.grant_id != stored.grant_id
+        || grant.target_vendor_id != stored.vendor_id
+        || grant.quotation_id != stored.quotation_id
+        || grant.quotation_version_id != stored.quotation_version_id
+        || grant.thread_id != stored.thread_id
+        || grant.projection_fingerprint != stored.projection_fingerprint
+        || grant_message.parent_id.as_deref() != Some(grant.approval_receipt_ref.as_str())
+        || !approved_receipt_visible(&messages, grant)
+        || grant_revoked(&messages, &grant.grant_id)
+        || closure_terminal
+        || replay.active_version_by_quotation.get(&grant.quotation_id)
+            != Some(&grant.quotation_version_id)
+    {
+        return Err(unavailable());
+    }
+    let existing = messages
+        .iter()
+        .filter_map(|message| message.content.get("response"))
+        .filter_map(|value| serde_json::from_value::<QuotationVendorResponse>(value.clone()).ok())
+        .collect::<Vec<_>>();
+    let incoming = request.response;
+    let response_id = incoming.response_id.clone();
+    let decision = reconcile_verified_afp_response(&existing, incoming.clone(), &routing)
+        .map_err(|_| unavailable())?;
+    if grant.scope == ContextGrantScope::SingleUse
+        && !existing.is_empty()
+        && !matches!(decision, ChannelReconciliationDecision::Duplicate { .. })
+    {
+        return Err(unavailable());
+    }
+    let (message, replayed) = match decision {
+        ChannelReconciliationDecision::New(response)
+        | ChannelReconciliationDecision::Successor(response) => (
+            afp_vendor_response_message(&response, &stored.grant_message_id, &stored.message_id)
+                .map_err(|_| unavailable())?,
+            false,
+        ),
+        ChannelReconciliationDecision::Duplicate {
+            existing_response_id,
+            fingerprint,
+        } => (
+            channel_reconciled_message(
+                &incoming,
+                &existing_response_id,
+                &fingerprint,
+                &stored.message_id,
+            ),
+            true,
+        ),
+    };
+    store_private_app_message(
+        &state.db,
+        &state.metrics,
+        &state.relay_tx,
+        &user.id,
+        message,
+    )
+    .await
+    .map_err(|_| unavailable())?;
+    Ok(Json(ConvergeResponseResult {
+        status: "review_required",
+        response_id,
+        replayed,
+    }))
 }
 
 async fn rejected_response(

@@ -156,6 +156,21 @@ const TRANSPORT_SELECT: &str = r#"
 "#;
 
 impl Db {
+    pub async fn vendor_response_transport_for_owner(
+        &self,
+        owner_user_id: &str,
+        message_id: &str,
+    ) -> Result<Option<StoredVendorTransport>, sqlx::Error> {
+        sqlx::query(&format!(
+            "{TRANSPORT_SELECT} WHERE t.owner_user_id = $1 AND t.message_id = $2 AND t.direction = 'to_couple' LIMIT 1"
+        ))
+        .bind(owner_user_id)
+        .bind(message_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map(|row| row.map(transport_from_row))
+    }
+
     async fn existing_vendor_transport_receipt(
         transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         vendor_id: &str,

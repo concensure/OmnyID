@@ -17,9 +17,9 @@ use crate::{
     quotation::{
         CLARIFICATION_SEND_RESERVED_KIND, CLARIFICATION_SENT_KIND, ClarificationApproval,
         ClarificationDraft, ClarificationSendDecision, ClarificationSendReceipt,
-        QuotationFeatureFlags, authorise_clarification_send, clarification_send_idempotency_key,
-        clarification_send_reservation_message, clarification_sent_message, draft_hash,
-        replay_quotation_messages,
+        QuotationFeatureFlags, authorise_clarification_send, clarification_context_is_shareable,
+        clarification_send_idempotency_key, clarification_send_reservation_message,
+        clarification_sent_message, draft_hash, replay_quotation_messages,
     },
 };
 
@@ -97,6 +97,12 @@ fn parse_draft(message: &AFPMessage) -> Result<ClarificationDraft, (StatusCode, 
             "clarification draft is invalid".to_string(),
         )
     })?;
+    if !clarification_context_is_shareable(&draft.context) {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "clarification context is not shareable".to_string(),
+        ));
+    }
     let stored_hash = message
         .content
         .get("draft_hash")
@@ -170,6 +176,12 @@ fn active_revision_matches(messages: &[AFPMessage], draft: &ClarificationDraft) 
 }
 
 fn clarification_body(draft: &ClarificationDraft) -> String {
+    let context = draft
+        .context
+        .iter()
+        .map(|fact| format!("- {}: {}", fact.key.trim(), fact.value.trim()))
+        .collect::<Vec<_>>()
+        .join("\n");
     let questions = draft
         .questions
         .iter()
@@ -177,8 +189,13 @@ fn clarification_body(draft: &ClarificationDraft) -> String {
         .map(|(index, question)| format!("{}. {}", index + 1, question.question.trim()))
         .collect::<Vec<_>>()
         .join("\n");
+    let approved_context = if context.is_empty() {
+        String::new()
+    } else {
+        format!("\n\nApproved event context:\n{context}")
+    };
     format!(
-        "Hello,\n\nThank you for the quotation. Could you please clarify the following?\n\n{questions}\n\nKind regards"
+        "Hello,\n\nThank you for the quotation.{approved_context}\n\nCould you please clarify the following?\n\n{questions}\n\nKind regards"
     )
 }
 
@@ -504,10 +521,10 @@ mod tests {
     }
 
     #[test]
-    fn email_body_contains_only_reviewed_questions() {
+    fn email_body_contains_only_approved_context_and_reviewed_questions() {
         let body = clarification_body(&draft());
         assert!(body.contains("1. Is beverage service included?"));
-        assert!(!body.contains("guest_count"));
+        assert!(body.contains("event.guest_count: 80"));
         assert!(!body.contains("competitor"));
     }
 
@@ -562,6 +579,25 @@ mod tests {
         assert_eq!(
             parse_draft(&message).expect_err("stale hash").0,
             StatusCode::CONFLICT
+        );
+    }
+
+    #[test]
+    fn persisted_draft_cannot_bypass_context_disclosure_policy() {
+        let mut unsafe_draft = draft();
+        unsafe_draft.context[0].key = "competitor.price".to_string();
+        let message = AFPMessage {
+            r#type: "quotation_clarification_draft".to_string(),
+            kind: Some("quotation_clarification_draft".to_string()),
+            content: serde_json::json!({
+                "draft_hash": draft_hash(&unsafe_draft),
+                "draft": unsafe_draft,
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            parse_draft(&message).expect_err("forbidden context").0,
+            StatusCode::UNPROCESSABLE_ENTITY
         );
     }
 

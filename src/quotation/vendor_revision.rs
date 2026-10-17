@@ -72,11 +72,12 @@ fn extension(file_name: &str) -> &str {
     file_name.rsplit('.').next().unwrap_or("")
 }
 
-pub fn validate_vendor_revision_upload<'a>(
+fn validate_vendor_revision<'a>(
     file_name: &str,
     declared_media_type: Option<&str>,
     bytes: &[u8],
     extracted_text: Option<&'a str>,
+    require_prepared_docx_text: bool,
 ) -> Result<ValidatedVendorRevision<'a>, VendorRevisionBlocker> {
     if bytes.is_empty() {
         return Err(VendorRevisionBlocker::Empty);
@@ -140,7 +141,7 @@ pub fn validate_vendor_revision_upload<'a>(
             }
             Ok(ValidatedVendorRevision {
                 media_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                prepared_text: prepared_text(extracted_text, true)?,
+                prepared_text: prepared_text(extracted_text, require_prepared_docx_text)?,
             })
         }
         "docm" | "dotm" => Err(VendorRevisionBlocker::ActiveContent),
@@ -202,6 +203,27 @@ pub fn validate_vendor_revision_upload<'a>(
         }
         _ => Err(VendorRevisionBlocker::UnsupportedType),
     }
+}
+
+pub fn validate_vendor_revision_upload<'a>(
+    file_name: &str,
+    declared_media_type: Option<&str>,
+    bytes: &[u8],
+    extracted_text: Option<&'a str>,
+) -> Result<ValidatedVendorRevision<'a>, VendorRevisionBlocker> {
+    validate_vendor_revision(file_name, declared_media_type, bytes, extracted_text, true)
+}
+
+/// Applies the same signature, size, encryption, and active-content policy as
+/// portal uploads. Email attachments may omit browser-prepared DOCX text; in
+/// that case the source stays review-only if the shared server parser cannot
+/// safely extract it.
+pub fn validate_vendor_revision_email_attachment(
+    file_name: &str,
+    declared_media_type: Option<&str>,
+    bytes: &[u8],
+) -> Result<ValidatedVendorRevision<'static>, VendorRevisionBlocker> {
+    validate_vendor_revision(file_name, declared_media_type, bytes, None, false)
 }
 
 pub fn artifact_matches_binding(
@@ -277,6 +299,21 @@ mod tests {
             validate_vendor_revision_upload("quote.docx", None, b"PK safe", None),
             Err(VendorRevisionBlocker::PreparedTextRequired)
         );
+    }
+
+    #[test]
+    fn email_docx_reuses_safety_policy_without_claiming_client_extraction() {
+        let validated = validate_vendor_revision_email_attachment(
+            "quote.docx",
+            Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            b"PK safe document body",
+        )
+        .expect("safe email attachment");
+        assert_eq!(
+            validated.media_type,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+        assert_eq!(validated.prepared_text, None);
     }
 
     #[test]

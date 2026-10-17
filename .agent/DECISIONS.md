@@ -1,3 +1,22 @@
+## 2026-10-18: Vendor response channels converge only after exact transport proof
+
+Approved Gmail replies become quotation responses only when both the sender equals the approved
+recipient and `In-Reply-To`/`References` names exactly one durable clarification Message-ID. Sender,
+subject, body prose, and the legacy outreach fallback are never quotation authority. The matched
+body and safe attachments become one deterministic tenant-private source; attachments reuse the
+existing signature/active-content policy, ClamAV, quota, storage, image OCR, and source preparation
+boundaries. Unsupported binary extraction remains review-only rather than decoding DOCX/PDF bytes
+as text. An unavailable scanner or ambiguous/expired/revoked/stale grant creates no canonical fact.
+
+Ciphertext-only claimed/federated AFP remains encrypted in transport storage. Its receipt is a
+`delivery_accepted` event only. An authenticated owner client may converge decrypted canonical
+plaintext only when its complete fingerprint, response identity, claimed-Agent attribution, and
+grant/quotation/projection binding match the previously verified signed routing metadata. Email,
+portal, and AFP then share `quotation.vendor_response.v1`: exact material/source duplicates append
+only a channel-reconciliation receipt, while a material change requires a parent-linked successor
+and user review. No transport state is commercial acceptance, booking evidence, or payment
+authority. Both email reconciliation and relay remain independently release-gated and disabled.
+
 ## 2026-10-18: Vendor revision uploads are immutable capability-bound sources
 
 A secure-link vendor may attach one quotation revision only when the active grant permits

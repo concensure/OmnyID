@@ -25,6 +25,10 @@ fn transport_boundary_has_no_plaintext_columns_or_request_logging() {
     }
     assert!(routes.contains("validate_claimed_vendor_response"));
     assert!(routes.contains("claimed_vendor_invitation"));
+    assert!(routes.contains("/quotation/vendor-transactions/responses/converge"));
+    assert!(routes.contains("reconcile_verified_afp_response"));
+    assert!(persistence.contains("vendor_response_transport_for_owner"));
+    assert!(persistence.contains("t.owner_user_id = $1"));
     assert!(!routes.contains("vendor_subscriptions"));
 }
 

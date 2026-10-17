@@ -26,6 +26,7 @@ pub mod validation;
 pub mod vendor_context;
 pub mod vendor_response;
 pub mod vendor_response_transport;
+pub mod vendor_response_reconciliation;
 pub mod vendor_revision;
 
 pub use afp::*;
@@ -50,4 +51,5 @@ pub use validation::*;
 pub use vendor_context::*;
 pub use vendor_response::*;
 pub use vendor_response_transport::*;
+pub use vendor_response_reconciliation::*;
 pub use vendor_revision::*;

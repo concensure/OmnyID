@@ -12,6 +12,7 @@ pub struct QuotationFeatureFlags {
     pub vendor_context_grants: bool,
     pub vendor_response_capabilities: bool,
     pub claimed_vendor_responses: bool,
+    pub email_response_reconciliation: bool,
 }
 
 fn env_enabled(name: &str) -> bool {
@@ -55,6 +56,9 @@ impl QuotationFeatureFlags {
             ),
             claimed_vendor_responses: env_enabled(
                 "OMNYID_QUOTATION_CLAIMED_VENDOR_RESPONSES_ENABLED",
+            ),
+            email_response_reconciliation: env_enabled(
+                "OMNYID_QUOTATION_EMAIL_RESPONSE_RECONCILIATION_ENABLED",
             ),
         }
     }

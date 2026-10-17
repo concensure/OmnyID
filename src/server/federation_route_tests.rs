@@ -232,6 +232,9 @@ fn federated_delivery_sent_message_links_to_attempt() {
     assert_eq!(sent.subtype.as_deref(), Some("federated_delivery_sent"));
     assert_eq!(sent.content["attempted_message_id"], attempted.id);
     assert_eq!(sent.content["status"], "accepted_by_peer_relay");
+    assert_eq!(sent.content["progress"], "delivery_accepted");
+    assert_eq!(sent.content["commercial_acceptance"], false);
+    assert_eq!(sent.content["booking_evidence"], false);
     assert_eq!(
         sent.metadata.as_ref().expect("metadata")["delivery"],
         "sent"

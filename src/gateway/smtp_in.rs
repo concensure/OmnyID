@@ -1,4 +1,4 @@
-use mail_parser::{Address, HeaderValue, MessageParser};
+use mail_parser::{Address, HeaderValue, MessageParser, MimeHeaders, PartType};
 use serde_json::{Value, json};
 use ulid::Ulid;
 
@@ -17,6 +17,22 @@ pub struct IncomingEmailSummary {
     pub in_reply_to: Option<String>,
     pub reference_targets: Vec<String>,
     pub external_conversation_key: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IncomingEmailAttachment {
+    pub file_name: String,
+    pub media_type: String,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IncomingEmailSource {
+    pub summary: IncomingEmailSummary,
+    pub body: String,
+    pub body_media_type: String,
+    pub attachments: Vec<IncomingEmailAttachment>,
+    pub attachments_blocked: bool,
 }
 
 pub async fn handle_incoming_email(raw_email: &[u8]) -> Result<AFPMessage, String> {
@@ -110,6 +126,31 @@ pub fn summarize_incoming_email(raw_email: &[u8]) -> IncomingEmailSummary {
     }
 }
 
+pub fn parse_incoming_email_source(raw_email: &[u8]) -> IncomingEmailSource {
+    let parsed = parse_incoming_email(raw_email);
+    let summary = IncomingEmailSummary {
+        subject: parsed.subject.clone(),
+        smtp_from: parsed.smtp_from.clone(),
+        smtp_to: parsed.smtp_to.clone(),
+        body_preview: preview_text(&parsed.body, 240),
+        smtp_message_id: parsed.smtp_message_id.clone(),
+        in_reply_to: parsed.in_reply_to.clone(),
+        reference_targets: parsed.reference_targets.clone(),
+        external_conversation_key: external_email_conversation_key(
+            &parsed.smtp_message_id,
+            parsed.in_reply_to.as_deref(),
+            &parsed.reference_targets,
+        ),
+    };
+    IncomingEmailSource {
+        summary,
+        body: parsed.body,
+        body_media_type: parsed.body_media_type,
+        attachments: parsed.attachments,
+        attachments_blocked: parsed.attachments_blocked,
+    }
+}
+
 pub fn external_email_conversation_key(
     smtp_message_id: &str,
     in_reply_to: Option<&str>,
@@ -132,6 +173,9 @@ struct ParsedIncomingEmail {
     smtp_message_id: String,
     in_reply_to: Option<String>,
     reference_targets: Vec<String>,
+    body_media_type: String,
+    attachments: Vec<IncomingEmailAttachment>,
+    attachments_blocked: bool,
 }
 
 fn maybe_encrypt_gateway_message(message: &mut AFPMessage) -> Result<(), String> {
@@ -216,17 +260,63 @@ fn parse_incoming_email(raw_email: &[u8]) -> ParsedIncomingEmail {
             .unwrap_or_else(|| format!("smtp_{}", Ulid::new())),
         in_reply_to: extract_header(&fallback_raw, "In-Reply-To"),
         reference_targets: extract_reference_targets(&fallback_raw),
+        body_media_type: "text/plain".to_string(),
+        attachments: vec![],
+        attachments_blocked: false,
     };
 
     let Some(message) = MessageParser::default().parse(raw_email) else {
         return fallback;
     };
 
-    let body = message
-        .body_text(0)
-        .or_else(|| message.body_html(0))
-        .map(|value| value.into_owned())
-        .unwrap_or_else(|| fallback.body.clone());
+    let (body, body_media_type) = if let Some(value) = message.body_text(0) {
+        (value.into_owned(), "text/plain".to_string())
+    } else if let Some(value) = message.body_html(0) {
+        (value.into_owned(), "text/html".to_string())
+    } else {
+        (fallback.body.clone(), fallback.body_media_type.clone())
+    };
+
+    const MAX_ATTACHMENTS: usize = 20;
+    const MAX_ATTACHMENT_BYTES: usize = 25 * 1024 * 1024;
+    const MAX_TOTAL_ATTACHMENT_BYTES: usize = 32 * 1024 * 1024;
+    let mut attachments = Vec::new();
+    let mut total_bytes = 0_usize;
+    let mut attachments_blocked = false;
+    for (index, part) in message.attachments().enumerate() {
+        let bytes = match &part.body {
+            PartType::Binary(value) | PartType::InlineBinary(value) => value.as_ref(),
+            PartType::Text(value) | PartType::Html(value) => value.as_bytes(),
+            PartType::Message(value) => value.raw_message.as_ref(),
+            PartType::Multipart(_) => continue,
+        };
+        if attachments.len() >= MAX_ATTACHMENTS
+            || bytes.len() > MAX_ATTACHMENT_BYTES
+            || total_bytes.saturating_add(bytes.len()) > MAX_TOTAL_ATTACHMENT_BYTES
+        {
+            attachments_blocked = true;
+            continue;
+        }
+        let media_type = part
+            .content_type()
+            .map(|content_type| {
+                format!(
+                    "{}/{}",
+                    content_type.c_type,
+                    content_type.c_subtype.as_deref().unwrap_or("octet-stream")
+                )
+            })
+            .unwrap_or_else(|| "application/octet-stream".to_string());
+        attachments.push(IncomingEmailAttachment {
+            file_name: part
+                .attachment_name()
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("attachment-{}.bin", index + 1)),
+            media_type,
+            bytes: bytes.to_vec(),
+        });
+        total_bytes = total_bytes.saturating_add(bytes.len());
+    }
 
     ParsedIncomingEmail {
         subject: message
@@ -256,6 +346,9 @@ fn parse_incoming_email(raw_email: &[u8]) -> ParsedIncomingEmail {
                 parsed_references
             }
         },
+        body_media_type,
+        attachments,
+        attachments_blocked,
     }
 }
 
@@ -380,7 +473,7 @@ fn preview_text(input: &str, max_chars: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::handle_incoming_email;
+    use super::{handle_incoming_email, parse_incoming_email_source};
     use std::sync::{Mutex, OnceLock};
 
     fn env_lock() -> &'static Mutex<()> {
@@ -459,5 +552,51 @@ mod tests {
         assert_eq!(message.references[1]["metadata"]["relation"], "in_reply_to");
         assert_eq!(message.references[2]["target"], "<msg-0@example.com>");
         assert_eq!(message.references[3]["target"], "<msg-1@example.com>");
+    }
+
+    #[test]
+    fn incoming_email_source_preserves_bounded_mime_attachments() {
+        let raw = concat!(
+            "From: Vendor <vendor@example.test>\r\n",
+            "To: couple@example.test\r\n",
+            "Subject: Revised quote\r\n",
+            "Message-Id: <reply@example.test>\r\n",
+            "In-Reply-To: <invite@example.test>\r\n",
+            "Content-Type: multipart/mixed; boundary=quote-boundary\r\n",
+            "\r\n",
+            "--quote-boundary\r\n",
+            "Content-Type: text/plain; charset=utf-8\r\n",
+            "\r\n",
+            "The revised total is AUD 4,200.\r\n",
+            "--quote-boundary\r\n",
+            "Content-Type: text/plain; name=revision.txt\r\n",
+            "Content-Disposition: attachment; filename=revision.txt\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "VG90YWwgQVVEIDQsMjAw\r\n",
+            "--quote-boundary--\r\n"
+        );
+        let source = parse_incoming_email_source(raw.as_bytes());
+        assert_eq!(source.summary.smtp_from, "vendor@example.test");
+        assert_eq!(
+            source.summary.in_reply_to.as_deref(),
+            Some("<invite@example.test>")
+        );
+        assert!(source.body.contains("revised total"));
+        assert_eq!(source.body_media_type, "text/plain");
+        assert_eq!(source.attachments.len(), 1);
+        assert_eq!(source.attachments[0].file_name, "revision.txt");
+        assert_eq!(source.attachments[0].media_type, "text/plain");
+        assert_eq!(source.attachments[0].bytes, b"Total AUD 4,200");
+        assert!(!source.attachments_blocked);
+    }
+
+    #[test]
+    fn html_only_email_prefers_the_mail_parser_plaintext_view() {
+        let source = parse_incoming_email_source(
+            b"From: vendor@example.test\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<p>Total <strong>AUD 4,200</strong></p>",
+        );
+        assert_eq!(source.body_media_type, "text/plain");
+        assert!(source.body.contains("AUD 4,200"));
     }
 }

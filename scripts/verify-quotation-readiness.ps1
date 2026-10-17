@@ -21,12 +21,27 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Shared document-ingest service verification failed" }
     cargo test --lib gmail_api
     if ($LASTEXITCODE -ne 0) { throw "Gmail threading and provider-receipt verification failed" }
+    cargo test --lib smtp_in
+    if ($LASTEXITCODE -ne 0) { throw "Inbound MIME source verification failed" }
+    cargo test --lib federation_route_tests
+    if ($LASTEXITCODE -ne 0) { throw "Federation lifecycle verification failed" }
     cargo test --lib wedding_llm_ladder
     if ($LASTEXITCODE -ne 0) { throw "Shared LLM ladder verification failed" }
     cargo check
     if ($LASTEXITCODE -ne 0) { throw "Cargo check failed" }
     git diff --check
     if ($LASTEXITCODE -ne 0) { throw "Git whitespace check failed" }
+    $boundedQuotationFiles = @(
+        "src/quotation/vendor_response_reconciliation.rs",
+        "src/server/quotation_email_response.rs",
+        "src/server/quotation_vendor_response_routes.rs"
+    )
+    foreach ($relativePath in $boundedQuotationFiles) {
+        $lineCount = [System.IO.File]::ReadAllLines((Join-Path $root $relativePath)).Count
+        if ($lineCount -gt 999) {
+            throw "$relativePath exceeds the 999-line file budget ($lineCount lines)"
+        }
+    }
 }
 finally {
     Pop-Location

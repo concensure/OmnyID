@@ -140,6 +140,7 @@ mod proactive_ranking_helpers;
 mod proactive_routes;
 mod protocol_routes;
 mod quotation_normalisation_routes;
+pub(crate) mod quotation_email_response;
 mod quotation_routes;
 mod quotation_response_capability_routes;
 mod quotation_response_portal_routes;

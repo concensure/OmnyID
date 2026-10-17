@@ -31,8 +31,9 @@ use crate::{
         enrich_mail_passive_event_with_reply_policy, plan_passive_event_background_artifact,
     },
     server::{
-        app_to_proto, auth::store_private_app_message, env_hex_32, sign_server_generated_message,
-        store_proto_message,
+        app_to_proto, auth::store_private_app_message, env_hex_32,
+        quotation_email_response::try_ingest_quotation_email_response,
+        sign_server_generated_message, store_proto_message,
     },
 };
 
@@ -246,6 +247,18 @@ async fn gmail_sync_tick(
                     &raw_email,
                 )
                 .await?;
+                if let Err(err) = try_ingest_quotation_email_response(
+                    db,
+                    metrics,
+                    relay_tx,
+                    owner_user_id,
+                    &raw_gateway_message_id,
+                    &raw_email,
+                )
+                .await
+                {
+                    debug!(%err, owner_user_id, "quotation email response ingestion failed");
+                }
                 try_emit_wedding_vendor_reply(
                     db,
                     metrics,
