@@ -8,6 +8,10 @@ import {
   type WeddingDecisionProjectionInput,
 } from "@/lib/weddingDecisionAfpProjectionState";
 import type { QuotationClosureState } from "@/lib/quotationClosureState";
+import {
+  applyQuotationClosureTemplate,
+  type QuotationClosureDeadlineProjection,
+} from "@/lib/quotationClosureTemplateProjection";
 
 export type QuotationBudgetCommitment = {
   commitment_id: string;
@@ -144,21 +148,22 @@ export function quotationBudgetCommitmentToWeddingAfp(
 
 function deadlineTask(
   state: QuotationClosureState,
+  projection: QuotationClosureDeadlineProjection,
   context: WeddingQuotationClosureContext,
-): WeddingPlanningTaskItem | null {
-  if (!state.deadlineAt || ["booking_confirmed", "cancelled", "refunded", "superseded"].includes(state.status)) {
-    return null;
-  }
-  const isDeposit = state.status === "deposit_requested" || state.status === "deposit_recorded_paid";
+): WeddingPlanningTaskItem {
+  const isDeposit = projection.kind === "deposit_review";
+  const closed = projection.lifecycle === "closed";
   const amount = state.deposit
     ? `${state.deposit.currency.toUpperCase()} ${(state.deposit.amountMinor / 100).toFixed(2)}`
     : null;
   const vendorName = clean(context.vendorName) || "vendor";
   return {
-    id: `quotation-closure-deadline:${state.quotationId}:${state.revision}`,
-    title: isDeposit ? `Review deposit deadline for ${vendorName}` : `Review contract deadline for ${vendorName}`,
+    id: projection.taskId,
+    title: closed
+      ? `Closed quotation deadline for ${vendorName}`
+      : isDeposit ? `Review deposit deadline for ${vendorName}` : `Review contract deadline for ${vendorName}`,
     kind: isDeposit ? "budget_review" : "contract_review",
-    dueAt: state.deadlineAt,
+    dueAt: projection.dueAt,
     dueLabel: isDeposit ? "Deposit deadline" : "Contract deadline",
     priority: "high",
     source: "agent",
@@ -168,6 +173,8 @@ function deadlineTask(
     metadata: {
       ...record(context.metadata),
       quotation_closure_deadline: true,
+      quotation_closure_deadline_lifecycle: projection.lifecycle,
+      quotation_closure_projection_id: projection.projectionId,
       quotation_id: state.quotationId,
       quotation_version_id: state.quotationVersionId,
       closure_revision: state.revision,
@@ -176,13 +183,15 @@ function deadlineTask(
       budget_payment_review: isDeposit,
       budget_payment_candidate_id: isDeposit ? state.revision : null,
       budget_payment_due_amount_label: amount,
-      budget_payment_due_date_label: state.deadlineAt,
+      budget_payment_due_date_label: projection.dueAt,
       budget_vendor_label: vendorName,
       budget_category_label: clean(context.categoryLabel),
       budget_source_label: "Quotation closure evidence",
       payment_execution: false,
     },
-    notes: "Review the evidence-backed deadline. OmnyID does not execute payment.",
+    notes: closed
+      ? "Closed by a terminal quotation successor; prior evidence remains in history."
+      : "Review the evidence-backed deadline. OmnyID does not execute payment.",
   };
 }
 
@@ -191,25 +200,32 @@ export function quotationClosureDeadlineToWeddingTaskAfp(
   context: WeddingQuotationClosureContext,
   nowIso = new Date().toISOString(),
 ): AfpMessage | null {
-  const task = deadlineTask(state, context);
-  if (!task) return null;
-  const message = weddingTaskItemToAfpTaskMessage(task, nowIso);
-  if (!message) return null;
-  return {
-    ...message,
-    content: {
-      ...record(message.content),
-      payment_execution: false,
+  return applyQuotationClosureTemplate(state, {
+    deadline: (projection) => {
+      const task = deadlineTask(state, projection, context);
+      const message = weddingTaskItemToAfpTaskMessage(task, nowIso);
+      if (!message) return null;
+      return {
+        ...message,
+        id: `afp-${projection.projectionId}`,
+        content: {
+          ...record(message.content),
+          status: projection.lifecycle === "closed" ? "archived" : "open",
+          payment_execution: false,
+        },
+        metadata: {
+          ...(message.metadata ?? {}),
+          quotation_closure_deadline_lifecycle: projection.lifecycle,
+          payment_execution: false,
+        },
+        references: [
+          ...(message.references ?? []),
+          { type: "quotation", target: state.quotationId, label: "Quotation" },
+          { type: "quotation_version", target: state.quotationVersionId, label: "Quotation version" },
+          { type: "quotation_closure_task", target: projection.taskId, label: "Stable derived task" },
+          ...projection.evidenceRefs.map((target) => ({ type: "quotation_closure_source", target, label: "Closure evidence" })),
+        ],
+      };
     },
-    metadata: {
-      ...(message.metadata ?? {}),
-      payment_execution: false,
-    },
-    references: [
-      ...(message.references ?? []),
-      { type: "quotation", target: state.quotationId, label: "Quotation" },
-      { type: "quotation_version", target: state.quotationVersionId, label: "Quotation version" },
-      ...state.evidenceRefs.map((target) => ({ type: "quotation_closure_source", target, label: "Closure evidence" })),
-    ],
-  };
+  });
 }

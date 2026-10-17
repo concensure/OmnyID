@@ -89,17 +89,20 @@ async fn request_json(
     (status, payload)
 }
 
-fn source_message(thread_id: &str, source_id: &str) -> Value {
+fn source_message(thread_id: &str, source_id: &str, timestamp: &str) -> Value {
     json!({
         "protocol": "afp-v1",
         "id": source_id,
         "thread_id": thread_id,
         "from": "omnyid://integration/quotation-source",
         "to": ["agent://quotation-intelligence"],
-        "timestamp": Utc::now().to_rfc3339(),
+        "timestamp": timestamp,
         "type": "document",
         "kind": "quotation_source",
-        "content": {"title": "Bounded synthetic quotation source"},
+        "content": {
+            "title": "Bounded synthetic quotation source",
+            "body": "Lighting package AUD 4,000\nRefundable equipment bond AUD 500\nAll prices include GST"
+        },
         "metadata": {"privacy_scope": "tenant_private", "test_fixture": true},
         "store_in_relational": true
     })
@@ -142,6 +145,8 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
     let thread_id = Ulid::new().to_string();
     let source_id = Ulid::new().to_string();
     let tenant_b_source_id = Ulid::new().to_string();
+    let source_timestamp = Utc::now().to_rfc3339();
+    let tenant_b_source_timestamp = Utc::now().to_rfc3339();
     let suffix = Ulid::new().to_string().to_lowercase();
 
     let (status, unauthenticated) = request_json(
@@ -163,7 +168,7 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
         "POST",
         "/send",
         Some(&auth_a),
-        Some(source_message(&thread_id, &source_id)),
+        Some(source_message(&thread_id, &source_id, &source_timestamp)),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -172,7 +177,11 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
         "POST",
         "/send",
         Some(&auth_b),
-        Some(source_message(&thread_id, &tenant_b_source_id)),
+        Some(source_message(
+            &thread_id,
+            &tenant_b_source_id,
+            &tenant_b_source_timestamp,
+        )),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -335,6 +344,69 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
         "cross-tenant selection must disclose no object: {cross_tenant_selection}"
     );
 
+    let (status, prepared_source) = request_json(
+        &app,
+        "POST",
+        "/quotation/sources/prepare",
+        Some(&auth_a),
+        Some(json!({
+            "thread_id": thread_id,
+            "source_message_id": source_id
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "source preparation: {prepared_source}");
+    let prepared_source_version = prepared_source["receipt"]["source_version_id"]
+        .as_str()
+        .expect("prepared source version")
+        .to_string();
+    let prepared_content_hash = prepared_source["receipt"]["content_hash"]
+        .as_str()
+        .expect("prepared content hash")
+        .to_string();
+    let mut contract_quote = serde_json::to_value(&quote).expect("contract quotation");
+    contract_quote["identity"]["version_id"] = json!(format!("contract-{suffix}-v1"));
+    contract_quote["identity"]["supersedes_version_id"] = json!(quote.identity.version_id.clone());
+    contract_quote["sources"][0]["source_version_id"] = json!(prepared_source_version.clone());
+    contract_quote["sources"][0]["media_type"] = json!("text/plain");
+    contract_quote["sources"][0]["content_hash"] = json!(prepared_content_hash);
+    contract_quote["line_items"][0]["evidence"]["anchors"][0]["source_id"] =
+        json!(source_id.clone());
+    contract_quote["line_items"][0]["evidence"]["anchors"][0]["source_version_id"] =
+        json!(prepared_source_version.clone());
+    contract_quote["commercial_terms"][0]["evidence"]["anchors"][0]["source_id"] =
+        json!(source_id.clone());
+    contract_quote["commercial_terms"][0]["evidence"]["anchors"][0]["source_version_id"] =
+        json!(prepared_source_version.clone());
+    contract_quote["tax"]["evidence"]["anchors"][0]["source_id"] = json!(source_id.clone());
+    contract_quote["tax"]["evidence"]["anchors"][0]["source_version_id"] =
+        json!(prepared_source_version.clone());
+    let evidence_request = json!({
+        "thread_id": thread_id,
+        "source_message_id": source_id,
+        "proposal": {
+            "schema_version": "quotation.closure_evidence.v1",
+            "quotation_id": quote.identity.quotation_id,
+            "quotation_version_id": quote.identity.version_id,
+            "source_id": source_id,
+            "source_version_id": prepared_source_version,
+            "payload": {"kind": "contract", "contract_quotation": contract_quote}
+        }
+    });
+    let (status, evidence) = request_json(
+        &app,
+        "POST",
+        "/quotation/closure-evidence",
+        Some(&auth_a),
+        Some(evidence_request),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "closure evidence: {evidence}");
+    assert_eq!(evidence["outcome"]["status"], "ready");
+    let evidence_message_id = evidence["message_ids"][0]
+        .as_str()
+        .expect("closure evidence message id");
+
     let closure = json!({
         "thread_id": thread_id,
         "event_id": format!("contract-received-{suffix}"),
@@ -346,12 +418,7 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
         "expected_state": "selected",
         "target_state": "contract_received",
         "user_authority": true,
-        "evidence_sources": [{
-            "source_id": source_id,
-            "source_version_id": "contract-source-v1",
-            "media_type": "application/pdf"
-        }],
-        "contract_changes": [],
+        "evidence_message_id": evidence_message_id,
         "contract_changes_reviewed": false,
         "idempotency_key": format!("contract-received-idempotency-{suffix}")
     });

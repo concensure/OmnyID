@@ -1,6 +1,6 @@
 use super::{
     ClarificationApproval, ClarificationDraft, ClarificationSendReceipt, ClosureTransition,
-    QuotationSelection,
+    QuotationSelection, ValidatedClosureEvidence,
     contracts::{NormalisedQuotation, QuotationComparison},
     review::QuotationReviewSuccessor,
 };
@@ -17,6 +17,7 @@ pub const CLARIFICATION_SEND_RESERVED_KIND: &str = "quotation_clarification_send
 pub const CLARIFICATION_SENT_KIND: &str = "quotation_clarification_sent";
 pub const QUOTATION_VENDOR_SELECTED_KIND: &str = "quotation_vendor_selected";
 pub const QUOTATION_CLOSURE_TRANSITION_KIND: &str = "quotation_closure_transition";
+pub const QUOTATION_CLOSURE_EVIDENCE_KIND: &str = "quotation_closure_evidence_validated";
 
 pub(super) fn stable_hash<T: Serialize>(value: &T) -> String {
     let encoded = serde_json::to_vec(value).unwrap_or_default();
@@ -391,6 +392,51 @@ pub fn quotation_closure_transition_message(
             "metadata": {"source_version_id": source.source_version_id},
         }));
     }
+    message.typed_refs = message.references.clone();
+    message
+}
+
+pub fn quotation_closure_evidence_message(
+    evidence: &ValidatedClosureEvidence,
+    thread_id: &str,
+    parent_message_id: &str,
+    timestamp: &str,
+    actor: &str,
+) -> AFPMessage {
+    let payload_hash = stable_hash(evidence);
+    let mut message = base_message(
+        stable_message_id(
+            "quotation-closure-evidence",
+            &(thread_id, &evidence.evidence_id, &payload_hash),
+        ),
+        thread_id,
+        Some(parent_message_id),
+        timestamp,
+        actor,
+    );
+    message.kind = Some(QUOTATION_CLOSURE_EVIDENCE_KIND.to_string());
+    message.subtype = message.kind.clone();
+    message
+        .supertags
+        .push("quotation:closure_evidence".to_string());
+    message.content = json!({"evidence": evidence, "payment_execution": false});
+    message.metadata = Some(json!({
+        "payload_hash": payload_hash,
+        "idempotency_key": evidence.evidence_id,
+        "privacy_scope": "tenant_private",
+        "e2ee_required": true,
+        "schema_version": super::CLOSURE_EVIDENCE_SCHEMA_VERSION,
+        "payment_execution": false,
+    }));
+    message.references = vec![
+        reference("quotation", &evidence.quotation_id),
+        reference("quotation_version", &evidence.quotation_version_id),
+        json!({
+            "type": "source",
+            "target": evidence.source.source_id,
+            "metadata": {"source_version_id": evidence.source.source_version_id},
+        }),
+    ];
     message.typed_refs = message.references.clone();
     message
 }

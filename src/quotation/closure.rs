@@ -167,7 +167,10 @@ pub fn apply_closure_transition(
     {
         return Err(ClosureError::EvidenceRequired);
     }
-    if !transition.contract_changes.is_empty() && !transition.contract_changes_reviewed {
+    if transition.target_state != ClosureState::ContractReceived
+        && !transition.contract_changes.is_empty()
+        && !transition.contract_changes_reviewed
+    {
         return Err(ClosureError::ContractChangesRequireReview);
     }
     if matches!(

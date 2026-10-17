@@ -1,6 +1,7 @@
 //! Authenticated persistence and replay routes for template-neutral quotations.
 
 mod clarification_routes;
+mod closure_evidence_routes;
 mod closure_routes;
 mod decision_routes;
 
@@ -34,6 +35,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/quotation/comparisons", post(store_comparison_http))
         .route("/quotation/state", get(quotation_state_http))
         .merge(decision_routes::routes())
+        .merge(closure_evidence_routes::routes())
         .merge(closure_routes::routes())
         .merge(clarification_routes::routes())
 }

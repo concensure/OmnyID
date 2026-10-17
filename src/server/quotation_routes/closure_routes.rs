@@ -10,8 +10,8 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::quotation::{
-    ClosureState, ClosureTransition, DepositRecord, MaterialChange,
-    QUOTATION_CLOSURE_TRANSITION_KIND, QuotationFeatureFlags, SourceReference,
+    ClosureEvidenceKind, ClosureState, ClosureTransition, QUOTATION_CLOSURE_EVIDENCE_KIND,
+    QUOTATION_CLOSURE_TRANSITION_KIND, QuotationFeatureFlags, ValidatedClosureEvidence,
     apply_closure_transition, quotation_closure_transition_message, replay_quotation_messages,
 };
 
@@ -40,16 +40,9 @@ struct StoreClosureTransitionRequest {
     expected_state: ClosureState,
     target_state: ClosureState,
     user_authority: bool,
-    #[serde(default)]
-    evidence_sources: Vec<SourceReference>,
-    #[serde(default)]
-    contract_changes: Vec<MaterialChange>,
+    evidence_message_id: String,
     #[serde(default)]
     contract_changes_reviewed: bool,
-    #[serde(default)]
-    deposit: Option<DepositRecord>,
-    #[serde(default)]
-    deadline_at: Option<String>,
     idempotency_key: String,
 }
 
@@ -92,6 +85,7 @@ fn stored_comparison_matches(
 fn request_matches(
     transition: &ClosureTransition,
     request: &StoreClosureTransitionRequest,
+    evidence: &ValidatedClosureEvidence,
     actor: &str,
 ) -> bool {
     transition.event_id == request.event_id
@@ -101,16 +95,17 @@ fn request_matches(
         && transition.target_state == request.target_state
         && transition.actor_id == actor
         && transition.user_authority == request.user_authority
-        && transition.evidence_sources == request.evidence_sources
-        && transition.contract_changes == request.contract_changes
+        && transition.evidence_sources == vec![evidence.source.clone()]
+        && transition.contract_changes == evidence.contract_changes
         && transition.contract_changes_reviewed == request.contract_changes_reviewed
-        && transition.deposit == request.deposit
-        && transition.deadline_at == request.deadline_at
+        && transition.deposit == evidence.deposit
+        && transition.deadline_at == evidence.deadline_at
 }
 
 fn existing_transition<'a>(
     messages: &'a [crate::message::AFPMessage],
     request: &StoreClosureTransitionRequest,
+    evidence: &ValidatedClosureEvidence,
     actor: &str,
 ) -> Result<Option<&'a crate::message::AFPMessage>, (StatusCode, String)> {
     let Some(message) = messages.iter().find(|message| {
@@ -124,7 +119,7 @@ fn existing_transition<'a>(
         .get("transition")
         .cloned()
         .and_then(|value| serde_json::from_value::<ClosureTransition>(value).ok())
-        .is_some_and(|transition| request_matches(&transition, request, actor))
+        .is_some_and(|transition| request_matches(&transition, request, evidence, actor))
         && stored_comparison_matches(message, request);
     if !matches {
         return Err((
@@ -133,6 +128,26 @@ fn existing_transition<'a>(
         ));
     }
     Ok(Some(message))
+}
+
+fn closure_evidence<'a>(
+    messages: &'a [crate::message::AFPMessage],
+    evidence_message_id: &str,
+) -> Option<(&'a crate::message::AFPMessage, ValidatedClosureEvidence)> {
+    messages.iter().find_map(|message| {
+        (message.id == evidence_message_id
+            && message_kind(message) == QUOTATION_CLOSURE_EVIDENCE_KIND)
+            .then(|| message.content.get("evidence").cloned())
+            .flatten()
+            .and_then(|value| serde_json::from_value(value).ok())
+            .map(|evidence| (message, evidence))
+    })
+}
+
+fn evidence_supports_target(evidence: &ValidatedClosureEvidence, target: ClosureState) -> bool {
+    evidence.suggested_target == target
+        || (evidence.kind == ClosureEvidenceKind::Contract
+            && target == ClosureState::ContractReviewed)
 }
 
 fn parent_closure_message<'a>(
@@ -147,6 +162,14 @@ fn parent_closure_message<'a>(
                 .and_then(|value| value.get("event_id"))
                 .and_then(serde_json::Value::as_str)
                 == Some(last_event_id)
+    })
+}
+
+fn closure_evidence_reference(message: &crate::message::AFPMessage) -> Option<&str> {
+    message.references.iter().find_map(|reference| {
+        (reference.get("type").and_then(serde_json::Value::as_str) == Some("closure_evidence"))
+            .then(|| reference.get("target").and_then(serde_json::Value::as_str))
+            .flatten()
     })
 }
 
@@ -169,7 +192,40 @@ async fn store_closure_transition_http(
         ));
     }
     let messages = visible_messages(&state, &headers, &request.thread_id).await?;
-    if let Some(message) = existing_transition(&messages, &request, &user.id)? {
+    let (evidence_message, evidence) = closure_evidence(&messages, &request.evidence_message_id)
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            "validated closure evidence is unavailable".to_string(),
+        ))?;
+    if evidence.quotation_id != request.quotation_id
+        || evidence.quotation_version_id != request.quotation_version_id
+        || !evidence_supports_target(&evidence, request.target_state)
+        || evidence.payment_execution
+    {
+        return Err((
+            StatusCode::CONFLICT,
+            "validated evidence does not support this closure transition".to_string(),
+        ));
+    }
+    if evidence.requires_explicit_review
+        && request.target_state != ClosureState::ContractReviewed
+        && request.target_state != ClosureState::ContractReceived
+    {
+        return Err((
+            StatusCode::CONFLICT,
+            "material contract changes require review".to_string(),
+        ));
+    }
+    if request.target_state == ClosureState::ContractReviewed
+        && evidence.requires_explicit_review
+        && !request.contract_changes_reviewed
+    {
+        return Err((
+            StatusCode::CONFLICT,
+            "material contract changes require explicit review".to_string(),
+        ));
+    }
+    if let Some(message) = existing_transition(&messages, &request, &evidence, &user.id)? {
         return Ok(Json(StoredResponse {
             message_ids: vec![message.id.clone()],
         }));
@@ -214,18 +270,16 @@ async fn store_closure_transition_http(
             "quotation closure state is stale".to_string(),
         ));
     }
-    let visible_ids = messages
-        .iter()
-        .map(|message| message.id.as_str())
-        .collect::<std::collections::BTreeSet<_>>();
-    if request
-        .evidence_sources
-        .iter()
-        .any(|source| !visible_ids.contains(source.source_id.as_str()))
+    let parent = parent_closure_message(&messages, &current.last_event_id).ok_or((
+        StatusCode::CONFLICT,
+        "quotation closure predecessor is unavailable".to_string(),
+    ))?;
+    if request.target_state == ClosureState::ContractReviewed
+        && closure_evidence_reference(parent) != Some(request.evidence_message_id.as_str())
     {
         return Err((
-            StatusCode::NOT_FOUND,
-            "quotation closure evidence is unavailable".to_string(),
+            StatusCode::CONFLICT,
+            "contract review must use the received contract evidence".to_string(),
         ));
     }
     let transition = ClosureTransition {
@@ -237,11 +291,11 @@ async fn store_closure_transition_http(
         actor_id: user.id.clone(),
         user_authority: request.user_authority,
         occurred_at: chrono::Utc::now().to_rfc3339(),
-        evidence_sources: request.evidence_sources.clone(),
-        contract_changes: request.contract_changes.clone(),
+        evidence_sources: vec![evidence.source.clone()],
+        contract_changes: evidence.contract_changes.clone(),
         contract_changes_reviewed: request.contract_changes_reviewed,
-        deposit: request.deposit.clone(),
-        deadline_at: request.deadline_at.clone(),
+        deposit: evidence.deposit.clone(),
+        deadline_at: evidence.deadline_at.clone(),
     };
     apply_closure_transition(Some(current), &transition).map_err(|_| {
         (
@@ -249,10 +303,6 @@ async fn store_closure_transition_http(
             "quotation closure transition was rejected".to_string(),
         )
     })?;
-    let parent = parent_closure_message(&messages, &current.last_event_id).ok_or((
-        StatusCode::CONFLICT,
-        "quotation closure predecessor is unavailable".to_string(),
-    ))?;
     let mut message = quotation_closure_transition_message(
         &transition,
         &request.idempotency_key,
@@ -278,6 +328,11 @@ async fn store_closure_transition_http(
         "type": "comparison",
         "target": selection.comparison_id,
         "metadata": {"revision": selection.comparison_revision},
+    }));
+    message.references.push(json!({
+        "type": "closure_evidence",
+        "target": evidence_message.id,
+        "metadata": {"evidence_id": evidence.evidence_id},
     }));
     message.typed_refs = message.references.clone();
     let id = message.id.clone();

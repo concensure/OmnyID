@@ -63,7 +63,7 @@ test("closure API sends exact comparison and closure revisions to the AFP bounda
       action,
       eventId: "deposit-requested-v1",
       idempotencyKey: "idem-deposit-requested-v1",
-      evidenceSources: [{ source_id: "source-1", source_version_id: "source-1-v1", media_type: "application/pdf" }],
+      evidenceMessageId: "validated-evidence-message-1",
       userAuthority: true,
     });
     assert.deepEqual(result.messageIds, ["message-1"]);
@@ -72,6 +72,9 @@ test("closure API sends exact comparison and closure revisions to the AFP bounda
     assert.equal(body.quotation_version_id, "quote-1-v2");
     assert.equal(body.expected_state, "contract_reviewed");
     assert.equal(body.target_state, "deposit_requested");
+    assert.equal(body.evidence_message_id, "validated-evidence-message-1");
+    assert.equal("evidence_sources" in body, false);
+    assert.equal("deposit" in body, false);
   } finally {
     globalThis.fetch = originalFetch;
     restoreWindow();
@@ -89,7 +92,7 @@ test("stale closure responses become explicit recoverable refresh errors", async
         action,
         eventId: "deposit-requested-v1",
         idempotencyKey: "idem-deposit-requested-v1",
-        evidenceSources: [],
+        evidenceMessageId: "validated-evidence-message-1",
         userAuthority: true,
       }),
       (error: unknown) => {

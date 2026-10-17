@@ -10,7 +10,7 @@ $solidUi = Join-Path $root "solid-ui"
 Write-Host "Running quotation Rust verification"
 Push-Location $root
 try {
-    cargo test --test quotation_baseline --test quotation_contracts --test quotation_intelligence --test quotation_afp --test quotation_vendor_context --test quotation_extraction --test quotation_review --test quotation_clarification --test quotation_closure --test quotation_decision_api --test quotation_closure_api --test quotation_readiness
+    cargo test --test quotation_baseline --test quotation_contracts --test quotation_intelligence --test quotation_afp --test quotation_vendor_context --test quotation_extraction --test quotation_review --test quotation_clarification --test quotation_closure --test quotation_closure_evidence --test quotation_decision_api --test quotation_closure_api --test quotation_readiness
     if ($LASTEXITCODE -ne 0) { throw "Quotation Rust verification failed" }
     cargo test --test api_flows
     if ($LASTEXITCODE -ne 0) { throw "Quotation Postgres HTTP verification failed" }
@@ -44,6 +44,7 @@ try {
         tests/quotation-closure-state.test.ts `
         tests/quotation-decision-closure-state.test.ts `
         tests/quotation-decision-closure-api.test.ts `
+        tests/quotation-closure-template-projection.test.ts `
         tests/quotation-wedding-closure-adapter.test.ts `
         tests/quotation-readiness-state.test.ts
     if ($LASTEXITCODE -ne 0) { throw "Quotation Solid verification failed" }

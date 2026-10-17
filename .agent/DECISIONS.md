@@ -879,3 +879,26 @@ mapping; it presents projection-level provenance separately. A small template ad
 wedding presentation metadata without copying quotation state, so future OmnyID templates
 can consume the same generic projection. All closure copy states that OmnyID records external
 payment evidence but does not execute a payment.
+
+## 2026-10-17: Closure transitions consume validated evidence receipts, not client facts
+
+Closure evidence is a template-neutral, tenant-private AFP successor produced only after the
+existing authenticated source-preparation service resolves a visible message or attachment and
+uses its existing PDF parser or image OCR boundary. The persisted receipt contains the selected
+quotation/version, immutable source/version and content hash, bounded evidence facts, and
+`payment_execution: false`; extracted document text is never copied into the receipt. Parser or
+OCR unavailability yields manual review rather than inferred closure state.
+
+Contract terms must validate against exact excerpts from the prepared source, and material changes
+are derived against the active selected quotation. Contract review must reference the same
+validated contract evidence used for receipt. Deposit amount, currency, dates, refundability, and
+fee status are accepted only where conservative source text supports them; otherwise the result is
+manual review. The closure mutation route no longer accepts authoritative client sources, changes,
+deposit records, deadlines, or classifications. It requires a visible validated evidence AFP
+message and derives those fields server-side while preserving explicit user authority.
+
+Downstream templates consume one generic deadline projection. Its task identity is stable per
+quotation version while every closure revision produces a distinct successor projection. Terminal
+booking, cancellation, refund, or supersession archives the task without deleting prior events.
+The wedding planner is an adapter over this output, and only the existing evidence-backed generic
+booking commitment can enter its budget projection.

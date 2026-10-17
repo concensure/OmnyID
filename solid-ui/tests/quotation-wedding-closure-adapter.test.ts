@@ -72,7 +72,7 @@ test("budget projection is stable, source-linked, and cannot execute payment", (
   )), true);
 });
 
-test("active closure deadlines reuse wedding task projection and terminal states do not", () => {
+test("active deadlines open one stable task and terminal successors archive it", () => {
   const deposit = {
     ...state("deposit_requested"),
     deposit: { amountMinor: 250_000, currency: "AUD", isFee: false },
@@ -81,8 +81,10 @@ test("active closure deadlines reuse wedding task projection and terminal states
   assert.equal(task?.type, "task");
   assert.equal(task?.content.budget_payment_review, true);
   assert.equal(task?.metadata?.payment_execution, false);
-  assert.equal(
-    quotationClosureDeadlineToWeddingTaskAfp(state("booking_confirmed"), context),
-    null,
-  );
+  const terminalState = { ...state("booking_confirmed"), revision: "closure-v5" };
+  const terminal = quotationClosureDeadlineToWeddingTaskAfp(terminalState, context);
+  assert.equal(terminal?.content.status, "archived");
+  assert.equal(terminal?.content.task_id, task?.content.task_id);
+  assert.notEqual(terminal?.id, task?.id);
+  assert.equal(terminal?.metadata?.quotation_closure_deadline_lifecycle, "closed");
 });

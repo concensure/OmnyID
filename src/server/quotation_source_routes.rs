@@ -46,9 +46,16 @@ fn default_retention() -> String {
 }
 
 #[derive(Serialize)]
-struct PreparedSourceResponse {
-    receipt: QuotationSourceReceipt,
-    parsed_text: String,
+pub(super) struct PreparedSourceResponse {
+    pub(super) receipt: QuotationSourceReceipt,
+    pub(super) parsed_text: String,
+}
+
+pub(super) struct PrepareQuotationSourceInput<'a> {
+    pub(super) source_attachment_id: Option<&'a str>,
+    pub(super) mime_type: Option<&'a str>,
+    pub(super) parser: Option<&'a str>,
+    pub(super) retention_state: &'a str,
 }
 
 fn clean_identifier(value: &str) -> Result<String, (StatusCode, String)> {
@@ -134,18 +141,33 @@ async fn prepare_source_http(
         .find(|candidate| candidate.id == source_message_id)
         .map(super::proto_to_app)
         .ok_or((StatusCode::NOT_FOUND, "source unavailable".to_string()))?;
-    let source = resolve_quotation_source(
+    let prepared = prepare_authorized_quotation_source(
+        &user.id,
         &message,
-        request.source_attachment_id.as_deref(),
-        request.mime_type.as_deref(),
+        PrepareQuotationSourceInput {
+            source_attachment_id: request.source_attachment_id.as_deref(),
+            mime_type: request.mime_type.as_deref(),
+            parser: request.parser.as_deref(),
+            retention_state: &request.retention_state,
+        },
     )
-    .await
-    .map_err(|_| {
-        (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "source unreadable".to_string(),
-        )
-    })?;
+    .await?;
+    Ok(Json(prepared))
+}
+
+pub(super) async fn prepare_authorized_quotation_source(
+    tenant_id: &str,
+    message: &crate::message::AFPMessage,
+    input: PrepareQuotationSourceInput<'_>,
+) -> Result<PreparedSourceResponse, (StatusCode, String)> {
+    let source = resolve_quotation_source(message, input.source_attachment_id, input.mime_type)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "source unreadable".to_string(),
+            )
+        })?;
     if let ResolvedSourcePayload::RemoteUrl(url) = &source.payload {
         crate::gateway::rest_adapter::validate_public_http_url(url)
             .await
@@ -162,8 +184,8 @@ async fn prepare_source_http(
         .unwrap_or("application/octet-stream");
     let source_version_id = format!("{}:{}", message.id, message.timestamp);
     let initial = plan_quotation_source(QuotationSourcePlanInput {
-        tenant_id: &user.id,
-        authenticated_tenant_id: &user.id,
+        tenant_id,
+        authenticated_tenant_id: tenant_id,
         source_id: &message.id,
         source_version_id: &source_version_id,
         content_hash: "pending",
@@ -171,8 +193,8 @@ async fn prepare_source_http(
         file_name: source_file_name(&source),
         size_bytes: source_size(&source),
         encrypted_or_unreadable: false,
-        parser_override: request.parser.as_deref(),
-        retention_state: &request.retention_state,
+        parser_override: input.parser,
+        retention_state: input.retention_state,
     });
     let parser = match initial {
         QuotationSourcePlan::Ready { ref receipt } => receipt.parser,
@@ -192,7 +214,7 @@ async fn prepare_source_http(
             None,
         )
     } else {
-        let parser_family = select_parser(mime_type, request.parser.as_deref());
+        let parser_family = select_parser(mime_type, input.parser);
         let (text, pages, _) = call_parser(parser_family, &source, mime_type)
             .await
             .map_err(|_| {
@@ -214,8 +236,8 @@ async fn prepare_source_http(
         hex::encode(Sha256::digest(parsed_text.as_bytes()))
     );
     let final_plan = plan_quotation_source(QuotationSourcePlanInput {
-        tenant_id: &user.id,
-        authenticated_tenant_id: &user.id,
+        tenant_id,
+        authenticated_tenant_id: tenant_id,
         source_id: &message.id,
         source_version_id: &source_version_id,
         content_hash: &content_hash,
@@ -223,18 +245,18 @@ async fn prepare_source_http(
         file_name: source_file_name(&source),
         size_bytes: source_size(&source),
         encrypted_or_unreadable: false,
-        parser_override: request.parser.as_deref(),
-        retention_state: &request.retention_state,
+        parser_override: input.parser,
+        retention_state: input.retention_state,
     });
     let mut receipt = match final_plan {
         QuotationSourcePlan::Ready { receipt } => receipt,
         blocked => return Err(blocked_http(blocked)),
     };
     receipt.page_count = page_count;
-    Ok(Json(PreparedSourceResponse {
+    Ok(PreparedSourceResponse {
         receipt,
         parsed_text,
-    }))
+    })
 }
 
 #[cfg(test)]

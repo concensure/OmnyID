@@ -2,8 +2,6 @@ import { apiFetch } from "@/lib/api";
 import type {
   QuotationClosureAction,
   QuotationDecisionClosureReplay,
-  QuotationMaterialChange,
-  QuotationSourceReference,
 } from "@/lib/quotationDecisionClosureState";
 import type { QuotationClosureStatus } from "@/lib/quotationClosureState";
 
@@ -93,17 +91,8 @@ export async function persistQuotationClosureAction(input: {
   action: QuotationClosureAction;
   eventId: string;
   idempotencyKey: string;
-  evidenceSources: QuotationSourceReference[];
-  contractChanges?: QuotationMaterialChange[];
+  evidenceMessageId: string;
   contractChangesReviewed?: boolean;
-  deposit?: {
-    amount: { amount_minor: number; currency: string };
-    due_at?: string | null;
-    paid_at?: string | null;
-    refundable?: boolean | null;
-    is_fee: boolean;
-  } | null;
-  deadlineAt?: string | null;
   userAuthority: true;
 }): Promise<StoredQuotationMessages> {
   const { action } = input;
@@ -125,11 +114,8 @@ export async function persistQuotationClosureAction(input: {
         expected_state: expectedState,
         target_state: action.targetState,
         user_authority: input.userAuthority,
-        evidence_sources: input.evidenceSources,
-        contract_changes: input.contractChanges ?? [],
+        evidence_message_id: nonEmpty(input.evidenceMessageId, "Validated evidence message"),
         contract_changes_reviewed: input.contractChangesReviewed ?? false,
-        deposit: input.deposit ?? null,
-        deadline_at: input.deadlineAt ?? null,
         idempotency_key: nonEmpty(input.idempotencyKey, "Idempotency key"),
       },
     });

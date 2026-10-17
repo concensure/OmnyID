@@ -210,3 +210,50 @@ fn review_event_is_private_linked_and_does_not_duplicate_the_quotation() {
             && reference["target"] == "production-hire-quote-v2"
     }));
 }
+
+#[test]
+fn closure_evidence_receipt_is_deterministic_private_and_parsed_body_free() {
+    let evidence = ValidatedClosureEvidence {
+        evidence_id: "qclosure_evidence_abc".to_string(),
+        kind: ClosureEvidenceKind::BookingConfirmation,
+        quotation_id: "production-hire-quote".to_string(),
+        quotation_version_id: "production-hire-quote-v1".to_string(),
+        source: SourceReference {
+            source_id: "booking-email-1".to_string(),
+            source_version_id: "booking-email-1:2026-10-17T00:00:00Z".to_string(),
+            media_type: "message/rfc822".to_string(),
+            content_hash: Some("sha256:abc".to_string()),
+        },
+        suggested_target: ClosureState::BookingConfirmed,
+        contract_changes: Vec::new(),
+        requires_explicit_review: false,
+        deposit: None,
+        deadline_at: None,
+        payment_execution: false,
+    };
+    let first = quotation_closure_evidence_message(
+        &evidence,
+        "thread-1",
+        "booking-email-1",
+        "2026-10-17T00:01:00Z",
+        "user-1",
+    );
+    let second = quotation_closure_evidence_message(
+        &evidence,
+        "thread-1",
+        "booking-email-1",
+        "2026-10-17T00:01:00Z",
+        "user-1",
+    );
+    assert_eq!(first.id, second.id);
+    assert_eq!(first.kind.as_deref(), Some(QUOTATION_CLOSURE_EVIDENCE_KIND));
+    assert_eq!(first.parent_id.as_deref(), Some("booking-email-1"));
+    assert_eq!(first.references, first.typed_refs);
+    assert_eq!(
+        first.metadata.as_ref().unwrap()["privacy_scope"],
+        "tenant_private"
+    );
+    assert_eq!(first.metadata.as_ref().unwrap()["e2ee_required"], true);
+    assert_eq!(first.content["payment_execution"], false);
+    assert!(!first.content.to_string().contains("parsed_text"));
+}

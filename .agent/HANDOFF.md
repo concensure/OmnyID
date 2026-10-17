@@ -3106,3 +3106,48 @@ Next:
 - Run WED-216/WED-217 authenticated HTTP coverage against disposable Postgres.
 - Continue with DBV-03/WED-218 contract/deposit evidence ingestion and generic template
   projections; keep OCR/PDF work behind the existing shared document-ingest service.
+
+## 2026-10-17 - WED-218 closure evidence and template projections (Codex, complete)
+
+Changed:
+
+- Added a template-neutral closure-evidence validator for contract, deposit request/payment,
+  booking confirmation, cancellation, and refund sources. It binds the active selected quotation,
+  prepared source/version/content hash, exact excerpts, money, and dates and fails to manual review
+  when extraction or conservative support is unavailable.
+- Reused the authenticated shared quotation source preparation helper and therefore the existing
+  parser/OCR selection. No parser or OCR implementation was added, and parsed text is not stored in
+  the new private AFP evidence receipt.
+- Added deterministic `quotation_closure_evidence_validated` AFP receipts with equal canonical and
+  typed references, E2EE/private metadata, source-version lineage, and no payment execution.
+- Hardened `/quotation/closure-transitions`: it now requires a visible validated evidence message
+  and derives sources, target support, contract differences, deposit data, fee/refundability, and
+  deadlines server-side. Contract review must reuse the received contract evidence and explicitly
+  acknowledge material changes.
+- Added a generic template deadline adapter with stable task identity and revision-bound successor
+  IDs. Wedding projection reuses the existing task contract and archives terminal successors;
+  a non-wedding production-hire fixture proves generic consumption. Booking commitment behaviour
+  remains unchanged and only activates from evidence-backed `booking_confirmed`.
+
+Verification:
+
+- `scripts/verify-quotation-readiness.ps1` passed: 71 quotation Rust integration tests, the
+  conditional API-flow target, 30 focused Rust unit executions, `cargo check`, Solid type checking,
+  whitespace checks, and 35 Solid tests.
+- The full wedding unit suite passed 1,874 tests and the production Solid build passed.
+- `TEST_DATABASE_URL` was unset, so the API target returned through its conditional no-database
+  path; real Postgres assertions remain outstanding. The inherited `email_group_routes.rs`
+  unused-variable warning remains.
+- The line-budget test reports only inherited
+  `WeddingResponseWorkspaceView.tsx` (1,141 lines) and
+  `weddingResponseWorkspaceViewState.ts` (1,041 lines); neither was modified. New files are 437,
+  235, 53, 327, and 49 physical lines.
+- Release flags remain off. No provider, payment, legal, deployment, Cloudflare, or Oracle action
+  occurred.
+
+Next:
+
+- Run the authenticated WED-216/WED-218 HTTP flow against disposable Postgres when
+  `TEST_DATABASE_URL` is available.
+- Begin DBV-04/WED-219 response-capability and least-privilege vendor-context hardening from this
+  commit; do not enable closure or vendor-response release flags yet.

@@ -1944,3 +1944,51 @@ tasks:
       - the canonical quotation verifier passes 64 Rust integration tests, the conditional API-flow target, 29 focused Rust unit executions, cargo check, 32 Solid tests, type checking, whitespace checks, and four mobile/desktop Playwright checks
       - the complete wedding unit suite passes 1874 tests and the production UI build passes; the repository line-budget test still reports two pre-existing oversized wedding files that were not modified, and the unrelated wedding-contrast browser fixture still lacks its expected controls
       - every new file is below 500 physical lines, no oversized production file was expanded, release flags remain off, and no provider or deployment action occurred
+  - id: WED-218
+    title: Validate quotation closure evidence and downstream template projections
+    status: done
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-216
+      - WED-217
+      - WED-211
+    files:
+      - src/quotation/closure_evidence.rs
+      - src/quotation/afp.rs
+      - src/quotation/closure.rs
+      - src/quotation/mod.rs
+      - src/server/quotation_routes/closure_evidence_routes.rs
+      - src/server/quotation_routes/closure_routes.rs
+      - src/server/quotation_routes.rs
+      - src/server/quotation_source_routes.rs
+      - solid-ui/src/lib/quotationClosureTemplateProjection.ts
+      - solid-ui/src/lib/quotationDecisionClosureApi.ts
+      - solid-ui/src/lib/quotationWeddingClosureAdapter.ts
+      - tests/quotation_closure_evidence.rs
+      - tests/quotation_afp.rs
+      - tests/api_flows.rs
+      - solid-ui/tests/quotation-closure-template-projection.test.ts
+      - solid-ui/tests/quotation-decision-closure-api.test.ts
+      - solid-ui/tests/quotation-wedding-closure-adapter.test.ts
+      - scripts/verify-quotation-readiness.ps1
+      - .agent/**
+    acceptance:
+      - closure evidence is resolved from tenant-visible prepared source receipts and never from an authoritative client classification
+      - PDF and image evidence reuse the shared parser and OCR boundary, and unavailable extraction produces manual review without invented facts
+      - material contract differences are derived against the selected active quotation and block later transitions until explicitly reviewed
+      - deposits remain cash-flow schedules unless source evidence explicitly classifies a fee, and no path executes payment or gives legal interpretation
+      - only evidence-backed booking confirmation creates one deterministic quotation-version-bound commitment
+      - deadlines project idempotently through generic template output and the wedding adapter; terminal successors close active tasks without deleting history
+      - a non-wedding fixture consumes the generic projection and every new file stays below 1000 lines
+    progress:
+      - started from clean committed WED-217 checkpoint 2581d46
+      - audit confirmed the shared quotation source route already owns parser/OCR selection and the existing wedding adapter already maps confirmed commitments and deadlines; the unsafe remaining boundary is client-supplied closure evidence classification
+      - extracted the authenticated shared source-preparation helper without adding parser or OCR code; unavailable extraction returns manual review and parsed text is never persisted in the closure evidence event
+      - added deterministic private AFP closure-evidence receipts bound to active selected quotation, source version, content hash, exact excerpts, and conservative evidence semantics
+      - closure transitions now require a visible validated evidence message and derive target support, sources, material changes, deposits, fee/refundability, and deadlines server-side instead of accepting those facts from the client
+      - contract differences are derived against the active selected quotation; contract review must use the same evidence as contract receipt and explicit review is required before changed terms can progress
+      - generic deadline projections use a stable task identity plus revision-bound successors; the wedding adapter archives terminal tasks while preserving history, and a non-wedding fixture consumes the same interface
+      - canonical verifier passed 71 Rust integration tests, conditional API-flow compilation/path, 30 focused Rust units, cargo check, typecheck, whitespace checks, and 35 Solid tests; the full 1874-test wedding suite and production build passed
+      - TEST_DATABASE_URL remained unset, so real Postgres assertions were not executed; the line-budget command reports only the two inherited oversized wedding files, neither modified here
+      - all five new files are 437 lines or fewer; release flags stayed off and no provider, payment, legal interpretation, deployment, or Oracle mutation occurred
