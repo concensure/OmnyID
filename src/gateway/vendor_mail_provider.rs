@@ -199,6 +199,9 @@ mod tests {
         }
         let config = VendorMailConfig::from_env().expect("config");
         assert_eq!(config.readiness().reason, "cloudflare_credentials_missing");
+        unsafe { std::env::set_var("OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN", "send-only-token") };
+        let send_only = VendorMailConfig::from_env().expect("send-only config");
+        assert_eq!(send_only.readiness().reason, "cloudflare_credentials_missing");
         clear_env();
     }
 }

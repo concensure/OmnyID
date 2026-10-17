@@ -181,12 +181,7 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
         Err(primary_error) => {
             let Some(resend_api_key) = crate::secret_manager::read_process_secret_trimmed(
                 "OMNYID_TRANSACTIONAL_RESEND_API_KEY",
-            )
-            .or_else(|| {
-                crate::secret_manager::read_process_secret_trimmed(
-                    "OMNYID_VENDOR_MAIL_RESEND_API_KEY",
-                )
-            }) else {
+            ) else {
                 return Err(primary_error);
             };
 
@@ -233,24 +228,13 @@ async fn send_transactional_platform_email(
 ) -> Option<Result<(), String>> {
     let cloudflare_api_key = crate::secret_manager::read_process_secret_trimmed(
         "OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN",
-    )
-    .or_else(|| {
-        crate::secret_manager::read_process_secret_trimmed(
-            "OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN",
-        )
-    });
+    );
     let cloudflare_account_id = std::env::var("OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID")
         .ok()
-        .or_else(|| std::env::var("OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID").ok())
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty());
     let resend_api_key =
-        crate::secret_manager::read_process_secret_trimmed("OMNYID_TRANSACTIONAL_RESEND_API_KEY")
-            .or_else(|| {
-                crate::secret_manager::read_process_secret_trimmed(
-                    "OMNYID_VENDOR_MAIL_RESEND_API_KEY",
-                )
-            });
+        crate::secret_manager::read_process_secret_trimmed("OMNYID_TRANSACTIONAL_RESEND_API_KEY");
     if cloudflare_api_key.is_none() && resend_api_key.is_none() {
         return None;
     }
@@ -314,12 +298,7 @@ async fn send_transactional_email_via_cloudflare(
             urlencoding::encode(account_id)
         ))
         .bearer_auth(api_key)
-        .json(&serde_json::json!({
-            "from": from,
-            "to": [to],
-            "subject": subject,
-            "text": body,
-        }))
+        .json(&cloudflare_email_sending_payload(from, to, subject, body))
         .send()
         .await
         .map_err(|error| format!("Cloudflare Email Sending request failed: {error}"))?;
@@ -332,6 +311,15 @@ async fn send_transactional_email_via_cloudflare(
         "Cloudflare Email Sending returned {status}: {}",
         detail.chars().take(500).collect::<String>()
     ))
+}
+
+fn cloudflare_email_sending_payload(from: &str, to: &str, subject: &str, body: &str) -> Value {
+    serde_json::json!({
+            "from": from,
+            "to": [to],
+            "subject": subject,
+            "text": body,
+    })
 }
 
 async fn send_transactional_email_via_resend(
@@ -496,7 +484,7 @@ fn references_from_content(content: &Value) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_outgoing_email_request, dispatch_outgoing_message};
+    use super::{build_outgoing_email_request, cloudflare_email_sending_payload, dispatch_outgoing_message, send_transactional_platform_email};
     use crate::message::AFPMessage;
     use serde_json::{Value, json};
     use std::sync::{Mutex, OnceLock};
@@ -547,6 +535,35 @@ mod tests {
         assert_eq!(request.to, vec!["friend@example.com".to_string()]);
         assert_eq!(request.subject, "Hello");
         assert_eq!(request.body, "Body text");
+    }
+
+    #[test]
+    fn cloudflare_structured_payload_keeps_recipient_array_contract() {
+        let payload = cloudflare_email_sending_payload("hello@mail.omnyid.com", "vendor@example.com", "Wedding enquiry", "Hello");
+        assert_eq!(payload["to"], json!(["vendor@example.com"]));
+    }
+
+    #[tokio::test]
+    async fn vendor_relay_credentials_do_not_select_transactional_account_mail() {
+        let _guard = env_lock().lock().expect("env lock");
+        for key in [
+            "OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN",
+            "OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN_FILE",
+            "OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID",
+            "OMNYID_TRANSACTIONAL_RESEND_API_KEY",
+            "OMNYID_TRANSACTIONAL_RESEND_API_KEY_FILE",
+        ] {
+            unsafe { std::env::remove_var(key) };
+        }
+        unsafe {
+            std::env::set_var("OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN", "vendor-only-token");
+            std::env::set_var("OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID", "vendor-only-account");
+            std::env::set_var("OMNYID_VENDOR_MAIL_RESEND_API_KEY", "vendor-only-resend");
+        }
+        assert!(send_transactional_platform_email("person@example.com", "Subject", "Body").await.is_none());
+        for key in ["OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN", "OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID", "OMNYID_VENDOR_MAIL_RESEND_API_KEY"] {
+            unsafe { std::env::remove_var(key) };
+        }
     }
 
     #[test]
