@@ -2974,3 +2974,49 @@ Remaining:
 
 - The gated live Gmail smoke must still exercise success, timeout-with-provider-acceptance recovery,
   and true no-delivery conflict against an allowlisted account. No live message was sent here.
+
+## 2026-10-17 - WED-215 quotation vendor-response foundation audit (Codex, DBV-00 complete)
+
+Changed:
+
+- Created clean `agent/codex/WED-215` from exact base
+  `052acc73316f864500703cb975f72a77e889ee82` and brought only the two completed WED-215
+  planning documents across from dirty WED-187.
+- Audited the claim portal, ownership checks, AgentCard/browser keys, mail provider boundary,
+  quotation persistence, closure, vendor grants, Gmail reconciliation, and A2UI/DecisionOS
+  foundations against source and tests rather than task-ledger claims.
+- Recorded that WED-170's enquiry runtime and WED-171's local-first vendor inbox are absent.
+  The current vendor page is a partial claim/photo workspace, not a response portal.
+- Froze the template-neutral `quotation.vendor_response.v1` payload, AFP kinds/reference
+  roles, existing closure states and grant purposes, singular route namespace, A2UI actions,
+  and independent fail-closed rollout flags. No new foundational card type is required.
+- Added eight synthetic golden scenarios for claimed AFP, secure-link, and email responses,
+  quote revision, contract change, booking confirmation, revocation, and replay.
+- Recorded the exposed Cloudflare token's 2026-10-17 HTTP 401 / error 1000 result. It remains
+  invalid; no token rotation, routing mutation, or live provider call occurred.
+
+Files:
+
+- `Documents/design/wedding planner/wedding-quotation-decision-booking-vendor-portal-spec.md`
+- `Documents/design/wedding planner/wedding-quotation-decision-booking-vendor-portal-tasks.md`
+- `Documents/verification/quotation-vendor-portal-baseline.md`
+- `tests/fixtures/quotation/vendor_response_closure_golden.json`
+- `.agent/TASKS.yaml`, `.agent/DECISIONS.md`, `.agent/HANDOFF.md`
+
+Verification:
+
+- Full no-provider quotation verifier passed: 57 Rust integration tests, compiled API-flow
+  lane, 29 focused Rust unit executions, `cargo check`, Solid type checking, 23 Solid tests,
+  and whitespace checks.
+- `TEST_DATABASE_URL` was unset, so the API target is not evidence of real Postgres
+  assertions. The inherited `email_group_routes.rs` unused-variable warning remains.
+- Fresh-worktree setup required `npm ci` in `solid-ui` and `typescript-sdk`. The Solid audit
+  reported inherited dependency advisories; no automatic dependency changes were made.
+- All new files remain under 1,000 lines and oversized application/server source files were
+  not modified.
+
+Next:
+
+- Implement DBV-01/WED-216 as authenticated decision and closure subroutes using existing
+  tenant-private AFP storage and replay. Keep WED-187 isolated until its active work is
+  committed and the shared auth/registration overlaps can be reviewed deliberately.

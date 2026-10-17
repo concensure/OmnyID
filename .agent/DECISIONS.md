@@ -825,3 +825,22 @@ SHA-256 digest of their event namespace, thread, and stable domain payload. Quot
 declare `afp-v1`. This preserves idempotent replay while satisfying AFP core and avoids cross-thread
 primary-key collisions. Readable quotation/version/idempotency identifiers remain in content,
 metadata, and typed references rather than being overloaded as transport message ids.
+
+## 2026-10-17: Vendor responses extend generic quotation AFP, not the wedding planner
+
+The WED-215 audit found claim ownership, AgentCard keys, quotation closure, context grants,
+Gmail reconciliation, private AFP persistence, and A2UI projections on the clean `052acc7`
+base, but no WED-170 enquiry runtime or WED-171 local-first vendor inbox. Vendor responses
+will therefore use a template-neutral `quotation.vendor_response.v1` contract and the
+existing singular `/quotation` route namespace. Claimed AFP, scoped secure-link, and email
+channels converge on the same response fingerprint, evidence review, quotation successor,
+and closure lineage. Wedding code remains an adapter/transport only.
+
+Context purposes preserve the shipped `resolve_quote_gaps`, `refine_vendor_package`, and
+`confirm_booking_details` values; submitting a revision is an allowed action rather than a
+breaking purpose rename. Response access is exact-vendor, thread, grant, projection, action,
+and expiry bound. It cannot disclose competitor comparisons, private notes, hidden
+preferences, full-plan context, or internal scores. Existing decision/A2UI primitives are
+sufficient, and no new foundational comparison or booking card is authorized. Closure and
+vendor response capabilities remain independently fail-closed, and no transition executes
+payment.

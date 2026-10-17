@@ -1840,3 +1840,33 @@ tasks:
       - the first scoped Oracle build failed before service replacement because the runtime bundle omitted the compile-time quotation registries; Docker and Oracle staging now carry `schemas/`, with a packaging regression assertion
       - commits 4c7454d and 50d92d6 are live on Oracle in dark mode after a scoped homeserver/UI rollout; the deployed source hash matches, all quotation flags are disabled, the authenticated route is present, public surfaces return 200, and the full backup/restore audit passed
       - release status remains in progress because hosted shadow accuracy, the real Postgres HTTP execution, hosted browser security coverage, live provider smoke, and the seven-day cohort cannot be represented as verified evidence yet
+  - id: WED-215
+    title: Quotation decision, booking closure, and lightweight vendor response portal
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-169
+      - WED-170
+      - WED-171
+      - WED-185
+      - WED-211
+      - WED-212
+      - WED-214
+    files:
+      - Documents/design/wedding planner/wedding-quotation-decision-booking-vendor-portal-spec.md
+      - Documents/design/wedding planner/wedding-quotation-decision-booking-vendor-portal-tasks.md
+      - Documents/verification/quotation-vendor-portal-baseline.md
+      - .agent/**
+    acceptance:
+      - the verified baseline distinguishes reusable production code from ledger-only plans and release-gated paths
+      - vendor response and booking closure extend canonical AFP quotation contracts without a parallel wedding-planner subsystem
+      - vendor access is claim-bound, least-privilege, revocable, expiring, and excludes competitor or private-planning context
+      - user-visible vendor responses retain source evidence, revision lineage, and explicit approval before consequential communication
+      - closure remains evidence-backed and never executes payment
+      - new source and documentation files remain below 1000 lines and oversized files are not expanded
+    progress:
+      - started from clean commit 052acc73316f864500703cb975f72a77e889ee82 in a dedicated WED-215 worktree
+      - DBV-00 foundation audit completed before any vendor or closure contract changes; WED-170 enquiry runtime and WED-171 vendor inbox are absent on the base and are not assumed reusable
+      - frozen generic response, closure, reference, route, A2UI, grant-purpose, and fail-closed feature contracts are recorded with eight synthetic golden scenarios
+      - clean-base quotation verification passes 57 Rust integration tests, 29 focused Rust unit executions, cargo check, Solid type checking, 23 Solid tests, and whitespace checks; the Postgres lane remains conditional because TEST_DATABASE_URL is unset
