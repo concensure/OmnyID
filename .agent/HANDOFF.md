@@ -1,3 +1,41 @@
+## 2026-10-18 - WED-227 selective WED-187 reconciliation (Codex, review)
+
+Changed:
+
+- Proved `agent/codex/WED-187` is already an ancestor and has no missing committed changes. No
+  wholesale merge, copy, or cherry-pick ran. R10, R11, R12, and mail review landed as atomic commits
+  `58838df`, `4802cde`, `c97d171`, and `6ccd7b9`.
+- Added result-only Wedding Understanding import with privacy disclosure and deterministic AFP
+  retry identity. Added operator-only venue enrichment with exact source/numeric/date validation,
+  conservative authority, sealed review tokens, existing LLM metering, and authority-ranked upsert.
+- Added immutable plan-private preference feedback to the current home/search registry. Current
+  directory photos replace stale card media, long names get the full card width, recommendations
+  identify checked evidence, and comparisons stay visible beside outreach drafts and receipts.
+- Rejected the candidate blanket vendor-mail interception and scalar-only Cloudflare payload. The
+  existing structured payload keeps the supported recipient array, inbound shared-secret readiness
+  remains required, and transactional account mail can no longer fall back to vendor-relay secrets.
+
+Verification:
+
+- Read-only Oracle SQL returned exactly 93 distinct photographer vendor IDs and 441 attributes;
+  the wider photographer listing count is 109. No source corpus, importer, or database write ran.
+- R10: typecheck, wedding-site smoke, 1,879 wedding tests, focused auth Rust test, and production
+  build passed. R11: typecheck, 1,879 wedding tests, four focused enrichment tests, cargo check, and
+  build passed. R12: typecheck, 1,887 wedding tests, 66 vendor-search Rust tests, and build passed.
+- Mail: exact `cargo test --lib gateway::smtp_out -- --nocapture` passed 7 tests; vendor-provider
+  readiness passed 3 tests; typecheck, 1,887 wedding tests, cargo check, and build also passed.
+  The inherited unused `user_id` warning and Vite large-chunk advisory remain.
+- Every new file is at most 480 lines. Existing Rust files above 999 lines are line-neutral; the
+  oversized wedding workspace component is smaller than before R12 and its view-state is neutral.
+
+Unresolved / next:
+
+- The exposed Cloudflare token remains recorded as invalid from the 2026-10-17 read-only check
+  (`401`, Cloudflare error `1000`) and was not used. Vendor mail and ranking policy V2 remain off.
+- No Oracle application deployment ran. WED-225 remains blocked on real Postgres/clamd/provider
+  evidence, independent security/privacy/accessibility review, usability/wording review, and hosted
+  cohort evidence. Do not deploy this advanced branch or enable release flags until those gates pass.
+
 ## 2026-10-18 - WED-224 email and AFP response convergence (Codex, review)
 
 Changed:

@@ -1,3 +1,26 @@
+## 2026-10-18: Personalisation transplants preserve current quotation and mail boundaries
+
+WED-187 is already an ancestor of the advanced WED-215 branch and `git cherry` reports no missing
+committed changes, so no commit is cherry-picked and no worktree is merged wholesale. The dirty R10,
+R11, and R12 work is re-expressed as bounded features: result-only Wedding Understanding import,
+operator-reviewed evidence-bounded venue enrichment, and plan-private vendor preference signals in
+the current home/search registry. Comparison cards always remain alongside outreach state, refresh
+approved photos from the current directory, reserve full card width for names, and derive saved
+recommendations from checked evidence. Feedback may add only known-vocabulary, nice-weight inferred
+facets; a must-have still requires explicit user confirmation.
+
+Production photographer data remains operational data, not application source. The verified Oracle
+projection is 93 distinct photographer vendor IDs and 441 attributes; no corpus, seed, importer, or
+duplicate write is added or run.
+
+The WED-187 Cloudflare mail patch is not accepted as written. Current official Cloudflare Email
+Service material accepts both scalar and array recipient forms, while the main API reference and
+multi-recipient contract use an array. More importantly, the generic AFP SMTP gateway cannot infer
+that every outbound message is vendor mail. Vendor relay therefore does not intercept it, the
+Cloudflare inbound shared secret remains a readiness requirement, and transactional account mail
+may not consume vendor-relay credentials. `OMNYID_VENDOR_MAIL_ENABLED` and ranking policy V2 remain
+off until their existing independent evidence gates pass.
+
 ## 2026-10-18: Vendor response channels converge only after exact transport proof
 
 Approved Gmail replies become quotation responses only when both the sender equals the approved

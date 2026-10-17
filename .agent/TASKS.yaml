@@ -2316,7 +2316,7 @@ tasks:
       - TEST_DATABASE_URL and CLAMD_HOST are unset and no accuracy/provider/reviewer/usability/wording/hosted/cohort evidence was supplied; readiness is blocked, all flags remain off, and no provider, Oracle, email, payment, or deployment mutation occurred
   - id: WED-227
     title: Reconcile personalised vendor slices onto quotation portal architecture
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -2355,3 +2355,4 @@ tasks:
       - the R12 checkpoint passes Solid typecheck, 1,887 wedding tests, 66 Rust vendor-search tests, and the production build; every new file is at most 176 lines, the oversized workspace component shrank by two lines, and the oversized view-state file stayed line-neutral
       - the candidate mail interception and scalar-only Cloudflare recipient change were rejected: current official Cloudflare material accepts scalar or array recipients, blanket interception cannot distinguish vendor mail, and the inbound shared-secret gate remains required
       - transactional account mail no longer falls back to vendor-relay Cloudflare or Resend credentials; the exact SMTP target passes 7 tests, vendor-provider readiness passes 3 tests, and the slice also passes typecheck, 1,887 wedding tests, cargo check, and production build with both vendor mail and ranking policy V2 still disabled
+      - WED-227 implementation is locally complete in four atomic commits; no Oracle application deployment ran because WED-225 remains blocked on provider, disposable-Postgres/clamd, independent review, usability, wording, and cohort evidence
