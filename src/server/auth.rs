@@ -194,8 +194,7 @@ pub(super) async fn login_http(
     }
 
     let session = create_session_for_user(&state.db, &user).await?;
-
-    Ok(auth_response_with_session_cookie(session, &user))
+    Ok(auth_response_with_session_cookie(session, &user, false))
 }
 
 pub(super) async fn google_auth_config_http() -> Json<GoogleAuthConfigResponse> {
@@ -229,14 +228,14 @@ pub(super) async fn google_auth_http(
     let google_subjects = google_subject_candidates(&token_info.sub);
     let google_subject = google_subjects[0].clone();
 
-    let user = if let Some(existing) = state
+    let (user, account_created) = if let Some(existing) = state
         .db
         .find_user_by_any_google_sub(&google_subjects)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?
     {
-        existing
+        (existing, false)
     } else if let Some(existing_email) = state
         .db
         .find_user_by_email(&token_info.email)
@@ -257,7 +256,7 @@ pub(super) async fn google_auth_http(
         if !linked {
             return Err(external_sign_in_failed_error());
         }
-        existing_email
+        (existing_email, false)
     } else {
         let user = UserRecord {
             id: Ulid::new().to_string(),
@@ -288,7 +287,7 @@ pub(super) async fn google_auth_http(
         ensure_user_agents_and_demo_seed(&state, &user)
             .await
             .map_err(internal_http_error)?;
-        user
+        (user, true)
     };
 
     state
@@ -299,8 +298,7 @@ pub(super) async fn google_auth_http(
         .map_err(status_to_http)?;
 
     let session = create_session_for_user(&state.db, &user).await?;
-
-    Ok(auth_response_with_session_cookie(session, &user))
+    Ok(auth_response_with_session_cookie(session, &user, account_created))
 }
 
 fn passkey_rp_id_configured() -> Result<String, (StatusCode, String)> {
@@ -488,7 +486,7 @@ pub(super) async fn apple_auth_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
     let session = create_session_for_user(&state.db, &user).await?;
-    Ok(auth_response_with_session_cookie(session, &user))
+    Ok(auth_response_with_session_cookie(session, &user, false))
 }
 
 #[derive(serde::Deserialize)]
@@ -1623,9 +1621,9 @@ fn cookie_value(cookie_header: &str, name: &str) -> Option<String> {
     })
 }
 
-fn auth_response_with_session_cookie(session: AuthSessionRecord, user: &UserRecord) -> Response {
+fn auth_response_with_session_cookie(session: AuthSessionRecord, user: &UserRecord, account_created: bool) -> Response {
     let token = session.token.clone();
-    json_response_with_session_cookie(&token, Json(session_auth_response(session, user)))
+    json_response_with_session_cookie(&token, Json(session_auth_response(session, user, account_created)))
 }
 
 fn json_response_with_session_cookie(body_token: &str, body: impl IntoResponse) -> Response {
@@ -3786,12 +3784,13 @@ pub(super) fn session_user_response(user: &UserRecord) -> SessionUserResponse {
     }
 }
 
-fn session_auth_response(session: AuthSessionRecord, user: &UserRecord) -> AuthResponse {
+fn session_auth_response(session: AuthSessionRecord, user: &UserRecord, account_created: bool) -> AuthResponse {
     AuthResponse {
         token: Some(session.token),
         user: Some(session_user_response(user)),
         requires_2fa: false,
         verification_required: false,
+        account_created,
         message: None,
         email: None,
     }
@@ -3803,6 +3802,7 @@ fn verification_required_response(email: &str, message: &str) -> AuthResponse {
         user: None,
         requires_2fa: false,
         verification_required: true,
+        account_created: true,
         message: Some(message.to_string()),
         email: Some(email.to_string()),
     }
@@ -4151,5 +4151,5 @@ pub(super) async fn passkey_authenticate_finish_http(
         expires_at: (chrono::Utc::now() + chrono::Duration::days(30)).to_rfc3339(),
     };
 
-    Ok(auth_response_with_session_cookie(session, &user))
+    Ok(auth_response_with_session_cookie(session, &user, false))
 }

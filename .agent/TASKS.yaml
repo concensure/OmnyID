@@ -2314,3 +2314,38 @@ tasks:
       - browser evidence now checks URL/storage/cache token residue and vendor-text XSS in addition to mobile/desktop Axe, optional email fallback, generic unavailable state, exact CSRF, and upload binding
       - the reproducible verifier reports blocked with artifact digest d1365f92c1f4717250141313a1d34619b4a3d57fba8eb408f8a9ebba61b857cf after 106 Rust quotation integration tests, conditional API flow, 31 quotation unit tests, shared boundaries, cargo check, six SDK tests, 44 Solid tests, 11 browser cases, the migration catalog, 1874 wedding tests, the Solid production build, and scoped line budgets passed
       - TEST_DATABASE_URL and CLAMD_HOST are unset and no accuracy/provider/reviewer/usability/wording/hosted/cohort evidence was supplied; readiness is blocked, all flags remain off, and no provider, Oracle, email, payment, or deployment mutation occurred
+  - id: WED-227
+    title: Reconcile personalised vendor slices onto quotation portal architecture
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-196
+      - WED-197
+      - WED-198
+      - WED-199
+      - WED-225
+    files:
+      - wedding/**
+      - solid-ui/src/components/WeddingVendor*.tsx
+      - solid-ui/src/components/WeddingResponseWorkspaceView.tsx
+      - solid-ui/src/lib/weddingLeadMagnetImport*.ts
+      - solid-ui/src/lib/weddingPreferenceSignal*.ts
+      - solid-ui/src/lib/weddingResponseWorkspaceView*.ts
+      - src/server/wedding_vendor_enrichment.rs
+      - src/server/user_management_routes/wedding_enrichment.rs
+      - src/gateway/smtp_out.rs
+      - src/gateway/vendor_mail_provider.rs
+      - .agent/**
+    acceptance:
+      - every committed WED-187 change is proven present by ancestry or cherry-picked once in dependency order, with no wholesale merge or worktree copy
+      - R10, R11, and R12 are adapted as independent reviewed slices with typecheck, wedding tests, relevant Rust tests, and production build evidence after each slice
+      - comparison cards retain photos, readable vendor names, evidence-specific recommendations, and remain visible after vendor outreach is sent
+      - photographer production data is verified read-only as exactly 93 distinct vendor ids and 441 attributes; no source corpus or duplicate upload enters the application worktree
+      - the WED-187 mail delta is reviewed against current response convergence, its SMTP library tests pass, and vendor mail remains disabled until existing rollout criteria pass
+      - ranking policy V2 remains disabled until its existing independent-corpus, human-judge, replay, quality, and rollout gates pass
+    progress:
+      - agent/codex/WED-187 is an ancestor of this branch and git cherry reports no missing committed changes; no cherry-pick is required
+      - read-only Oracle verification found 93 distinct photographer vendor ids with 441 attributes; the wider active photographer category has 109 listings, and no importer or source corpus was run or copied
+      - R10 was adapted behind a small preference owner so the oversized workspace component shrank by 31 lines; result-only local storage, deterministic AFP retries, sign-in import, provenance, auth response, privacy copy, and public Wedding Understanding UI are covered
+      - the R10 checkpoint passes Solid typecheck, wedding-site smoke, 1,879 wedding tests, focused Rust auth, and the production build; the inherited Rust unused-variable and Vite chunk-size advisories remain

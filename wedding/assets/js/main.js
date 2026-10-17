@@ -405,6 +405,89 @@
     });
   });
 
+  /* ---------- Wedding Understanding: result-only browser storage ---------- */
+  var understandingForm = document.querySelector('[data-wedding-understanding-form]');
+  if (understandingForm) {
+    var understandingStatus = understandingForm.querySelector('[data-understanding-status]');
+    var understandingResult = document.querySelector('[data-understanding-result]');
+    function understandingMessage(message, kind) {
+      understandingStatus.textContent = message;
+      understandingStatus.className = 'newsletter-status' + (kind ? ' is-' + kind : '');
+    }
+    function imagePayload(file) {
+      return new Promise(function (resolve, reject) {
+        if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+          reject(new Error('Please use a JPEG, PNG, or WebP image.'));
+          return;
+        }
+        var reader = new FileReader();
+        reader.onerror = function () { reject(new Error('A photo could not be read.')); };
+        reader.onload = function () {
+          var image = new Image();
+          image.onerror = function () { reject(new Error('A photo could not be prepared.')); };
+          image.onload = function () {
+            var maxEdge = 1280;
+            var scale = Math.min(1, maxEdge / Math.max(image.naturalWidth || 1, image.naturalHeight || 1));
+            var canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            var context = canvas.getContext('2d');
+            if (!context) { reject(new Error('A photo could not be prepared.')); return; }
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            var encoded = canvas.toDataURL('image/jpeg', 0.8).split(',')[1] || '';
+            if (!encoded) { reject(new Error('A photo could not be prepared.')); return; }
+            resolve({ data_base64: encoded, media_type: 'image/jpeg' });
+          };
+          image.src = String(reader.result || '');
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    understandingForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var text = (understandingForm.querySelector('[name="text"]').value || '').trim();
+      var files = Array.prototype.slice.call(understandingForm.querySelector('[name="images"]').files || []).slice(0, 3);
+      var button = understandingForm.querySelector('button[type="submit"]');
+      button.disabled = true;
+      understandingMessage('Reflecting your ideas…', '');
+      Promise.all(files.map(imagePayload))
+        .then(function (images) {
+          return fetch('/wedding/understanding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text, images: images, company: (understandingForm.querySelector('[name="company"]').value || '') })
+          });
+        })
+        .then(function (response) {
+          if (!response.ok) return response.text().then(function (body) { throw new Error(body || 'We could not reflect this yet.'); });
+          return response.json();
+        })
+        .then(function (result) {
+          if (!result.core_theme) throw new Error('We could not reflect this yet.');
+          var record = {
+            version: 1,
+            created_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            core_theme: result.core_theme,
+            preferences: Array.isArray(result.preferences) ? result.preferences.slice(0, 12) : [],
+            largest_tension: result.largest_tension || null,
+            opening_observation: result.opening_observation || null
+          };
+          try { localStorage.setItem('omnyid.wedding.understanding.v1', JSON.stringify(record)); }
+          catch (error) { console.warn('Wedding Understanding result could not be stored locally; it remains visible on this page.', error); }
+          understandingResult.querySelector('[data-understanding-observation]').textContent = record.opening_observation || '';
+          understandingResult.querySelector('[data-understanding-theme]').textContent = record.core_theme;
+          understandingResult.querySelector('[data-understanding-pairs]').textContent = record.preferences.map(function (pair) { return pair.a + ' over ' + pair.b; }).join(' · ');
+          understandingResult.querySelector('[data-understanding-tension]').textContent = record.largest_tension || '';
+          understandingResult.hidden = false;
+          understandingResult.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'nearest' });
+          understandingMessage('Your result is ready.', 'success');
+        })
+        .catch(function (error) { understandingMessage(error.message || 'We could not reflect this yet.', 'error'); })
+        .then(function () { button.disabled = false; });
+    });
+  }
+
   /* ---------- current year ---------- */
   document.querySelectorAll('[data-year]').forEach(function (el) {
     el.textContent = new Date().getFullYear();

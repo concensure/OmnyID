@@ -1265,11 +1265,10 @@ function App() {
   const pendingAuthSource = deepLinkParams.get("source");
   const shouldLaunchWeddingTemplateFromDeepLink = () =>
     pendingAuthSource === "wedding" || pendingAuthSource === "marketing";
-  // Shared by both the "already signed in" boot check and the post-login handler below,
-  // so the wedding-site deep-link launch behaves identically no matter which path fires.
   function launchWeddingTemplateFromDeepLink() {
     saveWeddingEntrySource("wedding_site");
     void savePrimaryUseCase("wedding_planning", "inferred").catch(() => {});
+    void import("@/lib/weddingLeadMagnetImportRunnerState").then(({ requestWeddingLeadMagnetImport }) => requestWeddingLeadMagnetImport());
     void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
       const launch = buildWeddingTemplateDeepLinkLaunch();
       dispatchWeddingTemplateDeepLinkLaunch(launch);
@@ -3167,6 +3166,7 @@ function App() {
             void loadRunnerFiles();
             void loadRuntimeLogs();
             startLoraPolling();
+            void import("@/lib/weddingLeadMagnetImportRunnerState").then(({ requestWeddingLeadMagnetImport }) => requestWeddingLeadMagnetImport());
             // Wedding-site visitors who deep-linked in with ?source=wedding
             // land straight on the wedding template instead of the default
             // chat view, matching what they came here to do.

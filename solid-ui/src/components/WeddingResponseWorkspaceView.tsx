@@ -13,9 +13,6 @@ import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/Wedding
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { WeddingWorkspaceDocumentsPanel } from "@/components/WeddingWorkspaceDocumentsPanel";
 import { fetchThread, ingestAttachmentBatch, recordWeddingVendorContact, type AfpMessage, type SendAfpMessageInput } from "@/lib/api";
-import { applyWeddingPreferenceChipChange, confirmWeddingPreferenceProfile, interpretWeddingPreferenceOnIntakeSave, type WeddingPreferenceChipChange } from "@/lib/weddingPreferenceInterpreterState";
-import { weddingPreferenceProfileToAfpSendInput } from "@/lib/weddingPreferenceProfileAfpState";
-import type { WeddingPreferenceProfile } from "@/lib/weddingPreferenceProfileState";
 import type { EditorPayload } from "@/lib/editorPayload";
 import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
 import { A2UI_CARD_STATS_REQUEST_EVENT, type A2uiCardStatsRequestEventDetail } from "@/lib/a2uiEvents";
@@ -46,6 +43,7 @@ import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProvide
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
 import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import { useWeddingVendorQuoteDecisionProjection } from "@/lib/useWeddingVendorQuoteDecisionProjection";
+import { useWeddingPreferenceProfileOwner } from "@/lib/useWeddingPreferenceProfileOwner";
 import { installMobileFocusViewportListener, isMobileFocusViewport } from "@/lib/mobileFocusHomeState";
 import { useWeddingApprovalExecution } from "@/lib/useWeddingApprovalExecution";
 import { buildWeddingHomeSections, WeddingHomeSectionRegistry } from "@/lib/weddingHomeSectionRegistry";
@@ -112,9 +110,14 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const [homeLayoutScope, setHomeLayoutScope] = createSignal("");
   const [homeSectionOrder, setHomeSectionOrder] = createSignal<WeddingHomeSectionId[]>([...WEDDING_HOME_SECTION_IDS]);
   const [draggingHomeSectionId, setDraggingHomeSectionId] = createSignal<WeddingHomeSectionId | null>(null);
-  const [preferenceProfile, setPreferenceProfile] = createSignal<{ profile: WeddingPreferenceProfile; messageId: string; fingerprint: string } | null>(null);
-  const [preferenceSaving, setPreferenceSaving] = createSignal(false);
-  let interpretedPreferenceFingerprint = "";
+  const {
+    preferenceProfile,
+    preferenceSaving,
+    updatePreferenceProfile,
+    confirmPreferenceProfile,
+    leadMagnetImportNotice,
+    setLeadMagnetImportNotice,
+  } = useWeddingPreferenceProfileOwner({ state, saveProjection: props.saveProjection, onRefreshWorkspace: props.onRefreshWorkspace });
   const [homeControlsSectionId, setHomeControlsSectionId] = createSignal<WeddingHomeSectionId | null>(null);
   let homeControlsHideTimer: number | undefined;
   const localQuoteReplyReceiptProofMessage = (): AfpMessage | null => {
@@ -175,45 +178,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     state().workspace.metadata.weddingPlanId
     || state().workspace.metadata.responseWorkspaceId
     || "default";
-  function preferenceRequirements() {
-    const planning = state().contextCards.find((card) => card.planningContext)?.planningContext;
-    return {
-      guestCount: planning?.guestCount == null ? null : String(planning.guestCount), budgetComfort: planning?.budgetComfort ?? null,
-      dateOrSeason: planning?.dateOrSeason ?? null, location: planning?.location ?? null, preferences: planning?.vendorPreferences ?? null,
-      topPriorities: planning?.topPriorities ?? [], atmosphereDescription: planning?.atmosphereDescription ?? null, vendorCategories: planning?.vendorCategories ?? [],
-    };
-  }
-  async function persistPreferenceProfile(profile: WeddingPreferenceProfile, fingerprint: string, parentProfileMessageId: string | null, revision: string) {
-    const input = weddingPreferenceProfileToAfpSendInput({ metadata: state().workspace.metadata, profile, parentProfileMessageId, revision });
-    setPreferenceSaving(true);
-    try {
-      const saved = props.saveProjection ? await props.saveProjection(input) : null;
-      const record = saved && typeof saved === "object" ? saved as Record<string, unknown> : {};
-      const messageId = typeof record.message_id === "string" && record.message_id.trim() ? record.message_id : input.id ?? "";
-      setPreferenceProfile({ profile, messageId, fingerprint });
-      props.onRefreshWorkspace?.();
-    } finally { setPreferenceSaving(false); }
-  }
-  function updatePreferenceProfile(change: WeddingPreferenceChipChange) {
-    const current = preferenceProfile();
-    if (!current || preferenceSaving()) return;
-    void persistPreferenceProfile(applyWeddingPreferenceChipChange(current.profile, change), `${current.fingerprint}:${change.facetId}:${change.choice}`, current.messageId, `change-${Date.now()}`);
-  }
-  function confirmPreferenceProfile() {
-    const current = preferenceProfile();
-    if (!current || preferenceSaving()) return;
-    void persistPreferenceProfile(confirmWeddingPreferenceProfile(current.profile), `${current.fingerprint}:confirmed`, current.messageId, `confirmed-${Date.now()}`);
-  }
-  createEffect(() => {
-    const planId = state().workspace.metadata.weddingPlanId;
-    const requirements = preferenceRequirements();
-    if (!planId || (!(requirements.topPriorities?.length) && !requirements.preferences && !requirements.atmosphereDescription)) return;
-    void interpretWeddingPreferenceOnIntakeSave({ weddingPlanId: planId, requirements }).then(({ fingerprint, profile }) => {
-      if (interpretedPreferenceFingerprint === fingerprint || preferenceProfile()?.fingerprint === fingerprint) return;
-      interpretedPreferenceFingerprint = fingerprint;
-      void persistPreferenceProfile(profile, fingerprint, preferenceProfile()?.messageId ?? null, `intake-${fingerprint}`);
-    });
-  });
   createEffect(() => {
     if (state().workspace.activeArtifact) setShowPlanningFiles(true);
   });
@@ -988,6 +952,11 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       aria-labelledby={`wedding-tab-${activeMenu()}`}
     >
       <div class={primaryColumnClass()}>
+        <Show when={leadMagnetImportNotice()}>
+          {(notice) => <div class="mb-3 rounded-xl border border-wedding-muted bg-wedding-surface-blush px-4 py-3 text-sm text-wedding-ink" role="status">
+            {notice()} <button type="button" class="ml-2 font-semibold text-wedding-accent underline" onClick={() => { setLeadMagnetImportNotice(null); props.onSelectMenu?.("home"); }}>Review</button><button type="button" class="ml-2 font-semibold text-wedding-accent underline" onClick={() => setLeadMagnetImportNotice(null)}>Got it</button>
+          </div>}
+        </Show>
         <Show when={activeMenu() !== "home"}>
           <button
             type="button"

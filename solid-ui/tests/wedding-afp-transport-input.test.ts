@@ -32,3 +32,16 @@ test("keeps valid AFP transport identifiers untouched", () => {
   };
   assert.deepEqual(normalizeAfpTransportInput(input), input);
 });
+
+test("retries of a logical id retain the same opaque transport id", () => {
+  const input = {
+    id: "wedding_preference_profile:lead:retry",
+    thread_id: "wedding_context:lead",
+    timestamp: "2026-10-16T00:00:00.000Z",
+    from: "omnyid:wedding",
+    to: [],
+    type: "context",
+    content: { kind: "wedding_preference_profile" },
+  };
+  assert.equal(normalizeAfpTransportInput(input).id, normalizeAfpTransportInput(input).id);
+});

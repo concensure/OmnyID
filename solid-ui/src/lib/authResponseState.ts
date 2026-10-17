@@ -7,6 +7,7 @@ export type AuthApiResponse = {
   user?: Session["user"];
   requires_2fa: boolean;
   verification_required: boolean;
+  accountCreated?: boolean;
   message?: string;
   email?: string;
 };
@@ -41,6 +42,7 @@ export function parseAuthApiResponse(value: unknown): AuthApiResponse {
     user: normalizeAuthUser(value.user),
     requires_2fa: value.requires_2fa === true,
     verification_required: value.verification_required === true,
+    ...(value.account_created === true ? { accountCreated: true } : {}),
     message: typeof value.message === "string" ? value.message : undefined,
     email: typeof value.email === "string" ? value.email : undefined,
   };

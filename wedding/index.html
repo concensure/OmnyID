@@ -72,6 +72,35 @@
     </div>
   </section>
 
+  <section aria-labelledby="understandingTitle">
+    <div class="container">
+      <div class="section-head center reveal">
+        <p class="eyebrow" style="justify-content:center">✦ Wedding Understanding</p>
+        <h2 id="understandingTitle">Put your wedding feeling into words.</h2>
+        <p>Share a few thoughts or up to three inspiration images. We will reflect the preferences you have already expressed.</p>
+      </div>
+      <form data-wedding-understanding-form class="newsletter-band reveal" novalidate>
+        <div class="newsletter-action" style="max-width:760px; width:100%;">
+          <label for="understandingText">What are you picturing?</label>
+          <textarea id="understandingText" name="text" maxlength="1200" rows="4" style="width:100%; margin-top:.5rem; padding:.8rem; border:1px solid #d6c1bd; border-radius:.75rem; font:inherit;" placeholder="A relaxed long lunch, a small room and lots of time with our people."></textarea>
+          <label for="understandingImages" style="display:block; margin-top:.75rem;">Inspiration images (optional, up to 3)</label>
+          <input id="understandingImages" name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin-top:.4rem;">
+          <input name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute; left:-9999px;" />
+          <button class="btn btn-primary" type="submit" style="margin-top:1rem;">Reflect our wedding</button>
+          <p class="newsletter-status" data-understanding-status role="status" aria-live="polite"></p>
+        </div>
+      </form>
+      <section data-understanding-result hidden class="cta-band" aria-live="polite" style="margin-top:1rem;">
+        <h3>Your Wedding, According to OmnyID</h3>
+        <p data-understanding-observation></p>
+        <p><strong>Core theme:</strong> <span data-understanding-theme></span></p>
+        <p data-understanding-pairs></p>
+        <p data-understanding-tension></p>
+        <a class="btn btn-primary" href="../workspace/?auth=register&amp;source=wedding">Start planning free</a>
+      </section>
+    </div>
+  </section>
+
   <!-- ============ LOGO / TRUST STRIP ============ -->
   <div class="logo-strip">
     <div class="container logo-strip-inner">

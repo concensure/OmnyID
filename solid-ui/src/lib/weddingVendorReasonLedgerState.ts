@@ -6,7 +6,7 @@ import type { WeddingVendorRankingRequirements, WeddingVendorRankingSource, Wedd
 export type WeddingVendorReason = {
   id: string;
   anchor: string | null;
-  anchorSource: "priority" | "atmosphere" | "location" | "budget" | "guests" | "inspiration" | "feedback" | null;
+  anchorSource: "priority" | "atmosphere" | "location" | "budget" | "guests" | "inspiration" | "feedback" | "lead_magnet" | null;
   polarity: "pro" | "con" | "unknown";
   strength: "decisive" | "supporting";
   claim: string;

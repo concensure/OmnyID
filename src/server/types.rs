@@ -450,19 +450,19 @@ pub(super) struct AuthResponse {
     pub(super) requires_2fa: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(super) verification_required: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub(super) account_created: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) email: Option<String>,
 }
-
 #[derive(Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "data")]
 pub(super) enum DashboardContinuityParsedContent {
     StateSnapshot(StateSnapshotContent),
     StateSynthesis(AfpStateSynthesisContent),
 }
-
 #[derive(Clone, serde::Serialize)]
 pub(super) struct DashboardContinuityBrief {
     pub(super) source_type: String,

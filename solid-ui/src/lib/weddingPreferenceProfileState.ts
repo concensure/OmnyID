@@ -10,7 +10,7 @@ export type WeddingPreferenceFacet = {
   weight: WeddingPreferenceFacetWeight;
   polarity: 1 | -1;
   anchor: string;
-  anchorSource: "priority" | "atmosphere" | "preference" | "inspiration" | "feedback";
+  anchorSource: "priority" | "atmosphere" | "preference" | "inspiration" | "feedback" | "lead_magnet";
   confidence: number;
   authority: WeddingPreferenceFacetAuthority;
 };

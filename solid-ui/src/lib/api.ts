@@ -537,7 +537,7 @@ export function normalizeAfpTransportInput(body: SendAfpMessageInput): SendAfpMe
     : afpTransportId(`thread|${logicalThreadId}`);
   const transportMessageId = isAfpTransportId(logicalMessageId)
     ? logicalMessageId
-    : afpTransportId(`message|${logicalMessageId}|${logicalThreadId}|${timestamp}|${JSON.stringify(body.content)}|${++afpTransportSequence}`);
+    : afpTransportId(`message|${logicalMessageId}|${logicalThreadId}|${timestamp}|${JSON.stringify(body.content)}${logicalMessageId ? "" : `|${++afpTransportSequence}`}`);
   if (transportThreadId === logicalThreadId && transportMessageId === logicalMessageId && timestamp === body.timestamp) {
     return body;
   }
