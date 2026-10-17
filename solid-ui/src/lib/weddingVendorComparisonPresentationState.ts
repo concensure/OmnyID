@@ -197,6 +197,7 @@ export function vendorChoiceCards(
     })),
     verify_questions: verifyQuestions,
     facet_labels: weddingVendorFacetLabels(choice),
+    vendor_facet_ids: (choice.vendorFacets ?? []).map((facet) => facet.facetId).sort(),
     worth_knowing: weddingVendorWorthKnowing(choice),
     fit_word: weddingVendorFitWord(choice),
     reasons: choice.reasons,
@@ -342,12 +343,17 @@ export function comparisonRecommendationHandoff(input: {
     : topLocation?.known && topLocation.value >= 0.6 && clean(input.location)
       ? clean(input.location)
       : null;
+  const runnerAnchor = runnerUp?.reasons?.find((reason) => reason.polarity === "pro" && reason.evidence.length > 0)?.anchor ?? null;
+  const checkedFactorCount = topChoice?.components.filter((component) => component.known).length ?? 0;
+  const recommendationLabel = topChoice
+    ? runnerUp
+      ? strongestAnchor && runnerAnchor
+        ? `${topChoice.title} fits ${strongestAnchor} best; ${runnerUp.title} is stronger on ${runnerAnchor}.`
+        : `${topChoice.title} currently ranks first on ${checkedFactorCount} checked factor${checkedFactorCount === 1 ? "" : "s"}; compare its open questions with ${runnerUp.title}.`
+      : `${total} venue fits what you've told us so far.`
+    : "Review source-backed vendor options before outreach.";
   return {
-    recommendationLabel: topChoice
-      ? runnerUp
-        ? strongestAnchor && runnerUp.reasons?.find((reason) => reason.polarity === "pro" && reason.evidence.length > 0)?.anchor ? `${topChoice.title} fits ${strongestAnchor} best; ${runnerUp.title} is stronger on ${runnerUp.reasons.find((reason) => reason.polarity === "pro" && reason.evidence.length > 0)?.anchor}.` : `Compare the ${total} options below.`
-        : `${total} venue fits what you've told us so far.`
-      : "Review source-backed vendor options before outreach.",
+    recommendationLabel,
     whyLabels: [
       `${total} source-backed vendor${total === 1 ? "" : "s"} found: ${booked.length} booked, ${bookable.length} bookable, ${verify.length} awaiting availability confirmation`,
       excluded.length > 0 ? `${excluded.length} excluded by a hard constraint or unavailability` : null,

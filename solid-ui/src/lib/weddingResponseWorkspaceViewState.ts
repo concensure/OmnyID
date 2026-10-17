@@ -219,7 +219,7 @@ export type WeddingWorkspaceArtifactPreview = {
     rationaleLabels: string[];
     preferenceMatch: string;
     situationFit: string;
-    verificationLabel: string; checkedFactsCount: number; anchorRows: Array<{ anchor: string; status: "met" | "not_met" | "unknown"; detail: string; componentId: string; verifyQuestion: string | null }>; verifyQuestions: string[]; facetLabels?: string[]; worthKnowing?: string | null; fitWord?: string | null;
+    verificationLabel: string; checkedFactsCount: number; anchorRows: Array<{ anchor: string; status: "met" | "not_met" | "unknown"; detail: string; componentId: string; verifyQuestion: string | null }>; verifyQuestions: string[]; facetLabels?: string[]; vendorFacetIds?: string[]; worthKnowing?: string | null; fitWord?: string | null;
   } & WeddingVendorRankingCardFields>;
   persistedSelectedVendorChoices: Array<{
     optionId: string;

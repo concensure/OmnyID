@@ -83,7 +83,9 @@ export function vendorComparisonHandoffForArtifact(
   const record = handoff as Record<string, unknown>;
   const persistedRecommendation = clean(record.recommendationLabel);
   const cards = vendorComparisonCardsForArtifact(metadata);
-  const recommendationLabel = /^start by reviewing\b.*\bthen select every vendor\b/i.test(persistedRecommendation)
+  const genericRecommendation = /^start by reviewing\b.*\bthen select every vendor\b/i.test(persistedRecommendation)
+    || /^compare the \d+ options? below\.?$/i.test(persistedRecommendation);
+  const recommendationLabel = genericRecommendation
     ? practicalRecommendationLabel(cards)
     : persistedRecommendation;
   const whyLabels = stringArray(record.whyLabels).slice(0, 5);
@@ -110,7 +112,9 @@ function practicalRecommendationLabel(
   const metAnchor = first.anchorRows.find((row) => row.status === "met")?.anchor;
   return metAnchor
     ? `${first.title} is strongest on ${metAnchor}.`
-    : `Compare the ${cards.length} options below.`;
+    : first.checkedFactsCount > 0
+      ? `${first.title} currently leads on ${first.checkedFactsCount} checked fact${first.checkedFactsCount === 1 ? "" : "s"}; compare the open questions before outreach.`
+      : `${first.title} currently ranks first on the saved source evidence; compare its open questions before outreach.`;
 }
 
 export function vendorComparisonCardsForArtifact(
@@ -147,8 +151,7 @@ export function vendorComparisonCardsForArtifact(
       checkedFactsCount: typeof record.checked_facts_count === "number" && Number.isFinite(record.checked_facts_count)
         ? Math.max(0, Math.floor(record.checked_facts_count)) : 0,
       anchorRows: anchorRows(record.anchor_rows),
-      verifyQuestions: stringArray(record.verify_questions).slice(0, 3),
-      facetLabels: stringArray(record.facet_labels).slice(0, 2),
+      verifyQuestions: stringArray(record.verify_questions).slice(0, 3), facetLabels: stringArray(record.facet_labels).slice(0, 2), vendorFacetIds: stringArray(record.vendor_facet_ids).slice(0, 16),
       worthKnowing: clean(record.worth_knowing) || null,
       fitWord: clean(record.fit_word) || null,
       ...weddingVendorRankingCardFieldsFromRecord(record),

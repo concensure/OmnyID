@@ -12,6 +12,7 @@ import type { WeddingVendorAvailabilityState } from "@/lib/weddingVendorRankingS
 import { weddingVendorPhotoPlaceholder } from "@/lib/weddingVendorPhotoPlaceholderState";
 import { weddingVendorRoomPhotoSrc } from "@/lib/weddingVendorRoomState";
 import { weddingVendorChoiceActionState, type WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
+import type { WeddingPreferenceSignalReason } from "@/lib/weddingPreferenceSignalState";
 import {
   weddingVendorOutreachSentLabel,
   type WeddingVendorOutreachFlowState,
@@ -53,10 +54,27 @@ export function WeddingVendorChoiceCard(props: {
   onConnectGmailForOutreach?: () => void;
   selectedForFollowUp?: boolean;
   onToggleFollowUp?: (card: WeddingVendorChoiceCardData) => void;
-  onNotForUs?: (card: WeddingVendorChoiceCardData) => void;
+  onNotForUs?: (card: WeddingVendorChoiceCardData, reason: WeddingPreferenceSignalReason) => Promise<boolean> | boolean;
 }) {
   const card = props.card;
   const [contactOpen, setContactOpen] = createSignal(false);
+  const [feedbackOpen, setFeedbackOpen] = createSignal(false);
+  const [feedbackSaving, setFeedbackSaving] = createSignal(false);
+  const [feedbackError, setFeedbackError] = createSignal<string | null>(null);
+  const submitFeedback = async (reason: WeddingPreferenceSignalReason) => {
+    if (!props.onNotForUs || feedbackSaving()) return;
+    setFeedbackSaving(true);
+    setFeedbackError(null);
+    try {
+      const saved = await props.onNotForUs(card, reason);
+      if (saved === false) setFeedbackError("We couldn't save that yet. Check your connection and try again.");
+      else setFeedbackOpen(false);
+    } catch {
+      setFeedbackError("We couldn't save that yet. Check your connection and try again.");
+    } finally {
+      setFeedbackSaving(false);
+    }
+  };
   const contactRows = () => [
     card.websiteUrl ? { label: "Website", value: card.websiteUrl, href: card.websiteUrl } : null,
     card.instagramUrl ? { label: "Instagram", value: card.instagramUrl, href: card.instagramUrl } : null,
@@ -70,6 +88,7 @@ export function WeddingVendorChoiceCard(props: {
   createEffect(() => {
     const sourceUrl = card.imageUrl;
     if (!isGoogleWeddingVendorPhotoPath(sourceUrl)) {
+      setImageFailed(false);
       setResolvedImageUrl(sourceUrl ?? null);
       return;
     }
@@ -132,12 +151,12 @@ export function WeddingVendorChoiceCard(props: {
         )}
       </Show>
       <div class="space-y-2 p-3">
-        <div class="flex items-start justify-between gap-2">
+        <div class="grid min-w-0 gap-2">
           <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase text-wedding-text">{card.comparisonCount === 1 ? "Only venue that fits so far" : card.rank === 1 ? "Your best match" : `Best of ${card.comparisonCount} matches`}</p>
             <h4 class="mt-0.5 break-words text-sm font-semibold text-wedding-text">{card.title}</h4>
           </div>
-          <span class="shrink-0 rounded-full bg-wedding-surface-blush px-2 py-1 text-[11px] font-semibold text-wedding-accent">
+          <span class="w-fit max-w-full rounded-full bg-wedding-surface-blush px-2 py-1 text-[11px] font-semibold text-wedding-accent">
             {factSummary()}
           </span>
         </div>
@@ -299,8 +318,19 @@ export function WeddingVendorChoiceCard(props: {
         <div class="flex min-h-11 flex-wrap items-center gap-3 text-xs font-semibold text-wedding-text">
           <Show when={card.websiteUrl ?? card.sourceUrl}>{(url) => <a href={url()} target="_blank" rel="noreferrer" class="min-h-11 inline-flex items-center underline">Website</a>}</Show>
           <Show when={contactRows().length > 0}><button type="button" class="min-h-11 underline" onClick={() => setContactOpen((current) => !current)}>Contact</button></Show>
-          <Show when={props.onNotForUs}><button type="button" class="min-h-11 underline" onClick={() => props.onNotForUs?.(card)}>Not for us</button></Show>
+          <Show when={props.onNotForUs}><button type="button" class="min-h-11 underline" aria-expanded={feedbackOpen()} onClick={() => { setFeedbackOpen((current) => !current); setFeedbackError(null); }}>Not for us</button></Show>
         </div>
+        <Show when={feedbackOpen()}>
+          <section class="rounded-lg border border-wedding-muted bg-wedding-surface-blush p-2" aria-label={`Why ${card.title} is not for you`}>
+            <p class="text-xs font-semibold text-wedding-text">What made this one not for you?</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <For each={[["too_big", "Too big"], ["not_our_style", "Not our style"], ["too_far", "Too far"], ["too_expensive", "Too expensive"], ["other", "Other"]] as const}>
+                {([reason, label]) => <button type="button" disabled={feedbackSaving()} class="min-h-11 rounded-lg border border-wedding-muted bg-white px-3 text-xs font-semibold text-wedding-text disabled:opacity-60" onClick={() => void submitFeedback(reason)}>{label}</button>}
+              </For>
+            </div>
+            <Show when={feedbackError()}><p class="mt-2 text-xs text-wedding-text" role="alert">{feedbackError()}</p></Show>
+          </section>
+        </Show>
         <Show when={props.outreachFlow}>
           {(flow) => (
             <WeddingVendorOutreachComposer

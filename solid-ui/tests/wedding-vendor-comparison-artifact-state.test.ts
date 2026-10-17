@@ -40,7 +40,7 @@ test("reopened comparison artifacts hide previously persisted category pages", (
   assert.deepEqual(cards.map((card) => card.title), ["Harbour Lights Events"]);
 });
 
-test("legacy generic recommendation is rebuilt as a truthful comparison prompt", () => {
+test("legacy generic recommendation is rebuilt from saved source evidence", () => {
   const handoff = vendorComparisonHandoffForArtifact({
     vendorComparisonHandoff: {
       recommendationLabel: "Start by reviewing Harbour Studio, then select every vendor you want OmnyID to pursue.",
@@ -48,13 +48,26 @@ test("legacy generic recommendation is rebuilt as a truthful comparison prompt",
       confidenceLabel: "Confidence: developing",
     },
     topChoiceCards: [
-      { rank: 1, title: "Harbour Studio", source_url: "https://harbour.example", preference_match: "a waterfront ceremony" },
+      { rank: 1, title: "Harbour Studio", source_url: "https://harbour.example", preference_match: "a waterfront ceremony", checked_facts_count: 4 },
       { rank: 2, title: "Garden House", source_url: "https://garden.example", preference_match: "a garden reception" },
     ],
   });
-  assert.equal(handoff?.recommendationLabel, "Compare the 2 options below.");
+  assert.match(handoff?.recommendationLabel ?? "", /Harbour Studio.*4 checked facts/i);
   assert.doesNotMatch(handoff?.recommendationLabel ?? "", /Start by reviewing/i);
   assert.doesNotMatch(handoff?.recommendationLabel ?? "", /stronger fit|alternative/i);
+});
+
+test("persisted compare-the-options copy is replaced with an evidence-specific lead", () => {
+  const handoff = vendorComparisonHandoffForArtifact({
+    vendorComparisonHandoff: { recommendationLabel: "Compare the 3 options below.", whyLabels: ["3 source-backed vendors"], confidenceLabel: "Confidence: developing" },
+    topChoiceCards: [
+      { rank: 1, title: "Harbour Studio", source_url: "https://harbour.example", checked_facts_count: 2 },
+      { rank: 2, title: "Garden House", source_url: "https://garden.example", checked_facts_count: 1 },
+      { rank: 3, title: "City Loft", source_url: "https://city.example", checked_facts_count: 1 },
+    ],
+  });
+  assert.match(handoff?.recommendationLabel ?? "", /Harbour Studio.*2 checked facts/i);
+  assert.doesNotMatch(handoff?.recommendationLabel ?? "", /^Compare the/i);
 });
 
 test("comparison cards render approved public, proxy, and bounded first-party photos only", () => {

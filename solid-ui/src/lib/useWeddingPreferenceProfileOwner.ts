@@ -53,12 +53,14 @@ export function useWeddingPreferenceProfileOwner(input: {
     fingerprint: string,
     parentProfileMessageId: string | null,
     revision: string,
+    derivedFromSignals: readonly string[] = [],
   ): Promise<void> {
     const message = weddingPreferenceProfileToAfpSendInput({
       metadata: input.state().workspace.metadata,
       profile,
       parentProfileMessageId,
       revision,
+      derivedFromSignals,
     });
     setPreferenceSaving(true);
     try {

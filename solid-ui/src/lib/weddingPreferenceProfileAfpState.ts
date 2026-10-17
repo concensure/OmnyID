@@ -15,7 +15,7 @@ export type WeddingPreferenceProfileAfpInput = {
   profile: WeddingPreferenceProfile;
   hardConstraints?: readonly { key: string; anchor: string }[];
   tradeoffs?: readonly { prefer: string; over: string; anchor: string }[];
-  derivedFromSignals?: boolean;
+  derivedFromSignals?: readonly string[];
   vocabularyVersion?: string;
   parentProfileMessageId?: string | null;
   revision: string;
@@ -49,7 +49,7 @@ export function weddingPreferenceProfileToAfpSendInput(input: WeddingPreferenceP
       tradeoffs: [...(input.tradeoffs ?? [])],
       unmapped_phrases: [...input.profile.unmapped],
       vocabulary_version: vocabularyVersion,
-      derived_from_signals: input.derivedFromSignals === true,
+      derived_from_signals: unique(input.derivedFromSignals ?? []),
     },
     views: [{ format: "structured", priority: 1, content: { title: "Wedding preferences", facets: facets.map((facet) => ({ id: facet.facetId, label: weddingFacetById(facet.facetId)?.label ?? facet.facetId, weight: facet.weight, anchor: facet.anchor })) } }],
     attachments: [],

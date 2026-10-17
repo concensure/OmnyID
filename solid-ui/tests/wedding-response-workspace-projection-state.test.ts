@@ -146,7 +146,7 @@ test("buildWeddingResponseWorkspaceViewState projects selected top-three vendor 
   assert.equal(comparisonNodeProps?.column_actions, undefined);
   assert.equal(comparisonNodeProps?.footer_actions, undefined);
   assert.equal((comparisonNodeProps?.selection as Record<string, unknown> | undefined)?.mode, "multi");
-  assert.equal(state.activePreview?.vendorComparisonHandoff?.recommendationLabel, "Compare the 3 options below.");
+  assert.match(state.activePreview?.vendorComparisonHandoff?.recommendationLabel ?? "", /Harbour Studio.*1 checked factor.*Budget Lens/i);
   assert.equal(state.activePreview?.vendorComparisonHandoff?.confidenceLabel, "Confidence: low");
   assert.ok(state.activePreview?.vendorComparisonHandoff?.whyLabels.some((label) => /source-backed vendors found/i.test(label)));
   assert.equal(

@@ -14,7 +14,7 @@ test("vendor deck emits one actionable blocked card when no comparison exists", 
   assert.deepEqual(items.map((item) => item.kind), ["vendor_blocked"]);
 });
 
-test("persisted outreach replaces the comparison with an in-deck draft and receipt", () => {
+test("persisted outreach keeps the comparison visible beside its draft and receipt", () => {
   const preview = { artifactId: "a1", title: "Venue comparison", vendorComparisonCards: [{}, {}, {}], vendorComparisonHandoff: null };
   const flow = {
     choiceId: "choice-1", vendorName: "Harbour House", recipientEmail: "hello@example.com",
@@ -22,13 +22,13 @@ test("persisted outreach replaces the comparison with an in-deck draft and recei
     sentAtIso: null, receiptRef: null, threadId: "thread-1", blockedReason: null,
   };
   const draft = buildWeddingVendorDeckProjectionState({ artifactPreviews: [preview as never], outreachFlows: [flow] });
-  assert.deepEqual(draft.map((item) => item.kind), ["vendor_draft"]);
-  assert.equal(draft[0]?.vendorOutreachFlow?.bodyMarkdown, "Hello");
+  assert.deepEqual(draft.map((item) => item.kind), ["vendor_comparison", "vendor_draft"]);
+  assert.equal(draft[1]?.vendorOutreachFlow?.bodyMarkdown, "Hello");
 
   const receipt = buildWeddingVendorDeckProjectionState({
     artifactPreviews: [preview as never],
     outreachFlows: [{ ...flow, stage: "sent", sentAtIso: "2026-10-06T00:00:00Z", receiptRef: "provider-1" }],
   });
-  assert.deepEqual(receipt.map((item) => item.kind), ["vendor_receipt"]);
-  assert.match(receipt[0]?.whyNowLabel ?? "", /provider-1/i);
+  assert.deepEqual(receipt.map((item) => item.kind), ["vendor_comparison", "vendor_receipt"]);
+  assert.match(receipt[1]?.whyNowLabel ?? "", /provider-1/i);
 });

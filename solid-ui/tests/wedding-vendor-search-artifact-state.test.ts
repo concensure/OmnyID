@@ -268,7 +268,7 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
   ]);
   const comparisonMetadata = comparison.artifactInput?.metadata as Record<string, unknown>;
   const recommendationHandoff = comparisonMetadata.vendorComparisonHandoff as Record<string, unknown>;
-  assert.equal(recommendationHandoff.recommendationLabel, "Compare the 4 options below.");
+  assert.match(String(recommendationHandoff.recommendationLabel ?? ""), /Harbour Studio.*1 checked factor.*Budget Lens/i);
   assert.deepEqual(recommendationHandoff.whyLabels as string[], [
     "4 source-backed vendors found: 0 booked, 0 bookable, 4 awaiting availability confirmation",
     "1 choice matched stated preferences",

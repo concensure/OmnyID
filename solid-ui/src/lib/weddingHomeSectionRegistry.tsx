@@ -14,6 +14,8 @@ import { WeddingVendorFollowUpPanel } from "@/components/WeddingVendorFollowUpPa
 import { WeddingVendorQuoteReplyCard } from "@/components/WeddingVendorQuoteReplyCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import type { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
+import type { useWeddingPreferenceFeedbackOwner } from "@/lib/useWeddingPreferenceFeedbackOwner";
+import type { useWeddingPreferenceProfileOwner } from "@/lib/useWeddingPreferenceProfileOwner";
 import type { WeddingHomeSectionId } from "@/lib/weddingHomeSectionPolicyState";
 import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
 import type { WeddingResponseWorkspaceViewState, WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
@@ -40,6 +42,8 @@ export type WeddingHomeSectionRegistryInput = {
   } | null;
   onDismissSearchResult: (artifactId: string) => void;
   vendorOutreach: ReturnType<typeof useWeddingVendorOutreachOwner>;
+  preferenceProfileOwner: Pick<ReturnType<typeof useWeddingPreferenceProfileOwner>, "preferenceProfile" | "preferenceSaving" | "updatePreferenceProfile" | "confirmPreferenceProfile">;
+  preferenceFeedback: ReturnType<typeof useWeddingPreferenceFeedbackOwner>;
   quoteCardProps: (flow: WeddingVendorQuoteReplyFlowState) => ComponentProps<typeof WeddingVendorQuoteReplyCard>;
   followUpProps: ComponentProps<typeof WeddingVendorFollowUpPanel>;
 };
@@ -64,7 +68,21 @@ export function buildWeddingHomeSections(input: WeddingHomeSectionRegistryInput)
       id: "vendor_search",
       title: "Live vendor search",
       visible: true,
-      render: () => <WeddingVendorSearchHomeSection workspace={workspace} result={input.searchResult} outreach={input.vendorOutreach} onDismiss={input.onDismissSearchResult} />,
+      render: () => <WeddingVendorSearchHomeSection
+        workspace={workspace} result={input.searchResult} outreach={input.vendorOutreach} onDismiss={input.onDismissSearchResult}
+        preferenceProfile={input.preferenceProfileOwner.preferenceProfile()?.profile ?? null}
+        preferenceSaving={input.preferenceProfileOwner.preferenceSaving()}
+        onPreferenceChange={input.preferenceProfileOwner.updatePreferenceProfile}
+        onPreferenceConfirm={input.preferenceProfileOwner.confirmPreferenceProfile}
+        hiddenVendorIds={input.preferenceFeedback.hiddenVendorIds()}
+        onNotForUs={input.preferenceFeedback.recordVendorFeedback}
+        onRestoreVendor={input.preferenceFeedback.restoreVendor}
+        feedbackConfirmationPrompt={input.preferenceFeedback.feedbackConfirmation()?.prompt ?? null}
+        feedbackConfirmationActionLabel={input.preferenceFeedback.feedbackConfirmation()?.kind === "intimate" ? "Make it a must-have" : "Review preferences"}
+        feedbackNotice={input.preferenceFeedback.feedbackNotice()}
+        onConfirmFeedbackSuggestion={input.preferenceFeedback.confirmFeedbackSuggestion}
+        onDismissFeedbackSuggestion={input.preferenceFeedback.dismissFeedbackSuggestion}
+      />,
     },
     {
       id: "notice",

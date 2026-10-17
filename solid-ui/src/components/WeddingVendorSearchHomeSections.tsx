@@ -13,6 +13,8 @@ import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorks
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingPreferenceProfile } from "@/lib/weddingPreferenceProfileState";
 import type { WeddingPreferenceChipChange } from "@/lib/weddingPreferenceInterpreterState";
+import type { WeddingPreferenceSignalReason } from "@/lib/weddingPreferenceSignalState";
+import { weddingVendorCardWithCurrentPhoto } from "@/lib/weddingVendorCardMediaState";
 import {
   loadWeddingDecisionSelections,
   toggleWeddingDecisionSelectionValue,
@@ -144,6 +146,14 @@ export function WeddingVendorSearchHomeSection(props: {
   preferenceSaving?: boolean;
   onPreferenceChange?: (change: WeddingPreferenceChipChange) => void;
   onPreferenceConfirm?: () => void;
+  hiddenVendorIds?: readonly string[];
+  onNotForUs?: (card: WeddingVendorChoiceCardData, artifactId: string, reason: WeddingPreferenceSignalReason) => Promise<boolean>;
+  onRestoreVendor?: (card: WeddingVendorChoiceCardData, artifactId: string) => Promise<boolean>;
+  feedbackConfirmationPrompt?: string | null;
+  feedbackConfirmationActionLabel?: string;
+  feedbackNotice?: string | null;
+  onConfirmFeedbackSuggestion?: () => void;
+  onDismissFeedbackSuggestion?: () => void;
 }) {
   const workspace = () => props.workspace;
   const [fullResultExpanded, setFullResultExpanded] = createSignal(false);
@@ -172,6 +182,12 @@ export function WeddingVendorSearchHomeSection(props: {
       selected,
     });
   }
+  const cardVendorKey = (card: WeddingVendorChoiceCardData) => card.vendorId?.trim() || card.choiceId;
+  const visibleCards = (artifact: WeddingWorkspaceArtifactPreview) => artifact.vendorComparisonCards
+    .filter((card) => !props.hiddenVendorIds?.includes(cardVendorKey(card)))
+    .map((card) => weddingVendorCardWithCurrentPhoto(card, workspace().weddingVendorDirectory));
+  const hiddenCards = (artifact: WeddingWorkspaceArtifactPreview) => artifact.vendorComparisonCards
+    .filter((card) => props.hiddenVendorIds?.includes(cardVendorKey(card)));
   const searchDisabled = () => workspace().vendorSearchRunning
     || !workspace().onRunLiveVendorSearch;
   const visibleVendorSearchNotice = () => {
@@ -234,6 +250,18 @@ export function WeddingVendorSearchHomeSection(props: {
           {SEARCH_PROGRESS_LABELS[searchProgressIndex()]}
         </p>
       </Show>
+      <Show when={props.feedbackNotice}>
+        <p class="mt-3 rounded-xl border border-wedding-muted bg-wedding-surface-blush px-3 py-2 text-xs text-wedding-text" role="status">{props.feedbackNotice}</p>
+      </Show>
+      <Show when={props.feedbackConfirmationPrompt}>
+        <section class="mt-3 rounded-xl border border-wedding-muted bg-white px-3 py-3" aria-label="Confirm a preference suggestion">
+          <p class="text-sm font-semibold text-wedding-text">{props.feedbackConfirmationPrompt}</p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button type="button" class="min-h-11 rounded-lg border-2 border-wedding-cta bg-white px-3 text-xs font-bold text-wedding-text" onClick={() => props.onConfirmFeedbackSuggestion?.()}>{props.feedbackConfirmationActionLabel ?? "Make it a must-have"}</button>
+            <button type="button" class="min-h-11 rounded-lg border border-wedding-muted bg-white px-3 text-xs font-semibold text-wedding-text" onClick={() => props.onDismissFeedbackSuggestion?.()}>Keep it as is</button>
+          </div>
+        </section>
+      </Show>
       <Show when={!props.result && workspace().vendorSearchResultAction}>
         <button type="button" class="mt-3 min-h-11 rounded-full border border-wedding-accent bg-white px-3 text-xs font-bold text-wedding-accent" onClick={() => props.onDismiss("")}>
           Show comparison
@@ -276,7 +304,7 @@ export function WeddingVendorSearchHomeSection(props: {
                       class="mt-3 shadow-none"
                       hero={(
                         <div class="grid gap-2 lg:grid-cols-3">
-                          <For each={comparisonPreview().vendorComparisonCards.slice(0, 3)}>
+                          <For each={visibleCards(comparisonPreview()).slice(0, 3)}>
                             {(vendor) => (
                               <WeddingVendorChoiceCard
                                 card={vendor}
@@ -290,12 +318,24 @@ export function WeddingVendorSearchHomeSection(props: {
                                 onCancelOutreach={props.outreach.onCancelOutreach}
                                 onRetryOutreach={props.outreach.onRetryOutreach}
                                 onConnectGmailForOutreach={() => void props.outreach.onConnectGmailForOutreach()}
+                                onNotForUs={(card, reason) => props.onNotForUs?.(card, preview().artifactId, reason) ?? false}
                               />
                             )}
                           </For>
                         </div>
                       )}
                     />
+                  </Show>
+                  <Show when={hiddenCards(comparisonPreview()).length > 0}>
+                    <section class="mt-3 rounded-xl border border-wedding-muted bg-white p-3" aria-label="Hidden vendors">
+                      <p class="text-sm font-semibold text-wedding-accent">Hidden vendors</p>
+                      <For each={hiddenCards(comparisonPreview())}>{(card) => (
+                        <div class="mt-2 flex items-center justify-between gap-2">
+                          <span class="min-w-0 break-words text-xs text-wedding-text">{card.title}</span>
+                          <button type="button" class="min-h-11 shrink-0 rounded-lg border border-wedding-muted bg-white px-3 text-xs font-semibold text-wedding-text" onClick={() => void props.onRestoreVendor?.(card, preview().artifactId)}>Restore</button>
+                        </div>
+                      )}</For>
+                    </section>
                   </Show>
                     </>;
                   })()}

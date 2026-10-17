@@ -11,7 +11,7 @@ export function buildWeddingVendorDeckProjectionState(input: {
   const result: FocusDeckItem[] = [];
   const comparison = input.artifactPreviews.find((preview) => preview.vendorComparisonCards.length === 3);
   const activeOutreach = (input.outreachFlows ?? []).filter((flow) => flow.stage !== "idle");
-  if (comparison && activeOutreach.length === 0) {
+  if (comparison) {
     result.push({
       id: `vendor-comparison:${comparison.artifactId}`,
       kind: "vendor_comparison",

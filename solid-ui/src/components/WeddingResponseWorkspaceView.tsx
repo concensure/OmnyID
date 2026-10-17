@@ -44,6 +44,7 @@ import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendor
 import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import { useWeddingVendorQuoteDecisionProjection } from "@/lib/useWeddingVendorQuoteDecisionProjection";
 import { useWeddingPreferenceProfileOwner } from "@/lib/useWeddingPreferenceProfileOwner";
+import { useWeddingPreferenceFeedbackOwner } from "@/lib/useWeddingPreferenceFeedbackOwner";
 import { installMobileFocusViewportListener, isMobileFocusViewport } from "@/lib/mobileFocusHomeState";
 import { useWeddingApprovalExecution } from "@/lib/useWeddingApprovalExecution";
 import { buildWeddingHomeSections, WeddingHomeSectionRegistry } from "@/lib/weddingHomeSectionRegistry";
@@ -110,14 +111,8 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   const [homeLayoutScope, setHomeLayoutScope] = createSignal("");
   const [homeSectionOrder, setHomeSectionOrder] = createSignal<WeddingHomeSectionId[]>([...WEDDING_HOME_SECTION_IDS]);
   const [draggingHomeSectionId, setDraggingHomeSectionId] = createSignal<WeddingHomeSectionId | null>(null);
-  const {
-    preferenceProfile,
-    preferenceSaving,
-    updatePreferenceProfile,
-    confirmPreferenceProfile,
-    leadMagnetImportNotice,
-    setLeadMagnetImportNotice,
-  } = useWeddingPreferenceProfileOwner({ state, saveProjection: props.saveProjection, onRefreshWorkspace: props.onRefreshWorkspace });
+  const { preferenceProfile, preferenceSaving, updatePreferenceProfile, confirmPreferenceProfile, persistPreferenceProfile, leadMagnetImportNotice, setLeadMagnetImportNotice } = useWeddingPreferenceProfileOwner({ state, saveProjection: props.saveProjection, onRefreshWorkspace: props.onRefreshWorkspace });
+  const preferenceFeedback = useWeddingPreferenceFeedbackOwner({ state, preferenceProfile, persistPreferenceProfile, saveProjection: props.saveProjection, onRefreshWorkspace: props.onRefreshWorkspace, onReviewPreferences: () => props.onSelectMenu?.("plan") });
   const [homeControlsSectionId, setHomeControlsSectionId] = createSignal<WeddingHomeSectionId | null>(null);
   let homeControlsHideTimer: number | undefined;
   const localQuoteReplyReceiptProofMessage = (): AfpMessage | null => {
@@ -863,7 +858,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     handleSidebarAction,
     searchResult: inlineVendorSearchPreview(),
     onDismissSearchResult: setDismissedVendorSearchResultArtifactId,
-    vendorOutreach,
+    vendorOutreach, preferenceProfileOwner: { preferenceProfile, preferenceSaving, updatePreferenceProfile, confirmPreferenceProfile }, preferenceFeedback,
     quoteCardProps: (baseFlow) => {
       const flow = quoteReplyFlow(baseFlow);
       return {
@@ -1006,6 +1001,9 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             preferenceSaving={preferenceSaving()}
             onPreferenceChange={updatePreferenceProfile}
             onPreferenceConfirm={confirmPreferenceProfile}
+            hiddenVendorIds={preferenceFeedback.hiddenVendorIds()} onNotForUs={preferenceFeedback.recordVendorFeedback} onRestoreVendor={preferenceFeedback.restoreVendor}
+            feedbackConfirmationPrompt={preferenceFeedback.feedbackConfirmation()?.prompt ?? null} feedbackConfirmationActionLabel={preferenceFeedback.feedbackConfirmation()?.kind === "intimate" ? "Make it a must-have" : "Review preferences"} feedbackNotice={preferenceFeedback.feedbackNotice()}
+            onConfirmFeedbackSuggestion={preferenceFeedback.confirmFeedbackSuggestion} onDismissFeedbackSuggestion={preferenceFeedback.dismissFeedbackSuggestion}
           />
         </Show>
 
