@@ -11,7 +11,7 @@ $typescriptSdk = Join-Path $root "typescript-sdk"
 Write-Host "Running quotation Rust verification"
 Push-Location $root
 try {
-    cargo test --test quotation_baseline --test quotation_contracts --test quotation_intelligence --test quotation_afp --test quotation_vendor_context --test quotation_vendor_response --test quotation_vendor_response_transport --test quotation_vendor_response_api --test quotation_response_capability --test quotation_response_capability_api --test quotation_extraction --test quotation_review --test quotation_clarification --test quotation_closure --test quotation_closure_evidence --test quotation_decision_api --test quotation_closure_api --test quotation_readiness
+    cargo test --test quotation_baseline --test quotation_contracts --test quotation_intelligence --test quotation_afp --test quotation_vendor_context --test quotation_vendor_response --test quotation_vendor_response_transport --test quotation_vendor_response_api --test quotation_response_capability --test quotation_response_capability_api --test quotation_extraction --test quotation_review --test quotation_clarification --test quotation_closure --test quotation_closure_evidence --test quotation_decision_api --test quotation_closure_api --test quotation_readiness --test quotation_vendor_portal_e2e
     if ($LASTEXITCODE -ne 0) { throw "Quotation Rust verification failed" }
     cargo test --test api_flows
     if ($LASTEXITCODE -ne 0) { throw "Quotation Postgres HTTP verification failed" }
@@ -34,7 +34,8 @@ try {
     $boundedQuotationFiles = @(
         "src/quotation/vendor_response_reconciliation.rs",
         "src/server/quotation_email_response.rs",
-        "src/server/quotation_vendor_response_routes.rs"
+        "src/server/quotation_vendor_response_routes.rs",
+        "tests/quotation_vendor_portal_e2e.rs"
     )
     foreach ($relativePath in $boundedQuotationFiles) {
         $lineCount = [System.IO.File]::ReadAllLines((Join-Path $root $relativePath)).Count

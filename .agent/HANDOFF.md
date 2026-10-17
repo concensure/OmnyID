@@ -3420,3 +3420,48 @@ Remaining:
   `OMNYID_QUOTATION_CLAIMED_VENDOR_RESPONSES_ENABLED` before both gates pass.
 - After review, start WED-222/DBV-07 using the existing scoped response-capability session and this
   canonical response/receipt contract; do not broaden the claimed account into a general CRM.
+## 2026-10-18 - WED-225 quotation closure and vendor portal readiness (Codex, blocked)
+
+Changed:
+
+- Added a 484-line template-neutral end-to-end target for all seven DBV scenarios: stale decision,
+  changed contract, claimed AFP response, secure link, ordinary email response, booking/refund, and
+  permission minimisation. It exercises deterministic shuffled/duplicate replay and preserves AFP
+  history without granting vendor responses booking or payment authority.
+- Replaced free-form quotation metric labels with closed enums. Aggregate counts and bounded
+  latency answer the four investment questions without raw IDs, content, tokens, email addresses,
+  URLs, or commercial values. Existing WED-213 accuracy/safety thresholds are unchanged.
+- Extended the portal browser test with URL/storage/cache residue and vendor-controlled XSS checks.
+  Added a reproducible fail-closed readiness script, commit-bound external sign-off contract,
+  scoped line-budget check, artifact digest, and evidence index.
+
+Verification:
+
+- `scripts/verify-quotation-vendor-portal-readiness.ps1` completed with local checks passing and
+  readiness `blocked`; artifact digest is
+  `d1365f92c1f4717250141313a1d34619b4a3d57fba8eb408f8a9ebba61b857cf`.
+- Passed 106 Rust quotation integration tests (including seven scenario tests), the conditional API
+  flow, 31 quotation units, shared ingest/Gmail/MIME/federation/LLM checks, `cargo check`, six SDK
+  tests plus typecheck/build, 44 Solid tests plus typecheck, 11 Playwright cases, the real one-test
+  migration-catalog filter, 1,874 wedding tests, the Solid production build, and WED-225 line
+  budgets. The build retains its inherited large-chunk advisory and Rust retains the inherited
+  unused `email_group_routes.rs` variable warning.
+- The first consolidated attempts revealed and then fixed a PowerShell SHA compatibility issue,
+  named-parameter forwarding bug, zero-test migration filter, and coordination-ledger false line
+  budget failure. Only the final blocked manifest above is valid evidence.
+
+Blocked:
+
+- `TEST_DATABASE_URL` and `CLAMD_HOST` are unset. No current-commit accuracy corpus, clean clamd,
+  allowlisted provider, independent security/privacy or hosted accessibility review, couple/vendor
+  usability, human booking/permission wording, hosted shadow, or cohort sign-off was supplied.
+- Every quotation/relay flag remains false or unset. No provider, Oracle, Cloudflare, email,
+  payment, release, or deployment mutation occurred. Do not begin WED-226 dark deployment until
+  WED-225 is independently reviewed; do not enable any feature until the manifest is verified.
+
+Next:
+
+- Run the conditional HTTP suites with disposable Postgres and a clean clamd service, collect the
+  exact external sign-off JSON records described in the readiness document, and rerun the verifier.
+  After independent review, WED-226 may deploy the same artifact dark with every flag off and prove
+  runtime SHA/configuration before any separately authorised canary.

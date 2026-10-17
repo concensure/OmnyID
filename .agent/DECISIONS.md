@@ -1036,3 +1036,17 @@ review proposal rather than defining their own response model.
   booking, contract execution, or payment.
 - Gate the path independently with `OMNYID_QUOTATION_CLAIMED_VENDOR_RESPONSES_ENABLED`. Keep it
   disabled until the disposable-Postgres matrix and independent security review are recorded.
+## 2026-10-18: Vendor-portal readiness requires a closed metric taxonomy and commit-bound evidence
+
+Quotation funnel metrics use fixed event, category, and outcome enums rather than free-form labels.
+Only bounded aggregate counts, elapsed time, fallback/correction counts, and OmnyID processing cost
+are representable; identifiers, content, URLs, tokens, email addresses, and quote amounts have no
+field in the contract. This supports the source brief's four investment questions without creating
+a second commercial ledger or a surveillance signal such as email-open intent.
+
+The DBV-10 verifier emits `untested`, `blocked`, `failed`, or `verified` evidence and a SHA-256
+digest over quotation programme inputs. Local test success cannot satisfy Postgres, clean ClamAV,
+provider, accuracy-corpus, independent security/privacy/accessibility, usability, human wording,
+hosted-shadow, or cohort gates. External sign-offs must use the frozen small JSON contract and bind
+the exact commit. Missing or malformed evidence stays blocked. Deployment and feature enablement
+remain separate: no release flag follows automatically from code presence or a local green suite.

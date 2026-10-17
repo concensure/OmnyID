@@ -77,28 +77,118 @@ fn external_blockers_are_distinct_from_accuracy_failure() {
 #[test]
 fn metrics_accept_bounded_aggregates_and_reject_identifiers_or_urls() {
     let aggregate = QuotationMetricEvent {
-        event: "quotation_extraction_completed".to_string(),
-        category: "venue".to_string(),
-        outcome: "review_required".to_string(),
+        event: QuotationMetricName::ExtractionMaterialAccuracy,
+        category: QuotationMetricCategory::Venue,
+        outcome: QuotationMetricOutcome::ManualReview,
         count: 1,
-        latency_ms: Some(125),
+        latency_ms: None,
         provider_fallback_count: Some(1),
         correction_count: Some(2),
         estimated_cost_usd_micros: Some(40),
     };
     assert!(validate_metric_event(&aggregate).is_ok());
-    let mut leaking = aggregate.clone();
-    leaking.outcome = "vendor@example.test".to_string();
-    assert!(validate_metric_event(&leaking).is_err());
-    leaking.outcome = "https://private-source.test/quote".to_string();
-    assert!(validate_metric_event(&leaking).is_err());
-
     let raw = serde_json::json!({
-        "event": "quotation_extraction_completed",
+        "event": "extraction_material_accuracy",
         "category": "venue",
-        "outcome": "ok",
+        "outcome": "exact",
         "count": 1,
         "source_body": "secret quote"
     });
     assert!(serde_json::from_value::<QuotationMetricEvent>(raw).is_err());
+
+    for (field, private_value) in [
+        ("event", "quotation-01KGPRIVATE"),
+        ("category", "vendor@example.test"),
+        ("outcome", "https://private-source.test/quote"),
+    ] {
+        let mut raw = serde_json::json!({
+            "event": "response_channel",
+            "category": "venue",
+            "outcome": "email",
+            "count": 1,
+        });
+        raw[field] = serde_json::json!(private_value);
+        assert!(serde_json::from_value::<QuotationMetricEvent>(raw).is_err());
+    }
+}
+
+#[test]
+fn four_investment_metrics_are_expressible_without_content_or_identifiers() {
+    let events = [
+        QuotationMetricEvent {
+            event: QuotationMetricName::FirstCompleteQuoteToDecision,
+            category: QuotationMetricCategory::All,
+            outcome: QuotationMetricOutcome::Preferred,
+            count: 8,
+            latency_ms: Some(86_400_000),
+            provider_fallback_count: None,
+            correction_count: None,
+            estimated_cost_usd_micros: None,
+        },
+        QuotationMetricEvent {
+            event: QuotationMetricName::ClarificationExchangesPerBooking,
+            category: QuotationMetricCategory::All,
+            outcome: QuotationMetricOutcome::VerifiedBooking,
+            count: 3,
+            latency_ms: None,
+            provider_fallback_count: None,
+            correction_count: None,
+            estimated_cost_usd_micros: None,
+        },
+        QuotationMetricEvent {
+            event: QuotationMetricName::QualifiedEnquiryOutcome,
+            category: QuotationMetricCategory::All,
+            outcome: QuotationMetricOutcome::VerifiedBooking,
+            count: 12,
+            latency_ms: None,
+            provider_fallback_count: None,
+            correction_count: None,
+            estimated_cost_usd_micros: None,
+        },
+        QuotationMetricEvent {
+            event: QuotationMetricName::VendorActiveResponseTime,
+            category: QuotationMetricCategory::All,
+            outcome: QuotationMetricOutcome::Submitted,
+            count: 9,
+            latency_ms: Some(420_000),
+            provider_fallback_count: None,
+            correction_count: None,
+            estimated_cost_usd_micros: None,
+        },
+    ];
+    assert!(
+        events
+            .iter()
+            .all(|event| validate_metric_event(event).is_ok())
+    );
+    let encoded = serde_json::to_string(&events).unwrap();
+    for prohibited in [
+        "thread_id",
+        "quotation_id",
+        "vendor_id",
+        "amount_minor",
+        "email",
+    ] {
+        assert!(!encoded.contains(prohibited));
+    }
+}
+
+#[test]
+fn latency_metrics_require_bounded_elapsed_time_and_counts_are_nonzero() {
+    let mut event = QuotationMetricEvent {
+        event: QuotationMetricName::FirstCompleteQuoteToBooking,
+        category: QuotationMetricCategory::Other,
+        outcome: QuotationMetricOutcome::VerifiedBooking,
+        count: 1,
+        latency_ms: None,
+        provider_fallback_count: None,
+        correction_count: None,
+        estimated_cost_usd_micros: None,
+    };
+    assert!(validate_metric_event(&event).is_err());
+    event.latency_ms = Some(366 * 24 * 60 * 60 * 1_000 + 1);
+    assert!(validate_metric_event(&event).is_err());
+    event.latency_ms = Some(1_000);
+    event.count = 0;
+    assert!(validate_metric_event(&event).is_err());
 }

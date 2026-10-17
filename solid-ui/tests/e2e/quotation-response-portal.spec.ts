@@ -46,6 +46,17 @@ for (const viewport of [{ width: 360, height: 740 }, { width: 1280, height: 800 
     expect(requests.every((url) => !url.includes("synthetic-secret"))).toBe(true);
     expect(allRequests.every((url) => !url.includes("synthetic-secret"))).toBe(true);
     expect(allRequests.some((url) => /analytics|cloudflareinsights/i.test(url))).toBe(false);
+    const browserResidue = await page.evaluate(async () => ({
+      href: window.location.href,
+      referrer: document.referrer,
+      local: Object.entries(localStorage),
+      session: Object.entries(sessionStorage),
+      cacheKeys: "caches" in window ? await caches.keys() : [],
+      controlled: Boolean(navigator.serviceWorker?.controller),
+    }));
+    expect(JSON.stringify(browserResidue)).not.toContain("synthetic-secret");
+    expect(browserResidue.cacheKeys).toEqual([]);
+    expect(browserResidue.controlled).toBe(false);
     await expect(page.getByRole("heading", { name: "Answer questions about your quotation" })).toBeVisible();
     await expect(page.getByText("Harbour House").first()).toBeVisible();
     await expect(page.getByText(/reply to the original message/i)).toBeVisible();
@@ -70,6 +81,22 @@ test("expired or revoked links reveal only a generic email-safe fallback", async
   await expect(page.getByRole("heading", { name: "This response link is unavailable" })).toBeVisible();
   await expect(page.getByText("Harbour House")).toHaveCount(0);
   await expect(page.getByText(/reply to the original email/i)).toBeVisible();
+});
+
+test("vendor-controlled projection text cannot execute markup", async ({ page }) => {
+  const attack = `<img src=x onerror="window.__quotationXss='executed'">Vendor`;
+  await page.route("**/quotation/vendor-response/exchange", (route) => route.fulfill({
+    status: 200, contentType: "application/json", body: JSON.stringify({
+      session_id: "session-xss", expires_at: "2026-10-18T01:15:00Z",
+      capability_expires_at: "2027-10-19T01:00:00Z", csrf_token: "csrf-xss",
+      submission_nonce: "nonce-xss", account_access: false,
+      projection: { ...projection, fields: { ...projection.fields, "vendor.name": attack } },
+    }),
+  }));
+  await page.goto("/workspace/quotation-response.html#token=xss-secret", { waitUntil: "networkidle" });
+  await expect(page.getByText(attack, { exact: true }).first()).toBeVisible();
+  expect(await page.evaluate(() => (window as Window & { __quotationXss?: string }).__quotationXss)).toBeUndefined();
+  await expect(page.locator("main img")).toHaveCount(0);
 });
 
 test("revision upload preserves scoped bindings and joins the final review response", async ({ page }) => {

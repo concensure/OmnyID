@@ -2277,3 +2277,40 @@ tasks:
       - the full quotation verifier passes 99 Rust integration tests, the conditional API flow, 31 quotation unit tests, shared document/Gmail/MIME/federation/LLM checks, cargo check, six SDK tests plus typecheck/build, and 44 Solid tests; the first Windows rustc access violation was resolved by rerunning with CARGO_BUILD_JOBS=2
       - new files are 863 and 648 physical lines and the bounded response route is 748 lines; the only Rust warning is the inherited email-group unused variable
       - TEST_DATABASE_URL and CLAMD_HOST are unset, so real Postgres HTTP convergence, clean ClamAV daemon, provider smoke, independent security/privacy review, and release activation remain pending; no provider, Oracle, Cloudflare, email, payment, or deployment mutation occurred
+  - id: WED-225
+    title: Verify quotation closure and vendor portal readiness
+    status: blocked
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-216
+      - WED-217
+      - WED-218
+      - WED-219
+      - WED-220
+      - WED-221
+      - WED-222
+      - WED-223
+      - WED-224
+    files:
+      - tests/quotation_vendor_portal_e2e.rs
+      - tests/api_flows.rs
+      - tests/quotation_*_api.rs
+      - solid-ui/tests/e2e/quotation-response-portal.spec.ts
+      - scripts/verify-quotation-vendor-portal-readiness.ps1
+      - Documents/verification/quotation-vendor-portal-readiness.md
+      - src/quotation/metrics.rs
+      - .agent/**
+    acceptance:
+      - seven specification scenarios and security-negative matrices cover replay, stale authority, IDOR dimensions, CSRF, XSS, upload attacks, session fixation, Referer/cache leakage, and disabled-state honesty
+      - deterministic shuffled/duplicate AFP replay and content-free aggregate metrics preserve the existing accuracy and safety thresholds without private identifiers or commercial values
+      - readiness remains untested, blocked, failed, or verified and missing Postgres, clamd, provider, browser, reviewer, usability, wording, or cohort evidence never becomes verified
+      - reproducible verification covers Rust, SDK, Solid, wedding, browser, migration, disposable Postgres, line budgets, and an artifact digest without enabling feature or relay flags
+      - independent security/privacy, accessibility, usability, and human wording review gaps are recorded honestly and no critical or high issue is claimed closed without reviewer evidence
+    progress:
+      - started from clean WED-224 commit a5bb2d9 with every quotation, email reconciliation, and relay flag disabled; existing readiness, API, browser, metrics, and verification artifacts are being audited before adding evidence aggregation
+      - added one template-neutral seven-scenario target covering stale decisions, contract review, claimed AFP, secure-link replay/rate controls, email convergence, booking/refund idempotency, and permission minimisation; shuffled and duplicate AFP delivery remains deterministic
+      - replaced free-form metric labels with closed event/category/outcome enums; the four source-brief investment questions remain measurable using bounded counts and latency without identifiers, content, tokens, URLs, email addresses, or commercial amounts
+      - browser evidence now checks URL/storage/cache token residue and vendor-text XSS in addition to mobile/desktop Axe, optional email fallback, generic unavailable state, exact CSRF, and upload binding
+      - the reproducible verifier reports blocked with artifact digest d1365f92c1f4717250141313a1d34619b4a3d57fba8eb408f8a9ebba61b857cf after 106 Rust quotation integration tests, conditional API flow, 31 quotation unit tests, shared boundaries, cargo check, six SDK tests, 44 Solid tests, 11 browser cases, the migration catalog, 1874 wedding tests, the Solid production build, and scoped line budgets passed
+      - TEST_DATABASE_URL and CLAMD_HOST are unset and no accuracy/provider/reviewer/usability/wording/hosted/cohort evidence was supplied; readiness is blocked, all flags remain off, and no provider, Oracle, email, payment, or deployment mutation occurred

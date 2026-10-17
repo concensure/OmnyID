@@ -112,12 +112,82 @@ pub fn quotation_readiness_report(
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QuotationMetricName {
+    FirstCompleteQuoteToDecision,
+    FirstCompleteQuoteToBooking,
+    ClarificationExchangesPerBooking,
+    QualifiedEnquiryOutcome,
+    VendorActiveResponseTime,
+    PortalInviteLifecycle,
+    ResponseChannel,
+    DuplicateReconciliation,
+    ExtractionMaterialAccuracy,
+    ManualCorrection,
+    SecurityRejection,
+    ContractMaterialChange,
+    ClosureBudgetProjection,
+    IdempotencyConflict,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QuotationMetricCategory {
+    All,
+    Venue,
+    Catering,
+    Photography,
+    Entertainment,
+    FloralStyling,
+    Beauty,
+    Transport,
+    Accommodation,
+    ProductionHire,
+    Celebrant,
+    Stationery,
+    Cake,
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QuotationMetricOutcome {
+    Observed,
+    Preferred,
+    VerifiedBooking,
+    NotBooked,
+    Submitted,
+    Expired,
+    Revoked,
+    EmailFallback,
+    ClaimedAfp,
+    SecureLink,
+    Email,
+    Duplicate,
+    Exact,
+    Corrected,
+    ManualReview,
+    RejectedStale,
+    RejectedReplay,
+    RejectedCrossTenant,
+    MaterialChange,
+    Projected,
+    Conflict,
+}
+
+/// A deliberately closed, aggregate-only metric contract.
+///
+/// The enums prevent callers from turning vendor, user, quotation, thread, or
+/// source identifiers into metric labels. Values measure counts, elapsed time,
+/// parser/model fallback, corrections, and OmnyID processing cost only. They
+/// never carry a quotation amount or other commercial value.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct QuotationMetricEvent {
-    pub event: String,
-    pub category: String,
-    pub outcome: String,
+    pub event: QuotationMetricName,
+    pub category: QuotationMetricCategory,
+    pub outcome: QuotationMetricOutcome,
     pub count: u64,
     pub latency_ms: Option<u64>,
     pub provider_fallback_count: Option<u8>,
@@ -126,26 +196,29 @@ pub struct QuotationMetricEvent {
 }
 
 pub fn validate_metric_event(event: &QuotationMetricEvent) -> Result<(), String> {
-    for (label, value, max) in [
-        ("event", event.event.as_str(), 100),
-        ("category", event.category.as_str(), 100),
-        ("outcome", event.outcome.as_str(), 100),
-    ] {
-        if value.trim().is_empty()
-            || value.len() > max
-            || value.chars().any(char::is_control)
-            || value.contains('@')
-            || value.contains("http://")
-            || value.contains("https://")
-        {
-            return Err(format!("{label} is not privacy-safe"));
-        }
-    }
-    if event.count > 1_000_000
+    if event.count == 0
+        || event.count > 1_000_000
+        || event
+            .latency_ms
+            .is_some_and(|value| value > 366 * 24 * 60 * 60 * 1_000)
         || event.provider_fallback_count.is_some_and(|value| value > 3)
         || event.correction_count.is_some_and(|value| value > 500)
+        || event
+            .estimated_cost_usd_micros
+            .is_some_and(|value| value > 100_000_000_000)
     {
         return Err("metric value is outside its bounded range".to_string());
+    }
+
+    let requires_latency = matches!(
+        event.event,
+        QuotationMetricName::FirstCompleteQuoteToDecision
+            | QuotationMetricName::FirstCompleteQuoteToBooking
+            | QuotationMetricName::VendorActiveResponseTime
+            | QuotationMetricName::ClosureBudgetProjection
+    );
+    if requires_latency != event.latency_ms.is_some() {
+        return Err("latency presence does not match the metric kind".to_string());
     }
     Ok(())
 }
