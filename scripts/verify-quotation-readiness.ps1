@@ -42,11 +42,13 @@ try {
         tests/quotation-review-state.test.ts `
         tests/quotation-clarification-state.test.ts `
         tests/quotation-closure-state.test.ts `
+        tests/quotation-decision-closure-state.test.ts `
+        tests/quotation-decision-closure-api.test.ts `
         tests/quotation-wedding-closure-adapter.test.ts `
         tests/quotation-readiness-state.test.ts
     if ($LASTEXITCODE -ne 0) { throw "Quotation Solid verification failed" }
     if ($IncludeBrowser) {
-        npx playwright test tests/e2e/wedding-quotation-intelligence.spec.ts --config playwright.config.ts
+        npx playwright test tests/e2e/wedding-quotation-intelligence.spec.ts tests/e2e/quotation-decision-closure.spec.ts --config playwright.config.ts
         if ($LASTEXITCODE -ne 0) { throw "Quotation browser verification failed" }
     }
 }

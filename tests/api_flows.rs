@@ -342,6 +342,7 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
         "quotation_version_id": quote.identity.version_id,
         "comparison_id": comparison_id,
         "expected_comparison_revision": comparison_revision,
+        "expected_closure_revision": format!("selection_closure:selection-{suffix}"),
         "expected_state": "selected",
         "target_state": "contract_received",
         "user_authority": true,
@@ -380,6 +381,7 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
 
     let mut invalid_leap = closure;
     invalid_leap["event_id"] = json!(format!("invalid-booking-{suffix}"));
+    invalid_leap["expected_closure_revision"] = json!(format!("contract-received-{suffix}"));
     invalid_leap["expected_state"] = json!("contract_received");
     invalid_leap["target_state"] = json!("booking_confirmed");
     invalid_leap["idempotency_key"] = json!(format!("invalid-booking-idem-{suffix}"));

@@ -36,6 +36,7 @@ struct StoreClosureTransitionRequest {
     quotation_version_id: String,
     comparison_id: String,
     expected_comparison_revision: String,
+    expected_closure_revision: String,
     expected_state: ClosureState,
     target_state: ClosureState,
     user_authority: bool,
@@ -81,6 +82,10 @@ fn stored_comparison_matches(
                 .get("comparison_revision")
                 .and_then(serde_json::Value::as_str)
                 == Some(request.expected_comparison_revision.as_str())
+            && metadata
+                .get("expected_closure_revision")
+                .and_then(serde_json::Value::as_str)
+                == Some(request.expected_closure_revision.as_str())
     })
 }
 
@@ -201,7 +206,9 @@ async fn store_closure_transition_http(
             StatusCode::NOT_FOUND,
             "quotation closure is unavailable".to_string(),
         ))?;
-    if current.state != request.expected_state {
+    if current.state != request.expected_state
+        || current.last_event_id != request.expected_closure_revision
+    {
         return Err((
             StatusCode::CONFLICT,
             "quotation closure state is stale".to_string(),
@@ -261,6 +268,10 @@ async fn store_closure_transition_http(
         metadata.insert(
             "comparison_revision".to_string(),
             json!(request.expected_comparison_revision),
+        );
+        metadata.insert(
+            "expected_closure_revision".to_string(),
+            json!(request.expected_closure_revision),
         );
     }
     message.references.push(json!({

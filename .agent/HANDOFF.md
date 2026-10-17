@@ -3062,3 +3062,47 @@ Next:
 - Run the updated API flow against disposable Postgres, then mark WED-216 done if it passes.
 - Proceed to DBV-02/WED-217 using the replayed decision/closure fields and existing A2UI
   primitives; do not create a new foundational card.
+
+## 2026-10-17 - WED-217 DecisionOS/A2UI closure integration (Codex, complete)
+
+Changed:
+
+- Added a template-neutral replay projector that produces the existing Decision Card model,
+  existing A2UI primitives, a source-linked closure timeline, material contract diffs, and
+  the exact server-produced "What the vendor will see" field preview.
+- Added one-action closure controls for contract, deposit, booking, and refund recording.
+  Each control explains its consequence and the UI always states that OmnyID will not make
+  a payment. Booking, cancellation, refund, and supersession use distinct labels and icons.
+- Added a client adapter for quotation state, selection, and closure commands. Closure
+  commands now send the exact predecessor event revision; the server verifies and stores
+  that revision in addition to the comparison revision and expected state.
+- Added stale-successor replacement with a refresh-only action and recoverable client errors.
+- Added a small wedding template adapter over the generic projection; no wedding-specific
+  state entered quotation core and no foundational card or A2UI renderer was added.
+- Added isolated mobile/desktop fixtures and tests for keyboard operation, Axe, overflow,
+  source navigation, vendor field minimisation, swipe isolation, and stale refresh recovery.
+- Extended the canonical quotation verifier to include the new Solid and browser coverage.
+
+Verification:
+
+- `scripts/verify-quotation-readiness.ps1 -IncludeBrowser` passed: 64 quotation Rust
+  integration tests, the compiled conditional API-flow target, 29 focused Rust unit
+  executions, `cargo check`, 32 Solid tests, Solid type checking, whitespace checks, and
+  four Playwright cases at 360px and desktop.
+- The complete wedding unit suite passed 1,874 tests and the production Solid build passed.
+- The focused line-budget command still fails on pre-existing
+  `WeddingResponseWorkspaceView.tsx` (1,141 lines) and
+  `weddingResponseWorkspaceViewState.ts` (1,041 lines); neither was modified. Every new file
+  is below 500 physical lines.
+- The broader nine-case wedding browser run passed five cases, including every new closure
+  case, but four unrelated `wedding-contrast.spec.ts` cases fail because their fixture does
+  not expose the expected `Check availability` and category controls.
+- `TEST_DATABASE_URL` remains unset, so the HTTP test compiled and returned through its
+  existing conditional path rather than executing real Postgres assertions. The inherited
+  `email_group_routes.rs` unused-variable warning remains.
+
+Next:
+
+- Run WED-216/WED-217 authenticated HTTP coverage against disposable Postgres.
+- Continue with DBV-03/WED-218 contract/deposit evidence ingestion and generic template
+  projections; keep OCR/PDF work behind the existing shared document-ingest service.

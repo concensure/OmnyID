@@ -1870,6 +1870,7 @@ tasks:
       - DBV-00 foundation audit completed before any vendor or closure contract changes; WED-170 enquiry runtime and WED-171 vendor inbox are absent on the base and are not assumed reusable
       - frozen generic response, closure, reference, route, A2UI, grant-purpose, and fail-closed feature contracts are recorded with eight synthetic golden scenarios
       - clean-base quotation verification passes 57 Rust integration tests, 29 focused Rust unit executions, cargo check, Solid type checking, 23 Solid tests, and whitespace checks; the Postgres lane remains conditional because TEST_DATABASE_URL is unset
+      - DBV-02/WED-217 is complete: replay-derived DecisionOS/A2UI closure projection, exact-revision client/server binding, least-privilege vendor preview, accessible timeline, and template-neutral wedding adapter are implemented as a bounded layer over WED-216
   - id: WED-216
     title: Persist quotation decision and closure transitions
     status: in_progress
@@ -1904,3 +1905,42 @@ tasks:
       - the state API suppresses active decision/closure projections while the existing release-evidence-backed closure flag is off
       - 7 new decision/closure tests plus 5 existing AFP tests pass; the updated full verifier passes 64 quotation integration tests, 29 focused Rust unit executions, cargo check, Solid type checking, 23 Solid tests, and whitespace checks
       - the Postgres HTTP flow includes authenticated decision, duplicate replay, cross-tenant denial, closure, and invalid-leap assertions, but local execution remains conditional because TEST_DATABASE_URL is unset
+  - id: WED-217
+    title: Integrate quotation closure with DecisionOS and A2UI
+    status: done
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-216
+      - WED-212
+    files:
+      - solid-ui/src/lib/quotationDecisionClosureState.ts
+      - solid-ui/src/lib/quotationDecisionClosureApi.ts
+      - solid-ui/src/lib/quotationWeddingDecisionClosureAdapter.ts
+      - solid-ui/src/components/QuotationClosureTimeline.tsx
+      - solid-ui/src/components/QuotationClosureCard.tsx
+      - solid-ui/tests/quotation-decision-closure-state.test.ts
+      - solid-ui/tests/quotation-decision-closure-api.test.ts
+      - solid-ui/tests/e2e/quotation-decision-closure.spec.ts
+      - src/server/quotation_routes/closure_routes.rs
+      - tests/api_flows.rs
+      - scripts/verify-quotation-readiness.ps1
+      - .agent/**
+    acceptance:
+      - active server replay projects into existing review, clarify, compare, choose, approve_act, and record patterns without a new card type or renderer
+      - every mutation binds decision, quotation, comparison, closure, and grant revisions and explains its consequence
+      - stale successors replace active actions and offer a recoverable refresh path
+      - vendor grant preview is field-level and exactly matches the least-privilege vendor projection fixture
+      - booking, cancellation, refund, and supersession remain distinct, evidence-linked, accessible, and explicitly non-payment
+      - mobile actions remain inside the card without swipe conflicts and all new files stay below 1000 lines
+    progress:
+      - started from committed WED-216 checkpoint 5603495; existing quotation decision, closure, A2UI, and DecisionOS foundations will be reused
+      - active tenant replay now projects to the existing Decision Card contract and existing stat_row, constraint_badges, insight_line, callout, comparison_table, and action_chips nodes; no card type or renderer was added
+      - the closure timeline keeps selection, contract, deposit, booking, cancellation, refund, and supersession distinct and exposes exactly one current mutation with an explicit consequence and non-payment boundary
+      - action bindings carry decision, quotation, comparison, closure, and grant revisions; closure HTTP now also verifies and records the exact predecessor closure event rather than relying on the state enum alone
+      - stale quotation, comparison, or closure successors replace mutation with a refresh-only recovery action, and 409 responses are presented as recoverable refresh failures
+      - the field-level vendor preview renders the exact least-privilege server projection without deriving private or competitor context or inventing field-to-provenance mappings
+      - a small template adapter applies wedding presentation metadata without copying quotation state and proves a future non-wedding template can consume the same generic projection
+      - the canonical quotation verifier passes 64 Rust integration tests, the conditional API-flow target, 29 focused Rust unit executions, cargo check, 32 Solid tests, type checking, whitespace checks, and four mobile/desktop Playwright checks
+      - the complete wedding unit suite passes 1874 tests and the production UI build passes; the repository line-budget test still reports two pre-existing oversized wedding files that were not modified, and the unrelated wedding-contrast browser fixture still lacks its expected controls
+      - every new file is below 500 physical lines, no oversized production file was expanded, release flags remain off, and no provider or deployment action occurred

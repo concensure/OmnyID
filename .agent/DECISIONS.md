@@ -861,3 +861,21 @@ cannot activate unsupported closure state. Active decision and closure projectio
 suppressed while the release-evidence-backed closure flag is off; history remains
 append-only. Quotation successors deactivate old selections and closures without deleting
 them, and every persisted transport projection fixes payment execution to false.
+
+## 2026-10-17: Closure presentation is a revision-bound replay projection
+
+DecisionOS and A2UI consume the active tenant-visible quotation replay; they do not own a
+second booking state. The closure projector reuses the existing Decision Card contract and
+existing A2UI nodes, exposes at most one current closure mutation, and replaces stale
+mutation controls with a refresh-only action. Every action carries decision, quotation,
+comparison, closure, and grant revisions. The closure route additionally verifies the exact
+predecessor closure event and records it in event metadata, preventing a same-state client
+snapshot from standing in for the reviewed event revision.
+
+The vendor-share preview renders only the fields in the server-produced least-privilege
+projection. Because the canonical projection currently carries sorted field, fact, and
+provenance collections rather than a field-to-provenance map, the UI does not invent that
+mapping; it presents projection-level provenance separately. A small template adapter adds
+wedding presentation metadata without copying quotation state, so future OmnyID templates
+can consume the same generic projection. All closure copy states that OmnyID records external
+payment evidence but does not execute a payment.
