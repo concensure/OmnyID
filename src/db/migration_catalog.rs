@@ -569,4 +569,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Hashed transaction-scoped quotation response capabilities, sessions, rate limits, and content-free audit",
         include_str!("../../postgres/migrations/0112_quotation_response_capabilities.sql"),
     ),
+    (
+        "0113_quotation_response_capability_expiry",
+        "Auditable terminal expiry state for quotation response capabilities",
+        include_str!("../../postgres/migrations/0113_quotation_response_capability_expiry.sql"),
+    ),
 ];

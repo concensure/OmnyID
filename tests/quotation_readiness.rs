@@ -28,6 +28,7 @@ fn empty_evidence_is_untested_and_fails_closed() {
         clarification_send: true,
         closure: true,
         vendor_context_grants: true,
+        vendor_response_capabilities: true,
     };
     assert_eq!(
         requested.gated_by(&report),

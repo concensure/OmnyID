@@ -22,6 +22,7 @@ pub struct ResponseCapabilityBinding {
     pub thread_id: String,
     pub projection_fingerprint: String,
     pub allowed_actions: Vec<ContextGrantAction>,
+    pub allowed_question_ids: Vec<String>,
     pub not_before: String,
     pub expires_at: String,
 }
@@ -34,6 +35,7 @@ pub enum ResponseCapabilityStatus {
     Consumed,
     Revoked,
     Rotated,
+    Expired,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,6 +47,7 @@ pub enum ResponseCapabilityRevocationReason {
     ClaimDisputed,
     ClosureTerminal,
     Rotated,
+    Expired,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -182,6 +185,7 @@ pub enum ResponseCapabilityAuditKind {
     Consumed,
     Revoked,
     Rotated,
+    Expired,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -246,6 +250,11 @@ fn binding_valid(binding: &ResponseCapabilityBinding, issued_at: DateTime<Utc>) 
     let mut actions = binding.allowed_actions.clone();
     actions.sort();
     actions.dedup();
+    let questions = binding
+        .allowed_question_ids
+        .iter()
+        .map(|question| question.trim())
+        .collect::<std::collections::BTreeSet<_>>();
     [
         &binding.grant_id,
         &binding.vendor_id,
@@ -260,11 +269,14 @@ fn binding_valid(binding: &ResponseCapabilityBinding, issued_at: DateTime<Utc>) 
         && !actions.is_empty()
         && actions.len() == binding.allowed_actions.len()
         && actions.len() <= 3
+        && questions.len() == binding.allowed_question_ids.len()
+        && questions.len() <= 50
+        && questions.iter().all(|question| bounded(question, 180))
         && issued_at < expires_at
         && not_before < expires_at
 }
 
-fn mac(pepper: &[u8], value: &str) -> Option<String> {
+pub fn response_capability_secret_mac(pepper: &[u8], value: &str) -> Option<String> {
     if pepper.len() < TOKEN_BYTES {
         return None;
     }
@@ -288,14 +300,14 @@ fn secret(label: &str, entropy: [u8; TOKEN_BYTES]) -> String {
     format!("{label}_{}", URL_SAFE_NO_PAD.encode(entropy))
 }
 
-fn token_prefix(token: &str) -> Option<String> {
+pub fn response_capability_token_prefix(token: &str) -> Option<String> {
     if !token.starts_with("qrc_") || token.len() < 16 {
         return None;
     }
     Some(token[..16].to_string())
 }
 
-fn audit(
+pub fn response_capability_audit_event(
     capability_id: &str,
     kind: ResponseCapabilityAuditKind,
     occurred_at: &str,
@@ -335,8 +347,10 @@ pub fn issue_response_capability_with_entropy(
         return Err(ResponseCapabilityError::InvalidIssue);
     }
     let raw_token = secret("qrc", entropy);
-    let token_prefix = token_prefix(&raw_token).ok_or(ResponseCapabilityError::InvalidIssue)?;
-    let token_mac = mac(pepper, &raw_token).ok_or(ResponseCapabilityError::InvalidIssue)?;
+    let token_prefix = response_capability_token_prefix(&raw_token)
+        .ok_or(ResponseCapabilityError::InvalidIssue)?;
+    let token_mac = response_capability_secret_mac(pepper, &raw_token)
+        .ok_or(ResponseCapabilityError::InvalidIssue)?;
     let record = ResponseCapabilityRecord {
         schema_version: RESPONSE_CAPABILITY_SCHEMA_VERSION.to_string(),
         capability_id: issue.capability_id,
@@ -353,7 +367,7 @@ pub fn issue_response_capability_with_entropy(
         revocation_reason: None,
     };
     Ok(IssuedResponseCapability {
-        audit: audit(
+        audit: response_capability_audit_event(
             &record.capability_id,
             ResponseCapabilityAuditKind::Issued,
             &record.issued_at,
@@ -388,7 +402,8 @@ pub fn exchange_response_capability_with_entropy(
     let binding = &record.binding;
     if record.status != ResponseCapabilityStatus::Active
         || record.schema_version != RESPONSE_CAPABILITY_SCHEMA_VERSION
-        || token_prefix(raw_token).as_deref() != Some(record.token_prefix.as_str())
+        || response_capability_token_prefix(raw_token).as_deref()
+            != Some(record.token_prefix.as_str())
         || !mac_matches(pepper, raw_token, &record.token_mac)
         || parsed_time(&binding.not_before).is_none_or(|time| now < time)
         || parsed_time(&binding.expires_at).is_none_or(|time| now >= time)
@@ -418,10 +433,11 @@ pub fn exchange_response_capability_with_entropy(
         capability_id: record.capability_id.clone(),
         vendor_id: binding.vendor_id.clone(),
         thread_id: binding.thread_id.clone(),
-        session_token_mac: mac(pepper, &session_token)
+        session_token_mac: response_capability_secret_mac(pepper, &session_token)
             .ok_or(ResponseCapabilityError::Unavailable)?,
-        csrf_token_mac: mac(pepper, &csrf_token).ok_or(ResponseCapabilityError::Unavailable)?,
-        submission_nonce_mac: mac(pepper, &submission_nonce)
+        csrf_token_mac: response_capability_secret_mac(pepper, &csrf_token)
+            .ok_or(ResponseCapabilityError::Unavailable)?,
+        submission_nonce_mac: response_capability_secret_mac(pepper, &submission_nonce)
             .ok_or(ResponseCapabilityError::Unavailable)?,
         issued_at: now.to_rfc3339(),
         expires_at: expires_at.to_rfc3339(),
@@ -431,7 +447,7 @@ pub fn exchange_response_capability_with_entropy(
     record.status = ResponseCapabilityStatus::Exchanged;
     record.exchanged_at = Some(now.to_rfc3339());
     Ok(IssuedResponseTransactionSession {
-        audit: audit(
+        audit: response_capability_audit_event(
             &record.capability_id,
             ResponseCapabilityAuditKind::Exchanged,
             &now.to_rfc3339(),
@@ -482,7 +498,7 @@ pub fn consume_response_capability(
     session.consumed_at = Some(consumed_at.clone());
     record.status = ResponseCapabilityStatus::Consumed;
     record.consumed_at = Some(consumed_at.clone());
-    Ok(audit(
+    Ok(response_capability_audit_event(
         &record.capability_id,
         ResponseCapabilityAuditKind::Consumed,
         &consumed_at,
@@ -499,22 +515,23 @@ pub fn revoke_response_capability(
         ResponseCapabilityStatus::Consumed
             | ResponseCapabilityStatus::Revoked
             | ResponseCapabilityStatus::Rotated
+            | ResponseCapabilityStatus::Expired
     ) {
         return Err(ResponseCapabilityError::Unavailable);
     }
-    record.status = if reason == ResponseCapabilityRevocationReason::Rotated {
-        ResponseCapabilityStatus::Rotated
-    } else {
-        ResponseCapabilityStatus::Revoked
+    record.status = match reason {
+        ResponseCapabilityRevocationReason::Rotated => ResponseCapabilityStatus::Rotated,
+        ResponseCapabilityRevocationReason::Expired => ResponseCapabilityStatus::Expired,
+        _ => ResponseCapabilityStatus::Revoked,
     };
     record.revoked_at = Some(now.to_rfc3339());
     record.revocation_reason = Some(reason);
-    Ok(audit(
+    Ok(response_capability_audit_event(
         &record.capability_id,
-        if reason == ResponseCapabilityRevocationReason::Rotated {
-            ResponseCapabilityAuditKind::Rotated
-        } else {
-            ResponseCapabilityAuditKind::Revoked
+        match reason {
+            ResponseCapabilityRevocationReason::Rotated => ResponseCapabilityAuditKind::Rotated,
+            ResponseCapabilityRevocationReason::Expired => ResponseCapabilityAuditKind::Expired,
+            _ => ResponseCapabilityAuditKind::Revoked,
         },
         &now.to_rfc3339(),
     ))
@@ -529,12 +546,7 @@ pub fn rotate_response_capability_with_entropy(
 ) -> Result<IssuedResponseCapability, ResponseCapabilityError> {
     let now = parsed_time(&issued_at).ok_or(ResponseCapabilityError::InvalidIssue)?;
     let prior_id = record.capability_id.clone();
-    if matches!(
-        record.status,
-        ResponseCapabilityStatus::Consumed
-            | ResponseCapabilityStatus::Revoked
-            | ResponseCapabilityStatus::Rotated
-    ) {
+    if record.status != ResponseCapabilityStatus::Active {
         return Err(ResponseCapabilityError::Unavailable);
     }
     let next = issue_response_capability_with_entropy(

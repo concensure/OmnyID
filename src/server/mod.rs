@@ -141,6 +141,7 @@ mod proactive_routes;
 mod protocol_routes;
 mod quotation_normalisation_routes;
 mod quotation_routes;
+mod quotation_response_capability_routes;
 mod quotation_source_routes;
 mod runtime_routes;
 mod scope_helpers;
@@ -1360,6 +1361,7 @@ pub async fn run() {
         .merge(ingest_routes::routes())
         .merge(quotation_normalisation_routes::routes())
         .merge(quotation_routes::routes())
+        .merge(quotation_response_capability_routes::routes())
         .merge(quotation_source_routes::routes())
         .merge(knowledge_routes::routes())
         .merge(para_routes::routes())
@@ -1519,6 +1521,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .route("/actions/decision", post(record_action_decision_http))
         .route("/gateway/email", post(handle_gateway_email))
         .merge(quotation_routes::routes())
+        .merge(quotation_response_capability_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(app_state);

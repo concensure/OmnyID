@@ -923,3 +923,26 @@ Vendor context projection is now exact-version and exact-recipient bound. Author
 classes and a defence-in-depth key denylist reject competitor, score, private-note, hidden
 preference, full-plan, and unapproved values even if a malformed grant names their fact ids. The
 delivered canonical projection fingerprint must equal the couple-approved preview fingerprint.
+
+## 2026-10-18: Capability authority is replayed, signed, and transactionally persisted
+
+Response-link issuance requires the exact private AFP grant and canonical projection plus a visible
+human approval receipt signed by the configured OmnyID server key. The grant is parent-linked to
+that receipt, binds question IDs as well as actions, and must reference the active quotation version
+for the same vendor. Unsigned development mode, a missing signing key, a missing 256-bit capability
+pepper, or an unverified quotation release gate all fail closed.
+
+Capability lifecycle storage lives in a small database module rather than enlarging `src/db.rs`.
+Issue/audit, exchange/session/audit, consume/session/audit, revoke, and rotate use database
+transactions and optimistic status/generation predicates. A single-use grant cannot issue again
+after consumption, an exchanged link cannot rotate around its live session, and expiry is recorded
+as a distinct terminal audit state. Because migration 0112 was already committed, expiry constraints
+are introduced by additive migration 0113 rather than by changing applied migration semantics.
+
+Every public exchange and consume replays the owner's tenant-private quotation thread and rechecks
+grant revocation, active quote/version/vendor, claim dispute when a wedding listing exists, terminal
+closure, and the canonical projection fingerprint. Token-prefix, Cloudflare connecting-IP, stored
+vendor, and stored thread counters persist only keyed hashes; vendor/thread dimensions never trust
+request fields. Public failures intentionally collapse to `response unavailable`. The shared request
+middleware logs only request IDs, while capability route and persistence modules contain no request,
+secret, or projection logging.

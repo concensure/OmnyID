@@ -140,26 +140,50 @@ fn prohibited_key(key: &str) -> bool {
     })
 }
 
+fn bounded(value: &str, max: usize) -> bool {
+    let value = value.trim();
+    !value.is_empty() && value.chars().count() <= max && !value.chars().any(char::is_control)
+}
+
+fn distinct_bounded(values: &[String], max_count: usize, max_len: usize) -> bool {
+    values.len() <= max_count
+        && values.iter().all(|value| bounded(value, max_len))
+        && values.iter().collect::<BTreeSet<_>>().len() == values.len()
+}
+
 fn validate_grant(grant: &VendorContextGrant) -> bool {
-    !grant.grant_id.trim().is_empty()
-        && !grant.granted_by_user_id.trim().is_empty()
-        && !grant.target_vendor_id.trim().is_empty()
-        && !grant.quotation_id.trim().is_empty()
-        && !grant.quotation_version_id.trim().is_empty()
-        && !grant.thread_id.trim().is_empty()
-        && !grant.response_recipient_id.trim().is_empty()
-        && !grant.approval_receipt_ref.trim().is_empty()
+    let Some(issued_at) = parsed_time(&grant.issued_at) else {
+        return false;
+    };
+    let Some(not_before) = parsed_time(&grant.not_before) else {
+        return false;
+    };
+    let Some(expires_at) = parsed_time(&grant.expires_at) else {
+        return false;
+    };
+    bounded(&grant.grant_id, 180)
+        && bounded(&grant.granted_by_user_id, 180)
+        && bounded(&grant.target_vendor_id, 180)
+        && bounded(&grant.quotation_id, 180)
+        && bounded(&grant.quotation_version_id, 180)
+        && bounded(&grant.thread_id, 180)
+        && bounded(&grant.response_recipient_id, 180)
+        && grant
+            .target_agent_id
+            .as_deref()
+            .is_none_or(|agent_id| bounded(agent_id, 300))
+        && bounded(&grant.approval_receipt_ref, 180)
         && grant.projection_version == VENDOR_CONTEXT_PROJECTION_VERSION
         && !grant.allowed_fact_ids.is_empty()
-        && grant.allowed_fact_ids.len() <= 100
-        && grant.allowed_question_ids.len() <= 50
+        && distinct_bounded(&grant.allowed_fact_ids, 100, 180)
+        && distinct_bounded(&grant.allowed_question_ids, 50, 180)
         && !grant.allowed_actions.is_empty()
         && grant.allowed_actions.len() <= 3
-        && parsed_time(&grant.issued_at).is_some()
-        && parsed_time(&grant.not_before).is_some()
-        && parsed_time(&grant.expires_at).is_some()
-        && parsed_time(&grant.issued_at) <= parsed_time(&grant.not_before)
-        && parsed_time(&grant.not_before) < parsed_time(&grant.expires_at)
+        && grant.allowed_actions.iter().collect::<BTreeSet<_>>().len()
+            == grant.allowed_actions.len()
+        && issued_at <= not_before
+        && not_before < expires_at
+        && expires_at - not_before <= chrono::Duration::days(30)
         && grant.projection_fingerprint.len() == 64
         && grant
             .projection_fingerprint
@@ -183,6 +207,10 @@ fn projection_parts(
         if allowed.contains(field.fact_id.as_str())
             && field.class != ShareableContextClass::Prohibited
             && !prohibited_key(&field.key)
+            && bounded(&field.fact_id, 180)
+            && bounded(&field.key, 180)
+            && bounded(&field.provenance_ref, 300)
+            && serde_json::to_vec(&field.value).is_ok_and(|value| value.len() <= 8 * 1024)
         {
             fields.insert(field.key.clone(), field.value.clone());
             fact_ids.insert(field.fact_id.clone());
@@ -224,6 +252,60 @@ pub fn vendor_context_projection_fingerprint(
         &fact_ids,
         &provenance_refs,
     )))
+}
+
+pub fn persisted_vendor_context_projection_valid(
+    grant: &VendorContextGrant,
+    projection: &VendorContextProjection,
+) -> bool {
+    let mut actions = grant.allowed_actions.clone();
+    actions.sort();
+    let mut question_ids = grant.allowed_question_ids.clone();
+    question_ids.sort();
+    question_ids.dedup();
+    let fingerprint = stable_hash(&(
+        VENDOR_CONTEXT_PROJECTION_VERSION,
+        &projection.grant_id,
+        &projection.recipient_vendor_id,
+        &projection.response_recipient_id,
+        &projection.quotation_id,
+        &projection.quotation_version_id,
+        &projection.thread_id,
+        projection.purpose,
+        &projection.allowed_actions,
+        &projection.question_ids,
+        &projection.fields,
+        &projection.fact_ids,
+        &projection.provenance_refs,
+    ));
+    let allowed_fact_ids = grant.allowed_fact_ids.iter().collect::<BTreeSet<_>>();
+    validate_grant(grant)
+        && projection.projection_version == grant.projection_version
+        && projection.projection_fingerprint == grant.projection_fingerprint
+        && fingerprint == grant.projection_fingerprint
+        && projection.grant_id == grant.grant_id
+        && projection.recipient_vendor_id == grant.target_vendor_id
+        && projection.response_recipient_id == grant.response_recipient_id
+        && projection.quotation_id == grant.quotation_id
+        && projection.quotation_version_id == grant.quotation_version_id
+        && projection.thread_id == grant.thread_id
+        && projection.purpose == grant.purpose
+        && projection.allowed_actions == actions
+        && projection.question_ids == question_ids
+        && !projection.fields.is_empty()
+        && !projection.fact_ids.is_empty()
+        && projection.fields.len() <= 100
+        && distinct_bounded(&projection.fact_ids, 100, 180)
+        && projection
+            .fact_ids
+            .iter()
+            .all(|fact_id| allowed_fact_ids.contains(fact_id))
+        && distinct_bounded(&projection.provenance_refs, 100, 300)
+        && serde_json::to_vec(projection).is_ok_and(|bytes| bytes.len() <= 64 * 1024)
+        && projection
+            .fields
+            .keys()
+            .all(|key| bounded(key, 180) && !prohibited_key(key))
 }
 
 /// Produces only fields explicitly authorised by fact id for the target vendor.
@@ -289,13 +371,16 @@ pub fn project_vendor_context(
 
 pub fn vendor_context_grant_message(
     grant: &VendorContextGrant,
+    projection: &VendorContextProjection,
     parent_approval_message_id: &str,
     actor: &str,
 ) -> Result<AFPMessage, VendorContextError> {
-    if !validate_grant(grant) || parent_approval_message_id.trim().is_empty() {
+    if parent_approval_message_id != grant.approval_receipt_ref
+        || !persisted_vendor_context_projection_valid(grant, projection)
+    {
         return Err(VendorContextError::InvalidGrant);
     }
-    let hash = stable_hash(grant);
+    let hash = stable_hash(&(grant, projection));
     let mut message = base_message(
         stable_message_id(
             "quotation-context-grant",
@@ -311,7 +396,7 @@ pub fn vendor_context_grant_message(
     message
         .supertags
         .push("permission:vendor_context".to_string());
-    message.content = json!({"grant": grant});
+    message.content = json!({"grant": grant, "projection": projection});
     message.metadata = Some(json!({
         "payload_hash": hash,
         "idempotency_key": message.id,

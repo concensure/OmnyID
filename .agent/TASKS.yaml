@@ -1994,7 +1994,7 @@ tasks:
       - all five new files are 437 lines or fewer; release flags stayed off and no provider, payment, legal interpretation, deployment, or Oracle mutation occurred
   - id: WED-219
     title: Harden vendor context and response capability lifecycle
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -2006,9 +2006,18 @@ tasks:
       - src/quotation/mod.rs
       - src/quotation/afp.rs
       - postgres/migrations/0112_quotation_response_capabilities.sql
+      - postgres/migrations/0113_quotation_response_capability_expiry.sql
+      - src/db.rs
+      - src/db/quotation_response_capabilities.rs
       - src/db/migration_catalog.rs
+      - src/quotation/features.rs
+      - src/server/mod.rs
+      - src/server/quotation_response_capability_routes.rs
       - tests/quotation_vendor_context.rs
       - tests/quotation_response_capability.rs
+      - tests/quotation_response_capability_api.rs
+      - tests/quotation_readiness.rs
+      - Documents/security/quotation-response-capability-security-review.md
       - scripts/verify-quotation-readiness.ps1
       - .agent/**
     acceptance:
@@ -2028,4 +2037,13 @@ tasks:
       - added migration 0112 with capability/session/audit/rate tables separate from auth_magic_links; all secret-bearing columns store keyed MACs and transaction sessions are constrained to account_access false
       - six vendor-context and six response-capability tests pass; migration catalog test and cargo check pass, with only the inherited email-group warning
       - canonical quotation verifier passes 77 Rust integration tests, conditional API-flow path, 30 focused Rust units, cargo check, typecheck, whitespace checks, and 35 Solid tests
-      - remaining work is persistence methods, authenticated issue/revoke routes, unauthenticated exchange/consume routes, real rate counters, cross-tenant HTTP tests, and log-capture/security review
+      - added isolated persistence methods with atomic issue, exchange, consume, revoke, rotate, audit, session, single-use, and keyed rate-counter operations without expanding the oversized db implementation
+      - authenticated issue/revoke/rotate and public exchange/consume routes are behind an independent release-evidence-gated flag and require a separate 256-bit pepper; approval receipts must verify against the configured server signing key
+      - authority is re-evaluated at issue, exchange, consume, and rotate for exact owner/vendor/thread/quote/version/projection/actions/questions, grant revocation, quote supersession, claim dispute, and terminal closure; failures collapse to one unavailable response
+      - added explicit auditable expiry through additive migration 0113, strict transaction cookies, CSRF plus one-time nonce enforcement, one-active-capability and single-use replay protection, and stored vendor/thread rate keys rather than request-controlled keys
+      - the private AFP grant now carries the canonical approved projection; persisted projection validation recomputes its fingerprint, enforces fact subsets and authoritative deny rules, and bounds every list/value and total projection bytes
+      - added a conditional disposable-Postgres HTTP matrix for cross-tenant issue/revoke, wrong vendor, exact projection delivery, exchange/consume replay, and raw-secret absence, plus an always-run no-secret-logging source guard and security-review checklist
+      - full quotation verifier passes 82 Rust integration tests, conditional API-flow targets, 30 focused Rust units, cargo check, typecheck, whitespace checks, and 35 Solid tests; inherited email-group warning remains
+      - TEST_DATABASE_URL is unset locally, so the new HTTP matrix compiled and its logging guard ran but database-backed assertions returned through the documented conditional skip
+      - new implementation/test/review files are 772 physical lines or fewer; release flags remain off and no provider, payment, deployment, Cloudflare, or Oracle mutation occurred
+      - remaining review gates are a real disposable-Postgres run and independent security sign-off; do not enable the capability flag before both are recorded

@@ -163,14 +163,40 @@ fn wrong_recipient_expiry_revocation_and_single_use_consumption_fail_closed() {
 #[test]
 fn grant_and_revocation_messages_are_private_parent_linked_and_referenced() {
     let grant = grant(ContextGrantScope::SingleUse);
-    let message =
-        vendor_context_grant_message(&grant, "approval-message-1", "agent://quotation-permission")
-            .unwrap();
+    let projection = project_vendor_context(
+        &grant,
+        "vendor-a",
+        &available(),
+        &[],
+        &BTreeSet::new(),
+        time("2026-10-18T00:00:00Z"),
+    )
+    .unwrap();
+    assert!(matches!(
+        vendor_context_grant_message(
+            &grant,
+            &projection,
+            "different-approval",
+            "agent://quotation-permission",
+        ),
+        Err(VendorContextError::InvalidGrant)
+    ));
+    let message = vendor_context_grant_message(
+        &grant,
+        &projection,
+        &grant.approval_receipt_ref,
+        "agent://quotation-permission",
+    )
+    .unwrap();
     assert_eq!(message.kind.as_deref(), Some(CONTEXT_GRANT_KIND));
     assert_eq!(message.id.len(), 26);
-    assert_eq!(message.parent_id.as_deref(), Some("approval-message-1"));
+    assert_eq!(
+        message.parent_id.as_deref(),
+        Some(grant.approval_receipt_ref.as_str())
+    );
     assert_eq!(message.references, message.typed_refs);
     assert_eq!(message.metadata.as_ref().unwrap()["e2ee_required"], true);
+    assert_eq!(message.content["projection"], serde_json::json!(projection));
     assert!(message.references.iter().any(|reference| {
         reference.get("target").and_then(|value| value.as_str()) == Some("vendor-a")
     }));

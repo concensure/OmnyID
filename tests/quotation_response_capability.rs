@@ -22,6 +22,7 @@ fn binding() -> ResponseCapabilityBinding {
             ContextGrantAction::AnswerQuestions,
             ContextGrantAction::SubmitRevision,
         ],
+        allowed_question_ids: vec!["availability".to_string()],
         not_before: "2026-10-17T00:01:00Z".to_string(),
         expires_at: "2026-10-18T00:00:00Z".to_string(),
     }
@@ -276,6 +277,47 @@ fn revocation_and_rotation_preserve_a_content_free_audit_trail() {
         Err(ResponseCapabilityError::InvalidIssue)
     );
     assert_eq!(preserved.status, ResponseCapabilityStatus::Active);
+
+    let mut expired = issue(25).record;
+    let expired_event = revoke_response_capability(
+        &mut expired,
+        ResponseCapabilityRevocationReason::Expired,
+        time("2026-10-18T00:00:00Z"),
+    )
+    .unwrap();
+    assert_eq!(expired.status, ResponseCapabilityStatus::Expired);
+    assert_eq!(expired_event.kind, ResponseCapabilityAuditKind::Expired);
+}
+
+#[test]
+fn an_exchanged_capability_cannot_rotate_around_its_live_session() {
+    let issued = issue(26);
+    let raw = issued.token.expose();
+    let mut record = issued.record;
+    let fingerprint = record.binding.projection_fingerprint.clone();
+    exchange_response_capability_with_entropy(
+        &mut record,
+        &raw,
+        PEPPER,
+        &access(&fingerprint),
+        &authority(&fingerprint),
+        time("2026-10-17T00:02:00Z"),
+        [27; 32],
+        [28; 32],
+        [29; 32],
+    )
+    .unwrap();
+    assert_eq!(
+        rotate_response_capability_with_entropy(
+            &mut record,
+            "capability-30".to_string(),
+            "2026-10-17T00:03:00Z".to_string(),
+            PEPPER,
+            [30; 32],
+        ),
+        Err(ResponseCapabilityError::Unavailable)
+    );
+    assert_eq!(record.status, ResponseCapabilityStatus::Exchanged);
 }
 
 #[test]

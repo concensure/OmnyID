@@ -3190,3 +3190,47 @@ Remaining:
 - Add disposable-Postgres cross-tenant/vendor/thread tests and log capture proving secrets and
   projection fields never enter logs. Complete the independent security checklist before enabling
   any response-capability flag.
+
+## 2026-10-18 - WED-219 persisted response-capability boundary (Codex, review)
+
+Changed:
+
+- Added isolated capability persistence with atomic issue, exchange, session creation, consume,
+  revoke, rotate, expiry audit, single-use replay checks, and keyed four-dimensional rate counters.
+- Added authenticated issue/revoke/rotate routes and public exchange/consume routes behind
+  `OMNYID_QUOTATION_VENDOR_RESPONSE_CAPABILITIES_ENABLED`, the existing quotation release gate,
+  a base64url 256-bit pepper, and the configured server signing key.
+- Capability authority now reloads the owner's AFP thread on every transition, verifies the signed
+  human approval receipt and exact grant parent, and rechecks vendor, active quote/version,
+  projection, action/question scopes, revocation, disputed claim, and terminal closure.
+- Private grant AFP now includes the exact canonical approved projection. Validation recomputes the
+  fingerprint, enforces approved fact subsets and prohibited field classes/keys, and bounds grant
+  duration, list sizes, field values, and total projection bytes.
+- Added explicit `expired` lifecycle/audit constraints in additive migration 0113, leaving the
+  already-committed 0112 migration stable.
+- Added a conditional Postgres HTTP matrix and always-run log-boundary guard, plus
+  `Documents/security/quotation-response-capability-security-review.md` for independent sign-off.
+
+Verification:
+
+- `scripts/verify-quotation-readiness.ps1` passed: 82 quotation Rust integration tests, the
+  conditional API-flow targets, 30 focused Rust units, `cargo check`, Solid type checking,
+  whitespace checks, and 35 Solid tests.
+- `TEST_DATABASE_URL` was unset. The new API target compiled and its always-run logging assertion
+  passed, but its database-backed test returned through the explicit conditional skip; do not count
+  that as real Postgres evidence.
+- The only compiler warning is the inherited unused `user_id` in `email_group_routes.rs`.
+- New files are 772 physical lines or fewer. Only registration lines touched oversized `src/db.rs` and
+  `src/server/mod.rs`. Release flags remain off; no external provider, Cloudflare, Oracle, payment,
+  or deployment action occurred.
+- The latest visible GitHub CI runs are stale failures on unrelated `main` SHAs from March 2026;
+  this local branch has not been pushed and has no machine-owned CI result yet.
+
+Remaining:
+
+- Run `cargo test --test quotation_response_capability_api` with `TEST_DATABASE_URL` pointing to
+  disposable local `omnyid_test`, then record the evidence.
+- Obtain independent security sign-off in the checklist. Keep the capability flag disabled until
+  both gates pass.
+- After review, start WED-220/DBV-05 canonical vendor response contracts. Do not make the WED-219
+  consume endpoint accept response payloads; that belongs to the next canonical contract.

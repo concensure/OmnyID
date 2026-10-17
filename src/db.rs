@@ -21,6 +21,8 @@ use ulid::Ulid;
 
 mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
+mod quotation_response_capabilities;
+pub use quotation_response_capabilities::StoredQuotationResponseCapability;
 mod wedding_newsletter;
 mod wedding_onboarding_state;
 mod wedding_vendor_directory;
