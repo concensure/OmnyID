@@ -171,6 +171,7 @@ mod wedding_preference_routes;
 mod wedding_understanding_routes;
 mod wedding_newsletter_routes;
 mod wedding_vendor_claim_routes;
+mod wedding_vendor_enrichment;
 mod wedding_vendor_outreach_routes;
 mod wedding_vendor_photo_routes;
 mod wedding_vendor_production;
@@ -178,7 +179,6 @@ mod wedding_vendor_search_routes;
 mod workflow_connector_bindings;
 mod workflow_skill_capsule_runtime;
 mod workspace_routes;
-
 const DEFAULT_HTTP_BODY_LIMIT_BYTES: usize = 32 * 1024 * 1024;
 use self::approval_surfaces::{
     action_capability_id, build_action_approval_review_payload,

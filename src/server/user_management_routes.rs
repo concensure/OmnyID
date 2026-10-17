@@ -16,11 +16,10 @@ use crate::{
 #[cfg(test)]
 mod tests;
 mod wedding_admin;
+mod wedding_enrichment;
 mod wedding_rooms;
-
 use wedding_admin::*;
 use wedding_rooms::*;
-
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/admin/users", get(admin_users_list_http))
@@ -48,6 +47,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/admin/wedding/vendors",
             get(admin_wedding_vendors_list_http).post(admin_wedding_vendor_create_http),
         )
+        .merge(wedding_enrichment::routes())
         .route(
             "/admin/wedding/vendors/{vendor_id}",
             put(admin_wedding_vendor_update_http).delete(admin_wedding_vendor_delete_http),

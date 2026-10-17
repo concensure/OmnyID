@@ -14,6 +14,7 @@ import {
   type AdminWeddingVendorDraft,
 } from "@/lib/adminWeddingVendorFormState";
 import UsageAdminWeddingVendorAttributesEditor from "@/components/UsageAdminWeddingVendorAttributesEditor";
+import UsageAdminWeddingVendorEnrichmentPanel from "@/components/UsageAdminWeddingVendorEnrichmentPanel";
 import UsageAdminWeddingVendorRoomsEditor from "@/components/UsageAdminWeddingVendorRoomsEditor";
 import {
   buildWeddingVendorAttributeWrites,
@@ -301,6 +302,11 @@ export default function UsageAdminWeddingVendorsPanel() {
           </For>
         </div>
       </details>
+      <UsageAdminWeddingVendorEnrichmentPanel
+        vendors={vendors() ?? []}
+        disabled={busy()}
+        onApplied={() => void refetch()}
+      />
     </section>
   );
 }
