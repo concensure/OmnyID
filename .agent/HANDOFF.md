@@ -1,3 +1,32 @@
+## 2026-10-18 - WED-227 browser acceptance hardening (Codex, review)
+
+Changed:
+
+- Reworked the existing personalised recommendation fixture to use the production DecisionCard plus
+  WeddingVendorChoiceCard composition and production recommendation/outreach state helpers.
+- Added mobile and desktop browser proof that a decoded vendor photo, a long readable vendor name,
+  and an evidence-specific recommendation remain visible after an enquiry reaches sent state; the
+  comparison keeps both cards mounted instead of being replaced by the receipt.
+- Registered WED-226/DBV-11 in the canonical ledger as blocked behind WED-225, WED-213, and WED-185.
+  No rollout work, provider mutation, flag activation, or Oracle deployment ran.
+
+Verification:
+
+- Solid typecheck passed; the focused Playwright target passed two cases at 360x740 and 1280x800,
+  including decoded-image, name-geometry, comparison-retention, overflow, and Axe assertions.
+- All 1,887 wedding tests passed and the production Solid build passed with the inherited chunk-size
+  advisory. Visual inspection of the mobile post-send artifact confirmed the intended composition.
+- The generic source line budget passed. The focused wedding line-budget assertion still reports
+  only the inherited 1,108-line WeddingResponseWorkspaceView and 1,041-line view-state file; neither
+  file was modified in this hardening slice, and both new/changed test files remain below 250 lines.
+
+Next:
+
+- Independent review can close WED-227. WED-225 still needs disposable Postgres/clamd, provider,
+  security/privacy/accessibility, usability/wording, and hosted cohort evidence.
+- Keep WED-226 blocked and every release flag off until the readiness digest is verified and the
+  applicable WED-213/WED-185 gates and explicit rollout authorization are recorded.
+
 ## 2026-10-18 - WED-227 selective WED-187 reconciliation (Codex, review)
 
 Changed:

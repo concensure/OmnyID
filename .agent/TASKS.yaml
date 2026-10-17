@@ -2314,6 +2314,36 @@ tasks:
       - browser evidence now checks URL/storage/cache token residue and vendor-text XSS in addition to mobile/desktop Axe, optional email fallback, generic unavailable state, exact CSRF, and upload binding
       - the reproducible verifier reports blocked with artifact digest d1365f92c1f4717250141313a1d34619b4a3d57fba8eb408f8a9ebba61b857cf after 106 Rust quotation integration tests, conditional API flow, 31 quotation unit tests, shared boundaries, cargo check, six SDK tests, 44 Solid tests, 11 browser cases, the migration catalog, 1874 wedding tests, the Solid production build, and scoped line budgets passed
       - TEST_DATABASE_URL and CLAMD_HOST are unset and no accuracy/provider/reviewer/usability/wording/hosted/cohort evidence was supplied; readiness is blocked, all flags remain off, and no provider, Oracle, email, payment, or deployment mutation occurred
+  - id: WED-226
+    title: Stage gated vendor response rollout
+    status: blocked
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-225
+      - WED-213
+      - WED-185
+    files:
+      - docker-compose.oracle.yml
+      - docker-compose.oracle.minimal.yml
+      - docker-compose.oracle.quic.yml
+      - docker-compose.oracle.staging.yml
+      - scripts/verify-quotation-vendor-portal-readiness.ps1
+      - scripts/stage-oracle-runtime.ps1
+      - scripts/deploy-oracle.ps1
+      - scripts/oracle-production-proof.ps1
+      - src/quotation/features.rs
+      - .agent/**
+    acceptance:
+      - dark deployment changes no user-visible behaviour and every quotation, vendor-response, email-reconciliation, relay, and ranking-policy-v2 flag remains off
+      - disabled state creates no invitation, capability exchange, vendor response, booking action, provider send, or payment action
+      - deployed runtime SHA, packaged schemas, A2UI registry, health, readiness, route presence, and disabled configuration match machine evidence
+      - rollback is rehearsed by disabling flags and revoking links without deleting AFP or commercial history
+      - claimed-vendor, secure-link, and optional email canaries run only in increasing-risk order after their applicable readiness and authorization gates pass
+      - a wider cohort requires explicit approval, a verified readiness digest, applicable WED-213/WED-185 gates, and seven days of allowlisted evidence
+    progress:
+      - registered from DBV-11 so the final rollout stage is explicit in the canonical ledger
+      - blocked by WED-225 readiness plus unfinished WED-213 and WED-185 release gates; no staging, Oracle deployment, provider mutation, canary, or flag activation is authorized
   - id: WED-227
     title: Reconcile personalised vendor slices onto quotation portal architecture
     status: review
@@ -2356,3 +2386,6 @@ tasks:
       - the candidate mail interception and scalar-only Cloudflare recipient change were rejected: current official Cloudflare material accepts scalar or array recipients, blanket interception cannot distinguish vendor mail, and the inbound shared-secret gate remains required
       - transactional account mail no longer falls back to vendor-relay Cloudflare or Resend credentials; the exact SMTP target passes 7 tests, vendor-provider readiness passes 3 tests, and the slice also passes typecheck, 1,887 wedding tests, cargo check, and production build with both vendor mail and ranking policy V2 still disabled
       - WED-227 implementation is locally complete in four atomic commits; no Oracle application deployment ran because WED-225 remains blocked on provider, disposable-Postgres/clamd, independent review, usability, wording, and cohort evidence
+      - browser acceptance hardening reopened the task to prove current photos, readable full-width names, evidence-specific recommendation copy, and retained comparison state together after an outreach send
+      - the current DecisionCard/vendor-card browser composition passes at 360px and 1280px with decoded photo, long-name geometry, evidence-specific recommendation, retained two-card comparison after send, no horizontal overflow, and no serious/critical Axe finding
+      - final hardening passes typecheck, 1,887 wedding tests, the focused two-viewport Playwright target, and the production build; the focused line-budget target still reports only the two inherited oversized files, neither modified by this slice
