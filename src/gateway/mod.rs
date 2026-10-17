@@ -1,3 +1,4 @@
+pub mod clamav;
 pub mod custom_imap;
 pub mod gmail_api;
 pub mod graph_api;

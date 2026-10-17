@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   exchangeQuotationResponseToken, submitQuotationResponse, takeQuotationResponseToken,
+  uploadQuotationRevision,
   type QuotationResponseSession,
 } from "../src/lib/quotationResponseSessionApi.ts";
 
@@ -67,4 +68,36 @@ test("submits CSRF-bound canonical inputs and accepts only a non-booking review 
   assert.equal(body.submission_nonce, "nonce-1");
   assert.equal(body.vendor_id, undefined);
   assert.equal(body.booking, undefined);
+});
+
+test("uploads a CSRF-bound revision without client-supplied quotation bindings", async () => {
+  const session: QuotationResponseSession = {
+    sessionId: "session-1", expiresAt: "2026-10-18T01:15:00Z",
+    capabilityExpiresAt: "2026-10-19T01:00:00Z", csrfToken: "csrf-1",
+    submissionNonce: "nonce-1", projection: {
+      ...projection, allowed_actions: ["submit_revision"],
+    } as QuotationResponseSession["projection"],
+  };
+  let request: RequestInit | undefined;
+  const receipt = await uploadQuotationRevision(
+    session,
+    new File(["total AUD 4,200"], "quote.txt", { type: "text/plain" }),
+    undefined,
+    async (_url, init) => {
+      request = init;
+      return new Response(JSON.stringify({
+        status: "prepared", source_id: "source-1", source_version_id: "source-1:1",
+        attachment_id: "attachment-1", file_name: "quote.txt", media_type: "text/plain",
+        parser: "readability", requires_user_review: true, accepted: false,
+        booking: false, payment_execution: false,
+      }), { status: 200 });
+    },
+  );
+  assert.equal(receipt.attachmentId, "attachment-1");
+  assert.equal((request?.headers as Record<string, string>)["x-csrf-token"], "csrf-1");
+  assert.equal(request?.credentials, "include");
+  const form = request?.body as FormData;
+  assert.equal(form.get("extracted_text"), null);
+  assert.equal(form.has("vendor_id"), false);
+  assert.equal(form.has("quotation_id"), false);
 });

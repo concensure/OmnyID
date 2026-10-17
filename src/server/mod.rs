@@ -144,6 +144,7 @@ mod quotation_routes;
 mod quotation_response_capability_routes;
 mod quotation_response_portal_routes;
 mod quotation_vendor_response_routes;
+mod quotation_vendor_revision_routes;
 mod quotation_source_routes;
 mod runtime_routes;
 mod scope_helpers;
@@ -1366,6 +1367,7 @@ pub async fn run() {
         .merge(quotation_response_capability_routes::routes())
         .merge(quotation_response_portal_routes::routes())
         .merge(quotation_vendor_response_routes::routes())
+        .merge(quotation_vendor_revision_routes::routes())
         .merge(quotation_source_routes::routes())
         .merge(knowledge_routes::routes())
         .merge(para_routes::routes())

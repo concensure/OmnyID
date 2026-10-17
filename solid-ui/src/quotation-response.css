@@ -38,6 +38,10 @@ textarea { resize: vertical; line-height: 1.5; }
 .qr-primary { min-height: 3rem; padding: .75rem 1rem; border: 0; border-radius: .75rem; color: #fff; background: #245b46; font-weight: 800; cursor: pointer; }
 .qr-primary:hover { background: #194735; }
 .qr-primary:disabled { cursor: wait; opacity: .65; }
+.qr-secondary { min-height: 2.75rem; padding: .7rem 1rem; border: 1px solid #245b46; border-radius: .7rem; color: #194735; background: #edf6f1; font-weight: 760; cursor: pointer; }
+.qr-secondary:disabled { cursor: not-allowed; opacity: .6; }
+.qr-upload-receipt { display: grid; gap: .3rem; padding: .9rem; border: 1px solid #8bb5a1; border-radius: .75rem; background: #edf6f1; overflow-wrap: anywhere; }
+.qr-upload-error { margin: 0; padding: .8rem; border-left: 4px solid #a92f2f; background: #fff4f3; color: #7b2020; line-height: 1.45; }
 .qr-preview { padding: .9rem; border: 1px solid #dce4df; border-radius: .75rem; background: #fafcfb; }
 .qr-preview summary { min-height: 2.75rem; padding-top: .65rem; font-weight: 720; cursor: pointer; }
 .qr-preview li, .qr-preview p { overflow-wrap: anywhere; line-height: 1.5; }

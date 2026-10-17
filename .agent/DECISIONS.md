@@ -1,3 +1,26 @@
+## 2026-10-18: Vendor revision uploads are immutable capability-bound sources
+
+A secure-link vendor may attach one quotation revision only when the active grant permits
+`submit_revision`. The server derives owner, vendor, grant, thread, quotation/version, projection,
+source, attachment, and response bindings from the transaction session; multipart fields cannot
+assert them. A deterministic session-bound source makes exact upload retries idempotent and rejects
+a different replacement under the same link. The final canonical response reloads that private AFP
+source and adds its source/attachment references server-side.
+
+Raw files use the existing owner-scoped attachment store and quota. Public untrusted uploads fail
+closed unless the existing ClamAV boundary returns a clean result. A small policy layer permits only
+PDF, DOCX, PNG, JPEG, WebP, and text, verifies file signatures, and rejects encrypted PDFs, PDF
+active actions, OOXML macros/embeddings, and oversized input. It is validation policy, not a parser.
+
+DOCX and text-bearing PDF preparation reuse the browser Mammoth/PDF.js utilities already shipped
+by OmnyID; images reuse the shared server OCR boundary, and text reuses shared readability source
+planning. Prepared text then enters the same quotation normalisation helper, LLM fallback ladder,
+registry, exact-excerpt validation, usage receipt, and manual-review fallback as authenticated
+ingestion. Extraction never promotes a vendor statement automatically: the immutable source joins
+the existing response review proposal, and only the existing authenticated quotation review/
+normalisation policy may later append a successor. Replay then makes prior comparisons, decisions,
+and version-bound invitations stale without mutating historical quotations.
+
 ## 2026-10-18: Secure-link vendors are capability-attributed, never Agent-impersonated
 
 The optional quotation response portal accepts only fragment-carried capability tokens,

@@ -2188,3 +2188,46 @@ tasks:
       - the generic source line-budget assertion passes; the repository's focused wedding line-budget assertion still reports the two inherited oversized WED-187 files that this task did not modify
       - TEST_DATABASE_URL remains unset, so the disposable-Postgres HTTP body compiled but conditionally skipped; independent security/privacy review is also pending and the secure-link capability flag remains off
       - no provider, email, Cloudflare, payment, Oracle, deployment, or release-flag mutation occurred
+  - id: WED-223
+    title: Add vendor quotation revision and attachment ingestion
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-218
+      - WED-220
+      - WED-222
+    files:
+      - src/quotation/vendor_revision.rs
+      - src/quotation/mod.rs
+      - src/server/document_ingest_service.rs
+      - src/server/quotation_source_routes.rs
+      - src/server/quotation_response_portal_routes.rs
+      - src/server/quotation_vendor_revision_routes.rs
+      - src/server/file_upload_routes.rs
+      - src/server/mod.rs
+      - solid-ui/src/components/vendor-response/**
+      - solid-ui/src/lib/quotationResponseSessionApi.ts
+      - solid-ui/src/lib/knowledgeAttachmentExtract.ts
+      - solid-ui/tests/quotation-response-*.test.ts
+      - tests/quotation_vendor_revision*.rs
+      - scripts/verify-quotation-readiness.ps1
+      - .agent/**
+    acceptance:
+      - bounded PDF, safe raster image, text, and DOCX revisions reuse existing storage, malware, parser, OCR, and extraction boundaries without a parallel stack
+      - every immutable revision source is bound server-side to the active response session, grant, vendor, quotation, and quotation version
+      - upload failures preserve safe typed draft fields and expose an honest retry or manual-review blocker without leaking commercial context
+      - free-form extracted claims require exact source anchors, unsupported facts remain unknown, and proposed material changes enter the existing user review projection
+      - reviewed material changes create an append-only quotation successor, invalidate comparisons and decisions, and stale invitations bound to the replaced version
+      - focused supported, unsupported, encrypted, oversized, parser-unavailable, injection, replay, successor, and invalidation checks pass while release flags remain disabled
+    progress:
+      - started from clean committed WED-222 checkpoint b312bbb; capability and claimed-vendor response security gates remain pending and all vendor-response flags remain disabled
+      - shared document ingestion, upload persistence, malware scanning, client DOCX extraction, canonical response, and review/successor boundaries are being audited before implementation
+      - the scoped portal now accepts one bounded PDF, DOCX, safe raster image, or text revision only for submit_revision grants; file signatures, encrypted PDFs, PDF active actions, OOXML macros/embeddings, size, owner quota, and archive-only state fail closed before persistence
+      - public uploads reuse the existing ClamAV scanner and require an available clean result, reuse browser Mammoth/PDF.js extraction already shipped by OmnyID, reuse shared readability/image OCR/source receipts, and invoke the existing quotation LLM ladder with exact-anchor validation; no OCR, parser, storage, or extraction stack was added
+      - immutable raw storage and a tenant-private AFP source are deterministically bound server-side to session, grant, vendor, active quotation/version, and approved projection; the client cannot submit those bindings, exact upload retries reuse the receipt, and changed replays fail
+      - final secure-link submission reloads and validates the source binding, adds canonical source/attachment material and explicit AFP references, and leaves all extracted facts in user review; it never creates a quotation successor, booking, acceptance, or payment
+      - upload UI is optional, keyboard-accessible, mobile-safe, preserves typed draft state on failure, gives explicit safety/parser/quota alternatives, and keeps email visible
+      - the full quotation verifier passes 97 Rust integration tests, 20 focused quotation library tests, shared ingest/Gmail/LLM ladder tests, cargo check, six SDK tests plus typecheck/build, 44 Solid tests, and ten mobile/desktop Playwright checks including the new upload flow, Axe, and overflow assertions
+      - the Solid production bundle passes with the inherited large-chunk advisory; the only Rust warning is the inherited email-group unused variable and every new file is at most 535 lines
+      - TEST_DATABASE_URL and CLAMD_HOST are unset locally, so no real Postgres upload persistence or clean ClamAV daemon round trip was claimed; all release flags remain disabled and no provider, Oracle, Cloudflare, payment, email, or production configuration changed

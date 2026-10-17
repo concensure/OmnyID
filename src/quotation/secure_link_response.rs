@@ -9,8 +9,8 @@ use super::{
     VENDOR_RESPONSE_SCHEMA_VERSION, VendorAttestation, VendorAttestationAuthority,
     VendorAvailability, VendorCommercialFact, VendorContextProjection, VendorQuestionAnswer,
     VendorResponseChannel, VendorResponseChannelReceipt, VendorResponseEvidenceState,
-    VendorResponseReviewProposal, VendorResponseStatus, vendor_response_fingerprint,
-    vendor_response_review_proposal,
+    VendorResponseReviewProposal, VendorResponseStatus, VendorRevisionArtifact,
+    vendor_response_fingerprint, vendor_response_review_proposal,
 };
 
 pub const SECURE_LINK_RESPONSE_KIND: &str = "quotation_vendor_response_received";
@@ -95,6 +95,17 @@ pub fn prepare_secure_link_response(
     session_id: &str,
     now: DateTime<Utc>,
 ) -> Result<PreparedSecureLinkResponse, SecureLinkResponseError> {
+    prepare_secure_link_response_with_revision(input, binding, projection, session_id, now, None)
+}
+
+pub fn prepare_secure_link_response_with_revision(
+    input: &SecureLinkResponseInput,
+    binding: &ResponseCapabilityBinding,
+    projection: &VendorContextProjection,
+    session_id: &str,
+    now: DateTime<Utc>,
+    revision: Option<&VendorRevisionArtifact>,
+) -> Result<PreparedSecureLinkResponse, SecureLinkResponseError> {
     if !input_is_within_projection(input, binding, projection)
         || projection.grant_id != binding.grant_id
         || projection.recipient_vendor_id != binding.vendor_id
@@ -102,6 +113,17 @@ pub fn prepare_secure_link_response(
         || projection.quotation_id != binding.quotation_id
         || projection.quotation_version_id != binding.quotation_version_id
         || projection.projection_fingerprint != binding.projection_fingerprint
+        || revision.is_some_and(|artifact| {
+            !super::artifact_matches_binding(
+                artifact,
+                session_id,
+                &binding.grant_id,
+                &binding.vendor_id,
+                &binding.quotation_id,
+                &binding.quotation_version_id,
+                &binding.projection_fingerprint,
+            )
+        })
     {
         return Err(SecureLinkResponseError::OutsideGrant);
     }
@@ -129,8 +151,12 @@ pub fn prepare_secure_link_response(
         commercial_facts: input.commercial_facts.clone(),
         availability: input.availability.clone(),
         explanation: input.explanation.clone(),
-        sources: Vec::new(),
-        attachments: Vec::new(),
+        sources: revision
+            .map(|artifact| vec![artifact.source.clone()])
+            .unwrap_or_default(),
+        attachments: revision
+            .map(|artifact| vec![artifact.attachment.clone()])
+            .unwrap_or_default(),
         attestation: VendorAttestation {
             attested_by: binding.response_recipient_id.clone(),
             authority: VendorAttestationAuthority::VendorRepresentative,
@@ -196,6 +222,18 @@ pub fn secure_link_response_message(
         super::afp::reference("quotation_version", &prepared.response.quotation_version_id),
         super::afp::reference("vendor_response", &prepared.response.response_id),
     ];
+    message.references.extend(
+        prepared
+            .response
+            .sources
+            .iter()
+            .map(|source| super::afp::reference("quotation_source", &source.source_id)),
+    );
+    message
+        .references
+        .extend(prepared.response.attachments.iter().map(|attachment| {
+            super::afp::reference("quotation_attachment", &attachment.attachment_id)
+        }));
     message.typed_refs = message.references.clone();
     message
 }
@@ -309,6 +347,70 @@ mod tests {
         assert_eq!(
             prepare_secure_link_response(&input, &binding, &projection, "session-1", Utc::now()),
             Err(SecureLinkResponseError::OutsideGrant)
+        );
+    }
+
+    #[test]
+    fn server_attaches_only_a_session_bound_revision_source() {
+        let (binding, projection) = fixture();
+        let input = SecureLinkResponseInput {
+            action: ContextGrantAction::SubmitRevision,
+            question_answers: vec![],
+            commercial_facts: vec![],
+            availability: None,
+            explanation: None,
+            affirmed: true,
+        };
+        let artifact = VendorRevisionArtifact {
+            session_id: "session-1".into(),
+            grant_id: binding.grant_id.clone(),
+            vendor_id: binding.vendor_id.clone(),
+            quotation_id: binding.quotation_id.clone(),
+            quotation_version_id: binding.quotation_version_id.clone(),
+            projection_fingerprint: binding.projection_fingerprint.clone(),
+            source: crate::quotation::SourceReference {
+                source_id: "source-1".into(),
+                source_version_id: "source-1:1".into(),
+                media_type: "text/plain".into(),
+                content_hash: Some("sha256:parsed".into()),
+            },
+            attachment: crate::quotation::VendorResponseAttachment {
+                attachment_id: "attachment-1".into(),
+                file_name: "quote.txt".into(),
+                media_type: "text/plain".into(),
+                size_bytes: 12,
+                content_hash: "sha256:raw".into(),
+                source_id: "source-1".into(),
+                source_version_id: "source-1:1".into(),
+            },
+            parser: "readability".into(),
+            parsed_text_hash: "sha256:parsed".into(),
+            extraction_mode: "shared_readability".into(),
+        };
+        let prepared = prepare_secure_link_response_with_revision(
+            &input,
+            &binding,
+            &projection,
+            "session-1",
+            Utc.with_ymd_and_hms(2026, 10, 18, 1, 0, 0).unwrap(),
+            Some(&artifact),
+        )
+        .unwrap();
+        assert_eq!(prepared.response.sources, vec![artifact.source.clone()]);
+        assert_eq!(
+            prepared.response.attachments,
+            vec![artifact.attachment.clone()]
+        );
+        assert!(
+            prepare_secure_link_response_with_revision(
+                &input,
+                &binding,
+                &projection,
+                "other-session",
+                Utc::now(),
+                Some(&artifact),
+            )
+            .is_err()
         );
     }
 }

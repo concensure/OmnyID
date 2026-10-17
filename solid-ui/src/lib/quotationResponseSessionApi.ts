@@ -67,6 +67,24 @@ export type SubmissionReceipt = {
   paymentExecution: false;
 };
 
+export type QuotationRevisionReceipt = {
+  status: "prepared";
+  sourceId: string;
+  sourceVersionId: string;
+  attachmentId: string;
+  fileName: string;
+  mediaType: string;
+  parser: string;
+  requiresUserReview: true;
+};
+
+export class QuotationRevisionUploadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "QuotationRevisionUploadError";
+  }
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -166,5 +184,48 @@ export async function submitQuotationResponse(
   return {
     status: "received", receiptId, requiresUserReview: true,
     accepted: false, booking: false, paymentExecution: false,
+  };
+}
+
+export async function uploadQuotationRevision(
+  session: QuotationResponseSession,
+  file: File,
+  extractedText?: string,
+  fetcher: typeof fetch = fetch,
+): Promise<QuotationRevisionReceipt> {
+  const form = new FormData();
+  form.set("file", file, file.name);
+  if (extractedText?.trim()) form.set("extracted_text", extractedText.trim());
+  const response = await fetcher("/quotation/vendor-response/revision", {
+    method: "POST",
+    credentials: "include",
+    cache: "no-store",
+    referrerPolicy: "no-referrer",
+    headers: { "x-csrf-token": session.csrfToken },
+    body: form,
+  });
+  const rawBody = await response.text();
+  const body = record(rawBody ? (() => { try { return JSON.parse(rawBody); } catch { return null; } })() : null);
+  if (!response.ok) {
+    const message = text(body?.message) ?? text(body?.error)
+      ?? (rawBody.trim() || "The document could not be prepared. Your typed response is unchanged.");
+    throw new QuotationRevisionUploadError(message);
+  }
+  const sourceId = text(body?.source_id);
+  const sourceVersionId = text(body?.source_version_id);
+  const attachmentId = text(body?.attachment_id);
+  const fileName = text(body?.file_name);
+  const mediaType = text(body?.media_type);
+  const parser = text(body?.parser);
+  if (body?.status !== "prepared" || !sourceId || !sourceVersionId || !attachmentId
+    || !fileName || !mediaType || !parser || body.requires_user_review !== true
+    || body.accepted !== false || body.booking !== false || body.payment_execution !== false) {
+    throw new QuotationRevisionUploadError(
+      "The document receipt could not be verified. Your typed response is unchanged.",
+    );
+  }
+  return {
+    status: "prepared", sourceId, sourceVersionId, attachmentId,
+    fileName, mediaType, parser, requiresUserReview: true,
   };
 }

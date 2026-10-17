@@ -5,9 +5,12 @@ import {
   safeProjectionFieldEntries,
 } from "../../lib/quotationResponseFormState";
 import type { VendorContextProjection } from "../../lib/quotationResponseSessionApi";
+import type { QuotationResponseSession } from "../../lib/quotationResponseSessionApi";
+import VendorRevisionUpload from "./VendorRevisionUpload";
 
 type Props = {
   projection: VendorContextProjection;
+  session: QuotationResponseSession;
   state: QuotationResponseFormState;
   issues: FormIssue[];
   submitting: boolean;
@@ -80,6 +83,7 @@ export default function VendorResponseForm(props: Props) {
       </fieldset>
 
       <Show when={canRevise()}>
+        <VendorRevisionUpload session={props.session} />
         <fieldset>
           <legend>Package or quote change</legend>
           <label class="qr-check" for="commercial-enabled"><input id="commercial-enabled" type="checkbox"

@@ -93,7 +93,7 @@ export default function VendorResponsePortal() {
               </section>
               <Show when={portal().kind === "receipt"} fallback={
                 <div class="qr-layout"><VendorResponseContext projection={session().projection} />
-                  <Show when={form()}>{(current) => <VendorResponseForm projection={session().projection} state={current()}
+                  <Show when={form()}>{(current) => <VendorResponseForm session={session()} projection={session().projection} state={current()}
                     issues={issues()} submitting={submitting()} onChange={setForm} onSubmit={() => submit(session())} />}</Show></div>
               }>
                 <section class="qr-card qr-receipt" aria-live="polite"><h2 id="receipt-title" tabindex="-1">Response received</h2>

@@ -1,3 +1,42 @@
+## 2026-10-18 - WED-223 vendor quotation revision ingestion (Codex, review)
+
+Changed:
+
+- Added a capability-scoped multipart revision route and optional portal upload component for one
+  PDF, DOCX, PNG, JPEG, WebP, or text file. Typed draft state is independent from upload state and
+  remains intact after scanner, parser, quota, or network failure.
+- Reused existing owner attachment persistence/quota, ClamAV, PDF.js/Mammoth preparation, shared
+  readability/image OCR, source receipts, quotation extraction ladder, exact-anchor validation,
+  and canonical vendor response/review contracts. No parallel OCR, parser, storage, or extraction
+  stack was introduced.
+- Added deterministic server-derived source/attachment/session/grant/vendor/quotation bindings,
+  strict signature and active-content policy, fail-closed malware scanning, exact retry receipts,
+  tenant-private AFP lineage, and final response source references. Upload/extraction cannot create
+  a successor, booking, acceptance, or payment.
+- Refactored the existing authenticated quotation proposal handler into a shared internal helper so
+  vendor documents use the same feature gates, model ladder, registry, validation, and metering.
+
+Verification:
+
+- `scripts/verify-quotation-readiness.ps1 -IncludeBrowser` passed: 97 quotation integration tests,
+  the conditional API-flow target, 20 focused quotation library tests, shared ingest/Gmail/LLM
+  tests, `cargo check`, six TypeScript SDK tests plus typecheck/build, 44 Solid tests, and ten
+  Playwright cases at mobile/desktop sizes with Axe and overflow checks.
+- `npm run build` passed. Its existing large-chunk advisory remains. Rust retains the inherited
+  unused `user_id` warning in `email_group_routes.rs`.
+- New files are 535 lines or fewer. Registration-only changes touched `src/server/mod.rs`; three
+  helper visibilities changed in the existing upload route without adding a second storage path.
+- `TEST_DATABASE_URL` and `CLAMD_HOST` are unset, so real-Postgres persistence and an actual clean
+  ClamAV daemon round trip remain review evidence, not claimed passes. All quotation/vendor flags
+  remain off; no external provider, Oracle, Cloudflare, payment, email, or deployment mutation ran.
+
+Next:
+
+- Run the scoped upload path against disposable Postgres plus clamd and complete independent
+  security/privacy review before considering the response-capability flag.
+- Continue with DBV-09/WED-224 email and federation convergence. It must reuse the same canonical
+  response/source reconciliation and existing Gmail/federation receipt boundaries.
+
 ## 2026-10-18 - WED-222 scoped vendor response portal (Codex)
 
 - Added `/workspace/quotation-response.html` as a standalone, mobile-first transaction

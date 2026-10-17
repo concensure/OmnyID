@@ -39,28 +39,28 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
 }
 
 #[derive(Deserialize)]
-struct ProposeRequest {
-    source_id: String,
-    source_version_id: String,
-    parsed_text: String,
-    parser_version: String,
-    registry_id: String,
+pub(super) struct ProposeRequest {
+    pub(super) source_id: String,
+    pub(super) source_version_id: String,
+    pub(super) parsed_text: String,
+    pub(super) parser_version: String,
+    pub(super) registry_id: String,
     #[serde(default)]
-    page_count: Option<u32>,
+    pub(super) page_count: Option<u32>,
     #[serde(default)]
-    section_names: Vec<String>,
+    pub(super) section_names: Vec<String>,
     #[serde(default)]
-    structured_submission: Option<ExtractionProposal>,
+    pub(super) structured_submission: Option<ExtractionProposal>,
 }
 
 #[derive(Serialize)]
-struct ProposeResponse {
-    status: &'static str,
+pub(super) struct ProposeResponse {
+    pub(super) status: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    extraction: Option<ValidatedExtraction>,
+    pub(super) extraction: Option<ValidatedExtraction>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    receipt: Option<ExtractionAttemptReceipt>,
-    attempt_kinds: Vec<String>,
+    pub(super) receipt: Option<ExtractionAttemptReceipt>,
+    pub(super) attempt_kinds: Vec<String>,
 }
 
 fn bounded_identifier(value: &str, label: &str) -> Result<String, (StatusCode, String)> {
@@ -95,6 +95,14 @@ async fn propose_http(
         },
     )
     .await?;
+    propose_for_owner(&state, &user.id, request).await.map(Json)
+}
+
+pub(super) async fn propose_for_owner(
+    state: &AppState,
+    owner_user_id: &str,
+    request: ProposeRequest,
+) -> Result<ProposeResponse, (StatusCode, String)> {
     let source_id = bounded_identifier(&request.source_id, "source_id")?;
     let source_version_id = bounded_identifier(&request.source_version_id, "source_version_id")?;
     let parser_version = bounded_identifier(&request.parser_version, "parser_version")?;
@@ -115,12 +123,12 @@ async fn propose_http(
     let started = Instant::now();
 
     if !crate::quotation::QuotationFeatureFlags::from_env().extraction {
-        return Ok(Json(ProposeResponse {
+        return Ok(ProposeResponse {
             status: "manual_review_required",
             extraction: None,
             receipt: None,
             attempt_kinds: vec!["feature_disabled".to_string()],
-        }));
+        });
     }
 
     if let Some(proposal) = request.structured_submission {
@@ -141,12 +149,12 @@ async fn propose_http(
             started.elapsed().as_millis() as u64,
             vec![],
         );
-        return Ok(Json(ProposeResponse {
+        return Ok(ProposeResponse {
             status: "proposed",
             extraction: Some(extraction),
             receipt: Some(receipt),
             attempt_kinds: vec![],
-        }));
+        });
     }
 
     let system = extraction_system_prompt(&registry).map_err(|_| {
@@ -158,12 +166,12 @@ async fn propose_http(
     let user_text = extraction_user_text(&request.parsed_text)
         .map_err(|message| (StatusCode::BAD_REQUEST, message))?;
     if !wedding_admin_ai_policy::execution_enabled() {
-        return Ok(Json(ProposeResponse {
+        return Ok(ProposeResponse {
             status: "manual_review_required",
             extraction: None,
             receipt: None,
             attempt_kinds: vec!["feature_disabled".to_string()],
-        }));
+        });
     }
 
     let result = run_ladder_with_temperature(
@@ -186,7 +194,7 @@ async fn propose_http(
             attempts,
         } => (value, provider, model, attempts),
         LadderOutcome::Exhausted { attempts } => {
-            return Ok(Json(ProposeResponse {
+            return Ok(ProposeResponse {
                 status: "manual_review_required",
                 extraction: None,
                 receipt: None,
@@ -194,7 +202,7 @@ async fn propose_http(
                     .into_iter()
                     .map(|attempt| format!("{}:{}", attempt.provider.label(), attempt.error_kind))
                     .collect(),
-            }));
+            });
         }
     };
     let attempt_kinds = attempts
@@ -214,7 +222,7 @@ async fn propose_http(
     record_wedding_shared_tool_usage(
         &state.db,
         WeddingSharedToolUsageInput {
-            user_id: user.id,
+            user_id: owner_user_id.to_string(),
             provider: provider.metering_provider(),
             feature: WeddingSharedToolFeature::QuoteNormalisation,
             quantity: 1.0,
@@ -233,12 +241,12 @@ async fn propose_http(
             "couldn't save the extraction usage receipt; no proposal was returned".to_string(),
         )
     })?;
-    Ok(Json(ProposeResponse {
+    Ok(ProposeResponse {
         status: "proposed",
         extraction: Some(value),
         receipt: Some(receipt),
         attempt_kinds,
-    }))
+    })
 }
 
 #[cfg(test)]

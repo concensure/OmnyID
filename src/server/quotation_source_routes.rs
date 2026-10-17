@@ -168,6 +168,68 @@ pub(super) async fn prepare_authorized_quotation_source(
                 "source unreadable".to_string(),
             )
         })?;
+    let source_version_id = format!("{}:{}", message.id, message.timestamp);
+    prepare_resolved_quotation_source(
+        tenant_id,
+        &message.id,
+        &source_version_id,
+        source,
+        input,
+        None,
+        None,
+    )
+    .await
+}
+
+pub(super) async fn prepare_uploaded_quotation_source(
+    tenant_id: &str,
+    source_id: &str,
+    source_version_id: &str,
+    file_name: &str,
+    media_type: &str,
+    raw_bytes: &[u8],
+    extracted_text: Option<&str>,
+) -> Result<PreparedSourceResponse, (StatusCode, String)> {
+    let (processing_bytes, processing_mime) = extracted_text
+        .map(|text| (text.as_bytes().to_vec(), "text/plain"))
+        .unwrap_or_else(|| (raw_bytes.to_vec(), media_type));
+    let source = super::document_ingest_service::ResolvedIngestSource {
+        payload: ResolvedSourcePayload::InlineBytes {
+            bytes: processing_bytes,
+            file_name: Some(file_name.to_string()),
+        },
+        source_url: None,
+        source_kind: "vendor_revision_upload".to_string(),
+        source_message_id: Some(source_id.to_string()),
+        source_attachment_id: None,
+        mime_type: Some(processing_mime.to_string()),
+    };
+    prepare_resolved_quotation_source(
+        tenant_id,
+        source_id,
+        source_version_id,
+        source,
+        PrepareQuotationSourceInput {
+            source_attachment_id: None,
+            mime_type: Some(processing_mime),
+            parser: None,
+            retention_state: "keep_source_and_extracted",
+        },
+        Some(media_type),
+        Some(raw_bytes.len() as u64),
+    )
+    .await
+}
+
+async fn prepare_resolved_quotation_source(
+    tenant_id: &str,
+    source_id: &str,
+    source_version_id: &str,
+    source: super::document_ingest_service::ResolvedIngestSource,
+    input: PrepareQuotationSourceInput<'_>,
+    receipt_media_type: Option<&str>,
+    source_size_override: Option<u64>,
+) -> Result<PreparedSourceResponse, (StatusCode, String)> {
     if let ResolvedSourcePayload::RemoteUrl(url) = &source.payload {
         crate::gateway::rest_adapter::validate_public_http_url(url)
             .await
@@ -182,16 +244,15 @@ pub(super) async fn prepare_authorized_quotation_source(
         .mime_type
         .as_deref()
         .unwrap_or("application/octet-stream");
-    let source_version_id = format!("{}:{}", message.id, message.timestamp);
     let initial = plan_quotation_source(QuotationSourcePlanInput {
         tenant_id,
         authenticated_tenant_id: tenant_id,
-        source_id: &message.id,
-        source_version_id: &source_version_id,
+        source_id,
+        source_version_id,
         content_hash: "pending",
         mime_type,
         file_name: source_file_name(&source),
-        size_bytes: source_size(&source),
+        size_bytes: source_size_override.or_else(|| source_size(&source)),
         encrypted_or_unreadable: false,
         parser_override: input.parser,
         retention_state: input.retention_state,
@@ -238,12 +299,12 @@ pub(super) async fn prepare_authorized_quotation_source(
     let final_plan = plan_quotation_source(QuotationSourcePlanInput {
         tenant_id,
         authenticated_tenant_id: tenant_id,
-        source_id: &message.id,
-        source_version_id: &source_version_id,
+        source_id,
+        source_version_id,
         content_hash: &content_hash,
         mime_type,
         file_name: source_file_name(&source),
-        size_bytes: source_size(&source),
+        size_bytes: source_size_override.or_else(|| source_size(&source)),
         encrypted_or_unreadable: false,
         parser_override: input.parser,
         retention_state: input.retention_state,
@@ -253,6 +314,9 @@ pub(super) async fn prepare_authorized_quotation_source(
         blocked => return Err(blocked_http(blocked)),
     };
     receipt.page_count = page_count;
+    if let Some(media_type) = receipt_media_type {
+        receipt.mime_type = media_type.to_string();
+    }
     Ok(PreparedSourceResponse {
         receipt,
         parsed_text,
@@ -286,5 +350,28 @@ mod tests {
         assert!(clean_identifier("").is_err());
         assert!(clean_identifier("bad\nvalue").is_err());
         assert!(clean_identifier(&"x".repeat(181)).is_err());
+    }
+
+    #[tokio::test]
+    async fn prepared_docx_text_reuses_readability_with_original_media_receipt() {
+        let prepared = prepare_uploaded_quotation_source(
+            "owner-1",
+            "source-1",
+            "source-1:1",
+            "revision.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            b"PK synthetic raw package",
+            Some("Venue total is AUD 4,200."),
+        )
+        .await
+        .expect("prepared DOCX source");
+        assert_eq!(prepared.parsed_text, "Venue total is AUD 4,200.");
+        assert_eq!(prepared.receipt.parser, DocumentParser::Readability);
+        assert_eq!(
+            prepared.receipt.mime_type,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+        assert_eq!(prepared.receipt.source_id, "source-1");
+        assert_eq!(prepared.receipt.source_version_id, "source-1:1");
     }
 }

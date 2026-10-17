@@ -518,7 +518,7 @@ fn apply_attachment_download_headers(
     );
 }
 
-fn sanitize_upload_file_name(name: &str) -> String {
+pub(super) fn sanitize_upload_file_name(name: &str) -> String {
     let trimmed = name.trim();
     let fallback = if trimmed.is_empty() {
         "upload.bin"
@@ -588,7 +588,7 @@ fn safe_user_scope_id(user_id: &str) -> String {
     }
 }
 
-fn storage_key_for(user_id: &str, attachment_id: &str, file_name: &str) -> String {
+pub(super) fn storage_key_for(user_id: &str, attachment_id: &str, file_name: &str) -> String {
     let day_bucket = chrono::Utc::now().format("%Y/%m/%d").to_string();
     format!(
         "{}/{}/{}_{}",
@@ -709,7 +709,7 @@ pub(super) fn upload_root_dir() -> PathBuf {
         .unwrap_or_else(|_| std::env::temp_dir().join("omnyid-uploads"))
 }
 
-fn build_download_url(
+pub(super) fn build_download_url(
     attachment_id: &str,
     storage_backend: &str,
     storage_key: &str,
