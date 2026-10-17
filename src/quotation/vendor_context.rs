@@ -1,4 +1,4 @@
-use super::afp::{base_message, reference, stable_hash};
+use super::afp::{base_message, reference, stable_hash, stable_message_id};
 use crate::message::AFPMessage;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -24,20 +24,36 @@ pub enum ContextGrantScope {
     Reusable,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextGrantAction {
+    AnswerQuestions,
+    SubmitRevision,
+    ConfirmBookingDetails,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VendorContextGrant {
     pub grant_id: String,
     pub granted_by_user_id: String,
     pub target_vendor_id: String,
     pub quotation_id: String,
+    pub quotation_version_id: String,
     pub thread_id: String,
+    pub response_recipient_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_agent_id: Option<String>,
     pub purpose: ContextGrantPurpose,
     pub allowed_fact_ids: Vec<String>,
+    pub allowed_question_ids: Vec<String>,
+    pub allowed_actions: Vec<ContextGrantAction>,
     pub issued_at: String,
+    pub not_before: String,
     pub expires_at: String,
     pub scope: ContextGrantScope,
     pub approval_receipt_ref: String,
     pub projection_version: String,
+    pub projection_fingerprint: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -55,6 +71,18 @@ pub struct ShareableContextField {
     pub key: String,
     pub value: Value,
     pub provenance_ref: String,
+    pub class: ShareableContextClass,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShareableContextClass {
+    VendorQuotation,
+    ApprovedRequirement,
+    ApprovedQuestion,
+    ApprovedPackageChange,
+    ApprovedBudget,
+    Prohibited,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,7 +92,12 @@ pub struct VendorContextProjection {
     pub grant_id: String,
     pub recipient_vendor_id: String,
     pub quotation_id: String,
+    pub quotation_version_id: String,
+    pub thread_id: String,
+    pub response_recipient_id: String,
     pub purpose: ContextGrantPurpose,
+    pub allowed_actions: Vec<ContextGrantAction>,
+    pub question_ids: Vec<String>,
     pub fields: BTreeMap<String, Value>,
     pub fact_ids: Vec<String>,
     pub provenance_refs: Vec<String>,
@@ -75,6 +108,7 @@ pub struct VendorContextProjection {
 pub enum VendorContextError {
     InvalidGrant,
     WrongRecipient,
+    NotYetValid,
     Expired,
     Revoked,
     SingleUseConsumed,
@@ -111,14 +145,85 @@ fn validate_grant(grant: &VendorContextGrant) -> bool {
         && !grant.granted_by_user_id.trim().is_empty()
         && !grant.target_vendor_id.trim().is_empty()
         && !grant.quotation_id.trim().is_empty()
+        && !grant.quotation_version_id.trim().is_empty()
         && !grant.thread_id.trim().is_empty()
+        && !grant.response_recipient_id.trim().is_empty()
         && !grant.approval_receipt_ref.trim().is_empty()
         && grant.projection_version == VENDOR_CONTEXT_PROJECTION_VERSION
         && !grant.allowed_fact_ids.is_empty()
         && grant.allowed_fact_ids.len() <= 100
+        && grant.allowed_question_ids.len() <= 50
+        && !grant.allowed_actions.is_empty()
+        && grant.allowed_actions.len() <= 3
         && parsed_time(&grant.issued_at).is_some()
+        && parsed_time(&grant.not_before).is_some()
         && parsed_time(&grant.expires_at).is_some()
-        && parsed_time(&grant.issued_at) < parsed_time(&grant.expires_at)
+        && parsed_time(&grant.issued_at) <= parsed_time(&grant.not_before)
+        && parsed_time(&grant.not_before) < parsed_time(&grant.expires_at)
+        && grant.projection_fingerprint.len() == 64
+        && grant
+            .projection_fingerprint
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
+}
+
+fn projection_parts(
+    grant: &VendorContextGrant,
+    available: &[ShareableContextField],
+) -> Result<(BTreeMap<String, Value>, Vec<String>, Vec<String>), VendorContextError> {
+    let allowed = grant
+        .allowed_fact_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let mut fields = BTreeMap::new();
+    let mut fact_ids = BTreeSet::new();
+    let mut provenance_refs = BTreeSet::new();
+    for field in available {
+        if allowed.contains(field.fact_id.as_str())
+            && field.class != ShareableContextClass::Prohibited
+            && !prohibited_key(&field.key)
+        {
+            fields.insert(field.key.clone(), field.value.clone());
+            fact_ids.insert(field.fact_id.clone());
+            provenance_refs.insert(field.provenance_ref.clone());
+        }
+    }
+    if fields.is_empty() {
+        return Err(VendorContextError::NoShareableFields);
+    }
+    Ok((
+        fields,
+        fact_ids.into_iter().collect(),
+        provenance_refs.into_iter().collect(),
+    ))
+}
+
+pub fn vendor_context_projection_fingerprint(
+    grant: &VendorContextGrant,
+    available: &[ShareableContextField],
+) -> Result<String, VendorContextError> {
+    let (fields, fact_ids, provenance_refs) = projection_parts(grant, available)?;
+    let mut actions = grant.allowed_actions.clone();
+    actions.sort();
+    let mut questions = grant.allowed_question_ids.clone();
+    questions.sort();
+    questions.dedup();
+    Ok(stable_hash(&(
+        VENDOR_CONTEXT_PROJECTION_VERSION,
+        &grant.grant_id,
+        &grant.target_vendor_id,
+        &grant.response_recipient_id,
+        &grant.quotation_id,
+        &grant.quotation_version_id,
+        &grant.thread_id,
+        grant.purpose,
+        &actions,
+        &questions,
+        &fields,
+        &fact_ids,
+        &provenance_refs,
+    )))
 }
 
 /// Produces only fields explicitly authorised by fact id for the target vendor.
@@ -137,6 +242,9 @@ pub fn project_vendor_context(
     if grant.target_vendor_id != requested_recipient_vendor_id {
         return Err(VendorContextError::WrongRecipient);
     }
+    if parsed_time(&grant.not_before).is_none_or(|not_before| now < not_before) {
+        return Err(VendorContextError::NotYetValid);
+    }
     if parsed_time(&grant.expires_at).is_none_or(|expires_at| now >= expires_at) {
         return Err(VendorContextError::Expired);
     }
@@ -152,44 +260,30 @@ pub fn project_vendor_context(
         return Err(VendorContextError::SingleUseConsumed);
     }
 
-    let allowed = grant
-        .allowed_fact_ids
-        .iter()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-    let mut fields = BTreeMap::new();
-    let mut fact_ids = BTreeSet::new();
-    let mut provenance_refs = BTreeSet::new();
-    for field in available {
-        if allowed.contains(field.fact_id.as_str()) && !prohibited_key(&field.key) {
-            fields.insert(field.key.clone(), field.value.clone());
-            fact_ids.insert(field.fact_id.clone());
-            provenance_refs.insert(field.provenance_ref.clone());
-        }
+    let (fields, fact_ids, provenance_refs) = projection_parts(grant, available)?;
+    if vendor_context_projection_fingerprint(grant, available)? != grant.projection_fingerprint {
+        return Err(VendorContextError::InvalidGrant);
     }
-    if fields.is_empty() {
-        return Err(VendorContextError::NoShareableFields);
-    }
-    let fingerprint_input = (
-        VENDOR_CONTEXT_PROJECTION_VERSION,
-        &grant.grant_id,
-        &grant.target_vendor_id,
-        &grant.quotation_id,
-        grant.purpose,
-        &fields,
-        &fact_ids,
-        &provenance_refs,
-    );
+    let mut actions = grant.allowed_actions.clone();
+    actions.sort();
+    let mut question_ids = grant.allowed_question_ids.clone();
+    question_ids.sort();
+    question_ids.dedup();
     Ok(VendorContextProjection {
         projection_version: VENDOR_CONTEXT_PROJECTION_VERSION.to_string(),
-        projection_fingerprint: stable_hash(&fingerprint_input),
+        projection_fingerprint: grant.projection_fingerprint.clone(),
         grant_id: grant.grant_id.clone(),
         recipient_vendor_id: grant.target_vendor_id.clone(),
         quotation_id: grant.quotation_id.clone(),
+        quotation_version_id: grant.quotation_version_id.clone(),
+        thread_id: grant.thread_id.clone(),
+        response_recipient_id: grant.response_recipient_id.clone(),
         purpose: grant.purpose,
+        allowed_actions: actions,
+        question_ids,
         fields,
-        fact_ids: fact_ids.into_iter().collect(),
-        provenance_refs: provenance_refs.into_iter().collect(),
+        fact_ids,
+        provenance_refs,
     })
 }
 
@@ -203,7 +297,10 @@ pub fn vendor_context_grant_message(
     }
     let hash = stable_hash(grant);
     let mut message = base_message(
-        format!("quotation-context-grant:{}:{}", grant.grant_id, &hash[..16]),
+        stable_message_id(
+            "quotation-context-grant",
+            &(&grant.thread_id, &grant.grant_id, &hash),
+        ),
         &grant.thread_id,
         Some(parent_approval_message_id),
         &grant.issued_at,
@@ -224,7 +321,10 @@ pub fn vendor_context_grant_message(
     message.references = vec![
         reference("approval_receipt", &grant.approval_receipt_ref),
         reference("quotation", &grant.quotation_id),
+        reference("quotation_version", &grant.quotation_version_id),
+        reference("thread", &grant.thread_id),
         reference("target_vendor", &grant.target_vendor_id),
+        reference("response_recipient", &grant.response_recipient_id),
     ];
     message.typed_refs = message.references.clone();
     Ok(message)
@@ -246,10 +346,9 @@ pub fn vendor_context_revocation_message(
     }
     let hash = stable_hash(revocation);
     let mut message = base_message(
-        format!(
-            "quotation-context-grant-revoked:{}:{}",
-            revocation.grant_id,
-            &hash[..16]
+        stable_message_id(
+            "quotation-context-grant-revoked",
+            &(&grant_message.thread_id, &revocation.revocation_id, &hash),
         ),
         &grant_message.thread_id,
         Some(&grant_message.id),

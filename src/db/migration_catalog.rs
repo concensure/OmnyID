@@ -564,4 +564,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Official ACO On The Pier venue enquiry contact",
         include_str!("../../postgres/migrations/0111_wedding_vendor_aco_on_the_pier.sql"),
     ),
+    (
+        "0112_quotation_response_capabilities",
+        "Hashed transaction-scoped quotation response capabilities, sessions, rate limits, and content-free audit",
+        include_str!("../../postgres/migrations/0112_quotation_response_capabilities.sql"),
+    ),
 ];

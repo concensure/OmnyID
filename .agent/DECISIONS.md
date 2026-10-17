@@ -902,3 +902,24 @@ quotation version while every closure revision produces a distinct successor pro
 booking, cancellation, refund, or supersession archives the task without deleting prior events.
 The wedding planner is an adapter over this output, and only the existing evidence-backed generic
 booking commitment can enter its budget projection.
+
+## 2026-10-17: Vendor response links are transaction capabilities, never login links
+
+Quotation response capabilities are separate from `auth_magic_links`, account sessions, and vendor
+claim authentication. A capability binds one approved grant, vendor, response recipient, quotation
+version, commercial thread, projection fingerprint, and action set. The raw 256-bit link secret is
+returned once; storage retains only a peppered HMAC and a bounded prefix for rate-limit lookup.
+Database compromise therefore does not reveal a usable link without the separately managed service
+pepper.
+
+Exchange produces a short-lived transaction session constrained to `account_access = false`, an
+HttpOnly Secure SameSite=Strict cookie scoped to the response path, a CSRF secret, and a one-time
+submission nonce. Wrong recipient/thread/version/projection, expiry, grant revocation, quotation
+supersession, claim dispute, and terminal closure collapse to the same unavailable result. Lifecycle
+audit events contain only capability id, kind, time, and deterministic event id; projection fields,
+raw secrets, contact details, and network addresses are excluded.
+
+Vendor context projection is now exact-version and exact-recipient bound. Authoritative field
+classes and a defence-in-depth key denylist reject competitor, score, private-note, hidden
+preference, full-plan, and unapproved values even if a malformed grant names their fact ids. The
+delivered canonical projection fingerprint must equal the couple-approved preview fingerprint.

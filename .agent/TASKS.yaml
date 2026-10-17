@@ -1992,3 +1992,40 @@ tasks:
       - canonical verifier passed 71 Rust integration tests, conditional API-flow compilation/path, 30 focused Rust units, cargo check, typecheck, whitespace checks, and 35 Solid tests; the full 1874-test wedding suite and production build passed
       - TEST_DATABASE_URL remained unset, so real Postgres assertions were not executed; the line-budget command reports only the two inherited oversized wedding files, neither modified here
       - all five new files are 437 lines or fewer; release flags stayed off and no provider, payment, legal interpretation, deployment, or Oracle mutation occurred
+  - id: WED-219
+    title: Harden vendor context and response capability lifecycle
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-215
+      - WED-218
+    files:
+      - src/quotation/vendor_context.rs
+      - src/quotation/response_capability.rs
+      - src/quotation/mod.rs
+      - src/quotation/afp.rs
+      - postgres/migrations/0112_quotation_response_capabilities.sql
+      - src/db/migration_catalog.rs
+      - tests/quotation_vendor_context.rs
+      - tests/quotation_response_capability.rs
+      - scripts/verify-quotation-readiness.ps1
+      - .agent/**
+    acceptance:
+      - grants bind exact vendor, thread, quotation version, actions, questions, projection fingerprint, not-before, expiry, and recipient
+      - projection bytes remain identical to the approved preview and prohibited context classes remain unprojectable under tampered fact IDs
+      - raw response tokens are returned once, only keyed hashes are retained, and authentication magic links remain a separate contract
+      - issue, exchange, consume, revoke, expire, and rotate are deterministic and fail closed for wrong vendor/thread, stale quote, claim dispute, terminal closure, or grant revocation
+      - exchanged transaction sessions are HttpOnly Secure SameSite Strict, CSRF bound, and use one-time submission nonces without granting account access
+      - content-free audit events and bounded multi-key rate-limit decisions contain no raw token or private projection fields
+      - every new file remains below 1000 lines and release flags remain off
+    progress:
+      - started from clean WED-218 commit 077d4bf
+      - existing audit found a field allowlist and denylist plus claim magic-link storage, but grants lack exact quotation version/actions/questions/projection binding and there is no generic quotation response capability lifecycle
+      - vendor grants now bind exact quotation version, transaction recipient, optional Agent ID, allowed actions/questions, not-before, and the approved canonical projection fingerprint
+      - authoritative shareable-field classes plus the existing key denylist prevent prohibited data even when a grant carries a tampered fact ID; delivered projection bytes must match the approved fingerprint
+      - added a separate generic response-capability model with 256-bit link secrets, HMAC-only records, exact vendor/thread/version/projection checks, generic unavailable errors, strict transaction cookies, CSRF, one-time nonces, revocation, rotation, content-free audit, and multi-key rate decisions
+      - added migration 0112 with capability/session/audit/rate tables separate from auth_magic_links; all secret-bearing columns store keyed MACs and transaction sessions are constrained to account_access false
+      - six vendor-context and six response-capability tests pass; migration catalog test and cargo check pass, with only the inherited email-group warning
+      - canonical quotation verifier passes 77 Rust integration tests, conditional API-flow path, 30 focused Rust units, cargo check, typecheck, whitespace checks, and 35 Solid tests
+      - remaining work is persistence methods, authenticated issue/revoke routes, unauthenticated exchange/consume routes, real rate counters, cross-tenant HTTP tests, and log-capture/security review

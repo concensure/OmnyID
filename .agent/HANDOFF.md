@@ -3151,3 +3151,42 @@ Next:
   `TEST_DATABASE_URL` is available.
 - Begin DBV-04/WED-219 response-capability and least-privilege vendor-context hardening from this
   commit; do not enable closure or vendor-response release flags yet.
+
+## 2026-10-17 - WED-219 response capability security-model checkpoint (Codex, in progress)
+
+Changed:
+
+- Extended generic vendor-context grants with exact quotation version, response recipient,
+  optional target Agent ID, allowed questions/actions, not-before, and approved projection
+  fingerprint. Canonical delivered bytes must reproduce that approved fingerprint.
+- Added authoritative shareable-field classes in addition to the existing key denylist, so
+  prohibited competitor, score, private-note, hidden-preference, full-plan, and unapproved fields
+  cannot be projected through a tampered fact id.
+- Added a 570-line generic response-capability engine: 256-bit raw secrets returned once,
+  HMAC-only records, exact access/authority checks, generic unavailable errors, short-lived strict
+  transaction cookies, CSRF and one-time nonce verification, consume/revoke/rotate lifecycle,
+  content-free audit events, and token-prefix/IP-hash/vendor/thread rate-limit decisions.
+- Added migration 0112 for response capabilities, transaction sessions, content-free audit, and
+  keyed rate counters. It is deliberately separate from `auth_magic_links`; session rows enforce
+  `account_access = FALSE` and no table has a raw-token column.
+- Corrected vendor-context grant/revocation AFP message ids to deterministic AFP-valid ULIDs.
+
+Verification:
+
+- Six `quotation_vendor_context` tests and six `quotation_response_capability` tests pass.
+- The canonical verifier passes 77 Rust integration tests, the conditional API-flow target, 30
+  focused Rust unit executions, `cargo check`, Solid type checking, whitespace checks, and 35
+  Solid tests. The embedded migration-catalog test also passes. The inherited email-group
+  unused-variable warning remains.
+- New files are 570, 316, and 72 physical lines, below the 999-line limit. Release flags remain
+  off and no route, provider, database, deployment, Cloudflare, or Oracle mutation occurred.
+
+Remaining:
+
+- Add small persistence methods outside oversized `db.rs`, then authenticated issue/revoke/rotate
+  and public exchange/consume routes behind a new independent fail-closed feature flag.
+- Enforce real token-prefix/IP-hash/vendor/thread counters, claim/grant/quotation/closure state on
+  every exchange and consume, and generic not-found responses.
+- Add disposable-Postgres cross-tenant/vendor/thread tests and log capture proving secrets and
+  projection fields never enter logs. Complete the independent security checklist before enabling
+  any response-capability flag.

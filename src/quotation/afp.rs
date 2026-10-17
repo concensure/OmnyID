@@ -24,7 +24,7 @@ pub(super) fn stable_hash<T: Serialize>(value: &T) -> String {
     hex::encode(Sha256::digest(encoded))
 }
 
-fn stable_message_id<T: Serialize>(namespace: &str, value: &T) -> String {
+pub(super) fn stable_message_id<T: Serialize>(namespace: &str, value: &T) -> String {
     let encoded = serde_json::to_vec(value).unwrap_or_default();
     let mut hasher = Sha256::new();
     hasher.update(namespace.as_bytes());
