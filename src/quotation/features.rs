@@ -11,6 +11,7 @@ pub struct QuotationFeatureFlags {
     pub closure: bool,
     pub vendor_context_grants: bool,
     pub vendor_response_capabilities: bool,
+    pub claimed_vendor_responses: bool,
 }
 
 fn env_enabled(name: &str) -> bool {
@@ -51,6 +52,9 @@ impl QuotationFeatureFlags {
             vendor_context_grants: env_enabled("OMNYID_QUOTATION_VENDOR_GRANTS_ENABLED"),
             vendor_response_capabilities: env_enabled(
                 "OMNYID_QUOTATION_VENDOR_RESPONSE_CAPABILITIES_ENABLED",
+            ),
+            claimed_vendor_responses: env_enabled(
+                "OMNYID_QUOTATION_CLAIMED_VENDOR_RESPONSES_ENABLED",
             ),
         }
     }

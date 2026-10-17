@@ -87,9 +87,9 @@ struct ConsumeRequest {
     action: ContextGrantAction,
 }
 
-struct GrantEnvelope {
-    grant: VendorContextGrant,
-    projection: VendorContextProjection,
+pub(super) struct GrantEnvelope {
+    pub(super) grant: VendorContextGrant,
+    pub(super) projection: VendorContextProjection,
 }
 
 struct AuthoritySnapshot {
@@ -135,7 +135,7 @@ fn valid_id(value: &str) -> bool {
     !value.is_empty() && value.chars().count() <= 180 && !value.chars().any(char::is_control)
 }
 
-fn grant_envelope(message: &AFPMessage) -> Option<GrantEnvelope> {
+pub(super) fn grant_envelope(message: &AFPMessage) -> Option<GrantEnvelope> {
     if message.kind.as_deref().or(message.subtype.as_deref()) != Some(CONTEXT_GRANT_KIND) {
         return None;
     }
@@ -145,7 +145,7 @@ fn grant_envelope(message: &AFPMessage) -> Option<GrantEnvelope> {
         .then_some(GrantEnvelope { grant, projection })
 }
 
-fn grant_revoked(messages: &[AFPMessage], grant_id: &str) -> bool {
+pub(super) fn grant_revoked(messages: &[AFPMessage], grant_id: &str) -> bool {
     messages.iter().any(|message| {
         message.kind.as_deref().or(message.subtype.as_deref()) == Some(CONTEXT_GRANT_REVOKED_KIND)
             && message
@@ -157,7 +157,10 @@ fn grant_revoked(messages: &[AFPMessage], grant_id: &str) -> bool {
     })
 }
 
-fn approved_receipt_visible(messages: &[AFPMessage], grant: &VendorContextGrant) -> bool {
+pub(super) fn approved_receipt_visible(
+    messages: &[AFPMessage],
+    grant: &VendorContextGrant,
+) -> bool {
     let Some(server_public_key) = super::env_hex_32("OMNYID_SIGNING_KEY_HEX")
         .ok()
         .flatten()
@@ -187,7 +190,7 @@ fn approved_receipt_visible(messages: &[AFPMessage], grant: &VendorContextGrant)
     })
 }
 
-async fn owner_messages(
+pub(super) async fn owner_messages(
     state: &AppState,
     owner_user_id: &str,
     thread_id: &str,

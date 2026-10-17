@@ -18,6 +18,7 @@
       "afp-ts/continuity": ["../typescript-sdk/src/continuity.ts"],
       "afp-ts/retrieval": ["../typescript-sdk/src/retrieval.ts"],
       "afp-ts/workflows": ["../typescript-sdk/src/workflows.ts"],
+      "afp-ts/quotation": ["../typescript-sdk/src/quotation.ts"],
       "afp-ts/semantic-router": ["../typescript-sdk/src/semantic-router/index.ts"],
       "afp-ts/workspace-assistance": ["../typescript-sdk/src/workspace-assistance.ts"]
     }

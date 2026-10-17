@@ -965,3 +965,21 @@ response and preserve all transaction bindings. Response lifecycle stops at revi
 superseded: it contains no user acceptance, booking confirmation, payment execution, or
 `wedding_plan_id`. Later wedding and other template adapters consume the same generic response and
 review proposal rather than defining their own response model.
+
+## 2026-10-18 - Claimed-vendor responses use ciphertext envelopes plus routing sidecars
+
+- Reuse `wedding_enquiry_envelopes` as the only claimed-vendor commercial payload store. Its
+  serialized AFP message must have null/empty content and an exact encrypted container; server
+  code validates signed routing metadata but never decrypts or parses the canonical response.
+- Keep authority outside ciphertext in a bounded sidecar: owner, vendor, grant, thread, quotation
+  version, projection fingerprint, nonce, current AgentCard key, material fingerprint, and request
+  digest. This permits IDOR prevention, revocation/key-change checks, replay safety, and dedupe
+  without duplicating commercial facts.
+- Treat the current signed AgentCard as live authority on every inbox read and response submission.
+  Replacing its key hides invitations encrypted for the old key and invalidates old signature
+  assumptions; claim dispute or revocation removes access without deleting evidence history.
+- Browser-held keys perform X25519/XChaCha20-Poly1305 encryption/decryption and Ed25519 AFP
+  signing. Server receipts prove durable transport only and never imply user review, acceptance,
+  booking, contract execution, or payment.
+- Gate the path independently with `OMNYID_QUOTATION_CLAIMED_VENDOR_RESPONSES_ENABLED`. Keep it
+  disabled until the disposable-Postgres matrix and independent security review are recorded.

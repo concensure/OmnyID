@@ -3269,3 +3269,45 @@ Next:
   claim/AgentCard/encrypted enquiry foundations. Do not create a wedding-specific response schema.
 - Keep WED-219 capability rollout disabled until disposable-Postgres evidence and independent
   security sign-off are recorded.
+
+## 2026-10-18 - WED-221 claimed-vendor AFP response flow (Codex, review)
+
+Changed:
+
+- Added strict claimed-vendor AFP response validation, migration 0114 ciphertext routing/receipt
+  sidecars, isolated persistence, and authenticated invitation/inbox/submission routes.
+- Authority is re-evaluated against active claim ownership, deterministic linked Agent ID, current
+  verified AgentCard capability/key, owner-approved grant, active quotation version, exact
+  projection, expiry, revocation, and non-terminal closure.
+- Added local browser X25519/XChaCha20-Poly1305 decrypt/encrypt and Ed25519 AFP signing using the
+  existing non-extractable vendor keys. Plaintext commercial response content does not enter the
+  API or `wedding_enquiry_envelopes`.
+- Added deterministic durable accepted/rejected receipts, exact retry behavior, material-fingerprint
+  dedupe, nonce/response/request collision handling, and key-rotation invalidation.
+- Added the minimal own-transaction vendor panel to the existing claim portal. Approved questions
+  have an A2UI-compatible projection; competitor/private fields, booking, payment, and account-wide
+  inbox behavior are absent.
+
+Verification:
+
+- `scripts/verify-quotation-readiness.ps1` passed: 97 Rust integration tests, conditional API-flow
+  targets, 30 focused Rust library tests, `cargo check`, six TypeScript SDK tests plus typecheck/build,
+  and 38 Solid tests.
+- `npx playwright test tests/e2e/quotation-vendor-response.spec.ts --config playwright.config.ts`
+  passed at 360px and 1280px with accessibility and overflow assertions.
+- All 32 migration-catalog integrity tests and the Solid production build passed; the build retains
+  its inherited large-chunk advisory.
+- The inherited `email_group_routes.rs` unused-variable warning remains. `TEST_DATABASE_URL` is
+  unset, so the disposable-Postgres persistence body compiled but skipped.
+- Every new file is at most 574 physical lines. The independent claimed-vendor response flag remains
+  off; no provider, payment, Cloudflare, Oracle, deployment, or production configuration changed.
+
+Remaining:
+
+- Run `cargo test --test quotation_vendor_response_api` against disposable local `omnyid_test` and
+  record the real-Postgres evidence.
+- Obtain independent security review for claim/key rotation, ciphertext/AAD, replay, IDOR, and
+  durable rejected-receipt behavior. Do not enable
+  `OMNYID_QUOTATION_CLAIMED_VENDOR_RESPONSES_ENABLED` before both gates pass.
+- After review, start WED-222/DBV-07 using the existing scoped response-capability session and this
+  canonical response/receipt contract; do not broaden the claimed account into a general CRM.

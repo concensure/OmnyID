@@ -2085,3 +2085,57 @@ tasks:
       - shared fixture has the same hard-coded SHA-256 fingerprint in Rust and TypeScript; strict unknown-field, evidence, channel equivalence, shuffle, binding, successor, and review-proposal tests pass
       - expanded canonical verifier passes 90 Rust integration tests, conditional API-flow targets, 30 focused Rust units, cargo check, 6 TypeScript SDK tests, Solid typecheck, and 35 Solid tests
       - all new files are 720 physical lines or fewer; no route, database, provider, deployment, Cloudflare, Oracle, payment, or release-flag mutation occurred
+  - id: WED-221
+    title: Add claimed-vendor AFP quotation response flow
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-219
+      - WED-220
+    files:
+      - postgres/migrations/0114_quotation_vendor_response_transport.sql
+      - src/quotation/vendor_response_transport.rs
+      - src/quotation/features.rs
+      - src/quotation/mod.rs
+      - src/db.rs
+      - src/db/quotation_vendor_responses.rs
+      - src/db/migration_catalog.rs
+      - src/server/mod.rs
+      - src/server/quotation_vendor_response_routes.rs
+      - solid-ui/src/lib/vendorQuotationResponseState.ts
+      - solid-ui/src/lib/vendorAgentKeys.ts
+      - solid-ui/src/components/vendor/VendorQuotationResponsePanel.tsx
+      - solid-ui/src/components/vendor/VendorClaimFlow.tsx
+      - solid-ui/vite.config.mjs
+      - solid-ui/tsconfig.json
+      - tests/quotation_vendor_response_transport.rs
+      - tests/quotation_vendor_response_api.rs
+      - solid-ui/tests/vendor-quotation-response-state.test.ts
+      - solid-ui/e2e/quotation-vendor-response-fixture.html
+      - solid-ui/tests/e2e/quotation-vendor-response-fixture.tsx
+      - solid-ui/tests/e2e/quotation-vendor-response.spec.ts
+      - scripts/verify-quotation-readiness.ps1
+      - .agent/**
+    acceptance:
+      - only an authenticated owner of an active non-disputed vendor claim with the deterministic linked Agent ID and current signed AgentCard response capability can access a transaction
+      - inbox and submission authority require exact vendor, recipient, thread, grant, active quotation version, projection fingerprint, expiry, and allowed-action bindings
+      - AFP response envelopes persist ciphertext and bounded routing metadata only; plaintext commercial response bodies never enter the transport table
+      - signatures, encryption metadata, nonce uniqueness, expiry, payload bounds, grant state, claim state, and AgentCard key continuity fail closed
+      - identical retry returns the durable prior receipt while nonce or response identity reuse with different material is rejected
+      - vendor UI exposes only its own permissioned transaction projection and response workflow, without competitor data, account-wide access, paywall, booking, acceptance, or payment authority
+      - focused domain, API, encryption-boundary, IDOR, replay, key-change, claim-dispute, and UI tests pass; every new file stays below 1000 physical lines and the release flag remains off
+    progress:
+      - started from clean committed WED-220 checkpoint 3ffc148; WED-219 remains review-gated and all response release flags remain disabled
+      - added a strict signed AFP transport contract bound to the current non-disputed claim, deterministic Agent ID, current AgentCard key, exact vendor/thread/grant/quotation version/projection, recipient, nonce, expiry, allowed action, and active closure state
+      - the encrypted container permits only scheme, algorithm, ephemeral public key, nonce, ciphertext, and AAD; plaintext content and unknown side-channel fields fail before persistence and the 64 KiB envelope limit remains enforced
+      - migration 0114 adds routing and content-free receipt sidecars around the existing wedding_enquiry_envelopes ciphertext table without adding commercial body, projection, contact, booking, payment, or subscription columns
+      - owner-approved invitation, claimed-vendor inbox, and response routes are behind the independent OMNYID_QUOTATION_CLAIMED_VENDOR_RESPONSES_ENABLED release-evidence gate; inbox queries require active ownership and the current AgentCard key and do not join subscription state
+      - accepted and rejected requests receive deterministic durable receipts; exact retries return the prior receipt, response fingerprints deduplicate equivalent material, and reused request IDs, response IDs, or nonces with different material fail closed
+      - browser key custody now supports non-extractable X25519 decryption, ephemeral X25519/XChaCha20-Poly1305 encryption, and Rust-compatible Ed25519 AFP signing without sending plaintext or private keys to the server
+      - the existing vendor claim surface now includes a minimal own-transaction response panel; approved questions project as A2UI-compatible fields and no action accepts a booking, contract, payment, or competitor/private context
+      - seven transport tests, two API/persistence boundary tests, three Solid state tests, and a synthetic claimed-vendor Playwright matrix at 360px and 1280px pass, including accessibility and horizontal-overflow checks
+      - the full quotation verifier passes 97 Rust integration tests, 30 focused Rust library tests, cargo check, six TypeScript SDK tests with typecheck/build, and 38 Solid tests; only the inherited email-group warning remains
+      - all 32 migration-catalog integrity tests and the Solid production bundle pass; the build retains its inherited large-chunk advisory
+      - TEST_DATABASE_URL remains unset, so the disposable-Postgres test body compiled but conditionally skipped; independent security review is also pending and the claimed-vendor response flag remains off
+      - every new file is 574 physical lines or fewer; no provider, payment, deployment, Cloudflare, Oracle, or release-flag mutation occurred

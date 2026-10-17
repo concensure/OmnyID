@@ -6,6 +6,7 @@
 import { createSignal, Show } from "solid-js";
 
 import { VendorPhotoUploadPanel } from "@/components/vendor/VendorPhotoUploadPanel";
+import { VendorQuotationResponsePanel } from "@/components/vendor/VendorQuotationResponsePanel";
 import { getVendorClaim, startVendorClaim, type VendorClaim } from "@/lib/vendorClaimApi";
 
 const slugFromUrl = () => new URLSearchParams(window.location.search).get("vendor_slug")?.trim().toLowerCase() ?? "";
@@ -80,6 +81,7 @@ export function VendorClaimFlow() {
             <p class="mt-2 text-sm">Your listing claim is {activeClaim().status}. You can now manage its public photos.</p>
           </section>
           <section class="mt-6"><h2 class="mb-3 text-lg font-semibold">3. Photos</h2><VendorPhotoUploadPanel vendorSlug={activeClaim().vendor_slug} /></section>
+          <section class="mt-6"><VendorQuotationResponsePanel /></section>
         </>}
       </Show>
       <Show when={error()}>{(message) => <p class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">{message()}</p>}</Show>

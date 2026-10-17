@@ -574,4 +574,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Auditable terminal expiry state for quotation response capabilities",
         include_str!("../../postgres/migrations/0113_quotation_response_capability_expiry.sql"),
     ),
+    (
+        "0114_quotation_vendor_response_transport",
+        "Ciphertext-only claimed-vendor quotation response routing and durable content-free receipts",
+        include_str!("../../postgres/migrations/0114_quotation_vendor_response_transport.sql"),
+    ),
 ];

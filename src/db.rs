@@ -23,6 +23,10 @@ mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
 mod quotation_response_capabilities;
 pub use quotation_response_capabilities::StoredQuotationResponseCapability;
+mod quotation_vendor_responses;
+pub use quotation_vendor_responses::{
+    StoredVendorTransport, VendorTransportStoreOutcome, VendorTransportWrite,
+};
 mod wedding_newsletter;
 mod wedding_onboarding_state;
 mod wedding_vendor_directory;

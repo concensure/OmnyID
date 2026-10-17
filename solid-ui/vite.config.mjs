@@ -15,6 +15,7 @@ export default defineConfig({
       { find: "afp-ts/continuity", replacement: resolve(sdkRoot, "continuity.ts") },
       { find: "afp-ts/retrieval", replacement: resolve(sdkRoot, "retrieval.ts") },
       { find: "afp-ts/workflows", replacement: resolve(sdkRoot, "workflows.ts") },
+      { find: "afp-ts/quotation", replacement: resolve(sdkRoot, "quotation.ts") },
       { find: "afp-ts", replacement: resolve(sdkRoot, "index.ts") },
       { find: "@", replacement: resolve(import.meta.dirname, "src") },
       { find: "voice-input-ts", replacement: resolve(import.meta.dirname, "src/lib/voiceInput.ts") },
