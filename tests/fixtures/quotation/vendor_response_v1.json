@@ -1,0 +1,81 @@
+{
+  "schema_version": "quotation.vendor_response.v1",
+  "response_id": "response-1",
+  "vendor_id": "production-supplier",
+  "thread_id": "thread-production-hire",
+  "grant_id": "grant-production-hire",
+  "quotation_id": "production-hire-quote",
+  "quotation_version_id": "production-hire-quote-v1",
+  "projection_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "channel": "secure_link",
+  "channel_receipt": {
+    "receipt_id": "secure-link-receipt-1",
+    "received_at": "2026-10-18T01:05:00Z"
+  },
+  "status": "submitted",
+  "submitted_at": "2026-10-18T01:04:00Z",
+  "question_answers": [
+    {
+      "question_id": "availability",
+      "state": "proposed",
+      "answer": "The production package is available for the requested date."
+    }
+  ],
+  "commercial_facts": [
+    {
+      "fact_id": "lighting-price",
+      "key": "line_item.lighting.unit_price",
+      "state": "confirmed",
+      "value": {
+        "kind": "money",
+        "value": {"amount_minor": 425000, "currency": "AUD"}
+      },
+      "anchors": [
+        {
+          "source_id": "vendor-response-source-1",
+          "source_version_id": "vendor-response-source-1-v1",
+          "locator": "section=pricing",
+          "exact_excerpt": "Lighting package AUD 4,250 including GST"
+        }
+      ]
+    },
+    {
+      "fact_id": "crew-count",
+      "key": "package.crew_count",
+      "state": "proposed",
+      "value": {"kind": "integer", "value": 3}
+    }
+  ],
+  "availability": {
+    "state": "available",
+    "starts_at": "2027-02-20T08:00:00+11:00",
+    "ends_at": "2027-02-20T23:00:00+11:00",
+    "notes": "Setup access is required from 8am."
+  },
+  "explanation": "This revision adds one technician and updates the lighting package price.",
+  "sources": [
+    {
+      "source_id": "vendor-response-source-1",
+      "source_version_id": "vendor-response-source-1-v1",
+      "media_type": "application/pdf",
+      "content_hash": "sha256:vendor-response-fixture"
+    }
+  ],
+  "attachments": [
+    {
+      "attachment_id": "attachment-1",
+      "file_name": "revised-production-package.pdf",
+      "media_type": "application/pdf",
+      "size_bytes": 2048,
+      "content_hash": "sha256:vendor-response-fixture",
+      "source_id": "vendor-response-source-1",
+      "source_version_id": "vendor-response-source-1-v1"
+    }
+  ],
+  "attestation": {
+    "attested_by": "vendor-contact-1",
+    "authority": "vendor_representative",
+    "affirmed": true,
+    "attested_at": "2026-10-18T01:03:00Z"
+  }
+}

@@ -2047,3 +2047,41 @@ tasks:
       - TEST_DATABASE_URL is unset locally, so the new HTTP matrix compiled and its logging guard ran but database-backed assertions returned through the documented conditional skip
       - new implementation/test/review files are 772 physical lines or fewer; release flags remain off and no provider, payment, deployment, Cloudflare, or Oracle mutation occurred
       - remaining review gates are a real disposable-Postgres run and independent security sign-off; do not enable the capability flag before both are recorded
+  - id: WED-220
+    title: Define canonical quotation vendor responses
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-215
+      - WED-219
+    files:
+      - schemas/quotation/vendor-response.v1.json
+      - src/quotation/vendor_response.rs
+      - src/quotation/contracts.rs
+      - src/quotation/mod.rs
+      - typescript-sdk/src/quotation.ts
+      - tests/quotation_vendor_response.rs
+      - tests/fixtures/quotation/vendor_response_v1.json
+      - typescript-sdk/tests/quotation-vendor-response.test.mjs
+      - scripts/verify-quotation-readiness.ps1
+      - .agent/**
+    acceptance:
+      - one deny-unknown generic response model binds vendor, thread, grant, active quotation version, projection fingerprint, channel, and channel receipt
+      - question answers, commercial facts, sources, attachments, availability, explanation, and vendor attestation are typed and bounded
+      - material confirmed facts require exact source evidence while unsupported facts remain proposed or unknown
+      - semantic canonicalisation produces one fingerprint across equivalent AFP, secure-link, upload, and email inputs
+      - identical submissions deduplicate while material changes create parent-linked successors
+      - submitted never implies user acceptance, booking, or payment, and the contract contains no wedding_plan_id
+      - Rust, TypeScript, and JSON schema fixtures agree and every new file remains below 1000 physical lines
+    progress:
+      - started from clean committed WED-219 checkpoint f01198d while its release flag remains disabled pending Postgres evidence and independent review
+      - added one strict template-neutral Rust contract and matching JSON Schema/TypeScript Zod contract for AFP, secure-link, upload, and email response channels
+      - response bindings include vendor, thread, grant, quotation/version, projection fingerprint, channel receipt, lifecycle, source references, attachments, availability, explanation, and vendor attestation with bounded collections and byte size
+      - exact evidence is mandatory for confirmed material facts; vendor-proposed facts retain their proposed state but enter ordinary downstream review as unknown rather than inferred or accepted
+      - canonical material excludes transport IDs, channel, receipt, lifecycle, and attestation identity; it normalises timestamps and content-hash-backed sources so semantically equivalent channel submissions share one fingerprint
+      - duplicate inputs reconcile to the existing response, while material changes require the exact parent response and immutable vendor/thread/grant/quotation/projection bindings
+      - response lifecycle is draft to submitted to received to reviewed/rejected with explicit supersession; it contains no user acceptance, booking, payment, or wedding-plan state
+      - shared fixture has the same hard-coded SHA-256 fingerprint in Rust and TypeScript; strict unknown-field, evidence, channel equivalence, shuffle, binding, successor, and review-proposal tests pass
+      - expanded canonical verifier passes 90 Rust integration tests, conditional API-flow targets, 30 focused Rust units, cargo check, 6 TypeScript SDK tests, Solid typecheck, and 35 Solid tests
+      - all new files are 720 physical lines or fewer; no route, database, provider, deployment, Cloudflare, Oracle, payment, or release-flag mutation occurred

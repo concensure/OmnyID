@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnyid.dev/schemas/quotation/vendor-response.v1.json",
+  "title": "OmnyID quotation vendor response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "response_id", "vendor_id", "thread_id", "grant_id",
+    "quotation_id", "quotation_version_id", "projection_fingerprint", "channel",
+    "channel_receipt", "status", "submitted_at", "attestation"
+  ],
+  "properties": {
+    "schema_version": {"const": "quotation.vendor_response.v1"},
+    "response_id": {"$ref": "#/$defs/id"},
+    "parent_response_id": {"$ref": "#/$defs/id"},
+    "vendor_id": {"$ref": "#/$defs/id"},
+    "thread_id": {"$ref": "#/$defs/id"},
+    "grant_id": {"$ref": "#/$defs/id"},
+    "quotation_id": {"$ref": "#/$defs/id"},
+    "quotation_version_id": {"$ref": "#/$defs/id"},
+    "projection_fingerprint": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+    "channel": {"enum": ["afp", "secure_link", "upload", "email"]},
+    "channel_receipt": {"$ref": "#/$defs/channel_receipt"},
+    "status": {"enum": ["draft", "submitted", "received", "reviewed", "rejected", "superseded"]},
+    "submitted_at": {"type": "string", "format": "date-time"},
+    "question_answers": {
+      "type": "array", "maxItems": 50, "items": {"$ref": "#/$defs/question_answer"}
+    },
+    "commercial_facts": {
+      "type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/commercial_fact"}
+    },
+    "availability": {"$ref": "#/$defs/availability"},
+    "explanation": {"type": "string", "minLength": 1, "maxLength": 4000},
+    "sources": {
+      "type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/source"}
+    },
+    "attachments": {
+      "type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/attachment"}
+    },
+    "attestation": {"$ref": "#/$defs/attestation"}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 180},
+    "bounded_180": {"type": "string", "minLength": 1, "maxLength": 180},
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "source_version_id", "locator", "exact_excerpt"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/id"},
+        "source_version_id": {"$ref": "#/$defs/id"},
+        "locator": {"type": "string", "minLength": 1, "maxLength": 500},
+        "exact_excerpt": {"type": "string", "minLength": 1, "maxLength": 2000}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "source_version_id", "media_type"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/id"},
+        "source_version_id": {"$ref": "#/$defs/id"},
+        "media_type": {"$ref": "#/$defs/bounded_180"},
+        "content_hash": {"type": "string", "minLength": 1, "maxLength": 200}
+      }
+    },
+    "channel_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_id", "received_at"],
+      "properties": {
+        "receipt_id": {"$ref": "#/$defs/id"},
+        "received_at": {"type": "string", "format": "date-time"},
+        "transport_message_id": {"type": "string", "minLength": 1, "maxLength": 300}
+      }
+    },
+    "question_answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question_id", "state"],
+      "properties": {
+        "question_id": {"$ref": "#/$defs/id"},
+        "state": {"enum": ["confirmed", "proposed", "unknown"]},
+        "answer": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "anchors": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/anchor"}}
+      }
+    },
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount_minor", "currency"],
+      "properties": {
+        "amount_minor": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}
+      }
+    },
+    "commercial_value": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {"kind": {"const": "money"}, "value": {"$ref": "#/$defs/money"}}
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {"kind": {"const": "boolean"}, "value": {"type": "boolean"}}
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {"kind": {"const": "date"}, "value": {"type": "string", "format": "date-time"}}
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {"kind": {"const": "text"}, "value": {"type": "string", "minLength": 1, "maxLength": 4000}}
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": {"const": "inclusion"},
+            "value": {"enum": ["included", "required", "optional", "excluded", "conditional", "unknown"]}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": {"const": "integer"},
+            "value": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991}
+          }
+        }
+      ]
+    },
+    "commercial_fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fact_id", "key", "state"],
+      "properties": {
+        "fact_id": {"$ref": "#/$defs/id"},
+        "key": {"$ref": "#/$defs/id"},
+        "state": {"enum": ["confirmed", "proposed", "unknown"]},
+        "value": {"$ref": "#/$defs/commercial_value"},
+        "anchors": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/anchor"}}
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {"enum": ["available", "unavailable", "conditional", "unknown"]},
+        "starts_at": {"type": "string", "format": "date-time"},
+        "ends_at": {"type": "string", "format": "date-time"},
+        "notes": {"type": "string", "minLength": 1, "maxLength": 2000},
+        "anchors": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/anchor"}}
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attachment_id", "file_name", "media_type", "size_bytes", "content_hash",
+        "source_id", "source_version_id"
+      ],
+      "properties": {
+        "attachment_id": {"$ref": "#/$defs/id"},
+        "file_name": {"type": "string", "minLength": 1, "maxLength": 500},
+        "media_type": {"$ref": "#/$defs/bounded_180"},
+        "size_bytes": {"type": "integer", "minimum": 1, "maximum": 26214400},
+        "content_hash": {"type": "string", "minLength": 1, "maxLength": 200},
+        "source_id": {"$ref": "#/$defs/id"},
+        "source_version_id": {"$ref": "#/$defs/id"}
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attested_by", "authority", "affirmed", "attested_at"],
+      "properties": {
+        "attested_by": {"$ref": "#/$defs/id"},
+        "authority": {"enum": ["vendor_representative", "claimed_agent", "verified_email_recipient"]},
+        "affirmed": {"type": "boolean"},
+        "attested_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

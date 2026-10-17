@@ -3234,3 +3234,38 @@ Remaining:
   both gates pass.
 - After review, start WED-220/DBV-05 canonical vendor response contracts. Do not make the WED-219
   consume endpoint accept response payloads; that belongs to the next canonical contract.
+
+## 2026-10-18 - WED-220 canonical vendor response contract (Codex, complete)
+
+Changed:
+
+- Added `quotation.vendor_response.v1` in Rust, JSON Schema, and TypeScript/Zod with strict unknown
+  field rejection and bounded question answers, typed commercial facts, availability, explanation,
+  sources, attachments, channel receipts, lifecycle, and vendor attestation.
+- Added channel-independent canonicalisation and SHA-256 fingerprinting. Content-hash-backed source
+  identity, timestamps, media types, hash casing, and collection ordering normalise across AFP,
+  secure-link, upload, and email transport differences.
+- Added duplicate/successor reconciliation. Material successors require exact parent linkage and
+  cannot change vendor, thread, grant, quotation/version, or projection fingerprint.
+- Added a generic review proposal projection. Exact-evidence facts may remain confirmed; proposed
+  vendor facts enter review as unknown and always require user review.
+- Added an explicit response lifecycle with no acceptance, booking, payment, or wedding-plan state.
+- Added one shared non-wedding fixture with the same hard-coded fingerprint in Rust and TypeScript.
+
+Verification:
+
+- Expanded `scripts/verify-quotation-readiness.ps1` passed: 90 Rust integration tests, conditional
+  API-flow targets, 30 focused Rust units, `cargo check`, 6 TypeScript SDK tests and typecheck/build,
+  Solid typecheck, whitespace checks, and 35 Solid tests.
+- The inherited `email_group_routes.rs` unused-variable warning remains. `TEST_DATABASE_URL` remains
+  unset, so the WED-219 database-backed HTTP matrix is still a documented review gate.
+- New files are at most 720 physical lines; the extended TypeScript quotation module is 468 lines.
+- No provider, database, release flag, deployment, Cloudflare, Oracle, payment, or legal action was
+  performed.
+
+Next:
+
+- Begin WED-221/DBV-06 claimed-vendor AFP response transport using this contract and the existing
+  claim/AgentCard/encrypted enquiry foundations. Do not create a wedding-specific response schema.
+- Keep WED-219 capability rollout disabled until disposable-Postgres evidence and independent
+  security sign-off are recorded.

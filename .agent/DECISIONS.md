@@ -946,3 +946,22 @@ vendor, and stored thread counters persist only keyed hashes; vendor/thread dime
 request fields. Public failures intentionally collapse to `response unavailable`. The shared request
 middleware logs only request IDs, while capability route and persistence modules contain no request,
 secret, or projection logging.
+
+## 2026-10-18: All vendor response channels converge on one material fingerprint
+
+`quotation.vendor_response.v1` is template neutral and is the only semantic response contract for
+AFP, scoped secure-link, upload, and email channels. It binds the vendor, thread, grant, exact
+quotation version, and approved projection, while transport channel, receipt, response ID, lifecycle
+state, and attestation identity remain provenance rather than material response content. Canonical
+fingerprints use immutable source content hashes where available, normalise equivalent timestamps,
+media types, hash casing, and collection order, and therefore reconcile the same response across
+channel-specific source and receipt IDs.
+
+Confirmed commercial facts require exact anchors resolving to declared sources. Vendor-proposed
+facts retain their proposed state, but the generic review projection maps their evidence to unknown
+with an explicit user-review rationale; a vendor statement never becomes inferred platform truth.
+Identical material submissions deduplicate. A material change must be parent-linked to the prior
+response and preserve all transaction bindings. Response lifecycle stops at reviewed/rejected or
+superseded: it contains no user acceptance, booking confirmation, payment execution, or
+`wedding_plan_id`. Later wedding and other template adapters consume the same generic response and
+review proposal rather than defining their own response model.

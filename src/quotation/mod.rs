@@ -23,6 +23,7 @@ pub mod response_capability;
 pub mod review;
 pub mod validation;
 pub mod vendor_context;
+pub mod vendor_response;
 
 pub use afp::*;
 pub use calculation::*;
@@ -43,3 +44,4 @@ pub use response_capability::*;
 pub use review::*;
 pub use validation::*;
 pub use vendor_context::*;
+pub use vendor_response::*;

@@ -15,6 +15,7 @@ pub enum EvidenceState {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SourceAnchor {
     pub source_id: String,
     pub source_version_id: String,
@@ -50,6 +51,7 @@ impl Evidence {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Money {
     /// Integer minor units. AUD 123.45 is represented as 12345.
     pub amount_minor: i64,
@@ -120,6 +122,7 @@ pub enum QuoteLifecycle {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SourceReference {
     pub source_id: String,
     pub source_version_id: String,
