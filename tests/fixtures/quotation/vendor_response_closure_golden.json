@@ -149,10 +149,10 @@
     ],
     "contract_changes": [
       {
-        "field_path": "cancellation.non_refundable_after",
+        "kind": "commercial_term",
+        "path": "cancellation.non_refundable_after",
         "before": "2027-08-18",
-        "after": "2027-07-18",
-        "material": true
+        "after": "2027-07-18"
       }
     ],
     "contract_changes_reviewed": true,

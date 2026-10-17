@@ -1,5 +1,6 @@
 use super::{
-    ClarificationApproval, ClarificationDraft, ClarificationSendReceipt,
+    ClarificationApproval, ClarificationDraft, ClarificationSendReceipt, ClosureTransition,
+    QuotationSelection,
     contracts::{NormalisedQuotation, QuotationComparison},
     review::QuotationReviewSuccessor,
 };
@@ -14,6 +15,8 @@ pub const QUOTATION_COMPARISON_KIND: &str = "quotation_comparison_materialised";
 pub const QUOTATION_REVIEW_KIND: &str = "quotation_review_recorded";
 pub const CLARIFICATION_SEND_RESERVED_KIND: &str = "quotation_clarification_send_reserved";
 pub const CLARIFICATION_SENT_KIND: &str = "quotation_clarification_sent";
+pub const QUOTATION_VENDOR_SELECTED_KIND: &str = "quotation_vendor_selected";
+pub const QUOTATION_CLOSURE_TRANSITION_KIND: &str = "quotation_closure_transition";
 
 pub(super) fn stable_hash<T: Serialize>(value: &T) -> String {
     let encoded = serde_json::to_vec(value).unwrap_or_default();
@@ -305,6 +308,89 @@ pub fn clarification_sent_message(
             "metadata": {"relation": "message_id"},
         }),
     ];
+    message.typed_refs = message.references.clone();
+    message
+}
+
+pub fn quotation_selection_message(
+    selection: &QuotationSelection,
+    thread_id: &str,
+    parent_message_id: &str,
+) -> AFPMessage {
+    let payload_hash = stable_hash(selection);
+    let mut message = base_message(
+        stable_message_id(
+            "quotation-vendor-selected",
+            &(thread_id, &selection.idempotency_key),
+        ),
+        thread_id,
+        Some(parent_message_id),
+        &selection.occurred_at,
+        &selection.actor_id,
+    );
+    message.kind = Some(QUOTATION_VENDOR_SELECTED_KIND.to_string());
+    message.subtype = message.kind.clone();
+    message.content = json!({"selection": selection, "payment_execution": false});
+    message.metadata = Some(json!({
+        "payload_hash": payload_hash,
+        "idempotency_key": selection.idempotency_key,
+        "privacy_scope": "tenant_private",
+        "e2ee_required": true,
+        "schema_version": "quotation.selection.v1",
+        "payment_execution": false,
+    }));
+    message.references = vec![
+        reference("comparison", &selection.comparison_id),
+        reference("quotation", &selection.quotation_id),
+        reference("quotation_version", &selection.quotation_version_id),
+        reference("vendor", &selection.vendor_id),
+    ];
+    if let Some(previous) = &selection.supersedes_selection_id {
+        message.references.push(reference("parent", previous));
+    }
+    message.typed_refs = message.references.clone();
+    message
+}
+
+pub fn quotation_closure_transition_message(
+    transition: &ClosureTransition,
+    idempotency_key: &str,
+    thread_id: &str,
+    parent_message_id: &str,
+) -> AFPMessage {
+    let payload_hash = stable_hash(transition);
+    let mut message = base_message(
+        stable_message_id(
+            "quotation-closure-transition",
+            &(thread_id, idempotency_key),
+        ),
+        thread_id,
+        Some(parent_message_id),
+        &transition.occurred_at,
+        &transition.actor_id,
+    );
+    message.kind = Some(QUOTATION_CLOSURE_TRANSITION_KIND.to_string());
+    message.subtype = message.kind.clone();
+    message.content = json!({"transition": transition, "payment_execution": false});
+    message.metadata = Some(json!({
+        "payload_hash": payload_hash,
+        "idempotency_key": idempotency_key,
+        "privacy_scope": "tenant_private",
+        "e2ee_required": true,
+        "schema_version": "quotation.closure.v1",
+        "payment_execution": false,
+    }));
+    message.references = vec![
+        reference("quotation", &transition.quotation_id),
+        reference("quotation_version", &transition.quotation_version_id),
+    ];
+    for source in &transition.evidence_sources {
+        message.references.push(json!({
+            "type": "source",
+            "target": source.source_id,
+            "metadata": {"source_version_id": source.source_version_id},
+        }));
+    }
     message.typed_refs = message.references.clone();
     message
 }

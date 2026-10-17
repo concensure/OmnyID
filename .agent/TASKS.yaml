@@ -1870,3 +1870,37 @@ tasks:
       - DBV-00 foundation audit completed before any vendor or closure contract changes; WED-170 enquiry runtime and WED-171 vendor inbox are absent on the base and are not assumed reusable
       - frozen generic response, closure, reference, route, A2UI, grant-purpose, and fail-closed feature contracts are recorded with eight synthetic golden scenarios
       - clean-base quotation verification passes 57 Rust integration tests, 29 focused Rust unit executions, cargo check, Solid type checking, 23 Solid tests, and whitespace checks; the Postgres lane remains conditional because TEST_DATABASE_URL is unset
+  - id: WED-216
+    title: Persist quotation decision and closure transitions
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-215
+      - WED-211
+      - WED-214
+    files:
+      - src/server/quotation_routes/decision_routes.rs
+      - src/server/quotation_routes/closure_routes.rs
+      - src/server/quotation_routes.rs
+      - src/quotation/afp.rs
+      - tests/quotation_decision_api.rs
+      - tests/quotation_closure_api.rs
+      - tests/api_flows.rs
+      - .agent/**
+    acceptance:
+      - selection and closure mutations authenticate and derive active state from tenant-visible AFP replay
+      - commands bind exact quotation and comparison revisions, expected closure state, visible evidence, user authority, and stable idempotency
+      - duplicate and shuffled replay returns one active decision and closure state
+      - stale, invalid, cross-tenant, and wrong-thread commands fail without disclosing object existence
+      - selection is not booking and every transport result keeps payment execution false
+      - only evidence-backed booking confirmation can produce a budget commitment input
+    progress:
+      - started from committed DBV-00 contract checkpoint 227f15c
+      - added authenticated fail-closed decision and closure subroutes under the existing singular quotation namespace; handlers reload tenant-visible AFP replay and never accept a client snapshot or total
+      - selection binds the exact comparison AFP revision and active quote/vendor, persists a canonical private selection event, and idempotently starts a distinct selected closure state
+      - closure transitions bind the active selection, comparison revision, expected state, visible source evidence, explicit user authority, and an idempotency key; payment execution is hard-coded false
+      - generic replay now reconstructs historical and active selections/closures deterministically, deactivates them after quotation supersession, rejects divergent selections, and refuses closure evidence absent from the same thread
+      - the state API suppresses active decision/closure projections while the existing release-evidence-backed closure flag is off
+      - 7 new decision/closure tests plus 5 existing AFP tests pass; the updated full verifier passes 64 quotation integration tests, 29 focused Rust unit executions, cargo check, Solid type checking, 23 Solid tests, and whitespace checks
+      - the Postgres HTTP flow includes authenticated decision, duplicate replay, cross-tenant denial, closure, and invalid-leap assertions, but local execution remains conditional because TEST_DATABASE_URL is unset

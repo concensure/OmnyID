@@ -3020,3 +3020,45 @@ Next:
 - Implement DBV-01/WED-216 as authenticated decision and closure subroutes using existing
   tenant-private AFP storage and replay. Keep WED-187 isolated until its active work is
   committed and the shared auth/registration overlaps can be reviewed deliberately.
+
+## 2026-10-17 - WED-216 decision and closure persistence checkpoint (Codex, code complete locally)
+
+Changed:
+
+- Added small authenticated `/quotation/decisions` and
+  `/quotation/closure-transitions` submodules; the existing route file only registers them.
+- Selection reloads the exact active comparison/version/vendor from tenant-private AFP,
+  binds explicit user authority and idempotency, stores `quotation_vendor_selected`, and
+  starts a separate `selected` closure event. Retry repairs a missing initial closure without
+  duplicating the selection.
+- Closure reloads active selection/comparison/quote/expected state, checks source-message
+  visibility, runs the existing deterministic transition machine, and stores a compact AFP
+  successor. Stable retries return the original result; changed payloads under one key fail.
+- Extended generic replay with comparison message revisions, historical/active selections,
+  closure transitions/snapshots, successor invalidation, divergent-selection diagnostics,
+  and thread-local source enforcement. State hides active decision/closure projections while
+  the existing closure release flag is off.
+- AFP builders use canonical `afp-v1` deterministic ULIDs, equal canonical/typed refs,
+  tenant-private E2EE metadata, parent linkage, and `payment_execution: false`.
+
+Verification:
+
+- Updated no-provider verifier passed: 64 Rust quotation integration tests, compiled API
+  flow, 29 focused Rust unit executions, `cargo check`, Solid type checking, 23 Solid tests,
+  and whitespace checks.
+- New focused tests: 7 passed for deterministic selection/closure replay, quote-successor
+  invalidation, explicit authority, invalid leaps, invisible evidence, booking commitment,
+  and non-payment deposit records; 5 existing quotation AFP tests also pass.
+- The Postgres HTTP test now exercises authenticated selection/duplicate replay,
+  cross-tenant denial, contract receipt/duplicate replay, and invalid booking leap when CI
+  supplies `TEST_DATABASE_URL`. It compiled locally but skipped its database body because
+  that variable is unset; WED-216 stays in progress until observed Postgres evidence exists.
+- Repo-wide `cargo fmt --all --check` has unrelated pre-existing drift, so only touched Rust
+  files were formatted. The inherited email-group unused-variable warning remains.
+- New files are at most 291 lines. Oversized source files received registration-only changes.
+
+Next:
+
+- Run the updated API flow against disposable Postgres, then mark WED-216 done if it passes.
+- Proceed to DBV-02/WED-217 using the replayed decision/closure fields and existing A2UI
+  primitives; do not create a new foundational card.

@@ -123,6 +123,18 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
     let Some(db_url) = test_db_url() else {
         return;
     };
+    unsafe {
+        std::env::set_var("OMNYID_QUOTATION_RELEASE_GATE", "verified");
+        std::env::set_var(
+            "OMNYID_QUOTATION_RELEASE_GATE_VERSION",
+            "quotation.readiness.v1",
+        );
+        std::env::set_var(
+            "OMNYID_QUOTATION_RELEASE_EVIDENCE_SHA",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        );
+        std::env::set_var("OMNYID_QUOTATION_CLOSURE_ENABLED", "true");
+    }
     let db = Db::new(&db_url).await.expect("connect test database");
     let (user_a, auth_a) = seed_user(&db, "tenant-a").await;
     let (_user_b, auth_b) = seed_user(&db, "tenant-b").await;
@@ -271,6 +283,120 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
         "recommendation must remain disabled without verified release evidence"
     );
 
+    let comparison_revision = comparison["message_ids"][0]
+        .as_str()
+        .expect("comparison message id");
+    let selection = json!({
+        "thread_id": thread_id,
+        "selection_id": format!("selection-{suffix}"),
+        "comparison_id": comparison_id,
+        "expected_comparison_revision": comparison_revision,
+        "quotation_id": quote.identity.quotation_id,
+        "quotation_version_id": quote.identity.version_id,
+        "vendor_id": quote.identity.vendor_id,
+        "idempotency_key": format!("selection-idempotency-{suffix}"),
+        "user_authority": true
+    });
+    let (status, selected) = request_json(
+        &app,
+        "POST",
+        "/quotation/decisions",
+        Some(&auth_a),
+        Some(selection.clone()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "selection: {selected}");
+    assert_eq!(selected["message_ids"].as_array().map(Vec::len), Some(2));
+    let (status, duplicate_selection) = request_json(
+        &app,
+        "POST",
+        "/quotation/decisions",
+        Some(&auth_a),
+        Some(selection.clone()),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "duplicate selection: {duplicate_selection}"
+    );
+    assert_eq!(duplicate_selection, selected);
+
+    let (status, cross_tenant_selection) = request_json(
+        &app,
+        "POST",
+        "/quotation/decisions",
+        Some(&auth_b),
+        Some(selection),
+    )
+    .await;
+    assert!(
+        matches!(status, StatusCode::NOT_FOUND | StatusCode::CONFLICT),
+        "cross-tenant selection must disclose no object: {cross_tenant_selection}"
+    );
+
+    let closure = json!({
+        "thread_id": thread_id,
+        "event_id": format!("contract-received-{suffix}"),
+        "quotation_id": quote.identity.quotation_id,
+        "quotation_version_id": quote.identity.version_id,
+        "comparison_id": comparison_id,
+        "expected_comparison_revision": comparison_revision,
+        "expected_state": "selected",
+        "target_state": "contract_received",
+        "user_authority": true,
+        "evidence_sources": [{
+            "source_id": source_id,
+            "source_version_id": "contract-source-v1",
+            "media_type": "application/pdf"
+        }],
+        "contract_changes": [],
+        "contract_changes_reviewed": false,
+        "idempotency_key": format!("contract-received-idempotency-{suffix}")
+    });
+    let (status, closed) = request_json(
+        &app,
+        "POST",
+        "/quotation/closure-transitions",
+        Some(&auth_a),
+        Some(closure.clone()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "contract receipt: {closed}");
+    let (status, duplicate_closure) = request_json(
+        &app,
+        "POST",
+        "/quotation/closure-transitions",
+        Some(&auth_a),
+        Some(closure.clone()),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "duplicate closure: {duplicate_closure}"
+    );
+    assert_eq!(duplicate_closure, closed);
+
+    let mut invalid_leap = closure;
+    invalid_leap["event_id"] = json!(format!("invalid-booking-{suffix}"));
+    invalid_leap["expected_state"] = json!("contract_received");
+    invalid_leap["target_state"] = json!("booking_confirmed");
+    invalid_leap["idempotency_key"] = json!(format!("invalid-booking-idem-{suffix}"));
+    let (status, rejected_leap) = request_json(
+        &app,
+        "POST",
+        "/quotation/closure-transitions",
+        Some(&auth_a),
+        Some(invalid_leap),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "invalid closure leap: {rejected_leap}"
+    );
+
     let fingerprint = quotation_material_fingerprint(&quote);
     let review = json!({
         "thread_id": thread_id,
@@ -303,4 +429,11 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT, "stale review: {stale}");
+
+    unsafe {
+        std::env::remove_var("OMNYID_QUOTATION_RELEASE_GATE");
+        std::env::remove_var("OMNYID_QUOTATION_RELEASE_GATE_VERSION");
+        std::env::remove_var("OMNYID_QUOTATION_RELEASE_EVIDENCE_SHA");
+        std::env::remove_var("OMNYID_QUOTATION_CLOSURE_ENABLED");
+    }
 }

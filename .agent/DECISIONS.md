@@ -844,3 +844,20 @@ preferences, full-plan context, or internal scores. Existing decision/A2UI primi
 sufficient, and no new foundational comparison or booking card is authorized. Closure and
 vendor response capabilities remain independently fail-closed, and no transition executes
 payment.
+
+## 2026-10-17: Selection starts closure but remains a separate AFP fact
+
+An authenticated quotation selection binds the exact active comparison AFP message,
+quotation version, vendor, current selection, user authority, and idempotency key. The
+server persists `quotation_vendor_selected`, then idempotently creates a distinct initial
+`quotation_closure_transition` in `selected` state. This preserves the rule that choosing a
+vendor is not contract acceptance, payment, or booking while avoiding an ambiguous gap
+before later contract/deposit transitions.
+
+Closure commands reload tenant-visible replay, require the active selection and exact
+comparison revision, and accept evidence only when its source message exists in that same
+thread. Replay independently enforces source visibility so a directly injected AFP event
+cannot activate unsupported closure state. Active decision and closure projections are
+suppressed while the release-evidence-backed closure flag is off; history remains
+append-only. Quotation successors deactivate old selections and closures without deleting
+them, and every persisted transport projection fixes payment execution to false.

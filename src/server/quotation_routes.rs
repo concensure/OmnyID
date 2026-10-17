@@ -1,6 +1,8 @@
 //! Authenticated persistence and replay routes for template-neutral quotations.
 
 mod clarification_routes;
+mod closure_routes;
+mod decision_routes;
 
 use std::sync::Arc;
 
@@ -31,6 +33,8 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/quotation/reviews", post(store_review_http))
         .route("/quotation/comparisons", post(store_comparison_http))
         .route("/quotation/state", get(quotation_state_http))
+        .merge(decision_routes::routes())
+        .merge(closure_routes::routes())
         .merge(clarification_routes::routes())
 }
 
@@ -373,7 +377,12 @@ async fn quotation_state_http(
 ) -> Result<Json<crate::quotation::QuotationReplayState>, (StatusCode, String)> {
     let _user = authenticated_user(&state.db, &headers).await?;
     let messages = visible_messages(&state, &headers, &query.thread_id).await?;
-    Ok(Json(replay_quotation_messages(&messages)))
+    let mut replay = replay_quotation_messages(&messages);
+    if !crate::quotation::QuotationFeatureFlags::from_env().closure {
+        replay.active_selections.clear();
+        replay.active_closures.clear();
+    }
+    Ok(Json(replay))
 }
 
 #[cfg(test)]
