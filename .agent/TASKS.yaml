@@ -2314,6 +2314,7 @@ tasks:
       - browser evidence now checks URL/storage/cache token residue and vendor-text XSS in addition to mobile/desktop Axe, optional email fallback, generic unavailable state, exact CSRF, and upload binding
       - the reproducible verifier reports blocked with artifact digest d1365f92c1f4717250141313a1d34619b4a3d57fba8eb408f8a9ebba61b857cf after 106 Rust quotation integration tests, conditional API flow, 31 quotation unit tests, shared boundaries, cargo check, six SDK tests, 44 Solid tests, 11 browser cases, the migration catalog, 1874 wedding tests, the Solid production build, and scoped line budgets passed
       - TEST_DATABASE_URL and CLAMD_HOST are unset and no accuracy/provider/reviewer/usability/wording/hosted/cohort evidence was supplied; readiness is blocked, all flags remain off, and no provider, Oracle, email, payment, or deployment mutation occurred
+      - final local prerequisite audit still finds TEST_DATABASE_URL, DATABASE_URL, and CLAMD_HOST unset; Docker client 29.2.1 is installed but its daemon is unavailable, so disposable-Postgres and clean-daemon evidence cannot run on this host
   - id: WED-226
     title: Stage gated vendor response rollout
     status: blocked
@@ -2344,6 +2345,7 @@ tasks:
     progress:
       - registered from DBV-11 so the final rollout stage is explicit in the canonical ledger
       - blocked by WED-225 readiness plus unfinished WED-213 and WED-185 release gates; no staging, Oracle deployment, provider mutation, canary, or flag activation is authorized
+      - local vendor-mail and ranking-policy-v2 overrides are unset and the Oracle environment example keeps vendor mail plus every quotation release flag false; the branch has no GitHub run evidence to substitute for the missing readiness inputs
   - id: WED-227
     title: Reconcile personalised vendor slices onto quotation portal architecture
     status: review

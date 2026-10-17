@@ -9,6 +9,9 @@ Changed:
   comparison keeps both cards mounted instead of being replaced by the receipt.
 - Registered WED-226/DBV-11 in the canonical ledger as blocked behind WED-225, WED-213, and WED-185.
   No rollout work, provider mutation, flag activation, or Oracle deployment ran.
+- A final read-only prerequisite audit found no TEST_DATABASE_URL, DATABASE_URL, or CLAMD_HOST. The
+  Docker 29.2.1 client is present but cannot reach its daemon; local vendor-mail and ranking-V2
+  overrides are unset, the Oracle example keeps release flags false, and this branch has no CI run.
 
 Verification:
 
