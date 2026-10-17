@@ -62,10 +62,12 @@ try {
         tests/quotation-closure-template-projection.test.ts `
         tests/quotation-wedding-closure-adapter.test.ts `
         tests/vendor-quotation-response-state.test.ts `
+        tests/quotation-response-session-api.test.ts `
+        tests/quotation-response-form-state.test.ts `
         tests/quotation-readiness-state.test.ts
     if ($LASTEXITCODE -ne 0) { throw "Quotation Solid verification failed" }
     if ($IncludeBrowser) {
-        npx playwright test tests/e2e/wedding-quotation-intelligence.spec.ts tests/e2e/quotation-decision-closure.spec.ts tests/e2e/quotation-vendor-response.spec.ts --config playwright.config.ts
+        npx playwright test tests/e2e/wedding-quotation-intelligence.spec.ts tests/e2e/quotation-decision-closure.spec.ts tests/e2e/quotation-vendor-response.spec.ts tests/e2e/quotation-response-portal.spec.ts --config playwright.config.ts
         if ($LASTEXITCODE -ne 0) { throw "Quotation browser verification failed" }
     }
 }

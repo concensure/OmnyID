@@ -1,3 +1,14 @@
+## 2026-10-18: Secure-link vendors are capability-attributed, never Agent-impersonated
+
+The optional quotation response portal accepts only fragment-carried capability tokens,
+exchanges them into the existing short-lived HttpOnly transaction session, and derives
+all vendor, recipient, grant, quotation, channel, timestamp, response, and receipt
+identity on the server. A submission becomes one tenant-private AFP response plus a
+review proposal attributed to `capability://quotation-response`; it explicitly does not
+claim a vendor-Agent signature, user acceptance, booking, or payment. The scoped
+session stores only canonical response fingerprint and receipt identity so exact retries
+return one durable receipt while materially different replays fail closed.
+
 ## 2026-10-17: Quotation intelligence is deployed dark until evidence gates pass
 
 The generic quotation engine, authenticated AFP persistence, review, comparison,

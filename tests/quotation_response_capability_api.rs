@@ -26,12 +26,25 @@ use ulid::Ulid;
 #[test]
 fn capability_boundary_has_no_request_secret_or_projection_logging_calls() {
     let routes = include_str!("../src/server/quotation_response_capability_routes.rs");
+    let portal_routes = include_str!("../src/server/quotation_response_portal_routes.rs");
     let persistence = include_str!("../src/db/quotation_response_capabilities.rs");
-    for source in [routes, persistence] {
+    let response = include_str!("../src/quotation/secure_link_response.rs");
+    for source in [routes, portal_routes, persistence, response] {
         assert!(!source.contains("tracing::"));
         assert!(!source.contains("#[instrument"));
         assert!(!source.contains("println!"));
         assert!(!source.contains("dbg!"));
+    }
+    for required in [
+        "CACHE_CONTROL",
+        "no-store",
+        "REFERRER_POLICY",
+        "no-referrer",
+        "x-frame-options",
+        "frame-ancestors 'none'",
+        "permissions-policy",
+    ] {
+        assert!(routes.contains(required), "missing portal boundary {required}");
     }
     let middleware = include_str!("../src/server/mod.rs");
     let request_span = middleware
@@ -302,17 +315,8 @@ async fn capability_http_is_tenant_bound_one_time_and_stores_no_raw_secrets() {
     let raw_token = issued["response_token"].as_str().expect("raw token");
     let capability_id = issued["capability_id"].as_str().expect("capability id");
 
-    let exchange_body = json!({
-        "response_token": raw_token,
-        "vendor_id": grant.target_vendor_id,
-        "response_recipient_id": grant.response_recipient_id,
-        "quotation_id": grant.quotation_id,
-        "quotation_version_id": grant.quotation_version_id,
-        "thread_id": grant.thread_id,
-        "projection_fingerprint": grant.projection_fingerprint,
-    });
-    let mut wrong_vendor = exchange_body.clone();
-    wrong_vendor["vendor_id"] = json!("other-vendor");
+    let exchange_body = json!({"response_token": raw_token});
+    let wrong_vendor = json!({"response_token": raw_token, "vendor_id": "other-vendor"});
     let (status, _, wrong) = request(
         &app,
         "POST",
@@ -342,6 +346,24 @@ async fn capability_http_is_tenant_bound_one_time_and_stores_no_raw_secrets() {
     assert!(set_cookie.contains("HttpOnly"));
     assert!(set_cookie.contains("Secure"));
     assert!(set_cookie.contains("SameSite=Strict"));
+    assert_eq!(
+        exchange_headers
+            .get(header::CACHE_CONTROL)
+            .and_then(|value| value.to_str().ok()),
+        Some("no-store")
+    );
+    assert_eq!(
+        exchange_headers
+            .get(header::REFERRER_POLICY)
+            .and_then(|value| value.to_str().ok()),
+        Some("no-referrer")
+    );
+    assert_eq!(
+        exchange_headers
+            .get("x-frame-options")
+            .and_then(|value| value.to_str().ok()),
+        Some("DENY")
+    );
     let cookie = set_cookie.split(';').next().expect("cookie pair");
     let csrf = exchanged["csrf_token"].as_str().expect("csrf");
     let nonce = exchanged["submission_nonce"].as_str().expect("nonce");
@@ -360,7 +382,19 @@ async fn capability_http_is_tenant_bound_one_time_and_stores_no_raw_secrets() {
         "cross revoke: {cross_revoke}"
     );
 
-    let consume_body = json!({"submission_nonce": nonce, "action": "answer_questions"});
+    let consume_body = json!({
+        "submission_nonce": nonce,
+        "action": "answer_questions",
+        "question_answers": [{
+            "question_id": "availability",
+            "state": "confirmed",
+            "answer": "Yes, the package is available.",
+            "anchors": [],
+        }],
+        "commercial_facts": [],
+        "availability": {"state": "available", "anchors": []},
+        "affirmed": true,
+    });
     let (status, _, _) = request(
         &app,
         "POST",
@@ -370,7 +404,7 @@ async fn capability_http_is_tenant_bound_one_time_and_stores_no_raw_secrets() {
     )
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
-    let (status, _, consumed) = request(
+    let (status, consume_headers, consumed) = request(
         &app,
         "POST",
         "/quotation/vendor-response/consume",
@@ -379,6 +413,17 @@ async fn capability_http_is_tenant_bound_one_time_and_stores_no_raw_secrets() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "consume: {consumed}");
+    assert_eq!(consumed["status"], "received");
+    assert_eq!(consumed["requires_user_review"], true);
+    assert_eq!(consumed["accepted"], false);
+    assert_eq!(consumed["booking"], false);
+    assert_eq!(consumed["payment_execution"], false);
+    assert_eq!(
+        consume_headers
+            .get(header::CACHE_CONTROL)
+            .and_then(|value| value.to_str().ok()),
+        Some("no-store")
+    );
     let (status, _, replayed) = request(
         &app,
         "POST",
@@ -387,7 +432,26 @@ async fn capability_http_is_tenant_bound_one_time_and_stores_no_raw_secrets() {
         consume_body,
     )
     .await;
-    assert_eq!(status, StatusCode::NOT_FOUND, "replay: {replayed}");
+    assert_eq!(status, StatusCode::OK, "replay: {replayed}");
+    assert_eq!(replayed["receipt_id"], consumed["receipt_id"]);
+
+    let stored_messages = db
+        .get_private_thread(&owner.id, &grant.thread_id)
+        .await
+        .expect("private response thread");
+    let response_message = stored_messages
+        .iter()
+        .find(|message| message.kind.as_deref() == Some("quotation_vendor_response_received"))
+        .expect("private AFP response event");
+    let response_content: Value =
+        serde_json::from_str(&response_message.content).expect("response content");
+    assert_eq!(response_content["response"]["channel"], "secure_link");
+    assert_eq!(response_content["response"]["status"], "received");
+    assert_eq!(
+        response_content["attribution"]["signed_vendor_agent"],
+        false
+    );
+    assert_eq!(response_content["attribution"]["booking"], false);
 
     let stored: (String, Value) = sqlx::query_as(
         "SELECT token_mac, record_json FROM quotation_response_capabilities WHERE capability_id = $1",

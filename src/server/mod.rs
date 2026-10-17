@@ -142,6 +142,7 @@ mod protocol_routes;
 mod quotation_normalisation_routes;
 mod quotation_routes;
 mod quotation_response_capability_routes;
+mod quotation_response_portal_routes;
 mod quotation_vendor_response_routes;
 mod quotation_source_routes;
 mod runtime_routes;
@@ -1363,6 +1364,7 @@ pub async fn run() {
         .merge(quotation_normalisation_routes::routes())
         .merge(quotation_routes::routes())
         .merge(quotation_response_capability_routes::routes())
+        .merge(quotation_response_portal_routes::routes())
         .merge(quotation_vendor_response_routes::routes())
         .merge(quotation_source_routes::routes())
         .merge(knowledge_routes::routes())
@@ -1524,6 +1526,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .route("/gateway/email", post(handle_gateway_email))
         .merge(quotation_routes::routes())
         .merge(quotation_response_capability_routes::routes())
+        .merge(quotation_response_portal_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(app_state);

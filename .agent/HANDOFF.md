@@ -1,3 +1,34 @@
+## 2026-10-18 - WED-222 scoped vendor response portal (Codex)
+
+- Added `/workspace/quotation-response.html` as a standalone, mobile-first transaction
+  surface. It reads the opaque token only from the URL fragment, removes all token-shaped
+  URL data before exchange, stores no commercial draft locally, renders approved context
+  with A2UI-compatible stat/callout nodes, provides typed response controls and exact
+  preview, and keeps the email alternative visible.
+- The token-only exchange retains exact optional binding checks and returns a scoped
+  HttpOnly/Secure/SameSite=Strict session. Exchange and consume responses now enforce
+  no-store, no-referrer, frame denial, restrictive CSP, and permissions policy. Expired,
+  revoked, stale, disputed, terminal, CSRF, nonce, and out-of-grant failures remain the
+  same generic unavailable response.
+- Secure-link inputs converge on the WED-220 canonical response. The server derives all
+  authority/transport fields, appends a tenant-private AFP response plus review proposal,
+  and records that the source is a capability rather than a signed vendor Agent. Exact
+  retries return one receipt; changed replays fail. No response can accept a contract,
+  book, or execute payment.
+- Verification: the full quotation verifier passed 97 Rust integration tests, 14 focused
+  quotation library tests, cargo check, six SDK tests plus typecheck/build, 43 Solid tests,
+  and nine Playwright checks across 360px/desktop with Axe, Referer/token, failure-copy,
+  and overflow assertions. The Solid production build passed; the inherited large-chunk
+  advisory remains. The generic source line budget passed; the separate wedding budget
+  still reports the two inherited oversized WED-187 files not touched here.
+- `TEST_DATABASE_URL` is unset, so the real disposable-Postgres body compiled but skipped.
+  Independent security/privacy review also remains required. WED-222 is in review and the
+  existing secure-link capability flag remains off. No Oracle, provider, Cloudflare,
+  email, payment, or release-flag mutation was made.
+- Recommended next action: run the WED-219/WED-222 HTTP matrix on disposable Postgres and
+  obtain independent security/privacy sign-off before any canary; otherwise continue to
+  WED-223 structured quotation revision ingestion while all flags remain dark.
+
 ## 2026-10-17 - WED-213 quotation intelligence dark Oracle release (Codex)
 
 - Released the WED-202 quotation intelligence line through commits `4c7454d` and

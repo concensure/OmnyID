@@ -63,6 +63,7 @@ export default defineConfig({
         main: resolve(import.meta.dirname, "index.html"),
         dashboard: resolve(import.meta.dirname, "dashboard.html"),
         vendor: resolve(import.meta.dirname, "vendor.html"),
+        quotationResponse: resolve(import.meta.dirname, "quotation-response.html"),
       },
       onwarn(warning, warn) {
         const message = typeof warning === "string" ? warning : warning.message ?? "";

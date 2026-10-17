@@ -1871,6 +1871,7 @@ tasks:
       - frozen generic response, closure, reference, route, A2UI, grant-purpose, and fail-closed feature contracts are recorded with eight synthetic golden scenarios
       - clean-base quotation verification passes 57 Rust integration tests, 29 focused Rust unit executions, cargo check, Solid type checking, 23 Solid tests, and whitespace checks; the Postgres lane remains conditional because TEST_DATABASE_URL is unset
       - DBV-02/WED-217 is complete: replay-derived DecisionOS/A2UI closure projection, exact-revision client/server binding, least-privilege vendor preview, accessible timeline, and template-neutral wedding adapter are implemented as a bounded layer over WED-216
+      - DBV-07/WED-222 is implemented for review: a fragment-token, scoped no-account portal now converges on the canonical private AFP response/review lineage with durable idempotent receipts and all secure-link flags still disabled
   - id: WED-216
     title: Persist quotation decision and closure transitions
     status: in_progress
@@ -2139,3 +2140,51 @@ tasks:
       - all 32 migration-catalog integrity tests and the Solid production bundle pass; the build retains its inherited large-chunk advisory
       - TEST_DATABASE_URL remains unset, so the disposable-Postgres test body compiled but conditionally skipped; independent security review is also pending and the claimed-vendor response flag remains off
       - every new file is 574 physical lines or fewer; no provider, payment, deployment, Cloudflare, Oracle, or release-flag mutation occurred
+  - id: WED-222
+    title: Add scoped vendor response portal
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-219
+      - WED-220
+      - WED-221
+    files:
+      - src/quotation/mod.rs
+      - src/quotation/response_capability.rs
+      - src/quotation/secure_link_response.rs
+      - src/server/mod.rs
+      - src/server/quotation_response_capability_routes.rs
+      - src/server/quotation_response_portal_routes.rs
+      - solid-ui/quotation-response.html
+      - solid-ui/src/quotation-response-main.tsx
+      - solid-ui/src/quotation-response.css
+      - solid-ui/src/components/vendor-response/**
+      - solid-ui/src/lib/quotationResponseSessionApi.ts
+      - solid-ui/src/lib/quotationResponseFormState.ts
+      - solid-ui/tests/quotation-response-*.test.ts
+      - solid-ui/tests/e2e/quotation-response-portal.spec.ts
+      - solid-ui/vite.config.mjs
+      - tests/quotation_response_capability_api.rs
+      - scripts/verify-quotation-readiness.ps1
+      - .agent/**
+    acceptance:
+      - a raw response token is exchanged immediately for a scoped HttpOnly Secure SameSite Strict session and removed from browser history before commercial context renders
+      - the portal shows only the approved vendor projection, its purpose and expiry, own quotation context, approved questions, response controls, and a visible email alternative
+      - typed controls and exact preview produce the canonical WED-220 response without granting account, booking, payment, or acceptance authority
+      - CSRF, replay, expiry, revocation, stale quotation, generic-error, no-store, frame-denial, no-referrer, and analytics-exclusion boundaries fail closed
+      - refresh and exact retry return one durable receipt while expired, revoked, or stale links disclose no commercial context
+      - keyboard, screen-reader, safe no-JavaScript, 360px mobile, XSS, typecheck, build, and line-budget checks pass with the secure-link release flag still disabled
+    progress:
+      - started from clean committed WED-221 checkpoint 3fe05fb; WED-219 and WED-221 remain review-gated and all vendor-response feature flags remain disabled
+      - DBV-07 acceptance and the inherited capability/session boundary were re-audited before implementation; the portal will reuse WED-219 session authority and WED-220 canonical response contracts rather than introduce account access or a parallel response model
+      - the standalone no-account portal consumes fragment-only tokens, removes token-shaped URL data before exchange, keeps CSRF and submission nonce only in memory, and displays only the exact approved projection, purpose, expiry, typed response controls, exact preview, and email alternative
+      - exchange now accepts the opaque token alone while retaining optional exact-binding revalidation for adversarial clients; JSON exchange and consume responses carry no-store, no-referrer, frame-denial, restrictive CSP, and permissions-policy headers
+      - secure-link submission derives vendor, recipient, grant, quotation, version, projection, channel, timestamps, response ID, and receipt server-side; it persists one tenant-private AFP response and review proposal explicitly attributed to a capability rather than a signed vendor Agent
+      - exact retries with the same canonical fingerprint return the durable receipt, while a changed replay, wrong CSRF/nonce, out-of-grant question/fact, prohibited field, confirmed unanchored fact, expired/revoked grant, stale quotation, claim dispute, or terminal closure fails generically
+      - A2UI-compatible stat_row and callout nodes render read-only approved context; typed Solid controls cover question evidence, availability, amount/currency, date, inclusion, quantity, boolean, text, explanation, attestation, error summary, keyboard focus, and 360px layout without adding a foundational card or input primitive
+      - the full quotation verifier passes 97 Rust integration tests, 14 quotation Rust library tests, cargo check, six TypeScript SDK tests with typecheck/build, 43 focused Solid tests, and nine mobile/desktop Playwright checks including Axe, token/Referer, generic failure, and overflow assertions
+      - the standalone Solid production bundle passes; all WED-222 implementation files are 314 lines or fewer except the reused capability route, which was reduced from 910 to 749 lines by extracting a 194-line portal route module
+      - the generic source line-budget assertion passes; the repository's focused wedding line-budget assertion still reports the two inherited oversized WED-187 files that this task did not modify
+      - TEST_DATABASE_URL remains unset, so the disposable-Postgres HTTP body compiled but conditionally skipped; independent security/privacy review is also pending and the secure-link capability flag remains off
+      - no provider, email, Cloudflare, payment, Oracle, deployment, or release-flag mutation occurred

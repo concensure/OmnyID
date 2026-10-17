@@ -133,6 +133,10 @@ pub struct ResponseTransactionSessionRecord {
     pub expires_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consumed_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub submission_fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response_receipt_id: Option<String>,
     pub account_access: bool,
 }
 
@@ -442,6 +446,8 @@ pub fn exchange_response_capability_with_entropy(
         issued_at: now.to_rfc3339(),
         expires_at: expires_at.to_rfc3339(),
         consumed_at: None,
+        submission_fingerprint: None,
+        response_receipt_id: None,
         account_access: false,
     };
     record.status = ResponseCapabilityStatus::Exchanged;

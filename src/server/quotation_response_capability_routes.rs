@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use axum::{
     Json, Router,
+    body::Body,
     extract::{Path, State},
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{HeaderMap, HeaderValue, Request, StatusCode, header},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::post,
 };
@@ -18,18 +20,17 @@ use crate::{
     db::StoredQuotationResponseCapability,
     message::AFPMessage,
     quotation::{
-        CONTEXT_GRANT_KIND, CONTEXT_GRANT_REVOKED_KIND, ClosureState, ContextGrantAction,
-        ContextGrantScope, QuotationFeatureFlags, ResponseCapabilityAccess,
-        ResponseCapabilityAuthority, ResponseCapabilityBinding, ResponseCapabilityIssue,
-        ResponseCapabilityRateDecision, ResponseCapabilityRatePolicy,
-        ResponseCapabilityRateSnapshot, ResponseCapabilityRevocationReason,
-        ResponseSubmissionProof, VendorContextGrant, VendorContextProjection,
-        VendorContextRevocation, consume_response_capability,
-        exchange_response_capability_with_entropy, issue_response_capability,
-        persisted_vendor_context_projection_valid, replay_quotation_messages,
-        response_capability_audit_event, response_capability_rate_decision,
-        response_capability_secret_mac, response_capability_token_prefix,
-        revoke_response_capability, rotate_response_capability_with_entropy,
+        CONTEXT_GRANT_KIND, CONTEXT_GRANT_REVOKED_KIND, ClosureState, ContextGrantScope,
+        QuotationFeatureFlags, ResponseCapabilityAccess, ResponseCapabilityAuthority,
+        ResponseCapabilityBinding, ResponseCapabilityIssue, ResponseCapabilityRateDecision,
+        ResponseCapabilityRatePolicy, ResponseCapabilityRateSnapshot,
+        ResponseCapabilityRevocationReason, VendorContextGrant, VendorContextProjection,
+        VendorContextRevocation, exchange_response_capability_with_entropy,
+        issue_response_capability, persisted_vendor_context_projection_valid,
+        replay_quotation_messages, response_capability_audit_event,
+        response_capability_rate_decision, response_capability_secret_mac,
+        response_capability_token_prefix, revoke_response_capability,
+        rotate_response_capability_with_entropy,
     },
 };
 
@@ -43,6 +44,9 @@ const PEPPER_ENV: &str = "OMNYID_QUOTATION_RESPONSE_CAPABILITY_PEPPER";
 const UNAVAILABLE: &str = "response unavailable";
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
+    let portal = Router::new()
+        .route("/quotation/vendor-response/exchange", post(exchange_http))
+        .route_layer(middleware::from_fn(portal_security_headers));
     Router::new()
         .route("/quotation/response-capabilities", post(issue_http))
         .route(
@@ -53,8 +57,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/quotation/response-capabilities/{capability_id}/rotate",
             post(rotate_http),
         )
-        .route("/quotation/vendor-response/exchange", post(exchange_http))
-        .route("/quotation/vendor-response/consume", post(consume_http))
+        .merge(portal)
 }
 
 #[derive(Deserialize)]
@@ -73,18 +76,41 @@ struct IssuedResponse {
 #[derive(Deserialize)]
 struct ExchangeRequest {
     response_token: String,
-    vendor_id: String,
-    response_recipient_id: String,
-    quotation_id: String,
-    quotation_version_id: String,
-    thread_id: String,
-    projection_fingerprint: String,
+    #[serde(default)]
+    vendor_id: Option<String>,
+    #[serde(default)]
+    response_recipient_id: Option<String>,
+    #[serde(default)]
+    quotation_id: Option<String>,
+    #[serde(default)]
+    quotation_version_id: Option<String>,
+    #[serde(default)]
+    thread_id: Option<String>,
+    #[serde(default)]
+    projection_fingerprint: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct ConsumeRequest {
-    submission_nonce: String,
-    action: ContextGrantAction,
+pub(super) async fn portal_security_headers(request: Request<Body>, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    let headers = response.headers_mut();
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    headers.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
+    headers.insert("x-frame-options", HeaderValue::from_static("DENY"));
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+        ),
+    );
+    headers.insert(
+        "permissions-policy",
+        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
+    );
+    response
 }
 
 pub(super) struct GrantEnvelope {
@@ -92,16 +118,16 @@ pub(super) struct GrantEnvelope {
     pub(super) projection: VendorContextProjection,
 }
 
-struct AuthoritySnapshot {
+pub(super) struct AuthoritySnapshot {
     grant_active: bool,
     quotation_active: bool,
     claim_disputed: bool,
     closure_terminal: bool,
-    projection: VendorContextProjection,
+    pub(super) projection: VendorContextProjection,
 }
 
 impl AuthoritySnapshot {
-    fn authority(&self) -> ResponseCapabilityAuthority<'_> {
+    pub(super) fn authority(&self) -> ResponseCapabilityAuthority<'_> {
         ResponseCapabilityAuthority {
             grant_active: self.grant_active,
             quotation_active: self.quotation_active,
@@ -112,17 +138,17 @@ impl AuthoritySnapshot {
     }
 }
 
-fn feature_enabled() -> bool {
+pub(super) fn feature_enabled() -> bool {
     QuotationFeatureFlags::from_env().vendor_response_capabilities
 }
 
-fn pepper() -> Option<Vec<u8>> {
+pub(super) fn pepper() -> Option<Vec<u8>> {
     let encoded = std::env::var(PEPPER_ENV).ok()?;
     let decoded = URL_SAFE_NO_PAD.decode(encoded.trim()).ok()?;
     (decoded.len() >= 32).then_some(decoded)
 }
 
-fn unavailable() -> (StatusCode, String) {
+pub(super) fn unavailable() -> (StatusCode, String) {
     (StatusCode::NOT_FOUND, UNAVAILABLE.to_string())
 }
 
@@ -219,7 +245,7 @@ pub(super) async fn owner_messages(
     Ok(messages)
 }
 
-async fn authority_snapshot(
+pub(super) async fn authority_snapshot(
     state: &AppState,
     stored: &StoredQuotationResponseCapability,
 ) -> Result<AuthoritySnapshot, ()> {
@@ -470,7 +496,7 @@ async fn rate_allowed(
     Ok(matches!(decision, ResponseCapabilityRateDecision::Allowed))
 }
 
-fn automatic_revocation(
+pub(super) fn automatic_revocation(
     stored: &StoredQuotationResponseCapability,
     authority: &AuthoritySnapshot,
     now: DateTime<Utc>,
@@ -493,7 +519,7 @@ fn automatic_revocation(
     }
 }
 
-async fn terminalize_if_needed(
+pub(super) async fn terminalize_if_needed(
     state: &AppState,
     stored: &StoredQuotationResponseCapability,
     authority: &AuthoritySnapshot,
@@ -552,12 +578,30 @@ async fn exchange_http(
             continue;
         }
         let access = ResponseCapabilityAccess {
-            vendor_id: &request.vendor_id,
-            response_recipient_id: &request.response_recipient_id,
-            quotation_id: &request.quotation_id,
-            quotation_version_id: &request.quotation_version_id,
-            thread_id: &request.thread_id,
-            projection_fingerprint: &request.projection_fingerprint,
+            vendor_id: request
+                .vendor_id
+                .as_deref()
+                .unwrap_or(&stored.record.binding.vendor_id),
+            response_recipient_id: request
+                .response_recipient_id
+                .as_deref()
+                .unwrap_or(&stored.record.binding.response_recipient_id),
+            quotation_id: request
+                .quotation_id
+                .as_deref()
+                .unwrap_or(&stored.record.binding.quotation_id),
+            quotation_version_id: request
+                .quotation_version_id
+                .as_deref()
+                .unwrap_or(&stored.record.binding.quotation_version_id),
+            thread_id: request
+                .thread_id
+                .as_deref()
+                .unwrap_or(&stored.record.binding.thread_id),
+            projection_fingerprint: request
+                .projection_fingerprint
+                .as_deref()
+                .unwrap_or(&stored.record.binding.projection_fingerprint),
         };
         let mut updated = stored.record.clone();
         let mut entropy = [[0_u8; 32]; 3];
@@ -581,6 +625,7 @@ async fn exchange_http(
         let body = json!({
             "session_id": session.record.session_id,
             "expires_at": session.record.expires_at,
+            "capability_expires_at": stored.record.binding.expires_at,
             "csrf_token": session.secrets.csrf_token(),
             "submission_nonce": session.secrets.submission_nonce(),
             "account_access": false,
@@ -607,76 +652,6 @@ async fn exchange_http(
         return Ok(response);
     }
     Err(unavailable())
-}
-
-fn cookie_value<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
-    headers
-        .get(header::COOKIE)?
-        .to_str()
-        .ok()?
-        .split(';')
-        .find_map(|part| {
-            let (key, value) = part.trim().split_once('=')?;
-            (key == name).then_some(value)
-        })
-}
-
-async fn consume_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(request): Json<ConsumeRequest>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    if !feature_enabled() {
-        return Err(unavailable());
-    }
-    let pepper = pepper().ok_or_else(unavailable)?;
-    let session_token = cookie_value(&headers, crate::quotation::RESPONSE_SESSION_COOKIE_NAME)
-        .ok_or_else(unavailable)?;
-    let csrf = headers
-        .get("x-csrf-token")
-        .and_then(|value| value.to_str().ok())
-        .ok_or_else(unavailable)?;
-    let session_mac =
-        response_capability_secret_mac(&pepper, session_token).ok_or_else(unavailable)?;
-    let (stored, mut session) = state
-        .db
-        .quotation_response_session_by_mac(&session_mac)
-        .await
-        .map_err(|_| unavailable())?
-        .ok_or_else(unavailable)?;
-    let authority = authority_snapshot(&state, &stored)
-        .await
-        .map_err(|_| unavailable())?;
-    let now = Utc::now();
-    if automatic_revocation(&stored, &authority, now).is_some() {
-        terminalize_if_needed(&state, &stored, &authority, now).await;
-        return Err(unavailable());
-    }
-    let mut updated = stored.record.clone();
-    let proof = ResponseSubmissionProof {
-        session_token,
-        csrf_token: csrf,
-        submission_nonce: &request.submission_nonce,
-        action: request.action,
-    };
-    let audit = consume_response_capability(
-        &mut updated,
-        &mut session,
-        &proof,
-        &pepper,
-        &authority.authority(),
-        now,
-    )
-    .map_err(|_| unavailable())?;
-    if !state
-        .db
-        .consume_quotation_response_capability(&stored, &updated, &session, &audit)
-        .await
-        .map_err(|_| unavailable())?
-    {
-        return Err(unavailable());
-    }
-    Ok(Json(json!({"status": "consumed"})))
 }
 
 async fn revoke_http(
