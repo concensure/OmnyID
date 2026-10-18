@@ -1241,3 +1241,20 @@ fails closed. An ask-vendor selection persists the existing quotation clarificat
 before the decision, but does not create approval or send authority. This ordering makes partial
 failure safe: an orphan draft is inert, while a recorded ask-vendor decision implies the draft was
 already stored.
+
+## 2026-10-19: Cost advice is a revision-bound projection, never an allocation command
+
+Continuous cost advice derives candidate cost from the active normalised-quotation comparison and
+budget state from the latest strict tenant-private AFP `planning.cost_evidence.v1` message. The
+browser prepare request supplies only owned references. Candidate, budget, confirmed priority and
+source revisions form the advice identity; any successor invalidates the advice and any prior
+acknowledgement. Unknown cost remains unknown, uncertain cost remains a range, and an offset exists
+only when a current package, allowance or range provides evidence in the same currency.
+
+Offset order preserves confirmed higher-priority categories instead of maximizing nominal saving.
+The projection may describe uncontracted categories and unresolved fee drivers, but cannot move an
+allocation, select a vendor, buy, pay, book or negotiate. An over-budget path needs a deterministic
+append-only tenant-private acknowledgement for the exact advice before a later consumer may
+advance; in-budget paths do not fabricate receipts. Decision Card and A2UI are projections of the
+same record. Accepted/corrected telemetry consists only of two unlabelled counters, with no amount,
+category, identity or user text. Backend and UI capability flags remain independently default-off.

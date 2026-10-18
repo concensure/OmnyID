@@ -3858,3 +3858,39 @@ Next:
 - Proceed to WED-235 priority-weighted cost trade-offs from the committed WED-234 boundary. Keep
   quotation-normalisation/week-3-to-6 work paused for the user's human-judge review; do not enable
   ranking-policy-V2, vendor mail, relay, provider or Oracle deployment flags.
+
+## 2026-10-19 - WED-235 priority-weighted continuous budget advice (Codex, review)
+
+Changed:
+
+- Added a template-neutral, currency-safe cost-advice projector. It binds the active candidate,
+  latest budget evidence, confirmed category-priority constraints and all cost source revisions.
+  Exact, ranged and unknown cost remain distinct; checked arithmetic fails closed.
+- Added default-off authenticated prepare/acknowledge routes. Candidate cost is re-derived from the
+  active normalised-quotation comparison and budget state from the latest strict tenant-private AFP
+  cost-evidence message. Browser requests contain references rather than editable cost figures.
+- Added deterministic append-only acknowledgements for over-budget choices. They do not select,
+  allocate, book, pay or contact a vendor, and any bound revision successor prevents advancement.
+- Added existing Decision Card and A2UI projections with plain-language forecasts, evidenced
+  lower-priority offsets and bounded unknowns. Added only unlabelled accepted/corrected counters;
+  no amount, category, identity or user text enters metrics.
+
+Verification:
+
+- Real disposable PostgreSQL at `127.0.0.1:55432/omnyid_test` passed flags-off, tenant isolation,
+  source-derived quote cost, current budget evidence, append, exact retry and stale-budget cases.
+  Credentials were derived in-process and were not printed or persisted.
+- `cargo check`, 52 planning-intelligence tests and the focused metrics test passed. Solid typecheck,
+  five focused cost-advice tests, all 1,899 wedding tests, both line-budget checks and the production
+  build passed. New files are at most 570 lines; the 45,696-line server module stayed line-neutral.
+  Only the inherited Rust unused-parameter and Vite large-chunk advisories remain.
+
+Next:
+
+- Independently review WED-235. Keep `OMNYID_PLANNING_COST_TRADEOFFS_ENABLED` and
+  `VITE_PLANNING_COST_TRADEOFFS_ENABLED` off until review and release evidence permit them. A later
+  wedding adapter may emit the strict AFP cost-evidence snapshot when the current budget projection
+  is saved; do not infer figures from display strings.
+- Continue WED-236 milestone dependencies from the reviewed WED-235 boundary. Quotation/week-3-to-6
+  work remains paused for the user's human-judge review. Ranking-policy-V2, vendor mail, relay,
+  provider and Oracle deployment flags remain disabled; no deployment ran.

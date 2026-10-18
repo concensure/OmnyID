@@ -24,6 +24,8 @@ pub struct Metrics {
     wedding_quote_projection_latency_ms_count: AtomicU64,
     wedding_quote_projection_latency_ms_max: AtomicU64,
     wedding_quote_missed_critical_deadlines_total: AtomicU64,
+    planning_cost_advice_accepted_total: AtomicU64,
+    planning_cost_advice_corrected_total: AtomicU64,
 }
 
 impl Metrics {
@@ -117,6 +119,16 @@ impl Metrics {
             .fetch_add(1, Ordering::Relaxed);
     }
 
+    pub fn inc_planning_cost_advice_accepted(&self) {
+        self.planning_cost_advice_accepted_total
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn inc_planning_cost_advice_corrected(&self) {
+        self.planning_cost_advice_corrected_total
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
     pub fn snapshot(&self) -> MetricsSnapshot {
         MetricsSnapshot {
             messages_stored_total: self.messages_stored_total.load(Ordering::Relaxed),
@@ -165,6 +177,12 @@ impl Metrics {
             wedding_quote_missed_critical_deadlines_total: self
                 .wedding_quote_missed_critical_deadlines_total
                 .load(Ordering::Relaxed),
+            planning_cost_advice_accepted_total: self
+                .planning_cost_advice_accepted_total
+                .load(Ordering::Relaxed),
+            planning_cost_advice_corrected_total: self
+                .planning_cost_advice_corrected_total
+                .load(Ordering::Relaxed),
         }
     }
 }
@@ -191,6 +209,8 @@ pub struct MetricsSnapshot {
     pub wedding_quote_projection_latency_ms_count: u64,
     pub wedding_quote_projection_latency_ms_max: u64,
     pub wedding_quote_missed_critical_deadlines_total: u64,
+    pub planning_cost_advice_accepted_total: u64,
+    pub planning_cost_advice_corrected_total: u64,
 }
 
 impl MetricsSnapshot {
@@ -293,6 +313,16 @@ impl MetricsSnapshot {
                 "Wedding quote deferrals first resurfaced after the critical boundary",
                 self.wedding_quote_missed_critical_deadlines_total,
             ),
+            (
+                "omnyid_planning_cost_advice_accepted_total",
+                "Cost advice acknowledgement events accepted",
+                self.planning_cost_advice_accepted_total,
+            ),
+            (
+                "omnyid_planning_cost_advice_corrected_total",
+                "Cost advice correction feedback events received",
+                self.planning_cost_advice_corrected_total,
+            ),
         ];
         for (name, help, value) in fields {
             out.push_str(&format!(
@@ -327,6 +357,8 @@ mod tests {
         metrics.observe_wedding_quote_projection_latency_ms(120);
         metrics.observe_wedding_quote_projection_latency_ms(30);
         metrics.inc_wedding_quote_missed_critical_deadlines();
+        metrics.inc_planning_cost_advice_accepted();
+        metrics.inc_planning_cost_advice_corrected();
 
         assert_eq!(
             metrics.snapshot(),
@@ -351,6 +383,8 @@ mod tests {
                 wedding_quote_projection_latency_ms_count: 2,
                 wedding_quote_projection_latency_ms_max: 120,
                 wedding_quote_missed_critical_deadlines_total: 1,
+                planning_cost_advice_accepted_total: 1,
+                planning_cost_advice_corrected_total: 1,
             }
         );
     }

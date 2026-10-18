@@ -2661,7 +2661,7 @@ tasks:
       - moved to review with all planning, quotation, vendor-mail, relay and ranking-policy-V2 flags disabled and no Oracle or provider action performed
   - id: WED-235
     title: Add priority-weighted continuous budget advice
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -2671,12 +2671,15 @@ tasks:
     files:
       - src/planning_intelligence/cost_advice.rs
       - src/planning_intelligence/cost_advice_tests.rs
+      - src/planning_intelligence/cost_acknowledgement.rs
+      - src/planning_intelligence/cost_acknowledgement_tests.rs
       - src/planning_intelligence/mod.rs
       - src/planning_intelligence/validation.rs
       - src/server/planning_cost_tradeoff_routes.rs
       - tests/planning_cost_tradeoff_api.rs
       - solid-ui/src/lib/planningCostTradeoffApi.ts
       - solid-ui/tests/planning-cost-tradeoff-api.test.ts
+      - src/metrics.rs
       - .agent/**
     acceptance:
       - advice names uncontracted categories and unresolved fee drivers only from current budget and quotation evidence
@@ -2691,3 +2694,7 @@ tasks:
       - started from clean reviewed WED-234 commit 53879f4; implementing a pure currency-safe advice engine before any route, persistence or UI integration
       - pure cost-advice core now binds candidate, budget, priority-constraint and source revisions; stale evidence cannot produce offsets, uncontracted labels or fee drivers, and uncertain candidate cost remains a range or unknown rather than zero
       - eight focused unit tests pass for exact/ranged/unknown cost, checked arithmetic, currency isolation, priority-preserving offset order, missing/stale evidence, deterministic identity and successor invalidation
+      - authenticated default-off prepare and acknowledge routes derive candidate cost from the active quotation comparison and budget state from the latest strict tenant-private AFP cost-evidence message; request bodies carry references, never cost amounts
+      - over-budget acknowledgement is append-only, deterministic and bound to every advice revision; stale or divergent retries cannot advance, while in-budget advice needs no fabricated receipt
+      - existing Decision Card and A2UI adapters show conservative forecasts, source-backed offsets and plain-language unknowns without technical diagnostics; aggregate accepted/corrected counters carry no labels, amount or identity
+      - real disposable-Postgres API proof, 52 planning tests, metrics unit test, typecheck, five focused frontend tests, all 1,899 wedding tests, line budgets and production build pass; all flags remain disabled and no deployment ran
