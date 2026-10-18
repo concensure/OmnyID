@@ -1226,3 +1226,18 @@ comparison and optional grant revisions are included in its canonical inputs. A 
 edit therefore invalidates currentness and the existing draft hash/approval/provider-receipt flow
 remains the only authority capable of sending it. Preparing an intervention neither sends a
 message nor mutates a constraint, comparison or quotation.
+
+The clarification contract's legacy `comparison_revision` field is consumed as the logical
+comparison ID by its current send authorizer. Planning interventions therefore bind both that
+logical ID and the immutable comparison AFP message ID. The former preserves compatibility with
+the existing sender; the latter is included in the draft context, intervention identity, decision
+event and currentness check so a material comparison successor cannot reuse an old approval.
+
+Selecting an intervention option creates a separate tenant-private AFP decision event. Its message
+ID is a deterministic ULID derived from thread, intervention and idempotency key; its content binds
+the selected option and every constraint/evaluation/quotation/comparison/grant/draft revision.
+Concurrent selection retries serialize under an advisory lock. Reusing a key for different content
+fails closed. An ask-vendor selection persists the existing quotation clarification-draft message
+before the decision, but does not create approval or send authority. This ordering makes partial
+failure safe: an orphan draft is inert, while a recorded ask-vendor decision implies the draft was
+already stored.

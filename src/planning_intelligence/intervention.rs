@@ -1,8 +1,10 @@
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 
+use crate::message::AFPMessage;
 use crate::quotation::{
     ClarificationCandidate, ClarificationContextFact, ClarificationDraft,
     build_clarification_draft, draft_hash,
@@ -20,11 +22,16 @@ const REJECT_OPTION: &str = "reject_candidate";
 const ASK_VENDOR_OPTION: &str = "ask_vendor";
 const AMEND_OPTION: &str = "amend_constraint";
 
+pub const INTERVENTION_DECISION_SCHEMA_VERSION: &str = "planning.intervention_decision.v1";
+pub const INTERVENTION_DECISION_MESSAGE_SCHEMA: &str = "planning.intervention_decision_message.v1";
+pub const INTERVENTION_DECISION_KIND: &str = "planning_intervention_decision";
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct QuotationConflictBinding {
     pub quotation_id: String,
     pub quotation_version_id: String,
+    pub comparison_id: String,
     pub comparison_revision: String,
     pub grant_revision: Option<String>,
     pub recipient: String,
@@ -38,6 +45,7 @@ pub struct ConflictInterventionBindings {
     pub constraint_ref: String,
     pub evaluation_ref: String,
     pub quotation_version_id: String,
+    pub comparison_id: String,
     pub comparison_revision: String,
     pub grant_revision: Option<String>,
     pub clarification_draft_hash: String,
@@ -58,8 +66,28 @@ pub struct ConstraintConflictIntervention {
 pub struct CurrentConflictRevisions<'a> {
     pub constraint_ref: &'a str,
     pub quotation_version_id: &'a str,
+    pub comparison_id: &'a str,
     pub comparison_revision: &'a str,
     pub grant_revision: Option<&'a str>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InterventionDecision {
+    pub schema_version: String,
+    pub decision_id: String,
+    pub intervention_ref: String,
+    pub selected_option_id: String,
+    pub bindings: ConflictInterventionBindings,
+    pub prepared_clarification_draft_ref: Option<String>,
+    pub decided_at: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InterventionDecisionEnvelope {
+    pub schema_version: String,
+    pub decision: InterventionDecision,
 }
 
 pub fn build_constraint_conflict_intervention(
@@ -106,6 +134,10 @@ pub fn build_constraint_conflict_intervention(
             key: "binding.evaluation_revision".to_string(),
             value: evaluation.evaluation_id.clone(),
         },
+        ClarificationContextFact {
+            key: "binding.comparison_revision".to_string(),
+            value: binding.comparison_revision.clone(),
+        },
     ];
     if let Some(grant_revision) = &binding.grant_revision {
         context.push(ClarificationContextFact {
@@ -116,7 +148,7 @@ pub fn build_constraint_conflict_intervention(
     let clarification_draft = build_clarification_draft(
         &binding.quotation_id,
         &binding.quotation_version_id,
-        &binding.comparison_revision,
+        &binding.comparison_id,
         &binding.recipient,
         &binding.subject,
         &[candidate],
@@ -169,6 +201,7 @@ pub fn build_constraint_conflict_intervention(
             "constraint_ref": constraint.constraint_id,
             "evaluation_ref": evaluation.evaluation_id,
             "quotation_version_id": binding.quotation_version_id,
+            "comparison_id": binding.comparison_id,
             "comparison_revision": binding.comparison_revision,
             "grant_revision": binding.grant_revision,
             "clarification_draft_id": clarification_draft.draft_id,
@@ -203,6 +236,7 @@ pub fn build_constraint_conflict_intervention(
             constraint_ref: constraint.constraint_id.clone(),
             evaluation_ref: evaluation.evaluation_id.clone(),
             quotation_version_id: binding.quotation_version_id.clone(),
+            comparison_id: binding.comparison_id.clone(),
             comparison_revision: binding.comparison_revision.clone(),
             grant_revision: binding.grant_revision.clone(),
             clarification_draft_hash: draft_hash(&clarification_draft),
@@ -217,10 +251,217 @@ pub fn constraint_conflict_intervention_is_current(
 ) -> bool {
     projection.bindings.constraint_ref == current.constraint_ref
         && projection.bindings.quotation_version_id == current.quotation_version_id
+        && projection.bindings.comparison_id == current.comparison_id
         && projection.bindings.comparison_revision == current.comparison_revision
         && projection.bindings.grant_revision.as_deref() == current.grant_revision
         && projection.bindings.clarification_draft_hash
             == draft_hash(&projection.clarification_draft)
+}
+
+pub fn intervention_decision_id(
+    thread_id: &str,
+    intervention_ref: &str,
+    idempotency_key: &str,
+) -> Result<String, String> {
+    identifier(thread_id, "thread_id")?;
+    identifier(intervention_ref, "intervention_ref")?;
+    identifier(idempotency_key, "idempotency_key")?;
+    let canonical = crate::crypto::canonical_json_string(&json!({
+        "namespace": "planning_intervention_decision",
+        "thread_id": thread_id,
+        "intervention_ref": intervention_ref,
+        "idempotency_key": idempotency_key,
+    }));
+    let digest = Sha256::digest(canonical.as_bytes());
+    let mut bytes = [0_u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    Ok(ulid::Ulid::from_bytes(bytes).to_string())
+}
+
+pub fn build_intervention_decision(
+    thread_id: &str,
+    projection: &ConstraintConflictIntervention,
+    selected_option_id: &str,
+    idempotency_key: &str,
+    decided_at: &str,
+) -> Result<InterventionDecision, String> {
+    validate_intervention(&projection.intervention)?;
+    let option = projection
+        .intervention
+        .options
+        .iter()
+        .find(|option| option.option_id == selected_option_id)
+        .ok_or_else(|| "selected intervention option is unavailable".to_string())?;
+    identifier(&option.option_id, "selected_option_id")?;
+    chrono::DateTime::parse_from_rfc3339(decided_at)
+        .map_err(|_| "decided_at must be RFC3339".to_string())?;
+    let decision = InterventionDecision {
+        schema_version: INTERVENTION_DECISION_SCHEMA_VERSION.to_string(),
+        decision_id: intervention_decision_id(
+            thread_id,
+            &projection.intervention.intervention_id,
+            idempotency_key,
+        )?,
+        intervention_ref: projection.intervention.intervention_id.clone(),
+        selected_option_id: option.option_id.clone(),
+        bindings: projection.bindings.clone(),
+        prepared_clarification_draft_ref: (option.option_id == ASK_VENDOR_OPTION)
+            .then(|| projection.clarification_draft.draft_id.clone()),
+        decided_at: decided_at.to_string(),
+    };
+    validate_intervention_decision(&decision)?;
+    Ok(decision)
+}
+
+pub fn validate_intervention_decision(decision: &InterventionDecision) -> Result<(), String> {
+    if decision.schema_version != INTERVENTION_DECISION_SCHEMA_VERSION {
+        return Err("unsupported intervention decision schema".to_string());
+    }
+    for (label, value) in [
+        ("decision_id", decision.decision_id.as_str()),
+        ("intervention_ref", decision.intervention_ref.as_str()),
+        ("selected_option_id", decision.selected_option_id.as_str()),
+        ("constraint_ref", decision.bindings.constraint_ref.as_str()),
+        ("evaluation_ref", decision.bindings.evaluation_ref.as_str()),
+        (
+            "quotation_version_id",
+            decision.bindings.quotation_version_id.as_str(),
+        ),
+        ("comparison_id", decision.bindings.comparison_id.as_str()),
+        (
+            "comparison_revision",
+            decision.bindings.comparison_revision.as_str(),
+        ),
+        (
+            "clarification_draft_hash",
+            decision.bindings.clarification_draft_hash.as_str(),
+        ),
+    ] {
+        identifier(value, label)?;
+    }
+    if let Some(grant_revision) = &decision.bindings.grant_revision {
+        identifier(grant_revision, "grant_revision")?;
+    }
+    if let Some(draft_ref) = &decision.prepared_clarification_draft_ref {
+        identifier(draft_ref, "prepared_clarification_draft_ref")?;
+        if decision.selected_option_id != ASK_VENDOR_OPTION {
+            return Err("only ask_vendor may reference a clarification draft".to_string());
+        }
+    } else if decision.selected_option_id == ASK_VENDOR_OPTION {
+        return Err("ask_vendor requires the prepared clarification draft".to_string());
+    }
+    chrono::DateTime::parse_from_rfc3339(&decision.decided_at)
+        .map_err(|_| "decided_at must be RFC3339".to_string())?;
+    Ok(())
+}
+
+pub fn intervention_decision_message(
+    thread_id: &str,
+    actor: &str,
+    decision: &InterventionDecision,
+) -> Result<AFPMessage, String> {
+    validate_intervention_decision(decision)?;
+    identifier(thread_id, "thread_id")?;
+    bounded_text(actor, 1, 300, "actor")?;
+    let envelope = InterventionDecisionEnvelope {
+        schema_version: INTERVENTION_DECISION_MESSAGE_SCHEMA.to_string(),
+        decision: decision.clone(),
+    };
+    let payload_fingerprint = canonical_fingerprint(&envelope);
+    let mut references = vec![
+        json!({"type": "decision_intervention", "target": decision.intervention_ref}),
+        json!({"type": "planning_constraint", "target": decision.bindings.constraint_ref}),
+        json!({"type": "constraint_evaluation", "target": decision.bindings.evaluation_ref}),
+        json!({"type": "normalised_quotation_version", "target": decision.bindings.quotation_version_id}),
+        json!({"type": "quotation_comparison", "target": decision.bindings.comparison_id}),
+        json!({"type": "quotation_comparison_revision", "target": decision.bindings.comparison_revision}),
+    ];
+    if let Some(grant_revision) = &decision.bindings.grant_revision {
+        references.push(json!({"type": "quotation_context_grant", "target": grant_revision}));
+    }
+    if let Some(draft_ref) = &decision.prepared_clarification_draft_ref {
+        references.push(json!({"type": "clarification_draft", "target": draft_ref}));
+    }
+    Ok(AFPMessage {
+        protocol: "afp-v1".to_string(),
+        id: decision.decision_id.clone(),
+        thread_id: thread_id.to_string(),
+        parent_id: Some(decision.intervention_ref.clone()),
+        from: actor.to_string(),
+        to: vec!["agent://planning-intelligence".to_string()],
+        timestamp: decision.decided_at.clone(),
+        r#type: "ledger".to_string(),
+        kind: Some(INTERVENTION_DECISION_KIND.to_string()),
+        supertags: vec!["planning".to_string(), "decision".to_string()],
+        subtype: Some(INTERVENTION_DECISION_KIND.to_string()),
+        content: json!(envelope),
+        metadata: Some(json!({
+            "store": true,
+            "payload_fingerprint": payload_fingerprint,
+            "privacy_scope": "tenant_private",
+            "e2ee_required": true,
+            "schema_version": INTERVENTION_DECISION_MESSAGE_SCHEMA,
+        })),
+        signature: String::new(),
+        encryption: None,
+        views: Vec::new(),
+        references: references.clone(),
+        typed_refs: references,
+        attachments: Vec::new(),
+        store_in_relational: true,
+        prev_hash: None,
+    })
+}
+
+pub fn intervention_decision_from_message(
+    message: &AFPMessage,
+) -> Result<Option<InterventionDecision>, String> {
+    if message.kind.as_deref() != Some(INTERVENTION_DECISION_KIND) {
+        return Ok(None);
+    }
+    let envelope: InterventionDecisionEnvelope = serde_json::from_value(message.content.clone())
+        .map_err(|_| "intervention decision envelope is invalid".to_string())?;
+    if envelope.schema_version != INTERVENTION_DECISION_MESSAGE_SCHEMA {
+        return Err("unsupported intervention decision message schema".to_string());
+    }
+    validate_intervention_decision(&envelope.decision)?;
+    let fingerprint = canonical_fingerprint(&envelope);
+    let metadata = message
+        .metadata
+        .as_ref()
+        .ok_or_else(|| "intervention decision metadata is required".to_string())?;
+    if message.id != envelope.decision.decision_id
+        || message.parent_id.as_deref() != Some(envelope.decision.intervention_ref.as_str())
+        || !storage_timestamps_equivalent(&message.timestamp, &envelope.decision.decided_at)
+        || metadata
+            .get("payload_fingerprint")
+            .and_then(|value| value.as_str())
+            != Some(fingerprint.as_str())
+        || metadata
+            .get("privacy_scope")
+            .and_then(|value| value.as_str())
+            != Some("tenant_private")
+        || metadata
+            .get("e2ee_required")
+            .and_then(|value| value.as_bool())
+            != Some(true)
+    {
+        return Err("intervention decision message binding mismatch".to_string());
+    }
+    Ok(Some(envelope.decision))
+}
+
+fn storage_timestamps_equivalent(left: &str, right: &str) -> bool {
+    let parse = |value: &str| {
+        chrono::DateTime::parse_from_rfc3339(value)
+            .ok()
+            .or_else(|| chrono::DateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S%.f%#z").ok())
+            .map(|timestamp| timestamp.with_timezone(&chrono::Utc))
+    };
+    parse(left)
+        .zip(parse(right))
+        .and_then(|(left, right)| left.signed_duration_since(right).num_nanoseconds())
+        .is_some_and(|delta| delta.unsigned_abs() <= 1_000)
 }
 
 fn validate_binding(binding: &QuotationConflictBinding) -> Result<(), String> {
@@ -230,6 +471,7 @@ fn validate_binding(binding: &QuotationConflictBinding) -> Result<(), String> {
             "quotation_version_id",
             binding.quotation_version_id.as_str(),
         ),
+        ("comparison_id", binding.comparison_id.as_str()),
         ("comparison_revision", binding.comparison_revision.as_str()),
     ] {
         identifier(value, label)?;
@@ -264,6 +506,15 @@ fn stable_id(prefix: &str, value: &serde_json::Value) -> String {
     let canonical = crate::crypto::canonical_json_string(value);
     let digest = hex::encode(Sha256::digest(canonical.as_bytes()));
     format!("{prefix}:{}", &digest[..32])
+}
+
+fn canonical_fingerprint<T: Serialize>(value: &T) -> String {
+    let json = serde_json::to_value(value).unwrap_or(serde_json::Value::Null);
+    let canonical = crate::crypto::canonical_json_string(&json);
+    format!(
+        "sha256:{}",
+        hex::encode(Sha256::digest(canonical.as_bytes()))
+    )
 }
 
 fn kind_code(kind: &ConstraintKind) -> &'static str {

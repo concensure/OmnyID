@@ -1,7 +1,8 @@
 use crate::{
     planning_intelligence::*,
     quotation::{
-        ClarificationApproval, ClarificationError, authorise_clarification_send, draft_hash,
+        CLARIFICATION_DRAFT_KIND, ClarificationApproval, ClarificationError,
+        authorise_clarification_send, clarification_draft_message, draft_hash,
     },
 };
 
@@ -54,7 +55,8 @@ fn binding() -> QuotationConflictBinding {
     QuotationConflictBinding {
         quotation_id: "quotation:venue".to_string(),
         quotation_version_id: "quotation:venue:v1".to_string(),
-        comparison_revision: "comparison:one:v1".to_string(),
+        comparison_id: "comparison:one".to_string(),
+        comparison_revision: "comparison:one:message:v1".to_string(),
         grant_revision: Some("grant:vendor:v1".to_string()),
         recipient: "venue@example.test".to_string(),
         subject: "Question about your venue quotation".to_string(),
@@ -90,6 +92,10 @@ fn conflict_creates_bounded_decision_and_existing_clarification_draft() {
         Some(projection.clarification_draft.draft_id.as_str())
     );
     assert_eq!(projection.clarification_draft.questions.len(), 1);
+    assert_eq!(
+        projection.clarification_draft.comparison_revision,
+        "comparison:one"
+    );
     assert!(
         projection.clarification_draft.questions[0]
             .question
@@ -127,7 +133,8 @@ fn revisions_and_draft_hash_make_successors_stale() {
     let current = CurrentConflictRevisions {
         constraint_ref: "constraint:step_free:v1",
         quotation_version_id: "quotation:venue:v1",
-        comparison_revision: "comparison:one:v1",
+        comparison_id: "comparison:one",
+        comparison_revision: "comparison:one:message:v1",
         grant_revision: Some("grant:vendor:v1"),
     };
     assert!(constraint_conflict_intervention_is_current(
@@ -145,7 +152,11 @@ fn revisions_and_draft_hash_make_successors_stale() {
             ..current.clone()
         },
         CurrentConflictRevisions {
-            comparison_revision: "comparison:one:v2",
+            comparison_id: "comparison:two",
+            ..current.clone()
+        },
+        CurrentConflictRevisions {
+            comparison_revision: "comparison:one:message:v2",
             ..current.clone()
         },
         CurrentConflictRevisions {
@@ -244,4 +255,141 @@ fn intervention_is_deterministic_and_soft_conflicts_are_not_auto_recommended() {
 
     assert_eq!(first, second);
     assert_eq!(first.intervention.recommended_option_id, None);
+}
+
+#[test]
+fn selected_option_becomes_a_bound_private_afp_decision_without_mutation() {
+    let projection = build_constraint_conflict_intervention(
+        &constraint(),
+        &evaluation(),
+        "Current evidence conflicts",
+        &binding(),
+    )
+    .expect("intervention");
+    let decision = build_intervention_decision(
+        "thread:one",
+        &projection,
+        "ask_vendor",
+        "intent:one",
+        "2026-10-19T02:00:00Z",
+    )
+    .expect("decision");
+    let message = intervention_decision_message("thread:one", "user://one", &decision)
+        .expect("decision message");
+    let parsed = intervention_decision_from_message(&message)
+        .expect("valid message")
+        .expect("decision");
+
+    assert_eq!(parsed, decision);
+    assert_eq!(
+        parsed.prepared_clarification_draft_ref.as_deref(),
+        Some(projection.clarification_draft.draft_id.as_str())
+    );
+    assert_eq!(parsed.bindings, projection.bindings);
+    assert_eq!(constraint().status, ConstraintStatus::Confirmed);
+    assert!(
+        message
+            .references
+            .iter()
+            .any(|reference| reference["type"] == "quotation_comparison_revision")
+    );
+}
+
+#[test]
+fn decision_retry_is_stable_and_divergent_same_key_is_detectable() {
+    let projection = build_constraint_conflict_intervention(
+        &constraint(),
+        &evaluation(),
+        "Current evidence conflicts",
+        &binding(),
+    )
+    .expect("intervention");
+    let accepted = build_intervention_decision(
+        "thread:one",
+        &projection,
+        "accept_conflict",
+        "intent:stable",
+        "2026-10-19T02:00:00Z",
+    )
+    .expect("accepted");
+    let rejected = build_intervention_decision(
+        "thread:one",
+        &projection,
+        "reject_candidate",
+        "intent:stable",
+        "2026-10-19T02:00:01Z",
+    )
+    .expect("rejected");
+
+    assert_eq!(accepted.decision_id, rejected.decision_id);
+    assert_ne!(accepted, rejected);
+    assert!(
+        build_intervention_decision(
+            "thread:one",
+            &projection,
+            "not_an_option",
+            "intent:other",
+            "2026-10-19T02:00:00Z",
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn decision_message_rejects_content_or_privacy_tampering() {
+    let projection = build_constraint_conflict_intervention(
+        &constraint(),
+        &evaluation(),
+        "Current evidence conflicts",
+        &binding(),
+    )
+    .expect("intervention");
+    let decision = build_intervention_decision(
+        "thread:one",
+        &projection,
+        "reject_candidate",
+        "intent:tamper",
+        "2026-10-19T02:00:00Z",
+    )
+    .expect("decision");
+    let mut message = intervention_decision_message("thread:one", "user://one", &decision)
+        .expect("decision message");
+    message.content["decision"]["selected_option_id"] = serde_json::json!("accept_conflict");
+    assert!(intervention_decision_from_message(&message).is_err());
+
+    let mut message = intervention_decision_message("thread:one", "user://one", &decision)
+        .expect("decision message");
+    message.metadata.as_mut().unwrap()["privacy_scope"] = serde_json::json!("public");
+    assert!(intervention_decision_from_message(&message).is_err());
+}
+
+#[test]
+fn ask_vendor_uses_the_persistable_existing_clarification_message_shape() {
+    let projection = build_constraint_conflict_intervention(
+        &constraint(),
+        &evaluation(),
+        "Current evidence conflicts",
+        &binding(),
+    )
+    .expect("intervention");
+    let message = clarification_draft_message(
+        &projection.clarification_draft,
+        "01KTHREAD00000000000000000",
+        "user://one",
+    );
+
+    assert_eq!(message.id.len(), 26);
+    assert_eq!(message.kind.as_deref(), Some(CLARIFICATION_DRAFT_KIND));
+    assert_eq!(
+        message.content["draft_hash"],
+        draft_hash(&projection.clarification_draft)
+    );
+    assert_eq!(
+        message.metadata.as_ref().unwrap()["privacy_scope"],
+        "tenant_private"
+    );
+    assert_eq!(
+        message.content["draft"]["comparison_revision"],
+        projection.clarification_draft.comparison_revision
+    );
 }

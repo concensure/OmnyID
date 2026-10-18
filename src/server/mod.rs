@@ -135,7 +135,7 @@ mod map_routes;
 mod metadata_term_helpers;
 mod news_routes;
 mod para_routes;
-mod planning_constraint_capture_routes; mod planning_constraint_evaluation_routes; mod planning_constraint_routes; mod planning_directory_evaluation_routes;
+mod planning_constraint_capture_routes; mod planning_constraint_evaluation_routes; mod planning_constraint_intervention_routes; mod planning_constraint_routes; mod planning_directory_evaluation_routes;
 mod privacy_routes;
 mod proactive_ranking_helpers;
 mod proactive_routes;
@@ -1373,7 +1373,7 @@ pub async fn run() {
         .merge(quotation_source_routes::routes())
         .merge(knowledge_routes::routes())
         .merge(para_routes::routes())
-        .merge(planning_constraint_routes::routes()).merge(planning_constraint_capture_routes::routes()).merge(planning_constraint_evaluation_routes::routes()).merge(planning_directory_evaluation_routes::routes())
+        .merge(planning_constraint_routes::routes()).merge(planning_constraint_capture_routes::routes()).merge(planning_constraint_evaluation_routes::routes()).merge(planning_constraint_intervention_routes::routes()).merge(planning_directory_evaluation_routes::routes())
         .merge(news_routes::routes())
         .merge(map_routes::routes())
         .merge(geofence_routes::routes())
@@ -1533,7 +1533,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(quotation_vendor_response_routes::routes())
         .merge(quotation_vendor_revision_routes::routes())
         .merge(quotation_source_routes::routes())
-        .merge(planning_constraint_routes::routes()).merge(planning_constraint_capture_routes::routes()).merge(planning_constraint_evaluation_routes::routes()).merge(planning_directory_evaluation_routes::routes())
+        .merge(planning_constraint_routes::routes()).merge(planning_constraint_capture_routes::routes()).merge(planning_constraint_evaluation_routes::routes()).merge(planning_constraint_intervention_routes::routes()).merge(planning_directory_evaluation_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(app_state);

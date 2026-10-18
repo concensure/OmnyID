@@ -13,6 +13,7 @@ pub const NORMALISED_QUOTATION_KIND: &str = "quotation_normalisation_confirmed";
 pub const CORRECTED_QUOTATION_KIND: &str = "quotation_normalisation_corrected";
 pub const QUOTATION_COMPARISON_KIND: &str = "quotation_comparison_materialised";
 pub const QUOTATION_REVIEW_KIND: &str = "quotation_review_recorded";
+pub const CLARIFICATION_DRAFT_KIND: &str = "quotation_clarification_draft";
 pub const CLARIFICATION_SEND_RESERVED_KIND: &str = "quotation_clarification_send_reserved";
 pub const CLARIFICATION_SENT_KIND: &str = "quotation_clarification_sent";
 pub const QUOTATION_VENDOR_SELECTED_KIND: &str = "quotation_vendor_selected";
@@ -70,6 +71,39 @@ pub(super) fn base_message(
         store_in_relational: true,
         prev_hash: None,
     }
+}
+
+pub fn clarification_draft_message(
+    draft: &ClarificationDraft,
+    thread_id: &str,
+    actor: &str,
+) -> AFPMessage {
+    let hash = super::draft_hash(draft);
+    let mut message = base_message(
+        stable_message_id("quotation-clarification-draft", &(thread_id, &hash)),
+        thread_id,
+        None,
+        &draft.created_at,
+        actor,
+    );
+    message.kind = Some(CLARIFICATION_DRAFT_KIND.to_string());
+    message.subtype = message.kind.clone();
+    message.supertags.push("approval:draft".to_string());
+    message.content = json!({"draft": draft, "draft_hash": hash});
+    message.metadata = Some(json!({
+        "store": true,
+        "privacy_scope": "tenant_private",
+        "e2ee_required": true,
+        "schema_version": "quotation.clarification.draft.v1",
+        "idempotency_key": message.id,
+    }));
+    message.references = vec![
+        reference("quotation", &draft.quotation_id),
+        reference("normalised_quotation_version", &draft.quotation_version_id),
+        reference("quotation_comparison", &draft.comparison_revision),
+    ];
+    message.typed_refs = message.references.clone();
+    message
 }
 
 pub fn normalised_quotation_message(

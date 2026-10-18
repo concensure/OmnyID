@@ -2621,7 +2621,7 @@ tasks:
       - moved to review with every planning/quotation/vendor-mail/relay/ranking flag still disabled and no Oracle or provider action performed
   - id: WED-234
     title: Turn constraint conflicts into approval-safe interventions
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -2630,6 +2630,7 @@ tasks:
       - src/planning_intelligence/intervention.rs
       - src/planning_intelligence/intervention_tests.rs
       - src/planning_intelligence/mod.rs
+      - src/quotation/afp.rs
       - src/server/planning_constraint_intervention_routes.rs
       - tests/planning_constraint_intervention_api.rs
       - solid-ui/src/lib/planningConstraintInterventionApi.ts
@@ -2651,3 +2652,10 @@ tasks:
       - exact remembered wording and current conflict evidence stay in the couple-only projection, while the vendor draft contains only a closed requirement label and bounded question with no person identifier or private excerpt
       - constraint, quotation, comparison and optional grant revisions plus the clarification draft hash are bound into currentness checks; any successor or draft edit fails stale
       - six focused Rust tests and cargo check pass; the existing clarification authoriser still rejects the prepared draft without a separate approval receipt
+      - separated the comparison logical ID required by the legacy clarification sender from the immutable comparison AFP revision used for staleness, preventing a compatibility shortcut from weakening revision binding
+      - added default-off authenticated prepare/select routes that rederive the current conflict from the owner's private AFP replay, validate any supplied grant against vendor, quotation, question and active revocation state, and never trust a browser-provided evaluation
+      - explicit selections append a content-bound tenant-private AFP decision under an advisory lock; exact retries replay one deterministic ULID while a divergent reuse of the same idempotency key returns conflict and never mutates constraints or quotation history
+      - selecting ask_vendor first persists the existing quotation clarification draft message shape, then the decision; the draft remains inert until the separate existing approval and provider-receipt send path succeeds
+      - added a default-off frontend normalizer with technical-copy suppression plus projections into the existing Decision Card and A2UI callout, insight, unknowns and action-chips nodes; no new renderer or card type was added
+      - real disposable-Postgres coverage passes for flags-off, tenant isolation, deterministic preparation, private-text exclusion, append, retry and divergent retry; 40 planning units, 5 quotation clarification tests, typecheck, 8 focused frontend tests, all 1,899 wedding tests, line budgets and the production build pass
+      - moved to review with all planning, quotation, vendor-mail, relay and ranking-policy-V2 flags disabled and no Oracle or provider action performed

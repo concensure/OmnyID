@@ -3819,3 +3819,42 @@ Next:
   constraints or hide quotation/comparison history.
 - Keep all planning, quotation, vendor-mail, relay and ranking-policy-V2 flags off. Human-judge
   gated quotation/week-3-to-6 tasks remain paused and no Oracle/provider action has run.
+
+## 2026-10-19 - WED-234 intervention persistence and presentation (Codex, review)
+
+Changed:
+
+- Added default-off authenticated prepare/select endpoints. Preparation replays the owner's current
+  constraint, quotation and comparison state; no browser evaluation is accepted. An optional grant
+  must be an active owned grant for the exact vendor, quotation revision, question and answer action.
+- Split legacy comparison ID from the immutable comparison message revision. Both are bound through
+  intervention identity, clarification context and selection decisions, while the existing sender
+  continues to receive its expected logical comparison ID.
+- Added append-only private AFP intervention decisions with deterministic ULID retries, advisory
+  serialization, content fingerprints and stale/divergent rejection. Constraint, quotation and
+  comparison history is never edited or hidden.
+- Selecting ask-vendor persists the canonical quotation clarification-draft event before recording
+  the decision. It still requires the existing separate approval receipt and provider-confirmed
+  send flow. The vendor draft contains only a closed requirement label and bounded question.
+- Added a fail-closed frontend adapter behind `VITE_PLANNING_CONSTRAINT_INTERVENTION_ENABLED`, with
+  safe error/copy mapping and projections into the existing Decision Card and A2UI nodes. No new
+  card renderer was introduced.
+
+Verification:
+
+- Real disposable Postgres at `127.0.0.1:55432/omnyid_test` passes the intervention API flow for
+  flags-off, cross-tenant denial, deterministic preparation, private-text exclusion, first append,
+  exact replay, persisted clarification draft and divergent retry conflict. Credentials were not
+  printed or persisted.
+- `cargo check`, 40 planning-intelligence tests, 5 quotation clarification tests, Solid typecheck,
+  8 focused evaluation/intervention tests, all 1,899 wedding tests, line budgets and the production
+  build pass. New files are at most 397 lines and all source files remain below the applicable line
+  budget. Only the inherited unused Rust parameter and Vite chunk-size advisories remain.
+
+Next:
+
+- Independently review WED-234. Keep `OMNYID_PLANNING_INTERVENTIONS_ENABLED` and
+  `VITE_PLANNING_CONSTRAINT_INTERVENTION_ENABLED` off until review and release evidence permit them.
+- Proceed to WED-235 priority-weighted cost trade-offs from the committed WED-234 boundary. Keep
+  quotation-normalisation/week-3-to-6 work paused for the user's human-judge review; do not enable
+  ranking-policy-V2, vendor mail, relay, provider or Oracle deployment flags.
