@@ -1274,3 +1274,12 @@ maximum duration; critical wording is permitted only for computed zero or negati
 small positive bound is near-critical. At most one projected milestone receives a prepared
 research/compare descriptor targeting the existing vendor-search surface. That descriptor carries
 no authority to run a provider, send, book, pay, or mutate planning state.
+
+The authenticated adapter queries only the signed-in tenant's private wedding-tagged AFP task,
+calendar and decision projections. A closed `wedding_milestone_key` is the only task/calendar link;
+titles and free text never classify milestones. The current wedding date comes from the latest
+append-only wedding-date decision, with its calendar projection as a compatibility fallback.
+Concordant task/calendar mirrors merge, but different states or manual dates block. Presentation is
+a fail-closed projection into the existing Decision Card and A2UI contracts behind an independent
+default-off flag; it exposes friendly closed labels and blocker counts, not private task titles or
+technical diagnostics.

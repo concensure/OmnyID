@@ -267,7 +267,7 @@ pub fn project_milestone_graph(
         }
     }
     for (milestone_id, records) in &evidence {
-        if records.len() > 1 {
+        if evidence_conflicts(records) {
             blockers.push(blocker(
                 milestone_id,
                 MilestoneBlockerKind::EvidenceConflict,
@@ -276,7 +276,7 @@ pub fn project_milestone_graph(
                     .map(|value| value.source_ref.clone())
                     .collect::<Vec<_>>(),
             ));
-        } else if records[0].state == ObservedMilestoneState::Unknown {
+        } else if resolved_state(records) == Some(&ObservedMilestoneState::Unknown) {
             blockers.push(blocker(
                 milestone_id,
                 MilestoneBlockerKind::SourceStateUnresolved,
@@ -307,7 +307,7 @@ pub fn project_milestone_graph(
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
-        let source_state = (records.len() == 1).then(|| &records[0].state);
+        let source_state = resolved_state(&records);
         let terminal = matches!(
             source_state,
             Some(ObservedMilestoneState::Complete | ObservedMilestoneState::Waived)
@@ -633,19 +633,15 @@ fn latest_finishes(
             continue;
         }
         let definition = &definitions[id];
-        let record = evidence.get(id).and_then(|records| records.first());
-        let manual = record.and_then(|record| {
-            record
-                .manual_due_at
-                .as_deref()
-                .zip(record.manual_date_source_ref.as_deref())
-        });
+        let manual = evidence
+            .get(id)
+            .and_then(|records| resolved_manual_date(records));
         let (own_latest, provenance) = if let Some((date, source_ref)) = manual {
             (
-                parsed_time(date, "manual_due_at")?,
+                parsed_time(&date, "manual_due_at")?,
                 MilestoneDateProvenance {
                     authority: MilestoneDateAuthority::Manual,
-                    source_ref: source_ref.to_string(),
+                    source_ref,
                 },
             )
         } else {
@@ -693,17 +689,55 @@ fn terminal_ids(evidence: &BTreeMap<String, Vec<MilestoneEvidence>>) -> BTreeSet
     evidence
         .iter()
         .filter_map(|(id, records)| {
-            (records.len() == 1)
-                .then(|| &records[0])
-                .and_then(|record| {
-                    matches!(
-                        record.state,
-                        ObservedMilestoneState::Complete | ObservedMilestoneState::Waived
-                    )
-                    .then_some(id.clone())
-                })
+            resolved_state(records).and_then(|state| {
+                matches!(
+                    state,
+                    ObservedMilestoneState::Complete | ObservedMilestoneState::Waived
+                )
+                .then_some(id.clone())
+            })
         })
         .collect()
+}
+
+fn resolved_state(records: &[MilestoneEvidence]) -> Option<&ObservedMilestoneState> {
+    let first = records.first().map(|record| &record.state)?;
+    records
+        .iter()
+        .all(|record| &record.state == first)
+        .then_some(first)
+}
+
+fn resolved_manual_date(records: &[MilestoneEvidence]) -> Option<(String, String)> {
+    let mut dates = records
+        .iter()
+        .filter_map(|record| {
+            record
+                .manual_due_at
+                .as_ref()
+                .zip(record.manual_date_source_ref.as_ref())
+                .map(|(date, source)| (date.clone(), source.clone()))
+        })
+        .collect::<Vec<_>>();
+    dates.sort();
+    dates.dedup();
+    let date_values = dates
+        .iter()
+        .map(|(date, _)| date.as_str())
+        .collect::<BTreeSet<_>>();
+    (date_values.len() == 1).then(|| dates[0].clone())
+}
+
+fn evidence_conflicts(records: &[MilestoneEvidence]) -> bool {
+    if records.is_empty() || resolved_state(records).is_none() {
+        return !records.is_empty();
+    }
+    records
+        .iter()
+        .filter_map(|record| record.manual_due_at.as_deref())
+        .collect::<BTreeSet<_>>()
+        .len()
+        > 1
 }
 
 fn blockers_by_milestone(blockers: &[MilestoneBlocker]) -> BTreeMap<String, Vec<String>> {

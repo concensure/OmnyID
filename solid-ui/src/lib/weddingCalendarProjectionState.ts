@@ -302,6 +302,7 @@ function projectionMetadata(
   projection: string,
 ) {
   const itemMetadata = record(item.metadata);
+  const weddingMilestoneKey = clean(itemMetadata.wedding_milestone_key);
   const secondOrderLoop = clean(itemMetadata.second_order_loop);
   const alertOffsetDays = numberArray(itemMetadata.alert_offset_days);
   const alertDates = uniqueTags([
@@ -352,6 +353,7 @@ function projectionMetadata(
     approval_state: metadata.approvalState,
     review_status: item.reviewStatus ?? "accepted",
     linked_artifact_id: clean(item.linkedArtifactId),
+    wedding_milestone_key: weddingMilestoneKey,
     second_order_loop: secondOrderLoop,
     second_order_task: itemMetadata.second_order_task === true || Boolean(secondOrderLoop),
     second_order_evidence_labels: secondOrderEvidenceLabels,
@@ -621,6 +623,7 @@ export function weddingScheduleItemToAfpCalendarMessage(
     `Source: ${source}.`,
     `Approval: ${metadata.approvalState}.`,
   ].filter(Boolean).join(" ");
+  const projectedMetadata = projectionMetadata(item, metadata, "wedding_schedule_item_to_afp_calendar_event");
   const semanticFields = semanticProjectionFields(item);
 
   return {
@@ -650,11 +653,12 @@ export function weddingScheduleItemToAfpCalendarMessage(
       response_workspace_id: metadata.responseWorkspaceId,
       wedding_schedule_item_id: item.id,
       wedding_event_kind: item.kind,
+      wedding_milestone_key: projectedMetadata.wedding_milestone_key,
       linked_artifact_id: clean(item.linkedArtifactId),
       ...semanticFields,
     },
     metadata: {
-      ...projectionMetadata(item, metadata, "wedding_schedule_item_to_afp_calendar_event"),
+      ...projectedMetadata,
       wedding_schedule_item_id: item.id,
       wedding_event_kind: item.kind,
       ...semanticFields,
@@ -672,6 +676,7 @@ export function weddingScheduleItemToAfpCalendarMessage(
           wedding_plan_id: metadata.weddingPlanId,
           response_workspace_id: metadata.responseWorkspaceId,
           wedding_event_kind: item.kind,
+          wedding_milestone_key: projectedMetadata.wedding_milestone_key,
           ...semanticFields,
         },
       },
@@ -723,6 +728,7 @@ export function weddingTaskItemToAfpTaskMessage(
       response_workspace_id: metadata.responseWorkspaceId,
       wedding_task_item_id: item.id,
       wedding_task_kind: item.kind,
+      wedding_milestone_key: projectedMetadata.wedding_milestone_key,
       linked_artifact_id: clean(item.linkedArtifactId),
       preparation_checklist: projectedMetadata.preparation_checklist,
       preparation_checklist_item: projectedMetadata.preparation_checklist_item,
@@ -788,6 +794,7 @@ export function weddingTaskItemToAfpTaskMessage(
           wedding_plan_id: metadata.weddingPlanId,
           response_workspace_id: metadata.responseWorkspaceId,
           wedding_task_kind: item.kind,
+          wedding_milestone_key: projectedMetadata.wedding_milestone_key,
           preparation_checklist_item: projectedMetadata.preparation_checklist_item,
           alert_offset_days: projectedMetadata.alert_offset_days,
           alert_dates: projectedMetadata.alert_dates,

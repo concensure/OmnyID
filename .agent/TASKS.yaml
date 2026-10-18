@@ -2700,7 +2700,7 @@ tasks:
       - real disposable-Postgres API proof, 52 planning tests, metrics unit test, typecheck, five focused frontend tests, all 1,899 wedding tests, line budgets and production build pass; all flags remain disabled and no deployment ran
   - id: WED-236
     title: Build milestone dependencies and critical-path projection
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -2713,6 +2713,7 @@ tasks:
       - src/server/planning_milestone_routes.rs
       - tests/planning_milestone_api.rs
       - solid-ui/src/lib/planningMilestoneApi.ts
+      - solid-ui/src/lib/weddingCalendarProjectionState.ts
       - solid-ui/tests/planning-milestone-api.test.ts
       - .agent/**
     acceptance:
@@ -2731,3 +2732,8 @@ tasks:
       - earliest/latest completion bounds use conservative maximum duration, manual dates retain exact source provenance, and only computed slack at or below zero receives critical urgency
       - cycle membership is isolated from blocked descendants, missing predecessors and missing event horizon are explicit blockers, and at most one selected item receives a data-only existing vendor-search action
       - ten focused milestone projection tests pass; next is the authenticated default-off source adapter and existing Decision Card/A2UI projection
+      - concordant task/calendar mirrors now merge deterministically while different states or dates remain an evidence conflict; explicit wedding milestone links survive the existing AFP task and calendar projections
+      - added a default-off authenticated endpoint that reads only tenant-owned wedding-tagged AFP messages, derives the current date from append-only wedding-date decisions, deduplicates source revisions and ignores unlinked tasks instead of inferring from titles
+      - added a fail-closed frontend normalizer plus one existing Decision Card/A2UI review projection; technical identifiers and private titles are never used as visible copy, and prepared actions only open existing internal search/compare flows
+      - real disposable-Postgres coverage passes for flags-off, tenant isolation, current date, completed task, manual calendar date, private-title exclusion and replay identity; 63 planning tests, typecheck, 8 focused UI tests, all 1,899 wedding tests, line budgets and production build pass
+      - moved to review with critical-path and every other planning, quotation, vendor-mail, relay and ranking-policy-V2 flag disabled; no provider execution or deployment ran

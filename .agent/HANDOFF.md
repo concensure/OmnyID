@@ -3918,3 +3918,38 @@ Next:
 - Add an authenticated default-off adapter that reads owned linked task/calendar evidence and current
   wedding date without accepting editable graph facts from the browser. Then project one safe item
   through existing Decision Card/A2UI primitives. Keep every rollout/provider flag disabled.
+
+## 2026-10-19 - WED-236 milestone projection integration (Codex, review)
+
+Changed:
+
+- Added a default-off authenticated projection endpoint. It reads only the signed-in tenant's
+  wedding-tagged AFP task/calendar/date-decision messages and accepts only a closed explicit
+  `wedding_milestone_key`; task titles and browser-provided graph facts are not classification input.
+- Source revisions are deduplicated by stable task/calendar reference. Concordant mirrors merge;
+  differing states or dates block. The latest append-only wedding-date decision is authoritative,
+  with the existing calendar projection as compatibility fallback.
+- Passed explicit milestone links through the existing task/calendar AFP adapter without adding a
+  new task model. The 982-line adapter remains below the 1000-line wedding budget.
+- Added a fail-closed frontend normalizer and projections into the existing Decision Card and A2UI
+  primitives. At most one item appears, critical copy requires non-positive computed slack, private
+  titles/technical diagnostics stay hidden, and prepared actions only open internal search/compare.
+
+Verification:
+
+- Real disposable PostgreSQL passed flags-off, tenant isolation, current wedding-date selection,
+  completed task state, manual calendar-date precedence, private-title exclusion and deterministic
+  replay. Credentials were derived in-process and not printed or persisted.
+- `cargo check`, 63 planning-intelligence tests, Solid typecheck, 8 focused frontend tests, all 1,899
+  wedding tests, both line-budget checks and the production build pass. New files are at most 864
+  lines and the large server module stayed line-neutral. Only inherited unused-parameter and Vite
+  chunk-size advisories remain.
+
+Next:
+
+- Independently review WED-236. Keep `OMNYID_PLANNING_CRITICAL_PATH_ENABLED` and
+  `VITE_PLANNING_CRITICAL_PATH_ENABLED` off until release evidence permits them. The projection does
+  not invoke vendor search, messaging, booking or payment.
+- Continue WED-237 vendor-change interpretation unless the user supplies the pending human-judge
+  review first. Quotation/week-3-to-6 work remains paused; all provider, vendor-mail, relay and
+  ranking-policy-V2 flags remain disabled and no Oracle deployment ran.

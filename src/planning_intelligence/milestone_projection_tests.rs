@@ -295,6 +295,39 @@ fn conflicting_source_records_block_regardless_of_input_order() {
 }
 
 #[test]
+fn concordant_task_and_calendar_evidence_merge_without_a_duplicate_blocker() {
+    let task = evidence("stationery_details", ObservedMilestoneState::Active);
+    let mut calendar = task.clone();
+    calendar.source_ref = "calendar:stationery-deadline".to_string();
+    calendar.source_revision_ref = "calendar:stationery-deadline:v1".to_string();
+    calendar.source_kind = MilestoneEvidenceSourceKind::Calendar;
+    calendar.manual_due_at = Some("2026-05-01T00:00:00Z".to_string());
+    calendar.manual_date_source_ref = Some(calendar.source_revision_ref.clone());
+    let projection = project_wedding_milestones(
+        "plan:test",
+        "2026-01-01T00:00:00Z",
+        Some("2026-12-01T00:00:00Z"),
+        vec![task, calendar],
+    )
+    .unwrap();
+    let item = projection
+        .milestones
+        .iter()
+        .find(|item| item.dependency.milestone_id == milestone_id("stationery_details"))
+        .unwrap();
+
+    assert_eq!(item.dependency.state, MilestoneState::Active);
+    assert_eq!(
+        item.dependency.latest_at.as_deref(),
+        Some("2026-05-01T00:00:00Z")
+    );
+    assert!(!projection.blockers.iter().any(|blocker| {
+        blocker.milestone_id == milestone_id("stationery_details")
+            && blocker.kind == MilestoneBlockerKind::EvidenceConflict
+    }));
+}
+
+#[test]
 fn input_order_does_not_change_projection_identity() {
     let first = project_wedding_milestones(
         "plan:test",
