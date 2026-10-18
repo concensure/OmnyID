@@ -3894,3 +3894,27 @@ Next:
 - Continue WED-236 milestone dependencies from the reviewed WED-235 boundary. Quotation/week-3-to-6
   work remains paused for the user's human-judge review. Ranking-policy-V2, vendor mail, relay,
   provider and Oracle deployment flags remain disabled; no deployment ran.
+
+## 2026-10-19 - WED-236 milestone dependency core (Codex, in progress)
+
+Changed:
+
+- Added a deterministic generic dependency projector and versioned wedding adapter covering guest
+  counts, accommodation, stationery, invitations, vendor final counts and event readiness.
+- Linked task/calendar evidence is explicit. Manual dates override template suggestions with their
+  source reference; duplicate or unresolved evidence blocks rather than choosing one record.
+- Earliest/latest dates and slack use conservative maximum lead times. Critical urgency exists only
+  at zero/negative slack, and only one selected item may receive a data-only research/compare action.
+- Completed/waived milestones remain visible but leave the active path. Cycles, missing predecessors,
+  blocked ancestors and a missing event horizon remain typed blockers.
+
+Verification:
+
+- Ten focused milestone tests pass for the graph, date, state, blocker, criticality, action-safety and
+  determinism invariants. The only warning is the inherited unused email-group parameter.
+
+Next:
+
+- Add an authenticated default-off adapter that reads owned linked task/calendar evidence and current
+  wedding date without accepting editable graph facts from the browser. Then project one safe item
+  through existing Decision Card/A2UI primitives. Keep every rollout/provider flag disabled.

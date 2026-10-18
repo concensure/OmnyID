@@ -2698,3 +2698,36 @@ tasks:
       - over-budget acknowledgement is append-only, deterministic and bound to every advice revision; stale or divergent retries cannot advance, while in-budget advice needs no fabricated receipt
       - existing Decision Card and A2UI adapters show conservative forecasts, source-backed offsets and plain-language unknowns without technical diagnostics; aggregate accepted/corrected counters carry no labels, amount or identity
       - real disposable-Postgres API proof, 52 planning tests, metrics unit test, typecheck, five focused frontend tests, all 1,899 wedding tests, line budgets and production build pass; all flags remain disabled and no deployment ran
+  - id: WED-236
+    title: Build milestone dependencies and critical-path projection
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-230
+      - WED-235
+    files:
+      - src/planning_intelligence/milestone_projection.rs
+      - src/planning_intelligence/milestone_projection_tests.rs
+      - src/planning_intelligence/mod.rs
+      - src/server/planning_milestone_routes.rs
+      - tests/planning_milestone_api.rs
+      - solid-ui/src/lib/planningMilestoneApi.ts
+      - solid-ui/tests/planning-milestone-api.test.ts
+      - .agent/**
+    acceptance:
+      - a versioned wedding adapter maps only genuine guest-count, accommodation, stationery, invitation, vendor-final-count and event-date prerequisites into the generic milestone contract
+      - current saved task and calendar completion is merged by explicit references without rewriting source records, while complete and waived milestones remain in history and leave the active path
+      - manual dates override template suggestions with source provenance and absent dates or unresolved predecessors remain explicit blockers
+      - earliest and latest dates plus slack are computed deterministically, and critical language appears only for zero or negative computed slack
+      - PersonalOS receives at most one critical or near-critical item through existing Decision Card and A2UI primitives
+      - a prepared research or compare action never executes provider search, sends a message, books, pays, or mutates planning state
+      - all planning, quotation, vendor-mail, relay and ranking-policy-V2 flags remain disabled by default
+      - focused Rust/Postgres/Solid tests, wedding regressions, line budgets and production builds pass with every new file below 1000 lines
+    progress:
+      - started from clean reviewed WED-235 commit 7753d07; mapping the frozen milestone contract and existing task/calendar projections before implementing the deterministic graph core
+      - added a template-neutral deterministic dependency projector plus a versioned wedding adapter for guest-count, accommodation, stationery, invitations, final counts and event readiness
+      - explicit linked task/calendar evidence can supply state and manual dates; conflicting or unresolved source state blocks instead of guessing, while completed and waived items remain historical and leave active-path calculations
+      - earliest/latest completion bounds use conservative maximum duration, manual dates retain exact source provenance, and only computed slack at or below zero receives critical urgency
+      - cycle membership is isolated from blocked descendants, missing predecessors and missing event horizon are explicit blockers, and at most one selected item receives a data-only existing vendor-search action
+      - ten focused milestone projection tests pass; next is the authenticated default-off source adapter and existing Decision Card/A2UI projection

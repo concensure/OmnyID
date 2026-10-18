@@ -1258,3 +1258,19 @@ append-only tenant-private acknowledgement for the exact advice before a later c
 advance; in-budget paths do not fabricate receipts. Decision Card and A2UI are projections of the
 same record. Accepted/corrected telemetry consists only of two unlabelled counters, with no amount,
 category, identity or user text. Backend and UI capability flags remain independently default-off.
+
+## 2026-10-19: Critical-path advice is derived from linked evidence, never a second task planner
+
+The generic milestone projector consumes versioned definitions plus explicitly linked task or
+calendar evidence. The wedding adapter supplies only closed milestone identifiers, genuine
+prerequisites, conservative lead-time ranges and event-relative suggestions. It does not infer
+completion from titles, rewrite a task/calendar record, or make a template suggestion authoritative.
+A user-entered date overrides the template suggestion and retains its exact source reference.
+
+Unknown or conflicting linked source state, missing predecessors, dependency cycles and an absent
+event horizon remain explicit blockers. Completed and waived milestones remain in projection
+history but leave the active path. Earliest and latest completion bounds use the conservative
+maximum duration; critical wording is permitted only for computed zero or negative slack, while a
+small positive bound is near-critical. At most one projected milestone receives a prepared
+research/compare descriptor targeting the existing vendor-search surface. That descriptor carries
+no authority to run a provider, send, book, pay, or mutate planning state.

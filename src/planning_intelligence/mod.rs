@@ -7,6 +7,7 @@ mod evaluation;
 mod features;
 mod intervention;
 mod ledger;
+mod milestone_projection;
 mod quotation_projection;
 mod validation;
 
@@ -19,6 +20,7 @@ pub use evaluation::*;
 pub use features::*;
 pub use intervention::*;
 pub use ledger::*;
+pub use milestone_projection::*;
 pub use quotation_projection::*;
 pub use validation::*;
 
@@ -36,3 +38,5 @@ mod evaluation_tests;
 mod intervention_tests;
 #[cfg(test)]
 mod ledger_tests;
+#[cfg(test)]
+mod milestone_projection_tests;
