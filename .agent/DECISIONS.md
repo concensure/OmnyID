@@ -1211,3 +1211,18 @@ semantic approximations remain unknown. In particular, `wheelchair_accessible` i
 `step_free`. The authenticated route reads constraints only from the owner's private AFP thread,
 and presentation receives no vendor name, source URL, note or private excerpt. Frontend consumption
 uses the current recommendation/Decision Card projection behind an independent default-off flag.
+
+## 2026-10-19: Conflict interventions prepare existing clarification drafts without send authority
+
+A constraint-conflict intervention is a deterministic couple-private projection over one confirmed
+constraint and one current conflicting quotation evaluation. It reuses the frozen
+`DecisionIntervention` contract for bounded accept, reject, ask-vendor and amend choices. The exact
+remembered statement and current conflicting evidence are presentation fields for the couple only;
+they are never copied into vendor context.
+
+The ask-vendor option prepares the existing quotation `ClarificationDraft`, containing only a
+closed operational requirement label and bounded question. Constraint, evaluation, quotation,
+comparison and optional grant revisions are included in its canonical inputs. A successor or draft
+edit therefore invalidates currentness and the existing draft hash/approval/provider-receipt flow
+remains the only authority capable of sending it. Preparing an intervention neither sends a
+message nor mutates a constraint, comparison or quotation.

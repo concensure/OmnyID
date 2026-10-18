@@ -3790,3 +3790,32 @@ Next:
   `VITE_PLANNING_CONSTRAINT_EVALUATION_ENABLED` off until review and release evidence permit them.
 - Continue with WED-234 approval-safe conflict interventions over these immutable evaluations.
   Quote-normalisation/week-3-to-6 tasks remain paused for the user's human-judge review.
+
+## 2026-10-19 - WED-234 approval-safe intervention core (Codex, in progress)
+
+Changed:
+
+- Added a deterministic conflict intervention projector over confirmed WED-233 quotation conflicts.
+  It emits four bounded choices through the frozen DecisionIntervention contract and prepares the
+  existing quotation ClarificationDraft rather than introducing a new mail/send contract.
+- The couple projection retains the exact remembered statement and a current evidence label. The
+  vendor draft includes only a closed requirement kind and bounded question, with no person ID,
+  private excerpt or conflict-evidence text.
+- Currentness binds the constraint, evaluation, quotation, comparison, optional grant and draft
+  hash. Any material successor or draft change invalidates the prepared action.
+
+Verification:
+
+- Six focused intervention tests pass, including private-text exclusion, deterministic output,
+  stale revision/hash rejection and proof that the existing clarification authoriser refuses to
+  send without a separate approval receipt. `cargo check` passes with the inherited unused
+  `email_group_routes.rs` parameter warning. Scoped rustfmt and `git diff --check` pass; a global
+  rustfmt check continues to report unrelated legacy formatting drift and was not applied.
+
+Next:
+
+- Persist explicit option selection as an append-only tenant-private decision event, then expose a
+  default-off authenticated adapter and existing Decision Card/A2UI presentation. Do not mutate
+  constraints or hide quotation/comparison history.
+- Keep all planning, quotation, vendor-mail, relay and ranking-policy-V2 flags off. Human-judge
+  gated quotation/week-3-to-6 tasks remain paused and no Oracle/provider action has run.
