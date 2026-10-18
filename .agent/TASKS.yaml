@@ -2315,6 +2315,9 @@ tasks:
       - the reproducible verifier reports blocked with artifact digest d1365f92c1f4717250141313a1d34619b4a3d57fba8eb408f8a9ebba61b857cf after 106 Rust quotation integration tests, conditional API flow, 31 quotation unit tests, shared boundaries, cargo check, six SDK tests, 44 Solid tests, 11 browser cases, the migration catalog, 1874 wedding tests, the Solid production build, and scoped line budgets passed
       - TEST_DATABASE_URL and CLAMD_HOST are unset and no accuracy/provider/reviewer/usability/wording/hosted/cohort evidence was supplied; readiness is blocked, all flags remain off, and no provider, Oracle, email, payment, or deployment mutation occurred
       - final local prerequisite audit still finds TEST_DATABASE_URL, DATABASE_URL, and CLAMD_HOST unset; Docker client 29.2.1 is installed but its daemon is unavailable, so disposable-Postgres and clean-daemon evidence cannot run on this host
+      - Docker is now available and isolated test endpoints are healthy at PostgreSQL 127.0.0.1:55432/omnyid_test and clamd 127.0.0.1:33310; no production or Oracle data was touched
+      - the real Postgres API flow, capability API, vendor-response ciphertext/IDOR API, and clean clamd integration test pass; enabling those lanes exposed and fixed complete source-fixture rebinding, missing test-router quotation modules, and AFP signature stability across PostgreSQL timestamp normalisation
+      - readiness remains blocked on the separately required accuracy/provider, independent security/privacy/accessibility, couple/vendor usability, wording, hosted-shadow, and cohort evidence; release, vendor-mail, email-reconciliation, relay, and ranking-policy-V2 flags remain off
   - id: WED-226
     title: Stage gated vendor response rollout
     status: blocked
@@ -2391,3 +2394,47 @@ tasks:
       - browser acceptance hardening reopened the task to prove current photos, readable full-width names, evidence-specific recommendation copy, and retained comparison state together after an outreach send
       - the current DecisionCard/vendor-card browser composition passes at 360px and 1280px with decoded photo, long-name geometry, evidence-specific recommendation, retained two-card comparison after send, no horizontal overflow, and no serious/critical Axe finding
       - final hardening passes typecheck, 1,887 wedding tests, the focused two-viewport Playwright target, and the production build; the focused line-budget target still reports only the two inherited oversized files, neither modified by this slice
+  - id: WED-228
+    title: Make vendor comparison reflow resilient at browser zoom
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-227
+    files:
+      - solid-ui/src/components/WeddingVendorChoiceCard.tsx
+      - solid-ui/tests/e2e/wedding-personalised-recommendation-baseline.spec.ts
+      - solid-ui/tests/e2e/wedding-personalised-recommendation-baseline.tsx
+      - .agent/**
+    acceptance:
+      - comparison labels, vendor names, evidence chips, and evidence rows reflow without squeezing text into a one-character vertical stripe at 400 percent-equivalent zoom
+      - long unbroken vendor content wraps inside the card without horizontal page overflow
+      - decoded photos, evidence-specific recommendation text, and post-send comparison retention remain intact
+      - browser checks cover the 320 CSS-pixel reflow boundary and a desktop baseline with serious/critical Axe checks
+      - no oversized production file grows and every new file remains below 1000 lines
+    progress:
+      - removed the chip-driven min-content squeeze by giving the card, content column, title and evidence rows explicit min-width and overflow-wrap boundaries while keeping the evidence badge on its own wrapping row
+      - the production DecisionCard composition passes focused Playwright at 320x720, 360x740, and 1280x800 with decoded photo, readable title geometry, checked-evidence recommendation, two retained post-send cards, no horizontal overflow, and no serious/critical Axe finding
+      - Solid typecheck, all 1887 wedding tests, and the production build pass; the changed production component is 351 lines and no oversized file grew
+  - id: WED-229
+    title: Plan ideal wedding agent gap closure on the current AFP architecture
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-215
+      - WED-218
+      - WED-227
+    files:
+      - Documents/design/wedding planner/ideal-agent-gap-implementation-tasks.md
+      - .agent/**
+    acceptance:
+      - the plan reconciles both WED-187 ideal-agent documents against current WED-215 quotation, vendor-response, DecisionOS, A2UI, AFP, approval, and release-gate contracts
+      - work is decomposed into dependency-ordered, reviewable feature slices with file scope, data contracts, privacy and approval boundaries, tests, metrics, rollout gates, and explicit non-goals
+      - typed constraint memory, decision-time conflict checks, budget trade-offs, dependency critical path, vendor change interpretation, relationship memory, and recommendation cards all reuse project core rather than form a parallel wedding subsystem
+      - vendor-facing context remains permissioned, purpose-bound, revocable, minimal, and unable to expose competitor or private-plan context
+      - all proposed source files remain below 1000 lines and oversized files are reduced or left line-neutral
+    progress:
+      - reviewed both WED-187 ideal-agent briefs in full and reconciled their gaps against the current WED-215 quotation, vendor-response, preference, DecisionOS, A2UI, AFP and approval foundations
+      - added a 556-line dependency-ordered WED-230 through WED-240 implementation plan covering typed contracts, authority, privacy, tests, metrics, rollout, PR boundaries, non-goals, model choice and advanced-worktree base
+      - the plan uses a template-neutral planning core, current OCR and communication boundaries, existing Decision Cards/A2UI, and least-privilege revocable vendor projections rather than a parallel wedding system

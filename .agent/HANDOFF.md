@@ -1,3 +1,37 @@
+## 2026-10-18 - WED-228/WED-229 zoom hardening, gap plan, and local service evidence (Codex, review)
+
+Changed:
+
+- Fixed vendor comparison reflow at 400%-equivalent zoom by removing the evidence-chip min-content
+  squeeze and making the card, title, badge and evidence rows shrink and wrap within the viewport.
+- Added a detailed WED-230 through WED-240 implementation plan from both ideal-agent briefs. It
+  builds on WED-215, uses template-neutral AFP contracts and current DecisionOS/A2UI/OCR/outreach
+  foundations, limits vendor context by permission, and keeps each proposed file below 1000 lines.
+- Started isolated healthy Docker endpoints: PostgreSQL `127.0.0.1:55432/omnyid_test` and clamd
+  `127.0.0.1:33310`. Live tests fixed recursive quotation fixture source binding, aligned the test
+  router with production quotation modules, and made AFP signatures stable across PostgreSQL's
+  timestamp representation and microsecond rounding.
+
+Verification:
+
+- Solid typecheck, 1,887 wedding tests, production build, and focused Playwright at 320x720,
+  360x740 and 1280x800 passed. Browser assertions cover decoded photos, readable title geometry,
+  evidence-specific copy, retained post-send comparison, overflow, and serious/critical Axe issues.
+- `cargo test --lib crypto::tests`, disposable-Postgres `api_flows`, response-capability API and
+  vendor-response API tests passed. The opt-in `clamav_live` clean-scan test passed against clamd.
+- The task document is 556 lines, the changed card is 351 lines, and `git diff --check` passed.
+  Scoped `rustfmt --check` passed for changed Rust files; the repo-wide check still reports inherited
+  formatting drift outside this slice. The inherited Rust unused-`user_id` and Vite chunk-size
+  warnings remain.
+
+Unresolved / next:
+
+- WED-225 remains blocked on accuracy/provider and independent security/privacy/accessibility,
+  couple/vendor usability, wording, hosted-shadow and cohort evidence. The user's independent review
+  is still in progress. Keep WED-226 blocked and every release, mail, reconciliation, relay and
+  ranking-policy-V2 flag disabled; do not deploy this advanced branch yet.
+- Review WED-228 and WED-229, then start WED-230 contract freeze from the reviewed WED-215 commit.
+
 ## 2026-10-18 - WED-227 browser acceptance hardening (Codex, review)
 
 Changed:

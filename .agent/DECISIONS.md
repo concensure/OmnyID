@@ -1,3 +1,12 @@
+## 2026-10-18: AFP signatures survive PostgreSQL timestamp normalisation
+
+AFP signing canonicalises parseable timestamps to UTC at PostgreSQL-compatible microsecond
+precision before signing. This preserves timestamp integrity while ensuring the same signed bytes
+are reconstructed after PostgreSQL changes RFC 3339 spelling or rounds sub-microsecond input.
+Verification retains the prior exact-timestamp and storage-hint forms for compatibility, but all
+new signatures use the canonical form. Live disposable-Postgres capability tests must exercise the
+persisted approval path; an in-memory signature check is not sufficient evidence.
+
 ## 2026-10-18: Personalisation transplants preserve current quotation and mail boundaries
 
 WED-187 is already an ancestor of the advanced WED-215 branch and `git cherry` reports no missing
