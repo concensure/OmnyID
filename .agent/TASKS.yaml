@@ -2569,3 +2569,34 @@ tasks:
       - added a rollout-gated wedding home/intake card that saves the source privately, presents must-have versus preference confirmation at 44px touch targets, maps technical failures to user-safe copy, and appends only explicit user-confirmed records through WED-231
       - disposable-Postgres tests prove disabled routing, tenant isolation, exact anchors, explicit confirmation and deterministic retry; focused Rust tests, the existing ledger API, 1,896 wedding tests, Solid typecheck, line budgets, two mobile Playwright viewports, cargo check and production build pass
       - every new file is at most 852 lines, the oversized workspace files remain unchanged, all planning/quotation/vendor-mail/relay/ranking flags remain disabled, and no Oracle or provider action ran
+  - id: WED-233
+    title: Evaluate active constraints against revision-bound candidate evidence
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-232
+    files:
+      - src/planning_intelligence/evaluation.rs
+      - src/planning_intelligence/evaluation_tests.rs
+      - src/planning_intelligence/mod.rs
+      - src/planning_intelligence/validation.rs
+      - solid-ui/src/lib/weddingRecommendationExplanationState.ts
+      - solid-ui/tests/wedding-recommendation-explanation-state.test.ts
+      - .agent/**
+    acceptance:
+      - active confirmed constraints evaluate deterministically against exact revision-bound quote, directory, venue, catering, and guest evidence
+      - explicit matches and conflicts require candidate evidence while missing or contradictory facts remain unknown and never become inferred satisfaction
+      - centrepiece height, step-free access, venue-travel exclusion, dietary/accessibility aggregates, and stale revision cases are covered
+      - private person requirements produce aggregate source-facing labels without names, source excerpts, or vendor-visible private context
+      - constraint conflicts enter the existing recommendation and Decision Card/A2UI domain without graph-degree-only evidence or a parallel wedding surface
+      - material quotation/directory successors invalidate prior evaluations by revision binding and shuffled input produces the same result
+      - the evaluation flag remains disabled by default; no quotation, vendor-response, ranking-policy, provider, or deployment gate changes
+      - focused Rust/Solid tests, wedding regressions, line budgets and production builds pass with every new file below 1000 lines
+    progress:
+      - started from committed WED-232 capture and WED-231 ledger foundations; implementing the pure revision-bound evaluator before any route or recommendation projection
+      - added a pure template-neutral evaluator for confirmed active constraints over bounded candidate snapshots; decisive results require explicit revision-matched evidence and contradictory or missing facts fail closed to unknown
+      - centrepiece dimension limits, step-free absence, inter-event travel exclusions, dietary support, opaque relationship values, aggregate private-person labels, deterministic input order, stale revision invalidation, and superseded-history exclusion are covered
+      - added constraint_conflict to the existing wedding recommendation domain with source-facing evidence labels and conflict-first ordering; it reuses current recommendation/Decision Card projection rather than introducing another surface
+      - cargo check, eight focused Rust evaluator tests, eight focused Solid recommendation tests, all 1,898 wedding tests, Solid typecheck, line budgets, and the production build pass; presentation also rejects technical transport copy
+      - the authenticated route/projector that feeds current quote and directory snapshots remains to be implemented before review

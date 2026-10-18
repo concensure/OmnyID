@@ -345,6 +345,10 @@ fn constraint_value(value: &ConstraintValue) -> Result<(), String> {
     }
 }
 
+pub fn validate_constraint_value(value: &ConstraintValue) -> Result<(), String> {
+    constraint_value(value)
+}
+
 fn subject(value: &SubjectReference) -> Result<(), String> {
     identifier(&value.id, "subject_ref.id")
 }

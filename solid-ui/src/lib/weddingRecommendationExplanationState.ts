@@ -4,8 +4,10 @@ import type {
   WeddingGraphNode,
   WeddingKnowledgeGraphState,
 } from "@/lib/weddingKnowledgeGraphState";
+import { safeWeddingUiText } from "@/lib/weddingHomeUiCopyState";
 
 export type WeddingRecommendationKind =
+  | "constraint_conflict"
   | "missing_evidence"
   | "risk"
   | "approval"
@@ -28,6 +30,16 @@ export type WeddingRecommendationExplanationState = {
   summaryLabel: string;
   recommendations: WeddingRecommendationExplanation[];
   primaryRecommendation: WeddingRecommendationExplanation | null;
+};
+
+export type WeddingConstraintEvaluationRecommendation = {
+  evaluationId: string;
+  constraintRef: string;
+  candidateRevisionRef: string;
+  result: "satisfied" | "conflict" | "unknown" | "not_applicable";
+  severity: "blocking" | "decision_relevant" | "informational";
+  title: string;
+  evidenceLabel: string;
 };
 
 function readableKind(kind: string): string {
@@ -95,6 +107,39 @@ function missingEvidenceRecommendations(graph: WeddingKnowledgeGraphState): Wedd
   }));
 }
 
+function constraintEvaluationRecommendations(
+  evaluations: readonly WeddingConstraintEvaluationRecommendation[],
+): WeddingRecommendationExplanation[] {
+  return evaluations
+    .filter((evaluation) => evaluation.result === "conflict" || evaluation.result === "unknown")
+    .slice()
+    .sort((left, right) => left.evaluationId.localeCompare(right.evaluationId))
+    .slice(0, 4)
+    .map((evaluation) => ({
+      id: `wedding_recommendation:constraint:${evaluation.evaluationId}`,
+      kind: evaluation.result === "conflict" ? "constraint_conflict" : "missing_evidence",
+      title: safeWeddingUiText(
+        evaluation.title.trim().slice(0, 180),
+        "Planning requirement needs review",
+      ),
+      body: evaluation.result === "conflict"
+        ? "This option conflicts with a confirmed planning requirement. Review the checked evidence before deciding."
+        : "The current option evidence does not confirm whether this planning requirement is met.",
+      evidenceLabel: safeWeddingUiText(
+        evaluation.evidenceLabel.trim().slice(0, 220),
+        "Current option evidence needs checking.",
+      ),
+      badges: evaluation.result === "conflict"
+        ? ["constraint conflict", evaluation.severity.replace(/_/g, " ")]
+        : ["missing evidence", "constraint check"],
+      sourceNodeIds: [evaluation.constraintRef, evaluation.candidateRevisionRef],
+      edgeIds: [],
+      nextActionLabel: evaluation.result === "conflict"
+        ? "Compare or resolve this requirement before choosing."
+        : "Ask the vendor or check the current quote for this detail.",
+    }));
+}
+
 function approvalRecommendations(graph: WeddingKnowledgeGraphState): WeddingRecommendationExplanation[] {
   return graph.edges
     .filter((edge) => edge.kind === "requires_approval")
@@ -160,8 +205,10 @@ function topologyAnchorRecommendations(graph: WeddingKnowledgeGraphState): Weddi
 
 export function buildWeddingRecommendationExplanationState(
   graph: WeddingKnowledgeGraphState,
+  constraintEvaluations: readonly WeddingConstraintEvaluationRecommendation[] = [],
 ): WeddingRecommendationExplanationState {
   const recommendations = [
+    ...constraintEvaluationRecommendations(constraintEvaluations),
     ...missingEvidenceRecommendations(graph),
     ...riskRecommendations(graph),
     ...approvalRecommendations(graph),
@@ -172,7 +219,9 @@ export function buildWeddingRecommendationExplanationState(
   return {
     summaryLabel: recommendations.length === 0
       ? "No graph-backed wedding recommendations yet."
-      : `${recommendations.length} graph-backed wedding recommendation${recommendations.length === 1 ? "" : "s"}`,
+      : constraintEvaluations.length > 0
+        ? `${recommendations.length} evidence-backed wedding recommendation${recommendations.length === 1 ? "" : "s"}`
+        : `${recommendations.length} graph-backed wedding recommendation${recommendations.length === 1 ? "" : "s"}`,
     recommendations,
     primaryRecommendation: recommendations[0] ?? null,
   };

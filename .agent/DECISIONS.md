@@ -1163,3 +1163,22 @@ responses expose no model, provider, attempt, database, or protocol diagnostic. 
 surface consumes a small A2UI-compatible projection, maps untrusted errors at the rendering
 boundary, and keeps the established mobile navigation unchanged. This slice does not satisfy or
 bypass quotation, vendor-portal, ranking-policy-V2, human-review, or deployment gates.
+
+## 2026-10-19: Constraint evaluations bind to immutable candidate revisions
+
+A constraint evaluation is a pure projection of one confirmed active constraint and one bounded
+candidate evidence snapshot. The evaluation's `candidate_ref` is the immutable quote or directory
+revision reference, not a mutable vendor identity. Evidence facts must carry that same revision;
+a material successor therefore makes the old evaluation stale without mutating or deleting it.
+Input order cannot change the result or identity.
+
+Satisfied and conflict results require an explicit candidate evidence reference. Missing facts,
+unit mismatches, incomplete ranges, and contradictory explicit facts remain unknown with no
+candidate evidence claim. Hard conflicts are blocking; unknown hard requirements are
+decision-relevant, never silently satisfied. Person-scoped constraints remain couple-private and
+presentation receives only an aggregate count label, never names or source excerpts.
+
+Constraint conflicts enter the existing recommendation/Decision Card domain ahead of generic
+graph topology advice and use source-facing evidence labels instead of degree counts. This core is
+template-neutral and default-off through the existing evaluation flag; its presence does not
+enable a route, vendor context, metric, provider, quotation release, or deployment.

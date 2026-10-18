@@ -218,3 +218,40 @@ test("buildWeddingRecommendationExplanationState does not treat selected decisio
     && /Harbour Hall/i.test(recommendation.title)
   )));
 });
+
+test("constraint conflicts lead with source-facing evidence instead of graph degree", () => {
+  const graph = buildWeddingKnowledgeGraphState({ metadata });
+  const state = buildWeddingRecommendationExplanationState(graph, [{
+    evaluationId: "evaluation:step-free:v2",
+    constraintRef: "constraint:step-free",
+    candidateRevisionRef: "quotation:venue-a:revision:v2",
+    result: "conflict",
+    severity: "blocking",
+    title: "Accessibility conflicts with this option",
+    evidenceLabel: "1 private guest requirement checked",
+  }]);
+
+  assert.equal(state.primaryRecommendation?.kind, "constraint_conflict");
+  assert.equal(state.primaryRecommendation?.evidenceLabel, "1 private guest requirement checked");
+  assert.equal(state.primaryRecommendation?.evidenceLabel.includes("degree"), false);
+  assert.equal(JSON.stringify(state).includes("guest name"), false);
+  assert.match(state.summaryLabel, /evidence-backed/i);
+});
+
+test("constraint recommendations replace technical transport copy", () => {
+  const graph = buildWeddingKnowledgeGraphState({ metadata });
+  const state = buildWeddingRecommendationExplanationState(graph, [{
+    evaluationId: "evaluation:technical-copy:v2",
+    constraintRef: "constraint:technical-copy",
+    candidateRevisionRef: "quotation:venue-a:revision:v2",
+    result: "unknown",
+    severity: "decision_relevant",
+    title: "API payload schema error 500",
+    evidenceLabel: "postgres_status_code 500",
+  }]);
+
+  assert.equal(state.primaryRecommendation?.title, "Planning requirement needs review");
+  assert.equal(state.primaryRecommendation?.evidenceLabel, "Current option evidence needs checking.");
+  assert.equal(JSON.stringify(state).includes("API payload"), false);
+  assert.equal(JSON.stringify(state).includes("postgres"), false);
+});

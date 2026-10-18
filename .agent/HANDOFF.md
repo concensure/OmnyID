@@ -3704,3 +3704,34 @@ Unresolved / next:
   `OMNYID_PLANNING_CONSTRAINT_CAPTURE_ENABLED`; all remain off. No Oracle deployment ran.
 - WED-225/WED-226 quotation and week-3-to-6 work remain paused for the user's human-judge review.
   Vendor mail, relay, ranking-policy-V2, and all release flags remain disabled.
+
+## 2026-10-19 - WED-233 revision-bound evaluator checkpoint (Codex, in progress)
+
+Changed:
+
+- Added a pure evaluator for active confirmed constraints and immutable candidate evidence
+  snapshots. Explicit evidence can satisfy or conflict; missing, mismatched, or contradictory
+  evidence remains unknown. Evaluation identity and currency bind to the candidate revision.
+- Added privacy-safe presentation state: private person constraints produce aggregate requirement
+  counts without names or source text. Added `constraint_conflict` to the current wedding
+  recommendation domain with source-facing evidence and no parallel card system.
+
+Verification:
+
+- `cargo check` and eight focused evaluator tests pass, covering centrepiece height, step-free
+  absence, venue travel, unknown and contradictory evidence, deterministic ordering, private
+  aggregates, stale revisions, and superseded history.
+- Eight focused recommendation tests, all 1,898 wedding tests, Solid typecheck, both line-budget
+  checks, and the production build pass. The presentation adapter replaces technical transport copy
+  with plain planning language. New Rust files remain below 300 lines. No feature flag was enabled
+  and no provider/deployment action ran.
+
+Unresolved / next:
+
+- WED-233 remains in progress. Build the authenticated/default-off evaluation route or projector
+  that converts current quote/directory revisions into bounded snapshots, then feed its projections
+  into the existing workspace recommendation state. Add disposable-Postgres/source-binding tests
+  before moving the task to review.
+- Do not place private constraint excerpts in metrics or vendor context. Keep stale revisions
+  visible only as history and unknown evidence unknown. Quotation/week-3-to-6 work remains paused
+  for human-judge review; ranking-policy-V2 and all release flags remain disabled.
