@@ -3728,10 +3728,36 @@ Verification:
 
 Unresolved / next:
 
-- WED-233 remains in progress. Build the authenticated/default-off evaluation route or projector
-  that converts current quote/directory revisions into bounded snapshots, then feed its projections
-  into the existing workspace recommendation state. Add disposable-Postgres/source-binding tests
-  before moving the task to review.
+- WED-233 remains in progress. Add the directory-evidence projector and a default-off workspace API
+  adapter that feeds these records into the existing recommendation state; do not introduce a
+  parallel card system.
 - Do not place private constraint excerpts in metrics or vendor context. Keep stale revisions
   visible only as history and unknown evidence unknown. Quotation/week-3-to-6 work remains paused
   for human-judge review; ranking-policy-V2 and all release flags remain disabled.
+
+## 2026-10-19 - WED-233 private quotation evaluation route checkpoint (Codex, in progress)
+
+Changed:
+
+- Added a deterministic quotation projector and authenticated
+  `POST /planning/constraint-evaluations` route. It binds active constraints to the exact active
+  quotation revision and immutable comparison message in the owner's private AFP thread.
+- The route accepts no browser-provided facts. Stored hard conflicts are decisive; missing, unknown,
+  soft, and unmeasured numeric evidence stays unknown. Response presentation excludes source
+  excerpts and private vendor context. Both ledger and evaluation flags are required.
+
+Verification:
+
+- `cargo check` passes. All 27 planning-intelligence unit tests pass.
+- Disposable PostgreSQL at `127.0.0.1:55432/omnyid_test` passes the existing ledger and capture API
+  suites plus the new evaluation API suite (default-off, tenant isolation, active revision,
+  conflict projection, privacy-safe output). Credentials were neither printed nor persisted.
+- Configured ClamAV at `127.0.0.1:33310` passes the bounded clean INSTREAM test. New files are 374,
+  179, and 282 lines; no large file was expanded with a new block.
+
+Unresolved / next:
+
+- WED-233 remains in progress for directory-revision evidence and the default-off frontend API
+  adapter into the existing recommendation/Decision Card state. Keep the evaluation flag off.
+- Quote normalization/week-3-to-6 work remains paused for human-judge review. Ranking-policy-V2,
+  vendor mail, relay, provider, and deployment flags remain disabled; no Oracle deployment ran.

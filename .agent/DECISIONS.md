@@ -1182,3 +1182,17 @@ Constraint conflicts enter the existing recommendation/Decision Card domain ahea
 graph topology advice and use source-facing evidence labels instead of degree counts. This core is
 template-neutral and default-off through the existing evaluation flag; its presence does not
 enable a route, vendor context, metric, provider, quotation release, or deployment.
+
+## 2026-10-19: Quotation constraint evaluation consumes stored comparison evidence conservatively
+
+The authenticated evaluation route reads the owner's private AFP thread and binds to an active
+quotation revision plus its active, immutable comparison event. It does not accept candidate facts
+or requirement outcomes from the browser. Only hard-conflict identifiers durably recorded by that
+comparison become decisive facts; unknown hard requirements, absent identifiers, soft assessments,
+and numeric limits without an actual measured value remain unknown. A comparison event therefore
+cannot silently turn missing evidence into satisfaction.
+
+The route requires both the constraint-ledger and evaluation flags and returns bounded evaluation
+and presentation records without excerpts or vendor-visible private context. This adapter reuses
+quotation replay and planning evaluation; it does not change quotation persistence, recommendation
+policy, vendor context, or deployment gates.

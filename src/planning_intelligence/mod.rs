@@ -3,6 +3,7 @@ mod contracts;
 mod evaluation;
 mod features;
 mod ledger;
+mod quotation_projection;
 mod validation;
 
 pub use capture::*;
@@ -10,6 +11,7 @@ pub use contracts::*;
 pub use evaluation::*;
 pub use features::*;
 pub use ledger::*;
+pub use quotation_projection::*;
 pub use validation::*;
 
 #[cfg(test)]
