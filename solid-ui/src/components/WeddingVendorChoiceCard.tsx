@@ -129,7 +129,7 @@ export function WeddingVendorChoiceCard(props: {
   const anchorStatusLabel = (status: WeddingVendorChoiceCardData["anchorRows"][number]["status"]) => status === "met" ? "Matches" : status === "not_met" ? "Does not match" : "To confirm";
   const factSummary = () => `Based on ${card.checkedFactsCount} checked fact${card.checkedFactsCount === 1 ? "" : "s"} · ${card.anchorRows.filter((row) => row.status === "unknown").length} to confirm`;
   return (
-    <article class="min-w-0 overflow-hidden rounded-xl border border-wedding-muted bg-white/85">
+    <article class="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-wedding-muted bg-white/85">
       <Show
         when={resolvedImageUrl() && !imageFailed()}
         fallback={
@@ -150,13 +150,13 @@ export function WeddingVendorChoiceCard(props: {
           />
         )}
       </Show>
-      <div class="space-y-2 p-3">
-        <div class="grid min-w-0 gap-2">
-          <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase text-wedding-text">{card.comparisonCount === 1 ? "Only venue that fits so far" : card.rank === 1 ? "Your best match" : `Best of ${card.comparisonCount} matches`}</p>
-            <h4 class="mt-0.5 break-words text-sm font-semibold text-wedding-text">{card.title}</h4>
+      <div class="w-full min-w-0 space-y-2 p-3">
+        <div class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
+          <div class="w-full min-w-0 max-w-full">
+            <p class="min-w-0 max-w-full text-[11px] font-semibold uppercase text-wedding-text [overflow-wrap:anywhere]">{card.comparisonCount === 1 ? "Only venue that fits so far" : card.rank === 1 ? "Your best match" : `Best of ${card.comparisonCount} matches`}</p>
+            <h4 class="mt-0.5 min-w-0 max-w-full text-sm font-semibold text-wedding-text [overflow-wrap:anywhere]">{card.title}</h4>
           </div>
-          <span class="w-fit max-w-full rounded-full bg-wedding-surface-blush px-2 py-1 text-[11px] font-semibold text-wedding-accent">
+          <span class="w-fit min-w-0 max-w-full justify-self-start whitespace-normal rounded-2xl bg-wedding-surface-blush px-2 py-1 text-[11px] font-semibold text-wedding-accent [overflow-wrap:anywhere]">
             {factSummary()}
           </span>
         </div>
@@ -173,9 +173,9 @@ export function WeddingVendorChoiceCard(props: {
             <p class="text-[11px] font-semibold uppercase text-wedding-muted">For what you asked</p>
             <ul class="mt-1 space-y-1.5">
               <For each={card.anchorRows}>{(row) => (
-                <li class="flex gap-2 text-xs leading-5 text-wedding-text">
-                  <span aria-label={anchorStatusLabel(row.status)} class="font-bold text-wedding-accent">{anchorIcon(row.status)}</span>
-                  <span><strong>{row.anchor}</strong> — {row.detail}</span>
+                <li class="flex min-w-0 gap-2 text-xs leading-5 text-wedding-text">
+                  <span aria-label={anchorStatusLabel(row.status)} class="shrink-0 font-bold text-wedding-accent">{anchorIcon(row.status)}</span>
+                  <span class="min-w-0 [overflow-wrap:anywhere]"><strong>{row.anchor}</strong> — {row.detail}</span>
                 </li>
               )}</For>
             </ul>
