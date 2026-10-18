@@ -4,7 +4,7 @@
 // throughout, per design guidance to add visual interest without adding clutter.
 import type { JSX } from "solid-js";
 
-export type WeddingDashboardIconId = "calendar-days" | "banknotes" | "users" | "table-cells" | "user-plus" | "shield-check";
+export type WeddingDashboardIconId = "calendar-days" | "banknotes" | "users" | "table-cells" | "user-plus" | "shield-check" | "check-circle" | "clock" | "lock" | "alert-circle" | "search" | "arrow-right";
 
 function Icon(props: { class?: string; children: JSX.Element }) {
   return (
@@ -52,6 +52,24 @@ export function WeddingDashboardIcon(props: { id: WeddingDashboardIconId; class?
       <Icon class={props.class}>
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.75A11.959 11.959 0 0 1 12 2.714Z" />
       </Icon>
+    );
+    case "check-circle": return (
+      <Icon class={props.class}><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></Icon>
+    );
+    case "clock": return (
+      <Icon class={props.class}><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></Icon>
+    );
+    case "lock": return (
+      <Icon class={props.class}><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 0 0-9 0v3.75m-.75 10.5h10.5A2.25 2.25 0 0 0 19.5 18.75v-6A2.25 2.25 0 0 0 17.25 10.5H6.75A2.25 2.25 0 0 0 4.5 12.75v6A2.25 2.25 0 0 0 6.75 21Z" /></Icon>
+    );
+    case "alert-circle": return (
+      <Icon class={props.class}><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 4.5h.008v.008H12V16.5Z" /></Icon>
+    );
+    case "search": return (
+      <Icon class={props.class}><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.35-5.4a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" /></Icon>
+    );
+    case "arrow-right": return (
+      <Icon class={props.class}><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5 15.75 12l-7.5 7.5" /></Icon>
     );
     default: return null;
   }

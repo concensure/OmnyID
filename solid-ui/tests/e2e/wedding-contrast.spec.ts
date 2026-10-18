@@ -55,7 +55,7 @@ for (const viewport of [{ width: 360, height: 740 }, { width: 1280, height: 800 
     await page.setViewportSize(viewport);
     await openCleanFixture(page);
     const primary = page.getByRole("button", { name: "Check availability" });
-    const website = page.getByRole("link", { name: "Open website" });
+    const website = page.getByRole("link", { name: "Website", exact: true });
     await expect(primary).toBeVisible();
     await expect(website).toBeVisible();
     await expect(page.locator("article")).toHaveCount(1);

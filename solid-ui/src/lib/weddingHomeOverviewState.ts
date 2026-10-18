@@ -44,6 +44,12 @@ export type WeddingHomeTimelineOverview = {
   a2ui: Record<string, unknown>;
 };
 
+export type WeddingHomePlanningProgress = {
+  completedCount: number;
+  totalCount: number;
+  percentage: number;
+};
+
 function currencyLabel(amount: number | null | undefined): string {
   if (typeof amount !== "number" || !Number.isFinite(amount)) return "Set budget";
   return new Intl.NumberFormat("en-AU", {
@@ -174,6 +180,17 @@ export function buildWeddingHomeTimelineOverview(state: WeddingResponseWorkspace
     selectedRowId: upcoming?.id ?? null,
   };
   return { ...timeline, a2ui: timelineA2ui(timeline) };
+}
+
+export function buildWeddingHomePlanningProgress(state: WeddingResponseWorkspaceViewState): WeddingHomePlanningProgress {
+  const tasks = optionalArray(state.planningTaskItems);
+  const completedCount = tasks.filter(isDoneTimelineRow).length;
+  const totalCount = tasks.length;
+  return {
+    completedCount,
+    totalCount,
+    percentage: totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100),
+  };
 }
 
 export function buildWeddingHomeStatusState(state: WeddingResponseWorkspaceViewState): WeddingHomeStatusState {
@@ -310,7 +327,7 @@ export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorksp
   const budgetTile = {
     id: "budget" as const,
     valueLabel: budgetTarget === null
-      ? intakeBudgetComfort ? "Budget noted" : "Set budget"
+      ? intakeBudgetComfort ? "Budget noted" : "—"
       : budgetRemaining === null
         ? currencyLabel(budgetTarget)
         : budgetRemaining >= 0
@@ -321,9 +338,9 @@ export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorksp
       : `Paid ${currencyLabel(paidAmount)} - Estimated ${currencyLabel(estimatedAmount)} - Forecast ${currencyLabel(forecastAmount)}`,
     supportLabel: budgetSupport,
     tone: budgetTone as WeddingHomeOverviewActionTile["tone"],
-    toneLabel: budgetTone === "needs_input" ? intakeBudgetComfort ? "Needs target" : "Needs budget" : budgetTone === "risk" ? "Over target" : budgetTone === "attention" ? "Check risk" : "On track",
+    toneLabel: budgetTone === "needs_input" ? intakeBudgetComfort ? "Needs target" : "Action needed" : budgetTone === "risk" ? "Over target" : budgetTone === "attention" ? "In progress" : "On track",
     menuId: "budget" as const,
-    actionLabel: "Open budget",
+    actionLabel: budgetTarget === null ? "Add budget" : "Open budget",
   };
 
   const guestTracking = state.guestTracking;
@@ -332,32 +349,32 @@ export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorksp
   const hasGuests = guestTracking.guestRowCount > 0;
   const guestTile = {
     id: "guests" as const,
-    valueLabel: hasGuests ? `${guestTracking.guestRowCount} guests` : intakeGuestCount ? `${intakeGuestCount} expected` : "Add guests",
+    valueLabel: hasGuests ? `${guestTracking.guestRowCount}` : intakeGuestCount ? `${intakeGuestCount}` : "—",
     detailLabel: hasGuests
       ? `${respondedCount} replied - ${guestTracking.pendingCount} awaiting`
       : intakeGuestCount
         ? "Guest count captured from intake; make the guest list next."
-        : "Start the guest list so food, seating, and follow-ups have real numbers.",
+        : "Add guests to unlock catering and seating.",
     supportLabel: hasGuests ? `${guestTracking.attendingCount} attending` : intakeGuestCount ? "Open guests to build list" : "Open guests",
     tone: !hasGuests ? intakeGuestCount ? "attention" as const : "needs_input" as const : guestTracking.pendingCount > 0 ? "attention" as const : "ready" as const,
-    toneLabel: !hasGuests ? intakeGuestCount ? "Estimate only" : "Needs list" : guestTracking.pendingCount > 0 ? "Replies waiting" : "Replies clear",
+    toneLabel: !hasGuests ? intakeGuestCount ? "In progress" : "Action needed" : guestTracking.pendingCount > 0 ? "In progress" : "On track",
     menuId: "guests" as const,
-    actionLabel: "Open guests",
+    actionLabel: hasGuests ? "Open guests" : "Add guests",
   };
 
   const seating = state.seatingPlan;
   const canSeatGuests = guestTracking.attendingCount > 0 || seating.assignedSeatCount > 0 || seating.unassignedAttendingCount > 0;
   const seatingTile = {
     id: "seating" as const,
-    valueLabel: canSeatGuests ? `${seating.assignedSeatCount} seated` : "Plan seating",
+    valueLabel: canSeatGuests ? `${seating.assignedSeatCount}` : "—",
     detailLabel: canSeatGuests
       ? `${seating.unassignedAttendingCount} still unassigned`
-      : "Open seating to see what is needed before tables can be drafted.",
-    supportLabel: canSeatGuests ? "Open seating" : "Needs guest list first",
+      : "Needs your guest list first.",
+    supportLabel: canSeatGuests ? "Open seating" : "Unlock by adding guests",
     tone: !canSeatGuests ? "needs_input" as const : seating.unassignedAttendingCount > 0 ? "attention" as const : "ready" as const,
-    toneLabel: !canSeatGuests ? "Needs guests" : seating.unassignedAttendingCount > 0 ? "Seats left" : "Seating clear",
-    menuId: "seating" as const,
-    actionLabel: "Open seating",
+    toneLabel: !canSeatGuests ? "Locked" : seating.unassignedAttendingCount > 0 ? "In progress" : "On track",
+    menuId: canSeatGuests ? "seating" as const : "guests" as const,
+    actionLabel: canSeatGuests ? "Open seating" : "Add guests to unlock",
   };
 
   const vendorCards = state.vendorContactCards ?? [];
@@ -373,17 +390,17 @@ export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorksp
         ? `${dueVendorCount} due`
         : vendorCards.length > 0
           ? `${vendorCards.length} vendors`
-          : "Track vendors",
+          : "0",
     detailLabel: vendorCards.length > 0
       ? `${dueVendorCount} due - ${waitingVendorCount} waiting`
-      : "Keep outreach, replies, and follow-ups in one place.",
+      : "Saved vendors and replies live here.",
     supportLabel: vendorCards.length > 0 ? `${closedVendorCount} closed` : "Open vendor tracking",
     tone: urgentVendorCount > 0 ? "risk" as const : dueVendorCount > 0 ? "attention" as const : vendorCards.length > 0 ? "ready" as const : "needs_input" as const,
-    toneLabel: urgentVendorCount > 0 ? "Urgent" : dueVendorCount > 0 ? "Follow up" : vendorCards.length > 0 ? "Tracked" : "Needs vendors",
+    toneLabel: urgentVendorCount > 0 ? "Action needed" : dueVendorCount > 0 ? "In progress" : vendorCards.length > 0 ? "On track" : "Action needed",
     // Wedding vendor replies are represented by the wedding home follow-up
     // panel, not the unrelated, general-purpose Response Queue.
     menuId: "home" as const,
-    actionLabel: vendorCards.length > 0 ? "Open vendor follow-ups" : "Open vendor tracking",
+    actionLabel: vendorCards.length > 0 ? "Open vendor follow-ups" : "Track vendors",
   };
 
   return [

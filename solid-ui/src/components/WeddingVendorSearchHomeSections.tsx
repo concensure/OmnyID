@@ -2,6 +2,7 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 
 import { DecisionCard } from "@/components/DecisionCard";
+import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/WeddingDashboardIcons";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
 import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferenceConfirmationChips";
@@ -19,15 +20,30 @@ import {
   loadWeddingDecisionSelections,
   toggleWeddingDecisionSelectionValue,
 } from "@/lib/weddingDecisionSelectionState";
+import {
+  weddingPlanningNeedLabel,
+  weddingVendorSearchBlockedCopy,
+  weddingVendorSearchNoticeCopy,
+} from "@/lib/weddingHomeUiCopyState";
 
 type VendorSearchAction = NonNullable<WeddingResponseWorkspaceViewProps["vendorSearchResultAction"]>;
 type VendorOutreachOwner = ReturnType<typeof useWeddingVendorOutreachOwner>;
 
 const SEARCH_PROGRESS_LABELS = [
-  "gathering personal preferences",
-  "fetching vendor information...",
-  "ranking vendors based on your query",
+  "Checking what matters most to you…",
+  "Looking for nearby vendors…",
+  "Finding your strongest matches…",
 ] as const;
+
+const VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; icon: WeddingDashboardIconId }> = [
+  { label: "Venues", query: "wedding venues", icon: "calendar-days" },
+  { label: "Photographers", query: "wedding photographers", icon: "search" },
+  { label: "Bands & DJs", query: "wedding bands and DJs", icon: "users" },
+  { label: "Florists", query: "wedding florists", icon: "shield-check" },
+  { label: "Planners", query: "wedding planners", icon: "check-circle" },
+  { label: "Celebrants", query: "authorised wedding celebrants", icon: "user-plus" },
+  { label: "Cake", query: "wedding cakes", icon: "clock" },
+];
 
 // Keep typing local to the field. Updating the persisted wedding query on each
 // keystroke rebuilds the home surface and can move the viewport under the user.
@@ -96,21 +112,21 @@ export function WeddingPlanningBasicsSection(props: { workspace: WeddingResponse
     <div class="rounded-2xl border border-amber-200 bg-amber-50/90 p-3 shadow-sm">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="text-sm font-semibold text-amber-950">Planning basics needed</p>
+          <p class="text-sm font-semibold text-amber-950">Add a few wedding details</p>
           <p class="mt-1 break-words text-xs leading-5 text-amber-900/75">
-            Live wedding workflows stay blocked until the required planning context is captured.
+            This helps us find vendors that fit your plans.
           </p>
         </div>
         <span class="rounded-full border border-amber-200 bg-white/75 px-2 py-1 text-xs font-semibold text-amber-950">
-          Intake checkpoint
+          A few details
         </span>
       </div>
       <div class="mt-3 grid gap-2 sm:grid-cols-2">
         <Show when={workspace().vendorSearchReadiness?.status === "blocked"}>
           <div class="rounded-xl border border-amber-100 bg-white/75 p-3">
-            <p class="text-xs font-semibold uppercase text-amber-800/70">Vendor search</p>
+            <p class="text-xs font-semibold uppercase text-amber-800/70">Better matches</p>
             <p class="mt-1 break-words text-sm leading-6 text-amber-950">
-              Needs {workspace().vendorSearchReadiness?.missing.join(", ")}.
+              Add {workspace().vendorSearchReadiness?.missing.map(weddingPlanningNeedLabel).join(" and ")}.
             </p>
             <Show when={workspace().vendorSearchReadiness?.missing.some((item) => /priorities|fit preferences/i.test(item))}>
               <label class="mt-3 block text-xs font-semibold text-amber-950">
@@ -191,9 +207,15 @@ export function WeddingVendorSearchHomeSection(props: {
   const searchDisabled = () => workspace().vendorSearchRunning
     || !workspace().onRunLiveVendorSearch;
   const visibleVendorSearchNotice = () => {
-    const notice = workspace().vendorSearchNotice?.trim() ?? "";
-    return /^Directory-only vendor search returned\b/i.test(notice) ? null : notice || null;
+    return weddingVendorSearchNoticeCopy(workspace().vendorSearchNotice);
   };
+  const visibleBlockedReason = () => weddingVendorSearchBlockedCopy(workspace().vendorSearchBlockedReason);
+  function runCategorySearch(query: string): void {
+    if (searchDisabled()) return;
+    workspace().onVendorSearchQueryChange?.(query);
+    queueMicrotask(() => workspace().onRunLiveVendorSearch?.());
+  }
+  const isSelectedCategory = (query: string) => workspace().vendorSearchQuery?.trim().toLowerCase() === query.toLowerCase();
   createEffect(() => {
     if (!workspace().vendorSearchRunning) {
       setSearchProgressIndex(0);
@@ -206,7 +228,7 @@ export function WeddingVendorSearchHomeSection(props: {
     onCleanup(() => window.clearInterval(timer));
   });
   return (
-    <div class="rounded-xl border border-wedding-muted bg-white/85 px-4 py-5 shadow-sm phone:rounded-none phone:border-0 phone:bg-transparent phone:px-0 phone:py-2 phone:shadow-none sm:px-5 sm:py-6">
+    <div class="min-w-0 rounded-[28px] border border-wedding-hairline bg-white px-4 py-5 shadow-[0_8px_24px_rgba(36,26,44,.06)] phone:rounded-[28px] sm:px-5 sm:py-6">
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -220,28 +242,43 @@ export function WeddingVendorSearchHomeSection(props: {
       >
       <div class="min-w-0">
         <div class="min-w-0">
-          <p class="text-lg font-bold leading-6 text-wedding-accent">Live vendor search</p>
+          <p class="font-display text-[22px] font-semibold leading-7 tracking-[-.01em] text-wedding-text">Find vendors</p>
       </div>
-      <label class="mt-5 block">
+      <label class="relative mt-4 block">
+        <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-wedding-muted" aria-hidden="true"><WeddingDashboardIcon id="search" class="h-5 w-5" /></span>
         <VendorSearchDraftInput
           workspace={workspace()}
           name="wedding-vendor-search-query"
-          placeholder="florist in Sydney specialising in wedding"
-          class="mt-1 min-h-11 w-full rounded-lg border-2 border-wedding-muted bg-white px-3 py-2 text-sm text-wedding-accent shadow-sm outline-none transition placeholder:text-wedding-muted focus:border-wedding-accent focus:ring-4 focus:ring-wedding-surface-blush"
+          placeholder="Search photographers, venues, bands…"
+          class="h-14 w-full rounded-full border-[1.5px] border-wedding-hairline bg-wedding-surface py-2 pl-12 pr-[4.25rem] text-base text-wedding-text outline-none transition duration-150 placeholder:text-wedding-muted focus:border-wedding-accent focus:ring-4 focus:ring-wedding-accent/20"
         />
+        <button
+          type="submit"
+          class="absolute right-1.5 top-1.5 flex h-11 w-11 items-center justify-center rounded-full bg-wedding-cta text-white shadow-wedding-cta transition active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-45"
+          aria-label={workspace().vendorSearchRunning ? "Searching for vendors" : "Search vendors"}
+          disabled={searchDisabled()}
+        >
+          <WeddingDashboardIcon id={workspace().vendorSearchRunning ? "clock" : "arrow-right"} class="h-5 w-5" />
+        </button>
       </label>
-      <button
-        type="submit"
-        class="mt-3 min-h-11 w-full rounded-lg border border-wedding-accent bg-white px-4 py-2 text-sm font-bold text-wedding-accent transition hover:bg-wedding-surface-blush disabled:cursor-not-allowed disabled:opacity-50"
-        title={workspace().vendorSearchBlockedReason
-          ? `${workspace().vendorSearchBlockedReason} A named search can still check your wedding directory.`
-          : undefined}
-        disabled={searchDisabled()}
-      >
-        {workspace().vendorSearchRunning ? "Searching..." : "Search vendors"}
-      </button>
       </div>
       </form>
+      <div class="-mx-4 mt-3 flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0" aria-label="Popular vendor types">
+        <For each={VENDOR_CATEGORY_CHIPS}>{(chip) => (
+          <button
+            type="button"
+            class={`inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-full border px-3 text-sm font-semibold transition duration-100 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2 disabled:opacity-45 ${isSelectedCategory(chip.query) ? "border-wedding-accent bg-wedding-accent text-white" : "border-wedding-hairline bg-white text-wedding-text hover:border-wedding-accent hover:text-wedding-accent"}`}
+            disabled={searchDisabled()}
+            aria-pressed={isSelectedCategory(chip.query)}
+            onClick={() => runCategorySearch(chip.query)}
+          >
+            <WeddingDashboardIcon id={chip.icon} class="h-4 w-4" />{chip.label}
+          </button>
+        )}</For>
+      </div>
+      <Show when={!props.result && !workspace().vendorSearchRunning}>
+        <p class="mt-2 text-[13px] leading-[18px] text-wedding-muted">Real vendors near you. We show where each result came from.</p>
+      </Show>
       <Show
         when={workspace().vendorSearchRunning}
         fallback={<Show when={visibleVendorSearchNotice()}>{(notice) => <p class="mt-4 break-words text-xs leading-5 text-wedding-muted">{notice()}</p>}</Show>}
@@ -269,14 +306,14 @@ export function WeddingVendorSearchHomeSection(props: {
       </Show>
       <Show when={props.result}>
         {(result) => (
-          <div class="mt-4 rounded-xl border border-wedding-muted bg-wedding-surface-blush p-3 phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0">
+          <div class="mt-5 border-t border-wedding-hairline pt-4">
             <Show when={props.preferenceProfile && props.onPreferenceChange && props.onPreferenceConfirm}>
               <div class="mb-3"><WeddingPreferenceConfirmationChips profile={props.preferenceProfile ?? null} saving={props.preferenceSaving} onChange={(change) => props.onPreferenceChange?.(change)} onConfirm={() => props.onPreferenceConfirm?.()} /></div>
             </Show>
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="min-w-0">
-                <p class="break-words text-sm font-semibold text-wedding-accent">{result().preview?.title ?? result().action.label}</p>
-                <p class="mt-1 break-words text-xs leading-5 text-wedding-muted">{result().action.detail}</p>
+                <p class="break-words text-base font-semibold text-wedding-text">Top picks from your search</p>
+                <p class="mt-1 break-words text-sm leading-5 text-wedding-muted">Compare the strongest matches, then save any you want to contact.</p>
               </div>
             </div>
             <Show when={result().preview}>
@@ -292,8 +329,8 @@ export function WeddingVendorSearchHomeSection(props: {
                       : { ...preview(), vendorComparisonCards: [] };
                     return <>
                   <div class="mt-3 flex flex-wrap gap-2">
-                    <For each={[comparisonPreview().category, comparisonPreview().evidenceSummary.sourceCountLabel, comparisonPreview().vendorComparisonHandoff?.confidenceLabel].filter(Boolean)}>
-                      {(label) => <span class="rounded-lg border border-wedding-muted bg-white px-3 py-1.5 text-xs font-medium text-wedding-muted">{label}</span>}
+                    <For each={[comparisonPreview().category, comparisonPreview().evidenceSummary.sourceCountLabel].filter(Boolean)}>
+                      {(label) => <span class="rounded-full border border-wedding-hairline bg-white px-3 py-1.5 text-xs font-medium text-wedding-muted">{label}</span>}
                     </For>
                   </div>
                   <Show when={comparisonPreview().vendorComparisonCards.length > 0}>
@@ -345,8 +382,7 @@ export function WeddingVendorSearchHomeSection(props: {
             <div class="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                class="min-h-11 rounded-lg border border-wedding-accent bg-white px-3 text-sm font-bold text-wedding-accent"
-                title={result().action.detail ?? undefined}
+                class="inline-flex min-h-11 items-center gap-1 rounded-full px-1 text-sm font-semibold text-wedding-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2"
                 aria-expanded={fullResultExpanded()}
                 aria-controls="wedding-vendor-search-full-result"
                 onClick={() => setFullResultExpanded((expanded) => !expanded)}
@@ -355,7 +391,7 @@ export function WeddingVendorSearchHomeSection(props: {
                 data-magic-label={result().action.label}
                 data-magic-id="wedding:vendor-search:open-result"
               >
-                {fullResultExpanded() ? "Hide full search result" : "Show full search result"}
+                {fullResultExpanded() ? "Hide all results" : "See all results"}<WeddingDashboardIcon id="arrow-right" class={`h-4 w-4 transition-transform ${fullResultExpanded() ? "rotate-90" : ""}`} />
               </button>
             </div>
             <Show when={fullResultExpanded()}>
@@ -392,7 +428,7 @@ export function WeddingVendorSearchHomeSection(props: {
           </div>
         )}
       </Show>
-      <Show when={workspace().vendorSearchBlockedReason}>
+      <Show when={visibleBlockedReason()}>
         {(reason) => <p class="mt-2 break-words text-xs leading-5 text-wedding-muted">{reason()}</p>}
       </Show>
     </div>

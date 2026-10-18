@@ -1,6 +1,7 @@
 // @locs-version: 1.0
 import { For, Show, type JSX } from "solid-js";
 import type { DecisionCardAction, DecisionCardMode, DecisionCardModel } from "@/lib/decisionCardState";
+import { safeWeddingUiText } from "@/lib/weddingHomeUiCopyState";
 
 function patternLabel(pattern: DecisionCardModel["pattern"]): string {
   return ({
@@ -24,12 +25,13 @@ export function DecisionCard(props: {
   const mode = () => props.mode ?? "standard";
   const wedding = () => card().domain === "wedding";
   const palette = () => wedding()
-    ? "border-pink-100 bg-white/85 text-pink-950"
+    ? "rounded-[24px] border-wedding-hairline bg-white text-wedding-text"
     : "border-black/10 bg-white/85 text-on-surface";
   const accent = () => wedding()
-    ? "border-2 border-wedding-accent bg-white font-bold text-wedding-text hover:bg-wedding-surface-blush"
+    ? "bg-wedding-cta font-semibold text-white shadow-wedding-cta hover:bg-wedding-cta-hover active:translate-y-[3px] active:shadow-none"
     : "bg-primary text-white";
-  const muted = () => wedding() ? "text-pink-950/70" : "text-on-surface-variant";
+  const muted = () => wedding() ? "text-wedding-muted" : "text-on-surface-variant";
+  const text = (value: string | null | undefined, fallback: string) => wedding() ? safeWeddingUiText(value, fallback) : value ?? fallback;
   const handleKeyDown = (event: KeyboardEvent) => {
     if (!props.onSelect || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
@@ -41,7 +43,7 @@ export function DecisionCard(props: {
   };
   return (
     <article
-      class={`min-w-0 rounded-2xl border p-3 shadow-card transition sm:p-4 ${palette()} ${props.selected ? "ring-2 ring-primary/30" : ""} ${props.class ?? ""}`}
+      class={`min-w-0 rounded-2xl border p-3 shadow-card transition duration-200 sm:p-4 ${palette()} ${props.selected ? `ring-2 ${wedding() ? "ring-wedding-accent/30" : "ring-primary/30"}` : ""} ${props.class ?? ""}`}
       role={props.onSelect ? "button" : undefined}
       tabIndex={props.onSelect ? 0 : undefined}
       onClick={() => props.onSelect?.()}
@@ -51,16 +53,16 @@ export function DecisionCard(props: {
       data-decision-card-mode={mode()}
     >
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <span class={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${wedding() ? "bg-pink-50 text-pink-900" : "bg-primary/10 text-primary"}`}>
+        <span class={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${wedding() ? "bg-wedding-surface-blush text-wedding-accent" : "bg-primary/10 text-primary"}`}>
           {patternLabel(card().pattern)}
         </span>
         <Show when={card().timeSensitivity}>
           {(time) => <span class={`text-xs font-medium ${muted()}`}>{time().label}</span>}
         </Show>
       </div>
-      <h3 class={`${mode() === "glance" || mode() === "compact" ? "mt-2 text-sm" : "mt-3 text-base"} break-words font-semibold`}>{card().title}</h3>
+      <h3 class={`${mode() === "glance" || mode() === "compact" ? "mt-2 text-sm" : "mt-3 text-lg"} break-words font-semibold leading-snug`}>{text(card().title, "A wedding decision to review")}</h3>
       <Show when={mode() !== "glance" && props.showWhyItMatters !== false}>
-        <p class={`mt-2 break-words text-xs leading-5 ${muted()}`}>{card().whyItMatters}</p>
+        <p class={`mt-2 break-words text-sm leading-5 ${muted()}`}>{text(card().whyItMatters, "Review the details before you decide.")}</p>
       </Show>
       <Show when={props.hero}>
         {(hero) => <div class="mt-3">{hero()}</div>}
@@ -74,7 +76,7 @@ export function DecisionCard(props: {
                   <span class="text-xs font-semibold">{option.name}</span>
                   <Show when={option.recommended}><span class="text-[10px] font-semibold text-primary">Recommended</span></Show>
                 </div>
-                <Show when={option.summary}>{(summary) => <p class={`mt-1 text-[11px] leading-4 ${muted()}`}>{summary()}</p>}</Show>
+                <Show when={option.summary}>{(summary) => <p class={`mt-1 text-[11px] leading-4 ${muted()}`}>{text(summary(), "Open this option to review the details.")}</p>}</Show>
               </div>
             )}
           </For>
@@ -82,19 +84,19 @@ export function DecisionCard(props: {
       </Show>
       <Show when={mode() !== "glance" ? card().recommendation : null}>
         {(recommendation) => (
-          <div class={`mt-3 rounded-xl px-3 py-2 ${wedding() ? "bg-pink-50" : "bg-primary/5"}`}>
+          <div class={`mt-3 rounded-2xl px-3 py-3 ${wedding() ? "bg-wedding-surface-blush" : "bg-primary/5"}`}>
             <p class="text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">Recommendation</p>
-            <p class="mt-1 text-xs font-semibold">{recommendation().summary}</p>
+            <p class="mt-1 text-sm font-semibold leading-5">{text(recommendation().summary, "Review the best-fit option before choosing.")}</p>
           </div>
         )}
       </Show>
       <Show when={mode() === "standard" || mode() === "full"}>
         <div class="mt-3 flex flex-wrap gap-1.5">
-          <For each={card().evidence.slice(0, 4)}>{(item) => <span class="max-w-full break-words rounded-full border border-current/10 bg-white/70 px-2 py-1 text-[10px] opacity-75">{item.label}</span>}</For>
+          <For each={card().evidence.slice(0, 4)}>{(item) => <span class="max-w-full break-words rounded-full border border-current/10 bg-white/70 px-2 py-1 text-[10px] opacity-75">{text(item.label, "Checked detail")}</span>}</For>
           <span class="rounded-full border border-current/10 px-2 py-1 text-[10px] opacity-75">{card().verification.label}</span>
         </div>
         <Show when={card().unknowns.length > 0}>
-          <p class={`mt-2 text-[11px] leading-4 ${muted()}`}>Still unknown: {card().unknowns.join(" ")}</p>
+          <p class={`mt-2 text-[11px] leading-4 ${muted()}`}>Still to confirm: {text(card().unknowns.join(" "), "A few details")}</p>
         </Show>
       </Show>
       <Show when={props.showActions !== false}>
@@ -105,7 +107,7 @@ export function DecisionCard(props: {
               type="button"
               disabled={Boolean(action.disabledReason)}
               title={action.disabledReason ?? action.effect}
-              class={`min-h-9 rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${action.role === "primary" ? accent() : "border border-current/15 bg-white/75"}`}
+              class={`min-h-11 rounded-full px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${action.role === "primary" ? accent() : wedding() ? "border border-wedding-hairline bg-white text-wedding-text hover:bg-wedding-surface" : "border border-current/15 bg-white/75"}`}
               onClick={(event) => runAction(event, action)}
             >
               {action.label}

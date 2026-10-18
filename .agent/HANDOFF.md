@@ -3632,3 +3632,36 @@ Unresolved / next:
 - WED-225/WED-226 remain blocked for human-judge and other rollout evidence. Quote normalisation,
   week 3-6 closure/vendor work, Oracle deployment, vendor mail, relay, and ranking-policy V2 remain
   untouched and disabled.
+
+## 2026-10-19 - WED-241 mobile-first wedding home refresh (Codex, review)
+
+Changed:
+
+- Applied the approved Gen-Z direction to the current wedding home: a combined vendor-search field,
+  one-tap horizontally scrolling category chips, task-derived progress ring, dark countdown hero,
+  number-first budget/guest/seating/vendor tiles, standard status pills, and warmer decision cards.
+- Added a wedding-specific copy boundary so protocol/backend/search diagnostics and machine planning
+  labels do not leak into notices, tooltips, or wedding decision-card text.
+- Preserved the existing five-item fixed mobile navigation and its keyboard avoidance. No routing,
+  AFP, A2UI, provider, quotation, release flag, or deployment behavior changed.
+- Hardened older vendor-card rendering for absent evidence/room arrays and made compact Website and
+  Contact controls meet 44px touch-target requirements.
+
+Verification:
+
+- Solid typecheck, all 1,892 wedding tests, the focused 999-line guard, and the production build
+  passed. The inherited Vite large-chunk advisory remains.
+- The new home Playwright fixture passed at 320x720, 390x844, and 1280x800 with no horizontal
+  overflow, five mobile tabs, technical-copy exclusion, and no serious/critical Axe result.
+- The personalised vendor-comparison suite passed at 320/360/1280, and the existing contrast/touch
+  target suite passed at 360/1280 after its stale fixture was aligned with the current card shape.
+- Every new source/test file is at most 133 lines. The inherited 1,108-line workspace view and
+  1,041-line state builder are unchanged and now have exact no-growth caps.
+
+Next:
+
+- Review WED-241, then continue WED-232 from `ideal-agent-gap-implementation-tasks.md`: bounded,
+  confirmable remark capture into the WED-231 private constraint ledger, reusing current metered LLM
+  and OCR paths. Keep machine/import extraction proposed until explicit user confirmation.
+- WED-225/WED-226 and quotation/week-3-to-6 work remain review-gated. Do not deploy or enable
+  quotation, relay, vendor-mail, ranking-policy-V2, or planning-intelligence flags.

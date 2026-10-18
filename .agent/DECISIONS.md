@@ -1121,3 +1121,22 @@ confirmation, and explicit user removal. The server rejects mismatched status/au
 person constraints couple-private with pseudonymous identifiers, and serializes read-project-write
 with a transaction-scoped PostgreSQL advisory lock so concurrent successors cannot both pass.
 The route remains independently default-off.
+
+## 2026-10-19: Wedding-home presentation is warm, task-honest, and protocol-opaque
+
+The wedding home keeps the established warm wedding identity and mobile bottom navigation while
+adopting one high-contrast hero, number-first domain tiles, one-tap vendor categories, and tactile
+decision actions. Planning progress is derived only from completed planner tasks; it is never an
+elapsed-time decoration or a separately stored claim. Locked seating routes to its guest-list
+prerequisite, and empty domains use zero or a dash rather than enlarging instructions into data.
+
+Untrusted search notices, readiness reasons, planning-need labels, and wedding decision-card copy
+cross a bounded presentation mapper before rendering. Protocol, provider, database, schema,
+payload, token, status-code, and machine-key language collapses to short user guidance; raw backend
+messages are not rendered or placed in tooltips. This is a presentation boundary only: AFP, A2UI,
+planning-intelligence, quotation, and rollout contracts are unchanged.
+
+The two inherited wedding files already above 999 lines are capped at their exact existing sizes in
+the line-budget test, so they cannot grow while new components remain below the limit. Older cached
+vendor cards may omit later personalised evidence and room arrays; the card normalises those fields
+to bounded empty collections rather than failing the whole comparison surface.

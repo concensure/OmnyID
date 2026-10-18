@@ -2501,3 +2501,36 @@ tasks:
       - person subjects require couple-private scope and pseudonymous typed references; public or cross-tenant messages cannot enter the private projection, and PostgreSQL timestamp normalization preserves the canonical observed time
       - ten planning-intelligence unit tests, one route unit test, the disposable-Postgres HTTP flow, cargo check, Solid typecheck, all 1887 wedding tests, and the production build pass
       - every new file is at most 384 lines, src/server/mod.rs is line-neutral, all flags remain default-off, and no quotation, vendor-portal, ranking-policy-V2, provider, Oracle, or deployment action ran
+  - id: WED-241
+    title: Refresh the wedding home and decision-card presentation for mobile-first planning
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-215
+      - WED-229
+    files:
+      - solid-ui/tailwind.config.cjs
+      - solid-ui/src/components/WeddingHomeOverviewGrid.tsx
+      - solid-ui/src/components/WeddingPlanningProgressRing.tsx
+      - solid-ui/src/components/WeddingVendorSearchHomeSections.tsx
+      - solid-ui/src/components/DecisionCard.tsx
+      - solid-ui/src/lib/weddingHomeOverviewState.ts
+      - solid-ui/src/lib/weddingHomeUiCopyState.ts
+      - solid-ui/tests/wedding-home-*.test.ts
+      - solid-ui/tests/wedding-vendor-search-*.test.ts
+      - .agent/**
+    acceptance:
+      - the wedding home uses the approved warm high-contrast search, countdown hero, domain-tile, vendor-result, and decision-card direction without changing AFP contracts
+      - progress is derived honestly from completed planner tasks, empty domains show numbers or dashes rather than oversized instructions, and all actions remain reachable at 320 CSS pixels
+      - technical, provider, protocol, and raw backend messages are replaced with bounded user-facing wedding copy at the rendering boundary
+      - the existing five-item mobile bottom navigation remains mounted, usable, and clear of page content and the software keyboard
+      - reduced-motion, focus visibility, 44px touch targets, wrapping, contrast, and serious or critical Axe checks are covered
+      - every new file remains below 1000 lines and existing oversized files remain line-neutral or shrink
+    progress:
+      - added the warm high-contrast wedding token family, one-field vendor search with one-tap category chips, plain-language search states, a task-derived progress ring, dark countdown hero, number-first domain tiles, icon-and-text statuses, and tactile decision actions
+      - technical, provider, protocol, raw error, and internal planning-need wording is now mapped at the wedding UI boundary; a browser fixture proves protocol-shaped content is absent from rendered search and decision surfaces
+      - preserved the existing five-item mobile bottom bar and verified the home at 320, 390, and 1280 CSS pixels with no horizontal overflow or serious/critical Axe result
+      - hardened vendor comparison cards for older cached records missing personalised evidence or room arrays and restored 44 by 44 pixel Website and Contact targets
+      - Solid typecheck, the 1,892-test wedding suite, focused line-budget tests, the production build, the new home browser suite, the personalised comparison regression suite, and the existing contrast/target suite pass
+      - every new source/test file is at most 133 lines; the 1,108-line workspace view and 1,041-line state builder were not modified and are now explicitly capped against growth

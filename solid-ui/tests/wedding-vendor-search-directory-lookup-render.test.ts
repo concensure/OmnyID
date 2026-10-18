@@ -22,6 +22,14 @@ test("a source-only vendor result cannot crash Planner when an old cached packet
   assert.match(source, /vendorComparisonCards: \[\]/);
 });
 
+test("an older vendor card without personalised evidence rows remains renderable", () => {
+  const source = read("src/components/WeddingVendorChoiceCard.tsx");
+  assert.match(source, /Array\.isArray\(card\.anchorRows\)/);
+  assert.match(source, /Array\.isArray\(card\.verifyQuestions\)/);
+  assert.match(source, /Array\.isArray\(card\.rooms\)/);
+  assert.match(source, /typeof card\.checkedFactsCount === "number"/);
+});
+
 test("mobile decision saves receive the authenticated wedding account identity", () => {
   const source = read("src/components/WeddingMobileFocusHome.tsx");
   const workspace = read("src/components/WeddingResponseWorkspaceView.tsx");

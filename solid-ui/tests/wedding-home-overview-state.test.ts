@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildWeddingHomeStatusState,
   buildWeddingHomeOverviewActionTiles,
+  buildWeddingHomePlanningProgress,
   buildWeddingHomeTimelineOverview,
 } from "@/lib/weddingHomeOverviewState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
@@ -50,14 +51,14 @@ test("home overview guest tile is actionable before guests are added", () => {
   const tiles = buildWeddingHomeOverviewActionTiles(state());
   const guest = tiles.find((tile) => tile.id === "guests");
 
-  assert.equal(guest?.valueLabel, "Add guests");
+  assert.equal(guest?.valueLabel, "—");
   assert.equal(guest?.tone, "needs_input");
-  assert.equal(guest?.toneLabel, "Needs list");
+  assert.equal(guest?.toneLabel, "Action needed");
   assert.equal(guest?.menuId, "guests");
-  assert.equal(guest?.actionLabel, "Open guests");
+  assert.equal(guest?.actionLabel, "Add guests");
   assert.equal(firstActionTarget(guest!), "guests");
   assert.equal(guest?.a2ui.tone, "needs_input");
-  assert.equal(guest?.a2ui.tone_label, "Needs list");
+  assert.equal(guest?.a2ui.tone_label, "Action needed");
   assert.equal(guest?.a2ui.support_label, "Open guests");
 });
 
@@ -78,10 +79,10 @@ test("home overview tiles surface captured intake guest count and budget comfort
   assert.equal(budget?.detailLabel, "Intake: Keep the budget lean");
   assert.equal(budget?.supportLabel, "Open budget to set a numeric target.");
   assert.equal(budget?.toneLabel, "Needs target");
-  assert.equal(guests?.valueLabel, "80 expected");
+  assert.equal(guests?.valueLabel, "80");
   assert.equal(guests?.detailLabel, "Guest count captured from intake; make the guest list next.");
   assert.equal(guests?.tone, "attention");
-  assert.equal(guests?.toneLabel, "Estimate only");
+  assert.equal(guests?.toneLabel, "In progress");
 });
 
 test("home status summarizes the whole wedding and opens the most useful next area", () => {
@@ -92,7 +93,7 @@ test("home status summarizes the whole wedding and opens the most useful next ar
   assert.equal(status.title, "Your wedding plan has a clear next step");
   assert.equal(status.menuId, "timeline");
   assert.equal(status.actionLabel, "Add wedding date");
-  assert.ok(status.detail.includes("Budget: Set budget"));
+  assert.ok(status.detail.includes("Budget: —"));
   assert.ok(status.metrics.some((metric) => metric.id === "date" && metric.value === "Add date"));
   assert.equal(action.target_menu, "timeline");
 });
@@ -196,7 +197,7 @@ test("home overview budget tile surfaces cash timing and risk when insights exis
   const budget = tiles.find((tile) => tile.id === "budget");
 
   assert.equal(budget?.tone, "attention");
-  assert.equal(budget?.toneLabel, "Check risk");
+  assert.equal(budget?.toneLabel, "In progress");
   assert.equal(budget?.detailLabel, "Paid $8,000 - Estimated $12,000 - Forecast $54,500");
   assert.equal(budget?.supportLabel, "$15,000 dated across 2 months.");
 });
@@ -219,30 +220,30 @@ test("home overview budget tile names over-target status clearly", () => {
   assert.equal(firstActionTarget(budget!), "budget");
 });
 
-test("home overview seating tile opens seating even before guest list exists", () => {
+test("home overview seating tile sends a locked plan to the prerequisite guest list", () => {
   const tiles = buildWeddingHomeOverviewActionTiles(state());
   const seating = tiles.find((tile) => tile.id === "seating");
 
-  assert.equal(seating?.valueLabel, "Plan seating");
+  assert.equal(seating?.valueLabel, "—");
   assert.equal(seating?.tone, "needs_input");
-  assert.equal(seating?.toneLabel, "Needs guests");
-  assert.equal(seating?.menuId, "seating");
-  assert.equal(seating?.actionLabel, "Open seating");
-  assert.equal(seating?.supportLabel, "Needs guest list first");
-  assert.match(seating?.detailLabel ?? "", /Open seating/i);
-  assert.equal(firstActionTarget(seating!), "seating");
+  assert.equal(seating?.toneLabel, "Locked");
+  assert.equal(seating?.menuId, "guests");
+  assert.equal(seating?.actionLabel, "Add guests to unlock");
+  assert.equal(seating?.supportLabel, "Unlock by adding guests");
+  assert.match(seating?.detailLabel ?? "", /guest list/i);
+  assert.equal(firstActionTarget(seating!), "guests");
 });
 
 test("home overview vendor tile opens wedding vendor tracking before outreach exists", () => {
   const tiles = buildWeddingHomeOverviewActionTiles(state());
   const vendors = tiles.find((tile) => tile.id === "vendors");
 
-  assert.equal(vendors?.valueLabel, "Track vendors");
+  assert.equal(vendors?.valueLabel, "0");
   assert.equal(vendors?.tone, "needs_input");
-  assert.equal(vendors?.toneLabel, "Needs vendors");
+  assert.equal(vendors?.toneLabel, "Action needed");
   assert.equal(vendors?.menuId, "home");
-  assert.equal(vendors?.actionLabel, "Open vendor tracking");
-  assert.match(vendors?.detailLabel ?? "", /outreach, replies, and follow-ups/i);
+  assert.equal(vendors?.actionLabel, "Track vendors");
+  assert.match(vendors?.detailLabel ?? "", /saved vendors and replies/i);
   assert.equal(firstActionTarget(vendors!), "home");
 });
 
@@ -259,7 +260,7 @@ test("home overview vendor tile surfaces urgent and due follow-ups", () => {
 
   assert.equal(vendors?.valueLabel, "1 urgent");
   assert.equal(vendors?.tone, "risk");
-  assert.equal(vendors?.toneLabel, "Urgent");
+  assert.equal(vendors?.toneLabel, "Action needed");
   assert.equal(vendors?.detailLabel, "1 due - 1 waiting");
   assert.equal(vendors?.supportLabel, "1 closed");
   assert.equal(vendors?.actionLabel, "Open vendor follow-ups");
@@ -282,14 +283,14 @@ test("home overview tiles reflect populated guests and seating", () => {
   const guest = tiles.find((tile) => tile.id === "guests");
   const seating = tiles.find((tile) => tile.id === "seating");
 
-  assert.equal(guest?.valueLabel, "50 guests");
+  assert.equal(guest?.valueLabel, "50");
   assert.equal(guest?.detailLabel, "40 replied - 10 awaiting");
   assert.equal(guest?.supportLabel, "32 attending");
   assert.equal(guest?.tone, "attention");
-  assert.equal(guest?.toneLabel, "Replies waiting");
-  assert.equal(seating?.valueLabel, "24 seated");
+  assert.equal(guest?.toneLabel, "In progress");
+  assert.equal(seating?.valueLabel, "24");
   assert.equal(seating?.tone, "attention");
-  assert.equal(seating?.toneLabel, "Seats left");
+  assert.equal(seating?.toneLabel, "In progress");
   assert.equal(seating?.menuId, "seating");
   assert.equal(seating?.supportLabel, "Open seating");
   assert.equal(firstActionTarget(seating!), "seating");
@@ -327,6 +328,20 @@ test("home timeline overview skips completed rows and tolerates missing status l
   assert.equal(timeline.actionLabel, "Open timeline item");
   assert.equal(timeline.selectedRowId, "venue-payment");
   assert.equal(action.selected_row_id, "venue-payment");
+});
+
+test("home planning progress counts completed planner tasks rather than elapsed time", () => {
+  const progress = buildWeddingHomePlanningProgress(state({
+    planningTaskItems: [
+      { id: "one", status: "completed" },
+      { id: "two", statusLabel: "Done" },
+      { id: "three", status: "open" },
+      { id: "four", statusLabel: "Planned" },
+    ] as WeddingResponseWorkspaceViewState["planningTaskItems"],
+  }));
+
+  assert.deepEqual(progress, { completedCount: 2, totalCount: 4, percentage: 50 });
+  assert.deepEqual(buildWeddingHomePlanningProgress(state()), { completedCount: 0, totalCount: 0, percentage: 0 });
 });
 
 test("home timeline overview also skips rows with machine status fields", () => {

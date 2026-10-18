@@ -11,6 +11,10 @@ const responseQueueSource = readFileSync(
   resolve(process.cwd(), "src/components/ResponseQueueView.tsx"),
   "utf8",
 );
+const copySource = readFileSync(
+  resolve(process.cwd(), "src/lib/weddingHomeUiCopyState.ts"),
+  "utf8",
+);
 
 test("vendor search uses native form submission so Enter and the button share one action", () => {
   assert.match(source, /<form[\s\S]*onSubmit=\{\(event\) => \{/);
@@ -31,11 +35,12 @@ test("vendor search owns Enter rather than an armed global action", () => {
 
 test("provider readiness does not disable a named directory lookup", () => {
   assert.doesNotMatch(source, /\|\| Boolean\(workspace\(\)\.vendorSearchBlockedReason\)/);
-  assert.match(source, /A named search can still check your wedding directory/);
+  assert.match(source, /weddingVendorSearchBlockedCopy/);
+  assert.match(copySource, /You can still search by name/);
 });
 
 test("full vendor search evidence expands and closes in place", () => {
-  assert.match(source, /Show full search result/);
+  assert.match(source, /See all results/);
   assert.match(source, /aria-controls="wedding-vendor-search-full-result"/);
   assert.match(source, /result\(\)\.sourcePreview\?\.bodyText/);
   assert.match(source, /setFullResultExpanded\(false\)/);

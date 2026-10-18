@@ -16,6 +16,8 @@ const card = (rank: number, category = "venue"): WeddingVendorChoiceCardData => 
   availabilityLabel: "Availability unknown", confidenceLabel: "medium confidence", vendorId: `id-${rank}`,
   unknownConstraints: ["date availability"], weddingPlanId: "plan-fixture", qualityScoreLabel: null,
   sentimentScoreLabel: null, valueScoreLabel: null, seasonalNote: null,
+  checkedFactsCount: 2, anchorRows: [], verifyQuestions: ["Confirm date availability and final quote."],
+  rooms: [],
 });
 const comparisonItem = (category: string): FocusDeckItem => ({
   id: `comparison:${category}`, kind: "vendor_comparison", sourceSurface: "wedding_vendor_comparison", title: `Sydney ${category} comparison`,
