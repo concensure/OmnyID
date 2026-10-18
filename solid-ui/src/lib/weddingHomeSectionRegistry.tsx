@@ -17,6 +17,7 @@ import type { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutrea
 import type { useWeddingPreferenceFeedbackOwner } from "@/lib/useWeddingPreferenceFeedbackOwner";
 import type { useWeddingPreferenceProfileOwner } from "@/lib/useWeddingPreferenceProfileOwner";
 import type { WeddingHomeSectionId } from "@/lib/weddingHomeSectionPolicyState";
+import { planningConstraintCaptureUiEnabled } from "@/lib/planningConstraintCapture";
 import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
 import type { WeddingResponseWorkspaceViewState, WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 
@@ -61,7 +62,7 @@ export function buildWeddingHomeSections(input: WeddingHomeSectionRegistryInput)
     {
       id: "planning_basics",
       title: "Planning basics needed",
-      visible: workspace.vendorSearchReadiness?.status === "blocked",
+      visible: workspace.vendorSearchReadiness?.status === "blocked" || planningConstraintCaptureUiEnabled(),
       render: () => <WeddingPlanningBasicsSection workspace={workspace} />,
     },
     {

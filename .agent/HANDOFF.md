@@ -3665,3 +3665,42 @@ Next:
   and OCR paths. Keep machine/import extraction proposed until explicit user confirmation.
 - WED-225/WED-226 and quotation/week-3-to-6 work remain review-gated. Do not deploy or enable
   quotation, relay, vendor-mail, ranking-policy-V2, or planning-intelligence flags.
+
+## 2026-10-19 - WED-232 confirmable planning-remark capture (Codex, review)
+
+Changed:
+
+- Added a reusable deterministic-first capture core over the frozen planning constraint contract.
+  Supported operational remarks map to closed typed values with exact source anchors; ambiguous,
+  injection-shaped, sensitive-only, or unknown content creates no typed record.
+- Added an authenticated `/planning/constraints/capture` route. It validates the exact owned AFP
+  source/version, falls back to the current metered wedding LLM ladder only after deterministic
+  no-match, emits user-safe A2UI state, and never returns provider/model/attempt details.
+- Added a build-flagged wedding home/intake card. It saves the remark privately, clearly separates
+  must-haves from preferences, and uses the WED-231 append route only after an explicit tap. The
+  existing five-tab mobile menu and all current workspace contracts remain intact.
+
+Verification:
+
+- `cargo check`, 17 planning-intelligence library tests, the focused capture/LLM/metering route
+  tests, the existing disposable-Postgres ledger API test, and the new disposable-Postgres capture
+  API test passed. The latter covers flags-off, tenant isolation, sensitive-anchor removal,
+  ambiguity, hard proposal state, confirmation, and deterministic retry.
+- Solid typecheck, line-budget checks, all 1,896 wedding tests, and the production build passed.
+  The focused Playwright confirmation flow passed at 320x720 and 390x844 without horizontal
+  overflow or serious/critical Axe findings. The inherited Vite chunk advisory and Rust unused
+  `email_group_routes.rs` variable warning remain.
+- New files are at most 852 lines. The inherited 1,108-line workspace view and 1,041-line state
+  builder are unchanged. Disposable Postgres used 127.0.0.1:55432/omnyid_test and the healthy
+  ClamAV test endpoint remained at 127.0.0.1:33310; credentials were not printed or persisted.
+
+Unresolved / next:
+
+- Review WED-232, then implement WED-233 decision-time constraint evaluation from the frozen plan.
+  Keep unknown vendor/candidate evidence unknown, keep conflict checks pure, and reuse existing
+  Decision Cards/A2UI instead of introducing a parallel recommendation surface.
+- Enable the capture UI only with `VITE_PLANNING_CONSTRAINT_CAPTURE_ENABLED` and the backend only
+  with both `OMNYID_PLANNING_CONSTRAINT_LEDGER_ENABLED` and
+  `OMNYID_PLANNING_CONSTRAINT_CAPTURE_ENABLED`; all remain off. No Oracle deployment ran.
+- WED-225/WED-226 quotation and week-3-to-6 work remain paused for the user's human-judge review.
+  Vendor mail, relay, ranking-policy-V2, and all release flags remain disabled.

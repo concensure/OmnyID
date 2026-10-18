@@ -1140,3 +1140,26 @@ The two inherited wedding files already above 999 lines are capped at their exac
 the line-budget test, so they cannot grow while new components remain below the limit. Older cached
 vendor cards may omit later personalised evidence and room arrays; the card normalises those fields
 to bounded empty collections rather than failing the whole comparison surface.
+
+## 2026-10-19: Planning remarks remain private evidence until explicit confirmation
+
+Remark capture is an interpreter over the WED-231 AFP ledger, not a second memory store. The exact
+user note is first saved in the authenticated tenant-private thread. A capture proposal must point
+to a byte-exact substring of that source and use the frozen constraint kind, operator, value,
+strength, privacy, and authority vocabulary. Deterministic extraction runs first; an assisted pass
+may use the existing metered wedding LLM ladder only when deterministic extraction has no match.
+It may not invent anchors, kinds, people, diagnoses, protected attributes, or free-form values.
+
+Deterministic and assisted results remain unpersisted proposals. Hard rules receive a distinct
+must-have confirmation label, but every strength requires a user action before the canonical
+record is appended with `user` authority and `confirmed` status through WED-231. Ambiguity,
+prompt-injection language, unsupported or sensitive-only text, missing model capacity, and failed
+metering receipts retain the source note and return a bounded plain-language question without a
+typed record. Relationship controls accept only explicit opaque person references and remain
+couple-private.
+
+The capture route and home surface require independent default-off backend and build flags. API
+responses expose no model, provider, attempt, database, or protocol diagnostic. The confirmation
+surface consumes a small A2UI-compatible projection, maps untrusted errors at the rendering
+boundary, and keeps the established mobile navigation unchanged. This slice does not satisfy or
+bypass quotation, vendor-portal, ranking-policy-V2, human-review, or deployment gates.

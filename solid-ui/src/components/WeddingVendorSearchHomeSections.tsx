@@ -2,6 +2,7 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 
 import { DecisionCard } from "@/components/DecisionCard";
+import { PlanningConstraintCaptureCard } from "@/components/PlanningConstraintCaptureCard";
 import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/WeddingDashboardIcons";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
@@ -144,6 +145,7 @@ export function WeddingPlanningBasicsSection(props: { workspace: WeddingResponse
           </div>
         </Show>
       </div>
+      <PlanningConstraintCaptureCard workspace={workspace()} />
     </div>
   );
 }

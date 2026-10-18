@@ -2534,3 +2534,38 @@ tasks:
       - hardened vendor comparison cards for older cached records missing personalised evidence or room arrays and restored 44 by 44 pixel Website and Contact targets
       - Solid typecheck, the 1,892-test wedding suite, focused line-budget tests, the production build, the new home browser suite, the personalised comparison regression suite, and the existing contrast/target suite pass
       - every new source/test file is at most 133 lines; the 1,108-line workspace view and 1,041-line state builder were not modified and are now explicitly capped against growth
+  - id: WED-232
+    title: Capture bounded planning remarks as confirmable constraint proposals
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-231
+    files:
+      - src/planning_intelligence/capture.rs
+      - src/planning_intelligence/capture_tests.rs
+      - src/planning_intelligence/mod.rs
+      - src/server/planning_constraint_capture_routes.rs
+      - src/server/wedding_llm_ladder.rs
+      - src/server/mod.rs
+      - solid-ui/src/components/PlanningConstraintCaptureCard.tsx
+      - solid-ui/src/lib/planningConstraintCapture.ts
+      - solid-ui/tests/planning-constraint-capture*.test.ts
+      - tests/planning_constraint_capture_api.rs
+      - .agent/**
+    acceptance:
+      - supported remarks produce bounded, closed-vocabulary proposals with exact source anchors and no invented facts
+      - deterministic extraction handles supported accessibility, location, duration, dimension, dietary, alcohol, relationship, aesthetic, and category-priority controls before metered LLM fallback
+      - ambiguous, unsupported, injected, sensitive, or unavailable-model inputs retain the remark and ask a bounded question without creating a typed constraint
+      - hard constraints require explicit user confirmation and confirmed records append through the WED-231 private AFP ledger
+      - retry identities are deterministic and the feature remains disabled by default without changing quotation, vendor-response, or ranking-policy rollout gates
+      - the wedding confirmation surface is mobile-friendly, plain-language, A2UI-compatible, and does not expose protocol, provider, model, or database messages
+      - focused Rust, disposable-Postgres, Solid, wedding, line-budget, and production build checks pass; every new file remains below 1000 lines and oversized files do not grow
+    progress:
+      - started from committed WED-231 and WED-241 foundations; quotation normalisation and week 3 to 6 release-gated work remain paused for the user's human-judge review
+      - added a deterministic-first, template-neutral capture core covering accessibility, co-location, travel, duration, dimension, dietary, alcohol, opaque-person relationship, aesthetic, and category-priority controls with exact source substrings and a closed kind/value matrix
+      - ambiguous, injection-shaped, sensitive-only, unsupported, and unavailable-model inputs retain the private source note but create no typed record; diagnoses are never carried into operational anchors
+      - added an authenticated capture route behind both planning flags; it validates tenant-owned AFP source/version/text, reuses the metered wedding LLM ladder only after deterministic no-match, strips provider details, and emits plain-language A2UI confirmation state
+      - added a rollout-gated wedding home/intake card that saves the source privately, presents must-have versus preference confirmation at 44px touch targets, maps technical failures to user-safe copy, and appends only explicit user-confirmed records through WED-231
+      - disposable-Postgres tests prove disabled routing, tenant isolation, exact anchors, explicit confirmation and deterministic retry; focused Rust tests, the existing ledger API, 1,896 wedding tests, Solid typecheck, line budgets, two mobile Playwright viewports, cargo check and production build pass
+      - every new file is at most 852 lines, the oversized workspace files remain unchanged, all planning/quotation/vendor-mail/relay/ranking flags remain disabled, and no Oracle or provider action ran

@@ -21,6 +21,7 @@ pub enum WeddingSharedToolProvider {
 pub enum WeddingSharedToolFeature {
     VendorOutreachDraft,
     Interpreter,
+    ConstraintCapture,
     Enrichment,
     QuoteNormalisation,
     VendorDiscovery,
@@ -152,6 +153,7 @@ fn feature_label(feature: WeddingSharedToolFeature) -> &'static str {
     match feature {
         WeddingSharedToolFeature::VendorOutreachDraft => "vendor_outreach_draft",
         WeddingSharedToolFeature::Interpreter => "interpreter",
+        WeddingSharedToolFeature::ConstraintCapture => "constraint_capture",
         WeddingSharedToolFeature::Enrichment => "enrichment",
         WeddingSharedToolFeature::QuoteNormalisation => "quote_normalisation",
         WeddingSharedToolFeature::VendorDiscovery => "vendor_discovery",

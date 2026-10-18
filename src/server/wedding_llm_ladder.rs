@@ -21,6 +21,7 @@ const PROVIDER_TIMEOUT: Duration = Duration::from_secs(12);
 pub enum WeddingLlmFeature {
     Outreach,
     Interpreter,
+    ConstraintCapture,
     Enrichment,
     QuoteNormalisation,
 }
@@ -30,6 +31,7 @@ impl WeddingLlmFeature {
         match self {
             Self::Outreach => "OUTREACH",
             Self::Interpreter => "INTERPRETER",
+            Self::ConstraintCapture => "CONSTRAINT_CAPTURE",
             Self::Enrichment => "ENRICHMENT",
             Self::QuoteNormalisation => "QUOTE_NORMALISATION",
         }
