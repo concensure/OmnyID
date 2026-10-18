@@ -1196,3 +1196,18 @@ The route requires both the constraint-ledger and evaluation flags and returns b
 and presentation records without excerpts or vendor-visible private context. This adapter reuses
 quotation replay and planning evaluation; it does not change quotation persistence, recommendation
 policy, vendor context, or deployment gates.
+
+## 2026-10-19: Directory evaluation uses exact closed attributes and fingerprinted freshness state
+
+Directory constraint evaluation treats the established vendor directory as a rebuildable candidate
+projection, not a second constraint authority. Its immutable revision fingerprint covers the vendor
+category, service area, material attributes, source times and whether each validity boundary has
+expired. Attribute ordering cannot change the revision; an authoritative material update or expiry
+transition does.
+
+Only exact known evidence becomes a fact: allowlisted boolean service capabilities, positive exact
+style tags, service area and category. Missing tags, estimated/unknown values, expired evidence and
+semantic approximations remain unknown. In particular, `wheelchair_accessible` is not widened into
+`step_free`. The authenticated route reads constraints only from the owner's private AFP thread,
+and presentation receives no vendor name, source URL, note or private excerpt. Frontend consumption
+uses the current recommendation/Decision Card projection behind an independent default-off flag.

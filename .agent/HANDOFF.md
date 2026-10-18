@@ -3761,3 +3761,32 @@ Unresolved / next:
   adapter into the existing recommendation/Decision Card state. Keep the evaluation flag off.
 - Quote normalization/week-3-to-6 work remains paused for human-judge review. Ranking-policy-V2,
   vendor mail, relay, provider, and deployment flags remain disabled; no Oracle deployment ran.
+
+## 2026-10-19 - WED-233 directory evaluation and workspace adapter (Codex, review)
+
+Changed:
+
+- Added a generic directory evidence projector with fingerprinted material/freshness revisions.
+  Only exact known service booleans, positive style tags, service area and category are decisive;
+  missing, estimated, expired, unsupported or semantically wider evidence remains unknown.
+- Added authenticated `POST /planning/directory-constraint-evaluations`, scoped to the owner's
+  private constraint thread and an active exact vendor ID. No vendor name, source URL, note or
+  private source excerpt enters the response.
+- Added a default-off frontend adapter for quotation/directory evaluation responses and passed
+  validated revision-bound results into the existing wedding presentation recommendation cards.
+
+Verification:
+
+- `cargo check`, all 31 planning-intelligence tests, the ledger/capture/quotation-evaluation/
+  directory-evaluation disposable-Postgres API suites, and configured ClamAV test pass.
+- Twenty focused frontend tests, all 1,899 wedding tests, Solid typecheck, line budgets and the
+  production build pass. The inherited Rust unused-parameter and Vite chunk advisories remain.
+- New files are 426, 157, 281, 126 and 94 lines. Credentials were not printed or persisted. No
+  rollout flag, provider, Oracle deployment, policy V2, vendor mail or quote release state changed.
+
+Next:
+
+- Independently review WED-233. Keep `OMNYID_PLANNING_EVALUATION_ENABLED` and
+  `VITE_PLANNING_CONSTRAINT_EVALUATION_ENABLED` off until review and release evidence permit them.
+- Continue with WED-234 approval-safe conflict interventions over these immutable evaluations.
+  Quote-normalisation/week-3-to-6 tasks remain paused for the user's human-judge review.

@@ -11,6 +11,7 @@ import type { WeddingArtifactInput, WeddingArtifactSummary } from "@/lib/wedding
 import type { WeddingKnowledgeGraphState } from "@/lib/weddingKnowledgeGraphState";
 import {
   buildWeddingRecommendationExplanationState,
+  type WeddingConstraintEvaluationRecommendation,
   type WeddingRecommendationExplanationState,
 } from "@/lib/weddingRecommendationExplanationState";
 
@@ -332,6 +333,7 @@ export function buildWeddingPresentationState(input: {
   planningContext?: WeddingPlanningContext | null;
   artifacts?: readonly WeddingArtifactInput[] | null;
   knowledgeGraph?: WeddingKnowledgeGraphState | null;
+  constraintEvaluations?: readonly WeddingConstraintEvaluationRecommendation[] | null;
 }): WeddingPresentationState {
   const context = input.planningContext ?? {};
   const workspace = buildWeddingResponseWorkspaceState({
@@ -340,7 +342,10 @@ export function buildWeddingPresentationState(input: {
   });
   const probing = buildWeddingNeedToKnowProbingState(context);
   const recommendations = input.knowledgeGraph
-    ? buildWeddingRecommendationExplanationState(input.knowledgeGraph)
+    ? buildWeddingRecommendationExplanationState(
+      input.knowledgeGraph,
+      input.constraintEvaluations ?? [],
+    )
     : null;
   const title = input.title?.trim() || "Wedding planning response";
   const sections = (Object.keys(SECTION_COPY) as WeddingPresentationSectionId[])

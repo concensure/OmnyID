@@ -2571,7 +2571,7 @@ tasks:
       - every new file is at most 852 lines, the oversized workspace files remain unchanged, all planning/quotation/vendor-mail/relay/ranking flags remain disabled, and no Oracle or provider action ran
   - id: WED-233
     title: Evaluate active constraints against revision-bound candidate evidence
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -2580,12 +2580,19 @@ tasks:
       - src/planning_intelligence/evaluation.rs
       - src/planning_intelligence/evaluation_tests.rs
       - src/planning_intelligence/quotation_projection.rs
+      - src/planning_intelligence/directory_projection.rs
       - src/planning_intelligence/mod.rs
       - src/planning_intelligence/validation.rs
       - src/server/planning_constraint_evaluation_routes.rs
+      - src/server/planning_directory_evaluation_routes.rs
       - tests/planning_constraint_evaluation_api.rs
+      - tests/planning_directory_evaluation_api.rs
+      - solid-ui/src/lib/planningConstraintEvaluationApi.ts
       - solid-ui/src/lib/weddingRecommendationExplanationState.ts
+      - solid-ui/src/lib/weddingPresentationState.ts
+      - solid-ui/tests/planning-constraint-evaluation-api.test.ts
       - solid-ui/tests/wedding-recommendation-explanation-state.test.ts
+      - solid-ui/tests/wedding-presentation-state.test.ts
       - .agent/**
     acceptance:
       - active confirmed constraints evaluate deterministically against exact revision-bound quote, directory, venue, catering, and guest evidence
@@ -2606,4 +2613,9 @@ tasks:
       - added an authenticated route behind both ledger and evaluation flags; it reads only the owner's private AFP thread and projects stored active quotation comparisons rather than accepting browser-supplied candidate facts
       - stored hard-conflict IDs become revision-bound evidence, while absent IDs, unknown hard requirements, soft assessments, and numeric limits without actual measurements remain unknown
       - all 27 planning-intelligence unit tests, the ledger/capture/evaluation Postgres API suites, cargo check, and the configured ClamAV clean-scan proof pass against disposable local services
-      - WED-233 remains in progress for directory evidence projection and the default-off workspace API adapter that feeds the existing recommendation/Decision Card state
+      - completed directory evidence projection and the default-off workspace API adapter into the existing recommendation/Decision Card state
+      - added a generic fingerprinted directory projector for exact known boolean service capabilities, matching style tags, service area and category; estimated, expired, missing, semantically wider and unsupported evidence remains unknown
+      - added a private authenticated directory evaluation route behind the existing ledger/evaluation flags; real Postgres proves default-off behavior, tenant isolation, conflict-to-satisfied revision changes, and omission of vendor/source copy
+      - added a default-off frontend API normalizer for quotation and directory targets and passed its closed revision-bound results into the existing wedding presentation recommendation cards without a parallel UI
+      - final verification passes: 31 planning-intelligence units, four disposable-Postgres planning API suites, configured ClamAV, cargo check, 20 focused frontend tests, all 1,899 wedding tests, typecheck, line budgets and production build
+      - moved to review with every planning/quotation/vendor-mail/relay/ranking flag still disabled and no Oracle or provider action performed

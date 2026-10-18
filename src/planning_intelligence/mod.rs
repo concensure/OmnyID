@@ -1,5 +1,6 @@
 mod capture;
 mod contracts;
+mod directory_projection;
 mod evaluation;
 mod features;
 mod ledger;
@@ -8,6 +9,7 @@ mod validation;
 
 pub use capture::*;
 pub use contracts::*;
+pub use directory_projection::*;
 pub use evaluation::*;
 pub use features::*;
 pub use ledger::*;

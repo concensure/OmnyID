@@ -302,3 +302,30 @@ test("buildWeddingPresentationState adds graph-backed recommendation cards when 
   assert.equal(recommendations?.cards[0]?.secondaryAction?.kind, "open_graph");
   assert.match(recommendations?.cards[0]?.evidenceLabel ?? "", /graph relationship|missing artifact/i);
 });
+
+test("buildWeddingPresentationState places constraint conflicts in the existing recommendation cards", () => {
+  const metadata = {
+    wedding_plan_id: "wedding_plan:harbour",
+    response_workspace_id: "response_workspace:planning-pass",
+    source_response_id: "afp:response-1",
+  };
+  const state = buildWeddingPresentationState({
+    metadata,
+    knowledgeGraph: buildWeddingKnowledgeGraphState({ metadata }),
+    constraintEvaluations: [{
+      evaluationId: "evaluation:ceremony:v2",
+      constraintRef: "constraint:ceremony",
+      candidateRevisionRef: "directory:venue-one:revision:v2",
+      result: "conflict",
+      severity: "blocking",
+      title: "Service requirement conflicts with this option",
+      evidenceLabel: "Checked service requirement evidence",
+    }],
+  });
+  const card = state.sections.find((section) => section.id === "recommendations")?.cards[0];
+
+  assert.equal(state.recommendations?.primaryRecommendation?.kind, "constraint_conflict");
+  assert.equal(card?.title, "Service requirement conflicts with this option");
+  assert.equal(card?.evidenceLabel, "Checked service requirement evidence");
+  assert.equal(JSON.stringify(card).includes("degree"), false);
+});
