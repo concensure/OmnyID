@@ -2469,3 +2469,35 @@ tasks:
       - confirmed successors may replace prior records without mutating history, while proposals cannot supersede confirmed history and removal/supersession tombstones require an exact predecessor
       - every planning-intelligence flag defaults off; quotation, vendor-response, email, relay, rollout, and ranking-policy-V2 gates were not changed or enabled
       - five focused Rust tests, cargo check, SDK typecheck/build, and 48 SDK/package tests pass; every new file is at most 446 lines and no existing oversized source file grew
+  - id: WED-231
+    title: Persist an append-only typed constraint ledger
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-230
+    files:
+      - src/planning_intelligence/ledger.rs
+      - src/planning_intelligence/ledger_tests.rs
+      - src/planning_intelligence/mod.rs
+      - src/server/planning_constraint_routes.rs
+      - src/server/mod.rs
+      - tests/planning_constraint_api.rs
+      - .agent/**
+    acceptance:
+      - authenticated plan-private append and list routes reuse current AFP storage and ownership checks without a parallel wedding store
+      - exact retries are idempotent and deterministic replay returns active, superseded, and removed constraints under shuffled or duplicate delivery
+      - exact source anchors and observed times survive persistence and projection while subject identifiers reject embedded PII
+      - proposed/imported records cannot forge confirmation authority, person constraints default couple-private, and successors cannot relax privacy without explicit user authority
+      - removal appends a successor tombstone and never erases source evidence
+      - unit and disposable-Postgres HTTP tests cover retry, successor, removal, cross-tenant denial, forged authority/privacy, and source binding
+      - all planning-intelligence and quotation/release flags remain disabled by default and no review-gated work is resumed
+      - every new file remains below 1000 lines and existing oversized files remain line-neutral or shrink
+    progress:
+      - started from WED-230 contract-freeze commit 200bbac; generic AFP storage and current authenticated thread ownership are being audited before choosing additive persistence
+      - reused the existing tenant-private AFP message store with a strict planning constraint envelope and deterministic fingerprint-derived ULID, so no parallel wedding store, migration, or history backfill was required
+      - added deterministic active, superseded, and removed projection with exact retry dedupe, divergent identity/multiple-successor/cycle rejection, and immutable successor tombstones
+      - authenticated append/list routes read only the owner tenant table, require exact source message/version/excerpt binding, derive closed proposal/confirmation/removal authority, and serialize concurrent writes with a transaction-scoped Postgres advisory lock
+      - person subjects require couple-private scope and pseudonymous typed references; public or cross-tenant messages cannot enter the private projection, and PostgreSQL timestamp normalization preserves the canonical observed time
+      - ten planning-intelligence unit tests, one route unit test, the disposable-Postgres HTTP flow, cargo check, Solid typecheck, all 1887 wedding tests, and the production build pass
+      - every new file is at most 384 lines, src/server/mod.rs is line-neutral, all flags remain default-off, and no quotation, vendor-portal, ranking-policy-V2, provider, Oracle, or deployment action ran

@@ -1099,3 +1099,25 @@ confirmed history. Non-user ingress cannot claim user or confirmed-interpretatio
 privacy, or bind another plan. Every planning-intelligence capability remains independently
 default-off, and this contract work does not satisfy or bypass quotation, vendor-portal,
 ranking-policy-V2, human-review, or deployment gates.
+
+## 2026-10-18: Constraint memory is a tenant-private AFP projection, not a second database
+
+The typed constraint ledger uses the existing per-user AFP message table because it already gives
+append-only storage, deterministic retry insertion, immutable evidence, and tenant isolation. Each
+constraint is wrapped in a closed envelope whose AFP ULID derives from the thread and canonical
+contract fingerprint. List and append routes project only the authenticated owner's private table;
+public thread messages are not constraint authority. No new relational table, destructive
+migration, or conversation-history backfill is justified for this slice.
+
+Projection is deterministic under shuffled and duplicate delivery. A logical identity may have
+only one immutable payload and each predecessor only one successor; divergent identities, missing
+predecessors, forks, cycles, or forged envelope bindings fail closed. Removal is a successor
+tombstone, never deletion. Source message, source version, and exact excerpt must resolve inside
+the same owned private thread, while canonical observed time survives PostgreSQL's equivalent
+timestamp text and microsecond normalization.
+
+Authenticated append uses three closed authority intents: machine/import proposal, explicit user
+confirmation, and explicit user removal. The server rejects mismatched status/authority, makes
+person constraints couple-private with pseudonymous identifiers, and serializes read-project-write
+with a transaction-scoped PostgreSQL advisory lock so concurrent successors cannot both pass.
+The route remains independently default-off.

@@ -3599,3 +3599,36 @@ Unresolved / next:
 - WED-225/WED-226 remain review-gated. Do not resume quote normalisation or week 3-6 closure work,
   deploy, or enable quotation/vendor-mail/relay/ranking-policy-V2 flags until the requested human
   judge evidence and the existing rollout criteria are supplied.
+## 2026-10-18 - WED-231 append-only constraint ledger (Codex, review)
+
+Changed:
+
+- Reused tenant-private AFP storage for strict planning-constraint envelopes with deterministic
+  fingerprint-derived message IDs. Added order-independent projection of active, superseded, and
+  removed history, including fork/cycle/divergent-identity rejection and successor tombstones.
+- Added default-off authenticated list/append routes. They project only the owner's private table,
+  bind the exact source message/version/excerpt, enforce closed proposal/user-confirm/remove
+  authority, require couple-private pseudonymous person references, and preserve observed time.
+- Added transaction-scoped PostgreSQL advisory locking around read-project-write so concurrent
+  appends cannot create two accepted successors. No table, migration, wedding-only store, or
+  history backfill was added.
+
+Verification:
+
+- Ten planning-intelligence unit tests and the focused route unit test passed; cargo check passed.
+- The disposable-Postgres HTTP test passed against 127.0.0.1:55432/omnyid_test, covering the
+  disabled flag, auth, tenant denial, retry, source binding, successor, authority forgery, removal,
+  and evidence persistence. The isolated clamd endpoint at 127.0.0.1:33310 remained healthy.
+- Solid typecheck, all 1,887 wedding tests, and the production build passed. The inherited Vite
+  chunk-size advisory and Rust unused user_id warning remain.
+- Every new file is at most 384 lines, src/server/mod.rs is line-neutral, and git diff --check
+  passes.
+
+Unresolved / next:
+
+- Review commits 200bbac (WED-230) and the WED-231 commit, then continue with WED-232 bounded,
+  confirmable remark capture over this ledger. Keep extracted/imported facts proposed until user
+  confirmation and reuse the existing metered LLM/OCR paths rather than adding a new OCR service.
+- WED-225/WED-226 remain blocked for human-judge and other rollout evidence. Quote normalisation,
+  week 3-6 closure/vendor work, Oracle deployment, vendor mail, relay, and ranking-policy V2 remain
+  untouched and disabled.

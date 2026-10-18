@@ -135,6 +135,7 @@ mod map_routes;
 mod metadata_term_helpers;
 mod news_routes;
 mod para_routes;
+mod planning_constraint_routes;
 mod privacy_routes;
 mod proactive_ranking_helpers;
 mod proactive_routes;
@@ -1372,6 +1373,7 @@ pub async fn run() {
         .merge(quotation_source_routes::routes())
         .merge(knowledge_routes::routes())
         .merge(para_routes::routes())
+        .merge(planning_constraint_routes::routes())
         .merge(news_routes::routes())
         .merge(map_routes::routes())
         .merge(geofence_routes::routes())
@@ -1398,7 +1400,6 @@ pub async fn run() {
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(app_state.clone());
     let app = apply_default_body_limit(app);
-
     // Background cron trigger scheduler â€” fires schedule-family workflow triggers.
     let scheduler_state = app_state.clone();
     tokio::spawn(async move {
@@ -1499,7 +1500,6 @@ pub async fn run() {
         }
     }
 }
-
 pub async fn build_test_router(database_url: &str) -> Router {
     let db = Db::new(database_url)
         .await
@@ -1519,7 +1519,6 @@ pub async fn build_test_router(database_url: &str) -> Router {
         cost_oracle: Arc::new(CostOracle::new(db.pool.clone())),
         pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
     });
-
     let app = Router::new()
         .route("/healthz", get(healthz_http))
         .route("/send", post(send_http))
@@ -1534,6 +1533,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(quotation_vendor_response_routes::routes())
         .merge(quotation_vendor_revision_routes::routes())
         .merge(quotation_source_routes::routes())
+        .merge(planning_constraint_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(app_state);
