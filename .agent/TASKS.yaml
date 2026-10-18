@@ -2659,3 +2659,35 @@ tasks:
       - added a default-off frontend normalizer with technical-copy suppression plus projections into the existing Decision Card and A2UI callout, insight, unknowns and action-chips nodes; no new renderer or card type was added
       - real disposable-Postgres coverage passes for flags-off, tenant isolation, deterministic preparation, private-text exclusion, append, retry and divergent retry; 40 planning units, 5 quotation clarification tests, typecheck, 8 focused frontend tests, all 1,899 wedding tests, line budgets and the production build pass
       - moved to review with all planning, quotation, vendor-mail, relay and ranking-policy-V2 flags disabled and no Oracle or provider action performed
+  - id: WED-235
+    title: Add priority-weighted continuous budget advice
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-230
+      - WED-231
+      - WED-234
+    files:
+      - src/planning_intelligence/cost_advice.rs
+      - src/planning_intelligence/cost_advice_tests.rs
+      - src/planning_intelligence/mod.rs
+      - src/planning_intelligence/validation.rs
+      - src/server/planning_cost_tradeoff_routes.rs
+      - tests/planning_cost_tradeoff_api.rs
+      - solid-ui/src/lib/planningCostTradeoffApi.ts
+      - solid-ui/tests/planning-cost-tradeoff-api.test.ts
+      - .agent/**
+    acceptance:
+      - advice names uncontracted categories and unresolved fee drivers only from current budget and quotation evidence
+      - conservative incremental cost and before/after forecasts preserve exact currency and use ranges whenever inputs are uncertain
+      - offset candidates require current source evidence and rank by preserving confirmed higher-priority categories rather than maximizing raw savings
+      - stale quote, allowance or constraint revisions invalidate advice and unknown costs never become zero
+      - an over-budget selection cannot advance without an explicit append-only acknowledgement and no path reallocates, purchases, pays or negotiates
+      - correction and acceptance metrics are aggregate-only and contain no amount, category identity or user labels
+      - all planning, quotation, vendor-mail, relay and ranking-policy-V2 flags remain disabled by default
+      - focused Rust/Postgres/Solid tests, wedding regressions, line budgets and production builds pass with every new file below 1000 lines
+    progress:
+      - started from clean reviewed WED-234 commit 53879f4; implementing a pure currency-safe advice engine before any route, persistence or UI integration
+      - pure cost-advice core now binds candidate, budget, priority-constraint and source revisions; stale evidence cannot produce offsets, uncontracted labels or fee drivers, and uncertain candidate cost remains a range or unknown rather than zero
+      - eight focused unit tests pass for exact/ranged/unknown cost, checked arithmetic, currency isolation, priority-preserving offset order, missing/stale evidence, deterministic identity and successor invalidation
