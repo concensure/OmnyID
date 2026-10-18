@@ -1527,9 +1527,13 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .route("/thread/{thread_id}", get(get_thread_http))
         .route("/actions/decision", post(record_action_decision_http))
         .route("/gateway/email", post(handle_gateway_email))
+        .merge(quotation_normalisation_routes::routes())
         .merge(quotation_routes::routes())
         .merge(quotation_response_capability_routes::routes())
         .merge(quotation_response_portal_routes::routes())
+        .merge(quotation_vendor_response_routes::routes())
+        .merge(quotation_vendor_revision_routes::routes())
+        .merge(quotation_source_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(app_state);

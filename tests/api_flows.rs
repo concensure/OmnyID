@@ -108,6 +108,26 @@ fn source_message(thread_id: &str, source_id: &str, timestamp: &str) -> Value {
     })
 }
 
+fn rebind_fixture_source_id(value: &mut Value, source_id: &str) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                rebind_fixture_source_id(item, source_id);
+            }
+        }
+        Value::Object(fields) => {
+            for (key, field) in fields {
+                if key == "source_id" && field.as_str() == Some("source-generic") {
+                    *field = json!(source_id);
+                } else {
+                    rebind_fixture_source_id(field, source_id);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 fn quotation(source_id: &str, suffix: &str) -> NormalisedQuotation {
     let mut value: Value = serde_json::from_str(include_str!(
         "fixtures/quotation/generic_normalised_quote.json"
@@ -115,9 +135,7 @@ fn quotation(source_id: &str, suffix: &str) -> NormalisedQuotation {
     .expect("quotation fixture");
     value["identity"]["quotation_id"] = json!(format!("production-hire-{suffix}"));
     value["identity"]["version_id"] = json!(format!("production-hire-{suffix}-v1"));
-    value["sources"][0]["source_id"] = json!(source_id);
-    value["line_items"][0]["evidence"]["anchors"][0]["source_id"] = json!(source_id);
-    value["commercial_terms"][0]["evidence"]["anchors"][0]["source_id"] = json!(source_id);
+    rebind_fixture_source_id(&mut value, source_id);
     serde_json::from_value(value).expect("normalised quotation")
 }
 
@@ -355,7 +373,11 @@ async fn quotation_http_flow_is_tenant_private_idempotent_and_stale_safe() {
         })),
     )
     .await;
-    assert_eq!(status, StatusCode::OK, "source preparation: {prepared_source}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "source preparation: {prepared_source}"
+    );
     let prepared_source_version = prepared_source["receipt"]["source_version_id"]
         .as_str()
         .expect("prepared source version")

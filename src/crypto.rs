@@ -54,6 +54,17 @@ pub fn verify_signature(msg: &crate::message::AFPMessage) -> bool {
         return true;
     }
 
+    // Signatures created before timestamp canonicalisation used the timestamp
+    // text exactly as supplied. Continue to accept those while the original
+    // representation is still available (for example, before persistence).
+    let exact_signable = exact_timestamp_signable_payload(msg);
+    if verifying_key
+        .verify(exact_signable.as_bytes(), &signature)
+        .is_ok()
+    {
+        return true;
+    }
+
     // Backward compatibility: older AFP signatures incorrectly included the
     // storage hint in the signed bytes. Accept that legacy form for existing
     // messages, but do not generate new signatures with it.
@@ -153,6 +164,29 @@ pub fn is_supported_encryption_envelope(encryption: &Value) -> bool {
 }
 
 pub fn signable_payload(msg: &crate::message::AFPMessage) -> String {
+    signable_payload_with_timestamp(msg, canonical_signed_timestamp(&msg.timestamp))
+}
+
+fn exact_timestamp_signable_payload(msg: &crate::message::AFPMessage) -> String {
+    signable_payload_with_timestamp(msg, msg.timestamp.clone())
+}
+
+fn canonical_signed_timestamp(timestamp: &str) -> String {
+    let parsed = chrono::DateTime::parse_from_rfc3339(timestamp)
+        .or_else(|_| chrono::DateTime::parse_from_str(timestamp, "%Y-%m-%d %H:%M:%S%.f%#z"));
+    parsed
+        .ok()
+        .and_then(|value| {
+            let nanoseconds = value.with_timezone(&chrono::Utc).timestamp_nanos_opt()?;
+            let microseconds =
+                nanoseconds.div_euclid(1_000) + i64::from(nanoseconds.rem_euclid(1_000) >= 500);
+            chrono::DateTime::from_timestamp_micros(microseconds)
+        })
+        .map(|value| value.to_rfc3339_opts(chrono::SecondsFormat::Micros, true))
+        .unwrap_or_else(|| timestamp.to_string())
+}
+
+fn signable_payload_with_timestamp(msg: &crate::message::AFPMessage, timestamp: String) -> String {
     let mut parts = Vec::with_capacity(16);
     parts.push(msg.protocol.clone());
     parts.push(msg.id.clone());
@@ -160,7 +194,7 @@ pub fn signable_payload(msg: &crate::message::AFPMessage) -> String {
     parts.push(msg.parent_id.clone().unwrap_or_default());
     parts.push(msg.from.clone());
     parts.push(canonical_json_string(&serde_json::json!(msg.to)));
-    parts.push(msg.timestamp.clone());
+    parts.push(timestamp);
     parts.push(msg.r#type.clone());
     parts.push(msg.kind.clone().unwrap_or_default());
     parts.push(msg.subtype.clone().unwrap_or_default());
@@ -186,7 +220,7 @@ pub fn signable_payload(msg: &crate::message::AFPMessage) -> String {
 }
 
 fn legacy_signable_payload(msg: &crate::message::AFPMessage) -> String {
-    let mut parts = signable_payload(msg)
+    let mut parts = exact_timestamp_signable_payload(msg)
         .split('\n')
         .map(str::to_string)
         .collect::<Vec<_>>();
@@ -329,6 +363,24 @@ mod tests {
         let key = [7u8; 32];
         let signature = sign_message(&mut message, &key);
         assert!(has_verifiable_signature(&signature));
+        assert!(verify_signature(&message));
+    }
+
+    #[test]
+    fn signature_survives_postgres_timestamp_text_normalisation() {
+        let mut message = sample_message();
+        message.timestamp = "2026-03-20T00:00:00.987654321+00:00".to_string();
+        sign_message(&mut message, &[7u8; 32]);
+
+        message.timestamp = "2026-03-20 00:00:00.987654+00".to_string();
+        assert!(verify_signature(&message));
+
+        message.timestamp = "2026-03-20 00:00:01.987654+00".to_string();
+        assert!(!verify_signature(&message));
+
+        message.timestamp = "2026-03-20T00:00:02.987654789Z".to_string();
+        sign_message(&mut message, &[7u8; 32]);
+        message.timestamp = "2026-03-20 00:00:02.987655+00".to_string();
         assert!(verify_signature(&message));
     }
 
