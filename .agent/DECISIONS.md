@@ -1283,3 +1283,19 @@ Concordant task/calendar mirrors merge, but different states or manual dates blo
 a fail-closed projection into the existing Decision Card and A2UI contracts behind an independent
 default-off flag; it exposes friendly closed labels and blocker counts, not private task titles or
 technical diagnostics.
+
+## 2026-10-19: Vendor-change interpretation starts after canonical response convergence
+
+WED-237 consumes the validated canonical WED-220 `QuotationVendorResponse`; it does not reparse
+email, portal, upload or AFP transport text. Cross-channel material fingerprints and parent-linked
+successors therefore remain the deduplication authority. The interpreter recognizes only a closed
+commercial-fact vocabulary tied to an active quotation object. Confirmed facts need exact source
+anchors, and original terms need confirmed quotation anchors. Proposed or unanchored facts, stale
+quote bindings, missing objects/evidence, ambiguous replacements or deadlines, and currency
+mismatches remain typed review blockers.
+
+The frozen vendor-change contract represents cost delta with non-negative money. Direction is
+therefore retained by exact anchored original and replacement price terms, while `cost_delta`
+contains the absolute magnitude. Interpretation is review-only and explicitly does not mutate a
+quotation. A later acceptance adapter must reuse the existing quotation review successor lifecycle
+and its stale-decision invalidation rather than editing the active revision.

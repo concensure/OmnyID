@@ -3953,3 +3953,31 @@ Next:
 - Continue WED-237 vendor-change interpretation unless the user supplies the pending human-judge
   review first. Quotation/week-3-to-6 work remains paused; all provider, vendor-mail, relay and
   ranking-policy-V2 flags remain disabled and no Oracle deployment ran.
+
+## 2026-10-19 - WED-237 canonical vendor-change interpreter (Codex, in progress)
+
+Changed:
+
+- Added a pure classifier/interpreter over the established WED-220 canonical vendor response and
+  active normalised quotation. No email, portal, upload or AFP transport is reparsed.
+- A closed exact fact vocabulary supports item unavailability, substitutions, price/scope changes,
+  term timing and explicit deadlines. Multiple anchored substitutions become one bounded review
+  change, while ordinary answers/quote facts classify without inventing a change.
+- Proposed/unanchored facts, stale quotation binding, missing object/original evidence, ambiguous
+  replacements/deadlines and currency mismatch remain typed blockers. The output always states that
+  the quotation was not mutated.
+- Price direction remains visible in anchored original/replacement terms; the frozen contract's
+  non-negative delta field carries exact magnitude for both increases and decreases.
+
+Verification:
+
+- `cargo check`, seven focused vendor-change tests and all 70 planning-intelligence tests pass. New
+  files are at most 535 lines. The inherited unused email-group parameter warning remains.
+
+Next:
+
+- Add current-response replay plus constraint/style/budget/event-date evaluation behind the existing
+  default-off vendor-change flag. Preparation must remain review-only; explicit acceptance must call
+  the existing quotation review successor path and preserve stale-decision invalidation.
+- Keep all planning, quotation, vendor-mail, relay, provider and ranking-policy-V2 flags disabled.
+  Quotation-normalisation/week-3-to-6 work remains paused pending the user's human-judge review.

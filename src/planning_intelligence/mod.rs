@@ -10,6 +10,7 @@ mod ledger;
 mod milestone_projection;
 mod quotation_projection;
 mod validation;
+mod vendor_change;
 
 pub use capture::*;
 pub use contracts::*;
@@ -23,6 +24,7 @@ pub use ledger::*;
 pub use milestone_projection::*;
 pub use quotation_projection::*;
 pub use validation::*;
+pub use vendor_change::*;
 
 #[cfg(test)]
 mod capture_tests;
@@ -40,3 +42,5 @@ mod intervention_tests;
 mod ledger_tests;
 #[cfg(test)]
 mod milestone_projection_tests;
+#[cfg(test)]
+mod vendor_change_tests;

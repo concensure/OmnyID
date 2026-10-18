@@ -2737,3 +2737,37 @@ tasks:
       - added a fail-closed frontend normalizer plus one existing Decision Card/A2UI review projection; technical identifiers and private titles are never used as visible copy, and prepared actions only open existing internal search/compare flows
       - real disposable-Postgres coverage passes for flags-off, tenant isolation, current date, completed task, manual calendar date, private-title exclusion and replay identity; 63 planning tests, typecheck, 8 focused UI tests, all 1,899 wedding tests, line budgets and production build pass
       - moved to review with critical-path and every other planning, quotation, vendor-mail, relay and ranking-policy-V2 flag disabled; no provider execution or deployment ran
+  - id: WED-237
+    title: Interpret vendor change messages
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-220
+      - WED-230
+      - WED-236
+    files:
+      - src/planning_intelligence/vendor_change.rs
+      - src/planning_intelligence/vendor_change_tests.rs
+      - src/planning_intelligence/mod.rs
+      - src/server/planning_vendor_change_routes.rs
+      - tests/planning_vendor_change_api.rs
+      - solid-ui/src/lib/planningVendorChangeApi.ts
+      - solid-ui/tests/planning-vendor-change-api.test.ts
+      - .agent/**
+    acceptance:
+      - canonical WED-220 responses are classified as quote, clarification, change proposal or unclassified without treating transport state as acceptance or booking evidence
+      - change proposals extract only exact-anchored affected objects, original terms, bounded replacement options, cost deltas and explicit deadlines
+      - ambiguous objects, absent anchors, unsupported attachment extraction and stale response or quotation revisions remain review blockers rather than inferred changes
+      - replacement options are evaluated against current confirmed constraints, palette/style evidence, budget state and exact days-to-event where those inputs exist
+      - preparation creates a review proposal without mutating the active quotation, and user acceptance reuses the existing quotation successor and stale-decision lifecycle
+      - email, secure-link and AFP channels converge on the same canonical response semantics and duplicate fingerprints do not create duplicate review work
+      - all planning, quotation, vendor-mail, relay and ranking-policy-V2 flags remain disabled by default
+      - focused Rust/Postgres/Solid tests, wedding regressions, line budgets and production builds pass with every new file below 1000 lines
+    progress:
+      - started from clean WED-236 integration commit ec074ec; auditing canonical WED-220 response facts, anchors, reconciliation and quotation-successor APIs before implementing the pure classifier
+      - added a pure interpreter over the existing canonical WED-220 response and active normalised quotation; it does not parse transport text or create a parallel response model
+      - a closed change fact vocabulary maps line-item unavailability, substitutions, price/scope changes and commercial-term timing plus explicit decision deadlines to the frozen vendor-change contract
+      - only confirmed exact-anchored facts can produce a change; proposed/unanchored evidence, stale quote binding, absent quote objects, missing original anchors, ambiguous replacements/deadlines and currency mismatch remain typed review blockers
+      - price increases and decreases retain direction in anchored original/replacement terms while the frozen non-negative cost-delta field carries the exact magnitude; review output always reports quotation_mutated false
+      - seven focused tests and all 70 planning-intelligence tests pass for substitution, two alternatives, price changes/decreases, stale/unanchored facts, ambiguity, classification and order-independent identity
