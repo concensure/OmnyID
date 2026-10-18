@@ -1082,3 +1082,20 @@ provider, accuracy-corpus, independent security/privacy/accessibility, usability
 hosted-shadow, or cohort gates. External sign-offs must use the frozen small JSON contract and bind
 the exact commit. Missing or malformed evidence stays blocked. Deployment and feature enablement
 remain separate: no release flag follows automatically from code presence or a local green suite.
+
+## 2026-10-18: Planning intelligence starts with closed, template-neutral evidence contracts
+
+Planning intelligence is a reusable AFP-adjacent core rather than a wedding-only subsystem. Its
+first boundary consists of six strict, versioned contracts: constraint, constraint evaluation,
+cost trade-off, milestone dependency, quotation vendor change, and decision intervention. Values,
+operators, states, explanation codes, source anchors, privacy, and authority use closed types;
+unknown fields and schema versions fail closed. Rust and TypeScript share generic renovation
+fixtures and canonical SHA-256 fingerprints so later planners and A2UI surfaces cannot silently
+reinterpret the same record.
+
+Constraint history is append-only. A confirmed successor may reference exactly one predecessor,
+and a removal or explicit supersession tombstone must do so; an unconfirmed proposal cannot rewrite
+confirmed history. Non-user ingress cannot claim user or confirmed-interpretation authority, relax
+privacy, or bind another plan. Every planning-intelligence capability remains independently
+default-off, and this contract work does not satisfy or bypass quotation, vendor-portal,
+ranking-policy-V2, human-review, or deployment gates.

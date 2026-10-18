@@ -23,6 +23,10 @@
       "import": "./dist/quotation.js",
       "types": "./dist/quotation.d.ts"
     },
+    "./planning-intelligence": {
+      "import": "./dist/planning-intelligence.js",
+      "types": "./dist/planning-intelligence.d.ts"
+    },
     "./workflows": {
       "import": "./dist/workflows.js",
       "types": "./dist/workflows.d.ts"

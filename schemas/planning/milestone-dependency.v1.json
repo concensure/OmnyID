@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnyid.dev/schemas/planning/milestone-dependency.v1.json",
+  "title": "OmnyID planning milestone dependency v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "milestone_id", "plan_id", "depends_on", "state", "blocking_refs"
+  ],
+  "properties": {
+    "schema_version": {"const": "planning.milestone_dependency.v1"},
+    "milestone_id": {"$ref": "#/$defs/id"},
+    "plan_id": {"$ref": "#/$defs/id"},
+    "depends_on": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "duration_or_lead_time": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["minimum_days", "maximum_days", "evidence_ref"],
+          "properties": {
+            "minimum_days": {"type": "integer", "minimum": 0, "maximum": 3650},
+            "maximum_days": {"type": "integer", "minimum": 0, "maximum": 3650},
+            "evidence_ref": {"$ref": "#/$defs/id"}
+          }
+        },
+        {"type": "null"}
+      ]
+    },
+    "earliest_at": {"type": ["string", "null"], "format": "date-time"},
+    "latest_at": {"type": ["string", "null"], "format": "date-time"},
+    "slack_days": {"type": ["integer", "null"]},
+    "state": {"enum": ["not_started", "active", "blocked", "complete", "waived"]},
+    "blocking_refs": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "prepared_next_action": {"oneOf": [{"$ref": "#/$defs/prepared_action"}, {"type": "null"}]}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 180, "pattern": "^[^@\\s]+$"},
+    "prepared_action": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "target_ref"],
+      "properties": {"kind": {"enum": ["research", "compare", "draft"]}, "target_ref": {"$ref": "#/$defs/id"}}
+    }
+  }
+}

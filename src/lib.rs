@@ -78,6 +78,7 @@ pub mod persona_state_capture;
 pub mod personal_automation_planner;
 pub mod personal_event_ingestion;
 pub mod personalization;
+pub mod planning_intelligence;
 pub mod planning_session;
 pub mod policy_engine;
 pub mod post_quantum;

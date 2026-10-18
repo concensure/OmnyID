@@ -2438,3 +2438,34 @@ tasks:
       - reviewed both WED-187 ideal-agent briefs in full and reconciled their gaps against the current WED-215 quotation, vendor-response, preference, DecisionOS, A2UI, AFP and approval foundations
       - added a 556-line dependency-ordered WED-230 through WED-240 implementation plan covering typed contracts, authority, privacy, tests, metrics, rollout, PR boundaries, non-goals, model choice and advanced-worktree base
       - the plan uses a template-neutral planning core, current OCR and communication boundaries, existing Decision Cards/A2UI, and least-privilege revocable vendor projections rather than a parallel wedding system
+  - id: WED-230
+    title: Freeze reusable planning-intelligence contracts
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-229
+    files:
+      - schemas/planning/**
+      - src/planning_intelligence/**
+      - src/lib.rs
+      - tests/fixtures/planning/**
+      - typescript-sdk/src/planning-intelligence.ts
+      - typescript-sdk/src/index.ts
+      - typescript-sdk/tests/planning-intelligence.test.mjs
+      - typescript-sdk/package.json
+      - .agent/**
+    acceptance:
+      - six template-neutral planning contracts define closed kinds, bounded values, exact references, successor rules, privacy and authority without wedding-only fields
+      - Rust and TypeScript accept and reject the same shared fixtures and compute the same canonical fingerprint
+      - non-wedding fixtures prove the contracts are reusable outside Wedding
+      - client payloads cannot relax privacy or authority and unknown fields fail closed
+      - planning-intelligence feature flags default off and do not alter quotation or week 3 to 6 release gates
+      - every new file remains below 1000 lines and existing oversized files remain line-neutral or shrink
+    progress:
+      - started from clean advanced WED-215 commit ce99310 while WED-225 and WED-226 remain blocked pending human-judge and other external evidence
+      - froze six template-neutral, strict contracts for constraints, evaluations, cost trade-offs, milestone dependencies, vendor changes, and interventions with typed source anchors, bounded values, privacy, authority, and append-only successor lineage
+      - Rust and TypeScript consume the same home-renovation fixtures, reject unknown or unsafe inputs, and produce identical canonical SHA-256 fingerprints; published JSON schemas are closed and version-pinned
+      - confirmed successors may replace prior records without mutating history, while proposals cannot supersede confirmed history and removal/supersession tombstones require an exact predecessor
+      - every planning-intelligence flag defaults off; quotation, vendor-response, email, relay, rollout, and ranking-policy-V2 gates were not changed or enabled
+      - five focused Rust tests, cargo check, SDK typecheck/build, and 48 SDK/package tests pass; every new file is at most 446 lines and no existing oversized source file grew

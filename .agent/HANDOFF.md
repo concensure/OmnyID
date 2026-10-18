@@ -3569,3 +3569,33 @@ Next:
   exact external sign-off JSON records described in the readiness document, and rerun the verifier.
   After independent review, WED-226 may deploy the same artifact dark with every flag off and prove
   runtime SHA/configuration before any separately authorised canary.
+## 2026-10-18 - WED-230 planning-intelligence contract freeze (Codex, review)
+
+Changed:
+
+- Added six strict, versioned, template-neutral Rust/JSON Schema/TypeScript contracts for planning
+  constraints, evaluations, cost trade-offs, milestone dependencies, vendor changes, and decision
+  interventions. They carry bounded typed values, source anchors, privacy, authority, and lineage.
+- Added one shared home-renovation fixture corpus with valid/invalid cases and canonical SHA-256
+  fingerprints. Rust and TypeScript parse the same cases and fail closed on unknown fields,
+  unsupported versions, unsafe authority/privacy claims, and incomplete evidence.
+- Added default-off feature configuration for each future planning-intelligence slice and exported
+  the TypeScript boundary through both the package root and `afp-ts/planning-intelligence`.
+
+Verification:
+
+- `cargo test --lib planning_intelligence -- --nocapture` passed 5 tests; `cargo check` passed.
+- SDK typecheck and clean build passed; the focused fixture and package export run passed 48 tests.
+- `git diff --check` passed before coordination updates. Every new source/schema/fixture file is at
+  most 446 lines; no existing oversized production source grew. The inherited unused `user_id`
+  warning in `email_group_routes.rs` remains.
+
+Unresolved / next:
+
+- Review WED-230, then implement WED-231 as an authenticated, plan-private, append-only constraint
+  ledger and deterministic projector over this frozen contract. Preserve exact anchors and observed
+  times, reject forged authority/privacy and cross-tenant reads, and cover retry/replay in real
+  Postgres where applicable.
+- WED-225/WED-226 remain review-gated. Do not resume quote normalisation or week 3-6 closure work,
+  deploy, or enable quotation/vendor-mail/relay/ranking-policy-V2 flags until the requested human
+  judge evidence and the existing rollout criteria are supplied.

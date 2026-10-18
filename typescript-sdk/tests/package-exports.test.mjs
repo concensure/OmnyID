@@ -7,6 +7,14 @@ import * as retrievalSdk from 'afp-ts/retrieval';
 import * as workflowsSdk from 'afp-ts/workflows';
 import * as semanticRouterSdk from 'afp-ts/semantic-router';
 import * as workspaceAssistanceSdk from 'afp-ts/workspace-assistance';
+import * as planningIntelligenceSdk from 'afp-ts/planning-intelligence';
+
+test('planning intelligence subpath exposes the frozen contract boundary', () => {
+  assert.equal(typeof planningIntelligenceSdk.PlanningConstraintSchema?.parse, 'function');
+  assert.equal(typeof planningIntelligenceSdk.PlanningContractSchema?.parse, 'function');
+  assert.equal(typeof planningIntelligenceSdk.planningContractFingerprint, 'function');
+  assert.equal(typeof planningIntelligenceSdk.assertPlanningConstraintIngress, 'function');
+});
 
 test('root SDK re-exports continuity helpers', () => {
   assert.equal(typeof rootSdk.resolveContinuityTargetLabel, 'function');

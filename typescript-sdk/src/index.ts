@@ -14,6 +14,7 @@ export {
 } from './continuity.js';
 export * from './retrieval.js';
 export * from './quotation.js';
+export * from './planning-intelligence.js';
 
 const ViewSchema = z.object({
   format: z.enum(['email', 'notion', 'database', 'calendar', 'graph', 'system']),
