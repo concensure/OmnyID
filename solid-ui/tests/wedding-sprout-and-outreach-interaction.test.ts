@@ -42,7 +42,7 @@ test("live vendor results use the primary action for mobile follow-up selection"
   assert.match(vendorSearch, /loadWeddingDecisionSelections/);
   assert.match(vendorSearch, /onToggleFollowUp=\{\(card\) => toggleFollowUp/);
   assert.match(choiceCard, /hidden min-h-11[\s\S]*sm:inline-flex/);
-  assert.match(choiceCard, /min-h-12 w-full rounded-xl/);
+  assert.match(choiceCard, /min-h-12 w-full rounded-lg/);
 });
 
 test("phone tooltip placement clamps inside the viewport and custom image cards use pointer drag", () => {

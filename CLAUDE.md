@@ -130,7 +130,7 @@ cargo build --release                        # full build (slow, use only when n
 - Shared types live in `solid-ui/src/lib/` — `api.ts` for API types, `workflowGraphTypes.ts` for canvas types
 - Use existing CSS tokens from `tailwind.config.cjs` and `index.css` — do not invent new color values
 - Design system tokens: `primary` (#31568e), `on-surface` (#1a1c1b), `outline` (#737781) — see `docs/DESIGN_SYSTEM.md`
-- Wedding-surface components (WeddingVendorQuoteReplyCard and siblings) are exempt from CLAUDE.md's primary/on-surface/outline token restriction — they use a separate wedding palette defined in `tailwind.config.cjs`. Do not revert wedding colors back toward the blue primary tokens.
+- Wedding-surface components (WeddingVendorQuoteReplyCard and siblings) are exempt from CLAUDE.md's primary/on-surface/outline token restriction — they use a separate wedding brand, specified in `docs/DESIGN_SYSTEM.md` section 11: Deep Teal `#0F5F5A` primary, Warm Porcelain `#FAF7F2` page and button text, Ink Blue `#274B77` secondary, white cards with a `#E8E2D9` border and 8-12px radius (no pills). Tokens live in `tailwind.config.cjs`; the older rose/plum `wedding-accent` tokens are being migrated. Do not revert wedding colors back toward the blue primary tokens.
 - Animations: use `view-enter`, `card-hover`, `glass-button`, `animate-fade-in`, `animate-slide-down`
 - Glass surfaces: `.glass-surface` (main panels), `.glass-card` (inner cards)
 

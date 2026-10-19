@@ -110,35 +110,35 @@ function VendorSearchDraftInput(props: {
 export function WeddingPlanningBasicsSection(props: { workspace: WeddingResponseWorkspaceViewProps }) {
   const workspace = () => props.workspace;
   return (
-    <div class="rounded-2xl border border-amber-200 bg-amber-50/90 p-3 shadow-sm">
+    <div class="rounded-xl border border-wedding-border bg-wedding-card p-3 shadow-wedding-card">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="text-sm font-semibold text-amber-950">Add a few wedding details</p>
-          <p class="mt-1 break-words text-xs leading-5 text-amber-900/75">
+          <p class="text-sm font-semibold text-wedding-ink">Add a few wedding details</p>
+          <p class="mt-1 break-words text-xs leading-5 text-wedding-ink/70">
             This helps us find vendors that fit your plans.
           </p>
         </div>
-        <span class="rounded-full border border-amber-200 bg-white/75 px-2 py-1 text-xs font-semibold text-amber-950">
+        <span class="rounded-lg bg-wedding-status-progress-bg px-2 py-1 text-xs font-semibold text-wedding-status-progress-ink">
           A few details
         </span>
       </div>
       <div class="mt-3 grid gap-2 sm:grid-cols-2">
         <Show when={workspace().vendorSearchReadiness?.status === "blocked"}>
-          <div class="rounded-xl border border-amber-100 bg-white/75 p-3">
-            <p class="text-xs font-semibold uppercase text-amber-800/70">Better matches</p>
-            <p class="mt-1 break-words text-sm leading-6 text-amber-950">
+          <div class="rounded-lg border border-wedding-border bg-wedding-page p-3">
+            <p class="text-xs font-semibold uppercase text-wedding-primary">Better matches</p>
+            <p class="mt-1 break-words text-sm leading-6 text-wedding-ink">
               Add {workspace().vendorSearchReadiness?.missing.map(weddingPlanningNeedLabel).join(" and ")}.
             </p>
             <Show when={workspace().vendorSearchReadiness?.missing.some((item) => /priorities|fit preferences/i.test(item))}>
-              <label class="mt-3 block text-xs font-semibold text-amber-950">
+              <label class="mt-3 block text-xs font-semibold text-wedding-ink">
                 Vendor fit preferences
                 <VendorSearchDraftInput
                   workspace={workspace()}
                   placeholder="beachfront venue in Sydney with Gothic style for 60 guests"
-                  class="mt-1 w-full rounded-xl border border-amber-100 bg-white px-3 py-2 text-sm font-normal text-amber-950 outline-none transition placeholder:text-amber-950/35 focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
+                  class="mt-1 w-full rounded-lg border border-wedding-border bg-white px-3 py-2 text-sm font-normal text-wedding-ink outline-none transition placeholder:text-wedding-ink/40 focus:border-wedding-primary focus:ring-2 focus:ring-wedding-primary/15"
                 />
               </label>
-              <p class="mt-2 break-words text-[11px] leading-5 text-amber-900/75">
+              <p class="mt-2 break-words text-[11px] leading-5 text-wedding-ink/70">
                 A specific request here can unblock vendor fit preferences for live search.
               </p>
             </Show>
@@ -230,7 +230,7 @@ export function WeddingVendorSearchHomeSection(props: {
     onCleanup(() => window.clearInterval(timer));
   });
   return (
-    <div class="min-w-0 rounded-[28px] border border-wedding-hairline bg-white px-4 py-5 shadow-[0_8px_24px_rgba(36,26,44,.06)] phone:rounded-[28px] sm:px-5 sm:py-6">
+    <div data-wedding-surface="vendor-search" class="min-w-0 rounded-xl border border-wedding-border bg-wedding-card px-4 py-5 shadow-wedding-card sm:px-5 sm:py-6">
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -244,19 +244,19 @@ export function WeddingVendorSearchHomeSection(props: {
       >
       <div class="min-w-0">
         <div class="min-w-0">
-          <p class="font-display text-[22px] font-semibold leading-7 tracking-[-.01em] text-wedding-text">Find vendors</p>
+          <p class="font-display text-[22px] font-semibold leading-7 tracking-[-.01em] text-wedding-ink">Find vendors</p>
       </div>
       <label class="relative mt-4 block">
-        <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-wedding-muted" aria-hidden="true"><WeddingDashboardIcon id="search" class="h-5 w-5" /></span>
+        <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-wedding-ink/65" aria-hidden="true"><WeddingDashboardIcon id="search" class="h-5 w-5" /></span>
         <VendorSearchDraftInput
           workspace={workspace()}
           name="wedding-vendor-search-query"
           placeholder="Search photographers, venues, bands…"
-          class="h-14 w-full rounded-full border-[1.5px] border-wedding-hairline bg-wedding-surface py-2 pl-12 pr-[4.25rem] text-base text-wedding-text outline-none transition duration-150 placeholder:text-wedding-muted focus:border-wedding-accent focus:ring-4 focus:ring-wedding-accent/20"
+          class="h-14 w-full rounded-lg border border-wedding-border bg-wedding-page py-2 pl-12 pr-24 text-base text-wedding-ink outline-none transition duration-150 placeholder:text-wedding-ink/55 focus:border-wedding-primary focus:ring-4 focus:ring-wedding-primary/15"
         />
         <button
           type="submit"
-          class="absolute right-1.5 top-1.5 flex h-11 w-11 items-center justify-center rounded-full bg-wedding-cta text-white shadow-wedding-cta transition active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-45"
+          class="absolute right-1.5 top-1.5 flex h-11 min-w-11 items-center justify-center rounded-lg bg-wedding-primary px-3 text-wedding-page transition hover:bg-wedding-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
           aria-label={workspace().vendorSearchRunning ? "Searching for vendors" : "Search vendors"}
           disabled={searchDisabled()}
         >
@@ -269,7 +269,7 @@ export function WeddingVendorSearchHomeSection(props: {
         <For each={VENDOR_CATEGORY_CHIPS}>{(chip) => (
           <button
             type="button"
-            class={`inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-full border px-3 text-sm font-semibold transition duration-100 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2 disabled:opacity-45 ${isSelectedCategory(chip.query) ? "border-wedding-accent bg-wedding-accent text-white" : "border-wedding-hairline bg-white text-wedding-text hover:border-wedding-accent hover:text-wedding-accent"}`}
+            class={`inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold transition duration-100 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 disabled:opacity-45 ${isSelectedCategory(chip.query) ? "border-wedding-primary bg-wedding-primary text-wedding-page" : "border-wedding-border bg-white text-wedding-ink hover:border-wedding-primary hover:text-wedding-primary"}`}
             disabled={searchDisabled()}
             aria-pressed={isSelectedCategory(chip.query)}
             onClick={() => runCategorySearch(chip.query)}
@@ -279,43 +279,43 @@ export function WeddingVendorSearchHomeSection(props: {
         )}</For>
       </div>
       <Show when={!props.result && !workspace().vendorSearchRunning}>
-        <p class="mt-2 text-[13px] leading-[18px] text-wedding-muted">Real vendors near you. We show where each result came from.</p>
+        <p class="mt-2 text-[13px] leading-[18px] text-wedding-ink/70">Real vendors near you. We show where each result came from.</p>
       </Show>
       <Show
         when={workspace().vendorSearchRunning}
-        fallback={<Show when={visibleVendorSearchNotice()}>{(notice) => <p class="mt-4 break-words text-xs leading-5 text-wedding-muted">{notice()}</p>}</Show>}
+        fallback={<Show when={visibleVendorSearchNotice()}>{(notice) => <p class="mt-4 break-words text-xs leading-5 text-wedding-ink/70">{notice()}</p>}</Show>}
       >
-        <p class="mt-4 break-words text-xs font-medium leading-5 text-wedding-muted" role="status" aria-live="polite">
+        <p class="mt-4 break-words text-xs font-medium leading-5 text-wedding-ink/70" role="status" aria-live="polite">
           {SEARCH_PROGRESS_LABELS[searchProgressIndex()]}
         </p>
       </Show>
       <Show when={props.feedbackNotice}>
-        <p class="mt-3 rounded-xl border border-wedding-muted bg-wedding-surface-blush px-3 py-2 text-xs text-wedding-text" role="status">{props.feedbackNotice}</p>
+        <p class="mt-3 rounded-lg border border-wedding-border bg-wedding-slate px-3 py-2 text-xs text-wedding-ink" role="status">{props.feedbackNotice}</p>
       </Show>
       <Show when={props.feedbackConfirmationPrompt}>
-        <section class="mt-3 rounded-xl border border-wedding-muted bg-white px-3 py-3" aria-label="Confirm a preference suggestion">
-          <p class="text-sm font-semibold text-wedding-text">{props.feedbackConfirmationPrompt}</p>
+        <section class="mt-3 rounded-lg border border-wedding-border bg-white px-3 py-3" aria-label="Confirm a preference suggestion">
+          <p class="text-sm font-semibold text-wedding-ink">{props.feedbackConfirmationPrompt}</p>
           <div class="mt-2 flex flex-wrap gap-2">
-            <button type="button" class="min-h-11 rounded-lg border-2 border-wedding-cta bg-white px-3 text-xs font-bold text-wedding-text" onClick={() => props.onConfirmFeedbackSuggestion?.()}>{props.feedbackConfirmationActionLabel ?? "Make it a must-have"}</button>
-            <button type="button" class="min-h-11 rounded-lg border border-wedding-muted bg-white px-3 text-xs font-semibold text-wedding-text" onClick={() => props.onDismissFeedbackSuggestion?.()}>Keep it as is</button>
+            <button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-xs font-bold text-wedding-page" onClick={() => props.onConfirmFeedbackSuggestion?.()}>{props.feedbackConfirmationActionLabel ?? "Make it a must-have"}</button>
+            <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-xs font-semibold text-wedding-secondary" onClick={() => props.onDismissFeedbackSuggestion?.()}>Keep it as is</button>
           </div>
         </section>
       </Show>
       <Show when={!props.result && workspace().vendorSearchResultAction}>
-        <button type="button" class="mt-3 min-h-11 rounded-full border border-wedding-accent bg-white px-3 text-xs font-bold text-wedding-accent" onClick={() => props.onDismiss("")}>
+        <button type="button" class="mt-3 min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-xs font-bold text-wedding-secondary" onClick={() => props.onDismiss("")}>
           Show comparison
         </button>
       </Show>
       <Show when={props.result}>
         {(result) => (
-          <div class="mt-5 border-t border-wedding-hairline pt-4">
+          <div class="mt-5 border-t border-wedding-border pt-4">
             <Show when={props.preferenceProfile && props.onPreferenceChange && props.onPreferenceConfirm}>
               <div class="mb-3"><WeddingPreferenceConfirmationChips profile={props.preferenceProfile ?? null} saving={props.preferenceSaving} onChange={(change) => props.onPreferenceChange?.(change)} onConfirm={() => props.onPreferenceConfirm?.()} /></div>
             </Show>
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="min-w-0">
-                <p class="break-words text-base font-semibold text-wedding-text">Top picks from your search</p>
-                <p class="mt-1 break-words text-sm leading-5 text-wedding-muted">Compare the strongest matches, then save any you want to contact.</p>
+                <p class="break-words text-base font-semibold text-wedding-ink">Top picks from your search</p>
+                <p class="mt-1 break-words text-sm leading-5 text-wedding-ink/70">Compare the strongest matches, then save any you want to contact.</p>
               </div>
             </div>
             <Show when={result().preview}>
@@ -332,7 +332,7 @@ export function WeddingVendorSearchHomeSection(props: {
                     return <>
                   <div class="mt-3 flex flex-wrap gap-2">
                     <For each={[comparisonPreview().category, comparisonPreview().evidenceSummary.sourceCountLabel].filter(Boolean)}>
-                      {(label) => <span class="rounded-full border border-wedding-hairline bg-white px-3 py-1.5 text-xs font-medium text-wedding-muted">{label}</span>}
+                      {(label) => <span class="rounded-lg border border-wedding-border bg-white px-3 py-1.5 text-xs font-medium text-wedding-ink/70">{label}</span>}
                     </For>
                   </div>
                   <Show when={comparisonPreview().vendorComparisonCards.length > 0}>
@@ -366,12 +366,12 @@ export function WeddingVendorSearchHomeSection(props: {
                     />
                   </Show>
                   <Show when={hiddenCards(comparisonPreview()).length > 0}>
-                    <section class="mt-3 rounded-xl border border-wedding-muted bg-white p-3" aria-label="Hidden vendors">
-                      <p class="text-sm font-semibold text-wedding-accent">Hidden vendors</p>
+                    <section class="mt-3 rounded-xl border border-wedding-border bg-white p-3" aria-label="Hidden vendors">
+                      <p class="text-sm font-semibold text-wedding-primary">Hidden vendors</p>
                       <For each={hiddenCards(comparisonPreview())}>{(card) => (
                         <div class="mt-2 flex items-center justify-between gap-2">
-                          <span class="min-w-0 break-words text-xs text-wedding-text">{card.title}</span>
-                          <button type="button" class="min-h-11 shrink-0 rounded-lg border border-wedding-muted bg-white px-3 text-xs font-semibold text-wedding-text" onClick={() => void props.onRestoreVendor?.(card, preview().artifactId)}>Restore</button>
+                          <span class="min-w-0 break-words text-xs text-wedding-ink">{card.title}</span>
+                          <button type="button" class="min-h-11 shrink-0 rounded-lg border border-wedding-secondary bg-white px-3 text-xs font-semibold text-wedding-secondary" onClick={() => void props.onRestoreVendor?.(card, preview().artifactId)}>Restore</button>
                         </div>
                       )}</For>
                     </section>
@@ -384,7 +384,7 @@ export function WeddingVendorSearchHomeSection(props: {
             <div class="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center gap-1 rounded-full px-1 text-sm font-semibold text-wedding-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2"
+                class="inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-sm font-semibold text-wedding-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2"
                 aria-expanded={fullResultExpanded()}
                 aria-controls="wedding-vendor-search-full-result"
                 onClick={() => setFullResultExpanded((expanded) => !expanded)}
@@ -399,16 +399,16 @@ export function WeddingVendorSearchHomeSection(props: {
             <Show when={fullResultExpanded()}>
               <section
                 id="wedding-vendor-search-full-result"
-                class="mt-3 rounded-2xl border border-wedding-muted bg-white p-3"
+                class="mt-3 rounded-xl border border-wedding-border bg-white p-3"
                 aria-label="Full vendor search result"
               >
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                  <p class="text-sm font-semibold text-wedding-accent">
+                  <p class="text-sm font-semibold text-wedding-primary">
                     {result().sourcePreview?.title ?? "Vendor search notes"}
                   </p>
                   <button
                     type="button"
-                    class="min-h-11 rounded-full border border-wedding-muted bg-white px-3 text-xs font-semibold text-wedding-accent"
+                    class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-xs font-semibold text-wedding-secondary"
                     onClick={() => setFullResultExpanded(false)}
                   >
                     Close
@@ -416,11 +416,11 @@ export function WeddingVendorSearchHomeSection(props: {
                 </div>
                 <Show
                   when={result().sourcePreview?.bodyText}
-                  fallback={<p class="mt-3 text-xs leading-5 text-wedding-muted">The saved search text is not available yet.</p>}
+                  fallback={<p class="mt-3 text-xs leading-5 text-wedding-ink/70">The saved search text is not available yet.</p>}
                 >
                   {(body) => (
                     <div
-                      class="md-prose mt-3 max-h-[22rem] overflow-auto rounded-xl bg-wedding-surface-blush p-3 text-xs leading-5 text-wedding-accent"
+                      class="md-prose mt-3 max-h-[22rem] overflow-auto rounded-lg bg-wedding-slate p-3 text-xs leading-5 text-wedding-ink"
                       innerHTML={renderMarkdown(body())}
                     />
                   )}
@@ -431,7 +431,7 @@ export function WeddingVendorSearchHomeSection(props: {
         )}
       </Show>
       <Show when={visibleBlockedReason()}>
-        {(reason) => <p class="mt-2 break-words text-xs leading-5 text-wedding-muted">{reason()}</p>}
+        {(reason) => <p class="mt-2 break-words text-xs leading-5 text-wedding-ink/70">{reason()}</p>}
       </Show>
     </div>
   );

@@ -9,9 +9,16 @@ function luminance(hex: string): number {
   return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
 }
 function contrast(a: string, b: string): number { const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (light + .05) / (dark + .05); }
-test("wedding palette keeps readable text, CTA, and focus contrast", () => {
+test("legacy wedding palette keeps readable text, CTA, and focus contrast during migration", () => {
   assert.ok(contrast(colors["wedding-text"], colors["wedding-surface"]) >= 4.5);
   assert.ok(contrast(colors["wedding-muted"], colors["wedding-surface"]) >= 4.5);
   assert.ok(contrast(colors["wedding-accent"], colors["wedding-surface"]) >= 4.5);
   assert.ok(contrast("#FFFFFF", colors["wedding-cta"]) >= 4.5);
+});
+
+test("wedding planner surface palette keeps readable brand contrast", () => {
+  assert.ok(contrast(colors["wedding-ink"], colors["wedding-page"]) >= 4.5);
+  assert.ok(contrast(colors["wedding-primary"], colors["wedding-page"]) >= 4.5);
+  assert.ok(contrast(colors["wedding-secondary"], colors["wedding-page"]) >= 4.5);
+  assert.ok(contrast(colors["wedding-page"], colors["wedding-primary"]) >= 4.5);
 });

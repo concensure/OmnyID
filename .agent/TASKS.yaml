@@ -2318,6 +2318,7 @@ tasks:
       - Docker is now available and isolated test endpoints are healthy at PostgreSQL 127.0.0.1:55432/omnyid_test and clamd 127.0.0.1:33310; no production or Oracle data was touched
       - the real Postgres API flow, capability API, vendor-response ciphertext/IDOR API, and clean clamd integration test pass; enabling those lanes exposed and fixed complete source-fixture rebinding, missing test-router quotation modules, and AFP signature stability across PostgreSQL timestamp normalisation
       - readiness remains blocked on the separately required accuracy/provider, independent security/privacy/accessibility, couple/vendor usability, wording, hosted-shadow, and cohort evidence; release, vendor-mail, email-reconciliation, relay, and ranking-policy-V2 flags remain off
+      - clarified that local Postgres and live disposable ClamAV execution do not replace the verifier's exact-commit external records; documented the required evidence outcome for all ten sign-off parameters without representing any missing review as complete
   - id: WED-226
     title: Stage gated vendor response rollout
     status: blocked
@@ -2922,3 +2923,44 @@ tasks:
       - machine-evaluation foundation is complete for this slice; WED-240 remains in progress because independent human evaluation, the exact-commit verifier/report and blocked WED-225/WED-226 release evidence are still outstanding
       - added a clean-worktree exact-commit verifier with local-only endpoint guards, content-addressed artifact inputs, per-check logs, closed signed human-review records and explicit non-mutating release output
       - the verifier reports machine verified for f71dba5d86b2b07e764e7fdce32243b01582609a with artifact digest 49a75251f9b1a7faca2fe9d894f26b515ea01e5edd369f14659527c9c4913945; all 12 checks pass, while all nine human gates are missing and WED-225/WED-226 keep human and release status blocked
+      - documented the exact reviewer question and evidence workflow for each of the nine human dimensions; no human record was fabricated and all nine remain missing until independent reviewers supply commit-bound artifacts
+  - id: WED-242
+    title: Align wedding home and decision surfaces with the teal wedding brand
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-239
+      - WED-241
+    files:
+      - docs/DESIGN_SYSTEM.md
+      - CLAUDE.md
+      - solid-ui/tailwind.config.cjs
+      - solid-ui/src/components/WeddingHomeOverviewGrid.tsx
+      - solid-ui/src/components/WeddingPlanningJourneyStepper.tsx
+      - solid-ui/src/components/WeddingVendorSearchHomeSections.tsx
+      - solid-ui/src/components/WeddingVendorChoiceCard.tsx
+      - solid-ui/src/components/DecisionCard.tsx
+      - solid-ui/src/components/WeddingMobilePage.tsx
+      - solid-ui/src/components/WeddingMobileAppBar.tsx
+      - solid-ui/src/components/WeddingMobileTabBar.tsx
+      - solid-ui/src/components/WeddingDateEntryControl.tsx
+      - solid-ui/tests/wedding-brand-surface.test.ts
+      - solid-ui/tests/e2e/wedding-home-genz-ui.spec.ts
+      - .agent/**
+    acceptance:
+      - the useful mobile-first behavior from e3f04a9 is retained without copying or overwriting the WED-187 worktree or regressing later planning-intelligence changes
+      - wedding home, search, vendor comparison, and wedding decision cards use the section 11 Deep Teal, Warm Porcelain, Ink Blue, white-card, warm-border, and 8-12px radius contract through named tokens
+      - the home presents task-derived progress as a journey stepper and keeps up-next and saved-vendor context usable on desktop and stacked on mobile
+      - technical/provider/protocol messages remain bounded at the UI boundary, vendor photos and readable names remain intact, and comparison state survives outreach actions
+      - the five-item mobile bottom navigation remains mounted and all affected controls retain visible focus, 44px touch targets, wrapping, reduced-motion, and 320px containment
+      - typecheck, focused wedding tests, browser checks, line budgets, full wedding tests, and production build pass with every new file below 1000 lines
+    progress:
+      - confirmed e3f04a9 is already an ancestor of the advanced WED-215 branch; no commit was cherry-picked and no WED-187 worktree content was copied wholesale
+      - current branch preserves the later WED-239 intervention presentation and WED-240 readiness verifier while the wedding-specific visual contract is migrated component by component
+      - added the section 11 teal wedding-brand contract and named Deep Teal, Warm Porcelain, Ink Blue, warm-border, white-card, warm-ink and warm-slate tokens while retaining legacy tokens for explicit per-component migration
+      - retained the one-tap vendor search, source copy, task-derived progress, mobile bottom navigation, vendor media loading and full intervention reasons/options, but replaced rose/plum hero styling, oversized radii and pill controls on the touched surfaces
+      - the home now uses a task-bound six-step journey, white countdown card, stacked mobile/desktop right rail, white domain tiles and saved-vendor context; wedding decisions expose Best fit, checked facts, amber unknowns and a teal left edge
+      - computed-style browser assertions prove the exact brand colors and 8-12px radii at 320, 390 and 1280 pixels; the focusable horizontal journey fixes the Safari scroll-region Axe finding without introducing page overflow
+      - typecheck, 39 focused wedding tests, three Playwright cases, both line-budget checks, all 1929 wedding tests and the production build pass; the largest touched focused file is 438 lines and only inherited Tailwind/Vite advisories remain
+      - WED-225 evidence documentation now distinguishes successful local Postgres/ClamAV execution from the still-missing exact-commit external sign-offs; WED-225/WED-226 and all nine WED-240 human dimensions remain blocked

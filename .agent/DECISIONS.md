@@ -1419,3 +1419,24 @@ requires WED-225, WED-226 and mail/provider gates; machine tests cannot substitu
 Kill switches stop projection and action while preserving AFP and commercial history. Evaluation
 metrics remain content-free. Local disposable PostgreSQL and ClamAV evidence may establish machine
 correctness, but it cannot authorize Oracle deployment, provider use, cohort enablement or release.
+
+## 2026-10-20: Teal wedding brand supersedes the earlier rose/plum presentation
+
+Commit `e3f04a9` remains the behavioral base for the mobile-first wedding home: concise vendor search,
+one-tap categories, source-aware results, honest task-derived progress, number-first plan summaries,
+safe UI copy and the persistent five-item mobile navigation. Because that commit is already an
+ancestor of the advanced WED-215 branch, it is not cherry-picked again and the WED-187 worktree is
+not copied over later planning-intelligence changes.
+
+The Wedding Planner Surface contract in design-system section 11 now wins for presentation. Touched
+wedding surfaces use named Deep Teal, Warm Porcelain, Ink Blue, white-card, warm-border, warm-ink and
+warm-slate tokens; cards use 8-12px radii and primary/secondary actions are not pills. Older rose/plum
+tokens remain available only for explicit migration of untouched wedding components, avoiding a
+global replacement that could change unrelated flows.
+
+The decorative progress ring is retired in favor of a keyboard-accessible six-step journey whose
+position is derived from completed planner tasks. Up-next and saved-vendor context occupies a desktop
+rail and stacks on mobile. Wedding Decision Cards and first-ranked vendor cards use a teal left edge,
+retain checked facts and all valid alternatives, and separate amber unknowns from evidence-based Best
+fit wording. These are presentation changes only: AFP records, A2UI authority, outreach persistence,
+approval, booking, payment and feature-flag boundaries do not change.

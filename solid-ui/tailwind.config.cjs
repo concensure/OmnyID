@@ -67,13 +67,23 @@ module.exports = {
         "wedding-status-progress-bg": "#FFF0CC",
         "wedding-status-progress-ink": "#7A4A00",
         "wedding-status-locked-bg": "#ECE7F0",
-        "wedding-status-locked-ink": "#4B3F52"
+        "wedding-status-locked-ink": "#4B3F52",
+        // Wedding Planner Surface v2. Migrate the older rose/plum tokens above
+        // per component so unrelated wedding flows do not change implicitly.
+        "wedding-page": "#FAF7F2",
+        "wedding-primary": "#0F5F5A",
+        "wedding-secondary": "#274B77",
+        "wedding-border": "#E8E2D9",
+        "wedding-card": "#FFFFFF",
+        "wedding-ink": "#1F1A17",
+        "wedding-slate": "#EFEBE4"
       },
       boxShadow: {
         panel:   "0 24px 80px rgba(15, 23, 42, 0.14)",
         card:    "0 2px 12px rgba(15, 23, 42, 0.06)",
         "card-hover": "0 12px 32px rgba(15, 23, 42, 0.10)",
         "wedding-cta": "0 3px 0 #A6335A",
+        "wedding-card": "0 8px 32px rgba(31, 26, 23, 0.04)",
         "nav":   "0 1px 3px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(255,255,255,0.50) inset",
       },
       borderRadius: {

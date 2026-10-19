@@ -29,7 +29,7 @@ export function WeddingDateEntryControl(props: {
       setNotice("Wedding date saved.");
       setOpen(false);
     } catch {
-      setNotice("The date stayed here, but could not be saved to wedding memory yet.");
+      setNotice("We couldn't save that date yet. Try again.");
     } finally {
       setSaving(false);
     }
@@ -39,21 +39,21 @@ export function WeddingDateEntryControl(props: {
     <div class="min-w-0">
       <button
         type="button"
-        class="shrink-0 rounded-full bg-rose-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+        class="min-h-11 shrink-0 rounded-lg bg-wedding-primary px-4 py-2 text-sm font-semibold text-wedding-page transition hover:bg-wedding-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open()}
       >
         Add wedding date
       </button>
       <Show when={open()}>
-        <div class={`mt-3 rounded-2xl border border-rose-100 bg-white/90 p-3 shadow-sm ${props.compact ? "max-w-md" : "max-w-xl"}`}>
-          <label class="block min-w-0 text-xs font-semibold text-rose-950/75">
+        <div class={`mt-3 rounded-xl border border-wedding-border bg-wedding-card p-3 shadow-wedding-card ${props.compact ? "max-w-md" : "max-w-xl"}`}>
+          <label class="block min-w-0 text-xs font-semibold text-wedding-ink/75">
             Pick from calendar
             <input
               type="date"
               value={calendarDate()}
               onInput={(event) => setCalendarDate(event.currentTarget.value)}
-              class="mt-1 min-h-10 w-full rounded-full border border-rose-100 bg-white px-3 text-sm text-rose-950 outline-none transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+              class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 text-sm text-wedding-ink outline-none transition focus:border-wedding-primary focus:ring-2 focus:ring-wedding-primary/15"
             />
           </label>
           <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -61,19 +61,19 @@ export function WeddingDateEntryControl(props: {
               type="button"
               disabled={!parsedDate() || saving()}
               onClick={() => void saveDate()}
-              class="rounded-full bg-rose-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+              class="min-h-11 rounded-lg bg-wedding-primary px-3 py-2 text-xs font-semibold text-wedding-page transition hover:bg-wedding-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving() ? "Saving..." : "Save date"}
+              {saving() ? "Saving…" : "Save date"}
             </button>
             <button
               type="button"
-              class="rounded-full border border-rose-100 bg-white px-3 py-2 text-xs font-semibold text-rose-950/75 transition hover:bg-rose-50"
+              class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 py-2 text-xs font-semibold text-wedding-secondary transition hover:bg-wedding-slate"
               onClick={() => setOpen(false)}
             >
               Cancel
             </button>
             <Show when={notice()}>
-              {(message) => <p class="text-xs font-medium text-rose-950/70">{message()}</p>}
+              {(message) => <p class="text-xs font-medium text-wedding-ink/70">{message()}</p>}
             </Show>
           </div>
         </div>

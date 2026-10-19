@@ -42,8 +42,8 @@ export default function WeddingMobileAppBar(props: WeddingMobileAppBarProps) {
       ref={bar}
       class={`wedding-mobile-app-bar sticky top-0 z-30 grid h-[calc(3.5rem+env(safe-area-inset-top))] grid-cols-[1fr_auto_1fr] items-end border-b px-[max(1rem,env(safe-area-inset-left))] pb-0 pt-[env(safe-area-inset-top)] transition-colors sm:hidden ${
         scrolled()
-          ? "border-wedding-muted/15 bg-wedding-surface/85 backdrop-blur-xl"
-          : "border-transparent bg-wedding-surface"
+          ? "border-wedding-border bg-wedding-page/95 backdrop-blur-xl"
+          : "border-transparent bg-wedding-page"
       }`}
     >
       <div class="flex h-app-bar min-w-0 items-center justify-start">
@@ -51,7 +51,7 @@ export default function WeddingMobileAppBar(props: WeddingMobileAppBarProps) {
           {(back) => (
             <button
               type="button"
-              class="inline-flex h-11 min-w-11 max-w-full items-center gap-1 rounded-xl pr-2 text-wed-callout font-medium text-wedding-accent active:bg-wedding-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent"
+              class="inline-flex h-11 min-w-11 max-w-full items-center gap-1 rounded-lg pr-2 text-wed-callout font-medium text-wedding-secondary active:bg-wedding-slate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary"
               aria-label={`Back to ${back.label}`}
               onClick={back.onBack}
             >
@@ -65,7 +65,7 @@ export default function WeddingMobileAppBar(props: WeddingMobileAppBarProps) {
       </div>
 
       <div
-        class={`flex h-app-bar max-w-[12rem] items-center justify-center truncate px-2 text-wed-headline font-semibold text-wedding-text transition-opacity duration-150 ${showTitle() ? "opacity-100" : "opacity-0"}`}
+        class={`flex h-app-bar max-w-[12rem] items-center justify-center truncate px-2 text-wed-headline font-semibold text-wedding-ink transition-opacity duration-150 ${showTitle() ? "opacity-100" : "opacity-0"}`}
         aria-hidden={!showTitle()}
       >
         {props.title}

@@ -356,7 +356,60 @@ tailwind.config = {
 
 ---
 
-## 11. Resources
+## 11. Wedding Planner Surface (separate brand)
+
+The wedding planner (`wedding/` and the wedding components in `solid-ui/`) uses its own palette and
+component rules. Sections 1-10 above do not apply to it; the Do's and Don'ts here win for wedding views.
+Reference mock-up: `Documents/design/wedding planner/screenshots/wedding-home-proposed-teal-brand.png`.
+
+### Wedding palette
+
+| Role | Value | Name |
+|---|---|---|
+| Page background, primary-button text | `#FAF7F2` | Warm Porcelain |
+| Primary action fill, links on tint, progress | `#0F5F5A` | Deep Teal |
+| Secondary action border/text | `#274B77` | Ink Blue |
+| Card border | `#E8E2D9` | Soft Warm Gray |
+| Card background | `#FFFFFF` | Pure White |
+| Text | `#1F1A17` | Warm ink |
+| Muted fill (ghost button, chips) | warm slate, around `#EFEBE4` | Warm Slate |
+
+Status tints are reserved for status only: teal tint for "on track", amber for "in progress" and
+"still to confirm". Do not use colour alone; pair every status with an icon and a label.
+
+### Cards and containers
+
+- Background `#FFFFFF`, border `1px solid #E8E2D9`.
+- Radius 8px or 12px. No pill-shaped cards or bubbles.
+- Shadow very light and high blur: `0 8px 32px rgba(31, 26, 23, 0.04)`.
+- Emphasis comes from a 3-4px Deep Teal left edge (best fit, active decision), not from tinted
+  card backgrounds. One tinted colour per domain tile is retired.
+
+### Buttons and actions
+
+- Primary: Deep Teal `#0F5F5A` background, Warm Porcelain `#FAF7F2` text, crisp semi-bold sans-serif.
+  One primary button per viewport region.
+- Secondary: transparent background with Ink Blue `#274B77` border and text, or a subtle Warm Slate fill.
+- Radius 8px; no full-pill buttons. Category chips are 8px-radius, the selected chip uses the primary fill.
+
+### Layout patterns
+
+- Journey stepper (Budget, Venue, Key vendors, Guests, Seating, Booked) shows plan progress instead of
+  a decorative ring; completed steps are filled teal, the current step has a teal ring.
+- Decision cards show a "Best fit" tag, checked facts, and a "Still to confirm" risk note.
+- A right-hand rail holds "Up next" tasks and the saved-vendor count on desktop; it stacks on mobile.
+- Serif display face for page titles and the countdown number; sans for everything functional.
+
+### Implementation notes
+
+- Add the values as `wedding-*` tokens in `solid-ui/tailwind.config.cjs`; do not inline hex values.
+- The existing rose/plum wedding tokens (`wedding-accent #A6335A`, `wedding-cta`, `wedding-surface-blush`)
+  predate this brand and should be migrated per component, not mass-replaced.
+- Keep this palette out of non-wedding views.
+
+---
+
+## 12. Resources
 
 - **Google Fonts**: https://fonts.google.com
 - **EB Garamond**: https://fonts.google.com/specimen/EB+Garamond
@@ -366,7 +419,7 @@ tailwind.config = {
 
 ---
 
-## 12. Maintenance
+## 13. Maintenance
 
 This design system should be reviewed and updated:
 - When brand positioning changes

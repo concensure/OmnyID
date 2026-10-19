@@ -22,10 +22,10 @@ export type WeddingVendorChoiceCardData = WeddingWorkspaceArtifactPreview["vendo
 
 function availabilityChipClass(state: WeddingVendorAvailabilityState): string {
   if (["confirmed_available", "likely_available", "temporary_hold", "booked"].includes(state)) {
-    return "border-wedding-muted bg-wedding-surface-blush text-wedding-accent";
+    return "border-wedding-primary/20 bg-wedding-primary/10 text-wedding-primary";
   }
-  if (state === "unknown" || state === "confirmed_unavailable") return "border-wedding-muted bg-wedding-surface-blush text-wedding-muted";
-  return "border-wedding-muted bg-wedding-surface-blush text-wedding-accent";
+  if (state === "unknown" || state === "confirmed_unavailable") return "border-wedding-border bg-wedding-slate text-wedding-ink/70";
+  return "border-wedding-primary/20 bg-wedding-primary/10 text-wedding-primary";
 }
 
 function vendorEmailHref(title: string, email: string): string {
@@ -135,7 +135,7 @@ export function WeddingVendorChoiceCard(props: {
     : Math.max(0, card.rationaleLabels?.length ?? 0);
   const factSummary = () => `Based on ${checkedFactsCount()} checked fact${checkedFactsCount() === 1 ? "" : "s"} · ${anchorRows().filter((row) => row.status === "unknown").length} to confirm`;
   return (
-    <article class="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-wedding-muted bg-white/85">
+    <article data-wedding-surface="vendor-choice" class={`w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-wedding-border bg-wedding-card ${card.rank === 1 ? "border-l-4 border-l-wedding-primary" : ""}`}>
       <Show
         when={resolvedImageUrl() && !imageFailed()}
         fallback={
@@ -159,16 +159,16 @@ export function WeddingVendorChoiceCard(props: {
       <div class="w-full min-w-0 space-y-2 p-3">
         <div class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
           <div class="w-full min-w-0 max-w-full">
-            <p class="min-w-0 max-w-full text-[11px] font-semibold uppercase text-wedding-text [overflow-wrap:anywhere]">{card.comparisonCount === 1 ? "Only venue that fits so far" : card.rank === 1 ? "Your best match" : `Best of ${card.comparisonCount} matches`}</p>
-            <h4 class="mt-0.5 min-w-0 max-w-full text-sm font-semibold text-wedding-text [overflow-wrap:anywhere]">{card.title}</h4>
+            <p class="min-w-0 max-w-full text-[11px] font-semibold uppercase text-wedding-ink [overflow-wrap:anywhere]">{card.comparisonCount === 1 ? "Only venue that fits so far" : card.rank === 1 ? "Your best match" : `Best of ${card.comparisonCount} matches`}</p>
+            <h4 class="mt-0.5 min-w-0 max-w-full text-sm font-semibold text-wedding-ink [overflow-wrap:anywhere]">{card.title}</h4>
           </div>
-          <span class="w-fit min-w-0 max-w-full justify-self-start whitespace-normal rounded-2xl bg-wedding-surface-blush px-2 py-1 text-[11px] font-semibold text-wedding-accent [overflow-wrap:anywhere]">
+          <span class="w-fit min-w-0 max-w-full justify-self-start whitespace-normal rounded-lg bg-wedding-slate px-2 py-1 text-[11px] font-semibold text-wedding-primary [overflow-wrap:anywhere]">
             {factSummary()}
           </span>
         </div>
         <Show when={hasConfirmedAvailability()}>
         <span
-          class={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-semibold ${availabilityChipClass(availabilityState())}`}
+          class={`inline-block rounded-lg border px-2 py-0.5 text-[11px] font-semibold ${availabilityChipClass(availabilityState())}`}
           data-testid="vendor-availability-chip"
         >
           {card.availabilityLabel}
@@ -176,39 +176,39 @@ export function WeddingVendorChoiceCard(props: {
         </Show>
         <Show when={anchorRows().length > 0}>
           <section aria-label="For what you asked">
-            <p class="text-[11px] font-semibold uppercase text-wedding-muted">For what you asked</p>
+            <p class="text-[11px] font-semibold uppercase text-wedding-ink/65">For what you asked</p>
             <ul class="mt-1 space-y-1.5">
               <For each={anchorRows()}>{(row) => (
-                <li class="flex min-w-0 gap-2 text-xs leading-5 text-wedding-text">
-                  <span aria-label={anchorStatusLabel(row.status)} class="shrink-0 font-bold text-wedding-accent">{anchorIcon(row.status)}</span>
+                <li class="flex min-w-0 gap-2 text-xs leading-5 text-wedding-ink">
+                  <span aria-label={anchorStatusLabel(row.status)} class="shrink-0 font-bold text-wedding-primary">{anchorIcon(row.status)}</span>
                   <span class="min-w-0 [overflow-wrap:anywhere]"><strong>{row.anchor}</strong> — {row.detail}</span>
                 </li>
               )}</For>
             </ul>
           </section>
         </Show>
-        <Show when={card.fitWord}><p class="text-xs font-semibold text-wedding-accent">{card.fitWord}</p></Show>
-        <Show when={(card.facetLabels?.length ?? 0) > 0}><p class="text-xs text-wedding-muted">{card.facetLabels?.join(" · ")}</p></Show>
+        <Show when={card.fitWord}><p class="text-xs font-semibold text-wedding-primary">{card.fitWord}</p></Show>
+        <Show when={(card.facetLabels?.length ?? 0) > 0}><p class="text-xs text-wedding-ink/70">{card.facetLabels?.join(" · ")}</p></Show>
         <Show when={verifyQuestions().length > 0}>
           <section aria-label="We'll ask them">
-            <p class="text-[11px] font-semibold uppercase text-wedding-muted">We&apos;ll ask them</p>
-            <ul class="mt-1 list-disc space-y-1 pl-4 text-xs leading-5 text-wedding-muted"><For each={verifyQuestions()}>{(question) => <li>{question}</li>}</For></ul>
+            <p class="text-[11px] font-semibold uppercase text-wedding-ink/65">We&apos;ll ask them</p>
+            <ul class="mt-1 list-disc space-y-1 pl-4 text-xs leading-5 text-wedding-ink/70"><For each={verifyQuestions()}>{(question) => <li>{question}</li>}</For></ul>
           </section>
         </Show>
         <Show when={card.worthKnowing}>
-          <section aria-label="Worth knowing" class="rounded-lg border border-wedding-muted bg-wedding-surface-blush p-2 text-xs leading-5 text-wedding-text">
-            <p class="text-[11px] font-semibold uppercase text-wedding-muted">Worth knowing</p>
+          <section aria-label="Worth knowing" class="rounded-lg border border-wedding-border bg-wedding-slate p-2 text-xs leading-5 text-wedding-ink">
+            <p class="text-[11px] font-semibold uppercase text-wedding-ink/65">Worth knowing</p>
             <p>{card.worthKnowing}</p>
           </section>
         </Show>
         <Show when={confirmedScoreLabels().length > 0}>
           <div class="grid grid-cols-3 gap-1" aria-label="Vendor score summary">
-            <For each={confirmedScoreLabels()}>{(label) => <span class="rounded-lg border border-wedding-muted bg-wedding-surface-blush px-2 py-1 text-[10px] font-semibold text-wedding-accent">{label}</span>}</For>
+            <For each={confirmedScoreLabels()}>{(label) => <span class="rounded-lg border border-wedding-border bg-wedding-slate px-2 py-1 text-[10px] font-semibold text-wedding-primary">{label}</span>}</For>
           </div>
         </Show>
         <Show when={rooms().length > 0}>
-          <div class="rounded-lg border border-wedding-muted bg-wedding-surface-blush p-2" data-testid="vendor-rooms">
-            <p class="text-[11px] font-semibold uppercase text-wedding-muted">Rooms and pricing</p>
+          <div class="rounded-lg border border-wedding-border bg-wedding-slate p-2" data-testid="vendor-rooms">
+            <p class="text-[11px] font-semibold uppercase text-wedding-ink/65">Rooms and pricing</p>
             <ul class="mt-1 space-y-1.5">
               <For each={rooms()}>
                 {(room) => (
@@ -225,8 +225,8 @@ export function WeddingVendorChoiceCard(props: {
                       )}
                     </Show>
                     <div class="min-w-0">
-                      <p class="break-words font-semibold text-wedding-text">{room.name}</p>
-                      <p class="break-words text-wedding-muted">{room.summary}</p>
+                      <p class="break-words font-semibold text-wedding-ink">{room.name}</p>
+                      <p class="break-words text-wedding-ink/70">{room.summary}</p>
                     </div>
                   </li>
                 )}
@@ -235,10 +235,10 @@ export function WeddingVendorChoiceCard(props: {
           </div>
         </Show>
         <Show when={contactRows().length > 0}>
-          <div class="rounded-lg border border-wedding-muted bg-wedding-surface-blush p-2">
+          <div class="rounded-lg border border-wedding-border bg-wedding-slate p-2">
             <button
               type="button"
-              class="min-h-11 text-xs font-semibold text-wedding-text underline decoration-wedding-muted underline-offset-2"
+              class="min-h-11 text-xs font-semibold text-wedding-secondary underline decoration-wedding-border underline-offset-2"
               onClick={() => setContactOpen((current) => !current)}
               aria-expanded={contactOpen()}
             >
@@ -249,11 +249,11 @@ export function WeddingVendorChoiceCard(props: {
                 <For each={contactRows()}>
                   {(row) => (
                     <div class="grid gap-1 text-[11px] sm:grid-cols-[4.5rem_1fr]">
-                      <dt class="font-semibold text-wedding-muted">{row.label}</dt>
-                      <dd class="min-w-0 break-words text-wedding-text">
+                      <dt class="font-semibold text-wedding-ink/65">{row.label}</dt>
+                      <dd class="min-w-0 break-words text-wedding-ink">
                         <Show when={row.href} fallback={row.value}>
                           {(href) => (
-                            <a href={href()} target={row.label === "Email" || row.label === "Phone" ? undefined : "_blank"} rel="noreferrer" class="underline decoration-wedding-muted underline-offset-2">
+                            <a href={href()} target={row.label === "Email" || row.label === "Phone" ? undefined : "_blank"} rel="noreferrer" class="text-wedding-secondary underline decoration-wedding-border underline-offset-2">
                               {row.value}
                             </a>
                           )}
@@ -266,8 +266,8 @@ export function WeddingVendorChoiceCard(props: {
             </Show>
           </div>
         </Show>
-        <details class="text-xs text-wedding-muted">
-          <summary class="min-h-11 cursor-pointer py-2 font-semibold text-wedding-text">Why this ranking</summary>
+        <details class="text-xs text-wedding-ink/70">
+          <summary class="min-h-11 cursor-pointer py-2 font-semibold text-wedding-ink">Why this ranking</summary>
           <p class="pb-2">{card.scoreLabel}</p>
         </details>
         <div class="flex flex-wrap gap-1.5">
@@ -276,10 +276,10 @@ export function WeddingVendorChoiceCard(props: {
               type="button"
               onClick={() => props.onToggleFollowUp?.(card)}
               aria-pressed={Boolean(props.selectedForFollowUp)}
-              class={`hidden min-h-11 rounded-xl px-3 py-2 text-xs font-bold transition sm:inline-flex sm:w-auto sm:rounded-full sm:px-2.5 sm:py-1.5 ${
+              class={`hidden min-h-11 rounded-lg px-3 py-2 text-xs font-bold transition sm:inline-flex sm:w-auto sm:px-2.5 sm:py-1.5 ${
                 props.selectedForFollowUp
-                  ? "bg-wedding-accent text-white hover:bg-wedding-accent/90"
-                  : "border border-wedding-muted bg-white text-wedding-text hover:bg-wedding-surface-blush"
+                  ? "bg-wedding-primary text-wedding-page hover:bg-wedding-primary/90"
+                  : "border border-wedding-secondary bg-white text-wedding-secondary hover:bg-wedding-slate"
               }`}
             >
               {props.selectedForFollowUp ? "Selected for follow-up" : "Select for follow-up"}
@@ -302,14 +302,14 @@ export function WeddingVendorChoiceCard(props: {
                 data-magic-action="contact"
                 data-magic-icon="send"
                 data-magic-id={`wedding:vendor-choice:${card.choiceId}:contact`}
-                class="min-h-12 w-full rounded-xl border-2 border-wedding-cta bg-white px-3 py-2 text-sm font-bold text-wedding-text transition hover:bg-wedding-surface-blush"
+                class="min-h-12 w-full rounded-lg bg-wedding-primary px-3 py-2 text-sm font-bold text-wedding-page transition hover:bg-wedding-primary/90"
               >
                 <span aria-hidden="true">→ </span>
                 {primaryAction().label}
               </button>
             }
           >
-            <span class="rounded-full border border-wedding-muted bg-wedding-surface-blush px-2.5 py-1.5 text-xs font-semibold text-wedding-accent">
+            <span class="rounded-lg border border-wedding-border bg-wedding-slate px-2.5 py-1.5 text-xs font-semibold text-wedding-primary">
               {"✓ "}
               {weddingVendorOutreachSentLabel({ sentAtIso: props.outreachFlow?.sentAtIso ?? null })}
             </span>
@@ -321,20 +321,20 @@ export function WeddingVendorChoiceCard(props: {
             </div>
           </Show>
         </div>
-        <div class="flex min-h-11 flex-wrap items-center gap-3 text-xs font-semibold text-wedding-text">
+        <div class="flex min-h-11 flex-wrap items-center gap-3 text-xs font-semibold text-wedding-ink">
           <Show when={card.websiteUrl ?? card.sourceUrl}>{(url) => <a href={url()} target="_blank" rel="noreferrer" class="inline-flex min-h-11 min-w-11 items-center justify-center underline">Website</a>}</Show>
           <Show when={contactRows().length > 0}><button type="button" class="min-h-11 min-w-11 underline" onClick={() => setContactOpen((current) => !current)}>Contact</button></Show>
           <Show when={props.onNotForUs}><button type="button" class="min-h-11 min-w-11 underline" aria-expanded={feedbackOpen()} onClick={() => { setFeedbackOpen((current) => !current); setFeedbackError(null); }}>Not for us</button></Show>
         </div>
         <Show when={feedbackOpen()}>
-          <section class="rounded-lg border border-wedding-muted bg-wedding-surface-blush p-2" aria-label={`Why ${card.title} is not for you`}>
-            <p class="text-xs font-semibold text-wedding-text">What made this one not for you?</p>
+          <section class="rounded-lg border border-wedding-border bg-wedding-slate p-2" aria-label={`Why ${card.title} is not for you`}>
+            <p class="text-xs font-semibold text-wedding-ink">What made this one not for you?</p>
             <div class="mt-2 flex flex-wrap gap-2">
               <For each={[["too_big", "Too big"], ["not_our_style", "Not our style"], ["too_far", "Too far"], ["too_expensive", "Too expensive"], ["other", "Other"]] as const}>
-                {([reason, label]) => <button type="button" disabled={feedbackSaving()} class="min-h-11 rounded-lg border border-wedding-muted bg-white px-3 text-xs font-semibold text-wedding-text disabled:opacity-60" onClick={() => void submitFeedback(reason)}>{label}</button>}
+                {([reason, label]) => <button type="button" disabled={feedbackSaving()} class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-xs font-semibold text-wedding-secondary disabled:opacity-60" onClick={() => void submitFeedback(reason)}>{label}</button>}
               </For>
             </div>
-            <Show when={feedbackError()}><p class="mt-2 text-xs text-wedding-text" role="alert">{feedbackError()}</p></Show>
+            <Show when={feedbackError()}><p class="mt-2 text-xs text-wedding-ink" role="alert">{feedbackError()}</p></Show>
           </section>
         </Show>
         <Show when={props.outreachFlow}>

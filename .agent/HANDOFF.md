@@ -4186,3 +4186,39 @@ Next:
   while the nine human dimensions and WED-225/WED-226 remain unresolved.
 - Keep every planning, quotation, mail, provider, relay and ranking-policy-V2 flag disabled. Do not
   deploy to Oracle or advance a canary from this machine-only evidence.
+
+## 2026-10-20 - WED-242 teal wedding surface alignment (Codex, review)
+
+Changed:
+
+- Confirmed `e3f04a9` is already in this branch's ancestry and selectively retained its useful
+  mobile/search behavior without cherry-picking it or copying the WED-187 worktree. Later WED-239
+  recommendation reasons, review items, full alternatives and zoom reflow fixes remain intact.
+- Added design-system section 11 and the matching CLAUDE guidance. New named tokens implement Deep
+  Teal, Warm Porcelain, Ink Blue, white cards, warm borders/ink and warm slate without globally
+  changing legacy wedding flows.
+- Reworked the touched home/search/comparison/decision surfaces to 8-12px radii, rectangular actions,
+  white cards and semantic status tints. Vendor images, readable wrapped names, selected comparison
+  state and post-outreach comparison persistence are preserved.
+- Replaced the dark decorative ring with a task-derived journey stepper and added a desktop up-next /
+  saved-vendor rail that stacks on mobile. The stepper is horizontally contained and keyboard
+  focusable at narrow widths. The existing five-item mobile bottom navigation remains mounted.
+- Expanded the WED-240 and WED-225 verification guides with the nine human-review meanings, exact
+  record workflow and external portal evidence expectations. No reviewer evidence was invented.
+
+Verification:
+
+- Solid typecheck passed. Thirty-nine focused home/search/decision/outreach tests and all 1,929
+  wedding tests passed. Both line-budget checks passed; the largest touched focused file is 438 lines.
+- The focused Playwright home suite passed at 320, 390 and 1280 CSS pixels with exact computed token
+  colors/radii, no page overflow, no serious/critical Axe finding and the five mobile tabs intact.
+- Production UI build passed. Only the inherited Tailwind object-screen advisory and Vite large-chunk
+  advisory remain. No Rust contract changed, so no new Rust test lane was required for this UI slice.
+
+Unresolved / next:
+
+- WED-240 still needs nine independent, exact-commit human-review JSON records. The records are not
+  repository fixtures; reviewers create them after producing and hashing durable evidence.
+- WED-225 still needs all commit-bound external sign-offs accepted by its verifier. WED-226 remains
+  blocked by WED-225 plus WED-213 and WED-185; vendor mail, email reconciliation, quotation rollout,
+  relay and ranking-policy V2 stay disabled. No Oracle deployment or provider mutation ran.

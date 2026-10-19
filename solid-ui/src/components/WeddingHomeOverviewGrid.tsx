@@ -1,9 +1,9 @@
 // @locs-version: 1.0
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
 
 import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/WeddingDashboardIcons";
 import { WeddingDateEntryControl } from "@/components/WeddingDateEntryControl";
-import { WeddingPlanningProgressRing } from "@/components/WeddingPlanningProgressRing";
+import { WeddingPlanningJourneyStepper } from "@/components/WeddingPlanningJourneyStepper";
 import {
   buildWeddingHomeOverviewActionTiles,
   buildWeddingHomePlanningProgress,
@@ -18,11 +18,11 @@ import { weddingDayCountdownLabel, weddingTimelinePrimarySidebarAction } from "@
 
 type Domain = "budget" | "guests" | "seating" | "vendors";
 
-const DOMAIN_STYLE: Record<Domain, { shell: string; pop: string; icon: WeddingDashboardIconId; label: string }> = {
-  budget: { shell: "bg-wedding-tile-budget-bg text-wedding-tile-budget-ink", pop: "bg-wedding-tile-budget-pop", icon: "banknotes", label: "Budget" },
-  guests: { shell: "bg-wedding-tile-guests-bg text-wedding-tile-guests-ink", pop: "bg-wedding-tile-guests-pop", icon: "users", label: "Guests" },
-  seating: { shell: "bg-wedding-tile-seating-bg text-wedding-tile-seating-ink", pop: "bg-wedding-tile-seating-pop", icon: "table-cells", label: "Seating" },
-  vendors: { shell: "bg-wedding-tile-vendors-bg text-wedding-tile-vendors-ink", pop: "bg-wedding-tile-vendors-pop", icon: "user-plus", label: "Vendors" },
+const DOMAIN_STYLE: Record<Domain, { icon: WeddingDashboardIconId; label: string }> = {
+  budget: { icon: "banknotes", label: "Budget" },
+  guests: { icon: "users", label: "Guests" },
+  seating: { icon: "table-cells", label: "Seating" },
+  vendors: { icon: "user-plus", label: "Vendors" },
 };
 
 function dateLabel(value: string | null): string {
@@ -38,39 +38,39 @@ function displayValue(tile: WeddingHomeOverviewActionTile | undefined): string {
 }
 
 function statusStyle(tile: WeddingHomeOverviewActionTile): { shell: string; icon: WeddingDashboardIconId } {
-  if (tile.toneLabel === "Locked") return { shell: "bg-wedding-status-locked-bg text-wedding-status-locked-ink", icon: "lock" };
-  if (tile.tone === "ready") return { shell: "bg-wedding-status-track-bg text-wedding-status-track-ink", icon: "check-circle" };
+  if (tile.toneLabel === "Locked") return { shell: "bg-wedding-slate text-wedding-ink/70", icon: "lock" };
+  if (tile.tone === "ready") return { shell: "bg-wedding-primary/10 text-wedding-primary", icon: "check-circle" };
   if (tile.tone === "attention") return { shell: "bg-wedding-status-progress-bg text-wedding-status-progress-ink", icon: "clock" };
   return { shell: "bg-wedding-status-action-bg text-wedding-status-action-ink", icon: "alert-circle" };
 }
 
 function DomainTile(props: { tile?: WeddingHomeOverviewActionTile; domain: Domain; dense: boolean; onOpen: () => void; desktopSpan?: string }) {
   const style = DOMAIN_STYLE[props.domain];
-  const status = () => props.tile ? statusStyle(props.tile) : { shell: "bg-wedding-status-locked-bg text-wedding-status-locked-ink", icon: "lock" as const };
+  const status = () => props.tile ? statusStyle(props.tile) : { shell: "bg-wedding-slate text-wedding-ink/70", icon: "lock" as const };
   return (
     <button
       type="button"
-      class={`group min-h-[10.5rem] min-w-0 rounded-[24px] border border-transparent p-4 text-left shadow-card transition duration-200 ease-out hover:-translate-y-0.5 hover:shadow-card-hover active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2 motion-reduce:transform-none sm:p-5 ${style.shell} ${props.desktopSpan ?? ""} ${props.dense ? "min-h-[9rem] p-3 sm:p-3" : ""}`}
+      class={`group min-h-[10.5rem] min-w-0 rounded-xl border border-wedding-border bg-wedding-card p-4 text-left text-wedding-ink shadow-wedding-card transition duration-200 ease-out hover:-translate-y-0.5 hover:border-wedding-primary/40 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 motion-reduce:transform-none sm:p-5 ${props.desktopSpan ?? ""} ${props.dense ? "min-h-[9rem] p-3 sm:p-3" : ""}`}
       title={props.tile?.actionLabel}
       onClick={props.onOpen}
     >
       <div class="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <div class="flex min-w-0 items-center gap-2">
-          <span class={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${style.pop}`} aria-hidden="true">
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-wedding-slate text-wedding-primary" aria-hidden="true">
             <WeddingDashboardIcon id={style.icon} class="h-[18px] w-[18px]" />
           </span>
           <span class="truncate text-xs font-semibold uppercase tracking-[0.08em]">{style.label}</span>
         </div>
         <Show when={props.tile}>{(tile) => (
-          <span class={`ml-auto inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${status().shell}`}>
+          <span class={`ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${status().shell}`}>
             <WeddingDashboardIcon id={status().icon} class="h-3.5 w-3.5" />
             <span>{tile().toneLabel}</span>
           </span>
         )}</Show>
       </div>
       <p class="mt-4 break-words text-[2.125rem] font-extrabold leading-9 tracking-[-.02em] tabular-nums">{displayValue(props.tile)}</p>
-      <p class="mt-1 line-clamp-2 text-sm leading-5 opacity-80">{props.tile?.detailLabel}</p>
-      <span class="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold">
+      <p class="mt-1 line-clamp-2 text-sm leading-5 text-wedding-ink/70">{props.tile?.detailLabel}</p>
+      <span class="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-wedding-secondary">
         {props.tile?.actionLabel}<WeddingDashboardIcon id="arrow-right" class="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" />
       </span>
     </button>
@@ -105,29 +105,54 @@ export function WeddingHomeOverviewGrid(props: {
 
   return (
     <section class={`grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-12 lg:gap-4 ${dense() ? "gap-2" : ""}`} aria-label="Wedding plan overview">
-      <article class={`relative col-span-2 min-h-[13.75rem] min-w-0 overflow-hidden rounded-[32px] bg-gradient-to-br from-wedding-plum via-wedding-plum-light to-wedding-plum-warm p-5 text-white shadow-card lg:col-span-7 lg:row-span-2 lg:p-6 ${dense() ? "min-h-[12rem] p-4" : ""}`}>
-        <div class="pointer-events-none absolute -right-8 -top-12 h-44 w-44 rounded-full bg-wedding-bubblegum/20 blur-2xl" aria-hidden="true" />
-        <div class="relative flex items-start justify-between gap-4">
+      <article data-wedding-surface="countdown" class={`col-span-2 min-h-[13.75rem] min-w-0 rounded-xl border border-wedding-border bg-wedding-card p-5 text-wedding-ink shadow-wedding-card lg:col-span-9 lg:p-6 ${dense() ? "min-h-[12rem] p-4" : ""}`}>
+        <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="min-w-0">
-            <p class="break-words text-xs font-semibold uppercase tracking-[0.08em] text-wedding-butter">Wedding day · {dateLabel(weddingDate())}</p>
-            <p class={`mt-3 break-words font-display font-bold tracking-[-.03em] tabular-nums ${/^\d+$/.test(countdown()) ? "text-7xl leading-[.9] lg:text-8xl" : "max-w-[10ch] text-4xl leading-tight"}`}>{countdown()}</p>
-            <p class="mt-2 text-base text-white/80">{weddingDate() ? "days to go" : "Add your date to start the countdown"}</p>
+            <p class="break-words text-xs font-semibold uppercase tracking-[0.08em] text-wedding-primary">Wedding day · {dateLabel(weddingDate())}</p>
+            <p class={`mt-3 break-words font-display font-bold tracking-[-.03em] text-wedding-primary tabular-nums ${/^\d+$/.test(countdown()) ? "text-7xl leading-[.9] lg:text-8xl" : "max-w-[10ch] text-4xl leading-tight"}`}>{countdown()}</p>
+            <p class="mt-2 text-base text-wedding-ink/70">
+              {weddingDate() ? `days to go · ${progress().percentage}% of planning complete` : "Add your date to start the countdown"}
+            </p>
           </div>
-          <WeddingPlanningProgressRing percentage={progress().percentage} size={dense() ? 82 : 96} />
+          <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary px-4 text-sm font-semibold text-wedding-secondary transition hover:bg-wedding-slate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2" onClick={openTimeline}>
+            Open timeline
+          </button>
         </div>
+        <WeddingPlanningJourneyStepper completedCount={progress().completedCount} totalCount={progress().totalCount} />
         <Show when={!weddingDate() && props.onSaveWeddingDate} fallback={
-          <button type="button" class="relative mt-5 flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl bg-white/10 px-4 text-left text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-butter" onClick={openTimeline}>
+          <button type="button" class="mt-5 flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-wedding-border bg-wedding-page px-4 text-left text-sm font-semibold text-wedding-ink transition hover:border-wedding-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={openTimeline}>
             <span class="min-w-0 truncate">Next · {timeline().detailLabel.replace(/^Next:\s*/i, "")}</span><WeddingDashboardIcon id="arrow-right" class="h-5 w-5 shrink-0" />
           </button>
         }>
-          <div class="relative mt-4 rounded-2xl bg-white/10 p-3"><WeddingDateEntryControl onSave={props.onSaveWeddingDate!} locale="en-AU" compact /></div>
+          <div class="mt-4 rounded-lg border border-wedding-border bg-wedding-page p-3"><WeddingDateEntryControl onSave={props.onSaveWeddingDate!} locale="en-AU" compact /></div>
         </Show>
       </article>
 
-      <DomainTile domain="budget" tile={tile("budget")} dense={dense()} desktopSpan="lg:col-span-5" onOpen={() => openTile("budget")} />
-      <DomainTile domain="guests" tile={tile("guests")} dense={dense()} desktopSpan="lg:col-span-2" onOpen={() => openTile("guests")} />
+      <aside class="order-last col-span-2 rounded-xl border border-wedding-border bg-wedding-card p-4 text-wedding-ink shadow-wedding-card lg:order-none lg:col-span-3 lg:row-span-3" aria-label="Wedding plan up next">
+        <p class="text-xs font-semibold uppercase tracking-[0.08em] text-wedding-primary">Up next</p>
+        <button type="button" class="mt-3 flex min-h-11 w-full items-start gap-2 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={openTimeline}>
+          <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-wedding-primary text-wedding-primary"><WeddingDashboardIcon id="calendar-days" class="h-4 w-4" /></span>
+          <span class="min-w-0"><span class="block text-sm font-semibold">{timeline().detailLabel.replace(/^Next:\s*/i, "")}</span><span class="mt-0.5 block text-xs text-wedding-ink/65">Open the timeline</span></span>
+        </button>
+        <div class="mt-3 grid gap-1 border-t border-wedding-border pt-3">
+          <For each={tiles().slice(0, 3)}>{(item) => (
+            <button type="button" class="flex min-h-11 items-center justify-between gap-2 rounded-lg px-1 text-left hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={() => openTile(item.id)}>
+              <span class="min-w-0 truncate text-xs font-medium">{DOMAIN_STYLE[item.id].label}</span>
+              <span class="shrink-0 text-[11px] text-wedding-ink/65">{item.toneLabel}</span>
+            </button>
+          )}</For>
+        </div>
+        <div class="mt-3 border-t border-wedding-border pt-3">
+          <p class="text-xs font-semibold uppercase tracking-[0.08em] text-wedding-ink/65">Saved vendors</p>
+          <p class="mt-1 font-display text-3xl font-bold text-wedding-primary tabular-nums">{props.state.vendorContactCards?.length ?? 0}</p>
+          <button type="button" class="mt-1 min-h-11 text-left text-xs font-semibold text-wedding-secondary" onClick={() => openTile("vendors")}>Open saved vendors →</button>
+        </div>
+      </aside>
+
+      <DomainTile domain="budget" tile={tile("budget")} dense={dense()} desktopSpan="lg:col-span-3" onOpen={() => openTile("budget")} />
+      <DomainTile domain="guests" tile={tile("guests")} dense={dense()} desktopSpan="lg:col-span-3" onOpen={() => openTile("guests")} />
       <DomainTile domain="seating" tile={tile("seating")} dense={dense()} desktopSpan="lg:col-span-3" onOpen={() => openTile("seating")} />
-      <DomainTile domain="vendors" tile={tile("vendors")} dense={dense()} desktopSpan="lg:col-span-12 lg:min-h-[9rem]" onOpen={() => openTile("vendors")} />
+      <DomainTile domain="vendors" tile={tile("vendors")} dense={dense()} desktopSpan="lg:col-span-9 lg:min-h-[9rem]" onOpen={() => openTile("vendors")} />
     </section>
   );
 }

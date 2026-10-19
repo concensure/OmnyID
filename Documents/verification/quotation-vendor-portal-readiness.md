@@ -14,16 +14,20 @@ must remain off while this status is `blocked`, `failed`, or `untested`.
 
 ## Current verdict
 
-The deterministic local scenario suite and aggregate privacy contract are implemented.
-Release is blocked because disposable-Postgres execution, a real clean ClamAV scan,
-accuracy-corpus evidence, an allowlisted provider smoke, independent security/privacy
-review, hosted accessibility review, couple/vendor usability sessions, human review of
-booking and permission wording, hosted shadow evidence, and cohort evidence have not
-been supplied for the current commit.
+The deterministic local scenario suite and aggregate privacy contract are implemented. The latest
+recorded local run exercised disposable PostgreSQL and the live disposable ClamAV endpoint, but an
+exact-current-commit run is still required after implementation changes. Release remains blocked
+until the verifier receives commit-bound external evidence for the accuracy corpus, clean ClamAV
+authority, allowlisted provider smoke, independent security/privacy review, hosted accessibility
+review, couple/vendor usability sessions, booking and permission wording, hosted shadow run, and
+allowlisted cohort.
 
 No critical or high finding is represented as closed. The absence of a reviewer report is
 a blocker, not a pass. Local Axe checks are useful machine evidence but do not constitute
 independent accessibility or usability approval.
+
+The live local ClamAV test proves integration behavior; it does not replace the separately signed
+`clamav_clean_scan` external-evidence record required by the WED-225 verifier.
 
 ## Seven-scenario evidence map
 
@@ -124,6 +128,22 @@ Accepted gate names are `accuracy_corpus`, `clamav_clean_scan`,
 does not pass a gate: wrong schema, gate, status, commit, reviewer, timestamp, supporting
 reference, or supporting digest is reported as invalid. Reviewer reports retain their detailed
 findings separately; this small record is only the digestable, commit-bound sign-off pointer.
+
+| Gate | Evidence to obtain before marking it verified |
+| --- | --- |
+| `accuracy_corpus` | Exact-current-commit corpus results meeting the fixed money, currency, inclusion, unsupported-material, source-anchor, replay, and approval thresholds. |
+| `clamav_clean_scan` | Named test authority receipt for the live disposable scanner's clean-file result, with infected and unavailable behavior retained as fail-closed tests. |
+| `allowlisted_provider_smoke` | Provider receipt from an explicitly allowlisted non-production smoke; no unrestricted vendor send or payment action. |
+| `security_privacy_review` | Independent report covering tenant/vendor/grant/thread/session/attachment IDOR, CSRF, XSS, tokens, logs, metrics, stale authority, and channel reconciliation. |
+| `hosted_accessibility_review` | Independent hosted keyboard, screen-reader, zoom/reflow, contrast, focus, touch-target, error, and mobile/desktop review. |
+| `couple_usability` | Observed couple session covering compare, source/unknown review, clarification, selection, contract/deposit review, defer, and cancellation history. |
+| `vendor_usability` | Observed vendor session covering claimed AFP or secure link, bounded context, revision/attachment, expiry/revocation, and review-not-booking wording. |
+| `booking_permission_wording` | Human copy review proving prepare, share, approve, send, accept, book, pay, cancel, and refund states cannot be confused. |
+| `hosted_shadow` | Hosted shadow-run report with flags still off and no external side effect, bound to runtime and source commit. |
+| `allowlisted_cohort` | Seven-day allowlisted cohort evidence after prerequisite canaries, including rollback/kill-switch observations and explicit owner approval. |
+
+Create the small JSON pointer only after its supporting artifact exists, hash the supporting artifact,
+and pass each JSON file through the matching verifier parameter. Evidence from a prior commit is stale.
 
 ## Rollout boundary
 
