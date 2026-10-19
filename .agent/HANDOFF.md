@@ -4174,11 +4174,15 @@ Verification:
   site smoke, both line budgets, all 1,924 wedding tests and the production build. Compose structure
   validates for production, minimal, QUIC and staging without interpolating secrets. Only inherited
   Rust unused-variable, Tailwind screen-variant and Vite chunk advisories remain.
+- The exact-commit verifier reports machine `verified` for
+  `f71dba5d86b2b07e764e7fdce32243b01582609a`, artifact digest
+  `49a75251f9b1a7faca2fe9d894f26b515ea01e5edd369f14659527c9c4913945`, with all 12 checks passed.
+  Human and release remain `blocked`: all nine human-review records are missing and WED-225/WED-226
+  remain blocked.
 
 Next:
 
-- Add the exact-commit readiness verifier and machine-readable report, then ingest independent human
-  review evidence when supplied. WED-240 cannot move to review or release while human dimensions and
-  WED-225/WED-226 remain unresolved.
+- Ingest independent human-review evidence when supplied. WED-240 cannot move to review or release
+  while the nine human dimensions and WED-225/WED-226 remain unresolved.
 - Keep every planning, quotation, mail, provider, relay and ranking-policy-V2 flag disabled. Do not
   deploy to Oracle or advance a canary from this machine-only evidence.
