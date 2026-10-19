@@ -4233,18 +4233,20 @@ Unresolved / next:
 Changed:
 
 - Ran the WED-225 readiness workflow against the isolated local PostgreSQL and ClamAV endpoints.
-  Every functional lane passed, but the aggregator correctly failed because the later structured
-  A2UI action normalizer had grown the already-oversized renderer by eight lines since the WED-225
-  baseline.
+  Every functional lane passed. The aggregator correctly exposed two sequential line-budget issues:
+  the later structured A2UI action normalizer had grown the already-oversized renderer by eight
+  lines, then the expanded test-router registrations had grown the oversized server module by four.
 - Compacted only that normalizer without changing its accepted array/map shapes or label trimming.
   `A2UIRenderer.tsx` is now line-neutral at 1,983 lines against the 1,983-line baseline.
+- Grouped only the existing test-router merge chain without adding, removing or reordering a route.
+  `src/server/mod.rs` is now line-neutral at its 45,692-line WED-225 baseline.
 
 Verification before the clean-commit rerun:
 
 - Seven focused unified-intervention/A2UI reflow tests pass and Solid typecheck passes.
-- The first full verifier run passed the quotation suite, real disposable-Postgres API path, SDK,
+- Both full verifier attempts passed the quotation suite, real disposable-Postgres API path, SDK,
   44 Solid quotation tests, 11 Playwright cases, migration catalog, all 1,929 wedding tests and the
-  production build; its sole local failure was the now-repaired line-budget check.
+  production build; each fail-fast line-budget finding is now repaired.
 
 Unresolved / next:
 
