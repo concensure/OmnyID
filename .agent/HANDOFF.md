@@ -3981,3 +3981,35 @@ Next:
   the existing quotation review successor path and preserve stale-decision invalidation.
 - Keep all planning, quotation, vendor-mail, relay, provider and ranking-policy-V2 flags disabled.
   Quotation-normalisation/week-3-to-6 work remains paused pending the user's human-judge review.
+
+## 2026-10-19 - WED-237 revision-bound replacement review core (Codex, in progress)
+
+Changed:
+
+- Added a pure review projection over the canonical vendor-change interpretation. Every anchored
+  replacement has a stable option reference and independent constraint, aesthetic/palette and
+  budget outcomes; missing evidence remains unknown.
+- Bound evaluations to current confirmed constraint IDs, exact replacement option and source
+  revision. Identical retries deduplicate; conflicting, malformed, stale or source-mismatched
+  records become blockers. Hard conflict is derived from the current constraint strength rather
+  than trusting presentation severity.
+- Added exact calendar-day projections for explicit event dates and vendor deadlines. Invalid dates,
+  budget evidence and reference times block; no urgency or deadline is inferred.
+- Added currentness checks across response ID/fingerprint, quotation, constraints, budget and event
+  date. Review output is always non-mutating and provides no acceptance or booking authority.
+
+Verification:
+
+- Seven focused replacement-review tests and all 77 planning-intelligence tests pass; `cargo check`
+  passes. New files are 597 and 345 lines. The inherited unused email-group parameter warning
+  remains. A crate-wide formatter traversal was detected and fully reversed before this handoff.
+
+Next:
+
+- Add the default-off authenticated adapter that replays the tenant-owned current canonical vendor
+  response and active quotation, supplies only server-owned current constraint/budget/event evidence,
+  and projects review-safe output. Do not accept browser-authored evaluations or infer style from
+  response prose.
+- Then wire a fail-closed Decision Card/A2UI projection and explicit acceptance through the existing
+  quotation successor/stale-decision lifecycle. Keep all provider, vendor-mail, relay and
+  ranking-policy-V2 flags disabled; no Oracle deployment has run.

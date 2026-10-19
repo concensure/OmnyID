@@ -1299,3 +1299,19 @@ therefore retained by exact anchored original and replacement price terms, while
 contains the absolute magnitude. Interpretation is review-only and explicitly does not mutate a
 quotation. A later acceptance adapter must reuse the existing quotation review successor lifecycle
 and its stale-decision invalidation rather than editing the active revision.
+
+## 2026-10-19: Vendor replacement review preserves independent unknown dimensions
+
+Each anchored vendor replacement receives a deterministic option reference derived from the change
+and complete source-anchored term. Constraint evaluations bind to that option reference, the active
+confirmed constraint revision and the replacement source revision. Missing evaluation evidence is
+unknown; it is not a match. Identical evaluation retries deduplicate by immutable evaluation ID,
+while conflicting records, stale constraints and source mismatches block review preparation.
+
+Aesthetic/palette fit is an explicit subset of the same typed constraint evaluations, not a text
+similarity guess. Budget fit is computed only for exact same-currency old/new amounts against a
+validated revision-bound headroom range, preserving an uncertain range result. Timing reports exact
+calendar-day differences only when an RFC3339 event date or explicit vendor deadline exists. It does
+not create an urgency band or deadline. The review binds response fingerprint, quotation version,
+constraint revisions, optional budget revision and optional event-date revision; it never mutates or
+accepts a quotation.
