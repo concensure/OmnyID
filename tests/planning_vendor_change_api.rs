@@ -84,6 +84,31 @@ async fn post(app: &Router, uri: &str, auth: &str, body: Value) -> (StatusCode, 
     (status, body)
 }
 
+async fn get(app: &Router, uri: &str, auth: &str) -> (StatusCode, Value) {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(uri)
+                .header(AUTHORIZATION, auth)
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    let status = response.status();
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("body")
+        .to_bytes();
+    let body = serde_json::from_slice(&bytes)
+        .unwrap_or_else(|_| json!({"text": String::from_utf8_lossy(&bytes)}));
+    (status, body)
+}
+
 async fn send(app: &Router, auth: &str, message: &AFPMessage) {
     let (status, body) = post(
         app,
@@ -332,6 +357,109 @@ async fn vendor_change_prepare_is_private_current_deduplicated_and_non_mutating(
     .await;
     assert_eq!(status, StatusCode::OK, "duplicate: {duplicate_review}");
     assert_eq!(review["review_id"], duplicate_review["review_id"]);
+
+    let acceptance = json!({
+        "preparation": request,
+        "review_id": review["review_id"],
+        "option_ref": review["options"][0]["option_ref"],
+        "idempotency_key": "accept-lighting-price-v1"
+    });
+    let (status, hidden_acceptance) = post(
+        &app,
+        "/planning/vendor-changes/accept",
+        &other,
+        acceptance.clone(),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "accept tenant isolation: {hidden_acceptance}"
+    );
+    let (status, accepted) = post(
+        &app,
+        "/planning/vendor-changes/accept",
+        &owner,
+        acceptance.clone(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "accept: {accepted}");
+    assert_eq!(accepted["inserted"], true);
+    assert_eq!(accepted["booking_created"], false);
+    assert_eq!(accepted["payment_executed"], false);
+    assert_eq!(accepted["message_ids"].as_array().unwrap().len(), 2);
+    let successor_version = accepted["quotation_version_id"]
+        .as_str()
+        .expect("successor version");
+
+    let (status, retried) = post(
+        &app,
+        "/planning/vendor-changes/accept",
+        &owner,
+        acceptance.clone(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "idempotent retry: {retried}");
+    assert_eq!(retried["inserted"], false);
+    assert_eq!(retried["quotation_version_id"], successor_version);
+
+    let mut reused_key = acceptance.clone();
+    reused_key["review_id"] = json!("different-review");
+    let (status, conflict) =
+        post(&app, "/planning/vendor-changes/accept", &owner, reused_key).await;
+    assert_eq!(status, StatusCode::CONFLICT, "key reuse: {conflict}");
+
+    let mut second_key = acceptance.clone();
+    second_key["idempotency_key"] = json!("accept-lighting-price-v2");
+    let (status, duplicate_acceptance) =
+        post(&app, "/planning/vendor-changes/accept", &owner, second_key).await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "a second key cannot fork the accepted quotation: {duplicate_acceptance}"
+    );
+
+    let (status, state) = get(
+        &app,
+        &format!("/quotation/state?thread_id={thread_id}"),
+        &owner,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "quotation state: {state}");
+    assert_eq!(
+        state["active_version_by_quotation"]["production-hire-quote"],
+        successor_version
+    );
+    assert_eq!(
+        state["versions"][successor_version]["line_items"][0]["unit_price"]["amount_minor"],
+        425_000
+    );
+    assert_eq!(
+        state["versions"][successor_version]["line_items"][0]["evidence"]["rationale"],
+        "accepted_vendor_change"
+    );
+    assert_eq!(
+        state["versions"][successor_version]["sources"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|source| source["source_id"] == "vendor-response-source-1")
+            .count(),
+        1
+    );
+
+    let (status, stale_quote) = post(
+        &app,
+        "/planning/vendor-changes/prepare",
+        &owner,
+        request.clone(),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "accepted quote successor makes preparation stale: {stale_quote}"
+    );
 
     let mut successor = response(&thread_id, "response-successor");
     successor.parent_response_id = Some("response-original".to_string());

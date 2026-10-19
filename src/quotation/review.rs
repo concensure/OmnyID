@@ -3,8 +3,8 @@ use sha2::{Digest, Sha256};
 
 use super::{
     contracts::{
-        Evidence, EvidenceState, InclusionState, LineItem, NormalisedQuotation, QuoteLifecycle,
-        SourceAnchor, quotation_material_fingerprint,
+        CommercialTerm, Evidence, EvidenceState, InclusionState, LineItem, NormalisedQuotation,
+        QuoteLifecycle, SourceAnchor, SourceReference, quotation_material_fingerprint,
     },
     validation::validate_normalised_quotation,
 };
@@ -19,6 +19,28 @@ pub enum QuotationReviewAction {
         line_id: String,
         replacement: LineItem,
         correction_anchor: SourceAnchor,
+    },
+    AcceptVendorLineChange {
+        acceptance_ref: String,
+        planning_review_ref: String,
+        line_id: String,
+        replacement: LineItem,
+        correction_anchor: SourceAnchor,
+        source: SourceReference,
+        response_ref: String,
+        response_fingerprint: String,
+        option_ref: String,
+    },
+    AcceptVendorTermChange {
+        acceptance_ref: String,
+        planning_review_ref: String,
+        term_id: String,
+        replacement: CommercialTerm,
+        correction_anchor: SourceAnchor,
+        source: SourceReference,
+        response_ref: String,
+        response_fingerprint: String,
+        option_ref: String,
     },
     MarkUnknown {
         line_id: String,
@@ -115,6 +137,52 @@ fn anchor_registered(quotation: &NormalisedQuotation, anchor: &SourceAnchor) -> 
         && valid_text(&anchor.exact_excerpt, 2_000)
 }
 
+fn vendor_change_source_valid(
+    quotation: &NormalisedQuotation,
+    source: &SourceReference,
+    anchor: &SourceAnchor,
+    response_ref: &str,
+    response_fingerprint: &str,
+    option_ref: &str,
+    acceptance_ref: &str,
+    planning_review_ref: &str,
+) -> bool {
+    valid_text(response_ref, 180)
+        && valid_text(option_ref, 180)
+        && valid_text(acceptance_ref, 180)
+        && valid_text(planning_review_ref, 180)
+        && response_fingerprint.len() == 64
+        && response_fingerprint
+            .chars()
+            .all(|value| value.is_ascii_hexdigit())
+        && source.source_id == anchor.source_id
+        && source.source_version_id == anchor.source_version_id
+        && valid_text(&source.source_id, 180)
+        && valid_text(&source.source_version_id, 180)
+        && valid_text(&source.media_type, 180)
+        && source
+            .content_hash
+            .as_deref()
+            .is_some_and(|value| valid_text(value, 500))
+        && valid_text(&anchor.locator, 500)
+        && valid_text(&anchor.exact_excerpt, 2_000)
+        && quotation.sources.iter().all(|existing| {
+            existing.source_id != source.source_id
+                || existing.source_version_id != source.source_version_id
+                || existing == source
+        })
+}
+
+fn register_vendor_source(quotation: &mut NormalisedQuotation, source: &SourceReference) {
+    if !quotation.sources.iter().any(|existing| existing == source) {
+        quotation.sources.push(source.clone());
+        quotation.sources.sort_by(|left, right| {
+            (&left.source_id, &left.source_version_id)
+                .cmp(&(&right.source_id, &right.source_version_id))
+        });
+    }
+}
+
 fn successor_id(command: &QuotationReviewCommand, parent: &str) -> String {
     let bytes = serde_json::to_vec(&(command, parent)).unwrap_or_default();
     format!("qreview_{}", hex::encode(Sha256::digest(bytes)))
@@ -162,17 +230,24 @@ pub fn apply_review_action(
     let target_id = match &command.action {
         QuotationReviewAction::ConfirmLine { line_id }
         | QuotationReviewAction::CorrectLine { line_id, .. }
+        | QuotationReviewAction::AcceptVendorLineChange { line_id, .. }
         | QuotationReviewAction::MarkUnknown { line_id, .. }
         | QuotationReviewAction::MarkNotApplicable { line_id, .. } => line_id,
+        QuotationReviewAction::AcceptVendorTermChange { .. } => "",
         QuotationReviewAction::RejectExtraction { .. } => unreachable!(),
     };
-    let index = successor
-        .line_items
-        .iter()
-        .position(|line| &line.line_id == target_id)
-        .ok_or(ReviewError::LineNotFound)?;
+    let index = (!target_id.is_empty())
+        .then(|| {
+            successor
+                .line_items
+                .iter()
+                .position(|line| &line.line_id == target_id)
+                .ok_or(ReviewError::LineNotFound)
+        })
+        .transpose()?;
     match &command.action {
         QuotationReviewAction::ConfirmLine { .. } => {
+            let index = index.ok_or(ReviewError::LineNotFound)?;
             if successor.line_items[index].evidence.anchors.is_empty() {
                 return Err(ReviewError::EvidenceRequired);
             }
@@ -184,6 +259,7 @@ pub fn apply_review_action(
             correction_anchor,
             ..
         } => {
+            let index = index.ok_or(ReviewError::LineNotFound)?;
             if replacement.line_id != *target_id || !anchor_registered(quotation, correction_anchor)
             {
                 return Err(ReviewError::EvidenceRequired);
@@ -196,7 +272,82 @@ pub fn apply_review_action(
             };
             successor.line_items[index] = replacement;
         }
+        QuotationReviewAction::AcceptVendorLineChange {
+            acceptance_ref,
+            planning_review_ref,
+            line_id,
+            replacement,
+            correction_anchor,
+            source,
+            response_ref,
+            response_fingerprint,
+            option_ref,
+        } => {
+            let index = index.ok_or(ReviewError::LineNotFound)?;
+            if replacement.line_id != *line_id
+                || !vendor_change_source_valid(
+                    quotation,
+                    source,
+                    correction_anchor,
+                    response_ref,
+                    response_fingerprint,
+                    option_ref,
+                    acceptance_ref,
+                    planning_review_ref,
+                )
+            {
+                return Err(ReviewError::EvidenceRequired);
+            }
+            register_vendor_source(&mut successor, source);
+            let mut replacement = replacement.clone();
+            replacement.evidence = Evidence {
+                state: EvidenceState::Confirmed,
+                anchors: vec![correction_anchor.clone()],
+                rationale: Some("accepted_vendor_change".to_string()),
+            };
+            successor.line_items[index] = replacement;
+        }
+        QuotationReviewAction::AcceptVendorTermChange {
+            acceptance_ref,
+            planning_review_ref,
+            term_id,
+            replacement,
+            correction_anchor,
+            source,
+            response_ref,
+            response_fingerprint,
+            option_ref,
+        } => {
+            let index = successor
+                .commercial_terms
+                .iter()
+                .position(|term| term.term_id == *term_id)
+                .ok_or(ReviewError::LineNotFound)?;
+            if replacement.term_id != *term_id
+                || !vendor_change_source_valid(
+                    quotation,
+                    source,
+                    correction_anchor,
+                    response_ref,
+                    response_fingerprint,
+                    option_ref,
+                    acceptance_ref,
+                    planning_review_ref,
+                )
+            {
+                return Err(ReviewError::EvidenceRequired);
+            }
+            register_vendor_source(&mut successor, source);
+            let mut replacement = replacement.clone();
+            replacement.evidence = Evidence {
+                state: EvidenceState::Confirmed,
+                anchors: vec![correction_anchor.clone()],
+                rationale: Some("accepted_vendor_change".to_string()),
+            };
+            successor.commercial_terms[index] = replacement;
+        }
         QuotationReviewAction::MarkUnknown { reason, .. } => {
+            let index = index.ok_or(ReviewError::LineNotFound)?;
             if !valid_text(reason, 1_000) {
                 return Err(ReviewError::InvalidCommand);
             }
@@ -205,6 +356,7 @@ pub fn apply_review_action(
             successor.line_items[index].evidence = Evidence::unknown(reason);
         }
         QuotationReviewAction::MarkNotApplicable { reason, .. } => {
+            let index = index.ok_or(ReviewError::LineNotFound)?;
             if !valid_text(reason, 1_000) {
                 return Err(ReviewError::InvalidCommand);
             }

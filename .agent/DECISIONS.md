@@ -1331,3 +1331,23 @@ bound evidence exists; response prose is not treated as semantic proof. The UI n
 plain option, fit, budget and timing labels through the existing Decision Card/A2UI contracts. It
 hides source excerpts and technical blockers, makes no automatic recommendation, and exposes only a
 prepared review action. Acceptance remains a separate explicit successor operation.
+
+## 2026-10-19: Vendor-change acceptance is a guarded quotation review successor
+
+Accepting a prepared vendor replacement does not edit a quotation in place and does not create a
+second quote lifecycle. The server reloads the tenant-private response, quotation, constraints,
+optional budget evidence and wedding date, recomputes the prepared review, and requires the exact
+review and option references. Any blocker, hard constraint conflict, exceeded budget, response
+successor or quotation successor fails closed.
+
+The accepted replacement becomes one of two guarded quotation-review actions: an exact line-item
+replacement or an exact commercial-term timing replacement. The action binds the canonical response
+fingerprint, source version and excerpt anchor, planning review, option and a hashed acceptance
+reference. Only the immutable quotation successor registers the new vendor source. The generic
+quotation-review route cannot submit these guarded actions.
+
+Acceptance serializes per tenant thread and prepared review. Exact retries reconstruct the stored
+command and verify its review identity, material fingerprint and successor content; if review
+persistence succeeded but successor persistence did not, the retry may repair that same deterministic
+successor. A different idempotency key cannot fork the now-stale parent. This operation records no
+booking, payment, contract signature, outbound message or transport acceptance.

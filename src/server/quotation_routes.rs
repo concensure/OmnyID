@@ -75,8 +75,8 @@ struct StateQuery {
 }
 
 #[derive(Serialize)]
-struct StoredResponse {
-    message_ids: Vec<String>,
+pub(super) struct StoredResponse {
+    pub(super) message_ids: Vec<String>,
 }
 
 fn valid_id(value: &str) -> bool {
@@ -104,7 +104,7 @@ fn store_error() -> (StatusCode, String) {
     )
 }
 
-fn parent_message_for_version<'a>(
+pub(super) fn parent_message_for_version<'a>(
     messages: &'a [crate::message::AFPMessage],
     version_id: &str,
 ) -> Option<&'a crate::message::AFPMessage> {
@@ -210,6 +210,16 @@ async fn store_review_http(
     Json(request): Json<StoreReviewRequest>,
 ) -> Result<Json<StoredResponse>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    if matches!(
+        &request.command.action,
+        crate::quotation::QuotationReviewAction::AcceptVendorLineChange { .. }
+            | crate::quotation::QuotationReviewAction::AcceptVendorTermChange { .. }
+    ) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "vendor changes require the guarded review flow".to_string(),
+        ));
+    }
     let messages = visible_messages(&state, &headers, &request.thread_id).await?;
     let replay = replay_quotation_messages(&messages);
     let quotation = replay
@@ -246,7 +256,7 @@ async fn store_review_http(
     .await
 }
 
-async fn persist_review(
+pub(super) async fn persist_review(
     state: &AppState,
     user_id: &str,
     thread_id: &str,

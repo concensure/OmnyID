@@ -169,6 +169,136 @@ fn stale_actions_cannot_overwrite_a_newer_revision() {
 }
 
 #[test]
+fn guarded_vendor_line_change_registers_exact_response_source_on_successor_only() {
+    let original = quotation();
+    let source = SourceReference {
+        source_id: "vendor-response-source".to_string(),
+        source_version_id: "vendor-response-source-v1".to_string(),
+        media_type: "application/pdf".to_string(),
+        content_hash: Some("sha256:vendor-response".to_string()),
+    };
+    let correction_anchor = SourceAnchor {
+        source_id: source.source_id.clone(),
+        source_version_id: source.source_version_id.clone(),
+        locator: "section=pricing".to_string(),
+        exact_excerpt: "Venue hire is now AUD 5,250".to_string(),
+    };
+    let mut replacement = line();
+    replacement.unit_price.as_mut().unwrap().amount_minor = 525_000;
+    let action = QuotationReviewAction::AcceptVendorLineChange {
+        acceptance_ref: "vendor-change-acceptance:test".to_string(),
+        planning_review_ref: "vendor-change-review:test".to_string(),
+        line_id: replacement.line_id.clone(),
+        replacement,
+        correction_anchor,
+        source: source.clone(),
+        response_ref: "response-v2".to_string(),
+        response_fingerprint: "a".repeat(64),
+        option_ref: "vendor-change-option-v2".to_string(),
+    };
+
+    let accepted = apply_review_action(&original, command(&original, action)).unwrap();
+    let successor = accepted.quotation.unwrap();
+    assert_eq!(original.sources.len(), 1);
+    assert!(successor.sources.contains(&source));
+    assert_eq!(
+        successor.line_items[0]
+            .unit_price
+            .as_ref()
+            .unwrap()
+            .amount_minor,
+        525_000
+    );
+    assert_eq!(
+        successor.line_items[0].evidence.rationale.as_deref(),
+        Some("accepted_vendor_change")
+    );
+}
+
+#[test]
+fn vendor_change_source_binding_rejects_unmatched_fingerprint_or_anchor() {
+    let original = quotation();
+    let source = SourceReference {
+        source_id: "vendor-response-source".to_string(),
+        source_version_id: "vendor-response-source-v1".to_string(),
+        media_type: "application/pdf".to_string(),
+        content_hash: Some("sha256:vendor-response".to_string()),
+    };
+    let mut foreign_anchor = anchor("Unsupported vendor change");
+    foreign_anchor.source_id = source.source_id.clone();
+    let action = QuotationReviewAction::AcceptVendorLineChange {
+        acceptance_ref: "vendor-change-acceptance:test".to_string(),
+        planning_review_ref: "vendor-change-review:test".to_string(),
+        line_id: "venue_hire".to_string(),
+        replacement: line(),
+        correction_anchor: foreign_anchor,
+        source,
+        response_ref: "response-v2".to_string(),
+        response_fingerprint: "not-a-fingerprint".to_string(),
+        option_ref: "vendor-change-option-v2".to_string(),
+    };
+
+    assert_eq!(
+        apply_review_action(&original, command(&original, action)),
+        Err(ReviewError::EvidenceRequired)
+    );
+}
+
+#[test]
+fn guarded_vendor_term_change_updates_only_the_successor() {
+    let mut original = quotation();
+    original.commercial_terms.push(CommercialTerm {
+        term_id: "deposit".to_string(),
+        kind: "deposit".to_string(),
+        label: "Deposit".to_string(),
+        amount: Some(Money {
+            amount_minor: 50_000,
+            currency: "AUD".to_string(),
+        }),
+        due_at: Some("2026-11-01T00:00:00Z".to_string()),
+        refundable: Some(false),
+        evidence: Evidence::confirmed(anchor("Deposit due 1 November")),
+    });
+    let source = SourceReference {
+        source_id: "vendor-response-source".to_string(),
+        source_version_id: "vendor-response-source-v1".to_string(),
+        media_type: "text/plain".to_string(),
+        content_hash: Some("sha256:vendor-response".to_string()),
+    };
+    let correction_anchor = SourceAnchor {
+        source_id: source.source_id.clone(),
+        source_version_id: source.source_version_id.clone(),
+        locator: "section=payment".to_string(),
+        exact_excerpt: "Deposit is due on 1 December".to_string(),
+    };
+    let mut replacement = original.commercial_terms[0].clone();
+    replacement.due_at = Some("2026-12-01T00:00:00Z".to_string());
+    let action = QuotationReviewAction::AcceptVendorTermChange {
+        acceptance_ref: "vendor-change-acceptance:term".to_string(),
+        planning_review_ref: "vendor-change-review:term".to_string(),
+        term_id: replacement.term_id.clone(),
+        replacement,
+        correction_anchor,
+        source: source.clone(),
+        response_ref: "response-v2".to_string(),
+        response_fingerprint: "b".repeat(64),
+        option_ref: "vendor-change-option-term".to_string(),
+    };
+
+    let accepted = apply_review_action(&original, command(&original, action)).unwrap();
+    let successor = accepted.quotation.unwrap();
+    assert_ne!(
+        original.commercial_terms[0].due_at,
+        successor.commercial_terms[0].due_at
+    );
+    assert_eq!(
+        successor.commercial_terms[0].due_at.as_deref(),
+        Some("2026-12-01T00:00:00Z")
+    );
+    assert!(successor.sources.contains(&source));
+}
+
+#[test]
 fn low_confidence_material_fields_block_downstream_actions() {
     let gate = material_review_gate(&[
         MaterialReviewField {

@@ -4049,3 +4049,38 @@ Next:
 - Keep all planning flags default off. Vendor mail, relay, providers and ranking-policy-V2 remain
   disabled; no Oracle deployment has run. Quotation-normalisation/week-3-to-6 work remains paused
   pending the user's human-judge review.
+
+## 2026-10-19 - WED-237 guarded vendor-change acceptance (Codex, review)
+
+Changed:
+
+- Added `/planning/vendor-changes/accept` behind the same default-off planning gates. It authenticates
+  the owner, serializes the prepared review, reloads tenant-private evidence and recomputes the review
+  before accepting one exact option.
+- Added guarded quotation-review actions for line-item and commercial-term changes. They bind the
+  planning review, option, canonical response fingerprint and exact response source, then create the
+  existing immutable quotation successor. The parent and its source list remain unchanged.
+- The generic `/quotation/reviews` route rejects these guarded actions. Hard constraint conflicts,
+  exceeded budgets, stale bindings and any review blocker fail closed. No send, provider, booking,
+  payment, signature or transport-state mutation occurs.
+- Acceptance is idempotent without persisting the caller's raw key. Exact retries validate the stored
+  action/successor and can repair a missing successor after partial persistence; different keys cannot
+  fork an accepted parent.
+
+Verification:
+
+- Passed all 77 planning-intelligence and 33 quotation library tests, seven focused quotation-review
+  tests, and the expanded disposable-Postgres vendor-change API test covering flags-off behavior,
+  tenant isolation, deduplication, acceptance, retry, key misuse, exact evidence, successor state and
+  stale-parent rejection.
+- Passed Solid typecheck, both line-budget checks, wedding site smoke, all 1,899 wedding tests and the
+  production build. The largest changed focused file is 786 lines. Only the inherited unused
+  email-group parameter and Vite large-chunk advisory remain.
+
+Next:
+
+- Independently review WED-237, then continue WED-238. WED-239 owns the unified intervention selection
+  UI; the current vendor-change card intentionally opens review and does not silently call acceptance.
+- Keep every planning, quotation, vendor-mail, relay, provider and ranking-policy-V2 flag disabled.
+  No Oracle deployment ran. Quotation-normalisation/week-3-to-6 work remains paused for the user's
+  human-judge review.

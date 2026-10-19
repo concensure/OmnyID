@@ -2739,7 +2739,7 @@ tasks:
       - moved to review with critical-path and every other planning, quotation, vendor-mail, relay and ranking-policy-V2 flag disabled; no provider execution or deployment ran
   - id: WED-237
     title: Interpret vendor change messages
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -2751,7 +2751,10 @@ tasks:
       - src/planning_intelligence/vendor_change_tests.rs
       - src/planning_intelligence/mod.rs
       - src/server/planning_vendor_change_routes.rs
+      - src/server/quotation_routes.rs
+      - src/quotation/review.rs
       - tests/planning_vendor_change_api.rs
+      - tests/quotation_review.rs
       - solid-ui/src/lib/planningVendorChangeApi.ts
       - solid-ui/tests/planning-vendor-change-api.test.ts
       - .agent/**
@@ -2779,3 +2782,7 @@ tasks:
       - same-material email, secure-link and AFP responses converge by canonical fingerprint and yield one review identity; a material response successor or quotation successor rejects the old request as stale
       - added a fail-closed frontend normalizer plus existing Decision Card/A2UI projections; technical blockers, exact excerpts and revision identifiers stay out of visible copy, no option is auto-recommended, and the only action opens a prepared review without acceptance/send/booking/payment authority
       - real disposable-Postgres tenant isolation/currentness/dedup/budget/timing coverage, five focused UI tests, typecheck, both line budgets, all 1,899 wedding tests and the production build pass; the server module stayed line-neutral and new integration files are below 400 lines
+      - added a guarded explicit acceptance endpoint that reloads all owned evidence under a quotation-review advisory lock, rejects stale or blocked reviews plus hard-conflict and over-budget options, and converts only the selected exact-anchored replacement into the existing immutable quotation review successor
+      - acceptance records bind the prepared review, canonical response fingerprint, option, source and idempotency reference; exact retries reconstruct and validate the stored action and can repair a missing successor, while another key cannot fork the accepted parent
+      - the generic quotation review endpoint rejects guarded vendor actions; responses explicitly report that no booking or payment was created, and no provider, vendor send or transport acceptance occurs
+      - all 77 planning and 33 quotation library tests, seven focused successor tests, the expanded real-Postgres acceptance test, typecheck, both line budgets, site smoke, all 1,899 wedding tests and production build pass; new/expanded focused files remain below 1000 lines and rollout flags remain off
