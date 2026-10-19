@@ -2924,6 +2924,7 @@ tasks:
       - added a clean-worktree exact-commit verifier with local-only endpoint guards, content-addressed artifact inputs, per-check logs, closed signed human-review records and explicit non-mutating release output
       - the verifier reports machine verified for f71dba5d86b2b07e764e7fdce32243b01582609a with artifact digest 49a75251f9b1a7faca2fe9d894f26b515ea01e5edd369f14659527c9c4913945; all 12 checks pass, while all nine human gates are missing and WED-225/WED-226 keep human and release status blocked
       - documented the exact reviewer question and evidence workflow for each of the nine human dimensions; no human record was fabricated and all nine remain missing until independent reviewers supply commit-bound artifacts
+      - the clean exact-commit verifier reports machine verified for c89dec605cc84102bd1cd680fc35f39c9f99202e with artifact digest eb3885f4806e1b3b5934ac95eca4975e579b3a9e4ea6f867cf579e8c5d62dbc3; all 12 checks pass, all nine human records remain missing, WED-225/WED-226 remain blocked, flags were unchanged and no deployment ran
   - id: WED-242
     title: Align wedding home and decision surfaces with the teal wedding brand
     status: review

@@ -4214,6 +4214,11 @@ Verification:
   colors/radii, no page overflow, no serious/critical Axe finding and the five mobile tabs intact.
 - Production UI build passed. Only the inherited Tailwind object-screen advisory and Vite large-chunk
   advisory remain. No Rust contract changed, so no new Rust test lane was required for this UI slice.
+- The full clean-worktree WED-240 verifier then passed all 12 machine lanes for
+  `c89dec605cc84102bd1cd680fc35f39c9f99202e`, including planning Rust, disposable PostgreSQL,
+  live disposable ClamAV, SDK, UI, browser and compose checks. Its artifact digest is
+  `eb3885f4806e1b3b5934ac95eca4975e579b3a9e4ea6f867cf579e8c5d62dbc3`; human and release status
+  remain blocked, flags were unchanged and no deployment ran.
 
 Unresolved / next:
 
