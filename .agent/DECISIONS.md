@@ -1315,3 +1315,19 @@ calendar-day differences only when an RFC3339 event date or explicit vendor dead
 not create an urgency band or deadline. The review binds response fingerprint, quotation version,
 constraint revisions, optional budget revision and optional event-date revision; it never mutates or
 accepts a quotation.
+
+## 2026-10-19: Vendor-change preparation replays owned converged evidence
+
+The vendor-change prepare endpoint accepts only tenant-owned lookup references. It obtains the
+canonical response, active quotation, active constraints, current cost evidence and wedding date
+from the private AFP thread. It does not accept replacement evaluations, budget figures or dates
+from the browser. Same-material channel responses deduplicate by the established canonical response
+fingerprint and use a deterministic representative, while a material response successor or active
+quotation successor makes the old request stale.
+
+Current cost evidence contributes only a same-currency headroom range when both budget and forecast
+ranges cite their current AFP revision. Constraint/style results remain unknown until exact option-
+bound evidence exists; response prose is not treated as semantic proof. The UI normalizer exposes
+plain option, fit, budget and timing labels through the existing Decision Card/A2UI contracts. It
+hides source excerpts and technical blockers, makes no automatic recommendation, and exposes only a
+prepared review action. Acceptance remains a separate explicit successor operation.

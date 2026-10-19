@@ -4013,3 +4013,39 @@ Next:
 - Then wire a fail-closed Decision Card/A2UI projection and explicit acceptance through the existing
   quotation successor/stale-decision lifecycle. Keep all provider, vendor-mail, relay and
   ranking-policy-V2 flags disabled; no Oracle deployment has run.
+
+## 2026-10-19 - WED-237 guarded prepare API and UI projection (Codex, in progress)
+
+Changed:
+
+- Added `/planning/vendor-changes/prepare` behind the existing vendor-change plus constraint-ledger
+  and evaluation flags. It authenticates the user and reads only their requested AFP thread.
+- Replays the active normalised quotation and canonical vendor response. Same-material channel
+  duplicates converge on one fingerprint/review identity; a different-fingerprint response child or
+  active quotation successor makes the requested review stale.
+- Derives optional same-currency budget headroom from current cost evidence only when both ranges
+  cite that AFP revision. Derives the event date from current wedding decision/calendar evidence.
+  Browser-authored evaluations, amounts and dates are not accepted.
+- Added a fail-closed frontend normalizer and existing Decision Card/A2UI projection. Exact excerpts,
+  internal blocker kinds and revision IDs do not enter visible copy. No replacement is recommended;
+  the only prepared action opens review and explicitly carries no acceptance, send, booking or
+  payment authority.
+
+Verification:
+
+- Real disposable PostgreSQL passed feature-off, tenant-isolation, current quotation/response,
+  channel deduplication, price-range budget, event/deadline timing and response-successor rejection.
+- All 77 planning-intelligence tests, the focused API test, five focused UI tests, typecheck, both
+  line-budget checks, all 1,899 wedding tests and the production build pass. New API/UI files are at
+  most 387 lines; the 45,696-line server module stayed line-neutral. Only the inherited unused Rust
+  parameter and Vite large-chunk advisories remain.
+
+Next:
+
+- Implement explicit user acceptance by converting the selected anchored replacement into the
+  existing quotation review successor command, under an advisory lock and idempotency key. Re-run
+  prepare inside the transaction and reject stale response/quotation/constraint/budget/event
+  bindings. Do not add a parallel quote edit or transport acceptance state.
+- Keep all planning flags default off. Vendor mail, relay, providers and ranking-policy-V2 remain
+  disabled; no Oracle deployment has run. Quotation-normalisation/week-3-to-6 work remains paused
+  pending the user's human-judge review.
