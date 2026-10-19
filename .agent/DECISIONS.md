@@ -1351,3 +1351,19 @@ command and verify its review identity, material fingerprint and successor conte
 persistence succeeded but successor persistence did not, the retry may repair that same deterministic
 successor. A different idempotency key cannot fork the now-stale parent. This operation records no
 booking, payment, contract signature, outbound message or transport acceptance.
+
+## 2026-10-19: Preference conflicts derive only from canonical private person constraints
+
+The existing wedding preference-conflict builder has one production source: current WED-230
+constraint-ledger messages. The adapter accepts only stored ledger envelopes that are user-confirmed,
+couple-private, person-scoped, source-bound and fingerprinted. It supports a closed set of integer or
+enum preference values. Free text, exact source excerpts, source locators and private rationale are
+never copied into the conflict card or its AFP projection. People remain pseudonymous as Partner 1
+and Partner 2, while the underlying constraint IDs retain provenance.
+
+Derived conflicts use the existing resilience card, semantic object, A2UI payload and projection
+queue; no second conflict card or ledger was added. A persisted conflict with the same active
+constraint revisions suppresses a duplicate queue item. A changed constraint revision creates new
+review work under the same decision area. The existing Review Later control now emits the standard
+wedding decision-deferral event, and replay suppresses the matching card only while the deferral and
+its dependency fingerprint remain current.

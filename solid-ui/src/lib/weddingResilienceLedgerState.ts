@@ -50,6 +50,14 @@ export type WeddingResilienceLedgerState = {
 export type BuildWeddingResilienceLedgerInput = {
   messages?: readonly AfpMessage[] | null;
   responseWorkspaceId?: string | null;
+  decisionDeferrals?: readonly {
+    focusItemId: string;
+    deferredUntilAt?: string | null;
+    staleAfterAt?: string | null;
+    dependencyFingerprint?: string | null;
+    createdAt?: string | null;
+  }[] | null;
+  nowIso?: string | null;
 };
 
 type ParsedPreferenceConflict = {
@@ -237,6 +245,29 @@ function summaryFor(items: readonly WeddingResilienceAttentionItem[]): string {
   return `${items.length} wedding resilience item${items.length === 1 ? "" : "s"} need attention.`;
 }
 
+function dependencyFingerprint(item: WeddingResilienceAttentionItem): string {
+  return uniqueStrings([
+    item.id,
+    item.kind,
+    "attention",
+    item.kind === "recovery_plan" ? "response_queue" : "home",
+    ...item.metadataLabels,
+  ], 24).join("|").toLowerCase();
+}
+
+function activelyDeferred(
+  item: WeddingResilienceAttentionItem,
+  deferrals: BuildWeddingResilienceLedgerInput["decisionDeferrals"],
+  nowIso: string | null | undefined,
+): boolean {
+  const now = Date.parse(clean(nowIso) || new Date().toISOString());
+  const candidates = (deferrals ?? []).filter((deferral) => clean(deferral.focusItemId) === item.id);
+  const latest = candidates.sort((left, right) => Date.parse(clean(left.createdAt)) - Date.parse(clean(right.createdAt))).at(-1);
+  if (!latest || (clean(latest.dependencyFingerprint) && clean(latest.dependencyFingerprint) !== dependencyFingerprint(item))) return false;
+  const until = Date.parse(clean(latest.deferredUntilAt) || clean(latest.staleAfterAt));
+  return Number.isFinite(until) && now < until;
+}
+
 export function buildWeddingResilienceLedgerState(
   input: BuildWeddingResilienceLedgerInput = {},
 ): WeddingResilienceLedgerState {
@@ -265,7 +296,7 @@ export function buildWeddingResilienceLedgerState(
       return attention ? [attention] : [];
     }),
     ...dedupedRecoveries.map(attentionFromRecoveryPlan),
-  ].sort((a, b) => {
+  ].filter((item) => !activelyDeferred(item, input.decisionDeferrals, input.nowIso)).sort((a, b) => {
     const priorityRank: Record<WeddingResilienceAttentionPriority, number> = { urgent: 0, high: 1, normal: 2 };
     return priorityRank[a.priority] - priorityRank[b.priority] || a.title.localeCompare(b.title);
   });

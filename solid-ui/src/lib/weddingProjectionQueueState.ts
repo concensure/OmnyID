@@ -52,6 +52,12 @@ import type {
   WeddingSemanticUiKind,
   WeddingSemanticUiObject,
 } from "@/lib/weddingSemanticUiState";
+import type { WeddingPreferenceConflictState } from "@/lib/weddingPreferenceConflictState";
+import {
+  hasSentWeddingPreferenceConflictAfpProjection,
+  weddingPreferenceConflictProjectionId,
+  weddingPreferenceConflictToAfpSendInput,
+} from "@/lib/weddingPreferenceConflictAfpProjectionState";
 import {
   isWeddingSemanticUiKind,
   weddingSemanticUiObjectsFromAfpLikeMessage,
@@ -59,7 +65,7 @@ import {
 
 export const WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY = "omnyid.wedding.boundary_afp_projections.v1";
 
-export type WeddingProjectionQueueItemKind = "context" | "intake_profile" | "artifact" | "calendar_event" | "task" | "decision" | "access_control" | "boundary";
+export type WeddingProjectionQueueItemKind = "context" | "intake_profile" | "artifact" | "calendar_event" | "task" | "decision" | "preference_conflict" | "access_control" | "boundary";
 export type WeddingProjectionQueueItemStatus = ContinuityProjectionQueueItem<WeddingProjectionQueueItemKind>["status"];
 export type WeddingProjectionQueueItem = ContinuityProjectionQueueItem<WeddingProjectionQueueItemKind> & {
   semanticKind: WeddingSemanticUiKind | null;
@@ -251,6 +257,25 @@ function decisionItem(
   });
 }
 
+function preferenceConflictItem(
+  state: WeddingPreferenceConflictState,
+  nowIso: string,
+  storage: Storage,
+): WeddingProjectionQueueItem {
+  const sourceId = weddingPreferenceConflictProjectionId(state);
+  const sent = hasSentWeddingPreferenceConflictAfpProjection(sourceId, storage);
+  return queueItem({
+    id: `preference_conflict:${sourceId}`,
+    sourceId,
+    kind: "preference_conflict",
+    title: state.conflictObject?.title ?? "Partner preferences",
+    status: sent ? "sent" : "pending",
+    statusLabel: sent ? "Already saved to Decisions" : "Ready to save for couple review",
+    blockedReason: null,
+    sendInput: sent ? null : weddingPreferenceConflictToAfpSendInput(state, nowIso),
+  }, state);
+}
+
 function calendarItem(
   item: WeddingPlanningScheduleItem,
   nowIso: string,
@@ -363,6 +388,7 @@ function boundaryItem(
 export function buildWeddingProjectionQueueState(input: {
   contextItems?: readonly WeddingNeedToKnowProjectionContext[] | null;
   decisionItems?: readonly WeddingDecisionProjectionInput[] | null;
+  preferenceConflicts?: readonly WeddingPreferenceConflictState[] | null;
   artifacts?: readonly WeddingGeneratedArtifact[] | null;
   scheduleItems?: readonly WeddingPlanningScheduleItem[] | null;
   taskItems?: readonly WeddingPlanningTaskItem[] | null;
@@ -381,6 +407,7 @@ export function buildWeddingProjectionQueueState(input: {
       ...(hasIntakeProfilePlanningValue(context) ? [intakeProfileItem(context, nowIso, storage)] : []),
     ]),
     ...(input.decisionItems ?? []).map((decision) => decisionItem(decision, nowIso, storage)),
+    ...(input.preferenceConflicts ?? []).map((state) => preferenceConflictItem(state, nowIso, storage)),
     ...(input.artifacts ?? []).map((artifact) => artifactItem(artifact, nowIso, storage)),
     ...(input.scheduleItems ?? []).map((item) => calendarItem(item, nowIso, storage)),
     ...(input.taskItems ?? []).map((item) => taskItem(item, nowIso, storage)),

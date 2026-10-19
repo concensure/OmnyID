@@ -8,6 +8,7 @@ import {
 export type WeddingPreferenceConflictStatus = "insufficient" | "aligned" | "conflict";
 
 export type WeddingPreferenceInput = {
+  sourceRef?: string | null;
   personId?: string | null;
   personLabel: string;
   decisionArea?: string | null;
@@ -153,7 +154,8 @@ function preferenceObject(
   const personLabel = clean(input.personLabel) || `Partner ${index + 1}`;
   const personId = clean(input.personId) || `wedding_person:${safeWeddingLabel(personLabel)}`;
   const prefLabel = clean(input.preferenceLabel) || "Preference";
-  const id = `wedding_preference:${safeWeddingLabel(metadata.responseWorkspaceId)}:${safeWeddingLabel(decisionArea)}:${safeWeddingLabel(personLabel)}:${index + 1}`;
+  const sourceRef = clean(input.sourceRef);
+  const id = sourceRef || `wedding_preference:${safeWeddingLabel(metadata.responseWorkspaceId)}:${safeWeddingLabel(decisionArea)}:${safeWeddingLabel(personLabel)}:${index + 1}`;
   return {
     id,
     kind: "wedding_preference_signal",
@@ -175,6 +177,7 @@ function preferenceObject(
     references: [
       { type: "held_by", target: personId },
       { type: "belongs_to_wedding_plan", target: metadata.weddingPlanId },
+      ...(sourceRef ? [{ type: "planning_constraint", target: sourceRef }] : []),
     ],
     supertags: [
       "wedding",

@@ -8,6 +8,7 @@ import type { WeddingCollaboratorInviteCard } from "@/lib/weddingCollaborationSt
 import type { WeddingBoundaryLedgerObject } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 import type { WeddingNeedToKnowProjectionContext } from "@/lib/weddingNeedToKnowAfpProjectionState";
+import type { WeddingPreferenceConflictState } from "@/lib/weddingPreferenceConflictState";
 import {
   buildWeddingProjectionQueueViewState,
   type WeddingProjectionQueueViewState,
@@ -16,6 +17,7 @@ import {
 export type WeddingResponseWorkspaceProjectionQueueInput = {
   contextItems?: readonly WeddingNeedToKnowProjectionContext[] | null;
   decisionItems?: readonly WeddingDecisionProjectionInput[] | null;
+  preferenceConflicts?: readonly WeddingPreferenceConflictState[] | null;
   artifacts?: readonly WeddingGeneratedArtifact[] | null;
   scheduleItems?: readonly WeddingPlanningScheduleItem[] | null;
   taskItems?: readonly WeddingPlanningTaskItem[] | null;
@@ -33,6 +35,7 @@ export function buildWeddingResponseWorkspaceProjectionQueueState(
   const hasProjectionInputs = Boolean(
     input.contextItems?.length
     || input.decisionItems?.length
+    || input.preferenceConflicts?.length
     || input.artifacts?.length
     || input.scheduleItems?.length
     || input.taskItems?.length
@@ -43,6 +46,7 @@ export function buildWeddingResponseWorkspaceProjectionQueueState(
   return buildWeddingProjectionQueueViewState({
     contextItems: input.contextItems,
     decisionItems: input.decisionItems,
+    preferenceConflicts: input.preferenceConflicts,
     artifacts: input.artifacts,
     scheduleItems: input.scheduleItems,
     taskItems: input.taskItems,

@@ -18,6 +18,7 @@ import {
 } from "@/lib/weddingCalendarProjectionState";
 import { markWeddingCollaborationAfpProjectionSent } from "@/lib/weddingCollaborationAfpProjectionState";
 import { WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY } from "@/lib/weddingProjectionQueueState";
+import { markWeddingPreferenceConflictAfpProjectionSent } from "@/lib/weddingPreferenceConflictAfpProjectionState";
 import type {
   WeddingProjectionQueueItem,
   WeddingProjectionQueueItemKind,
@@ -169,6 +170,8 @@ export function markWeddingProjectionDispatchReceiptSent(
       markWeddingIntakeProfileAfpProjectionSent(item.sourceId, storage);
     } else if (item.kind === "decision") {
       markWeddingDecisionAfpProjectionSent(item.sourceId, storage);
+    } else if (item.kind === "preference_conflict") {
+      markWeddingPreferenceConflictAfpProjectionSent(item.sourceId, storage);
     } else if (item.kind === "artifact") {
       markWeddingArtifactAfpProjectionSent(item.sourceId, storage);
     } else if (item.kind === "calendar_event") {

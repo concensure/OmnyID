@@ -21,6 +21,8 @@ import {
   buildWeddingProjectionDispatchReceiptState,
   markWeddingProjectionDispatchReceiptSent,
 } from "@/lib/weddingProjectionDispatchState";
+import { buildWeddingPreferenceConflictState } from "@/lib/weddingPreferenceConflictState";
+import { hasSentWeddingPreferenceConflictAfpProjection } from "@/lib/weddingPreferenceConflictAfpProjectionState";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -120,6 +122,28 @@ test("buildWeddingProjectionDispatchReceiptState records failures and retry ids"
   assert.deepEqual(receipt.retryItemIds, [queue.pendingItems[1]?.id]);
   assert.equal(receipt.canRetry, true);
   assert.equal(receipt.failedItems[0]?.semanticKind, null);
+});
+
+test("markWeddingProjectionDispatchReceiptSent records the preference-conflict family", () => {
+  const storage = memoryStorage();
+  const conflict = buildWeddingPreferenceConflictState({
+    metadata,
+    decisionArea: "wedding style",
+    preferences: [
+      { sourceRef: "constraint-1", personId: "person:partner_0001", personLabel: "Partner 1", preferenceLabel: "Modern", underlyingValue: "modern" },
+      { sourceRef: "constraint-2", personId: "person:partner_0002", personLabel: "Partner 2", preferenceLabel: "Romantic", underlyingValue: "romantic" },
+    ],
+  });
+  const queue = buildWeddingProjectionQueueState({ preferenceConflicts: [conflict], storage });
+  const item = queue.pendingItems[0]!;
+  const receipt = buildWeddingProjectionDispatchReceiptState({
+    queue,
+    outcomes: [{ itemId: item.id, status: "saved", messageId: "message-conflict" }],
+  });
+  markWeddingProjectionDispatchReceiptSent(receipt, storage);
+
+  assert.equal(item.kind, "preference_conflict");
+  assert.equal(hasSentWeddingPreferenceConflictAfpProjection(item.sourceId, storage), true);
 });
 
 test("buildWeddingProjectionDispatchReceiptState skips blocked or already handled items without fake success", () => {

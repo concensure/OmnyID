@@ -2786,3 +2786,41 @@ tasks:
       - acceptance records bind the prepared review, canonical response fingerprint, option, source and idempotency reference; exact retries reconstruct and validate the stored action and can repair a missing successor, while another key cannot fork the accepted parent
       - the generic quotation review endpoint rejects guarded vendor actions; responses explicitly report that no booking or payment was created, and no provider, vendor send or transport acceptance occurs
       - all 77 planning and 33 quotation library tests, seven focused successor tests, the expanded real-Postgres acceptance test, typecheck, both line budgets, site smoke, all 1,899 wedding tests and production build pass; new/expanded focused files remain below 1000 lines and rollout flags remain off
+  - id: WED-238
+    title: Wire the existing preference-conflict builder
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-230
+      - WED-237
+    files:
+      - solid-ui/src/lib/weddingPreferenceConflictState.ts
+      - solid-ui/src/lib/weddingPreferenceConflictAfpProjectionState.ts
+      - solid-ui/src/lib/weddingPreferenceConflictConstraintAdapter.ts
+      - solid-ui/src/lib/weddingResilienceLedgerState.ts
+      - solid-ui/src/lib/weddingResilienceActionState.ts
+      - solid-ui/src/lib/weddingResponseWorkspaceViewState.ts
+      - solid-ui/src/lib/weddingProjectionQueueState.ts
+      - solid-ui/src/lib/weddingProjectionQueueViewState.ts
+      - solid-ui/src/lib/weddingProjectionDispatchState.ts
+      - solid-ui/src/lib/weddingResponseWorkspaceProjectionQueueState.ts
+      - solid-ui/tests/wedding-preference-conflict*.test.ts
+      - solid-ui/tests/wedding-response-workspace-resilience-state.test.ts
+      - solid-ui/tests/wedding-projection-queue-state.test.ts
+      - .agent/**
+    acceptance:
+      - one production-owned path derives a preference conflict from current explicit partner preferences and projects it through the existing AFP queue
+      - both partners' stated preferences and values remain distinct; no averaging, inferred consent or auto-selection occurs
+      - persisted conflict successors deduplicate across refresh and resolve, defer and dismiss lifecycle states survive replay
+      - partner-private rationale text or ciphertext never appears in vendor-shareable, visible comparison or recommendation output
+      - existing resilience, Decision Card and A2UI projections remain the only user-facing conflict card owner
+      - focused tests, all wedding regressions, line budgets, typecheck and production build pass with new files below 1000 lines
+    progress:
+      - reachability audit found the builder and AFP parser/serializer are tested, and the resilience ledger can render persisted conflicts, but production code never invokes the builder; implementation will connect one authoritative current-preference source rather than add a parallel card
+      - a strict adapter now derives conflicts only from current WED-230 user-confirmed, couple-private, person-scoped constraint-ledger messages with source anchors, fingerprints and closed integer or enum values
+      - generated conflict projections use pseudonymous Partner labels and never copy exact source excerpts, locators, free text or private rationale into the visible card or AFP conflict payload
+      - derived conflicts reuse the existing resilience card, DecisionOS/A2UI payload and AFP projection queue; matching persisted constraint revisions deduplicate on replay while a constraint successor reopens review
+      - Review Later now emits the existing durable decision-deferral event and replay suppresses only a matching, unexpired dependency fingerprint
+      - focused tests, typecheck, both line budgets, wedding site smoke, all 1906 wedding tests and the production build pass; the response-workspace file remains line-neutral at 1041 lines and the new adapter is 186 lines
+      - task remains in progress for explicit resolved and dismissed preference-conflict successor records plus replay coverage

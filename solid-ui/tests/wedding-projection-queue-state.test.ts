@@ -19,6 +19,7 @@ import {
 } from "@/lib/weddingProjectionQueueState";
 import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
 import type { WeddingBoundaryPolicy } from "@/lib/weddingBoundaryLedgerState";
+import { buildWeddingPreferenceConflictState } from "@/lib/weddingPreferenceConflictState";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -173,6 +174,30 @@ test("buildWeddingProjectionQueueState preserves semantic decision objects for m
   assert.equal(item?.semanticObject?.title, "Decision: Harbour House");
   assert.ok(item?.semanticTags.includes("wedding_comparison"));
   assert.equal(item?.semanticObject?.comparison?.columns.map((column) => column.kind).join(","), "option,location,availability");
+});
+
+test("buildWeddingProjectionQueueState saves one existing preference-conflict projection", () => {
+  const storage = memoryStorage();
+  const conflict = buildWeddingPreferenceConflictState({
+    metadata,
+    decisionArea: "wedding style",
+    preferences: [
+      { sourceRef: "constraint-1", personId: "person:partner_0001", personLabel: "Partner 1", preferenceLabel: "Modern", underlyingValue: "modern" },
+      { sourceRef: "constraint-2", personId: "person:partner_0002", personLabel: "Partner 2", preferenceLabel: "Romantic", underlyingValue: "romantic" },
+    ],
+  });
+  const state = buildWeddingProjectionQueueState({
+    preferenceConflicts: [conflict],
+    nowIso: "2026-10-19T00:00:00Z",
+    storage,
+  });
+
+  assert.equal(state.pendingItems.length, 1);
+  assert.equal(state.pendingItems[0]?.kind, "preference_conflict");
+  assert.equal(state.pendingItems[0]?.sendInput?.subtype, "wedding_preference_conflict");
+  assert.equal(state.pendingItems[0]?.semanticKind, "wedding_conflict");
+  assert.equal(JSON.stringify(state.pendingItems[0]).includes("partner_0001"), true);
+  assert.equal(JSON.stringify(state.pendingItems[0]).includes("exact_excerpt"), false);
 });
 
 test("buildWeddingProjectionQueueState extracts semantic objects from view payloads", () => {

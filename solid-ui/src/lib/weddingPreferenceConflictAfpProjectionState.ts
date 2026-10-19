@@ -52,7 +52,7 @@ function messageToSendInput(message: AfpMessage): SendAfpMessageInput {
   };
 }
 
-function projectionId(state: WeddingPreferenceConflictState): string {
+export function weddingPreferenceConflictProjectionId(state: WeddingPreferenceConflictState): string {
   const metadata = normalizeWeddingPlanningMetadata(state.metadata);
   return state.conflictObject?.id
     ?? `wedding_preference_context:${safeWeddingLabel(metadata.responseWorkspaceId)}:${safeWeddingLabel(state.decisionArea)}`;
@@ -204,7 +204,7 @@ export function weddingPreferenceConflictToAfpMessage(
   nowIso = new Date().toISOString(),
 ): AfpMessage {
   const metadata = normalizeWeddingPlanningMetadata(state.metadata);
-  const id = projectionId(state);
+  const id = weddingPreferenceConflictProjectionId(state);
   const markdown = markdownFor(state);
   const semanticObject = weddingSemanticObjectFromPreferenceConflictState(state);
   const searchableTerms = uniqueStrings([

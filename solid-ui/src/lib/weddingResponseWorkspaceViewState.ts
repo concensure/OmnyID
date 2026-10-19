@@ -137,11 +137,10 @@ import {
   buildWeddingSeatingDraftCards,
   type WeddingSeatingDraftCard,
 } from "@/lib/weddingSeatingDraftCardState";
-import {
-  buildWeddingResilienceDisplayState,
-  type WeddingResilienceDisplayState,
-} from "@/lib/weddingResilienceDisplayState";
+import { buildWeddingResilienceDisplayState, type WeddingResilienceDisplayState } from "@/lib/weddingResilienceDisplayState";
 import { buildWeddingResilienceLedgerState } from "@/lib/weddingResilienceLedgerState";
+import { buildWeddingPreferenceConflictsFromConstraintMessages } from "@/lib/weddingPreferenceConflictConstraintAdapter";
+import { weddingPreferenceConflictFromAfpMessage, weddingPreferenceConflictToAfpMessage } from "@/lib/weddingPreferenceConflictAfpProjectionState";
 import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
 import {
   buildWeddingVendorQuoteAttachmentParserState,
@@ -890,10 +889,10 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     now: input.nowIso ? new Date(input.nowIso) : null,
     limit: 40,
   });
-  const resilience = buildWeddingResilienceDisplayState(buildWeddingResilienceLedgerState({
-    messages: input.afpMessages,
-    responseWorkspaceId: workspace.metadata.responseWorkspaceId,
-  }));
+  const derivedPreferenceConflicts = buildWeddingPreferenceConflictsFromConstraintMessages({ messages: input.afpMessages, metadata: workspace.metadata });
+  const persistedConflictRevisions = new Map((input.afpMessages ?? []).flatMap((message) => { const state = weddingPreferenceConflictFromAfpMessage(message); return state?.conflictObject ? [[state.conflictObject.id, state.preferenceSignals.map((signal) => signal.id).sort().join("|")] as const] : []; }));
+  const pendingPreferenceConflicts = derivedPreferenceConflicts.filter((state) => persistedConflictRevisions.get(state.conflictObject!.id) !== state.preferenceSignals.map((signal) => signal.id).sort().join("|"));
+  const resilience = buildWeddingResilienceDisplayState(buildWeddingResilienceLedgerState({ messages: [...(input.afpMessages ?? []), ...pendingPreferenceConflicts.map((state) => weddingPreferenceConflictToAfpMessage(state, input.nowIso ?? undefined))], responseWorkspaceId: workspace.metadata.responseWorkspaceId, decisionDeferrals: input.decisionDeferrals, nowIso: input.nowIso }));
   const decisionFocus = {
     summaryLabel: personalOsProjection.decisionLoadRelief.summaryLabel,
     backlogCount: personalOsProjection.decisionLoadRelief.backlogCount,
@@ -954,6 +953,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
   const projectionQueue = buildWeddingResponseWorkspaceProjectionQueueState({
     contextItems: input.contextItems,
     decisionItems: activeDecisions,
+    preferenceConflicts: pendingPreferenceConflicts,
     artifacts: generatedArtifacts,
     scheduleItems: projectionScheduleItems,
     taskItems: activeProjectionTaskItems,

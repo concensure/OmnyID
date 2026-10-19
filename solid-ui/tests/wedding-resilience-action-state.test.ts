@@ -15,6 +15,7 @@ import {
   buildWeddingResilienceSidebarAction,
 } from "../src/lib/weddingResilienceActionState.ts";
 import { buildWeddingResilienceLedgerState } from "../src/lib/weddingResilienceLedgerState.ts";
+import { weddingDecisionDeferralActionToAfpSendInput } from "../src/lib/weddingDecisionDeferralAfpState.ts";
 
 function conflictMessage(): AfpMessage {
   return weddingPreferenceConflictToAfpMessage(buildWeddingPreferenceConflictState({
@@ -89,6 +90,10 @@ test("buildWeddingResilienceSidebarAction can defer a resilience item without lo
   assert.equal(action.label, "Review Later");
   assert.equal(packet.intent, "defer_item");
   assert.equal(packet.item_kind, "preference_conflict");
+  const deferral = action.metadata?.decision_deferral as Record<string, unknown>;
+  assert.equal(deferral.id, state.attentionItems[0]?.id);
+  assert.equal(deferral.requested_state, "deferred");
+  assert.equal(weddingDecisionDeferralActionToAfpSendInput(action, conflictMessage().metadata, "2026-10-19T00:00:00Z")?.subtype, "wedding_decision_deferral");
 });
 
 test("buildWeddingResilienceReviewAllAction summarizes all resilience work", () => {

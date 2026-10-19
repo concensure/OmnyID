@@ -135,3 +135,34 @@ test("buildWeddingResilienceLedgerState sets attention priority and practical la
   assert.equal(state.urgentCount, 1);
   assert.equal(state.summaryLabel, "1 urgent, 1 total wedding resilience item.");
 });
+
+test("buildWeddingResilienceLedgerState keeps a saved deferral quiet until expiry", () => {
+  const initial = buildWeddingResilienceLedgerState({ messages: [conflictMessage()] });
+  const item = initial.attentionItems[0]!;
+  const fingerprint = [item.id, item.kind, "attention", "home", ...item.metadataLabels]
+    .filter(Boolean).join("|").toLowerCase();
+  const hidden = buildWeddingResilienceLedgerState({
+    messages: [conflictMessage()],
+    nowIso: "2026-10-20T00:00:00Z",
+    decisionDeferrals: [{
+      focusItemId: item.id,
+      createdAt: "2026-10-19T00:00:00Z",
+      staleAfterAt: "2026-10-26T00:00:00Z",
+      dependencyFingerprint: fingerprint,
+    }],
+  });
+  const resurfaced = buildWeddingResilienceLedgerState({
+    messages: [conflictMessage()],
+    nowIso: "2026-10-27T00:00:00Z",
+    decisionDeferrals: hidden.preferenceConflicts.length ? [{
+      focusItemId: item.id,
+      createdAt: "2026-10-19T00:00:00Z",
+      staleAfterAt: "2026-10-26T00:00:00Z",
+      dependencyFingerprint: fingerprint,
+    }] : [],
+  });
+
+  assert.equal(hidden.attentionItems.length, 0);
+  assert.equal(hidden.preferenceConflicts.length, 1);
+  assert.equal(resurfaced.attentionItems.length, 1);
+});

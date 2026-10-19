@@ -15,6 +15,7 @@ import type {
 } from "@/lib/weddingCalendarProjectionState";
 import type { WeddingCollaboratorInviteCard } from "@/lib/weddingCollaborationState";
 import type { WeddingBoundaryLedgerObject } from "@/lib/weddingBoundaryLedgerState";
+import type { WeddingPreferenceConflictState } from "@/lib/weddingPreferenceConflictState";
 import {
   buildWeddingSemanticSurfaceState,
   type WeddingSemanticSurfaceState,
@@ -98,6 +99,7 @@ const GROUP_LABELS: Record<WeddingProjectionQueueItemKind, string> = {
   context: "Context",
   intake_profile: "Profile",
   decision: "Decisions",
+  preference_conflict: "Partner decisions",
   access_control: "Access",
   boundary: "Guest boundaries",
   artifact: "Files",
@@ -360,6 +362,7 @@ function vendorApprovalCardState(input: {
 export function buildWeddingProjectionQueueViewState(input: {
   contextItems?: readonly WeddingNeedToKnowProjectionContext[] | null;
   decisionItems?: readonly WeddingDecisionProjectionInput[] | null;
+  preferenceConflicts?: readonly WeddingPreferenceConflictState[] | null;
   artifacts?: readonly WeddingGeneratedArtifact[] | null;
   scheduleItems?: readonly WeddingPlanningScheduleItem[] | null;
   taskItems?: readonly WeddingPlanningTaskItem[] | null;

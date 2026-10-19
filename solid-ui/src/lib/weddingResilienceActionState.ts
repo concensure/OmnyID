@@ -43,6 +43,24 @@ function packetFor(
   };
 }
 
+function deferralPacket(item: WeddingResilienceAttentionItem): Record<string, unknown> {
+  return {
+    version: 1,
+    id: item.id,
+    kind: item.kind,
+    title: item.title,
+    pressure_family: "attention",
+    source_surface: menuFor(item),
+    due_label: null,
+    due_at: null,
+    explanation: item.detail,
+    evidence_labels: item.metadataLabels,
+    requested_state: "deferred",
+    user_reason: "The couple chose to review this later.",
+    resurface_policy: "Bring this back after 7 days or when the evidence changes.",
+  };
+}
+
 export function buildWeddingResilienceSidebarAction(
   item: WeddingResilienceAttentionItem | null,
   intent: WeddingResilienceActionIntent = "open_item",
@@ -54,6 +72,7 @@ export function buildWeddingResilienceSidebarAction(
     reason: item ? null : "No partner conflicts or recovery plans need attention.",
     metadata: {
       wedding_workspace_menu: item ? menuFor(item) : "home",
+      ...(item && intent === "defer_item" ? { decision_deferral: deferralPacket(item) } : {}),
       wedding_resilience: item ? packetFor(item, intent) : {
         version: 1,
         intent,
