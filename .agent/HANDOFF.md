@@ -4149,3 +4149,36 @@ Next:
 - Keep all planning, quotation, vendor-mail, relay, provider and ranking-policy-V2 flags disabled.
   No Oracle deployment ran. Quotation-normalisation/week-3-to-6 work remains paused pending the
   user's human-judge review.
+
+## 2026-10-19 - WED-240 machine-evaluation foundation (Codex, in progress)
+
+Changed:
+
+- Added `planning.ideal_agent_evaluation.v1`, covering all nine golden scenarios with explicit
+  producer, authority, privacy, automated-evidence and human-review fields. Rust and Solid audits
+  require every referenced evidence path to exist and keep the scenario/review vocabularies closed.
+- Explicitly dark-packaged all seven backend and seven frontend planning flags in `.env.example`,
+  the UI Docker build and each Oracle compose variant. No flag was enabled and no deployment ran.
+- Enforced rollout order from dark package to synthetic tenant, allowlisted couple and permissioned
+  vendor. The final stage requires WED-225, WED-226 and mail/provider gates; kill switches preserve
+  AFP history and evaluation metrics remain content-free.
+
+Verification:
+
+- Passed 77 planning-intelligence units, shared-schema/adversarial/deterministic replay coverage,
+  migration catalog, three manifest audits and three frontend dark-package audits.
+- Against isolated local Docker only, passed all seven authenticated planning API suites plus live
+  clean ClamAV and infected/error boundary units. No Oracle or persistent application database was
+  used.
+- Passed four focused Playwright cases at 320, 360, 390 and 1280 CSS pixels, Solid typecheck, wedding
+  site smoke, both line budgets, all 1,924 wedding tests and the production build. Compose structure
+  validates for production, minimal, QUIC and staging without interpolating secrets. Only inherited
+  Rust unused-variable, Tailwind screen-variant and Vite chunk advisories remain.
+
+Next:
+
+- Add the exact-commit readiness verifier and machine-readable report, then ingest independent human
+  review evidence when supplied. WED-240 cannot move to review or release while human dimensions and
+  WED-225/WED-226 remain unresolved.
+- Keep every planning, quotation, mail, provider, relay and ranking-policy-V2 flag disabled. Do not
+  deploy to Oracle or advance a canary from this machine-only evidence.

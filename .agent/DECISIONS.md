@@ -1402,3 +1402,20 @@ and use a stable minimum table width, preventing high zoom or a 320 CSS-pixel vi
 labels into one-character columns. Structured A2UI action maps normalize to visible labels, but no
 presentation action bypasses the existing approval, send, booking or payment boundary. The unified
 surface remains independently default-off.
+
+## 2026-10-19: Ideal-agent rollout starts as an explicit dark package
+
+The WED-230 through WED-239 programme is evaluated against one versioned nine-scenario manifest.
+Each scenario names its producer, authority boundary, privacy boundary, automated evidence paths and
+applicable human-review dimensions. The manifest is evaluation metadata only; it does not create a
+second runtime policy, planning record or decision authority.
+
+All seven backend planning flags and all seven frontend planning flags are explicitly false in the
+example environment and deployment packaging. Static Rust and Solid audits fail if a flag, evidence
+path, golden scenario, rollout stage or required release blocker disappears. The stages are ordered:
+dark package, synthetic tenant, allowlisted couple, then permissioned vendor. The vendor stage
+requires WED-225, WED-226 and mail/provider gates; machine tests cannot substitute for those reviews.
+
+Kill switches stop projection and action while preserving AFP and commercial history. Evaluation
+metrics remain content-free. Local disposable PostgreSQL and ClamAV evidence may establish machine
+correctness, but it cannot authorize Oracle deployment, provider use, cohort enablement or release.

@@ -2876,3 +2876,47 @@ tasks:
       - shared Decision Card rendering now shows every standard/full alternative, explicit recommendation reasons and review items; shared A2UI accepts structured action maps and contains comparison tables in a minimum-width horizontal viewport so zoom cannot collapse words into vertical character stripes
       - typecheck, focused schema/producer/reflow tests, both line budgets, wedding site smoke, all 1921 wedding tests and the production build pass; the new shared adapter is 453 lines, all new files are below 1000 lines, and only inherited Vite advisories remain
       - moved to review with the unified-intervention and every planning, quotation, provider, mail, relay and ranking-policy-V2 flag disabled; no Oracle or provider action ran
+  - id: WED-240
+    title: Evaluate ideal-agent planning and hold staged release behind evidence gates
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-230
+      - WED-231
+      - WED-232
+      - WED-233
+      - WED-234
+      - WED-235
+      - WED-236
+      - WED-237
+      - WED-238
+      - WED-239
+    files:
+      - .env.example
+      - config/planning_ideal_agent_evaluation_v1.json
+      - docker-compose.oracle.yml
+      - docker-compose.oracle.minimal.yml
+      - docker-compose.oracle.quic.yml
+      - docker-compose.oracle.staging.yml
+      - solid-ui/Dockerfile
+      - tests/planning_ideal_agent_evaluation.rs
+      - solid-ui/tests/wedding-planning-ideal-agent-evaluation.test.ts
+      - scripts/verify-planning-ideal-agent-readiness.ps1
+      - Documents/verification/planning-ideal-agent-readiness.md
+      - .agent/**
+    acceptance:
+      - one reviewed manifest covers all nine golden scenarios with explicit producer, privacy, authority, automated evidence and human-review dimensions
+      - shared-schema, deterministic replay, disposable-Postgres, ClamAV, Rust, SDK, browser, migration, wedding, build and line-budget evidence is reproducible and bound to the evaluated commit
+      - adversarial extraction and privacy checks prove unknown evidence stays unknown, private couple context stays private and stale authority cannot execute
+      - all planning and quotation flags remain false through dark packaging; kill switches preserve AFP history and no cohort advances without prior evidence
+      - synthetic tenant, allowlisted couple and permissioned vendor canaries are distinct stages and WED-225/WED-226 plus applicable mail/provider gates block enablement
+      - independent human evaluation remains explicit for memory fidelity, cost clarity, critical-path wording, vendor minimisation, accessibility, usability, permission wording and alternative preservation
+      - every new file remains below 1000 lines and full relevant verification passes without Oracle, provider, mail or deployment mutation
+    progress:
+      - started from clean reviewed WED-239 commit e397bd3; implementing machine-readable scenario and rollout evidence while keeping release and human-review gates unresolved
+      - added a versioned manifest covering all nine golden scenarios with explicit producer, authority boundary, privacy boundary, real automated evidence paths and closed human-review dimensions
+      - dark packaging now declares every backend and frontend planning flag false in the example environment, UI build and all Oracle compose variants; static Rust and Solid audits enforce the flag inventory, stage order and WED-225/WED-226 vendor-stage blockers
+      - local Docker evidence passes against disposable PostgreSQL 127.0.0.1:55432/omnyid_test and ClamAV 127.0.0.1:33310: seven authenticated planning API suites, clean live scan and infected/error parser boundaries all pass without touching Oracle
+      - 77 planning-intelligence units, shared contract fixtures, deterministic duplicate replay, migration catalog, three evaluation-manifest tests, three frontend evaluation tests, four focused 320/360/390/1280 browser tests, typecheck, site smoke, both line budgets, all 1924 wedding tests and production build pass
+      - machine-evaluation foundation is complete for this slice; WED-240 remains in progress because independent human evaluation, the exact-commit verifier/report and blocked WED-225/WED-226 release evidence are still outstanding
