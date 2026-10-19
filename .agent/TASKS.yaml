@@ -2319,6 +2319,7 @@ tasks:
       - the real Postgres API flow, capability API, vendor-response ciphertext/IDOR API, and clean clamd integration test pass; enabling those lanes exposed and fixed complete source-fixture rebinding, missing test-router quotation modules, and AFP signature stability across PostgreSQL timestamp normalisation
       - readiness remains blocked on the separately required accuracy/provider, independent security/privacy/accessibility, couple/vendor usability, wording, hosted-shadow, and cohort evidence; release, vendor-mail, email-reconciliation, relay, and ranking-policy-V2 flags remain off
       - clarified that local Postgres and live disposable ClamAV execution do not replace the verifier's exact-commit external records; documented the required evidence outcome for all ten sign-off parameters without representing any missing review as complete
+      - the current-head verifier exposed one local line-budget regression from the later structured A2UI action normalizer; the behavior-preserving compaction restores A2UIRenderer.tsx to its 1983-line WED-225 baseline and its focused reflow/action tests plus Solid typecheck pass
   - id: WED-226
     title: Stage gated vendor response rollout
     status: blocked

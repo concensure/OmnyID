@@ -499,15 +499,7 @@ function normalizeConstraintBadgeItems(value: unknown): ConstraintBadgeItem[] {
 }
 
 function normalizeActionItems(value: unknown): string[] {
-  const values = Array.isArray(value)
-    ? value
-    : isRecord(value) ? Object.values(value) : [];
-  return values.flatMap((item) => {
-    if (typeof item === "string") return item.trim() ? [item.trim()] : [];
-    if (!isRecord(item)) return [];
-    const label = asString(item.label).trim();
-    return label ? [label] : [];
-  });
+  return (Array.isArray(value) ? value : isRecord(value) ? Object.values(value) : []).map((item) => (isRecord(item) ? asString(item.label) : asString(item)).trim()).filter(Boolean);
 }
 
 function normalizeBulletListItemViews(value: unknown): BulletListItemView[] {

@@ -4227,3 +4227,29 @@ Unresolved / next:
 - WED-225 still needs all commit-bound external sign-offs accepted by its verifier. WED-226 remains
   blocked by WED-225 plus WED-213 and WED-185; vendor mail, email reconciliation, quotation rollout,
   relay and ranking-policy V2 stay disabled. No Oracle deployment or provider mutation ran.
+
+## 2026-10-20 - WED-225 current-head line-budget repair (Codex, blocked)
+
+Changed:
+
+- Ran the WED-225 readiness workflow against the isolated local PostgreSQL and ClamAV endpoints.
+  Every functional lane passed, but the aggregator correctly failed because the later structured
+  A2UI action normalizer had grown the already-oversized renderer by eight lines since the WED-225
+  baseline.
+- Compacted only that normalizer without changing its accepted array/map shapes or label trimming.
+  `A2UIRenderer.tsx` is now line-neutral at 1,983 lines against the 1,983-line baseline.
+
+Verification before the clean-commit rerun:
+
+- Seven focused unified-intervention/A2UI reflow tests pass and Solid typecheck passes.
+- The first full verifier run passed the quotation suite, real disposable-Postgres API path, SDK,
+  44 Solid quotation tests, 11 Playwright cases, migration catalog, all 1,929 wedding tests and the
+  production build; its sole local failure was the now-repaired line-budget check.
+
+Unresolved / next:
+
+- Re-run the complete verifier on the clean repair commit and use its generated manifest as the
+  current machine record. WED-225 must remain blocked because all ten exact-commit external records
+  are still absent; a successful local ClamAV test is not the independent clean-scan sign-off.
+- WED-226, vendor mail, email reconciliation, quotation release, relay and ranking-policy V2 remain
+  disabled. No Oracle deployment or live provider action is authorized.
