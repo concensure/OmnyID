@@ -17,6 +17,14 @@ if ([string]::IsNullOrWhiteSpace($env:CARGO_BUILD_JOBS)) {
     $env:CARGO_BUILD_JOBS = "2"
 }
 
+function Get-RelativePath {
+    param([string]$Path)
+    $rootWithSeparator = $root.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+    $rootUri = [Uri]$rootWithSeparator
+    $pathUri = [Uri]([System.IO.Path]::GetFullPath($Path))
+    return [Uri]::UnescapeDataString($rootUri.MakeRelativeUri($pathUri).ToString()).Replace("\", "/")
+}
+
 function Invoke-ReadinessCheck {
     param([string]$Name, [scriptblock]$Action)
     $slug = $Name.ToLowerInvariant() -replace '[^a-z0-9]+', '-'
@@ -29,7 +37,7 @@ function Invoke-ReadinessCheck {
         return [ordered]@{
             name = $Name
             status = "passed"
-            log = [System.IO.Path]::GetRelativePath($root, $logPath).Replace("\", "/")
+            log = Get-RelativePath $logPath
             detail = $null
         }
     }
@@ -38,7 +46,7 @@ function Invoke-ReadinessCheck {
         return [ordered]@{
             name = $Name
             status = "failed"
-            log = [System.IO.Path]::GetRelativePath($root, $logPath).Replace("\", "/")
+            log = Get-RelativePath $logPath
             detail = $_.Exception.Message
         }
     }
@@ -122,7 +130,7 @@ function Read-HumanReview {
         return [ordered]@{
             dimension = $Dimension
             status = "verified"
-            evidence = [System.IO.Path]::GetRelativePath($root, (Resolve-Path -LiteralPath $path).Path).Replace("\", "/")
+            evidence = Get-RelativePath (Resolve-Path -LiteralPath $path).Path
             sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
             detail = $null
         }
