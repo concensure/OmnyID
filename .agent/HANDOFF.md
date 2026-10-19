@@ -4117,33 +4117,35 @@ Next:
   No Oracle deployment ran. Quotation-normalisation/week-3-to-6 work remains paused for the user's
   human-judge review.
 
-## 2026-10-19 - WED-238 canonical preference-conflict production path (Codex, in progress)
+## 2026-10-19 - WED-239 unified intervention presentation (Codex, review)
 
 Changed:
 
-- Registered WED-238 after confirming that the existing preference-conflict builder was test-only;
-  the resilience/DecisionOS/A2UI path already owned persisted conflict presentation.
-- Added a strict adapter from current WED-230 constraint-ledger messages. It requires tenant-private,
-  user-confirmed, couple-private, person-scoped, source-bound and fingerprinted closed values.
-- Uses pseudonymous Partner 1/Partner 2 labels. Exact excerpts, locators, free text and private
-  rationale never enter the conflict projection or visible card.
-- Reuses the existing AFP projection queue and dispatch marker. A persisted matching revision
-  deduplicates; a current constraint successor reopens review.
-- Made Review Later emit the standard durable wedding decision deferral. Replay hides a card only
-  while the deferral is unexpired and its dependency fingerprint still matches.
+- Added a strict `decision.intervention.v1` frontend normalizer and one shared presentation adapter
+  over the existing Decision Card and A2UI primitives. It separates recommendation, reasons, cost,
+  timing, unknowns and evidence, preserves explicit currency labels and suppresses technical copy.
+- Constraint interventions retain and project the frozen contract. Cost, milestone and vendor-change
+  workflows retain their domain-specific execution semantics while sharing the A2UI projector.
+  Preference conflicts keep their existing couple-private resilience owner and persist the same typed
+  presentation metadata through AFP replay.
+- Standard/full Decision Cards now show every alternative, recommendation reasons and review items.
+  A2UI structured action objects now retain their labels, and comparison tables use contained
+  horizontal overflow plus a stable minimum width so 320 CSS-pixel / 400%-equivalent zoom does not
+  produce vertical character stripes or page overflow.
+- Actions remain bounded to one primary plus at most three secondary choices. Their copy states that
+  nothing is sent, booked or paid automatically, and prepared-only workflows retain that marker.
 
 Verification:
 
-- Focused adapter, queue, dispatch, resilience action, ledger and workspace tests pass, including
-  persisted-revision deduplication and successor reopening.
-- Solid typecheck, both line-budget checks, wedding site smoke, all 1,906 wedding tests and the
-  production build pass. The workspace file remains line-neutral at 1,041 lines; the new adapter is
-  186 lines. Only the inherited Vite large-chunk advisory remains.
+- Passed Solid typecheck and 37 focused intervention, producer, preference-AFP and reflow tests.
+- Passed both line-budget checks, wedding site smoke, all 1,921 wedding tests and the production build.
+  The new shared adapter is 453 lines and both new tests are below 150 lines. Only the inherited Vite
+  screen-variant and large-chunk advisories remain.
 
 Next:
 
-- Add explicit resolved and dismissed preference-conflict successor records and replay tests, then
-  move WED-238 to review.
+- Independently review WED-239 and visually confirm the Decision Card/A2UI comparison at 320 CSS px
+  and 400% browser zoom before enabling its independent flag in any environment.
 - Keep all planning, quotation, vendor-mail, relay, provider and ranking-policy-V2 flags disabled.
-  No Oracle deployment ran. Quotation-normalisation/week-3-to-6 work remains paused for the user's
-  human-judge review.
+  No Oracle deployment ran. Quotation-normalisation/week-3-to-6 work remains paused pending the
+  user's human-judge review.

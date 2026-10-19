@@ -1,5 +1,9 @@
 import { apiFetch } from "@/lib/api";
 import type { DecisionCardModel } from "@/lib/decisionCardState";
+import {
+  buildPlanningUnifiedA2ui,
+  type PlanningUnifiedInterventionA2ui,
+} from "@/lib/planningUnifiedInterventionState";
 
 export type PlanningCostTradeoffPreparation = {
   threadId: string;
@@ -42,17 +46,7 @@ export type PlanningCostTradeoffAdvice = {
   };
 };
 
-export type PlanningCostTradeoffA2ui = {
-  schema_version: "a2ui.v1";
-  kind: "planning_cost_tradeoff";
-  title: string;
-  layout: { type: "stack"; gap: "md" };
-  nodes: Array<{
-    id: string;
-    type: "callout" | "insight_line" | "bullet_list" | "action_chips";
-    props: Record<string, unknown>;
-  }>;
-};
+export type PlanningCostTradeoffA2ui = PlanningUnifiedInterventionA2ui;
 
 const CATEGORY_LABELS: Record<string, string> = {
   venue_ceremony: "Venue and ceremony",
@@ -319,46 +313,14 @@ export function planningCostTradeoffA2ui(
   value: PlanningCostTradeoffAdvice,
 ): PlanningCostTradeoffA2ui {
   const card = planningCostTradeoffDecisionCard(value);
-  return {
-    schema_version: "a2ui.v1",
-    kind: "planning_cost_tradeoff",
-    title: card.title,
-    layout: { type: "stack", gap: "md" },
-    nodes: [
-      {
-        id: "cost-status",
-        type: "callout",
-        props: {
-          tone: value.exceedsBudget ? "warning" : "info",
-          title: card.title,
-          body: card.whyItMatters,
-        },
-      },
-      {
-        id: "cost-forecast",
-        type: "insight_line",
-        props: { text: card.evidence[0]?.label, evidence_required: true },
-      },
-      {
-        id: "cost-unknowns",
-        type: "bullet_list",
-        props: { title: "Still to confirm", items: card.unknowns },
-      },
-      {
-        id: "cost-actions",
-        type: "action_chips",
-        props: {
-          actions: Object.fromEntries(card.actions.map((action) => [action.id, {
-            id: action.id,
-            label: action.label,
-            kind: action.intent,
-            tradeoff_ref: value.tradeoffId,
-            requires_acknowledgement: value.requiresAcknowledgement,
-          }])),
-        },
-      },
-    ],
-  };
+  return buildPlanningUnifiedA2ui({
+    card,
+    presentation: {
+      costRangeLabel: value.forecastAfter
+        ? `Forecast after this choice: ${rangeLabel(value.forecastAfter)}`
+        : "Final cost still to confirm",
+    },
+  });
 }
 
 export async function preparePlanningCostTradeoff(

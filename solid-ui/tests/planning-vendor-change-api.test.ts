@@ -97,12 +97,13 @@ test("review projects into existing Decision Card and A2UI without accepting the
   assert.equal(containsTechnicalWeddingUiCopy(visibleCopy), false);
 
   const a2ui = planningVendorChangeA2ui(review);
+  assert.equal(a2ui.kind, "planning_unified_intervention");
   assert.deepEqual(a2ui.nodes.map((node) => node.type), [
-    "callout", "stat_row", "comparison_table", "constraint_badges", "bullet_list", "action_chips",
+    "callout", "comparison_table", "constraint_badges", "stat_row",
+    "bullet_list", "bullet_list", "action_chips",
   ]);
   assert.equal(
-    (a2ui.nodes.at(-1)?.props.actions as Record<string, { prepared_only: boolean }>)
-      .open_vendor_change_review?.prepared_only,
+    (a2ui.nodes.at(-1)?.props.actions as Array<{ prepared_only: boolean }>)[0]?.prepared_only,
     true,
   );
 });

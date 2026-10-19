@@ -40,6 +40,13 @@ test("buildWeddingPreferenceConflictState preserves partner preferences instead 
   assert.ok(state.compromiseOptions[0]?.plainLanguage.includes("wider family"));
   assert.ok(state.approvalGateLabel?.includes("Both partners"));
   assert.equal(state.a2ui.kind, "wedding_preference_conflict");
+  assert.equal(state.interventionPresentation.title, "wedding scale: values to balance");
+  assert.deepEqual(state.interventionPresentation.reasonLabels, ["meaningful interaction", "family inclusion"]);
+  assert.equal(state.interventionPresentation.constraintLabels?.length, 2);
+  assert.equal(
+    (state.a2ui.presentation as { verificationLabel: string }).verificationLabel,
+    "Current stated preferences checked",
+  );
 });
 
 test("buildWeddingPreferenceConflictState asks for reasons before solving thin preferences", () => {

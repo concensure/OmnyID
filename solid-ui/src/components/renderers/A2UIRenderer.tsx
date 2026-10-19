@@ -499,7 +499,15 @@ function normalizeConstraintBadgeItems(value: unknown): ConstraintBadgeItem[] {
 }
 
 function normalizeActionItems(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(String) : [];
+  const values = Array.isArray(value)
+    ? value
+    : isRecord(value) ? Object.values(value) : [];
+  return values.flatMap((item) => {
+    if (typeof item === "string") return item.trim() ? [item.trim()] : [];
+    if (!isRecord(item)) return [];
+    const label = asString(item.label).trim();
+    return label ? [label] : [];
+  });
 }
 
 function normalizeBulletListItemViews(value: unknown): BulletListItemView[] {
@@ -811,7 +819,7 @@ function resolveActionChipsState(props: Record<string, unknown>, renderMode: Ren
     countLabel: `${actions.length} action${actions.length !== 1 ? "s" : ""}`,
     glanceText: `${actions.length} action${actions.length !== 1 ? "s" : ""}`,
     buttonClass:
-      "rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-on-surface transition hover:bg-white/20 active:scale-95",
+      "max-w-full break-words rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-on-surface [overflow-wrap:anywhere] transition hover:bg-white/20 active:scale-95",
     showActions: actions.length > 0,
   };
 }
@@ -1412,12 +1420,12 @@ function A2UINodeRenderer(props: {
               </Show>
             </div>
           </Show>
-          <div class="overflow-auto rounded-lg border border-white/12 bg-white/6 p-3">
-            <table class="w-full text-left text-sm">
+          <div class="max-w-full min-w-0 overflow-x-auto rounded-lg border border-white/12 bg-white/6 p-3">
+            <table class="w-full min-w-[36rem] table-fixed text-left text-sm">
               <thead class="text-xs uppercase tracking-[0.14em] text-outline">
                 <tr>
                   <For each={state.headerColumns}>
-                    {(column) => <th class="pb-2 pr-3 font-mono">{column.label}</th>}
+                    {(column) => <th class="min-w-32 break-words pb-2 pr-3 font-mono [overflow-wrap:anywhere]">{column.label}</th>}
                   </For>
                 </tr>
               </thead>
@@ -1425,9 +1433,9 @@ function A2UINodeRenderer(props: {
                 <For each={state.rows}>
                   {(row) => (
                     <tr class="border-t border-white/10">
-                      <td class="py-2 pr-3 align-top font-medium">{row.label}</td>
+                      <td class="min-w-32 break-words py-2 pr-3 align-top font-medium [overflow-wrap:anywhere]">{row.label}</td>
                       <For each={row.cells}>
-                        {(cell) => <td class="py-2 pr-3 align-top">{cell.text}</td>}
+                        {(cell) => <td class="min-w-32 break-words py-2 pr-3 align-top [overflow-wrap:anywhere]">{cell.text}</td>}
                       </For>
                     </tr>
                   )}

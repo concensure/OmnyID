@@ -24,15 +24,23 @@ const preparation = {
 function payload() {
   return {
     intervention: {
+      schema_version: "decision.intervention.v1",
       intervention_id: "intervention:one",
       decision_ref: "evaluation:one",
       recommended_option_id: "reject_candidate",
       options: [
-        { option_id: "reject_candidate", label: "Remove this option from consideration", evidence_refs: ["source:one"] },
-        { option_id: "ask_vendor", label: "Ask the vendor to clarify", evidence_refs: ["source:one"] },
-        { option_id: "amend_constraint", label: "Review the remembered requirement", evidence_refs: ["source:one"] },
-        { option_id: "accept_conflict", label: "Keep this option and accept the conflict", evidence_refs: ["source:one"] },
+        { option_id: "reject_candidate", label: "Remove this option from consideration", consequence_codes: ["candidate_rejected"], evidence_refs: ["source:one"] },
+        { option_id: "ask_vendor", label: "Ask the vendor to clarify", consequence_codes: ["approval_required_before_send"], evidence_refs: ["source:one"] },
+        { option_id: "amend_constraint", label: "Review the remembered requirement", consequence_codes: ["constraint_review_required"], evidence_refs: ["source:one"] },
+        { option_id: "accept_conflict", label: "Keep this option and accept the conflict", consequence_codes: ["conflict_explicitly_accepted"], evidence_refs: ["source:one"] },
       ],
+      reason_codes: ["constraint_conflict"],
+      unknown_codes: ["vendor_confirmation_pending"],
+      consequence_summary_codes: [
+        "decision_appends_without_mutating_history",
+        "vendor_message_requires_separate_approval",
+      ],
+      prepared_next_action: { kind: "draft", target_ref: "qclarify_abc" },
     },
     remembered_statement: "My aunt needs step-free access",
     conflict_evidence_label: "Current comparison evidence: hard requirement conflict.",
@@ -100,10 +108,12 @@ test("closed intervention payload maps to the existing Decision Card", () => {
   assert.match(card.whyItMatters, /quote and comparison will stay visible/);
   const a2ui = planningConstraintInterventionA2ui(intervention);
   assert.equal(a2ui.schema_version, "a2ui.v1");
+  assert.equal(a2ui.kind, "planning_unified_intervention");
   assert.deepEqual(a2ui.nodes.map((node) => node.type), [
-    "callout", "insight_line", "bullet_list", "action_chips",
+    "callout", "comparison_table", "constraint_badges", "insight_line",
+    "bullet_list", "bullet_list", "action_chips",
   ]);
-  assert.equal(Object.keys(a2ui.nodes[3]!.props.actions as object).length, 4);
+  assert.equal((a2ui.nodes.at(-1)!.props.actions as unknown[]).length, 4);
 });
 
 test("unknown options, stale shape and technical copy fail closed or become safe text", () => {

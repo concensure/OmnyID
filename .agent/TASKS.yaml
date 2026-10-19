@@ -2831,3 +2831,48 @@ tasks:
       - explicit Resolved together and Not a conflict controls now append couple-private exact-revision lifecycle successors; neither action creates a planning rule, and stale terminal records cannot hide a changed preference revision
       - conflict projection ids now include the active revision so local sent markers deduplicate exact replay without blocking a changed revision from persistence
       - focused tests, typecheck, both line budgets, wedding site smoke, all 1914 wedding tests and the production build pass; the large workspace files remain within their frozen budgets and all new files are below 1000 lines
+  - id: WED-239
+    title: Project unified planning interventions through shared Decision Card and A2UI
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-234
+      - WED-235
+      - WED-236
+      - WED-237
+      - WED-238
+    files:
+      - solid-ui/src/lib/planningUnifiedInterventionState.ts
+      - solid-ui/src/lib/planningConstraintInterventionApi.ts
+      - solid-ui/src/lib/planningCostTradeoffApi.ts
+      - solid-ui/src/lib/planningMilestoneApi.ts
+      - solid-ui/src/lib/planningVendorChangeApi.ts
+      - solid-ui/src/lib/weddingPreferenceConflictState.ts
+      - solid-ui/src/lib/weddingPreferenceConflictAfpProjectionState.ts
+      - solid-ui/src/components/DecisionCard.tsx
+      - solid-ui/src/components/renderers/A2UIRenderer.tsx
+      - solid-ui/tests/wedding-planning-unified-intervention-state.test.ts
+      - solid-ui/tests/wedding-decision-card-reflow-render.test.ts
+      - solid-ui/tests/planning-constraint-intervention-api.test.ts
+      - solid-ui/tests/planning-cost-tradeoff-api.test.ts
+      - solid-ui/tests/planning-milestone-api.test.ts
+      - solid-ui/tests/planning-vendor-change-api.test.ts
+      - solid-ui/tests/wedding-preference-conflict-state.test.ts
+      - .agent/**
+    acceptance:
+      - validated decision.intervention.v1 objects project through the existing shared Decision Card and A2UI renderers without a parallel decision or wedding card type
+      - recommendation, reasons, cost range, timing, unknowns and evidence remain separate, and every alternative remains visible even when one option is recommended
+      - exactly one primary action and a bounded set of secondary actions preserve prepared-only, approval, booking, payment and send boundaries
+      - constraint, cost, milestone, vendor-change and partner-preference producers use one closed presentation vocabulary without exposing private source text or technical diagnostics
+      - 320 CSS-pixel and 400%-equivalent reflow avoids page overflow and vertical text stripes; long labels wrap inside bounded cells, keyboard order is stable and reduced-motion behavior is preserved
+      - the unified-intervention flag remains independently disabled by default and every existing planning, quotation, provider, mail, relay and ranking-policy-V2 flag remains off
+      - focused accessibility/reflow and projection tests, all wedding regressions, line budgets, typecheck and production build pass with new files below 1000 lines
+    progress:
+      - audit confirmed WED-234 already emits the frozen generic intervention contract while WED-235 through WED-238 retain evidence-rich producer-specific projections; implementation will add one shared presentation adapter rather than replace those producers or add a new card owner
+      - added a strict frontend normalizer for the frozen decision.intervention.v1 schema plus one closed presentation vocabulary that keeps recommendation, reasons, cost, timing, unknowns and evidence separate and sanitizes technical diagnostics without discarding explicit currency labels
+      - constraint interventions now retain the validated generic contract and derive both the existing Decision Card and shared A2UI projection from it; all alternatives stay visible while one primary and at most three secondary actions remain executable
+      - cost, milestone and vendor-change adapters retain their domain and execution semantics but reuse the same A2UI projector; partner-preference conflicts retain the existing resilience owner while carrying the same typed presentation metadata through AFP replay
+      - shared Decision Card rendering now shows every standard/full alternative, explicit recommendation reasons and review items; shared A2UI accepts structured action maps and contains comparison tables in a minimum-width horizontal viewport so zoom cannot collapse words into vertical character stripes
+      - typecheck, focused schema/producer/reflow tests, both line budgets, wedding site smoke, all 1921 wedding tests and the production build pass; the new shared adapter is 453 lines, all new files are below 1000 lines, and only inherited Vite advisories remain
+      - moved to review with the unified-intervention and every planning, quotation, provider, mail, relay and ranking-policy-V2 flag disabled; no Oracle or provider action ran

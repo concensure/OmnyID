@@ -142,9 +142,11 @@ test("computed critical item maps to existing Decision Card and A2UI surfaces", 
 
   const a2ui = planningMilestoneA2ui(projection);
   assert.ok(a2ui);
+  assert.equal(a2ui.kind, "planning_unified_intervention");
   assert.deepEqual(a2ui.nodes.map((node) => node.type), [
-    "callout", "insight_line", "bullet_list", "action_chips",
+    "callout", "stat_row", "insight_line", "bullet_list", "bullet_list", "action_chips",
   ]);
+  assert.equal((a2ui.nodes.at(-1)!.props.actions as Array<{ prepared_only: boolean }>)[0]?.prepared_only, true);
 });
 
 test("near-critical language requires positive bounded computed slack", () => {

@@ -119,9 +119,12 @@ test("revision-bound advice maps to existing Decision Card and A2UI surfaces", (
 
   const a2ui = planningCostTradeoffA2ui(advice);
   assert.equal(a2ui.schema_version, "a2ui.v1");
+  assert.equal(a2ui.kind, "planning_unified_intervention");
   assert.deepEqual(a2ui.nodes.map((node) => node.type), [
-    "callout", "insight_line", "bullet_list", "action_chips",
+    "callout", "comparison_table", "stat_row", "insight_line",
+    "bullet_list", "bullet_list", "action_chips",
   ]);
+  assert.equal((a2ui.nodes[1]!.props.rows as unknown[]).length, advice.offsets.length);
 });
 
 test("unknown money stays unknown and invalid currency/ranges fail closed", () => {

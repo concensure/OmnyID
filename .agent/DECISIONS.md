@@ -1381,3 +1381,24 @@ review. A terminal lifecycle successor hides only its exact source revision; a l
 successor cannot be suppressed by an older resolved or dismissed record. Deferral remains temporary
 and dependency-bound, while resolve and dismiss remain append-only terminal acknowledgements.
 Terminal controls appear only after the source conflict revision itself is durably persisted.
+
+## 2026-10-19: Planning interventions share presentation, not domain authority
+
+The frozen `decision.intervention.v1` contract is normalized strictly before it can create a user
+surface. Its options, reason codes, evidence references and prepared action remain the authority for
+constraint-intervention choices. The frontend projects that contract through the existing Decision
+Card and A2UI renderers; it does not introduce another decision record, card type or action executor.
+
+Cost advice, critical milestones and vendor changes keep their established domain contracts and
+execution boundaries. They reuse the same closed presentation vocabulary and A2UI projector rather
+than being coerced into fabricated persisted intervention objects. Partner-preference conflicts keep
+the existing couple-private resilience card owner and carry the same typed presentation metadata
+through AFP replay. This preserves producer provenance and approval rules while making recommendation,
+reasons, cost, timing, unknowns and evidence visually consistent.
+
+Standard and full Decision Cards retain every alternative even when actions are bounded to one
+primary plus at most three secondary choices. A2UI comparison tables own their horizontal overflow
+and use a stable minimum table width, preventing high zoom or a 320 CSS-pixel viewport from collapsing
+labels into one-character columns. Structured A2UI action maps normalize to visible labels, but no
+presentation action bypasses the existing approval, send, booking or payment boundary. The unified
+surface remains independently default-off.

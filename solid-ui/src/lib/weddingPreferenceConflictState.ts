@@ -4,6 +4,7 @@ import {
   safeWeddingLabel,
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
+import type { PlanningUnifiedInterventionPresentation } from "@/lib/planningUnifiedInterventionState";
 
 export type WeddingPreferenceConflictStatus = "insufficient" | "aligned" | "conflict";
 
@@ -73,8 +74,28 @@ export type WeddingPreferenceConflictState = {
   compromiseOptions: WeddingPreferenceCompromiseOption[];
   nextQuestionLabel: string | null;
   approvalGateLabel: string | null;
+  interventionPresentation: PlanningUnifiedInterventionPresentation;
   a2ui: Record<string, unknown>;
 };
+
+export function weddingPreferenceConflictInterventionPresentation(input: Pick<
+  WeddingPreferenceConflictState,
+  "status" | "summaryLabel" | "preferenceSignals" | "conflictObject" | "nextQuestionLabel"
+>): PlanningUnifiedInterventionPresentation {
+  return {
+    title: input.conflictObject?.title ?? "Partner preferences",
+    summary: input.summaryLabel,
+    reasonLabels: input.conflictObject?.underlyingValueLabels.length
+      ? input.conflictObject.underlyingValueLabels
+      : null,
+    unknownLabels: input.nextQuestionLabel ? [input.nextQuestionLabel] : [],
+    constraintLabels: input.preferenceSignals.map((signal) => ({
+      label: `${signal.personLabel}: ${signal.preferenceLabel}`,
+      status: input.status === "aligned" ? "satisfied" : input.status === "conflict" ? "conflict" : "unknown",
+    })),
+    verificationLabel: "Current stated preferences checked",
+  };
+}
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
@@ -268,26 +289,37 @@ export function buildWeddingPreferenceConflictState(input: {
     : status === "conflict" && values.length < 2
       ? "Ask each partner why this preference matters before proposing a compromise."
       : null;
+  const title = conflictObject?.title ?? "Partner preferences";
+  const summaryLabel = status === "conflict"
+    ? `Do not average this decision. Balance ${values.length ? values.join(" and ") : "the reasons behind each preference"}.`
+    : status === "aligned"
+      ? "Partner preferences look compatible enough to proceed."
+      : "More than one partner preference is needed before OmnyID can mediate this decision.";
+  const interventionPresentation = weddingPreferenceConflictInterventionPresentation({
+    status,
+    summaryLabel,
+    preferenceSignals: signals,
+    conflictObject,
+    nextQuestionLabel: nextQuestion,
+  });
   return {
     metadata,
     status,
     decisionArea,
     conflictAxis: axis,
-    summaryLabel: status === "conflict"
-      ? `Do not average this decision. Balance ${values.length ? values.join(" and ") : "the reasons behind each preference"}.`
-      : status === "aligned"
-        ? "Partner preferences look compatible enough to proceed."
-        : "More than one partner preference is needed before OmnyID can mediate this decision.",
+    summaryLabel,
     preferenceSignals: signals,
     conflictObject,
     compromiseOptions: options,
     nextQuestionLabel: nextQuestion,
     approvalGateLabel: conflictObject ? "Both partners should approve the compromise before it becomes a planning rule." : null,
+    interventionPresentation,
     a2ui: {
       schema_version: "a2ui.v1",
       kind: "wedding_preference_conflict",
-      title: conflictObject?.title ?? "Partner preferences",
+      title,
       status,
+      presentation: interventionPresentation,
       sections: [
         { title: "What each person wants", items: signals.map((signal) => `${signal.personLabel}: ${signal.preferenceLabel}`) },
         { title: "Why it matters", items: values.length ? values : ["Ask why this matters before solving."] },

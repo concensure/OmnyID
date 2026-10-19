@@ -1,5 +1,11 @@
 import { apiFetch } from "@/lib/api";
 import type { DecisionCardModel } from "@/lib/decisionCardState";
+import {
+  buildPlanningUnifiedInterventionState,
+  normalizePlanningDecisionIntervention,
+  type PlanningDecisionIntervention,
+  type PlanningUnifiedInterventionA2ui,
+} from "@/lib/planningUnifiedInterventionState";
 import { safeWeddingUiText } from "@/lib/weddingHomeUiCopyState";
 
 const OPTION_IDS = [
@@ -22,6 +28,7 @@ export type PlanningConstraintInterventionPreparation = {
 };
 
 export type PlanningConstraintIntervention = {
+  contract: PlanningDecisionIntervention;
   interventionId: string;
   decisionRef: string;
   rememberedStatement: string;
@@ -57,17 +64,7 @@ export type PlanningConstraintInterventionSelection = {
   intervention: PlanningConstraintIntervention;
 };
 
-export type PlanningConstraintInterventionA2ui = {
-  schema_version: "a2ui.v1";
-  kind: "planning_constraint_intervention";
-  title: string;
-  layout: { type: "stack"; gap: "md" };
-  nodes: Array<{
-    id: string;
-    type: "callout" | "insight_line" | "bullet_list" | "action_chips";
-    props: Record<string, unknown>;
-  }>;
-};
+export type PlanningConstraintInterventionA2ui = PlanningUnifiedInterventionA2ui;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -146,13 +143,13 @@ export function normalizePlanningConstraintIntervention(
   value: unknown,
 ): PlanningConstraintIntervention | null {
   const root = record(value);
-  const intervention = record(root?.["intervention"]);
+  const intervention = normalizePlanningDecisionIntervention(root?.["intervention"]);
   const bindings = record(root?.["bindings"]);
   const draft = record(root?.["clarification_draft"]);
   const questions = Array.isArray(draft?.["questions"]) ? draft.questions : [];
   const firstQuestion = record(questions[0]);
-  const interventionId = identifier(intervention?.["intervention_id"]);
-  const decisionRef = identifier(intervention?.["decision_ref"]);
+  const interventionId = intervention?.interventionId ?? "";
+  const decisionRef = intervention?.decisionRef ?? "";
   const constraintRef = identifier(bindings?.["constraint_ref"]);
   const evaluationRef = identifier(bindings?.["evaluation_ref"]);
   const quotationVersionId = identifier(bindings?.["quotation_version_id"]);
@@ -161,29 +158,22 @@ export function normalizePlanningConstraintIntervention(
   const clarificationDraftHash = identifier(bindings?.["clarification_draft_hash"]);
   const draftId = identifier(draft?.["draft_id"]);
   const recipient = text(draft?.["recipient"]);
-  const rawOptions = Array.isArray(intervention?.["options"])
-    ? intervention.options.slice(0, OPTION_IDS.length)
-    : [];
-  const options = rawOptions.flatMap((value) => {
-    const row = record(value);
-    const id = optionId(row?.["option_id"]);
-    const label = safeText(row?.["label"], "Review this option", 180);
-    const evidenceRefs = Array.isArray(row?.["evidence_refs"])
-      ? row.evidence_refs.map(identifier).filter(Boolean).slice(0, 12)
-      : [];
-    return id ? [{ id, label, evidenceRefs }] : [];
+  const options = (intervention?.options ?? []).flatMap((row) => {
+    const id = optionId(row.id);
+    return id ? [{ id, label: row.label, evidenceRefs: row.evidenceRefs }] : [];
   });
   const uniqueOptions = new Set(options.map((option) => option.id));
-  if (!interventionId || !decisionRef || !constraintRef || !evaluationRef
+  if (!intervention || !interventionId || !decisionRef || !constraintRef || !evaluationRef
     || !quotationVersionId || !comparisonId || !comparisonRevision
     || !clarificationDraftHash || !draftId || !recipient.includes("@")
     || options.length !== OPTION_IDS.length || uniqueOptions.size !== OPTION_IDS.length) return null;
-  const recommendedOptionId = optionId(intervention?.["recommended_option_id"]);
+  const recommendedOptionId = optionId(intervention?.recommendedOptionId);
   const grantRevision = bindings?.["grant_revision"] == null
     ? null
     : identifier(bindings["grant_revision"]);
   if (bindings?.["grant_revision"] != null && !grantRevision) return null;
   return {
+    contract: intervention,
     interventionId,
     decisionRef,
     rememberedStatement: safeText(
@@ -225,114 +215,38 @@ export function normalizePlanningConstraintIntervention(
 export function planningConstraintInterventionDecisionCard(
   value: PlanningConstraintIntervention,
 ): DecisionCardModel {
-  const recommended = value.options.find((option) => option.id === value.recommendedOptionId);
-  const evidence = [
-    {
-      label: `You said: “${value.rememberedStatement}”`,
-      ref: value.bindings.constraintRef,
-      sourceKind: "confirmed_requirement",
-      freshness: "current" as const,
-    },
-    {
-      label: value.conflictEvidenceLabel,
-      ref: value.bindings.evaluationRef,
-      sourceKind: "current_comparison",
-      freshness: "current" as const,
-    },
-  ];
-  const actions = value.options.map((option) => ({
-    id: option.id,
-    label: option.label,
-    role: option.id === value.recommendedOptionId ? "primary" as const : "secondary" as const,
-    effect: option.id === "ask_vendor"
-      ? "Records this choice and opens the approval-bound vendor question draft"
-      : "Records this choice without changing the remembered requirement or quote history",
-    intent: option.id,
-  }));
-  if (!actions.some((action) => action.role === "primary")) {
-    actions[0] = { ...actions[0]!, role: "primary", effect: "Records this explicit choice" };
-  }
-  return {
-    schema: "content.decision_card",
-    pattern: "choose",
-    patternVersion: "1.0",
-    id: value.interventionId,
-    title: "Resolve a planning requirement conflict",
-    domain: "wedding",
-    pressure: value.recommendedOptionId === "reject_candidate" ? "high" : "medium",
-    whyItMatters: "This option conflicts with something you confirmed. Your quote and comparison will stay visible whichever path you choose.",
-    recommendation: recommended
-      ? { summary: recommended.label, reasons: [value.conflictEvidenceLabel] }
-      : null,
-    actions,
-    evidence,
-    confidence: {
-      label: "Current checked conflict",
-      reason: value.conflictEvidenceLabel,
-    },
-    timeSensitivity: null,
-    visual: { kind: "none" },
-    unknowns: value.unknownLabels,
-    patternSlots: {
-      options: value.options.map((option) => ({
-        id: option.id,
-        name: option.label,
-        recommended: option.id === value.recommendedOptionId,
-      })),
-      payloadPreview: value.clarificationDraft.question,
-    },
-    verification: { status: "partial", label: "Requirement and current comparison checked" },
-  };
+  return planningConstraintInterventionState(value).card;
 }
 
 export function planningConstraintInterventionA2ui(
   value: PlanningConstraintIntervention,
 ): PlanningConstraintInterventionA2ui {
-  return {
-    schema_version: "a2ui.v1",
-    kind: "planning_constraint_intervention",
-    title: "Resolve a planning requirement conflict",
-    layout: { type: "stack", gap: "md" },
-    nodes: [
-      {
-        id: "constraint-memory",
-        type: "callout",
-        props: {
-          tone: "warning",
-          title: "What you asked us to remember",
-          body: value.rememberedStatement,
-        },
-      },
-      {
-        id: "constraint-conflict-evidence",
-        type: "insight_line",
-        props: {
-          text: value.conflictEvidenceLabel,
-          evidence_required: true,
-          evidence_ref: value.bindings.evaluationRef,
-        },
-      },
-      {
-        id: "constraint-conflict-unknowns",
-        type: "bullet_list",
-        props: { title: "Still to confirm", items: value.unknownLabels },
-      },
-      {
-        id: "constraint-conflict-actions",
-        type: "action_chips",
-        props: {
-          actions: Object.fromEntries(value.options.map((option) => [option.id, {
-            id: option.id,
-            label: option.label,
-            kind: "record_planning_intervention_decision",
-            recommended: option.id === value.recommendedOptionId,
-            intervention_ref: value.interventionId,
-            comparison_revision: value.bindings.comparisonRevision,
-          }])),
-        },
-      },
-    ],
-  };
+  return planningConstraintInterventionState(value).a2ui;
+}
+
+function planningConstraintInterventionState(value: PlanningConstraintIntervention) {
+  return buildPlanningUnifiedInterventionState({
+    intervention: value.contract,
+    presentation: {
+      title: "Resolve a planning requirement conflict",
+      summary: "This option conflicts with something you confirmed. Your quote and comparison will stay visible whichever path you choose.",
+      reasonLabels: [value.conflictEvidenceLabel],
+      unknownLabels: value.unknownLabels,
+      evidence: [{
+        label: `You said: “${value.rememberedStatement}”`,
+        ref: value.bindings.constraintRef,
+        sourceKind: "confirmed_requirement",
+        freshness: "current",
+      }, {
+        label: value.conflictEvidenceLabel,
+        ref: value.bindings.evaluationRef,
+        sourceKind: "current_comparison",
+        freshness: "current",
+      }],
+      constraintLabels: [{ label: value.rememberedStatement, status: "conflict" }],
+      verificationLabel: "Requirement and current comparison checked",
+    },
+  });
 }
 
 export async function preparePlanningConstraintIntervention(

@@ -1,6 +1,7 @@
 // @locs-version: 1.0
 import type { AfpMessage, AfpReference, SendAfpMessageInput } from "@/lib/api";
 import {
+  weddingPreferenceConflictInterventionPresentation,
   type WeddingPreferenceConflictLedgerObject,
   type WeddingPreferenceConflictState,
   type WeddingPreferenceCompromiseOption,
@@ -376,22 +377,35 @@ export function weddingPreferenceConflictFromAfpMessage(message: AfpMessage): We
       return option ? [option] : [];
     })
     : [];
+  const summaryLabel = clean(message.metadata?.searchable_summary)
+    || clean(content.markdown)?.split(/\r?\n/).find(Boolean)
+    || "Partner preference balance saved.";
+  const nextQuestionLabel = clean(content.next_question_label) || null;
+  const interventionPresentation = weddingPreferenceConflictInterventionPresentation({
+    status,
+    summaryLabel,
+    preferenceSignals,
+    conflictObject,
+    nextQuestionLabel,
+  });
   return {
     metadata,
     status,
     decisionArea: clean(content.decision_area) || conflictObject?.decisionArea || "wedding decision",
     conflictAxis: clean(content.conflict_axis) || conflictObject?.conflictAxis || null,
-    summaryLabel: clean(message.metadata?.searchable_summary) || clean(content.markdown)?.split(/\r?\n/).find(Boolean) || "Partner preference balance saved.",
+    summaryLabel,
     preferenceSignals,
     conflictObject,
     compromiseOptions,
-    nextQuestionLabel: clean(content.next_question_label) || null,
+    nextQuestionLabel,
     approvalGateLabel: clean(content.approval_gate_label) || null,
+    interventionPresentation,
     a2ui: record(message.views?.find((view) => view.format === "a2ui")?.content) ?? {
       schema_version: "a2ui.v1",
       kind: "wedding_preference_conflict",
       title: conflictObject?.title ?? "Partner preferences",
       status,
+      presentation: interventionPresentation,
     },
   };
 }

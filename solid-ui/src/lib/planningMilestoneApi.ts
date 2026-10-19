@@ -1,5 +1,9 @@
 import { apiFetch } from "@/lib/api";
 import type { DecisionCardModel } from "@/lib/decisionCardState";
+import {
+  buildPlanningUnifiedA2ui,
+  type PlanningUnifiedInterventionA2ui,
+} from "@/lib/planningUnifiedInterventionState";
 
 const MILESTONE_LABELS: Record<string, string> = {
   guest_count_draft: "Draft the guest count",
@@ -36,17 +40,7 @@ export type PlanningMilestoneProjection = {
   waivedCount: number;
 };
 
-export type PlanningMilestoneA2ui = {
-  schema_version: "a2ui.v1";
-  kind: "planning_milestone";
-  title: string;
-  layout: { type: "stack"; gap: "md" };
-  nodes: Array<{
-    id: string;
-    type: "callout" | "insight_line" | "bullet_list" | "action_chips";
-    props: Record<string, unknown>;
-  }>;
-};
+export type PlanningMilestoneA2ui = PlanningUnifiedInterventionA2ui;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -312,46 +306,11 @@ export function planningMilestoneA2ui(
 ): PlanningMilestoneA2ui | null {
   const card = planningMilestoneDecisionCard(value);
   if (!card || !value.selected) return null;
-  return {
-    schema_version: "a2ui.v1",
-    kind: "planning_milestone",
-    title: card.title,
-    layout: { type: "stack", gap: "md" },
-    nodes: [
-      {
-        id: "milestone-status",
-        type: "callout",
-        props: {
-          tone: value.selected.urgency === "critical" ? "warning" : "info",
-          title: card.title,
-          body: card.whyItMatters,
-        },
-      },
-      {
-        id: "milestone-date",
-        type: "insight_line",
-        props: { text: card.evidence[0]?.label, evidence_required: true },
-      },
-      {
-        id: "milestone-unknowns",
-        type: "bullet_list",
-        props: { title: "Still to check", items: card.unknowns },
-      },
-      {
-        id: "milestone-actions",
-        type: "action_chips",
-        props: {
-          actions: Object.fromEntries(card.actions.map((item) => [item.id, {
-            id: item.id,
-            label: item.label,
-            kind: item.intent,
-            milestone_ref: value.selected?.milestoneId,
-            prepared_only: true,
-          }])),
-        },
-      },
-    ],
-  };
+  return buildPlanningUnifiedA2ui({
+    card,
+    presentation: { timingLabel: card.timeSensitivity?.label },
+    preparedOnly: value.selected.action !== null,
+  });
 }
 
 export async function preparePlanningMilestones(

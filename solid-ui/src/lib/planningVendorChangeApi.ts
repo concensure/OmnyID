@@ -1,5 +1,9 @@
 import { apiFetch } from "@/lib/api";
 import type { DecisionCardModel } from "@/lib/decisionCardState";
+import {
+  buildPlanningUnifiedA2ui,
+  type PlanningUnifiedInterventionA2ui,
+} from "@/lib/planningUnifiedInterventionState";
 import { safeWeddingUiText } from "@/lib/weddingHomeUiCopyState";
 
 const FITS = ["satisfied", "conflict", "unknown"] as const;
@@ -50,18 +54,7 @@ export type PlanningVendorChangeReview = {
   blockerCount: number;
 };
 
-export type PlanningVendorChangeA2ui = {
-  schema_version: "a2ui.v1";
-  kind: "planning_vendor_change";
-  title: string;
-  layout: { type: "stack"; gap: "md" };
-  nodes: Array<{
-    id: string;
-    type: "callout" | "comparison_table" | "constraint_badges" | "stat_row"
-      | "bullet_list" | "action_chips";
-    props: Record<string, unknown>;
-  }>;
-};
+export type PlanningVendorChangeA2ui = PlanningUnifiedInterventionA2ui;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -305,63 +298,17 @@ export function planningVendorChangeA2ui(
   value: PlanningVendorChangeReview,
 ): PlanningVendorChangeA2ui {
   const card = planningVendorChangeDecisionCard(value);
-  return {
-    schema_version: "a2ui.v1",
-    kind: "planning_vendor_change",
-    title: card.title,
-    layout: { type: "stack", gap: "md" },
-    nodes: [
-      {
-        id: "vendor-change-status",
-        type: "callout",
-        props: { tone: card.pressure === "high" ? "warning" : "info", title: card.title, body: card.whyItMatters },
-      },
-      {
-        id: "vendor-change-timing",
-        type: "stat_row",
-        props: { label: "Timing", value: timingLabel(value) ?? "No vendor decision date recorded" },
-      },
-      {
-        id: "vendor-change-options",
-        type: "comparison_table",
-        props: {
-          title: "Vendor-proposed options",
-          columns: ["Option", "Preference fit", "Budget"],
-          rows: value.options.map((item) => ({
-            label: item.label,
-            values: [item.label, fitLabel(item.constraintFit), budgetLabel(item.budgetFit)],
-          })),
-        },
-      },
-      {
-        id: "vendor-change-constraints",
-        type: "constraint_badges",
-        props: {
-          items: value.options.map((item) => ({ label: item.label, status: item.constraintFit })),
-        },
-      },
-      {
-        id: "vendor-change-unknowns",
-        type: "bullet_list",
-        props: { title: "Still to check", items: card.unknowns },
-      },
-      {
-        id: "vendor-change-actions",
-        type: "action_chips",
-        props: {
-          actions: {
-            open_vendor_change_review: {
-              id: "open_vendor_change_review",
-              label: "Review update",
-              kind: "open_vendor_change_review",
-              review_ref: value.reviewId,
-              prepared_only: true,
-            },
-          },
-        },
-      },
-    ],
-  };
+  return buildPlanningUnifiedA2ui({
+    card,
+    presentation: {
+      timingLabel: timingLabel(value) ?? "No vendor decision date recorded",
+      constraintLabels: value.options.map((item) => ({
+        label: item.label,
+        status: item.constraintFit,
+      })),
+    },
+    preparedOnly: true,
+  });
 }
 
 export async function preparePlanningVendorChange(
