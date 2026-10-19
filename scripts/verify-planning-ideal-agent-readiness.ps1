@@ -30,10 +30,14 @@ function Invoke-ReadinessCheck {
     $slug = $Name.ToLowerInvariant() -replace '[^a-z0-9]+', '-'
     $logPath = Join-Path $evidenceRoot "$slug.log"
     Write-Host "Running $Name"
+    $previousErrorAction = $ErrorActionPreference
     try {
+        $ErrorActionPreference = "Continue"
         $lines = @(& $Action 2>&1 | ForEach-Object { $_.ToString() })
+        $exitCode = $LASTEXITCODE
+        $ErrorActionPreference = $previousErrorAction
         [System.IO.File]::WriteAllLines($logPath, $lines)
-        if ($LASTEXITCODE -ne 0) { throw "$Name exited with code $LASTEXITCODE" }
+        if ($exitCode -ne 0) { throw "$Name exited with code $exitCode" }
         return [ordered]@{
             name = $Name
             status = "passed"
@@ -42,6 +46,7 @@ function Invoke-ReadinessCheck {
         }
     }
     catch {
+        $ErrorActionPreference = $previousErrorAction
         [System.IO.File]::WriteAllText($logPath, $_.Exception.ToString())
         return [ordered]@{
             name = $Name
